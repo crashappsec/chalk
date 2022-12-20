@@ -4,6 +4,7 @@ import ../utils
 import ../config
 
 import con4m
+import con4m/st
 
 import tables
 import options
@@ -38,7 +39,7 @@ proc processOldSami(sami: SamiObj, olddict: SamiDict): Box =
           continue
     groomedDict[fullkey] = v
 
-  result = boxDict[string, Box](groomedDict)
+  result = boxDict[string, Box](groomedDict, toCon4mType("{string:@a}"))
 
 
 method getArtifactInfo*(self: SystemPlugin,

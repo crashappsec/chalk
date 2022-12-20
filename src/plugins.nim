@@ -238,7 +238,7 @@ method getArtifactInfo*(self: ExternalPlugin, sami: SamiObj): KeyInfo =
     let
       str  = self.command & " " & sami.fullpath
       sbox = box(str)
-      rbox = builtinCmd(@[sbox], nil, nil).get()
+      rbox = builtinCmd(@[sbox]).get()
       jobj = parseJson(newStringStream(unbox[string](rbox)))
       tbl  = jobj.kvpairs
 

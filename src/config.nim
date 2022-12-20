@@ -272,7 +272,7 @@ plugin conffile {
 ## will use for config file layering.
 ## TODO: Add a field to the global or a section to configure
 ## logging options.
-var samiConfig = con4m(Sami, baseconfig):
+var samiConfig =  con4m(Sami, baseconfig):
   attr(config_path,
        [string],
        @[".", "~"],
@@ -728,41 +728,25 @@ proc loadUserConfigFile*() =
   let
     path = getConfigPath()
     filename = getConfigFileName()
-  var s: string = ""
+  var fname: string = ""
   var f: FileStream
 
   for dir in path:
-    let fname = dir.joinPath(filename)
-    if not fname.fileExists():
-      continue
-    try:
-      f = newFileStream(filename, fmRead)
-      s = f.readAll()
+    fname = dir.joinPath(filename)
+    if fname.fileExists():
       break
-    except:
-      continue
-    finally:
-      if f != nil:
-        f.close()
 
-
-  if s != "":
-    let tree = parse(newStringStream(s))
-    if tree == nil:
+  if fname != "":
+    let res = ctxSamiConf.stackConfig(fname)
+    if res.isNone():
       error(fmt"{filename}: invalid configuration not loaded.")
-      return
-    ctxSamiConf.errors = @[]
-    tree.checkTree(ctxSamiConf)
-
-    if ctxSamiConf.errors.len() == 0:
-      tree.evalNode(ctxSamiConf)
-
-    if ctxSamiConf.errors.len() != 0:
-      for err in ctxSamiConf.errors:
-        error(err)
-
+      
+      if ctxSamiConf.errors.len() != 0:
+        for err in ctxSamiConf.errors:
+          error(err)
+          
       quit()
 
-    samiConfig = ctxSamiConf.loadSamiConfig()
-    doAdditionalValidation()
+  samiConfig = ctxSamiConf.loadSamiConfig()
+  doAdditionalValidation()
 

@@ -17,18 +17,6 @@ const
   elfSwapped* = 0x464c457f'u32
   prefixExt* = "X-"
   
-  # String constants for the environment variables we support.
-  envCfgPath* = "SAMI_CONF_PATH"
-  envCfgFName* = "SAMI_CONF_FNAME"
-  envLogLevel* = "SAMI_LOGLEVEL"
-  envNoRecurse* = "SAMI_NO_RECURSION"
-  envDryRun* = "SAMI_DRY_RUN"
-  envNoColor* = "SAMI_NO_COLOR"
-  envOverWrite* = "SAMI_OVERWRITE"
-  envExtractFile* = "SAMI_EXTRACT_FILE"
-  envExtractDir* = "SAMI_EXTRACT_DIR"
-  envArtifactPath* = "SAMI_ARTIFACTS"
-
   # Errors used in config code.
   eConflictFmt* = "Conflicting flags provided: {l1} ({s1}) and {l2} ({s2})"
   eBadBoolEnv* = "Boolean envvar {envVar} ignored (invalid value: {contents}"
@@ -220,33 +208,6 @@ be used, given the impact of config files / environment variables.
   txtVerbose* = "VERBOSE"
   txtTrace* = "TRACE"
 
-  cfgTrueValues* = ["", "T", "TRUE", "Y", "YES", "ON"]
-  cfgFalseValues* = ["F", "FALSE", "N", "NO", "OFF"]
-  cfgGoodRead* = ": config file read successfully"
-
-  cfgColor* = "color"
-  cfgDryRun* = "dry-run"
-  cfgLogLevel* = "log-level"
-  cfgOverwrite* = "overwrite-prev-sami"
-  cfgRecursive* = "recurse-for-artifacts"
-  cfgOutDir* = "extraction-directory"
-  cfgOutFile* = "extraction-file-name"
-  cfgArtifactPath* = "artifact-search-path"
-
-  # cmds/env.nim
-  # Strings used when printing out environment variables.
-  envHeader* = "Defined environment variables:\n"
-  envFirstRow* = """
-  Variable          |  Value
--------------------------------------------------------------------------------"""
-  envNone* = "  None defined!"
-  envFooter* = "\nRun as: 'env --help' to see environment variable descriptions"
-  envTemplate* = "  {envVar:18}|  {contents}"
-  envValInvalid* = "<INVALID> (will be ignored)"
-  envTrueOutStr* = "TRUE"
-  envFalseOutStr* = "FALSE"
-  envUndefOutStr* = "<EMPTY>"
-
   # cmds/extract.nim
   fmtFullPath* = "$#" & DirSep & "$#"
   fmtEmbedList* = "{embededJson}{sep}{embj}"
@@ -278,11 +239,6 @@ be used, given the impact of config files / environment variables.
   eDidWrite* = "{sami.fullpath}: wrote SAMI successfully"
   eBadBin* = "{sami.fullpath}: Found binary SAMI magic, but SAMI didn't parse"
   ePathNotFound* = "{path}: No such file or directory"
-
-  # Codec names
-  codecNameBase* = "not provided" # codec/base.nim
-  codecNameShebang* = "Shebang!" # codec/codecShebang.nim
-  codecNameElf* = "elf" # codec/codecElf.nim
 
   # codec/codecShebang
   sShebang* = "#!"
@@ -318,7 +274,6 @@ be used, given the impact of config files / environment variables.
   binIntItemFmt* = "\x02{u64ToStr(uint64(i))}"
   binTrue* = "\x03\x01"
   binFalse* = "\x03\x00"
-  binBinaryItemFmt* = "\x04{u32ToStr(uint32(len(s)))}{s}"
   binArrStartFmt* = "\x05{u32ToStr(uint32(len(arr)))}"
   binNullType* = "\x00"
   binObjHdr* = "\x06{u32ToStr(uint32(len(self)))}"
