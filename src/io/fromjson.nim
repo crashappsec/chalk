@@ -4,6 +4,7 @@ import ./json
 import ../config
 
 import con4m
+import con4m/st
 
 import streams
 import tables
@@ -107,7 +108,7 @@ proc valueFromJson(jobj: JsonNode, fname: string): Box =
   of JObject:
     let
       o = objFromJson(jobj, fname)
-    return boxDict[string, Box](o)
+    return boxDict[string, Box](o, toCon4mType("{string:@a}"))
   of JArray:
     let
       a = arrayFromJson(jobj, fname)

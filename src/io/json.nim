@@ -5,6 +5,7 @@ import streams
 import strformat
 
 import con4m
+import con4m/st
 
 import ../resources
 
@@ -51,7 +52,7 @@ proc jsonNodeToBox*(n: JSonNode): Box =
       let b = v.jsonNodeToBox()
       res[k] = b
 
-    return boxDict[string, Box](res)
+    return boxDict[string, Box](res, toCon4mType("{string:@a}"))
 
 when not defined(release) and defined(traceJson):
   proc readOne(s: Stream): char {.inline.} =

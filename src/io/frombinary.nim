@@ -1,6 +1,7 @@
 import ../resources
 import ../types
 import con4m
+import con4m/st
 
 import endians
 import streams
@@ -88,7 +89,7 @@ proc itemFromBin(stream: FileStream, swapEndian: bool): Box =
   of binTypeObj:
     let
       o = stream.objFromBin(swapEndian)
-      b = boxDict[string, Box](o)
+      b = boxDict[string, Box](o, toCon4mType("{string:@a}"))
     return b
 
   else: raise newException(IOError, eUnkObjT)
