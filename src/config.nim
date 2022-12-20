@@ -384,6 +384,19 @@ var samiConfig =  con4m(Sami, baseconfig):
     attr(docstring,
          string,
          required = false)
+  section(output, allowedSubSections = @["*"]):
+    attr(enabled,
+         bool,
+         required = true)
+    attr(secret,
+         string,
+         required = false)
+    attr(file,
+         string,
+         required = false)
+    attr(uri,
+         string,
+         required = false)
 
 #         doc = "Is this plugin a codec?")
 #         doc = "The list of keys this codec can serve")
