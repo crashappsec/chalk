@@ -8,6 +8,7 @@ import tables
 import algorithm
 import os
 import streams
+import sugar
 
 include errors
 
@@ -265,6 +266,19 @@ plugin conffile {
     keys: ["*"]
     priority: 2147483646
 }
+
+output stdout {
+}
+
+output local_file {
+}
+
+output s3 {
+}
+
+extractor_handles: ["stdout", "what", "is", "going", "on"]
+injector_handles: []
+
 """
 
 ## This variable represents the current config.  The con4m
@@ -292,8 +306,8 @@ var samiConfig =  con4m(Sami, baseconfig):
   attr(dry_run, bool, false)
   attr(artifact_search_path, [string], @["."])
   attr(recursive, bool, true)
-  attr(output_dir, string, ".")
-  attr(output_file, string, "sami-extractions.json")
+  attr(extractor_handles, [string], defaultVal = @["stdout"])
+  attr(injector_handles, [string], defaultVal = @["stdout"])
   section(key, allowedSubSections = @["*", "*.json", "*.binary"]):
     attr(required,
          bool,
@@ -385,17 +399,17 @@ var samiConfig =  con4m(Sami, baseconfig):
          string,
          required = false)
   section(output, allowedSubSections = @["*"]):
-    attr(enabled,
-         bool,
-         required = true)
     attr(secret,
          string,
          required = false)
-    attr(file,
+    attr(filename,
          string,
          required = false)
-    attr(uri,
+    attr(dst_uri,
          string,
+         required = false)
+    attr(command,
+         [string],
          required = false)
 
 #         doc = "Is this plugin a codec?")
@@ -409,6 +423,25 @@ var samiConfig =  con4m(Sami, baseconfig):
 
 const allowedCmds = ["inject", "extract", "defaults"]
 const validLogLevels = ["none", "error", "warn", "info", "trace"]
+
+
+type SamiOutputHandler* = (string, SamiOutputSection) -> bool
+
+
+proc getOutputConfig*(): TableRef[string, SamiOutputSection] =
+  return samiConfig.output
+
+proc getOutputSecret*(s: SamiOutputSection): Option[string] =
+  return s.secret
+  
+proc getOutputFilename*(s: SamiOutputSection): Option[string] =
+  return s.filename
+  
+proc getOutputDstUri*(s: SamiOutputSection): Option[string] =
+  return s.dst_uri
+  
+proc getOutputCommand*(s: SamiOutputSection): Option[seq[string]] =
+  return s.command
 
 proc getConfigErrors*(): Option[seq[string]] =
   if ctxSamiConf.errors.len() != 0:
@@ -470,19 +503,11 @@ proc setRecursive*(val: bool) =
   discard ctxSamiConf.setOverride("recursive", box(val))
   samiConfig.recursive = val
 
-proc getOutputDir*(): string =
-  return samiConfig.outputDir
+proc getExtractorHandles*(): seq[string] =
+  return samiConfig.extractorHandles
 
-proc setOutputDir*(val: string) =
-  discard ctxSamiConf.setOverride("output_dir", box(val))
-  samiConfig.outputDir = val
-
-proc getOutputFile*(): string =
-  return samiConfig.outputFile
-
-proc setOutputFile*(val: string) =
-  discard ctxSamiConf.setOverride("output_file", box(val))
-  samiConfig.outputFile = val
+proc getInjectorHandles*(): seq[string] =
+  return samiConfig.injectorHandles
 
 proc getAllKeys*(): seq[string] =
   result = @[]
@@ -676,9 +701,8 @@ log level:                 {c.logLevel}
 dry run:                   {c.dryRun}
 artifact search path:      {c.artifactSearchPath.join(":")}
 recursive artifact search: {c.recursive}
-output directory:          {c.outputDir}
-output filename:           {c.outputFile}
-
+extractors loaded:         {c.extractorHandles}
+injectors loaded:          {c.injectorHandles}
 Configured SAMI keys:
 {configKeys.join("\n")}
 

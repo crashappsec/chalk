@@ -43,7 +43,6 @@ type
     configInfo*: SamiPluginSection
 
   PluginInfo* = tuple[priority: int, name: string, plugin: Plugin]
-
   Codec* = ref object of Plugin
     samis*: seq[SamiObj]
     magic*: string

@@ -60,11 +60,6 @@ const
     (fCfgSearchPathShort, fCfgSearchPathLong, cfgSearchHelp)
   ]
 
-  injectOpts = [
-    (fOutputFileShort, fOutputFileLong, outFileHelp),
-    (fOutputDirShort, fOutputDirLong, outDirHelp),
-  ]
-
   topFlags = [
     fidColor, fidNoColor, fidDryRun, fidNoDryRun, fidSilent, fidQuiet,
     fidNormal, fidVerbose, fidTrace
@@ -118,8 +113,8 @@ template extractCmd(cmd: string, primary: bool) =
 
     genCmdFlags(extractFlags)
 
-    for (s, l, h) in injectOpts:
-      option(s, l, help = h)
+    # for (s, l, h) in injectOpts:
+    #   option(s, l, help = h)
 
     run:
       if opts.recursive or opts.noRecursive:
@@ -129,10 +124,6 @@ template extractCmd(cmd: string, primary: bool) =
           setRecursive(true)
         else:
           setRecursive(false)
-      if opts.outputFile != "":
-        setOutputFile(opts.outputFile)
-      if opts.outputDir != "":
-        setOutputDir(opts.outputDir)
       setArtifactSearchPath(opts.files)
       runCmdExtract()
 
