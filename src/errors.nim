@@ -125,5 +125,5 @@ template error*(str: string) =
   let opterr = getConfigErrors()
   if opterr.isSome():
     for item in opterr.get():
-      echo(item)
+      stderr.writeLine(item)
     quit()

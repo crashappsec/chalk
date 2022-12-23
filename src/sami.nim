@@ -20,7 +20,7 @@ proc runCmdDefaults*() {.noreturn, inline.} =
 
 proc runCmdInject*() {.noreturn, inline.} =
   loadUserConfigFile()
-  loadCommandPlugins()  
+  loadCommandPlugins()
   doInjection() # inject.nim
   quit()
 
@@ -58,11 +58,6 @@ const
   mainOpts = [
     (fCfgFileNameShort, fCfgFileNameLong, cfgFileHelp),
     (fCfgSearchPathShort, fCfgSearchPathLong, cfgSearchHelp)
-  ]
-
-  injectOpts = [
-    (fOutputFileShort, fOutputFileLong, outFileHelp),
-    (fOutputDirShort, fOutputDirLong, outDirHelp),
   ]
 
   topFlags = [
@@ -118,8 +113,8 @@ template extractCmd(cmd: string, primary: bool) =
 
     genCmdFlags(extractFlags)
 
-    for (s, l, h) in injectOpts:
-      option(s, l, help = h)
+    # for (s, l, h) in injectOpts:
+    #   option(s, l, help = h)
 
     run:
       if opts.recursive or opts.noRecursive:
@@ -129,10 +124,6 @@ template extractCmd(cmd: string, primary: bool) =
           setRecursive(true)
         else:
           setRecursive(false)
-      if opts.outputFile != "":
-        setOutputFile(opts.outputFile)
-      if opts.outputDir != "":
-        setOutputDir(opts.outputDir)
       setArtifactSearchPath(opts.files)
       runCmdExtract()
 
@@ -141,8 +132,8 @@ template defaultsCmd(cmd: string, primary: bool) =
     if primary:
       help(showDefHelp)
     run:
-      runCmdDefaults()  
-  
+      runCmdDefaults()
+
 when isMainModule:
   var cmdLine = newParser:
     help(generalHelp)

@@ -35,7 +35,7 @@ proc registerPlugin*(name: string, plugin: Plugin) =
 
   plugin.configInfo = maybe.get()
   installedPlugins[name] = plugin
-  
+
   inform(fmt"Installed plugin {name}")
 
 proc loadCommandPlugins*() =
@@ -60,7 +60,7 @@ proc getCodecsByPriority*(): seq[PluginInfo] =
       continue
     if plugin.configInfo.getCodec():
       result.add((plugin.configInfo.getPriority(), name, plugin))
-      
+
   result.sort()
 
 proc getInfoPluginsByPriority*(): seq[PluginInfo] =
@@ -74,24 +74,26 @@ proc getInfoPluginsByPriority*(): seq[PluginInfo] =
   result.sort()
 
 method getArtifactInfo*(self: Plugin, sami: SamiObj): KeyInfo {.base.} =
+  var msg = ePureVirtual
+
   for k, v in installedPlugins:
     if v == self:
-      echo "In plugin: ", k
+      msg = "In plugin: " & k & ": " & msg
       break
-  raise newException(Exception, ePureVirtual)
+  raise newException(Exception, msg)
 
 proc getSamis*(self: Codec): seq[SamiObj] {.inline.} =
   return self.samis
-  
-method scan*(self: Codec, sami: SamiObj): bool {.base.} =
-    ## Return true if the codec is going to handle this file.  This
-    ## function should add position information and presence
-    ## information into the sami.primary: SamiPoint object.
-    ##
-    ## If the Codec handles embedded SAMIs, register them with
-    ## addEmbeddedSamiLoc()
 
-    discard
+method scan*(self: Codec, sami: SamiObj): bool {.base.} =
+  ## Return true if the codec is going to handle this file.  This
+  ## function should add position information and presence
+  ## information into the sami.primary: SamiPoint object.
+  ##
+  ## If the Codec handles embedded SAMIs, register them with
+  ## addEmbeddedSamiLoc()
+
+  discard
 
 proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
   var fields: SamiDict
@@ -100,7 +102,7 @@ proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
                if not BigEndian in sami.flags: true else: false
              else:
                if BigEndian in sami.flags: true else: false
-      
+
   trace(fmtTraceFIP.fmt())
 
   if Binary in sami.flags:
@@ -131,12 +133,12 @@ proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
       pt.startOffset = truestart
       pt.endOffset = sami.stream.getPosition()
       pt.valid = true
-    except:      
+    except:
       warn(eBadJson.fmt() & ": " & getCurrentExceptionMsg())
       pt.startOffset = truestart
       pt.endOffset = sami.stream.getPosition()
       pt.valid = false
-  
+
 proc dispatchFileScan(self: Codec, filepath: string, top: string): bool =
   let
     stream = newFileStream(filepath, fmRead)
@@ -148,10 +150,10 @@ proc dispatchFileScan(self: Codec, filepath: string, top: string): bool =
     self.samis.add(sami)
     if sami.primary.present:
       self.loadSamiLoc(sami)
-    
+
 proc addExclusion*(self: Codec, fullpath: string) =
   self.exclusions.add(fullpath)
-      
+
 proc doScan*(self: Codec,
              searchPath: seq[string],
              exclusions: seq[string],
@@ -196,7 +198,7 @@ proc doScan*(self: Codec,
       dirWalk(true, walkDir):
         if self.dispatchFileScan(item, path):
           self.addExclusion(item)
-  
+
 
 # TODO: Probably need to add a hash scheme as an option.  Because
 # even w/ shebang, it could make sense to hash the main script only,
@@ -208,47 +210,47 @@ proc doScan*(self: Codec,
 # *not* carried with the artifact.
 method getArtifactHash*(self: Codec, sami: SamiObj): string {.base.} =
   raise newException(Exception, ePureVirtual)
-  
+
 method getArtifactInfo*(self: Codec, sami: SamiObj): KeyInfo =
   result = newTable[string, Box]()
 
   let
     (head, tail) = sami.fullpath.splitPath()
-    hashFilesBox = boxList[Box](@[box(sami.fullpath)])
-    encodedHash  = self.getArtifactHash(sami).toHex().toLowerAscii()
-  
+    hashFilesBox = pack(@[sami.fullpath])
+    encodedHash = self.getArtifactHash(sami).toHex().toLowerAscii()
 
-  result["HASH"]       = box(encodedHash)
+
+  result["HASH"] = pack(encodedHash)
   result["HASH_FILES"] = hashFilesBox
-  result["SRC_PATH"]   = box(head)
-  result["FILE_NAME"]  = box(tail)
-  
+  result["SRC_PATH"] = pack(head)
+  result["FILE_NAME"] = pack(tail)
+
 method handleWrite*(self: Codec,
                     ctx: Stream,
                     pre: string,
                     encoded: string,
                     post: string) {.base.} =
   raise newException(Exception, ePureVirtual)
-  
+
 
 method getArtifactInfo*(self: ExternalPlugin, sami: SamiObj): KeyInfo =
   result = newTable[string, Box]()
-  
+
   try:
     let
-      str  = self.command & " " & sami.fullpath
-      sbox = box(str)
+      str = self.command & " " & sami.fullpath
+      sbox = pack(str)
       rbox = builtinCmd(@[sbox]).get()
-      jobj = parseJson(newStringStream(unbox[string](rbox)))
-      tbl  = jobj.kvpairs
+      jobj = parseJson(newStringStream(unpack[string](rbox)))
+      tbl = jobj.kvpairs
 
     for key, val in tbl:
       let bval = val.jsonNodeToBox()
 
       result[key] = bval
   except:
-    return 
-      
+    return
+
 # We need to turn off UnusedImport here, because the nim static
 # analyzer thinks the below imports are unused. When we first import,
 # they call registerPlugin(), which absolutely will get called.

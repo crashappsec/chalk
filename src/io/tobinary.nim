@@ -51,14 +51,14 @@ proc binEncodeObj(self: SamiDict): string =
 
 proc binEncodeItem(self: Box): string =
   case self.kind
-  of TypeBool: return binEncodeBool(unbox[bool](self))
-  of TypeInt: return binEncodeInt(unbox[uint64](self))
-  of TypeString:
-    return binEncodeStr(unbox[string](self))
-  of TypeDict:
-    return binEncodeObj(unboxDict[string, Box](self))
-  of TypeList:
-    return binEncodeArr(unboxList[Box](self))
+  of MkBool: return binEncodeBool(unpack[bool](self))
+  of MkInt: return binEncodeInt(unpack[uint64](self))
+  of MkStr:
+    return binEncodeStr(unpack[string](self))
+  of MkTable:
+    return binEncodeObj(unpack[SamiDict](self))
+  of MkSeq:
+    return binEncodeArr(unpack[seq[Box]](self))
   else:
     unreachable
 

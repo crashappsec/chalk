@@ -16,7 +16,7 @@ const
   elfMagic* = 0x7f454c46'u32
   elfSwapped* = 0x464c457f'u32
   prefixExt* = "X-"
-  
+
   # Errors used in config code.
   eConflictFmt* = "Conflicting flags provided: {l1} ({s1}) and {l2} ({s2})"
   eBadBoolEnv* = "Boolean envvar {envVar} ignored (invalid value: {contents}"

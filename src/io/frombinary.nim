@@ -1,7 +1,6 @@
 import ../resources
 import ../types
 import con4m
-import con4m/st
 
 import endians
 import streams
@@ -73,23 +72,23 @@ proc itemFromBin(stream: FileStream, swapEndian: bool): Box =
 
   case valcode
   of binTypeNull: return
-  of binTypeString: return box(stream.strFromBin(swapEndian))
-  of binTypeInteger: return box(cast[int](stream.intFromBin(swapEndian)))
+  of binTypeString: return pack(stream.strFromBin(swapEndian))
+  of binTypeInteger: return pack(stream.intFromBin(swapEndian))
   of binTypeBool:
     case stream.readUint8()
-    of 0: return box(false)
-    of 1: return box(true)
+    of 0: return pack(false)
+    of 1: return pack(true)
     else:
       raise newException(IOError, eBoolParse)
   of binTypeArray:
     let
       a = stream.arrFromBin(swapEndian)
-      b = boxList[Box](a)
+      b = pack(a)
     return b
   of binTypeObj:
     let
       o = stream.objFromBin(swapEndian)
-      b = boxDict[string, Box](o, toCon4mType("{string:@a}"))
+      b = pack(o)
     return b
 
   else: raise newException(IOError, eUnkObjT)

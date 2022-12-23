@@ -3,14 +3,14 @@ import config
 import plugins
 import resources
 import io/tojson
-import os
+import output
 
+import os
 import strutils
 import options
 import strformat
 import streams
 import nativesockets
-import std/tempfiles
 
 proc doExtraction*(onBehalfOfInjection: bool) =
   # This function will extract SAMIs, leaving them in SAMI
@@ -36,11 +36,6 @@ proc doExtraction*(onBehalfOfInjection: bool) =
     codecInfo.add(codec)
 
   try:
-    if not onBehalfOfInjection and not getDryRun():
-      filepath = fmtFullPath % [getOutputDir(), getOutputFile()]
-      (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
-      ctx = newFileStream(f)
-
     for codec in codecInfo:
       for sami in codec.samis:
         var comma, primaryJson, embededJson: string
@@ -60,7 +55,7 @@ proc doExtraction*(onBehalfOfInjection: bool) =
         for (key, pt) in sami.embeds:
           let
             embstore = pt.samiFields.get()
-            keyJson = strKeyToJson(key)
+            keyJson = strValToJson(key)
             valJson = embstore.foundToJson()
 
           if not onBehalfOfInjection and not getDryRun():
@@ -68,11 +63,12 @@ proc doExtraction*(onBehalfOfInjection: bool) =
             comma = comfyItemSep
 
         embededJson = jsonArrFmt % [embededJson]
+        if not getDryRun():
+          let absPath = absolutePath(sami.fullpath)
+          handleOutput(logTemplate % [absPath, getHostName(),
+                                    primaryJson, embededJson],
+                       onBehalfOfInjection)
 
-        if not onBehalfOfInjection and not getDryRun():
-          let outstr = logTemplate % [sami.fullpath, getHostName(),
-                                      primaryJson, embededJson]
-          ctx.writeLine(outstr)
   except:
     # TODO: do better here.
     # echo getStackTrace()

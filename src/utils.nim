@@ -31,7 +31,7 @@ template dirWalk*(flag: bool, walker: untyped, body: untyped) =
       item = i
 
     body
-  
+
 template unixTimeInMs*(): uint64 =
   # One oddity of NIM is that, if I put a decimal point here to make
   # it a float, I *have* to put a trailing zero. That in and of itself

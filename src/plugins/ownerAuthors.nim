@@ -57,7 +57,7 @@ method getArtifactInfo*(self: AuthorsFileCodeOwner,
     else:
       let s = ctx.readAll()
       if s != "":
-        result["CODE_OWNERS"] = box(s)
+        result["CODE_OWNERS"] = pack(s)
   except:
     warn(eCantOpen.fmt())
   finally:

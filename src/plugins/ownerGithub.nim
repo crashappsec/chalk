@@ -73,7 +73,7 @@ method getArtifactInfo*(self: GithubCodeOwner,
       let s = ctx.readAll()
       # TODO-- match from the file instead of dumping the whole thing.
       if s != "":
-        result["CODE_OWNERS"] = box(s)
+        result["CODE_OWNERS"] = pack(s)
   except:
     warn(eCantOpen.fmt())
   finally:

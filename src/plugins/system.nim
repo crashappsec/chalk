@@ -4,8 +4,6 @@ import ../utils
 import ../config
 
 import con4m
-import con4m/st
-
 import tables
 import options
 
@@ -39,16 +37,16 @@ proc processOldSami(sami: SamiObj, olddict: SamiDict): Box =
           continue
     groomedDict[fullkey] = v
 
-  result = boxDict[string, Box](groomedDict, toCon4mType("{string:@a}"))
+  result = pack(groomedDict)
 
 
 method getArtifactInfo*(self: SystemPlugin,
                         sami: SamiObj): KeyInfo =
   result = newTable[string, Box]()
 
-  result["SAMI_ID"] = box(cast[int](secureRand[uint64]()))
-  result["TIMESTAMP"] = box(cast[int](unixTimeInMs()))
-  result["_MAGIC.json"] = box("dadfedabbadabbed")
+  result["SAMI_ID"] = pack(cast[int](secureRand[uint64]()))
+  result["TIMESTAMP"] = pack(cast[int](unixTimeInMs()))
+  result["_MAGIC.json"] = pack("dadfedabbadabbed")
 
   let oldSamiOpt = config.getKeySpec("OLD_SAMI")
 
