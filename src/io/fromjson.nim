@@ -4,7 +4,6 @@ import ./json
 import ../config
 
 import con4m
-import con4m/st
 
 import streams
 import tables
@@ -99,25 +98,20 @@ proc arrayFromJson(jobj: JsonNode, fname: string): seq[Box] =
 proc valueFromJson(jobj: JsonNode, fname: string): Box =
   case jobj.kind
   of JNull: return
-  of JBool: return box(jobj.boolval)
+  of JBool: return pack(jobj.boolval)
   of JInt:
-    return box(cast[int](jobj.intval))
+    return pack(jobj.intval)
   of JFloat: raise newException(IOError, eNoFloat)
   of JString:
-    return box(jobj.strval)
+    return pack(jobj.strval)
   of JObject:
-    let
-      o = objFromJson(jobj, fname)
-    return boxDict[string, Box](o, toCon4mType("{string:@a}"))
+    return pack(objFromJson(jobj, fname))
   of JArray:
-    let
-      a = arrayFromJson(jobj, fname)
-      
-    return boxList[Box](a)
+    return pack(arrayFromJson(jobj, fname))
 
 proc extractOneSamiJson*(sami: SamiObj): SamiDict =
   var jobj: JSonNode = sami.stream.parseJson()
 
   let fv = valueFromJson(jobj, sami.fullpath)
 
-  return unboxDict[string, Box](fv)
+  return unpack[TableRef[string, Box]](fv)

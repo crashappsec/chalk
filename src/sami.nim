@@ -20,7 +20,7 @@ proc runCmdDefaults*() {.noreturn, inline.} =
 
 proc runCmdInject*() {.noreturn, inline.} =
   loadUserConfigFile()
-  loadCommandPlugins()  
+  loadCommandPlugins()
   doInjection() # inject.nim
   quit()
 
@@ -132,8 +132,8 @@ template defaultsCmd(cmd: string, primary: bool) =
     if primary:
       help(showDefHelp)
     run:
-      runCmdDefaults()  
-  
+      runCmdDefaults()
+
 when isMainModule:
   var cmdLine = newParser:
     help(generalHelp)

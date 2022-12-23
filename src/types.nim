@@ -48,16 +48,16 @@ type
     magic*: string
     searchPath*: seq[string]
     exclusions*: seq[string]
-  
+
   ExternalPlugin* = ref object of Plugin
-    command*: string  
-    
+    command*: string
+
 
   KeyInfo* = TableRef[string, Box]
 
 proc samiHasExisting*(sami: SamiObj): bool {.inline.} =
   return sami.primary.valid
-  
+
 proc samiIsEmpty*(sami: SamiObj): bool {.inline.} =
   return if (sami.embeds.len() > 0) or sami.samiHasExisting(): false else: true
 

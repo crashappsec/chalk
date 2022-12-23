@@ -135,7 +135,7 @@ proc getOrigin(self: GitPlugin, sami: SamiObj): (bool, Box) =
       url = self.calcOrigin(config)
 
     trace(trOrigin.fmt())
-    return (true, box(url))
+    return (true, pack(url))
   except:
     warn(wNotParsed.fmt())
     return (false, nil)
@@ -144,19 +144,19 @@ proc getOrigin(self: GitPlugin, sami: SamiObj): (bool, Box) =
 #[
 proc getWorkingDir(self: GitPlugin, sami: SamiObj): (bool, Box) =
   if self.vcsDir != "":
-    return (true, box(self.vcsDir.splitPath().head))
+    return (true, pack(self.vcsDir.splitPath().head))
   return (false, nil)
 ]#
 
 proc getHead(self: GitPlugin, sami: SamiObj): (bool, Box) =
   if self.commitID == "":
     return (false, nil)
-  return (true, box(self.commitID))
+  return (true, pack(self.commitID))
 
 proc getBranch(self: GitPlugin, sami: SamiObj): (bool, Box) =
   if self.branchName == "":
     return (false, nil)
-  return (true, box(self.branchName))
+  return (true, pack(self.branchName))
 
 method getArtifactInfo*(self: GitPlugin, sami: SamiObj): KeyInfo =
   result = newTable[string, Box]()

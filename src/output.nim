@@ -8,7 +8,7 @@ var outputCallbacks: Table[string, SamiOutputHandler]
 
 proc registerOutputHandler*(name: string, fn: SamiOutputHandler) =
   outputCallbacks[name] = fn
-  
+
 proc handleOutput*(content: string, injectContext: bool) =
   let
     handleInfo = getOutputConfig()
@@ -17,9 +17,6 @@ proc handleOutput*(content: string, injectContext: bool) =
               else:
                 getExtractorHandles()
 
-
-  echo "found some shit!!"
-  echo "handles = ", handles
   for handle in handles:
 
     if not (handle in handleInfo):
@@ -38,32 +35,32 @@ proc handleOutput*(content: string, injectContext: bool) =
       # we want to handle it.
       if not fn(content, thisInfo):
         when not defined(release):
-          echo "Output handler {handle} failed."
+          stderr.writeLine("Output handler {handle} failed.")
       continue
     elif thisInfo.getOutputCommand().isSome():
-        let cmd = thisInfo.getOutputCommand().get()
-        try: 
-          let
-            process = startProcess(cmd[0],
-                                   args = cmd[1 .. ^1],
-                                   options = {poUsePath})
-            (istream, ostream) = (process.outputStream, process.inputStream)
-          ostream.write(content)
-          ostream.flush()
-          istream.close()
-          discard process.waitForExit()
-        except:
-          when not defined(release):
-            echo "Output handler {handle} failed."
-            raise
+      let cmd = thisInfo.getOutputCommand().get()
+      try:
+        let
+          process = startProcess(cmd[0],
+                                 args = cmd[1 .. ^1],
+                                 options = {poUsePath})
+          (istream, ostream) = (process.outputStream, process.inputStream)
+        ostream.write(content)
+        ostream.flush()
+        istream.close()
+        discard process.waitForExit()
+      except:
+        when not defined(release):
+          stderr.writeLine("Output handler {handle} failed.")
+          raise
 
 proc stdoutHandler*(content: string, h: SamiOutputSection): bool =
-  echo string
+  echo content
   return true
 
 proc localFileHandler*(content: string, h: SamiOutputSection): bool =
   var f: FileStream
-  
+
   if not h.getOutputFilename().isSome():
     return false
   try:
@@ -77,4 +74,4 @@ proc localFileHandler*(content: string, h: SamiOutputSection): bool =
 
 registerOutputHandler("stdout", stdoutHandler)
 registerOutputHandler("local_file", localFileHandler)
-        
+

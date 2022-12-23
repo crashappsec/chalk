@@ -55,7 +55,7 @@ proc doExtraction*(onBehalfOfInjection: bool) =
         for (key, pt) in sami.embeds:
           let
             embstore = pt.samiFields.get()
-            keyJson = strKeyToJson(key)
+            keyJson = strValToJson(key)
             valJson = embstore.foundToJson()
 
           if not onBehalfOfInjection and not getDryRun():
@@ -64,7 +64,8 @@ proc doExtraction*(onBehalfOfInjection: bool) =
 
         embededJson = jsonArrFmt % [embededJson]
         if not getDryRun():
-          handleOutput(logTemplate % [sami.fullpath, getHostName(),
+          let absPath = absolutePath(sami.fullpath)
+          handleOutput(logTemplate % [absPath, getHostName(),
                                     primaryJson, embededJson],
                        onBehalfOfInjection)
 

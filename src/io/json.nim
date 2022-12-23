@@ -5,7 +5,6 @@ import streams
 import strformat
 
 import con4m
-import con4m/st
 
 import ../resources
 
@@ -34,17 +33,17 @@ type
 proc jsonNodeToBox*(n: JSonNode): Box =
   case n.kind
   of JNull: return nil
-  of JBool: return box(n.boolval)
-  of JInt:  return box(int(n.intval))
-  of JFloat: return box(n.floatval)
-  of JString: return box(n.strval)
+  of JBool: return pack(n.boolval)
+  of JInt: return pack(int(n.intval))
+  of JFloat: return pack(n.floatval)
+  of JString: return pack(n.strval)
   of JArray:
     var res: seq[Box]
 
     for item in n.items:
       res.add(item.jsonNodeToBox())
 
-    return boxList[Box](res)
+    return pack[seq[Box]](res)
   of JObject:
     var res: TableRef[string, Box] = newTable[string, Box]()
 
@@ -52,7 +51,7 @@ proc jsonNodeToBox*(n: JSonNode): Box =
       let b = v.jsonNodeToBox()
       res[k] = b
 
-    return boxDict[string, Box](res, toCon4mType("{string:@a}"))
+    return pack(res)
 
 when not defined(release) and defined(traceJson):
   proc readOne(s: Stream): char {.inline.} =

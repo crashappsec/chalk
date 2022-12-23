@@ -15,6 +15,8 @@ include errors
 const baseConfig = """
 sami_version := "0.2.0"
 ascii_magic := "dadfedabbadabbed"
+extractor_handles: ["stdout"]
+injector_handles: []
 
 key _MAGIC json {
     required: true
@@ -276,9 +278,6 @@ output local_file {
 output s3 {
 }
 
-extractor_handles: ["stdout", "what", "is", "going", "on"]
-injector_handles: []
-
 """
 
 ## This variable represents the current config.  The con4m
@@ -286,7 +285,9 @@ injector_handles: []
 ## will use for config file layering.
 ## TODO: Add a field to the global or a section to configure
 ## logging options.
-var samiConfig =  con4m(Sami, baseconfig):
+var samiConfig = con4m(Sami, baseconfig):
+  attr(extractor_handles, [string], required = true)
+  attr(injector_handles, [string], required = true)
   attr(config_path,
        [string],
        @[".", "~"],
@@ -306,8 +307,6 @@ var samiConfig =  con4m(Sami, baseconfig):
   attr(dry_run, bool, false)
   attr(artifact_search_path, [string], @["."])
   attr(recursive, bool, true)
-  attr(extractor_handles, [string], defaultVal = @["stdout"])
-  attr(injector_handles, [string], defaultVal = @["stdout"])
   section(key, allowedSubSections = @["*", "*.json", "*.binary"]):
     attr(required,
          bool,
@@ -433,13 +432,13 @@ proc getOutputConfig*(): TableRef[string, SamiOutputSection] =
 
 proc getOutputSecret*(s: SamiOutputSection): Option[string] =
   return s.secret
-  
+
 proc getOutputFilename*(s: SamiOutputSection): Option[string] =
   return s.filename
-  
+
 proc getOutputDstUri*(s: SamiOutputSection): Option[string] =
   return s.dst_uri
-  
+
 proc getOutputCommand*(s: SamiOutputSection): Option[seq[string]] =
   return s.command
 
@@ -451,14 +450,14 @@ proc getConfigPath*(): seq[string] =
   return samiConfig.configPath
 
 proc setConfigPath*(val: seq[string]) =
-  discard ctxSamiConf.setOverride("config_path", boxList(val))
+  discard ctxSamiConf.setOverride("config_path", pack(val))
   samiConfig.configPath = val
 
 proc getConfigFileName*(): string =
   return samiConfig.configFileName
 
 proc setConfigFileName*(val: string) =
-  discard ctxSamiConf.setOverride("config_filename", box(val))
+  discard ctxSamiConf.setOverride("config_filename", pack(val))
   samiConfig.configFileName = val
 
 proc getDefaultCommand*(): Option[string] =
@@ -472,35 +471,35 @@ proc getColor*(): bool =
   return samiConfig.color
 
 proc setColor*(val: bool) =
-  discard ctxSamiConf.setOverride("color", box(val))
+  discard ctxSamiConf.setOverride("color", pack(val))
   samiConfig.color = val
 
 proc getLogLevel*(): string =
   return samiConfig.logLevel
 
 proc setLogLevel*(val: string) =
-  discard ctxSamiConf.setOverride("log_level", box(val))
+  discard ctxSamiConf.setOverride("log_level", pack(val))
   samiConfig.logLevel = val
 
 proc getDryRun*(): bool =
   return samiConfig.dryRun
 
 proc setDryRun*(val: bool) =
-  discard ctxSamiConf.setOverride("dry_run", box(val))
+  discard ctxSamiConf.setOverride("dry_run", pack(val))
   samiConfig.dryRun = val
 
 proc getArtifactSearchPath*(): seq[string] =
   return samiConfig.artifactSearchPath
 
 proc setArtifactSearchPath*(val: seq[string]) =
-  discard ctxSamiConf.setOverride("artifact_search_path", boxList(val))
+  discard ctxSamiConf.setOverride("artifact_search_path", pack(val))
   samiConfig.artifactSearchPath = val
 
 proc getRecursive*(): bool =
   return samiConfig.recursive
 
 proc setRecursive*(val: bool) =
-  discard ctxSamiConf.setOverride("recursive", box(val))
+  discard ctxSamiConf.setOverride("recursive", pack(val))
   samiConfig.recursive = val
 
 proc getExtractorHandles*(): seq[string] =
@@ -644,23 +643,8 @@ proc `$`*(plugin: SamiPluginSection): string =
 
 """
 
-proc valueToString(b: Box): string =
-  # TODO: expand out complex types.
-  case b.kind:
-  of TypeInt:
-    return $(unbox[int](b))
-  of TypeFloat:
-    return $(unbox[float](b))
-  of TypeBool:
-    return $(unbox[bool](b))
-  of TypeString:
-    return unbox[string](b)
-  of TypeList:
-    return "<somelist>"
-  of TypeDict:
-    return "<some dict>"
-  else:
-    return "??"
+proc valueToString(b: Box): string {.inline.} =
+  return $(b)
 
 proc `$`*(key: SamiKeySection): string =
   var valstr = "<none>"
@@ -711,7 +695,7 @@ Configured Plugins:
 """
 
 proc showConfig*() =
-  echo $samiConfig
+  stderr.writeLine($(samiConfig))
 
 proc lockBuiltinKeys*() =
   for key in getAllKeys():
@@ -720,7 +704,7 @@ proc lockBuiltinKeys*() =
       std = getConfigVar(ctxSamiConf, prefix & ".standard").get()
       sys = getConfigVar(ctxSamiConf, prefix & ".system").get()
 
-    if unbox[bool](std):
+    if unpack[bool](std):
       discard ctxSamiConf.lockConfigVar(prefix & ".required")
       discard ctxSamiConf.lockConfigVar(prefix & ".system")
       discard ctxSamiConf.lockConfigVar(prefix & ".type")
@@ -728,7 +712,7 @@ proc lockBuiltinKeys*() =
       discard ctxSamiConf.lockConfigVar(prefix & ".since")
       discard ctxSamiConf.lockConfigVar(prefix & ".output_order")
 
-    if unbox[bool](sys):
+    if unpack[bool](sys):
       discard ctxSamiConf.lockConfigVar(prefix & ".missing_action")
       discard ctxSamiConf.lockConfigVar(prefix & ".value")
 
@@ -753,7 +737,7 @@ proc doAdditionalValidation*() =
     warn(fmt"Log level {samiConfig.logLevel} not recognized. " &
          "Defaulting to 'warn'")
     var entry = ctxSamiConf.st.entries["log_level"]
-    entry.value = some(box("warn"))
+    entry.value = some(pack("warn"))
     ctxSamiConf.st.entries["log_level"] = entry
     samiConfig.logLevel = "warn"
 
@@ -777,11 +761,11 @@ proc loadUserConfigFile*() =
     let res = ctxSamiConf.stackConfig(fname)
     if res.isNone():
       error(fmt"{filename}: invalid configuration not loaded.")
-      
+
       if ctxSamiConf.errors.len() != 0:
         for err in ctxSamiConf.errors:
           error(err)
-          
+
       quit()
 
   samiConfig = ctxSamiConf.loadSamiConfig()
