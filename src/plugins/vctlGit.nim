@@ -163,6 +163,9 @@ method getArtifactInfo*(self: GitPlugin, sami: SamiObj): KeyInfo =
 
   self.loadBasics(sami)
 
+  if self.vcsDir == "":
+    return # No git directory, so no work to do.
+
   let
     (originThere, origin) = self.getOrigin(sami)
     (headThere, head) = self.getHead(sami)

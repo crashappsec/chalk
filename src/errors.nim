@@ -1,3 +1,4 @@
+# Do not import this.  Import config instead, it includes this.
 type LogLevel* = enum
   logLevelNone, logLevelErr, logLevelWarn, logLevelVerbose,
   logLevelTrace

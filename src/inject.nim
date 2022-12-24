@@ -90,6 +90,7 @@ proc doInjection*() =
 
   doExtraction(onBehalfOfInjection = true)
 
+  trace("Beginning artifact metadata collection and injection.")
   # We're going to build a list of priority ordering based on plugin.
   # For codecs, they only get called when the SAMI is being read/written by
   # that codec.

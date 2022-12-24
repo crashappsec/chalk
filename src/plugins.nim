@@ -144,19 +144,24 @@ proc dispatchFileScan(self: Codec, filepath: string, top: string): bool =
     stream = newFileStream(filepath, fmRead)
     sami = SamiObj(fullpath: filepath, toplevel: top, stream: stream)
 
+  if stream == nil:
+    warn("Could not open file: " & filepath)
+    return
   result = self.scan(sami)
 
   if result:
     self.samis.add(sami)
     if sami.primary.present:
       self.loadSamiLoc(sami)
-
-proc addExclusion*(self: Codec, fullpath: string) =
-  self.exclusions.add(fullpath)
+  else:
+    try:
+      stream.close()
+    except:
+      discard
 
 proc doScan*(self: Codec,
              searchPath: seq[string],
-             exclusions: seq[string],
+             exclusions: var seq[string],
              recurse: bool) =
   ## Generate a list of all insertion/extraction points this codec
   ## belives it is responsible for, placing the resulting SamiPoint
@@ -174,10 +179,13 @@ proc doScan*(self: Codec,
   ## for instance, in client-side JavaScript.  Therefore, it's up to
   ## the concrete codec implementation to check for this condition
   ## and warn / error as appropriate.
-  self.searchPath = searchPath
-  self.exclusions = exclusions
+  if len(searchPath) != 0:
+    self.searchPath = searchPath
+  else:
+    self.searchPath = @[resolvePath("")]
 
   for path in self.searchPath:
+    trace(fmt"Codec beginning scan of {path}")
     var info: FileInfo
     try:
       info = getFileInfo(path)
@@ -185,19 +193,26 @@ proc doScan*(self: Codec,
       error(ePathNotFound.fmt())
       continue
 
-    trace(fmtTraceLoadArg.fmt())
     if info.kind == pcFile:
+      if path in exclusions:
+        continue
+      trace(fmtTraceScanFileP.fmt())        
       if self.dispatchFileScan(path, path):
-        self.addExclusion(path)
+        exclusions.add(path)
     elif recurse:
       dirWalk(false, walkDirRec):
+        if item in exclusions:
+          continue
         trace(fmtTraceScanFile.fmt())
         if self.dispatchFileScan(item, path):
-          self.addExclusion(item)
+          exclusions.add(item)
     else:
       dirWalk(true, walkDir):
+        if item in exclusions:
+          continue
+        trace(fmt"Non-recursive dir walk examining: {item}")
         if self.dispatchFileScan(item, path):
-          self.addExclusion(item)
+          exclusions.add(item)
 
 
 # TODO: Probably need to add a hash scheme as an option.  Because
