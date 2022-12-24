@@ -1,15 +1,15 @@
 import strformat
 import strutils
-import con4m
-import con4m/st # TODO: fix so not needed
-import con4m/eval # TODO whole lot of no
-# TODO: these should be automaticly exported by con4m
 import tables
 import algorithm
 import os
 import streams
 import sugar
 
+import con4m
+import con4m/st 
+import con4m/eval
+import utils
 include errors
 
 const baseConfig = """
@@ -492,8 +492,13 @@ proc getArtifactSearchPath*(): seq[string] =
   return samiConfig.artifactSearchPath
 
 proc setArtifactSearchPath*(val: seq[string]) =
+  
+  samiConfig.artifactSearchPath = @[]
+
+  for item in val:
+    samiConfig.artifactSearchPath.add(item.resolvePath())
+
   discard ctxSamiConf.setOverride("artifact_search_path", pack(val))
-  samiConfig.artifactSearchPath = val
 
 proc getRecursive*(): bool =
   return samiConfig.recursive
@@ -741,33 +746,50 @@ proc doAdditionalValidation*() =
     ctxSamiConf.st.entries["log_level"] = entry
     samiConfig.logLevel = "warn"
 
+  # Take any paths and turn them into absolute paths.
+  for i in 0 ..< len(samiConfig.artifactSearchPath):
+    samiConfig.artifactSearchPath[i] =
+      samiConfig.artifactSearchPath[i].resolvePath()
+      
+  for i in 0 ..< len(samiConfig.configPath):
+    samiConfig.configPath[i] = samiConfig.configPath[i].resolvePath()
+  
   # Now, lock a bunch of fields.
   lockBuiltinKeys()
 
-
 proc loadUserConfigFile*() =
-  let
+  var
     path = getConfigPath()
-    filename = getConfigFileName()
-  var fname: string = ""
-  var f: FileStream
+    filename = getConfigFileName()  # the base file name.
+    fname: string   # configPath / baseFileName
+    f: FileStream
+    loaded: bool = false
 
   for dir in path:
     fname = dir.joinPath(filename)
     if fname.fileExists():
       break
+    trace(fmt"No configuration file found in {dir}.")
 
   if fname != "":
+    trace(fmt"Loading config file: {fname}")
     let res = ctxSamiConf.stackConfig(fname)
     if res.isNone():
-      error(fmt"{filename}: invalid configuration not loaded.")
+      error(fmt"{fname}: invalid configuration not loaded.")
 
       if ctxSamiConf.errors.len() != 0:
         for err in ctxSamiConf.errors:
           error(err)
 
       quit()
+    else:
+      loaded = true
+
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
 
+  if loaded:
+    trace(fmt"Loaded configuration file: {fname}")
+  else:
+    trace("Running without a config file.")

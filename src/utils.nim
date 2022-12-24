@@ -5,6 +5,7 @@
 
 import std/sysrand
 import times
+import os
 
 template secureRand*[T](): T =
   ## Returns a uniformly distributed random value of any _sized_ type.
@@ -39,3 +40,38 @@ template unixTimeInMs*(): uint64 =
   # indentation'
   const toMS = 1000000.0
   cast[uint64](epochTime() * toMS)
+
+proc tildeExpand(s: string): string {.inline.} =
+  var homedir = os.getHomeDir()
+  
+  if homedir[^1] == '/':
+    homedir.setLen(len(homedir) - 1)  
+  if s == "":
+    return homedir
+  
+  let parentFolder = homedir.splitPath().head
+  
+  return os.joinPath(parentFolder, s)
+  
+proc resolvePath*(inpath: string): string =
+  # First, resolve tildes, as Nim doesn't seem to have an API call to
+  # do that for us.
+  var cur: string
+  
+  if inpath == "": return getCurrentDir()
+  if inpath[0] == '~':
+    let ix = inpath.find('/')
+    if ix == -1:
+      return tildeExpand(inpath[1 .. ^1])
+    cur = joinPath(tildeExpand(inpath[1 .. ix]), inpath[ix+1 .. ^1])
+  else:
+    cur = inpath
+  return cur.normalizedPath().absolutePath()
+
+when isMainModule:
+  echo resolvePath("~")
+  echo resolvePath("")
+  echo resolvePath("~fred")
+  echo resolvePath("../../src/../../eoeoeo")
+
+      

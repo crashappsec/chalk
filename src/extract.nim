@@ -26,15 +26,18 @@ proc doExtraction*(onBehalfOfInjection: bool) =
     f: File
     path: string
     filePath: string
+    numExtractions = 0
 
-  let
-    artifactPath = getArtifactSearchPath()
+  var artifactPath = getArtifactSearchPath()
 
-  for (_, _, plugin) in getCodecsByPriority():
+  for (_, name, plugin) in getCodecsByPriority():
     let codec = cast[Codec](plugin)
+    trace(fmt"Asking codec '{name}' to scan for SAMIs.")
     codec.doScan(artifactPath, exclusions, getRecursive())
     codecInfo.add(codec)
 
+  trace("Beginning extraction attempts for any found SAMIs")
+  
   try:
     for codec in codecInfo:
       for sami in codec.samis:
@@ -63,18 +66,21 @@ proc doExtraction*(onBehalfOfInjection: bool) =
             comma = comfyItemSep
 
         embededJson = jsonArrFmt % [embededJson]
+
+        numExtractions += 1
+        
         if not getDryRun():
           let absPath = absolutePath(sami.fullpath)
           handleOutput(logTemplate % [absPath, getHostName(),
                                     primaryJson, embededJson],
                        onBehalfOfInjection)
-
   except:
     # TODO: do better here.
     # echo getStackTrace()
     # raise
     warn(getCurrentExceptionMsg() & " (likely a bad SAMI embed; ignored)")
   finally:
+    trace(fmt"Completed {numExtractions} extractions.")
     if ctx != nil:
       ctx.close()
       try:

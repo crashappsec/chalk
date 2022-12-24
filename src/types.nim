@@ -47,7 +47,6 @@ type
     samis*: seq[SamiObj]
     magic*: string
     searchPath*: seq[string]
-    exclusions*: seq[string]
 
   ExternalPlugin* = ref object of Plugin
     command*: string
