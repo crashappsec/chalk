@@ -7,7 +7,7 @@ import streams
 import sugar
 
 import con4m
-import con4m/st 
+import con4m/st
 import con4m/eval
 import utils
 include errors
@@ -15,8 +15,10 @@ include errors
 const baseConfig = """
 sami_version := "0.2.0"
 ascii_magic := "dadfedabbadabbed"
-extractor_handles: ["stdout"]
-injector_handles: []
+
+extraction_output_handlers: ["stdout"]
+injection_prev_sami_output_handlers: []
+injection_output_handlers: []
 
 key _MAGIC json {
     required: true
@@ -28,6 +30,7 @@ key _MAGIC json {
     standard: true
     since: "0.1.0"
     output_order: 0
+    in_ref: true
 }
 
 key SAMI_ID {
@@ -39,6 +42,7 @@ key SAMI_ID {
     standard: true
     since: "0.1.0"
     output_order: 1
+    in_ref: true
 }
 
 key SAMI_VERSION {
@@ -50,6 +54,16 @@ key SAMI_VERSION {
     standard: true
     since: "0.1.0"
     output_order: 2
+    in_ref: true
+}
+
+key SAMI_PTR {
+    required: false
+    type: "string"
+    standard: true
+    since: "0.10"
+    output_order: 3
+    in_ref: true
 }
 
 key TIMESTAMP {
@@ -58,7 +72,7 @@ key TIMESTAMP {
     system: true
     type: "integer"
     since: "0.1.0"
-    output_order: 3
+    output_order: 4
     standard: true
 }
 
@@ -67,7 +81,7 @@ key EARLIEST_VERSION {
     since: "0.1.0"
     system: true
     value: sami_version
-    output_order: 4
+    output_order: 5
     standard: true
 }
 
@@ -223,6 +237,7 @@ key SIGNATURE {
     since: "0.1.0"
     standard: true
     output_order: 1000
+    in_ref: true
 }
 
 # Doesn't do any keys other than the codec defaults, which are:
@@ -263,7 +278,8 @@ plugin system {
 
 # This plugin takes values from the conf file. By default, these
 # are of the lowest priority of anything that can conflict.
-# This will set SAMI_VERSION, EARLIEST_VERSION and _MAGIC.
+# This will set SAMI_VERSION, EARLIEST_VERSION, SAMI_REF (if provided)
+#  and _MAGIC.
 plugin conffile {
     keys: ["*"]
     priority: 2147483646
@@ -286,8 +302,30 @@ output s3 {
 ## TODO: Add a field to the global or a section to configure
 ## logging options.
 var samiConfig = con4m(Sami, baseconfig):
-  attr(extractor_handles, [string], required = true)
-  attr(injector_handles, [string], required = true)
+  attr(extraction_output_handlers,
+       [string],
+       required = true,
+       doc = "When extracting a SAMI from an artifact, which handler(s) " &
+             "to call for doing the actual outputting?")
+  attr(injection_prev_sami_output_handlers,
+       [string],
+       required = true,
+       doc = "When injecting a SAMI into an artifact, if a previous SAMI " &
+             "is found, it will be output with any handler provided here. " &
+             "This is separate from whether it gets embedded in the new " &
+             "SAMI, which happens any time OLD_SAMI does NOT have skip " &
+             "set.")
+  attr(injection_output_handlers,
+        [string],
+        required = true,
+        doc = "When injecting, the codec will inject a SAMI, but these " &
+              "handlers will also get called to write a SAMI.  Note that, " &
+              "if the key SAMI_PTR is enabled (i.e., set to a value and not " &
+              "being skipped), the codec will only inject the miniminal " &
+              "pointer information, and these handlers will be used for " &
+              "writing the full SAMI. Note that the string value of the " &
+              "SAMI_PTR field should match at least one of the locations " &
+              "output to via this handler.")
   attr(config_path,
        [string],
        @[".", "~"],
@@ -317,7 +355,8 @@ var samiConfig = con4m(Sami, baseconfig):
          string,
          defaultVal = "warn",
          doc = "What to do if, when READING a SAMI, we do not see this key")
-    attr(system, bool,
+    attr(system,
+         bool,
          defaultVal = false,
          doc = "these fields CANNOT be customzied in any way;" &
                "the system sets them outside the scope of the plugin system.")
@@ -345,6 +384,11 @@ var samiConfig = con4m(Sami, baseconfig):
          doc = "If not required by the spec, skip writing this key," &
                " even if its value could be computed. Will also be " &
                "skipped if found in a nested SAMI")
+    attr(in_ref,
+         bool,
+         defaultVal = false,
+         doc = "If the key is to be injected, should it appear in the pointer" &
+               " (if used; ignored otherwise)?")
     attr(output_order,
          int,
          defaultVal = 500,
@@ -492,7 +536,7 @@ proc getArtifactSearchPath*(): seq[string] =
   return samiConfig.artifactSearchPath
 
 proc setArtifactSearchPath*(val: seq[string]) =
-  
+
   samiConfig.artifactSearchPath = @[]
 
   for item in val:
@@ -507,18 +551,20 @@ proc setRecursive*(val: bool) =
   discard ctxSamiConf.setOverride("recursive", pack(val))
   samiConfig.recursive = val
 
-proc getExtractorHandles*(): seq[string] =
-  return samiConfig.extractorHandles
+proc getExtractionOutputHandlers*(): seq[string] =
+  return samiConfig.extractionOutputHandlers
 
-proc getInjectorHandles*(): seq[string] =
-  return samiConfig.injectorHandles
+proc getInjectionPrevSamiOutputHandlers*(): seq[string] =
+  return samiConfig.injectionPrevSamiOutputHandlers
+
+proc getInjectionOutputHandlers*(): seq[string] =
+  return samiConfig.injectionOutputHandlers
 
 proc getAllKeys*(): seq[string] =
   result = @[]
 
   for key, val in samiConfig.key:
     result.add(key)
-
 
 proc getKeySpec*(name: string): Option[SamiKeySection] =
   if name in samiConfig.key:
@@ -570,6 +616,9 @@ proc getMustForce*(key: SamiKeySection): bool =
 proc getSkip*(key: SamiKeySection): bool =
   return key.skip
 
+proc getInRef*(key: SamiKeySection): bool =
+  return key.inRef
+
 proc getOutputOrder*(key: SamiKeySection): int =
   return key.outputOrder
 
@@ -615,6 +664,17 @@ proc getCommandPlugins*(): seq[(string, string)] =
     if (not plugin.command.isSome()) or (not plugin.enabled):
       continue
     result.add((name, plugin.command.get()))
+
+proc getOutputPointers*(): bool =
+  let contents = samiConfig.key["SAMI_PTR"]
+
+  if getInjectionOutputHandlers().len() == 0:
+    return false
+
+  if contents.getValue().isSome() and not contents.getSkip():
+    return true
+
+  return false
 
 proc `$`*(plugin: SamiPluginSection): string =
   var overrideStr, ignoreStr: string
@@ -690,8 +750,9 @@ log level:                 {c.logLevel}
 dry run:                   {c.dryRun}
 artifact search path:      {c.artifactSearchPath.join(":")}
 recursive artifact search: {c.recursive}
-extractors loaded:         {c.extractorHandles}
-injectors loaded:          {c.injectorHandles}
+extraction out handlers:   {c.extractionOutputHandlers}
+prev sami out handlers:    {c.injectionPrevSamiOutputHandlers}
+new sami out handlers:     {c.injectionOutputHandlers}
 Configured SAMI keys:
 {configKeys.join("\n")}
 
@@ -750,18 +811,18 @@ proc doAdditionalValidation*() =
   for i in 0 ..< len(samiConfig.artifactSearchPath):
     samiConfig.artifactSearchPath[i] =
       samiConfig.artifactSearchPath[i].resolvePath()
-      
+
   for i in 0 ..< len(samiConfig.configPath):
     samiConfig.configPath[i] = samiConfig.configPath[i].resolvePath()
-  
+
   # Now, lock a bunch of fields.
   lockBuiltinKeys()
 
 proc loadUserConfigFile*() =
   var
     path = getConfigPath()
-    filename = getConfigFileName()  # the base file name.
-    fname: string   # configPath / baseFileName
+    filename = getConfigFileName() # the base file name.
+    fname: string                  # configPath / baseFileName
     f: FileStream
     loaded: bool = false
 

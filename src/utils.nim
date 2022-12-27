@@ -43,21 +43,21 @@ template unixTimeInMs*(): uint64 =
 
 proc tildeExpand(s: string): string {.inline.} =
   var homedir = os.getHomeDir()
-  
+
   if homedir[^1] == '/':
-    homedir.setLen(len(homedir) - 1)  
+    homedir.setLen(len(homedir) - 1)
   if s == "":
     return homedir
-  
+
   let parentFolder = homedir.splitPath().head
-  
+
   return os.joinPath(parentFolder, s)
-  
+
 proc resolvePath*(inpath: string): string =
   # First, resolve tildes, as Nim doesn't seem to have an API call to
   # do that for us.
   var cur: string
-  
+
   if inpath == "": return getCurrentDir()
   if inpath[0] == '~':
     let ix = inpath.find('/')
@@ -74,4 +74,4 @@ when isMainModule:
   echo resolvePath("~fred")
   echo resolvePath("../../src/../../eoeoeo")
 
-      
+

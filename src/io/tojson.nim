@@ -50,7 +50,7 @@ proc foundToJson*(self: SamiDict): string =
 
   result = jSonObjFmt % [result]
 
-proc createdToJson*(sami: SamiObj): string =
+proc createdToJson*(sami: SamiObj, ptrOnly = false): string =
   var comma = ""
 
   for fullKey in getOrderedKeys():
@@ -62,12 +62,34 @@ proc createdToJson*(sami: SamiObj): string =
         continue
       outputKey = parts[0]
 
+    # If this key is set, but ptrOnly is false, then we are
+    # outputting the "full" SAMI, in which case we do not
+    # write this field out.
+    if outputKey == "SAMI_PTR" and not ptrOnly:
+      continue
+
+    let spec = getKeySpec(fullKey).get()
+
     if not sami.newFields.contains(fullKey):
+      continue
+
+    # Skip outputting this key if "skip" is set in the key's existing
+    # configuration.
+    if spec.getSkip():
+      continue
+
+    # If SAMI pointers are set up, and we're currently outputting
+    # a pointer, then we only output if the config has the in_ref
+    # field set.
+    if ptrOnly and not spec.getInRef():
       continue
 
     let
       keyJson = strValToJson(outputKey)
       valJson = boxToJson(sami.newFields[fullKey])
+
+    if outputKey == "OLD_SAMI":
+      echo "debug: ", sami.newFields[fullKey]
 
     result = result & kvPairJFmt.fmt()
     comma = comfyItemSep

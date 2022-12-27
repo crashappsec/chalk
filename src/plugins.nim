@@ -196,7 +196,7 @@ proc doScan*(self: Codec,
     if info.kind == pcFile:
       if path in exclusions:
         continue
-      trace(fmtTraceScanFileP.fmt())        
+      trace(fmtTraceScanFileP.fmt())
       if self.dispatchFileScan(path, path):
         exclusions.add(path)
     elif recurse:

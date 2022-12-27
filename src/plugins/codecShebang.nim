@@ -1,7 +1,6 @@
 import ../types
 import ../plugins
 import ../resources
-import ../config
 
 import nimsha2
 

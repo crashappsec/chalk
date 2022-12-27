@@ -1,3 +1,4 @@
+import types
 import config
 import osproc
 import streams
@@ -9,16 +10,17 @@ var outputCallbacks: Table[string, SamiOutputHandler]
 proc registerOutputHandler*(name: string, fn: SamiOutputHandler) =
   outputCallbacks[name] = fn
 
-proc handleOutput*(content: string, injectContext: bool) =
+proc handleOutput*(content: string, context: SamiOutputContext) =
   let
     handleInfo = getOutputConfig()
-    handles = if injectContext:
-                getInjectorHandles()
-              else:
-                getExtractorHandles()
-
+    handles = case context
+      of OutCtxInject:
+        getInjectionOutputHandlers()
+      of OutCtxInjectPrev:
+        getInjectionPrevSamiOutputHandlers()
+      of OutCtxExtract:
+        getExtractionOutputHandlers()
   for handle in handles:
-
     if not (handle in handleInfo):
       # There's not a config blob, so we can't possibly
       # have the plugin loaded.
