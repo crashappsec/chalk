@@ -3,8 +3,7 @@ import ../resources
 import ./json
 import ../config
 
-import con4m
-
+import nimutils/box
 import streams
 import tables
 import strformat

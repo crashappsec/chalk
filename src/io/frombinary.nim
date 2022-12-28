@@ -1,6 +1,6 @@
 import ../resources
 import ../types
-import con4m
+import nimutils/box
 
 import endians
 import streams

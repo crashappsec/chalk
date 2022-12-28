@@ -4,8 +4,7 @@ import tables
 import streams
 import strformat
 
-import con4m
-
+import nimutils/box
 import ../resources
 
 const jsonWSChars* = ['\x20', '\x0a', '\x0d', '\x09']

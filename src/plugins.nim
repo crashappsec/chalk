@@ -1,13 +1,16 @@
 import types
-import utils
+import nimutils
 import config
 import resources
 import io/fromjson
 import io/frombinary
 import io/json
 
-import con4m
+import nimutils
+import nimutils/box
 import nimsha2
+
+import con4m
 
 import algorithm
 import tables
@@ -200,20 +203,19 @@ proc doScan*(self: Codec,
       if self.dispatchFileScan(path, path):
         exclusions.add(path)
     elif recurse:
-      dirWalk(false, walkDirRec):
+      dirWalk(true):
         if item in exclusions:
           continue
         trace(fmtTraceScanFile.fmt())
         if self.dispatchFileScan(item, path):
           exclusions.add(item)
     else:
-      dirWalk(true, walkDir):
+      dirWalk(false):
         if item in exclusions:
           continue
         trace(fmt"Non-recursive dir walk examining: {item}")
         if self.dispatchFileScan(item, path):
           exclusions.add(item)
-
 
 # TODO: Probably need to add a hash scheme as an option.  Because
 # even w/ shebang, it could make sense to hash the main script only,

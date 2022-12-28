@@ -2,7 +2,8 @@ import ../resources
 import ../types
 import ../config
 
-import con4m
+import nimutils
+import nimutils/box
 
 import strformat
 import strutils

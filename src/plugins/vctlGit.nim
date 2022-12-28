@@ -3,7 +3,7 @@ import ../config
 import ../plugins
 import ../resources
 import ../io/gitConfig
-import con4m
+import nimutils/box
 import os
 import streams
 import tables

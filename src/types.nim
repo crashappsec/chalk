@@ -1,4 +1,4 @@
-import con4m
+import nimutils/box
 
 import tables
 import options
