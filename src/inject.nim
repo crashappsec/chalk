@@ -3,7 +3,7 @@ import types
 import config
 import plugins
 import extract
-import con4m # just for getOrElse()
+import nimutils
 import output
 import io/tobinary
 import io/tojson

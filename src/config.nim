@@ -9,7 +9,8 @@ import sugar
 import con4m
 import con4m/st
 import con4m/eval
-import utils
+import nimutils
+import nimutils/box
 include errors
 
 const baseConfig = """

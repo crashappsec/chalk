@@ -1,9 +1,10 @@
 import ../types
 import ../plugins
-import ../utils
 import ../config
 
-import con4m
+import nimutils
+import nimutils/box
+import nimutils/random
 import tables
 import options
 

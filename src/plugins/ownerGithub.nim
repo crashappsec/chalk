@@ -2,7 +2,7 @@ import ../config
 import ../types
 import ../plugins
 import ../resources
-import con4m
+import nimutils/box
 
 import os
 import streams

@@ -2,7 +2,7 @@ import ../resources
 import ../types
 import ../config
 
-import con4m
+import nimutils/box
 
 import std/json
 import strutils
