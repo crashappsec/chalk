@@ -42,9 +42,11 @@ proc processOldSami(sami: SamiObj, olddict: SamiDict): Box =
 
 method getArtifactInfo*(self: SystemPlugin,
                         sami: SamiObj): KeyInfo =
+  let samiId = cast[int](secureRand[uint64]()) and 0x7fffffffffffffff
+
   result = newTable[string, Box]()
 
-  result["SAMI_ID"] = pack(cast[int](secureRand[uint64]()))
+  result["SAMI_ID"] = pack(samiId)
   result["TIMESTAMP"] = pack(cast[int](unixTimeInMs()))
   result["_MAGIC.json"] = pack("dadfedabbadabbed")
 

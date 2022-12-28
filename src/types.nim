@@ -6,6 +6,9 @@ import streams
 import config
 
 type
+  SamiOutputContext* = enum
+    OutCtxExtract, OutCtxInjectPrev, OutCtxInject
+
   SamiDict* = TableRef[string, Box] ## \
      ## Representation of the abstract SAMI's fields. If the SAMI
      ## was read from a file, this will include any embeds / nests.

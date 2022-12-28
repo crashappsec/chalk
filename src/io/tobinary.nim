@@ -62,7 +62,7 @@ proc binEncodeItem(self: Box): string =
   else:
     unreachable
 
-proc createdToBinary*(sami: SamiObj): string =
+proc createdToBinary*(sami: SamiObj, ptrOnly = false): string =
   var fieldCount = 0
 
   # Count how many fields we will write.  Ignore .json fields
@@ -84,9 +84,28 @@ proc createdToBinary*(sami: SamiObj): string =
         continue
       outputKey = parts[0]
 
+    # If this key is set, but ptrOnly is false, then we are
+    # outputting the "full" SAMI, in which case we do not
+    # write this field out.
+    if outputKey == "SAMI_PTR" and not ptrOnly:
+      continue
+
+    let spec = getKeySpec(fullKey).get()
+
     if not sami.newFields.contains(fullKey):
       continue
 
-    let val = sami.newFields[fullKey]
+    # Skip outputting this key if "skip" is set in the key's existing
+    # configuration.
+    if spec.getSkip():
+      continue
+
+    # If SAMI pointers are set up, and we're currently outputting
+    # a pointer, then we only output if the config has the in_ref
+    # field set.
+    if ptrOnly and not spec.getInRef():
+      continue
+
+    let val = sami.newFields[outputKey]
     result = kvPairBinFmt.fmt()
 

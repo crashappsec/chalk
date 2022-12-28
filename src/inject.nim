@@ -4,6 +4,7 @@ import config
 import plugins
 import extract
 import con4m # just for getOrElse()
+import output
 import io/tobinary
 import io/tojson
 
@@ -157,12 +158,26 @@ proc doInjection*() =
       else:
         item.stream.setPosition(0)
         let
+          outputPtrs = getOutputPointers()
           point = item.primary
           pre = item.stream.readStr(point.startOffset)
+        var
           encoded = if Binary in item.flags:
-                      item.createdToBinary()
+                      item.createdToBinary(outputPtrs)
                     else:
-                      item.createdToJson()
+                      item.createdToJson(outputPtrs)
+
+        # Here we are not yet calling into the codec to do the actual
+        # write.  There may be additional places we need to output the
+        # SAMI, especially when the one we're injecting is a small
+        # pointer... we will be sending the full SAMI off somewhere.
+        #
+        # We pass the full SAMI off to these handlers; if we're
+        # writing a pointer the codec will not write the whole thing.
+        if outputPtrs or (Binary in item.flags):
+          handleOutput(item.createdToJson(), OutCtxInject)
+        else:
+          handleOutput(encoded, OutCtxInject)
 
         if point.endOffset > point.startOffset:
           item.stream.setPosition(point.endOffset)

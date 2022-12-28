@@ -37,7 +37,7 @@ proc doExtraction*(onBehalfOfInjection: bool) =
     codecInfo.add(codec)
 
   trace("Beginning extraction attempts for any found SAMIs")
-  
+
   try:
     for codec in codecInfo:
       for sami in codec.samis:
@@ -68,17 +68,19 @@ proc doExtraction*(onBehalfOfInjection: bool) =
         embededJson = jsonArrFmt % [embededJson]
 
         numExtractions += 1
-        
+
         if not getDryRun():
           let absPath = absolutePath(sami.fullpath)
           handleOutput(logTemplate % [absPath, getHostName(),
                                     primaryJson, embededJson],
-                       onBehalfOfInjection)
+                       if onBehalfOfInjection: OutCtxInjectPrev
+                       else: OutCtxExtract)
   except:
     # TODO: do better here.
     # echo getStackTrace()
     # raise
-    warn(getCurrentExceptionMsg() & " (likely a bad SAMI embed; ignored)")
+    warn(getCurrentExceptionMsg() &
+         " (likely a bad SAMI embed; ignored)")
   finally:
     trace(fmt"Completed {numExtractions} extractions.")
     if ctx != nil:
