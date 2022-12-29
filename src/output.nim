@@ -39,7 +39,7 @@ proc handleOutput*(content: string, context: SamiOutputContext) =
       # we want to handle it.
       if not fn(content, thisInfo):
         when not defined(release):
-          stderr.writeLine("Output handler {handle} failed.")
+          stderr.writeLine(fmt"Output handler {handle} failed.")
       continue
     elif thisInfo.getOutputCommand().isSome():
       let cmd = thisInfo.getOutputCommand().get()
@@ -106,6 +106,7 @@ proc awsFileHandler*(content: string, h: SamiOutputSection): bool =
     raise newException(ValueError, msg)
     
   discard client.putObject(bucket, path, content)
+  retrun true
 
 registerOutputHandler("stdout", stdoutHandler)
 registerOutputHandler("local_file", localFileHandler)
