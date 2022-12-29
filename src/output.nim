@@ -3,7 +3,9 @@ import config
 import osproc
 import streams
 import tables
-
+import std/uri
+import nimutils
+import nimaws/s3client
 
 var outputCallbacks: Table[string, SamiOutputHandler]
 
@@ -74,6 +76,38 @@ proc localFileHandler*(content: string, h: SamiOutputSection): bool =
     if f != nil:
       f.close()
 
+proc awsFileHandler*(content: string, h: SamiOutputSection): bool =
+  if h.getOutputSecret().isNone():
+    stderr.writeLine("AWS secret not configured.")
+    raise
+  if h.getOutputUserId().isNone():
+    stderr.writeLine("AWS iam user not configured.")
+    raise
+  if h.getOutputDstUri().isNone():
+    stderr.writeLine("AWS bucket URI not configured.")
+  if not h.getOutputRegion().isSome():
+    stderr.writeLine("AWS region not configured.")
+
+  let
+    secret = h.getOutputSecret().get()
+    userid = h.getOutputUserId().get()
+    dstUri = parseURI(h.getOutputDstUri().get())
+    bucket = dstUri.hostname
+    path   = dstUri.path & "." & $(unixTimeInMS())
+    region = h.getOutputRegion().get()
+
+  var
+    client = newS3Client((userid, secret))
+    
+
+  if dstUri.scheme != "s3":
+    let msg = "AWS URI must be of type s3"
+    stderr.writeLine(msg)
+    raise newException(ValueError, msg)
+    
+  discard client.putObject(bucket, path, content)
+
 registerOutputHandler("stdout", stdoutHandler)
 registerOutputHandler("local_file", localFileHandler)
+registerOutputHandler("s3", awsFileHandler)
 
