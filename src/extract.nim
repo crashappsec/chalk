@@ -23,7 +23,6 @@ proc doExtraction*(onBehalfOfInjection: bool) =
     exclusions: seq[string]
     codecInfo: seq[Codec]
     ctx: FileStream
-    f: File
     path: string
     filePath: string
     numExtractions = 0

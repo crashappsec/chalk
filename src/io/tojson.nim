@@ -11,9 +11,6 @@ import strformat
 
 proc foundToJson*(self: SamiDict): string
 
-proc samiJsonEscape(self: string): string =
-  samiJsonEscapeSequence & self
-
 proc strValToJson*(s: string): string =
   # %* from the json module; this basically does any escaping
   # we need, which gives us a JsonNode object, that we then convert

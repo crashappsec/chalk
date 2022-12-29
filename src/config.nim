@@ -824,7 +824,6 @@ proc loadUserConfigFile*() =
     path = getConfigPath()
     filename = getConfigFileName() # the base file name.
     fname: string                  # configPath / baseFileName
-    f: FileStream
     loaded: bool = false
 
   for dir in path:

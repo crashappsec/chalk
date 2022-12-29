@@ -1,5 +1,4 @@
 import types
-import nimutils
 import config
 import resources
 import io/fromjson

@@ -7,7 +7,6 @@ license       = "Apache-2.0"
 srcDir        = "src"
 bin           = @["sami"]
 
-
 # Dependencies
 
 requires "https://github.com/crashappsec/con4m >= 0.3.2"
@@ -15,7 +14,6 @@ requires "https://github.com/crashappsec/nimutils >= 0.1.0"
 requires "nim >= 1.6.8"
 requires "argparse >= 3.0.0"
 requires "nimsha2 >= 0.1.1"
-
 
 # Docs generated with
 # nimble --project --index:on --git.url:https://github.com/crashappsec/con4m.git --git.commit:`version`

@@ -23,7 +23,10 @@ let
   warnPrefix = fmtWarnPrefix.fmt()
   errPrefix = fmtErrPrefix.fmt()
   tracePrefix = fmtTracePrefix.fmt()
-  debugPrefix = fmtDebugPrefix.fmt()
+  
+when not defined(release):
+  let
+    debugPrefix = fmtDebugPrefix.fmt()
 
 proc logLevel(): LogLevel =
   case getLogLevel()
