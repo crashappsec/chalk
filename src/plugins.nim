@@ -117,7 +117,6 @@ proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
       pt.valid = true
       return
     except:
-      raise
       warn(eBadBin.fmt() & " " & getCurrentExceptionMsg())
       pt.endOffset = sami.stream.getPosition()
       pt.valid = false

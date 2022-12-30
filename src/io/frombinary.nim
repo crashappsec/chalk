@@ -52,8 +52,6 @@ proc arrFromBin(stream: FileStream, swapEndian: bool): seq[Box] =
 proc objFromBin(stream: FileStream, swapEndian: bool): SamiDict =
   result = new(SamiDict)
 
-  assert stream != nil
-  echo stream.getPosition()
   var n = stream.readUint32()
 
   n = n.handleEndian(swapEndian)
