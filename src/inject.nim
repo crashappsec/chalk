@@ -11,6 +11,7 @@ import io/tojson
 import os
 import tables
 import algorithm
+import strutils
 import strformat
 import streams
 import std/tempfiles
@@ -86,6 +87,7 @@ proc doInjection*() =
     keys: seq[string]
     overrides: TableRef[string, int]
     priorityInfo = newTable[string, seq[KeyPriorityInfo]]()
+    objsForHookWrite: seq[string] = @[]
   let
     everyKey = getOrderedKeys()
 
@@ -174,10 +176,12 @@ proc doInjection*() =
         #
         # We pass the full SAMI off to these handlers; if we're
         # writing a pointer the codec will not write the whole thing.
-        if outputPtrs or (Binary in item.flags):
-          handleOutput(item.createdToJson(), OutCtxInject)
+        #
+        # However, we write the blob all at once, after               
+        if outputPtrs or Binary in item.flags:
+          objsForHookWrite.add(item.createdToJson())
         else:
-          handleOutput(encoded, OutCtxInject)
+          objsForHookWrite.add(encoded)
 
         if point.endOffset > point.startOffset:
           item.stream.setPosition(point.endOffset)
@@ -208,8 +212,7 @@ proc doInjection*() =
             except:
               removeFile(path)
               raise
-
-
-
-
-
+  # Finally, if we've got external output requirements, it's time to
+  # dump what we've read.
+  let fullJson = "[" & join(objsForHookWrite, ", ") & "]"
+  handleOutput(fullJson, OutCtxInject)

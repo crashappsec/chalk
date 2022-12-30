@@ -83,7 +83,7 @@ proc getUniqueSuffix(h: SamiOutputSection): string =
     
   result = "." & $(unixTimeInMS())
   if auxId != "": result = result & "." & auxId
-  result = result & "." & $(secureRand[uint32]())
+  result = result & "." & $(secureRand[uint32]()) & ".json"
 
   
 proc awsFileHandler*(content: string, h: SamiOutputSection): bool =
