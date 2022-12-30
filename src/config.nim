@@ -87,100 +87,11 @@ key EARLIEST_VERSION {
     standard: true
 }
 
-key ORIGIN_URI {
-    type: "string"
-    missing_action: "warn"
-    since: "0.1.0"
-    standard: true
-}
-
-key ARTIFACT_VERSION {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key ARTIFACT_FILES {
-    type: "[string]"
-    since: "0.1.0"
-    standard: true
-}
-
-key IAM_USERNAME {
-    must_force: true
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key IAM_UID {
-    must_force: true
-    type: "integer"
-    since: "0.1.0"
-    standard: true
-}
-
-key BUILD_URI {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key STORE_URI {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key BRANCH {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key SRC_URI {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key REPO_ORIGIN {
-    type: "string"
-    system: false
-    since: "0.1.0"
-    standard: true
-}
-
-key HASH {
-    type: "string"
-    since: "0.1.0"
-    codec: true
-    standard: true
-}
-
-key HASH_FILES {
-    type: "[string]"
-    since: "0.1.0"
-    codec: true
-    standard: true
-}
-
-key COMMIT_ID {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key JOB_ID {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
 key SRC_PATH {
     type: "string"
     since: "0.1.0"
     codec: true
+    output_order: 6
     standard: true
 }
 
@@ -188,19 +99,126 @@ key FILE_NAME {
     type: "string"
     since: "0.1.0"
     codec: true
+    output_order: 7
     standard: true
+}
+
+key ORIGIN_URI {
+    type: "string"
+    missing_action: "warn"
+    since: "0.1.0"
+    output_order: 8
+    standard: true
+}
+
+key ARTIFACT_VERSION {
+    type: "string"
+    since: "0.1.0"
+    output_order: 9
+    standard: true
+}
+
+key ARTIFACT_FILES {
+    type: "[string]"
+    since: "0.1.0"
+    output_order: 10
+    standard: true
+}
+
+key IAM_USERNAME {
+    must_force: true
+    type: "string"
+    since: "0.1.0"
+    output_order: 11
+    standard: true
+}
+
+key IAM_UID {
+    must_force: true
+    type: "integer"
+    since: "0.1.0"
+    output_order: 12
+    standard: true
+}
+
+key BUILD_URI {
+    type: "string"
+    since: "0.1.0"
+    output_order: 13
+    standard: true
+}
+
+key STORE_URI {
+    type: "string"
+    since: "0.1.0"
+    output_order: 14
+    standard: true
+}
+
+key BRANCH {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 15
+}
+
+key SRC_URI {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 16
+}
+
+key REPO_ORIGIN {
+    type: "string"
+    system: false
+    since: "0.1.0"
+    standard: true
+    output_order: 17
+}
+
+key HASH {
+    type: "string"
+    since: "0.1.0"
+    codec: true
+    standard: true
+    output_order: 18
+}
+
+key HASH_FILES {
+    type: "[string]"
+    since: "0.1.0"
+    codec: true
+    standard: true
+    output_order: 19
+}
+
+key COMMIT_ID {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 20
+}
+
+key JOB_ID {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 21
 }
 
 key CODE_OWNERS {
     type: "string"
     since: "0.1.0"
     standard: true
+    output_order: 22
 }
 
 key BUILD_OWNERS {
     type: "string"
     since: "0.1.0"
     standard: true
+    output_order: 23
 }
 
 key OLD_SAMI {
