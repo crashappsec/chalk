@@ -4,6 +4,7 @@ import streams
 import strformat
 import strutils
 import tables
+import json
 import std/uri
 import nimutils
 import nimutils/random
@@ -36,7 +37,7 @@ proc handleOutput*(content: string, context: SamiOutputContext) =
                 of OutCtxInject: getInjectionOutputHandlers()
       ct = "When " & contextAsText[context] & ":"
       xtra = if handlers != @["stdout"]:
-               "\nWould have written:\n" & content
+               "\nWould have written:\n" & pretty(parseJson(content))
              else: "\n"
       output = fmt"{ct} without 'dry run' on, would have sent output to: " &
                handlers.join(", ") & xtra
@@ -84,7 +85,7 @@ proc stdoutHandler*(content: string,
                     h: SamiOutputSection,
                     ctx: string): bool =
   echo "When ", ctx, ":"
-  echo content
+  echo pretty(parseJson(content))
   return true
 
 proc localFileHandler*(content: string,
