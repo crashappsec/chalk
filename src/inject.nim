@@ -155,63 +155,61 @@ proc doInjection*() =
     for item in extracts:
       populateOneSami(item, codec, priorityInfo, pluginsOnly)
 
-      if getDryRun():
-        forceInform(infWouldWrite.fmt())
+      item.stream.setPosition(0)
+      let
+        outputPtrs = getOutputPointers()
+        point = item.primary
+        pre = item.stream.readStr(point.startOffset)
+      var
+        encoded = if Binary in item.flags:
+                    item.createdToBinary(outputPtrs)
+                  else:
+                    item.createdToJson(outputPtrs)
+
+      # Here we are not yet calling into the codec to do the actual
+      # write.  There may be additional places we need to output the
+      # SAMI, especially when the one we're injecting is a small
+      # pointer... we will be sending the full SAMI off somewhere.
+      #
+      # We pass the full SAMI off to these handlers; if we're
+      # writing a pointer the codec will not write the whole thing.
+      #
+      # However, we write the blob all at once, after               
+      if outputPtrs or Binary in item.flags:
+        objsForHookWrite.add(item.createdToJson())
       else:
-        item.stream.setPosition(0)
-        let
-          outputPtrs = getOutputPointers()
-          point = item.primary
-          pre = item.stream.readStr(point.startOffset)
-        var
-          encoded = if Binary in item.flags:
-                      item.createdToBinary(outputPtrs)
-                    else:
-                      item.createdToJson(outputPtrs)
+        objsForHookWrite.add(encoded)
 
-        # Here we are not yet calling into the codec to do the actual
-        # write.  There may be additional places we need to output the
-        # SAMI, especially when the one we're injecting is a small
-        # pointer... we will be sending the full SAMI off somewhere.
-        #
-        # We pass the full SAMI off to these handlers; if we're
-        # writing a pointer the codec will not write the whole thing.
-        #
-        # However, we write the blob all at once, after               
-        if outputPtrs or Binary in item.flags:
-          objsForHookWrite.add(item.createdToJson())
+      if point.endOffset > point.startOffset:
+        item.stream.setPosition(point.endOffset)
+      let
+        post = item.stream.readAll()
+
+      var
+        f: File
+        path: string
+        ctx: FileStream
+
+      try:
+        (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
+        ctx = newFileStream(f)
+        codec.handleWrite(ctx, pre, encoded, post)
+        if point.present:
+          inform(infReplacedSami.fmt())
         else:
-          objsForHookWrite.add(encoded)
-
-        if point.endOffset > point.startOffset:
-          item.stream.setPosition(point.endOffset)
-        let
-          post = item.stream.readAll()
-
-        var
-          f: File
-          path: string
-          ctx: FileStream
-
-        try:
-          (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
-          ctx = newFileStream(f)
-          codec.handleWrite(ctx, pre, encoded, post)
-          if point.present:
-            inform(infReplacedSami.fmt())
-          else:
-            inform(infNewSami.fmt())
-        except:
-          error(eCantInsert.fmt())
-          removeFile(path)
-        finally:
-          if ctx != nil:
-            ctx.close()
-            try:
-              moveFile(path, item.fullPath)
-            except:
-              removeFile(path)
-              raise
+          inform(infNewSami.fmt())
+      except:
+        error(eCantInsert.fmt())
+        removeFile(path)
+      finally:
+        if ctx != nil:
+          ctx.close()
+          try:
+            moveFile(path, item.fullPath)
+          except:
+            removeFile(path)
+            raise
+            
   # Finally, if we've got external output requirements, it's time to
   # dump what we've read.
   let fullJson = "[" & join(objsForHookWrite, ", ") & "]"
