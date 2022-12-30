@@ -474,6 +474,9 @@ var samiConfig = con4m(Sami, baseconfig):
     attr(command,
          [string],
          required = false)
+    attr(auxid,
+         string,
+         required = false)
     attr(docstring,
          string,
          required = false)
@@ -514,6 +517,9 @@ proc getOutputRegion*(s: SamiOutputSection): Option[string] =
 
 proc getOutputCommand*(s: SamiOutputSection): Option[seq[string]] =
   return s.command
+
+proc getOutputAuxId*(s: SamiOutputSection): Option[string] =
+  return s.auxid
 
 proc getConfigErrors*(): Option[seq[string]] =
   if ctxSamiConf.errors.len() != 0:

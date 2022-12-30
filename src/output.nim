@@ -2,9 +2,11 @@ import types
 import config
 import osproc
 import streams
+import strformat
 import tables
 import std/uri
 import nimutils
+import nimutils/random
 import nimaws/s3client
 
 var outputCallbacks: Table[string, SamiOutputHandler]
@@ -76,6 +78,14 @@ proc localFileHandler*(content: string, h: SamiOutputSection): bool =
     if f != nil:
       f.close()
 
+proc getUniqueSuffix(h: SamiOutputSection): string =
+  let auxId = h.getOutputAuxId().getOrElse("")
+    
+  result = "." & $(unixTimeInMS())
+  if auxId != "": result = result & "." & auxId
+  result = result & "." & $(secureRand[uint32]())
+
+  
 proc awsFileHandler*(content: string, h: SamiOutputSection): bool =
   if h.getOutputSecret().isNone():
     stderr.writeLine("AWS secret not configured.")
@@ -93,12 +103,11 @@ proc awsFileHandler*(content: string, h: SamiOutputSection): bool =
     userid = h.getOutputUserId().get()
     dstUri = parseURI(h.getOutputDstUri().get())
     bucket = dstUri.hostname
-    path   = dstUri.path & "." & $(unixTimeInMS())
+    path   = dstUri.path[1 .. ^1] & getUniqueSuffix(h)
     region = h.getOutputRegion().get()
 
   var
     client = newS3Client((userid, secret))
-    
 
   if dstUri.scheme != "s3":
     let msg = "AWS URI must be of type s3"
@@ -106,7 +115,7 @@ proc awsFileHandler*(content: string, h: SamiOutputSection): bool =
     raise newException(ValueError, msg)
     
   discard client.putObject(bucket, path, content)
-  retrun true
+  return true
 
 registerOutputHandler("stdout", stdoutHandler)
 registerOutputHandler("local_file", localFileHandler)
