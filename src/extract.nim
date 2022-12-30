@@ -26,6 +26,7 @@ proc doExtraction*(onBehalfOfInjection: bool) =
     path: string
     filePath: string
     numExtractions = 0
+    samisToOut: seq[string] = @[]
 
   var artifactPath = getArtifactSearchPath()
 
@@ -68,12 +69,13 @@ proc doExtraction*(onBehalfOfInjection: bool) =
 
         numExtractions += 1
 
-        if not getDryRun():
-          let absPath = absolutePath(sami.fullpath)
-          handleOutput(logTemplate % [absPath, getHostName(),
-                                    primaryJson, embededJson],
-                       if onBehalfOfInjection: OutCtxInjectPrev
-                       else: OutCtxExtract)
+        let absPath = absolutePath(sami.fullpath)
+        samisToOut.add(logTemplate % [absPath, getHostName(),
+                                      primaryJson, embededJson])
+
+    let toOut = "[" & samisToOut.join(", ") & "]"
+    handleOutput(toOut, if onBehalfOfInjection: OutCtxInjectPrev
+                        else: OutCtxExtract)
   except:
     # TODO: do better here.
     # echo getStackTrace()

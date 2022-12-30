@@ -2,6 +2,7 @@ import config
 import osproc
 import streams
 import strformat
+import strutils
 import tables
 import std/uri
 import nimutils
@@ -9,9 +10,9 @@ import nimutils/random
 import nimaws/s3client
 
 var outputCallbacks: Table[string, SamiOutputHandler]
-let contextAsText = { OutCtxExtract : "Extraction",
-                      OutCtxInjectPrev : "Previous SAMI",
-                      OutCtxInject : "Injection" }.toTable
+let contextAsText = { OutCtxExtract : "extracting SAMIs",
+                      OutCtxInjectPrev : "looking for existing SAMIs",
+                      OutCtxInject : "injecting SAMIs" }.toTable
 
 proc registerOutputHandler*(name: string, fn: SamiOutputHandler) =
   outputCallbacks[name] = fn
@@ -26,6 +27,23 @@ proc handleOutput*(content: string, context: SamiOutputContext) =
         getInjectionPrevSamiOutputHandlers()
       of OutCtxExtract:
         getExtractionOutputHandlers()
+
+  if getDryRun():
+    let
+      handlers = case context
+                of OutCtxExtract: getExtractionOutputHandlers()
+                of OutCtxInjectPrev: getInjectionPrevSamiOutputHandlers()
+                of OutCtxInject: getInjectionOutputHandlers()
+      ct = "When " & contextAsText[context] & ":"
+      xtra = if handlers != @["stdout"]:
+               "\nWould have written:\n" & content
+             else: "\n"
+      output = fmt"{ct} without 'dry run' on, would have sent output to: " &
+               handlers.join(", ") & xtra
+            
+    echo output
+    return
+    
   for handle in handles:
     if not (handle in handleInfo):
       # There's not a config blob, so we can't possibly
@@ -65,7 +83,7 @@ proc handleOutput*(content: string, context: SamiOutputContext) =
 proc stdoutHandler*(content: string,
                     h: SamiOutputSection,
                     ctx: string): bool =
-  echo "In context: ", ctx
+  echo "When ", ctx, ":"
   echo content
   return true
 
