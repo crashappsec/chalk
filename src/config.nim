@@ -512,7 +512,12 @@ const allowedCmds = ["inject", "extract", "defaults"]
 const validLogLevels = ["none", "error", "warn", "info", "trace"]
 
 
-type SamiOutputHandler* = (string, SamiOutputSection) -> bool
+
+type
+  SamiOutputContext* = enum
+    OutCtxExtract, OutCtxInjectPrev, OutCtxInject
+  
+  SamiOutputHandler* = (string, SamiOutputSection, string) -> bool
 
 
 proc getOutputConfig*(): TableRef[string, SamiOutputSection] =

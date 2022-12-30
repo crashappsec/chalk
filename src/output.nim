@@ -1,4 +1,3 @@
-import types
 import config
 import osproc
 import streams
@@ -10,6 +9,9 @@ import nimutils/random
 import nimaws/s3client
 
 var outputCallbacks: Table[string, SamiOutputHandler]
+let contextAsText = { OutCtxExtract : "Extraction",
+                      OutCtxInjectPrev : "Previous SAMI",
+                      OutCtxInject : "Injection" }.toTable
 
 proc registerOutputHandler*(name: string, fn: SamiOutputHandler) =
   outputCallbacks[name] = fn
@@ -39,7 +41,7 @@ proc handleOutput*(content: string, context: SamiOutputContext) =
 
       # For now, we're not handling failure.  Need to think about how
       # we want to handle it.
-      if not fn(content, thisInfo):
+      if not fn(content, thisInfo, contextAsText[context]):
         when not defined(release):
           stderr.writeLine(fmt"Output handler {handle} failed.")
       continue
@@ -60,18 +62,23 @@ proc handleOutput*(content: string, context: SamiOutputContext) =
           stderr.writeLine("Output handler {handle} failed.")
           raise
 
-proc stdoutHandler*(content: string, h: SamiOutputSection): bool =
+proc stdoutHandler*(content: string,
+                    h: SamiOutputSection,
+                    ctx: string): bool =
+  echo "In context: ", ctx
   echo content
   return true
 
-proc localFileHandler*(content: string, h: SamiOutputSection): bool =
+proc localFileHandler*(content: string,
+                       h: SamiOutputSection,
+                       ctx: string): bool =
   var f: FileStream
 
   if not h.getOutputFilename().isSome():
     return false
   try:
     f = newFileStream(h.getOutputFileName().get(), fmWrite)
-    f.write(content)
+    f.write(fmt"""{{ "context": {ctx}, "SAMIs" : {content} }}""")
   except:
     return false
   finally:
@@ -86,17 +93,29 @@ proc getUniqueSuffix(h: SamiOutputSection): string =
   result = result & "." & $(secureRand[uint32]()) & ".json"
 
   
-proc awsFileHandler*(content: string, h: SamiOutputSection): bool =
+proc awsFileHandler*(content: string,
+                     h: SamiOutputSection,
+                     ctx: string): bool =
   if h.getOutputSecret().isNone():
     stderr.writeLine("AWS secret not configured.")
-    raise
+    when not defined(release):
+      echo getStackTrace()
+    return false
   if h.getOutputUserId().isNone():
     stderr.writeLine("AWS iam user not configured.")
-    raise
+    when not defined(release):
+      echo getStackTrace()
+    return false
   if h.getOutputDstUri().isNone():
     stderr.writeLine("AWS bucket URI not configured.")
+    when not defined(release):
+      echo getStackTrace()
+    return false
   if not h.getOutputRegion().isSome():
     stderr.writeLine("AWS region not configured.")
+    when not defined(release):
+      echo getStackTrace()
+    return false
 
   let
     secret = h.getOutputSecret().get()
@@ -105,6 +124,7 @@ proc awsFileHandler*(content: string, h: SamiOutputSection): bool =
     bucket = dstUri.hostname
     path   = dstUri.path[1 .. ^1] & getUniqueSuffix(h)
     region = h.getOutputRegion().get()
+    body   = fmt"""{{ "context": {ctx}, "SAMIs" : {content} }}"""
 
   var
     client = newS3Client((userid, secret))
@@ -112,9 +132,9 @@ proc awsFileHandler*(content: string, h: SamiOutputSection): bool =
   if dstUri.scheme != "s3":
     let msg = "AWS URI must be of type s3"
     stderr.writeLine(msg)
-    raise newException(ValueError, msg)
+    return false
     
-  discard client.putObject(bucket, path, content)
+  discard client.putObject(bucket, path, body)
   return true
 
 registerOutputHandler("stdout", stdoutHandler)
