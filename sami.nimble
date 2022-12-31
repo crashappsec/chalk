@@ -9,7 +9,7 @@ bin           = @["sami"]
 
 # Dependencies
 
-requires "https://github.com/crashappsec/con4m >= 0.3.2"
+requires "https://github.com/crashappsec/con4m >= 0.3.4"
 requires "https://github.com/crashappsec/nimutils >= 0.1.0"
 requires "nim >= 1.6.8"
 requires "argparse >= 3.0.0"
