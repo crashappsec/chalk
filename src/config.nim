@@ -768,7 +768,12 @@ proc lockBuiltinKeys*() =
   for key in getAllKeys():
     let
       prefix = "key." & key
-      std = getConfigVar(ctxSamiConf, prefix & ".standard").get()
+      stdOpt = getConfigVar(ctxSamiConf, prefix & ".standard")
+
+    if stdOpt.isNone(): continue
+    
+    let
+      std = stdOpt.get()
       sys = getConfigVar(ctxSamiConf, prefix & ".system").get()
 
     if unpack[bool](std):
