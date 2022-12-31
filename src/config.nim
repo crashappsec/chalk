@@ -262,6 +262,7 @@ key SIGNATURE {
 
 # Doesn't do any keys other than the codec defaults, which are:
 # SRC_PATH, FILE_NAME, HASH, HASH_FILES
+
 plugin elf {
     codec: true
     keys: []
@@ -284,6 +285,10 @@ plugin authors {
 
 plugin "github-codeowners" {
     keys: ["CODE_OWNERS"]
+}
+
+plugin sbomCallback {
+    keys: ["SBOMS"]
 }
 
 # This plugin is the only thing allowed to set these keys. However, it
@@ -978,3 +983,5 @@ proc loadUserConfigFile*() =
     trace(fmt"Loaded configuration file: {fname}")
   else:
     trace("Running without a config file.")
+
+proc getConfigState*(): ConfigState = ctxSamiConf    

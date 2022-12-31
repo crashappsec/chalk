@@ -279,3 +279,4 @@ import plugins/codecElf
 import plugins/ownerAuthors
 import plugins/ownerGithub
 import plugins/vctlGit
+import plugins/sbomCallback

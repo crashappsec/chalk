@@ -59,7 +59,7 @@ proc populateOneSami(sami: SamiObj,
       if currentPriorities.contains(key) and pri >= currentPriorities[key]:
         continue
         # No plugin has run to set this key, so we're definitely going
-        # to run, even if someone else comes along and has a lowever
+        # to run, even if someone else comes along and has a lower
         # priority in an override (the codecs are sorted on their
         # overall priority order).
       runPlugin = true
@@ -67,6 +67,8 @@ proc populateOneSami(sami: SamiObj,
 
     if not runPlugin: continue
     let ki = plugin.getArtifactInfo(sami)
+
+    if ki == nil: continue
 
     for k, v in ki:
       if not currentPriorities.contains(k):
