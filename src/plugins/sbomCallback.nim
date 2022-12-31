@@ -25,6 +25,7 @@ method getArtifactInfo*(self: SbomCallbackPlugin,
       dict = unpack[TableRef[string, Box]](res)
       
     if len(dict) != 0:
+      new result
       result["SBOMS"] = res
 
 registerPlugin("sbomCallback", SbomCallbackPlugin())
