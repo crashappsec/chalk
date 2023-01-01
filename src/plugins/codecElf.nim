@@ -2,7 +2,7 @@ import ../resources
 import ../plugins
 import ../config
 
-import nimsha2
+import nimSHA2
 
 import endians
 import streams
