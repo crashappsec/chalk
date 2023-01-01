@@ -3,6 +3,7 @@ import plugins
 import resources
 import io/tojson
 import output
+import nimutils
 
 import os
 import strutils
@@ -24,7 +25,7 @@ proc doExtraction*(onBehalfOfInjection: bool) =
   # because we overload the capability for loading / unloading the
   # admin's config file.
   var
-    exclusions: seq[string] = @[joinPath(getAppDir(), getAppFileName())]
+    exclusions: seq[string] = @[resolvePath(getAppFileName())]
     codecInfo: seq[Codec]
     ctx: FileStream
     path: string
@@ -104,7 +105,7 @@ proc getSelfExtraction*(): Option[SamiDict] =
     return selfSami
   
   var
-    myPath = @[joinPath(getAppDir(), getAppFileName())]
+    myPath = @[resolvePath(getAppFileName())]
     exclusions: seq[string] = @[]
     
   trace(fmt"Checking sami binary @{myPath} for embedded config")
@@ -126,4 +127,3 @@ proc getSelfExtraction*(): Option[SamiDict] =
       
   warn(fmt"We have no codec for this platform's native executable type")
   return none(SamiDict)
-
