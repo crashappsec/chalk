@@ -432,20 +432,27 @@ proc doAdditionalValidation*() =
   # Now, lock a bunch of fields.
   lockBuiltinKeys()
 
-proc loadEmbeddedConfig(selfSami: SamiDict) =
+proc loadEmbeddedConfig(selfSami: SamiDict, dieIfInvalid = true) =
+  var confString: string
+  
   # We extracted a SAMI object from our own executable.  Check for an
   # X_SAMI_CONFIG key, and if there is one, run that configuration
   # file, before loading any on-disk configuration file.
   if not selfSami.contains("X_SAMI_CONFIG"):
     trace("Embedded self-SAMI does not contain a configuration.")
-    return
-  let
+    confString = defaultConfig
+  else:
     confString = unpack[string](selfSami["X_SAMI_CONFIG"])
+  
+  let
     confStream = newStringStream(confString)
     res = ctxSamiConf.stackConfig(confStream, "<embedded>")
 
   if res.isNone():
-    error("Embeeded configuration is invalid. Use 'setconf' command to fix")
+    if dieIfInvalid:
+      error("Embeeded configuration is invalid. Use 'setconf' command to fix")
+    else:
+      return # We ignore this.
 
     if ctxSamiConf.errors.len() != 0:
       for err in ctxSamiConf.errors:
