@@ -1,6 +1,5 @@
-import ../types
-import ../plugins
 import ../config
+import ../plugins
 import nimutils/box
 
 import tables

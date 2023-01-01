@@ -1,5 +1,4 @@
 import ../config
-import ../types
 import ../plugins
 import ../resources
 import nimutils/box

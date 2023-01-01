@@ -1,5 +1,4 @@
 import resources
-import types
 import config
 import plugins
 import extract

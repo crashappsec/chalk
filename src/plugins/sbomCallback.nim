@@ -1,6 +1,5 @@
 import tables
 import ../config
-import ../types
 import ../plugins
 import con4m/[eval, st, builtins]
 import nimutils/box

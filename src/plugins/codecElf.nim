@@ -1,4 +1,3 @@
-import ../types
 import ../resources
 import ../plugins
 import ../config

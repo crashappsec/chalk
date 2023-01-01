@@ -1,4 +1,3 @@
-import types
 import config
 import plugins
 import resources
@@ -18,9 +17,14 @@ proc doExtraction*(onBehalfOfInjection: bool) =
   # can reuse this code.
   #
   # TODO: need to validate extracted SAMIs.
-  # Also TODO, we will be adding output plugins very soon.
+  # 
+  # We do not process the actual sami binary that is running, if it
+  # happens to be in the search path.  It's a special command to do a
+  # self-insertion, partially to avoid accidents, and partially
+  # because we overload the capability for loading / unloading the
+  # admin's config file.
   var
-    exclusions: seq[string]
+    exclusions: seq[string] = @[joinPath(getAppDir(), getAppFileName())]
     codecInfo: seq[Codec]
     ctx: FileStream
     path: string
@@ -91,4 +95,35 @@ proc doExtraction*(onBehalfOfInjection: bool) =
       except:
         removeFile(path)
         raise
+
+var selfSami: Option[SamiDict] = none(SamiDict)
+
+proc getSelfExtraction*(): Option[SamiDict] =
+  # If we somehow call this twice, no need to re-compute.
+  if selfSami.isSome():
+    return selfSami
+  
+  var
+    myPath = @[joinPath(getAppDir(), getAppFileName())]
+    exclusions: seq[string] = @[]
+    
+  trace(fmt"Checking sami binary @{myPath} for embedded config")
+  
+  for (_, name, plugin) in getCodecsByPriority():
+    let codec = cast[Codec](plugin)
+    codec.doScan(myPath, exclusions, false)
+    if len(codec.samis) == 0: continue
+    let
+      obj = codec.samis[0]
+      pt = obj.primary
+    codec.samis = @[]
+    selfSami = pt.samiFields
+    if obj.samiIsEmpty() or not obj.samiHasExisting():
+      trace(fmt"No embedded self-SAMI found.")
+    else:
+      trace(fmt"Found existing self-SAMI.")
+    return selfSami
+      
+  warn(fmt"We have no codec for this platform's native executable type")
+  return none(SamiDict)
 

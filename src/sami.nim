@@ -50,7 +50,7 @@ doAdditionalValidation()
 
 
 proc runCmdDefaults*() {.noreturn, inline.} =
-  loadUserConfigFile()
+  loadUserConfigFile(getSelfExtraction())
   loadCommandPlugins()
   showConfig() # config.nim
   quit()
@@ -62,13 +62,13 @@ proc runCmdInject*() {.noreturn, inline.} =
   # that before we set up any command-line arguments; it would return
   # 'false' for us always, no matter what the user supplies.
   cmdInject = some(pack(true))
-  loadUserConfigFile()
+  loadUserConfigFile(getSelfExtraction())
   loadCommandPlugins()
   doInjection() # inject.nim
   quit()
 
 proc runCmdExtract*() {.noreturn, inline.} =
-  loadUserConfigFile()
+  loadUserConfigFile(getSelfExtraction())
   doExtraction(onBehalfOfInjection = false) # extract.nim
   quit()
 

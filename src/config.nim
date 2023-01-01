@@ -1,6 +1,7 @@
 import strformat
 import strutils
 import tables
+import options
 import algorithm
 import os
 import streams
@@ -221,6 +222,12 @@ key BUILD_OWNERS {
     output_order: 23
 }
 
+key X_SAMI_CONFIG {
+    system: true
+    type: "string"
+    since: "0.1.0"
+}
+
 key OLD_SAMI {
     type: "sami"
     since: "0.1.0"
@@ -336,6 +343,9 @@ output s3 {
 ## This variable represents the current config.  The con4m
 ## macro will also inject a variable with more config state, which we
 ## will use for config file layering.
+##
+## This will create a number of types for us.
+##
 ## TODO: Add a field to the global or a section to configure
 ## logging options.
 var samiConfig = con4m(Sami, baseconfig):
@@ -503,7 +513,6 @@ var samiConfig = con4m(Sami, baseconfig):
     attr(docstring,
          string,
          required = false)
-
 #         doc = "Is this plugin a codec?")
 #         doc = "The list of keys this codec can serve")
 #         doc = "List of keys whose priorities should be changed from the " &
@@ -516,13 +525,72 @@ var samiConfig = con4m(Sami, baseconfig):
 const allowedCmds = ["inject", "extract", "defaults"]
 const validLogLevels = ["none", "error", "warn", "info", "trace"]
 
-
-
 type
   SamiOutputContext* = enum
     OutCtxExtract, OutCtxInjectPrev, OutCtxInject
   
   SamiOutputHandler* = (string, SamiOutputSection, string) -> bool
+  SamiDict* = TableRef[string, Box] ## \
+     ## Representation of the abstract SAMI's fields. If the SAMI
+     ## was read from a file, this will include any embeds / nests.
+     ## If, however, it is a "new" SAMI, then any embeds or
+     ## SAMIs that were there when we first loaded the file
+     ## will end up in the FileOfInterest object.
+
+  FileFlags* = enum
+    Binary, BigEndian, Arch64Bit
+
+  SamiPoint* = ref object
+    ## The SamiPoints object encodes all info known about a single point
+    ## for a SAMI, such as whether there's currently a SAMI object
+    ## there.
+    samiFields*: Option[SamiDict] ## The SAMI fields found at a point.
+    startOffset*: int ## When we're inserting SAMI, where does it go?
+    endOffset*: int ## When we're inserting SAMI, where does the file resume?
+    present*: bool ## Flag to indicate whether there's magic at the location.
+    valid*: bool
+    err*: seq[string]
+
+  SamiObj* = ref object
+    ## The SAMI point info for a single artifact.
+    fullpath*: string    ## The path to the file we've hit on the walk.
+    toplevel*: string    ## The toplevel path under which we found this file.
+    stream*: FileStream  ## The open file.
+    newFields*: SamiDict ## What we're adding during insertion.
+    primary*: SamiPoint  ## This represents the location of a SAMI's
+                         ## insertion, and also holds any SAMI fields
+                         ## extracted from this position.
+    flags*: set[FileFlags]
+    embeds*: seq[(string, SamiPoint)]
+
+  Plugin* = ref object of RootObj
+    configInfo*: SamiPluginSection
+
+  PluginInfo* = tuple[priority: int, name: string, plugin: Plugin]
+  Codec* = ref object of Plugin
+    samis*: seq[SamiObj]
+    magic*: string
+    searchPath*: seq[string]
+
+  ExternalPlugin* = ref object of Plugin
+    command*: string
+
+  KeyInfo* = TableRef[string, Box]
+
+proc samiHasExisting*(sami: SamiObj): bool {.inline.} =
+  return sami.primary.valid
+
+proc samiIsEmpty*(sami: SamiObj): bool {.inline.} =
+  return if (sami.embeds.len() > 0) or sami.samiHasExisting(): false else: true
+
+# For use in binary JSON encoding.
+const
+  binTypeNull* = 0'u8
+  binTypeString* = 1'u8
+  binTypeInteger* = 2'u8
+  binTypeBool* = 3'u8
+  binTypeArray* = 5'u8
+  binTypeObj* = 6'u8
 
 
 proc getOutputConfig*(): TableRef[string, SamiOutputSection] =
@@ -948,7 +1016,34 @@ proc doAdditionalValidation*() =
   # Now, lock a bunch of fields.
   lockBuiltinKeys()
 
-proc loadUserConfigFile*() =
+proc loadEmbeddedConfig(selfSami: SamiDict) =
+  # We extracted a SAMI object from our own executable.  Check for an
+  # X_SAMI_CONFIG key, and if there is one, run that configuration
+  # file, before loading any on-disk configuration file.
+  if not selfSami.contains("X_SAMI_CONFIG"):
+    trace("Embedded self-SAMI does not contain a configuration.")
+    return
+  let
+    confString = unpack[string](selfSami["X_SAMI_CONFIG"])
+    confStream = newStringStream(confString)
+    res = ctxSamiConf.stackConfig(confStream, "<embedded>")
+
+  if res.isNone():
+    error("Embeeded configuration is invalid. Use 'setconf' command to fix")
+
+    if ctxSamiConf.errors.len() != 0:
+      for err in ctxSamiConf.errors:
+        error(err)
+    quit()
+
+  samiConfig = ctxSamiConf.loadSamiConfig()
+  doAdditionalValidation()
+  trace("Loaded embedded configuration file")
+    
+proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
+  if selfSami.isSome():
+    loadEmbeddedConfig(selfSami.get())
+    
   var
     path = getConfigPath()
     filename = getConfigFileName() # the base file name.
@@ -974,7 +1069,6 @@ proc loadUserConfigFile*() =
       quit()
     else:
       loaded = true
-
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
