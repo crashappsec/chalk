@@ -91,6 +91,7 @@ proc doInjection*() =
     objsForHookWrite: seq[string] = @[]
   let
     everyKey = getOrderedKeys()
+    dryRun = getDryRun()
 
   doExtraction(onBehalfOfInjection = true)
 
@@ -181,6 +182,10 @@ proc doInjection*() =
       else:
         objsForHookWrite.add(encoded)
 
+      # NOW, if we're in dry-run mode, we don't actually inject.
+      if dryRun:
+        continue
+        
       if point.endOffset > point.startOffset:
         item.stream.setPosition(point.endOffset)
       let

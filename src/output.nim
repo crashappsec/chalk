@@ -37,10 +37,15 @@ proc handleOutput*(content: string, context: SamiOutputContext) =
                 of OutCtxInject: getInjectionOutputHandlers()
       ct = "When " & contextAsText[context] & ":"
       xtra = if handlers != @["stdout"]:
-               "\nWould have written:\n" & pretty(parseJson(content))
+               "\nWould have written to handlers:\n" &
+                 pretty(parseJson(content))
              else: "\n"
-      output = fmt"{ct} without 'dry run' on, would have sent output to: " &
-               handlers.join(", ") & xtra
+      output = if handlers.len() != 0:
+                 fmt"{ct} without 'dry run' on, would have sent output to: " &
+                   handlers.join(", ") & xtra
+               else:
+                 fmt"{ct} No output handlers installed, and 'dry run' on." &
+                  xtra
             
     echo output
     return

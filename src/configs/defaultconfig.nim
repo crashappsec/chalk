@@ -1,4 +1,9 @@
 const defaultConfig = """
+color: true
+log_level: "info"
+
+echo("Loading default SAMI config.")
+
 extraction_output_handlers: ["stdout"]
 injection_prev_sami_output_handlers: []
 injection_output_handlers: []

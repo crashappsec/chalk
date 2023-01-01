@@ -432,17 +432,22 @@ proc doAdditionalValidation*() =
   # Now, lock a bunch of fields.
   lockBuiltinKeys()
 
-proc loadEmbeddedConfig(selfSami: SamiDict, dieIfInvalid = true) =
+proc loadEmbeddedConfig(selfSamiOpt: Option[SamiDict], dieIfInvalid = true) =
   var confString: string
-  
-  # We extracted a SAMI object from our own executable.  Check for an
-  # X_SAMI_CONFIG key, and if there is one, run that configuration
-  # file, before loading any on-disk configuration file.
-  if not selfSami.contains("X_SAMI_CONFIG"):
-    trace("Embedded self-SAMI does not contain a configuration.")
+
+  if selfSamiOpt.isNone():
     confString = defaultConfig
   else:
-    confString = unpack[string](selfSami["X_SAMI_CONFIG"])
+    let selfSami = selfSamiOpt.get()
+  
+    # We extracted a SAMI object from our own executable.  Check for an
+    # X_SAMI_CONFIG key, and if there is one, run that configuration
+    # file, before loading any on-disk configuration file.
+    if not selfSami.contains("X_SAMI_CONFIG"):
+      trace("Embedded self-SAMI does not contain a configuration.")
+      confString = defaultConfig
+    else:
+      confString = unpack[string](selfSami["X_SAMI_CONFIG"])
   
   let
     confStream = newStringStream(confString)
@@ -464,8 +469,7 @@ proc loadEmbeddedConfig(selfSami: SamiDict, dieIfInvalid = true) =
   trace("Loaded embedded configuration file")
     
 proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
-  if selfSami.isSome():
-    loadEmbeddedConfig(selfSami.get())
+  loadEmbeddedConfig(selfSami)
     
   var
     path = getConfigPath()
@@ -481,17 +485,21 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
 
   if fname != "":
     trace(fmt"Loading config file: {fname}")
-    let res = ctxSamiConf.stackConfig(fname)
-    if res.isNone():
-      error(fmt"{fname}: invalid configuration not loaded.")
+    try:
+      let res = ctxSamiConf.stackConfig(fname)
+      if res.isNone():
+        error(fmt"{fname}: invalid configuration not loaded.")
 
-      if ctxSamiConf.errors.len() != 0:
-        for err in ctxSamiConf.errors:
-          error(err)
+        if ctxSamiConf.errors.len() != 0:
+          for err in ctxSamiConf.errors:
+            error(err)
 
-      quit()
-    else:
-      loaded = true
+        quit()
+      else:
+        loaded = true
+      
+    except Con4mError: # config not present:
+      inform(fmt"{fname}: config file not found.")
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
