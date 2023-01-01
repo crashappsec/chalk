@@ -8,9 +8,46 @@ import argparse
 import macros
 import tables
 import strformat
+import nimutils/box
+import con4m/[types, builtins]
+
+# This "builtin" call for con4m doesn't need to be available until
+# user configurations load, but let's be sure to do it before that
+# happens.  First we define the function here, and next we'll register
+# it.
+var cmdInject = some(pack(false))
+
+proc getInjecting*(args: seq[Box],
+                   unused1: Con4mScope,
+                   unused2: VarStack,
+                   unused3: Con4mScope): Option[Box] =
+    return cmdInject
 
 
+# getConfigState() is defined in config.nim, and basically
+# just exports a variable that is auto-generated for us when we
+# initialize con4m (also in config.nim).
+
+let ctxSamiConf = getConfigState()
+ctxSamiConf.newBuiltIn("injecting", getInjecting, "f() -> bool")
+
+# The internally stored config file loads due to the import of config.
+# Call this function to do the additional configuration validation
+# before we process any command-line flags.  
+#
+# This could also run automatically on importing config, but the
+# plugins module also sets up some stuff that should load before the
+# config is validated (some loaded plugins set up callbacks in con4m,
+# for instance).  Even if we put "import plugins" before "import
+# config", plugins imports config, so that will have its
+# initialization code run first.  Thus, this gets done here, where we
+# can be sure that it will happen after each module has set up what it
+# needs.
+#
+# Plus, it gives me the opportunity to point out some setup is
+# happening before the command-line flag processing.
 doAdditionalValidation()
+
 
 proc runCmdDefaults*() {.noreturn, inline.} =
   loadUserConfigFile()
@@ -19,6 +56,12 @@ proc runCmdDefaults*() {.noreturn, inline.} =
   quit()
 
 proc runCmdInject*() {.noreturn, inline.} =
+  # This needs to be set before we load any user-level configuration
+  # file, for the sake of the "injecting()" builtin (above).  Note: we
+  # cannot use that builtin in the base configuration, since we run
+  # that before we set up any command-line arguments; it would return
+  # 'false' for us always, no matter what the user supplies.
+  cmdInject = some(pack(true))
   loadUserConfigFile()
   loadCommandPlugins()
   doInjection() # inject.nim
