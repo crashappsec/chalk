@@ -8,6 +8,9 @@ include configs/con4mconfig   # gives us the variable samiConfig, which is
                               # a con4m configuration object.
                               # this needs to happen before we include types.
 include types
+
+const allowedCmds = ["inject", "extract", "defaults", "configDump"]
+const validLogLevels = ["none", "error", "warn", "info", "trace"]
  
 proc getOutputConfig*(): TableRef[string, SamiOutputSection] =
   return samiConfig.output
@@ -58,6 +61,9 @@ proc getDefaultCommand*(): Option[string] =
 # proc setDefaultCommand*(val: string) =
 #   samiConfig.defaultCommand = some(val)
 
+proc getCanDump*(): bool =
+  return samiConfig.canDump
+  
 proc getColor*(): bool =
   return samiConfig.color
 
@@ -97,6 +103,9 @@ proc getRecursive*(): bool =
 proc setRecursive*(val: bool) =
   discard ctxSamiConf.setOverride("recursive", pack(val))
   samiConfig.recursive = val
+
+proc getAllowExternalConfig*(): bool =
+  return samiConfig.allowExternalConfig
 
 proc getExtractionOutputHandlers*(): seq[string] =
   return samiConfig.extractionOutputHandlers
@@ -244,7 +253,7 @@ proc `$`*(plugin: SamiPluginSection): string =
     ignoreStr = optI.get().join(", ")
 
 
-  return fmt"""  default priority:    {plugin.getPriority()}
+  return fmt"""  default priority:      {plugin.getPriority()}
   is codec:              {plugin.getCodec()}
   is enabled:            {plugin.getEnabled()}
   keys handled:          {plugin.getKeys().join(", ")}
@@ -356,8 +365,17 @@ new sami out hooks:     {c.injectionOutputHandlers.join(", ")}
 
 proc showConfig*() =
   stderr.writeLine($(samiConfig))
+  stderr.writeLine("""
+Use 'dumpConfig' to export the embedded configuration file to disk,
+and 'loadConfig' to load one.""")
+
+var onceLockBuiltinKeys = false
 
 proc lockBuiltinKeys*() =
+  if onceLockBuiltinKeys:
+    return
+  else:
+    onceLockBuiltinKeys = true
   for key in getAllKeys():
     let
       prefix = "key." & key
@@ -379,7 +397,6 @@ proc lockBuiltinKeys*() =
   # These are locks of invalid fields for specific output handlers.
   # Note that all of these lock calls could go away if con4m gets a
   # locking syntax.
-
   discard ctxSamiConf.lockConfigVar("output.stdout.filename")
   discard ctxSamiConf.lockConfigVar("output.stdout.command")
   discard ctxSamiConf.lockConfigVar("output.stdout.dst_uri")
@@ -432,10 +449,14 @@ proc doAdditionalValidation*() =
   # Now, lock a bunch of fields.
   lockBuiltinKeys()
 
-proc loadEmbeddedConfig(selfSamiOpt: Option[SamiDict], dieIfInvalid = true) =
-  var confString: string
+proc loadEmbeddedConfig(selfSamiOpt: Option[SamiDict],
+                        dieIfInvalid = true): bool =
+  var
+    confString: string
+    validEmbedded: bool
 
   if selfSamiOpt.isNone():
+    validEmbedded = false
     confString = defaultConfig
   else:
     let selfSami = selfSamiOpt.get()
@@ -446,9 +467,11 @@ proc loadEmbeddedConfig(selfSamiOpt: Option[SamiDict], dieIfInvalid = true) =
     if not selfSami.contains("X_SAMI_CONFIG"):
       trace("Embedded self-SAMI does not contain a configuration.")
       confString = defaultConfig
+      validEmbedded = false
     else:
       confString = unpack[string](selfSami["X_SAMI_CONFIG"])
-  
+      validEmbedded = true
+
   let
     confStream = newStringStream(confString)
     res = ctxSamiConf.stackConfig(confStream, "<embedded>")
@@ -457,19 +480,59 @@ proc loadEmbeddedConfig(selfSamiOpt: Option[SamiDict], dieIfInvalid = true) =
     if dieIfInvalid:
       error("Embeeded configuration is invalid. Use 'setconf' command to fix")
     else:
-      return # We ignore this.
+      validEmbedded = false
+  else:
+    validEmbedded = true
 
-    if ctxSamiConf.errors.len() != 0:
-      for err in ctxSamiConf.errors:
-        error(err)
-    quit()
+  if not validEmbedded: return false
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
   trace("Loaded embedded configuration file")
+  return true
+
+proc handleConfigDump*(selfSami: Option[SamiDict]) =
+  let confValid = loadEmbeddedConfig(selfSami, dieIfInvalid = false)
+  if not getCanDump():
+    error("Dumping embedded config is disabled.")
+    quit()
+  else:
+    # The 'argument' for the dump output (if any), was set to
+    # artifactSearchPath, which defaults to our cwd.  Not awesome, but
+    # the way it is right now, until we do our own command line
+    # argument parser as part of con4m.
+    let targetOut = getArtifactSearchPath()
     
+    if len(targetOut) > 2:
+      error("configDump requires at most one parameter")
+      quit()
+
+    let
+      outfile = if resolvePath(targetOut[0]) == resolvePath("."):
+                  "sami.conf.dump"
+                else: resolvePath(targetOut[0])
+      toDump = if confValid: unpack[string](selfSami.get()["X_SAMI_CONFIG"])
+               else: defaultConfig
+               
+    try:
+      var f = newFileStream(outfile, fmWrite)
+      if f == nil:
+        error(fmt"Could not write to: {outfile} ({getCurrentExceptionMsg()})")
+        quit()
+      f.write(toDump)
+      f.close()
+    except:
+      error(fmt"Could not write to: {outfile} ({getCurrentExceptionMsg()})")
+      quit()
+
+    stderr.writeLine(fmt"Dumped configuration to: {outfile}")
+    quit()
+
 proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
-  loadEmbeddedConfig(selfSami)
+  discard loadEmbeddedConfig(selfSami)
+
+  if not getAllowExternalConfig():
+    return
     
   var
     path = getConfigPath()

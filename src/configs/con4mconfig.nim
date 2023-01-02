@@ -50,6 +50,8 @@ var samiConfig = con4m(Sami, baseconfig):
   attr(dry_run, bool, false)
   attr(artifact_search_path, [string], @["."])
   attr(recursive, bool, true)
+  attr(can_dump, bool, true)
+  attr(allow_external_config, bool, true)
   section(key, allowedSubSections = @["*", "*.json", "*.binary"]):
     attr(required,
          bool,
@@ -111,14 +113,14 @@ var samiConfig = con4m(Sami, baseconfig):
            "grained control over when the conf file takes precedence " &
            "over the other plugins.",
          required = false)
-    attr(docstring,
-         string,
-         required = false,
-         doc = "documentation for the key.")
     attr(codec,
          bool,
          defaultVal = false,
          doc = "If true, then this key is settable by plugins marked codec.")
+    attr(docstring,
+         string,
+         required = false,
+         doc = "documentation for the key.")
   section(plugin, allowedSubSections = @["*"]):
     attr(priority,
          int,

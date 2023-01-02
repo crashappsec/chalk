@@ -112,7 +112,7 @@ template fatal*(str: string, nested: bool = false) =
 
   quit(1)
 
-template error*(str: string) =
+template error*(str: string, die=true) =
   if logLevel() != logLevelNone:
     if getColor():
       stderr.styledWrite(fgRed, styleBright, errPrefix, ansiResetCode)

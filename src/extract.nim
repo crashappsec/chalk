@@ -108,7 +108,7 @@ proc getSelfExtraction*(): Option[SamiDict] =
     myPath = @[resolvePath(getAppFileName())]
     exclusions: seq[string] = @[]
     
-  trace(fmt"Checking sami binary @{myPath} for embedded config")
+  trace(fmt"Checking sami binary {myPath[0]} for embedded config")
   
   for (_, name, plugin) in getCodecsByPriority():
     let codec = cast[Codec](plugin)

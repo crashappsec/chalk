@@ -49,6 +49,9 @@ ctxSamiConf.newBuiltIn("injecting", getInjecting, "f() -> bool")
 doAdditionalValidation()
 
 
+proc runCmdDump*() {.noreturn, inline.} =
+  handleConfigDump(getSelfExtraction())
+  
 proc runCmdDefaults*() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
   loadCommandPlugins()
@@ -177,6 +180,13 @@ template defaultsCmd(cmd: string, primary: bool) =
     run:
       runCmdDefaults()
 
+template dumpCmd(cmd: string, primary: bool) =
+  command(cmd):
+    if primary:
+      help(showDumpHelp)
+    run:
+      runCmdDump()
+
 when isMainModule:
   var cmdLine = newParser:
     help(generalHelp)
@@ -240,19 +250,23 @@ when isMainModule:
       if opts.configSearchPath != "":
         setConfigPath(opts.configSearchPath.split(":"))
 
-    injectCmd(cmdNameInject1, true)
-    injectCmd(cmdNameInject2, false)
-    injectCmd(cmdNameInject3, false)
-    injectCmd(cmdNameInject4, false)
-    injectCmd(cmdNameInject5, false)
+    injectCmd("inject", true)
+    injectCmd("insert", false)
+    injectCmd("ins", false)
+    injectCmd("inj", false)
+    injectCmd("in", false)
+    injectCmd("i", false)    
 
-    extractCmd(cmdNameExtract1, true)
-    extractCmd(cmdNameExtract2, false)
-    extractCmd(cmdNameExtract3, false)
+    extractCmd("extract", true)
+    extractCmd("ex", false)
+    extractCmd("x", false)
 
-    defaultsCmd(cmdNameDefaults1, true)
-    defaultsCmd(cmdNameDefaults2, false)
-    defaultsCmd(cmdNameDefaults3, false)
+    defaultsCmd("defaults", true)
+    defaultsCmd("def", false)
+    defaultsCmd("d", false)
+
+    dumpCmd("configDump", true)
+    dumpCmd("dump", false)
 
   try:
     cmdLine.run()

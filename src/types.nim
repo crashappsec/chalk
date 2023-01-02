@@ -52,9 +52,6 @@ type
 
   KeyInfo* = TableRef[string, Box]
 
-const allowedCmds = ["inject", "extract", "defaults"]
-const validLogLevels = ["none", "error", "warn", "info", "trace"]
-
 proc samiHasExisting*(sami: SamiObj): bool {.inline.} =
   return sami.primary.valid
 
