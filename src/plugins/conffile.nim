@@ -22,8 +22,8 @@ method getArtifactInfo*(self: ConfFilePlugin,
       optval = spec.getValue()
 
     if optval.isNone(): continue
+    if spec.getSystem(): continue # This plugin doesn't handle system keys.
 
     result[key] = optval.get()
-
 
 registerPlugin("conffile", ConfFilePlugin())

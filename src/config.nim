@@ -57,12 +57,11 @@ proc setConfigFileName*(val: string) =
 proc getDefaultCommand*(): Option[string] =
   return samiConfig.defaultCommand
 
-# not needed.
-# proc setDefaultCommand*(val: string) =
-#   samiConfig.defaultCommand = some(val)
-
-proc getCanDump*(): bool =
+proc getCanDump(): bool =
   return samiConfig.canDump
+  
+proc getCanLoad(): bool =
+  return samiConfig.canLoad
   
 proc getColor*(): bool =
   return samiConfig.color
@@ -528,6 +527,12 @@ proc handleConfigDump*(selfSami: Option[SamiDict]) =
     stderr.writeLine(fmt"Dumped configuration to: {outfile}")
     quit()
 
+proc quitIfCantChangeEmbeddedConfig*(selfSami: Option[SamiDict]) =
+  discard loadEmbeddedConfig(selfSami, dieIfInvalid = false)
+  if not getCanLoad():
+    error("Loading a new embedded config is diabled.")
+    quit()
+
 proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
   discard loadEmbeddedConfig(selfSami)
 
@@ -572,4 +577,116 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
   else:
     trace("Running without a config file.")
 
-proc getConfigState*(): ConfigState = ctxSamiConf    
+var selfInjection = false
+
+proc getSelfInjecting*(): bool =
+  return selfInjection
+    
+proc setupSelfInjection*(filename: string) =
+  var newCon4m: string
+  
+  selfInjection = true
+
+  setArtifactSearchPath(@[resolvePath(getAppFileName())])
+
+  # This protection is easily thwarted, especially since SAMI is open
+  # source.  So we don't try to guard against it too much.
+  #
+  # Particularly, we'd happily inject a SAMI into a copy of the SAMI
+  # executable via just standard injection, which would allow us to
+  # nuke any policy that locks loading.
+  #
+  # Given that it's open source, no need to try to run an arms race;
+  # the feature is here more to ensure there are clear operational
+  # controls.
+  
+  if not getCanLoad():
+    error("Loading embedded configurations not supported.")
+    quit()
+    
+  if filename == "default":
+    newCon4m = defaultConfig
+    if getDryRun():
+      forceInform("Would install the default configuration file.")
+      quit()
+    else:
+      inform("Installing the default confiuration file.")
+  else:
+    let f = newFileStream(resolvePath(filename))
+    if f == nil:
+      error(fmt"{filename}: could not open configuration file")
+      quit()
+    try:
+      let contents = f.readAll()
+      f.close()
+    except:
+      error(fmt"{filename}: could not read configuration file")
+      quit()
+      
+    # Now we need to validate the config, without stacking it over our
+    # existing configuration. We really want to know that the file
+    # will not only be a valid con4m file, but that it will meet the
+    # SAMI spec.
+    #
+    # Unfortunately, the only way we can be reasonably sure it will
+    # load is by running it once, as the spec check requires seeing
+    # the final configuration state.
+    #
+    # But, since it's code that could have conditionals, that might
+    # also not tell us whether it would always meet the spec. And,
+    # the code might side-effect, which isn't ideal.
+    #
+    # Still, we're going to go ahead and evaluate the thing once to
+    # give ourselves the best shot of detecting any errors early.
+    #
+    # But, we're not going to stack this configuration, as we wouldn't
+    # want it to interfere with this run (the configuration is meant
+    # to apply from the next run).  So we set up a new context, but
+    # then nick the specification context.
+    #
+    # TODO: we're currently opening and reading the config file
+    # twice; should fix this by providing the right API in con4m,
+    # whether we have it eval from a string, or have it expose
+    # the source to us so we can stash in the newCon4m variable.
+
+    inform(fmt"{filename}: Validating configuration.")
+    
+    let testOpt = evalConfig(resolvePath(filename))
+    if testOpt.isNone():
+      # Pretty sure this check is redundant with ours above.  We
+      # should get a state object back, even if it has errors in it.
+      error("Could not load config file.")
+      quit()
+      
+    let (testState, testScope) = testOpt.get()
+
+    testState.addSpec(ctxSamiConf.spec.get())
+    
+    if testState.errors.len() != 0 or not testState.validateConfig():
+      ctxSamiConf.errors = testState.errors
+      error("Configuration file failed to load.")
+      quit()
+    
+    trace(fmt"{filename}: Configuration successfully validated.")
+
+    if getDryRun():
+      forceInform("The provided configuration file would be loaded.")
+      quit()
+      
+    # Now we're going to set up the injection properly solely by
+    # tinkering with the config state.
+    #
+    # While we will leave any injection handlers in place, we will
+    # NOT use a SAMI pointer.
+    #
+    # These keys we are requesting are all in the base config, so
+    # these lookups won't fail.
+    var samiPtrKey = getKeySpec("SAMI_PTR").get()
+    samiPtrKey.value = none(Box)
+
+    var xSamiConfKey = getKeySpec("X_SAMI_CONFIG").get()
+    xSamiConfKey.value = some(pack(newCon4m))
+    
+proc getConfigState*(): ConfigState =
+  return ctxSamiConf    
+  

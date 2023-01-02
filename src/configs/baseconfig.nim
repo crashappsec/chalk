@@ -302,7 +302,7 @@ plugin sbomCallback {
 # to 32-bit maxint (though should consider using the whole 64-bits).
 
 plugin system {
-    keys: ["TIMESTAMP", "SAMI_ID", "OLD_SAMI"]
+    keys: ["TIMESTAMP", "SAMI_ID", "OLD_SAMI", "X_SAMI_CONFIG"]
     priority: 2147483647
 }
 

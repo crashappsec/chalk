@@ -51,6 +51,7 @@ var samiConfig = con4m(Sami, baseconfig):
   attr(artifact_search_path, [string], @["."])
   attr(recursive, bool, true)
   attr(can_dump, bool, true)
+  attr(can_load, bool, true)
   attr(allow_external_config, bool, true)
   section(key, allowedSubSections = @["*", "*.json", "*.binary"]):
     attr(required,

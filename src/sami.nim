@@ -5,7 +5,7 @@ import extract
 import plugins
 
 import argparse
-import macros
+import macros except error
 import tables
 import strformat
 import nimutils/box
@@ -48,17 +48,12 @@ ctxSamiConf.newBuiltIn("injecting", getInjecting, "f() -> bool")
 # happening before the command-line flag processing.
 doAdditionalValidation()
 
-
-proc runCmdDump*() {.noreturn, inline.} =
-  handleConfigDump(getSelfExtraction())
-  
-proc runCmdDefaults*() {.noreturn, inline.} =
+proc runCmdDefaults() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
-  loadCommandPlugins()
   showConfig() # config.nim
   quit()
 
-proc runCmdInject*() {.noreturn, inline.} =
+proc runCmdInject() {.noreturn, inline.} =
   # This needs to be set before we load any user-level configuration
   # file, for the sake of the "injecting()" builtin (above).  Note: we
   # cannot use that builtin in the base configuration, since we run
@@ -70,10 +65,29 @@ proc runCmdInject*() {.noreturn, inline.} =
   doInjection() # inject.nim
   quit()
 
-proc runCmdExtract*() {.noreturn, inline.} =
+proc runCmdExtract() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
   doExtraction(onBehalfOfInjection = false) # extract.nim
   quit()
+
+proc runCmdDump() {.noreturn, inline.} =
+  handleConfigDump(getSelfExtraction())
+
+proc runCmdLoad() {.noreturn, inline.} =
+  # The fact that we're injecting into ourself will be special-cased
+  # in the injection workflow.
+  let
+    selfSami = getSelfExtraction()
+    args = getArtifactSearchPath()
+    
+  quitIfCantChangeEmbeddedConfig(selfSami)
+  if len(args) != 1:
+    error("configLoad requires either a file name or 'default'")
+    quit()
+
+  setupSelfInjection(args[0])
+  
+  runCmdInject() 
 
 type
   FlagID = enum
@@ -187,6 +201,13 @@ template dumpCmd(cmd: string, primary: bool) =
     run:
       runCmdDump()
 
+template loadCmd(cmd: string, primary: bool) =
+  command(cmd):
+    if primary:
+      help(showLoadHelp)
+    run:
+      runCmdLoad()
+
 when isMainModule:
   var cmdLine = newParser:
     help(generalHelp)
@@ -267,6 +288,9 @@ when isMainModule:
 
     dumpCmd("configDump", true)
     dumpCmd("dump", false)
+
+    loadCmd("configLoad", true)
+    loadCmd("load", false)
 
   try:
     cmdLine.run()

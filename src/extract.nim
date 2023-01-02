@@ -97,12 +97,13 @@ proc doExtraction*(onBehalfOfInjection: bool) =
         removeFile(path)
         raise
 
+var selfSamiObj: Option[SamiObj] = none(SamiObj)
 var selfSami: Option[SamiDict] = none(SamiDict)
 
-proc getSelfExtraction*(): Option[SamiDict] =
+proc getSelfSamiObj*(): Option[SamiObj] =
   # If we somehow call this twice, no need to re-compute.
-  if selfSami.isSome():
-    return selfSami
+  if selfSamiObj.isSome():
+    return selfSamiObj
   
   var
     myPath = @[resolvePath(getAppFileName())]
@@ -114,16 +115,30 @@ proc getSelfExtraction*(): Option[SamiDict] =
     let codec = cast[Codec](plugin)
     codec.doScan(myPath, exclusions, false)
     if len(codec.samis) == 0: continue
-    let
-      obj = codec.samis[0]
-      pt = obj.primary
+    selfSamiObj = some(codec.samis[0])
     codec.samis = @[]
-    selfSami = pt.samiFields
-    if obj.samiIsEmpty() or not obj.samiHasExisting():
-      trace(fmt"No embedded self-SAMI found.")
-    else:
-      trace(fmt"Found existing self-SAMI.")
-    return selfSami
-      
+    return selfSamiObj
+
   warn(fmt"We have no codec for this platform's native executable type")
-  return none(SamiDict)
+  return none(SamiObj)
+  
+proc getSelfExtraction*(): Option[SamiDict] =
+  # If we somehow call this twice, no need to re-compute.
+  if selfSami.isSome():
+    return selfSami
+  
+  let samiObjOpt = getSelfSamiObj()
+  if not samiObjOpt.isSome(): return none(SamiDict)
+
+  let
+    obj = samiObjOpt.get()
+    pt = obj.primary
+    selfSami = pt.samiFields
+    
+  if obj.samiIsEmpty() or not obj.samiHasExisting():
+    trace(fmt"No embedded self-SAMI found.")
+    return none(SamiDict)
+  else:
+    trace(fmt"Found existing self-SAMI.")
+  return selfSami
+      
