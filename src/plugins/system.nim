@@ -1,5 +1,6 @@
 import ../config
 import ../plugins
+import ../extract # for getSelfID()
 
 import nimutils
 import nimutils/box
@@ -50,6 +51,11 @@ method getArtifactInfo*(self: SystemPlugin,
   result["TIMESTAMP"] = pack(cast[int](unixTimeInMs()))
   result["_MAGIC.json"] = pack("dadfedabbadabbed")
 
+  let selfIdOpt = getSelfId()
+
+  if selfIdOpt.isSome():
+    result["INJECTOR_ID"] = pack(selfIdOpt.get())
+  
   let
     spec = config.getKeySpec("X_SAMI_CONFIG").get()
     optVal = spec.getValue()

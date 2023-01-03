@@ -4,6 +4,7 @@ import resources
 import io/tojson
 import output
 import nimutils
+import nimutils/box
 
 import os
 import strutils
@@ -11,6 +12,7 @@ import options
 import strformat
 import streams
 import nativesockets
+import tables
 
 proc doExtraction*(onBehalfOfInjection: bool) =
   # This function will extract SAMIs, leaving them in SAMI
@@ -122,7 +124,9 @@ proc getSelfSamiObj*(): Option[SamiObj] =
 
   warn(fmt"We have no codec for this platform's native executable type")
   return none(SamiObj)
-  
+
+var selfID: Option[uint] = none(uint)
+
 proc getSelfExtraction*(): Option[SamiDict] =
   # If we somehow call this twice, no need to re-compute.
   if selfSami.isSome():
@@ -141,4 +145,12 @@ proc getSelfExtraction*(): Option[SamiDict] =
     return none(SamiDict)
   else:
     trace(fmt"Found existing self-SAMI.")
+    let sami = selfSami.get()
+    # Should always be true, but just in case.
+    if sami.contains("SAMI_ID"):
+      selfID = some(unpack[uint](sami["SAMI_ID"]))
+      
   return selfSami
+
+proc getSelfID*(): Option[uint] =
+  return selfID
