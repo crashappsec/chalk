@@ -68,14 +68,6 @@ const
   fOutputDirShort* = "-d"
   fOutputDirLong* = "--output-dir"
 
-  # TODO: stick these in arrays and use macros to generate code.
-  cmdNameInject1* = "inject"
-  cmdNameInject2* = "insert"
-  cmdNameInject3* = "ins"
-  cmdNameInject4* = "in"
-  cmdNameInject5* = "i"
-
-
   cmdNameExtract1* = "extract"
   cmdNameExtract2* = "ex"
   cmdNameExtract3* = "x"
@@ -162,9 +154,11 @@ be used, given the impact of config files / environment variables.
   normalHelp* = "Output at normal logging level (warnings, but not too chatty)"
   verboseHelp* = "Output basic information during run"
   traceHelp* = "Output detailed tracing information"
-  showDefHelp* = "Show what options will be selected, and why. Considers\n" &
+  showDefHelp* = "Show what options will be selected. Considers\n" &
               "\t\t\t     the impact of any config file, environment \n" &
               "\t\t\t     variables and options passed before this flag appears"
+  showDumpHelp* = "Dumps any embedded configuration to disk."
+  showLoadHelp* = "Loads an embedded configuration from the specified file."
   cfgFileHelp* = "Specify the config file name to search for (NOT the path)"
   cfgSearchHelp* = "The search path for looking for configuration files"
   inFilesHelp* = "Specify which files or directories to target for insertion."

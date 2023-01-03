@@ -1,9 +1,9 @@
-import types
 import config
 import plugins
 import resources
 import io/tojson
 import output
+import nimutils
 
 import os
 import strutils
@@ -18,9 +18,15 @@ proc doExtraction*(onBehalfOfInjection: bool) =
   # can reuse this code.
   #
   # TODO: need to validate extracted SAMIs.
-  # Also TODO, we will be adding output plugins very soon.
+  # 
+  # We do not process the actual sami binary that is running, if it
+  # happens to be in the search path.  It's a special command to do a
+  # self-insertion, partially to avoid accidents, and partially
+  # because we overload the capability for loading / unloading the
+  # admin's config file.
   var
-    exclusions: seq[string]
+    exclusions: seq[string] = if getSelfInjecting(): @[]
+                              else: @[resolvePath(getAppFileName())]
     codecInfo: seq[Codec]
     ctx: FileStream
     path: string
@@ -92,3 +98,47 @@ proc doExtraction*(onBehalfOfInjection: bool) =
         removeFile(path)
         raise
 
+var selfSamiObj: Option[SamiObj] = none(SamiObj)
+var selfSami: Option[SamiDict] = none(SamiDict)
+
+proc getSelfSamiObj*(): Option[SamiObj] =
+  # If we somehow call this twice, no need to re-compute.
+  if selfSamiObj.isSome():
+    return selfSamiObj
+  
+  var
+    myPath = @[resolvePath(getAppFileName())]
+    exclusions: seq[string] = @[]
+    
+  trace(fmt"Checking sami binary {myPath[0]} for embedded config")
+  
+  for (_, name, plugin) in getCodecsByPriority():
+    let codec = cast[Codec](plugin)
+    codec.doScan(myPath, exclusions, false)
+    if len(codec.samis) == 0: continue
+    selfSamiObj = some(codec.samis[0])
+    codec.samis = @[]
+    return selfSamiObj
+
+  warn(fmt"We have no codec for this platform's native executable type")
+  return none(SamiObj)
+  
+proc getSelfExtraction*(): Option[SamiDict] =
+  # If we somehow call this twice, no need to re-compute.
+  if selfSami.isSome():
+    return selfSami
+  
+  let samiObjOpt = getSelfSamiObj()
+  if not samiObjOpt.isSome(): return none(SamiDict)
+
+  let
+    obj = samiObjOpt.get()
+    pt = obj.primary
+    selfSami = pt.samiFields
+    
+  if obj.samiIsEmpty() or not obj.samiHasExisting():
+    trace(fmt"No embedded self-SAMI found.")
+    return none(SamiDict)
+  else:
+    trace(fmt"Found existing self-SAMI.")
+  return selfSami

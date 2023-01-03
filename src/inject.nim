@@ -1,5 +1,4 @@
 import resources
-import types
 import config
 import plugins
 import extract
@@ -14,6 +13,7 @@ import algorithm
 import strutils
 import strformat
 import streams
+import terminal
 import std/tempfiles
 
 const requiredCodecKeys = ["SRC_PATH", "FILE_NAME", "HASH", "HASH_FILES"]
@@ -59,7 +59,7 @@ proc populateOneSami(sami: SamiObj,
       if currentPriorities.contains(key) and pri >= currentPriorities[key]:
         continue
         # No plugin has run to set this key, so we're definitely going
-        # to run, even if someone else comes along and has a lowever
+        # to run, even if someone else comes along and has a lower
         # priority in an override (the codecs are sorted on their
         # overall priority order).
       runPlugin = true
@@ -67,6 +67,8 @@ proc populateOneSami(sami: SamiObj,
 
     if not runPlugin: continue
     let ki = plugin.getArtifactInfo(sami)
+
+    if ki == nil: continue
 
     for k, v in ki:
       if not currentPriorities.contains(k):
@@ -90,6 +92,7 @@ proc doInjection*() =
     objsForHookWrite: seq[string] = @[]
   let
     everyKey = getOrderedKeys()
+    dryRun = getDryRun()
 
   doExtraction(onBehalfOfInjection = true)
 
@@ -180,6 +183,10 @@ proc doInjection*() =
       else:
         objsForHookWrite.add(encoded)
 
+      # NOW, if we're in dry-run mode, we don't actually inject.
+      if dryRun:
+        continue
+        
       if point.endOffset > point.startOffset:
         item.stream.setPosition(point.endOffset)
       let
@@ -205,10 +212,20 @@ proc doInjection*() =
         if ctx != nil:
           ctx.close()
           try:
-            moveFile(path, item.fullPath)
+            let newPath = if getSelfInjecting(): item.fullPath & ".new"
+                          else: item.fullPath
+            moveFile(path, newPath)
+            if getSelfInjecting():
+              if getColor():
+                stderr.styledWrite(infoColor,
+                                   styleBright,
+                                   infoPrefix,
+                                   ansiResetCode)
+              stderr.writeLine(fmt"Wrote new sami binary to {newpath}")
           except:
             removeFile(path)
             raise
+
             
   # Finally, if we've got external output requirements, it's time to
   # dump what we've read.

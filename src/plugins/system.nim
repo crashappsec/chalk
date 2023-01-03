@@ -1,6 +1,5 @@
-import ../types
-import ../plugins
 import ../config
+import ../plugins
 
 import nimutils
 import nimutils/box
@@ -50,6 +49,14 @@ method getArtifactInfo*(self: SystemPlugin,
   result["SAMI_ID"] = pack(samiId)
   result["TIMESTAMP"] = pack(cast[int](unixTimeInMs()))
   result["_MAGIC.json"] = pack("dadfedabbadabbed")
+
+  let
+    spec = config.getKeySpec("X_SAMI_CONFIG").get()
+    optVal = spec.getValue()
+
+  if optVal.isSome():
+    result["X_SAMI_CONFIG"] = optVal.get()
+  
 
   let oldSamiOpt = config.getKeySpec("OLD_SAMI")
 

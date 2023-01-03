@@ -1,4 +1,3 @@
-import types
 import config
 import resources
 import io/fromjson
@@ -7,7 +6,7 @@ import io/json
 
 import nimutils
 import nimutils/box
-import nimsha2
+import nimSHA2
 
 import con4m
 
@@ -279,3 +278,4 @@ import plugins/codecElf
 import plugins/ownerAuthors
 import plugins/ownerGithub
 import plugins/vctlGit
+import plugins/sbomCallback

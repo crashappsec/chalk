@@ -1,5 +1,5 @@
 import ../resources
-import ../types
+import ../config
 import nimutils/box
 
 import endians

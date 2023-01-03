@@ -1,4 +1,3 @@
-import ../types
 import ../resources
 import ./json
 import ../config

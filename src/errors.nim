@@ -19,7 +19,7 @@ proc getConfigErrors*(): Option[seq[string]]
 
 let
   exename = getAppFileName().splitPath().tail
-  infoPrefix = fmtInfoPrefix.fmt()
+  infoPrefix* = fmtInfoPrefix.fmt()
   warnPrefix = fmtWarnPrefix.fmt()
   errPrefix = fmtErrPrefix.fmt()
   tracePrefix = fmtTracePrefix.fmt()
@@ -112,7 +112,7 @@ template fatal*(str: string, nested: bool = false) =
 
   quit(1)
 
-template error*(str: string) =
+template error*(str: string, die=true) =
   if logLevel() != logLevelNone:
     if getColor():
       stderr.styledWrite(fgRed, styleBright, errPrefix, ansiResetCode)

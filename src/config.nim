@@ -1,525 +1,17 @@
-import strformat
-import strutils
-import tables
-import algorithm
-import os
-import streams
-import sugar
+import strformat, strutils, tables, options, algorithm, os, streams, sugar
 import macros
-
-import con4m
-import con4m/st
-import con4m/eval
-import nimutils
-import nimutils/box
+import con4m, con4m/st, con4m/eval, nimutils, nimutils/box
 include errors
+include configs/baseconfig    # Gives us the variable baseConfig
+include configs/defaultconfig # Gives us defaultConfig
+include configs/con4mconfig   # gives us the variable samiConfig, which is
+                              # a con4m configuration object.
+                              # this needs to happen before we include types.
+include types
 
-const baseConfig = """
-sami_version := "0.2.0"
-ascii_magic := "dadfedabbadabbed"
-
-extraction_output_handlers: ["stdout"]
-injection_prev_sami_output_handlers: []
-injection_output_handlers: []
-
-key _MAGIC json {
-    required: true
-    missing_action: "abort"
-    system: true
-    squash: true
-    type: "string"
-    value: ascii_magic
-    standard: true
-    since: "0.1.0"
-    output_order: 0
-    in_ref: true
-}
-
-key SAMI_ID {
-    required: true
-    missing_action: "error"
-    system: true
-    squash: false
-    type: "integer"
-    standard: true
-    since: "0.1.0"
-    output_order: 1
-    in_ref: true
-}
-
-key SAMI_VERSION {
-    required: true
-    missing_action: "error"
-    system: true
-    type: "string"
-    value: sami_version
-    standard: true
-    since: "0.1.0"
-    output_order: 2
-    in_ref: true
-}
-
-key SAMI_PTR {
-    required: false
-    type: "string"
-    standard: true
-    since: "0.10"
-    output_order: 3
-    in_ref: true
-}
-
-key TIMESTAMP {
-    required: true
-    missing_action: "error"
-    system: true
-    type: "integer"
-    since: "0.1.0"
-    output_order: 4
-    standard: true
-}
-
-key EARLIEST_VERSION {
-    type: "string"
-    since: "0.1.0"
-    system: true
-    value: sami_version
-    output_order: 5
-    standard: true
-}
-
-key SRC_PATH {
-    type: "string"
-    since: "0.1.0"
-    codec: true
-    output_order: 6
-    standard: true
-}
-
-key FILE_NAME {
-    type: "string"
-    since: "0.1.0"
-    codec: true
-    output_order: 7
-    standard: true
-}
-
-key ORIGIN_URI {
-    type: "string"
-    missing_action: "warn"
-    since: "0.1.0"
-    output_order: 8
-    standard: true
-}
-
-key ARTIFACT_VERSION {
-    type: "string"
-    since: "0.1.0"
-    output_order: 9
-    standard: true
-}
-
-key ARTIFACT_FILES {
-    type: "[string]"
-    since: "0.1.0"
-    output_order: 10
-    standard: true
-}
-
-key IAM_USERNAME {
-    must_force: true
-    type: "string"
-    since: "0.1.0"
-    output_order: 11
-    standard: true
-}
-
-key IAM_UID {
-    must_force: true
-    type: "integer"
-    since: "0.1.0"
-    output_order: 12
-    standard: true
-}
-
-key BUILD_URI {
-    type: "string"
-    since: "0.1.0"
-    output_order: 13
-    standard: true
-}
-
-key STORE_URI {
-    type: "string"
-    since: "0.1.0"
-    output_order: 14
-    standard: true
-}
-
-key BRANCH {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-    output_order: 15
-}
-
-key SRC_URI {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-    output_order: 16
-}
-
-key REPO_ORIGIN {
-    type: "string"
-    system: false
-    since: "0.1.0"
-    standard: true
-    output_order: 17
-}
-
-key HASH {
-    type: "string"
-    since: "0.1.0"
-    codec: true
-    standard: true
-    output_order: 18
-}
-
-key HASH_FILES {
-    type: "[string]"
-    since: "0.1.0"
-    codec: true
-    standard: true
-    output_order: 19
-}
-
-key COMMIT_ID {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-    output_order: 20
-}
-
-key JOB_ID {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-    output_order: 21
-}
-
-key CODE_OWNERS {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-    output_order: 22
-}
-
-key BUILD_OWNERS {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-    output_order: 23
-}
-
-key OLD_SAMI {
-    type: "sami"
-    since: "0.1.0"
-    standard: true
-    output_order: 996
-}
-
-key EMBEDS {
-    type: "[(string, sami)]"
-    standard: true
-    output_order: 997
-    since: "0.1.0"
-}
-
-key SBOMS {
-    type: "{string, string}"
-    since: "0.1.0"
-    standard: true
-    output_order: 998
-}
-
-
-key ERR_INFO {
-    type: "[string]"
-    standard: true
-    since: "0.1.0"
-    system: true
-    standard: true
-    output_order: 999
-}
-
-key SIGNATURE {
-    type: "{string : string}"
-    since: "0.1.0"
-    standard: true
-    output_order: 1000
-    in_ref: true
-}
-
-# Doesn't do any keys other than the codec defaults, which are:
-# SRC_PATH, FILE_NAME, HASH, HASH_FILES
-plugin elf {
-    codec: true
-    keys: []
-}
-
-plugin shebang {
-    codec: true
-    keys: []
-}
-
-# Probably should add file time of artifact, date of branch
-# and any tag associated.
-plugin "vctl-git" {
-    keys: ["COMMIT_ID", "BRANCH", "ORIGIN_URI"]
-}
-
-plugin authors {
-    keys: ["CODE_OWNERS"]
-}
-
-plugin "github-codeowners" {
-    keys: ["CODE_OWNERS"]
-}
-
-# This plugin is the only thing allowed to set these keys. However, it
-# should run last to make sureit knows what other fields are being set
-# before deciding how to handle the OLD_SAMI field.  Thus, the setting
-# to 32-bit maxint (though should consider using the whole 64-bits).
-
-plugin system {
-    keys: ["TIMESTAMP", "SAMI_ID", "OLD_SAMI"]
-    priority: 2147483647
-}
-
-# This plugin takes values from the conf file. By default, these
-# are of the lowest priority of anything that can conflict.
-# This will set SAMI_VERSION, EARLIEST_VERSION, SAMI_REF (if provided)
-#  and _MAGIC.
-plugin conffile {
-    keys: ["*"]
-    priority: 2147483646
-}
-
-output stdout {
-}
-
-output local_file {
-}
-
-output s3 {
-  if envExists("AWS_ACCESS_SECRET") {
-    secret: env("AWS_ACCESS_SECRET")
-  }
-  if envExists("AWS_ACCESS_ID") {
-    userid: env("AWS_ACCESS_ID")
-  }
-  if envExists("AWS_REGION") {
-    region: env("AWS_REGION")
-  }
-  if envExists("AWS_S3_BUCKET_URI") {
-    dst_uri: env("AWS_S3_BUCKET_URI")
-  }
-}
-
-"""
-
-## This variable represents the current config.  The con4m
-## macro will also inject a variable with more config state, which we
-## will use for config file layering.
-## TODO: Add a field to the global or a section to configure
-## logging options.
-var samiConfig = con4m(Sami, baseconfig):
-  attr(extraction_output_handlers,
-       [string],
-       required = true,
-       doc = "When extracting a SAMI from an artifact, which handler(s) " &
-             "to call for doing the actual outputting?")
-  attr(injection_prev_sami_output_handlers,
-       [string],
-       required = true,
-       doc = "When injecting a SAMI into an artifact, if a previous SAMI " &
-             "is found, it will be output with any handler provided here. " &
-             "This is separate from whether it gets embedded in the new " &
-             "SAMI, which happens any time OLD_SAMI does NOT have skip " &
-             "set.")
-  attr(injection_output_handlers,
-        [string],
-        required = true,
-        doc = "When injecting, the codec will inject a SAMI, but these " &
-              "handlers will also get called to write a SAMI.  Note that, " &
-              "if the key SAMI_PTR is enabled (i.e., set to a value and not " &
-              "being skipped), the codec will only inject the miniminal " &
-              "pointer information, and these handlers will be used for " &
-              "writing the full SAMI. Note that the string value of the " &
-              "SAMI_PTR field should match at least one of the locations " &
-              "output to via this handler.")
-  attr(config_path,
-       [string],
-       @[".", "~"],
-       doc = "The path to search for other config files. " &
-       "This can be specified at the command-line with an early flag."
-  )
-  attr(config_filename,
-       string,
-       "sami.conf",
-       doc = "The config filename; also can be set from the command line")
-  attr(default_command, string,
-       required = false,
-       doc = "When this command runs, if no command is provided, " &
-             "which one runs?")
-  attr(color, bool, false, doc = "Do you want ansi output?")
-  attr(log_level, string, "warn")
-  attr(dry_run, bool, false)
-  attr(artifact_search_path, [string], @["."])
-  attr(recursive, bool, true)
-  section(key, allowedSubSections = @["*", "*.json", "*.binary"]):
-    attr(required,
-         bool,
-         defaultVal = false,
-         doc = "When true, fail to WRITE a SAMI if no value is found " &
-           "for the key via any allowed plugin.")
-    attr(missing_action,
-         string,
-         defaultVal = "warn",
-         doc = "What to do if, when READING a SAMI, we do not see this key")
-    attr(system,
-         bool,
-         defaultVal = false,
-         doc = "these fields CANNOT be customzied in any way;" &
-               "the system sets them outside the scope of the plugin system.")
-    attr(squash,
-         bool,
-         doc = "If there's an existing SAMI we are incorporating, " &
-         "remove this key in the old SAMI if squash is true when possible",
-         defaultVal = true,
-         lockOnWrite = true)
-    attr(standard,
-         bool,
-         defaultVal = false,
-         doc = "These fields are part of the draft SAMI standard, " &
-               "meaning they are NOT custom fields.  If you set " &
-               "this to 'true' and it's not actually standard, your " &
-               "key is never getting written!")
-    attr(must_force,
-         bool,
-         defaultVal = false,
-         doc = "If this is true, the key only will be turned on if " &
-              "a command-line flag was passed to force adding this flag.")
-    attr(skip,
-         bool,
-         defaultVal = false,
-         doc = "If not required by the spec, skip writing this key," &
-               " even if its value could be computed. Will also be " &
-               "skipped if found in a nested SAMI")
-    attr(in_ref,
-         bool,
-         defaultVal = false,
-         doc = "If the key is to be injected, should it appear in the pointer" &
-               " (if used; ignored otherwise)?")
-    attr(output_order,
-         int,
-         defaultVal = 500,
-         doc = "Lower numbers go first. Each provided value must be unique.")
-    attr(since,
-         string,
-         required = false,
-         doc = "When did this get added to the spec (if it's a spec key)")
-    attr(type, string, lockOnWrite = true, required = true)
-    attr(value,
-         @x,
-         doc = "This is the value set when the 'conffile' plugin runs. " &
-           "The conffile plugin can handle any key, but you can still " &
-           "configure it to set priority ordering, so you have fine-" &
-           "grained control over when the conf file takes precedence " &
-           "over the other plugins.",
-         required = false)
-    attr(docstring,
-         string,
-         required = false,
-         doc = "documentation for the key.")
-    attr(codec,
-         bool,
-         defaultVal = false,
-         doc = "If true, then this key is settable by plugins marked codec.")
-  section(plugin, allowedSubSections = @["*"]):
-    attr(priority,
-         int,
-         required = true,
-         defaultVal = 50,
-         doc = "Vs other plugins, where should this run?  Lower goes first")
-    attr(codec,
-         bool,
-         required = true,
-         defaultVal = false,
-         lockOnWrite = true)
-    attr(enabled, bool, defaultVal = true, doc = "Turn off this plugin.")
-    attr(command,
-         string,
-         required = false)
-    attr(keys,
-         [string],
-         required = true,
-         lockOnWrite = true)
-    attr(overrides,
-         {string: int}, required = false)
-    attr(ignore,
-         [string],
-         required = false)
-    attr(docstring,
-         string,
-         required = false)
-  section(output, allowedSubSections = @["*"]):
-    attr(secret,
-         string,
-         required = false)
-    attr(userid,
-         string,
-         required = false)
-    attr(region,
-         string,
-         required = false)
-    attr(filename,
-         string,
-         required = false)
-    attr(dst_uri, # For AWS, s3://bucket-name/path/to/file
-         string,
-         required = false)
-    attr(command,
-         [string],
-         required = false)
-    attr(auxid,
-         string,
-         required = false)
-    attr(docstring,
-         string,
-         required = false)
-
-#         doc = "Is this plugin a codec?")
-#         doc = "The list of keys this codec can serve")
-#         doc = "List of keys whose priorities should be changed from the " &
-#          "default value this plugin has")
-#         doc = "Keys that the user does NOT want this plugin to handle")
-#         doc = "Description of plugin")
-#         doc = "Plugin is not linked, but called via an external command to return JSON"
-# TODO: possibly a reverse squash
-
-const allowedCmds = ["inject", "extract", "defaults"]
+const allowedCmds = ["inject", "extract", "defaults", "configDump"]
 const validLogLevels = ["none", "error", "warn", "info", "trace"]
-
-
-
-type
-  SamiOutputContext* = enum
-    OutCtxExtract, OutCtxInjectPrev, OutCtxInject
-  
-  SamiOutputHandler* = (string, SamiOutputSection, string) -> bool
-
-
+ 
 proc getOutputConfig*(): TableRef[string, SamiOutputSection] =
   return samiConfig.output
 
@@ -565,10 +57,12 @@ proc setConfigFileName*(val: string) =
 proc getDefaultCommand*(): Option[string] =
   return samiConfig.defaultCommand
 
-# not needed.
-# proc setDefaultCommand*(val: string) =
-#   samiConfig.defaultCommand = some(val)
-
+proc getCanDump(): bool =
+  return samiConfig.canDump
+  
+proc getCanLoad(): bool =
+  return samiConfig.canLoad
+  
 proc getColor*(): bool =
   return samiConfig.color
 
@@ -608,6 +102,9 @@ proc getRecursive*(): bool =
 proc setRecursive*(val: bool) =
   discard ctxSamiConf.setOverride("recursive", pack(val))
   samiConfig.recursive = val
+
+proc getAllowExternalConfig*(): bool =
+  return samiConfig.allowExternalConfig
 
 proc getExtractionOutputHandlers*(): seq[string] =
   return samiConfig.extractionOutputHandlers
@@ -755,7 +252,7 @@ proc `$`*(plugin: SamiPluginSection): string =
     ignoreStr = optI.get().join(", ")
 
 
-  return fmt"""  default priority:    {plugin.getPriority()}
+  return fmt"""  default priority:      {plugin.getPriority()}
   is codec:              {plugin.getCodec()}
   is enabled:            {plugin.getEnabled()}
   keys handled:          {plugin.getKeys().join(", ")}
@@ -867,8 +364,17 @@ new sami out hooks:     {c.injectionOutputHandlers.join(", ")}
 
 proc showConfig*() =
   stderr.writeLine($(samiConfig))
+  stderr.writeLine("""
+Use 'dumpConfig' to export the embedded configuration file to disk,
+and 'loadConfig' to load one.""")
+
+var onceLockBuiltinKeys = false
 
 proc lockBuiltinKeys*() =
+  if onceLockBuiltinKeys:
+    return
+  else:
+    onceLockBuiltinKeys = true
   for key in getAllKeys():
     let
       prefix = "key." & key
@@ -895,7 +401,6 @@ proc lockBuiltinKeys*() =
   # These are locks of invalid fields for specific output handlers.
   # Note that all of these lock calls could go away if con4m gets a
   # locking syntax.
-
   discard ctxSamiConf.lockConfigVar("output.stdout.filename")
   discard ctxSamiConf.lockConfigVar("output.stdout.command")
   discard ctxSamiConf.lockConfigVar("output.stdout.dst_uri")
@@ -948,7 +453,91 @@ proc doAdditionalValidation*() =
   # Now, lock a bunch of fields.
   lockBuiltinKeys()
 
-proc loadUserConfigFile*() =
+proc loadEmbeddedConfig(selfSamiOpt: Option[SamiDict],
+                        dieIfInvalid = true): bool =
+  var
+    confString: string
+    validEmbedded: bool
+
+  if selfSamiOpt.isNone():
+    validEmbedded = false
+    confString = defaultConfig
+  else:
+    let selfSami = selfSamiOpt.get()
+  
+    # We extracted a SAMI object from our own executable.  Check for an
+    # X_SAMI_CONFIG key, and if there is one, run that configuration
+    # file, before loading any on-disk configuration file.
+    if not selfSami.contains("X_SAMI_CONFIG"):
+      trace("Embedded self-SAMI does not contain a configuration.")
+      confString = defaultConfig
+      validEmbedded = false
+    else:
+      confString = unpack[string](selfSami["X_SAMI_CONFIG"])
+      validEmbedded = true
+
+  let
+    confStream = newStringStream(confString)
+    res = ctxSamiConf.stackConfig(confStream, "<embedded>")
+
+  if res.isNone():
+    if dieIfInvalid:
+      error("Embeeded configuration is invalid. Use 'setconf' command to fix")
+    else:
+      validEmbedded = false
+  else:
+    validEmbedded = true
+
+  if not validEmbedded: return false
+
+  samiConfig = ctxSamiConf.loadSamiConfig()
+  doAdditionalValidation()
+  trace("Loaded embedded configuration file")
+  return true
+
+proc handleConfigDump*(selfSami: Option[SamiDict], argv: seq[string]) =
+  let confValid = loadEmbeddedConfig(selfSami, dieIfInvalid = false)
+  if not getCanDump():
+    error("Dumping embedded config is disabled.")
+    quit()
+  else:
+    if len(argv) > 1:
+      error("configDump requires at most one parameter")
+      quit()
+
+    let
+      outfile = if len(argv) == 0 or resolvePath(argv[0]) == resolvePath("."):
+                  "sami.conf.dump"
+                else: resolvePath(argv[0])
+      toDump = if selfSami.isSome(): unpack[string](selfSami.get()["X_SAMI_CONFIG"])
+               else: defaultConfig
+               
+    try:
+      var f = newFileStream(outfile, fmWrite)
+      if f == nil:
+        error(fmt"Could not write to: {outfile} ({getCurrentExceptionMsg()})")
+        quit()
+      f.write(toDump)
+      f.close()
+    except:
+      error(fmt"Could not write to: {outfile} ({getCurrentExceptionMsg()})")
+      quit()
+
+    stderr.writeLine(fmt"Dumped configuration to: {outfile}")
+    quit()
+
+proc quitIfCantChangeEmbeddedConfig*(selfSami: Option[SamiDict]) =
+  discard loadEmbeddedConfig(selfSami, dieIfInvalid = false)
+  if not getCanLoad():
+    error("Loading a new embedded config is diabled.")
+    quit()
+
+proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
+  discard loadEmbeddedConfig(selfSami)
+
+  if not getAllowExternalConfig():
+    return
+    
   var
     path = getConfigPath()
     filename = getConfigFileName() # the base file name.
@@ -963,18 +552,21 @@ proc loadUserConfigFile*() =
 
   if fname != "":
     trace(fmt"Loading config file: {fname}")
-    let res = ctxSamiConf.stackConfig(fname)
-    if res.isNone():
-      error(fmt"{fname}: invalid configuration not loaded.")
+    try:
+      let res = ctxSamiConf.stackConfig(fname)
+      if res.isNone():
+        error(fmt"{fname}: invalid configuration not loaded.")
 
-      if ctxSamiConf.errors.len() != 0:
-        for err in ctxSamiConf.errors:
-          error(err)
+        if ctxSamiConf.errors.len() != 0:
+          for err in ctxSamiConf.errors:
+            error(err)
 
-      quit()
-    else:
-      loaded = true
-
+        quit()
+      else:
+        loaded = true
+      
+    except Con4mError: # config not present:
+      inform(fmt"{fname}: config file not found.")
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
@@ -983,3 +575,117 @@ proc loadUserConfigFile*() =
     trace(fmt"Loaded configuration file: {fname}")
   else:
     trace("Running without a config file.")
+
+var selfInjection = false
+
+proc getSelfInjecting*(): bool =
+  return selfInjection
+    
+proc setupSelfInjection*(filename: string) =
+  var newCon4m: string
+  
+  selfInjection = true
+
+  setArtifactSearchPath(@[resolvePath(getAppFileName())])
+
+  # This protection is easily thwarted, especially since SAMI is open
+  # source.  So we don't try to guard against it too much.
+  #
+  # Particularly, we'd happily inject a SAMI into a copy of the SAMI
+  # executable via just standard injection, which would allow us to
+  # nuke any policy that locks loading.
+  #
+  # Given that it's open source, no need to try to run an arms race;
+  # the feature is here more to ensure there are clear operational
+  # controls.
+  
+  if not getCanLoad():
+    error("Loading embedded configurations not supported.")
+    quit()
+    
+  if filename == "default":
+    newCon4m = defaultConfig
+    if getDryRun():
+      forceInform("Would install the default configuration file.")
+      quit()
+    else:
+      inform("Installing the default confiuration file.")
+  else:
+    let f = newFileStream(resolvePath(filename))
+    if f == nil:
+      error(fmt"{filename}: could not open configuration file")
+      quit()
+    try:
+      newCon4m = f.readAll()
+      f.close()
+    except:
+      error(fmt"{filename}: could not read configuration file")
+      quit()
+      
+    # Now we need to validate the config, without stacking it over our
+    # existing configuration. We really want to know that the file
+    # will not only be a valid con4m file, but that it will meet the
+    # SAMI spec.
+    #
+    # Unfortunately, the only way we can be reasonably sure it will
+    # load is by running it once, as the spec check requires seeing
+    # the final configuration state.
+    #
+    # But, since it's code that could have conditionals, that might
+    # also not tell us whether it would always meet the spec. And,
+    # the code might side-effect, which isn't ideal.
+    #
+    # Still, we're going to go ahead and evaluate the thing once to
+    # give ourselves the best shot of detecting any errors early.
+    #
+    # But, we're not going to stack this configuration, as we wouldn't
+    # want it to interfere with this run (the configuration is meant
+    # to apply from the next run).  So we set up a new context, but
+    # then nick the specification context.
+    #
+    # TODO: we're currently opening and reading the config file
+    # twice; should fix this by providing the right API in con4m,
+    # whether we have it eval from a string, or have it expose
+    # the source to us so we can stash in the newCon4m variable.
+
+    inform(fmt"{filename}: Validating configuration.")
+    
+    let testOpt = evalConfig(resolvePath(filename))
+    if testOpt.isNone():
+      # Pretty sure this check is redundant with ours above.  We
+      # should get a state object back, even if it has errors in it.
+      error("Could not load config file.")
+      quit()
+      
+    let (testState, testScope) = testOpt.get()
+
+    testState.addSpec(ctxSamiConf.spec.get())
+    
+    if testState.errors.len() != 0 or not testState.validateConfig():
+      ctxSamiConf.errors = testState.errors
+      error("Configuration file failed to load.")
+      quit()
+    
+    trace(fmt"{filename}: Configuration successfully validated.")
+
+    if getDryRun():
+      forceInform("The provided configuration file would be loaded.")
+      quit()
+      
+    # Now we're going to set up the injection properly solely by
+    # tinkering with the config state.
+    #
+    # While we will leave any injection handlers in place, we will
+    # NOT use a SAMI pointer.
+    #
+    # These keys we are requesting are all in the base config, so
+    # these lookups won't fail.
+    var samiPtrKey = getKeySpec("SAMI_PTR").get()
+    samiPtrKey.value = none(Box)
+
+    var xSamiConfKey = getKeySpec("X_SAMI_CONFIG").get()
+    xSamiConfKey.value = some(pack(newCon4m))
+    
+proc getConfigState*(): ConfigState =
+  return ctxSamiConf    
+  

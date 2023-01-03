@@ -1,5 +1,4 @@
 import ../config
-import ../types
 import ../plugins
 import ../resources
 import nimutils/box
@@ -8,7 +7,8 @@ import os
 import streams
 import tables
 import strformat
-
+import strutils
+import glob
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 
@@ -40,6 +40,39 @@ proc findCOFile(fullpath: string): string =
 
   return head.findCOFile()
 
+proc findCodeOwner(contents, artifactPath, copath: string): string =
+  assert artifactPath.startsWith(copath)
+
+  let 
+    lines   = contents.split("\n")
+    gitdir  = copath.splitPath().head
+    relPath = artifactPath[len(copath) .. ^1]
+    path    = if relpath.startsWith("/"): relpath else: "/" & relPath
+
+  for line in lines:
+    let cur = line.strip()
+
+    if cur == "" or cur[0] == '#':
+      continue
+
+    let ix = cur.find(' ')
+    if ix == -1: continue
+    var
+      txt = cur[0 ..< ix].strip()
+
+    if not txt.startsWith("/"):
+      txt = "**/" & txt
+    if txt.endsWith("/"):
+      txt &= "**"
+    let
+      pattern = glob(txt)
+      owners = line[ix+1 .. ^1].strip()
+
+
+    if path.matches(pattern):
+      result = owners
+      # Keep going; the last match is the most specific and wins.
+
 type GithubCodeOwner = ref object of Plugin
 
 method getArtifactInfo*(self: GithubCodeOwner,
@@ -70,10 +103,12 @@ method getArtifactInfo*(self: GithubCodeOwner,
     if ctx == nil:
       warn(eFileOpen)
     else:
-      let s = ctx.readAll()
-      # TODO-- match from the file instead of dumping the whole thing.
-      if s != "":
-        result["CODE_OWNERS"] = pack(s)
+      let 
+        s = ctx.readAll()
+        m = s.findCodeOwner(sami.fullPath, fname.splitPath().head)
+
+      if m != "":
+        result["CODE_OWNERS"] = pack(m)
   except:
     warn(eCantOpen.fmt())
   finally:

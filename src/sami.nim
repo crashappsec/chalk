@@ -5,28 +5,89 @@ import extract
 import plugins
 
 import argparse
-import macros
+import macros except error
 import tables
 import strformat
+import nimutils/box
+import con4m/[types, builtins]
+
+# This "builtin" call for con4m doesn't need to be available until
+# user configurations load, but let's be sure to do it before that
+# happens.  First we define the function here, and next we'll register
+# it.
+var cmdInject = some(pack(false))
+
+proc getInjecting*(args: seq[Box],
+                   unused1: Con4mScope,
+                   unused2: VarStack,
+                   unused3: Con4mScope): Option[Box] =
+    return cmdInject
 
 
+# getConfigState() is defined in config.nim, and basically
+# just exports a variable that is auto-generated for us when we
+# initialize con4m (also in config.nim).
+
+let ctxSamiConf = getConfigState()
+ctxSamiConf.newBuiltIn("injecting", getInjecting, "f() -> bool")
+
+# The internally stored config file loads due to the import of config.
+# Call this function to do the additional configuration validation
+# before we process any command-line flags.  
+#
+# This could also run automatically on importing config, but the
+# plugins module also sets up some stuff that should load before the
+# config is validated (some loaded plugins set up callbacks in con4m,
+# for instance).  Even if we put "import plugins" before "import
+# config", plugins imports config, so that will have its
+# initialization code run first.  Thus, this gets done here, where we
+# can be sure that it will happen after each module has set up what it
+# needs.
+#
+# Plus, it gives me the opportunity to point out some setup is
+# happening before the command-line flag processing.
 doAdditionalValidation()
 
-proc runCmdDefaults*() {.noreturn, inline.} =
-  loadUserConfigFile()
-  loadCommandPlugins()
+proc runCmdDefaults() {.noreturn, inline.} =
+  loadUserConfigFile(getSelfExtraction())
   showConfig() # config.nim
   quit()
 
-proc runCmdInject*() {.noreturn, inline.} =
-  loadUserConfigFile()
+proc runCmdInject() {.noreturn, inline.} =
+  # This needs to be set before we load any user-level configuration
+  # file, for the sake of the "injecting()" builtin (above).  Note: we
+  # cannot use that builtin in the base configuration, since we run
+  # that before we set up any command-line arguments; it would return
+  # 'false' for us always, no matter what the user supplies.
+  cmdInject = some(pack(true))
+  loadUserConfigFile(getSelfExtraction())
   loadCommandPlugins()
   doInjection() # inject.nim
   quit()
 
-proc runCmdExtract*() {.noreturn, inline.} =
-  loadUserConfigFile()
+proc runCmdExtract() {.noreturn, inline.} =
+  loadUserConfigFile(getSelfExtraction())
   doExtraction(onBehalfOfInjection = false) # extract.nim
+  quit()
+
+proc runCmdDump(arglist: seq[string]) {.noreturn, inline.} =
+  handleConfigDump(getSelfExtraction(), arglist)
+
+proc runCmdLoad() {.noreturn, inline.} =
+  # The fact that we're injecting into ourself will be special-cased
+  # in the injection workflow.
+  let
+    selfSami = getSelfExtraction()
+    args = getArtifactSearchPath()
+    
+  quitIfCantChangeEmbeddedConfig(selfSami)
+  if len(args) != 1:
+    error("configLoad requires either a file name or 'default'")
+    quit()
+
+  setupSelfInjection(args[0])
+  loadCommandPlugins()
+  doInjection()
   quit()
 
 type
@@ -134,6 +195,24 @@ template defaultsCmd(cmd: string, primary: bool) =
     run:
       runCmdDefaults()
 
+template dumpCmd(cmd: string, primary: bool) =
+  command(cmd):
+    if primary:
+      help(showDumpHelp)
+    arg("files", nargs = -1, help = inFilesHelp)      
+    run:
+      setArtifactSearchPath(opts.files)
+      runCmdDump(opts.files)
+
+template loadCmd(cmd: string, primary: bool) =
+  command(cmd):
+    if primary:
+      help(showLoadHelp)
+    arg("files", nargs = -1, help = inFilesHelp)      
+    run:
+      setArtifactSearchPath(opts.files)
+      runCmdLoad()
+
 when isMainModule:
   var cmdLine = newParser:
     help(generalHelp)
@@ -197,19 +276,26 @@ when isMainModule:
       if opts.configSearchPath != "":
         setConfigPath(opts.configSearchPath.split(":"))
 
-    injectCmd(cmdNameInject1, true)
-    injectCmd(cmdNameInject2, false)
-    injectCmd(cmdNameInject3, false)
-    injectCmd(cmdNameInject4, false)
-    injectCmd(cmdNameInject5, false)
+    injectCmd("inject", true)
+    injectCmd("insert", false)
+    injectCmd("ins", false)
+    injectCmd("inj", false)
+    injectCmd("in", false)
+    injectCmd("i", false)    
 
-    extractCmd(cmdNameExtract1, true)
-    extractCmd(cmdNameExtract2, false)
-    extractCmd(cmdNameExtract3, false)
+    extractCmd("extract", true)
+    extractCmd("ex", false)
+    extractCmd("x", false)
 
-    defaultsCmd(cmdNameDefaults1, true)
-    defaultsCmd(cmdNameDefaults2, false)
-    defaultsCmd(cmdNameDefaults3, false)
+    defaultsCmd("defaults", true)
+    defaultsCmd("def", false)
+    defaultsCmd("d", false)
+
+    dumpCmd("configDump", true)
+    dumpCmd("dump", false)
+
+    loadCmd("configLoad", true)
+    loadCmd("load", false)
 
   try:
     cmdLine.run()

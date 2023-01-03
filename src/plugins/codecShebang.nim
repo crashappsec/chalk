@@ -1,8 +1,8 @@
-import ../types
+import ../config
 import ../plugins
 import ../resources
 
-import nimsha2
+import nimSHA2
 
 import streams
 import strutils

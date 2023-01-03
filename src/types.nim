@@ -1,11 +1,10 @@
-import nimutils/box
-
-import tables
-import options
-import streams
-import config
+# Do NOT include or import this directly; instead include config.nim.
 
 type
+  SamiOutputContext* = enum
+    OutCtxExtract, OutCtxInjectPrev, OutCtxInject
+  
+  SamiOutputHandler* = (string, SamiOutputSection, string) -> bool
   SamiDict* = TableRef[string, Box] ## \
      ## Representation of the abstract SAMI's fields. If the SAMI
      ## was read from a file, this will include any embeds / nests.
@@ -51,7 +50,6 @@ type
   ExternalPlugin* = ref object of Plugin
     command*: string
 
-
   KeyInfo* = TableRef[string, Box]
 
 proc samiHasExisting*(sami: SamiObj): bool {.inline.} =
@@ -68,6 +66,3 @@ const
   binTypeBool* = 3'u8
   binTypeArray* = 5'u8
   binTypeObj* = 6'u8
-
-
-
