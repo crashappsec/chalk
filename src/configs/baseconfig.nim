@@ -220,6 +220,13 @@ key BUILD_OWNERS {
     output_order: 23
 }
 
+key INJECTOR_ID {
+    type: "int"
+    since: "0.1.0"
+    standard: true
+    output_order: 24
+}
+
 key X_SAMI_CONFIG {
     system: true
     type: "string"
@@ -302,7 +309,7 @@ plugin sbomCallback {
 # to 32-bit maxint (though should consider using the whole 64-bits).
 
 plugin system {
-    keys: ["TIMESTAMP", "SAMI_ID", "OLD_SAMI", "X_SAMI_CONFIG"]
+    keys: ["TIMESTAMP", "SAMI_ID", "OLD_SAMI", "X_SAMI_CONFIG", "INJECTOR_ID"]
     priority: 2147483647
 }
 
