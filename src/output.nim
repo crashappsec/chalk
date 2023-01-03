@@ -102,7 +102,7 @@ proc localFileHandler*(content: string,
     return false
   try:
     f = newFileStream(h.getOutputFileName().get(), fmWrite)
-    f.write(fmt"""{{ "context": {ctx}, "SAMIs" : {content} }}""")
+    f.write(fmt"""{{ "context": "{ctx}", "SAMIs" : {content} }}""")
   except:
     return false
   finally:

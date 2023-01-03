@@ -588,7 +588,7 @@ proc setupSelfInjection*(filename: string) =
 
   setArtifactSearchPath(@[resolvePath(getAppFileName())])
 
-  # This protection is easily thwarted, especially since SAMI is open
+  # The below protection is easily thwarted, especially since SAMI is open
   # source.  So we don't try to guard against it too much.
   #
   # Particularly, we'd happily inject a SAMI into a copy of the SAMI
@@ -621,51 +621,62 @@ proc setupSelfInjection*(filename: string) =
     except:
       error(fmt"{filename}: could not read configuration file")
       quit()
-      
+
+    inform(fmt"{filename}: Validating configuration.")
+    
     # Now we need to validate the config, without stacking it over our
     # existing configuration. We really want to know that the file
     # will not only be a valid con4m file, but that it will meet the
     # SAMI spec.
     #
-    # Unfortunately, the only way we can be reasonably sure it will
-    # load is by running it once, as the spec check requires seeing
-    # the final configuration state.
+    # The only way we can be reasonably sure it will load is by running it 
+    # once, as the spec validation check requires seeing the final 
+    # configuration state.
     #
-    # But, since it's code that could have conditionals, that might
-    # also not tell us whether it would always meet the spec. And,
-    # the code might side-effect, which isn't ideal.
+    # But, since configs are code that could have conditionals, evaluating
+    # isn't going to tell us whether the spec we're loading is ALWYS going to
+    # meet the spec, and has the unfortunate consequence of executing any
+    # side-effects that the code might have, which isn't ideal. 
     #
-    # Still, we're going to go ahead and evaluate the thing once to
-    # give ourselves the best shot of detecting any errors early.
+    # Still, that's the best we can reasonably do, so we're going to go ahead 
+    # and evaluate the thing once to give ourselves the best shot of detecting 
+    # any errors early.  Since con4m is fully statically type checked, that
+    # does provide us a reasonable amount of confidence; the only issues we
+    # might have in the field are:
     #
-    # But, we're not going to stack this configuration, as we wouldn't
-    # want it to interfere with this run (the configuration is meant
-    # to apply from the next run).  So we set up a new context, but
-    # then nick the specification context.
+    # 1) Spec validation failures when different conditional branches are taken.
+    # 2) Runtime errors, like index-out-of-bounds errors.
     #
-    # TODO: we're currently opening and reading the config file
-    # twice; should fix this by providing the right API in con4m,
-    # whether we have it eval from a string, or have it expose
-    # the source to us so we can stash in the newCon4m variable.
-
-    inform(fmt"{filename}: Validating configuration.")
-    
-    let testOpt = evalConfig(resolvePath(filename))
-    if testOpt.isNone():
-      # Pretty sure this check is redundant with ours above.  We
-      # should get a state object back, even if it has errors in it.
-      error("Could not load config file.")
+    # To do this check, we first re-load the base configuration in a new
+    # universe, so that our checking doesn't conflict with our current
+    # configuration.
+    #
+    # Then, we nick the (read-only) schema spec and function table from the 
+    # current configuration universe, to make sure we can properly check 
+    # anything in the new configuration file.
+    #
+    # Finally, in that new universe, we "stack" the new config over the newly
+    # loaded base configuration.  The stack operation fully checks everything, 
+    # so if it doesn't error, then we know the new config file is good enough, 
+    # and we should load it.
+    try:
+      var 
+        tree = parse(newStringStream(baseConfig), "baseconfig")
+        opt = tree.evalTree()
+        testState = opt.get()
+        testStream = newStringStream(newCon4m)
+      testState.spec = ctxSamiConf.spec
+      testState.funcTable = ctxSamiConf.funcTable
+      if testState.stackConfig(testStream, filename).isNone():
+        error(fmt"{filename}: invalid configuration.")
+        if testState.errors.len() != 0:
+          for err in testState.errors:
+            error(err)
+        quit()
+    except:
+      error("Could not load config file: {getExceptionMessage()}")
       quit()
       
-    let (testState, testScope) = testOpt.get()
-
-    testState.addSpec(ctxSamiConf.spec.get())
-    
-    if testState.errors.len() != 0 or not testState.validateConfig():
-      ctxSamiConf.errors = testState.errors
-      error("Configuration file failed to load.")
-      quit()
-    
     trace(fmt"{filename}: Configuration successfully validated.")
 
     if getDryRun():
