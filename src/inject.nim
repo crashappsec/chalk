@@ -13,6 +13,7 @@ import algorithm
 import strutils
 import strformat
 import streams
+import terminal
 import std/tempfiles
 
 const requiredCodecKeys = ["SRC_PATH", "FILE_NAME", "HASH", "HASH_FILES"]
@@ -211,10 +212,20 @@ proc doInjection*() =
         if ctx != nil:
           ctx.close()
           try:
-            moveFile(path, item.fullPath)
+            let newPath = if getSelfInjecting(): item.fullPath & ".new"
+                          else: item.fullPath
+            moveFile(path, newPath)
+            if getSelfInjecting():
+              if getColor():
+                stderr.styledWrite(infoColor,
+                                   styleBright,
+                                   infoPrefix,
+                                   ansiResetCode)
+              stderr.writeLine(fmt"Wrote new sami binary to {newpath}")
           except:
             removeFile(path)
             raise
+
             
   # Finally, if we've got external output requirements, it's time to
   # dump what we've read.

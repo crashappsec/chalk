@@ -50,6 +50,14 @@ method getArtifactInfo*(self: SystemPlugin,
   result["TIMESTAMP"] = pack(cast[int](unixTimeInMs()))
   result["_MAGIC.json"] = pack("dadfedabbadabbed")
 
+  let
+    spec = config.getKeySpec("X_SAMI_CONFIG").get()
+    optVal = spec.getValue()
+
+  if optVal.isSome():
+    result["X_SAMI_CONFIG"] = optVal.get()
+  
+
   let oldSamiOpt = config.getKeySpec("OLD_SAMI")
 
   if oldSamiOpt.isSome() and sami.primary.present and sami.primary.valid:

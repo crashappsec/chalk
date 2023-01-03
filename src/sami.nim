@@ -70,8 +70,8 @@ proc runCmdExtract() {.noreturn, inline.} =
   doExtraction(onBehalfOfInjection = false) # extract.nim
   quit()
 
-proc runCmdDump() {.noreturn, inline.} =
-  handleConfigDump(getSelfExtraction())
+proc runCmdDump(arglist: seq[string]) {.noreturn, inline.} =
+  handleConfigDump(getSelfExtraction(), arglist)
 
 proc runCmdLoad() {.noreturn, inline.} =
   # The fact that we're injecting into ourself will be special-cased
@@ -86,8 +86,9 @@ proc runCmdLoad() {.noreturn, inline.} =
     quit()
 
   setupSelfInjection(args[0])
-  
-  runCmdInject() 
+  loadCommandPlugins()
+  doInjection()
+  quit()
 
 type
   FlagID = enum
@@ -198,14 +199,18 @@ template dumpCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showDumpHelp)
+    arg("files", nargs = -1, help = inFilesHelp)      
     run:
-      runCmdDump()
+      setArtifactSearchPath(opts.files)
+      runCmdDump(opts.files)
 
 template loadCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showLoadHelp)
+    arg("files", nargs = -1, help = inFilesHelp)      
     run:
+      setArtifactSearchPath(opts.files)
       runCmdLoad()
 
 when isMainModule:

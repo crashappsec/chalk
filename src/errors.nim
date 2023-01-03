@@ -19,7 +19,7 @@ proc getConfigErrors*(): Option[seq[string]]
 
 let
   exename = getAppFileName().splitPath().tail
-  infoPrefix = fmtInfoPrefix.fmt()
+  infoPrefix* = fmtInfoPrefix.fmt()
   warnPrefix = fmtWarnPrefix.fmt()
   errPrefix = fmtErrPrefix.fmt()
   tracePrefix = fmtTracePrefix.fmt()

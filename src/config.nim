@@ -490,27 +490,21 @@ proc loadEmbeddedConfig(selfSamiOpt: Option[SamiDict],
   trace("Loaded embedded configuration file")
   return true
 
-proc handleConfigDump*(selfSami: Option[SamiDict]) =
+proc handleConfigDump*(selfSami: Option[SamiDict], argv: seq[string]) =
   let confValid = loadEmbeddedConfig(selfSami, dieIfInvalid = false)
   if not getCanDump():
     error("Dumping embedded config is disabled.")
     quit()
   else:
-    # The 'argument' for the dump output (if any), was set to
-    # artifactSearchPath, which defaults to our cwd.  Not awesome, but
-    # the way it is right now, until we do our own command line
-    # argument parser as part of con4m.
-    let targetOut = getArtifactSearchPath()
-    
-    if len(targetOut) > 2:
+    if len(argv) > 1:
       error("configDump requires at most one parameter")
       quit()
 
     let
-      outfile = if resolvePath(targetOut[0]) == resolvePath("."):
+      outfile = if len(argv) == 0 or resolvePath(argv[0]) == resolvePath("."):
                   "sami.conf.dump"
-                else: resolvePath(targetOut[0])
-      toDump = if confValid: unpack[string](selfSami.get()["X_SAMI_CONFIG"])
+                else: resolvePath(argv[0])
+      toDump = if selfSami.isSome(): unpack[string](selfSami.get()["X_SAMI_CONFIG"])
                else: defaultConfig
                
     try:
@@ -617,7 +611,7 @@ proc setupSelfInjection*(filename: string) =
       error(fmt"{filename}: could not open configuration file")
       quit()
     try:
-      let contents = f.readAll()
+      newCon4m = f.readAll()
       f.close()
     except:
       error(fmt"{filename}: could not read configuration file")

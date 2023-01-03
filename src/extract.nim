@@ -25,7 +25,8 @@ proc doExtraction*(onBehalfOfInjection: bool) =
   # because we overload the capability for loading / unloading the
   # admin's config file.
   var
-    exclusions: seq[string] = @[resolvePath(getAppFileName())]
+    exclusions: seq[string] = if getSelfInjecting(): @[]
+                              else: @[resolvePath(getAppFileName())]
     codecInfo: seq[Codec]
     ctx: FileStream
     path: string
@@ -141,4 +142,3 @@ proc getSelfExtraction*(): Option[SamiDict] =
   else:
     trace(fmt"Found existing self-SAMI.")
   return selfSami
-      
