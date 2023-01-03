@@ -72,6 +72,12 @@ proc createdToBinary*(sami: SamiObj, ptrOnly = false): string =
       let parts = key.split(".")
       if len(parts) != 2 or parts[1] != "binary":
         continue
+    let spec = getKeySpec(key).get()
+    if spec.getSkip():
+      continue
+    if ptrOnly and not spec.getInRef():
+      continue
+      
     fieldCount += 1
 
   result = magicBin & u32ToStr(uint32(fieldCount))

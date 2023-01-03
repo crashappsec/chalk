@@ -5,6 +5,7 @@ import algorithm
 import os
 import streams
 import sugar
+import macros
 
 import con4m
 import con4m/st
@@ -86,100 +87,11 @@ key EARLIEST_VERSION {
     standard: true
 }
 
-key ORIGIN_URI {
-    type: "string"
-    missing_action: "warn"
-    since: "0.1.0"
-    standard: true
-}
-
-key ARTIFACT_VERSION {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key ARTIFACT_FILES {
-    type: "[string]"
-    since: "0.1.0"
-    standard: true
-}
-
-key IAM_USERNAME {
-    must_force: true
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key IAM_UID {
-    must_force: true
-    type: "integer"
-    since: "0.1.0"
-    standard: true
-}
-
-key BUILD_URI {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key STORE_URI {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key BRANCH {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key SRC_URI {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key REPO_ORIGIN {
-    type: "string"
-    system: false
-    since: "0.1.0"
-    standard: true
-}
-
-key HASH {
-    type: "string"
-    since: "0.1.0"
-    codec: true
-    standard: true
-}
-
-key HASH_FILES {
-    type: "[string]"
-    since: "0.1.0"
-    codec: true
-    standard: true
-}
-
-key COMMIT_ID {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
-key JOB_ID {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-}
-
 key SRC_PATH {
     type: "string"
     since: "0.1.0"
     codec: true
+    output_order: 6
     standard: true
 }
 
@@ -187,19 +99,126 @@ key FILE_NAME {
     type: "string"
     since: "0.1.0"
     codec: true
+    output_order: 7
     standard: true
+}
+
+key ORIGIN_URI {
+    type: "string"
+    missing_action: "warn"
+    since: "0.1.0"
+    output_order: 8
+    standard: true
+}
+
+key ARTIFACT_VERSION {
+    type: "string"
+    since: "0.1.0"
+    output_order: 9
+    standard: true
+}
+
+key ARTIFACT_FILES {
+    type: "[string]"
+    since: "0.1.0"
+    output_order: 10
+    standard: true
+}
+
+key IAM_USERNAME {
+    must_force: true
+    type: "string"
+    since: "0.1.0"
+    output_order: 11
+    standard: true
+}
+
+key IAM_UID {
+    must_force: true
+    type: "integer"
+    since: "0.1.0"
+    output_order: 12
+    standard: true
+}
+
+key BUILD_URI {
+    type: "string"
+    since: "0.1.0"
+    output_order: 13
+    standard: true
+}
+
+key STORE_URI {
+    type: "string"
+    since: "0.1.0"
+    output_order: 14
+    standard: true
+}
+
+key BRANCH {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 15
+}
+
+key SRC_URI {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 16
+}
+
+key REPO_ORIGIN {
+    type: "string"
+    system: false
+    since: "0.1.0"
+    standard: true
+    output_order: 17
+}
+
+key HASH {
+    type: "string"
+    since: "0.1.0"
+    codec: true
+    standard: true
+    output_order: 18
+}
+
+key HASH_FILES {
+    type: "[string]"
+    since: "0.1.0"
+    codec: true
+    standard: true
+    output_order: 19
+}
+
+key COMMIT_ID {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 20
+}
+
+key JOB_ID {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 21
 }
 
 key CODE_OWNERS {
     type: "string"
     since: "0.1.0"
     standard: true
+    output_order: 22
 }
 
 key BUILD_OWNERS {
     type: "string"
     since: "0.1.0"
     standard: true
+    output_order: 23
 }
 
 key OLD_SAMI {
@@ -293,6 +312,18 @@ output local_file {
 }
 
 output s3 {
+  if envExists("AWS_ACCESS_SECRET") {
+    secret: env("AWS_ACCESS_SECRET")
+  }
+  if envExists("AWS_ACCESS_ID") {
+    userid: env("AWS_ACCESS_ID")
+  }
+  if envExists("AWS_REGION") {
+    region: env("AWS_REGION")
+  }
+  if envExists("AWS_S3_BUCKET_URI") {
+    dst_uri: env("AWS_S3_BUCKET_URI")
+  }
 }
 
 """
@@ -446,14 +477,26 @@ var samiConfig = con4m(Sami, baseconfig):
     attr(secret,
          string,
          required = false)
+    attr(userid,
+         string,
+         required = false)
+    attr(region,
+         string,
+         required = false)
     attr(filename,
          string,
          required = false)
-    attr(dst_uri,
+    attr(dst_uri, # For AWS, s3://bucket-name/path/to/file
          string,
          required = false)
     attr(command,
          [string],
+         required = false)
+    attr(auxid,
+         string,
+         required = false)
+    attr(docstring,
+         string,
          required = false)
 
 #         doc = "Is this plugin a codec?")
@@ -469,7 +512,12 @@ const allowedCmds = ["inject", "extract", "defaults"]
 const validLogLevels = ["none", "error", "warn", "info", "trace"]
 
 
-type SamiOutputHandler* = (string, SamiOutputSection) -> bool
+
+type
+  SamiOutputContext* = enum
+    OutCtxExtract, OutCtxInjectPrev, OutCtxInject
+  
+  SamiOutputHandler* = (string, SamiOutputSection, string) -> bool
 
 
 proc getOutputConfig*(): TableRef[string, SamiOutputSection] =
@@ -478,14 +526,23 @@ proc getOutputConfig*(): TableRef[string, SamiOutputSection] =
 proc getOutputSecret*(s: SamiOutputSection): Option[string] =
   return s.secret
 
+proc getOutputUserId*(s: SamiOutputSection): Option[string] =
+  return s.userId
+
 proc getOutputFilename*(s: SamiOutputSection): Option[string] =
   return s.filename
 
 proc getOutputDstUri*(s: SamiOutputSection): Option[string] =
-  return s.dst_uri
+  return s.dstUri
+
+proc getOutputRegion*(s: SamiOutputSection): Option[string] =
+  return s.region
 
 proc getOutputCommand*(s: SamiOutputSection): Option[seq[string]] =
   return s.command
+
+proc getOutputAuxId*(s: SamiOutputSection): Option[string] =
+  return s.auxid
 
 proc getConfigErrors*(): Option[seq[string]] =
   if ctxSamiConf.errors.len() != 0:
@@ -698,7 +755,7 @@ proc `$`*(plugin: SamiPluginSection): string =
     ignoreStr = optI.get().join(", ")
 
 
-  return fmt"""  default priority:   {plugin.getPriority()}
+  return fmt"""  default priority:    {plugin.getPriority()}
   is codec:              {plugin.getCodec()}
   is enabled:            {plugin.getEnabled()}
   keys handled:          {plugin.getKeys().join(", ")}
@@ -706,7 +763,6 @@ proc `$`*(plugin: SamiPluginSection): string =
   ignore:                {ignoreStr}
   doc string:            {getOrElse(plugin.docstring, "<none>")}
   external impl command: {plugin.command}
-
 """
 
 proc valueToString(b: Box): string {.inline.} =
@@ -732,16 +788,61 @@ proc `$`*(key: SamiKeySection): string =
   doc string:         {getOrElse(key.docstring, "<none>")}
 """
 
+macro condOutputHandlerFormatStr(sym: untyped, prefix: string): string =
+  let fieldAsStr = newLit(sym.strVal)
+  
+  result = quote do:
+    let optEntry = dottedLookup(attrs, @["output", s, `fieldAsStr`])
+    let locked = if optEntry.isSome(): optEntry.get().locked else: false
+
+    if o.`sym`.isSome() or not locked:
+      if o.`sym`.isSome(): `prefix` & o.`sym`.get() & "\n"
+      else: `prefix` & "<none>\n"
+    else:
+      ""
+
+macro condOutputHandlerFormatStrSeq(sym: untyped, prefix: string): string =
+  let fieldAsStr = newLit(sym.strVal)
+  
+  result = quote do:
+    let optEntry = dottedLookup(attrs, @["output", s, `fieldAsStr`])
+    let locked = if optEntry.isSome(): optEntry.get().locked else: false
+
+    if o.`sym`.isSome() or not locked:
+      if o.`sym`.isSome(): `prefix` & join(o.`sym`.get(), " ") & "\n"
+      else: `prefix` & "<none>\n"
+    else:
+      ""
+        
+proc `$`*(o: SamiOutputSection, s: string): string =
+  let
+    attrs = ctxSamiConf.st
+
+  result  = condOutputHandlerFormatStr(filename, "  file name:       ")
+  result &= condOutputHandlerFormatStrSeq(command, "  command:         ")
+  result &= condOutputHandlerFormatStr(dst_uri, "  destination URI: ")
+  result &= condOutputHandlerFormatStr(region, "  region:          ")
+  result &= condOutputHandlerFormatStr(userid, "  IAM user:        ")
+  result &= condOutputHandlerFormatStr(secret, "  secret:          ")
+
 proc `$`*(c: SamiConfig): string =
-  var configKeys, configPlugins: seq[string]
+  var configKeys, configPlugins, configOuts: seq[string]
 
   for key, val in c.key:
-    configKeys.add($(key))
+    configKeys.add(key)
     configKeys.add($(val))
 
   for plugin, val in c.plugin:
-    configPlugins.add($(plugin))
+    configPlugins.add(plugin)
     configPlugins.add($(val))
+
+  for confOut, val in c.output:
+    if confOut == "stdout":
+      configOuts.insert(`$`(val, confOut), 0)
+      configOuts.insert(confOut, 0)
+    else:
+      configOuts.add(confOut)
+      configOuts.add(`$`(val, confOut))
 
   return fmt"""config search path:        {c.configPath.join(":")}
 config filename:           {c.configFilename}
@@ -751,14 +852,17 @@ log level:                 {c.logLevel}
 dry run:                   {c.dryRun}
 artifact search path:      {c.artifactSearchPath.join(":")}
 recursive artifact search: {c.recursive}
-extraction out handlers:   {c.extractionOutputHandlers}
-prev sami out handlers:    {c.injectionPrevSamiOutputHandlers}
-new sami out handlers:     {c.injectionOutputHandlers}
 Configured SAMI keys:
 {configKeys.join("\n")}
 
 Configured Plugins:
 {configPlugins.join("\n")}
+
+Configured Ouput Hooks:
+{configOuts.join("\n")}
+extraction hooks:       {c.extractionOutputHandlers.join(", ")}
+prev sami out hooks:    {c.injectionPrevSamiOutputHandlers.join(", ")}
+new sami out hooks:     {c.injectionOutputHandlers.join(", ")}
 """
 
 proc showConfig*() =
@@ -788,6 +892,26 @@ proc lockBuiltinKeys*() =
       discard ctxSamiConf.lockConfigVar(prefix & ".missing_action")
       discard ctxSamiConf.lockConfigVar(prefix & ".value")
 
+  # These are locks of invalid fields for specific output handlers.
+  # Note that all of these lock calls could go away if con4m gets a
+  # locking syntax.
+
+  discard ctxSamiConf.lockConfigVar("output.stdout.filename")
+  discard ctxSamiConf.lockConfigVar("output.stdout.command")
+  discard ctxSamiConf.lockConfigVar("output.stdout.dst_uri")
+  discard ctxSamiConf.lockConfigVar("output.stdout.region")
+  discard ctxSamiConf.lockConfigVar("output.stdout.userid")
+  discard ctxSamiConf.lockConfigVar("output.stdout.secret")        
+
+  discard ctxSamiConf.lockConfigVar("output.local_file.command")
+  discard ctxSamiConf.lockConfigVar("output.local_file.dst_uri")
+  discard ctxSamiConf.lockConfigVar("output.local_file.region")
+  discard ctxSamiConf.lockConfigVar("output.local_file.userid")
+  discard ctxSamiConf.lockConfigVar("output.local_file.secret")
+
+  discard ctxSamiConf.lockConfigVar("output.s3.filename")
+  discard ctxSamiConf.lockConfigVar("output.s3.command")
+  
 # This should eventually move to evaluation callbacks.  They can give
 # better error messages more easily.
 # TODO: should also validate that all plugin keys are spec'd.

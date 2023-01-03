@@ -85,9 +85,6 @@ proc createdToJson*(sami: SamiObj, ptrOnly = false): string =
       keyJson = strValToJson(outputKey)
       valJson = boxToJson(sami.newFields[fullKey])
 
-    if outputKey == "OLD_SAMI":
-      echo "debug: ", sami.newFields[fullKey]
-
     result = result & kvPairJFmt.fmt()
     comma = comfyItemSep
 
