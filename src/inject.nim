@@ -221,6 +221,8 @@ proc doInjection*() =
                                    styleBright,
                                    infoPrefix,
                                    ansiResetCode)
+              else:
+                stderr.write(infoPrefix)
               stderr.writeLine(fmt"Wrote new sami binary to {newpath}")
           except:
             removeFile(path)
