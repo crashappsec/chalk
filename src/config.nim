@@ -115,6 +115,9 @@ proc getInjectionPrevSamiOutputHandlers*(): seq[string] =
 proc getInjectionOutputHandlers*(): seq[string] =
   return samiConfig.injectionOutputHandlers
 
+proc getDeletionOutputHandlers*(): seq[string] =
+  return samiConfig.deletionOutputHandlers
+
 proc getAllKeys*(): seq[string] =
   result = @[]
 

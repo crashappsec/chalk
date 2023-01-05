@@ -16,7 +16,7 @@ import streams
 import terminal
 import std/tempfiles
 
-const requiredCodecKeys = ["SRC_PATH", "HASH", "HASH_FILES"]
+const requiredCodecKeys = ["ARTIFACT_PATH", "HASH", "HASH_FILES"]
 
 type
   KeyPriorityInfo = tuple[priority: int, plugin: Plugin]
@@ -94,7 +94,7 @@ proc doInjection*() =
     everyKey = getOrderedKeys()
     dryRun = getDryRun()
 
-  doExtraction(onBehalfOfInjection = true)
+  doExtraction(OutCtxInject)
 
   trace("Beginning artifact metadata collection and injection.")
   # We're going to build a list of priority ordering based on plugin.

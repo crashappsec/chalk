@@ -14,7 +14,7 @@ import streams
 import nativesockets
 import tables
 
-proc doExtraction*(onBehalfOfInjection: bool) =
+proc doExtraction*(context: SamiOutputContext) =
   # This function will extract SAMIs, leaving them in SAMI
   # objects inside the codecs.  That way, the inject command
   # can reuse this code.
@@ -47,6 +47,8 @@ proc doExtraction*(onBehalfOfInjection: bool) =
   trace("Beginning extraction attempts for any found SAMIs")
 
   try:
+    # TODO, could check to see if there are output handlers registered, 
+    # and skip creating a JSON string if there aren't.
     for codec in codecInfo:
       for sami in codec.samis:
         var comma, primaryJson, embededJson: string
@@ -69,7 +71,7 @@ proc doExtraction*(onBehalfOfInjection: bool) =
             keyJson = strValToJson(key)
             valJson = embstore.foundToJson()
 
-          if not onBehalfOfInjection and not getDryRun():
+          if not getDryRun():
             embededJson = embededJson & kvPairJFmt.fmt()
             comma = comfyItemSep
 
@@ -78,15 +80,18 @@ proc doExtraction*(onBehalfOfInjection: bool) =
         numExtractions += 1
 
         let absPath = absolutePath(sami.fullpath)
-        samisToOut.add(logTemplate % [absPath, getHostName(),
-                                      primaryJson, embededJson])
+        samisToOut.add(logTemplate % [primaryJson, embededJson])
 
     let toOut = "[" & samisToOut.join(", ") & "]"
-    handleOutput(toOut, if onBehalfOfInjection: OutCtxInjectPrev
-                        else: OutCtxExtract)
+    
+    case context
+    of OutCtxInject:
+      handleOutput(toOut, OutCtxInjectPrev)
+    else:
+      handleOutput(toOut, context)
   except:
     # TODO: do better here.
-    # echo getStackTrace()
+    echo getCurrentException().getStackTrace()
     # raise
     warn(getCurrentExceptionMsg() &
          " (likely a bad SAMI embed; ignored)")

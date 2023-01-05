@@ -21,16 +21,21 @@ var samiConfig = con4m(Sami, baseconfig):
              "SAMI, which happens any time OLD_SAMI does NOT have skip " &
              "set.")
   attr(injection_output_handlers,
-        [string],
-        required = true,
-        doc = "When injecting, the codec will inject a SAMI, but these " &
-              "handlers will also get called to write a SAMI.  Note that, " &
-              "if the key SAMI_PTR is enabled (i.e., set to a value and not " &
-              "being skipped), the codec will only inject the miniminal " &
-              "pointer information, and these handlers will be used for " &
-              "writing the full SAMI. Note that the string value of the " &
-              "SAMI_PTR field should match at least one of the locations " &
-              "output to via this handler.")
+       [string],
+       required = true,
+       doc = "When injecting, the codec will inject a SAMI, but these " &
+             "handlers will also get called to write a SAMI.  Note that, " &
+             "if the key SAMI_PTR is enabled (i.e., set to a value and not " &
+             "being skipped), the codec will only inject the miniminal " &
+             "pointer information, and these handlers will be used for " &
+             "writing the full SAMI. Note that the string value of the " &
+             "SAMI_PTR field should match at least one of the locations " &
+             "output to via this handler.")
+  attr(deletion_output_handlers,
+       [string],
+       required = true,
+       doc = "When deleting a SAMI, write info about the deletion to any " &
+             "registed handlers.")
   attr(config_path,
        [string],
        @[".", "~"],

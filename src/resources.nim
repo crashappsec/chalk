@@ -211,8 +211,6 @@ be used, given the impact of config files / environment variables.
   fmtEmbedList* = "{embededJson}{sep}{embj}"
   # This is the logging template for JSON output.
   logTemplate* = """{ 
-  "ARTIFACT_PATH" : "$#", 
-  "ARTIFACT_HOST" : "$#",
   "SAMI" : $#,
   "EMBEDDED_SAMIS" : $#
 }"""
@@ -234,6 +232,7 @@ be used, given the impact of config files / environment variables.
   infNewSami* = "{item.fullpath}: new artifact metadata added."
   infReplacedSami* = "{item.fullpath}: artifact metadata replaced."
   eCantInsert* = "{item.fullpath}: insertion failed!"
+  eDeleteFailed* = "{item.fullpath}: deletion failed"
   eCantWrite* = "{sami.fullpath}: couldn't write out SAMI"
   eDidWrite* = "{sami.fullpath}: wrote SAMI successfully"
   eBadBin* = "{sami.fullpath}: Found binary SAMI magic, but SAMI didn't parse"

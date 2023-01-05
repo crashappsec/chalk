@@ -13,7 +13,8 @@ import nimaws/s3client
 var outputCallbacks: Table[string, SamiOutputHandler]
 let contextAsText = { OutCtxExtract : "extracting SAMIs",
                       OutCtxInjectPrev : "looking for existing SAMIs",
-                      OutCtxInject : "injecting SAMIs" }.toTable
+                      OutCtxInject : "injecting SAMIs",
+                      OutCtxDelete : "deleting SAMISs" }.toTable
 
 proc registerOutputHandler*(name: string, fn: SamiOutputHandler) =
   outputCallbacks[name] = fn
@@ -22,30 +23,24 @@ proc handleOutput*(content: string, context: SamiOutputContext) =
   let
     handleInfo = getOutputConfig()
     handles = case context
-      of OutCtxInject:
-        getInjectionOutputHandlers()
-      of OutCtxInjectPrev:
-        getInjectionPrevSamiOutputHandlers()
-      of OutCtxExtract:
-        getExtractionOutputHandlers()
+      of OutCtxInject: getInjectionOutputHandlers()
+      of OutCtxInjectPrev: getInjectionPrevSamiOutputHandlers()
+      of OutCtxExtract: getExtractionOutputHandlers()
+      of OutCtxDelete: getDeletionOutputHandlers()
+        
 
   if getDryRun():
     let
-      handlers = case context
-                of OutCtxExtract: getExtractionOutputHandlers()
-                of OutCtxInjectPrev: getInjectionPrevSamiOutputHandlers()
-                of OutCtxInject: getInjectionOutputHandlers()
       ct = "When " & contextAsText[context] & ":"
-      xtra = if handlers != @["stdout"]:
-               "\nWould have written to handlers:\n" &
+      xtra = if handles != @["stdout"]:
+               "\nAnd would have send the following to those handlers:\n" &
                  pretty(parseJson(content))
              else: "\n"
-      output = if handlers.len() != 0:
+      output = if handles.len() != 0:
                  fmt"{ct} without 'dry run' on, would have sent output to: " &
-                   handlers.join(", ") & xtra
+                   handles.join(", ") & xtra
                else:
-                 fmt"{ct} No output handlers installed, and 'dry run' on." &
-                  xtra
+                 fmt"{ct} No output handlers installed, and 'dry run' on."
             
     echo output
     return
@@ -65,7 +60,7 @@ proc handleOutput*(content: string, context: SamiOutputContext) =
 
       # For now, we're not handling failure.  Need to think about how
       # we want to handle it.
-      if not fn(content, thisInfo, contextAsText[context]):
+      if not fn(content, thisInfo, context):
         when not defined(release):
           stderr.writeLine(fmt"Output handler {handle} failed.")
       continue
@@ -86,23 +81,28 @@ proc handleOutput*(content: string, context: SamiOutputContext) =
           stderr.writeLine("Output handler {handle} failed.")
           raise
 
+proc jsonFormatOutputBlob(content: string, 
+                          ctx: SamiOutputContext): string {.inline.} =
+  let ctxStr = $ctx
+  return """{{ "context": "{ctxStr}", "ITEM LIST" : {content} }}""".fmt()
+
 proc stdoutHandler*(content: string,
                     h: SamiOutputSection,
-                    ctx: string): bool =
-  echo "When ", ctx, ":"
-  echo pretty(parseJson(content))
+                    ctx: SamiOutputContext): bool =
+
+  echo pretty(parseJson(jsonFormatOutputBlob(content, ctx)))
   return true
 
 proc localFileHandler*(content: string,
                        h: SamiOutputSection,
-                       ctx: string): bool =
+                       ctx: SamiOutputContext): bool =
   var f: FileStream
 
   if not h.getOutputFilename().isSome():
     return false
   try:
     f = newFileStream(h.getOutputFileName().get(), fmWrite)
-    f.write(fmt"""{{ "context": "{ctx}", "SAMIs" : {content} }}""")
+    f.write(jsonFormatOutputBlob(content, ctx))
   except:
     return false
   finally:
@@ -119,7 +119,8 @@ proc getUniqueSuffix(h: SamiOutputSection): string =
   
 proc awsFileHandler*(content: string,
                      h: SamiOutputSection,
-                     ctx: string): bool =
+                     ctx: SamiOutputContext): bool =
+
   if h.getOutputSecret().isNone():
     stderr.writeLine("AWS secret not configured.")
     when not defined(release):
@@ -148,7 +149,7 @@ proc awsFileHandler*(content: string,
     bucket = dstUri.hostname
     path   = dstUri.path[1 .. ^1] & getUniqueSuffix(h)
     region = h.getOutputRegion().get()
-    body   = fmt"""{{ "context": {ctx}, "SAMIs" : {content} }}"""
+    body   = jsonFormatOutputBlob(content, ctx)
 
   var
     client = newS3Client((userid, secret))

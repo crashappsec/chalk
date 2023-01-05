@@ -236,7 +236,7 @@ method getArtifactInfo*(self: Codec, sami: SamiObj): KeyInfo =
 
   result["HASH"] = pack(encodedHash)
   result["HASH_FILES"] = hashFilesBox
-  result["SRC_PATH"] = pack(sami.fullpath)
+  result["ARTIFACT_PATH"] = pack(sami.fullpath)
 
 method handleWrite*(self: Codec,
                     ctx: Stream,

@@ -10,15 +10,13 @@ import resources
 import std/tempfiles
 
 proc doDelete*() =
+  # We don't handle the output hook writing; doExtraction handles it for us.
   trace("Identifying artifacts with existing SAMIs")
-  doExtraction(onBehalfOfInjection = true) # TODO, make this flag an enum.
+  doExtraction(OutCtxDelete)
   
   var codecs = getCodecsByPriority()
 
-  static:
-    echo typeof(codecs)
   for pluginInfo in codecs:
-    
     let
       codec = cast[Codec](pluginInfo.plugin)
       extracts = codec.getSamis()
@@ -26,11 +24,14 @@ proc doDelete*() =
     if len(extracts) == 0: continue
 
     for item in extracts:
+      if not item.primary.present:
+        continue # It's markable, but not marked.
       item.stream.setPosition(0)
       let
         outputPtrs = getOutputPointers()
         point = item.primary
         pre = item.stream.readStr(point.startOffset)
+
       forceInform(fmt"{item.fullPath}: removing sami")
       if getDryRun(): continue
 
@@ -50,7 +51,7 @@ proc doDelete*() =
         ctx = newFileStream(f)
         codec.handleWrite(ctx, pre, none(string), post)
       except:
-        error(eCantInsert.fmt())
+        error(eDeleteFailed.fmt())
         removeFile(path)
       finally:
         if ctx != nil:
@@ -60,4 +61,4 @@ proc doDelete*() =
           except:
             removeFile(path)
             raise
-      
+

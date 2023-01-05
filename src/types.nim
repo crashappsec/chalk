@@ -2,9 +2,9 @@
 
 type
   SamiOutputContext* = enum
-    OutCtxExtract, OutCtxInjectPrev, OutCtxInject
+    OutCtxExtract, OutCtxInjectPrev, OutCtxInject, OutCtxDelete
   
-  SamiOutputHandler* = (string, SamiOutputSection, string) -> bool
+  SamiOutputHandler* = (string, SamiOutputSection, SamiOutputContext) -> bool
   SamiDict* = TableRef[string, Box] ## \
      ## Representation of the abstract SAMI's fields. If the SAMI
      ## was read from a file, this will include any embeds / nests.

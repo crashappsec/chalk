@@ -8,6 +8,13 @@ extraction_output_handlers: ["stdout"]
 injection_prev_sami_output_handlers: []
 injection_output_handlers: []
 
+key INSERTION_HOSTINFO {
+    info, exitCode := system("uname -a")
+    if exitCode == 0 {
+      value: info
+    }
+}
+
 output s3 {
   if envExists("AWS_ACCESS_SECRET") {
     secret: env("AWS_ACCESS_SECRET")

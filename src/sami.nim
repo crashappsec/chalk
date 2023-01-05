@@ -24,7 +24,6 @@ proc getInjecting*(args: seq[Box],
                    unused3: Con4mScope): Option[Box] =
     return cmdInject
 
-
 # getConfigState() is defined in config.nim, and basically
 # just exports a variable that is auto-generated for us when we
 # initialize con4m (also in config.nim).
@@ -68,7 +67,7 @@ proc runCmdInject() {.noreturn, inline.} =
 
 proc runCmdExtract() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
-  doExtraction(onBehalfOfInjection = false) # extract.nim
+  doExtraction(OutCtxExtract) # extract.nim
   quit()
 
 proc runCmdDump(arglist: seq[string]) {.noreturn, inline.} =
