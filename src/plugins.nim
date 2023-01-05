@@ -241,7 +241,7 @@ method getArtifactInfo*(self: Codec, sami: SamiObj): KeyInfo =
 method handleWrite*(self: Codec,
                     ctx: Stream,
                     pre: string,
-                    encoded: string,
+                    encoded: Option[string],
                     post: string) {.base.} =
   raise newException(Exception, ePureVirtual)
 

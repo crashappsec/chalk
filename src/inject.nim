@@ -200,7 +200,7 @@ proc doInjection*() =
       try:
         (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
         ctx = newFileStream(f)
-        codec.handleWrite(ctx, pre, encoded, post)
+        codec.handleWrite(ctx, pre, some(encoded), post)
         if point.present:
           inform(infReplacedSami.fmt())
         else:

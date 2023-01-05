@@ -1,6 +1,7 @@
 import strformat
 import streams
 import os
+import options
 
 import config
 import plugins
@@ -47,7 +48,7 @@ proc doDelete*() =
       try:
         (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
         ctx = newFileStream(f)
-        codec.handleWrite(ctx, pre, "", post)
+        codec.handleWrite(ctx, pre, none(string), post)
       except:
         error(eCantInsert.fmt())
         removeFile(path)

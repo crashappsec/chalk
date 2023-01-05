@@ -8,6 +8,7 @@ import endians
 import streams
 import strutils
 import strformat
+import options
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
@@ -100,10 +101,11 @@ method scan*(self: CodecElf, sami: SamiObj): bool =
 method handleWrite*(self: CodecElf,
                     ctx: Stream,
                     pre: string,
-                    encoded: string,
+                    encoded: Option[string],
                     post: string) =
   ctx.write(pre)
-  ctx.write(encoded)
+  if encoded.isSome():
+    ctx.write(encoded.get())
 
 method getArtifactHash*(self: CodecElf, sami: SamiObj): string =
   var shaCtx = initSHA[SHA256]()
