@@ -6,6 +6,7 @@ import nimSHA2
 
 import streams
 import strutils
+import options
 
 type CodecShebang* = ref object of Codec
 
@@ -36,13 +37,17 @@ method scan*(self: CodecShebang, sami: SamiObj): bool =
 method handleWrite*(self: CodecShebang,
                     ctx: Stream,
                     pre: string,
-                    encoded: string,
+                    encoded: Option[string],
                     post: string) =
 
-  ctx.write(pre)
-  if not pre.strip().endsWith("\n#"):
-    ctx.write("\n# ")
-  ctx.write(encoded)
+
+  if encoded.isSome():
+    ctx.write(pre)
+    if not pre.strip().endsWith("\n#"):
+      ctx.write("\n# ")
+    ctx.write(encoded.get()) 
+  else:
+    ctx.write(pre[0 ..< pre.find('\n')])
   ctx.write(post)
 
 method getArtifactHash*(self: CodecShebang, sami: SamiObj): string =

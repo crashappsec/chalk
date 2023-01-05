@@ -159,9 +159,13 @@ be used, given the impact of config files / environment variables.
               "\t\t\t     variables and options passed before this flag appears"
   showDumpHelp* = "Dumps any embedded configuration to disk."
   showLoadHelp* = "Loads an embedded configuration from the specified file."
+  showDelHelp* = "Remove SAMI objects from artifacts."
+  delFilesHelp* = "Specify the files/directories from which to remove SAMIs from"
   cfgFileHelp* = "Specify the config file name to search for (NOT the path)"
   cfgSearchHelp* = "The search path for looking for configuration files"
   inFilesHelp* = "Specify which files or directories to target for insertion."
+  dumpFileHelp* = "Specify the (optional) file to dump the embedded configuration file."
+  loadFileHelp* = "Specify the configuration file to embed."
   overWriteHelp* = "Replace existing SAMI metadata found in an artifact"
   noOverWriteHelp* = "Keep existing SAMI metadata found in an artifact by\n" &
                    "\t\t\t     embedding it in the OLD_SAMI field"
@@ -207,8 +211,6 @@ be used, given the impact of config files / environment variables.
   fmtEmbedList* = "{embededJson}{sep}{embj}"
   # This is the logging template for JSON output.
   logTemplate* = """{ 
-  "ARTIFACT_PATH" : "$#", 
-  "ARTIFACT_HOST" : "$#",
   "SAMI" : $#,
   "EMBEDDED_SAMIS" : $#
 }"""
@@ -230,6 +232,7 @@ be used, given the impact of config files / environment variables.
   infNewSami* = "{item.fullpath}: new artifact metadata added."
   infReplacedSami* = "{item.fullpath}: artifact metadata replaced."
   eCantInsert* = "{item.fullpath}: insertion failed!"
+  eDeleteFailed* = "{item.fullpath}: deletion failed"
   eCantWrite* = "{sami.fullpath}: couldn't write out SAMI"
   eDidWrite* = "{sami.fullpath}: wrote SAMI successfully"
   eBadBin* = "{sami.fullpath}: Found binary SAMI magic, but SAMI didn't parse"

@@ -2,6 +2,7 @@ import resources
 import config
 import inject
 import extract
+import delete
 import plugins
 
 import argparse
@@ -22,7 +23,6 @@ proc getInjecting*(args: seq[Box],
                    unused2: VarStack,
                    unused3: Con4mScope): Option[Box] =
     return cmdInject
-
 
 # getConfigState() is defined in config.nim, and basically
 # just exports a variable that is auto-generated for us when we
@@ -67,7 +67,7 @@ proc runCmdInject() {.noreturn, inline.} =
 
 proc runCmdExtract() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
-  doExtraction(onBehalfOfInjection = false) # extract.nim
+  doExtraction(OutCtxExtract) # extract.nim
   quit()
 
 proc runCmdDump(arglist: seq[string]) {.noreturn, inline.} =
@@ -90,6 +90,10 @@ proc runCmdLoad() {.noreturn, inline.} =
   doInjection()
   quit()
 
+proc runCmdDel() {.noreturn, inline.} =
+  loadUserConfigFile(getSelfExtraction())
+  doDelete() # delete.nim
+  quit()
 type
   FlagID = enum
     fidColor, fidNoColor, fidDryRun, fidNoDryRun, fidSilent, fidQuiet,
@@ -199,7 +203,7 @@ template dumpCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showDumpHelp)
-    arg("files", nargs = -1, help = inFilesHelp)      
+    arg("files", nargs = -1, help = dumpFileHelp)      
     run:
       setArtifactSearchPath(opts.files)
       runCmdDump(opts.files)
@@ -208,10 +212,19 @@ template loadCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showLoadHelp)
-    arg("files", nargs = -1, help = inFilesHelp)      
+    arg("files", nargs = -1, help = loadFileHelp)      
     run:
       setArtifactSearchPath(opts.files)
       runCmdLoad()
+
+template delCmd(cmd: string, primary: bool) =
+  command(cmd):
+    if primary:
+      help(showDelHelp)
+    arg("files", nargs = -1, help = delFilesHelp)
+    run:
+      setArtifactSearchPath(opts.files)
+      runCmdDel()
 
 when isMainModule:
   var cmdLine = newParser:
@@ -296,6 +309,9 @@ when isMainModule:
 
     loadCmd("configLoad", true)
     loadCmd("load", false)
+
+    delCmd("delete", true)
+    delCmd("del", false)
 
   try:
     cmdLine.run()

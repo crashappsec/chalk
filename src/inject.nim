@@ -16,7 +16,7 @@ import streams
 import terminal
 import std/tempfiles
 
-const requiredCodecKeys = ["SRC_PATH", "FILE_NAME", "HASH", "HASH_FILES"]
+const requiredCodecKeys = ["ARTIFACT_PATH", "HASH", "HASH_FILES"]
 
 type
   KeyPriorityInfo = tuple[priority: int, plugin: Plugin]
@@ -94,7 +94,7 @@ proc doInjection*() =
     everyKey = getOrderedKeys()
     dryRun = getDryRun()
 
-  doExtraction(onBehalfOfInjection = true)
+  doExtraction(OutCtxInject)
 
   trace("Beginning artifact metadata collection and injection.")
   # We're going to build a list of priority ordering based on plugin.
@@ -200,7 +200,7 @@ proc doInjection*() =
       try:
         (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
         ctx = newFileStream(f)
-        codec.handleWrite(ctx, pre, encoded, post)
+        codec.handleWrite(ctx, pre, some(encoded), post)
         if point.present:
           inform(infReplacedSami.fmt())
         else:
@@ -221,6 +221,8 @@ proc doInjection*() =
                                    styleBright,
                                    infoPrefix,
                                    ansiResetCode)
+              else:
+                stderr.write(infoPrefix)
               stderr.writeLine(fmt"Wrote new sami binary to {newpath}")
           except:
             removeFile(path)

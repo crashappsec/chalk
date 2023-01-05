@@ -20,6 +20,7 @@ ascii_magic := "dadfedabbadabbed"
 extraction_output_handlers: []
 injection_prev_sami_output_handlers: []
 injection_output_handlers: []
+deletion_output_handlers: []
 
 key _MAGIC json {
     required: true
@@ -86,7 +87,7 @@ key EARLIEST_VERSION {
     standard: true
 }
 
-key SRC_PATH {
+key ARTIFACT_PATH {
     type: "string"
     since: "0.1.0"
     codec: true
@@ -94,10 +95,9 @@ key SRC_PATH {
     standard: true
 }
 
-key FILE_NAME {
+key INSERTION_HOSTINFO {
     type: "string"
     since: "0.1.0"
-    codec: true
     output_order: 7
     standard: true
 }
@@ -273,7 +273,7 @@ key SIGNATURE {
 }
 
 # Doesn't do any keys other than the codec defaults, which are:
-# SRC_PATH, FILE_NAME, HASH, HASH_FILES
+# ARTIFACT_PATH, HASH, HASH_FILES
 
 plugin elf {
     codec: true
