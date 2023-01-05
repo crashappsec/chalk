@@ -230,15 +230,13 @@ method getArtifactInfo*(self: Codec, sami: SamiObj): KeyInfo =
   result = newTable[string, Box]()
 
   let
-    (head, tail) = sami.fullpath.splitPath()
     hashFilesBox = pack(@[sami.fullpath])
     encodedHash = self.getArtifactHash(sami).toHex().toLowerAscii()
 
 
   result["HASH"] = pack(encodedHash)
   result["HASH_FILES"] = hashFilesBox
-  result["SRC_PATH"] = pack(head)
-  result["FILE_NAME"] = pack(tail)
+  result["SRC_PATH"] = pack(sami.fullpath)
 
 method handleWrite*(self: Codec,
                     ctx: Stream,

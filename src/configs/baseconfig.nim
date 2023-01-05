@@ -94,14 +94,6 @@ key SRC_PATH {
     standard: true
 }
 
-key FILE_NAME {
-    type: "string"
-    since: "0.1.0"
-    codec: true
-    output_order: 7
-    standard: true
-}
-
 key ORIGIN_URI {
     type: "string"
     missing_action: "warn"
@@ -273,7 +265,7 @@ key SIGNATURE {
 }
 
 # Doesn't do any keys other than the codec defaults, which are:
-# SRC_PATH, FILE_NAME, HASH, HASH_FILES
+# SRC_PATH, HASH, HASH_FILES
 
 plugin elf {
     codec: true

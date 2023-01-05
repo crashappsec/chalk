@@ -16,7 +16,7 @@ import streams
 import terminal
 import std/tempfiles
 
-const requiredCodecKeys = ["SRC_PATH", "FILE_NAME", "HASH", "HASH_FILES"]
+const requiredCodecKeys = ["SRC_PATH", "HASH", "HASH_FILES"]
 
 type
   KeyPriorityInfo = tuple[priority: int, plugin: Plugin]
