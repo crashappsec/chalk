@@ -11,10 +11,10 @@ import nimutils/random
 import nimaws/s3client
 
 var outputCallbacks: Table[string, SamiOutputHandler]
-let contextAsText = { OutCtxExtract : "extracting SAMIs",
-                      OutCtxInjectPrev : "looking for existing SAMIs",
-                      OutCtxInject : "injecting SAMIs",
-                      OutCtxDelete : "deleting SAMISs" }.toTable
+const contextAsText = { OutCtxExtract : "extracting SAMIs",
+                        OutCtxInjectPrev : "looking for existing SAMIs",
+                        OutCtxInject : "injecting SAMIs",
+                        OutCtxDelete : "deleting SAMISs" }.toTable
 
 proc registerOutputHandler*(name: string, fn: SamiOutputHandler) =
   outputCallbacks[name] = fn
