@@ -154,6 +154,38 @@ var samiConfig = con4m(Sami, baseconfig):
     attr(docstring,
          string,
          required = false)
+  section(sink, allowedSubSections = @["*"]):
+    attr(uses_secret, bool, defaultVal = false)
+    attr(uses_userid, bool, defaultVal = false)
+    attr(uses_filename, bool, defaultVal = false)
+    attr(uses_uri, bool, defaultVal = false)
+    attr(uses_region, bool, defaultVal = false)
+    attr(uses_aux, bool, defaultVal = false)
+    attr(needs_secret, bool, defaultVal = false)
+    attr(needs_userid, bool, defaultVal = false)
+    attr(needs_filename, bool, defaultVal = false)
+    attr(needs_uri, bool, defaultVal = false)
+    attr(needs_region, bool, defaultVal = false)
+    attr(needs_aux, bool, defaultVal = false)
+    attr(docstring, string, required = false)
+    
+  section(outhook, allowedSubSections = @["*"]):
+    attr(sink, string, required = true)
+    attr(filters, [string], defaultVal = @[])
+    attr(secret, string, required = false)
+    attr(userid, string, required = false)
+    attr(filename, string, required = false)
+    attr(uri, string, required = false)
+    attr(region, string, required = false)
+    attr(aux, string, required = false)
+    attr(stop, bool, defaultVal = false)
+    attr(docstring, string, required = false)
+    
+  section(stream, allowedSubSections = @["*"]):
+    attr(dict, bool, defaultVal = false)
+    attr(hooks, [string], defaultVal = @[])
+    attr(filters, [[string]], defaultVal = @[])
+    
   section(output, allowedSubSections = @["*"]):
     attr(secret,
          string,

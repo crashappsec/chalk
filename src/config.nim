@@ -9,7 +9,7 @@ include configs/con4mconfig   # gives us the variable samiConfig, which is
                               # this needs to happen before we include types.
 include types
 
-const allowedCmds = ["inject", "extract", "defaults", "configDump"]
+const allowedCmds = ["inject", "extract"]
 const validLogLevels = ["none", "error", "warn", "info", "trace"]
  
 proc getOutputConfig*(): TableRef[string, SamiOutputSection] =
@@ -222,6 +222,56 @@ proc getCommandPlugins*(): seq[(string, string)] =
     if (not plugin.command.isSome()) or (not plugin.enabled):
       continue
     result.add((name, plugin.command.get()))
+
+proc getAllOuthooks*(): TableRef[string, SamiOuthookSection] =
+  result = samiConfig.outhook
+
+proc getSink*(hook: string): Option[SamiSinkSection] =
+  if samiConfig.`sink`.contains(hook):
+    return some(samiConfig.`sink`[hook])
+  return none(SamiSinkSection)
+
+proc getSink*(hook: SamiOuthookSection): Option[SamiSinkSection] =
+  return getSink(hook.`sink`)
+
+proc getFilters*(hook: SamiOuthookSection): seq[string] =
+  return hook.filters
+
+proc getSecret*(hook: SamiOuthookSection): Option[string] =
+  return hook.secret
+
+proc getUserId*(hook: SamiOuthookSection): Option[string] =
+  return hook.userid
+
+proc getFileName*(hook: SamiOuthookSection): Option[string] =
+  return hook.filename
+
+proc getUri*(hook: SamiOuthookSection): Option[string] =
+  return hook.uri
+
+proc getRegion*(hook: SamiOuthookSection): Option[string] =
+  return hook.region
+
+proc getAux*(hook: SamiOuthookSection): Option[string] =
+  return hook.aux
+
+proc getStop*(hook: SamiOuthookSection): bool =
+  return hook.stop
+
+proc getStreamConfig*(name: string): Option[SamiStreamSection] =
+  if samiConfig.stream.contains(name):
+    return some(samiConfig.stream[name])
+  return none(SamiStreamSection)
+
+proc getIsDictStream*(sconf: SamiStreamSection): bool =
+  return sconf.dict
+
+proc getHooks*(sconf: SamiStreamSection): seq[string] =
+  return sconf.hooks
+
+proc getFilters*(sconf: SamiStreamSection): seq[seq[string]] = 
+  return sconf.filters
+
 
 proc getOutputPointers*(): bool =
   let contents = samiConfig.key["SAMI_PTR"]
@@ -452,6 +502,24 @@ proc doAdditionalValidation*() =
 
   for i in 0 ..< len(samiConfig.configPath):
     samiConfig.configPath[i] = samiConfig.configPath[i].resolvePath()
+
+  var validSinks = newTable[string, SamiSinkSection]()
+
+  for name, contents in samiConfig.outhook:
+    if not samiConfig.sink.contains(contents.sink):
+      warn(fmt"Output hook {name} is attached to sink {contents.sink}, but" &
+            " no such sink is configured (hook skipped)")
+      continue
+    let oneSink = samiConfig.sink[name]
+    if oneSink.needsAux:
+      if contents.aux.isNone():
+        warn(fmt"Hook {name} is missing field 'aux' (hook skipped)")
+        continue
+    elif not oneSink.usesAux:
+      if contents.aux.isSome():
+        warn(fmt"Hook {name} declares an 'aux' field, which sink " &
+             fmt"'{contents.sink}' does not use (ignoring)")
+      
 
   # Now, lock a bunch of fields.
   lockBuiltinKeys()

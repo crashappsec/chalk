@@ -12,6 +12,10 @@
 ##
 ## Nothing should really be in here that doesn't need to be here-- add
 ## it to defaultconfig.nim, which users can change.
+## 
+## Note, if you end up w/ syntax errors in this file, when you run sami 
+## and get an error, the line number will be relative to the first line 
+## after the """ below, so add 20 to get the line # in this file.
 
 const baseConfig = """
 sami_version := "0.2.0"
@@ -322,12 +326,104 @@ plugin conffile {
     priority: 2147483646
 }
 
-output stdout {
+sink stdout {
+  docstring: "A sink that writes to stdout"
 }
 
-output local_file {
+sink stderr {
+  docstring: "A sink that writes to stderr"
 }
 
-output s3 {
+sink local_file {
+  needs_filename: true # Assumes uses_filename
+  docstring: "A sink that writes a local file"
 }
+
+sink s3 {
+  needs_secret: true
+  needs_userid: true
+  needs_uri: true
+  uses_region: true
+  docstring: "A sink for S3 buckets"
+}
+
+sink post {
+  uses_secret: true
+  uses_userid: true
+  needs_uri: true
+  docstring: "Generic HTTP/HTTPS post to a URL"
+}
+
+sink custom {
+  uses_secret: true
+  uses_userid: true
+  uses_filename: true
+  uses_uri: true
+  uses_region: true
+  uses_aux: true
+  docstring: "Implement a custom sink via a con4m callback"
+}
+
+outhook defaultLog {
+  sink: "stderr"
+}
+
+outhook defaultOut {
+  sink: "stdout"
+}
+
+# There are two different 
+stream error { 
+  hooks: ["defaultLog"]
+  filters: [ 
+             ["loglevel", "error"]
+           ]
+}
+
+stream warn {
+  hooks: ["defaultLog"]  
+  filters: [ 
+             ["loglevel", "warn"]
+           ]
+}
+
+stream inform {
+  hooks: ["defaultLog"]
+  filters: [ 
+             ["loglevel", "inform"]
+           ]
+ }
+stream trace {
+  hooks: ["defaultLog"]
+  filters: [
+             ["loglevel", "trace"]
+           ] 
+}
+
+stream debug {
+  hooks: ["stderr"]
+  filters: [ 
+             ["debugging"]
+           ]
+ }
+
+stream extract {
+  dict: true
+  hooks: ["stdout"]
+ }
+
+stream inject { 
+  dict: true
+  hooks: ["stdout"]
+}
+
+stream nesting { 
+  dict: true
+}
+stream delete {
+  dict: true
+}
+stream confchange {
+  dict: true
+ }
 """
