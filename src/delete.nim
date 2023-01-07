@@ -15,8 +15,9 @@ proc doDelete*() =
   
   var codecs           = getCodecsByPriority()
   let pendingDeletions = doExtraction()
-  
-  output("delete", logLevelNone, pendingDeletions)
+
+  if pendingDeletions.isSome():
+    output("delete", logLevelNone, pendingDeletions.get())
 
   for pluginInfo in codecs:
     let

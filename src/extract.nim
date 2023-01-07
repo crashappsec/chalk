@@ -7,7 +7,7 @@ import nimutils/box
 import os, tables, strutils, options, strformat, nativesockets
 
 
-proc doExtraction*(): string =
+proc doExtraction*(): Option[string] =
   # This function will extract SAMIs, leaving them in SAMI objects
   # inside the codecs.  it does NOT do any output, but it does build a
   # single JSON string that *could* be output.
@@ -73,7 +73,9 @@ proc doExtraction*(): string =
     echo getCurrentException().getStackTrace()
     error(getCurrentExceptionMsg() & " (likely a bad SAMI embed)")
   finally:
-    result = "[" & samisToRet.join(", ") & "]"
+    if numExtractions == 0:
+      return none(string)
+    result = some("[" & samisToRet.join(", ") & "]")
     trace(fmt"Completed {numExtractions} extractions.")
 
 var selfSamiObj: Option[SamiObj] = none(SamiObj)

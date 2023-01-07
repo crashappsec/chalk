@@ -378,24 +378,13 @@ outhook defaultOut {
 }
 
 outhook debug {
-  sink: "debug"
+  sink: "stderr"
   filters: [
              ["debugEnabled"]
            ]
 }
 
-stream error { 
-  hooks: ["defaultLog"]
-}
-
-stream warn {
-  hooks: ["defaultLog"]  
-}
-
-stream inform {
-  hooks: ["defaultLog"]
- }
-stream trace {
+stream errors { 
   hooks: ["defaultLog"]
 }
 

@@ -46,18 +46,21 @@ proc registerSink*(name: string, info: SamiSinkSection): bool =
 
   return true
   
-proc registerHook*(name: string, sinkName: string, info: SamiOuthookSection) =
+proc registerHook*(name: string, info: SamiOuthookSection) =
   let
-    theSink = sinkPtrs[sinkName]
-    o       = SamiOuthookInfo(sectionInfo: info, theSink: theSink.impl)
+    sinkName = info.getSink()
+    theSink  = sinkPtrs[sinkName]
+    o        = SamiOuthookInfo(sectionInfo: info, theSink: theSink.impl)
 
   if not theSink.enabled:
     return # Do this now so we don't have to check later.
     
   hooks[name] = o
 
-proc registerStream*(name: string, hookList: seq[string]) =
-  var hookObjs : seq[SamiOuthookInfo] = @[]
+proc registerStream*(name: string, s: SamiStreamSection) =
+  var
+    hookList = s.getHooks()
+    hookObjs : seq[SamiOuthookInfo] = @[]
 
   for hookName in hookList:
     hookObjs.add(hooks[hookName])
@@ -67,11 +70,31 @@ proc registerStream*(name: string, hookList: seq[string]) =
 let
   startOfType = toCon4mType("f(string, int)->(string, bool)")
   strType     = Con4mType(kind: TypeString)
+
+proc handleOutputRegistrations*() =
+  var
+    cfg = getConfigState()
+  let
+    sinks   = getAllSinks()
+    hooks   = getAllOuthooks()
+    streams = getAllStreams()
+
+  for name, item in sinks:
+    if not registerSink(name, item):
+      error(fmt"Sink {name} does not have an implementation.")
+      quit()
+  for name, item in hooks:
+    registerHook(name, item)
+  for name, item in streams:
+    registerStream(name, item)
   
 proc output*(stream:  string,
              ll:      LogLevel,
              content: string) =
 
+  if stream notin outStreams:
+    return
+    
   let hookObjs = outStreams[stream]
   var output   = content
   
@@ -118,11 +141,11 @@ proc output*(stream:  string,
 
 
 proc stdoutSink(content: string, cfg: SamiOuthookSection): bool =
-  stdout.write(content)
+  stdout.writeLine(content)
   return true
 
 proc stderrSink(content: string, cfg: SamiOuthookSection): bool =
-  stderr.write(content)
+  stderr.writeLine(content)
   return true
 
 var fileStreamCache: Table[string, FileStream]

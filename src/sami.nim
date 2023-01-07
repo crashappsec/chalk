@@ -41,6 +41,10 @@ doAdditionalValidation()
 
 proc runCmdDefaults() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
+  # We can't really put this in loadUserConfigFile() unless we move
+  # it, due to current module interdependencies.  Will probably fix
+  # this sooner than later.
+  handleOutputRegistrations() 
   showConfig() # config.nim
   quit()
 
@@ -51,14 +55,19 @@ proc runCmdInject() {.noreturn, inline.} =
   # that before we set up any command-line arguments; it would return
   # 'false' for us always, no matter what the user supplies.
   loadUserConfigFile(getSelfExtraction())
+  handleOutputRegistrations()   
   loadCommandPlugins()
   doInjection() # inject.nim
   quit()
 
 proc runCmdExtract() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
+  handleOutputRegistrations() 
   let extractions = doExtraction() # extract.nim
-  output("extract", logLevelNone, extractions)
+  if extractions.isSome():
+    output("extract", logLevelNone, extractions.get())
+  else:
+    warn("No items extracted.")
   quit()
 
 proc runCmdDump(arglist: seq[string]) {.noreturn, inline.} =
@@ -83,6 +92,7 @@ proc runCmdLoad() {.noreturn, inline.} =
 
 proc runCmdDel() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
+  handleOutputRegistrations()
   doDelete() # delete.nim
   quit()
 type

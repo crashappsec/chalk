@@ -199,6 +199,9 @@ proc getCommandPlugins*(): seq[(string, string)] =
 proc getAllOuthooks*(): TableRef[string, SamiOuthookSection] =
   result = samiConfig.outhook
 
+proc getAllSinks*(): TableRef[string, SamiSinkSection] =
+  result = samiConfig.sink
+  
 proc getSink*(hook: string): Option[SamiSinkSection] =
   if samiConfig.`sink`.contains(hook):
     return some(samiConfig.`sink`[hook])
@@ -234,11 +237,9 @@ proc getAux*(hook: SamiOuthookSection): Option[string] =
 proc getStop*(hook: SamiOuthookSection): bool =
   return hook.stop
 
-proc getStreamConfig*(name: string): Option[SamiStreamSection] =
-  if samiConfig.stream.contains(name):
-    return some(samiConfig.stream[name])
-  return none(SamiStreamSection)
-
+proc getAllStreams*(): TableRef[string, SamiStreamSection] =
+   return samiConfig.stream
+  
 proc getHooks*(sconf: SamiStreamSection): seq[string] =
   return sconf.hooks
 
@@ -440,15 +441,14 @@ template hookCheck(fieldName: untyped) =
            "', which is required by sink '" & contents.sink &
            "' (hook skipped)")
       continue
-    elif not oneSink.`uses fieldName`:
-      if contents.`fieldName`.isSome():
-        warn("Hook '" & outHookName & "' declares a '" & s &
-             "' field, but sink '" & contents.sink & "' does not use it. " &
-             "(ignoring)")
+  elif not oneSink.`uses fieldName`:
+    if contents.`fieldName`.isSome():
+      warn("Hook '" & outHookName & "' declares a '" & s &
+           "' field, but sink '" & contents.sink & "' does not use it. " &
+           "(ignoring)")
 
 # This should eventually move to evaluation callbacks.  They can give
 # better error messages more easily.
-# TODO: should also validate that all plugin keys are spec'd.
 proc doAdditionalValidation*() =
   if samiConfig.defaultCommand.isSome() and
     not (samiConfig.defaultCommand.get() in allowedCmds):
@@ -538,8 +538,8 @@ proc doAdditionalValidation*() =
         t   = toCon4mType(con4mType)
         sig = getFuncBySig(ctxSamiConf, filter[0], t)
       if sig.isNone():
-        warn("In output hook {outHookName}, could not find a matching " &
-             "function" & filter[0] & `$`(t) &
+        warn(fmt"In output hook {outHookName}, could not find a matching " &
+             "con4m function " & filter[0] & (`$`(t))[1 .. ^1] &
              " (hook skipped)")
         skipHook = true
         break
@@ -562,14 +562,14 @@ proc doAdditionalValidation*() =
     
     for hook in contents.hooks:
       if hook notin samiConfig.outhook:
-        warn(fmt"Hook {hook} was attached to output stream {name}, but " &
+        warn(fmt"Hook {hook} was attached to output stream '{name}', but " &
              "there is no valid hook with that name")
         continue
       else:
         validHooks.add(hook)
 
-    if len(validHooks) == 0 and len(samiConfig.stream) != 0:
-      warn(fmt"No hooks configured for stream {name} are valid.")
+    if len(validHooks) == 0 and len(contents.hooks) != 0:
+      warn(fmt"No hooks configured for stream '{name}' are valid.")
 
   # Now, lock a bunch of fields.
   lockBuiltinKeys()

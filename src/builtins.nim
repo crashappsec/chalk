@@ -37,7 +37,7 @@ proc packFilterRet*(s: string, b: bool): Option[Box] =
 proc debugEnabled*(args: seq[Box],
                    unused1: Con4mScope,
                    unused2: VarStack,
-                   unused3: Con4mScope): Option[Box] {.inline.} =
+                   unused3: Con4mScope): Option[Box] =
   let output = unpack[string](args[0])
     
   when not defined(release):
@@ -79,10 +79,9 @@ proc logLevel*(args: seq[Box],
     return packFilterRet("", false)
 
 proc prettyJson*(args: seq[Box],
-
-               unused1: Con4mScope,
-               unused2: VarStack,
-               unused3: Con4mScope): Option[Box] =
+                 unused1: Con4mScope,
+                 unused2: VarStack,
+                 unused3: Con4mScope): Option[Box] =
     let output = unpack[string](args[0])
 
     try:
@@ -91,6 +90,14 @@ proc prettyJson*(args: seq[Box],
       return packFilterRet("\"Invalid JSon formatting\"", false)
   
 proc loadAdditionalBuiltins*() =
-  let ctxSamiConf = getConfigState()
-  ctxSamiConf.newBuiltIn("injecting", getInjecting, "f() -> bool")
+  let
+    ctx           = getConfigState()
+    llsig         = "f(string, int, string)->(string, bool)"
+    basefiltersig = "f(string, int)->(string, bool)"
+    
+  ctx.newBuiltIn("injecting", getInjecting, "f() -> bool")
+  ctx.newBuiltIn("logLevel", logLevel, llsig)
+  ctx.newBuiltIn("debugEnabled", debugEnabled, basefiltersig)
+  ctx.newBuiltIn("prettyJson", prettyJson, basefiltersig)
+  
 

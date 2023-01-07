@@ -91,7 +91,8 @@ proc doInjection*() =
 
   # Anything we've extracted is for an artifact where we are about to
   # inject over it.  Report these to the "nesting" output stream.
-  output("nesting", logLevelNone, extractions)
+  if extractions.isSome():
+    output("nesting", logLevelNone, extractions.get())
 
   trace("Beginning artifact metadata collection and injection.")
   # We're going to build a list of priority ordering based on plugin.
