@@ -3,33 +3,24 @@ import config
 import inject
 import extract
 import delete
+import dump
 import plugins
 
 import argparse
 import macros except error
 import tables
 import strformat
-import nimutils/box
-import con4m/[types, builtins]
+import builtins
+import output
 
-# This "builtin" call for con4m doesn't need to be available until
-# user configurations load, but let's be sure to do it before that
-# happens.  First we define the function here, and next we'll register
-# it.
-var cmdInject = some(pack(false))
 
-proc getInjecting*(args: seq[Box],
-                   unused1: Con4mScope,
-                   unused2: VarStack,
-                   unused3: Con4mScope): Option[Box] =
-    return cmdInject
-
-# getConfigState() is defined in config.nim, and basically
-# just exports a variable that is auto-generated for us when we
-# initialize con4m (also in config.nim).
-
-let ctxSamiConf = getConfigState()
-ctxSamiConf.newBuiltIn("injecting", getInjecting, "f() -> bool")
+# The base configuration will load when we import config.  We forego
+# using any SAMI-specific builtns in that config, because it's just
+# specification (otherwise we'd load those builtins there.
+#
+# But we want to go ahead and add these before we run any user definable
+# config.
+loadAdditionalBuiltins()
 
 # The internally stored config file loads due to the import of config.
 # Call this function to do the additional configuration validation
@@ -59,7 +50,6 @@ proc runCmdInject() {.noreturn, inline.} =
   # cannot use that builtin in the base configuration, since we run
   # that before we set up any command-line arguments; it would return
   # 'false' for us always, no matter what the user supplies.
-  cmdInject = some(pack(true))
   loadUserConfigFile(getSelfExtraction())
   loadCommandPlugins()
   doInjection() # inject.nim
@@ -67,7 +57,8 @@ proc runCmdInject() {.noreturn, inline.} =
 
 proc runCmdExtract() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
-  doExtraction(OutCtxExtract) # extract.nim
+  let extractions = doExtraction() # extract.nim
+  output("extract", logLevelNone, extractions)
   quit()
 
 proc runCmdDump(arglist: seq[string]) {.noreturn, inline.} =

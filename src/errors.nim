@@ -2,12 +2,15 @@
 type LogLevel* = enum
   logLevelNone, logLevelErr, logLevelWarn, logLevelVerbose,
   logLevelTrace
-
+  
+import strformat, strutils, tables, options, algorithm, os, streams, sugar
+import std/uri
+import macros
+import con4m, con4m/st, con4m/eval, con4m/dollars
+import nimutils, nimutils/box
 import resources
 import terminal
 export styledWriteLine, styledWrite
-import options
-export options
 
 # Error handling helpers.
 # TODO... normalize filename variables

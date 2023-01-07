@@ -1,168 +1,280 @@
 import config
-import osproc
+import os
 import streams
 import strformat
 import strutils
 import tables
-import json
+import options
+import std/net
 import std/uri
+import std/httpclient
 import nimutils
+import nimutils/box
 import nimutils/random
 import nimaws/s3client
+import con4m
+import con4m/st
+import con4m/eval
+import con4m/typecheck
 
-var outputCallbacks: Table[string, SamiOutputHandler]
-const contextAsText = { OutCtxExtract : "extracting SAMIs",
-                        OutCtxInjectPrev : "looking for existing SAMIs",
-                        OutCtxInject : "injecting SAMIs",
-                        OutCtxDelete : "deleting SAMISs" }.toTable
-
-proc registerOutputHandler*(name: string, fn: SamiOutputHandler) =
-  outputCallbacks[name] = fn
-
-proc handleOutput*(content: string, context: SamiOutputContext) =
-  let
-    handleInfo = getOutputConfig()
-    handles = case context
-      of OutCtxInject: getInjectionOutputHandlers()
-      of OutCtxInjectPrev: getInjectionPrevSamiOutputHandlers()
-      of OutCtxExtract: getExtractionOutputHandlers()
-      of OutCtxDelete: getDeletionOutputHandlers()
-        
-
-  if getDryRun():
-    let
-      ct = "When " & contextAsText[context] & ":"
-      xtra = if handles != @["stdout"]:
-               "\nAnd would have send the following to those handlers:\n" &
-                 pretty(parseJson(content))
-             else: "\n"
-      output = if handles.len() != 0:
-                 fmt"{ct} without 'dry run' on, would have sent output to: " &
-                   handles.join(", ") & xtra
-               else:
-                 fmt"{ct} No output handlers installed, and 'dry run' on."
-            
-    echo output
-    return
+type
+  SamiSinkInfo = object
+    impl:     SamiSink
+    enabled: bool
     
-  for handle in handles:
-    if not (handle in handleInfo):
-      # There's not a config blob, so we can't possibly
-      # have the plugin loaded.
-      continue
+  SamiOuthookInfo = object
+    sectionInfo: SamiOuthookSection
+    theSink:     SamiSink
+    
+  SamiStream = seq[SamiOuthookInfo]
 
-    let thisInfo = handleInfo[handle]
+var sinkImpls:  Table[string, SamiSink]
+var sinkPtrs:   Table[string, SamiSinkInfo]
+var hooks:      Table[string, SamiOuthookInfo]
+var outStreams: Table[string, seq[SamiOuthookInfo]]
 
-    if handle in outputCallbacks:
-      # This is the standard path. If it's false, then we will check
-      # below for a command in the handler.
-      let fn = outputCallbacks[handle]
+proc registerSinkImplementation*(name: string, fn: SamiSink) =
+  sinkImpls[name] = fn
 
-      # For now, we're not handling failure.  Need to think about how
-      # we want to handle it.
-      if not fn(content, thisInfo, context):
-        when not defined(release):
-          stderr.writeLine(fmt"Output handler {handle} failed.")
-      continue
-    elif thisInfo.getOutputCommand().isSome():
-      let cmd = thisInfo.getOutputCommand().get()
-      try:
-        let
-          process = startProcess(cmd[0],
-                                 args = cmd[1 .. ^1],
-                                 options = {poUsePath})
-          (istream, ostream) = (process.outputStream, process.inputStream)
-        ostream.write(content)
-        ostream.flush()
-        istream.close()
-        discard process.waitForExit()
-      except:
-        when not defined(release):
-          stderr.writeLine("Output handler {handle} failed.")
-          raise
+proc registerSink*(name: string, info: SamiSinkSection): bool =
+  if name notin sinkImpls:
+    return false
+    
+  let callback = sinkImpls[name]
 
-proc jsonFormatOutputBlob(content: string, 
-                          ctx: SamiOutputContext): string {.inline.} =
-  let ctxStr = $ctx
-  return """{{ "context": "{ctxStr}", "ITEM LIST" : {content} }}""".fmt()
+  sinkPtrs[name] = SamiSinkInfo(impl: callback, enabled: info.getEnabled())
 
-proc stdoutHandler*(content: string,
-                    h: SamiOutputSection,
-                    ctx: SamiOutputContext): bool =
+  return true
+  
+proc registerHook*(name: string, sinkName: string, info: SamiOuthookSection) =
+  let
+    theSink = sinkPtrs[sinkName]
+    o       = SamiOuthookInfo(sectionInfo: info, theSink: theSink.impl)
 
-  echo pretty(parseJson(jsonFormatOutputBlob(content, ctx)))
+  if not theSink.enabled:
+    return # Do this now so we don't have to check later.
+    
+  hooks[name] = o
+
+proc registerStream*(name: string, hookList: seq[string]) =
+  var hookObjs : seq[SamiOuthookInfo] = @[]
+
+  for hookName in hookList:
+    hookObjs.add(hooks[hookName])
+
+  outStreams[name] = hookObjs
+
+let
+  startOfType = toCon4mType("f(string, int)->(string, bool)")
+  strType     = Con4mType(kind: TypeString)
+  
+proc output*(stream:  string,
+             ll:      LogLevel,
+             content: string) =
+
+  let hookObjs = outStreams[stream]
+  var output   = content
+  
+  
+  for hook in hookObjs:
+    for filter in hook.sectionInfo.getFilters():
+      var t = copyType(startOfType)
+      var args: seq[Box] = @[pack(output), pack(getLogLevel())]
+
+      for i in 1 ..< len(filter):
+        t.params.add(strType)
+        args.add(pack[string](filter[i]))
+
+      let
+        ret = sCall(getConfigState(), filter[0], args, t).get()
+        tup = unpack[seq[Box]](ret)
+      
+      output = unpack[string](tup[0])
+
+      if output == "" or not unpack[bool](tup[1]):
+        break
+
+    if output == "": return
+
+    if getDryRun():
+      for key, outhookInfo in hooks:
+        if outHookInfo == hook:
+          stderr.write(fmt"dry-run: stream {stream}: hook {key}: " &
+                       fmt"would write: {output}")
+          break
+    else:
+      if not hook.theSink(output, hook.sectionInfo):
+        for key, outhookInfo in hooks:
+          if outHookInfo == hook:
+              error(fmt"FAILED WRITE: stream {stream}: hook {key}: " &
+                          fmt"when writing: {output}")
+          break
+        
+  
+# proc jsonFormatOutputBlob(content: string, 
+#                           ctx: SamiOutputContext): string {.inline.} =
+#   let ctxStr = $ctx
+#   return """{{ "context": "{ctxStr}", "ITEM LIST" : {content} }}""".fmt()
+
+
+proc stdoutSink(content: string, cfg: SamiOuthookSection): bool =
+  stdout.write(content)
   return true
 
-proc localFileHandler*(content: string,
-                       h: SamiOutputSection,
-                       ctx: SamiOutputContext): bool =
-  var f: FileStream
+proc stderrSink(content: string, cfg: SamiOuthookSection): bool =
+  stderr.write(content)
+  return true
 
-  if not h.getOutputFilename().isSome():
-    return false
+var fileStreamCache: Table[string, FileStream]
+
+proc fileSink(content: string, cfg: SamiOuthookSection): bool =
+  let
+    filename = cfg.getFileName().get()
+    key      = cfg.getSink() & "!" & filename
+  var
+    f: FileStream
+
+  if fileStreamCache.contains(key):
+    f = fileStreamCache[key]
+  else:
+    f = newFileStream(filename, fmAppend)
+    if f == nil:
+      return false
+    else:
+      fileStreamCache[key] = f
+
   try:
-    f = newFileStream(h.getOutputFileName().get(), fmWrite)
-    f.write(jsonFormatOutputBlob(content, ctx))
+    f.write(content)
+    return true
   except:
     return false
-  finally:
-    if f != nil:
-      f.close()
 
-proc getUniqueSuffix(h: SamiOutputSection): string =
-  let auxId = h.getOutputAuxId().getOrElse("")
-    
-  result = "." & $(unixTimeInMS())
-  if auxId != "": result = result & "." & auxId
-  result = result & "." & $(secureRand[uint32]()) & ".json"
-
+var awsClientCache: Table[string, S3Client] 
   
-proc awsFileHandler*(content: string,
-                     h: SamiOutputSection,
-                     ctx: SamiOutputContext): bool =
+proc awsSink(content: string, cfg: SamiOuthookSection): bool =
+  let
+    uri          = cfg.getUri().get()
+    uid          = cfg.getUserId().get()
+    secret       = cfg.getSecret().get()
+    key          = cfg.getSink() & "!" & uid & "!" & uri
+    dstUri       = parseURI(uri)
+    bucket       = dstUri.hostname
+    ts           = $(unixTimeInMS())
+    randVal      = getRandomWords(2)
+    baseObj      = dstUri.path[1 .. ^1] # Strip the leading /
+    (head, tail) = splitPath(baseObj)
+    `aux?`       = cfg.getAux()
+  var
+    objParts: seq[string] = @[ts, randVal]
+    client:   S3Client
 
-  if h.getOutputSecret().isNone():
-    stderr.writeLine("AWS secret not configured.")
-    when not defined(release):
-      echo getStackTrace()
-    return false
-  if h.getOutputUserId().isNone():
-    stderr.writeLine("AWS iam user not configured.")
-    when not defined(release):
-      echo getStackTrace()
-    return false
-  if h.getOutputDstUri().isNone():
-    stderr.writeLine("AWS bucket URI not configured.")
-    when not defined(release):
-      echo getStackTrace()
-    return false
-  if not h.getOutputRegion().isSome():
-    stderr.writeLine("AWS region not configured.")
-    when not defined(release):
-      echo getStackTrace()
-    return false
+  if awsClientCache.contains(key):
+    client = awsClientCache[key]
+  else:
+    client = newS3Client((uid, secret))
+
+  if `aux?`.isSome():
+    objParts.add(`aux?`.get())
+
+  objParts.add(tail)
 
   let
-    secret = h.getOutputSecret().get()
-    userid = h.getOutputUserId().get()
-    dstUri = parseURI(h.getOutputDstUri().get())
-    bucket = dstUri.hostname
-    path   = dstUri.path[1 .. ^1] & getUniqueSuffix(h)
-    region = h.getOutputRegion().get()
-    body   = jsonFormatOutputBlob(content, ctx)
+    newTail = objParts.join("-")
+    newPath = joinPath(head, newTail)
+    res     = client.putObject(bucket, newPath, content)
 
-  var
-    client = newS3Client((userid, secret))
-
-  if dstUri.scheme != "s3":
-    let msg = "AWS URI must be of type s3"
-    stderr.writeLine(msg)
+  if res.code == Http200:
+    return true
+  else:
     return false
+
+const customPostHeadersType = "f(string)->{string:string}"
+const customPostHeadersName = "getPostHeaders"
+getConfigState().newCallback(customPostHeadersName, customPostHeadersType)
+
+proc postSink(content: string, cfg: SamiOuthookSection): bool =
+  let dstUri = parseURI(cfg.getUri().get())
+
+  var client = if dstUri.scheme == "https":
+                 newHttpClient(sslContext=newContext(verifyMode=CVerifyPeer))
+               else:
+                 newHttpClient()
+                 
+  if client == nil: return false
+
+  let `headers?` = runCallBack(getConfigState(),
+                               customPostHeadersName,
+                               @[pack(cfg.getSink())],
+                               some(toCon4mType(customPostHeadersType)))
+  if `headers?`.isSome():
+    let
+      box     = `headers?`.get()
+      headers = unpack[TableRef[string, string]](box)
+    var
+      asSeqOfTuples: seq[(string, string)] = @[]
+
+    for k, v in headers.pairs():
+      asSeqOfTuples.add((k, v)) 
+
+    if len(headers) != 0:
+      client.headers = newHTTPHeaders(asSeqOfTuples)
+
+  let response = client.request(cfg.getUri().get(),
+                                httpMethod = HttpPost,
+                                body = content)
+
+  if `$`(response.code)[0] == '2': return true
+  return false
+                            
+  
+const sinkCallbackType = "f(string, {string:string})->bool"
+const sinkCallbackName = "userout"
+getConfigState().newCallback(sinkCallbackName, sinkCallbackType)
+
+proc customSink(content: string, cfg: SamiOuthookSection): bool =
+  ## We call the con4m callback 'userout', passing it a dictionary
+  ## containing any fields that are in the config.  
+  ## the callback's signature is f(string, {string: string})->bool
+  var
+    fields: TableRef[string, string] = newTable[string, string]()
+    args:   seq[Box]                 = @[pack(content)]
+
+  let
+    secret   = cfg.getSecret()
+    userid   = cfg.getUserId()
+    filename = cfg.getFileName()
+    uri      = cfg.getUri()
+    region   = cfg.getRegion()
+    aux      = cfg.getAux()
     
-  discard client.putObject(bucket, path, body)
-  return true
+  if secret.isSome():
+    fields["secret"]   = secret.get()
+  if userid.isSome():
+    fields["userid"]   = userid.get()
+  if filename.isSome():
+    fields["filename"] = filename.get()
+  if uri.isSome():
+    fields["uri"]      = uri.get()
+  if region.isSome():
+    fields["region"]   = region.get()
+  if aux.isSome():
+    fields["aux"]      = aux.get()
 
-registerOutputHandler("stdout", stdoutHandler)
-registerOutputHandler("local_file", localFileHandler)
-registerOutputHandler("s3", awsFileHandler)
+  args.add(pack(fields))
 
+  let `res?` = runCallBack(getConfigState(),
+                           sinkCallbackName,
+                           args,
+                           some(toCon4mType(sinkCallbackType)))
+  if `res?`.isNone():
+    return false
+
+  let box = `res?`.get()
+  return unpack[bool](box)
+
+registerSinkImplementation("stdout", stdoutSink)
+registerSinkImplementation("stderr", stderrSink)
+registerSinkImplementation("file", fileSink)
+registerSinkImplementation("s3", awsSink)
+registerSinkImplementation("post", postSink)
+registerSinkImplementation("custom", customSink)

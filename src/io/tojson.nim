@@ -1,12 +1,7 @@
 import ../resources
 import ../config
-
 import nimutils/box
-
-import std/json
-import strutils
-import tables
-import strformat
+import tables, options, strformat, strutils, std/json
 
 proc foundToJson*(self: SamiDict): string
 

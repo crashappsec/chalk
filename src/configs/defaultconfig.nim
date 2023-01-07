@@ -1,4 +1,4 @@
-const defaultConfig = """
+const defaultConfig* = """
 echo("Loading the default SAMI config")
 
 color: true

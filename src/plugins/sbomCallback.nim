@@ -1,4 +1,4 @@
-import tables
+import tables, options
 import ../config
 import ../plugins
 import con4m/[eval, st, builtins]

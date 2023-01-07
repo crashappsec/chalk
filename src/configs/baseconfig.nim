@@ -17,7 +17,7 @@
 ## and get an error, the line number will be relative to the first line 
 ## after the """ below, so add 20 to get the line # in this file.
 
-const baseConfig = """
+const baseConfig* = """
 sami_version := "0.2.0"
 ascii_magic := "dadfedabbadabbed"
 
@@ -326,6 +326,9 @@ plugin conffile {
     priority: 2147483646
 }
 
+# If you add more sinks, please make sure they get locked in the
+# lockBuiltinKeys() function in config.nim
+
 sink stdout {
   docstring: "A sink that writes to stdout"
 }
@@ -334,7 +337,7 @@ sink stderr {
   docstring: "A sink that writes to stderr"
 }
 
-sink local_file {
+sink file {
   needs_filename: true # Assumes uses_filename
   docstring: "A sink that writes a local file"
 }
@@ -344,14 +347,13 @@ sink s3 {
   needs_userid: true
   needs_uri: true
   uses_region: true
+  uses_aux: true
   docstring: "A sink for S3 buckets"
 }
 
 sink post {
-  uses_secret: true
-  uses_userid: true
   needs_uri: true
-  docstring: "Generic HTTP/HTTPS post to a URL"
+  docstring: "Generic HTTP/HTTPS post to a URL. Add custom headers by providing an implementation to the callback getPostHeaders(), which should return a dictionary where all keys and values are strings."
 }
 
 sink custom {
@@ -366,64 +368,58 @@ sink custom {
 
 outhook defaultLog {
   sink: "stderr"
+  filters: [
+             ["logLevel", "info"]
+           ]
 }
 
 outhook defaultOut {
   sink: "stdout"
 }
 
-# There are two different 
+outhook debug {
+  sink: "debug"
+  filters: [
+             ["debugEnabled"]
+           ]
+}
+
 stream error { 
   hooks: ["defaultLog"]
-  filters: [ 
-             ["loglevel", "error"]
-           ]
 }
 
 stream warn {
   hooks: ["defaultLog"]  
-  filters: [ 
-             ["loglevel", "warn"]
-           ]
 }
 
 stream inform {
   hooks: ["defaultLog"]
-  filters: [ 
-             ["loglevel", "inform"]
-           ]
  }
 stream trace {
   hooks: ["defaultLog"]
-  filters: [
-             ["loglevel", "trace"]
-           ] 
 }
 
 stream debug {
-  hooks: ["stderr"]
-  filters: [ 
-             ["debugging"]
-           ]
+  hooks: ["debug"]
  }
 
 stream extract {
-  dict: true
-  hooks: ["stdout"]
+  hooks: ["defaultOut"]
  }
 
 stream inject { 
-  dict: true
-  hooks: ["stdout"]
+  hooks: ["defaultOut"]
 }
 
 stream nesting { 
-  dict: true
 }
+
 stream delete {
-  dict: true
 }
-stream confchange {
-  dict: true
- }
+
+stream confload {
+}
+
+stream confdump {
+}
 """

@@ -154,6 +154,7 @@ var samiConfig = con4m(Sami, baseconfig):
     attr(docstring,
          string,
          required = false)
+    
   section(sink, allowedSubSections = @["*"]):
     attr(uses_secret, bool, defaultVal = false)
     attr(uses_userid, bool, defaultVal = false)
@@ -167,6 +168,7 @@ var samiConfig = con4m(Sami, baseconfig):
     attr(needs_uri, bool, defaultVal = false)
     attr(needs_region, bool, defaultVal = false)
     attr(needs_aux, bool, defaultVal = false)
+    attr(enabled, bool, defaultVal = true)    
     attr(docstring, string, required = false)
     
   section(outhook, allowedSubSections = @["*"]):
@@ -180,42 +182,8 @@ var samiConfig = con4m(Sami, baseconfig):
     attr(aux, string, required = false)
     attr(stop, bool, defaultVal = false)
     attr(docstring, string, required = false)
-    
-  section(stream, allowedSubSections = @["*"]):
-    attr(dict, bool, defaultVal = false)
-    attr(hooks, [string], defaultVal = @[])
     attr(filters, [[string]], defaultVal = @[])
     
-  section(output, allowedSubSections = @["*"]):
-    attr(secret,
-         string,
-         required = false)
-    attr(userid,
-         string,
-         required = false)
-    attr(region,
-         string,
-         required = false)
-    attr(filename,
-         string,
-         required = false)
-    attr(dst_uri, # For AWS, s3://bucket-name/path/to/file
-         string,
-         required = false)
-    attr(command,
-         [string],
-         required = false)
-    attr(auxid,
-         string,
-         required = false)
-    attr(docstring,
-         string,
-         required = false)
-#         doc = "Is this plugin a codec?")
-#         doc = "The list of keys this codec can serve")
-#         doc = "List of keys whose priorities should be changed from the " &
-#          "default value this plugin has")
-#         doc = "Keys that the user does NOT want this plugin to handle")
-#         doc = "Description of plugin")
-#         doc = "Plugin is not linked, but called via an external command to return JSON"
-# TODO: possibly a reverse squash
+  section(stream, allowedSubSections = @["*"]):
+    attr(hooks, [string], defaultVal = @[])
+
