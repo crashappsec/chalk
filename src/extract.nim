@@ -1,12 +1,5 @@
-import config
-import plugins
-import resources
-import io/tojson
-import nimutils
-import nimutils/box
-import os, tables, strutils, options, strformat, nativesockets
-
-
+import tables, strformat, strutils, os, options, nativesockets
+import nimutils, nimutils/box, resources, config, plugins, io/tojson
 proc doExtraction*(): Option[string] =
   # This function will extract SAMIs, leaving them in SAMI objects
   # inside the codecs.  it does NOT do any output, but it does build a
@@ -42,16 +35,16 @@ proc doExtraction*(): Option[string] =
         var comma, primaryJson, embededJson: string
 
         if sami.samiIsEmpty():
-          inform(fmtInfoNoExtract.fmt())
+          info(fmtInfoNoExtract.fmt())
           continue
         if sami.samiHasExisting():
           let
             p = sami.primary
             s = p.samiFields.get()
           primaryJson = s.foundToJson()
-          forceInform(fmtInfoYesExtract.fmt())
+          dryRun(fmtInfoYesExtract.fmt())
         else:
-          inform(fmtInfoNoPrimary.fmt())
+          info(fmtInfoNoPrimary.fmt())
 
         for (key, pt) in sami.embeds:
           let
@@ -76,7 +69,7 @@ proc doExtraction*(): Option[string] =
     if numExtractions == 0:
       return none(string)
     result = some("[" & samisToRet.join(", ") & "]")
-    trace(fmt"Completed {numExtractions} extractions.")
+    info(fmt"Completed {numExtractions} extractions.")
 
 var selfSamiObj: Option[SamiObj] = none(SamiObj)
 var selfSami: Option[SamiDict] = none(SamiDict)

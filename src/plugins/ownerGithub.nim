@@ -1,14 +1,6 @@
-import ../config
-import ../plugins
-import ../resources
-import nimutils/box
+import tables, streams, strutils, strformat, os, glob
+import nimutils/box, ../config, ../plugins, ../resources
 
-import os
-import streams
-import tables
-import strformat
-import strutils
-import glob
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 

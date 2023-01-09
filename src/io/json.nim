@@ -1,12 +1,6 @@
-import unicode
-import parseutils
-import tables
-import streams
-import strformat
-
-import nimutils/box
-import ../resources
-
+import strformat, tables, streams, unicode, parseutils
+import nimutils/box, ../resources
+       
 const jsonWSChars* = ['\x20', '\x0a', '\x0d', '\x09']
 
 type JSonError = ref object of ValueError

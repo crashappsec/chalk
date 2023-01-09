@@ -1,18 +1,7 @@
-import resources
-import config
-import inject
-import extract
-import delete
-import dump
-import plugins
-
-import argparse
+import tables, strformat, argparse
+import nimutils/topics, resources, config, inject, extract, delete, dump,
+       plugins, builtins
 import macros except error
-import tables
-import strformat
-import builtins
-import output
-
 
 # The base configuration will load when we import config.  We forego
 # using any SAMI-specific builtns in that config, because it's just
@@ -44,7 +33,6 @@ proc runCmdDefaults() {.noreturn, inline.} =
   # We can't really put this in loadUserConfigFile() unless we move
   # it, due to current module interdependencies.  Will probably fix
   # this sooner than later.
-  handleOutputRegistrations() 
   showConfig() # config.nim
   quit()
 
@@ -55,24 +43,23 @@ proc runCmdInject() {.noreturn, inline.} =
   # that before we set up any command-line arguments; it would return
   # 'false' for us always, no matter what the user supplies.
   loadUserConfigFile(getSelfExtraction())
-  handleOutputRegistrations()   
   loadCommandPlugins()
   doInjection() # inject.nim
   quit()
 
 proc runCmdExtract() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
-  handleOutputRegistrations() 
   let extractions = doExtraction() # extract.nim
   if extractions.isSome():
-    output("extract", logLevelNone, extractions.get())
+    publish("extract", extractions.get())
   else:
     warn("No items extracted.")
   quit()
 
 proc runCmdDump(arglist: seq[string]) {.noreturn, inline.} =
   handleConfigDump(getSelfExtraction(), arglist)
-
+  quit()
+  
 proc runCmdLoad() {.noreturn, inline.} =
   # The fact that we're injecting into ourself will be special-cased
   # in the injection workflow.
@@ -92,7 +79,6 @@ proc runCmdLoad() {.noreturn, inline.} =
 
 proc runCmdDel() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
-  handleOutputRegistrations()
   doDelete() # delete.nim
   quit()
 type
@@ -141,7 +127,8 @@ proc flagConflict(flag1: FlagID, flag2: FlagID) {.noreturn.} =
     (s1, l1, _) = flagPairs[flag1]
     (s2, l2, _) = flagPairs[flag2]
 
-  fatal(eConflictFmt.fmt())
+  error(eConflictFmt.fmt())
+  quit()
 
 macro genCmdFlags(fromWhat: static[openarray[FlagID]]): untyped =
   result = newStmtList()
@@ -322,4 +309,3 @@ when isMainModule:
   except UsageError:
     stderr.writeLine(getCurrentExceptionMsg())
     quit(1)
-

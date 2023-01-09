@@ -1,14 +1,7 @@
-import resources
-import config
-import plugins
-import extract
-import nimutils
-import output
-import io/tobinary
-import io/tojson
-
-import os, options, tables, strutils, strformat, streams, terminal
-import algorithm, std/tempfiles
+import options, tables, streams, algorithm, strutils, strformat, os,
+       std/tempfiles
+import nimutils, nimutils/topics, resources, config, plugins, extract,
+       io/tobinary, io/tojson
 
 const requiredCodecKeys = ["ARTIFACT_PATH", "HASH", "HASH_FILES"]
 
@@ -86,13 +79,13 @@ proc doInjection*() =
     objsForWrite: seq[string] = @[]
   let
     everyKey    = getOrderedKeys()
-    dryRun      = getDryRun()
+    inDryRun    = getDryRun()
     extractions = doExtraction()
 
   # Anything we've extracted is for an artifact where we are about to
   # inject over it.  Report these to the "nesting" output stream.
   if extractions.isSome():
-    output("nesting", logLevelNone, extractions.get())
+    publish("nesting", extractions.get())
 
   trace("Beginning artifact metadata collection and injection.")
   # We're going to build a list of priority ordering based on plugin.
@@ -182,7 +175,7 @@ proc doInjection*() =
         objsForWrite.add(encoded)
 
       # NOW, if we're in dry-run mode, we don't actually inject.
-      if dryRun:
+      if inDryRun:
         continue
         
       if point.endOffset > point.startOffset:
@@ -200,9 +193,9 @@ proc doInjection*() =
         ctx = newFileStream(f)
         codec.handleWrite(ctx, pre, some(encoded), post)
         if point.present:
-          inform(infReplacedSami.fmt())
+          info(infReplacedSami.fmt())
         else:
-          inform(infNewSami.fmt())
+          info(infNewSami.fmt())
       except:
         error(eCantInsert.fmt())
         removeFile(path)
@@ -214,14 +207,7 @@ proc doInjection*() =
                           else: item.fullPath
             moveFile(path, newPath)
             if getSelfInjecting():
-              if getColor():
-                stderr.styledWrite(infoColor,
-                                   styleBright,
-                                   infoPrefix,
-                                   ansiResetCode)
-              else:
-                stderr.write(infoPrefix)
-              stderr.writeLine(fmt"Wrote new sami binary to {newpath}")
+              info(fmt"Wrote new sami binary to {newpath}")
           except:
             removeFile(path)
             raise
@@ -233,6 +219,6 @@ proc doInjection*() =
   let fullJson = "[" & join(objsForWrite, ", ") & "]"
 
   if getSelfInjecting():
-    output("confload", logLevelNone, fullJson)
+    publish("confload", fullJson)
   else:
-    output("inject",   logLevelNone, fullJson)
+    publish("inject",   fullJson)

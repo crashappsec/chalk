@@ -6,36 +6,11 @@
 ##
 ## TODO: Add a field to the global or a section to configure
 ## logging options.
+
+
+import nimutils/box
+
 var samiConfig = con4m(Sami, baseconfig):
-  attr(extraction_output_handlers,
-       [string],
-       required = true,
-       doc = "When extracting a SAMI from an artifact, which handler(s) " &
-             "to call for doing the actual outputting?")
-  attr(injection_prev_sami_output_handlers,
-       [string],
-       required = true,
-       doc = "When injecting a SAMI into an artifact, if a previous SAMI " &
-             "is found, it will be output with any handler provided here. " &
-             "This is separate from whether it gets embedded in the new " &
-             "SAMI, which happens any time OLD_SAMI does NOT have skip " &
-             "set.")
-  attr(injection_output_handlers,
-       [string],
-       required = true,
-       doc = "When injecting, the codec will inject a SAMI, but these " &
-             "handlers will also get called to write a SAMI.  Note that, " &
-             "if the key SAMI_PTR is enabled (i.e., set to a value and not " &
-             "being skipped), the codec will only inject the miniminal " &
-             "pointer information, and these handlers will be used for " &
-             "writing the full SAMI. Note that the string value of the " &
-             "SAMI_PTR field should match at least one of the locations " &
-             "output to via this handler.")
-  attr(deletion_output_handlers,
-       [string],
-       required = true,
-       doc = "When deleting a SAMI, write info about the deletion to any " &
-             "registed handlers.")
   attr(config_path,
        [string],
        @[".", "~"],
@@ -49,7 +24,7 @@ var samiConfig = con4m(Sami, baseconfig):
   attr(default_command, string,
        required = false,
        doc = "When this command runs, if no command is provided, " &
-             "which one runs?")
+             "which one runs?") # Currently not hooked up.
   attr(color, bool, false, doc = "Do you want ansi output?")
   attr(log_level, string, "warn")
   attr(dry_run, bool, false)
@@ -161,6 +136,8 @@ var samiConfig = con4m(Sami, baseconfig):
     attr(uses_filename, bool, defaultVal = false)
     attr(uses_uri, bool, defaultVal = false)
     attr(uses_region, bool, defaultVal = false)
+    attr(uses_headers, bool, defaultVal = false)
+    attr(uses_cacheid, bool, defaultVal = false)        
     attr(uses_aux, bool, defaultVal = false)
     attr(needs_secret, bool, defaultVal = false)
     attr(needs_userid, bool, defaultVal = false)
@@ -168,7 +145,8 @@ var samiConfig = con4m(Sami, baseconfig):
     attr(needs_uri, bool, defaultVal = false)
     attr(needs_region, bool, defaultVal = false)
     attr(needs_aux, bool, defaultVal = false)
-    attr(enabled, bool, defaultVal = true)    
+    attr(needs_headers, bool, defaultVal = false)
+    attr(needs_cacheid, bool, defaultVal = false)        
     attr(docstring, string, required = false)
     
   section(outhook, allowedSubSections = @["*"]):
@@ -179,11 +157,9 @@ var samiConfig = con4m(Sami, baseconfig):
     attr(filename, string, required = false)
     attr(uri, string, required = false)
     attr(region, string, required = false)
+    attr(headers, string, required = false)
+    attr(cacheid, string, required = false)
     attr(aux, string, required = false)
     attr(stop, bool, defaultVal = false)
     attr(docstring, string, required = false)
-    attr(filters, [[string]], defaultVal = @[])
-    
-  section(stream, allowedSubSections = @["*"]):
-    attr(hooks, [string], defaultVal = @[])
-
+    attr(filters, [string], defaultVal = @[])

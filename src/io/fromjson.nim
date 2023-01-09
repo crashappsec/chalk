@@ -1,11 +1,4 @@
-import ../resources
-import ./json
-import ../config
-
-import nimutils/box
-import streams
-import tables
-import strformat
+import tables, strformat, streams, nimutils/box, ../config, ../resources, ./json
 
 proc findJsonStart*(stream: FileStream): bool =
   var
@@ -82,7 +75,7 @@ proc objFromJson(jobj: JsonNode, fname: string): SamiDict =
 
   for key, value in jobj.kvpairs:
     if result.contains(key): # SAMI objects can't have duplicate keys.
-      warn(eDupeKey.fmt(), nested = false)
+      warn(eDupeKey.fmt())
       continue
 
     result[key] = valueFromJson(jobj = value, fname = fname)

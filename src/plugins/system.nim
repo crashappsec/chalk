@@ -1,12 +1,5 @@
-import ../config
-import ../plugins
-import ../extract # for getSelfID()
-
-import nimutils
-import nimutils/box
-import nimutils/random
-import tables
-import options
+import tables, options
+import nimutils, nimutils/[box, random], ../config, ../plugins, ../extract
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}

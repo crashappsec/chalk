@@ -1,5 +1,7 @@
 # Do NOT include or import this directly; instead include config.nim.
 
+import sugar, streams
+
 type
   SamiSink* = (string, SamiOuthookSection) -> bool
   SamiDict* = TableRef[string, Box] ## \

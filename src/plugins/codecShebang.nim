@@ -1,12 +1,4 @@
-import ../config
-import ../plugins
-import ../resources
-
-import nimSHA2
-
-import streams
-import strutils
-import options
+import strutils, options, streams, nimSHA2, ../config, ../plugins, ../resources
 
 type CodecShebang* = ref object of Codec
 

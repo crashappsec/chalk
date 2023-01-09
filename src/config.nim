@@ -1,14 +1,22 @@
-include errors
+import options, tables, strutils, strformat, algorithm, uri, os
+import con4m, con4m/[st, eval, dollars], nimutils, nimutils/[logging, topics]
+import macros except error
+export logging
+
+proc getConfigState*(): ConfigState
+
 include configs/baseconfig    # Gives us the variable baseConfig
 include configs/defaultconfig # Gives us defaultConfig
 include configs/con4mconfig   # gives us the variable samiConfig, which is
                               # a con4m configuration object.
                               # this needs to happen before we include types.
 include types
+include output
 
-const allowedCmds = ["inject", "extract"]
-const validLogLevels = ["none", "error", "warn", "info", "trace"]
- 
+
+# This should prob be auto-generated.
+proc getConfigState*(): ConfigState = return ctxSamiConf    
+
 proc getConfigErrors*(): Option[seq[string]] =
   if ctxSamiConf.errors.len() != 0:
     return some(ctxSamiConf.errors)
@@ -41,13 +49,15 @@ proc getColor*(): bool =
 
 proc setColor*(val: bool) =
   discard ctxSamiConf.setOverride("color", pack(val))
+  setShowColors(val)
   samiConfig.color = val
 
-proc getLogLevel*(): string =
+proc geSamitLogLevel*(): string =
   return samiConfig.logLevel
 
-proc setLogLevel*(val: string) =
+proc setSamiLogLevel*(val: string) =
   discard ctxSamiConf.setOverride("log_level", pack(val))
+  setLogLevel(val)
   samiConfig.logLevel = val
 
 proc getDryRun*(): bool =
@@ -78,18 +88,6 @@ proc setRecursive*(val: bool) =
 
 proc getAllowExternalConfig*(): bool =
   return samiConfig.allowExternalConfig
-
-proc getExtractionOutputHandlers*(): seq[string] =
-  return samiConfig.extractionOutputHandlers
-
-proc getInjectionPrevSamiOutputHandlers*(): seq[string] =
-  return samiConfig.injectionPrevSamiOutputHandlers
-
-proc getInjectionOutputHandlers*(): seq[string] =
-  return samiConfig.injectionOutputHandlers
-
-proc getDeletionOutputHandlers*(): seq[string] =
-  return samiConfig.deletionOutputHandlers
 
 proc getAllKeys*(): seq[string] =
   result = @[]
@@ -207,13 +205,10 @@ proc getSink*(hook: string): Option[SamiSinkSection] =
     return some(samiConfig.`sink`[hook])
   return none(SamiSinkSection)
 
-proc getEnabled*(s: SamiSinkSection): bool =
-  return s.enabled
-
 proc getSink*(hook: SamiOuthookSection): string =
   return hook.`sink`
 
-proc getFilters*(hook: SamiOuthookSection): seq[seq[string]] =
+proc getFilters*(hook: SamiOuthookSection): seq[string] =
   return hook.filters
 
 proc getSecret*(hook: SamiOuthookSection): Option[string] =
@@ -237,17 +232,8 @@ proc getAux*(hook: SamiOuthookSection): Option[string] =
 proc getStop*(hook: SamiOuthookSection): bool =
   return hook.stop
 
-proc getAllStreams*(): TableRef[string, SamiStreamSection] =
-   return samiConfig.stream
-  
-proc getHooks*(sconf: SamiStreamSection): seq[string] =
-  return sconf.hooks
-
 proc getOutputPointers*(): bool =
   let contents = samiConfig.key["SAMI_PTR"]
-
-  if getInjectionOutputHandlers().len() == 0:
-    return false
 
   if contents.getValue().isSome() and not contents.getSkip():
     return true
@@ -334,37 +320,15 @@ macro condOutputHandlerFormatStrSeq(sym: untyped, prefix: string): string =
     else:
       ""
         
-proc `$`*(c: SamiConfig): string =
-  discard
-
-#[
-  return fmt"""config search path:        {c.configPath.join(":")}
-config filename:           {c.configFilename}
-config default command:    {getOrElse(samiConfig.defaultCommand, "<none>")}
-color:                     {c.color}
-log level:                 {c.logLevel}
-dry run:                   {c.dryRun}
-artifact search path:      {c.artifactSearchPath.join(":")}
-recursive artifact search: {c.recursive}
-Configured SAMI keys:
-{configKeys.join("\n")}
-
-Configured Plugins:
-{configPlugins.join("\n")}
-
-Configured Ouput Hooks:
-{configOuts.join("\n")}
-extraction hooks:       {c.extractionOutputHandlers.join(", ")}
-prev sami out hooks:    {c.injectionPrevSamiOutputHandlers.join(", ")}
-new sami out hooks:     {c.injectionOutputHandlers.join(", ")}
-"""
-]#
-
 proc showConfig*() =
-  stderr.writeLine($(samiConfig))
-  stderr.writeLine("""
+  ## This is a placeholder, we need to do something nicer
+  ## that focuses on the info they'll expect to see.
+  
+  publish("defaults", `$`(ctxSamiConf.st) & """
 Use 'dumpConfig' to export the embedded configuration file to disk,
-and 'loadConfig' to load one.""")
+and 'loadConfig' to load one.
+""")
+  
 
 var onceLockBuiltinKeys = false
 
@@ -447,23 +411,16 @@ template hookCheck(fieldName: untyped) =
            "' field, but sink '" & contents.sink & "' does not use it. " &
            "(ignoring)")
 
-# This should eventually move to evaluation callbacks.  They can give
+# This should mostly move to evaluation callbacks.  They can give
 # better error messages more easily.
 proc doAdditionalValidation*() =
-  if samiConfig.defaultCommand.isSome() and
-    not (samiConfig.defaultCommand.get() in allowedCmds):
-    warn(fmt"Default command {samiConfig.defaultCommand.get()} " &
-          "not recognized (ignored)")
+  # Actually, not validation, but get this done early.
+  setShowColors(samiConfig.color)
 
-    # This dance needs to be automated by con4m.  Note that we are
-    # only making a copy of the entry here, so after we edit we need
-    # to re-set it.
-    var entry = ctxSamiConf.st.entries["default_command"]
-    entry.value = none(Box)
-    ctxSamiConf.st.entries["default_command"] = entry
-    samiConfig.defaultCommand = none(string)
-
-  if not (samiConfig.logLevel in validLogLevels):
+  try:
+    setLogLevel(samiConfig.logLevel)
+  except:
+    setLogLevel(llWarn)
     warn(fmt"Log level {samiConfig.logLevel} not recognized. " &
          "Defaulting to 'warn'")
     var entry = ctxSamiConf.st.entries["log_level"]
@@ -478,6 +435,12 @@ proc doAdditionalValidation*() =
 
   for i in 0 ..< len(samiConfig.configPath):
     samiConfig.configPath[i] = samiConfig.configPath[i].resolvePath()
+
+  # Make sure the sinks specified are all sinks we have
+  # implementations for.
+  for sinkname, _ in samiConfig.sink:
+    if getSink(sinkname).isNone():
+      warn(fmt"Config declared sink '{sinkname}', but no implementation exists")
 
   # Check the fields provided for output hooks relative to
   # the sinks they are bound to.
@@ -499,6 +462,8 @@ proc doAdditionalValidation*() =
     hookCheck(filename)
     hookCheck(uri)
     hookCheck(region)
+    hookCheck(headers)
+    hookCheck(cacheid)
     hookCheck(aux)
 
     # Even more validation.
@@ -511,65 +476,14 @@ proc doAdditionalValidation*() =
         skipHook = true
     
     for filter in contents.filters:
-      
-      if len(filter) == 0:
-        warn(fmt"Empty filter spec for configuration of stream {outHookName}.")
+      if not getFilterByName(filter).isSome():
+        warn(fmt"Invalid filter named '{filter}'")
         skipHook = true
         break
       
-      # Filters are named in arg[0].
-      #
-      # The filter is passed a string output and an integer metadata
-      # (usually the log level) and returns a string.  Plus, if the
-      # spec had more arugments, than those string constants are also
-      # passed.
-      #
-      # The return type for filters is (string, bool)... the string
-      # is the "filtered" string, and bool is whether more filtering
-      # may be applied.  Basically, if a filter sets that value to
-      # 'false', it can block further filtering.
-          
-      var con4mType = "f(string, int,"
-      for item in filter[1 .. ^1]:
-        con4mType.add(" string,")
-      con4mType[^1] = ')' # Overwrite that comma!
-      con4mType.add(" -> (string, bool)")
-      let
-        t   = toCon4mType(con4mType)
-        sig = getFuncBySig(ctxSamiConf, filter[0], t)
-      if sig.isNone():
-        warn(fmt"In output hook {outHookName}, could not find a matching " &
-             "con4m function " & filter[0] & (`$`(t))[1 .. ^1] &
-             " (hook skipped)")
-        skipHook = true
-        break
-
     if skipHook: continue
     
-    validOuthooks[outHookName] = contents
-
-  if len(validOuthooks) == 0:
-    warn("No valid output hooks defined.")
-  
-  samiConfig.outhook = validOutHooks
-  
-  # Check the stream specifications.  Warn about (and disable) hooks
-  # that don't have an associated hook definition. Also warn
-  # about filters that don't seem to exist.  We look for *all* filters
-  # in the con4m function table, even the ones we provide.
-  for name, contents in samiConfig.stream:
-    var validHooks: seq[string] = @[]
-    
-    for hook in contents.hooks:
-      if hook notin samiConfig.outhook:
-        warn(fmt"Hook {hook} was attached to output stream '{name}', but " &
-             "there is no valid hook with that name")
-        continue
-      else:
-        validHooks.add(hook)
-
-    if len(validHooks) == 0 and len(contents.hooks) != 0:
-      warn(fmt"No hooks configured for stream '{name}' are valid.")
+    setupHookRecord(outHookName, contents)
 
   # Now, lock a bunch of fields.
   lockBuiltinKeys()
@@ -650,7 +564,7 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
         loaded = true
       
     except Con4mError: # config not present:
-      inform(fmt"{fname}: config file not found.")
+      info(fmt"{fname}: config file not found.")
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
@@ -660,9 +574,6 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
   else:
     trace("Running without a config file.")
     
-proc getConfigState*(): ConfigState =
-  return ctxSamiConf    
-  
 ## Code to set us up for self-injection.
 proc quitIfCantChangeEmbeddedConfig*(selfSami: Option[SamiDict]) =
   discard loadEmbeddedConfig(selfSami, dieIfInvalid = false)
@@ -701,10 +612,9 @@ proc setupSelfInjection*(filename: string) =
   if filename == "default":
     newCon4m = defaultConfig
     if getDryRun():
-      forceInform("Would install the default configuration file.")
-      quit()
+      dryRun("Would install the default configuration file.")
     else:
-      inform("Installing the default confiuration file.")
+      info("Installing the default confiuration file.")
   else:
     let f = newFileStream(resolvePath(filename))
     if f == nil:
@@ -717,7 +627,7 @@ proc setupSelfInjection*(filename: string) =
       error(fmt"{filename}: could not read configuration file")
       quit()
 
-    inform(fmt"{filename}: Validating configuration.")
+    info(fmt"{filename}: Validating configuration.")
     
     # Now we need to validate the config, without stacking it over our
     # existing configuration. We really want to know that the file
@@ -776,9 +686,7 @@ proc setupSelfInjection*(filename: string) =
       
     trace(fmt"{filename}: Configuration successfully validated.")
 
-    if getDryRun():
-      forceInform("The provided configuration file would be loaded.")
-      quit()
+    dryRun("The provided configuration file would be loaded.")
       
     # Now we're going to set up the injection properly solely by
     # tinkering with the config state.

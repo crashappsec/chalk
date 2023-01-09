@@ -1,8 +1,6 @@
 ## Implements commands for configuration dumping and loading.
 
-import tables, options, output
-import nimutils, nimutils/box
-import config
+import tables, options, nimutils, nimutils/[box, topics], config
 
 proc handleConfigDump*(selfSami: Option[SamiDict], argv: seq[string]) =
   let confValid = loadEmbeddedConfig(selfSami, dieIfInvalid = false)
@@ -21,8 +19,5 @@ proc handleConfigDump*(selfSami: Option[SamiDict], argv: seq[string]) =
       toDump = if selfSami.isSome(): unpack[string](selfSami.get()["X_SAMI_CONFIG"])
                else: defaultConfig
 
-    # TODO: hook this up to the command line.
-    # If a file name is provided, change the stdout hook and
-    # add a file hook.               
-    output("confdump", logLevelNone, toDump)
+    publish("confdump", toDump)
 

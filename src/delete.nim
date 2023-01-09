@@ -1,14 +1,5 @@
-import strformat
-import streams
-import os
-import options
-
-import config
-import plugins
-import extract
-import resources
-import output
-import std/tempfiles
+import options, streams, strformat, os, std/tempfiles
+import nimutils/topics, resources, config, plugins, extract
 
 proc doDelete*() =
   trace("Identifying artifacts with existing SAMIs")
@@ -17,7 +8,7 @@ proc doDelete*() =
   let pendingDeletions = doExtraction()
 
   if pendingDeletions.isSome():
-    output("delete", logLevelNone, pendingDeletions.get())
+    publish("delete", pendingDeletions.get())
 
   for pluginInfo in codecs:
     let
@@ -35,7 +26,7 @@ proc doDelete*() =
         point      = item.primary
         pre        = item.stream.readStr(point.startOffset)
 
-      forceInform(fmt"{item.fullPath}: removing sami")
+      dryRun(fmt"{item.fullPath}: removing sami")
       if getDryRun(): continue
 
       if point.endOffset > point.startOffset:
