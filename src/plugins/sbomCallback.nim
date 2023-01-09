@@ -1,8 +1,5 @@
-import tables
-import ../config
-import ../plugins
-import con4m/[eval, st, builtins]
-import nimutils/box
+import options, tables
+import nimutils/box, con4m/[eval, st, builtins], ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}

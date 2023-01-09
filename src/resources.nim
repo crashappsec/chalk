@@ -2,8 +2,7 @@
 # The main purpose is to facilitate localization.  All of these values
 # are exported since none of them are used in this module directly.
 
-import terminal
-import os
+import terminal, os
 
 const
   # This first section constitutes items that are part of the

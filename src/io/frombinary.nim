@@ -1,10 +1,4 @@
-import ../resources
-import ../config
-import nimutils/box
-
-import endians
-import streams
-import tables
+import tables, streams, endians, nimutils/box, ../resources, ../config
 
 proc itemFromBin(stream: FileStream, swapEndian: bool): Box
 

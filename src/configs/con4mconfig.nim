@@ -6,36 +6,11 @@
 ##
 ## TODO: Add a field to the global or a section to configure
 ## logging options.
+
+
+import nimutils/box
+
 var samiConfig = con4m(Sami, baseconfig):
-  attr(extraction_output_handlers,
-       [string],
-       required = true,
-       doc = "When extracting a SAMI from an artifact, which handler(s) " &
-             "to call for doing the actual outputting?")
-  attr(injection_prev_sami_output_handlers,
-       [string],
-       required = true,
-       doc = "When injecting a SAMI into an artifact, if a previous SAMI " &
-             "is found, it will be output with any handler provided here. " &
-             "This is separate from whether it gets embedded in the new " &
-             "SAMI, which happens any time OLD_SAMI does NOT have skip " &
-             "set.")
-  attr(injection_output_handlers,
-       [string],
-       required = true,
-       doc = "When injecting, the codec will inject a SAMI, but these " &
-             "handlers will also get called to write a SAMI.  Note that, " &
-             "if the key SAMI_PTR is enabled (i.e., set to a value and not " &
-             "being skipped), the codec will only inject the miniminal " &
-             "pointer information, and these handlers will be used for " &
-             "writing the full SAMI. Note that the string value of the " &
-             "SAMI_PTR field should match at least one of the locations " &
-             "output to via this handler.")
-  attr(deletion_output_handlers,
-       [string],
-       required = true,
-       doc = "When deleting a SAMI, write info about the deletion to any " &
-             "registed handlers.")
   attr(config_path,
        [string],
        @[".", "~"],
@@ -49,7 +24,7 @@ var samiConfig = con4m(Sami, baseconfig):
   attr(default_command, string,
        required = false,
        doc = "When this command runs, if no command is provided, " &
-             "which one runs?")
+             "which one runs?") # Currently not hooked up.
   attr(color, bool, false, doc = "Do you want ansi output?")
   attr(log_level, string, "warn")
   attr(dry_run, bool, false)
@@ -154,36 +129,37 @@ var samiConfig = con4m(Sami, baseconfig):
     attr(docstring,
          string,
          required = false)
-  section(output, allowedSubSections = @["*"]):
-    attr(secret,
-         string,
-         required = false)
-    attr(userid,
-         string,
-         required = false)
-    attr(region,
-         string,
-         required = false)
-    attr(filename,
-         string,
-         required = false)
-    attr(dst_uri, # For AWS, s3://bucket-name/path/to/file
-         string,
-         required = false)
-    attr(command,
-         [string],
-         required = false)
-    attr(auxid,
-         string,
-         required = false)
-    attr(docstring,
-         string,
-         required = false)
-#         doc = "Is this plugin a codec?")
-#         doc = "The list of keys this codec can serve")
-#         doc = "List of keys whose priorities should be changed from the " &
-#          "default value this plugin has")
-#         doc = "Keys that the user does NOT want this plugin to handle")
-#         doc = "Description of plugin")
-#         doc = "Plugin is not linked, but called via an external command to return JSON"
-# TODO: possibly a reverse squash
+    
+  section(sink, allowedSubSections = @["*"]):
+    attr(uses_secret, bool, defaultVal = false)
+    attr(uses_userid, bool, defaultVal = false)
+    attr(uses_filename, bool, defaultVal = false)
+    attr(uses_uri, bool, defaultVal = false)
+    attr(uses_region, bool, defaultVal = false)
+    attr(uses_headers, bool, defaultVal = false)
+    attr(uses_cacheid, bool, defaultVal = false)        
+    attr(uses_aux, bool, defaultVal = false)
+    attr(needs_secret, bool, defaultVal = false)
+    attr(needs_userid, bool, defaultVal = false)
+    attr(needs_filename, bool, defaultVal = false)
+    attr(needs_uri, bool, defaultVal = false)
+    attr(needs_region, bool, defaultVal = false)
+    attr(needs_aux, bool, defaultVal = false)
+    attr(needs_headers, bool, defaultVal = false)
+    attr(needs_cacheid, bool, defaultVal = false)        
+    attr(docstring, string, required = false)
+    
+  section(outhook, allowedSubSections = @["*"]):
+    attr(sink, string, required = true)
+    attr(filters, [string], defaultVal = @[])
+    attr(secret, string, required = false)
+    attr(userid, string, required = false)
+    attr(filename, string, required = false)
+    attr(uri, string, required = false)
+    attr(region, string, required = false)
+    attr(headers, string, required = false)
+    attr(cacheid, string, required = false)
+    attr(aux, string, required = false)
+    attr(stop, bool, defaultVal = false)
+    attr(docstring, string, required = false)
+    attr(filters, [string], defaultVal = @[])

@@ -1,22 +1,6 @@
-import config
-import resources
-import io/fromjson
-import io/frombinary
-import io/json
-
-import nimutils
-import nimutils/box
-import nimSHA2
-
-import con4m
-
-import algorithm
-import tables
-import streams
-import strformat
-import strutils
-import options
-import os
+import os, tables, strformat, strutils, algorithm, streams, options
+import nimSHA2, con4m, nimutils, nimutils/box, resources, config     
+import io/[fromjson, frombinary, json]
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
@@ -37,7 +21,7 @@ proc registerPlugin*(name: string, plugin: Plugin) =
   plugin.configInfo = maybe.get()
   installedPlugins[name] = plugin
 
-  inform(fmt"Installed plugin {name}")
+  trace(fmt"Installed plugin {name}")
 
 proc loadCommandPlugins*() =
   for (name, command) in getCommandPlugins():

@@ -1,14 +1,5 @@
-import ../resources
-import ../plugins
-import ../config
-
-import nimSHA2
-
-import endians
-import streams
-import strutils
-import strformat
-import options
+import options, streams, strutils, strformat, endians
+import nimSHA2, ../resources, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}

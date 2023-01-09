@@ -1,23 +1,9 @@
-import config
-import plugins
-import resources
-import io/tojson
-import output
-import nimutils
-import nimutils/box
-
-import os
-import strutils
-import options
-import strformat
-import streams
-import nativesockets
-import tables
-
-proc doExtraction*(context: SamiOutputContext) =
-  # This function will extract SAMIs, leaving them in SAMI
-  # objects inside the codecs.  That way, the inject command
-  # can reuse this code.
+import tables, strformat, strutils, os, options, nativesockets
+import nimutils, nimutils/box, resources, config, plugins, io/tojson
+proc doExtraction*(): Option[string] =
+  # This function will extract SAMIs, leaving them in SAMI objects
+  # inside the codecs.  it does NOT do any output, but it does build a
+  # single JSON string that *could* be output.
   #
   # TODO: need to validate extracted SAMIs.
   # 
@@ -30,11 +16,8 @@ proc doExtraction*(context: SamiOutputContext) =
     exclusions: seq[string] = if getSelfInjecting(): @[]
                               else: @[resolvePath(getAppFileName())]
     codecInfo: seq[Codec]
-    ctx: FileStream
-    path: string
-    filePath: string
     numExtractions = 0
-    samisToOut: seq[string] = @[]
+    samisToRet: seq[string] = @[]
 
   var artifactPath = getArtifactSearchPath()
 
@@ -47,23 +30,21 @@ proc doExtraction*(context: SamiOutputContext) =
   trace("Beginning extraction attempts for any found SAMIs")
 
   try:
-    # TODO, could check to see if there are output handlers registered, 
-    # and skip creating a JSON string if there aren't.
     for codec in codecInfo:
       for sami in codec.samis:
         var comma, primaryJson, embededJson: string
 
         if sami.samiIsEmpty():
-          inform(fmtInfoNoExtract.fmt())
+          info(fmtInfoNoExtract.fmt())
           continue
         if sami.samiHasExisting():
           let
             p = sami.primary
             s = p.samiFields.get()
           primaryJson = s.foundToJson()
-          forceInform(fmtInfoYesExtract.fmt())
+          dryRun(fmtInfoYesExtract.fmt())
         else:
-          inform(fmtInfoNoPrimary.fmt())
+          info(fmtInfoNoPrimary.fmt())
 
         for (key, pt) in sami.embeds:
           let
@@ -71,39 +52,24 @@ proc doExtraction*(context: SamiOutputContext) =
             keyJson = strValToJson(key)
             valJson = embstore.foundToJson()
 
-          if not getDryRun():
-            embededJson = embededJson & kvPairJFmt.fmt()
-            comma = comfyItemSep
+          embededJson = embededJson & kvPairJFmt.fmt()
+          comma = comfyItemSep
 
         embededJson = jsonArrFmt % [embededJson]
 
         numExtractions += 1
 
         let absPath = absolutePath(sami.fullpath)
-        samisToOut.add(logTemplate % [primaryJson, embededJson])
-
-    let toOut = "[" & samisToOut.join(", ") & "]"
-    
-    case context
-    of OutCtxInject:
-      handleOutput(toOut, OutCtxInjectPrev)
-    else:
-      handleOutput(toOut, context)
+        samisToRet.add(logTemplate % [primaryJson, embededJson])
   except:
     # TODO: do better here.
     echo getCurrentException().getStackTrace()
-    # raise
-    warn(getCurrentExceptionMsg() &
-         " (likely a bad SAMI embed; ignored)")
+    error(getCurrentExceptionMsg() & " (likely a bad SAMI embed)")
   finally:
-    trace(fmt"Completed {numExtractions} extractions.")
-    if ctx != nil:
-      ctx.close()
-      try:
-        moveFile(path, filepath)
-      except:
-        removeFile(path)
-        raise
+    if numExtractions == 0:
+      return none(string)
+    result = some("[" & samisToRet.join(", ") & "]")
+    info(fmt"Completed {numExtractions} extractions.")
 
 var selfSamiObj: Option[SamiObj] = none(SamiObj)
 var selfSami: Option[SamiDict] = none(SamiDict)

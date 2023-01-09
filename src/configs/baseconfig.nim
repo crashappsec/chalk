@@ -12,15 +12,15 @@
 ##
 ## Nothing should really be in here that doesn't need to be here-- add
 ## it to defaultconfig.nim, which users can change.
+## 
+## Note, if you end up w/ syntax errors in this file, when you run sami 
+## and get an error, the line number will be relative to the first line 
+## after the """ below, so add 20 to get the line # in this file.
 
-const baseConfig = """
+const baseConfig* = """
+color: true
 sami_version := "0.2.0"
 ascii_magic := "dadfedabbadabbed"
-
-extraction_output_handlers: []
-injection_prev_sami_output_handlers: []
-injection_output_handlers: []
-deletion_output_handlers: []
 
 key _MAGIC json {
     required: true
@@ -322,12 +322,82 @@ plugin conffile {
     priority: 2147483646
 }
 
-output stdout {
+# Adding a sink requires a linked implementation. The existing sinks
+# are currently in the nimutils library, except for 'custom', which is
+# in output.nim.  That one allows you to define your own sink in con4m
+# by supplying the callback userOutput()
+#
+# If you do add more hardcoded sinks, please do make sure they get
+#  locked in the lockBuiltinKeys() function in config.nim.
+
+sink stdout {
+  docstring: "A sink that writes to stdout"
 }
 
-output local_file {
+sink stderr {
+  docstring: "A sink that writes to stderr"
 }
 
-output s3 {
+sink file {
+  needs_filename: true 
+  docstring:      "A sink that writes a local file"
 }
+
+sink s3 {
+  needs_secret: true
+  needs_userid: true
+  needs_uri:    true
+  uses_region:  true
+  uses_cacheid: true
+  docstring:    "A sink for S3 buckets"
+}
+
+sink post {
+  needs_uri:    true
+  uses_headers: true
+  docstring:    "Generic HTTP/HTTPS post to a URL. Add custom headers by providing an implementation to the callback getPostHeaders(), which should return a dictionary where all keys and values are strings."
+}
+
+sink custom {
+  uses_secret: true
+  uses_userid: true
+  uses_filename: true
+  uses_uri: true
+  uses_region: true
+  uses_aux: true
+  docstring: "Implement a custom sink via a con4m callback"
+}
+
+# This is actually installed by default by nimutils. You can't
+# actually redefine it, but you can unsubscribe() it, and add
+# a replacement instead via subscribe()
+# 
+# 
+#
+# # If a stacked config redefines stream.logs.hooks, then it will
+# # wipe out the default installed hook above.
+# stream logs {
+#   filters: [ "defaultLogs" ]
+# }
+
+outhook defaultOut {
+  sink: "stderr"
+  filters: [ "addTopic" ]
+}
+
+outhook defaultDryRun {
+  sink: "stderr"
+}
+
+outhook defaultDebug {
+  sink: "stderr"
+}
+
+# Valid topics right now are:
+# "logs", "extract", "inject", "nesting", "delete", 
+# "confload", "confdump", "debug"
+#
+# This is done for us by nimutils:
+# subscribe("logs", "defaultLogs")
+
 """

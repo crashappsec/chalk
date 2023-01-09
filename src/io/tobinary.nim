@@ -1,12 +1,5 @@
-import ../resources
-import ../config
-
-import nimutils
-import nimutils/box
-
-import strformat
-import strutils
-import tables
+import tables, options, strformat, strutils
+import nimutils, nimutils/box, ../resources, ../config
 
 proc u32ToStr*(i: uint32): string =
   result = newStringOfCap(sizeof(uint32)+1)

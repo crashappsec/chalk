@@ -1,12 +1,5 @@
-import ../resources
-import ../config
-
-import nimutils/box
-
-import std/json
-import strutils
-import tables
-import strformat
+import tables, options, strformat, strutils, std/json
+import ../resources, ../config, nimutils/box
 
 proc foundToJson*(self: SamiDict): string
 
@@ -28,13 +21,14 @@ proc foundToJson*(self: SamiDict): string =
   for fullKey in getOrderedKeys():
     var outputKey = fullKey
 
-    if "." in fullKey:
+    
+    if fullKey.contains("."):
       let parts = fullKey.split(".")
       if len(parts) != 2 or parts[1] != "json":
         continue
       outputKey = parts[0]
 
-    if not self.contains(fullKey):
+    if fullKey notin self:
       continue
 
     let

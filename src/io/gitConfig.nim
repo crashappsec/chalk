@@ -12,8 +12,7 @@
 # name: [a-zA-Z0-9-]+
 # # and ; are comments.
 
-import ../resources
-import streams
+import streams, ../resources
 
 type KVPair* = (string, string)
 type KVPairs* = seq[KVPair]

@@ -1,40 +1,21 @@
-import strformat, strutils, tables, options, algorithm, os, streams, sugar
-import macros
-import con4m, con4m/st, con4m/eval, nimutils, nimutils/box
-include errors
+import options, tables, strutils, strformat, algorithm, uri, os
+import con4m, con4m/[st, eval, dollars], nimutils, nimutils/[logging, topics]
+import macros except error
+export logging
+
+proc getConfigState*(): ConfigState
+
 include configs/baseconfig    # Gives us the variable baseConfig
 include configs/defaultconfig # Gives us defaultConfig
 include configs/con4mconfig   # gives us the variable samiConfig, which is
                               # a con4m configuration object.
                               # this needs to happen before we include types.
 include types
+include output
 
-const allowedCmds = ["inject", "extract", "defaults", "configDump"]
-const validLogLevels = ["none", "error", "warn", "info", "trace"]
- 
-proc getOutputConfig*(): TableRef[string, SamiOutputSection] =
-  return samiConfig.output
 
-proc getOutputSecret*(s: SamiOutputSection): Option[string] =
-  return s.secret
-
-proc getOutputUserId*(s: SamiOutputSection): Option[string] =
-  return s.userId
-
-proc getOutputFilename*(s: SamiOutputSection): Option[string] =
-  return s.filename
-
-proc getOutputDstUri*(s: SamiOutputSection): Option[string] =
-  return s.dstUri
-
-proc getOutputRegion*(s: SamiOutputSection): Option[string] =
-  return s.region
-
-proc getOutputCommand*(s: SamiOutputSection): Option[seq[string]] =
-  return s.command
-
-proc getOutputAuxId*(s: SamiOutputSection): Option[string] =
-  return s.auxid
+# This should prob be auto-generated.
+proc getConfigState*(): ConfigState = return ctxSamiConf    
 
 proc getConfigErrors*(): Option[seq[string]] =
   if ctxSamiConf.errors.len() != 0:
@@ -57,10 +38,10 @@ proc setConfigFileName*(val: string) =
 proc getDefaultCommand*(): Option[string] =
   return samiConfig.defaultCommand
 
-proc getCanDump(): bool =
+proc getCanDump*(): bool =
   return samiConfig.canDump
   
-proc getCanLoad(): bool =
+proc getCanLoad*(): bool =
   return samiConfig.canLoad
   
 proc getColor*(): bool =
@@ -68,13 +49,15 @@ proc getColor*(): bool =
 
 proc setColor*(val: bool) =
   discard ctxSamiConf.setOverride("color", pack(val))
+  setShowColors(val)
   samiConfig.color = val
 
-proc getLogLevel*(): string =
+proc geSamitLogLevel*(): string =
   return samiConfig.logLevel
 
-proc setLogLevel*(val: string) =
+proc setSamiLogLevel*(val: string) =
   discard ctxSamiConf.setOverride("log_level", pack(val))
+  setLogLevel(val)
   samiConfig.logLevel = val
 
 proc getDryRun*(): bool =
@@ -105,18 +88,6 @@ proc setRecursive*(val: bool) =
 
 proc getAllowExternalConfig*(): bool =
   return samiConfig.allowExternalConfig
-
-proc getExtractionOutputHandlers*(): seq[string] =
-  return samiConfig.extractionOutputHandlers
-
-proc getInjectionPrevSamiOutputHandlers*(): seq[string] =
-  return samiConfig.injectionPrevSamiOutputHandlers
-
-proc getInjectionOutputHandlers*(): seq[string] =
-  return samiConfig.injectionOutputHandlers
-
-proc getDeletionOutputHandlers*(): seq[string] =
-  return samiConfig.deletionOutputHandlers
 
 proc getAllKeys*(): seq[string] =
   result = @[]
@@ -223,11 +194,46 @@ proc getCommandPlugins*(): seq[(string, string)] =
       continue
     result.add((name, plugin.command.get()))
 
+proc getAllOuthooks*(): TableRef[string, SamiOuthookSection] =
+  result = samiConfig.outhook
+
+proc getAllSinks*(): TableRef[string, SamiSinkSection] =
+  result = samiConfig.sink
+  
+proc getSink*(hook: string): Option[SamiSinkSection] =
+  if samiConfig.`sink`.contains(hook):
+    return some(samiConfig.`sink`[hook])
+  return none(SamiSinkSection)
+
+proc getSink*(hook: SamiOuthookSection): string =
+  return hook.`sink`
+
+proc getFilters*(hook: SamiOuthookSection): seq[string] =
+  return hook.filters
+
+proc getSecret*(hook: SamiOuthookSection): Option[string] =
+  return hook.secret
+
+proc getUserId*(hook: SamiOuthookSection): Option[string] =
+  return hook.userid
+
+proc getFileName*(hook: SamiOuthookSection): Option[string] =
+  return hook.filename
+
+proc getUri*(hook: SamiOuthookSection): Option[string] =
+  return hook.uri
+
+proc getRegion*(hook: SamiOuthookSection): Option[string] =
+  return hook.region
+
+proc getAux*(hook: SamiOuthookSection): Option[string] =
+  return hook.aux
+
+proc getStop*(hook: SamiOuthookSection): bool =
+  return hook.stop
+
 proc getOutputPointers*(): bool =
   let contents = samiConfig.key["SAMI_PTR"]
-
-  if getInjectionOutputHandlers().len() == 0:
-    return false
 
   if contents.getValue().isSome() and not contents.getSkip():
     return true
@@ -314,62 +320,15 @@ macro condOutputHandlerFormatStrSeq(sym: untyped, prefix: string): string =
     else:
       ""
         
-proc `$`*(o: SamiOutputSection, s: string): string =
-  let
-    attrs = ctxSamiConf.st
-
-  result  = condOutputHandlerFormatStr(filename, "  file name:       ")
-  result &= condOutputHandlerFormatStrSeq(command, "  command:         ")
-  result &= condOutputHandlerFormatStr(dst_uri, "  destination URI: ")
-  result &= condOutputHandlerFormatStr(region, "  region:          ")
-  result &= condOutputHandlerFormatStr(userid, "  IAM user:        ")
-  result &= condOutputHandlerFormatStr(secret, "  secret:          ")
-
-proc `$`*(c: SamiConfig): string =
-  var configKeys, configPlugins, configOuts: seq[string]
-
-  for key, val in c.key:
-    configKeys.add(key)
-    configKeys.add($(val))
-
-  for plugin, val in c.plugin:
-    configPlugins.add(plugin)
-    configPlugins.add($(val))
-
-  for confOut, val in c.output:
-    if confOut == "stdout":
-      configOuts.insert(`$`(val, confOut), 0)
-      configOuts.insert(confOut, 0)
-    else:
-      configOuts.add(confOut)
-      configOuts.add(`$`(val, confOut))
-
-  return fmt"""config search path:        {c.configPath.join(":")}
-config filename:           {c.configFilename}
-config default command:    {getOrElse(samiConfig.defaultCommand, "<none>")}
-color:                     {c.color}
-log level:                 {c.logLevel}
-dry run:                   {c.dryRun}
-artifact search path:      {c.artifactSearchPath.join(":")}
-recursive artifact search: {c.recursive}
-Configured SAMI keys:
-{configKeys.join("\n")}
-
-Configured Plugins:
-{configPlugins.join("\n")}
-
-Configured Ouput Hooks:
-{configOuts.join("\n")}
-extraction hooks:       {c.extractionOutputHandlers.join(", ")}
-prev sami out hooks:    {c.injectionPrevSamiOutputHandlers.join(", ")}
-new sami out hooks:     {c.injectionOutputHandlers.join(", ")}
-"""
-
 proc showConfig*() =
-  stderr.writeLine($(samiConfig))
-  stderr.writeLine("""
+  ## This is a placeholder, we need to do something nicer
+  ## that focuses on the info they'll expect to see.
+  
+  publish("defaults", `$`(ctxSamiConf.st) & """
 Use 'dumpConfig' to export the embedded configuration file to disk,
-and 'loadConfig' to load one.""")
+and 'loadConfig' to load one.
+""")
+  
 
 var onceLockBuiltinKeys = false
 
@@ -419,25 +378,49 @@ proc lockBuiltinKeys*() =
 
   discard ctxSamiConf.lockConfigVar("output.s3.filename")
   discard ctxSamiConf.lockConfigVar("output.s3.command")
+
+  const builtinSinks = ["stdout", "stderr", "local_file",
+                        "s3", "post", "custom"]
+
+  for item in builtinSinks:
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_secret")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_userid")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_filename")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_uri")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_region")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_aux")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_secret")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_userid")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_filename")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_uri")    
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_region")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_aux")
+
+template hookCheck(fieldName: untyped) =
+  let s = astToStr(fieldName)
   
-# This should eventually move to evaluation callbacks.  They can give
+  if oneSink.`needs fieldName`:
+    if contents.`fieldName`.isNone():
+      warn("Hook '" & outHookName & "' is missing field '" & s &
+           "', which is required by sink '" & contents.sink &
+           "' (hook skipped)")
+      continue
+  elif not oneSink.`uses fieldName`:
+    if contents.`fieldName`.isSome():
+      warn("Hook '" & outHookName & "' declares a '" & s &
+           "' field, but sink '" & contents.sink & "' does not use it. " &
+           "(ignoring)")
+
+# This should mostly move to evaluation callbacks.  They can give
 # better error messages more easily.
-# TODO: should also validate that all plugin keys are spec'd.
 proc doAdditionalValidation*() =
-  if samiConfig.defaultCommand.isSome() and
-    not (samiConfig.defaultCommand.get() in allowedCmds):
-    warn(fmt"Default command {samiConfig.defaultCommand.get()} " &
-          "not recognized (ignored)")
+  # Actually, not validation, but get this done early.
+  setShowColors(samiConfig.color)
 
-    # This dance needs to be automated by con4m.  Note that we are
-    # only making a copy of the entry here, so after we edit we need
-    # to re-set it.
-    var entry = ctxSamiConf.st.entries["default_command"]
-    entry.value = none(Box)
-    ctxSamiConf.st.entries["default_command"] = entry
-    samiConfig.defaultCommand = none(string)
-
-  if not (samiConfig.logLevel in validLogLevels):
+  try:
+    setLogLevel(samiConfig.logLevel)
+  except:
+    setLogLevel(llWarn)
     warn(fmt"Log level {samiConfig.logLevel} not recognized. " &
          "Defaulting to 'warn'")
     var entry = ctxSamiConf.st.entries["log_level"]
@@ -453,11 +436,60 @@ proc doAdditionalValidation*() =
   for i in 0 ..< len(samiConfig.configPath):
     samiConfig.configPath[i] = samiConfig.configPath[i].resolvePath()
 
+  # Make sure the sinks specified are all sinks we have
+  # implementations for.
+  for sinkname, _ in samiConfig.sink:
+    if getSink(sinkname).isNone():
+      warn(fmt"Config declared sink '{sinkname}', but no implementation exists")
+
+  # Check the fields provided for output hooks relative to
+  # the sinks they are bound to.
+  var
+    validOutHooks = newTable[string, SamiOuthookSection]()
+
+  for outHookName, contents in samiConfig.outhook:
+    var skipHook = false
+      
+    if not samiConfig.sink.contains(contents.sink):
+      warn(fmt"Output hook {outHookName} is attached to sink " &
+           fmt"{contents.sink}, but no such sink is configured " &
+           "(hook skipped)")
+      continue
+    let oneSink = samiConfig.sink[contents.sink]
+
+    hookCheck(secret)
+    hookCheck(userid)
+    hookCheck(filename)
+    hookCheck(uri)
+    hookCheck(region)
+    hookCheck(headers)
+    hookCheck(cacheid)
+    hookCheck(aux)
+
+    # Even more validation.
+    if contents.sink == "s3":
+      let dstUri = parseURI(contents.uri.get())
+
+      if dstUri.scheme != "s3":
+        warn(fmt"Output hook {outHookName} requires a URI of " &
+           "the form s3://bucket-name/object-path (hook skipped)")
+        skipHook = true
+    
+    for filter in contents.filters:
+      if not getFilterByName(filter).isSome():
+        warn(fmt"Invalid filter named '{filter}'")
+        skipHook = true
+        break
+      
+    if skipHook: continue
+    
+    setupHookRecord(outHookName, contents)
+
   # Now, lock a bunch of fields.
   lockBuiltinKeys()
 
-proc loadEmbeddedConfig(selfSamiOpt: Option[SamiDict],
-                        dieIfInvalid = true): bool =
+proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict],
+                         dieIfInvalid = true): bool =
   var
     confString: string
     validEmbedded: bool
@@ -498,43 +530,6 @@ proc loadEmbeddedConfig(selfSamiOpt: Option[SamiDict],
   trace("Loaded embedded configuration file")
   return true
 
-proc handleConfigDump*(selfSami: Option[SamiDict], argv: seq[string]) =
-  let confValid = loadEmbeddedConfig(selfSami, dieIfInvalid = false)
-  if not getCanDump():
-    error("Dumping embedded config is disabled.")
-    quit()
-  else:
-    if len(argv) > 1:
-      error("configDump requires at most one parameter")
-      quit()
-
-    let
-      outfile = if len(argv) == 0 or resolvePath(argv[0]) == resolvePath("."):
-                  "sami.conf.dump"
-                else: resolvePath(argv[0])
-      toDump = if selfSami.isSome(): unpack[string](selfSami.get()["X_SAMI_CONFIG"])
-               else: defaultConfig
-               
-    try:
-      var f = newFileStream(outfile, fmWrite)
-      if f == nil:
-        error(fmt"Could not write to: {outfile} ({getCurrentExceptionMsg()})")
-        quit()
-      f.write(toDump)
-      f.close()
-    except:
-      error(fmt"Could not write to: {outfile} ({getCurrentExceptionMsg()})")
-      quit()
-
-    stderr.writeLine(fmt"Dumped configuration to: {outfile}")
-    quit()
-
-proc quitIfCantChangeEmbeddedConfig*(selfSami: Option[SamiDict]) =
-  discard loadEmbeddedConfig(selfSami, dieIfInvalid = false)
-  if not getCanLoad():
-    error("Loading a new embedded config is diabled.")
-    quit()
-
 proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
   discard loadEmbeddedConfig(selfSami)
 
@@ -569,7 +564,7 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
         loaded = true
       
     except Con4mError: # config not present:
-      inform(fmt"{fname}: config file not found.")
+      info(fmt"{fname}: config file not found.")
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
@@ -578,6 +573,13 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
     trace(fmt"Loaded configuration file: {fname}")
   else:
     trace("Running without a config file.")
+    
+## Code to set us up for self-injection.
+proc quitIfCantChangeEmbeddedConfig*(selfSami: Option[SamiDict]) =
+  discard loadEmbeddedConfig(selfSami, dieIfInvalid = false)
+  if not getCanLoad():
+    error("Loading a new embedded config is diabled.")
+    quit()
 
 var selfInjection = false
 
@@ -586,6 +588,7 @@ proc getSelfInjecting*(): bool =
     
 proc setupSelfInjection*(filename: string) =
   var newCon4m: string
+  let ctxSamiConf = getConfigState()
   
   selfInjection = true
 
@@ -609,10 +612,9 @@ proc setupSelfInjection*(filename: string) =
   if filename == "default":
     newCon4m = defaultConfig
     if getDryRun():
-      forceInform("Would install the default configuration file.")
-      quit()
+      dryRun("Would install the default configuration file.")
     else:
-      inform("Installing the default confiuration file.")
+      info("Installing the default confiuration file.")
   else:
     let f = newFileStream(resolvePath(filename))
     if f == nil:
@@ -625,7 +627,7 @@ proc setupSelfInjection*(filename: string) =
       error(fmt"{filename}: could not read configuration file")
       quit()
 
-    inform(fmt"{filename}: Validating configuration.")
+    info(fmt"{filename}: Validating configuration.")
     
     # Now we need to validate the config, without stacking it over our
     # existing configuration. We really want to know that the file
@@ -664,12 +666,14 @@ proc setupSelfInjection*(filename: string) =
     # and we should load it.
     try:
       var 
-        tree = parse(newStringStream(baseConfig), "baseconfig")
-        opt = tree.evalTree()
-        testState = opt.get()
+        tree       = parse(newStringStream(baseConfig), "baseconfig")
+        opt        = tree.evalTree()
+        testState  = opt.get()
         testStream = newStringStream(newCon4m)
-      testState.spec = ctxSamiConf.spec
+        
+      testState.spec      = ctxSamiConf.spec
       testState.funcTable = ctxSamiConf.funcTable
+      
       if testState.stackConfig(testStream, filename).isNone():
         error(fmt"{filename}: invalid configuration.")
         if testState.errors.len() != 0:
@@ -682,9 +686,7 @@ proc setupSelfInjection*(filename: string) =
       
     trace(fmt"{filename}: Configuration successfully validated.")
 
-    if getDryRun():
-      forceInform("The provided configuration file would be loaded.")
-      quit()
+    dryRun("The provided configuration file would be loaded.")
       
     # Now we're going to set up the injection properly solely by
     # tinkering with the config state.
@@ -699,7 +701,3 @@ proc setupSelfInjection*(filename: string) =
 
     var xSamiConfKey = getKeySpec("X_SAMI_CONFIG").get()
     xSamiConfKey.value = some(pack(newCon4m))
-    
-proc getConfigState*(): ConfigState =
-  return ctxSamiConf    
-  
