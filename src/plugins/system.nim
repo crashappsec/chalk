@@ -1,5 +1,5 @@
 import tables, options
-import nimutils, nimutils/[box, random], ../config, ../plugins, ../extract
+import nimutils, ../config, ../plugins, ../extract
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}

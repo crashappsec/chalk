@@ -1,14 +1,20 @@
 import options, streams, strutils, strformat, endians
-import nimSHA2, ../resources, ../config, ../plugins
+import nimSHA2, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 
-const b64OffsetLoc = 0x28
-#const b32OffsetLoc = 0x20
-const wsOffsetLoc = 0x04
-const is64BitVal = char(0x02)
-const bigEndianVal = char(0x02)
+const  
+  b64OffsetLoc = 0x28
+  b32OffsetLoc = 0x20
+  wsOffsetLoc  = 0x04
+  is64BitVal   = char(0x02)
+  bigEndianVal = char(0x02)
+  magicSwapped = "\xed\xbb\xda\xba\xab\xed\xdf\xda"
+  elfMagic     = 0x7f454c46'u32
+  elfSwapped   = 0x464c457f'u32
+  
+  
 
 type CodecElf* = ref object of Codec
 

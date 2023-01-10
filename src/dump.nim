@@ -1,6 +1,6 @@
 ## Implements commands for configuration dumping and loading.
 
-import tables, options, nimutils, nimutils/[box, topics], config
+import tables, options, nimutils, config
 
 proc handleConfigDump*(selfSami: Option[SamiDict], argv: seq[string]) =
   let confValid = loadEmbeddedConfig(selfSami, dieIfInvalid = false)

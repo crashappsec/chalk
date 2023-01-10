@@ -1,5 +1,8 @@
 import options, streams, strformat, os, std/tempfiles
-import nimutils/topics, resources, config, plugins, extract
+import nimutils, config, plugins, extract
+
+const
+  eDeleteFailed = "{item.fullpath}: deletion failed"
 
 proc doDelete*() =
   trace("Identifying artifacts with existing SAMIs")

@@ -1,4 +1,10 @@
-import tables, streams, endians, nimutils/box, ../resources, ../config
+import tables, streams, endians, nimutils, ../config
+
+const
+  eUnkObjT   = "(unknown object type)"
+  eBoolParse = "(when parsing bool)"
+  eBinParse  = "(when parsing binary)"
+  eStrParse  = "(when parsing string)"  
 
 proc itemFromBin(stream: FileStream, swapEndian: bool): Box
 

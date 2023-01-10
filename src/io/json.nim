@@ -1,7 +1,25 @@
-import strformat, tables, streams, unicode, parseutils
-import nimutils/box, ../resources
+import strformat, tables, streams, unicode, parseutils, nimutils
        
-const jsonWSChars* = ['\x20', '\x0a', '\x0d', '\x09']
+const
+  jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']
+  fmtReadTrace     = "read: {$c}; position now: {$s.getPosition()}"
+  jNullStr         = "null" 
+  jTrueStr         = "true"
+  jFalseStr        = "false"
+  eBadLiteral      = "Invalid JSON literal. Expected: "
+  eDoubleNeg       = "Double negative in JSON not allowed"
+  eWTF             = "Programming mistake, shouldn't happen"
+  eNoExponent      = "Exponent expected"
+  eBadUniEscape    = "Invalid \\u escape in JSON"
+  eBadEscape       = "Invalid JSON escape command after '\\'"
+  eEOFInStr        = "End of file in string"
+  eBadUTF8         = "Invalid UTF-8 in JSON string literal"
+  eBadArrayItem    = "Expected comma or end of array"
+  eNoColon         = "Colon expected"
+  eBadObjMember    = "Invalid JSON obj, expected , or }}, got: '{$c}'"
+  eBadObject       = "Bad object, expected either } or a string key"
+  eBadElementStart = "Bad JSon at position: {s.getPosition()}"
+  
 
 type JSonError = ref object of ValueError
 

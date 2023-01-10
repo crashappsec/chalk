@@ -1,5 +1,14 @@
-import tables, options, strformat, strutils
-import nimutils, nimutils/box, ../resources, ../config
+import tables, options, strformat, strutils, nimutils, ../config
+
+const
+  kvPairBinFmt   = "{result}{binEncodeStr(outputkey)}{binEncodeItem(val)}"
+  binStrItemFmt  = "\x01{u32ToStr(uint32(len(s)))}{s}"
+  binIntItemFmt  = "\x02{u64ToStr(uint64(i))}"
+  binTrue        = "\x03\x01"
+  binFalse       = "\x03\x00"
+  binArrStartFmt = "\x05{u32ToStr(uint32(len(arr)))}"
+  binObjHdr      = "\x06{u32ToStr(uint32(len(self)))}"
+  
 
 proc u32ToStr*(i: uint32): string =
   result = newStringOfCap(sizeof(uint32)+1)

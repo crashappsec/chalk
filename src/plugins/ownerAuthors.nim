@@ -1,5 +1,12 @@
-import tables, os, streams, strformat
-import nimutils/box, ../config, ../plugins, ../resources
+import tables, os, streams, strformat, nimutils, ../config, ../plugins
+
+const
+  fNameAuthor  = "AUTHOR"
+  fNameAuthors = "AUTHORS"
+  dirDoc       = "docs"
+  eCantOpen    = "{fname}: File found, but could not be read"  
+  eFileOpen    = "{filename}: Could not open file."   
+  
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}

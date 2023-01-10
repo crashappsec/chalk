@@ -1,6 +1,22 @@
 import os, streams, tables, strutils, strformat
-import nimutils/box, ../config, ../plugins, ../resources, ../io/gitConfig
+import nimutils, ../config, ../plugins, ../io/gitConfig
 
+const
+  dirGit       = ".git"
+  fNameHead    = "HEAD"
+  fNameConfig  = "config"
+  trVcsDir     = "version control dir: {self.vcsDir}"
+  trBranch     = "branch: {self.branchName}"
+  trCommit     = "commit ID: {self.commitID}"
+  trOrigin     = "origin: {url}"
+  wNotParsed   = "{confFileName}: Github configuration file not parsed."
+  ghRef        = "ref:"
+  ghBranch     = "branch"
+  ghRemote     = "remote"
+  ghUrl        = "url"
+  ghOrigin     = "origin"
+  ghLocal      = "local"
+  
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 
