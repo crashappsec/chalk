@@ -1,4 +1,4 @@
-import options, tables, strutils, strformat, algorithm, uri, os
+import options, tables, strutils, strformat, algorithm, os
 import con4m, con4m/[st, eval, dollars], nimutils, nimutils/logging
 import macros except error
 export logging
@@ -12,94 +12,37 @@ include types
 
 
 const
-  availableFilters = { "logLevel"   : MsgFilter(logLevelFilter),
-                       "logPrefix"  : MsgFilter(logPrefixFilter),
-                       "prettyJson" : MsgFilter(prettyJson),
-                       "addTopic"   : MsgFilter(addTopic)
-                     }.toTable()
   # Some string constants used in multiple places.                       
   magicBin*      = "\xda\xdf\xed\xab\xba\xda\xbb\xed"
   magicUTF8*     = "dadfedabbadabbed"
   tmpFilePrefix* = "sami"
   tmpFileSuffix* = "-extract.json"  
 
-discard registerTopic("extract")
-discard registerTopic("inject")
-discard registerTopic("nesting")
-discard registerTopic("defaults")
-discard registerTopic("dry-run")
-discard registerTopic("delete")
-discard registerTopic("confload")
-discard registerTopic("confdump")
-discard registerTopic("debug")
 
-const customSinkType = "f(string, {string : string}) -> bool"
-
-proc customOut(msg: string, record: SinkConfig, xtra: StringTable): bool =
-  var
-    cfg:  StringTable = newTable[string, string]()
-    args: seq[Box]
-    t:    Con4mType   = toCon4mType(customSinkType)
-
-  for key, val in xtra:          cfg[key] = val
-  for key, val in record.config: cfg[key] = val
-
-  args.add(pack(msg))
-  args.add(pack(cfg))
-
-  var retBox = runCallback(ctxSamiConf, "outhook", args, some(t)).get()
+template hookCheck(fieldname: untyped) =
+  let s = astToStr(fieldName)
   
-  return unpack[bool](retBox)
+  if sinkConfData.`needs fieldName`:
+    if not sinkopts.contains(s):
+      warn("Sink config '" & sinkconf & "' is missing field '" & s &
+           "', which is required by sink '" & sinkname &
+           "' (config not installed)")
+      
 
-const customKeys = { "secret" :  false, "uid"    : false, "filename": false,
-                     "uri" :     false, "region" : false, "headers":  false,
-                     "cacheid" : false, "aux"    : false }.toTable()
-
-registerSink("custom", SinkRecord(outputFunction: customOut, keys: customKeys))
-ctxSamiConf.newCallback("outhook", customSinkType)
+proc checkHooks*(sinkname:     string,
+                 sinkconf:     string,
+                 sinkConfData: SamiSinkSection,
+                 sinkopts:     StringTable) =
+    hookCheck(secret)
+    hookCheck(userid)
+    hookCheck(filename)
+    hookCheck(uri)
+    hookCheck(region)
+    hookCheck(headers)
+    hookCheck(cacheid)
+    hookCheck(aux)
 
   
-proc getFilterByName*(name: string): Option[MsgFilter] =
-  if name in availableFilters:
-    return some(availableFilters[name])
-  return none(MsgFilter)
-
-var availableHooks = initTable[string, Option[SinkConfig]]()
-
-proc setupHookRecord(name: string, contents: SamiOuthookSection) =
-  var
-    theSink = getSink(contents.sink).get()
-    cfg:      StringTable = newTable[string, string]()
-    filters:  seq[MsgFilter] = @[]
-
-  if contents.secret.isSome():
-    cfg["secret"] = contents.secret.get()
-  if contents.userid.isSome():
-    cfg["uid"]    = contents.userid.get()
-  if contents.filename.isSome():
-    cfg["filename"] = contents.filename.get()
-  if contents.uri.isSome():
-    cfg["uri"] = contents.uri.get()
-  if contents.region.isSome():
-    cfg["region"] = contents.region.get()
-  if contents.headers.isSome():
-    cfg["headers"] = contents.headers.get()
-  if contents.cacheid.isSome():
-    cfg["cacheid"] = contents.cacheid.get()
-  if contents.aux.isSome():
-    cfg["aux"] = contents.aux.get()
-
-  for item in contents.filters:
-    filters.add(availableFilters[item])
-
-  availableHooks[name] = configSink(theSink, some(cfg), filters)     
-  
-proc getHookByName*(name: string): Option[SinkConfig] =
-  if name in availableHooks:
-    return availableHooks[name]
-    
-  return none(SinkConfig)
-
 template dryRun*(s: string) =
   if samiConfig.dryRun:
     publish("dry-run", s)
@@ -297,43 +240,13 @@ proc getCommandPlugins*(): seq[(string, string)] =
       continue
     result.add((name, plugin.command.get()))
 
-proc getAllOuthooks*(): TableRef[string, SamiOuthookSection] =
-  result = samiConfig.outhook
-
 proc getAllSinks*(): TableRef[string, SamiSinkSection] =
   result = samiConfig.sink
   
-proc getSink*(hook: string): Option[SamiSinkSection] =
+proc getSinkConfig*(hook: string): Option[SamiSinkSection] =
   if samiConfig.`sink`.contains(hook):
     return some(samiConfig.`sink`[hook])
   return none(SamiSinkSection)
-
-proc getSink*(hook: SamiOuthookSection): string =
-  return hook.`sink`
-
-proc getFilters*(hook: SamiOuthookSection): seq[string] =
-  return hook.filters
-
-proc getSecret*(hook: SamiOuthookSection): Option[string] =
-  return hook.secret
-
-proc getUserId*(hook: SamiOuthookSection): Option[string] =
-  return hook.userid
-
-proc getFileName*(hook: SamiOuthookSection): Option[string] =
-  return hook.filename
-
-proc getUri*(hook: SamiOuthookSection): Option[string] =
-  return hook.uri
-
-proc getRegion*(hook: SamiOuthookSection): Option[string] =
-  return hook.region
-
-proc getAux*(hook: SamiOuthookSection): Option[string] =
-  return hook.aux
-
-proc getStop*(hook: SamiOuthookSection): bool =
-  return hook.stop
 
 proc getOutputPointers*(): bool =
   let contents = samiConfig.key["SAMI_PTR"]
@@ -486,6 +399,8 @@ proc lockBuiltinKeys*() =
                         "s3", "post", "custom"]
 
   for item in builtinSinks:
+    # Really need to be able to lock entire sections.  You shouldn't be
+    # able to add ANY sinks from the conf file, that wouldn't work out.
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_secret")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_userid")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_filename")
@@ -498,21 +413,6 @@ proc lockBuiltinKeys*() =
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_uri")    
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_region")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_aux")
-
-template hookCheck(fieldName: untyped) =
-  let s = astToStr(fieldName)
-  
-  if oneSink.`needs fieldName`:
-    if contents.`fieldName`.isNone():
-      warn("Hook '" & outHookName & "' is missing field '" & s &
-           "', which is required by sink '" & contents.sink &
-           "' (hook skipped)")
-      continue
-  elif not oneSink.`uses fieldName`:
-    if contents.`fieldName`.isSome():
-      warn("Hook '" & outHookName & "' declares a '" & s &
-           "' field, but sink '" & contents.sink & "' does not use it. " &
-           "(ignoring)")
 
 # This should mostly move to evaluation callbacks.  They can give
 # better error messages more easily.
@@ -545,53 +445,8 @@ proc doAdditionalValidation*() =
     if getSink(sinkname).isNone():
       warn(fmt"Config declared sink '{sinkname}', but no implementation exists")
 
-  # Check the fields provided for output hooks relative to
-  # the sinks they are bound to.
-  var
-    validOutHooks = newTable[string, SamiOuthookSection]()
-
-  for outHookName, contents in samiConfig.outhook:
-    var skipHook = false
-      
-    if not samiConfig.sink.contains(contents.sink):
-      warn(fmt"Output hook {outHookName} is attached to sink " &
-           fmt"{contents.sink}, but no such sink is configured " &
-           "(hook skipped)")
-      continue
-    let oneSink = samiConfig.sink[contents.sink]
-
-    hookCheck(secret)
-    hookCheck(userid)
-    hookCheck(filename)
-    hookCheck(uri)
-    hookCheck(region)
-    hookCheck(headers)
-    hookCheck(cacheid)
-    hookCheck(aux)
-
-    # Even more validation.
-    if contents.sink == "s3":
-      let dstUri = parseURI(contents.uri.get())
-
-      if dstUri.scheme != "s3":
-        warn(fmt"Output hook {outHookName} requires a URI of " &
-           "the form s3://bucket-name/object-path (hook skipped)")
-        skipHook = true
-    
-    for filter in contents.filters:
-      if not getFilterByName(filter).isSome():
-        warn(fmt"Invalid filter named '{filter}'")
-        skipHook = true
-        break
-      
-    if skipHook: continue
-    
-    setupHookRecord(outHookName, contents)
-
   # Now, lock a bunch of fields.
   lockBuiltinKeys()
-  when not defined(release):
-      discard subscribe("debug", getHookByName("defaultDebug").get())
   
 
 proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict],

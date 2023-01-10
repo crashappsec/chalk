@@ -364,6 +364,7 @@ sink custom {
   uses_filename: true
   uses_uri: true
   uses_region: true
+  uses_cacheid: true
   uses_aux: true
   docstring: "Implement a custom sink via a con4m callback"
 }
@@ -379,25 +380,5 @@ sink custom {
 # stream logs {
 #   filters: [ "defaultLogs" ]
 # }
-
-outhook defaultOut {
-  sink: "stderr"
-  filters: [ "addTopic" ]
-}
-
-outhook defaultDryRun {
-  sink: "stderr"
-}
-
-outhook defaultDebug {
-  sink: "stderr"
-}
-
-# Valid topics right now are:
-# "logs", "extract", "inject", "nesting", "delete", 
-# "confload", "confdump", "debug"
-#
-# This is done for us by nimutils:
-# subscribe("logs", "defaultLogs")
 
 """

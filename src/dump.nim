@@ -12,12 +12,8 @@ proc handleConfigDump*(selfSami: Option[SamiDict], argv: seq[string]) =
       error("configDump requires at most one parameter")
       quit()
 
-    let
-      outfile = if len(argv) == 0 or resolvePath(argv[0]) == resolvePath("."):
-                  "sami.conf.dump"
-                else: resolvePath(argv[0])
-      toDump = if selfSami.isSome(): unpack[string](selfSami.get()["X_SAMI_CONFIG"])
-               else: defaultConfig
-
+    let toDump = if selfSami.isSome(): unpack[string](selfSami.get()["X_SAMI_CONFIG"])
+                 else: defaultConfig
+               
     publish("confdump", toDump)
 

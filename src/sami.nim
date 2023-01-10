@@ -62,16 +62,14 @@ proc runCmdDump(arglist: seq[string]) {.noreturn, inline.} =
 proc runCmdLoad() {.noreturn, inline.} =
   # The fact that we're injecting into ourself will be special-cased
   # in the injection workflow.
-  let
-    selfSami = getSelfExtraction()
-    args = getArtifactSearchPath()
+  let selfSami = getSelfExtraction()
     
   quitIfCantChangeEmbeddedConfig(selfSami)
-  if len(args) != 1:
+  if len(getArgs()) != 1:
     error("configLoad requires either a file name or 'default'")
     quit()
 
-  setupSelfInjection(args[0])
+  setupSelfInjection(getArgs()[0])
   loadCommandPlugins()
   doInjection()
   quit()
@@ -237,6 +235,7 @@ template injectCmd(cmd: string, primary: bool) =
           setRecursive(true)
         else:
           setRecursive(false)
+      setArgs(opts.files)      
       setArtifactSearchPath(opts.files)
       runCmdInject()
 
@@ -259,6 +258,7 @@ template extractCmd(cmd: string, primary: bool) =
           setRecursive(true)
         else:
           setRecursive(false)
+      setArgs(opts.files)      
       setArtifactSearchPath(opts.files)
       runCmdExtract()
 
@@ -266,34 +266,37 @@ template defaultsCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showDefHelp)
+    arg("args", nargs = -1, help = dumpFileHelp)            
     run:
+      setArgs(opts.args)      
       runCmdDefaults()
 
 template dumpCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showDumpHelp)
-    arg("files", nargs = -1, help = dumpFileHelp)      
+    arg("args", nargs = -1, help = dumpFileHelp)      
     run:
-      setArtifactSearchPath(opts.files)
-      runCmdDump(opts.files)
+      setArgs(opts.args)
+      runCmdDump(opts.args)
 
 template loadCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showLoadHelp)
-    arg("files", nargs = -1, help = loadFileHelp)      
+    arg("args", nargs = -1, help = loadFileHelp)      
     run:
-      setArtifactSearchPath(opts.files)
+      setArgs(opts.args)
       runCmdLoad()
 
 template delCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showDelHelp)
-    arg("files", nargs = -1, help = delFilesHelp)
+    arg("args", nargs = -1, help = delFilesHelp)
     run:
-      setArtifactSearchPath(opts.files)
+      setArgs(opts.args)      
+      setArtifactSearchPath(opts.args)
       runCmdDel()
 
 when isMainModule:
