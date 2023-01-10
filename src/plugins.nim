@@ -1,6 +1,17 @@
 import os, tables, strformat, strutils, algorithm, streams, options
-import nimSHA2, con4m, nimutils, nimutils/box, resources, config     
-import io/[fromjson, frombinary, json]
+import nimSHA2, con4m, nimutils, config, io/[fromjson, frombinary, json]
+
+const
+  fmtTraceScanFile  = "{item}: scanning file"
+  fmtTraceScanFileP = "{path}: scanning file"
+  fmtTraceFIP       = "{sami.fullpath}: Found @{$pt.startOffset}"
+  eBadBin           = "{sami.fullpath}: Found binary SAMI magic, " &
+                      "but SAMI didn't parse"
+  eBadJson          = "{sami.fullpath}: Invalid input JSON in file"
+  ePathNotFound     = "{path}: No such file or directory"
+  ePureVirtual      = "Method is not defined; it must be overridden"
+  
+  
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}

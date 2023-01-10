@@ -1,4 +1,11 @@
-import tables, strformat, streams, nimutils/box, ../config, ../resources, ./json
+import tables, strformat, streams, nimutils, ../config, ./json
+
+const
+  eDupeKey    = "{fname}: Duplicate entry for SAMI key '{key}'"
+  eNoFloat    = "{fname}: JSon type for {key} is `float`, which is NOT " &
+                "a valid SAMI type"
+  rawMagicKey = "\"_MAGIC"
+  
 
 proc findJsonStart*(stream: FileStream): bool =
   var

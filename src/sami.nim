@@ -1,6 +1,5 @@
 import tables, strformat, argparse
-import nimutils/topics, resources, config, inject, extract, delete, dump,
-       plugins, builtins
+import nimutils, config, inject, extract, delete, dump, plugins, builtins
 import macros except error
 
 # The base configuration will load when we import config.  We forego
@@ -81,6 +80,89 @@ proc runCmdDel() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
   doDelete() # delete.nim
   quit()
+
+
+const
+  fColorShort         = "-a"
+  fColorLong          = "--color"
+  fNoColorShort       = "-A"
+  fNoColorLong        = "--no-color"
+  fDryRunShort        = "-d"
+  fDryRunLong         = "--dry-run"
+  fNoDryRunShort      = "-D"
+  fNoDryRunLong       = "--no-dry-run"
+  fSilentShort        = "-z"
+  fSilentLong         = "--silent"
+  fQuietShort         = "-q"
+  fQuietLong          = "--quiet"
+  fNormalShort        = "-n"
+  fNormalLong         = "--normal-output"
+  fVerboseShort       = "-i"
+  fVerboseLong        = "--info"
+  fTraceShort         = "-v"
+  fTraceLong          = "--verbose"
+  fCfgFileNameShort   = "-c"
+  fCfgFileNameLong    = "--config-file-name"
+  fCfgSearchPathShort = "-p"
+  fCfgSearchPathLong  = "--config-search-path"
+  fOverwriteShort     = "-w"
+  fOverwriteLong      = "--overwrite"
+  fNoOverwriteShort   = "-W"
+  fNoOverwriteLong    = "--no-overwrite"
+  fRecursiveShort     = "-r"
+  fRecursiveLong      = "--recursive"
+  fNoRecursiveShort   = "-R"
+  fNoRecursiveLong    = "--no-recursive"
+
+  # help strings for the command line.
+  insertHelp      = "Insert SAMIs into artifacts"
+  extractHelp     = "Extract SAMIs from artifacts"
+  colorHelp       = "Turn on color in error messages"
+  noColorHelp     = "Turn OFF color in error messages"
+  dryRunHelp      = "Do not write files; output to terminal what would have\n" &
+                    "\t\t\t     been done. Shows which files would have " &
+                    "metadata\n\t\t\t     inserted / extracted, and " &
+                    "what metadata is present"
+  noDryRunHelp    = "Turn off dry run (if defined via env variable or conf file"
+  silentHelp      = "Doesn't output any messages (except with --dry-run)"
+  quietHelp       = "Only outputs if there's an error (or --dry-run output)"
+  normalHelp      = "Output at normal logging level (warnings, but not " &
+                    "too chatty)"
+  verboseHelp     = "Output basic information during run"
+  traceHelp       = "Output detailed tracing information"
+  showDefHelp     = "Show what options will be selected. Considers\n" &
+                    "\t\t\t     the impact of any config file, environment \n" &
+                    "\t\t\t     variables and options passed before this " &
+                    "flag appears"
+  showDumpHelp    = "Dumps any embedded configuration to disk."
+  showLoadHelp    = "Loads an embedded configuration from the specified file."
+  showDelHelp     = "Remove SAMI objects from artifacts."
+  delFilesHelp    = "Specify the files/directories from which to remove " &
+                    "SAMIs from"
+  cfgFileHelp     = "Specify the config file name to search for (NOT the path)"
+  cfgSearchHelp   = "The search path for looking for configuration files"
+  inFilesHelp     = "Specify which files or directories to target for " &
+                    "insertion."
+  dumpFileHelp    = "Specify the (optional) file to dump the embedded " &
+                    "configuration file."
+  loadFileHelp    = "Specify the configuration file to embed."
+  overWriteHelp   = "Replace existing SAMI metadata found in an artifact"
+  noOverWriteHelp = "Keep existing SAMI metadata found in an artifact by\n" &
+                    "\t\t\t     embedding it in the OLD_SAMI field"
+  recursiveHelp   = "Recurse any directories when looking for artifacts"
+  noRecursiveHelp = "Do NOT recurse into dirs when looking for artifacts." &
+                     "\t\t\t     If dirs are listed in arguments, the " &
+                     "top-level files \t\t\t     will be checked, but " &
+                     "no deeper."
+  outFilesHelp    = "Specify files/directories from which to extract SAMIs from"
+  eConflictFmt    = "Conflicting flags provided: {l1} ({s1}) and {l2} ({s2})"
+  generalHelp     = """{prog}: insert or extract software artifact metadata.
+Default options shown can be overridden by config file or environment 
+variables, where provided. Use --show-defaults to see what values would
+be used, given the impact of config files / environment variables.
+"""
+  
+  
 type
   FlagID = enum
     fidColor, fidNoColor, fidDryRun, fidNoDryRun, fidSilent, fidQuiet,
@@ -241,31 +323,31 @@ when isMainModule:
         else:
           setDryRun(false)
       if (opts.silent or opts.quiet or opts.normalOutput or
-          opts.verbose or opts.trace):
+          opts.verbose or opts.info):
         if opts.silent and opts.quiet:
           flagConflict(fidSilent, fidQuiet)
         elif opts.silent and opts.normalOutput:
           flagConflict(fidSilent, fidNormal)
         elif opts.silent and opts.verbose:
           flagConflict(fidSilent, fidVerbose)
-        elif opts.silent and opts.trace:
+        elif opts.silent and opts.verbose:
           flagConflict(fidSilent, fidTrace)
         elif opts.quiet and opts.normalOutput:
           flagConflict(fidQuiet, fidNormal)
         elif opts.quiet and opts.verbose:
           flagConflict(fidQuiet, fidVerbose)
-        elif opts.quiet and opts.trace:
+        elif opts.quiet and opts.verbose:
           flagConflict(fidQuiet, fidTrace)
         elif opts.normalOutput and opts.verbose:
           flagConflict(fidNormal, fidVerbose)
-        elif opts.normalOutput and opts.trace:
+        elif opts.normalOutput and opts.verbose:
           flagConflict(fidNormal, fidTrace)
-        elif opts.verbose and opts.trace:
+        elif opts.verbose and opts.verbose:
           flagConflict(fidVerbose, fidTrace)
-        elif opts.trace:
+        elif opts.verbose:
           setLogLevel("trace")
         elif opts.verbose:
-          setLogLevel("verbose")
+          setLogLevel("info")
         elif opts.normalOutput:
           setLogLevel("warn")
         elif opts.quiet:

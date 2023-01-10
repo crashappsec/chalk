@@ -12,7 +12,11 @@
 # name: [a-zA-Z0-9-]+
 # # and ; are comments.
 
-import streams, ../resources
+import streams
+       
+const
+  eBadGitConf = "Github configuration file is invalid"  
+  
 
 type KVPair* = (string, string)
 type KVPairs* = seq[KVPair]

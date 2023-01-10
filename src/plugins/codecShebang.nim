@@ -1,7 +1,7 @@
-import strutils, options, streams, nimSHA2, ../config, ../plugins, ../resources
+import strutils, options, streams, nimSHA2, ../config, ../plugins
 
 type CodecShebang* = ref object of Codec
-
+  
 method scan*(self: CodecShebang, sami: SamiObj): bool =
   var line1: string
 
@@ -12,7 +12,7 @@ method scan*(self: CodecShebang, sami: SamiObj): bool =
     line1 = sami.stream.readLine()
   except:
     return false
-  if not line1.startsWith(sShebang):
+  if not line1.startsWith("#!"):
     return false
   let
     line2 = sami.stream.readLine()

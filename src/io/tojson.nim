@@ -1,5 +1,11 @@
-import tables, options, strformat, strutils, std/json
-import ../resources, ../config, nimutils/box
+import tables, options, strformat, strutils, std/json, ../config, nimutils
+
+const
+  comfyItemSep = ", " # also used in extract.nim
+  kvPairJFmt   = "{comma}{keyJson} : {valJson}" # also extract.nim
+  jSonObjFmt   = "{ $# }"
+  jsonArrFmt   = "[ $# ]"
+  
 
 proc foundToJson*(self: SamiDict): string
 

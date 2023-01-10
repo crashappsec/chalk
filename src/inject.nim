@@ -1,9 +1,13 @@
 import options, tables, streams, algorithm, strutils, strformat, os,
        std/tempfiles
-import nimutils, nimutils/topics, resources, config, plugins, extract,
-       io/tobinary, io/tojson
+import nimutils, config, plugins, extract,io/[tobinary, tojson]
 
-const requiredCodecKeys = ["ARTIFACT_PATH", "HASH", "HASH_FILES"]
+const
+  requiredCodecKeys = ["ARTIFACT_PATH", "HASH", "HASH_FILES"]
+  infNewSami        = "{item.fullpath}: new artifact metadata added."
+  infReplacedSami   = "{item.fullpath}: artifact metadata replaced."
+  eCantInsert       = "{item.fullpath}: insertion failed!"
+  
 
 type
   KeyPriorityInfo = tuple[priority: int, plugin: Plugin]

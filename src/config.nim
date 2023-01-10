@@ -1,9 +1,7 @@
 import options, tables, strutils, strformat, algorithm, uri, os
-import con4m, con4m/[st, eval, dollars], nimutils, nimutils/[logging, topics]
+import con4m, con4m/[st, eval, dollars], nimutils, nimutils/logging
 import macros except error
 export logging
-
-proc getConfigState*(): ConfigState
 
 include configs/baseconfig    # Gives us the variable baseConfig
 include configs/defaultconfig # Gives us defaultConfig
@@ -11,7 +9,112 @@ include configs/con4mconfig   # gives us the variable samiConfig, which is
                               # a con4m configuration object.
                               # this needs to happen before we include types.
 include types
-include output
+
+
+const
+  availableFilters = { "logLevel"   : MsgFilter(logLevelFilter),
+                       "logPrefix"  : MsgFilter(logPrefixFilter),
+                       "prettyJson" : MsgFilter(prettyJson),
+                       "addTopic"   : MsgFilter(addTopic)
+                     }.toTable()
+  # Some string constants used in multiple places.                       
+  magicBin*      = "\xda\xdf\xed\xab\xba\xda\xbb\xed"
+  magicUTF8*     = "dadfedabbadabbed"
+  tmpFilePrefix* = "sami"
+  tmpFileSuffix* = "-extract.json"  
+
+discard registerTopic("extract")
+discard registerTopic("inject")
+discard registerTopic("nesting")
+discard registerTopic("defaults")
+discard registerTopic("dry-run")
+discard registerTopic("delete")
+discard registerTopic("confload")
+discard registerTopic("confdump")
+discard registerTopic("debug")
+
+const customSinkType = "f(string, {string : string}) -> bool"
+
+proc customOut(msg: string, record: SinkConfig, xtra: StringTable): bool =
+  var
+    cfg:  StringTable = newTable[string, string]()
+    args: seq[Box]
+    t:    Con4mType   = toCon4mType(customSinkType)
+
+  for key, val in xtra:          cfg[key] = val
+  for key, val in record.config: cfg[key] = val
+
+  args.add(pack(msg))
+  args.add(pack(cfg))
+
+  var retBox = runCallback(ctxSamiConf, "outhook", args, some(t)).get()
+  
+  return unpack[bool](retBox)
+
+const customKeys = { "secret" :  false, "uid"    : false, "filename": false,
+                     "uri" :     false, "region" : false, "headers":  false,
+                     "cacheid" : false, "aux"    : false }.toTable()
+
+registerSink("custom", SinkRecord(outputFunction: customOut, keys: customKeys))
+ctxSamiConf.newCallback("outhook", customSinkType)
+
+  
+proc getFilterByName*(name: string): Option[MsgFilter] =
+  if name in availableFilters:
+    return some(availableFilters[name])
+  return none(MsgFilter)
+
+var availableHooks = initTable[string, Option[SinkConfig]]()
+
+proc setupHookRecord(name: string, contents: SamiOuthookSection) =
+  var
+    theSink = getSink(contents.sink).get()
+    cfg:      StringTable = newTable[string, string]()
+    filters:  seq[MsgFilter] = @[]
+
+  if contents.secret.isSome():
+    cfg["secret"] = contents.secret.get()
+  if contents.userid.isSome():
+    cfg["uid"]    = contents.userid.get()
+  if contents.filename.isSome():
+    cfg["filename"] = contents.filename.get()
+  if contents.uri.isSome():
+    cfg["uri"] = contents.uri.get()
+  if contents.region.isSome():
+    cfg["region"] = contents.region.get()
+  if contents.headers.isSome():
+    cfg["headers"] = contents.headers.get()
+  if contents.cacheid.isSome():
+    cfg["cacheid"] = contents.cacheid.get()
+  if contents.aux.isSome():
+    cfg["aux"] = contents.aux.get()
+
+  for item in contents.filters:
+    filters.add(availableFilters[item])
+
+  availableHooks[name] = configSink(theSink, some(cfg), filters)     
+  
+proc getHookByName*(name: string): Option[SinkConfig] =
+  if name in availableHooks:
+    return availableHooks[name]
+    
+  return none(SinkConfig)
+
+template dryRun*(s: string) =
+  if samiConfig.dryRun:
+    publish("dry-run", s)
+    
+when not defined(release):
+  template samiDebug*(s: string) =
+    const
+      pre  = "\e[1;35m"
+      post = "\e[0m"
+    let
+      msg = pre & "DEBUG: " & post & s & "\n"
+
+    publish("debug", msg)
+else:
+  template samiDebug*(s: string) = discard
 
 
 # This should prob be auto-generated.
@@ -52,7 +155,7 @@ proc setColor*(val: bool) =
   setShowColors(val)
   samiConfig.color = val
 
-proc geSamitLogLevel*(): string =
+proc geSamiLogLevel*(): string =
   return samiConfig.logLevel
 
 proc setSamiLogLevel*(val: string) =
@@ -487,6 +590,9 @@ proc doAdditionalValidation*() =
 
   # Now, lock a bunch of fields.
   lockBuiltinKeys()
+  when not defined(release):
+      discard subscribe("debug", getHookByName("defaultDebug").get())
+  
 
 proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict],
                          dieIfInvalid = true): bool =
@@ -563,8 +669,10 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
       else:
         loaded = true
       
-    except Con4mError: # config not present:
-      info(fmt"{fname}: config file not found.")
+    except Con4mError: # config file didn't load:
+      info(fmt"{fname}: config file not loaded.")
+      samiDebug("\n" & getCurrentException().getStackTrace())
+      samiDebug("continuing.")
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()

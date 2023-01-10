@@ -1,5 +1,19 @@
 import tables, strformat, strutils, os, options, nativesockets
-import nimutils, nimutils/box, resources, config, plugins, io/tojson
+import nimutils, config, plugins, io/tojson
+
+const
+  # This is the logging template for JSON output.
+  logTemplate       = """{ 
+  "SAMI" : $#,
+  "EMBEDDED_SAMIS" : $#
+}"""
+  fmtInfoNoExtract  = "{sami.fullpath}: No SAMI found for extraction"
+  fmtInfoYesExtract = "{sami.fullpath}: SAMI extracted"
+  fmtInfoNoPrimary  = "{sami.fullpath}: couldn't find a primary SAMI insertion"
+  comfyItemSep      = ", "
+  jsonArrFmt        = "[ $# ]"
+
+
 proc doExtraction*(): Option[string] =
   # This function will extract SAMIs, leaving them in SAMI objects
   # inside the codecs.  it does NOT do any output, but it does build a
@@ -52,7 +66,7 @@ proc doExtraction*(): Option[string] =
             keyJson = strValToJson(key)
             valJson = embstore.foundToJson()
 
-          embededJson = embededJson & kvPairJFmt.fmt()
+          embededJson = fmt"{embededJson}{comma}{keyJson} : {valJson}"
           comma = comfyItemSep
 
         embededJson = jsonArrFmt % [embededJson]
