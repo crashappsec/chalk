@@ -227,6 +227,20 @@ key INJECTOR_ID {
     output_order: 24
 }
 
+key INJECTOR_VERSION {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    system: true
+}
+
+key INJECTOR_PLATFORM {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    system: true
+}
+
 key X_SAMI_CONFIG {
     system: true
     type: "string"
@@ -309,7 +323,8 @@ plugin sbomCallback {
 # to 32-bit maxint (though should consider using the whole 64-bits).
 
 plugin system {
-    keys: ["TIMESTAMP", "SAMI_ID", "OLD_SAMI", "X_SAMI_CONFIG", "INJECTOR_ID"]
+    keys: ["TIMESTAMP", "SAMI_ID", "OLD_SAMI", "X_SAMI_CONFIG",
+           "INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM"]
     priority: 2147483647
 }
 
@@ -364,6 +379,7 @@ sink custom {
   uses_filename: true
   uses_uri: true
   uses_region: true
+  uses_cacheid: true
   uses_aux: true
   docstring: "Implement a custom sink via a con4m callback"
 }
@@ -379,25 +395,5 @@ sink custom {
 # stream logs {
 #   filters: [ "defaultLogs" ]
 # }
-
-outhook defaultOut {
-  sink: "stderr"
-  filters: [ "addTopic" ]
-}
-
-outhook defaultDryRun {
-  sink: "stderr"
-}
-
-outhook defaultDebug {
-  sink: "stderr"
-}
-
-# Valid topics right now are:
-# "logs", "extract", "inject", "nesting", "delete", 
-# "confload", "confdump", "debug"
-#
-# This is done for us by nimutils:
-# subscribe("logs", "defaultLogs")
 
 """

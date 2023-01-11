@@ -4,6 +4,7 @@ import nimutils, config, plugins, io/tojson
 const
   # This is the logging template for JSON output.
   logTemplate       = """{ 
+  "ARTIFACT_PATH: $#,
   "SAMI" : $#,
   "EMBEDDED_SAMIS" : $#
 }"""
@@ -73,8 +74,9 @@ proc doExtraction*(): Option[string] =
 
         numExtractions += 1
 
-        let absPath = absolutePath(sami.fullpath)
-        samisToRet.add(logTemplate % [primaryJson, embededJson])
+        let absPath = resolvePath(sami.fullpath)
+        samisToRet.add(logTemplate %
+                 [absPath, primaryJson, embededJson])
   except:
     # TODO: do better here.
     echo getCurrentException().getStackTrace()

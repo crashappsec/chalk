@@ -1,5 +1,3 @@
-# Package
-
 version       = "0.2.0"
 author        = "John Viega"
 description   = "Reference implementation of the SAMI spec for inserting metadata into software artifacts"
@@ -10,8 +8,8 @@ bin           = @["sami"]
 # Dependencies
 
 requires "nim >= 1.6.8"
-requires "https://github.com/crashappsec/con4m == 0.4.4"
-requires "https://github.com/crashappsec/nimutils == 0.1.3"
+requires "https://github.com/crashappsec/con4m == 0.4.5"
+requires "https://github.com/crashappsec/nimutils == 0.1.4"
 requires "argparse == 3.0.0"
 requires "nimsha2 == 0.1.1"
 requires "glob == 0.11.2"

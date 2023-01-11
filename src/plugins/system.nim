@@ -40,9 +40,11 @@ method getArtifactInfo*(self: SystemPlugin,
 
   result = newTable[string, Box]()
 
-  result["SAMI_ID"] = pack(samiId)
-  result["TIMESTAMP"] = pack(cast[int](unixTimeInMs()))
-  result["_MAGIC.json"] = pack("dadfedabbadabbed")
+  result["SAMI_ID"]           = pack(samiId)
+  result["TIMESTAMP"]         = pack(cast[int](unixTimeInMs()))
+  result["_MAGIC.json"]       = pack("dadfedabbadabbed")
+  result["INJECTOR_VERSION"]  = pack(getSamiExeVersion())
+  result["INJECTOR_PLATFORM"] = pack(getSamiPlatform())
 
   let selfIdOpt = getSelfId()
 

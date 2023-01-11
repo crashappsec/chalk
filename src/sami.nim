@@ -62,16 +62,14 @@ proc runCmdDump(arglist: seq[string]) {.noreturn, inline.} =
 proc runCmdLoad() {.noreturn, inline.} =
   # The fact that we're injecting into ourself will be special-cased
   # in the injection workflow.
-  let
-    selfSami = getSelfExtraction()
-    args = getArtifactSearchPath()
+  let selfSami = getSelfExtraction()
     
   quitIfCantChangeEmbeddedConfig(selfSami)
-  if len(args) != 1:
+  if len(getArgs()) != 1:
     error("configLoad requires either a file name or 'default'")
     quit()
 
-  setupSelfInjection(args[0])
+  setupSelfInjection(getArgs()[0])
   loadCommandPlugins()
   doInjection()
   quit()
@@ -80,7 +78,6 @@ proc runCmdDel() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
   doDelete() # delete.nim
   quit()
-
 
 const
   fColorShort         = "-a"
@@ -237,6 +234,8 @@ template injectCmd(cmd: string, primary: bool) =
           setRecursive(true)
         else:
           setRecursive(false)
+      setArgs(opts.files)
+      setCommandName("inject")
       setArtifactSearchPath(opts.files)
       runCmdInject()
 
@@ -259,6 +258,8 @@ template extractCmd(cmd: string, primary: bool) =
           setRecursive(true)
         else:
           setRecursive(false)
+      setCommandName("extract")
+      setArgs(opts.files)      
       setArtifactSearchPath(opts.files)
       runCmdExtract()
 
@@ -266,36 +267,56 @@ template defaultsCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showDefHelp)
+    arg("args", nargs = -1, help = dumpFileHelp)            
     run:
+      setCommandName("defaults")
+      setArgs(opts.args)      
       runCmdDefaults()
 
 template dumpCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showDumpHelp)
-    arg("files", nargs = -1, help = dumpFileHelp)      
+    arg("args", nargs = -1, help = dumpFileHelp)      
     run:
-      setArtifactSearchPath(opts.files)
-      runCmdDump(opts.files)
+      setCommandName("dump")
+      setArgs(opts.args)
+      runCmdDump(opts.args)
 
 template loadCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showLoadHelp)
-    arg("files", nargs = -1, help = loadFileHelp)      
+    arg("args", nargs = -1, help = loadFileHelp)      
     run:
-      setArtifactSearchPath(opts.files)
+      setCommandName("load")
+      setArgs(opts.args)
       runCmdLoad()
 
 template delCmd(cmd: string, primary: bool) =
   command(cmd):
     if primary:
       help(showDelHelp)
-    arg("files", nargs = -1, help = delFilesHelp)
+    arg("args", nargs = -1, help = delFilesHelp)
     run:
-      setArtifactSearchPath(opts.files)
+      setCommandName("del")
+      setArgs(opts.args)      
+      setArtifactSearchPath(opts.args)
       runCmdDel()
 
+template versionCmd(cmd: string, primary: bool) =
+  command(cmd):
+    if primary:
+      help(showDefHelp)
+    run:
+      setCommandName("version")
+      loadUserConfigFile(getSelfExtraction())
+      publish("version", ansi("invert", "bold").get() & "Sami version:" &
+              ansi("reset").get() & " " & getSamiExeVersion() & "\n" &
+              ansi("invert", "bold").get() & "Built for:   " &
+              ansi("reset").get() & " " & getSamiPlatform() & "\n")
+      quit()
+      
 when isMainModule:
   var cmdLine = newParser:
     help(generalHelp)
@@ -382,6 +403,11 @@ when isMainModule:
 
     delCmd("delete", true)
     delCmd("del", false)
+
+    versionCmd("version", true)
+    versionCmd("ver", false)
+    versionCmd("v", false)
+    
 
   try:
     cmdLine.run()
