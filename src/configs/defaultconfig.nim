@@ -25,8 +25,10 @@ key INSERTION_HOSTINFO {
 }
 
 
-cmd := argv0()
+cmd  := argv0()
+args := argv()
 
+log("trace", "running command: " + cmd)
 if cmd == "extract" or cmd == "inject" or cmd == "del" {
   sinkConfig("defaultOut", "stderr", {}, ["addTopic"])
 
@@ -45,7 +47,6 @@ if cmd == "extract" or cmd == "inject" or cmd == "del" {
   subscribe("extract",  "defaultOut") # Writes SAMIs extracted w/ 'extract' cmd
   subscribe("nesting",  "defaultOut") # Writes extracted samis when injecting
   subscribe("inject",   "defaultOut") # Writes full SAMIs (no ptrs) being injected
-  }
 }
 
 if cmd == "defaults" or cmd == "load" {
@@ -54,7 +55,7 @@ if cmd == "defaults" or cmd == "load" {
 }
 
 if cmd == "dump" {
-  if len(args) {
+  if len(args) > 0 {
     sinkConfig("dumpOut", "local_file", {"filename" : args[0]}, [])
   }
   else {

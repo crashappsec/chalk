@@ -235,7 +235,8 @@ template injectCmd(cmd: string, primary: bool) =
           setRecursive(true)
         else:
           setRecursive(false)
-      setArgs(opts.files)      
+      setArgs(opts.files)
+      setCommandName("inject")
       setArtifactSearchPath(opts.files)
       runCmdInject()
 
@@ -258,6 +259,7 @@ template extractCmd(cmd: string, primary: bool) =
           setRecursive(true)
         else:
           setRecursive(false)
+      setCommandName("extract")
       setArgs(opts.files)      
       setArtifactSearchPath(opts.files)
       runCmdExtract()
@@ -268,6 +270,7 @@ template defaultsCmd(cmd: string, primary: bool) =
       help(showDefHelp)
     arg("args", nargs = -1, help = dumpFileHelp)            
     run:
+      setCommandName("defaults")
       setArgs(opts.args)      
       runCmdDefaults()
 
@@ -277,6 +280,7 @@ template dumpCmd(cmd: string, primary: bool) =
       help(showDumpHelp)
     arg("args", nargs = -1, help = dumpFileHelp)      
     run:
+      setCommandName("dump")
       setArgs(opts.args)
       runCmdDump(opts.args)
 
@@ -286,6 +290,7 @@ template loadCmd(cmd: string, primary: bool) =
       help(showLoadHelp)
     arg("args", nargs = -1, help = loadFileHelp)      
     run:
+      setCommandName("load")
       setArgs(opts.args)
       runCmdLoad()
 
@@ -295,6 +300,7 @@ template delCmd(cmd: string, primary: bool) =
       help(showDelHelp)
     arg("args", nargs = -1, help = delFilesHelp)
     run:
+      setCommandName("del")
       setArgs(opts.args)      
       setArtifactSearchPath(opts.args)
       runCmdDel()

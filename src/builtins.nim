@@ -54,7 +54,7 @@ const
                        "addTopic"   : MsgFilter(addTopic)
                      }.toTable()
 
-var availableHooks = initTable[string, Option[SinkConfig]]()
+var availableHooks = { "debugHook" : defaultDebugHook }.toTable()
   
 
 proc getFilterByName*(name: string): Option[MsgFilter] =
@@ -64,7 +64,7 @@ proc getFilterByName*(name: string): Option[MsgFilter] =
   
 proc getHookByName*(name: string): Option[SinkConfig] =
   if name in availableHooks:
-    return availableHooks[name]
+    return some(availableHooks[name])
     
   return none(SinkConfig)
 
@@ -85,7 +85,6 @@ var commandName: string
 
 proc setCommandName*(str: string) =
   commandName = str
-  
   
 proc getArgv(args:    seq[Box],
              unused1: Con4mScope,
@@ -176,14 +175,12 @@ proc sinkConfig(args:    seq[Box],
       filters    = unpack[seq[string]](args[3])
       cfgopt     = getSinkConfig(sinkNAME)
 
-    
     if cfgOpt.isNone():
       warn(fmt"When running sinkConfig for config named '{sinkconf}': " &
                "no such sink named '{sinkname}'")
       return
 
-    let
-      sinkConfData = cfgopt.get()
+    let sinkConfData = cfgopt.get()
 
     # Need to call info config.nim for now because we don't have perms
     # to check the fields and have not set up accessors.
@@ -220,8 +217,13 @@ proc sinkConfig(args:    seq[Box],
       warn(fmt"Sink {sinkname} is configured, and the config file specs it, " &
            "but there is no implementation for that sink.")
       return
-      
-    availableHooks[sinkname] = configSink(theSinkOpt.get(), some(sinkopts), filterObjs)
+
+    let `cfg?` = configSink(theSinkOpt.get(), some(sinkopts), filterObjs)
+
+    if `cfg?`.isSome():
+      availableHooks[sinkconf] = `cfg?`.get()
+    else:
+      warn(fmt"Output sink configuration '{sinkconf}' failed to load.")
 
 
 proc loadAdditionalBuiltins*() =
@@ -237,4 +239,4 @@ proc loadAdditionalBuiltins*() =
                  "f(string, string, {string: string}, [string])")
 
 when not defined(release):
-    discard subscribe("debug", getHookByName("defaultDebug").get())
+    discard subscribe("debug", defaultDebugHook)
