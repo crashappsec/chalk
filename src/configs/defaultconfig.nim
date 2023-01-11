@@ -44,27 +44,32 @@ if cmd == "extract" or cmd == "inject" or cmd == "del" {
     }
   }
 
-  subscribe("extract",  "defaultOut") # Writes SAMIs extracted w/ 'extract' cmd
-  subscribe("nesting",  "defaultOut") # Writes extracted samis when injecting
-  subscribe("inject",   "defaultOut") # Writes full SAMIs (no ptrs) being injected
+  subscribe("extract", "defaultOut") # Writes SAMIs extracted w/ 'extract' cmd
+  subscribe("nesting", "defaultOut") # Writes extracted samis when injecting
+  subscribe("inject",  "defaultOut") # Writes full SAMIs (no ptrs) being injected
 }
-
-if cmd == "defaults" or cmd == "load" {
-  sinkConfig("redirectableOut", "stdout", {}, [])
-  subscribe("defaults", "redirectableOut")
-}
-
-if cmd == "dump" {
+elif cmd == "dump" {
   if len(args) > 0 {
-    sinkConfig("dumpOut", "local_file", {"filename" : args[0]}, [])
+    sinkConfig("dumpOut", "file", {"filename" : args[0]}, ["color"])
   }
   else {
-    sinkConfig("dumpOut", "stdout", {}, [])
+    sinkConfig("dumpOut", "stdout", {}, ["color"])
   }
 
   subscribe("confdump", "dumpOut")
 }
-
+else {
+  # These all use the same sink config.
+  sinkConfig("redirectableOut", "stdout", {}, ["color"])
+  if cmd == "defaults" {
+    subscribe("defaults", "redirectableOut")
+  }
+  elif cmd == "load" {
+    subscribe("confload", "redirectableOut")
+  } else {
+    subscribe("version",  "redirectableOut")
+  }
+}
 
 
 """

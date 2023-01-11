@@ -1,6 +1,9 @@
-## This is where we keep builtin functions specific to SAMI, that do
-## not belong in con4m.
-import tables, options, uri, strformat, nimutils, nimutils/logging
+## This is where we keep our customizations of platform stuff that is
+## specific to SAMI, including output setup and builtin con4m calls.
+## That is, the output code and con4m calls here do not belong in
+## con4m etc.
+
+import tables, options, uri, strformat, nimutils, nimutils/logging, streams
 import con4m, con4m/[builtins, st, eval], config
 
 # This "builtin" call for con4m doesn't need to be available until
@@ -19,10 +22,22 @@ discard registerTopic("dry-run")
 discard registerTopic("delete")
 discard registerTopic("confload")
 discard registerTopic("confdump")
+discard registerTopic("version")
 
 const customSinkType = "f(string, {string : string}) -> bool"
 
 let ctxSamiConf = getConfigState()
+
+proc modedFileSinkOut*(msg: string, cfg: SinkConfig, t: StringTable): bool =
+  try:
+    var stream = cast[FileStream](cfg.private)
+    stream.write(msg)
+    info("Wrote to file: " & cfg.config["filename"])
+    return true
+  except:
+    return false
+
+allSinks["file"].outputFunction = OutputCallback(modedFileSinkOut)
 
 proc customOut(msg: string, record: SinkConfig, xtra: StringTable): bool =
   var
@@ -48,10 +63,12 @@ registerSink("custom", SinkRecord(outputFunction: customOut, keys: customKeys))
 ctxSamiConf.newCallback("outhook", customSinkType)
 
 const
-  availableFilters = { "logLevel"   : MsgFilter(logLevelFilter),
-                       "logPrefix"  : MsgFilter(logPrefixFilter),
-                       "prettyJson" : MsgFilter(prettyJson),
-                       "addTopic"   : MsgFilter(addTopic)
+  availableFilters = { "logLevel"    : MsgFilter(logLevelFilter),
+                       "logPrefix"   : MsgFilter(logPrefixFilter),
+                       "prettyJson"  : MsgFilter(prettyJson),
+                       "addTopic"    : MsgFilter(addTopic),
+                       "color"       : MsgFilter(colorFilter),
+                       "colorstrip"  : MsgFilter(stripColors)
                      }.toTable()
 
 var availableHooks = { "debugHook" : defaultDebugHook }.toTable()
@@ -90,7 +107,7 @@ proc getArgv(args:    seq[Box],
              unused1: Con4mScope,
              unused2: VarStack,
              unused3: Con4mScope): Option[Box] =
-  return some(pack(args))
+  return some(pack(getArgs()))
 
 proc getCommandName(args:    seq[Box],
                     unused1: Con4mScope,
@@ -177,7 +194,7 @@ proc sinkConfig(args:    seq[Box],
 
     if cfgOpt.isNone():
       warn(fmt"When running sinkConfig for config named '{sinkconf}': " &
-               "no such sink named '{sinkname}'")
+           fmt"no such sink named '{sinkname}'")
       return
 
     let sinkConfData = cfgopt.get()
@@ -225,10 +242,36 @@ proc sinkConfig(args:    seq[Box],
     else:
       warn(fmt"Output sink configuration '{sinkconf}' failed to load.")
 
+proc getOsName(args:    seq[Box],
+               globals: Con4mScope,
+               unused1: VarStack,
+               unused2: Con4mScope): Option[Box] =
+    const retval = getBinaryOS()
+      
+    return some(pack(retval))
 
+proc getArch(args:    seq[Box],
+             globals: Con4mScope,
+             unused1: VarStack,
+             unused2: Con4mScope): Option[Box] =
+    const retval = getBinaryArch()
+      
+    return some(pack(retval))
+
+proc getExeVersion(args:    seq[Box],
+                   globals: Con4mScope,
+                   unused1: VarStack,
+                   unused2: Con4mScope): Option[Box] =
+    const retval = getSamiExeVersion()
+      
+    return some(pack(retval))
+    
 proc loadAdditionalBuiltins*() =
   let ctx = getConfigState()
-    
+
+  ctx.newBuiltin("osname",      getOsName,        "f() -> string")
+  ctx.newBuiltin("arch",        getArch,          "f() -> string")
+  ctx.newBuiltin("version",     getExeVersion,    "f() -> string")
   ctx.newBuiltIn("injecting",   getInjecting,     "f() -> bool")
   ctx.newBuiltIn("subscribe",   topicSubscribe,   "f(string, string)->bool")
   ctx.newBuiltIn("unsubscribe", topicUnSubscribe, "f(string, string)->bool")

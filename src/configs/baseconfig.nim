@@ -227,6 +227,20 @@ key INJECTOR_ID {
     output_order: 24
 }
 
+key INJECTOR_VERSION {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    system: true
+}
+
+key INJECTOR_PLATFORM {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    system: true
+}
+
 key X_SAMI_CONFIG {
     system: true
     type: "string"
@@ -309,7 +323,8 @@ plugin sbomCallback {
 # to 32-bit maxint (though should consider using the whole 64-bits).
 
 plugin system {
-    keys: ["TIMESTAMP", "SAMI_ID", "OLD_SAMI", "X_SAMI_CONFIG", "INJECTOR_ID"]
+    keys: ["TIMESTAMP", "SAMI_ID", "OLD_SAMI", "X_SAMI_CONFIG",
+           "INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM"]
     priority: 2147483647
 }
 

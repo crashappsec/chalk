@@ -79,7 +79,6 @@ proc runCmdDel() {.noreturn, inline.} =
   doDelete() # delete.nim
   quit()
 
-
 const
   fColorShort         = "-a"
   fColorLong          = "--color"
@@ -305,6 +304,19 @@ template delCmd(cmd: string, primary: bool) =
       setArtifactSearchPath(opts.args)
       runCmdDel()
 
+template versionCmd(cmd: string, primary: bool) =
+  command(cmd):
+    if primary:
+      help(showDefHelp)
+    run:
+      setCommandName("version")
+      loadUserConfigFile(getSelfExtraction())
+      publish("version", ansi("invert", "bold").get() & "Sami version:" &
+              ansi("reset").get() & " " & getSamiExeVersion() & "\n" &
+              ansi("invert", "bold").get() & "Built for:   " &
+              ansi("reset").get() & " " & getSamiPlatform() & "\n")
+      quit()
+      
 when isMainModule:
   var cmdLine = newParser:
     help(generalHelp)
@@ -391,6 +403,11 @@ when isMainModule:
 
     delCmd("delete", true)
     delCmd("del", false)
+
+    versionCmd("version", true)
+    versionCmd("ver", false)
+    versionCmd("v", false)
+    
 
   try:
     cmdLine.run()

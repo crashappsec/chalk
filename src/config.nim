@@ -3,6 +3,21 @@ import con4m, con4m/[st, eval, dollars], nimutils, nimutils/logging
 import macros except error
 export logging
 
+const versionStr  = staticexec("cat ../sami.nimble | grep ^version")
+const archStr     = staticexec("uname -m")
+const osStr       = staticexec("uname -o")
+
+macro declareSamiExeVersion(): untyped =
+  return parseStmt("const " & versionStr)
+
+proc getSamiExeVersion*(): string =
+  declareSamiExeVersion()
+  return version
+
+proc getBinaryOS*():     string = osStr
+proc getBinaryArch*():   string = archStr
+proc getSamiPlatform*(): string = osStr & " " & archStr
+
 include configs/baseconfig    # Gives us the variable baseConfig
 include configs/defaultconfig # Gives us defaultConfig
 include configs/con4mconfig   # gives us the variable samiConfig, which is
