@@ -12,9 +12,9 @@
 ##
 ## Nothing should really be in here that doesn't need to be here-- add
 ## it to defaultconfig.nim, which users can change.
-## 
-## Note, if you end up w/ syntax errors in this file, when you run sami 
-## and get an error, the line number will be relative to the first line 
+##
+## Note, if you end up w/ syntax errors in this file, when you run sami
+## and get an error, the line number will be relative to the first line
 ## after the """ below, so add 20 to get the line # in this file.
 
 const baseConfig* = """
@@ -96,7 +96,7 @@ key ARTIFACT_PATH {
     codec: true
     output_order: 6
     standard: true
-    docstring: "Path of artifact on host where injection occured" 
+    docstring: "Path of artifact on host where injection occured"
 }
 
 key INSERTION_HOSTINFO {
@@ -139,14 +139,6 @@ key IAM_UID {
     output_order: 12
     standard: true
     docstring: "Possibly removing..."
-}
-
-key BUILD_URI {
-    type: "string"
-    since: "0.1.0"
-    output_order: 13
-    standard: true
-    docstring: "URI for the repository used for build"
 }
 
 key STORE_URI {
@@ -192,14 +184,6 @@ key COMMIT_ID {
     docstring: "The commit hash or id for the repository the artifact was built from"
 }
 
-key JOB_ID {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-    output_order: 21
-    docstring: "The job information from the CI/CD job"
-}
-
 key CODE_OWNERS {
     type: "string"
     since: "0.1.0"
@@ -230,6 +214,46 @@ key INJECTOR_PLATFORM {
     standard: true
     system: true
     docstring: "OS / system info at time of insertion"
+}
+
+key BUILD_ID {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 50
+    docstring: "The ID of the CI/CD job"
+}
+
+key BUILD_URI {
+    type: "string"
+    since: "0.1.0"
+    output_order: 51
+    standard: true
+    docstring: "URI to the CI/CD job"
+}
+
+key BUILD_API_URI {
+    type: "string"
+    since: "0.1.0"
+    output_order: 52
+    standard: true
+    docstring: "URI to the CI/CD api if more information needs to be queried"
+}
+
+key BUILD_TRIGGER {
+    type: "string"
+    since: "0.1.0"
+    output_order: 53
+    standard: true
+    docstring: "What event triggered CI/CD job"
+}
+
+key BUILD_CONTACT {
+    type: "[string]"
+    since: "0.1.0"
+    output_order: 54
+    standard: true
+    docstring: "List of contacts which triggered CI/CD job"
 }
 
 key X_SAMI_CONFIG {
@@ -296,6 +320,11 @@ plugin "vctl-git" {
     keys: ["COMMIT_ID", "BRANCH", "ORIGIN_URI"]
 }
 
+plugin "github-ci" {
+    keys: ["BUILD_ID", "BUILD_URI", "BUILD_API_URI", "BUILD_TRIGGER",
+           "BUILD_CONTACT"]
+}
+
 plugin authors {
     keys: ["CODE_OWNERS"]
 }
@@ -345,7 +374,7 @@ sink stderr {
 }
 
 sink file {
-  needs_filename: true 
+  needs_filename: true
   docstring:      "A sink that writes a local file"
 }
 
@@ -378,8 +407,8 @@ sink custom {
 # This is actually installed by default by nimutils. You can't
 # actually redefine it, but you can unsubscribe() it, and add
 # a replacement instead via subscribe()
-# 
-# 
+#
+#
 #
 # # If a stacked config redefines stream.logs.hooks, then it will
 # # wipe out the default installed hook above.
