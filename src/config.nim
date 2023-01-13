@@ -18,13 +18,13 @@ proc getBinaryOS*():     string = osStr
 proc getBinaryArch*():   string = archStr
 proc getSamiPlatform*(): string = osStr & " " & archStr
 
-include configs/baseconfig    # Gives us the variable baseConfig
-include configs/defaultconfig # Gives us defaultConfig
+const baseConfig*    = staticRead("configs/baseconfig.c4m")
+const defaultConfig* = staticRead("configs/defaultconfig.c4m")
+
 include configs/con4mconfig   # gives us the variable samiConfig, which is
                               # a con4m configuration object.
                               # this needs to happen before we include types.
 include types
-
 
 const
   # Some string constants used in multiple places.                       
@@ -34,6 +34,14 @@ const
   tmpFileSuffix* = "-extract.json"  
 
 
+var commandName: string
+
+proc setCommandName*(str: string) =
+  commandName = str
+
+proc getCommandName*(): string =
+  return commandName
+  
 template hookCheck(fieldname: untyped) =
   let s = astToStr(fieldName)
   
@@ -95,6 +103,9 @@ proc getConfigFileName*(): string =
 proc setConfigFileName*(val: string) =
   discard ctxSamiConf.setOverride("config_filename", pack(val))
   samiConfig.configFileName = val
+
+proc getPublishUnmarked*(): bool =
+  return samiConfig.publishUnmarked
 
 proc getDefaultCommand*(): Option[string] =
   return samiConfig.defaultCommand
@@ -378,14 +389,11 @@ proc doAdditionalValidation*() =
   lockBuiltinKeys()
   
 
-proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict],
-                         dieIfInvalid = true): bool =
+proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict]): bool =
   var
-    confString: string
-    validEmbedded: bool
+    confString:     string
 
   if selfSamiOpt.isNone():
-    validEmbedded = false
     confString = defaultConfig
   else:
     let selfSami = selfSamiOpt.get()
@@ -396,35 +404,30 @@ proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict],
     if not selfSami.contains("X_SAMI_CONFIG"):
       trace("Embedded self-SAMI does not contain a configuration.")
       confString = defaultConfig
-      validEmbedded = false
     else:
       confString = unpack[string](selfSami["X_SAMI_CONFIG"])
-      validEmbedded = true
 
   let
     confStream = newStringStream(confString)
     res = ctxSamiConf.stackConfig(confStream, "<embedded>")
 
   if res.isNone():
-    if dieIfInvalid:
-      error("Embeeded configuration is invalid. Use 'setconf' command to fix")
+    if getCommandName() == "setconf":
+      return true
     else:
-      validEmbedded = false
-  else:
-    validEmbedded = true
-
-  if not validEmbedded: return false
+      error("Embedded configuration is invalid. Use 'setconf' command to fix")
+      return false
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
   trace("Loaded embedded configuration file")
   return true
 
-proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
+proc loadUserConfigFile*(selfSami: Option[SamiDict]): bool =
   discard loadEmbeddedConfig(selfSami)
 
   if not getAllowExternalConfig():
-    return
+    return true
     
   var
     path = getConfigPath()
@@ -449,7 +452,7 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
           for err in ctxSamiConf.errors:
             error(err)
 
-        quit()
+        return false
       else:
         loaded = true
       
@@ -466,13 +469,8 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]) =
   else:
     trace("Running without a config file.")
     
-## Code to set us up for self-injection.
-proc quitIfCantChangeEmbeddedConfig*(selfSami: Option[SamiDict]) =
-  discard loadEmbeddedConfig(selfSami, dieIfInvalid = false)
-  if not getCanLoad():
-    error("Loading a new embedded config is diabled.")
-    quit()
-
+  return true
+    
 var selfInjection = false
 
 proc getSelfInjecting*(): bool =

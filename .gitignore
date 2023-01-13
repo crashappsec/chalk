@@ -2,3 +2,7 @@
 sami
 # universal tags
 tags
+.DS_Store
+.vscode
+sami.conf
+sami.dSYM

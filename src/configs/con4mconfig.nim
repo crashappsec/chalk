@@ -37,6 +37,12 @@ var samiConfig = con4m(Sami, baseconfig):
        bool,
        defaultVal = false,
        doc = "When true, publishes config used to the 'defaults' topic")
+  attr(publish_unmarked,
+       bool,
+       defaultVal = true,
+       doc = "When publishing extractions, whether to also provide the " &
+             "list of artifacts scanned where SAMIs were not found, but " &
+             "would have been extracted, had they been there.")
   
   section(key, allowedSubSections = @["*", "*.json", "*.binary"]):
     attr(required,

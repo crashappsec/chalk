@@ -1,4 +1,4 @@
-import tables, strformat, strutils, os, options, nativesockets
+import tables, strformat, strutils, os, options, nativesockets, json
 import nimutils, config, plugins, io/tojson
 
 const
@@ -30,10 +30,11 @@ proc doExtraction*(): Option[string] =
   var
     exclusions: seq[string] = if getSelfInjecting(): @[]
                               else: @[resolvePath(getAppFileName())]
-    codecInfo: seq[Codec]
-    numExtractions = 0
+    codecInfo:  seq[Codec]
     samisToRet: seq[string] = @[]
+    unmarked:   seq[string] # Unmarked artifacts.
 
+    numExtractions = 0
   var artifactPath = getArtifactSearchPath()
 
   for (_, name, plugin) in getCodecsByPriority():
@@ -51,6 +52,8 @@ proc doExtraction*(): Option[string] =
 
         if sami.samiIsEmpty():
           info(fmtInfoNoExtract.fmt())
+          unmarked.add(sami.fullpath)
+          
           continue
         if sami.samiHasExisting():
           let
@@ -84,7 +87,16 @@ proc doExtraction*(): Option[string] =
   finally:
     if numExtractions == 0:
       return none(string)
-    result = some("[" & samisToRet.join(", ") & "]")
+    var toOut = "{ "
+    toOut &= "\"extractions\" : [ " & samisToRet.join(", ") & " ] "
+    
+    if getPublishUnmarked():
+      toOut &= ", \"unmarked\" : " & $( %* unmarked)
+
+    toOut &= "}"
+
+    result = some(toOut)
+    
     info(fmt"Completed {numExtractions} extractions.")
 
 var selfSamiObj: Option[SamiObj] = none(SamiObj)

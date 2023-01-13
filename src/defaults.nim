@@ -1,7 +1,7 @@
 import tables, options, strutils, strformat, unicode
 import nimutils, config, builtins
 
-proc formatTitle(text: string): string {.inline.} =
+proc formatTitle*(text: string): string {.inline.} =
   let
     titleCode = toAnsiCode(@[acFont4, acBGreen])
     endCode   = toAnsiCode(@[acReset])
@@ -9,12 +9,16 @@ proc formatTitle(text: string): string {.inline.} =
   return titleCode & text & endCode & "\n"
 
 const
-    hdrFmt      = @[acFont2, acBCyan]
-    evenFmt     = @[acFont0, acBGCyan, acBBlack]
-    oddFmt      = @[acFont0, acBGWhite, acBBlack]
+    hdrFmt*     = @[acFont2, acBCyan]
+    evenFmt*    = @[acFont0, acBGCyan, acBBlack]
+    oddFmt*     = @[acFont0, acBGWhite, acBBlack]
 
-proc samiTableFormatter*(numColumns: int): TextTable =
+proc samiTableFormatter*(numColumns:  int,
+                         rows:        seq[seq[string]]      = @[],
+                         headerAlign: Option[AlignmentType] = some(AlignCenter),
+                         wrapStyle =  WrapBlock): TextTable =
   return newTextTable(numColumns      = numColumns,
+                      fillWidth       = true,
                       colHeaderSep    = some(Rune('|')),
                       colSep          = some(Rune('|')),
                       rowHeaderSep    = some(Rune('-')),
@@ -26,9 +30,10 @@ proc samiTableFormatter*(numColumns: int): TextTable =
                       addRightBorder  = true,
                       addTopBorder    = true,
                       addBottomBorder = true,
-                      headerRowAlign  = some(AlignCenter),
-                      wrapByDefault   = true,
-                      maxCellBytes    = 200)
+                      headerRowAlign  = headerAlign,
+                      wrapStyle       = wrapStyle,
+                      maxCellBytes    = 0,
+                      rows            = rows)
 
 proc showGeneralOptions*(): int {.discardable.} =
   # Returns the width of the table.
@@ -161,7 +166,7 @@ proc showKeyConfigs*(): int {.discardable.} =
 
       ot.addRow(@[key, enabled, default, inRef, desc])
   
-  let tableout = ot.render()
+  let tableout = ot.render(-4)
   publish("defaults", formatTitle("SAMI Key Configuration:") & tableout)
 
   return tableout.find("\n")
@@ -179,11 +184,13 @@ proc showDisclaimer*(w: int) =
                       "the 'defaults' command always publishes, though."
   publish("defaults", "\n" & indentWrap(disclaimer, w - 1) & "\n")
   
-proc showConfig*(viaCmd: bool) =
+proc showConfig*() =
+  let isDefaultsCmd = getCommandName() == "defaults"
   
-  showGeneralOptions()
-  showSinkConfigs()
-  let w = showKeyConfigs()
-  if viaCmd:
-    showDisclaimer(w)
+  if getPublishDefaults() or isDefaultsCmd:
+    showGeneralOptions()
+    showSinkConfigs()
+    let w = showKeyConfigs()
+    if isDefaultsCmd:
+      showDisclaimer(w)
       

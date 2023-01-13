@@ -1,0 +1,6 @@
+%{H Usage: {appName} delete [COMMAND_OPTION]... [search path] }%
+Deletes metadata from all artifacts specified in the search path.
+
+Without configuration overrides, deleted objects will be 'published' to the 'extract' topic before deletion. 
+
+Note that there is currently no flag for specifying exceptions, so we recommend running this on specific artifacts.

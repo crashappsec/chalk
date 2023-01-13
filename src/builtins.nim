@@ -23,6 +23,7 @@ discard registerTopic("delete")
 discard registerTopic("confload")
 discard registerTopic("confdump")
 discard registerTopic("version")
+discard registerTopic("help")
 
 const customSinkType = "f(string, {string : string}) -> bool"
 
@@ -104,11 +105,6 @@ proc setArgs*(a: seq[string]) =
   args = a
 
 proc getArgs*(): seq[string] = args
-
-var commandName: string
-
-proc setCommandName*(str: string) =
-  commandName = str
   
 proc getArgv(args:    seq[Box],
              unused1: Con4mScope,
@@ -120,7 +116,7 @@ proc getCommandName(args:    seq[Box],
                     unused1: Con4mScope,
                     unused2: VarStack,
                     unused3: Con4mScope): Option[Box] =
-    return some(pack(commandName))
+    return some(pack(getCommandName()))
   
 proc topicSubscribe(args:    seq[Box],
                     unused1: Con4mScope,
