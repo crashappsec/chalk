@@ -63,7 +63,10 @@ proc paramFmt(t: StringTable): string =
   var parts: seq[string] = @[]
 
   for key, val in t:
-    parts.add(key & " : " & val)
+    if key == "secret":
+      parts.add(key & " : " & "(redacted)")
+    else:
+      parts.add(key & " : " & val)
 
   return parts.join(", ")
 
