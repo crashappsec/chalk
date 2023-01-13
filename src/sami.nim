@@ -334,10 +334,13 @@ template versionCmd(cmd: string, primary: bool) =
     run:
       setCommandName("version")
       loadUserConfigFile(getSelfExtraction())
-      publish("version", ansi("invert", "bold").get() & "Sami version:" &
-              ansi("reset").get() & " " & getSamiExeVersion() & "\n" &
-              ansi("invert", "bold").get() & "Built for:   " &
-              ansi("reset").get() & " " & getSamiPlatform() & "\n")
+      let
+        invertColor = toAnsiCode(@[acBold, acInvert])
+        resetColor  = toAnsiCode(@[acReset])
+      publish("version", invertColor & "Sami version:" &
+              resetColor & " " & getSamiExeVersion() & "\n" &
+              invertColor & "Built for:   " &
+              resetColor & " " & getSamiPlatform() & "\n")
       quit()
       
 when isMainModule:

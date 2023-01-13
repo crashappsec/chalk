@@ -30,12 +30,14 @@ args := argv()
 
 log("trace", "running command: " + cmd)
 
-sinkConfig("redirectableOut", "stdout", {}, ["color"])
+sinkConfig("redirectableOut", "stdout", {}, [])
 sinkConfig("defaultOut",      "stderr", {}, ["addTopic"])
 
 
 if cmd != "defaults" {
     subscribe("defaults", "defaultOut")
+} else {
+    subscribe("defaults", "redirectableOut")
 }
 
 if cmd == "extract" or cmd == "inject" or cmd == "del" {
@@ -58,7 +60,7 @@ if cmd == "extract" or cmd == "inject" or cmd == "del" {
 }
 elif cmd == "dump" {
   if len(args) > 0 {
-    sinkConfig("dumpOut", "file", {"filename" : args[0]}, ["color"])
+    sinkConfig("dumpOut", "file", {"filename" : args[0]}, [])
   }
   else {
     sinkConfig("dumpOut", "stdout", {}, ["color"])

@@ -67,8 +67,6 @@ const
                        "logPrefix"   : MsgFilter(logPrefixFilter),
                        "prettyJson"  : MsgFilter(prettyJson),
                        "addTopic"    : MsgFilter(addTopic),
-                       "color"       : MsgFilter(colorFilter),
-                       "colorstrip"  : MsgFilter(stripColors),
                        "wrap"        : MsgFilter(wrapToWidth)
                      }.toTable()
 

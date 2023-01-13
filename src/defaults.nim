@@ -2,9 +2,9 @@ import tables, options, strutils, strformat, unicode
 import nimutils, config, builtins
 
 proc formatTitle(text: string): string {.inline.} =
-  const
-    titleCode = ansi("font4", "GREEN").get()
-    endCode   = ansi("reset").get()
+  let
+    titleCode = toAnsiCode(@[acFont4, acBGreen])
+    endCode   = toAnsiCode(@[acReset])
 
   return titleCode & text & endCode & "\n"
 
