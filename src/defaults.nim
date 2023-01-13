@@ -161,10 +161,10 @@ proc showKeyConfigs*(): int {.discardable.} =
 
       ot.addRow(@[key, enabled, default, inRef, desc])
   
-    let tableout = ot.render()
-    publish("defaults", formatTitle("SAMI Key Configuration:") & tableout)
+  let tableout = ot.render()
+  publish("defaults", formatTitle("SAMI Key Configuration:") & tableout)
 
-    return tableout.find("\n")
+  return tableout.find("\n")
                
 proc showDisclaimer*(w: int) =
   var disclaimer = "Note that these values can change based on logic in " &
