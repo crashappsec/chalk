@@ -26,14 +26,26 @@ method getArtifactInfo*(self: GithubCI,
   if GITHUB_RUN_ID != "":
     result["BUILD_ID"] = pack(GITHUB_RUN_ID)
 
-  if GITHUB_SERVER_URL != "" and GITHUB_REPOSITORY != "" and GITHUB_RUN_ID != "":
-    result["BUILD_URI"] = pack(fmt"{GITHUB_SERVER_URL}/{GITHUB_REPOSITORY}/actions/runs/{GITHUB_RUN_ID}")
+  if (
+    GITHUB_SERVER_URL != "" and
+    GITHUB_REPOSITORY != "" and
+    GITHUB_RUN_ID != ""
+  ):
+    result["BUILD_URI"] = pack(
+      GITHUB_SERVER_URL &
+      GITHUB_REPOSITORY &
+      "/actions/runs/" &
+      GITHUB_RUN_ID
+    )
 
   if GITHUB_API_URL != "":
     result["BUILD_API_URI"] = pack(GITHUB_API_URL)
 
   # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
-  if GITHUB_EVENT_NAME != "" and GITHUB_REF_TYPE != "":
+  if (
+    GITHUB_EVENT_NAME != "" and
+    GITHUB_REF_TYPE != ""
+  ):
     if GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
       result["BUILD_TRIGGER"] = pack("tag")
     elif GITHUB_EVENT_NAME == "push":
