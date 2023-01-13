@@ -67,23 +67,30 @@ const
                        "logPrefix"   : MsgFilter(logPrefixFilter),
                        "prettyJson"  : MsgFilter(prettyJson),
                        "addTopic"    : MsgFilter(addTopic),
-                       "color"       : MsgFilter(colorFilter),
-                       "colorstrip"  : MsgFilter(stripColors)
+                       "wrap"        : MsgFilter(wrapToWidth)
                      }.toTable()
 
-var availableHooks = { "debugHook" : defaultDebugHook }.toTable()
+var availableHooks = { "debugHook" : defaultDebugHook,
+                       "logHook"   : defaultLogHook
+                     }.toTable()
   
-
 proc getFilterByName*(name: string): Option[MsgFilter] =
   if name in availableFilters:
     return some(availableFilters[name])
   return none(MsgFilter)
-  
+
+proc getFilterName*(filter: MsgFilter): Option[string] =
+  for name, f in availableFilters:
+    if f == filter: return some(name)
+    
 proc getHookByName*(name: string): Option[SinkConfig] =
   if name in availableHooks:
     return some(availableHooks[name])
     
   return none(SinkConfig)
+
+proc getSinkConfigs*(): Table[string, SinkConfig] =
+  return availableHooks
 
 proc getInjecting*(args: seq[Box],
                    unused1: Con4mScope,
