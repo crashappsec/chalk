@@ -29,8 +29,16 @@ cmd  := argv0()
 args := argv()
 
 log("trace", "running command: " + cmd)
+
+sinkConfig("redirectableOut", "stdout", {}, ["color"])
+sinkConfig("defaultOut",      "stderr", {}, ["addTopic"])
+
+
+if cmd != "defaults" {
+    subscribe("defaults", "defaultOut")
+}
+
 if cmd == "extract" or cmd == "inject" or cmd == "del" {
-  sinkConfig("defaultOut", "stderr", {}, ["addTopic"])
 
   if envExists("AWS_S3_BUCKET_URI") {
     if not envExists("AWS_ACCESS_ID") {
@@ -59,14 +67,9 @@ elif cmd == "dump" {
   subscribe("confdump", "dumpOut")
 }
 else {
-  # These all use the same sink config.
-  sinkConfig("redirectableOut", "stdout", {}, ["color"])
-  if cmd == "defaults" {
-    subscribe("defaults", "redirectableOut")
-  }
-  elif cmd == "load" {
+  if cmd == "load" {
     subscribe("confload", "redirectableOut")
-  } else {
+  } elif cmd == "version" {
     subscribe("version",  "redirectableOut")
   }
 }

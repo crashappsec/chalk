@@ -24,7 +24,6 @@ ascii_magic := "dadfedabbadabbed"
 
 key _MAGIC json {
     required: true
-    missing_action: "abort"
     system: true
     squash: true
     type: "string"
@@ -33,11 +32,11 @@ key _MAGIC json {
     since: "0.1.0"
     output_order: 0
     in_ref: true
+    docstring: "Used to identify the start of JSON encoded output only"
 }
 
 key SAMI_ID {
     required: true
-    missing_action: "error"
     system: true
     squash: false
     type: "integer"
@@ -45,11 +44,11 @@ key SAMI_ID {
     since: "0.1.0"
     output_order: 1
     in_ref: true
+    docstring: "Unique 64-bit value per insertion"
 }
 
 key SAMI_VERSION {
     required: true
-    missing_action: "error"
     system: true
     type: "string"
     value: sami_version
@@ -57,6 +56,7 @@ key SAMI_VERSION {
     since: "0.1.0"
     output_order: 2
     in_ref: true
+    docstring: "Spec version of inserted objects"
 }
 
 key SAMI_PTR {
@@ -66,25 +66,28 @@ key SAMI_PTR {
     since: "0.10"
     output_order: 3
     in_ref: true
+    docstring: "When enabled, injects minimal metadata; this field then gets a URL you supply to point to the rest of the data. Items marked as 'true' in the 'Ptr?' column are added in the PTR object"
 }
 
 key TIMESTAMP {
     required: true
-    missing_action: "error"
     system: true
     type: "integer"
     since: "0.1.0"
     output_order: 4
     standard: true
+    docstring: "Time of insertion"
 }
 
 key EARLIEST_VERSION {
     type: "string"
     since: "0.1.0"
     system: true
+    skip: true
     value: sami_version
     output_order: 5
     standard: true
+    docstring: "Reserved for future use"
 }
 
 key ARTIFACT_PATH {
@@ -93,6 +96,7 @@ key ARTIFACT_PATH {
     codec: true
     output_order: 6
     standard: true
+    docstring: "Path of artifact on host where injection occured" 
 }
 
 key INSERTION_HOSTINFO {
@@ -100,14 +104,15 @@ key INSERTION_HOSTINFO {
     since: "0.1.0"
     output_order: 7
     standard: true
+    docstring: "Host information at injection; by default, uname -a"
 }
 
 key ORIGIN_URI {
     type: "string"
-    missing_action: "warn"
     since: "0.1.0"
     output_order: 8
     standard: true
+    docstring: "URI of origin for repo from which artifact was built"
 }
 
 key ARTIFACT_VERSION {
@@ -115,13 +120,7 @@ key ARTIFACT_VERSION {
     since: "0.1.0"
     output_order: 9
     standard: true
-}
-
-key ARTIFACT_FILES {
-    type: "[string]"
-    since: "0.1.0"
-    output_order: 10
-    standard: true
+    docstring: "Reserved for future use"
 }
 
 key IAM_USERNAME {
@@ -130,6 +129,7 @@ key IAM_USERNAME {
     since: "0.1.0"
     output_order: 11
     standard: true
+    docstring: "Possibly removing..."
 }
 
 key IAM_UID {
@@ -138,6 +138,7 @@ key IAM_UID {
     since: "0.1.0"
     output_order: 12
     standard: true
+    docstring: "Possibly removing..."
 }
 
 key BUILD_URI {
@@ -145,6 +146,7 @@ key BUILD_URI {
     since: "0.1.0"
     output_order: 13
     standard: true
+    docstring: "URI for the repository used for build"
 }
 
 key STORE_URI {
@@ -152,6 +154,7 @@ key STORE_URI {
     since: "0.1.0"
     output_order: 14
     standard: true
+    docstring: "URI for the artifact storage location"
 }
 
 key BRANCH {
@@ -159,21 +162,7 @@ key BRANCH {
     since: "0.1.0"
     standard: true
     output_order: 15
-}
-
-key SRC_URI {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-    output_order: 16
-}
-
-key REPO_ORIGIN {
-    type: "string"
-    system: false
-    since: "0.1.0"
-    standard: true
-    output_order: 17
+    docstring: "Version control branch the artifact was built from"
 }
 
 key HASH {
@@ -182,6 +171,7 @@ key HASH {
     codec: true
     standard: true
     output_order: 18
+    docstring: "Hash file of artifact w/o SAMI in it, to ensure extracted SAMIs are intact"
 }
 
 key HASH_FILES {
@@ -190,6 +180,8 @@ key HASH_FILES {
     codec: true
     standard: true
     output_order: 19
+    docstring: "Files that constitute the artifact, and used in the hash, if not just the ARTIFACT_PATH"
+
 }
 
 key COMMIT_ID {
@@ -197,6 +189,7 @@ key COMMIT_ID {
     since: "0.1.0"
     standard: true
     output_order: 20
+    docstring: "The commit hash or id for the repository the artifact was built from"
 }
 
 key JOB_ID {
@@ -204,6 +197,7 @@ key JOB_ID {
     since: "0.1.0"
     standard: true
     output_order: 21
+    docstring: "The job information from the CI/CD job"
 }
 
 key CODE_OWNERS {
@@ -211,13 +205,7 @@ key CODE_OWNERS {
     since: "0.1.0"
     standard: true
     output_order: 22
-}
-
-key BUILD_OWNERS {
-    type: "string"
-    since: "0.1.0"
-    standard: true
-    output_order: 23
+    docstring: "Code owners associated with the artifact"
 }
 
 key INJECTOR_ID {
@@ -225,6 +213,7 @@ key INJECTOR_ID {
     since: "0.1.0"
     standard: true
     output_order: 24
+    docstring: "SAMI ID of the sami binary that inserted metadata"
 }
 
 key INJECTOR_VERSION {
@@ -232,6 +221,7 @@ key INJECTOR_VERSION {
     since: "0.1.0"
     standard: true
     system: true
+    docstring: "Version of the SAMI binary used for injection"
 }
 
 key INJECTOR_PLATFORM {
@@ -239,26 +229,24 @@ key INJECTOR_PLATFORM {
     since: "0.1.0"
     standard: true
     system: true
+    docstring: "OS / system info at time of insertion"
 }
 
 key X_SAMI_CONFIG {
     system: true
     type: "string"
     since: "0.1.0"
+    docstring: "Embedded configuration file"
 }
 
 key OLD_SAMI {
     type: "sami"
     since: "0.1.0"
+    system: true
     standard: true
     output_order: 996
-}
-
-key EMBEDS {
-    type: "[(string, sami)]"
-    standard: true
-    output_order: 997
-    since: "0.1.0"
+    skip: true
+    docstring: "Old SAMI info associated with an artifact, when a new SAMI is inserted"
 }
 
 key SBOMS {
@@ -266,6 +254,7 @@ key SBOMS {
     since: "0.1.0"
     standard: true
     output_order: 998
+    docstring: "SBOMs associated with this artifact"
 }
 
 
@@ -276,6 +265,7 @@ key ERR_INFO {
     system: true
     standard: true
     output_order: 999
+    docstring: "Errors when inserting metadata"
 }
 
 key SIGNATURE {
@@ -284,6 +274,7 @@ key SIGNATURE {
     standard: true
     output_order: 1000
     in_ref: true
+    docstring: "Embedded digital signature for artifact"
 }
 
 # Doesn't do any keys other than the codec defaults, which are:

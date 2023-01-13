@@ -33,16 +33,17 @@ var samiConfig = con4m(Sami, baseconfig):
   attr(can_dump, bool, true)
   attr(can_load, bool, true)
   attr(allow_external_config, bool, true)
+  attr(publish_defaults,
+       bool,
+       defaultVal = false,
+       doc = "When true, publishes config used to the 'defaults' topic")
+  
   section(key, allowedSubSections = @["*", "*.json", "*.binary"]):
     attr(required,
          bool,
          defaultVal = false,
          doc = "When true, fail to WRITE a SAMI if no value is found " &
            "for the key via any allowed plugin.")
-    attr(missing_action,
-         string,
-         defaultVal = "warn",
-         doc = "What to do if, when READING a SAMI, we do not see this key")
     attr(system,
          bool,
          defaultVal = false,

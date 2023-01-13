@@ -1,5 +1,6 @@
 import tables, strformat, argparse
-import nimutils, config, inject, extract, delete, dump, plugins, builtins
+import nimutils, config, inject, extract, delete, dump, plugins, builtins,
+       defaults
 import macros except error
 
 # The base configuration will load when we import config.  We forego
@@ -32,7 +33,7 @@ proc runCmdDefaults() {.noreturn, inline.} =
   # We can't really put this in loadUserConfigFile() unless we move
   # it, due to current module interdependencies.  Will probably fix
   # this sooner than later.
-  showConfig() # config.nim
+  showConfig(true) # config.nim
   quit()
 
 proc runCmdInject() {.noreturn, inline.} =
@@ -42,12 +43,16 @@ proc runCmdInject() {.noreturn, inline.} =
   # that before we set up any command-line arguments; it would return
   # 'false' for us always, no matter what the user supplies.
   loadUserConfigFile(getSelfExtraction())
+  if getPublishDefaults():
+    showConfig(false)
   loadCommandPlugins()
   doInjection() # inject.nim
   quit()
 
 proc runCmdExtract() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
+  if getPublishDefaults():
+    showConfig(false)
   let extractions = doExtraction() # extract.nim
   if extractions.isSome():
     publish("extract", extractions.get())
@@ -56,7 +61,11 @@ proc runCmdExtract() {.noreturn, inline.} =
   quit()
 
 proc runCmdDump(arglist: seq[string]) {.noreturn, inline.} =
-  handleConfigDump(getSelfExtraction(), arglist)
+  var selfSami = getSelfExtraction()
+  loadUserConfigFile(selfSami)
+  if getPublishDefaults():
+    showConfig(false)
+  handleConfigDump(selfSami, arglist)
   quit()
   
 proc runCmdLoad() {.noreturn, inline.} =
@@ -71,11 +80,15 @@ proc runCmdLoad() {.noreturn, inline.} =
 
   setupSelfInjection(getArgs()[0])
   loadCommandPlugins()
+  if getPublishDefaults():
+    showConfig(false)
   doInjection()
   quit()
 
 proc runCmdDel() {.noreturn, inline.} =
   loadUserConfigFile(getSelfExtraction())
+  if getPublishDefaults():
+    showConfig(false)
   doDelete() # delete.nim
   quit()
 
@@ -110,6 +123,10 @@ const
   fRecursiveLong      = "--recursive"
   fNoRecursiveShort   = "-R"
   fNoRecursiveLong    = "--no-recursive"
+  fPubDefShort        = "-u"
+  fPubDefLong         = "--publish-defaults"
+  fNoPubDefShort      = "-U"
+  fNoPubDefLong       = "--no-publish-defaults"
 
   # help strings for the command line.
   insertHelp      = "Insert SAMIs into artifacts"
@@ -152,6 +169,9 @@ const
                      "top-level files \t\t\t     will be checked, but " &
                      "no deeper."
   outFilesHelp    = "Specify files/directories from which to extract SAMIs from"
+  pubDefHelp      = "Publishes the runtime state of key config items to " &
+                    "the 'defaults' topic, no matter what command was run."
+  noPubDefHelp    = "Overrides publishing of defaults."
   eConflictFmt    = "Conflicting flags provided: {l1} ({s1}) and {l2} ({s2})"
   generalHelp     = """{prog}: insert or extract software artifact metadata.
 Default options shown can be overridden by config file or environment 
@@ -164,39 +184,42 @@ type
   FlagID = enum
     fidColor, fidNoColor, fidDryRun, fidNoDryRun, fidSilent, fidQuiet,
     fidNormal, fidVerbose, fidTrace, fidCfgFileName, fidCfgSearchPath,
-    fidOverwrite, fidNoOverwrite, fidRecursive, fidNoRecursive
+    fidOverwrite, fidNoOverwrite, fidRecursive, fidNoRecursive, fidPubDef,
+    fidNoPubDef
 
   OptParts = (string, string, string)
   OptTable = Table[FlagID, OptParts]
 
 const
   flagPairs: OptTable = {
-    fidColor: (fColorShort, fColorLong, colorHelp),
-    fidNoColor: (fNoColorShort, fNoColorLong, noColorHelp),
-    fidDryRun: (fDryRunShort, fDryRunLong, dryRunHelp),
-    fidNoDryRun: (fNoDryRunShort, fNoDryRunLong, noDryRunHelp),
-    fidSilent: (fSilentShort, fSilentLong, silentHelp),
-    fidQuiet: (fQuietShort, fQuietLong, quietHelp),
-    fidNormal: (fNormalShort, fNormalLong, normalHelp),
-    fidVerbose: (fVerboseShort, fVerboseLong, verboseHelp),
-    fidTrace: (fTraceShort, fTraceLong, traceHelp),
-    fidOverwrite: (fOverwriteShort, fOverwriteLong, overwriteHelp),
+    fidColor:       (fColorShort,       fColorLong,       colorHelp),
+    fidNoColor:     (fNoColorShort,     fNoColorLong,     noColorHelp),
+    fidDryRun:      (fDryRunShort,      fDryRunLong,      dryRunHelp),
+    fidNoDryRun:    (fNoDryRunShort,    fNoDryRunLong,    noDryRunHelp),
+    fidSilent:      (fSilentShort,      fSilentLong,      silentHelp),
+    fidQuiet:       (fQuietShort,       fQuietLong,       quietHelp),
+    fidNormal:      (fNormalShort,      fNormalLong,      normalHelp),
+    fidVerbose:     (fVerboseShort,     fVerboseLong,     verboseHelp),
+    fidTrace:       (fTraceShort,       fTraceLong,       traceHelp),
+    fidOverwrite:   (fOverwriteShort,   fOverwriteLong,   overwriteHelp),
     fidNoOverwrite: (fNoOverwriteShort, fNoOverwriteLong, noOverwriteHelp),
-    fidRecursive: (fRecursiveShort, fRecursiveLong, recursiveHelp),
+    fidRecursive:   (fRecursiveShort,   fRecursiveLong,   recursiveHelp),
     fidNoRecursive: (fNoRecursiveShort, fNoRecursiveLong, noRecursiveHelp),
+    fidPubDef:      (fPubDefShort,      fPubDefLong,      pubDefHelp),
+    fidNoPubDef:    (fNoPubDefShort,    fNoPubDefLong,    noPubDefHelp)
   }.toTable()
 
   mainOpts = [
-    (fCfgFileNameShort, fCfgFileNameLong, cfgFileHelp),
+    (fCfgFileNameShort,   fCfgFileNameLong,   cfgFileHelp),
     (fCfgSearchPathShort, fCfgSearchPathLong, cfgSearchHelp)
   ]
 
   topFlags = [
     fidColor, fidNoColor, fidDryRun, fidNoDryRun, fidSilent, fidQuiet,
-    fidNormal, fidVerbose, fidTrace
+    fidNormal, fidVerbose, fidTrace, fidPubDef, fidNoPubDef
   ]
 
-  injectFlags = [fidRecursive, fidNoRecursive]
+  injectFlags =  [fidRecursive, fidNoRecursive]
   extractFlags = [fidRecursive, fidNoRecursive]
 
 # When doing option parsing, error when two conflicting flags are given.
@@ -343,6 +366,10 @@ when isMainModule:
           setDryRun(true)
         else:
           setDryRun(false)
+      if opts.publishDefaults or opts.noPublishDefaults:
+        if opts.publishDefaults and opts.noPublishDefaults:
+          flagConflict(fidPubDef, fidNoPubDef)
+        setPublishDefaults(opts.publishDefaults)
       if (opts.silent or opts.quiet or opts.normalOutput or
           opts.verbose or opts.info):
         if opts.silent and opts.quiet:

@@ -1,5 +1,5 @@
 import options, tables, strutils, strformat, algorithm, os
-import con4m, con4m/[st, eval, dollars], nimutils, nimutils/logging
+import con4m, con4m/[st, eval], nimutils, nimutils/logging
 import macros except error
 export logging
 
@@ -76,7 +76,7 @@ else:
 
 
 # This should prob be auto-generated.
-proc getConfigState*(): ConfigState = return ctxSamiConf    
+proc getConfigState*(): ConfigState = return ctxSamiConf
 
 proc getConfigErrors*(): Option[seq[string]] =
   if ctxSamiConf.errors.len() != 0:
@@ -128,6 +128,13 @@ proc setDryRun*(val: bool) =
   discard ctxSamiConf.setOverride("dry_run", pack(val))
   samiConfig.dryRun = val
 
+proc getPublishDefaults*(): bool = 
+  return samiConfig.publishDefaults
+
+proc setPublishDefaults*(val: bool) =
+  discard ctxSamiConf.setOverride("publish_defaults", pack(val))
+  samiConfig.publishDefaults = val
+
 proc getArtifactSearchPath*(): seq[string] =
   return samiConfig.artifactSearchPath
 
@@ -174,11 +181,11 @@ proc getOrderedKeys*(): seq[string] =
   for (priority, key) in list:
     result.add(key)
 
-proc getCustomKeys*(name: string): seq[string] =
+proc getCustomKeys*(): seq[string] =
   result = @[]
 
   for key, val in samiConfig.key:
-    if not val.system:
+    if val.since.isNone():
       result.add(key)
 
 proc getPluginConfig*(name: string): Option[SamiPluginSection] =
@@ -187,9 +194,6 @@ proc getPluginConfig*(name: string): Option[SamiPluginSection] =
 
 proc getRequired*(key: SamiKeySection): bool =
   return key.required
-
-proc getMissingAction*(key: SamiKeySection): string =
-  return key.missingAction
 
 proc getSystem*(key: SamiKeySection): bool =
   return key.system
@@ -271,95 +275,6 @@ proc getOutputPointers*(): bool =
 
   return false
 
-proc `$`*(plugin: SamiPluginSection): string =
-  var overrideStr, ignoreStr: string
-
-  let optO = plugin.getOverrides()
-
-  if optO.isNone():
-    overrideStr = "<none>"
-  else:
-    var l: seq[string]
-    for key, val in optO.get():
-      l.add(fmt"{key} : {val}")
-    overrideStr = l.join(", ")
-
-  let optI = plugin.getIgnore()
-
-  if optI.isNone():
-    ignoreStr = "<none>"
-  else:
-    ignoreStr = optI.get().join(", ")
-
-
-  return fmt"""  default priority:      {plugin.getPriority()}
-  is codec:              {plugin.getCodec()}
-  is enabled:            {plugin.getEnabled()}
-  keys handled:          {plugin.getKeys().join(", ")}
-  priority overrides:    {overrideStr}
-  ignore:                {ignoreStr}
-  doc string:            {getOrElse(plugin.docstring, "<none>")}
-  external impl command: {plugin.command}
-"""
-
-proc valueToString(b: Box): string {.inline.} =
-  return $(b)
-
-proc `$`*(key: SamiKeySection): string =
-  var valstr = "<none>"
-
-  if key.value.isSome():
-    valstr = valueToString(key.value.get())
-
-  return fmt"""  standard:           {key.standard}
-  required:           {key.required}
-  missing action:     {key.missingAction}
-  system:             {key.system}
-  squash:             {key.squash}  
-  force required:     {key.mustForce}
-  skip:               {key.skip}
-  first spec version: {getOrElse(key.since, "<none>")}
-  output order:       {key.outputOrder}
-  content type:       {key.`type`}
-  value:              {valstr}
-  doc string:         {getOrElse(key.docstring, "<none>")}
-"""
-
-macro condOutputHandlerFormatStr(sym: untyped, prefix: string): string =
-  let fieldAsStr = newLit(sym.strVal)
-  
-  result = quote do:
-    let optEntry = dottedLookup(attrs, @["output", s, `fieldAsStr`])
-    let locked = if optEntry.isSome(): optEntry.get().locked else: false
-
-    if o.`sym`.isSome() or not locked:
-      if o.`sym`.isSome(): `prefix` & o.`sym`.get() & "\n"
-      else: `prefix` & "<none>\n"
-    else:
-      ""
-
-macro condOutputHandlerFormatStrSeq(sym: untyped, prefix: string): string =
-  let fieldAsStr = newLit(sym.strVal)
-  
-  result = quote do:
-    let optEntry = dottedLookup(attrs, @["output", s, `fieldAsStr`])
-    let locked = if optEntry.isSome(): optEntry.get().locked else: false
-
-    if o.`sym`.isSome() or not locked:
-      if o.`sym`.isSome(): `prefix` & join(o.`sym`.get(), " ") & "\n"
-      else: `prefix` & "<none>\n"
-    else:
-      ""
-        
-proc showConfig*() =
-  ## This is a placeholder, we need to do something nicer
-  ## that focuses on the info they'll expect to see.
-  
-  publish("defaults", `$`(ctxSamiConf.st) & """
-Use 'dumpConfig' to export the embedded configuration file to disk,
-and 'loadConfig' to load one.
-""")
-  
 
 var onceLockBuiltinKeys = false
 
@@ -388,7 +303,6 @@ proc lockBuiltinKeys*() =
       discard ctxSamiConf.lockConfigVar(prefix & ".output_order")
 
     if unpack[bool](sys):
-      discard ctxSamiConf.lockConfigVar(prefix & ".missing_action")
       discard ctxSamiConf.lockConfigVar(prefix & ".value")
 
   # These are locks of invalid fields for specific output handlers.
