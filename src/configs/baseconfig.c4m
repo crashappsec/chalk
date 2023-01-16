@@ -1,26 +1,3 @@
-<<<<<<< HEAD:src/configs/baseconfig.c4m
-=======
-## This contains the base configuration.  The key entries should not
-## change unless the specification changes, with the exception of any
-## keys starting with 'X'.
-##
-## Any statically linked plugins and output hooks all need to have an
-## entry here, but the contents (when we provide them) can mostly be
-## overriden, the exceptions being the specification of what keys
-## plugins export, and whether plugins are codecs.
-##
-## Currently, we don't support dynamic plugins, but generally you can
-## do what you want via con4m.
-##
-## Nothing should really be in here that doesn't need to be here-- add
-## it to defaultconfig.nim, which users can change.
-##
-## Note, if you end up w/ syntax errors in this file, when you run sami
-## and get an error, the line number will be relative to the first line
-## after the """ below, so add 20 to get the line # in this file.
-
-const baseConfig* = """
->>>>>>> main:src/configs/baseconfig.nim
 color: true
 sami_version := "0.2.0"
 ascii_magic := "dadfedabbadabbed"
