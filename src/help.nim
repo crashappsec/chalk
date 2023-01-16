@@ -1,4 +1,5 @@
-import unicode, tables, os, nimutils, std/terminal, defaults,  options, formatstr
+import unicode, tables, os, nimutils, std/terminal, defaults,  options,
+       formatstr
 from strutils import replace, split, find
 
 when true:

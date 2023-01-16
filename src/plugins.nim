@@ -265,6 +265,7 @@ method getArtifactInfo*(self: ExternalPlugin, sami: SamiObj): KeyInfo =
 {.warning[UnusedImport]: off.}
 
 import plugins/system
+import plugins/metsys
 import plugins/ciGithub
 import plugins/conffile
 import plugins/codecShebang
