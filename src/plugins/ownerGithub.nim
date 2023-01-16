@@ -5,10 +5,10 @@ import nimutils, ../config, ../plugins
 const
   fNameGHCO = "CODEOWNERS"
   dirGH     = ".github"
-  dirDoc    = "docs" 
+  dirDoc    = "docs"
   eCantOpen = "{fname}: File found, but could not be read"
-  eFileOpen = "{filename}: Could not open file."     
-  
+  eFileOpen = "{filename}: Could not open file."
+
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 
@@ -43,7 +43,7 @@ proc findCOFile(fullpath: string): string =
 proc findCodeOwner(contents, artifactPath, copath: string): string =
   assert artifactPath.startsWith(copath)
 
-  let 
+  let
     lines   = contents.split("\n")
     gitdir  = copath.splitPath().head
     relPath = artifactPath[len(copath) .. ^1]
@@ -103,7 +103,7 @@ method getArtifactInfo*(self: GithubCodeOwner,
     if ctx == nil:
       warn(eFileOpen)
     else:
-      let 
+      let
         s = ctx.readAll()
         m = s.findCodeOwner(sami.fullPath, fname.splitPath().head)
 
@@ -115,4 +115,4 @@ method getArtifactInfo*(self: GithubCodeOwner,
     if ctx != nil:
       ctx.close()
 
-registerPlugin("github-codeowners", GithubCodeOwner())
+registerPlugin("github_codeowners", GithubCodeOwner())

@@ -62,4 +62,4 @@ method getArtifactInfo*(self: GithubCI,
   if GITHUB_ACTOR != "":
     result["BUILD_CONTACT"] = pack(@[GITHUB_ACTOR])
 
-registerPlugin("github-ci", GithubCI())
+registerPlugin("ci_github", GithubCI())
