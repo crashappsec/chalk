@@ -212,7 +212,7 @@ proc parseJankCtrl(s: string, width: int): seq[JankBlock] =
 proc parseJank(s: string, width: int): seq[JankBlock] =
   result = @[]
   var cur = s
-  
+
   while len(cur) != 0:
     var
       nextCtrl  = cur.find("%{")
@@ -238,10 +238,17 @@ proc parseJank(s: string, width: int): seq[JankBlock] =
       result.add(parseJankText(cur[0 .. nextBreak], width))
       cur = cur[nextBreak+1 .. ^1]
       
-proc doHelp*(args: seq[string]) =
+proc doHelp*(preargs: seq[string]) =
   var
     jank:  seq[JankBlock] = @[]
+    args:  seq[string]
     width                 = terminalWidth()
+
+
+  args = preargs # Nim doesn't treat formals as local copies, oddly.
+  
+  if len(args) == 0:
+    args = @["main"]
 
   for arg in args:
     if arg == "topics" or arg notin helpCorpus:

@@ -15,6 +15,17 @@ log_level: "info"
 
 log("info", "Loading the default SAMI config")
 
+# The following default commands are valid:
+# help, insert, extract, version
+#
+# The default only gets used if nothing else is given at the command
+# line, at all.  If you pass any flags at all, you must pass in a
+# command.
+#
+# You can comment this out, and people will get a terse error message.
+
+default_command = "help"
+
 ## KEY CONFIGURATION
 
 key INSERTION_HOSTINFO {

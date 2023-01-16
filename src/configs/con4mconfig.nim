@@ -23,8 +23,9 @@ var samiConfig = con4m(Sami, baseconfig):
        doc = "The config filename; also can be set from the command line")
   attr(default_command, string,
        required = false,
-       doc = "When this command runs, if no command is provided, " &
-             "which one runs?") # Currently not hooked up.
+       doc = "When this command runs, if no command line arguments are " &
+             "provided, if this value is set, the command will run, " &
+             "using the configuration from the configuration file.")
   attr(color, bool, false, doc = "Do you want ansi output?")
   attr(log_level, string, "warn")
   attr(dry_run, bool, false)
