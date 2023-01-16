@@ -63,7 +63,7 @@ elif cmd == "dump" {
     sinkConfig("dumpOut", "file", {"filename" : args[0]}, [])
   }
   else {
-    sinkConfig("dumpOut", "stdout", {}, ["color"])
+    sinkConfig("dumpOut", "stdout", {}, [])
   }
 
   subscribe("confdump", "dumpOut")

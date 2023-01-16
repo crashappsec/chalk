@@ -27,7 +27,7 @@ proc samiTableFormatter*(numColumns: int): TextTable =
                       addTopBorder    = true,
                       addBottomBorder = true,
                       headerRowAlign  = some(AlignCenter),
-                      wrapByDefault   = true,
+                      wrapStyle       = WrapLines,
                       maxCellBytes    = 200)
 
 proc showGeneralOptions*(): int {.discardable.} =
