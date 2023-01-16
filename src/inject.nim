@@ -91,6 +91,11 @@ proc doInjection*() =
   if extractions.isSome():
     publish("nesting", extractions.get())
 
+  # It's possible to define a plugin via external command that writes
+  # JSON to stdout.  This loads any such plugins specified in the
+  # config file.
+  loadCommandPlugins()
+  
   trace("Beginning artifact metadata collection and injection.")
   # We're going to build a list of priority ordering based on plugin.
   # For codecs, they only get called when the SAMI is being read/written by

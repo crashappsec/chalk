@@ -1,0 +1,8 @@
+%{H Usage: {appName} confload FILE }%
+
+Attempt to replaces the embedded configuration file, reading from the
+specified file name.
+
+You can use the {bold}confdump{reset} command to dump the output first.
+
+See {bold}{appName} help config{reset} for an overview of the configuration file format.

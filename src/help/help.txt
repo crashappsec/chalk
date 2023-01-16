@@ -1,0 +1,5 @@
+%{H Usage: {appName} help [topic]]... }%
+Shows help files for one or more topics.
+
+See {bold}{appName} help topics{reset} for a list of all available topics.
+

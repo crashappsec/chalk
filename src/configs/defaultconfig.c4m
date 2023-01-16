@@ -1,5 +1,3 @@
-const defaultConfig* = """
-
 color: true
 
 # If not provided, log_level will default to "warn".
@@ -17,6 +15,8 @@ log_level: "info"
 
 log("info", "Loading the default SAMI config")
 
+## KEY CONFIGURATION
+
 key INSERTION_HOSTINFO {
     info, exitCode := system("uname -a")
     if exitCode == 0 {
@@ -24,6 +24,7 @@ key INSERTION_HOSTINFO {
     }
 }
 
+## I/O CONFIGURATION
 
 cmd  := argv0()
 args := argv()
@@ -31,7 +32,7 @@ args := argv()
 log("trace", "running command: " + cmd)
 
 sinkConfig("redirectableOut", "stdout", {}, [])
-sinkConfig("defaultOut",      "stderr", {}, ["addTopic"])
+sinkConfig("defaultOut",      "stderr", {}, [])
 
 
 if cmd != "defaults" {
@@ -39,6 +40,8 @@ if cmd != "defaults" {
 } else {
     subscribe("defaults", "redirectableOut")
 }
+
+subscribe("help", "defaultOut")
 
 if cmd == "extract" or cmd == "inject" or cmd == "del" {
 
@@ -58,7 +61,7 @@ if cmd == "extract" or cmd == "inject" or cmd == "del" {
   subscribe("nesting", "defaultOut") # Writes extracted samis when injecting
   subscribe("inject",  "defaultOut") # Writes full SAMIs (no ptrs) being injected
 }
-elif cmd == "dump" {
+elif cmd == "confdump" {
   if len(args) > 0 {
     sinkConfig("dumpOut", "file", {"filename" : args[0]}, [])
   }
@@ -69,12 +72,9 @@ elif cmd == "dump" {
   subscribe("confdump", "dumpOut")
 }
 else {
-  if cmd == "load" {
+  if cmd == "confload" {
     subscribe("confload", "redirectableOut")
   } elif cmd == "version" {
     subscribe("version",  "redirectableOut")
-  }
+  } 
 }
-
-
-"""

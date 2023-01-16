@@ -1,3 +1,5 @@
+<<<<<<< HEAD:src/configs/baseconfig.c4m
+=======
 ## This contains the base configuration.  The key entries should not
 ## change unless the specification changes, with the exception of any
 ## keys starting with 'X'.
@@ -18,6 +20,7 @@
 ## after the """ below, so add 20 to get the line # in this file.
 
 const baseConfig* = """
+>>>>>>> main:src/configs/baseconfig.nim
 color: true
 sami_version := "0.2.0"
 ascii_magic := "dadfedabbadabbed"
@@ -415,5 +418,3 @@ sink custom {
 # stream logs {
 #   filters: [ "defaultLogs" ]
 # }
-
-"""

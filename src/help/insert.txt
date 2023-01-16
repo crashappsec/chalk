@@ -1,0 +1,6 @@
+%{H Usage: {appName} insert [COMMAND_OPTION]... [search path] }%
+Inserts metadata into artifacts specified in the search path.
+
+There are two styles of marking, one where all metadata is directly attached to the artifact, and one where the artifact is marked primarily with a 'pointer', and then the rest of the metadata is stored elsewhere.  Generally, we recommend writing a 'pointer' by default.
+
+It is easy to choose which keys in the full set of possible metadata get put either into a pointer, and it's easy to select which metadata isn't collected at all.  Similarly, it's easy to write full metadata to multiple different places, and include different keys in each place.  See {bold}{appName} help output{reset} for details.

@@ -1,0 +1,10 @@
+%{H Usage: {appName} extract [COMMAND_OPTION]... [search path] }%
+Extracts metadata into artifacts specified in the search path.
+
+Extract metadata is then 'published' to the 'extract' topic.
+
+ In the absense of any output configuration, data will be published in JSON format, but pretty-printed (somewhat), to stdout.  See 'help output' for an overview of the outputting system, which includes filters.
+
+Also, unless configured otherwise, the 'extract' command will report a list of artifacts it found in the search, where an insertion would have been configured to insert, but there was nothing to extract.
+
+

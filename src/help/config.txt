@@ -1,0 +1,28 @@
+%{H SAMI Configuration Files }%
+
+In their simplest form, they are fairly typical key-value configuration files for setting default values:
+%{c
+color: true
+log_level: "warn" {brown}# Don't print out informational bits.
+key SAMI_PTR \{
+  {brown}# This field is meant to be a URL to redirect people from the artifact
+  {brown}# to where the full metadata is kept.
+  value: {red}"https://www.myrepo.com/samilookup/$\{artifactid\}"
+\}
+}%
+
+Since SAMI's goal is to make it easy and flexible to capture arbitrary metadata about software artifacts, the fact that the world isn't homogenous requires a lot of flexibility. As a result, SAMI embeds a small, efficient language called {bold}con4m{reset} that can intertwine the two.
+
+For instance, if you have two data stores, one for things running AWS, and one for everything else, you could change the above code to do different things if AWS is going to get used.  For instance:
+
+%{c
+key SAMI_PTR \{
+  if envExists({red}"AWS_S3_BUCKET_URI"{cyan}) and envExists({red}"AWS_ACCESS_SECRET"{cyan}) \{
+    value: {red}"s3://some-bucket/sami-$\{artifactid\}"
+  \} else \{
+    value: {red}"https://www.myrepo.com/samilookup/$\{artifactid\}"
+  \}
+\}
+}%
+
+
