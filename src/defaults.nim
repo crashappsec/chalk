@@ -18,6 +18,7 @@ proc samiTableFormatter*(numColumns:  int,
                          headerAlign: Option[AlignmentType] = some(AlignCenter),
                          wrapStyle =  WrapBlock): TextTable =
   return newTextTable(numColumns      = numColumns,
+                      rows            = rows,
                       fillWidth       = true,
                       colHeaderSep    = some(Rune('|')),
                       colSep          = some(Rune('|')),
