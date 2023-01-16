@@ -81,11 +81,12 @@ proc runCmdVersion() =
              @["Build CPU", hostCPU],
              @["Build Date", CompileDate],
              @["Build Time", CompileTime]]
-    t    = samiTableFormatter(2, rows=rows)
+    t    = samiTableFormatter(2)
 
-  t.setNoHeaders()
-    
-  publish("version", t.render())
+  for row in rows:
+    t.addRow(row)
+
+  publish("version", t.render() & "\n")
                      
               
 proc runCmdHelp(args: seq[string] = @["main"]) =
