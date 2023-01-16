@@ -29,7 +29,7 @@ key SAMI_ID {
 
 key SAMI_VERSION {
     required: true
-    system: true
+    system: false
     type: "string"
     value: sami_version
     standard: true

@@ -81,10 +81,10 @@ proc runCmdVersion() =
              @["Build CPU", hostCPU],
              @["Build Date", CompileDate],
              @["Build Time", CompileTime]]
-    t    = samiTableFormatter(2)
+    t    = samiTableFormatter(2, rows=rows)
 
-  for row in rows:
-    t.addRow(row)
+  t.setTableBorders(false)
+  t.setNoHeaders()
 
   publish("version", t.render() & "\n")
                      
@@ -233,8 +233,6 @@ macro declareCommand(names:    static[seq[string]],
             
     result.add(oneAlias)
 
-      
-    
 when isMainModule:
   var cmdLine = newParser:
     noHelpFlag()
