@@ -316,11 +316,11 @@ plugin shebang {
 
 # Probably should add file time of artifact, date of branch
 # and any tag associated.
-plugin "vctl-git" {
+plugin vctl_git {
     keys: ["COMMIT_ID", "BRANCH", "ORIGIN_URI"]
 }
 
-plugin "github-ci" {
+plugin ci_github {
     keys: ["BUILD_ID", "BUILD_URI", "BUILD_API_URI", "BUILD_TRIGGER",
            "BUILD_CONTACT"]
 }
@@ -329,11 +329,11 @@ plugin authors {
     keys: ["CODE_OWNERS"]
 }
 
-plugin "github-codeowners" {
+plugin github_codeowners {
     keys: ["CODE_OWNERS"]
 }
 
-plugin sbomCallback {
+plugin sbom_callback {
     keys: ["SBOMS"]
 }
 
