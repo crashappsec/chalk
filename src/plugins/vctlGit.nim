@@ -16,7 +16,7 @@ const
   ghUrl        = "url"
   ghOrigin     = "origin"
   ghLocal      = "local"
-  
+
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 
@@ -182,4 +182,4 @@ method getArtifactInfo*(self: GitPlugin, sami: SamiObj): KeyInfo =
   if branchThere: result["BRANCH"] = name
 
 
-registerPlugin("vctl-git", GitPlugin())
+registerPlugin("vctl_git", GitPlugin())

@@ -10,8 +10,8 @@ const
   eBadJson          = "{sami.fullpath}: Invalid input JSON in file"
   ePathNotFound     = "{path}: No such file or directory"
   ePureVirtual      = "Method is not defined; it must be overridden"
-  
-  
+
+
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
@@ -265,6 +265,7 @@ method getArtifactInfo*(self: ExternalPlugin, sami: SamiObj): KeyInfo =
 {.warning[UnusedImport]: off.}
 
 import plugins/system
+import plugins/ciGithub
 import plugins/conffile
 import plugins/codecShebang
 import plugins/codecElf

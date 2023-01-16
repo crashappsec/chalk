@@ -30,10 +30,16 @@ proc samiTableFormatter*(numColumns:  int,
                       addRightBorder  = true,
                       addTopBorder    = true,
                       addBottomBorder = true,
+<<<<<<< HEAD
                       headerRowAlign  = headerAlign,
                       wrapStyle       = wrapStyle,
                       maxCellBytes    = 0,
                       rows            = rows)
+=======
+                      headerRowAlign  = some(AlignCenter),
+                      wrapStyle       = WrapLines,
+                      maxCellBytes    = 200)
+>>>>>>> main
 
 proc showGeneralOptions*(): int {.discardable.} =
   # Returns the width of the table.

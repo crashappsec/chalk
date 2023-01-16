@@ -7,7 +7,7 @@ when (NimMajor, NimMinor) < (1, 7):
 const callbackType = "f(string) -> {string : string}"
 
 type SbomCallbackPlugin* = ref object of Plugin
-  
+
 method getArtifactInfo*(self: SbomCallbackPlugin,
                         sami: SamiObj): KeyInfo =
 
@@ -19,10 +19,10 @@ method getArtifactInfo*(self: SbomCallbackPlugin,
     let
       res = optinfo.get()
       dict = unpack[TableRef[string, Box]](res)
-      
+
     if len(dict) != 0:
       new result
       result["SBOMS"] = res
 
-registerPlugin("sbomCallback", SbomCallbackPlugin())
+registerPlugin("sbom_callback", SbomCallbackPlugin())
 getConfigState().newCallback("get_sboms", callbackType)
