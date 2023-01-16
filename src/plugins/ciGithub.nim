@@ -1,5 +1,8 @@
-import tables, streams, strutils, strformat, os, glob
+import tables, strformat, os
 import nimutils, ../config, ../plugins
+
+when (NimMajor, NimMinor) < (1, 7):
+  {.warning[LockLevel]: off.}
 
 type GithubCI = ref object of Plugin
 
