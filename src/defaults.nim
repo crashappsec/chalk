@@ -16,7 +16,9 @@ const
 proc samiTableFormatter*(numColumns:  int,
                          rows:        seq[seq[string]]      = @[],
                          headerAlign: Option[AlignmentType] = some(AlignCenter),
-                         wrapStyle =  WrapBlock): TextTable =
+                         wrapStyle =  WrapBlock,
+                         maxCellSz =  200
+                        ): TextTable =
   return newTextTable(numColumns      = numColumns,
                       rows            = rows,
                       fillWidth       = true,
@@ -31,9 +33,9 @@ proc samiTableFormatter*(numColumns:  int,
                       addRightBorder  = true,
                       addTopBorder    = true,
                       addBottomBorder = true,
-                      headerRowAlign  = some(AlignCenter),
-                      wrapStyle       = WrapBlock,
-                      maxCellBytes    = 200)
+                      headerRowAlign  = headerAlign,
+                      wrapStyle       = wrapStyle,
+                      maxCellBytes    = maxCellSz)
 
 proc showGeneralOptions*(): int {.discardable.} =
   # Returns the width of the table.

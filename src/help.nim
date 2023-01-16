@@ -181,7 +181,9 @@ proc jankCodeBlock(s: string, width: int): JankBlock =
     formatted = s.jankyFormat()
     t         = samiTableFormatter(1,
                                    @[@[formatted]],
-                                   some(AlignLeft), WrapLines)
+                                   some(AlignLeft),
+                                   WrapLines,
+                                   0)
 
   return JankBlock(kind: JankCodeBlock, content: t.render(width))
 
