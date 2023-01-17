@@ -2,6 +2,41 @@ import tables, argparse, sugar
 import nimutils, config, inject, extract, delete, builtins, defaults, help
 import macros except error
 
+const
+  validDefaultCommands = ["help", "insert", "extract", "version"]
+  allValidCommands     = ["insert", "extract", "delete", "defaults",
+                          "confdump", "confload", "version", "help"]
+  
+type
+  SettrFunc    = (bool) -> void
+  BoolFlagSpec = tuple[trueS, trueL, falseS, falseL, settr: string]
+
+# Rather than manually repeating the logic for boolean flags over and over,
+# we stick info about them in a list and then automatically processes.
+const globalNoOptionFlags: seq[BoolFlagSpec] = @[
+  (trueS:  "-c",
+   trueL:  "--color",
+   falseS: "-C",
+   falseL: "--no-color",
+   settr:  "setColor"),
+  (trueS:  "-d",
+   trueL:  "--dry-run",
+   falseS: "-D",
+   falseL: "--no-dry-run",
+   settr:  "setDryRun"),
+  (trueS:  "-p",
+   trueL:  "--publish-defaults",
+   falseS: "-P",
+   falseL: "--no-publish-defaults",
+   settr:  "setPublishDefaults")]
+  
+const artifactNoOptionFlags: seq[BoolFlagSpec] = @[
+  (trueS:  "-r",
+   trueL:  "--recursive",
+   falseS: "-R",
+   falseL: "--no-recursive",
+   settr:  "setRecursive") ]
+                     
 # The base configuration will load when we import config.  We forego
 # using any SAMI-specific builtns in that config, because it's just
 # specification (otherwise we'd load those builtins there).
@@ -77,10 +112,10 @@ proc runCmdConfLoad(arg: string) {.inline.} =
 proc runCmdVersion() =
   var
     rows = @[@["Sami version", getSamiExeVersion()],
-             @["Build OS", hostOS],
-             @["Build CPU", hostCPU],
-             @["Build Date", CompileDate],
-             @["Build Time", CompileTime]]
+             @["Build OS",     hostOS],
+             @["Build CPU",    hostCPU],
+             @["Build Date",   CompileDate],
+             @["Build Time",   CompileTime]]
     t    = samiTableFormatter(2, rows=rows)
 
   t.setTableBorders(false)
@@ -90,42 +125,8 @@ proc runCmdVersion() =
                      
               
 proc runCmdHelp(args: seq[string] = @["main"]) =
-  if len(args) == 0:
-    doHelp(@["main"])
-  else:
-    doHelp(args)
+  doHelp(args)
   
-type
-  SettrFunc    = (bool) -> void
-  BoolFlagSpec = tuple[trueS, trueL, falseS, falseL, settr: string]
-
-# Rather than manually repeating the logic for boolean flags over and over,
-# we stick info about them in a list and then automatically processes.
-const globalNoOptionFlags: seq[BoolFlagSpec] = @[
-  (trueS:  "-c",
-   trueL:  "--color",
-   falseS: "-C",
-   falseL: "--no-color",
-   settr:  "setColor"),
-  (trueS:  "-d",
-   trueL:  "--dry-run",
-   falseS: "-D",
-   falseL: "--no-dry-run",
-   settr:  "setDryRun"),
-  (trueS:  "-p",
-   trueL:  "--publish-defaults",
-   falseS: "-P",
-   falseL: "--no-publish-defaults",
-   settr:  "setPublishDefaults")]
-  
-const artifactNoOptionFlags: seq[BoolFlagSpec] = @[
-  (trueS:  "-r",
-   trueL:  "--recursive",
-   falseS: "-R",
-   falseL: "--no-recursive",
-   settr:  "setRecursive") ]
-
-
 proc flagToId(s: string): string =
   return s[2 .. ^1].replace("-", "")
 
@@ -143,8 +144,10 @@ proc oneBoolFlagCheck(opts, fn: NimNode, field1, field2: string): NimNode =
           `lit2` & "'")
         quit()
     elif `opts`.`ident1`:
+      parsedFlags.add(`lit1` & "=true")
       `fn`(true)
     else:
+      parsedFlags.add(`lit1` & "=false")      
       `fn`(false)
   
 macro genBoolFlagChecks(opts: untyped,
@@ -157,7 +160,6 @@ macro genBoolFlagChecks(opts: untyped,
                                 spec.trueL,
                                 spec.falseL))
     
-  
 # Since the argparse library doesn't give us a way to declare aliases,
 # we generate the same block of code multiple times, once per alias,
 # but make sure they all call the same function, whose name will be
@@ -205,8 +207,6 @@ macro declareCommand(names:    static[seq[string]],
           elif `hasArg`:
             arg("theArgs", nargs = `nargs`)
           run:
-            setCommandName(`cmd`)
-
             when `artifact`:
               genBoolFlagChecks(opts, artifactNoOptionFlags)
               if len(opts.theArgs) > 0:
@@ -216,13 +216,15 @@ macro declareCommand(names:    static[seq[string]],
                 setArgs(@[opts.theArgs])
               else:
                 setArgs(opts.theArgs)
-    
-            if not loadUserConfigFile(getSelfExtraction()):
-              # If the config file fails to load, 'load' is the only
-              # command that should still run.
-              if `cmd` != "load":
-                quit(1)
-          
+
+            if not configLoaded and `cmd` notin ["load", "help"]:
+              echo "Default config didn't load. Run 'sami load default' to " &
+                   "generate a fixed executable."
+              quit(1)
+            if not loadUserConfigFile(`cmd`, parsedFlags, getSelfExtraction()):
+              error("External config file failed to load. Quitting.")
+              quit(1)
+
             when `hasArg` or `artifact`:
               `funcName`(opts.theArgs)
             else:
@@ -233,16 +235,39 @@ macro declareCommand(names:    static[seq[string]],
             
     result.add(oneAlias)
 
+proc predictCommand(): string =
+  # Since we now load the base config before the command line parser
+  # goes, we need to quickly scan through argv, looking for the first
+  # argument that is a valid command name.  If the user provided a
+  # command, this will be right.  Otherwise, either the user made an
+  # error, OR there will end up being a 'default' command (though,
+  # only if there are no other arguments given).  Either way, if there
+  # is no hit, we will report "default" for now, and update it if the
+  # default command really is used.
+  for item in commandLineParams():
+    if item in allValidCommands:
+      return item
+  return "default"
+  
 when isMainModule:
-  var cmdLine = newParser:
+  setCommandName(predictCommand())
+  
+  var
+    parsedFlags: seq[string] = @[]
+    `selfSami?`              = getSelfExtraction()
+    configLoaded             = loadEmbeddedConfig(`selfSami?`)
+
+  var cmdLine  = newParser:
     noHelpFlag()
-    flag("-h", "--help")
+    flag  ("-h", "--help")
     option("-f", "--config-file")
     option("-l", "--log-level",
            choices = @["none", "error", "warn", "info", "verbose", "trace"])
     for tup in globalNoOptionFlags:
       flag(tup.trueS, tup.trueL)
       flag(tup.falseS, tup.falseL)
+    # The first parameter to each of these MUST be duplicated in the
+    # allValidCommands() array up top.
     declareCommand(@["insert", "inject", "ins", "in", "i"], true, true, -1)
     declareCommand(@["extract", "ex", "x"], true, true, -1)
     declareCommand(@["delete", "del"], true, true, -1)
@@ -257,8 +282,10 @@ when isMainModule:
         quit(1)
       genBoolFlagChecks(opts, globalNoOptionFlags)
       if opts.logLevel != "":
+        parsedFlags.add("--log-level=" & opts.logLevel)
         setLogLevel(opts.logLevel)
       if opts.configFile != "":
+        parsedFlags.add("--config-file=" % opts.configFile)
         let
           confFile     = opts.configFile
           (head, tail) = confFile.splitPath()
@@ -269,13 +296,31 @@ when isMainModule:
         setConfigPath(@[head])
         setConfigFileName(tail)
   try:
-    cmdLine.run()
-    # cmdLine.run() doesn't return, if successful.
-    runCmdHelp()
+    var argv = commandLineParams()
+
+    if len(argv) == 0:
+      var
+        `cmd?` = getDefaultCommand()
+        cmd: string
+          
+      if `cmd?`.isSome():
+        cmd = `cmd?`.get()
+        if cmd notin validDefaultCommands:
+          error("Default command '" & cmd & "' is not a valid default value.")
+        else:
+          setCommandName(cmd)
+          argv.add(cmd)
+    if len(argv) != 0:
+      cmdLine.run(argv)
+    
+    error("No valid command given.")
+    stderr.writeLine("Run '" & getAppFileName().splitPath().tail &
+                     " help' for more information.")
     quit(1)
   except UsageError:
     stderr.writeLine(getCurrentExceptionMsg())
-    stderr.writeLine("Run 'sami help' for more information.")
+    stderr.writeLine("Run '" & getAppFileName().splitPath().tail &
+                     " help' for more information.")
   except:
     stderr.writeLine("The program terminated abnormally.")
     stderr.writeLine(getCurrentExceptionMsg())

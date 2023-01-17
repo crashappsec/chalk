@@ -8,7 +8,6 @@ const
   infReplacedSami   = "{item.fullpath}: artifact metadata replaced."
   eCantInsert       = "{item.fullpath}: insertion failed!"
   
-
 type
   KeyPriorityInfo = tuple[priority: int, plugin: Plugin]
 let noOverrides = newTable[string, int]()
@@ -221,7 +220,6 @@ proc doInjection*() =
             removeFile(path)
             raise
 
-            
   # Finally, if we've got external output requirements, it's time to
   # dump what we've read to the "inject" stream.
             

@@ -15,6 +15,21 @@ log_level: "info"
 
 log("info", "Loading the default SAMI config")
 
+# The following default commands are valid:
+# help, insert, extract, version
+#
+# The default only gets used if nothing else is given at the command
+# line, at all.  If you pass any flags at all, you must pass in a
+# command.
+#
+# If you pick a default command, note that, when this script asks for
+# the command via the argv0() call, the result will be "default", NOT
+# the value you pick.  So make sure to set up your output
+# configuration properly if you change this value.
+#
+# You can comment this out, and people will get a terse error message.
+default_command = "help"
+
 ## KEY CONFIGURATION
 
 key INSERTION_HOSTINFO {
@@ -25,6 +40,11 @@ key INSERTION_HOSTINFO {
 }
 
 ## I/O CONFIGURATION
+
+# Note that, if there is no command given, the value of "cmd" here
+# will be 'default' here, instead of the value you picked as a
+# default.  Your default doesn't go into effect until this script
+# finishes running.
 
 cmd  := argv0()
 args := argv()
@@ -42,7 +62,6 @@ if cmd != "defaults" {
 }
 
 subscribe("help", "defaultOut")
-
 if cmd == "extract" or cmd == "inject" or cmd == "del" {
 
   if envExists("AWS_S3_BUCKET_URI") {

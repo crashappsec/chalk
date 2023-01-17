@@ -317,24 +317,47 @@ plugin sbom_callback {
     keys: ["SBOMS"]
 }
 
-# This plugin is the only thing allowed to set these keys. However, it
-# should run last to make sureit knows what other fields are being set
-# before deciding how to handle the OLD_SAMI field.  Thus, the setting
-# to 32-bit maxint (though should consider using the whole 64-bits).
-
+# This plugin is the only thing allowed to set these keys. It goes first
+# so that other plugins can use the data if need be.  Priority should
+# thus set to low(int64), but con4m currently doesn't get this right,
+# low(int64) in con4m is -high(int64), when it should be one less.
 plugin system {
-    keys: ["TIMESTAMP", "SAMI_ID", "OLD_SAMI", "X_SAMI_CONFIG",
-           "INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM"]
-    priority: 2147483647
+  keys: ["TIMESTAMP", "SAMI_ID", "X_SAMI_CONFIG", "INJECTOR_ID",
+         "INJECTOR_VERSION", "INJECTOR_PLATFORM", "_MAGIC.json"]
+  priority: -9223372036854775807
+}
+
+# These keys would be set by the `metsys` plugin, but need to go LAST
+# not first.  The OLD_SAMI field needs to know what fields get written
+# before it can figure out what to write.
+#
+#
+# Also, this should be the place where signatures happen, though we
+# still have to work on that mechanism (a con4m callback probably).
+#
+# `metsys` is essentially meant to be "system end" in the sense of the
+# old algol days where an if statement's end delimeter was `fi` and a
+# case statement's end was `esac`. But also, this is where system
+# stuff goes that needs other metadata before it can write its own, so
+# I thought it was particularly appropriate.
+#
+# The priority field is set to high(int64).
+plugin metsys {
+    keys: ["OLD_SAMI", "SIGNATURE" ]
+    priority: 9223372036854775807
 }
 
 # This plugin takes values from the conf file. By default, these
 # are of the lowest priority of anything that can conflict.
 # This will set SAMI_VERSION, EARLIEST_VERSION, SAMI_REF (if provided)
-#  and _MAGIC.
+# and _MAGIC.
+#
+# This plugin does attempt to apply substitutions to text strings.
+# If it fails, it just treats the value field as text.  See the
+# plugin implementation for details on the substitutions.
 plugin conffile {
     keys: ["*"]
-    priority: 2147483646
+    priority: 9223372036854775806
 }
 
 # Adding a sink requires a linked implementation. The existing sinks

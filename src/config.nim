@@ -1,4 +1,4 @@
-import options, tables, strutils, strformat, algorithm, os
+import options, tables, strutils, strformat, algorithm, os, json, nativesockets
 import con4m, con4m/[st, eval], nimutils, nimutils/logging
 import macros except error
 export logging
@@ -138,6 +138,9 @@ proc getDryRun*(): bool =
 proc setDryRun*(val: bool) =
   discard ctxSamiConf.setOverride("dry_run", pack(val))
   samiConfig.dryRun = val
+
+proc getPublishAudit*(): bool =
+   return samiConfig.publishAudit
 
 proc getPublishDefaults*(): bool = 
   return samiConfig.publishDefaults
@@ -423,17 +426,37 @@ proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict]): bool =
   trace("Loaded embedded configuration file")
   return true
 
-proc loadUserConfigFile*(selfSami: Option[SamiDict]): bool =
-  discard loadEmbeddedConfig(selfSami)
+proc doAudit(commandName: string,
+             parsedFlags: seq[string],
+             configFile:  string) =
+  if not getPublishAudit():
+    return
+
+  var preJson = { "command"    : commandName,
+                  "flags"      : parsedFlags.join(","),
+                  "hostname"   : getHostName(),
+                  "config"     : configFile,
+                  "time"       : $(unixTimeInMs()),
+                  "platform"   : getSamiPlatform(),
+                }.toTable()
+
+  publish("audit", $(%* prejson))
+          
+
+proc loadUserConfigFile*(commandName: string,
+                         parsedFlags: seq[string],
+                         selfSami: Option[SamiDict]): bool =
 
   if not getAllowExternalConfig():
+    doAudit(commandName, parsedFlags, "")
     return true
     
   var
-    path = getConfigPath()
+    path     = getConfigPath()
     filename = getConfigFileName() # the base file name.
-    fname: string                  # configPath / baseFileName
-    loaded: bool = false
+    fname:     string              # configPath / baseFileName
+    loaded:    bool   = false
+    contents:  string = ""
 
   for dir in path:
     fname = dir.joinPath(filename)
@@ -444,7 +467,9 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]): bool =
   if fname != "":
     trace(fmt"Loading config file: {fname}")
     try:
-      let res = ctxSamiConf.stackConfig(fname)
+      var
+        fd   = newFileStream(fname)
+        res  = ctxSamiConf.stackConfig(fname)
       if res.isNone():
         error(fmt"{fname}: invalid configuration not loaded.")
 
@@ -454,9 +479,12 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]): bool =
 
         return false
       else:
+        fd.setPosition(0)
+        contents = fd.readAll()
         loaded = true
       
     except Con4mError: # config file didn't load:
+      contents = "" # Just in case.
       info(fmt"{fname}: config file not loaded.")
       samiDebug("\n" & getCurrentException().getStackTrace())
       samiDebug("continuing.")
@@ -464,10 +492,12 @@ proc loadUserConfigFile*(selfSami: Option[SamiDict]): bool =
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
 
+  doAudit(commandName, parsedFlags, contents)
+  
   if loaded:
     trace(fmt"Loaded configuration file: {fname}")
   else:
-    trace("Running without a config file.")
+    trace("No user config file loaded.")
     
   return true
     
