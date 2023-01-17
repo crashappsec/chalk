@@ -42,7 +42,7 @@ template loadBasics(self: GitPlugin, sami: SamiObj) =
   self.vcsDir = findGitDir(self.samiPath)
   trace(trVcsDir.fmt())
 
-proc loadHead(self: GitPlugin): bool =
+proc loadHead(self: GitPlugin, sami: SamiObj): bool =
   # Don't want to commit to the order in which things get called,
   # so everything that might get called first someday calls this to
   # be safe.
@@ -66,7 +66,8 @@ proc loadHead(self: GitPlugin): bool =
               fname.split("/")
 
   if parts.len() < 3:
-    return false # TODO: throw a warning here.
+    sami.insertionError("Could not load github HEAD file")
+    return false 
 
   self.branchName = parts[2 .. ^1].join($DirSep)
   var reffile = newFileStream(self.vcsDir.joinPath(fname))
@@ -128,7 +129,7 @@ proc calcOrigin(self: GitPlugin, conf: seq[SecInfo]): string =
   return ghLocal
 
 proc getOrigin(self: GitPlugin, sami: SamiObj): (bool, Box) =
-  if not self.loadHead():
+  if not self.loadHead(sami):
     return (false, nil)
 
   let
@@ -143,7 +144,7 @@ proc getOrigin(self: GitPlugin, sami: SamiObj): (bool, Box) =
     trace(trOrigin.fmt())
     return (true, pack(url))
   except:
-    warn(wNotParsed.fmt())
+    sami.insertionError(wNotParsed.fmt())
     return (false, nil)
 
 # Not sure I'm going to use this.  Stay tuned.

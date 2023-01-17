@@ -19,7 +19,8 @@ proc populateOneSami(sami: SamiObj,
   var
     currentPriorities: Table[string, int]
     runPlugin: bool
-    keyPriorities: Table[string, int] # Track the lowest priority we've seen for a key.
+    keyPriorities: Table[string, int] # Track the lowest priority we've
+                                      # seen for a key.
     pri: int # current priority value we're looking at
     allPlugins = nonCodecPlugins
 
@@ -63,7 +64,8 @@ proc populateOneSami(sami: SamiObj,
     for k, v in ki:
       if len(k) > 0 and k[0] != 'X':
         if not isBuiltinKey(k):
-          error("Invalid key: " & k & " (custom keys must start with X)")
+          sami.insertionError("Invalid key: " & k &
+            " (custom keys must start with X)")
           continue
       if not currentPriorities.contains(k):
         sami.newFields[k] = v
@@ -77,13 +79,13 @@ proc populateOneSami(sami: SamiObj,
 proc doInjection*() =
   var
     # At the end we'll ask each codec w/ SAMIs to write all at once, if merited.
-    codecs: seq[Codec]
+    codecs:        seq[Codec]
     # Attach the codec to SAMIs as 'loser' Codecs don't get queried for keys.
-    pluginInfo: seq[KeyPriorityInfo]
-    keys: seq[string]
-    overrides: TableRef[string, int]
+    pluginInfo:    seq[KeyPriorityInfo]
+    keys:          seq[string]
+    overrides:     TableRef[string, int]
     priorityInfo = newTable[string, seq[KeyPriorityInfo]]()
-    objsForWrite: seq[string] = @[]
+    objsForWrite:  seq[string] = @[]
   let
     everyKey    = getOrderedKeys()
     inDryRun    = getDryRun()
@@ -111,7 +113,7 @@ proc doInjection*() =
 
     if plugin.configInfo.getCodec():
       let
-        codec = cast[Codec](plugin)
+        codec    = cast[Codec](plugin)
         extracts = codec.getSamis()
       if len(extracts) == 0: continue
       codecs.add(codec)
@@ -196,13 +198,13 @@ proc doInjection*() =
         post = item.stream.readAll()
 
       var
-        f: File
+        f:    File
         path: string
-        ctx: FileStream
+        ctx:  FileStream
 
       try:
         (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
-        ctx = newFileStream(f)
+        ctx       = newFileStream(f)
         codec.handleWrite(ctx, pre, some(encoded), post)
         if point.present:
           info(infReplacedSami.fmt())
