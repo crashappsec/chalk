@@ -1,0 +1,70 @@
+%{H Output basics}%
+SAMI currently defines the following "sinks" that you can output to:
+%{T
+Sink name::Description :: Configuration Parameters
+stdout :: Write to stdout::n/a
+stderr :: Write to stderr::n/a
+file::Write to a local file::{red}filename
+post :: Write via a HTTP/HTTPS post:: {red}uri, {red}headers {black}(must be in MIME format)
+s3 :: Write to an S3 bucket :: {red}uid, {red}secret, {red}uri {black}(must be a link in the form: s3://bucket-name/object-name), {red}cacheid
+custom :: Write to a con4m callback :: Any of the above
+}%
+Via configuration file, you can {green}configure{reset} each sink, and then attach those configurations to "topics".
+
+Each sink can have multiple attached configurations.  Each configuration can set up parameters such as credentials and locations, and can also set up output filters.
+
+Note that sinks are not used for data injection itself. But, when a codec injects a SAMI, the system will publish the "full" set of metadata you've configured to be collected for any given file, even if the codec was configured to only inject a small "pointer".
+
+The current supported topics are:
+%{T
+Topic::What it's for
+extract:: Recording data extracted from artifacts.
+inject:: Record metadata about the artifact into which data is getting inserted.
+nesting:: Show SAMI objects already existing in an artifact during an insert.
+defaults:: Show information about how the results of config file execution.
+dry-run:: To get messages about what *would* be inserted on injection, when the --dry-run flag is on.
+delete:: For recording when SAMIs are deleted from artifacts.
+audit:: For recording use of the command, along w/ command line flags and any external configuration file.
+confload:: For recording the old configuration and the fact that a new configuration was loaded.
+confdump:: For outputting the embedded configuration file.
+version:: Outputting basic command version info. Should usually be connected to stderr.
+help::Outputting help messages.  Should usually be connected to stderr.
+log::Printing error messages, that are filtered based on the global log-level setting.
+debug::Receiving debug output when using a non-release executable build.
+}%
+
+There are also a few available filters:
+%{T
+Filter Name::Description
+prettyJson::Format output as somewhat pretty-printed JSON.  Intended only for used with topics that write JSON, particularly, {red}extract, {red}inject, {red}nesting, {red}delete, {red}audit.
+addTopic::Add topic information to the beginning and end of the output.
+logLevel::Filter based on log-level.  Only works with the 'log' topic.
+logPrefix::Adds the colored prefix to the log message.  Only works with the 'log' topic.
+}%
+
+%{h Examples }%
+
+This first example connects the output of the {green}defaults{reset} command to stdout when you run it, but if you don't run it, and pass the --defaults flag (which also publishes to the 'defaults' topic, publishing will go to stderr instead. This is taken from the 'default' configuration file.
+%{c
+sink_config({red}"redirectableOut"{cyan}, {red}"stdout"{cyan}, \{\}, [])
+sink_config({red}"defaultOut"{cyan},      {red}"stderr"{cyan}, \{\}, [])
+brown} #argv() gets the command name.
+if argv0() != {red}"defaults"{cyan} \{
+    subscribe({red}"defaults"{cyan}, {red}"defaultOut"{cyan})
+\} else \{
+    subscribe({red}"defaults"{cyan}, {red}"redirectableOut"{cyan})
+\}
+}%
+
+This example configures S3 as a sink, taking the configuration needed for that sink from environment variables.  You could test the existence of these environment variables first (and indeed we do that in the default configuration).
+%{c
+if cmd == {red}"extract"{cyan} or cmd == {red}"insert"{cyan} or cmd == {red}"delete"{cyan} \{
+  sink_config({red}"s3"{cyan}, {red}"s3"{cyan}, \{ {red}"secret"{cyan} : env({red}"AWS_ACCESS_SECRET"{cyan}),
+                            {red}"userid"{cyan} : env({red}"AWS_ACCESS_ID"{cyan}),
+                            {red}"uri"{cyan}    : env({red}"AWS_S3_BUCKET_URI"{cyan}) \}, [] )
+\}
+
+{brown}# these are NOT done in the default config, you'd have to add them yourself.
+subscribe({red}"insert"{cyan}, {red}"s3"{cyan})
+subscribe({red}"extract"{cyan}, {red}"s3"{cyan})
+}%

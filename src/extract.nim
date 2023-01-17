@@ -94,7 +94,6 @@ proc doExtraction*(): Option[string] =
       toOut &= ", \"unmarked\" : " & $( %* unmarked)
 
     toOut &= "}"
-
     result = some(toOut)
     
     info(fmt"Completed {numExtractions} extractions.")

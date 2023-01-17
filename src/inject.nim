@@ -234,4 +234,4 @@ proc doInjection*() =
   if getSelfInjecting():
     publish("confload", fullJson)
   else:
-    publish("inject",   fullJson)
+    publish("insert",   fullJson)

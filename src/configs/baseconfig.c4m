@@ -261,7 +261,6 @@ key SBOMS {
     docstring: "SBOMs associated with this artifact"
 }
 
-
 key ERR_INFO {
     type: "[string]"
     standard: true

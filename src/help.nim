@@ -74,54 +74,60 @@ type
     kind:    JankKind
 
 proc jankyFormat(s: string): string =
-  return s.format(
-    {
-      "appName"      : getAppFileName().splitPath().tail,
-      "black"        : toAnsiCode(@[acBlack]),
-      "red"          : toAnsiCode(@[acRed]),
-      "green"        : toAnsiCode(@[acGreen]),
-      "yellow"       : toAnsiCode(@[acYellow]),
-      "blue"         : toAnsiCode(@[acBlue]),
-      "magenta"      : toAnsiCode(@[acMagenta]),
-      "cyan"         : toAnsiCode(@[acCyan]),
-      "white"        : toAnsiCode(@[acWhite]),
-      "brown"        : toAnsiCode(@[acBrown]),
-      "purple"       : toAnsiCode(@[acPurple]),      
-      "bblack"       : toAnsiCode(@[acBBlack]),
-      "bred"         : toAnsiCode(@[acBRed]),
-      "bgreen"       : toAnsiCode(@[acBGreen]),
-      "byellow"      : toAnsiCode(@[acBYellow]),
-      "bblue"        : toAnsiCode(@[acBBlue]),
-      "bmagenta"     : toAnsiCode(@[acBMagenta]),
-      "bcyan"        : toAnsiCode(@[acBCyan]),
-      "bwhite"       : toAnsiCode(@[acBWhite]),
-      "bgblack"      : toAnsiCode(@[acBGBlack]),
-      "bgred"        : toAnsiCode(@[acBGRed]),
-      "bggreen"      : toAnsiCode(@[acBgGreen]),
-      "bgyellow"     : toAnsiCode(@[acBGYellow]),
-      "bgblue"       : toAnsiCode(@[acBGBlue]),
-      "bgmagenta"    : toAnsiCode(@[acBGMagenta]),
-      "bgcyan"       : toAnsiCode(@[acBGCyan]),
-      "bgwhite"      : toAnsiCode(@[acBGWhite]),
-      "bold"         : toAnsiCode(@[acBold]),
-      "unbold"       : toAnsiCode(@[acUnbold]),
-      "invert"       : toAnsiCode(@[acInvert]),
-      "uninvert"     : toAnsiCode(@[acUninvert]),
-      "strikethru"   : toAnsiCode(@[acStrikethru]),
-      "nostrikethru" : toAnsiCode(@[acNostrikethru]),
-      "font0"        : toAnsiCode(@[acFont0]),
-      "font1"        : toAnsiCode(@[acFont1]),
-      "font2"        : toAnsiCode(@[acFont2]),
-      "font3"        : toAnsiCode(@[acFont3]),
-      "font4"        : toAnsiCode(@[acFont4]),
-      "font5"        : toAnsiCode(@[acFont5]),
-      "font6"        : toAnsiCode(@[acFont6]),
-      "font7"        : toAnsiCode(@[acFont7]),
-      "font8"        : toAnsiCode(@[acFont8]),
-      "font9"        : toAnsiCode(@[acFont9]),
-      "reset"        : toAnsiCode(@[acReset])
-  })
-  
+  try:
+    return s.format(
+      {
+        "nl"           : "\n",
+        "appName"      : getAppFileName().splitPath().tail,
+        "black"        : toAnsiCode(@[acBlack]),
+        "red"          : toAnsiCode(@[acRed]),
+        "green"        : toAnsiCode(@[acGreen]),
+        "yellow"       : toAnsiCode(@[acYellow]),
+        "blue"         : toAnsiCode(@[acBlue]),
+        "magenta"      : toAnsiCode(@[acMagenta]),
+        "cyan"         : toAnsiCode(@[acCyan]),
+        "white"        : toAnsiCode(@[acWhite]),
+        "brown"        : toAnsiCode(@[acBrown]),
+        "purple"       : toAnsiCode(@[acPurple]),      
+        "bblack"       : toAnsiCode(@[acBBlack]),
+        "bred"         : toAnsiCode(@[acBRed]),
+        "bgreen"       : toAnsiCode(@[acBGreen]),
+        "byellow"      : toAnsiCode(@[acBYellow]),
+        "bblue"        : toAnsiCode(@[acBBlue]),
+        "bmagenta"     : toAnsiCode(@[acBMagenta]),
+        "bcyan"        : toAnsiCode(@[acBCyan]),
+        "bwhite"       : toAnsiCode(@[acBWhite]),
+        "bgblack"      : toAnsiCode(@[acBGBlack]),
+        "bgred"        : toAnsiCode(@[acBGRed]),
+        "bggreen"      : toAnsiCode(@[acBgGreen]),
+        "bgyellow"     : toAnsiCode(@[acBGYellow]),
+        "bgblue"       : toAnsiCode(@[acBGBlue]),
+        "bgmagenta"    : toAnsiCode(@[acBGMagenta]),
+        "bgcyan"       : toAnsiCode(@[acBGCyan]),
+        "bgwhite"      : toAnsiCode(@[acBGWhite]),
+        "bold"         : toAnsiCode(@[acBold]),
+        "unbold"       : toAnsiCode(@[acUnbold]),
+        "invert"       : toAnsiCode(@[acInvert]),
+        "uninvert"     : toAnsiCode(@[acUninvert]),
+        "strikethru"   : toAnsiCode(@[acStrikethru]),
+        "nostrikethru" : toAnsiCode(@[acNostrikethru]),
+        "font0"        : toAnsiCode(@[acFont0]),
+        "font1"        : toAnsiCode(@[acFont1]),
+        "font2"        : toAnsiCode(@[acFont2]),
+        "font3"        : toAnsiCode(@[acFont3]),
+        "font4"        : toAnsiCode(@[acFont4]),
+        "font5"        : toAnsiCode(@[acFont5]),
+        "font6"        : toAnsiCode(@[acFont6]),
+        "font7"        : toAnsiCode(@[acFont7]),
+        "font8"        : toAnsiCode(@[acFont8]),
+        "font9"        : toAnsiCode(@[acFont9]),
+        "reset"        : toAnsiCode(@[acReset])
+    })
+  except:
+    # Generally we want to ignore these problems, but when
+    # running a debug build, let's expose them.
+    publish("debug", getCurrentException().getStackTrace())
+    return s
 proc parseJankText(s: string, width: int): seq[JankBlock] =
   let
     processed = s.jankyFormat()
@@ -135,14 +141,20 @@ proc parseJankText(s: string, width: int): seq[JankBlock] =
                                              width,
                                              hangingIndent = 0) & "\n"))
 
+import parseutils
+
+template `not`(x: int): untyped = x == 0
+  
 proc parseJankTable(s: string, width: int, plain: bool): JankBlock =
   let
-    strRows = s.jankyFormat().split(Rune('\n'))
+    strRows = s.jankyFormat().strip(leading=false).split(Rune('\n'))
   var
     rows: seq[seq[string]] = @[]
     maxCols                = 0
+    options                = strRows[0].strip()
 
-  for line in strRows:
+
+  for line in strRows[1 .. ^1]:
     var
       row = strutils.split(line, "::")
       n   = len(row)
@@ -160,7 +172,25 @@ proc parseJankTable(s: string, width: int, plain: bool): JankBlock =
     while len(row) < maxCols:
       row.add("")
 
-  var t = samiTableFormatter(maxCols, rows=rows, wrapStyle=WrapLines)
+  var t = samiTableFormatter(maxCols,
+                             rows=rows,
+                             wrapStyle=WrapLines,
+                             maxCellSz=0)
+
+  if options.len != 0:
+    let specs = options.split(Rune(':'))
+    for i, item in specs:
+      var parsed: int
+      if not len(item): continue
+      case item[0]
+      of '>':
+        discard parseInt(item[1..^1], parsed, 0)
+        discard t.newColSpec(maxChr = parsed, colNum = i)
+      of '<':
+        discard parseInt(item[1..^1], parsed, 0)
+        discard t.newColSpec(minChr = parsed, colNum = i)
+      else:
+          raise newException(ValueError, "Invalid janky col width specifier")
 
   if plain:
     t.setNoFormatting()
@@ -192,19 +222,23 @@ proc jankCodeBlock(s: string, width: int): JankBlock =
 proc parseJank(s: string, width: int): seq[JankBlock]
 
 proc parseJankCtrl(s: string, width: int): seq[JankBlock] =
-  var n = s[1 .. ^1].strip()
+  var n = s[1 .. ^1]
   case s[0] 
   of 't': # Table, plain, no headers or borders.
     return @[parseJankTable(n, width, true)]
   of 'T': # Table, yes headers and borders.
     return @[parseJankTable(n, width, false)]
   of 'H':
+    n = n.strip()
     return @[jankHeader1(n)]
   of 'h':
+    n = n.strip()
     return @[jankHeader2(n)]
   of 'i', 'I':
+    n = n.strip()
     return parseJank(helpCorpus[n].strip(), width)
   of 'c':
+    n = n.strip()
     return @[jankCodeBlock(n, width)]
   else:
     raise newException(ValueError, "Janky jank option: '" & $(Rune(s[0])))

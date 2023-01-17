@@ -13,7 +13,7 @@ color: true
 
 log_level: "info" 
 
-log("info", "Loading the default SAMI config")
+#log("info", "Loading the default SAMI config")
 
 # The following default commands are valid:
 # help, insert, extract, version
@@ -49,11 +49,10 @@ key INSERTION_HOSTINFO {
 cmd  := argv0()
 args := argv()
 
-log("trace", "running command: " + cmd)
+log("info", "running command: " + cmd)
 
-sinkConfig("redirectableOut", "stdout", {}, [])
-sinkConfig("defaultOut",      "stderr", {}, [])
-
+sink_config("redirectableOut", "stdout", {}, [])
+sink_config("defaultOut",      "stderr", {}, [])
 
 if cmd != "defaults" {
     subscribe("defaults", "defaultOut")
@@ -62,30 +61,32 @@ if cmd != "defaults" {
 }
 
 subscribe("help", "defaultOut")
-if cmd == "extract" or cmd == "inject" or cmd == "del" {
 
+if cmd == "extract" or cmd == "insert" or cmd == "delete" {
   if envExists("AWS_S3_BUCKET_URI") {
     if not envExists("AWS_ACCESS_ID") {
        log("warn", "To configure AWS must provide AWS_ACCESS_ID")
     } elif not envExists("AWS_ACCESS_SECRET") {
        log("warn", "To configure AWS must provide AWS_ACCESS_SECRET")       
     } else {
-      sinkConfig("s3", "s3", { "secret" : env("AWS_ACCESS_SECRET"),
+      sink_config("s3", "s3", { "secret" : env("AWS_ACCESS_SECRET"),
                                "userid" : env("AWS_ACCESS_ID"),
                                "uri"    : env("AWS_S3_BUCKET_URI") }, [] )
     }
   }
-
   subscribe("extract", "defaultOut") # Writes SAMIs extracted w/ 'extract' cmd
-  subscribe("nesting", "defaultOut") # Writes extracted samis when injecting
-  subscribe("inject",  "defaultOut") # Writes full SAMIs (no ptrs) being injected
+  subscribe("nesting", "defaultOut") # Writes extracted samis when inserting
+  subscribe("insert",  "defaultOut") # Writes full SAMIs (no ptrs) being insert
+  subscribe("delete",  "defaultOut") # Writes full SAMIs being deleted
+  subscribe("dry-run", "defaultOut")
+  
 }
 elif cmd == "confdump" {
   if len(args) > 0 {
-    sinkConfig("dumpOut", "file", {"filename" : args[0]}, [])
+    sink_config("dumpOut", "file", {"filename" : args[0]}, [])
   }
   else {
-    sinkConfig("dumpOut", "stdout", {}, [])
+    sink_config("dumpOut", "stdout", {}, [])
   }
 
   subscribe("confdump", "dumpOut")

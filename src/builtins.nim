@@ -6,16 +6,10 @@
 import tables, options, uri, strformat, nimutils, nimutils/logging, streams
 import con4m, con4m/[builtins, st, eval], config
 
-# This "builtin" call for con4m doesn't need to be available until
-# user configurations load, but let's be sure to do it before that
-# happens.  First we define the function here, and next we'll register
-# it.
-var cmdInject = some(pack(false))
-
 # First builtin topic stuff.  Then builtin con4m calls.
 
 discard registerTopic("extract")
-discard registerTopic("inject")
+discard registerTopic("insert")
 discard registerTopic("nesting")
 discard registerTopic("defaults")
 discard registerTopic("dry-run")
@@ -93,12 +87,6 @@ proc getHookByName*(name: string): Option[SinkConfig] =
 
 proc getSinkConfigs*(): Table[string, SinkConfig] =
   return availableHooks
-
-proc getInjecting*(args: seq[Box],
-                   unused1: Con4mScope,
-                   unused2: VarStack,
-                   unused3: Con4mScope): Option[Box] =
-    return cmdInject
 
 var args: seq[string]
 
@@ -276,13 +264,12 @@ proc loadAdditionalBuiltins*() =
   ctx.newBuiltin("osname",      getOsName,        "f() -> string")
   ctx.newBuiltin("arch",        getArch,          "f() -> string")
   ctx.newBuiltin("version",     getExeVersion,    "f() -> string")
-  ctx.newBuiltIn("injecting",   getInjecting,     "f() -> bool")
   ctx.newBuiltIn("subscribe",   topicSubscribe,   "f(string, string)->bool")
   ctx.newBuiltIn("unsubscribe", topicUnSubscribe, "f(string, string)->bool")
   ctx.newBuiltIn("log",         logBuiltin,       "f(string, string)")
   ctx.newBuiltIn("argv",        getArgv,          "f() -> [string]")
   ctx.newBuiltIn("argv0",       getCommandName,   "f() -> string")
-  ctx.newBuiltIn("sinkConfig",  sinkConfig,
+  ctx.newBuiltIn("sink_config",  sinkConfig,
                  "f(string, string, {string: string}, [string])")
 
 when not defined(release):
