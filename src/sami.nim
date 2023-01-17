@@ -4,9 +4,45 @@ import macros except error
 
 const
   validDefaultCommands = ["help", "insert", "extract", "version"]
-  allValidCommands     = ["insert", "extract", "delete", "defaults",
-                          "confdump", "confload", "version", "help"]
   
+  cmdsInsert           = ["insert", "inject", "ins", "in", "i"]
+  cmdsExtract          = ["extract", "ex", "x"]
+  cmdsDelete           = ["delete", "del"]
+  cmdsDefaults         = ["defaults", "def"]
+  cmdsConfDump         = ["confdump", "dump"]
+  cmdsConfLoad         = ["confload", "load"]
+  cmdsVersion          = ["version", "vers", "v"]
+  cmdsHelp             = ["help", "h"]
+
+# We're going to, at compile time, turn the above arrays starting with
+# 'cmd' into a hash table that maps every possible command we'd accept
+# to its 'official' name, which is the first argument in that array.
+#
+# We do need the arrays around for properly calling the argparse library.  
+macro declareReverseTable(all: static[openarray[seq[string]]]): untyped =
+  var constr = newNimNode(nnkTableConstr)
+
+  for arr in all:
+    let
+      officialName = arr[0]
+      cachedNode   = newLit(arr[0])
+
+    for validEntry in arr:
+      var kvDeclNode = newNimNode(nnkExprColonExpr)
+      kvDeclNode.add(newLit(validEntry))
+      kvDeclNode.add(cachedNode)
+      constr.add(kvDeclNode)
+
+  return quote do: toTable(`constr`)
+
+const cmdReverseTable = declareReverseTable([@cmdsInsert,
+                                             @cmdsExtract,
+                                             @cmdsDelete,
+                                             @cmdsDefaults,
+                                             @cmdsConfDump,
+                                             @cmdsConfLoad,
+                                             @cmdsVersion,
+                                             @cmdsHelp])
 type
   SettrFunc    = (bool) -> void
   BoolFlagSpec = tuple[trueS, trueL, falseS, falseL, settr: string]
@@ -184,7 +220,7 @@ macro genBoolFlagChecks(opts: untyped,
 # of arguments, or -1 for variable.  So if a command can take 0 or 1
 # arguments, you still have to pass in -1, then do the check in
 # your `runCmdWhatever` proc.
-macro declareCommand(names:    static[seq[string]],
+macro declareCommand(names:    static[openarray[string]],
                      artifact: bool,
                      hasArg:   bool,
                      nargs:    int) =
@@ -245,8 +281,8 @@ proc predictCommand(): string =
   # is no hit, we will report "default" for now, and update it if the
   # default command really is used.
   for item in commandLineParams():
-    if item in allValidCommands:
-      return item
+    if item in cmdReverseTable:
+      return cmdReverseTable[item]
   return "default"
   
 when isMainModule:
@@ -266,16 +302,14 @@ when isMainModule:
     for tup in globalNoOptionFlags:
       flag(tup.trueS, tup.trueL)
       flag(tup.falseS, tup.falseL)
-    # The first parameter to each of these MUST be duplicated in the
-    # allValidCommands() array up top.
-    declareCommand(@["insert", "inject", "ins", "in", "i"], true, true, -1)
-    declareCommand(@["extract", "ex", "x"], true, true, -1)
-    declareCommand(@["delete", "del"], true, true, -1)
-    declareCommand(@["defaults", "def"], false, false, 0)
-    declareCommand(@["confdump", "dump"], false, true, -1)
-    declareCommand(@["confload", "load"], false, true, 1)
-    declareCommand(@["version", "vers", "v"], false, false, 0)
-    declareCommand(@["help", "h"], false, true, -1)
+    declareCommand(cmdsInsert, true, true, -1)
+    declareCommand(cmdsExtract, true, true, -1)
+    declareCommand(cmdsDelete, true, true, -1)
+    declareCommand(cmdsDefaults, false, false, 0)
+    declareCommand(cmdsConfDump, false, true, -1)
+    declareCommand(cmdsConfLoad, false, true, 1)
+    declareCommand(cmdsVersion, false, false, 0)
+    declareCommand(cmdsHelp, false, true, -1)
     run:
       if opts.help:
         runCmdHelp()
