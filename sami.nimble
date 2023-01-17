@@ -13,7 +13,7 @@ requires "https://github.com/crashappsec/nimutils >= 0.1.6"
 requires "argparse == 3.0.0"
 requires "nimsha2 == 0.1.1"
 requires "glob == 0.11.2"
-requires "formatstr == 0.2.0"
+requires "https://github.com/guibar64/formatstr == 0.2.0"
 
 # Docs generated with
 # nimble --project --index:on --git.url:https://github.com/crashappsec/con4m.git --git.commit:`version`
