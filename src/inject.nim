@@ -12,17 +12,26 @@ type
   KeyPriorityInfo = tuple[priority: int, plugin: Plugin]
 let noOverrides = newTable[string, int]()
 
-proc populateOneSami(sami: SamiObj,
-                     codec: Codec,
-                     priorityInfo: TableRef[string, seq[KeyPriorityInfo]],
+var
+  systeMetsys: array[2, Plugin]
+
+proc getSystemPlugins(): array[2, Plugin] {.inline.} =
+  once:
+    systeMetsys = [getPluginByName("system"), getPluginByName("metsys")]
+    
+  return systeMetsys
+    
+proc populateOneSami(sami:            SamiObj,
+                     codec:           Codec,
+                     priorityInfo:    TableRef[string, seq[KeyPriorityInfo]],
                      nonCodecPlugins: seq[Plugin]) =
   var
     currentPriorities: Table[string, int]
-    runPlugin: bool
-    keyPriorities: Table[string, int] # Track the lowest priority we've
-                                      # seen for a key.
-    pri: int # current priority value we're looking at
-    allPlugins = nonCodecPlugins
+    runPlugin:         bool
+    keyPriorities:     Table[string, int] # Track the lowest priority we've
+                                          # seen for a key.
+    pri:               int # current priority value we're looking at
+    allPlugins       = nonCodecPlugins
 
   allPlugins.add(codec)
 
@@ -32,7 +41,7 @@ proc populateOneSami(sami: SamiObj,
     runPlugin = false
     var
       pluginKeys = plugin.configInfo.getKeys()
-      overrides = getOrElse(plugin.configInfo.getOverrides(), noOverrides)
+      overrides  = getOrElse(plugin.configInfo.getOverrides(), noOverrides)
 
     if (pluginKeys.len() == 1) and (pluginKeys[0] == "*"):
       pluginKeys = getOrderedKeys()
@@ -61,20 +70,30 @@ proc populateOneSami(sami: SamiObj,
 
     if ki == nil: continue
 
+    # For keys that are spec'd as 'codec' or 'system', those can only
+    # be set by codecs or the system plugin, respectively.  We enforce
+    # that in this loop.
+    
     for k, v in ki:
+      if k.isSystemKey() and plugin notin getSystemPlugins():
+        error("Invalid (non-system) attempt to set system key: " & k)
+        continue
+      if k.isCodecKey() and plugin != codec:
+        error("Non-codec attempted to set codec key: " & k)        
+        continue
       if len(k) > 0 and k[0] != 'X':
         if not isBuiltinKey(k):
           sami.insertionError("Invalid key: " & k &
             " (custom keys must start with X)")
           continue
       if not currentPriorities.contains(k):
-        sami.newFields[k] = v
+        sami.newFields[k]    = v
         currentPriorities[k] = keyPriorities[k]
       else:
         let i = currentPriorities[k]
         if keyPriorities[k] < i:
           currentPriorities[k] = keyPriorities[k]
-          sami.newFields[k] = v
+          sami.newFields[k]    = v
 
 proc doInjection*() =
   var

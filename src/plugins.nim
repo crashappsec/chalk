@@ -38,6 +38,9 @@ proc loadCommandPlugins*() =
   for (name, command) in getCommandPlugins():
     registerPlugin(name, ExternalPlugin(command: command))
 
+proc getPluginByName*(name: string): Plugin =
+  return installedPlugins[name]
+                         
 proc getPluginsByPriority*(): seq[PluginInfo] =
   result = @[]
 
@@ -289,12 +292,13 @@ method getArtifactInfo*(self: ExternalPlugin, sami: SamiObj): KeyInfo =
 {.warning[UnusedImport]: off.}
 
 import plugins/system
-import plugins/metsys
 import plugins/ciGithub
 import plugins/conffile
 import plugins/codecShebang
 import plugins/codecElf
+import plugins/custom
 import plugins/ownerAuthors
 import plugins/ownerGithub
-import plugins/vctlGit
 import plugins/sbomCallback
+import plugins/vctlGit
+import plugins/metsys

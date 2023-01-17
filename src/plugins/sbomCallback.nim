@@ -4,7 +4,10 @@ import nimutils/box, con4m/[eval, st, builtins], ../config, ../plugins
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 
-const callbackType = "f(string) -> {string : string}"
+const pluginName      = "sbom_callback"
+const callbackName    = "get_sboms"
+const callbackTypeStr = "f(string) -> {string : string}"
+let   callbackType    = callbackTypeStr.toCon4mType()
 
 type SbomCallbackPlugin* = ref object of Plugin
 
@@ -12,9 +15,9 @@ method getArtifactInfo*(self: SbomCallbackPlugin,
                         sami: SamiObj): KeyInfo =
 
   let optInfo = sCall(getConfigState(),
-                      "get_sboms",
+                      callbackName,
                       @[pack(sami.fullpath)],
-                      callbackType.toCon4mType())
+                      callbackType)
   if optInfo.isSome():
     let
       res = optinfo.get()
@@ -24,5 +27,5 @@ method getArtifactInfo*(self: SbomCallbackPlugin,
       new result
       result["SBOMS"] = res
 
-registerPlugin("sbom_callback", SbomCallbackPlugin())
-getConfigState().newCallback("get_sboms", callbackType)
+registerPlugin(pluginName, SbomCallbackPlugin())
+getConfigState().newCallback(callbackName, callbackTypeStr)

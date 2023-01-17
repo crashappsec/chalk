@@ -274,6 +274,7 @@ key ERR_INFO {
 key SIGNATURE {
     type: "{string : string}"
     since: "0.1.0"
+    system: true
     standard: true
     output_order: 1000
     in_ptr: true
@@ -281,7 +282,8 @@ key SIGNATURE {
 }
 
 # Doesn't do any keys other than the codec defaults, which are:
-# ARTIFACT_PATH, HASH, HASH_FILES
+# ARTIFACT_PATH, HASH, HASH_FILES.  Note that non-codecs cannot set
+# these keys.
 
 plugin elf {
     codec: true
@@ -357,6 +359,11 @@ plugin metsys {
 plugin conffile {
     keys: ["*"]
     priority: 9223372036854775806
+}
+
+plugin custom_metadata {
+  keys:     ["*"]
+  priority: 0
 }
 
 # Adding a sink requires a linked implementation. The existing sinks
