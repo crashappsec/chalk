@@ -31,6 +31,11 @@ var samiConfig = con4m(Sami, baseconfig):
   attr(dry_run, bool, false)
   attr(publish_audit, bool, defaultVal = false)
   attr(artifact_search_path, [string], @["."])
+  attr(ignore_patterns, [string],
+       @[".*/**", "*.txt", "*.json"],
+       doc = "File system patterns to ignore for SAMI insertion ONLY. " &
+             "Other operations depend on the presence of a SAMI in a " &
+             "file, so this is not used in those situations.")
   attr(recursive, bool, true)
   attr(can_dump, bool, true)
   attr(can_load, bool, true)

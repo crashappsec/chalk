@@ -1,4 +1,4 @@
-import tables, strformat, strutils, os, options, nativesockets, json
+import tables, strformat, strutils, os, options, nativesockets, json, glob
 import nimutils, config, plugins, io/tojson
 
 const
@@ -28,19 +28,26 @@ proc doExtraction*(): Option[string] =
   # because we overload the capability for loading / unloading the
   # admin's config file.
   var
-    exclusions: seq[string] = if getSelfInjecting(): @[]
-                              else: @[resolvePath(getAppFileName())]
-    codecInfo:  seq[Codec]
-    samisToRet: seq[string] = @[]
-    unmarked:   seq[string] # Unmarked artifacts.
+    exclusions:  seq[string] = if getSelfInjecting(): @[]
+                               else: @[resolvePath(getAppFileName())]
+    codecInfo:   seq[Codec]
+    samisToRet:  seq[string] = @[]
+    unmarked:    seq[string]       # Unmarked artifacts.
+    ignoreGlobs: seq[Glob]   = @[]
+    artifactPath             = getArtifactSearchPath()
+    ignorePatternsAsStr      = getIgnorePatterns()
+    numExtractions           = 0
 
-    numExtractions = 0
-  var artifactPath = getArtifactSearchPath()
-
+  for item in ignorePatternsAsStr:
+    ignoreGlobs.add(glob("**/" & item))
+    
   for (_, name, plugin) in getCodecsByPriority():
     let codec = cast[Codec](plugin)
     trace(fmt"Asking codec '{name}' to scan for SAMIs.")
-    codec.doScan(artifactPath, exclusions, getRecursive())
+    if getCommandName() == "insert":
+      codec.doScan(artifactPath, exclusions, ignoreGlobs, getRecursive())
+    else:
+      codec.doScan(artifactPath, exclusions, @[], getRecursive())      
     codecInfo.add(codec)
 
   trace("Beginning extraction attempts for any found SAMIs")
@@ -51,7 +58,11 @@ proc doExtraction*(): Option[string] =
         var comma, primaryJson, embededJson: string
 
         if sami.samiIsEmpty():
-          info(fmtInfoNoExtract.fmt())
+          # mustIgnore is in plugins.nim
+          if mustIgnore(sami.fullpath, ignoreGlobs):
+            trace(fmtInfoNoExtract.fmt())
+          else:
+            info(fmtInfoNoExtract.fmt())
           unmarked.add(sami.fullpath)
           
           continue
@@ -81,8 +92,7 @@ proc doExtraction*(): Option[string] =
         samisToRet.add(logTemplate %
                  [absPath, primaryJson, embededJson])
   except:
-    # TODO: do better here.
-    echo getCurrentException().getStackTrace()
+    publish("debug", getCurrentException().getStackTrace())
     error(getCurrentExceptionMsg() & " (likely a bad SAMI embed)")
   finally:
     if numExtractions == 0:
@@ -117,7 +127,7 @@ proc getSelfSamiObj*(): Option[SamiObj] =
   
     for (_, name, plugin) in getCodecsByPriority():
       let codec = cast[Codec](plugin)
-      codec.doScan(myPath, exclusions, false)
+      codec.doScan(myPath, exclusions, @[], false)
       if len(codec.samis) == 0: continue
       selfSamiObj = some(codec.samis[0])
       codec.samis = @[]

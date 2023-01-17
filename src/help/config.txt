@@ -11,6 +11,8 @@ key SAMI_PTR \{
 \}
 }%
 
+There are a number of global options that can be configured.  See {bold}{appName} help globals{reset} for a list and description.
+
 Since SAMI's goal is to make it easy and flexible to capture arbitrary metadata about software artifacts, the fact that the world isn't homogenous requires a lot of flexibility. As a result, SAMI embeds a small, efficient language called {bold}con4m{reset} that can intertwine the two.
 
 For instance, if you have two data stores, one for things running AWS, and one for everything else, you could change the above code to do different things if AWS is going to get used.  For instance:
@@ -24,6 +26,10 @@ key SAMI_PTR \{
   \}
 \}
 }%
+
+SAMI's got typical core data types, including strings, ints, floats, lists and dictionaries. Strings used as values need to be put in quotes.  See the con4m manual (link below) for more.
+
+%{h Configuration stacking}%
 SAMI configuration files {invert}stack{reset}. Specifically:
 
 - The system loads a base configuration file that loads the underlying schema and some core implementation details.

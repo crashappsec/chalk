@@ -161,6 +161,9 @@ proc setArtifactSearchPath*(val: seq[string]) =
 
   discard ctxSamiConf.setOverride("artifact_search_path", pack(val))
 
+proc getIgnorePatterns*(): seq[string] =
+  return samiConfig.ignorePatterns
+
 proc getRecursive*(): bool =
   return samiConfig.recursive
 
