@@ -20,7 +20,8 @@ proc processOldSami(sami: SamiObj, olddict: SamiDict): Box =
         specOpt = getKeySpec(fullkey)
 
     if specOpt.isNone():
-      warn("Found unknown key (" & k & ") in a SAMI we're replacing")
+      sami.insertionError("Found unknown key (" & k &
+                          ") in a SAMI we're replacing")
     else:
       let spec = specOpt.get()
       if spec.getSkip():
@@ -47,5 +48,8 @@ method getArtifactInfo*(self: MetsysPlugin,
         result["OLD_SAMI"] = processOldSami(sami, oldpoint.samiFields.get())
 
   # TODO... handle previous sami.
+  if len(sami.err) != 0:
+    result["ERR_INFO"] = pack(sami.err)
+  
 
 registerPlugin("metsys", MetsysPlugin())

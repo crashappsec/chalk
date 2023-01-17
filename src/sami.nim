@@ -259,7 +259,7 @@ when isMainModule:
 
   var cmdLine  = newParser:
     noHelpFlag()
-    flag  ("-h", "--help")
+    flag("-h", "--help")
     option("-f", "--config-file")
     option("-l", "--log-level",
            choices = @["none", "error", "warn", "info", "verbose", "trace"])

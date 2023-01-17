@@ -10,7 +10,8 @@ method getArtifactInfo*(self: GithubCI,
                         sami: SamiObj): KeyInfo =
   result = newTable[string, Box]()
 
-  # https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
+  # https://docs.github.com/en/actions/
+  #              learn-github-actions/variables#default-environment-variables
   let
     CI                = os.getEnv("CI")
     GITHUB_SHA        = os.getEnv("GITHUB_SHA")
@@ -44,7 +45,8 @@ method getArtifactInfo*(self: GithubCI,
   if GITHUB_API_URL != "":
     result["BUILD_API_URI"] = pack(GITHUB_API_URL)
 
-  # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
+  # https://docs.github.com/en/actions/using-workflows/
+  #                                    events-that-trigger-workflows
   if (
     GITHUB_EVENT_NAME != "" and
     GITHUB_REF_TYPE != ""

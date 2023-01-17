@@ -81,6 +81,12 @@ method getArtifactInfo*(self: Plugin, sami: SamiObj): KeyInfo {.base.} =
 proc getSamis*(self: Codec): seq[SamiObj] {.inline.} =
   return self.samis
 
+proc insertionError*(o: SamiObj, msg: string) =
+  ## These things can go into the errorInfo field of the SAMI, and
+  ## will get published to the log topic.
+  error(msg)
+  o.err.add(msg)
+  
 method scan*(self: Codec, sami: SamiObj): bool {.base.} =
   ## Return true if the codec is going to handle this file.  This
   ## function should add position information and presence
@@ -111,7 +117,8 @@ proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
       pt.valid = true
       return
     except:
-      warn(eBadBin.fmt() & " " & getCurrentExceptionMsg())
+      # Technically an extraction error.
+      sami.insertionError(eBadBin.fmt() & " " & getCurrentExceptionMsg())
       pt.endOffset = sami.stream.getPosition()
       pt.valid = false
       return
@@ -130,7 +137,7 @@ proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
       pt.endOffset = sami.stream.getPosition()
       pt.valid = true
     except:
-      warn(eBadJson.fmt() & ": " & getCurrentExceptionMsg())
+      sami.insertionError(eBadJson.fmt() & ": " & getCurrentExceptionMsg())
       pt.startOffset = truestart
       pt.endOffset = sami.stream.getPosition()
       pt.valid = false
@@ -226,11 +233,11 @@ method getArtifactInfo*(self: Codec, sami: SamiObj): KeyInfo =
 
   let
     hashFilesBox = pack(@[sami.fullpath])
-    encodedHash = self.getArtifactHash(sami).toHex().toLowerAscii()
+    encodedHash  = self.getArtifactHash(sami).toHex().toLowerAscii()
 
 
-  result["HASH"] = pack(encodedHash)
-  result["HASH_FILES"] = hashFilesBox
+  result["HASH"]          = pack(encodedHash)
+  result["HASH_FILES"]    = hashFilesBox
   result["ARTIFACT_PATH"] = pack(sami.fullpath)
 
 method handleWrite*(self: Codec,

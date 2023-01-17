@@ -343,7 +343,7 @@ plugin system {
 #
 # The priority field is set to high(int64).
 plugin metsys {
-    keys: ["OLD_SAMI", "SIGNATURE" ]
+    keys: ["OLD_SAMI", "SIGNATURE", "ERR_INFO"]
     priority: 9223372036854775807
 }
 

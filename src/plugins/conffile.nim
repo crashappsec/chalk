@@ -18,7 +18,7 @@ method getArtifactInfo*(self: ConfFilePlugin,
       spec   = config.getKeySpec(key).get()
       optval = spec.getValue()
 
-    if optval.isNone(): continue
+    if optval.isNone():  continue
     if spec.getSystem(): continue # This plugin doesn't handle system keys.
 
     if spec.getType() == "string":
@@ -36,7 +36,7 @@ method getArtifactInfo*(self: ConfFilePlugin,
       except:
         result[key] = pack(raw)
     else:
-      result[key] = optval.get()
+      result[key]   = optval.get()
 
 
 registerPlugin("conffile", ConfFilePlugin())
