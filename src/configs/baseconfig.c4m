@@ -11,7 +11,7 @@ key _MAGIC json {
     standard: true
     since: "0.1.0"
     output_order: 0
-    in_ref: true
+    in_ptr: true
     docstring: "Used to identify the start of JSON encoded output only"
 }
 
@@ -23,7 +23,7 @@ key SAMI_ID {
     standard: true
     since: "0.1.0"
     output_order: 1
-    in_ref: true
+    in_ptr: true
     docstring: "Unique 64-bit value per insertion"
 }
 
@@ -35,7 +35,7 @@ key SAMI_VERSION {
     standard: true
     since: "0.1.0"
     output_order: 2
-    in_ref: true
+    in_ptr: true
     docstring: "Spec version of inserted objects"
 }
 
@@ -45,7 +45,7 @@ key SAMI_PTR {
     standard: true
     since: "0.10"
     output_order: 3
-    in_ref: true
+    in_ptr: true
     docstring: "When enabled, injects minimal metadata; this field then gets a URL you supply to point to the rest of the data. Items marked as 'true' in the 'Ptr?' column are added in the PTR object"
 }
 
@@ -276,7 +276,7 @@ key SIGNATURE {
     since: "0.1.0"
     standard: true
     output_order: 1000
-    in_ref: true
+    in_ptr: true
     docstring: "Embedded digital signature for artifact"
 }
 

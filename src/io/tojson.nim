@@ -77,7 +77,7 @@ proc createdToJson*(sami: SamiObj, ptrOnly = false): string =
     # If SAMI pointers are set up, and we're currently outputting
     # a pointer, then we only output if the config has the in_ref
     # field set.
-    if ptrOnly and not spec.getInRef():
+    if ptrOnly and not spec.getInPtr():
       continue
 
     let

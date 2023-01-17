@@ -81,7 +81,7 @@ var samiConfig = con4m(Sami, baseconfig):
          doc = "If not required by the spec, skip writing this key," &
                " even if its value could be computed. Will also be " &
                "skipped if found in a nested SAMI")
-    attr(in_ref,
+    attr(in_ptr,
          bool,
          defaultVal = false,
          doc = "If the key is to be injected, should it appear in the pointer" &

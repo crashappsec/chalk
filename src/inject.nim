@@ -169,6 +169,9 @@ proc doInjection*() =
         point = item.primary
         pre = item.stream.readStr(point.startOffset)
       var
+        # Note that createdToBinary and createdToJson detrmine whether
+        # to write individual fields based on the setting of the
+        # metadata key's in_ptr property.
         encoded = if Binary in item.flags:
                     item.createdToBinary(outputPtrs)
                   else:

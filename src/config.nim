@@ -224,8 +224,8 @@ proc getMustForce*(key: SamiKeySection): bool =
 proc getSkip*(key: SamiKeySection): bool =
   return key.skip
 
-proc getInRef*(key: SamiKeySection): bool =
-  return key.inRef
+proc getInPtr*(key: SamiKeySection): bool =
+  return key.inPtr
 
 proc getOutputOrder*(key: SamiKeySection): int =
   return key.outputOrder

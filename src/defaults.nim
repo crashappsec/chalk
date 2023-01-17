@@ -154,10 +154,10 @@ proc showKeyConfigs*(): int {.discardable.} =
       system  = spec.getSystem()
       defOpt  = spec.getValue()
       default = $(getOrElse(defOpt, if system: sysVal else: emptyVal))
-      inRef   = if spec.getInRef(): "YES" else: "no"
+      inPtr   = if spec.getInPtr(): "YES" else: "no"
       desc    = getOrElse(spec.getDocString(), "none")
 
-    ot.addRow(@[key, enabled, default, inRef, desc])
+    ot.addRow(@[key, enabled, default, inPtr, desc])
 
   if len(custom) != 0:
     # TODO... Span rows and/or per-cell overrides.  Tmp hack.
@@ -170,10 +170,10 @@ proc showKeyConfigs*(): int {.discardable.} =
         enabled = if spec.getSkip(): "NO" else: "yes"
         defOpt  = spec.getValue()
         default = $(getOrElse(defOpt, pack("none")))
-        inRef   = if spec.getInRef(): "YES" else: "no"
+        inPtr   = if spec.getInPtr(): "YES" else: "no"
         desc    = getOrElse(spec.getDocString(), "none")
 
-      ot.addRow(@[key, enabled, default, inRef, desc])
+      ot.addRow(@[key, enabled, default, inPtr, desc])
   
   let tableout = ot.render(-4)
   publish("defaults", formatTitle("SAMI Key Configuration:") & tableout)

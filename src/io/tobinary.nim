@@ -76,7 +76,7 @@ proc createdToBinary*(sami: SamiObj, ptrOnly = false): string =
     let spec = getKeySpec(key).get()
     if spec.getSkip():
       continue
-    if ptrOnly and not spec.getInRef():
+    if ptrOnly and not spec.getInPtr():
       continue
       
     fieldCount += 1
@@ -109,9 +109,9 @@ proc createdToBinary*(sami: SamiObj, ptrOnly = false): string =
       continue
 
     # If SAMI pointers are set up, and we're currently outputting
-    # a pointer, then we only output if the config has the in_ref
+    # a pointer, then we only output if the config has the in_ptr
     # field set.
-    if ptrOnly and not spec.getInRef():
+    if ptrOnly and not spec.getInPtr():
       continue
 
     let val = sami.newFields[outputKey]
