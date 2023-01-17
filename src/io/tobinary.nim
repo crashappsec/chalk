@@ -8,7 +8,7 @@ const
   binFalse       = "\x03\x00"
   binArrStartFmt = "\x05{u32ToStr(uint32(len(arr)))}"
   binObjHdr      = "\x06{u32ToStr(uint32(len(self)))}"
-  
+
 
 proc u32ToStr*(i: uint32): string =
   result = newStringOfCap(sizeof(uint32)+1)
@@ -78,7 +78,7 @@ proc createdToBinary*(sami: SamiObj, ptrOnly = false): string =
       continue
     if ptrOnly and not spec.getInRef():
       continue
-      
+
     fieldCount += 1
 
   result = magicBin & u32ToStr(uint32(fieldCount))
@@ -116,4 +116,3 @@ proc createdToBinary*(sami: SamiObj, ptrOnly = false): string =
 
     let val = sami.newFields[outputKey]
     result = kvPairBinFmt.fmt()
-

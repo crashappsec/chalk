@@ -48,7 +48,7 @@ proc customOut(msg: string, record: SinkConfig, xtra: StringTable): bool =
   args.add(pack(cfg))
 
   var retBox = runCallback(ctxSamiConf, "outhook", args, some(t)).get()
-  
+
   return unpack[bool](retBox)
 
 const customKeys = { "secret" :  false, "uid"    : false, "filename": false,
@@ -66,10 +66,12 @@ const
                        "wrap"        : MsgFilter(wrapToWidth)
                      }.toTable()
 
-var availableHooks = { "debugHook" : defaultDebugHook,
-                       "logHook"   : defaultLogHook
+var availableHooks = { "logHook"     : defaultLogHook
                      }.toTable()
-  
+
+when not defined(release):
+  availableHooks["debugHook"] = defaultDebugHook
+
 proc getFilterByName*(name: string): Option[MsgFilter] =
   if name in availableFilters:
     return some(availableFilters[name])
@@ -78,11 +80,11 @@ proc getFilterByName*(name: string): Option[MsgFilter] =
 proc getFilterName*(filter: MsgFilter): Option[string] =
   for name, f in availableFilters:
     if f == filter: return some(name)
-    
+
 proc getHookByName*(name: string): Option[SinkConfig] =
   if name in availableHooks:
     return some(availableHooks[name])
-    
+
   return none(SinkConfig)
 
 proc getSinkConfigs*(): Table[string, SinkConfig] =
@@ -94,7 +96,7 @@ proc setArgs*(a: seq[string]) =
   args = a
 
 proc getArgs*(): seq[string] = args
-  
+
 proc getArgv(args:    seq[Box],
              unused1: Con4mScope,
              unused2: VarStack,
@@ -106,7 +108,7 @@ proc getCommandName(args:    seq[Box],
                     unused2: VarStack,
                     unused3: Con4mScope): Option[Box] =
     return some(pack(getCommandName()))
-  
+
 proc topicSubscribe(args:    seq[Box],
                     unused1: Con4mScope,
                     unused2: VarStack,
@@ -158,8 +160,8 @@ proc logBuiltin(args:    seq[Box],
 
     # log level and color may have been set; con4m doesn't set that
     # stuff where we can see it until it ends evaluation.
-    # TODO: add a simpler interface to con4m for this logic.      
-      
+    # TODO: add a simpler interface to con4m for this logic.
+
     if `cover?`.isSome():
       setShowColors(unpack[bool](`cover?`.get()))
     else:
@@ -168,7 +170,7 @@ proc logBuiltin(args:    seq[Box],
       setLogLevel(unpack[string](`lover?`.get()))
     else:
       setLogLevel(unpack[string](lval))
-      
+
     log(ll, msg)
 
     return none(Box)
@@ -203,14 +205,14 @@ proc sinkConfig(args:    seq[Box],
                "the form s3://bucket-name/object-path (skipped)")
       except:
           warn(fmt"Sink config '{sinkconf}' contains an invalid URI (skipped)")
-        
+
     for filter in filters:
       if not getFilterByName(filter).isSome():
         warn(fmt"Invalid filter named '{filter}': skipping filter.")
-    
+
     if sinkopts.contains("userid"):
       # Temporarily correct an oversight in the spec
-      sinkopts["uid"] = sinkopts["userid"]  
+      sinkopts["uid"] = sinkopts["userid"]
 
     # We currently pass through unknown keys to make life easier for
     # new sink writers.
@@ -239,7 +241,7 @@ proc getOsName(args:    seq[Box],
                unused1: VarStack,
                unused2: Con4mScope): Option[Box] =
     const retval = getBinaryOS()
-      
+
     return some(pack(retval))
 
 proc getArch(args:    seq[Box],
@@ -247,7 +249,7 @@ proc getArch(args:    seq[Box],
              unused1: VarStack,
              unused2: Con4mScope): Option[Box] =
     const retval = getBinaryArch()
-      
+
     return some(pack(retval))
 
 proc getExeVersion(args:    seq[Box],
@@ -255,9 +257,9 @@ proc getExeVersion(args:    seq[Box],
                    unused1: VarStack,
                    unused2: Con4mScope): Option[Box] =
     const retval = getSamiExeVersion()
-      
+
     return some(pack(retval))
-    
+
 proc loadAdditionalBuiltins*() =
   let ctx = getConfigState()
 
