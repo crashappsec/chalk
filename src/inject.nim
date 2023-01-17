@@ -61,6 +61,10 @@ proc populateOneSami(sami: SamiObj,
     if ki == nil: continue
 
     for k, v in ki:
+      if len(k) > 0 and k[0] != 'X':
+        if not isBuiltinKey(k):
+          error("Invalid key: " & k & " (custom keys must start with X)")
+          continue
       if not currentPriorities.contains(k):
         sami.newFields[k] = v
         currentPriorities[k] = keyPriorities[k]

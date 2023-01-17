@@ -226,11 +226,11 @@ method getArtifactInfo*(self: Codec, sami: SamiObj): KeyInfo =
 
   let
     hashFilesBox = pack(@[sami.fullpath])
-    encodedHash = self.getArtifactHash(sami).toHex().toLowerAscii()
+    encodedHash  = self.getArtifactHash(sami).toHex().toLowerAscii()
 
 
-  result["HASH"] = pack(encodedHash)
-  result["HASH_FILES"] = hashFilesBox
+  result["HASH"]          = pack(encodedHash)
+  result["HASH_FILES"]    = hashFilesBox
   result["ARTIFACT_PATH"] = pack(sami.fullpath)
 
 method handleWrite*(self: Codec,

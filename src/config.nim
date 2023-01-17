@@ -289,73 +289,73 @@ proc getOutputPointers*(): bool =
 
   return false
 
+var builtinKeys: seq[string] = @[]
 
-var onceLockBuiltinKeys = false
+proc isBuiltinKey*(name: string): bool =
+  return name in builtinKeys
 
 proc lockBuiltinKeys*() =
-  if onceLockBuiltinKeys:
-    return
-  else:
-    onceLockBuiltinKeys = true
-  for key in getAllKeys():
-    let
-      prefix = "key." & key
-      stdOpt = getConfigVar(ctxSamiConf, prefix & ".standard")
+  once:
+    for key in getAllKeys():
+      builtinKeys.add(key)
+      let
+        prefix = "key." & key
+        stdOpt = getConfigVar(ctxSamiConf, prefix & ".standard")
 
-    if stdOpt.isNone(): continue
+      if stdOpt.isNone(): continue
     
-    let
-      std = stdOpt.get()
-      sys = getConfigVar(ctxSamiConf, prefix & ".system").get()
+      let
+        std = stdOpt.get()
+        sys = getConfigVar(ctxSamiConf, prefix & ".system").get()
 
-    if unpack[bool](std):
-      discard ctxSamiConf.lockConfigVar(prefix & ".required")
-      discard ctxSamiConf.lockConfigVar(prefix & ".system")
-      discard ctxSamiConf.lockConfigVar(prefix & ".type")
-      discard ctxSamiConf.lockConfigVar(prefix & ".standard")
-      discard ctxSamiConf.lockConfigVar(prefix & ".since")
-      discard ctxSamiConf.lockConfigVar(prefix & ".output_order")
+      if unpack[bool](std):
+        discard ctxSamiConf.lockConfigVar(prefix & ".required")
+        discard ctxSamiConf.lockConfigVar(prefix & ".system")
+        discard ctxSamiConf.lockConfigVar(prefix & ".type")
+        discard ctxSamiConf.lockConfigVar(prefix & ".standard")
+        discard ctxSamiConf.lockConfigVar(prefix & ".since")
+        discard ctxSamiConf.lockConfigVar(prefix & ".output_order")
 
-    if unpack[bool](sys):
-      discard ctxSamiConf.lockConfigVar(prefix & ".value")
+      if unpack[bool](sys):
+        discard ctxSamiConf.lockConfigVar(prefix & ".value")
 
-  # These are locks of invalid fields for specific output handlers.
-  # Note that all of these lock calls could go away if con4m gets a
-  # locking syntax.
-  discard ctxSamiConf.lockConfigVar("output.stdout.filename")
-  discard ctxSamiConf.lockConfigVar("output.stdout.command")
-  discard ctxSamiConf.lockConfigVar("output.stdout.dst_uri")
-  discard ctxSamiConf.lockConfigVar("output.stdout.region")
-  discard ctxSamiConf.lockConfigVar("output.stdout.userid")
-  discard ctxSamiConf.lockConfigVar("output.stdout.secret")        
+    # These are locks of invalid fields for specific output handlers.
+    # Note that all of these lock calls could go away if con4m gets a
+    # locking syntax.
+    discard ctxSamiConf.lockConfigVar("output.stdout.filename")
+    discard ctxSamiConf.lockConfigVar("output.stdout.command")
+    discard ctxSamiConf.lockConfigVar("output.stdout.dst_uri")
+    discard ctxSamiConf.lockConfigVar("output.stdout.region")
+    discard ctxSamiConf.lockConfigVar("output.stdout.userid")
+    discard ctxSamiConf.lockConfigVar("output.stdout.secret")        
 
-  discard ctxSamiConf.lockConfigVar("output.local_file.command")
-  discard ctxSamiConf.lockConfigVar("output.local_file.dst_uri")
-  discard ctxSamiConf.lockConfigVar("output.local_file.region")
-  discard ctxSamiConf.lockConfigVar("output.local_file.userid")
-  discard ctxSamiConf.lockConfigVar("output.local_file.secret")
+    discard ctxSamiConf.lockConfigVar("output.local_file.command")
+    discard ctxSamiConf.lockConfigVar("output.local_file.dst_uri")
+    discard ctxSamiConf.lockConfigVar("output.local_file.region")
+    discard ctxSamiConf.lockConfigVar("output.local_file.userid")
+    discard ctxSamiConf.lockConfigVar("output.local_file.secret")
 
-  discard ctxSamiConf.lockConfigVar("output.s3.filename")
-  discard ctxSamiConf.lockConfigVar("output.s3.command")
+    discard ctxSamiConf.lockConfigVar("output.s3.filename")
+    discard ctxSamiConf.lockConfigVar("output.s3.command")
 
-  const builtinSinks = ["stdout", "stderr", "local_file",
-                        "s3", "post", "custom"]
+    const builtinSinks = ["stdout", "stderr", "local_file",
+                          "s3", "post", "custom"]
 
-  for item in builtinSinks:
-    # Really need to be able to lock entire sections.  You shouldn't be
-    # able to add ANY sinks from the conf file, that wouldn't work out.
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_secret")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_userid")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_filename")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_uri")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_region")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_aux")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_secret")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_userid")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_filename")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_uri")    
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_region")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_aux")
+    for item in builtinSinks:
+      # Really need to be able to lock entire sections.  You shouldn't be
+      # able to add ANY sinks from the conf file, that wouldn't work out.
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_secret")
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_userid")
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_filename")
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_uri")
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_region")
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_aux")
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_secret")
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_userid")
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_filename")
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_uri")    
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_region")
+      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_aux")
 
 # This should mostly move to evaluation callbacks.  They can give
 # better error messages more easily.
