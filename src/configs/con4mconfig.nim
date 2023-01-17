@@ -29,6 +29,7 @@ var samiConfig = con4m(Sami, baseconfig):
   attr(color, bool, false, doc = "Do you want ansi output?")
   attr(log_level, string, "warn")
   attr(dry_run, bool, false)
+  attr(publish_audit, bool, defaultVal = false)
   attr(artifact_search_path, [string], @["."])
   attr(recursive, bool, true)
   attr(can_dump, bool, true)

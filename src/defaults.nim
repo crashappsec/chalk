@@ -45,12 +45,19 @@ proc showGeneralOptions*(): int {.discardable.} =
   ot.addRow(@["Color",                $(getColor()), "color"])
   ot.addRow(@["Log level",            $(getLogLevel()), "log_level"])
   ot.addRow(@["Dry run",              $(getDryRun()), "dry_run"])
-  
-  ot.addRow(@["Config files allowed", $(getAllowExternalConfig()),
+  ot.addRow(@["Config files allowed",
+              $(getAllowExternalConfig()),
               "allow_external_config"])
   ot.addRow(@["Export builtin config ok", $(getCanDump()), "can_dump"])
   ot.addRow(@["Replace builtin config ok", $(getCanLoad()), "can_load"])
-  ot.addRow(@["Artifact search path", getArtifactSearchPath().join(", "),
+  ot.addRow(@["Publish run config to audit topic",
+              $(getPublishAudit()),
+              "publish_audit"])
+  ot.addRow(@["Always publish defaults",
+              $(getPublishDefaults()),
+              "publish_defaults"])
+  ot.addRow(@["Artifact search path",
+              getArtifactSearchPath().join(", "),
               "artifact_search_path"])
   ot.addRow(@["Recurse for artifacts", $(getRecursive()), "recursive"])
   # default_command is not implemented, but add it when it is.
