@@ -48,7 +48,7 @@ This first example connects the output of the {green}defaults{reset} command to 
 %{c
 sink_config({red}"redirectableOut"{cyan}, {red}"stdout"{cyan}, \{\}, [])
 sink_config({red}"defaultOut"{cyan},      {red}"stderr"{cyan}, \{\}, [])
-brown} #argv() gets the command name.
+{brown} #argv() gets the command name.
 if argv0() != {red}"defaults"{cyan} \{
     subscribe({red}"defaults"{cyan}, {red}"defaultOut"{cyan})
 \} else \{

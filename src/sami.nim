@@ -256,8 +256,8 @@ macro declareCommand(names:    static[openarray[string]],
             # Load the base config before we layer anything on top
             # of it, like setting the artifact search path.
             let
-              `selfSami?`  = getSelfExtraction()
-              configLoaded = loadEmbeddedConfig(`selfSami?`)
+              selfSami     = getSelfExtraction()
+              configLoaded = loadEmbeddedConfig(selfSami)
             
             
             when `artifact`:
