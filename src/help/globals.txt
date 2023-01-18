@@ -1,0 +1,21 @@
+%{H Global configuration options }%
+
+This is a list of the current configuration options that can be set in a configuration file.  It also provides the command-line flag or arguments that can override the value, if any currently exists.
+
+%{T:<14:
+Variable::Override::Type::Description
+color::-c, -C, --color, --no-color::bool::Sets whether ANSI formatting characters are emitted.
+log_level::-l, --log-level::string::Sets the level of logs to report, for configurations that use the log level filter.  Valid values are "error", "warn", "info", "verbose" and "none".  Also, "trace" is a synonym for "verbose".
+artifact_search_path::Command line arguments for relevent commands::[string]::Sets the paths to search for artifacts.  Without configuration, this defaults to the current working directory.
+ignore_patterns::n/a::[string]::Glob expressions for filtering out files and directories that should NOT be processed for injection. Note that these files are not skipped for {cyan}extraction{black} operations, but, in those situations, if no SAMIs are found, the log level goes from informational to verbose.
+recursive::-r, -R, --recursive, --no-recursive::bool::Determines whether searching the artifact path should be done recursively or not, for all mark or extraction operations.
+default_command::n/a::string::If no arguments are provided at the command line, then, when this value is set, the default action will be taken, using only values from config files.  This only works when no args are passed.
+dry_run::-d, -D, --dry-run, --no-dry-run::bool::Controls whether injection actually happens, or if the system reports on what it would have injected instead.  All other functionality remains the same.
+allow_external_config::n/a::bool::If this is set to false, then no external configuration file will be loaded, even if it is available.  This is checked after any embedded configuration is loaded.
+config_path::-f, --config-file::[string]::A path to search for external configuration files to execute AFTER the embedded configuration file.  This is not checked if allow_external_config is set to false.  The command-line override doesn't set a search path, it can only point to a specific config file.
+config_filename::-f, --config-file::string::The file name to look for when searching the config path.  This defaults to {red}sami.conf{cyan}.
+can_dump::n/a::bool::If this is true, the "confdump" command will NOT dump the existing embedded configuration file. Note that this is still easily extracted; we intend this measure to prevent mistakes.
+can_load::n/a::bool::If this is true, the "confload" command will refuse to load a new configuration file. Again, this is not meant to be a security measure, just something to prevent accidental issues.
+publish_audit::n/a::bool::When true, all runs will publish information including startup configuration changes from the default to a topic named 'audit', which can be directed to any configured sink.
+publish_defaults::n/a::bool::When true, all runs will end with the final state of the configuration file being published to the 'defaults' topic.  This never controls the actual 'defaults' command.
+}%

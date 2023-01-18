@@ -42,14 +42,21 @@ proc showGeneralOptions*(): int {.discardable.} =
   var ot = samiTableFormatter(3)
 
   ot.addRow(@["Option", "Value", "Con4m Variable"])
-  ot.addRow(@["Color",                $(getColor()), "color"])
-  ot.addRow(@["Log level",            $(getLogLevel()), "log_level"])
-  ot.addRow(@["Dry run",              $(getDryRun()), "dry_run"])
+  ot.addRow(@["Color",
+              $(getColor()), "color"])
+  ot.addRow(@["Log level",
+              $(getLogLevel()), "log_level"])
+  ot.addRow(@["Dry run",
+              $(getDryRun()), "dry_run"])
   ot.addRow(@["Config files allowed",
               $(getAllowExternalConfig()),
               "allow_external_config"])
-  ot.addRow(@["Export builtin config ok", $(getCanDump()), "can_dump"])
-  ot.addRow(@["Replace builtin config ok", $(getCanLoad()), "can_load"])
+  ot.addRow(@["Export builtin config ok",
+              $(getCanDump()),
+              "can_dump"])
+  ot.addRow(@["Replace builtin config ok",
+              $(getCanLoad()),
+              "can_load"])
   ot.addRow(@["Publish run config to audit topic",
               $(getPublishAudit()),
               "publish_audit"])
@@ -59,15 +66,23 @@ proc showGeneralOptions*(): int {.discardable.} =
   ot.addRow(@["Artifact search path",
               getArtifactSearchPath().join(", "),
               "artifact_search_path"])
-  ot.addRow(@["Recurse for artifacts", $(getRecursive()), "recursive"])
-  # default_command is not implemented, but add it when it is.
+  ot.addRow(@["Recurse for artifacts",
+              $(getRecursive()),
+              "recursive"])
+  ot.addRow(@["Ignored patterns",
+              getIgnorePatterns(). join(", "),
+              "ignore_patterns"])
+  ot.addRow(@["Default exe command",
+              getOrElse(getDefaultCommand(), "none"),
+              "default_command"])
   
   if getAllowExternalConfig():
     ot.addRow(@["Config file path",
                 getConfigPath().join(", "),
                 "config_path"])
-    ot.addRow(@["Config file name", $(getConfigFileName()),
-                                      "config_filename"])
+    ot.addRow(@["Config file name",
+                $(getConfigFileName()),
+                "config_filename"])
 
   let tableout = ot.render()
   publish("defaults", formatTitle("General Options:") & tableout)
@@ -154,10 +169,10 @@ proc showKeyConfigs*(): int {.discardable.} =
       system  = spec.getSystem()
       defOpt  = spec.getValue()
       default = $(getOrElse(defOpt, if system: sysVal else: emptyVal))
-      inRef   = if spec.getInRef(): "YES" else: "no"
+      inPtr   = if spec.getInPtr(): "YES" else: "no"
       desc    = getOrElse(spec.getDocString(), "none")
 
-    ot.addRow(@[key, enabled, default, inRef, desc])
+    ot.addRow(@[key, enabled, default, inPtr, desc])
 
   if len(custom) != 0:
     # TODO... Span rows and/or per-cell overrides.  Tmp hack.
@@ -170,10 +185,10 @@ proc showKeyConfigs*(): int {.discardable.} =
         enabled = if spec.getSkip(): "NO" else: "yes"
         defOpt  = spec.getValue()
         default = $(getOrElse(defOpt, pack("none")))
-        inRef   = if spec.getInRef(): "YES" else: "no"
+        inPtr   = if spec.getInPtr(): "YES" else: "no"
         desc    = getOrElse(spec.getDocString(), "none")
 
-      ot.addRow(@[key, enabled, default, inRef, desc])
+      ot.addRow(@[key, enabled, default, inPtr, desc])
   
   let tableout = ot.render(-4)
   publish("defaults", formatTitle("SAMI Key Configuration:") & tableout)

@@ -161,6 +161,9 @@ proc setArtifactSearchPath*(val: seq[string]) =
 
   discard ctxSamiConf.setOverride("artifact_search_path", pack(val))
 
+proc getIgnorePatterns*(): seq[string] =
+  return samiConfig.ignorePatterns
+
 proc getRecursive*(): bool =
   return samiConfig.recursive
 
@@ -224,8 +227,8 @@ proc getMustForce*(key: SamiKeySection): bool =
 proc getSkip*(key: SamiKeySection): bool =
   return key.skip
 
-proc getInRef*(key: SamiKeySection): bool =
-  return key.inRef
+proc getInPtr*(key: SamiKeySection): bool =
+  return key.inPtr
 
 proc getOutputOrder*(key: SamiKeySection): int =
   return key.outputOrder
@@ -290,9 +293,17 @@ proc getOutputPointers*(): bool =
   return false
 
 var builtinKeys: seq[string] = @[]
+var systemKeys:  seq[string] = @[]
+var codecKeys:   seq[string] = @[]
 
 proc isBuiltinKey*(name: string): bool =
   return name in builtinKeys
+
+proc isSystemKey*(name: string): bool =
+  return name in systemKeys
+
+proc isCodecKey*(name: string): bool =
+  return name in codecKeys
 
 proc lockBuiltinKeys*() =
   once:
@@ -305,8 +316,9 @@ proc lockBuiltinKeys*() =
       if stdOpt.isNone(): continue
     
       let
-        std = stdOpt.get()
-        sys = getConfigVar(ctxSamiConf, prefix & ".system").get()
+        std  = stdOpt.get()
+        sys  = getConfigVar(ctxSamiConf, prefix & ".system").get()
+        codec = getConfigVar(ctxSamiConf, prefix & ".codec").get()
 
       if unpack[bool](std):
         discard ctxSamiConf.lockConfigVar(prefix & ".required")
@@ -315,9 +327,14 @@ proc lockBuiltinKeys*() =
         discard ctxSamiConf.lockConfigVar(prefix & ".standard")
         discard ctxSamiConf.lockConfigVar(prefix & ".since")
         discard ctxSamiConf.lockConfigVar(prefix & ".output_order")
+        discard ctxSamiConf.lockConfigVar(prefix & ".codec")        
 
       if unpack[bool](sys):
         discard ctxSamiConf.lockConfigVar(prefix & ".value")
+        systemKeys.add(key)
+
+      if unpack[bool](codec):
+        codecKeys.add(key)
 
     # These are locks of invalid fields for specific output handlers.
     # Note that all of these lock calls could go away if con4m gets a
@@ -338,10 +355,7 @@ proc lockBuiltinKeys*() =
     discard ctxSamiConf.lockConfigVar("output.s3.filename")
     discard ctxSamiConf.lockConfigVar("output.s3.command")
 
-    const builtinSinks = ["stdout", "stderr", "local_file",
-                          "s3", "post", "custom"]
-
-    for item in builtinSinks:
+    for item, _ in samiConfig.sink:
       # Really need to be able to lock entire sections.  You shouldn't be
       # able to add ANY sinks from the conf file, that wouldn't work out.
       discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_secret")

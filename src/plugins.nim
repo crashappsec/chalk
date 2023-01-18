@@ -1,4 +1,4 @@
-import os, tables, strformat, strutils, algorithm, streams, options
+import os, tables, strformat, strutils, algorithm, streams, options, glob
 import nimSHA2, con4m, nimutils, config, io/[fromjson, frombinary, json]
 
 const
@@ -38,6 +38,9 @@ proc loadCommandPlugins*() =
   for (name, command) in getCommandPlugins():
     registerPlugin(name, ExternalPlugin(command: command))
 
+proc getPluginByName*(name: string): Plugin =
+  return installedPlugins[name]
+                         
 proc getPluginsByPriority*(): seq[PluginInfo] =
   result = @[]
 
@@ -162,10 +165,17 @@ proc dispatchFileScan(self: Codec, filepath: string, top: string): bool =
     except:
       discard
 
-proc doScan*(self: Codec,
+proc mustIgnore*(path: string, globs: seq[Glob]): bool {.inline.} =
+  for item in globs:
+    if path.matches(item):
+      return true
+  return false
+
+proc doScan*(self:       Codec,
              searchPath: seq[string],
              exclusions: var seq[string],
-             recurse: bool) =
+             ignoreList: seq[Glob],
+             recurse:    bool) =
   ## Generate a list of all insertion/extraction points this codec
   ## belives it is responsible for, placing the resulting SamiPoint
   ## objects into the `samis` field, whether or not there is a SAMI
@@ -199,6 +209,8 @@ proc doScan*(self: Codec,
     if info.kind == pcFile:
       if path in exclusions:
         continue
+      if path.mustIgnore(ignoreList):
+        continue
       trace(fmtTraceScanFileP.fmt())
       if self.dispatchFileScan(path, path):
         exclusions.add(path)
@@ -206,12 +218,20 @@ proc doScan*(self: Codec,
       dirWalk(true):
         if item in exclusions:
           continue
+        if item.mustIgnore(ignoreList):
+          continue
+        if getFileInfo(item).kind != pcFile:
+          continue
         trace(fmtTraceScanFile.fmt())
         if self.dispatchFileScan(item, path):
           exclusions.add(item)
     else:
       dirWalk(false):
         if item in exclusions:
+          continue
+        if item.mustIgnore(ignoreList):
+          continue
+        if getFileInfo(item).kind != pcFile:
           continue
         trace(fmt"Non-recursive dir walk examining: {item}")
         if self.dispatchFileScan(item, path):
@@ -272,12 +292,13 @@ method getArtifactInfo*(self: ExternalPlugin, sami: SamiObj): KeyInfo =
 {.warning[UnusedImport]: off.}
 
 import plugins/system
-import plugins/metsys
 import plugins/ciGithub
 import plugins/conffile
 import plugins/codecShebang
 import plugins/codecElf
+import plugins/custom
 import plugins/ownerAuthors
 import plugins/ownerGithub
-import plugins/vctlGit
 import plugins/sbomCallback
+import plugins/vctlGit
+import plugins/metsys

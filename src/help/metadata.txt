@@ -1,0 +1,69 @@
+%{H Configuring Metadata }%
+SAMI's entire reason for being is to make it easy to capture and manage metadata about software artifacts.
+
+It not only collects metadata automatically, but can inject it into many kinds of artifacts without impacting the functionality.
+
+Geenerally, you can either inject all of the metadata your require into artifacts, or you can inject a minimal tracer called a "SAMI pointer", and shuttle the rest of the SAMI off to wherever you configure (see {bold}{appName} help output{reset} for more information).
+
+Most of the metadata this command can gather is collected only if available, and only if collection is configured. But, three bits are required:
+
+%{T
+Key::Description
+SAMI_ID::This is a 63-bit value chosen at random at the time of insertion. This is key to tracking artifacts and associating them with what we see, so it is always present.
+SAMI_VERSION:: This denotes the spec version the metadata conforms to, helping to avoid extraction issues with future specification changes.
+TIMESTAMP:: The raw field is measured in miliseconds since 1970, and is measured locally at the time of metadata insertion.
+}%
+
+Often, the only additional field inserted into artifacts will be the {green}SAMI_PTR{reset} field, which provides a customizable URL that points to where any addtional captured metadata is stored.
+
+An overview of each key's purpose is available if you run: {bold}{appName} defaults{reset}.
+
+You also can collect arbitrary metadata yourself, as discussed below.
+
+%{h Basics }%
+With regard to builtin metadata, the configuration file allows you to:
+
+1. Decide which keys should be output or not.
+2. Control the contents of those fields.
+3. Control how those items get collected.
+
+For #3, SAMI is capable of having multiple metadata collection 'plugins' that collect the same kinds of data, where some control over prioritization might be desired. Currently, there really aren't such conflicts with the current set of functionality, so we will focus on the first two items (though, overrides can be useful if you want to provide a hard-coded default, which we discuss below).
+
+Every built-in key in SAMI can be configured by adding a {cyan}key{reset} section. First, let's look at turning OFF metadata collection.  Disabling a key in the configuration file will ensure that no work is done to collect that metadata at all. For instance, if you decide you do not have any interest in collecting {green}SBOM{reset} information, you can disable it as follows:
+
+%{c
+  key {green}SBOMS{cyan} \{
+    skip: {yellow}true
+ \}
+}%
+
+But, just because SBOMs often are large, doesn't mean you shouldn't collect them! That data doesn't have to go directly into the artifact.
+
+As mentioned above, keys are only part of an artifact's SAMI if values can be collected, and in a few cases, you need to provide those values yourself.
+
+For instance, the {green}SAMI_PTR{reset} is useful for cutting down the amount of metadata going into the actual artifact, under the promise of you configuring the command to route that data somewhere else.  While it is not disabled by default (i.e., {cyan}skip{reset} is set to {yellow}true{reset}), it will not get added unless a valid value is set.
+
+The SAMI_PTR's value should point to the store, but, providing the store is not the command's responsibilty. Even if you configure the command to use one of many data sinks, where the data goes from there is beyond the knowledge of the command.  So you need to configure it.  For example:
+%{c
+  key {green}SAMI_PTR{cyan} \{
+    value: {red}"https://my.example.io/script?q=\{artifactname\}"
+ \}
+}%
+
+Note that, when {appName} writes the SAMI_PTR field, it will substitute {red}{artifactid}{reset} with the {green}SAMI_ID{reset} of the object, and will substitute {red}{artifactname}{reset} with a four word value, separated by hyphens.  For instance:
+{red}multiform-disobedient-leader-submission{reset}
+
+The above text is an algorithmic, reversable translation of a SAMI ID, mapping 15 bits of the value to each word. Currently, every 16th bit is always 0, but we will soon (before 1.0) add 3 of those bits back (the most significant bit will always remain zero).
+
+%{h Controlling the behavior of SAMI_PTR }%
+When you turn on {green}SAMI_PTR{reset} default will be to NOT insert metadata keys, unless they are in the required set above (or are otherwise required to be in the output if present, particularly {green}SIGNATURE{reset}).  Instead, all extracted keys get published via our outputting system (see {bold}{appName} help output{reset}).
+
+However, you can explicitly choose to put keys into the pointer by with the key's {cyan}in_ptr{reset} property.  For instance, if you want the source code repo to always be stored with the artifact when the value can be determined, you can do:
+
+%{c
+  key {green}ORIGIN_URI{cyan} \{
+    in_ptr: {yellow}true
+ \}
+}%
+
+For more complex metadata collection, see {bold}{appName} help custom{reset} for more details.
