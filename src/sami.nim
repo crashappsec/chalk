@@ -130,8 +130,10 @@ proc runCmdConfDump(arglist: seq[string]) {.inline.} =
     
     if selfSami.contains("X_SAMI_CONFIG"):
       toDump   = unpack[string](selfSami["X_SAMI_CONFIG"])
+    else:
+      toDump   = defaultConfig
       
-  publish("confdump", defaultConfig)
+  publish("confdump", toDump)
   
 proc runCmdConfLoad(arg: string) {.inline.} =
   # The fact that we're injecting into ourself will be special-cased
@@ -243,16 +245,26 @@ macro declareCommand(names:    static[openarray[string]],
           elif `hasArg`:
             arg("theArgs", nargs = `nargs`)
           run:
-            when `artifact`:
-              genBoolFlagChecks(opts, artifactNoOptionFlags)
-              if len(opts.theArgs) > 0:
-                setArtifactSearchPath(opts.theArgs)
             when `hasArg`:
               when type(opts.theArgs) is string:
                 setArgs(@[opts.theArgs])
               else:
                 setArgs(opts.theArgs)
+                
+            setCommandName(`cmd`)
 
+            # Load the base config before we layer anything on top
+            # of it, like setting the artifact search path.
+            let
+              `selfSami?`  = getSelfExtraction()
+              configLoaded = loadEmbeddedConfig(`selfSami?`)
+            
+            
+            when `artifact`:
+              genBoolFlagChecks(opts, artifactNoOptionFlags)
+              if len(opts.theArgs) > 0:
+                setArtifactSearchPath(opts.theArgs)
+            
             if not configLoaded and `cmd` notin ["load", "help"]:
               echo "Default config didn't load. Run 'sami load default' to " &
                    "generate a fixed executable."
@@ -261,7 +273,7 @@ macro declareCommand(names:    static[openarray[string]],
               error("External config file failed to load. Quitting.")
               quit(1)
 
-            when `hasArg` or `artifact`:
+            when `hasArg`:
               `funcName`(opts.theArgs)
             else:
               `funcName`()
@@ -271,28 +283,10 @@ macro declareCommand(names:    static[openarray[string]],
             
     result.add(oneAlias)
 
-proc predictCommand(): string =
-  # Since we now load the base config before the command line parser
-  # goes, we need to quickly scan through argv, looking for the first
-  # argument that is a valid command name.  If the user provided a
-  # command, this will be right.  Otherwise, either the user made an
-  # error, OR there will end up being a 'default' command (though,
-  # only if there are no other arguments given).  Either way, if there
-  # is no hit, we will report "default" for now, and update it if the
-  # default command really is used.
-  for item in commandLineParams():
-    if item in cmdReverseTable:
-      return cmdReverseTable[item]
-  return "default"
-  
 when isMainModule:
-  setCommandName(predictCommand())
-  
   var
     parsedFlags: seq[string] = @[]
-    `selfSami?`              = getSelfExtraction()
-    configLoaded             = loadEmbeddedConfig(`selfSami?`)
-
+    
   var cmdLine  = newParser:
     noHelpFlag()
     flag("-h", "--help")
