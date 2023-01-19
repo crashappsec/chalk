@@ -1,5 +1,5 @@
 import unicode, tables, os, nimutils, std/terminal, defaults,  options,
-       formatstr
+       formatstr, builtins
 from strutils import replace, split, find
 
 when true:
@@ -272,15 +272,12 @@ proc parseJank(s: string, width: int): seq[JankBlock] =
       result.add(parseJankText(cur[0 .. nextBreak], width))
       cur = cur[nextBreak+1 .. ^1]
       
-proc doHelp*(preargs: seq[string]) =
+proc doHelp*() {.noreturn.} =
   var
     jank:  seq[JankBlock] = @[]
-    args:  seq[string]
+    args:  seq[string]    = getArgs()
     width                 = terminalWidth()
 
-
-  args = preargs # Nim doesn't treat formals as local copies, oddly.
-  
   if len(args) == 0:
     args = @["main"]
 
@@ -333,3 +330,4 @@ proc doHelp*(preargs: seq[string]) =
     msg &= item.content
 
   publish("help", msg)
+  quit()

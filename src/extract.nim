@@ -134,7 +134,8 @@ proc getSelfSamiObj*(): Option[SamiObj] =
       return selfSamiObj
       
     warn(fmt"We have no codec for this platform's native executable type")
-      
+    setNoSelfInjection()
+
   return none(SamiObj)
 
 var selfID: Option[uint] = none(uint)

@@ -1,6 +1,6 @@
 import options, tables, streams, algorithm, strutils, strformat, os,
        std/tempfiles
-import nimutils, config, plugins, extract,io/[tobinary, tojson]
+import nimutils, config, plugins, extract, io/[tobinary, tojson]
 
 const
   requiredCodecKeys = ["ARTIFACT_PATH", "HASH", "HASH_FILES"]
@@ -246,6 +246,7 @@ proc doInjection*() =
               info(fmt"Wrote new sami binary to {newpath}")
           except:
             removeFile(path)
+            error("Could complete file write.")
             raise
 
   # Finally, if we've got external output requirements, it's time to
@@ -257,3 +258,5 @@ proc doInjection*() =
     publish("confload", fullJson)
   else:
     publish("insert",   fullJson)
+
+    
