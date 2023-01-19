@@ -146,11 +146,6 @@ proc showSinkConfigs*(): int {.discardable.} =
   return tableout.find("\n")
 
 proc showKeyConfigs*(): int {.discardable.} =
-  # required
-  # value
-  # In reference
-  # skip
-  # description
   var
     keyList  = getOrderedKeys()
     custom   = getCustomKeys()
