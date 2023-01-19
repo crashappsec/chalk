@@ -169,6 +169,9 @@ proc getArtifactSearchPath*(): seq[string] =
   return samiConfig.artifactSearchPath
 
 proc setArtifactSearchPath*(val: seq[string]) =
+  if len(val) == 0:
+    return
+    
   samiConfig.artifactSearchPath = @[]
 
   for item in val:
