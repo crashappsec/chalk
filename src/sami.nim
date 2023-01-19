@@ -1,4 +1,4 @@
-import tables, argparse, nativesockets, json
+import tables, nativesockets, json, strutils, os
 import nimutils, config, builtins
 import inject, extract, delete, confload, defaults, help
 
