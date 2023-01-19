@@ -17,3 +17,12 @@ requires "https://github.com/guibar64/formatstr == 0.2.0"
 # Docs generated with
 # nimble --project --index:on --git.url:https://github.com/crashappsec/con4m.git --git.commit:`version`
 # --outdir:docs src/con4m.nim
+
+task debug, "Package the debug build":
+  # additional flags are configured in config.nims
+  exec "nimble build"
+
+task release, "Package the release build":
+  # additional flags are configured in config.nims
+  exec "nimble build --define:release --opt:size"
+  exec "strip " & bin[0]
