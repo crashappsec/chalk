@@ -27,6 +27,15 @@ key SAMI_ID {
     docstring: "Unique 64-bit value per insertion"
 }
 
+key SAMI_ALT_ID {
+    system: true
+    type: "string"
+    standard: true
+    since: "0.1.0"
+    output_order: 2
+    docstring: "Equivolent string representation of the SAMI_ID field"
+}
+
 key SAMI_VERSION {
     required: true
     system: false
@@ -34,7 +43,7 @@ key SAMI_VERSION {
     value: sami_version
     standard: true
     since: "0.1.0"
-    output_order: 2
+    output_order: 3
     in_ptr: true
     docstring: "Spec version of inserted objects"
 }
@@ -44,7 +53,7 @@ key SAMI_PTR {
     type: "string"
     standard: true
     since: "0.10"
-    output_order: 3
+    output_order: 4
     in_ptr: true
     docstring: "When enabled, injects minimal metadata; this field then gets a URL you supply to point to the rest of the data. Items marked as 'true' in the 'Ptr?' column are added in the PTR object"
 }
@@ -54,7 +63,7 @@ key TIMESTAMP {
     system: true
     type: "integer"
     since: "0.1.0"
-    output_order: 4
+    output_order: 5
     standard: true
     docstring: "Time of insertion"
 }
@@ -65,7 +74,7 @@ key EARLIEST_VERSION {
     system: true
     skip: true
     value: sami_version
-    output_order: 5
+    output_order: 6
     standard: true
     docstring: "Reserved for future use"
 }
@@ -74,7 +83,7 @@ key ARTIFACT_PATH {
     type: "string"
     since: "0.1.0"
     codec: true
-    output_order: 6
+    output_order: 7
     standard: true
     docstring: "Path of artifact on host where injection occured"
 }
@@ -82,7 +91,7 @@ key ARTIFACT_PATH {
 key INSERTION_HOSTINFO {
     type: "string"
     since: "0.1.0"
-    output_order: 7
+    output_order: 8
     standard: true
     docstring: "Host information at injection; by default, uname -a"
 }
@@ -90,7 +99,7 @@ key INSERTION_HOSTINFO {
 key ORIGIN_URI {
     type: "string"
     since: "0.1.0"
-    output_order: 8
+    output_order: 9
     standard: true
     docstring: "URI of origin for repo from which artifact was built"
 }
@@ -98,7 +107,7 @@ key ORIGIN_URI {
 key ARTIFACT_VERSION {
     type: "string"
     since: "0.1.0"
-    output_order: 9
+    output_order: 11
     standard: true
     docstring: "Reserved for future use"
 }
@@ -107,7 +116,7 @@ key IAM_USERNAME {
     must_force: true
     type: "string"
     since: "0.1.0"
-    output_order: 11
+    output_order: 12
     standard: true
     docstring: "Possibly removing..."
 }
@@ -116,7 +125,7 @@ key IAM_UID {
     must_force: true
     type: "integer"
     since: "0.1.0"
-    output_order: 12
+    output_order: 13
     standard: true
     docstring: "Possibly removing..."
 }
@@ -195,6 +204,14 @@ key INJECTOR_PLATFORM {
     system: true
     docstring: "OS / system info at time of insertion"
 }
+
+key INJECTOR_COMMIT_ID {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    system: true
+    docstring: "The commit hash or id from which the injector was built."
+}   
 
 key BUILD_ID {
     type: "string"
@@ -323,8 +340,9 @@ plugin sbom_callback {
 # thus set to low(int64), but con4m currently doesn't get this right,
 # low(int64) in con4m is -high(int64), when it should be one less.
 plugin system {
-  keys: ["TIMESTAMP", "SAMI_ID", "X_SAMI_CONFIG", "INJECTOR_ID",
-         "INJECTOR_VERSION", "INJECTOR_PLATFORM", "_MAGIC.json"]
+  keys: ["TIMESTAMP", "SAMI_ID", "SAMI_ALT_ID", "INJECTOR_ID",
+         "INJECTOR_VERSION", "INJECTOR_PLATFORM", "INJECTOR_COMMIT_ID",
+	 "X_SAMI_CONFIG", "_MAGIC.json"]
   priority: -9223372036854775807
 }
 

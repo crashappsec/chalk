@@ -4,6 +4,7 @@ import macros except error
 export logging
 
 const versionStr  = staticexec("cat ../sami.nimble | grep ^version")
+const commitID    = staticexec("git rev-parse HEAD")
 const archStr     = staticexec("uname -m")
 const osStr       = staticexec("uname -o")
 
@@ -13,6 +14,9 @@ macro declareSamiExeVersion(): untyped =
 proc getSamiExeVersion*(): string =
   declareSamiExeVersion()
   return version
+
+proc getSamiCommitID*(): string =
+  return commitID
 
 proc getBinaryOS*():     string = osStr
 proc getBinaryArch*():   string = archStr
