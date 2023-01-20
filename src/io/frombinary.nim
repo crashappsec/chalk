@@ -4,7 +4,7 @@ const
   eUnkObjT   = "(unknown object type)"
   eBoolParse = "(when parsing bool)"
   eBinParse  = "(when parsing binary)"
-  eStrParse  = "(when parsing string)"  
+  eStrParse  = "(when parsing string)"
 
 proc itemFromBin(stream: FileStream, swapEndian: bool): Box
 
@@ -95,4 +95,3 @@ proc itemFromBin(stream: FileStream, swapEndian: bool): Box =
 
 proc extractOneSamiBinary*(sami: SamiObj, swapEndian: bool): SamiDict =
   return sami.stream.objFromBin(swapEndian)
-

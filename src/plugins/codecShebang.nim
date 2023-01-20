@@ -1,7 +1,7 @@
 import strutils, options, streams, nimSHA2, ../config, ../plugins
 
 type CodecShebang* = ref object of Codec
-  
+
 method scan*(self: CodecShebang, sami: SamiObj): bool =
   var line1: string
 
@@ -37,7 +37,7 @@ method handleWrite*(self: CodecShebang,
     ctx.write(pre)
     if not pre.strip().endsWith("\n#"):
       ctx.write("\n# ")
-    ctx.write(encoded.get()) 
+    ctx.write(encoded.get())
   else:
     ctx.write(pre[0 ..< pre.find('\n')])
   ctx.write(post)
@@ -57,4 +57,3 @@ method getArtifactHash*(self: CodecShebang, sami: SamiObj): string =
   return $shaCtx.final()
 
 registerPlugin("shebang", CodecShebang())
-

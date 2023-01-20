@@ -1,9 +1,9 @@
 import strformat, tables, streams, unicode, parseutils, nimutils
-       
+
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']
   fmtReadTrace     = "read: {$c}; position now: {$s.getPosition()}"
-  jNullStr         = "null" 
+  jNullStr         = "null"
   jTrueStr         = "true"
   jFalseStr        = "false"
   eBadLiteral      = "Invalid JSON literal. Expected: "
@@ -19,7 +19,7 @@ const
   eBadObjMember    = "Invalid JSON obj, expected , or }}, got: '{$c}'"
   eBadObject       = "Bad object, expected either } or a string key"
   eBadElementStart = "Bad JSon at position: {s.getPosition()}"
-  
+
 
 type JSonError = ref object of ValueError
 

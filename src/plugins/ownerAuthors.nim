@@ -4,9 +4,9 @@ const
   fNameAuthor  = "AUTHOR"
   fNameAuthors = "AUTHORS"
   dirDoc       = "docs"
-  eCantOpen    = "{fname}: File found, but could not be read"  
-  eFileOpen    = "{filename}: Could not open file."   
-  
+  eCantOpen    = "{fname}: File found, but could not be read"
+  eFileOpen    = "{filename}: Could not open file."
+
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}

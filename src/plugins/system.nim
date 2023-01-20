@@ -24,13 +24,13 @@ method getArtifactInfo*(self: SystemPlugin,
 
   if selfIdOpt.isSome():
     result["INJECTOR_ID"] = pack(selfIdOpt.get())
-  
+
   let
     spec = config.getKeySpec("X_SAMI_CONFIG").get()
     optVal = spec.getValue()
 
   if optVal.isSome():
     result["X_SAMI_CONFIG"] = optVal.get()
-  
+
 
 registerPlugin("system", SystemPlugin())

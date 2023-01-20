@@ -5,7 +5,7 @@ const
   eNoFloat    = "{fname}: JSon type for {key} is `float`, which is NOT " &
                 "a valid SAMI type"
   rawMagicKey = "\"_MAGIC"
-  
+
 
 proc findJsonStart*(stream: FileStream): bool =
   var

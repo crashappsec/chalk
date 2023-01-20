@@ -211,7 +211,7 @@ key INJECTOR_COMMIT_ID {
     standard: true
     system: true
     docstring: "The commit hash or id from which the injector was built."
-}   
+}
 
 key BUILD_ID {
     type: "string"
