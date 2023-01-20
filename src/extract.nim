@@ -140,12 +140,16 @@ var selfID: Option[uint] = none(uint)
 proc getSelfExtraction*(): Option[SamiDict] =
   once:
     let samiObjOpt = getSelfSamiObj()
-    if not samiObjOpt.isSome(): return none(SamiDict)
+    if not samiObjOpt.isSome():
+      trace(fmt"Binary does not have an embedded configuration.")
+      return none(SamiDict)
 
     let
       obj = samiObjOpt.get()
       pt = obj.primary
-      selfSami = pt.samiFields
+
+    # Keep this out of the let block; it's a module level variable!
+    selfSami = pt.samiFields
 
     if obj.samiIsEmpty() or not obj.samiHasExisting():
       trace(fmt"No embedded self-SAMI found.")

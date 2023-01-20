@@ -103,7 +103,7 @@ when isMainModule:
               addChoiceFlag('l', "log-level", @["verbose", "trace", "info",
                                                 "warn", "error", "none"],
                             true,
-                            setlogLevel).
+                            setSamiLogLevel).
               addFlagWithStrArg('f', "config-file", setConfigFile)
 
   cmdLine.addCommand("insert", ["inject", "ins", "in", "i"]).
@@ -133,7 +133,8 @@ when isMainModule:
     doHelp()
 
   if "log-level" in flags:
-    setLogLevel(flags["log-level"])
+    setSamiLogLevel(flags["log-level"])
+
 
   if parsed.getSubcommand().isSome():
     setArgs(parsed.getSubcommand().get().getArgs())
