@@ -51,6 +51,7 @@ proc runCmdConfDump() {.inline.} =
 proc runCmdVersion() =
   var
     rows = @[@["Sami version", getSamiExeVersion()],
+             @["Commit ID",    getSamiCommitID()],
              @["Build OS",     hostOS],
              @["Build CPU",    hostCPU],
              @["Build Date",   CompileDate],
