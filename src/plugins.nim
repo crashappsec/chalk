@@ -11,8 +11,6 @@ const
   ePathNotFound     = "{path}: No such file or directory"
   ePureVirtual      = "Method is not defined; it must be overridden"
 
-
-
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 
@@ -22,17 +20,17 @@ proc registerPlugin*(name: string, plugin: Plugin) =
   if name in installedPlugins:
     error("Attempt to install a plugin named " &
           fmt"{name} when one is already installed")
-    return
-
-  let maybe = getPluginConfig(name)
-  if maybe.isNone():
-    error(fmt"No configuration provided for plugin {name}. Plugin ignored.")
-    return
-
-  plugin.configInfo = maybe.get()
   installedPlugins[name] = plugin
 
-  trace(fmt"Installed plugin {name}")
+proc validatePlugins*() =
+  for name, plugin in installedPlugins:
+    let maybe = getPluginConfig(name)
+    if maybe.isNone():
+      error(fmt"No configuration provided for plugin {name}. Plugin ignored.")
+      installedPlugins.del(name)
+    else:
+      plugin.configInfo = maybe.get()    
+      trace(fmt"Installed plugin {name}")
 
 proc loadCommandPlugins*() =
   for (name, command) in getCommandPlugins():
@@ -275,7 +273,7 @@ method getArtifactInfo*(self: ExternalPlugin, sami: SamiObj): KeyInfo =
     let
       str = self.command & " " & sami.fullpath
       sbox = pack(str)
-      rbox = builtinCmd(@[sbox]).get()
+      rbox = c4mCmd(@[sbox]).get()
       jobj = parseJson(newStringStream(unpack[string](rbox)))
       tbl = jobj.kvpairs
 

@@ -3,10 +3,70 @@ import con4m, con4m/[st, eval], nimutils, nimutils/logging
 import macros except error
 export logging
 
-const versionStr  = staticexec("cat ../sami.nimble | grep ^version")
-const commitID    = staticexec("git rev-parse HEAD")
-const archStr     = staticexec("uname -m")
-const osStr       = staticexec("uname -o")
+const
+  versionStr  = staticexec("cat ../sami.nimble | grep ^version")
+  commitID    = staticexec("git rev-parse HEAD")
+  archStr     = staticexec("uname -m")
+  osStr       = staticexec("uname -o")
+                 
+  # Some string constants used in multiple places.                       
+  magicBin*      = "\xda\xdf\xed\xab\xba\xda\xbb\xed"
+  magicUTF8*     = "dadfedabbadabbed"
+  tmpFilePrefix* = "sami"
+  tmpFileSuffix* = "-file.tmp"
+  baseConfig*    = staticRead("configs/baseconfig.c4m")  
+  defaultConfig* = staticRead("configs/defaultconfig.c4m")
+
+
+## A lot of functions in this module work around the fact that Nim
+## currently SUCKS when modules need to cyclically import each
+## other. They don't even let you prototype across modules the way C
+## does.  So a lot of data where, it'd be better for us to go out and
+## query other modules when we need it, we have those modules, on
+## startup (ie, not in a function), set stuff here.  Or, if we have
+## to, we will drop a callback in here.
+##
+
+# These includes will autogenerate several procs, including:
+# proc initialSamiRun(baseconfig, samiCon4mBuiltins, @[])
+# proc loadSamiConfig(samiConfig)
+#
+# Note that, b/c con4m doesn't do export markers on fields right now,
+# this has to be included so we have visibility from here. When I get
+# time, con4m should auto-gen most of the gettrs/settrs we need.
+
+include configs/con4mconfig   # gives us the variable samiConfig, which is
+                              # a con4m configuration object.
+                              # this needs to happen before we import types.
+include  types
+
+var
+  samiCon4mBuiltins: seq[(string, BuiltinFn, string)]
+  ctxSamiConf:       ConfigState
+  samiConfig:        SamiConfig   # Type from the con4m macro.
+  con4mCallbacks:    seq[(string, string)] = @[]
+
+proc registerCon4mCallback*(con4mName: string, con4mType: string) =
+  con4mCallbacks.add((con4mName, con4mType))
+  
+proc setSamiCon4mBuiltIns*(fns: seq[(string, BuiltinFn, string)]) =
+  samiCon4mBuiltins = fns
+
+proc loadBaseConfiguration*() =
+  assert len(samiCon4mBuiltins) != 0
+  let
+   (x, y) = firstSamiRun(baseconfig,
+                         samiCon4mBuiltins,
+                         @[],
+                         con4mCallbacks)
+  ctxSamiConf = x
+  samiConfig  = y
+  
+  if samiConfig == nil:
+    for err in ctxSamiConf.errors:
+      error(err)
+    echo "WTFFFFFFFF"
+    quit(1)
 
 macro declareSamiExeVersion(): untyped =
   return parseStmt("const " & versionStr)
@@ -21,21 +81,6 @@ proc getSamiCommitID*(): string =
 proc getBinaryOS*():     string = osStr
 proc getBinaryArch*():   string = archStr
 proc getSamiPlatform*(): string = osStr & " " & archStr
-
-const baseConfig*    = staticRead("configs/baseconfig.c4m")
-const defaultConfig* = staticRead("configs/defaultconfig.c4m")
-
-include configs/con4mconfig   # gives us the variable samiConfig, which is
-                              # a con4m configuration object.
-                              # this needs to happen before we include types.
-include types
-
-const
-  # Some string constants used in multiple places.                       
-  magicBin*      = "\xda\xdf\xed\xab\xba\xda\xbb\xed"
-  magicUTF8*     = "dadfedabbadabbed"
-  tmpFilePrefix* = "sami"
-  tmpFileSuffix* = "-extract.json"  
 
 var commandName: string
 

@@ -40,7 +40,7 @@ proc doExtraction*(): Option[string] =
 
   for item in ignorePatternsAsStr:
     ignoreGlobs.add(glob("**/" & item))
-    
+
   for (_, name, plugin) in getCodecsByPriority():
     let codec = cast[Codec](plugin)
     trace(fmt"Asking codec '{name}' to scan for SAMIs.")
@@ -141,27 +141,24 @@ proc getSelfSamiObj*(): Option[SamiObj] =
 var selfID: Option[uint] = none(uint)
 
 proc getSelfExtraction*(): Option[SamiDict] =
-  # If we somehow call this twice, no need to re-compute.
-  if selfSami.isSome():
-    return selfSami
-  
-  let samiObjOpt = getSelfSamiObj()
-  if not samiObjOpt.isSome(): return none(SamiDict)
+  once:
+    let samiObjOpt = getSelfSamiObj()
+    if not samiObjOpt.isSome(): return none(SamiDict)
 
-  let
-    obj = samiObjOpt.get()
-    pt = obj.primary
-    selfSami = pt.samiFields
+    let
+      obj = samiObjOpt.get()
+      pt = obj.primary
+      selfSami = pt.samiFields
     
-  if obj.samiIsEmpty() or not obj.samiHasExisting():
-    trace(fmt"No embedded self-SAMI found.")
-    return none(SamiDict)
-  else:
-    trace(fmt"Found existing self-SAMI.")
-    let sami = selfSami.get()
-    # Should always be true, but just in case.
-    if sami.contains("SAMI_ID"):
-      selfID = some(unpack[uint](sami["SAMI_ID"]))
+    if obj.samiIsEmpty() or not obj.samiHasExisting():
+      trace(fmt"No embedded self-SAMI found.")
+      return none(SamiDict)
+    else:
+      trace(fmt"Found existing self-SAMI.")
+      let sami = selfSami.get()
+      # Should always be true, but just in case.
+      if sami.contains("SAMI_ID"):
+        selfID = some(unpack[uint](sami["SAMI_ID"]))
       
   return selfSami
 

@@ -1,4 +1,7 @@
 # Do NOT include or import this directly; instead include config.nim.
+# There is no good way to resolve our cyclic dependency w/ the
+# auto-generated types without using include or moving out of the one
+# central place some of the types (the plugin stuff in particular)
 
 import streams
 
