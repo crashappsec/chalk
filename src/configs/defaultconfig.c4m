@@ -1,5 +1,3 @@
-color: true
-
 # If not provided, log_level will default to "warn".
 # Options for log_level are:
 # "trace" (show verbose messages)
