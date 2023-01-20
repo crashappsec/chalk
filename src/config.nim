@@ -53,6 +53,13 @@ var
   samiConfig:        SamiConfig   # Type from the con4m macro.
   con4mCallbacks:    seq[(string, string)] = @[]
 
+# These two procs are needed externally to test new conf files when loading.
+proc getCon4mBuiltins*(): seq[(string, BuiltinFn, string)] =
+  return samiCon4mBuiltins
+
+proc getCon4mCallbacks*(): seq[(string, string)] =
+  return con4mCallbacks
+  
 proc registerCon4mCallback*(con4mName: string, con4mType: string) =
   con4mCallbacks.add((con4mName, con4mType))
   

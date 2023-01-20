@@ -1,4 +1,4 @@
-import con4m, con4m/eval, nimutils, options, os, streams, strformat
+import con4m, con4m/eval, nimutils, options, os, streams, strformat, os
 import config, builtins, inject
 
 proc runCmdConfLoad*() =
@@ -84,23 +84,31 @@ proc runCmdConfLoad*() =
     # so if it doesn't error, then we know the new config file is good enough, 
     # and we should load it.
     try:
-      var 
-        tree       = parse(newStringStream(baseConfig), "baseconfig")
-        opt        = tree.evalTree()
-        testState  = opt.get()
-        testStream = newStringStream(newCon4m)
+      var
+        builtins   = getCon4mBuiltins()
+        callbacks  = getCon4mCallbacks()
+        samiSpec   = newStringStream(samiSchema)
+        baseConfig = newStringStream(baseConfig)
+        testConfig = newStringStream(newCon4m)
+        tree       = parse(samiSpec, "spec")
+        opt        = tree.evalTree(builtins, [], callbacks)
+        cnfObj     = opt.get() # This can break if the schema doesn't load.
+        baseStack  = cnfObj.stackConfig(baseConfig, "base")
+        `resConf?`: Option[Con4mScope]
         
-      testState.spec      = ctxSamiConf.spec
-      testState.funcTable = ctxSamiConf.funcTable
+      cnfObj.spec = ctxSamiConf.spec
+      `resConf?`     = cnfObj.stackConfig(testConfig, "load candidate")
       
-      if testState.stackConfig(testStream, filename).isNone():
+      if `resConf?`.isNone():
         error(fmt"{filename}: invalid configuration.")
-        if testState.errors.len() != 0:
-          for err in testState.errors:
+        if cnfObj.errors.len() != 0:
+          for err in cnfObj.errors:
             error(err)
         return
+
     except:
-      error("Could not load config file: {getExceptionMessage()}")
+      publish("debug", getCurrentException().getStackTrace())
+      error(fmt"Could not load config file: {getCurrentExceptionMsg()}")
       return
       
     trace(fmt"{filename}: Configuration successfully validated.")
@@ -120,5 +128,7 @@ proc runCmdConfLoad*() =
 
     var xSamiConfKey = getKeySpec("X_SAMI_CONFIG").get()
     xSamiConfKey.setKeyValue(some(pack(newCon4m)))
-
+    
+  trace(fmt"{filename}: installing configuration.")
   doInjection()
+  
