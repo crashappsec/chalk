@@ -166,10 +166,10 @@ proc sinkConfig(args:    seq[Box],
                 unused2: Con4mScope): Option[Box] =
     let
       sinkconf   = unpack[string](args[0])
-      sinkname   = unpack[string](args[1])
+      sinkName   = unpack[string](args[1])
       sinkopts   = unpack[OrderedTableRef[string, string]](args[2])
       filters    = unpack[seq[string]](args[3])
-      cfgopt     = getSinkConfig(sinkNAME)
+      cfgopt     = getSinkConfig(sinkName)
 
     if cfgOpt.isNone():
       warn(fmt"When running sinkConfig for config named '{sinkconf}': " &

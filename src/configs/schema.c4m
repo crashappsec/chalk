@@ -1,0 +1,432 @@
+## SAMI SCHEMA
+sami_version := "0.2.0"
+ascii_magic := "dadfedabbadabbed"
+
+key _MAGIC json {
+    required: true
+    system: true
+    squash: true
+    type: "string"
+    value: ascii_magic
+    standard: true
+    since: "0.1.0"
+    output_order: 0
+    in_ptr: true
+    docstring: "Used to identify the start of JSON encoded output only"
+}
+
+key SAMI_ID {
+    required: true
+    system: true
+    squash: false
+    type: "integer"
+    standard: true
+    since: "0.1.0"
+    output_order: 1
+    in_ptr: true
+    docstring: "Unique 64-bit value per insertion"
+}
+
+key SAMI_ALT_ID {
+    system: true
+    type: "string"
+    standard: true
+    since: "0.1.0"
+    output_order: 2
+    docstring: "Equivolent string representation of the SAMI_ID field"
+}
+
+key SAMI_VERSION {
+    required: true
+    system: false
+    type: "string"
+    value: sami_version
+    standard: true
+    since: "0.1.0"
+    output_order: 3
+    in_ptr: true
+    docstring: "Spec version of inserted objects"
+}
+
+key SAMI_PTR {
+    required: false
+    type: "string"
+    standard: true
+    since: "0.10"
+    output_order: 4
+    in_ptr: true
+    docstring: "When enabled, injects minimal metadata; this field then gets a URL you supply to point to the rest of the data. Items marked as 'true' in the 'Ptr?' column are added in the PTR object"
+}
+
+key TIMESTAMP {
+    required: true
+    system: true
+    type: "integer"
+    since: "0.1.0"
+    output_order: 5
+    standard: true
+    docstring: "Time of insertion"
+}
+
+key EARLIEST_VERSION {
+    type: "string"
+    since: "0.1.0"
+    system: true
+    skip: true
+    value: sami_version
+    output_order: 6
+    standard: true
+    docstring: "Reserved for future use"
+}
+
+key ARTIFACT_PATH {
+    type: "string"
+    since: "0.1.0"
+    codec: true
+    output_order: 7
+    standard: true
+    docstring: "Path of artifact on host where injection occured"
+}
+
+key INSERTION_HOSTINFO {
+    type: "string"
+    since: "0.1.0"
+    output_order: 8
+    standard: true
+    docstring: "Host information at injection; by default, uname -a"
+}
+
+key ORIGIN_URI {
+    type: "string"
+    since: "0.1.0"
+    output_order: 9
+    standard: true
+    docstring: "URI of origin for repo from which artifact was built"
+}
+
+key ARTIFACT_VERSION {
+    type: "string"
+    since: "0.1.0"
+    output_order: 11
+    standard: true
+    docstring: "Reserved for future use"
+}
+
+key IAM_USERNAME {
+    must_force: true
+    type: "string"
+    since: "0.1.0"
+    output_order: 12
+    standard: true
+    docstring: "Possibly removing..."
+}
+
+key IAM_UID {
+    must_force: true
+    type: "integer"
+    since: "0.1.0"
+    output_order: 13
+    standard: true
+    docstring: "Possibly removing..."
+}
+
+key STORE_URI {
+    type: "string"
+    since: "0.1.0"
+    output_order: 14
+    standard: true
+    docstring: "URI for the artifact storage location"
+}
+
+key BRANCH {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 15
+    docstring: "Version control branch the artifact was built from"
+}
+
+key HASH {
+    type: "string"
+    since: "0.1.0"
+    codec: true
+    standard: true
+    output_order: 18
+    docstring: "Hash file of artifact w/o SAMI in it, to ensure extracted SAMIs are intact"
+}
+
+key HASH_FILES {
+    type: "[string]"
+    since: "0.1.0"
+    codec: true
+    standard: true
+    output_order: 19
+    docstring: "Files that constitute the artifact, and used in the hash, if not just the ARTIFACT_PATH"
+
+}
+
+key COMMIT_ID {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 20
+    docstring: "The commit hash or id for the repository the artifact was built from"
+}
+
+key CODE_OWNERS {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 22
+    docstring: "Code owners associated with the artifact"
+}
+
+key INJECTOR_ID {
+    type: "int"
+    since: "0.1.0"
+    standard: true
+    output_order: 24
+    docstring: "SAMI ID of the sami binary that inserted metadata"
+}
+
+key INJECTOR_VERSION {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    system: true
+    docstring: "Version of the SAMI binary used for injection"
+}
+
+key INJECTOR_PLATFORM {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    system: true
+    docstring: "OS / system info at time of insertion"
+}
+
+key INJECTOR_COMMIT_ID {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    system: true
+    docstring: "The commit hash or id from which the injector was built."
+}   
+
+key BUILD_ID {
+    type: "string"
+    since: "0.1.0"
+    standard: true
+    output_order: 50
+    docstring: "The ID of the CI/CD job"
+}
+
+key BUILD_URI {
+    type: "string"
+    since: "0.1.0"
+    output_order: 51
+    standard: true
+    docstring: "URI to the CI/CD job"
+}
+
+key BUILD_API_URI {
+    type: "string"
+    since: "0.1.0"
+    output_order: 52
+    standard: true
+    docstring: "URI to the CI/CD api if more information needs to be queried"
+}
+
+key BUILD_TRIGGER {
+    type: "string"
+    since: "0.1.0"
+    output_order: 53
+    standard: true
+    docstring: "What event triggered CI/CD job"
+}
+
+key BUILD_CONTACT {
+    type: "[string]"
+    since: "0.1.0"
+    output_order: 54
+    standard: true
+    docstring: "List of contacts which triggered CI/CD job"
+}
+
+key X_SAMI_CONFIG {
+    system: true
+    type: "string"
+    since: "0.1.0"
+    docstring: "Embedded configuration file"
+}
+
+key OLD_SAMI {
+    type: "sami"
+    since: "0.1.0"
+    system: true
+    standard: true
+    output_order: 996
+    skip: true
+    docstring: "Old SAMI info associated with an artifact, when a new SAMI is inserted"
+}
+
+key SBOMS {
+    type: "{string, string}"
+    since: "0.1.0"
+    standard: true
+    output_order: 998
+    docstring: "SBOMs associated with this artifact"
+}
+
+key ERR_INFO {
+    type: "[string]"
+    standard: true
+    since: "0.1.0"
+    system: true
+    standard: true
+    output_order: 999
+    docstring: "Errors when inserting metadata"
+}
+
+key SIGNATURE {
+    type: "{string : string}"
+    since: "0.1.0"
+    system: true
+    standard: true
+    output_order: 1000
+    in_ptr: true
+    docstring: "Embedded digital signature for artifact"
+}
+
+# Doesn't do any keys other than the codec defaults, which are:
+# ARTIFACT_PATH, HASH, HASH_FILES.  Note that non-codecs cannot set
+# these keys.
+
+plugin elf {
+    codec: true
+    keys: []
+}
+
+plugin shebang {
+    codec: true
+    keys: []
+}
+
+# Probably should add file time of artifact, date of branch
+# and any tag associated.
+plugin vctl_git {
+    keys: ["COMMIT_ID", "BRANCH", "ORIGIN_URI"]
+}
+
+plugin ci_github {
+    keys: ["BUILD_ID", "BUILD_URI", "BUILD_API_URI", "BUILD_TRIGGER",
+           "BUILD_CONTACT"]
+}
+
+plugin authors {
+    keys: ["CODE_OWNERS"]
+}
+
+plugin github_codeowners {
+    keys: ["CODE_OWNERS"]
+}
+
+plugin sbom_callback {
+    keys: ["SBOMS"]
+}
+
+# This plugin is the only thing allowed to set these keys. It goes first
+# so that other plugins can use the data if need be.  Priority should
+# thus set to low(int64), but con4m currently doesn't get this right,
+# low(int64) in con4m is -high(int64), when it should be one less.
+plugin system {
+  keys: ["TIMESTAMP", "SAMI_ID", "SAMI_ALT_ID", "INJECTOR_ID",
+         "INJECTOR_VERSION", "INJECTOR_PLATFORM", "INJECTOR_COMMIT_ID",
+	 "X_SAMI_CONFIG", "_MAGIC.json"]
+  priority: -9223372036854775807
+}
+
+# These keys would be set by the `metsys` plugin, but need to go LAST
+# not first.  The OLD_SAMI field needs to know what fields get written
+# before it can figure out what to write.
+#
+#
+# Also, this should be the place where signatures happen, though we
+# still have to work on that mechanism (a con4m callback probably).
+#
+# `metsys` is essentially meant to be "system end" in the sense of the
+# old algol days where an if statement's end delimeter was `fi` and a
+# case statement's end was `esac`. But also, this is where system
+# stuff goes that needs other metadata before it can write its own, so
+# I thought it was particularly appropriate.
+#
+# The priority field is set to high(int64).
+plugin metsys {
+    keys: ["OLD_SAMI", "SIGNATURE", "ERR_INFO"]
+    priority: 9223372036854775807
+}
+
+# This plugin takes values from the conf file. By default, these
+# are of the lowest priority of anything that can conflict.
+# This will set SAMI_VERSION, EARLIEST_VERSION, SAMI_REF (if provided)
+# and _MAGIC.
+#
+# This plugin does attempt to apply substitutions to text strings.
+# If it fails, it just treats the value field as text.  See the
+# plugin implementation for details on the substitutions.
+plugin conffile {
+    keys: ["*"]
+    priority: 9223372036854775806
+}
+
+plugin custom_metadata {
+  keys:     ["*"]
+  priority: 0
+}
+
+# Adding a sink requires a linked implementation. The existing sinks
+# are currently in the nimutils library, except for 'custom', which is
+# in output.nim.  That one allows you to define your own sink in con4m
+# by supplying the callback outhook()
+#
+# If you do add more hardcoded sinks, please do make sure they get
+#  locked in the lockBuiltinKeys() function in config.nim.
+
+sink stdout {
+  docstring: "A sink that writes to stdout"
+}
+
+sink stderr {
+  docstring: "A sink that writes to stderr"
+}
+
+sink file {
+  needs_filename: true
+  docstring:      "A sink that writes a local file"
+}
+
+sink s3 {
+  needs_secret: true
+  needs_userid: true
+  needs_uri:    true
+  uses_region:  true
+  uses_cacheid: true
+  docstring:    "A sink for S3 buckets"
+}
+
+sink post {
+  needs_uri:    true
+  uses_headers: true
+  docstring:    "Generic HTTP/HTTPS post to a URL. Add custom headers by providing an implementation to the callback getPostHeaders(), which should return a dictionary where all keys and values are strings."
+}
+
+sink custom {
+  uses_secret: true
+  uses_userid: true
+  uses_filename: true
+  uses_uri: true
+  uses_region: true
+  uses_cacheid: true
+  uses_aux: true
+  docstring: "Implement a custom sink via a con4m callback"
+}

@@ -1,5 +1,3 @@
-color: true
-
 # If not provided, log_level will default to "warn".
 # Options for log_level are:
 # "trace" (show verbose messages)
@@ -41,26 +39,13 @@ key INSERTION_HOSTINFO {
 
 ## I/O CONFIGURATION
 
-# Note that, if there is no command given, the value of "cmd" here
-# will be 'default' here, instead of the value you picked as a
-# default.  Your default doesn't go into effect until this script
-# finishes running.
+## This is an example of what you can do.  At this point, you will
+## have some subscriptions set up, based on the command.  The code
+## used for I/O in the base configuration is in the comments below;
+## you can undo any of it if you really want!
 
 cmd  := argv0()
 args := argv()
-
-log("info", "running command: " + cmd)
-
-sink_config("redirectableOut", "stdout", {}, [])
-sink_config("defaultOut",      "stderr", {}, [])
-
-if cmd != "defaults" {
-    subscribe("defaults", "defaultOut")
-} else {
-    subscribe("defaults", "redirectableOut")
-}
-
-subscribe("help", "defaultOut")
 
 if cmd == "extract" or cmd == "insert" or cmd == "delete" {
   if envExists("AWS_S3_BUCKET_URI") {
@@ -70,31 +55,24 @@ if cmd == "extract" or cmd == "insert" or cmd == "delete" {
        log("warn", "To configure AWS must provide AWS_ACCESS_SECRET")       
     } else {
       sink_config("s3", "s3", { "secret" : env("AWS_ACCESS_SECRET"),
-                               "userid" : env("AWS_ACCESS_ID"),
-                               "uri"    : env("AWS_S3_BUCKET_URI") }, [] )
+                                "userid" : env("AWS_ACCESS_ID"),
+                                "uri"    : env("AWS_S3_BUCKET_URI") }, [])
+      #  Stuff you might do if the sink is configured...
+      # subscribe("insert", "s3")
+      # subscribe("extract", "s3")
+      # subscribe("delete", "s3")
+      # unsubscribe("unsert", "defaultOut")			       
     }
   }
-  subscribe("extract", "defaultOut") # Writes SAMIs extracted w/ 'extract' cmd
-  subscribe("nesting", "defaultOut") # Writes extracted samis when inserting
-  subscribe("insert",  "defaultOut") # Writes full SAMIs (no ptrs) being insert
-  subscribe("delete",  "defaultOut") # Writes full SAMIs being deleted
-  subscribe("dry-run", "defaultOut")
-  
 }
-elif cmd == "confdump" {
-  if len(args) > 0 {
-    sink_config("dumpOut", "file", {"filename" : args[0]}, [])
-  }
-  else {
-    sink_config("dumpOut", "stdout", {}, [])
-  }
 
-  subscribe("confdump", "dumpOut")
-}
-else {
-  if cmd == "confload" {
-    subscribe("confload", "redirectableOut")
-  } elif cmd == "version" {
-    subscribe("version",  "redirectableOut")
-  } 
-}
+# Note that, if there is no command given, the value of "cmd" here
+# will be 'default' here, instead of the value you picked as a
+# default.  Your default doesn't go into effect until this script
+# finishes running.
+
+log("info", "running command: " + argv0())
+
+# Configuration code that has already run, before your base configuration
+# loaded:
+#
