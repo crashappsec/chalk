@@ -11,7 +11,7 @@
 
 log_level: "info"
 
-#log("info", "Loading the default SAMI config")
+# log("info", "Loading the default SAMI config")
 
 # The following default commands are valid:
 # help, insert, extract, version
