@@ -3,13 +3,13 @@
 # "trace" (show verbose messages)
 # "info"  (show default messages)
 # "warn"  (don't show informational messages, but do show warnings and errors)
-# "error" (show ONLY actual fatal errors) 
+# "error" (show ONLY actual fatal errors)
 # "none"  (show nothing, not even errors)
 #
 # You can configure where these messages go; they get published to the
 # "logs" topic, which automatically is hooked to stderr by default.
 
-log_level: "info" 
+log_level: "info"
 
 # log("info", "Loading the default SAMI config")
 
@@ -52,7 +52,7 @@ if cmd == "extract" or cmd == "insert" or cmd == "delete" {
     if not envExists("AWS_ACCESS_ID") {
        log("warn", "To configure AWS must provide AWS_ACCESS_ID")
     } elif not envExists("AWS_ACCESS_SECRET") {
-       log("warn", "To configure AWS must provide AWS_ACCESS_SECRET")       
+       log("warn", "To configure AWS must provide AWS_ACCESS_SECRET")
     } else {
       sink_config("s3", "s3", { "secret" : env("AWS_ACCESS_SECRET"),
                                 "userid" : env("AWS_ACCESS_ID"),
@@ -61,7 +61,7 @@ if cmd == "extract" or cmd == "insert" or cmd == "delete" {
       # subscribe("insert", "s3")
       # subscribe("extract", "s3")
       # subscribe("delete", "s3")
-      # unsubscribe("unsert", "defaultOut")			       
+      # unsubscribe("unsert", "defaultOut")
     }
   }
 }

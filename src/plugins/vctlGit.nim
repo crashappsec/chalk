@@ -67,7 +67,7 @@ proc loadHead(self: GitPlugin, sami: SamiObj): bool =
 
   if parts.len() < 3:
     sami.insertionError("Could not load github HEAD file")
-    return false 
+    return false
 
   self.branchName = parts[2 .. ^1].join($DirSep)
   var reffile = newFileStream(self.vcsDir.joinPath(fname))

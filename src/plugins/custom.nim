@@ -13,12 +13,12 @@ const callback3TypeStr = "f(string, string) -> {string : float}"
 let   callback1Type    = callback1TypeStr.toCon4mType()
 let   callback2Type    = callback2TypeStr.toCon4mType()
 let   callback3Type    = callback3TypeStr.toCon4mType()
-  
+
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 
 type CustomMetadataPlugin* = ref object of Plugin
-  
+
 template processOneKeyType(cbNum: untyped, cbType: string) =
   if `optInfo cbNum`.isSome():
     let
@@ -27,14 +27,14 @@ template processOneKeyType(cbNum: untyped, cbType: string) =
 
     for k, v in dict:
       let specOpt = getKeySpec(k)
-      
+
       if not specOpt.isSome():
         error("When calling " & `callback cbNum Name` &
           ": key " & k & " does not match any key spec from the configuration.")
         continue
-        
+
       let spec = specOpt.get()
-      
+
       if  spec.getType() != cbType:
         error("When calling " & `callback cbNum Name` &
           " for custom metadata: key '" & k & "' is of type: " &
@@ -42,11 +42,11 @@ template processOneKeyType(cbNum: untyped, cbType: string) =
           "for that key was of type: " & cbType)
         continue
       result[k] = v
-                           
+
 method getArtifactInfo*(self: CustomMetadataPlugin,
                         sami: SamiObj): KeyInfo =
   result = newTable[string, Box]()
-  
+
   sami.stream.setPosition(0)
 
   let
@@ -60,10 +60,9 @@ method getArtifactInfo*(self: CustomMetadataPlugin,
   processOneKeyType(1, "string")
   processOneKeyType(2, "int")
   processOneKeyType(3, "float")
-      
+
 registerPlugin(pluginName, CustomMetadataPlugin())
 
 registerCon4mCallback(callback1Name, callback1TypeStr)
 registerCon4mCallback(callback2Name, callback2TypeStr)
 registerCon4mCallback(callback3Name, callback3TypeStr)
-  

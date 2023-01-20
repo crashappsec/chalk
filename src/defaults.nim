@@ -75,7 +75,7 @@ proc showGeneralOptions*(): int {.discardable.} =
   ot.addRow(@["Default exe command",
               getOrElse(getDefaultCommand(), "none"),
               "default_command"])
-  
+
   if getAllowExternalConfig():
     ot.addRow(@["Config file path",
                 getConfigPath().join(", "),
@@ -101,7 +101,7 @@ proc paramFmt(t: StringTable): string =
 
 proc filterFmt(flist: seq[MsgFilter]): string =
   var parts: seq[string] = @[]
-  
+
   for filter in flist:
     parts.add(filter.getFilterName().get())
 
@@ -122,7 +122,7 @@ proc showSinkConfigs*(): int {.discardable.} =
         subLists[config] = @[topic]
       else:
         subLists[config].add(topic)
-  
+
   ot.addRow(@["Config name", "Sink", "Parameters", "Filters", "Topics"])
   for key, config in sinkConfigs:
     if config notin sublists:
@@ -136,13 +136,13 @@ proc showSinkConfigs*(): int {.discardable.} =
 
   let specs       = ot.getColSpecs()
   specs[2].minChr = 15
-  
+
   let tableout = ot.render()
   publish("defaults", formatTitle("Output Configuration:") & tableout)
   if len(unusedTopics) != 0 and getLogLevel() == llTrace:
     let unused = unusedTopics.join(", ")
     publish("defaults", formatTitle(fmt"Unused topics: {unused}") & "\n")
-      
+
   return tableout.find("\n")
 
 proc showKeyConfigs*(): int {.discardable.} =
@@ -155,7 +155,7 @@ proc showKeyConfigs*(): int {.discardable.} =
     emptyVal = pack("*supplied via plugin*")
 
   ot.addRow(@["Key", "Use", "Value", "In Ptr?", "Description"])
-  
+
   for key in keyList:
     if key in custom: continue
     let
@@ -171,10 +171,10 @@ proc showKeyConfigs*(): int {.discardable.} =
 
   if len(custom) != 0:
     # TODO... Span rows and/or per-cell overrides.  Tmp hack.
-    ot.addRow(@[":", "    ", "", "", ""]) 
-    ot.addRow(@["CUSTOM KEYS:", "", "", "", ""]) 
+    ot.addRow(@[":", "    ", "", "", ""])
+    ot.addRow(@["CUSTOM KEYS:", "", "", "", ""])
 
-    for key in custom: 
+    for key in custom:
       let
         spec    = getKeySpec(key).get()
         enabled = if spec.getSkip(): "NO" else: "yes"
@@ -184,12 +184,12 @@ proc showKeyConfigs*(): int {.discardable.} =
         desc    = getOrElse(spec.getDocString(), "none")
 
       ot.addRow(@[key, enabled, default, inPtr, desc])
-  
+
   let tableout = ot.render(-4)
   publish("defaults", formatTitle("SAMI Key Configuration:") & tableout)
 
   return tableout.find("\n")
-               
+
 proc showDisclaimer*(w: int) =
   var disclaimer = "Note that these values can change based on logic in " &
                       "the config file.  You can cause the current " &
@@ -202,14 +202,13 @@ proc showDisclaimer*(w: int) =
                       "configuration file asks for it to be used. Running " &
                       "the 'defaults' command always publishes, though."
   publish("defaults", "\n" & indentWrap(disclaimer, w - 1) & "\n")
-  
+
 proc showConfig*() =
   let isDefaultsCmd = getCommandName() == "defaults"
-  
+
   if getPublishDefaults() or isDefaultsCmd:
     showGeneralOptions()
     showSinkConfigs()
     let w = showKeyConfigs()
     if isDefaultsCmd:
       showDisclaimer(w)
-      

@@ -246,7 +246,7 @@ proc getExeVersion(args:    seq[Box],
     return some(pack(retval))
 
 
-    
+
 setSamiCon4mBuiltins(@[
   ("osname",      BuiltInFn(getOsName),        "f() -> string"),
   ("arch",        BuiltInFn(getArch),          "f() -> string"),
@@ -271,8 +271,6 @@ discard registerTopic("confload")
 discard registerTopic("confdump")
 discard registerTopic("version")
 discard registerTopic("help")
-  
+
 when not defined(release):
     discard subscribe("debug", defaultDebugHook)
-
-    

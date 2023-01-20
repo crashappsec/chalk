@@ -29,7 +29,7 @@ proc validatePlugins*() =
       error(fmt"No configuration provided for plugin {name}. Plugin ignored.")
       installedPlugins.del(name)
     else:
-      plugin.configInfo = maybe.get()    
+      plugin.configInfo = maybe.get()
       trace(fmt"Installed plugin {name}")
 
 proc loadCommandPlugins*() =
@@ -38,7 +38,7 @@ proc loadCommandPlugins*() =
 
 proc getPluginByName*(name: string): Plugin =
   return installedPlugins[name]
-                         
+
 proc getPluginsByPriority*(): seq[PluginInfo] =
   result = @[]
 
@@ -87,7 +87,7 @@ proc insertionError*(o: SamiObj, msg: string) =
   ## will get published to the log topic.
   error(msg)
   o.err.add(msg)
-  
+
 method scan*(self: Codec, sami: SamiObj): bool {.base.} =
   ## Return true if the codec is going to handle this file.  This
   ## function should add position information and presence

@@ -5,7 +5,7 @@ const
   kvPairJFmt   = "{comma}{keyJson} : {valJson}" # also extract.nim
   jSonObjFmt   = "{ $# }"
   jsonArrFmt   = "[ $# ]"
-  
+
 
 proc foundToJson*(self: SamiDict): string
 
@@ -27,7 +27,7 @@ proc foundToJson*(self: SamiDict): string =
   for fullKey in getOrderedKeys():
     var outputKey = fullKey
 
-    
+
     if fullKey.contains("."):
       let parts = fullKey.split(".")
       if len(parts) != 2 or parts[1] != "json":

@@ -17,10 +17,10 @@ else:
     var
       i        = 0
       curStart = 0
-    
+
 
     result = ""
-    
+
     while i < limit:
       case s[i]
       of '\\':
@@ -46,7 +46,7 @@ else:
           var
             found = false
             val: string
-            
+
           for (k, v) in map:
             if k == key:
               val = v
@@ -61,7 +61,7 @@ else:
         discard
       i = i + 1
     result &= s[curStart .. ^1]
-  
+
 
 const helpPath   = staticExec("pwd") & "/help/"
 const helpCorpus = newOrderedFileTable(helpPath)
@@ -87,7 +87,7 @@ proc jankyFormat(s: string): string =
         "cyan"         : toAnsiCode(@[acCyan]),
         "white"        : toAnsiCode(@[acWhite]),
         "brown"        : toAnsiCode(@[acBrown]),
-        "purple"       : toAnsiCode(@[acPurple]),      
+        "purple"       : toAnsiCode(@[acPurple]),
         "bblack"       : toAnsiCode(@[acBBlack]),
         "bred"         : toAnsiCode(@[acBRed]),
         "bgreen"       : toAnsiCode(@[acBGreen]),
@@ -143,7 +143,7 @@ proc parseJankText(s: string, width: int): seq[JankBlock] =
 import parseutils
 
 template `not`(x: int): untyped = x == 0
-  
+
 proc parseJankTable(s: string, width: int, plain: bool): JankBlock =
   let
     strRows = s.jankyFormat().strip(leading=false).split(Rune('\n'))
@@ -160,7 +160,7 @@ proc parseJankTable(s: string, width: int, plain: bool): JankBlock =
 
     if n > maxCols:
       maxCols = n
-      
+
     for i in 0 ..< n:
       row[i] = row[i].strip()
 
@@ -205,7 +205,7 @@ proc jankHeader1(s: string): JankBlock =
 proc jankHeader2(s: string): JankBlock =
   let ret = toAnsiCode(@[acBGCyan]) & s & toAnsiCode(@[acReset])
   return JankBlock(kind: JankHeader, content: ret.jankyFormat())
-  
+
 proc jankCodeBlock(s: string, width: int): JankBlock =
   var
     formatted = s.jankyFormat()
@@ -222,7 +222,7 @@ proc parseJank(s: string, width: int): seq[JankBlock]
 
 proc parseJankCtrl(s: string, width: int): seq[JankBlock] =
   var n = s[1 .. ^1]
-  case s[0] 
+  case s[0]
   of 't': # Table, plain, no headers or borders.
     return @[parseJankTable(n, width, true)]
   of 'T': # Table, yes headers and borders.
@@ -241,7 +241,7 @@ proc parseJankCtrl(s: string, width: int): seq[JankBlock] =
     return @[jankCodeBlock(n, width)]
   else:
     raise newException(ValueError, "Janky jank option: '" & $(Rune(s[0])))
-  
+
 proc parseJank(s: string, width: int): seq[JankBlock] =
   result = @[]
   var cur = s
@@ -270,7 +270,7 @@ proc parseJank(s: string, width: int): seq[JankBlock] =
     else:
       result.add(parseJankText(cur[0 .. nextBreak], width))
       cur = cur[nextBreak+1 .. ^1]
-      
+
 proc doHelp*() {.noreturn.} =
   var
     jank:  seq[JankBlock] = @[]
@@ -301,12 +301,12 @@ proc doHelp*() {.noreturn.} =
       var
         table            = newTextTable(numCols)
         row: seq[string] = @[]
-        
+
       table.setNoHeaders()
 
       for item in topics:
         row.add(item)
-        
+
         if len(row) == numCols:
           table.addRow(row)
           row = @[]

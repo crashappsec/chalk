@@ -12,7 +12,7 @@ method getArtifactInfo*(self: ConfFilePlugin,
   let
     keyList = getAllKeys()
     samiID  = unpack[int](sami.newFields["SAMI_ID"])
-      
+
   for key in keyList:
     let
       spec   = config.getKeySpec(key).get()

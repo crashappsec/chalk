@@ -49,7 +49,7 @@ con4mDef(Sami):
        doc = "When publishing extractions, whether to also provide the " &
              "list of artifacts scanned where SAMIs were not found, but " &
              "would have been extracted, had they been there.")
-  
+
   section(key, allowedSubSections = @["*", "*.json", "*.binary"]):
     attr(required,
          bool,
@@ -142,7 +142,7 @@ con4mDef(Sami):
     attr(docstring,
          string,
          required = false)
-    
+
   section(sink, allowedSubSections = @["*"]):
     attr(uses_secret, bool, defaultVal = false)
     attr(uses_userid, bool, defaultVal = false)
@@ -150,7 +150,7 @@ con4mDef(Sami):
     attr(uses_uri, bool, defaultVal = false)
     attr(uses_region, bool, defaultVal = false)
     attr(uses_headers, bool, defaultVal = false)
-    attr(uses_cacheid, bool, defaultVal = false)        
+    attr(uses_cacheid, bool, defaultVal = false)
     attr(uses_aux, bool, defaultVal = false)
     attr(needs_secret, bool, defaultVal = false)
     attr(needs_userid, bool, defaultVal = false)
@@ -159,5 +159,5 @@ con4mDef(Sami):
     attr(needs_region, bool, defaultVal = false)
     attr(needs_aux, bool, defaultVal = false)
     attr(needs_headers, bool, defaultVal = false)
-    attr(needs_cacheid, bool, defaultVal = false)        
+    attr(needs_cacheid, bool, defaultVal = false)
     attr(docstring, string, required = false)

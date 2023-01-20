@@ -13,10 +13,10 @@
 # # and ; are comments.
 
 import streams
-       
+
 const
-  eBadGitConf = "Github configuration file is invalid"  
-  
+  eBadGitConf = "Github configuration file is invalid"
+
 
 type KVPair* = (string, string)
 type KVPairs* = seq[KVPair]
@@ -195,4 +195,3 @@ proc parseGitConfig*(s: Stream): seq[SecInfo] =
       return
     else:
       result.add((sec, sub, pairs))
-

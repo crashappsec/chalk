@@ -3,7 +3,7 @@ import nimutils, config, plugins, io/tojson
 
 const
   # This is the logging template for JSON output.
-  logTemplate       = """{ 
+  logTemplate       = """{
   "ARTIFACT_PATH: $#,
   "SAMI" : $#,
   "EMBEDDED_SAMIS" : $#
@@ -21,7 +21,7 @@ proc doExtraction*(): Option[string] =
   # single JSON string that *could* be output.
   #
   # TODO: need to validate extracted SAMIs.
-  # 
+  #
   # We do not process the actual sami binary that is running, if it
   # happens to be in the search path.  It's a special command to do a
   # self-insertion, partially to avoid accidents, and partially
@@ -47,7 +47,7 @@ proc doExtraction*(): Option[string] =
     if getCommandName() == "insert":
       codec.doScan(artifactPath, exclusions, ignoreGlobs, getRecursive())
     else:
-      codec.doScan(artifactPath, exclusions, @[], getRecursive())      
+      codec.doScan(artifactPath, exclusions, @[], getRecursive())
     codecInfo.add(codec)
 
   trace("Beginning extraction attempts for any found SAMIs")
@@ -64,7 +64,7 @@ proc doExtraction*(): Option[string] =
           else:
             info(fmtInfoNoExtract.fmt())
           unmarked.add(sami.fullpath)
-          
+
           continue
         if sami.samiHasExisting():
           let
@@ -99,13 +99,13 @@ proc doExtraction*(): Option[string] =
       return none(string)
     var toOut = "{ "
     toOut &= "\"extractions\" : [ " & samisToRet.join(", ") & " ] "
-    
+
     if getPublishUnmarked():
       toOut &= ", \"unmarked\" : " & $( %* unmarked)
 
     toOut &= "}"
     result = some(toOut)
-    
+
     info(fmt"Completed {numExtractions} extractions.")
 
 var selfSamiObj: Option[SamiObj] = none(SamiObj)
@@ -122,9 +122,9 @@ proc getSelfSamiObj*(): Option[SamiObj] =
     var
       myPath = @[resolvePath(getAppFileName())]
       exclusions: seq[string] = @[]
-    
+
     trace(fmt"Checking sami binary {myPath[0]} for embedded config")
-  
+
     for (_, name, plugin) in getCodecsByPriority():
       let codec = cast[Codec](plugin)
       codec.doScan(myPath, exclusions, @[], false)
@@ -132,7 +132,7 @@ proc getSelfSamiObj*(): Option[SamiObj] =
       selfSamiObj = some(codec.samis[0])
       codec.samis = @[]
       return selfSamiObj
-      
+
     warn(fmt"We have no codec for this platform's native executable type")
     setNoSelfInjection()
 
@@ -149,7 +149,7 @@ proc getSelfExtraction*(): Option[SamiDict] =
       obj = samiObjOpt.get()
       pt = obj.primary
       selfSami = pt.samiFields
-    
+
     if obj.samiIsEmpty() or not obj.samiHasExisting():
       trace(fmt"No embedded self-SAMI found.")
       return none(SamiDict)
@@ -159,7 +159,7 @@ proc getSelfExtraction*(): Option[SamiDict] =
       # Should always be true, but just in case.
       if sami.contains("SAMI_ID"):
         selfID = some(unpack[uint](sami["SAMI_ID"]))
-      
+
   return selfSami
 
 proc getSelfID*(): Option[uint] =

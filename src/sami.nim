@@ -9,14 +9,14 @@
 ##    definition lives in `configs/schema.c4m`
 ## 3) We load in a small **base configuration** that does NOT change, which is
 ##    in `configs/baseconfig.c4m`. This is fixed, because we don't want people
-##    accidentally deleting the I/O setup. 
+##    accidentally deleting the I/O setup.
 ## 4) We load the **embedded configuration**, which shouldn't do much except
 ##    document the kinds of things people can do. This lives in
 ##    `configs/defaultconfig.c4m`
 ## 5) At this point, we **commit** any command-line flags that the embedded
 ##    configuration allows us to commit. (audit will still report what flags
 ##    people tried to use, even if they're not allowed).
-## 6) Run any **external configuration**, if it exists, as long as the 
+## 6) Run any **external configuration**, if it exists, as long as the
 ##    embedded config allows it to run.
 ## 7) **Audit**, if the embedded configuration asked for it (it does NOT by
 ##    default, as we don't want to spam people who haven't set up a place for
@@ -39,15 +39,15 @@ var `selfSami?` = none(SamiDict)
 proc runCmdConfDump() {.inline.} =
   var toDump  = defaultConfig
   var argList = getArgs()
-  
+
   if `selfSami?`.isSome():
     let selfSami = `selfSami?`.get()
-    
+
     if selfSami.contains("X_SAMI_CONFIG"):
       toDump   = unpack[string](selfSami["X_SAMI_CONFIG"])
-      
+
   publish("confdump", toDump)
-  
+
 proc runCmdVersion() =
   var
     rows = @[@["Sami version", getSamiExeVersion()],
@@ -69,7 +69,7 @@ proc doAudit(commandName: string,
     return
 
   var flagStrs: seq[string] = @[]
-  
+
   for key, value in parsedFlags:
     if value == "":
       flagStrs.add("--" & key)
@@ -85,14 +85,14 @@ proc doAudit(commandName: string,
                  }.toTable()
 
   publish("audit", $(%* prejson))
-          
+
 when isMainModule:
   var
     parsed:        ArgResult
     done:          bool
     cmdName:       string
     `configFile?`: Option[string]
-  
+
     cmdLine = newArgSpec(defaultCmd = true).
               addPairedFlag('c', 'C', "color", setColor).
               addPairedFlag('d', 'D', "dry-run", setDryRun).
@@ -103,19 +103,19 @@ when isMainModule:
                             true,
                             setlogLevel).
               addFlagWithStrArg('f', "config-file", setConfigFile)
-              
+
   cmdLine.addCommand("insert", ["inject", "ins", "in", "i"]).
             addArgs(callback = setArtifactSearchPath).
             addPairedFlag('r', 'R', "recursive", setRecursive)
-            
+
   cmdLine.addCommand("extract", ["ex", "e"]).
             addArgs(callback = setArtifactSearchPath).
             addPairedFlag('r', 'R', "recursive", setRecursive)
-            
+
   cmdLine.addCommand("delete", ["del"]).
             addArgs(callback = setArtifactSearchPath).
             addPairedFlag('r', 'R', "recursive", setRecursive)
-            
+
   cmdLine.addCommand("defaults", ["def"])
   cmdLine.addCommand("confdump", ["dump"]).addArgs(min = 0, max = 1)
   cmdLine.addCommand("confload", ["load"]).addArgs(min = 1, max = 1)
@@ -131,9 +131,9 @@ when isMainModule:
 
   if parsed.getSubcommand().isSome():
     setArgs(parsed.getSubcommand().get().getArgs())
-    
+
   setCommandName(cmdName)
-  
+
   # Now that we've set argv, we can do our own setup, including
   # loading the base configuration.  This is in config.nim
   loadBaseConfiguration()
@@ -152,7 +152,7 @@ when isMainModule:
   # getSelfExtraction() is in extract.nim; loadEmbeddedConfig is in
   # config.nim
   `selfSami?` = getSelfExtraction()
-    
+
   let
     configLoaded = loadEmbeddedConfig(`selfSami?`)
     appName      = getAppFileName().splitPath().tail
@@ -188,7 +188,7 @@ when isMainModule:
     parsed.commit()
 
   doAudit(cmdName, parsed.getFlags(), `configFile?`)
-  
+
   case cmdName
   of "insert":
     doInjection()
@@ -212,5 +212,5 @@ when isMainModule:
     doHelp() # doHelp() exits; it does NOT do a config dump or run the config.
   else:
     unreachable # Unless we add more commands.
-    
+
   showConfig() # In defaults.
