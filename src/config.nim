@@ -550,9 +550,11 @@ proc loadUserConfigFile*(commandName: string,
 
     except Con4mError: # config file didn't load:
       contents = "" # Just in case.
-      info(fmt"{fname}: config file not loaded.")
       samiDebug("\n" & getCurrentException().getStackTrace())
-      samiDebug("continuing.")
+      error(fmt"{fname}: {getCurrentExceptionMsg()}")
+      info(fmt"{fname}: config file not loaded.")
+      return none(string)
+
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
