@@ -112,12 +112,8 @@ var selfSamiObj: Option[SamiObj] = none(SamiObj)
 var selfSami: Option[SamiDict] = none(SamiDict)
 
 proc getSelfSamiObj*(): Option[SamiObj] =
-  # If we call this twice, no need to re-compute.
-  if selfSamiObj.isSome():
-    return selfSamiObj
   # If we call twice and we're on a platform where we don't
   # have a codec for this type of executable, avoid dupe errors.
-
   once:
     var
       myPath = @[resolvePath(getAppFileName())]
@@ -136,7 +132,8 @@ proc getSelfSamiObj*(): Option[SamiObj] =
     warn(fmt"We have no codec for this platform's native executable type")
     setNoSelfInjection()
 
-  return none(SamiObj)
+  return selfSamiObj
+
 
 var selfID: Option[uint] = none(uint)
 

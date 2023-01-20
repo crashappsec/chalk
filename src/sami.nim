@@ -93,6 +93,7 @@ when isMainModule:
     done:          bool
     cmdName:       string
     `configFile?`: Option[string]
+    flags:         TableRef[string, string]
 
     cmdLine = newArgSpec(defaultCmd = true).
               addPairedFlag('c', 'C', "color", setColor).
@@ -126,9 +127,13 @@ when isMainModule:
   try:
     (parsed, done) = cmdLine.mostlyParse(topHasDefault = true)
     cmdName        = getOrElse(parsed.getCurrentCommandName(), "default")
+    flags          = parsed.getFlags()
   except:
     error(getCurrentExceptionMsg())
     doHelp()
+
+  if "log-level" in flags:
+    setLogLevel(flags["log-level"])
 
   if parsed.getSubcommand().isSome():
     setArgs(parsed.getSubcommand().get().getArgs())
@@ -188,7 +193,7 @@ when isMainModule:
   else:
     parsed.commit()
 
-  doAudit(cmdName, parsed.getFlags(), `configFile?`)
+  doAudit(cmdName, flags, `configFile?`)
 
   case cmdName
   of "insert":

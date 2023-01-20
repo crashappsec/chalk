@@ -30,10 +30,7 @@ proc runCmdConfLoad*() =
 
   if filename == "default":
     newCon4m = defaultConfig
-    if getDryRun():
-      dryRun("Would install the default configuration file.")
-    else:
-      info("Installing the default confiuration file.")
+    info("Installing the default confiuration file.")
   else:
     let f = newFileStream(resolvePath(filename))
     if f == nil:
