@@ -7,7 +7,7 @@ const
   infNewSami        = "{item.fullpath}: new artifact metadata added."
   infReplacedSami   = "{item.fullpath}: artifact metadata replaced."
   eCantInsert       = "{item.fullpath}: insertion failed!"
-  
+
 type
   KeyPriorityInfo = tuple[priority: int, plugin: Plugin]
 let noOverrides = newTable[string, int]()
@@ -18,9 +18,9 @@ var
 proc getSystemPlugins(): array[2, Plugin] {.inline.} =
   once:
     systeMetsys = [getPluginByName("system"), getPluginByName("metsys")]
-    
+
   return systeMetsys
-    
+
 proc populateOneSami(sami:            SamiObj,
                      codec:           Codec,
                      priorityInfo:    TableRef[string, seq[KeyPriorityInfo]],
@@ -73,13 +73,13 @@ proc populateOneSami(sami:            SamiObj,
     # For keys that are spec'd as 'codec' or 'system', those can only
     # be set by codecs or the system plugin, respectively.  We enforce
     # that in this loop.
-    
+
     for k, v in ki:
       if k.isSystemKey() and plugin notin getSystemPlugins():
         error("Invalid (non-system) attempt to set system key: " & k)
         continue
       if k.isCodecKey() and plugin != codec:
-        error("Non-codec attempted to set codec key: " & k)        
+        error("Non-codec attempted to set codec key: " & k)
         continue
       if len(k) > 0 and k[0] != 'X':
         if not isBuiltinKey(k):
@@ -119,7 +119,7 @@ proc doInjection*() =
   # JSON to stdout.  This loads any such plugins specified in the
   # config file.
   loadCommandPlugins()
-  
+
   trace("Beginning artifact metadata collection and injection.")
   # We're going to build a list of priority ordering based on plugin.
   # For codecs, they only get called when the SAMI is being read/written by
@@ -204,7 +204,7 @@ proc doInjection*() =
       # We pass the full SAMI off to these handlers; if we're
       # writing a pointer the codec will not write the whole thing.
       #
-      # However, we write the blob all at once, after               
+      # However, we write the blob all at once, after
       if outputPtrs or Binary in item.flags:
         objsForWrite.add(item.createdToJson())
       else:
@@ -213,7 +213,7 @@ proc doInjection*() =
       # NOW, if we're in dry-run mode, we don't actually inject.
       if inDryRun:
         continue
-        
+
       if point.endOffset > point.startOffset:
         item.stream.setPosition(point.endOffset)
       let
@@ -251,12 +251,10 @@ proc doInjection*() =
 
   # Finally, if we've got external output requirements, it's time to
   # dump what we've read to the "inject" stream.
-            
+
   let fullJson = "[" & join(objsForWrite, ", ") & "]"
 
   if getSelfInjecting():
     publish("confload", fullJson)
   else:
     publish("insert",   fullJson)
-
-    

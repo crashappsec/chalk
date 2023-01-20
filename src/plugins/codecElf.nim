@@ -4,7 +4,7 @@ import nimSHA2, ../config, ../plugins
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 
-const  
+const
   b64OffsetLoc = 0x28
   b32OffsetLoc = 0x20
   wsOffsetLoc  = 0x04
@@ -13,8 +13,8 @@ const
   magicSwapped = "\xed\xbb\xda\xba\xab\xed\xdf\xda"
   elfMagic     = 0x7f454c46'u32
   elfSwapped   = 0x464c457f'u32
-  
-  
+
+
 
 type CodecElf* = ref object of Codec
 

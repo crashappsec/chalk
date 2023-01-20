@@ -25,4 +25,3 @@ Currently, SAMI's behavior is easily customized, primarily via a flexible config
 See {bold}{appName} help topics{reset} for a list of all help topics.
 See {bold}{appName} help metadata{reset} for information about configuring default metadata keys.
 See {bold}{appName} help custom{reset} for information about adding custom metadata keys.
-

@@ -13,13 +13,13 @@ sink_config("redirectable_out", "stdout", {}, [])
 sink_config("default_out",      "stderr", {}, [])
 
 if cmd == "extract" or cmd == "insert" or cmd == "delete" {
-    
+
   subscribe("extract", "default_out") # Writes SAMIs extracted w/ 'extract' cmd
   subscribe("nesting", "default_out") # Writes extracted samis when inserting
   subscribe("insert",  "default_out") # Writes full SAMIs on insert (no ptrs)
   subscribe("delete",  "default_out") # Writes full SAMIs being deleted
   subscribe("dry-run", "default_out")
-  
+
 }
 elif cmd == "confdump" {
   if len(args) > 0 {
@@ -36,7 +36,7 @@ else {
     subscribe("confload", "redirectable_out")
   } elif cmd == "version" {
     subscribe("version",  "redirectable_out")
-  } 
+  }
 }
 
 if cmd != "defaults" {

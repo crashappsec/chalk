@@ -8,20 +8,20 @@ proc comment(s: string): string =
   result    = ""
   for line in lines:
     result &= "# " & line & "\n"
-    
+
 const
   versionStr  = staticexec("cat ../sami.nimble | grep ^version")
   commitID    = staticexec("git rev-parse HEAD")
   archStr     = staticexec("uname -m")
   osStr       = staticexec("uname -o")
-                 
-  # Some string constants used in multiple places.                       
+
+  # Some string constants used in multiple places.
   magicBin*      = "\xda\xdf\xed\xab\xba\xda\xbb\xed"
   magicUTF8*     = "dadfedabbadabbed"
   tmpFilePrefix* = "sami"
   tmpFileSuffix* = "-file.tmp"
   samiSchema*    = staticRead("configs/schema.c4m")
-  baseConfig*    = staticRead("configs/baseconfig.c4m")  
+  baseConfig*    = staticRead("configs/baseconfig.c4m")
   defaultConfig* = staticRead("configs/defaultconfig.c4m") & comment(baseConfig)
 
 
@@ -55,7 +55,7 @@ var
 
 proc registerCon4mCallback*(con4mName: string, con4mType: string) =
   con4mCallbacks.add((con4mName, con4mType))
-  
+
 proc setSamiCon4mBuiltIns*(fns: seq[(string, BuiltinFn, string)]) =
   samiCon4mBuiltins = fns
 
@@ -91,16 +91,16 @@ proc canSelfInject*(): bool =
 
 proc getSelfInjecting*(): bool =
   return commandName == "confload"
-  
+
 template hookCheck(fieldname: untyped) =
   let s = astToStr(fieldName)
-  
+
   if sinkConfData.`needs fieldName`:
     if not sinkopts.contains(s):
       warn("Sink config '" & sinkconf & "' is missing field '" & s &
            "', which is required by sink '" & sinkname &
            "' (config not installed)")
-      
+
 
 proc checkHooks*(sinkname:     string,
                  sinkconf:     string,
@@ -115,11 +115,11 @@ proc checkHooks*(sinkname:     string,
     hookCheck(cacheid)
     hookCheck(aux)
 
-  
+
 template dryRun*(s: string) =
   if samiConfig.dryRun:
     publish("dry-run", s)
-    
+
 when not defined(release):
   template samiDebug*(s: string) =
     const
@@ -168,10 +168,10 @@ proc getDefaultCommand*(): Option[string] =
 
 proc getCanDump*(): bool =
   return samiConfig.canDump
-  
+
 proc getCanLoad*(): bool =
   return samiConfig.canLoad
-  
+
 proc getColor*(): bool =
   return samiConfig.color
 
@@ -198,7 +198,7 @@ proc setDryRun*(val: bool) =
 proc getPublishAudit*(): bool =
    return samiConfig.publishAudit
 
-proc getPublishDefaults*(): bool = 
+proc getPublishDefaults*(): bool =
   return samiConfig.publishDefaults
 
 proc setPublishDefaults*(val: bool) =
@@ -211,7 +211,7 @@ proc getArtifactSearchPath*(): seq[string] =
 proc setArtifactSearchPath*(val: seq[string]) =
   if len(val) == 0:
     return
-    
+
   samiConfig.artifactSearchPath = @[]
 
   for item in val:
@@ -339,7 +339,7 @@ proc getCommandPlugins*(): seq[(string, string)] =
 
 proc getAllSinks*(): TableRef[string, SamiSinkSection] =
   result = samiConfig.sink
-  
+
 proc getSinkConfig*(hook: string): Option[SamiSinkSection] =
   if samiConfig.`sink`.contains(hook):
     return some(samiConfig.`sink`[hook])
@@ -374,7 +374,7 @@ proc lockBuiltinKeys*() =
       stdOpt = getConfigVar(ctxSamiConf, prefix & ".standard")
 
     if stdOpt.isNone(): continue
-    
+
     let
       std  = stdOpt.get()
       sys  = getConfigVar(ctxSamiConf, prefix & ".system").get()
@@ -387,7 +387,7 @@ proc lockBuiltinKeys*() =
       discard ctxSamiConf.lockConfigVar(prefix & ".standard")
       discard ctxSamiConf.lockConfigVar(prefix & ".since")
       discard ctxSamiConf.lockConfigVar(prefix & ".output_order")
-      discard ctxSamiConf.lockConfigVar(prefix & ".codec")        
+      discard ctxSamiConf.lockConfigVar(prefix & ".codec")
 
     if unpack[bool](sys):
       discard ctxSamiConf.lockConfigVar(prefix & ".value")
@@ -404,7 +404,7 @@ proc lockBuiltinKeys*() =
   discard ctxSamiConf.lockConfigVar("output.stdout.dst_uri")
   discard ctxSamiConf.lockConfigVar("output.stdout.region")
   discard ctxSamiConf.lockConfigVar("output.stdout.userid")
-  discard ctxSamiConf.lockConfigVar("output.stdout.secret")        
+  discard ctxSamiConf.lockConfigVar("output.stdout.secret")
 
   discard ctxSamiConf.lockConfigVar("output.local_file.command")
   discard ctxSamiConf.lockConfigVar("output.local_file.dst_uri")
@@ -427,7 +427,7 @@ proc lockBuiltinKeys*() =
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_secret")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_userid")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_filename")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_uri")    
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_uri")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_region")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_aux")
 
@@ -436,7 +436,7 @@ proc lockBuiltinKeys*() =
 # loading, to do any sanity checking.  Could probably do more with it.
 # A lot of what's currently here should eventually move to
 # auto-generated bits in the con4m spec, though.
-    
+
 proc doAdditionalValidation() =
   # Actually, not validation, but get this done early.
   setShowColors(samiConfig.color)
@@ -470,7 +470,7 @@ proc doAdditionalValidation() =
   # we load the schema.
   once:
     lockBuiltinKeys()
-  
+
 
 proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict]): bool =
   var
@@ -480,7 +480,7 @@ proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict]): bool =
     confString = defaultConfig
   else:
     let selfSami = selfSamiOpt.get()
-  
+
     # We extracted a SAMI object from our own executable.  Check for an
     # X_SAMI_CONFIG key, and if there is one, run that configuration
     # file, before loading any on-disk configuration file.
@@ -540,7 +540,7 @@ proc loadUserConfigFile*(commandName: string,
         fd.setPosition(0)
         contents = fd.readAll()
         loaded = true
-      
+
     except Con4mError: # config file didn't load:
       contents = "" # Just in case.
       info(fmt"{fname}: config file not loaded.")
@@ -553,7 +553,7 @@ proc loadUserConfigFile*(commandName: string,
   if loaded:
     trace(fmt"Loaded configuration file: {fname}")
     return some(contents)
-    
+
   else:
     trace("No user config file loaded.")
     return none(string)
@@ -568,7 +568,7 @@ proc loadBaseConfiguration*() =
                          con4mCallbacks)
   ctxSamiConf = x
   samiConfig  = y
-  
+
   if samiConfig == nil:
     for err in ctxSamiConf.errors:
       error(err)
@@ -578,7 +578,7 @@ proc loadBaseConfiguration*() =
   let
     baseStream = newStringStream(baseConfig)
     stack      = ctxSamiConf.stackConfig(baseStream, "base")
-    
+
   if stack.isNone():
     error("Base configuration is broken.")
     for err in ctxSamiConf.errors:

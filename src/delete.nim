@@ -6,7 +6,7 @@ const
 
 proc doDelete*() =
   trace("Identifying artifacts with existing SAMIs")
-  
+
   var codecs           = getCodecsByPriority()
   let pendingDeletions = doExtraction()
 
@@ -17,7 +17,7 @@ proc doDelete*() =
     let
       codec    = cast[Codec](pluginInfo.plugin)
       extracts = codec.getSamis()
-    
+
     if len(extracts) == 0: continue
 
     for item in extracts:
@@ -34,7 +34,7 @@ proc doDelete*() =
 
       if point.endOffset > point.startOffset:
         item.stream.setPosition(point.endOffset)
-        
+
       let
         post = item.stream.readAll()
 
@@ -58,4 +58,3 @@ proc doDelete*() =
           except:
             removeFile(path)
             raise
-
