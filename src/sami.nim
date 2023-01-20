@@ -135,6 +135,7 @@ when isMainModule:
   if "log-level" in flags:
     setSamiLogLevel(flags["log-level"])
 
+
   if parsed.getSubcommand().isSome():
     setArgs(parsed.getSubcommand().get().getArgs())
 
