@@ -1,9 +1,38 @@
+## This is the entry point for SAMI.
+##
+## Here's an overview of what happens:
+## 0) Some **internal registration** happens as modules load.  Specifically:
+##      a) We register output topics that SAMI uses.
+##      b) Plugins register themselves, and any con4m callbacks they support.
+## 1) **Arguments** get parsed (but the values are not committed)
+## 2) We load in the SAMI **con4m schema**, and validate it. The schema
+##    definition lives in `configs/schema.c4m`
+## 3) We load in a small **base configuration** that does NOT change, which is
+##    in `configs/baseconfig.c4m`. This is fixed, because we don't want people
+##    accidentally deleting the I/O setup. 
+## 4) We load the **embedded configuration**, which shouldn't do much except
+##    document the kinds of things people can do. This lives in
+##    `configs/defaultconfig.c4m`
+## 5) At this point, we **commit** any command-line flags that the embedded
+##    configuration allows us to commit. (audit will still report what flags
+##    people tried to use, even if they're not allowed).
+## 6) Run any **external configuration**, if it exists, as long as the 
+##    embedded config allows it to run.
+## 7) **Audit**, if the embedded configuration asked for it (it does NOT by
+##    default, as we don't want to spam people who haven't set up a place for
+##    this to go... we don't want it spamming stdout for sure).
+## 8) **Dispatch** to the appropriate command, which runs and returns.
+## 9) **Publish defaults**, if doing so was requested.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023
+
 import tables, nativesockets, json, strutils, os, options
+# Note that importing builtins causes topics to register, and
+# importing plugins causes plugins to register.
 import nimutils, config, builtins, plugins
 import inject, extract, delete, confload, defaults, help
 
-# When we import things above, a few modules do some setup, like
-# plugins register. But nothing meaningful yet... 
 var `selfSami?` = none(SamiDict)
 
 # Tiny commands live in this file. The major ones are broken out.
@@ -106,12 +135,22 @@ when isMainModule:
   setCommandName(cmdName)
   
   # Now that we've set argv, we can do our own setup, including
-  # loading the base configuration.
+  # loading the base configuration.  This is in config.nim
   loadBaseConfiguration()
-  doAdditionalValidation()
+  # This is in plugin.nim, but can't easily live in our validation
+  # code in the previous call, because it would add a cyclic module
+  # dependency.  But this is conceptually part of the schema
+  # validation... are there any loaded plugins that do NOT show up in
+  # the schema?  It also will cause the plugin objects to cache a
+  # reference to the con4m configuration info about the plugin (this
+  # could easily wait until the plugin first gets used, but if we do
+  # that, put it in a once: block).
   validatePlugins()
-  
-  # Let's check our own executable for a self-SAMI.
+  # Next, we need to load the embedded configuration, so we load our
+  # self-SAMI, if we have one, as loadEmbeddedConfig will check it for
+  # the embedded config, and select the default if it isn't there.
+  # getSelfExtraction() is in extract.nim; loadEmbeddedConfig is in
+  # config.nim
   `selfSami?` = getSelfExtraction()
     
   let
@@ -123,6 +162,11 @@ when isMainModule:
           " load default' to generate a fixed executable.")
     cmdName = "help"
 
+  # We allow the embedded config file to control what happens if no
+  # command is specified, particularly, which command should run.  So,
+  # if the argument parsing didn't match a command, we had passed in
+  # "default" as a command name, and if we had to ask the config file,
+  # we now need the answer, so we can dispatch.
   if cmdName == "default":
     var `cmd?` = getDefaultCommand()
     if `cmd?`.isSome():
@@ -170,5 +214,3 @@ when isMainModule:
     unreachable # Unless we add more commands.
     
   showConfig() # In defaults.
-
-  

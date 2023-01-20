@@ -46,3 +46,16 @@ if cmd != "defaults" {
 }
 
 subscribe("help", "default_out")
+
+
+# This is actually installed by default by nimutils. You can't
+# actually redefine it, but you can unsubscribe() it, and add
+# a replacement instead via subscribe()
+#
+#
+#
+# # If a stacked config redefines stream.logs.hooks, then it will
+# # wipe out the default installed hook above.
+# stream logs {
+#   filters: [ "defaultLogs" ]
+# }

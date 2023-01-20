@@ -430,15 +430,3 @@ sink custom {
   uses_aux: true
   docstring: "Implement a custom sink via a con4m callback"
 }
-
-# This is actually installed by default by nimutils. You can't
-# actually redefine it, but you can unsubscribe() it, and add
-# a replacement instead via subscribe()
-#
-#
-#
-# # If a stacked config redefines stream.logs.hooks, then it will
-# # wipe out the default installed hook above.
-# stream logs {
-#   filters: [ "defaultLogs" ]
-# }

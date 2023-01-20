@@ -367,74 +367,77 @@ proc isCodecKey*(name: string): bool =
   return name in codecKeys
 
 proc lockBuiltinKeys*() =
-  once:
-    for key in getAllKeys():
-      builtinKeys.add(key)
-      let
-        prefix = "key." & key
-        stdOpt = getConfigVar(ctxSamiConf, prefix & ".standard")
+  for key in getAllKeys():
+    builtinKeys.add(key)
+    let
+      prefix = "key." & key
+      stdOpt = getConfigVar(ctxSamiConf, prefix & ".standard")
 
-      if stdOpt.isNone(): continue
+    if stdOpt.isNone(): continue
     
-      let
-        std  = stdOpt.get()
-        sys  = getConfigVar(ctxSamiConf, prefix & ".system").get()
-        codec = getConfigVar(ctxSamiConf, prefix & ".codec").get()
+    let
+      std  = stdOpt.get()
+      sys  = getConfigVar(ctxSamiConf, prefix & ".system").get()
+      codec = getConfigVar(ctxSamiConf, prefix & ".codec").get()
 
-      if unpack[bool](std):
-        discard ctxSamiConf.lockConfigVar(prefix & ".required")
-        discard ctxSamiConf.lockConfigVar(prefix & ".system")
-        discard ctxSamiConf.lockConfigVar(prefix & ".type")
-        discard ctxSamiConf.lockConfigVar(prefix & ".standard")
-        discard ctxSamiConf.lockConfigVar(prefix & ".since")
-        discard ctxSamiConf.lockConfigVar(prefix & ".output_order")
-        discard ctxSamiConf.lockConfigVar(prefix & ".codec")        
+    if unpack[bool](std):
+      discard ctxSamiConf.lockConfigVar(prefix & ".required")
+      discard ctxSamiConf.lockConfigVar(prefix & ".system")
+      discard ctxSamiConf.lockConfigVar(prefix & ".type")
+      discard ctxSamiConf.lockConfigVar(prefix & ".standard")
+      discard ctxSamiConf.lockConfigVar(prefix & ".since")
+      discard ctxSamiConf.lockConfigVar(prefix & ".output_order")
+      discard ctxSamiConf.lockConfigVar(prefix & ".codec")        
 
-      if unpack[bool](sys):
-        discard ctxSamiConf.lockConfigVar(prefix & ".value")
-        systemKeys.add(key)
+    if unpack[bool](sys):
+      discard ctxSamiConf.lockConfigVar(prefix & ".value")
+      systemKeys.add(key)
 
-      if unpack[bool](codec):
-        codecKeys.add(key)
+    if unpack[bool](codec):
+      codecKeys.add(key)
 
-    # These are locks of invalid fields for specific output handlers.
-    # Note that all of these lock calls could go away if con4m gets a
-    # locking syntax.
-    discard ctxSamiConf.lockConfigVar("output.stdout.filename")
-    discard ctxSamiConf.lockConfigVar("output.stdout.command")
-    discard ctxSamiConf.lockConfigVar("output.stdout.dst_uri")
-    discard ctxSamiConf.lockConfigVar("output.stdout.region")
-    discard ctxSamiConf.lockConfigVar("output.stdout.userid")
-    discard ctxSamiConf.lockConfigVar("output.stdout.secret")        
+  # These are locks of invalid fields for specific output handlers.
+  # Note that all of these lock calls could go away if con4m gets a
+  # locking syntax.
+  discard ctxSamiConf.lockConfigVar("output.stdout.filename")
+  discard ctxSamiConf.lockConfigVar("output.stdout.command")
+  discard ctxSamiConf.lockConfigVar("output.stdout.dst_uri")
+  discard ctxSamiConf.lockConfigVar("output.stdout.region")
+  discard ctxSamiConf.lockConfigVar("output.stdout.userid")
+  discard ctxSamiConf.lockConfigVar("output.stdout.secret")        
 
-    discard ctxSamiConf.lockConfigVar("output.local_file.command")
-    discard ctxSamiConf.lockConfigVar("output.local_file.dst_uri")
-    discard ctxSamiConf.lockConfigVar("output.local_file.region")
-    discard ctxSamiConf.lockConfigVar("output.local_file.userid")
-    discard ctxSamiConf.lockConfigVar("output.local_file.secret")
+  discard ctxSamiConf.lockConfigVar("output.local_file.command")
+  discard ctxSamiConf.lockConfigVar("output.local_file.dst_uri")
+  discard ctxSamiConf.lockConfigVar("output.local_file.region")
+  discard ctxSamiConf.lockConfigVar("output.local_file.userid")
+  discard ctxSamiConf.lockConfigVar("output.local_file.secret")
 
-    discard ctxSamiConf.lockConfigVar("output.s3.filename")
-    discard ctxSamiConf.lockConfigVar("output.s3.command")
+  discard ctxSamiConf.lockConfigVar("output.s3.filename")
+  discard ctxSamiConf.lockConfigVar("output.s3.command")
 
-    for item, _ in samiConfig.sink:
-      # Really need to be able to lock entire sections.  You shouldn't be
-      # able to add ANY sinks from the conf file, that wouldn't work out.
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_secret")
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_userid")
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_filename")
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_uri")
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_region")
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_aux")
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_secret")
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_userid")
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_filename")
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_uri")    
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_region")
-      discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_aux")
+  for item, _ in samiConfig.sink:
+    # Really need to be able to lock entire sections.  You shouldn't be
+    # able to add ANY sinks from the conf file, that wouldn't work out.
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_secret")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_userid")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_filename")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_uri")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_region")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_aux")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_secret")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_userid")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_filename")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_uri")    
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_region")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_aux")
 
-# This should mostly move to evaluation callbacks.  They can give
-# better error messages more easily.
-proc doAdditionalValidation*() =
+# Do last-minute sanity-checking so we can give better error messages
+# more easily.  This function currently runs once for each config
+# loading, to do any sanity checking.  Could probably do more with it.
+# A lot of what's currently here should eventually move to
+# auto-generated bits in the con4m spec, though.
+    
+proc doAdditionalValidation() =
   # Actually, not validation, but get this done early.
   setShowColors(samiConfig.color)
 
@@ -463,8 +466,10 @@ proc doAdditionalValidation*() =
     if getSink(sinkname).isNone():
       warn(fmt"Config declared sink '{sinkname}', but no implementation exists")
 
-  # Now, lock a bunch of fields.
-  lockBuiltinKeys()
+  # Now, lock a bunch of fields.  But this is only needed once, when
+  # we load the schema.
+  once:
+    lockBuiltinKeys()
   
 
 proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict]): bool =
@@ -582,5 +587,3 @@ proc loadBaseConfiguration*() =
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
-  
-    
