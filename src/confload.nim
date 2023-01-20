@@ -100,6 +100,7 @@ proc runCmdConfLoad*() =
       `resConf?`     = cnfObj.stackConfig(testConfig, "load candidate")
 
       if `resConf?`.isNone():
+
         error(fmt"{filename}: invalid configuration.")
         if cnfObj.errors.len() != 0:
           for err in cnfObj.errors:
