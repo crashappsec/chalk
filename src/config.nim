@@ -3,6 +3,12 @@ import con4m, con4m/[st, eval], nimutils, nimutils/logging
 import macros except error
 export logging
 
+proc comment(s: string): string =
+  let lines = s.split("\n")
+  result    = ""
+  for line in lines:
+    result &= "# " & line & "\n"
+    
 const
   versionStr  = staticexec("cat ../sami.nimble | grep ^version")
   commitID    = staticexec("git rev-parse HEAD")
@@ -14,8 +20,9 @@ const
   magicUTF8*     = "dadfedabbadabbed"
   tmpFilePrefix* = "sami"
   tmpFileSuffix* = "-file.tmp"
+  samiSchema*    = staticRead("configs/schema.c4m")
   baseConfig*    = staticRead("configs/baseconfig.c4m")  
-  defaultConfig* = staticRead("configs/defaultconfig.c4m")
+  defaultConfig* = staticRead("configs/defaultconfig.c4m") & comment(baseConfig)
 
 
 ## A lot of functions in this module work around the fact that Nim
@@ -51,22 +58,6 @@ proc registerCon4mCallback*(con4mName: string, con4mType: string) =
   
 proc setSamiCon4mBuiltIns*(fns: seq[(string, BuiltinFn, string)]) =
   samiCon4mBuiltins = fns
-
-proc loadBaseConfiguration*() =
-  assert len(samiCon4mBuiltins) != 0
-  let
-   (x, y) = firstSamiRun(baseconfig,
-                         samiCon4mBuiltins,
-                         @[],
-                         con4mCallbacks)
-  ctxSamiConf = x
-  samiConfig  = y
-  
-  if samiConfig == nil:
-    for err in ctxSamiConf.errors:
-      error(err)
-    echo "WTFFFFFFFF"
-    quit(1)
 
 macro declareSamiExeVersion(): untyped =
   return parseStmt("const " & versionStr)
@@ -561,3 +552,35 @@ proc loadUserConfigFile*(commandName: string,
   else:
     trace("No user config file loaded.")
     return none(string)
+
+proc loadBaseConfiguration*() =
+  # First we load the schema.
+  assert len(samiCon4mBuiltins) != 0
+  let
+   (x, y) = firstSamiRun(samiSchema,
+                         samiCon4mBuiltins,
+                         @[],
+                         con4mCallbacks)
+  ctxSamiConf = x
+  samiConfig  = y
+  
+  if samiConfig == nil:
+    for err in ctxSamiConf.errors:
+      error(err)
+    quit(1)
+
+  # Now stack on the "base" configuration.
+  let
+    baseStream = newStringStream(baseConfig)
+    stack      = ctxSamiConf.stackConfig(baseStream, "base")
+    
+  if stack.isNone():
+    error("Base configuration is broken.")
+    for err in ctxSamiConf.errors:
+      error(err)
+    quit(1)
+
+  samiConfig = ctxSamiConf.loadSamiConfig()
+  doAdditionalValidation()
+  
+    

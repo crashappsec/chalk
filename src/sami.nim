@@ -1,16 +1,10 @@
-import tables, nativesockets, json, strutils, os
+import tables, nativesockets, json, strutils, os, options
 import nimutils, config, builtins, plugins
 import inject, extract, delete, confload, defaults, help
 
 # When we import things above, a few modules do some setup, like
-# plugins register. But nothing meaningful yet... this is where we
-# load the base config file.
-loadBaseConfiguration()
-doAdditionalValidation()
-validatePlugins()
-
-# Now check our own executable for a self-SAMI.
-let `selfSami?` = getSelfExtraction()
+# plugins register. But nothing meaningful yet... 
+var `selfSami?` = none(SamiDict)
 
 # Tiny commands live in this file. The major ones are broken out.
 proc runCmdConfDump() {.inline.} =
@@ -110,6 +104,16 @@ when isMainModule:
     setArgs(parsed.getSubcommand().get().getArgs())
     
   setCommandName(cmdName)
+  
+  # Now that we've set argv, we can do our own setup, including
+  # loading the base configuration.
+  loadBaseConfiguration()
+  doAdditionalValidation()
+  validatePlugins()
+  
+  # Let's check our own executable for a self-SAMI.
+  `selfSami?` = getSelfExtraction()
+    
   let
     configLoaded = loadEmbeddedConfig(`selfSami?`)
     appName      = getAppFileName().splitPath().tail
