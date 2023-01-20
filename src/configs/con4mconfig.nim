@@ -7,10 +7,9 @@
 ## TODO: Add a field to the global or a section to configure
 ## logging options.
 
+import con4m, options, nimutils, tables
 
-import nimutils/box
-
-var samiConfig = con4m(Sami, baseconfig):
+con4mDef(Sami):
   attr(config_path,
        [string],
        @[".", "~"],

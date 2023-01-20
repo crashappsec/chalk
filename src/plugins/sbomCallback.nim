@@ -1,5 +1,5 @@
 import options, tables
-import nimutils/box, con4m/[eval, st, builtins], ../config, ../plugins
+import nimutils/box, con4m/[eval, st], ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
@@ -28,4 +28,4 @@ method getArtifactInfo*(self: SbomCallbackPlugin,
       result["SBOMS"] = res
 
 registerPlugin(pluginName, SbomCallbackPlugin())
-getConfigState().newCallback(callbackName, callbackTypeStr)
+registerCon4mCallback(callbackName, callbackTypeStr)

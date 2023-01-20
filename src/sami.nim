@@ -1,16 +1,15 @@
 import tables, nativesockets, json, strutils, os
-import nimutils, config, builtins
+import nimutils, config, builtins, plugins
 import inject, extract, delete, confload, defaults, help
 
-# The base configuration will load when we import config.  We forego
-# using any SAMI-specific builtns in that config, because it's just
-# specification (otherwise we'd load those builtins there).
-#
-# But we want to go ahead and add these before we run any user
-# definable config.
-loadAdditionalBuiltins()
+# When we import things above, a few modules do some setup, like
+# plugins register. But nothing meaningful yet... this is where we
+# load the base config file.
+loadBaseConfiguration()
 doAdditionalValidation()
+validatePlugins()
 
+# Now check our own executable for a self-SAMI.
 let `selfSami?` = getSelfExtraction()
 
 # Tiny commands live in this file. The major ones are broken out.

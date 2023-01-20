@@ -1,7 +1,7 @@
 # Allows people do do custom metadata keys via the con4m callback
 # custom_metadata.
 import tables, options, nimutils, streams, ../config, ../plugins
-import con4m/[eval, st, builtins]
+import con4m/[eval, st]
 
 const pluginName       = "custom_metadata"
 const callback1Name    = "custom_string_metadata"
@@ -63,7 +63,7 @@ method getArtifactInfo*(self: CustomMetadataPlugin,
       
 registerPlugin(pluginName, CustomMetadataPlugin())
 
-getConfigState().newCallback(callback1Name, callback1TypeStr)
-getConfigState().newCallback(callback2Name, callback2TypeStr)
-getConfigState().newCallback(callback3Name, callback3TypeStr)
+registerCon4mCallback(callback1Name, callback1TypeStr)
+registerCon4mCallback(callback2Name, callback2TypeStr)
+registerCon4mCallback(callback3Name, callback3TypeStr)
   

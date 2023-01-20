@@ -54,7 +54,6 @@ else:
               break
           if not found:
             raise newException(ValueError, "invalid specifier: '" & key & "'")
-          echo "key = ", key
           result &= val
           i        = i + 1
           curstart = i

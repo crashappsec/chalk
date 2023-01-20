@@ -3,22 +3,8 @@
 ## That is, the output code and con4m calls here do not belong in
 ## con4m etc.
 
-import tables, options, uri, strformat, nimutils, nimutils/logging, streams
-import con4m, con4m/[builtins, st, eval], config
-
-# First builtin topic stuff.  Then builtin con4m calls.
-
-discard registerTopic("extract")
-discard registerTopic("insert")
-discard registerTopic("nesting")
-discard registerTopic("defaults")
-discard registerTopic("dry-run")
-discard registerTopic("delete")
-discard registerTopic("audit")
-discard registerTopic("confload")
-discard registerTopic("confdump")
-discard registerTopic("version")
-discard registerTopic("help")
+import config, streams, options, tables, strformat, uri
+import nimutils, con4m
 
 const customSinkType = "f(string, {string : string}) -> bool"
 
@@ -48,7 +34,6 @@ proc customOut(msg: string, record: SinkConfig, xtra: StringTable): bool =
   args.add(pack(cfg))
 
   var retBox = runCallback(ctxSamiConf, "outhook", args, some(t)).get()
-
   return unpack[bool](retBox)
 
 const customKeys = { "secret" :  false, "uid"    : false, "filename": false,
@@ -56,7 +41,7 @@ const customKeys = { "secret" :  false, "uid"    : false, "filename": false,
                      "cacheid" : false, "aux"    : false }.toTable()
 
 registerSink("custom", SinkRecord(outputFunction: customOut, keys: customKeys))
-ctxSamiConf.newCallback("outhook", customSinkType)
+registerCon4mCallback("outhook", customSinkType)
 
 const
   availableFilters = { "logLevel"    : MsgFilter(logLevelFilter),
@@ -103,10 +88,10 @@ proc getArgv(args:    seq[Box],
              unused3: Con4mScope): Option[Box] =
   return some(pack(getArgs()))
 
-proc getCommandName(args:    seq[Box],
-                    unused1: Con4mScope,
-                    unused2: VarStack,
-                    unused3: Con4mScope): Option[Box] =
+proc getExeName(args:    seq[Box],
+                unused1: Con4mScope,
+                unused2: VarStack,
+                unused3: Con4mScope): Option[Box] =
     return some(pack(getCommandName()))
 
 proc topicSubscribe(args:    seq[Box],
@@ -260,19 +245,34 @@ proc getExeVersion(args:    seq[Box],
 
     return some(pack(retval))
 
-proc loadAdditionalBuiltins*() =
-  let ctx = getConfigState()
 
-  ctx.newBuiltin("osname",      getOsName,        "f() -> string")
-  ctx.newBuiltin("arch",        getArch,          "f() -> string")
-  ctx.newBuiltin("version",     getExeVersion,    "f() -> string")
-  ctx.newBuiltIn("subscribe",   topicSubscribe,   "f(string, string)->bool")
-  ctx.newBuiltIn("unsubscribe", topicUnSubscribe, "f(string, string)->bool")
-  ctx.newBuiltIn("log",         logBuiltin,       "f(string, string)")
-  ctx.newBuiltIn("argv",        getArgv,          "f() -> [string]")
-  ctx.newBuiltIn("argv0",       getCommandName,   "f() -> string")
-  ctx.newBuiltIn("sink_config",  sinkConfig,
-                 "f(string, string, {string: string}, [string])")
+    
+setSamiCon4mBuiltins(@[
+  ("osname",      BuiltInFn(getOsName),        "f() -> string"),
+  ("arch",        BuiltInFn(getArch),          "f() -> string"),
+  ("version",     BuiltinFn(getExeVersion),    "f() -> string"),
+  ("subscribe",   BuiltInFn(topicSubscribe),   "f(string, string)->bool"),
+  ("unsubscribe", BuiltInFn(topicUnSubscribe), "f(string, string)->bool"),
+  ("log",         BuiltInFn(logBuiltin),       "f(string, string)"),
+  ("argv",        BuiltInFn(getArgv),          "f() -> [string]"),
+  ("argv0",       BuiltInFn(getExeName),       "f() -> string"),
+  ("sink_config", BuiltInFn(sinkConfig),
+                            "f(string, string, {string: string}, [string])")
+  ])
 
+discard registerTopic("extract")
+discard registerTopic("insert")
+discard registerTopic("nesting")
+discard registerTopic("defaults")
+discard registerTopic("dry-run")
+discard registerTopic("delete")
+discard registerTopic("audit")
+discard registerTopic("confload")
+discard registerTopic("confdump")
+discard registerTopic("version")
+discard registerTopic("help")
+  
 when not defined(release):
     discard subscribe("debug", defaultDebugHook)
+
+    
