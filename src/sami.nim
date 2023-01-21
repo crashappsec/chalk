@@ -133,8 +133,9 @@ when isMainModule:
     doHelp()
 
   if "log-level" in flags:
-    setSamiLogLevel(flags["log-level"])
-
+    # We can't call samiLogLevel yet b/c there's no config object
+    # to set overrides on.
+    setLogLevel(flags["log-level"])
 
   if parsed.getSubcommand().isSome():
     setArgs(parsed.getSubcommand().get().getArgs())
@@ -144,6 +145,9 @@ when isMainModule:
   # Now that we've set argv, we can do our own setup, including
   # loading the base configuration.  This is in config.nim
   loadBaseConfiguration()
+  if "log-level" in flags:
+    setSamiLogLevel(flags["log-level"])
+
   # This is in plugin.nim, but can't easily live in our validation
   # code in the previous call, because it would add a cyclic module
   # dependency.  But this is conceptually part of the schema
