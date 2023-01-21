@@ -7,36 +7,39 @@ if envExists("NO_COLOR") {
 
 cmd  := argv0()
 args := argv()
-echo("command is: ", cmd)
 
-sink_config("redirectable_out", "stdout", {}, [])
-sink_config("default_out",      "stderr", {}, [])
+sink_config("user_err", "stderr", {}, [])
+
+# For commands that output JSON, default user output should get
+# JSON formatting and always get a newline per-publish.
+if cmd == "extract" or cmd == "insert" or cmd == "delete" {
+  sink_config("user_out", "stdout", {}, ["prettyJson", "fixNewline"])
+} else {
+  sink_config("user_out", "stdout", {}, [])
+}
 
 if cmd == "extract" or cmd == "insert" or cmd == "delete" {
-
-  subscribe("extract", "default_out") # Writes SAMIs extracted w/ 'extract' cmd
-  subscribe("nesting", "default_out") # Writes extracted samis when inserting
-  subscribe("insert",  "default_out") # Writes full SAMIs on insert (no ptrs)
-  subscribe("delete",  "default_out") # Writes full SAMIs being deleted
-  subscribe("dry-run", "default_out")
-
+  subscribe("extract", "user_out") # Writes SAMIs extracted w/ 'extract' cmd
+  subscribe("nesting", "user_out") # Writes extracted samis when inserting
+  subscribe("insert",  "user_out") # Writes full SAMIs on insert (no ptrs)
+  subscribe("delete",  "user_out") # Writes full SAMIs being deleted
+  subscribe("dry-run", "user_out")
 }
 elif cmd == "confdump" {
   if len(args) > 0 {
     sink_config("dump_out", "file", {"filename" : args[0]}, [])
+    subscribe("confdump", "dump_out")
   }
   else {
-    sink_config("dump_out", "stdout", {}, [])
+    subscribe("confdump", "user_out")
   }
-
-  subscribe("confdump", "dump_out")
-}
-else {
-  if cmd == "confload" {
-    subscribe("confload", "redirectable_out")
-  } elif cmd == "version" {
-    subscribe("version",  "redirectable_out")
-  }
+} elif cmd == "version" {
+  # Send to stdout so people can more easily grep from scripts.
+  subscribe("version",  "redirectable_out")
+} elif cmd == "confload" {
+  # Do nothing; the "confload" topic publishes the new config file.
+  # But, if you had an s3 sink set up and wanted to record it, could do:
+  # subscribe("confload", "s3")
 }
 
 if cmd != "defaults" {
