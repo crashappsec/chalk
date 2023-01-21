@@ -55,7 +55,7 @@ if cmd == "extract" or cmd == "insert" or cmd == "delete" {
        log("warn", "To configure AWS must provide AWS_ACCESS_SECRET")
     } else {
       sink_config("s3", "s3", { "secret" : env("AWS_ACCESS_SECRET"),
-                                "userid" : env("AWS_ACCESS_ID"),
+                                "uid"    : env("AWS_ACCESS_ID"),
                                 "uri"    : env("AWS_S3_BUCKET_URI") }, [])
       #  Stuff you might do if the sink is configured...
       # subscribe("insert", "s3")

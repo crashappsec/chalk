@@ -195,10 +195,6 @@ proc sinkConfig(args:    seq[Box],
       if not getFilterByName(filter).isSome():
         warn(fmt"Invalid filter named '{filter}': skipping filter.")
 
-    if sinkopts.contains("userid"):
-      # Temporarily correct an oversight in the spec
-      sinkopts["uid"] = sinkopts["userid"]
-
     # We currently pass through unknown keys to make life easier for
     # new sink writers.
 

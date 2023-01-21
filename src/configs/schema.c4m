@@ -407,7 +407,7 @@ sink file {
 
 sink s3 {
   needs_secret: true
-  needs_userid: true
+  needs_uid:    true
   needs_uri:    true
   uses_region:  true
   uses_cacheid: true
@@ -422,7 +422,7 @@ sink post {
 
 sink custom {
   uses_secret: true
-  uses_userid: true
+  uses_uid: true
   uses_filename: true
   uses_uri: true
   uses_region: true

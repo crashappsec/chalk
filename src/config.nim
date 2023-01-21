@@ -114,7 +114,7 @@ proc checkHooks*(sinkname:     string,
                  sinkConfData: SamiSinkSection,
                  sinkopts:     StringTable) =
     hookCheck(secret)
-    hookCheck(userid)
+    hookCheck(uid)
     hookCheck(filename)
     hookCheck(uri)
     hookCheck(region)
@@ -410,13 +410,13 @@ proc lockBuiltinKeys*() =
   discard ctxSamiConf.lockConfigVar("output.stdout.command")
   discard ctxSamiConf.lockConfigVar("output.stdout.dst_uri")
   discard ctxSamiConf.lockConfigVar("output.stdout.region")
-  discard ctxSamiConf.lockConfigVar("output.stdout.userid")
+  discard ctxSamiConf.lockConfigVar("output.stdout.uid")
   discard ctxSamiConf.lockConfigVar("output.stdout.secret")
 
   discard ctxSamiConf.lockConfigVar("output.local_file.command")
   discard ctxSamiConf.lockConfigVar("output.local_file.dst_uri")
   discard ctxSamiConf.lockConfigVar("output.local_file.region")
-  discard ctxSamiConf.lockConfigVar("output.local_file.userid")
+  discard ctxSamiConf.lockConfigVar("output.local_file.uid")
   discard ctxSamiConf.lockConfigVar("output.local_file.secret")
 
   discard ctxSamiConf.lockConfigVar("output.s3.filename")
@@ -426,13 +426,13 @@ proc lockBuiltinKeys*() =
     # Really need to be able to lock entire sections.  You shouldn't be
     # able to add ANY sinks from the conf file, that wouldn't work out.
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_secret")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_userid")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_uid")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_filename")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_uri")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_region")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.uses_aux")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_secret")
-    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_userid")
+    discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_uid")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_filename")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_uri")
     discard ctxSamiConf.lockConfigVar(fmt"sink.{item}.needs_region")

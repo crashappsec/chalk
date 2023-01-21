@@ -145,7 +145,7 @@ con4mDef(Sami):
 
   section(sink, allowedSubSections = @["*"]):
     attr(uses_secret, bool, defaultVal = false)
-    attr(uses_userid, bool, defaultVal = false)
+    attr(uses_uid, bool, defaultVal = false)
     attr(uses_filename, bool, defaultVal = false)
     attr(uses_uri, bool, defaultVal = false)
     attr(uses_region, bool, defaultVal = false)
@@ -153,7 +153,7 @@ con4mDef(Sami):
     attr(uses_cacheid, bool, defaultVal = false)
     attr(uses_aux, bool, defaultVal = false)
     attr(needs_secret, bool, defaultVal = false)
-    attr(needs_userid, bool, defaultVal = false)
+    attr(needs_uid, bool, defaultVal = false)
     attr(needs_filename, bool, defaultVal = false)
     attr(needs_uri, bool, defaultVal = false)
     attr(needs_region, bool, defaultVal = false)
