@@ -11,7 +11,7 @@
 
 log_level: "info"
 
-# log("info", "Loading the default SAMI config")
+# info("Loading the default SAMI config")
 
 # The following default commands are valid:
 # help, insert, extract, version
@@ -31,9 +31,9 @@ default_command = "help"
 ## KEY CONFIGURATION
 
 key INSERTION_HOSTINFO {
-    info, exitCode := system("uname -a")
+    hostinfo, exitCode := system("uname -a")
     if exitCode == 0 {
-      value: info
+      value: hostinfo
     }
 }
 
@@ -50,9 +50,9 @@ args := argv()
 if cmd == "extract" or cmd == "insert" or cmd == "delete" {
   if envExists("AWS_S3_BUCKET_URI") {
     if not envExists("AWS_ACCESS_ID") {
-       log("warn", "To configure AWS must provide AWS_ACCESS_ID")
+       warn("To configure AWS must provide AWS_ACCESS_ID")
     } elif not envExists("AWS_ACCESS_SECRET") {
-       log("warn", "To configure AWS must provide AWS_ACCESS_SECRET")
+       warn("To configure AWS must provide AWS_ACCESS_SECRET")
     } else {
       sink_config("s3", "s3", { "secret" : env("AWS_ACCESS_SECRET"),
                                 "uid"    : env("AWS_ACCESS_ID"),
@@ -71,7 +71,7 @@ if cmd == "extract" or cmd == "insert" or cmd == "delete" {
 # default.  Your default doesn't go into effect until this script
 # finishes running.
 
-log("info", "running command: " + argv0())
+info("running command: " + argv0())
 
 # Configuration code that has already run, before your base configuration
 # loaded:

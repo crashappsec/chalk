@@ -130,36 +130,45 @@ proc topicUnsubscribe(args:    seq[Box],
 
     return some(pack(unsubscribe(topic, `rec?`.get())))
 
-proc logBuiltin(args:    seq[Box],
-                globals: Con4mScope,
-                unused1: VarStack,
-                unused2: Con4mScope): Option[Box] =
+proc logBase(ll: string, args: seq[Box], globals: Con4mScope): Option[Box] =
     let
-      ll       = unpack[string](args[0])
-      msg      = unpack[string](args[1])
+      msg      = unpack[string](args[0])
       csym     = lookup(globals, "color").get()
       cval     = csym.value.get()
-      `cover?` = csym.override
+      `cOver?` = csym.override
       lsym     = lookup(globals, "log_level").get()
       lval     = lsym.value.get()
-      `lover?` = lsym.override
+      `lOver?` = lsym.override
 
     # log level and color may have been set; con4m doesn't set that
     # stuff where we can see it until it ends evaluation.
     # TODO: add a simpler interface to con4m for this logic.
 
-    if `cover?`.isSome():
-      setShowColors(unpack[bool](`cover?`.get()))
+    if `cOver?`.isSome():
+      setShowColors(unpack[bool](`cOver?`.get()))
     else:
       setShowColors(unpack[bool](cval))
-    if `lover?`.isSome():
-      setLogLevel(unpack[string](`lover?`.get()))
+    if `lOver?`.isSome():
+      setLogLevel(unpack[string](`lOver?`.get()))
     else:
       setLogLevel(unpack[string](lval))
 
     log(ll, msg)
 
     return none(Box)
+
+proc logError(args: seq[Box], globals, u1, u2: auto): Option[Box] =
+  return logBase("error", args, globals)
+
+proc logWarn(args: seq[Box], globals, u1, u2: auto): Option[Box] =
+  return logBase("warn", args, globals)
+
+proc logInfo(args: seq[Box], globals, u1, u2: auto): Option[Box] =
+  return logBase("info", args, globals)
+
+proc logTrace(args: seq[Box], globals, u1, u2: auto): Option[Box] =
+  return logBase("trace", args, globals)
+
 
 proc sinkConfig(args:    seq[Box],
                 globals: Con4mScope,
@@ -249,7 +258,10 @@ setSamiCon4mBuiltins(@[
   ("version",     BuiltinFn(getExeVersion),    "f() -> string"),
   ("subscribe",   BuiltInFn(topicSubscribe),   "f(string, string)->bool"),
   ("unsubscribe", BuiltInFn(topicUnSubscribe), "f(string, string)->bool"),
-  ("log",         BuiltInFn(logBuiltin),       "f(string, string)"),
+  ("error",       BuiltInFn(logError),         "f(string)"),
+  ("warn",        BuiltInFn(logWarn),          "f(string)"),
+  ("info",        BuiltInFn(logInfo),          "f(string)"),
+  ("trace",       BuiltInFn(logTrace),         "f(string)"),
   ("argv",        BuiltInFn(getArgv),          "f() -> [string]"),
   ("argv0",       BuiltInFn(getExeName),       "f() -> string"),
   ("sink_config", BuiltInFn(sinkConfig),
