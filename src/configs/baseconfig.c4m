@@ -9,23 +9,19 @@ cmd  := argv0()
 args := argv()
 
 sink_config("user_err", "stderr", {}, [])
+sink_config("user_out", "stdout", {}, [])
 
 # For commands that output JSON, default user output should get
 # JSON formatting and always get a newline per-publish.
-if cmd == "extract" or cmd == "insert" or cmd == "delete" {
-  sink_config("user_out", "stdout", {}, ["prettyJson", "fixNewline"])
-} else {
-  sink_config("user_out", "stdout", {}, [])
-}
+sink_config("json_out", "stdout", {}, ["pretty_json", "fix_new_line"])
 
-if cmd == "extract" or cmd == "insert" or cmd == "delete" {
-  subscribe("extract", "user_out") # Writes SAMIs extracted w/ 'extract' cmd
-  subscribe("nesting", "user_out") # Writes extracted samis when inserting
-  subscribe("insert",  "user_out") # Writes full SAMIs on insert (no ptrs)
-  subscribe("delete",  "user_out") # Writes full SAMIs being deleted
-  subscribe("dry-run", "user_out")
-}
-elif cmd == "confdump" {
+subscribe("extract", "json_out") # Writes SAMIs extracted w/ 'extract' cmd
+subscribe("nesting", "json_out") # Writes extracted samis when inserting
+subscribe("insert",  "json_out") # Writes full SAMIs on insert (no ptrs)
+subscribe("delete",  "json_out") # Writes full SAMIs being deleted
+subscribe("dry-run", "user_out")
+
+if cmd == "confdump" {
   if len(args) > 0 {
     sink_config("dump_out", "file", {"filename" : args[0]}, [])
     subscribe("confdump", "dump_out")
@@ -35,7 +31,7 @@ elif cmd == "confdump" {
   }
 } elif cmd == "version" {
   # Send to stdout so people can more easily grep from scripts.
-  subscribe("version",  "redirectable_out")
+  subscribe("version",  "user_out")
 } elif cmd == "confload" {
   # Do nothing; the "confload" topic publishes the new config file.
   # But, if you had an s3 sink set up and wanted to record it, could do:
@@ -43,22 +39,13 @@ elif cmd == "confdump" {
 }
 
 if cmd != "defaults" {
-    subscribe("defaults", "default_out")
+    subscribe("defaults", "user_out")
 } else {
-    subscribe("defaults", "redirectable_out")
+    subscribe("defaults", "user_err")
 }
 
-subscribe("help", "default_out")
+subscribe("help", "user_out")
 
-
-# This is actually installed by default by nimutils. You can't
-# actually redefine it, but you can unsubscribe() it, and add
-# a replacement instead via subscribe()
-#
-#
-#
-# # If a stacked config redefines stream.logs.hooks, then it will
-# # wipe out the default installed hook above.
-# stream logs {
-#   filters: [ "defaultLogs" ]
-# }
+# Note that there is already an output configuration called "log_hook"
+# to which you can subscribe to different sinks in order to get the
+# log messages going different places.

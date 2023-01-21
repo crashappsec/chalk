@@ -61,7 +61,7 @@ if cmd == "extract" or cmd == "insert" or cmd == "delete" {
       # subscribe("insert", "s3")
       # subscribe("extract", "s3")
       # subscribe("delete", "s3")
-      # unsubscribe("unsert", "defaultOut")
+      # unsubscribe("insert", "user_out")  # Stop JSON from going to console.
     }
   }
 }

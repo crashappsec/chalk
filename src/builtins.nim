@@ -44,19 +44,19 @@ registerSink("custom", SinkRecord(outputFunction: customOut, keys: customKeys))
 registerCon4mCallback("outhook", customSinkType)
 
 const
-  availableFilters = { "logLevel"    : MsgFilter(logLevelFilter),
-                       "logPrefix"   : MsgFilter(logPrefixFilter),
-                       "prettyJson"  : MsgFilter(prettyJson),
-                       "fixNewline"  : MsgFilter(fixNewline),
-                       "addTopic"    : MsgFilter(addTopic),
-                       "wrap"        : MsgFilter(wrapToWidth)
+  availableFilters = { "log_level"     : MsgFilter(logLevelFilter),
+                       "log_prefix"    : MsgFilter(logPrefixFilter),
+                       "pretty_json"   : MsgFilter(prettyJson),
+                       "fix_new_line"  : MsgFilter(fixNewline),
+                       "add_topic"     : MsgFilter(addTopic),
+                       "wrap"          : MsgFilter(wrapToWidth)
                      }.toTable()
 
-var availableHooks = { "logHook"     : defaultLogHook
+var availableHooks = { "log_hook"     : defaultLogHook
                      }.toTable()
 
 when not defined(release):
-  availableHooks["debugHook"] = defaultDebugHook
+  availableHooks["debug_hook"] = defaultDebugHook
 
 proc getFilterByName*(name: string): Option[MsgFilter] =
   if name in availableFilters:
