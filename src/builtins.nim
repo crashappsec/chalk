@@ -47,6 +47,7 @@ const
   availableFilters = { "logLevel"    : MsgFilter(logLevelFilter),
                        "logPrefix"   : MsgFilter(logPrefixFilter),
                        "prettyJson"  : MsgFilter(prettyJson),
+                       "fixNewline"  : MsgFilter(fixNewline),
                        "addTopic"    : MsgFilter(addTopic),
                        "wrap"        : MsgFilter(wrapToWidth)
                      }.toTable()
@@ -191,17 +192,16 @@ proc sinkConfig(args:    seq[Box],
       except:
           warn(fmt"Sink config '{sinkconf}' contains an invalid URI (skipped)")
 
+    var filterObjs: seq[MsgFilter] = @[]
     for filter in filters:
-      if not getFilterByName(filter).isSome():
+      if filter notin availableFilters:
         warn(fmt"Invalid filter named '{filter}': skipping filter.")
+      else:
+        filterObjs.add(availableFilters[filter])
+        trace(fmt"Config {sinkconf}: added filter '{filter}'")
 
     # We currently pass through unknown keys to make life easier for
     # new sink writers.
-
-    var filterObjs: seq[MsgFilter] = @[]
-
-    for item in filters:
-      filterObjs.add(availableFilters[item])
 
     let theSinkOpt = getSink(sinkname)
 
