@@ -55,7 +55,7 @@ proc runCmdVersion() =
              @["Build OS",     hostOS],
              @["Build CPU",    hostCPU],
              @["Build Date",   CompileDate],
-             @["Build Time",   CompileTime]]
+             @["Build Time",   CompileTime & " UTC"]]
     t    = samiTableFormatter(2, rows=rows)
 
   t.setTableBorders(false)
