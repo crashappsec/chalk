@@ -21,8 +21,10 @@ const
   tmpFilePrefix* = "sami"
   tmpFileSuffix* = "-file.tmp"
   samiSchema*    = staticRead("configs/schema.c4m")
-  baseConfig*    = staticRead("configs/baseconfig.c4m")
-  defaultConfig* = staticRead("configs/defaultconfig.c4m") & comment(baseConfig)
+  baseFname      = "configs/baseconfig.c4m"
+  defCfgFname    = "configs/defaultconfig.c4m"
+  baseConfig*    = staticRead(baseFname)
+  defaultConfig* = staticRead(defCfgFname) & comment(baseConfig)
 
 
 ## A lot of functions in this module work around the fact that Nim
@@ -497,11 +499,11 @@ proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict]): bool =
     else:
       confString = unpack[string](selfSami["X_SAMI_CONFIG"])
 
-  let
-    confStream = newStringStream(confString)
-    res = ctxSamiConf.stackConfig(confStream, "<embedded>")
-
-  if res.isNone():
+  try:
+    let
+      confStream = newStringStream(confString)
+      res = ctxSamiConf.stackConfig(confStream, "<embedded configuration>")
+  except:
     if getCommandName() == "setconf":
       return true
     else:
@@ -511,6 +513,14 @@ proc loadEmbeddedConfig*(selfSamiOpt: Option[SamiDict]): bool =
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
   trace("Loaded embedded configuration file")
+
+  var c4errLevel =  if samiConfig.con4mPinpoint: c4vShowLoc else: c4vBasic
+
+  if samiConfig.con4mTraces:
+    c4errLevel = if c4errLevel == c4vBasic: c4vTrace else: c4vMax
+
+  setCon4mVerbosity(c4errLevel)
+
   return true
 
 proc loadUserConfigFile*(commandName: string,
@@ -549,9 +559,6 @@ proc loadUserConfigFile*(commandName: string,
         loaded = true
 
     except Con4mError: # config file didn't load:
-      contents = "" # Just in case.
-      samiDebug("\n" & getCurrentException().getStackTrace())
-      error(fmt"{fname}: {getCurrentExceptionMsg()}")
       info(fmt"{fname}: config file not loaded.")
       return none(string)
 
@@ -568,6 +575,10 @@ proc loadUserConfigFile*(commandName: string,
     return none(string)
 
 proc loadBaseConfiguration*() =
+  # For our internal configurations, if we mess up, we want to see
+  # all the debug info.  We'll turn that off later though.
+  setCon4mVerbosity(c4vMax)
+
   # First we load the schema.
   assert len(samiCon4mBuiltins) != 0
   let
@@ -584,15 +595,16 @@ proc loadBaseConfiguration*() =
     quit(1)
 
   # Now stack on the "base" configuration.
-  let
-    baseStream = newStringStream(baseConfig)
-    stack      = ctxSamiConf.stackConfig(baseStream, "base")
+  try:
+    let
+      baseStream = newStringStream(baseConfig)
+      fName      = "<compile_location>/src/" & baseFname
+      stack      = ctxSamiConf.stackConfig(baseStream, fname)
 
-  if stack.isNone():
-    error("Base configuration is broken.")
-    for err in ctxSamiConf.errors:
-      error(err)
+  except:
+    error("The base configuration is broken.")
     quit(1)
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()
+  setCon4mVerbosity(c4vShowLoc)

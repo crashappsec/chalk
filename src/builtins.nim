@@ -6,6 +6,8 @@
 import config, streams, options, tables, strformat, uri
 import nimutils, con4m
 
+discard subscribe(con4mTopic, defaultCon4mHook)
+
 const customSinkType = "f(string, {string : string}) -> bool"
 
 let ctxSamiConf = getConfigState()
@@ -52,7 +54,8 @@ const
                        "wrap"          : MsgFilter(wrapToWidth)
                      }.toTable()
 
-var availableHooks = { "log_hook"     : defaultLogHook
+var availableHooks = { "log_hook"     : defaultLogHook,
+                       "con4m_hook"   : defaultCon4mHook
                      }.toTable()
 
 when not defined(release):

@@ -46,6 +46,20 @@ if cmd != "defaults" {
 
 subscribe("help", "user_out")
 
-# Note that there is already an output configuration called "log_hook"
-# to which you can subscribe to different sinks in order to get the
-# log messages going different places.
+# Note that there are already two pre-built output configurations.
+# They are both subscribed to the 'stdout' sink.  You can remove those
+# subscriptions.
+#
+# - "log_hook",   to which SAMI log messages post. There are filters
+#                 installed to add optional color, and to filter based
+#                 on your log-level setting.
+#
+# - "con4m_hook", to which errors in the configuration file post. The
+#                 same filters are installed; it respects the same
+#                 'log-level' setting, but all messages posted to it
+#                 will be 'error' messages.
+#
+# You can, if you like, configure subscriptions to the underlying
+# topics, in order to hook up other sinks.  The logging topic is
+# called, appropriately enough, "logs".  The topic for configuration
+# file errors is "con4m".

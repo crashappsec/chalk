@@ -3,9 +3,6 @@
 ## will use for config file layering.
 ##
 ## This will create a number of types for us.
-##
-## TODO: Add a field to the global or a section to configure
-## logging options.
 
 import con4m, options, nimutils, tables
 
@@ -28,6 +25,8 @@ con4mDef(Sami):
   attr(color, bool, false, doc = "Do you want ansi output?")
   attr(log_level, string, "warn")
   attr(dry_run, bool, false)
+  attr(con4m_pinpoint, bool, true)  # Non-advertised as well.
+  attr(con4m_traces, bool, false)   # Non-advertised. Not in 'defaults'.
   attr(publish_audit, bool, defaultVal = false)
   attr(artifact_search_path, [string], @["."])
   attr(ignore_patterns, [string],
