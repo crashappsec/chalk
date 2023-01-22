@@ -241,6 +241,9 @@ proc setRecursive*(val: bool) =
 proc getAllowExternalConfig*(): bool =
   return samiConfig.allowExternalConfig
 
+proc getIgnoreBrokenConf*(): bool =
+  return samiConfig.ignoreBrokenConf
+
 proc getAllKeys*(): seq[string] =
   result = @[]
 
@@ -560,8 +563,10 @@ proc loadUserConfigFile*(commandName: string,
 
     except Con4mError: # config file didn't load:
       info(fmt"{fname}: config file not loaded.")
-      return none(string)
-
+      if samiConfig.ignoreBrokenConf:
+        return none(string)
+      trace("ignore_broken_conf is false: terminating.")
+      quit()
 
   samiConfig = ctxSamiConf.loadSamiConfig()
   doAdditionalValidation()

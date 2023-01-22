@@ -25,6 +25,7 @@ con4mDef(Sami):
   attr(color, bool, false, doc = "Do you want ansi output?")
   attr(log_level, string, "warn")
   attr(dry_run, bool, false)
+  attr(ignore_broken_conf, bool, true)
   attr(con4m_pinpoint, bool, true)  # Non-advertised as well.
   attr(con4m_traces, bool, false)   # Non-advertised. Not in 'defaults'.
   attr(publish_audit, bool, defaultVal = false)
