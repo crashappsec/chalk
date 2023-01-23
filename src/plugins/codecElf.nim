@@ -83,12 +83,15 @@ proc extractKeyMetadata*(self: CodecElf, sami: SamiObj): bool =
 method scan*(self: CodecElf, sami: SamiObj): bool =
   sami.stream.setPosition(0)
 
-  let magic = sami.stream.readUint32()
+  try: # Reads can fail, for instance on 0-byte files.
+    let magic = sami.stream.readUint32()
 
-  if magic != elfMagic and magic != elfSwapped:
+    if magic != elfMagic and magic != elfSwapped:
       return false
 
-  return self.extractKeyMetadata(sami)
+    result = self.extractKeyMetadata(sami)
+  except:
+    result = false
 
 method handleWrite*(self: CodecElf,
                     ctx: Stream,

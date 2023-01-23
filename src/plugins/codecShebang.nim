@@ -10,21 +10,21 @@ method scan*(self: CodecShebang, sami: SamiObj): bool =
   sami.stream.setPosition(0)
   try:
     line1 = sami.stream.readLine()
+    if not line1.startsWith("#!"):
+      return false
+    let
+      line2 = sami.stream.readLine()
+      ix = line2.find(magicUTF8)
+      pos = ix + line1.len() + 1 # +1 for the newline
+
+    let
+      present = if ix == -1: false else: true
+      pointInfo = SamiPoint(startOffset: pos, present: present)
+
+    sami.primary = pointInfo
+    return true
   except:
     return false
-  if not line1.startsWith("#!"):
-    return false
-  let
-    line2 = sami.stream.readLine()
-    ix = line2.find(magicUTF8)
-    pos = ix + line1.len() + 1 # +1 for the newline
-
-  let
-    present = if ix == -1: false else: true
-    pointInfo = SamiPoint(startOffset: pos, present: present)
-
-  sami.primary = pointInfo
-  return true
 
 method handleWrite*(self: CodecShebang,
                     ctx: Stream,

@@ -546,7 +546,7 @@ proc loadUserConfigFile*(commandName: string,
     trace(fmt"No configuration file found in {dir}.")
 
   if fname != "":
-    trace(fmt"Loading config file: {fname}")
+    info(fmt"Loading config file: {fname}")
     try:
       var
         fd   = newFileStream(fname)
@@ -572,6 +572,7 @@ proc loadUserConfigFile*(commandName: string,
       quit()
 
   samiConfig = ctxSamiConf.loadSamiConfig()
+  let x = samiConfig.plugin["gitrepo"]
   doAdditionalValidation()
 
   if loaded:

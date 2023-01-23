@@ -14,7 +14,7 @@ type
      ## will end up in the FileOfInterest object.
 
   FileFlags* = enum
-    Binary, BigEndian, Arch64Bit
+    Binary, BigEndian, Arch64Bit, SkipWrite
 
   SamiPoint* = ref object
     ## The SamiPoints object encodes all info known about a single point
@@ -28,13 +28,14 @@ type
 
   SamiObj* = ref object
     ## The SAMI point info for a single artifact.
-    fullpath*:  string     ## The path to the file we've hit on the walk.
-    toplevel*:  string     ## The toplevel path under which we found this file.
-    stream*:    FileStream ## The open file.
-    newFields*: SamiDict   ## What we're adding during insertion.
-    primary*:   SamiPoint  ## This represents the location of a SAMI's
-                           ## insertion, and also holds any SAMI fields
-                           ## extracted from this position.
+    fullpath*:  string      ## The path to the file we've hit on the walk.
+    toplevel*:  string      ## The toplevel path under which we found this file.
+    stream*:    FileStream  ## The open file.
+    newFields*: SamiDict    ## What we're adding during insertion.
+    primary*:   SamiPoint   ## This represents the location of a SAMI's
+                            ## insertion, and also holds any SAMI fields
+                            ## extracted from this position.
+    exclude*:   seq[string] ## Extra files to exclude from the scan.
     flags*:     set[FileFlags]
     embeds*:    seq[(string, SamiPoint)]
     err*:       seq[string]
