@@ -50,9 +50,21 @@ proc loadHead(self: GitPlugin, sami: SamiObj): bool =
     return true
 
   var
+    fs: FileStream
+    hf: string
+
+  try:
     fs = newFileStream(self.vcsDir.joinPath(fNameHead))
     hf = fs.readAll().strip()
-  fs.close()
+
+    try:
+      fs.close()
+    except:
+      discard
+  except:
+    error(fmt"{fNameHead}: github HEAD file couldn't be read")
+    return false
+
 
   if not hf.startsWith(ghRef):
     self.commitID = hf
@@ -66,7 +78,7 @@ proc loadHead(self: GitPlugin, sami: SamiObj): bool =
               fname.split("/")
 
   if parts.len() < 3:
-    sami.insertionError("Could not load github HEAD file")
+    error(fmt"{fNameHead}: github HEAD file couldn't be loaded")
     return false
 
   self.branchName = parts[2 .. ^1].join($DirSep)
