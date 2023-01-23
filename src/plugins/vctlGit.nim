@@ -30,12 +30,13 @@ proc findGitDir(fullpath: string): string =
 
   return head.findGitDir()
 
-type GitPlugin = ref object of Plugin
+# Using this in the GitRepo plugin too.
+type GitPlugin* = ref object of Plugin
   branchName: string
-  commitId: string
-  vcsDir: string
-  origin: string
-  samiPath: string
+  commitId:   string
+  vcsDir*:    string
+  origin:     string
+  samiPath:   string
 
 template loadBasics(self: GitPlugin, sami: SamiObj) =
   self.samiPath = sami.fullpath

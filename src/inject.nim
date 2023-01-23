@@ -221,6 +221,13 @@ proc doInjection*() =
         item.yieldFileStream()
         continue
 
+      # Similarly, if we're asked NOT to write by the codec, we just call
+      # handleWrite instead.
+      if SkipWrite in item.flags:
+        codec.handleWrite(nil, "", some(encoded), "")
+        item.yieldFileStream()
+        continue
+
       if point.endOffset > point.startOffset:
         stream.setPosition(point.endOffset)
       let

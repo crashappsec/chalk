@@ -53,6 +53,9 @@ proc getCodecsByPriority*(): seq[PluginInfo] =
   result = @[]
 
   for name, plugin in installedPlugins:
+    # This may need to be refreshed; the config can be updated
+    # after the self-sami loads.
+    plugin.configInfo = getPluginConfig(name).get()
     if not plugin.configInfo.getEnabled():
       continue
     if plugin.configInfo.getCodec():
@@ -161,17 +164,24 @@ proc acquireFileStream*(sami: SamiObj): Option[FileStream] =
   else:
     result = some(sami.stream)
 
-proc yieldFileStream*(sami: SamiObj) =
-  if numCachedFds == getCacheFdLimit():
+proc closeFileStream*(sami: SamiObj) =
     try:
       if sami.stream != nil:
         sami.stream.close()
     except:
       warn(sami.fullpath & ": Error when attempting to close file.")
-    numCachedFds -= 1
-    sami.stream = nil
+    finally:
+      sami.stream = nil
+      numCachedFds -= 1
 
-proc dispatchFileScan(self: Codec, filepath: string, top: string): bool =
+proc yieldFileStream*(sami: SamiObj) =
+  if numCachedFds == getCacheFdLimit():
+    sami.closeFileStream()
+
+proc dispatchFileScan(self:       Codec,
+                      filepath:   string,
+                      top:        string,
+                      exclusions: var seq[string]): bool =
   let
     sami      = SamiObj(fullpath: filepath, toplevel: top, stream: nil)
     `stream?` = sami.acquireFileStream()
@@ -181,12 +191,25 @@ proc dispatchFileScan(self: Codec, filepath: string, top: string): bool =
 
   result = self.scan(sami)
 
+  # If a file scan registers interest, returning the file will
+  # automatically lead to the scan loop exclusing that file.  However,
+  # we want to let codecs exclude multiple files if it makes sense,
+  # without polluting the method signature with rarely used variables.
+  # So we'll check sami.exclude here, for extra exclusions.
+
   if result:
+    if len(sami.exclude) != 0:
+      for item in sami.exclude:
+        exclusions.add(item)
     self.samis.add(sami)
     if sami.primary.present:
       self.loadSamiLoc(sami)
+    sami.yieldFileStream()
+    return true # Found a codec to handle.
+  else:
+    sami.closeFileStream()
+    return false # This codec isn't handling.
 
-  sami.yieldFileStream()
 
 proc mustIgnore*(path: string, globs: seq[Glob]): bool {.inline.} =
   for item in globs:
@@ -235,7 +258,7 @@ proc doScan*(self:       Codec,
       if path.mustIgnore(ignoreList):
         continue
       trace(fmtTraceScanFileP.fmt())
-      if self.dispatchFileScan(path, path):
+      if self.dispatchFileScan(path, path, exclusions):
         exclusions.add(path)
     elif recurse:
       dirWalk(true):
@@ -246,7 +269,7 @@ proc doScan*(self:       Codec,
         if getFileInfo(item).kind != pcFile:
           continue
         trace(fmtTraceScanFile.fmt())
-        if self.dispatchFileScan(item, path):
+        if self.dispatchFileScan(item, path, exclusions):
           exclusions.add(item)
     else:
       dirWalk(false):
@@ -257,7 +280,7 @@ proc doScan*(self:       Codec,
         if getFileInfo(item).kind != pcFile:
           continue
         trace(fmt"Non-recursive dir walk examining: {item}")
-        if self.dispatchFileScan(item, path):
+        if self.dispatchFileScan(item, path, exclusions):
           exclusions.add(item)
 
 # TODO: Probably need to add a hash scheme as an option.  Because
@@ -319,6 +342,7 @@ import plugins/ciGithub
 import plugins/conffile
 import plugins/codecShebang
 import plugins/codecElf
+import plugins/codecGitRepo
 import plugins/custom
 import plugins/ownerAuthors
 import plugins/ownerGithub

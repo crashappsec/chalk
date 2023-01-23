@@ -271,6 +271,8 @@ setSamiCon4mBuiltins(@[
                             "f(string, string, {string: string}, [string])")
   ])
 
+# Can be used by codecs that aren't directly inserting.
+discard registerTopic("ghost-insert")
 discard registerTopic("extract")
 discard registerTopic("insert")
 discard registerTopic("nesting")
