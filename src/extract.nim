@@ -109,7 +109,8 @@ proc doExtraction*(): Option[string] =
     info(fmt"Completed {numExtractions} extractions.")
 
 var selfSamiObj: Option[SamiObj] = none(SamiObj)
-var selfSami: Option[SamiDict] = none(SamiDict)
+var selfSami:    Option[SamiDict] = none(SamiDict)
+var selfID:      Option[uint] = none(uint)
 
 proc getSelfSamiObj*(): Option[SamiObj] =
   # If we call twice and we're on a platform where we don't
@@ -133,9 +134,6 @@ proc getSelfSamiObj*(): Option[SamiObj] =
     setNoSelfInjection()
 
   return selfSamiObj
-
-
-var selfID: Option[uint] = none(uint)
 
 proc getSelfExtraction*(): Option[SamiDict] =
   once:
