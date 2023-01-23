@@ -4,7 +4,7 @@ import nimutils, config, plugins, io/tojson
 const
   # This is the logging template for JSON output.
   logTemplate       = """{
-  "ARTIFACT_PATH: $#,
+  "ARTIFACT_PATH": $#,
   "SAMI" : $#,
   "EMBEDDED_SAMIS" : $#
 }"""
@@ -90,14 +90,14 @@ proc doExtraction*(): Option[string] =
 
         let absPath = resolvePath(sami.fullpath)
         samisToRet.add(logTemplate %
-                 [absPath, primaryJson, embededJson])
+                 [escapeJson(absPath), primaryJson, embededJson])
   except:
     publish("debug", getCurrentException().getStackTrace())
     error(getCurrentExceptionMsg() & " (likely a bad SAMI embed)")
   finally:
     if numExtractions == 0:
       return none(string)
-    var toOut = "{ "
+    var toOut = "{ \"action\" : " & escapeJson(getCommandName()) & ", "
     toOut &= "\"extractions\" : [ " & samisToRet.join(", ") & " ] "
 
     if getPublishUnmarked():
@@ -109,7 +109,8 @@ proc doExtraction*(): Option[string] =
     info(fmt"Completed {numExtractions} extractions.")
 
 var selfSamiObj: Option[SamiObj] = none(SamiObj)
-var selfSami: Option[SamiDict] = none(SamiDict)
+var selfSami:    Option[SamiDict] = none(SamiDict)
+var selfID:      Option[uint] = none(uint)
 
 proc getSelfSamiObj*(): Option[SamiObj] =
   # If we call twice and we're on a platform where we don't
@@ -133,9 +134,6 @@ proc getSelfSamiObj*(): Option[SamiObj] =
     setNoSelfInjection()
 
   return selfSamiObj
-
-
-var selfID: Option[uint] = none(uint)
 
 proc getSelfExtraction*(): Option[SamiDict] =
   once:

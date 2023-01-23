@@ -18,4 +18,5 @@ can_dump::n/a::bool::If this is true, the "confdump" command will NOT dump the e
 can_load::n/a::bool::If this is true, the "confload" command will refuse to load a new configuration file. Again, this is not meant to be a security measure, just something to prevent accidental issues.
 publish_audit::n/a::bool::When true, all runs will publish information including startup configuration changes from the default to a topic named 'audit', which can be directed to any configured sink.
 publish_defaults::n/a::bool::When true, all runs will end with the final state of the configuration file being published to the 'defaults' topic.  This never controls the actual 'defaults' command.
+ignore_broken_conf::n/a::bool::When true, if there's an EXTERNAL configuration file that fails to load, SAMI will continue to run.
 }%

@@ -6,6 +6,8 @@
 import config, streams, options, tables, strformat, uri
 import nimutils, con4m
 
+discard subscribe(con4mTopic, defaultCon4mHook)
+
 const customSinkType = "f(string, {string : string}) -> bool"
 
 let ctxSamiConf = getConfigState()
@@ -44,18 +46,20 @@ registerSink("custom", SinkRecord(outputFunction: customOut, keys: customKeys))
 registerCon4mCallback("outhook", customSinkType)
 
 const
-  availableFilters = { "logLevel"    : MsgFilter(logLevelFilter),
-                       "logPrefix"   : MsgFilter(logPrefixFilter),
-                       "prettyJson"  : MsgFilter(prettyJson),
-                       "addTopic"    : MsgFilter(addTopic),
-                       "wrap"        : MsgFilter(wrapToWidth)
+  availableFilters = { "log_level"     : MsgFilter(logLevelFilter),
+                       "log_prefix"    : MsgFilter(logPrefixFilter),
+                       "pretty_json"   : MsgFilter(prettyJson),
+                       "fix_new_line"  : MsgFilter(fixNewline),
+                       "add_topic"     : MsgFilter(addTopic),
+                       "wrap"          : MsgFilter(wrapToWidth)
                      }.toTable()
 
-var availableHooks = { "logHook"     : defaultLogHook
+var availableHooks = { "log_hook"     : defaultLogHook,
+                       "con4m_hook"   : defaultCon4mHook
                      }.toTable()
 
 when not defined(release):
-  availableHooks["debugHook"] = defaultDebugHook
+  availableHooks["debug_hook"] = defaultDebugHook
 
 proc getFilterByName*(name: string): Option[MsgFilter] =
   if name in availableFilters:
@@ -129,36 +133,45 @@ proc topicUnsubscribe(args:    seq[Box],
 
     return some(pack(unsubscribe(topic, `rec?`.get())))
 
-proc logBuiltin(args:    seq[Box],
-                globals: Con4mScope,
-                unused1: VarStack,
-                unused2: Con4mScope): Option[Box] =
+proc logBase(ll: string, args: seq[Box], globals: Con4mScope): Option[Box] =
     let
-      ll       = unpack[string](args[0])
-      msg      = unpack[string](args[1])
+      msg      = unpack[string](args[0])
       csym     = lookup(globals, "color").get()
       cval     = csym.value.get()
-      `cover?` = csym.override
+      `cOver?` = csym.override
       lsym     = lookup(globals, "log_level").get()
       lval     = lsym.value.get()
-      `lover?` = lsym.override
+      `lOver?` = lsym.override
 
     # log level and color may have been set; con4m doesn't set that
     # stuff where we can see it until it ends evaluation.
     # TODO: add a simpler interface to con4m for this logic.
 
-    if `cover?`.isSome():
-      setShowColors(unpack[bool](`cover?`.get()))
+    if `cOver?`.isSome():
+      setShowColors(unpack[bool](`cOver?`.get()))
     else:
       setShowColors(unpack[bool](cval))
-    if `lover?`.isSome():
-      setLogLevel(unpack[string](`lover?`.get()))
+    if `lOver?`.isSome():
+      setLogLevel(unpack[string](`lOver?`.get()))
     else:
       setLogLevel(unpack[string](lval))
 
     log(ll, msg)
 
     return none(Box)
+
+proc logError(args: seq[Box], globals, u1, u2: auto): Option[Box] =
+  return logBase("error", args, globals)
+
+proc logWarn(args: seq[Box], globals, u1, u2: auto): Option[Box] =
+  return logBase("warn", args, globals)
+
+proc logInfo(args: seq[Box], globals, u1, u2: auto): Option[Box] =
+  return logBase("info", args, globals)
+
+proc logTrace(args: seq[Box], globals, u1, u2: auto): Option[Box] =
+  return logBase("trace", args, globals)
+
 
 proc sinkConfig(args:    seq[Box],
                 globals: Con4mScope,
@@ -191,17 +204,16 @@ proc sinkConfig(args:    seq[Box],
       except:
           warn(fmt"Sink config '{sinkconf}' contains an invalid URI (skipped)")
 
+    var filterObjs: seq[MsgFilter] = @[]
     for filter in filters:
-      if not getFilterByName(filter).isSome():
+      if filter notin availableFilters:
         warn(fmt"Invalid filter named '{filter}': skipping filter.")
+      else:
+        filterObjs.add(availableFilters[filter])
+        trace(fmt"Config {sinkconf}: added filter '{filter}'")
 
     # We currently pass through unknown keys to make life easier for
     # new sink writers.
-
-    var filterObjs: seq[MsgFilter] = @[]
-
-    for item in filters:
-      filterObjs.add(availableFilters[item])
 
     let theSinkOpt = getSink(sinkname)
 
@@ -249,7 +261,10 @@ setSamiCon4mBuiltins(@[
   ("version",     BuiltinFn(getExeVersion),    "f() -> string"),
   ("subscribe",   BuiltInFn(topicSubscribe),   "f(string, string)->bool"),
   ("unsubscribe", BuiltInFn(topicUnSubscribe), "f(string, string)->bool"),
-  ("log",         BuiltInFn(logBuiltin),       "f(string, string)"),
+  ("error",       BuiltInFn(logError),         "f(string)"),
+  ("warn",        BuiltInFn(logWarn),          "f(string)"),
+  ("info",        BuiltInFn(logInfo),          "f(string)"),
+  ("trace",       BuiltInFn(logTrace),         "f(string)"),
   ("argv",        BuiltInFn(getArgv),          "f() -> [string]"),
   ("argv0",       BuiltInFn(getExeName),       "f() -> string"),
   ("sink_config", BuiltInFn(sinkConfig),

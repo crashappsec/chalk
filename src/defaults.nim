@@ -63,6 +63,9 @@ proc showGeneralOptions*(): int {.discardable.} =
   ot.addRow(@["Always publish defaults",
               $(getPublishDefaults()),
               "publish_defaults"])
+  ot.addRow(@["Ignore compile errors",
+              $(getIgnoreBrokenConf()),
+              "ignore_broken_conf"])
   ot.addRow(@["Artifact search path",
               getArtifactSearchPath().join(", "),
               "artifact_search_path"])
