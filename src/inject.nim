@@ -180,13 +180,19 @@ proc doInjection*() =
     let extracts = codec.getSamis()
 
     for item in extracts:
+      # Acquire a stream here so that none of the plugins need
+      # to worry about it, they can read from sami.stream.
+      let `stream?` = item.acquireFileStream()
+      if `stream?`.isNone(): continue # acquire will have errored.
+      let stream    = `stream?`.get()
+
       populateOneSami(item, codec, priorityInfo, pluginsOnly)
 
-      item.stream.setPosition(0)
+      stream.setPosition(0)
       let
         outputPtrs = getOutputPointers()
         point = item.primary
-        pre = item.stream.readStr(point.startOffset)
+        pre = stream.readStr(point.startOffset)
       var
         # Note that createdToBinary and createdToJson detrmine whether
         # to write individual fields based on the setting of the
@@ -212,12 +218,15 @@ proc doInjection*() =
 
       # NOW, if we're in dry-run mode, we don't actually inject.
       if inDryRun:
+        item.yieldFileStream()
         continue
 
       if point.endOffset > point.startOffset:
-        item.stream.setPosition(point.endOffset)
+        stream.setPosition(point.endOffset)
       let
-        post = item.stream.readAll()
+        post = stream.readAll()
+
+      item.yieldFileStream()
 
       var
         f:    File
@@ -246,8 +255,7 @@ proc doInjection*() =
               info(fmt"Wrote new sami binary to {newpath}")
           except:
             removeFile(path)
-            error("Could complete file write.")
-            raise
+            error(fmt"{item.fullPath}: Could not write (no permission)")
 
   # Finally, if we've got external output requirements, it's time to
   # dump what we've read to the "inject" stream.

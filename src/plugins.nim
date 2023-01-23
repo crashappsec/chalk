@@ -143,25 +143,50 @@ proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
       pt.endOffset = sami.stream.getPosition()
       pt.valid = false
 
+var numCachedFds: int = 0
+
+proc acquireFileStream*(sami: SamiObj): Option[FileStream] =
+  if sami.stream == nil:
+    let handle = newFileStream(sami.fullpath, fmRead)
+    if handle == nil:
+      error(sami.fullpath & ": could not open file.")
+      return none(FileStream)
+
+    sami.stream = handle
+
+    if numCachedFds < getCacheFdLimit():
+      numCachedFds = numCachedFds + 1
+
+    return some(handle)
+  else:
+    result = some(sami.stream)
+
+proc yieldFileStream*(sami: SamiObj) =
+  if numCachedFds == getCacheFdLimit():
+    try:
+      if sami.stream != nil:
+        sami.stream.close()
+    except:
+      warn(sami.fullpath & ": Error when attempting to close file.")
+    numCachedFds -= 1
+    sami.stream = nil
+
 proc dispatchFileScan(self: Codec, filepath: string, top: string): bool =
   let
-    stream = newFileStream(filepath, fmRead)
-    sami = SamiObj(fullpath: filepath, toplevel: top, stream: stream)
+    sami      = SamiObj(fullpath: filepath, toplevel: top, stream: nil)
+    `stream?` = sami.acquireFileStream()
 
-  if stream == nil:
-    warn("Could not open file: " & filepath)
-    return
+  if `stream?`.isNone():
+    return false
+
   result = self.scan(sami)
 
   if result:
     self.samis.add(sami)
     if sami.primary.present:
       self.loadSamiLoc(sami)
-  else:
-    try:
-      stream.close()
-    except:
-      discard
+
+  sami.yieldFileStream()
 
 proc mustIgnore*(path: string, globs: seq[Glob]): bool {.inline.} =
   for item in globs:

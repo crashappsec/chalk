@@ -1,4 +1,4 @@
-import options, streams, strutils, strformat, endians
+import options, streams, strutils, endians
 import nimSHA2, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7):
@@ -81,17 +81,12 @@ proc extractKeyMetadata*(self: CodecElf, sami: SamiObj): bool =
   return true
 
 method scan*(self: CodecElf, sami: SamiObj): bool =
-  if sami.stream == nil:
-    warn(fmt"could not open {sami.fullpath}")
-    return
-  try:
-    sami.stream.setPosition(0)
-    let magic = sami.stream.readUint32()
+  sami.stream.setPosition(0)
 
-    if magic != elfMagic and magic != elfSwapped:
+  let magic = sami.stream.readUint32()
+
+  if magic != elfMagic and magic != elfSwapped:
       return false
-  except:
-    return false
 
   return self.extractKeyMetadata(sami)
 
