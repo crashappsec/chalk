@@ -60,7 +60,7 @@ This example configures S3 as a sink, taking the configuration needed for that s
 %{c
 if cmd == {red}"extract"{cyan} or cmd == {red}"insert"{cyan} or cmd == {red}"delete"{cyan} \{
   sink_config({red}"s3"{cyan}, {red}"s3"{cyan}, \{ {red}"secret"{cyan} : env({red}"AWS_ACCESS_SECRET"{cyan}),
-                            {red}"userid"{cyan} : env({red}"AWS_ACCESS_ID"{cyan}),
+                            {red}"uid"{cyan}    : env({red}"AWS_ACCESS_ID"{cyan}),
                             {red}"uri"{cyan}    : env({red}"AWS_S3_BUCKET_URI"{cyan}) \}, [] )
 \}
 

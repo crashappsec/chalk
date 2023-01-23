@@ -28,6 +28,9 @@ log_level: "info"
 # You can comment this out, and people will get a terse error message.
 default_command = "help"
 
+cmd  := argv0()
+args := argv()
+
 ## KEY CONFIGURATION
 
 key INSERTION_HOSTINFO {
@@ -43,9 +46,6 @@ key INSERTION_HOSTINFO {
 ## have some subscriptions set up, based on the command.  The code
 ## used for I/O in the base configuration is in the comments below;
 ## you can undo any of it if you really want!
-
-cmd  := argv0()
-args := argv()
 
 if cmd == "extract" or cmd == "insert" or cmd == "delete" {
   if envExists("AWS_S3_BUCKET_URI") {
