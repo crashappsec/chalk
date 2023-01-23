@@ -214,6 +214,9 @@ proc setPublishDefaults*(val: bool) =
   discard ctxSamiConf.setOverride("publish_defaults", pack(val))
   samiConfig.publishDefaults = val
 
+proc getCacheFdLimit*(): int =
+  return samiConfig.cacheFdLimit
+
 proc getArtifactSearchPath*(): seq[string] =
   return samiConfig.artifactSearchPath
 

@@ -23,20 +23,34 @@ proc doDelete*() =
     for item in extracts:
       if not item.primary.present:
         continue # It's markable, but not marked.
-      item.stream.setPosition(0)
+
+      let
+        `stream?`  = item.acquireFileStream()
+      # acquireFileStream will have reported the error.
+      if not `stream?`.isSome(): continue
+
+      var
+        stream     = `stream?`.get()
+
+      stream.setPosition(0)
+
       let
         outputPtrs = getOutputPointers()
         point      = item.primary
-        pre        = item.stream.readStr(point.startOffset)
+        pre        = stream.readStr(point.startOffset)
 
       dryRun(fmt"{item.fullPath}: removing sami")
-      if getDryRun(): continue
+      if getDryRun():
+        item.yieldFileStream()
+        continue
 
       if point.endOffset > point.startOffset:
-        item.stream.setPosition(point.endOffset)
+        stream.setPosition(point.endOffset)
 
       let
-        post = item.stream.readAll()
+        post = stream.readAll()
+
+      item.yieldFileStream()
 
       var
         f:    File
@@ -47,6 +61,8 @@ proc doDelete*() =
         (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
         ctx       = newFileStream(f)
         codec.handleWrite(ctx, pre, none(string), post)
+        close(f)
+        info(fmt"{item.fullPath}: SAMI removed")
       except:
         error(eDeleteFailed.fmt())
         removeFile(path)
@@ -57,4 +73,4 @@ proc doDelete*() =
             moveFile(path, item.fullPath)
           except:
             removeFile(path)
-            raise
+            error(fmt"{item.fullPath}: Could not write (no permission)")

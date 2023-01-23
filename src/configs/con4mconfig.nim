@@ -28,6 +28,7 @@ con4mDef(Sami):
   attr(ignore_broken_conf, bool, true)
   attr(con4m_pinpoint, bool, true)  # Non-advertised as well.
   attr(con4m_traces, bool, false)   # Non-advertised. Not in 'defaults'.
+  attr(cache_fd_limit, int, 20) # Def. is low to avoid probs in constrained envs
   attr(publish_audit, bool, defaultVal = false)
   attr(artifact_search_path, [string], @["."])
   attr(ignore_patterns, [string],
