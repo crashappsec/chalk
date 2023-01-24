@@ -11,7 +11,7 @@ method getArtifactInfo*(self: ConfFilePlugin,
 
   let
     keyList = getAllKeys()
-    samiID  = unpack[int](sami.newFields["SAMI_ID"])
+    samiID  = unpack[string](sami.newFields["SAMI_ID"])
 
   for key in keyList:
     let
@@ -29,10 +29,7 @@ method getArtifactInfo*(self: ConfFilePlugin,
         result[key] = pack(raw)
         continue
       try:
-        result[key] = pack(format(raw,
-                                  { "artifactid":   $(samiId),
-                                    "artifactname": intToWords(samiId, false)
-                                  }))
+        result[key] = pack(format(raw, { "artifactid":   samiId}))
       except:
         result[key] = pack(raw)
     else:

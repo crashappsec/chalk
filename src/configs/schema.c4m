@@ -19,21 +19,12 @@ key SAMI_ID {
     required: true
     system: true
     squash: false
-    type: "integer"
+    type: "strng"
     standard: true
     since: "0.1.0"
     output_order: 1
     in_ptr: true
-    docstring: "Unique 64-bit value per insertion"
-}
-
-key SAMI_ALT_ID {
-    system: true
-    type: "string"
-    standard: true
-    since: "0.1.0"
-    output_order: 2
-    docstring: "Equivolent string representation of the SAMI_ID field"
+    docstring: "Unique ulid with a 48 bit time stamp and 80 bit random value"
 }
 
 key SAMI_VERSION {
@@ -56,16 +47,6 @@ key SAMI_PTR {
     output_order: 4
     in_ptr: true
     docstring: "When enabled, injects minimal metadata; this field then gets a URL you supply to point to the rest of the data. Items marked as 'true' in the 'Ptr?' column are added in the PTR object"
-}
-
-key TIMESTAMP {
-    required: true
-    system: true
-    type: "integer"
-    since: "0.1.0"
-    output_order: 5
-    standard: true
-    docstring: "Time of insertion"
 }
 
 key EARLIEST_VERSION {
@@ -182,7 +163,7 @@ key CODE_OWNERS {
 }
 
 key INJECTOR_ID {
-    type: "int"
+    type: "string"
     since: "0.1.0"
     standard: true
     output_order: 24
@@ -347,9 +328,8 @@ plugin sbom_callback {
 # thus set to low(int64), but con4m currently doesn't get this right,
 # low(int64) in con4m is -high(int64), when it should be one less.
 plugin system {
-  keys: ["TIMESTAMP", "SAMI_ID", "SAMI_ALT_ID", "INJECTOR_ID",
-         "INJECTOR_VERSION", "INJECTOR_PLATFORM", "INJECTOR_COMMIT_ID",
-	 "X_SAMI_CONFIG", "_MAGIC.json"]
+  keys: ["SAMI_ID", "INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
+  "INJECTOR_COMMIT_ID", "X_SAMI_CONFIG", "_MAGIC.json"]
   priority: -9223372036854775807
 }
 

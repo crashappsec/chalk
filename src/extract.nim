@@ -110,7 +110,7 @@ proc doExtraction*(): Option[string] =
 
 var selfSamiObj: Option[SamiObj] = none(SamiObj)
 var selfSami:    Option[SamiDict] = none(SamiDict)
-var selfID:      Option[uint] = none(uint)
+var selfID:      Option[string] = none(string)
 
 proc getSelfSamiObj*(): Option[SamiObj] =
   # If we call twice and we're on a platform where we don't
@@ -157,9 +157,9 @@ proc getSelfExtraction*(): Option[SamiDict] =
       let sami = selfSami.get()
       # Should always be true, but just in case.
       if sami.contains("SAMI_ID"):
-        selfID = some(unpack[uint](sami["SAMI_ID"]))
+        selfID = some(unpack[string](sami["SAMI_ID"]))
 
   return selfSami
 
-proc getSelfID*(): Option[uint] =
+proc getSelfID*(): Option[string] =
   return selfID

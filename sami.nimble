@@ -9,7 +9,7 @@ bin           = @["sami"]
 
 requires "nim >= 1.6.8"
 requires "https://github.com/crashappsec/con4m ~= 0.4.8"
-requires "https://github.com/crashappsec/nimutils ~= 0.1.7"
+requires "https://github.com/crashappsec/nimutils ~= 0.1.9"
 requires "nimsha2 == 0.1.1"
 requires "glob == 0.11.2"
 requires "https://github.com/guibar64/formatstr == 0.2.0"
