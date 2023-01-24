@@ -19,7 +19,7 @@ key SAMI_ID {
     required: true
     system: true
     squash: false
-    type: "strng"
+    type: "stirng"
     standard: true
     since: "0.1.0"
     output_order: 1
