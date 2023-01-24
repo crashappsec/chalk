@@ -1,4 +1,4 @@
-import tables, strformat, os
+import tables, strformat, strutils, os
 import nimutils, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7):
@@ -36,9 +36,9 @@ method getArtifactInfo*(self: GithubCI,
     GITHUB_RUN_ID != ""
   ):
     result["BUILD_URI"] = pack(
-      GITHUB_SERVER_URL &
+      GITHUB_SERVER_URL.strip(leading = false, chars = {'/'}) &
       "/" &
-      GITHUB_REPOSITORY &
+      GITHUB_REPOSITORY.strip(chars = {'/'}) &
       "/actions/runs/" &
       GITHUB_RUN_ID
     )
