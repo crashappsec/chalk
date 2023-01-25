@@ -410,6 +410,11 @@ proc lockBuiltinKeys*() =
     if unpack[bool](codec):
       codecKeys.add(key)
 
+  discard ctxSamiConf.lockConfigVar("key._MAGIC.json.in_ptr")
+  discard ctxSamiConf.lockConfigVar("key.SAMI_ID.in_ptr")
+  discard ctxSamiConf.lockConfigVar("key.SAMI_VERSION.in_ptr")
+  discard ctxSamiConf.lockConfigVar("key.SAMI_PTR.in_ptr")
+  discard ctxSamiConf.lockConfigVar("key.METADATA_ID.in_ptr")
   # These are locks of invalid fields for specific output handlers.
   # Note that all of these lock calls could go away if con4m gets a
   # locking syntax.

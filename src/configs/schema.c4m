@@ -254,7 +254,7 @@ key OLD_SAMI {
     since: "0.1.0"
     system: true
     standard: true
-    output_order: high() - 5
+    output_order: high() - 6
     skip: true
     docstring: "Old SAMI info associated with an artifact, when a new SAMI " +
     "is inserted"
@@ -265,7 +265,7 @@ key EMBEDDED_SAMIS {
     since: "0.1.0"
     system: true
     standard: true
-    output_order: high() - 4
+    output_order: high() - 5
     docstring: "Other artifacts contained in this artifact"
 }
 
@@ -273,7 +273,7 @@ key SBOMS {
     type: "{string, string}"
     since: "0.1.0"
     standard: true
-    output_order: high() - 3
+    output_order: high() - 4
     docstring: "SBOMs associated with this artifact"
 }
 
@@ -283,8 +283,19 @@ key ERR_INFO {
     since: "0.1.0"
     system: true
     standard: true
-    output_order: high() - 2
+    output_order: high() - 3
     docstring: "Errors when inserting metadata"
+}
+
+key METADATA_HASH {
+    type: "string"
+    since: "0.1.0"
+    system: true
+    standard: true
+    output_order: high() - 2
+    in_ptr: true
+    docstring: "A unique ID for this metadata, derived in part from the " +
+    "hash of all the preceding metadata, in addition to the current time."
 }
 
 key METADATA_ID {
@@ -293,6 +304,7 @@ key METADATA_ID {
     system: true
     standard: true
     output_order: high() - 1
+    required: true
     in_ptr: true
     docstring: "A unique ID for this metadata, derived in part from the " +
     "hash of all the preceding metadata, in addition to the current time."

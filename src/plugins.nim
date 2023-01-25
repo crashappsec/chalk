@@ -1,5 +1,5 @@
 import os, tables, strformat, strutils, algorithm, streams, options, glob
-import nimSHA2, con4m, nimutils, config, io/[fromjson, frombinary, json]
+import nimSHA2, con4m, nimutils, config, io/[fromjson, json]
 
 const
   fmtTraceScanFile  = "{item}: scanning file"
@@ -74,12 +74,12 @@ proc getCodecsByPriority*(): seq[Codec] =
     result.add(plugin)
 
 method getArtifactInfo*(self: Plugin, sami: SamiObj): KeyInfo {.base.} =
-  var msg = ePureVirtual
+  var msg = "In plugin: " & self.name & ": " & ePureVirtual
+  raise newException(Exception, msg)
 
-  for k, v in installedPlugins:
-    if v == self:
-      msg = "In plugin: " & k & ": " & msg
-      break
+method doVirtualLoad*(self: Codec, sami: SamiObj): void {.base.} =
+  # Used to load a location when there's no file system object.
+  var msg = "In plugin: " & self.name & ": " & ePureVirtual
   raise newException(Exception, msg)
 
 proc getSamis*(self: Codec): seq[SamiObj] {.inline.} =
@@ -111,21 +111,8 @@ proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
 
   trace(fmtTraceFIP.fmt())
 
-  if Binary in sami.flags:
-    sami.stream.setPosition(pt.startOffset + len(magicBin))
-
-    try:
-      fields = sami.extractOneSamiBinary(swap)
-      pt.samiFields = some(fields)
-      pt.endOffset = sami.stream.getPosition()
-      pt.valid = true
-      return
-    except:
-      # Technically an extraction error.
-      sami.insertionError(eBadBin.fmt() & " " & getCurrentExceptionMsg())
-      pt.endOffset = sami.stream.getPosition()
-      pt.valid = false
-      return
+  if SkipWrite in sami.flags:
+    self.doVirtualLoad(sami)
   else:
     sami.stream.setPosition(pt.startOffset)
     if not sami.stream.findJsonStart():

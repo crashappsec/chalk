@@ -37,8 +37,6 @@ proc extractKeyMetadata*(self: CodecElf, sami: SamiObj): bool =
   var present: bool
   var offset: int
 
-  sami.flags.incl(Binary)
-
   if isBigEndian:
     sami.flags.incl(BigEndian)
 
