@@ -253,6 +253,14 @@ proc getExeVersion(args:    seq[Box],
 
     return some(pack(retval))
 
+proc samiHigh(u1, u2, u3, u4: auto): Option[Box] =
+  return some(pack(high(int64)))
+
+
+proc samiLow(u1, u2, u3, u4: auto): Option[Box] =
+  # Note that this value the parser doesn't accept right now because
+  # I was super lazy when writing the tokenizer.
+  return some(pack(low(int64)))
 
 
 setSamiCon4mBuiltins(@[
@@ -267,6 +275,8 @@ setSamiCon4mBuiltins(@[
   ("trace",       BuiltInFn(logTrace),         "f(string)"),
   ("argv",        BuiltInFn(getArgv),          "f() -> [string]"),
   ("argv0",       BuiltInFn(getExeName),       "f() -> string"),
+  ("high",        BuiltInFn(samiHigh),         "f() -> int"),
+  ("low",         BuiltInFn(samiLow),          "f() -> int"),
   ("sink_config", BuiltInFn(sinkConfig),
                             "f(string, string, {string: string}, [string])")
   ])
