@@ -97,8 +97,9 @@ proc doInjection*() =
   if extractions.isSome():
     publish("replacing", extractions.get())
 
-  for (name, plugin) in codecs:
+  for plugin in codecs:
     let
+      name            = plugin.name
       codec           = Codec(plugin)
       extracts        = codec.getSamis()
       codecIgnores    = codec.configInfo.getIgnore()
@@ -127,7 +128,9 @@ proc doInjection*() =
         if key in codecIgnores or key notin keyInfo: continue
         infoObj.newFields[key] = keyInfo[key]
 
-      for (piname, plugin) in pluginInfo:
+      for  plugin in pluginInfo:
+        let piname = plugin.name
+
         if plugin.configInfo.getCodec(): continue
         if not plugin.configInfo.getEnabled(): continue
         if not streamAvailable and plugin.configInfo.getUsesFstream():

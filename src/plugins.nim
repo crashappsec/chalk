@@ -36,23 +36,26 @@ proc validatePlugins*() =
 proc getPluginByName*(name: string): Plugin =
   return installedPlugins[name]
 
-proc getPluginsByPriority*(): seq[PluginInfo] =
-  var preResult: seq[(int, string, Plugin)] = @[]
+proc getPluginsByPriority*(): seq[Plugin] =
+  var preResult: seq[(int, Plugin)] = @[]
 
   for name, plugin in installedPlugins:
+    # This may need to be refreshed; the config can be updated
+    # after the self-sami loads.
+    plugin.configInfo = getPluginConfig(name).get()
     if not plugin.configInfo.getEnabled():
       continue
-    preResult.add((plugin.configInfo.getPriority(), name, plugin))
+    preResult.add((plugin.configInfo.getPriority(), plugin))
 
   preResult.sort()
 
   result = @[]
 
-  for (_, name, plugin) in preResult:
-    result.add((name, plugin))
+  for (_, plugin) in preResult:
+    result.add(plugin)
 
-proc getCodecsByPriority*(): seq[PluginInfo] =
-  var preResult: seq[(int, string, Plugin)] = @[]
+proc getCodecsByPriority*(): seq[Codec] =
+  var preResult: seq[(int, Codec)] = @[]
 
   for name, plugin in installedPlugins:
     # This may need to be refreshed; the config can be updated
@@ -61,29 +64,14 @@ proc getCodecsByPriority*(): seq[PluginInfo] =
     if not plugin.configInfo.getEnabled():
       continue
     if plugin.configInfo.getCodec():
-      preResult.add((plugin.configInfo.getPriority(), name, plugin))
+      preResult.add((plugin.configInfo.getPriority(), Codec(plugin)))
 
   preResult.sort()
 
   result = @[]
 
-  for (_, name, plugin) in preResult:
-    result.add((name, plugin))
-
-proc getInfoPluginsByPriority*(): seq[PluginInfo] =
-  var preResult: seq[(int, string, Plugin)] = @[]
-
-  for name, plugin in installedPlugins:
-    if plugin.configInfo.getCodec() or not plugin.configInfo.getEnabled():
-      continue
-    preResult.add((plugin.configInfo.getPriority(), name, plugin))
-
-  preResult.sort()
-
-  result = @[]
-
-  for (_, name, plugin) in preResult:
-    result.add((name, plugin))
+  for (_, plugin) in preResult:
+    result.add(plugin)
 
 method getArtifactInfo*(self: Plugin, sami: SamiObj): KeyInfo {.base.} =
   var msg = ePureVirtual
