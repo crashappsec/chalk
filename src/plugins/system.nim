@@ -8,11 +8,9 @@ type SystemPlugin* = ref object of Plugin
 
 method getArtifactInfo*(self: SystemPlugin,
                         sami: SamiObj): KeyInfo =
-  let samiId = getUlid()
 
   result = newTable[string, Box]()
 
-  result["SAMI_ID"]            = pack(samiId)
   result["_MAGIC.json"]        = pack("dadfedabbadabbed")
   result["INJECTOR_VERSION"]   = pack(getSamiExeVersion())
   result["INJECTOR_PLATFORM"]  = pack(getSamiPlatform())

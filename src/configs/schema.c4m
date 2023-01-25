@@ -17,14 +17,14 @@ key _MAGIC json {
 
 key SAMI_ID {
     required: true
-    system: true
+    codec: true
     squash: false
-    type: "stirng"
+    type: "strng"
     standard: true
     since: "0.1.0"
     output_order: 1
     in_ptr: true
-    docstring: "Unique ulid with a 48 bit time stamp and 80 bit random value"
+    docstring: "Unique luid with a 48 bit time stamp and 80 bit random value"
 }
 
 key SAMI_VERSION {
@@ -328,7 +328,7 @@ plugin sbom_callback {
 # thus set to low(int64), but con4m currently doesn't get this right,
 # low(int64) in con4m is -high(int64), when it should be one less.
 plugin system {
-  keys: ["SAMI_ID", "INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
+  keys: ["METADATA_ID", "INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
   "INJECTOR_COMMIT_ID", "X_SAMI_CONFIG", "_MAGIC.json"]
   priority: -9223372036854775807
 }

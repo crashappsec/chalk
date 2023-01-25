@@ -51,5 +51,4 @@ method getArtifactInfo*(self: MetsysPlugin,
   if len(sami.err) != 0:
     result["ERR_INFO"] = pack(sami.err)
 
-
 registerPlugin("metsys", MetsysPlugin())

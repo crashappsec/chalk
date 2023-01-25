@@ -275,7 +275,7 @@ setSamiCon4mBuiltins(@[
 discard registerTopic("ghost-insert")
 discard registerTopic("extract")
 discard registerTopic("insert")
-discard registerTopic("nesting")
+discard registerTopic("replacing")
 discard registerTopic("defaults")
 discard registerTopic("dry-run")
 discard registerTopic("delete")

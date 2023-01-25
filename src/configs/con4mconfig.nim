@@ -121,29 +121,50 @@ con4mDef(Sami):
          int,
          required = true,
          defaultVal = 50,
-         doc = "Vs other plugins, where should this run?  Lower goes first")
+         doc = "Vs other plugins, where should this run?  Lower goes first." &
+               "For codecs, this controls which codec will have priority " &
+               "for making the choice on whether to handle a particular " &
+               "artifact.  Codecs always get to write their keys first. For " &
+               "other plugins, it determines the order in which they get to " &
+               "write their keys.")
+    attr(ignore,
+         [string],
+         defaultVal = @[])
     attr(codec,
          bool,
          required = true,
          defaultVal = false,
          lockOnWrite = true)
-    attr(enabled, bool, defaultVal = true, doc = "Turn off this plugin.")
-    attr(command,
-         string,
-         required = false)
+         #doc = "Is this plugin also a codec?")
     attr(keys,
          [string],
          required = true,
          lockOnWrite = true)
+         #doc = "List of keys that this plugin might set. We use this to " &
+         #      "skip running unnecessary plugins, if plugins with higher" &
+         #      "priorities have already filled in all the appropriate keys.")
+    attr(enabled, bool, defaultVal = true, doc = "Turn off this plugin.")
+         #doc = "A list of keys that you do NOT want to take from this plugin.")
     attr(overrides,
-         {string: int}, required = false)
-    attr(ignore,
          [string],
-         required = false)
+         defaultVal = @[])
+         #doc = "A list of keys that you want to force-write when it is this " &
+         #     "plugin's turn to write, even if higher priority plugins have " &
+         #     "already written those keys. Note that this can't be used with" &
+         #     " system or codec keys.")
+    attr(uses_fstream,
+         bool,
+         defaultVal = true)
+         #doc        = "set this to true if the codec or plugin *requires* " &
+         #             "access to a file object. If the plugin reads from the" &
+         #             " artifact itself, or writes to it (in the case of a" &
+         #             " codec), then this value should be true. But some " &
+         #             " codecs might not directly open a re-sharable file " &
+         #             " pointer, for instance, one for a docker container.")
     attr(docstring,
          string,
          required = false)
-
+         #doc = "Documentation for the plugin.")
   section(sink, allowedSubSections = @["*"]):
     attr(uses_secret, bool, defaultVal = false)
     attr(uses_uid, bool, defaultVal = false)

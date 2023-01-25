@@ -124,7 +124,6 @@ proc checkHooks*(sinkname:     string,
     hookCheck(cacheid)
     hookCheck(aux)
 
-
 template dryRun*(s: string) =
   if samiConfig.dryRun:
     publish("dry-run", s)
@@ -253,6 +252,13 @@ proc getAllKeys*(): seq[string] =
   for key, val in samiConfig.key:
     result.add(key)
 
+proc getRequiredKeys*(): seq[string] =
+  result = @[]
+
+  for key, val in samiConfig.key:
+    if val.required:
+      result.add(key)
+
 proc getKeySpec*(name: string): Option[SamiKeySection] =
   if name in samiConfig.key:
     return some(samiConfig.key[name])
@@ -333,24 +339,17 @@ proc getEnabled*(plugin: SamiPluginSection): bool =
 proc getKeys*(plugin: SamiPluginSection): seq[string] =
   return plugin.keys
 
-proc getOverrides*(plugin: SamiPluginSection):
-                 Option[TableRef[string, int]] =
+proc getIgnore*(plugin: SamiPluginSection): seq[string] =
+  return plugin.ignore
+
+proc getOverrides*(plugin: SamiPluginSection): seq[string] =
   return plugin.overrides
 
-proc getIgnore*(plugin: SamiPluginSection): Option[seq[string]] =
-  return plugin.ignore
+proc getUsesFstream*(plugin: SamiPluginSection): bool =
+  return plugin.usesFstream
 
 proc getDocString*(plugin: SamiPluginSection): Option[string] =
   return plugin.docstring
-
-proc getCommand*(plugin: SamiPluginSection): Option[string] =
-  return plugin.command
-
-proc getCommandPlugins*(): seq[(string, string)] =
-  for name, plugin in samiConfig.plugin:
-    if (not plugin.command.isSome()) or (not plugin.enabled):
-      continue
-    result.add((name, plugin.command.get()))
 
 proc getAllSinks*(): TableRef[string, SamiSinkSection] =
   result = samiConfig.sink

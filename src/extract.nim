@@ -41,7 +41,7 @@ proc doExtraction*(): Option[string] =
   for item in ignorePatternsAsStr:
     ignoreGlobs.add(glob("**/" & item))
 
-  for (_, name, plugin) in getCodecsByPriority():
+  for (name, plugin) in getCodecsByPriority():
     let codec = cast[Codec](plugin)
     trace(fmt"Asking codec '{name}' to scan for SAMIs.")
     if getCommandName() == "insert":
@@ -122,7 +122,7 @@ proc getSelfSamiObj*(): Option[SamiObj] =
 
     trace(fmt"Checking sami binary {myPath[0]} for embedded config")
 
-    for (_, name, plugin) in getCodecsByPriority():
+    for (name, plugin) in getCodecsByPriority():
       let codec = cast[Codec](plugin)
       codec.doScan(myPath, exclusions, @[], false)
       if len(codec.samis) == 0: continue

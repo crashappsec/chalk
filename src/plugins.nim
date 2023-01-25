@@ -20,6 +20,7 @@ proc registerPlugin*(name: string, plugin: Plugin) =
   if name in installedPlugins:
     error("Attempt to install a plugin named " &
           fmt"{name} when one is already installed")
+  plugin.name            = name
   installedPlugins[name] = plugin
 
 proc validatePlugins*() =
@@ -32,25 +33,26 @@ proc validatePlugins*() =
       plugin.configInfo = maybe.get()
       trace(fmt"Installed plugin {name}")
 
-proc loadCommandPlugins*() =
-  for (name, command) in getCommandPlugins():
-    registerPlugin(name, ExternalPlugin(command: command))
-
 proc getPluginByName*(name: string): Plugin =
   return installedPlugins[name]
 
 proc getPluginsByPriority*(): seq[PluginInfo] =
-  result = @[]
+  var preResult: seq[(int, string, Plugin)] = @[]
 
   for name, plugin in installedPlugins:
     if not plugin.configInfo.getEnabled():
       continue
-    result.add((plugin.configInfo.getPriority(), name, plugin))
+    preResult.add((plugin.configInfo.getPriority(), name, plugin))
 
-  result.sort()
+  preResult.sort()
+
+  result = @[]
+
+  for (_, name, plugin) in preResult:
+    result.add((name, plugin))
 
 proc getCodecsByPriority*(): seq[PluginInfo] =
-  result = @[]
+  var preResult: seq[(int, string, Plugin)] = @[]
 
   for name, plugin in installedPlugins:
     # This may need to be refreshed; the config can be updated
@@ -59,19 +61,29 @@ proc getCodecsByPriority*(): seq[PluginInfo] =
     if not plugin.configInfo.getEnabled():
       continue
     if plugin.configInfo.getCodec():
-      result.add((plugin.configInfo.getPriority(), name, plugin))
+      preResult.add((plugin.configInfo.getPriority(), name, plugin))
 
-  result.sort()
+  preResult.sort()
+
+  result = @[]
+
+  for (_, name, plugin) in preResult:
+    result.add((name, plugin))
 
 proc getInfoPluginsByPriority*(): seq[PluginInfo] =
-  result = @[]
+  var preResult: seq[(int, string, Plugin)] = @[]
 
   for name, plugin in installedPlugins:
     if plugin.configInfo.getCodec() or not plugin.configInfo.getEnabled():
       continue
-    result.add((plugin.configInfo.getPriority(), name, plugin))
+    preResult.add((plugin.configInfo.getPriority(), name, plugin))
 
-  result.sort()
+  preResult.sort()
+
+  result = @[]
+
+  for (_, name, plugin) in preResult:
+    result.add((name, plugin))
 
 method getArtifactInfo*(self: Plugin, sami: SamiObj): KeyInfo {.base.} =
   var msg = ePureVirtual
@@ -152,9 +164,10 @@ proc acquireFileStream*(sami: SamiObj): Option[FileStream] =
   if sami.stream == nil:
     let handle = newFileStream(sami.fullpath, fmRead)
     if handle == nil:
-      error(sami.fullpath & ": could not open file.")
+      error(fmt"{sami.fullpath}: could not open file.")
       return none(FileStream)
 
+    trace(fmt"{sami.fullpath}: File stream opened")
     sami.stream = handle
 
     if numCachedFds < getCacheFdLimit():
@@ -168,6 +181,7 @@ proc closeFileStream*(sami: SamiObj) =
     try:
       if sami.stream != nil:
         sami.stream.close()
+        trace(fmt"{sami.fullpath}: File stream closed")
     except:
       warn(sami.fullpath & ": Error when attempting to close file.")
     finally:
@@ -209,7 +223,6 @@ proc dispatchFileScan(self:       Codec,
   else:
     sami.closeFileStream()
     return false # This codec isn't handling.
-
 
 proc mustIgnore*(path: string, globs: seq[Glob]): bool {.inline.} =
   for item in globs:
@@ -283,28 +296,28 @@ proc doScan*(self:       Codec,
         if self.dispatchFileScan(item, path, exclusions):
           exclusions.add(item)
 
-# TODO: Probably need to add a hash scheme as an option.  Because
-# even w/ shebang, it could make sense to hash the main script only,
-# or it might make sense to hash the modules it loads, etc.  My
-# original thinking was, the HASH field wouldn't stand in for a full
-# integrity check a la a digital signature, it would be more to
-# allow one to confirm the SAMI/artifact pairing, which might
-# particularly be useful, if we end up with cases where the SAMI is
-# *not* carried with the artifact.
 method getArtifactHash*(self: Codec, sami: SamiObj): string {.base.} =
   raise newException(Exception, ePureVirtual)
 
 method getArtifactInfo*(self: Codec, sami: SamiObj): KeyInfo =
   result = newTable[string, Box]()
 
-  let
+  var
     hashFilesBox = pack(@[sami.fullpath])
-    encodedHash  = self.getArtifactHash(sami).toHex().toLowerAscii()
-
+    rawHash      = self.getArtifactHash(sami)
+    encodedHash  = rawHash.toHex().toLowerAscii()
+    ulidHiBytes  = rawHash[^10 .. ^9]
+    ulidLowBytes = rawHash[^8 .. ^1]
+    ulidHiInt    = (cast[ptr uint16](addr ulidHiBytes[0]))[]
+    ulidLowInt   = (cast[ptr uint64](addr ulidLowBytes[0]))[]
+    now          = unixTimeInMs()
+    samiId       = encodeUlid(now, ulidHiInt, ulidLowInt)
 
   result["HASH"]          = pack(encodedHash)
   result["HASH_FILES"]    = hashFilesBox
   result["ARTIFACT_PATH"] = pack(sami.fullpath)
+  result["SAMI_ID"]       = pack(samiId)
+  trace(fmt"samid: {samiId}")
 
 method handleWrite*(self: Codec,
                     ctx: Stream,
@@ -313,24 +326,6 @@ method handleWrite*(self: Codec,
                     post: string) {.base.} =
   raise newException(Exception, ePureVirtual)
 
-
-method getArtifactInfo*(self: ExternalPlugin, sami: SamiObj): KeyInfo =
-  result = newTable[string, Box]()
-
-  try:
-    let
-      str = self.command & " " & sami.fullpath
-      sbox = pack(str)
-      rbox = c4mCmd(@[sbox]).get()
-      jobj = parseJson(newStringStream(unpack[string](rbox)))
-      tbl = jobj.kvpairs
-
-    for key, val in tbl:
-      let bval = val.jsonNodeToBox()
-
-      result[key] = bval
-  except:
-    return
 
 # We need to turn off UnusedImport here, because the nim static
 # analyzer thinks the below imports are unused. When we first import,
