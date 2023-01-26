@@ -97,7 +97,6 @@ method getArtifactHash*(self: CodecElf, sami: SamiObj): string =
   var shaCtx = initSHA[SHA256]()
   let offset = sami.primary.startOffset
 
-  error("Offset: " &  $offset)
   sami.stream.setPosition(0)
   shaCtx.update(sami.stream.readStr(offset))
 

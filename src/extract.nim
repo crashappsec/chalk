@@ -6,7 +6,8 @@ const
   logTemplate       = """{
   "ARTIFACT_PATH": $#,
   "SAMI" : $#,
-  "EMBEDDED_SAMIS" : $#
+  "EMBEDDED_SAMIS" : $#,
+  "VALIDATION_PASSED" : $#
 }"""
   fmtInfoNoExtract  = "{sami.fullpath}: No SAMI found for extraction"
   fmtInfoYesExtract = "{sami.fullpath}: SAMI extracted"
@@ -14,6 +15,33 @@ const
   comfyItemSep      = ", "
   jsonArrFmt        = "[ $# ]"
 
+proc validateMetadata(codec: Codec, sami: SamiObj, fields: SamiDict): bool =
+  result = true
+
+  var
+    rawHash      = codec.getArtifactHash(sami)
+    ulidHiBytes  = rawHash[^10 .. ^9]
+    ulidLowBytes = rawHash[^8 .. ^1]
+    ulidHiInt    = (cast[ptr uint16](addr ulidHiBytes[0]))[]
+    ulidLowInt   = (cast[ptr uint64](addr ulidLowBytes[0]))[]
+    now          = 0'u64
+    samiId       = encodeUlid(now, ulidHiInt, ulidLowInt)
+
+  if "SAMI_ID" notin fields:
+    error(fmt"{sami.fullPath}: required SAMI_ID field is missing.")
+    result = false
+
+  elif len(unpack[string](fields["SAMI_ID"])) != 26:
+    error(fmt"{sami.fullPath}: SAMI_ID is invalid length (expected 26 bytes)")
+    result = false
+
+  elif samiId[^15 .. ^1] != (unpack[string](fields["SAMI_ID"]))[^15 .. ^1]:
+    error(fmt"{sami.fullPath}: Calculated SAMI_ID doesn't match extracted ID " &
+          fmt"'{samiId[^15 .. ^1]}' vs " &
+          (unpack[string](fields["SAMI_ID"]))[^15 .. ^1])
+    result = false
+
+  # TODO: else: validate metadata hash... use foundToBinary
 
 proc doExtraction*(): Option[string] =
   # This function will extract SAMIs, leaving them in SAMI objects
@@ -54,8 +82,10 @@ proc doExtraction*(): Option[string] =
 
   try:
     for codec in codecInfo:
+
       for sami in codec.samis:
         var comma, primaryJson, embededJson: string
+        var isValid: bool
 
         if sami.samiIsEmpty():
           # mustIgnore is in plugins.nim
@@ -71,7 +101,8 @@ proc doExtraction*(): Option[string] =
             p = sami.primary
             s = p.samiFields.get()
           primaryJson = s.foundToJson()
-          dryRun(fmtInfoYesExtract.fmt())
+          isValid = validateMetadata(codec, sami, s)
+          info(fmtInfoYesExtract.fmt())
         else:
           info(fmtInfoNoPrimary.fmt())
 
@@ -90,7 +121,7 @@ proc doExtraction*(): Option[string] =
 
         let absPath = resolvePath(sami.fullpath)
         samisToRet.add(logTemplate %
-                 [escapeJson(absPath), primaryJson, embededJson])
+                 [escapeJson(absPath), primaryJson, embededJson, $isValid])
   except:
     publish("debug", getCurrentException().getStackTrace())
     error(getCurrentExceptionMsg() & " (likely a bad SAMI embed)")
