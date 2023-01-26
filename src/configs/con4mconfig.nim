@@ -6,6 +6,8 @@
 
 import con4m, options, nimutils, tables
 
+const defaultKeyPriority = 500
+
 con4mDef(Sami):
   attr(config_path,
        [string],
@@ -23,7 +25,12 @@ con4mDef(Sami):
              "provided, if this value is set, the command will run, " &
              "using the configuration from the configuration file.")
   attr(color, bool, false, doc = "Do you want ansi output?")
-  attr(log_level, string, "warn")
+  attr(log_level, string, "info",
+       doc = "Controls the log-level for what gets output to the 'log' topic.")
+  attr(sami_log_level, string, "warn",
+       doc = "Controls the log-level for status messages getting put into " &
+             "the SAMI_ERRORS field, during SAMI creation. These will only " &
+             "be messages relevent to that SAMI's creation process.")
   attr(dry_run, bool, false)
   attr(ignore_broken_conf, bool, true)
   attr(con4m_pinpoint, bool, true)  # Non-advertised as well.
@@ -93,8 +100,8 @@ con4mDef(Sami):
                " (if used; ignored otherwise)?")
     attr(output_order,
          int,
-         defaultVal = 500,
-         doc = "Lower numbers go first. Each provided value must be unique.")
+         defaultVal = defaultKeyPriority,
+         doc = "Should not be set on custom keys.")
     attr(since,
          string,
          required = false,
@@ -121,29 +128,50 @@ con4mDef(Sami):
          int,
          required = true,
          defaultVal = 50,
-         doc = "Vs other plugins, where should this run?  Lower goes first")
+         doc = "Vs other plugins, where should this run?  Lower goes first." &
+               "For codecs, this controls which codec will have priority " &
+               "for making the choice on whether to handle a particular " &
+               "artifact.  Codecs always get to write their keys first. For " &
+               "other plugins, it determines the order in which they get to " &
+               "write their keys.")
+    attr(ignore,
+         [string],
+         defaultVal = @[])
     attr(codec,
          bool,
          required = true,
          defaultVal = false,
          lockOnWrite = true)
-    attr(enabled, bool, defaultVal = true, doc = "Turn off this plugin.")
-    attr(command,
-         string,
-         required = false)
+         #doc = "Is this plugin also a codec?")
     attr(keys,
          [string],
          required = true,
          lockOnWrite = true)
+         #doc = "List of keys that this plugin might set. We use this to " &
+         #      "skip running unnecessary plugins, if plugins with higher" &
+         #      "priorities have already filled in all the appropriate keys.")
+    attr(enabled, bool, defaultVal = true, doc = "Turn off this plugin.")
+         #doc = "A list of keys that you do NOT want to take from this plugin.")
     attr(overrides,
-         {string: int}, required = false)
-    attr(ignore,
          [string],
-         required = false)
+         defaultVal = @[])
+         #doc = "A list of keys that you want to force-write when it is this " &
+         #     "plugin's turn to write, even if higher priority plugins have " &
+         #     "already written those keys. Note that this can't be used with" &
+         #     " system or codec keys.")
+    attr(uses_fstream,
+         bool,
+         defaultVal = true)
+         #doc        = "set this to true if the codec or plugin *requires* " &
+         #             "access to a file object. If the plugin reads from the" &
+         #             " artifact itself, or writes to it (in the case of a" &
+         #             " codec), then this value should be true. But some " &
+         #             " codecs might not directly open a re-sharable file " &
+         #             " pointer, for instance, one for a docker container.")
     attr(docstring,
          string,
          required = false)
-
+         #doc = "Documentation for the plugin.")
   section(sink, allowedSubSections = @["*"]):
     attr(uses_secret, bool, defaultVal = false)
     attr(uses_uid, bool, defaultVal = false)

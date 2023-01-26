@@ -14,7 +14,7 @@ type
      ## will end up in the FileOfInterest object.
 
   FileFlags* = enum
-    Binary, BigEndian, Arch64Bit, SkipWrite
+    BigEndian, Arch64Bit, SkipWrite
 
   SamiPoint* = ref object
     ## The SamiPoints object encodes all info known about a single point
@@ -41,16 +41,13 @@ type
     err*:       seq[string]
 
   Plugin* = ref object of RootObj
+    name*:       string
     configInfo*: SamiPluginSection
 
-  PluginInfo* = tuple[priority: int, name: string, plugin: Plugin]
   Codec* = ref object of Plugin
     samis*:      seq[SamiObj]
     magic*:      string
     searchPath*: seq[string]
-
-  ExternalPlugin* = ref object of Plugin
-    command*: string
 
   KeyInfo* = TableRef[string, Box]
 

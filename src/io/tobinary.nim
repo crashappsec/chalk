@@ -64,7 +64,9 @@ proc binEncodeItem(self: Box): string =
   else:
     unreachable
 
-proc createdToBinary*(sami: SamiObj, ptrOnly = false): string =
+proc createdToBinary*(sami: SamiObj, ptrOnly = getOutputPointers()): string =
+  # Currently, this is only called for the METADATA_HASH field, which only
+  # signs things actually being written out.  We skip everything else.
   var fieldCount = 0
 
   # Count how many fields we will write.  Ignore .json fields
@@ -81,9 +83,15 @@ proc createdToBinary*(sami: SamiObj, ptrOnly = false): string =
 
     fieldCount += 1
 
-  result = magicBin & u32ToStr(uint32(fieldCount))
+  result = u32ToStr(uint32(fieldCount))
 
   for fullKey in getOrderedKeys():
+    # It's important to write everything out in a canonical order for
+    # signing.  The keys are written in the order we spec, and user-defined
+    # keys are in lexigraphical order.
+    #
+    # Note that even dictionary values (e.g., SBOMS) are kept ordered by
+    # the insertion ordering, so there is no ambiguity.
     var outputKey = fullKey
 
     if "." in fullKey:
@@ -115,4 +123,19 @@ proc createdToBinary*(sami: SamiObj, ptrOnly = false): string =
       continue
 
     let val = sami.newFields[outputKey]
+    result = kvPairBinFmt.fmt()
+
+proc foundToBinary*(kvPairs: SamiDict): string =
+  var keys: seq[string]
+
+  for k, v in kvPairs:
+    if k in ["_MAGIC", "METADATA_HASH", "METADATA_ID"]: continue
+    keys.add(k)
+
+  keys = orderKeys(keys)
+
+  result = u32ToStr(uint32(len(keys)))
+
+  for outputkey in keys:
+    let val = kvPairs[outputKey]
     result = kvPairBinFmt.fmt()

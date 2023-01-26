@@ -51,13 +51,13 @@ method getArtifactInfo*(self: AuthorsFileCodeOwner,
   try:
     ctx = newFileStream(fname, fmRead)
     if ctx == nil:
-      sami.insertionError(eFileOpen)
+      error(eFileOpen)
     else:
       let s = ctx.readAll()
       if s != "":
         result["CODE_OWNERS"] = pack(s)
   except:
-    sami.insertionError(eCantOpen.fmt())
+    error(eCantOpen.fmt())
   finally:
     if ctx != nil:
       ctx.close()

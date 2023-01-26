@@ -101,7 +101,7 @@ method getArtifactInfo*(self: GithubCodeOwner,
   try:
     ctx = newFileStream(fname, fmRead)
     if ctx == nil:
-      sami.insertionError(eFileOpen)
+      error(eFileOpen)
     else:
       let
         s = ctx.readAll()
@@ -110,7 +110,7 @@ method getArtifactInfo*(self: GithubCodeOwner,
       if m != "":
         result["CODE_OWNERS"] = pack(m)
   except:
-    sami.insertionError(eCantOpen.fmt())
+    error(eCantOpen.fmt())
   finally:
     if ctx != nil:
       ctx.close()

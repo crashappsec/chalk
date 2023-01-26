@@ -133,32 +133,68 @@ proc topicUnsubscribe(args:    seq[Box],
 
     return some(pack(unsubscribe(topic, `rec?`.get())))
 
+
+var samiStack: seq[SamiObj] = @[]
+
+proc pushTargetSamiForErrorMsgs*(s: SamiObj) =
+  samiStack.add(s)
+
+proc popTargetSamiForErrorMsgs*() =
+  discard samiStack.pop()
+
+# This is private, not available from con4m.
+proc samiErrSink(msg: string, cfg: SinkConfig, arg: StringTable): bool =
+  if len(samiStack) == 0:
+    return false
+  if samiStack[^1] == nil:
+    samiStack[^1].err = @[msg]
+  else:
+    samiStack[^1].err.add(msg)
+  return true
+
+proc samiErrFilter(msg: string, info: StringTable): (string, bool) =
+  if len(samiStack) > 0 and keyLogLevel in info:
+    let llStr = info[keyLogLevel]
+
+    if (llStr in toLogLevelMap) and
+         (toLogLevelMap[llStr] <= toLogLevelMap[getSamiLogLevel()]):
+      return (msg, true)
+  return ("", false)
+
+let errSinkObj = SinkRecord(outputFunction: samiErrSink)
+
+registerSink("sami-err-log", errSinkObj)
+
+let errCfg = configSink(errSinkObj, filters = @[MsgFilter(samiErrFilter)]).get()
+
+subscribe("logs", errCfg)
+
 proc logBase(ll: string, args: seq[Box], globals: Con4mScope): Option[Box] =
-    let
-      msg      = unpack[string](args[0])
-      csym     = lookup(globals, "color").get()
-      cval     = csym.value.get()
-      `cOver?` = csym.override
-      lsym     = lookup(globals, "log_level").get()
-      lval     = lsym.value.get()
-      `lOver?` = lsym.override
+  let
+    msg      = unpack[string](args[0])
+    csym     = lookup(globals, "color").get()
+    cval     = csym.value.get()
+    `cOver?` = csym.override
+    lsym     = lookup(globals, "log_level").get()
+    lval     = lsym.value.get()
+    `lOver?` = lsym.override
 
-    # log level and color may have been set; con4m doesn't set that
-    # stuff where we can see it until it ends evaluation.
-    # TODO: add a simpler interface to con4m for this logic.
+  # log level and color may have been set; con4m doesn't set that
+  # stuff where we can see it until it ends evaluation.
+  # TODO: add a simpler interface to con4m for this logic.
 
-    if `cOver?`.isSome():
-      setShowColors(unpack[bool](`cOver?`.get()))
-    else:
-      setShowColors(unpack[bool](cval))
-    if `lOver?`.isSome():
-      setLogLevel(unpack[string](`lOver?`.get()))
-    else:
-      setLogLevel(unpack[string](lval))
+  if `cOver?`.isSome():
+    setShowColors(unpack[bool](`cOver?`.get()))
+  else:
+    setShowColors(unpack[bool](cval))
+  if `lOver?`.isSome():
+    setLogLevel(unpack[string](`lOver?`.get()))
+  else:
+    setLogLevel(unpack[string](lval))
 
-    log(ll, msg)
+  log(ll, msg)
 
-    return none(Box)
+  return none(Box)
 
 proc logError(args: seq[Box], globals, u1, u2: auto): Option[Box] =
   return logBase("error", args, globals)
@@ -253,6 +289,14 @@ proc getExeVersion(args:    seq[Box],
 
     return some(pack(retval))
 
+proc samiHigh(u1, u2, u3, u4: auto): Option[Box] =
+  return some(pack(high(int64)))
+
+
+proc samiLow(u1, u2, u3, u4: auto): Option[Box] =
+  # Note that this value the parser doesn't accept right now because
+  # I was super lazy when writing the tokenizer.
+  return some(pack(low(int64)))
 
 
 setSamiCon4mBuiltins(@[
@@ -267,6 +311,8 @@ setSamiCon4mBuiltins(@[
   ("trace",       BuiltInFn(logTrace),         "f(string)"),
   ("argv",        BuiltInFn(getArgv),          "f() -> [string]"),
   ("argv0",       BuiltInFn(getExeName),       "f() -> string"),
+  ("high",        BuiltInFn(samiHigh),         "f() -> int"),
+  ("low",         BuiltInFn(samiLow),          "f() -> int"),
   ("sink_config", BuiltInFn(sinkConfig),
                             "f(string, string, {string: string}, [string])")
   ])
@@ -275,7 +321,7 @@ setSamiCon4mBuiltins(@[
 discard registerTopic("ghost-insert")
 discard registerTopic("extract")
 discard registerTopic("insert")
-discard registerTopic("nesting")
+discard registerTopic("replacing")
 discard registerTopic("defaults")
 discard registerTopic("dry-run")
 discard registerTopic("delete")

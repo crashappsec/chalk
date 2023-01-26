@@ -10,30 +10,21 @@ key _MAGIC json {
     value: ascii_magic
     standard: true
     since: "0.1.0"
-    output_order: 0
+    output_order: low()
     in_ptr: true
     docstring: "Used to identify the start of JSON encoded output only"
 }
 
 key SAMI_ID {
     required: true
-    system: true
+    codec: true
     squash: false
-    type: "integer"
+    type: "strng"
     standard: true
     since: "0.1.0"
-    output_order: 1
+    output_order: low() + 1
     in_ptr: true
-    docstring: "Unique 64-bit value per insertion"
-}
-
-key SAMI_ALT_ID {
-    system: true
-    type: "string"
-    standard: true
-    since: "0.1.0"
-    output_order: 2
-    docstring: "Equivolent string representation of the SAMI_ID field"
+    docstring: "Unique luid with a 48 bit time stamp and 80 bit random value"
 }
 
 key SAMI_VERSION {
@@ -43,7 +34,7 @@ key SAMI_VERSION {
     value: sami_version
     standard: true
     since: "0.1.0"
-    output_order: 3
+    output_order: low() + 2
     in_ptr: true
     docstring: "Spec version of inserted objects"
 }
@@ -53,19 +44,11 @@ key SAMI_PTR {
     type: "string"
     standard: true
     since: "0.10"
-    output_order: 4
+    output_order: low() + 3
     in_ptr: true
-    docstring: "When enabled, injects minimal metadata; this field then gets a URL you supply to point to the rest of the data. Items marked as 'true' in the 'Ptr?' column are added in the PTR object"
-}
-
-key TIMESTAMP {
-    required: true
-    system: true
-    type: "integer"
-    since: "0.1.0"
-    output_order: 5
-    standard: true
-    docstring: "Time of insertion"
+    docstring: "When enabled, injects minimal metadata; this field then " +
+    "gets a URL you supply to point to the rest of the data. Items marked " +
+    "as 'true' in the 'Ptr?' column are added in the PTR object"
 }
 
 key EARLIEST_VERSION {
@@ -74,7 +57,7 @@ key EARLIEST_VERSION {
     system: true
     skip: true
     value: sami_version
-    output_order: 6
+    output_order: low() + 4
     standard: true
     docstring: "Reserved for future use"
 }
@@ -83,7 +66,7 @@ key ARTIFACT_PATH {
     type: "string"
     since: "0.1.0"
     codec: true
-    output_order: 7
+    output_order: low() + 5
     standard: true
     docstring: "Path of artifact on host where injection occured"
 }
@@ -91,7 +74,7 @@ key ARTIFACT_PATH {
 key INSERTION_HOSTINFO {
     type: "string"
     since: "0.1.0"
-    output_order: 8
+    output_order: low() + 6
     standard: true
     docstring: "Host information at injection; by default, uname -a"
 }
@@ -99,7 +82,7 @@ key INSERTION_HOSTINFO {
 key ORIGIN_URI {
     type: "string"
     since: "0.1.0"
-    output_order: 9
+    output_order: low() + 7
     standard: true
     docstring: "URI of origin for repo from which artifact was built"
 }
@@ -107,7 +90,7 @@ key ORIGIN_URI {
 key ARTIFACT_VERSION {
     type: "string"
     since: "0.1.0"
-    output_order: 11
+    output_order: low() + 8
     standard: true
     docstring: "Reserved for future use"
 }
@@ -116,7 +99,7 @@ key IAM_USERNAME {
     must_force: true
     type: "string"
     since: "0.1.0"
-    output_order: 12
+    output_order: low() + 9
     standard: true
     docstring: "Possibly removing..."
 }
@@ -125,7 +108,7 @@ key IAM_UID {
     must_force: true
     type: "integer"
     since: "0.1.0"
-    output_order: 13
+    output_order: low() + 10
     standard: true
     docstring: "Possibly removing..."
 }
@@ -133,7 +116,7 @@ key IAM_UID {
 key STORE_URI {
     type: "string"
     since: "0.1.0"
-    output_order: 14
+    output_order: low() + 11
     standard: true
     docstring: "URI for the artifact storage location"
 }
@@ -142,7 +125,7 @@ key BRANCH {
     type: "string"
     since: "0.1.0"
     standard: true
-    output_order: 15
+    output_order: low() + 12
     docstring: "Version control branch the artifact was built from"
 }
 
@@ -151,8 +134,9 @@ key HASH {
     since: "0.1.0"
     codec: true
     standard: true
-    output_order: 18
-    docstring: "Hash file of artifact w/o SAMI in it, to ensure extracted SAMIs are intact"
+    output_order: low() + 13
+    docstring: "Hash file of artifact w/o SAMI in it, to ensure extracted " +
+    "SAMIs are intact"
 }
 
 key HASH_FILES {
@@ -160,8 +144,9 @@ key HASH_FILES {
     since: "0.1.0"
     codec: true
     standard: true
-    output_order: 19
-    docstring: "Files that constitute the artifact, and used in the hash, if not just the ARTIFACT_PATH"
+    output_order: low() + 14
+    docstring: "Files that constitute the artifact, and used in the hash, " +
+    "if not just the ARTIFACT_PATH"
 
 }
 
@@ -169,23 +154,24 @@ key COMMIT_ID {
     type: "string"
     since: "0.1.0"
     standard: true
-    output_order: 20
-    docstring: "The commit hash or id for the repository the artifact was built from"
+    output_order: low() + 15
+    docstring: "The commit hash or id for the repository the artifact was " +
+    "built from"
 }
 
 key CODE_OWNERS {
     type: "string"
     since: "0.1.0"
     standard: true
-    output_order: 22
+    output_order: low() + 16
     docstring: "Code owners associated with the artifact"
 }
 
 key INJECTOR_ID {
-    type: "int"
+    type: "string"
     since: "0.1.0"
     standard: true
-    output_order: 24
+    output_order: low() + 17
     docstring: "SAMI ID of the sami binary that inserted metadata"
 }
 
@@ -194,6 +180,7 @@ key INJECTOR_VERSION {
     since: "0.1.0"
     standard: true
     system: true
+    output_order: low() + 18
     docstring: "Version of the SAMI binary used for injection"
 }
 
@@ -202,6 +189,7 @@ key INJECTOR_PLATFORM {
     since: "0.1.0"
     standard: true
     system: true
+    output_order: low() + 19
     docstring: "OS / system info at time of insertion"
 }
 
@@ -210,6 +198,7 @@ key INJECTOR_COMMIT_ID {
     since: "0.1.0"
     standard: true
     system: true
+    output_order: low() + 20
     docstring: "The commit hash or id from which the injector was built."
 }
 
@@ -217,14 +206,14 @@ key BUILD_ID {
     type: "string"
     since: "0.1.0"
     standard: true
-    output_order: 50
+    output_order: low() + 21
     docstring: "The ID of the CI/CD job"
 }
 
 key BUILD_URI {
     type: "string"
     since: "0.1.0"
-    output_order: 51
+    output_order: low() + 22
     standard: true
     docstring: "URI to the CI/CD job"
 }
@@ -232,7 +221,7 @@ key BUILD_URI {
 key BUILD_API_URI {
     type: "string"
     since: "0.1.0"
-    output_order: 52
+    output_order: low() + 23
     standard: true
     docstring: "URI to the CI/CD api if more information needs to be queried"
 }
@@ -240,7 +229,7 @@ key BUILD_API_URI {
 key BUILD_TRIGGER {
     type: "string"
     since: "0.1.0"
-    output_order: 53
+    output_order: low() + 24
     standard: true
     docstring: "What event triggered CI/CD job"
 }
@@ -248,7 +237,7 @@ key BUILD_TRIGGER {
 key BUILD_CONTACT {
     type: "[string]"
     since: "0.1.0"
-    output_order: 54
+    output_order: low() + 25
     standard: true
     docstring: "List of contacts which triggered CI/CD job"
 }
@@ -265,16 +254,26 @@ key OLD_SAMI {
     since: "0.1.0"
     system: true
     standard: true
-    output_order: 996
+    output_order: high() - 6
     skip: true
-    docstring: "Old SAMI info associated with an artifact, when a new SAMI is inserted"
+    docstring: "Old SAMI info associated with an artifact, when a new SAMI " +
+    "is inserted"
+}
+
+key EMBEDDED_SAMIS {
+    type: "{string: sami}"
+    since: "0.1.0"
+    system: true
+    standard: true
+    output_order: high() - 5
+    docstring: "Other artifacts contained in this artifact"
 }
 
 key SBOMS {
     type: "{string, string}"
     since: "0.1.0"
     standard: true
-    output_order: 998
+    output_order: high() - 4
     docstring: "SBOMs associated with this artifact"
 }
 
@@ -284,8 +283,31 @@ key ERR_INFO {
     since: "0.1.0"
     system: true
     standard: true
-    output_order: 999
+    output_order: high() - 3
     docstring: "Errors when inserting metadata"
+}
+
+key METADATA_HASH {
+    type: "string"
+    since: "0.1.0"
+    system: true
+    standard: true
+    output_order: high() - 2
+    in_ptr: true
+    docstring: "A unique ID for this metadata, derived in part from the " +
+    "hash of all the preceding metadata, in addition to the current time."
+}
+
+key METADATA_ID {
+    type: "string"
+    since: "0.1.0"
+    system: true
+    standard: true
+    output_order: high() - 1
+    required: true
+    in_ptr: true
+    docstring: "A unique ID for this metadata, derived in part from the " +
+    "hash of all the preceding metadata, in addition to the current time."
 }
 
 key SIGNATURE {
@@ -293,7 +315,7 @@ key SIGNATURE {
     since: "0.1.0"
     system: true
     standard: true
-    output_order: 1000
+    output_order: high()
     in_ptr: true
     docstring: "Embedded digital signature for artifact"
 }
@@ -347,10 +369,9 @@ plugin sbom_callback {
 # thus set to low(int64), but con4m currently doesn't get this right,
 # low(int64) in con4m is -high(int64), when it should be one less.
 plugin system {
-  keys: ["TIMESTAMP", "SAMI_ID", "SAMI_ALT_ID", "INJECTOR_ID",
-         "INJECTOR_VERSION", "INJECTOR_PLATFORM", "INJECTOR_COMMIT_ID",
-	 "X_SAMI_CONFIG", "_MAGIC.json"]
-  priority: -9223372036854775807
+  keys: ["INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
+  "INJECTOR_COMMIT_ID", "X_SAMI_CONFIG", "_MAGIC.json"]
+  priority: low()
 }
 
 # These keys would be set by the `metsys` plugin, but need to go LAST
@@ -369,8 +390,8 @@ plugin system {
 #
 # The priority field is set to high(int64).
 plugin metsys {
-    keys: ["OLD_SAMI", "SIGNATURE", "ERR_INFO"]
-    priority: 9223372036854775807
+    keys: ["METADATA_ID", "OLD_SAMI", "SIGNATURE", "ERR_INFO"]
+    priority: high()
 }
 
 # This plugin takes values from the conf file. By default, these
@@ -383,7 +404,7 @@ plugin metsys {
 # plugin implementation for details on the substitutions.
 plugin conffile {
     keys: ["*"]
-    priority: 9223372036854775806
+    priority: high() - 1
 }
 
 plugin custom_metadata {
@@ -424,7 +445,10 @@ sink s3 {
 sink post {
   needs_uri:    true
   uses_headers: true
-  docstring:    "Generic HTTP/HTTPS post to a URL. Add custom headers by providing an implementation to the callback getPostHeaders(), which should return a dictionary where all keys and values are strings."
+  docstring:    "Generic HTTP/HTTPS post to a URL. Add custom headers " +
+                "by providing an implementation to the callback " +
+		"getPostHeaders(), which should return a dictionary where " +
+		"all keys and values are strings."
 }
 
 sink custom {

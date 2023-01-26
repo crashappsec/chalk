@@ -103,7 +103,7 @@ when isMainModule:
               addChoiceFlag('l', "log-level", @["verbose", "trace", "info",
                                                 "warn", "error", "none"],
                             true,
-                            setSamiLogLevel).
+                            setConsoleLogLevel).
               addFlagWithStrArg('f', "config-file", setConfigFile)
 
   cmdLine.addCommand("insert", ["inject", "ins", "in", "i"]).
@@ -146,7 +146,7 @@ when isMainModule:
   # loading the base configuration.  This is in config.nim
   loadBaseConfiguration()
   if "log-level" in flags:
-    setSamiLogLevel(flags["log-level"])
+    setConsoleLogLevel(flags["log-level"])
 
   # This is in plugin.nim, but can't easily live in our validation
   # code in the previous call, because it would add a cyclic module

@@ -13,9 +13,8 @@ proc doDelete*() =
   if pendingDeletions.isSome():
     publish("delete", pendingDeletions.get())
 
-  for pluginInfo in codecs:
+  for codec in codecs:
     let
-      codec    = cast[Codec](pluginInfo.plugin)
       extracts = codec.getSamis()
 
     if len(extracts) == 0: continue

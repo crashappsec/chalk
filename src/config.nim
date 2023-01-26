@@ -16,7 +16,6 @@ const
   osStr       = staticexec("uname -o")
 
   # Some string constants used in multiple places.
-  magicBin*      = "\xda\xdf\xed\xab\xba\xda\xbb\xed"
   magicUTF8*     = "dadfedabbadabbed"
   tmpFilePrefix* = "sami"
   tmpFileSuffix* = "-file.tmp"
@@ -124,7 +123,6 @@ proc checkHooks*(sinkname:     string,
     hookCheck(cacheid)
     hookCheck(aux)
 
-
 template dryRun*(s: string) =
   if samiConfig.dryRun:
     publish("dry-run", s)
@@ -189,13 +187,16 @@ proc setColor*(val: bool) =
   setShowColors(val)
   samiConfig.color = val
 
-proc geSamiLogLevel*(): string =
+proc getConsoleLogLevel*(): string =
   return samiConfig.logLevel
 
-proc setSamiLogLevel*(val: string) =
+proc setConsoleLogLevel*(val: string) =
   discard ctxSamiConf.setOverride("log_level", pack(val))
   setLogLevel(val)
   samiConfig.logLevel = val
+
+proc getSamiLogLevel*(): string =
+  return samiConfig.samiLogLevel
 
 proc getDryRun*(): bool =
   return samiConfig.dryRun
@@ -253,6 +254,13 @@ proc getAllKeys*(): seq[string] =
   for key, val in samiConfig.key:
     result.add(key)
 
+proc getRequiredKeys*(): seq[string] =
+  result = @[]
+
+  for key, val in samiConfig.key:
+    if val.required:
+      result.add(key)
+
 proc getKeySpec*(name: string): Option[SamiKeySection] =
   if name in samiConfig.key:
     return some(samiConfig.key[name])
@@ -260,19 +268,26 @@ proc getKeySpec*(name: string): Option[SamiKeySection] =
 proc setKeyValue*(sec: SamiKeySection, b: Option[Box]) =
   sec.value = b
 
-proc getOrderedKeys*(): seq[string] =
-  let keys = getAllKeys()
-
+proc orderKeys*(keys: openarray[string]): seq[string] =
   var list: seq[(int, string)] = @[]
 
+  result = @[]
+
   for key in keys:
-    let spec = getKeySpec(key).get()
-    list.add((spec.outputOrder, key))
+    try:
+      let spec = getKeySpec(key).get()
+      list.add((spec.outputOrder, key))
+    except:
+      warn(fmt"Unknown key found in extraction: {key}")
+      list.add((defaultKeyPriority, key))
 
   list.sort()
 
-  for (priority, key) in list:
+  for (_, key) in list:
     result.add(key)
+
+proc getOrderedKeys*(): seq[string] =
+  return orderKeys(getAllKeys())
 
 proc getCustomKeys*(): seq[string] =
   result = @[]
@@ -333,24 +348,17 @@ proc getEnabled*(plugin: SamiPluginSection): bool =
 proc getKeys*(plugin: SamiPluginSection): seq[string] =
   return plugin.keys
 
-proc getOverrides*(plugin: SamiPluginSection):
-                 Option[TableRef[string, int]] =
+proc getIgnore*(plugin: SamiPluginSection): seq[string] =
+  return plugin.ignore
+
+proc getOverrides*(plugin: SamiPluginSection): seq[string] =
   return plugin.overrides
 
-proc getIgnore*(plugin: SamiPluginSection): Option[seq[string]] =
-  return plugin.ignore
+proc getUsesFstream*(plugin: SamiPluginSection): bool =
+  return plugin.usesFstream
 
 proc getDocString*(plugin: SamiPluginSection): Option[string] =
   return plugin.docstring
-
-proc getCommand*(plugin: SamiPluginSection): Option[string] =
-  return plugin.command
-
-proc getCommandPlugins*(): seq[(string, string)] =
-  for name, plugin in samiConfig.plugin:
-    if (not plugin.command.isSome()) or (not plugin.enabled):
-      continue
-    result.add((name, plugin.command.get()))
 
 proc getAllSinks*(): TableRef[string, SamiSinkSection] =
   result = samiConfig.sink
@@ -411,6 +419,11 @@ proc lockBuiltinKeys*() =
     if unpack[bool](codec):
       codecKeys.add(key)
 
+  discard ctxSamiConf.lockConfigVar("key._MAGIC.json.in_ptr")
+  discard ctxSamiConf.lockConfigVar("key.SAMI_ID.in_ptr")
+  discard ctxSamiConf.lockConfigVar("key.SAMI_VERSION.in_ptr")
+  discard ctxSamiConf.lockConfigVar("key.SAMI_PTR.in_ptr")
+  discard ctxSamiConf.lockConfigVar("key.METADATA_ID.in_ptr")
   # These are locks of invalid fields for specific output handlers.
   # Note that all of these lock calls could go away if con4m gets a
   # locking syntax.
@@ -459,13 +472,18 @@ proc doAdditionalValidation() =
   try:
     setLogLevel(samiConfig.logLevel)
   except:
-    setLogLevel(llWarn)
-    warn(fmt"Log level {samiConfig.logLevel} not recognized. " &
-         "Defaulting to 'warn'")
+    setLogLevel(llInfo)
+    warn(fmt"Log level '{samiConfig.logLevel}' not recognized. " &
+         "Defaulting to 'info'")
     var entry = ctxSamiConf.st.entries["log_level"]
-    entry.value = some(pack("warn"))
+    entry.value = some(pack("info"))
     ctxSamiConf.st.entries["log_level"] = entry
-    samiConfig.logLevel = "warn"
+    samiConfig.logLevel = "info"
+
+  if samiConfig.samiLogLevel notin toLogLevelMap:
+    warn(fmt"Log level for outputting to SAMIs '{samiConfig.samiLogLevel}' " &
+      "is not recognized. Defaulting to 'warn'")
+    samiConfig.samiLogLevel = "warn"
 
   # Take any paths and turn them into absolute paths.
   for i in 0 ..< len(samiConfig.artifactSearchPath):

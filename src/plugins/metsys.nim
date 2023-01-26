@@ -1,5 +1,5 @@
-import tables, options
-import nimutils, ../config, ../plugins
+import tables, options, strutils, nimSHA2, nimutils
+import ../config, ../plugins, ../io/tobinary
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
@@ -20,8 +20,7 @@ proc processOldSami(sami: SamiObj, olddict: SamiDict): Box =
         specOpt = getKeySpec(fullkey)
 
     if specOpt.isNone():
-      sami.insertionError("Found unknown key (" & k &
-                          ") in a SAMI we're replacing")
+      error("Found unknown key (" & k & ") in a SAMI we're replacing")
     else:
       let spec = specOpt.get()
       if spec.getSkip():
@@ -34,9 +33,10 @@ proc processOldSami(sami: SamiObj, olddict: SamiDict): Box =
 
   result = pack(groomedDict)
 
-
 method getArtifactInfo*(self: MetsysPlugin,
                         sami: SamiObj): KeyInfo =
+
+  new result
 
   let oldSamiOpt = config.getKeySpec("OLD_SAMI")
 
@@ -47,9 +47,23 @@ method getArtifactInfo*(self: MetsysPlugin,
       if oldpoint.samiFields.isSome():
         result["OLD_SAMI"] = processOldSami(sami, oldpoint.samiFields.get())
 
-  # TODO... handle previous sami.
   if len(sami.err) != 0:
     result["ERR_INFO"] = pack(sami.err)
 
+  let toHash = createdToBinary(sami)
+  var shaCtx = initSHA[SHA256]()
+  shaCtx.update(toHash)
+
+  var
+    metaHash     = shaCtx.final()
+    ulidHiBytes  = metaHash[^10 .. ^9]
+    ulidLowBytes = metaHash[^8 .. ^1]
+    ulidHiInt    = (cast[ptr uint16](addr ulidHiBytes[0]))[]
+    ulidLowInt   = (cast[ptr uint64](addr ulidLowBytes[0]))[]
+    now          = unixTimeInMs()
+    metaId       = encodeUlid(now, ulidHiInt, ulidLowInt)
+
+  result["METADATA_HASH"] = pack(metahash.toHex().toLowerAscii())
+  result["METADATA_ID"]   = pack(metaId)
 
 registerPlugin("metsys", MetsysPlugin())

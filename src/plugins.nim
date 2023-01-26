@@ -1,5 +1,5 @@
 import os, tables, strformat, strutils, algorithm, streams, options, glob
-import nimSHA2, con4m, nimutils, config, io/[fromjson, frombinary, json]
+import con4m, nimutils, config, io/[fromjson, json]
 
 const
   fmtTraceScanFile  = "{item}: scanning file"
@@ -20,6 +20,7 @@ proc registerPlugin*(name: string, plugin: Plugin) =
   if name in installedPlugins:
     error("Attempt to install a plugin named " &
           fmt"{name} when one is already installed")
+  plugin.name            = name
   installedPlugins[name] = plugin
 
 proc validatePlugins*() =
@@ -32,25 +33,29 @@ proc validatePlugins*() =
       plugin.configInfo = maybe.get()
       trace(fmt"Installed plugin {name}")
 
-proc loadCommandPlugins*() =
-  for (name, command) in getCommandPlugins():
-    registerPlugin(name, ExternalPlugin(command: command))
-
 proc getPluginByName*(name: string): Plugin =
   return installedPlugins[name]
 
-proc getPluginsByPriority*(): seq[PluginInfo] =
-  result = @[]
+proc getPluginsByPriority*(): seq[Plugin] =
+  var preResult: seq[(int, Plugin)] = @[]
 
   for name, plugin in installedPlugins:
+    # This may need to be refreshed; the config can be updated
+    # after the self-sami loads.
+    plugin.configInfo = getPluginConfig(name).get()
     if not plugin.configInfo.getEnabled():
       continue
-    result.add((plugin.configInfo.getPriority(), name, plugin))
+    preResult.add((plugin.configInfo.getPriority(), plugin))
 
-  result.sort()
+  preResult.sort()
 
-proc getCodecsByPriority*(): seq[PluginInfo] =
   result = @[]
+
+  for (_, plugin) in preResult:
+    result.add(plugin)
+
+proc getCodecsByPriority*(): seq[Codec] =
+  var preResult: seq[(int, Codec)] = @[]
 
   for name, plugin in installedPlugins:
     # This may need to be refreshed; the config can be updated
@@ -59,37 +64,26 @@ proc getCodecsByPriority*(): seq[PluginInfo] =
     if not plugin.configInfo.getEnabled():
       continue
     if plugin.configInfo.getCodec():
-      result.add((plugin.configInfo.getPriority(), name, plugin))
+      preResult.add((plugin.configInfo.getPriority(), Codec(plugin)))
 
-  result.sort()
+  preResult.sort()
 
-proc getInfoPluginsByPriority*(): seq[PluginInfo] =
   result = @[]
 
-  for name, plugin in installedPlugins:
-    if plugin.configInfo.getCodec() or not plugin.configInfo.getEnabled():
-      continue
-    result.add((plugin.configInfo.getPriority(), name, plugin))
-
-  result.sort()
+  for (_, plugin) in preResult:
+    result.add(plugin)
 
 method getArtifactInfo*(self: Plugin, sami: SamiObj): KeyInfo {.base.} =
-  var msg = ePureVirtual
+  var msg = "In plugin: " & self.name & ": " & ePureVirtual
+  raise newException(Exception, msg)
 
-  for k, v in installedPlugins:
-    if v == self:
-      msg = "In plugin: " & k & ": " & msg
-      break
+method doVirtualLoad*(self: Codec, sami: SamiObj): void {.base.} =
+  # Used to load a location when there's no file system object.
+  var msg = "In plugin: " & self.name & ": " & ePureVirtual
   raise newException(Exception, msg)
 
 proc getSamis*(self: Codec): seq[SamiObj] {.inline.} =
   return self.samis
-
-proc insertionError*(o: SamiObj, msg: string) =
-  ## These things can go into the errorInfo field of the SAMI, and
-  ## will get published to the log topic.
-  error(msg)
-  o.err.add(msg)
 
 method scan*(self: Codec, sami: SamiObj): bool {.base.} =
   ## Return true if the codec is going to handle this file.  This
@@ -111,21 +105,8 @@ proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
 
   trace(fmtTraceFIP.fmt())
 
-  if Binary in sami.flags:
-    sami.stream.setPosition(pt.startOffset + len(magicBin))
-
-    try:
-      fields = sami.extractOneSamiBinary(swap)
-      pt.samiFields = some(fields)
-      pt.endOffset = sami.stream.getPosition()
-      pt.valid = true
-      return
-    except:
-      # Technically an extraction error.
-      sami.insertionError(eBadBin.fmt() & " " & getCurrentExceptionMsg())
-      pt.endOffset = sami.stream.getPosition()
-      pt.valid = false
-      return
+  if SkipWrite in sami.flags:
+    self.doVirtualLoad(sami)
   else:
     sami.stream.setPosition(pt.startOffset)
     if not sami.stream.findJsonStart():
@@ -141,7 +122,7 @@ proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
       pt.endOffset = sami.stream.getPosition()
       pt.valid = true
     except:
-      sami.insertionError(eBadJson.fmt() & ": " & getCurrentExceptionMsg())
+      error(eBadJson.fmt() & ": " & getCurrentExceptionMsg())
       pt.startOffset = truestart
       pt.endOffset = sami.stream.getPosition()
       pt.valid = false
@@ -152,9 +133,10 @@ proc acquireFileStream*(sami: SamiObj): Option[FileStream] =
   if sami.stream == nil:
     let handle = newFileStream(sami.fullpath, fmRead)
     if handle == nil:
-      error(sami.fullpath & ": could not open file.")
+      error(fmt"{sami.fullpath}: could not open file.")
       return none(FileStream)
 
+    trace(fmt"{sami.fullpath}: File stream opened")
     sami.stream = handle
 
     if numCachedFds < getCacheFdLimit():
@@ -168,6 +150,7 @@ proc closeFileStream*(sami: SamiObj) =
     try:
       if sami.stream != nil:
         sami.stream.close()
+        trace(fmt"{sami.fullpath}: File stream closed")
     except:
       warn(sami.fullpath & ": Error when attempting to close file.")
     finally:
@@ -209,7 +192,6 @@ proc dispatchFileScan(self:       Codec,
   else:
     sami.closeFileStream()
     return false # This codec isn't handling.
-
 
 proc mustIgnore*(path: string, globs: seq[Glob]): bool {.inline.} =
   for item in globs:
@@ -283,28 +265,28 @@ proc doScan*(self:       Codec,
         if self.dispatchFileScan(item, path, exclusions):
           exclusions.add(item)
 
-# TODO: Probably need to add a hash scheme as an option.  Because
-# even w/ shebang, it could make sense to hash the main script only,
-# or it might make sense to hash the modules it loads, etc.  My
-# original thinking was, the HASH field wouldn't stand in for a full
-# integrity check a la a digital signature, it would be more to
-# allow one to confirm the SAMI/artifact pairing, which might
-# particularly be useful, if we end up with cases where the SAMI is
-# *not* carried with the artifact.
 method getArtifactHash*(self: Codec, sami: SamiObj): string {.base.} =
   raise newException(Exception, ePureVirtual)
 
 method getArtifactInfo*(self: Codec, sami: SamiObj): KeyInfo =
   result = newTable[string, Box]()
 
-  let
+  var
     hashFilesBox = pack(@[sami.fullpath])
-    encodedHash  = self.getArtifactHash(sami).toHex().toLowerAscii()
-
+    rawHash      = self.getArtifactHash(sami)
+    encodedHash  = rawHash.toHex().toLowerAscii()
+    ulidHiBytes  = rawHash[^10 .. ^9]
+    ulidLowBytes = rawHash[^8 .. ^1]
+    ulidHiInt    = (cast[ptr uint16](addr ulidHiBytes[0]))[]
+    ulidLowInt   = (cast[ptr uint64](addr ulidLowBytes[0]))[]
+    now          = unixTimeInMs()
+    samiId       = encodeUlid(now, ulidHiInt, ulidLowInt)
 
   result["HASH"]          = pack(encodedHash)
   result["HASH_FILES"]    = hashFilesBox
   result["ARTIFACT_PATH"] = pack(sami.fullpath)
+  result["SAMI_ID"]       = pack(samiId)
+  trace(fmt"samid: {samiId}")
 
 method handleWrite*(self: Codec,
                     ctx: Stream,
@@ -313,24 +295,6 @@ method handleWrite*(self: Codec,
                     post: string) {.base.} =
   raise newException(Exception, ePureVirtual)
 
-
-method getArtifactInfo*(self: ExternalPlugin, sami: SamiObj): KeyInfo =
-  result = newTable[string, Box]()
-
-  try:
-    let
-      str = self.command & " " & sami.fullpath
-      sbox = pack(str)
-      rbox = c4mCmd(@[sbox]).get()
-      jobj = parseJson(newStringStream(unpack[string](rbox)))
-      tbl = jobj.kvpairs
-
-    for key, val in tbl:
-      let bval = val.jsonNodeToBox()
-
-      result[key] = bval
-  except:
-    return
 
 # We need to turn off UnusedImport here, because the nim static
 # analyzer thinks the below imports are unused. When we first import,

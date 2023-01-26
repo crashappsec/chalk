@@ -1,12 +1,13 @@
 import tables, strformat, strutils, os, options, nativesockets, json, glob
-import nimutils, config, plugins, io/tojson
+import nimSHA2, nimutils, config, plugins, io/[tojson, tobinary]
 
 const
   # This is the logging template for JSON output.
   logTemplate       = """{
   "ARTIFACT_PATH": $#,
   "SAMI" : $#,
-  "EMBEDDED_SAMIS" : $#
+  "EMBEDDED_SAMIS" : $#,
+  "VALIDATION_PASSED" : $#
 }"""
   fmtInfoNoExtract  = "{sami.fullpath}: No SAMI found for extraction"
   fmtInfoYesExtract = "{sami.fullpath}: SAMI extracted"
@@ -14,6 +15,64 @@ const
   comfyItemSep      = ", "
   jsonArrFmt        = "[ $# ]"
 
+proc validateMetadata(codec: Codec, sami: SamiObj, fields: SamiDict): bool =
+  result = true
+
+  var
+    rawHash      = codec.getArtifactHash(sami)
+    ulidHiBytes  = rawHash[^10 .. ^9]
+    ulidLowBytes = rawHash[^8 .. ^1]
+    ulidHiInt    = (cast[ptr uint16](addr ulidHiBytes[0]))[]
+    ulidLowInt   = (cast[ptr uint64](addr ulidLowBytes[0]))[]
+    now          = 0'u64
+    samiId       = encodeUlid(now, ulidHiInt, ulidLowInt)
+
+  if "SAMI_ID" notin fields:
+    error(fmt"{sami.fullPath}: required SAMI_ID field is missing.")
+    result = false
+
+  elif len(unpack[string](fields["SAMI_ID"])) != 26:
+    error(fmt"{sami.fullPath}: SAMI_ID is invalid length (expected 26 bytes)")
+    result = false
+
+  elif samiId[^15 .. ^1] != (unpack[string](fields["SAMI_ID"]))[^15 .. ^1]:
+    error(fmt"{sami.fullPath}: Calculated SAMI_ID doesn't match extracted ID " &
+          fmt"'{samiId[^15 .. ^1]}' vs " &
+          (unpack[string](fields["SAMI_ID"]))[^15 .. ^1])
+    result = false
+
+  # TODO: else: validate metadata hash... use foundToBinary
+  if "METADATA_ID" notin fields:
+    error(fmt"{sami.fullPath}: Required field METADATA_ID is missing")
+    if "METADATA_HASH" notin fields:
+      error(fmt"{sami.fullPath}: No information found for METAID validation")
+      return false
+  var
+    toHash = foundToBinary(fields)
+    shaCtx = initSHA[SHA256]()
+
+  shaCtx.update(toHash)
+
+  rawHash      = $(shaCtx.final())
+  ulidHiBytes  = rawHash[^10 .. ^9]
+  ulidLowBytes = rawHash[^8 .. ^1]
+  ulidHiInt    = (cast[ptr uint16](addr ulidHiBytes[0]))[]
+  ulidLowInt   = (cast[ptr uint64](addr ulidLowBytes[0]))[]
+  samiId       = encodeUlid(now, ulidHiInt, ulidLowInt)
+
+  if "METADATA_HASH" in fields:
+    let
+      ourHash   = rawHash.toHex.toLowerAscii()
+      theirHash = unpack[string](fields["METADATA_HASH"]).toLowerAscii()
+    if ourHash != theirHash:
+      error(fmt"{sami.fullPath}: METADATA_HASH field does not match " &
+               "calculated value")
+      result = false
+  if "METADATA_ID" in fields:
+    if samiId[^15 .. ^1] != (unpack[string](fields["METADATA_ID"]))[^15 .. ^1]:
+      error(fmt"{sami.fullPath}: METADATA_HASH field does not match " &
+               "calculated value")
+      result = false
 
 proc doExtraction*(): Option[string] =
   # This function will extract SAMIs, leaving them in SAMI objects
@@ -41,9 +100,9 @@ proc doExtraction*(): Option[string] =
   for item in ignorePatternsAsStr:
     ignoreGlobs.add(glob("**/" & item))
 
-  for (_, name, plugin) in getCodecsByPriority():
+  for plugin in getCodecsByPriority():
     let codec = cast[Codec](plugin)
-    trace(fmt"Asking codec '{name}' to scan for SAMIs.")
+    trace(fmt"Asking codec '{plugin.name}' to scan for SAMIs.")
     if getCommandName() == "insert":
       codec.doScan(artifactPath, exclusions, ignoreGlobs, getRecursive())
     else:
@@ -54,8 +113,10 @@ proc doExtraction*(): Option[string] =
 
   try:
     for codec in codecInfo:
+
       for sami in codec.samis:
         var comma, primaryJson, embededJson: string
+        var isValid: bool
 
         if sami.samiIsEmpty():
           # mustIgnore is in plugins.nim
@@ -71,7 +132,8 @@ proc doExtraction*(): Option[string] =
             p = sami.primary
             s = p.samiFields.get()
           primaryJson = s.foundToJson()
-          dryRun(fmtInfoYesExtract.fmt())
+          isValid = validateMetadata(codec, sami, s)
+          info(fmtInfoYesExtract.fmt())
         else:
           info(fmtInfoNoPrimary.fmt())
 
@@ -90,7 +152,7 @@ proc doExtraction*(): Option[string] =
 
         let absPath = resolvePath(sami.fullpath)
         samisToRet.add(logTemplate %
-                 [escapeJson(absPath), primaryJson, embededJson])
+                 [escapeJson(absPath), primaryJson, embededJson, $isValid])
   except:
     publish("debug", getCurrentException().getStackTrace())
     error(getCurrentExceptionMsg() & " (likely a bad SAMI embed)")
@@ -110,7 +172,7 @@ proc doExtraction*(): Option[string] =
 
 var selfSamiObj: Option[SamiObj] = none(SamiObj)
 var selfSami:    Option[SamiDict] = none(SamiDict)
-var selfID:      Option[uint] = none(uint)
+var selfID:      Option[string] = none(string)
 
 proc getSelfSamiObj*(): Option[SamiObj] =
   # If we call twice and we're on a platform where we don't
@@ -122,7 +184,7 @@ proc getSelfSamiObj*(): Option[SamiObj] =
 
     trace(fmt"Checking sami binary {myPath[0]} for embedded config")
 
-    for (_, name, plugin) in getCodecsByPriority():
+    for plugin in getCodecsByPriority():
       let codec = cast[Codec](plugin)
       codec.doScan(myPath, exclusions, @[], false)
       if len(codec.samis) == 0: continue
@@ -157,9 +219,9 @@ proc getSelfExtraction*(): Option[SamiDict] =
       let sami = selfSami.get()
       # Should always be true, but just in case.
       if sami.contains("SAMI_ID"):
-        selfID = some(unpack[uint](sami["SAMI_ID"]))
+        selfID = some(unpack[string](sami["SAMI_ID"]))
 
   return selfSami
 
-proc getSelfID*(): Option[uint] =
+proc getSelfID*(): Option[string] =
   return selfID
