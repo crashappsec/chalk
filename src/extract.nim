@@ -1,5 +1,5 @@
 import tables, strformat, strutils, os, options, nativesockets, json, glob
-import nimutils, config, plugins, io/tojson
+import nimSHA2, nimutils, config, plugins, io/[tojson, tobinary]
 
 const
   # This is the logging template for JSON output.
@@ -42,6 +42,37 @@ proc validateMetadata(codec: Codec, sami: SamiObj, fields: SamiDict): bool =
     result = false
 
   # TODO: else: validate metadata hash... use foundToBinary
+  if "METADATA_ID" notin fields:
+    error(fmt"{sami.fullPath}: Required field METADATA_ID is missing")
+    if "METADATA_HASH" notin fields:
+      error(fmt"{sami.fullPath}: No information found for METAID validation")
+      return false
+  var
+    toHash = foundToBinary(fields)
+    shaCtx = initSHA[SHA256]()
+
+  shaCtx.update(toHash)
+
+  rawHash      = $(shaCtx.final())
+  ulidHiBytes  = rawHash[^10 .. ^9]
+  ulidLowBytes = rawHash[^8 .. ^1]
+  ulidHiInt    = (cast[ptr uint16](addr ulidHiBytes[0]))[]
+  ulidLowInt   = (cast[ptr uint64](addr ulidLowBytes[0]))[]
+  samiId       = encodeUlid(now, ulidHiInt, ulidLowInt)
+
+  if "METADATA_HASH" in fields:
+    let
+      ourHash   = rawHash.toHex.toLowerAscii()
+      theirHash = unpack[string](fields["METADATA_HASH"]).toLowerAscii()
+    if ourHash != theirHash:
+      error(fmt"{sami.fullPath}: METADATA_HASH field does not match " &
+               "calculated value")
+      result = false
+  if "METADATA_ID" in fields:
+    if samiId[^15 .. ^1] != (unpack[string](fields["METADATA_ID"]))[^15 .. ^1]:
+      error(fmt"{sami.fullPath}: METADATA_HASH field does not match " &
+               "calculated value")
+      result = false
 
 proc doExtraction*(): Option[string] =
   # This function will extract SAMIs, leaving them in SAMI objects

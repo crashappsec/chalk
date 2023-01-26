@@ -6,6 +6,8 @@
 
 import con4m, options, nimutils, tables
 
+const defaultKeyPriority = 500
+
 con4mDef(Sami):
   attr(config_path,
        [string],
@@ -98,8 +100,8 @@ con4mDef(Sami):
                " (if used; ignored otherwise)?")
     attr(output_order,
          int,
-         defaultVal = 500,
-         doc = "Lower numbers go first. Each provided value must be unique.")
+         defaultVal = defaultKeyPriority,
+         doc = "Should not be set on custom keys.")
     attr(since,
          string,
          required = false,

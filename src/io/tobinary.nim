@@ -83,7 +83,7 @@ proc createdToBinary*(sami: SamiObj, ptrOnly = getOutputPointers()): string =
 
     fieldCount += 1
 
-  result = magicBin & u32ToStr(uint32(fieldCount))
+  result = u32ToStr(uint32(fieldCount))
 
   for fullKey in getOrderedKeys():
     # It's important to write everything out in a canonical order for
@@ -123,4 +123,19 @@ proc createdToBinary*(sami: SamiObj, ptrOnly = getOutputPointers()): string =
       continue
 
     let val = sami.newFields[outputKey]
+    result = kvPairBinFmt.fmt()
+
+proc foundToBinary*(kvPairs: SamiDict): string =
+  var keys: seq[string]
+
+  for k, v in kvPairs:
+    if k in ["_MAGIC", "METADATA_HASH", "METADATA_ID"]: continue
+    keys.add(k)
+
+  keys = orderKeys(keys)
+
+  result = u32ToStr(uint32(len(keys)))
+
+  for outputkey in keys:
+    let val = kvPairs[outputKey]
     result = kvPairBinFmt.fmt()

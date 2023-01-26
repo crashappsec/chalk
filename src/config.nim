@@ -16,7 +16,6 @@ const
   osStr       = staticexec("uname -o")
 
   # Some string constants used in multiple places.
-  magicBin*      = "\xda\xdf\xed\xab\xba\xda\xbb\xed"
   magicUTF8*     = "dadfedabbadabbed"
   tmpFilePrefix* = "sami"
   tmpFileSuffix* = "-file.tmp"
@@ -269,19 +268,26 @@ proc getKeySpec*(name: string): Option[SamiKeySection] =
 proc setKeyValue*(sec: SamiKeySection, b: Option[Box]) =
   sec.value = b
 
-proc getOrderedKeys*(): seq[string] =
-  let keys = getAllKeys()
-
+proc orderKeys*(keys: openarray[string]): seq[string] =
   var list: seq[(int, string)] = @[]
 
+  result = @[]
+
   for key in keys:
-    let spec = getKeySpec(key).get()
-    list.add((spec.outputOrder, key))
+    try:
+      let spec = getKeySpec(key).get()
+      list.add((spec.outputOrder, key))
+    except:
+      warn(fmt"Unknown key found in extraction: {key}")
+      list.add((defaultKeyPriority, key))
 
   list.sort()
 
-  for (priority, key) in list:
+  for (_, key) in list:
     result.add(key)
+
+proc getOrderedKeys*(): seq[string] =
+  return orderKeys(getAllKeys())
 
 proc getCustomKeys*(): seq[string] =
   result = @[]

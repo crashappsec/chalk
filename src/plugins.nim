@@ -1,5 +1,5 @@
 import os, tables, strformat, strutils, algorithm, streams, options, glob
-import nimSHA2, con4m, nimutils, config, io/[fromjson, json]
+import con4m, nimutils, config, io/[fromjson, json]
 
 const
   fmtTraceScanFile  = "{item}: scanning file"
