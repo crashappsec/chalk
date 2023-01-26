@@ -1,5 +1,5 @@
 import options, tables, streams, strutils, strformat, os, std/tempfiles
-import nimutils, config, plugins, extract, io/tojson
+import nimutils, config, plugins, extract, io/tojson, builtins
 
 const requiredCodecKeys = ["ARTIFACT_PATH", "HASH", "HASH_FILES", "SAMI_ID"]
 
@@ -107,6 +107,7 @@ proc doInjection*() =
       streamAvailable = codec.configInfo.getUsesFstream()
 
     for infoObj in extracts:
+      pushTargetSamiForErrorMsgs(infoObj)
       let
         keyInfo = codec.getArtifactInfo(infoObj)
         path    = infoObj.fullPath
@@ -180,6 +181,7 @@ proc doInjection*() =
 
       # Should be totally done with the file stream now.
       infoObj.closeFileStream()
+      popTargetSamiForErrorMsgs()
 
   let fullJson = "[" & join(objsForPublish, ", ") & "]"
 

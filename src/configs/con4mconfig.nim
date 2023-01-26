@@ -23,7 +23,12 @@ con4mDef(Sami):
              "provided, if this value is set, the command will run, " &
              "using the configuration from the configuration file.")
   attr(color, bool, false, doc = "Do you want ansi output?")
-  attr(log_level, string, "warn")
+  attr(log_level, string, "info",
+       doc = "Controls the log-level for what gets output to the 'log' topic.")
+  attr(sami_log_level, string, "warn",
+       doc = "Controls the log-level for status messages getting put into " &
+             "the SAMI_ERRORS field, during SAMI creation. These will only " &
+             "be messages relevent to that SAMI's creation process.")
   attr(dry_run, bool, false)
   attr(ignore_broken_conf, bool, true)
   attr(con4m_pinpoint, bool, true)  # Non-advertised as well.

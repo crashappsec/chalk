@@ -20,8 +20,7 @@ proc processOldSami(sami: SamiObj, olddict: SamiDict): Box =
         specOpt = getKeySpec(fullkey)
 
     if specOpt.isNone():
-      sami.insertionError("Found unknown key (" & k &
-                          ") in a SAMI we're replacing")
+      error("Found unknown key (" & k & ") in a SAMI we're replacing")
     else:
       let spec = specOpt.get()
       if spec.getSkip():

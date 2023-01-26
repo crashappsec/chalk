@@ -85,12 +85,6 @@ method doVirtualLoad*(self: Codec, sami: SamiObj): void {.base.} =
 proc getSamis*(self: Codec): seq[SamiObj] {.inline.} =
   return self.samis
 
-proc insertionError*(o: SamiObj, msg: string) =
-  ## These things can go into the errorInfo field of the SAMI, and
-  ## will get published to the log topic.
-  error(msg)
-  o.err.add(msg)
-
 method scan*(self: Codec, sami: SamiObj): bool {.base.} =
   ## Return true if the codec is going to handle this file.  This
   ## function should add position information and presence
@@ -128,7 +122,7 @@ proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
       pt.endOffset = sami.stream.getPosition()
       pt.valid = true
     except:
-      sami.insertionError(eBadJson.fmt() & ": " & getCurrentExceptionMsg())
+      error(eBadJson.fmt() & ": " & getCurrentExceptionMsg())
       pt.startOffset = truestart
       pt.endOffset = sami.stream.getPosition()
       pt.valid = false

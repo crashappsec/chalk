@@ -188,13 +188,16 @@ proc setColor*(val: bool) =
   setShowColors(val)
   samiConfig.color = val
 
-proc geSamiLogLevel*(): string =
+proc getConsoleLogLevel*(): string =
   return samiConfig.logLevel
 
-proc setSamiLogLevel*(val: string) =
+proc setConsoleLogLevel*(val: string) =
   discard ctxSamiConf.setOverride("log_level", pack(val))
   setLogLevel(val)
   samiConfig.logLevel = val
+
+proc getSamiLogLevel*(): string =
+  return samiConfig.samiLogLevel
 
 proc getDryRun*(): bool =
   return samiConfig.dryRun
@@ -463,13 +466,18 @@ proc doAdditionalValidation() =
   try:
     setLogLevel(samiConfig.logLevel)
   except:
-    setLogLevel(llWarn)
-    warn(fmt"Log level {samiConfig.logLevel} not recognized. " &
-         "Defaulting to 'warn'")
+    setLogLevel(llInfo)
+    warn(fmt"Log level '{samiConfig.logLevel}' not recognized. " &
+         "Defaulting to 'info'")
     var entry = ctxSamiConf.st.entries["log_level"]
-    entry.value = some(pack("warn"))
+    entry.value = some(pack("info"))
     ctxSamiConf.st.entries["log_level"] = entry
-    samiConfig.logLevel = "warn"
+    samiConfig.logLevel = "info"
+
+  if samiConfig.samiLogLevel notin toLogLevelMap:
+    warn(fmt"Log level for outputting to SAMIs '{samiConfig.samiLogLevel}' " &
+      "is not recognized. Defaulting to 'warn'")
+    samiConfig.samiLogLevel = "warn"
 
   # Take any paths and turn them into absolute paths.
   for i in 0 ..< len(samiConfig.artifactSearchPath):

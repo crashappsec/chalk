@@ -157,7 +157,7 @@ proc getOrigin(self: GitPlugin, sami: SamiObj): (bool, Box) =
     trace(trOrigin.fmt())
     return (true, pack(url))
   except:
-    sami.insertionError(wNotParsed.fmt())
+    error(wNotParsed.fmt())
     return (false, nil)
 
 # Not sure I'm going to use this.  Stay tuned.
