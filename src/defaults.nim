@@ -78,6 +78,13 @@ proc showGeneralOptions*(): int {.discardable.} =
   ot.addRow(@["Default exe command",
               getOrElse(getDefaultCommand(), "none"),
               "default_command"])
+  ot.addRow(@["Container image hash",
+              getContainerImageId(),
+              "container_image_id"])
+  ot.addRow(@["Container image name",
+              getContainerImageName(),
+              "container_image_name"])
+
 
   if getAllowExternalConfig():
     ot.addRow(@["Config file path",
