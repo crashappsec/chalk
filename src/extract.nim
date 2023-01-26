@@ -104,9 +104,16 @@ proc doExtraction*(): Option[string] =
     let codec = cast[Codec](plugin)
     trace(fmt"Asking codec '{plugin.name}' to scan for SAMIs.")
     if getCommandName() == "insert":
-      codec.doScan(artifactPath, exclusions, ignoreGlobs, getRecursive())
+      if not codec.doScan(artifactPath,
+                          exclusions,
+                          ignoreGlobs,
+                          getRecursive()):
+        codecInfo.add(codec)
+        break
     else:
-      codec.doScan(artifactPath, exclusions, @[], getRecursive())
+      if not codec.doScan(artifactPath, exclusions, @[], getRecursive()):
+        codecInfo.add(codec)
+        break
     codecInfo.add(codec)
 
   trace("Beginning extraction attempts for any found SAMIs")
@@ -186,7 +193,7 @@ proc getSelfSamiObj*(): Option[SamiObj] =
 
     for plugin in getCodecsByPriority():
       let codec = cast[Codec](plugin)
-      codec.doScan(myPath, exclusions, @[], false)
+      discard codec.doScan(myPath, exclusions, @[], false)
       if len(codec.samis) == 0: continue
       selfSamiObj = some(codec.samis[0])
       codec.samis = @[]

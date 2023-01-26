@@ -14,7 +14,7 @@ type
      ## will end up in the FileOfInterest object.
 
   FileFlags* = enum
-    BigEndian, Arch64Bit, SkipWrite
+    BigEndian, Arch64Bit, SkipWrite, StopScan
 
   SamiPoint* = ref object
     ## The SamiPoints object encodes all info known about a single point

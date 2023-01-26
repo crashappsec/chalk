@@ -1,0 +1,78 @@
+import os, tables, strutils, streams, nimutils, ../config, ../plugins, json
+
+when (NimMajor, NimMinor) < (1, 7):
+  {.warning[LockLevel]: off.}
+
+type CodecContainer* = ref object of Codec
+
+method scan*(self: CodecContainer, sami: SamiObj): bool =
+  # Never interfere with a self-SAMI.  Leave that to the real codecs.
+  if sami.fullpath == resolvePath(getAppFileName()):
+    return false
+
+  var idstr = getContainerImageId()
+
+  if idstr == "":
+    return false
+
+  if idstr.startsWith("sha256:"):
+    idstr = idstr[7 .. ^1]
+
+  idstr = idstr.toLowerAscii()
+  if len(idstr) != 64:
+    once:
+      error("Invalid container image ID given (expected 64 bytes of hex)")
+    return false
+
+  for ch in idstr:
+    if ch notin "0123456789abcdef":
+      error("Invalid sh256 for container image ID given")
+      return false
+
+    # Create a liar SAMI point.
+  # Should probably have a bit in the sami.flags field to control.
+  sami.primary = SamiPoint(startOffset: 0, present: true)
+  sami.exclude = @[]
+
+  var path = sami.fullPath
+  dirWalk(true, sami.exclude.add(item))
+
+  once:
+    sami.flags.incl(SkipWrite)
+    sami.flags.incl(StopScan)
+    return true
+  return false
+
+method doVirtualLoad*(self: CodecContainer, sami: SamiObj) =
+  discard
+
+method handleWrite*(self:    CodecContainer,
+                    ctx:     Stream,
+                    pre:     string,
+                    encoded: Option[string],
+                    post:    string) =
+  echo pretty(parseJson(encoded.get()))
+
+method getArtifactInfo*(self: CodecContainer, sami: SamiObj): KeyInfo =
+  var
+    idstr = getContainerImageId()
+    name  = getContainerImageName()
+
+  if idstr.startsWith("sha256:"):
+    idstr = idstr[7 .. ^1]
+
+  var
+    shortBytes = idstr[^20 .. ^17]
+    longBytes  = idstr[^16 .. ^1]
+    shortInt   = fromHex[uint16](shortBytes)
+    longInt    = fromHex[uint64](longBytes)
+    ulid       = encodeUlid(unixTimeInMs(), shortInt, longInt)
+
+
+  result                  = newTable[string, Box]()
+  result["HASH"]          = pack(idstr)
+  result["HASH_FILES"]    = pack(@[name])
+  result["ARTIFACT_PATH"] = pack(name)
+  result["SAMI_ID"]       = pack(ulid)
+
+registerPlugin("container", CodecContainer())

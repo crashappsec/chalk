@@ -46,6 +46,8 @@ con4mDef(Sami):
   attr(recursive, bool, true)
   attr(can_dump, bool, true)
   attr(can_load, bool, true)
+  attr(container_image_id, string, defaultVal = "")
+  attr(container_image_name, string, defaultVal = "")
   attr(allow_external_config, bool, true)
   attr(publish_defaults,
        bool,

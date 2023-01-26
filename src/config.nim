@@ -53,6 +53,11 @@ var
   ctxSamiConf:       ConfigState
   samiConfig:        SamiConfig   # Type from the con4m macro.
   con4mCallbacks:    seq[(string, string)] = @[]
+  commandName:       string
+  `canSelfInject?`:  bool                  = true
+  builtinKeys:       seq[string]           = @[]
+  systemKeys:        seq[string]           = @[]
+  codecKeys:         seq[string]           = @[]
 
 # These two procs are needed externally to test new conf files when loading.
 proc getCon4mBuiltins*(): seq[(string, BuiltinFn, string)] =
@@ -81,15 +86,11 @@ proc getBinaryOS*():     string = osStr
 proc getBinaryArch*():   string = archStr
 proc getSamiPlatform*(): string = osStr & " " & archStr
 
-var commandName: string
-
 proc setCommandName*(str: string) =
   commandName = str
 
 proc getCommandName*(): string =
   return commandName
-
-var `canSelfInject?` = true
 
 proc setNoSelfInjection*() =
   `canSelfInject?` = false
@@ -248,6 +249,20 @@ proc getAllowExternalConfig*(): bool =
 proc getIgnoreBrokenConf*(): bool =
   return samiConfig.ignoreBrokenConf
 
+proc getContainerImageId*(): string =
+  return samiConfig.containerImageId
+
+proc setContainerImageId*(s: string) =
+  discard ctxSamiConf.setOverride("container_image_id", pack(s))
+  samiConfig.containerImageId = s
+
+proc getContainerImageName*(): string =
+  return samiConfig.containerImageName
+
+proc setContainerImageName*(s: string) =
+  discard ctxSamiConf.setOverride("container_image_name", pack(s))
+  samiConfig.containerImageName = s
+
 proc getAllKeys*(): seq[string] =
   result = @[]
 
@@ -375,10 +390,6 @@ proc getOutputPointers*(): bool =
     return true
 
   return false
-
-var builtinKeys: seq[string] = @[]
-var systemKeys:  seq[string] = @[]
-var codecKeys:   seq[string] = @[]
 
 proc isBuiltinKey*(name: string): bool =
   return name in builtinKeys
@@ -590,7 +601,6 @@ proc loadUserConfigFile*(commandName: string,
       quit()
 
   samiConfig = ctxSamiConf.loadSamiConfig()
-  let x = samiConfig.plugin["gitrepo"]
   doAdditionalValidation()
 
   if loaded:

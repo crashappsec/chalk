@@ -164,15 +164,15 @@ proc yieldFileStream*(sami: SamiObj) =
 proc dispatchFileScan(self:       Codec,
                       filepath:   string,
                       top:        string,
-                      exclusions: var seq[string]): bool =
+                      exclusions: var seq[string]): (bool, bool) =
   let
     sami      = SamiObj(fullpath: filepath, toplevel: top, stream: nil)
     `stream?` = sami.acquireFileStream()
 
   if `stream?`.isNone():
-    return false
+    return (false, true)
 
-  result = self.scan(sami)
+  let success = self.scan(sami)
 
   # If a file scan registers interest, returning the file will
   # automatically lead to the scan loop exclusing that file.  However,
@@ -180,7 +180,7 @@ proc dispatchFileScan(self:       Codec,
   # without polluting the method signature with rarely used variables.
   # So we'll check sami.exclude here, for extra exclusions.
 
-  if result:
+  if success:
     if len(sami.exclude) != 0:
       for item in sami.exclude:
         exclusions.add(item)
@@ -188,10 +188,10 @@ proc dispatchFileScan(self:       Codec,
     if sami.primary.present:
       self.loadSamiLoc(sami)
     sami.yieldFileStream()
-    return true # Found a codec to handle.
+    return (true, StopScan in sami.flags)  # Found a codec to handle.
   else:
     sami.closeFileStream()
-    return false # This codec isn't handling.
+    return (false, false) # This codec isn't handling.
 
 proc mustIgnore*(path: string, globs: seq[Glob]): bool {.inline.} =
   for item in globs:
@@ -203,7 +203,7 @@ proc doScan*(self:       Codec,
              searchPath: seq[string],
              exclusions: var seq[string],
              ignoreList: seq[Glob],
-             recurse:    bool) =
+             recurse:    bool): bool =
   ## Generate a list of all insertion/extraction points this codec
   ## belives it is responsible for, placing the resulting SamiPoint
   ## objects into the `samis` field, whether or not there is a SAMI
@@ -220,6 +220,8 @@ proc doScan*(self:       Codec,
   ## for instance, in client-side JavaScript.  Therefore, it's up to
   ## the concrete codec implementation to check for this condition
   ## and warn / error as appropriate.
+  result = true # Default is to keep scanning
+
   if len(searchPath) != 0:
     self.searchPath = searchPath
   else:
@@ -240,8 +242,11 @@ proc doScan*(self:       Codec,
       if path.mustIgnore(ignoreList):
         continue
       trace(fmtTraceScanFileP.fmt())
-      if self.dispatchFileScan(path, path, exclusions):
+      let (handling, stop) = self.dispatchFileScan(path, path, exclusions)
+      if handling:
         exclusions.add(path)
+      if stop:
+        return false
     elif recurse:
       dirWalk(true):
         if item in exclusions:
@@ -251,8 +256,11 @@ proc doScan*(self:       Codec,
         if getFileInfo(item).kind != pcFile:
           continue
         trace(fmtTraceScanFile.fmt())
-        if self.dispatchFileScan(item, path, exclusions):
+        let (handling, stop) = self.dispatchFileScan(item, path, exclusions)
+        if handling:
           exclusions.add(item)
+        if stop:
+          return false
     else:
       dirWalk(false):
         if item in exclusions:
@@ -262,25 +270,34 @@ proc doScan*(self:       Codec,
         if getFileInfo(item).kind != pcFile:
           continue
         trace(fmt"Non-recursive dir walk examining: {item}")
-        if self.dispatchFileScan(item, path, exclusions):
+        let (handling, stop) = self.dispatchFileScan(item, path, exclusions)
+        if handling:
           exclusions.add(item)
+        if stop:
+          return false
 
 method getArtifactHash*(self: Codec, sami: SamiObj): string {.base.} =
   raise newException(Exception, ePureVirtual)
+
+proc processRawHash*(rawHash: string,
+                     time:    uint64 = unixTimeInMs()): (string, string) =
+  ## Return (hash, hash-as-ulid)
+  var
+    encodedHash = rawHash.toHex().toLowerAscii()
+    ulidHiBytes  = rawHash[^10 .. ^9]
+    ulidLowBytes = rawHash[^8 .. ^1]
+    ulidHiInt    = (cast[ptr uint16](addr ulidHiBytes[0]))[]
+    ulidLowInt   = (cast[ptr uint64](addr ulidLowBytes[0]))[]
+    ulid         = encodeUlid(time, ulidHiInt, ulidLowInt)
+
+  return (encodedHash, ulid)
 
 method getArtifactInfo*(self: Codec, sami: SamiObj): KeyInfo =
   result = newTable[string, Box]()
 
   var
-    hashFilesBox = pack(@[sami.fullpath])
-    rawHash      = self.getArtifactHash(sami)
-    encodedHash  = rawHash.toHex().toLowerAscii()
-    ulidHiBytes  = rawHash[^10 .. ^9]
-    ulidLowBytes = rawHash[^8 .. ^1]
-    ulidHiInt    = (cast[ptr uint16](addr ulidHiBytes[0]))[]
-    ulidLowInt   = (cast[ptr uint64](addr ulidLowBytes[0]))[]
-    now          = unixTimeInMs()
-    samiId       = encodeUlid(now, ulidHiInt, ulidLowInt)
+    hashFilesBox          = pack(@[sami.fullpath])
+    (encodedHash, samiId) = processRawHash(self.getArtifactHash(sami))
 
   result["HASH"]          = pack(encodedHash)
   result["HASH_FILES"]    = hashFilesBox
@@ -306,7 +323,7 @@ import plugins/ciGithub
 import plugins/conffile
 import plugins/codecShebang
 import plugins/codecElf
-import plugins/codecGitRepo
+import plugins/codecContainer
 import plugins/custom
 import plugins/ownerAuthors
 import plugins/ownerGithub

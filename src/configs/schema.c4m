@@ -334,12 +334,13 @@ plugin shebang {
     keys: []
 }
 
-plugin gitrepo {
+plugin container {
     codec:    true
     keys:     []
-    priority: -1    # If enabled, you probably want this running first.
-    enabled: false
+    priority: low()
+    enabled:  true
 }
+
 
 # Probably should add file time of artifact, date of branch
 # and any tag associated.

@@ -108,8 +108,11 @@ when isMainModule:
 
   cmdLine.addCommand("insert", ["inject", "ins", "in", "i"]).
             addArgs(callback = setArtifactSearchPath).
-            addPairedFlag('r', 'R', "recursive", setRecursive)
-
+            addPairedFlag('r', 'R', "recursive", setRecursive).
+            addFlagWithStrArg('I', "container-image-id", setContainerImageId).
+            addFlagWithStrArg('N',
+                              "container-image-name",
+                              setContainerImageName)
   cmdLine.addCommand("extract", ["ex", "e"]).
             addArgs(callback = setArtifactSearchPath).
             addPairedFlag('r', 'R', "recursive", setRecursive)
