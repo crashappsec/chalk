@@ -161,9 +161,12 @@ proc samiErrFilter(msg: string, info: StringTable): (string, bool) =
       return (msg, true)
   return ("", false)
 
-let errSinkObj  = SinkRecord(outputFunction: samiErrSink)
+let errSinkObj = SinkRecord(outputFunction: samiErrSink)
+
 registerSink("sami-err-log", errSinkObj)
-let errCfg      = configSink(errSinkObj,  filters = @[MsgFilter(samiErrFilter)]).get()
+
+let errCfg = configSink(errSinkObj, filters = @[MsgFilter(samiErrFilter)]).get()
+
 subscribe("logs", errCfg)
 
 proc logBase(ll: string, args: seq[Box], globals: Con4mScope): Option[Box] =

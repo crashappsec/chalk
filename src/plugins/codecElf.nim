@@ -10,7 +10,6 @@ const
   wsOffsetLoc  = 0x04
   is64BitVal   = char(0x02)
   bigEndianVal = char(0x02)
-  magicSwapped = "\xed\xbb\xda\xba\xab\xed\xdf\xda"
   elfMagic     = 0x7f454c46'u32
   elfSwapped   = 0x464c457f'u32
 
@@ -33,9 +32,9 @@ proc extractKeyMetadata*(self: CodecElf, sami: SamiObj): bool =
                     false
 
   var rawBytes: uint64
-  var shStart: uint64
-  var present: bool
-  var offset: int
+  var shStart:  uint64
+  var present:  bool
+  var offset:   int
 
   if isBigEndian:
     sami.flags.incl(BigEndian)
@@ -59,16 +58,10 @@ proc extractKeyMetadata*(self: CodecElf, sami: SamiObj): bool =
     sami.stream.setPosition(int(shStart))
     let
       secHdr = sami.stream.readAll()
-      offset1 = secHdr.find(magicBin)
-      offset2 = secHdr.find(magicSwapped)
-
-    #let total = len(secHdr) + int(shStart)
+      offset1 = secHdr.find(magicUTF8)
 
     if offset1 != -1:
       offset = int(shStart) + offset1
-      present = true
-    elif offset2 != -1:
-      offset = int(shStart) + offset2
       present = true
     else:
       offset = int(shStart) + secHdr.len()
@@ -104,6 +97,7 @@ method getArtifactHash*(self: CodecElf, sami: SamiObj): string =
   var shaCtx = initSHA[SHA256]()
   let offset = sami.primary.startOffset
 
+  error("Offset: " &  $offset)
   sami.stream.setPosition(0)
   shaCtx.update(sami.stream.readStr(offset))
 
