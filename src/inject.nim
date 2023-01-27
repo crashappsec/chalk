@@ -12,7 +12,14 @@
 import options, tables, streams, strutils, strformat, os, std/tempfiles
 import nimutils, config, plugins, extract, io/tojson, builtins
 
-const requiredCodecKeys = ["ARTIFACT_PATH", "HASH", "HASH_FILES", "SAMI_ID"]
+const
+  codecOnlyKeys = ["ARTIFACT_PATH",
+                   "HASH",
+                   "HASH_FILES",
+                   "COMPONENT_HASHES",
+                   "SAMI_ID"]
+  optionalCodecKeys = ["COMPONENT_HASHES"]
+
 
 var systeMetsys: array[2, Plugin]
 
@@ -129,8 +136,8 @@ proc doInjection*() =
 
       trace(fmt"{path}: Codec '{name}' beginning metadata collection.")
 
-      for key in requiredCodecKeys:
-        if key notin keyInfo:
+      for key in codecOnlyKeys:
+        if key notin keyInfo and key notin optionalCodecKeys:
           error(fmt"{name}: Did not provide required key {key} for " &
                 fmt"artifact at: {infoObj.full_path}")
           continue
