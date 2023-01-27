@@ -303,8 +303,18 @@ key METADATA_ID {
 		  "current time."
 }
 
+key SIGN_PARAMS {
+    type:         "{string: string}"
+    since:        "0.1.0"
+    system:       true
+    standard:     true
+    output_order: high() - 1
+    in_ptr:       true
+    docstring:    "Signing parameters for digital signatures."
+}
+
 key SIGNATURE {
-    type:         "{string : string}"
+    type:         "string"
     since:        "0.1.0"
     system:       true
     standard:     true
