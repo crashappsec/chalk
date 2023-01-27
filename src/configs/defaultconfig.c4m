@@ -104,44 +104,35 @@ func osx_host_info() {
 func linux_host_info() {
   hostinfo_cmd := "uname -a"
   platuuid_cmd := "cat /sys/class/dmi/id/board_serial /etc/machine-id " +
-                      "/sys/class/dmi/id/product_uuid"
-  ifaces_cmd   := "for i in $(ifconfig -lu); do if ifconfig $i | " +
-                  "grep -q \"status: active\" ; then echo $i\:; fi; done; "
-  ifcfg_cmd    := "ifconfig "
-  extip_cmd    := "/usr/bin/dig +short myip.opendns.com @resolver1.opendns.com"
+                      "/sys/class/dmi/id/product_uuid 2>/dev/null"
+  ifcfg_cmd    := "ifconfig 2>/dev/null"
+  extip_cmd    := "dig +short myip.opendns.com @resolver1.opendns.com 2>/dev/null"
   gip_cmd_pre  := "curl \"https://api.geoiplookup.net/?query="
   gip_cmd_post := "&json=true\" 2>/dev/null"
 
 
   hostinfo     := strip(run(hostinfo_cmd))
   platuuid     := strip(run(platuuid_cmd))
-  iface_str    := slice(strip(run(ifaces_cmd)), 0, -2)
   extip        := strip(run(extip_cmd))
   myip         := strip(run(extip_cmd))
-  gipinfo      := run(gip_cmd_pre + myip + gip_cmd_post)
-  ifaces       := split(iface_str, ":")
-  iface_detail := ""
-
-  for i from 0 to len(ifaces) {
-    iface_detail := iface_detail + run(ifcfg_cmd + strip(ifaces[i]))
-
-  }
+  gipinfo      := strip(run(gip_cmd_pre + myip + gip_cmd_post))
+  iface_detail := strip(run(ifcfg_cmd))
 
   result := "[[Host Info]]\n" + hostinfo + "\n\n[[Host UUID]]\n" + platuuid
-  result := result + "\n\n[[Active Interfaces]]" + iface_detail
-  result := result + "\n\n[[External Host Info]]" + gipinfo
+  result := result + "\n\n[[Active Interfaces]]\n" + iface_detail
+  result := result + "\n\n[[External Host Info]]\n" + gipinfo
 
   return result
 }
 
-osName := osname()
+os := osname()
 
 hostinfo := ""
 
-if osName == "Darwin" {
+if os == "Darwin" {
    hostinfo := osx_host_info()
 }
-elif osName == "Linux" {
+elif contains(os, "Linux") {
    hostinfo := linux_host_info()
 }
 else {
@@ -149,7 +140,7 @@ else {
 }
 
 if len(hostinfo) > 0 {
-  #echo(hostinfo)
+  echo(hostinfo)
 
   key INSERTION_HOSTINFO {
     value: strip(hostinfo)
