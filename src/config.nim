@@ -304,6 +304,9 @@ proc getKeySpec*(name: string): Option[SamiKeySection] =
 proc setKeyValue*(sec: SamiKeySection, b: Option[Box]) =
   sec.value = b
 
+proc getStandard*(key: SamiKeySection): bool =
+  return key.standard
+
 proc orderKeys*(keys: openarray[string]): seq[string] =
   var list: seq[(int, string)] = @[]
 
@@ -312,7 +315,10 @@ proc orderKeys*(keys: openarray[string]): seq[string] =
   for key in keys:
     try:
       let spec = getKeySpec(key).get()
-      list.add((spec.outputOrder, key))
+      if spec.getStandard():
+        list.add((spec.outputOrder, key))
+      else:
+        list.add((defaultKeyPriority, key))
     except:
       warn(fmt"Unknown key found in extraction: {key}")
       list.add((defaultKeyPriority, key))
@@ -344,9 +350,6 @@ proc getSystem*(key: SamiKeySection): bool =
 
 proc getSquash*(key: SamiKeySection): bool =
   return key.squash
-
-proc getStandard*(key: SamiKeySection): bool =
-  return key.standard
 
 proc getMustForce*(key: SamiKeySection): bool =
   return key.mustForce

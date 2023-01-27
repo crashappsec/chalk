@@ -4,13 +4,19 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, strutils, nimSHA2, nimutils
+import tables, options, strutils, nimSHA2, nimutils, con4m
 import ../config, ../plugins, ../io/tobinary
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 
 type MetsysPlugin* = ref object of Plugin
+
+const
+  callbackName    = "sign"
+  callbackTypeStr = "f(string, string) -> (string, {string: string})"
+let
+  callbackType    = callbackTypeStr.toCon4mType()
 
 proc processOldSami(sami: SamiObj, olddict: SamiDict): Box =
   var groomedDict: SamiDict = newTable[string, Box]()
@@ -69,7 +75,25 @@ method getArtifactInfo*(self: MetsysPlugin,
     now          = unixTimeInMs()
     metaId       = encodeUlid(now, ulidHiInt, ulidLowInt)
 
+
   result["METADATA_HASH"] = pack(metahash.toHex().toLowerAscii())
   result["METADATA_ID"]   = pack(metaId)
 
+  let optSigInfo = scall(getConfigState(),
+                         callbackName,
+                         @[sami.newFields["HASH"], pack(metaId)],
+                         callbackType)
+
+  if optSigInfo.isSome():
+    let
+      res  = optSigInfo.get()
+      tup  = unpack[seq[Box]](res)
+      hash = unpack[string](tup[0])
+
+    if hash != "":
+      result["SIGNATURE"]   = tup[0]
+      result["SIGN_PARAMS"] = tup[1]
+
 registerPlugin("metsys", MetsysPlugin())
+
+registerCon4mCallback("sign", callbackTypeStr)
