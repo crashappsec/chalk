@@ -6,8 +6,8 @@ const
   binIntItemFmt  = "\x02{u64ToStr(uint64(i))}"
   binTrue        = "\x03\x01"
   binFalse       = "\x03\x00"
-  binArrStartFmt = "\x05{u32ToStr(uint32(len(arr)))}"
-  binObjHdr      = "\x06{u32ToStr(uint32(len(self)))}"
+  binArrStartFmt = "\x04{u32ToStr(uint32(len(arr)))}"
+  binObjHdr      = "\x05{u32ToStr(uint32(len(self)))}"
 
 
 proc u32ToStr*(i: uint32): string =
