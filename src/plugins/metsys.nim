@@ -1,3 +1,9 @@
+## The system plugin that runs LAST and deals with things that *must*
+## come last, such as hashing, digital signatures, etc.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import tables, options, strutils, nimSHA2, nimutils
 import ../config, ../plugins, ../io/tobinary
 

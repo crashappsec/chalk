@@ -1,3 +1,13 @@
+## This is the focal point for most of the metadata gathering. While
+## it's called from several commands, once the context comes to a
+## single artifact, a lot of the work runs through here.
+##
+## This file itself provides base types for Plugin and Codec (a type
+## of Plugin), and functions that manage dispatching to them, etc.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import os, tables, strformat, strutils, algorithm, streams, options, glob
 import con4m, nimutils, config, io/[fromjson, json]
 

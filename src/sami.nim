@@ -25,7 +25,7 @@
 ## 9) **Publish defaults**, if doing so was requested.
 ##
 ## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023
+## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import tables, nativesockets, json, strutils, os, options
 # Note that importing builtins causes topics to register, and

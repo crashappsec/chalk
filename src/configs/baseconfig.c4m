@@ -1,4 +1,11 @@
+## This is where we provide sane defaults for I/O.  SAMI is very
+## flexible in this regard, and almost nothing is hardcoded.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 ## STARTUP CONFIGURATION
+
 if envExists("NO_COLOR") {
   color: false
 } else {

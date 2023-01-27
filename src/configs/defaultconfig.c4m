@@ -1,3 +1,34 @@
+## This is the default startup configuration that ships with SAMI. It
+## runs after the base configuration. By default, not much happens
+## here; there's a bit of example code that shows off I/O
+## configuration, that doubles as an example to show how to allow
+## people to use environment variables of your choosing, to set
+## important configuration parameters, but otherwise is intended for
+## you to customize.
+##
+## This config is meant to be edited and reloaded by users, and can be
+## used to embed defaults for any of SAMI's con4m configuration
+## variables.
+##
+## To do that, one can use the 'confdump' command to get the current
+## config, and the 'confload' command to load a new one.
+##
+## Note that the initial I/O setup can be overridden here, but is
+## codified in baseconfig.c4m to make sure that it is easy to get to a
+## good known state if there are catastrophic configuration mistakes.
+##
+## Also, if allowed by this file (and by default, it's allowed), it
+## is possible to run an external configuration file.  Generally, the
+## best use for such a file is testing functionality before loading it
+## into this default configuration! It tends to make debugging problems
+## much easier.
+##
+## Note that configuration flags will override config files, except in
+## some cases where the config file explicitly disallows such overrides.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 # If not provided, log_level will default to "warn".
 # Options for log_level are:
 # "trace" (show verbose messages)

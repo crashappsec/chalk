@@ -1,3 +1,10 @@
+## The plugin responsible for pulling metadata from the git
+## repository. Leverages the lightweight parsing of the .git directory
+## we do in io/gitConfig.nim.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import os, streams, tables, strutils, strformat
 import nimutils, ../config, ../plugins, ../io/gitConfig
 

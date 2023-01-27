@@ -1,3 +1,14 @@
+## This is the implementation of the 'insert' / 'inject' command, and
+## basically orchestrates collecting data from plugins and calling out
+## to do actual outputting.
+##
+## Once logic gets into the realm of a single plugin / codec, the
+## implementation moves mainly to plugin.c (the plugins themselves
+## generally are never going to be very big).
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import options, tables, streams, strutils, strformat, os, std/tempfiles
 import nimutils, config, plugins, extract, io/tojson, builtins
 

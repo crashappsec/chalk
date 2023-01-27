@@ -1,3 +1,8 @@
+## Looks for and parses github CODEOWNERS files.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import tables, streams, strutils, strformat, os, glob
 import nimutils, ../config, ../plugins
 

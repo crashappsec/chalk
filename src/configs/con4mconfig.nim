@@ -3,6 +3,9 @@
 ## will use for config file layering.
 ##
 ## This will create a number of types for us.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import con4m, options, nimutils, tables
 

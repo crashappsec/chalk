@@ -1,3 +1,8 @@
+## Turn a set of SAMI metadata key-value pairs into a JSON Sami object.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import tables, options, strformat, strutils, std/json, ../config, nimutils
 
 const

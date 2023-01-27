@@ -1,3 +1,9 @@
+## The system plugin that runs FIRST.  Though, there's not really much
+## that HAD to happen first.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import tables, options
 import nimutils, ../config, ../plugins, ../extract
 

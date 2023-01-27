@@ -1,3 +1,21 @@
+## Our kind of janky help system. It basically at compile time embeds
+## the src/help directory into a dictionary, so you can look up help
+## topics.  The only other thing is does is some basic format
+## substitution, which is definitely janky.
+##
+## I was originally expecting to pick a markdown variant, and to
+## figure out the best approach for ANSI color formatting (which
+## mostly lives in the nimutils library). But, the few existing
+## markdown parsers for Nim all go STRAIGHT to html which doesn't help
+## us for terminal output.  And I sure didn't want to write a full
+## Markdown parser for any variant... but probably will eventually.
+##
+## Until then, what's here is good enough.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
+
 import unicode, tables, os, nimutils, std/terminal, defaults,  options,
        formatstr, builtins
 from strutils import replace, split, find

@@ -1,3 +1,8 @@
+## Pull metadata from the local .git directory, when available.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 # TODO: This doesn't handle the include.path mechanism yet
 # TODO: Some more grace on parse errors.
 #

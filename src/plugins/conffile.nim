@@ -1,3 +1,9 @@
+## This plugin uses information from the config file to set metadata
+## keys.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import tables, options, nimutils, ../config, ../plugins, formatstr
 
 when (NimMajor, NimMinor) < (1, 7):

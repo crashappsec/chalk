@@ -1,3 +1,10 @@
+## This module implements both the "defaults" command, and the similar
+## --publish-defaults functionality for other commands.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
+
 import tables, options, strutils, strformat, unicode
 import nimutils, config, builtins
 

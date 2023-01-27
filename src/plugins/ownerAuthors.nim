@@ -1,3 +1,8 @@
+## Plugin that looks for an old school AUTHOR/AUTHORS file.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import tables, os, streams, strformat, nimutils, ../config, ../plugins
 
 const

@@ -1,3 +1,13 @@
+## This is the first configuration file loaded, and basically provides
+## data and defaults. The bulk of it specifies the default metadata
+## schema (key blocks).
+##
+## There's also metadata about the plugin modules and sinks we have
+## available.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 ## SAMI SCHEMA
 sami_version := "0.2.0"
 ascii_magic  := "dadfedabbadabbed"

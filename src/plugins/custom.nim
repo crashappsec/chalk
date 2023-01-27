@@ -1,5 +1,9 @@
-# Allows people do do custom metadata keys via the con4m callback
-# custom_metadata.
+## This plugin allows people do do custom metadata keys via the con4m
+## callback custom_metadata.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import tables, options, nimutils, streams, ../config, ../plugins
 import con4m/[eval, st]
 

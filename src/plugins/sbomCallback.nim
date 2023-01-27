@@ -1,3 +1,9 @@
+## A plugin providing a specific callback intended for having con4m
+## collect SBOM information, most likely through an external command.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import options, tables
 import nimutils/box, con4m/[eval, st], ../config, ../plugins
 

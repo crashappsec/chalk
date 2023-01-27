@@ -1,3 +1,8 @@
+## Read a SAMI from a file that has embedded JSON.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import tables, strformat, streams, nimutils, ../config, ./json
 
 const

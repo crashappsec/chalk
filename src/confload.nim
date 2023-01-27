@@ -1,3 +1,9 @@
+## This module implements the "confload" command, which loads a con4m
+## configuration into the SAMI embedded in the executable itself.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import con4m, con4m/eval, nimutils, options, os, streams, strformat, os
 import config, builtins, inject
 

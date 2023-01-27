@@ -1,3 +1,9 @@
+## Entry point for SAMI extraction, used both by the 'extract' command
+## and by most other commands that first scan and see what's already there.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import tables, strformat, strutils, os, options, nativesockets, json, glob
 import nimSHA2, nimutils, config, plugins, io/[tojson, tobinary]
 

@@ -1,3 +1,9 @@
+## This module implements the "delete" command, which deletes SAMIs from
+## artifacts.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import options, streams, strformat, os, std/tempfiles
 import nimutils, config, plugins, extract
 

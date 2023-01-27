@@ -1,3 +1,13 @@
+## Converts SAMI metadata keys into a canonical binary
+## representation. Originally, this was used to inject into binaries,
+## but we have moved that to JSON. This lives on though, to give us a
+## way to normalize metadata for hashing and/or signing.  We don't use
+## JSON for that, because it'd be too easy to lose interoperability if
+## people whiff on whatever we decide for how to handle spaces, etc.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import tables, options, strformat, strutils, nimutils, ../config
 
 const

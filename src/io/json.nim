@@ -1,3 +1,11 @@
+## Core JSON parsing library; we couldn't use the default NIM library
+## because it requires we know up front where the end of our input
+## is. But we don't know as there is no length encoded; we only find
+## out when we reach the end of the top-level object.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import strformat, tables, streams, unicode, parseutils, nimutils
 
 const

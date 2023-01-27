@@ -2,6 +2,12 @@
 ## specific to SAMI, including output setup and builtin con4m calls.
 ## That is, the output code and con4m calls here do not belong in
 ## con4m etc.
+##
+## Similarly, info about sinks and topics and other bits inherited
+## from nimtuils are here.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import config, streams, options, tables, strformat, uri
 import nimutils, con4m

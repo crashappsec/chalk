@@ -1,3 +1,10 @@
+## This plugin is responsible for providing metadata gleaned from a
+## github CI environment.
+##
+## :Author: Miroslav Shubernetskiy (miroslav@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
+
 import tables, strformat, strutils, os
 import nimutils, ../config, ../plugins
 

@@ -1,3 +1,14 @@
+## This is currently a bare-bones implementation for container
+## injection.  There is not yet functionality for deleting or
+## extracting data from containers, and even the insertion will not
+## actively place the metadata in containers, it just outputs it and
+## expects your tooling to insert it.  This certainly needs to all be
+## improved upon quickly!
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
+
 import os, tables, strutils, streams, nimutils, ../config, ../plugins, json
 
 when (NimMajor, NimMinor) < (1, 7):

@@ -1,3 +1,15 @@
+## A codec for ELF binaries. Currently, this takes the 'fast and easy'
+## approach, choosing the end of the ELF file, instead of inserting a
+## real section.
+##
+## We should eventually add another plugin that takes the other
+## approach, because some people might prefer to have more 'robust'
+## insertions.  By that, I mean our current approach can be accidentally
+## removed via the 'strip' command.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 import options, streams, strutils, endians
 import nimSHA2, ../config, ../plugins
 
@@ -12,7 +24,6 @@ const
   bigEndianVal = char(0x02)
   elfMagic     = 0x7f454c46'u32
   elfSwapped   = 0x464c457f'u32
-
 
 
 type CodecElf* = ref object of Codec
