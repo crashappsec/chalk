@@ -140,14 +140,25 @@ key HASH_FILES {
     output_order: low() + 12
     docstring:    "Files that constitute the artifact, and used in the hash, " +
                   "if not just the ARTIFACT_PATH"
+}
 
+key COMPONENT_HASHES {
+    type:         "[string]"
+    since:        "0.1.0"
+    codec:        true
+    standard:     true
+    output_order: low() + 13
+    docstring:    "When there are multiple files hashed for a single " +
+                  "artifact, this contains SHA256 hashes of the individual " +
+		  "component hashes. The ordering will match the order of " +
+		  " the HASH_FILES field"
 }
 
 key COMMIT_ID {
     type:         "string"
     since:        "0.1.0"
     standard:     true
-    output_order: low() + 13
+    output_order: low() + 14
     docstring:    "The commit hash or id for the repository the artifact was " +
                   "built from"
 }
@@ -156,7 +167,7 @@ key CODE_OWNERS {
     type:         "string"
     since:        "0.1.0"
     standard:     true
-    output_order: low() + 14
+    output_order: low() + 15
     docstring:    "Code owners associated with the artifact"
 }
 
@@ -164,7 +175,7 @@ key INJECTOR_ID {
     type:         "string"
     since:        "0.1.0"
     standard:     true
-    output_order: low() + 15
+    output_order: low() + 16
     docstring:    "SAMI ID of the sami binary that inserted metadata"
 }
 
@@ -173,7 +184,7 @@ key INJECTOR_VERSION {
     since:        "0.1.0"
     standard:     true
     system:       true
-    output_order: low() + 16
+    output_order: low() + 17
     docstring:    "Version of the SAMI binary used for injection"
 }
 
@@ -182,7 +193,7 @@ key INJECTOR_PLATFORM {
     since:        "0.1.0"
     standard:     true
     system:       true
-    output_order: low() + 17
+    output_order: low() + 18
     docstring:    "OS / system info at time of insertion"
 }
 
@@ -191,7 +202,7 @@ key INJECTOR_COMMIT_ID {
     since:        "0.1.0"
     standard:     true
     system:       true
-    output_order: low() + 18
+    output_order: low() + 19
     docstring:    "The commit hash or id from which the injector was built."
 }
 
@@ -199,14 +210,14 @@ key BUILD_ID {
     type:         "string"
     since:        "0.1.0"
     standard:     true
-    output_order: low() + 19
+    output_order: low() + 20
     docstring:    "The ID of the CI/CD job"
 }
 
 key BUILD_URI {
     type:         "string"
     since:        "0.1.0"
-    output_order: low() + 20
+    output_order: low() + 21
     standard:     true
     docstring:    "URI to the CI/CD job"
 }
@@ -214,7 +225,7 @@ key BUILD_URI {
 key BUILD_API_URI {
     type:         "string"
     since:        "0.1.0"
-    output_order: low() + 21
+    output_order: low() + 22
     standard:     true
     docstring:    "URI to the CI/CD api if more information needs to be queried"
 }
@@ -222,7 +233,7 @@ key BUILD_API_URI {
 key BUILD_TRIGGER {
     type:         "string"
     since:        "0.1.0"
-    output_order: low() + 22
+    output_order: low() + 23
     standard:     true
     docstring:    "What event triggered CI/CD job"
 }
@@ -230,7 +241,7 @@ key BUILD_TRIGGER {
 key BUILD_CONTACT {
     type:         "[string]"
     since:        "0.1.0"
-    output_order: low() + 23
+    output_order: low() + 24
     standard:     true
     docstring:    "List of contacts which triggered CI/CD job"
 }
@@ -324,8 +335,8 @@ key SIGNATURE {
 }
 
 # Doesn't do any keys other than the codec defaults, which are:
-# ARTIFACT_PATH, HASH, HASH_FILES.  Note that non-codecs cannot set
-# these keys.
+# ARTIFACT_PATH, HASH, HASH_FILES, COMPONENT_HASHES.  Note that
+# non-codecs cannot set these keys.
 
 plugin elf {
     codec: true

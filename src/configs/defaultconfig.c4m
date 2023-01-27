@@ -59,16 +59,92 @@ log_level: "info"
 # You can comment this out, and people will get a terse error message.
 default_command = "help"
 
-cmd  := argv0()
-args := argv()
+cmd     := argv0()
+args    := argv()
+ptr_url := ""
 
 ## KEY CONFIGURATION
 
-key INSERTION_HOSTINFO {
-    hostinfo, exitCode := system("uname -a")
-    if exitCode == 0 {
-      value: hostinfo
-    }
+fallback_cmd       := "uname -a"
+
+
+func osx_host_info() {
+  hostinfo_cmd := "uname -a"
+  platuuid_cmd := "/usr/sbin/ioreg -d2 -c IOPlatformExpertDevice | " +
+                  "awk -F\\\" '/IOPlatformUUID/{print $(NF-1)}'"
+  ifaces_cmd   := "for i in $(ifconfig -lu); do if ifconfig $i | " +
+                  "grep -q \"status: active\" ; then echo $i\:; fi; done; "
+  ifcfg_cmd    := "ifconfig "
+  extip_cmd    := "/usr/bin/dig +short myip.opendns.com @resolver1.opendns.com"
+  gip_cmd_pre  := "curl \"https://api.geoiplookup.net/?query="
+  gip_cmd_post := "&json=true\" 2>/dev/null"
+
+
+  hostinfo     := strip(run(hostinfo_cmd))
+  platuuid     := strip(run(platuuid_cmd))
+  iface_str    := slice(strip(run(ifaces_cmd)), 0, -2)
+  extip        := strip(run(extip_cmd))
+  myip         := strip(run(extip_cmd))
+  gipinfo      := run(gip_cmd_pre + myip + gip_cmd_post)
+  ifaces       := split(iface_str, ":")
+  iface_detail := ""
+
+  for i from 0 to len(ifaces) {
+    iface_detail := iface_detail + run(ifcfg_cmd + strip(ifaces[i]))
+
+  }
+
+  result := "[[Host Info]]\n" + hostinfo + "\n\n[[Host UUID]]\n" + platuuid
+  result := result + "\n\n[[Active Interfaces]]\n" + iface_detail
+  result := result + "\n\n[[External Host Info]]" + gipinfo
+
+  return result
+}
+
+func linux_host_info() {
+  hostinfo_cmd := "uname -a"
+  platuuid_cmd := "cat /sys/class/dmi/id/board_serial /etc/machine-id " +
+                      "/sys/class/dmi/id/product_uuid 2>/dev/null"
+  ifcfg_cmd    := "ifconfig 2>/dev/null"
+  extip_cmd    := "dig +short myip.opendns.com @resolver1.opendns.com 2>/dev/null"
+  gip_cmd_pre  := "curl \"https://api.geoiplookup.net/?query="
+  gip_cmd_post := "&json=true\" 2>/dev/null"
+
+
+  hostinfo     := strip(run(hostinfo_cmd))
+  platuuid     := strip(run(platuuid_cmd))
+  extip        := strip(run(extip_cmd))
+  myip         := strip(run(extip_cmd))
+  gipinfo      := strip(run(gip_cmd_pre + myip + gip_cmd_post))
+  iface_detail := strip(run(ifcfg_cmd))
+
+  result := "[[Host Info]]\n" + hostinfo + "\n\n[[Host UUID]]\n" + platuuid
+  result := result + "\n\n[[Active Interfaces]]\n" + iface_detail
+  result := result + "\n\n[[External Host Info]]\n" + gipinfo
+
+  return result
+}
+
+os := osname()
+
+hostinfo := ""
+
+if os == "Darwin" {
+   hostinfo := osx_host_info()
+}
+elif contains(os, "Linux") {
+   hostinfo := linux_host_info()
+}
+else {
+   hostinfo := run(fallback_cmd)
+}
+
+if len(hostinfo) > 0 {
+  echo(hostinfo)
+
+  key INSERTION_HOSTINFO {
+    value: strip(hostinfo)
+  }
 }
 
 ## I/O CONFIGURATION
@@ -88,12 +164,19 @@ if cmd == "extract" or cmd == "insert" or cmd == "delete" {
       sink_config("s3", "s3", { "secret" : env("AWS_ACCESS_SECRET"),
                                 "uid"    : env("AWS_ACCESS_ID"),
                                 "uri"    : env("AWS_S3_BUCKET_URI") }, [])
+      ptr_url := env("AWS_S3_BUCKET_URI")
       #  Stuff you might do if the sink is configured...
       # subscribe("insert", "s3")
       # subscribe("extract", "s3")
       # subscribe("delete", "s3")
       # unsubscribe("insert", "user_out")  # Stop JSON from going to console.
     }
+  }
+}
+
+if len(ptr_url) > 0 {
+  key SAMI_PTR {
+    value: ptr_url
   }
 }
 
