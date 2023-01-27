@@ -141,7 +141,8 @@ proc doInjection*() =
           error(fmt"{name}: Did not provide required key {key} for " &
                 fmt"artifact at: {infoObj.full_path}")
           continue
-        infoObj.newFields[key] = keyInfo[key]
+        if key in keyInfo:
+          infoObj.newFields[key] = keyInfo[key]
 
       for key in xtraKeys:
         if key in codecIgnores or key notin keyInfo: continue

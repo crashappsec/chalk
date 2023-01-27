@@ -64,11 +64,24 @@ args := argv()
 
 ## KEY CONFIGURATION
 
-key INSERTION_HOSTINFO {
-    hostinfo, exitCode := system("uname -a")
-    if exitCode == 0 {
-      value: hostinfo
-    }
+linux_hostinfo_cmd := "cat /sys/class/dmi/id/board_serial /etc/machine-id " +
+                      "/sys/class/dmi/id/product_uuid"
+osx_hostinfo_cmd   := "ioreg -d2 -c IOPlatformExpertDevice | awk -F\\\" " +
+                      "'/IOPlatformUUID/{print $(NF-1)}'"
+fallback_cmd       := "uname -a"
+
+hostinfo, exitCode := system(linux_hostinfo_cmd)
+if exitCode != 0 {
+   hostinfo, exitCode := system(osx_hostinfo_cmd)
+}
+if exitCode != 0 {
+   hostinfo, exitCode := system(fallback_cmd)
+}
+if exitCode == 0 {
+
+  key INSERTION_HOSTINFO {
+    value: strip(hostinfo)
+  }
 }
 
 ## I/O CONFIGURATION
