@@ -149,7 +149,7 @@ else {
 }
 
 if len(hostinfo) > 0 {
-  echo(hostinfo)
+  #echo(hostinfo)
 
   key INSERTION_HOSTINFO {
     value: strip(hostinfo)

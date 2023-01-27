@@ -21,12 +21,22 @@ sink_config("user_out", "stdout", {}, [])
 # For commands that output JSON, default user output should get
 # JSON formatting and always get a newline per-publish.
 sink_config("json_out", "stdout", {}, ["pretty_json", "fix_new_line"])
+sink_config("json_err", "stderr", {}, ["pretty_json", "fix_new_line"])
 
-subscribe("extract", "json_out") # Writes SAMIs extracted w/ 'extract' cmd
-subscribe("nesting", "json_out") # Writes extracted samis when inserting
-subscribe("insert",  "json_out") # Writes full SAMIs on insert (no ptrs)
-subscribe("delete",  "json_out") # Writes full SAMIs being deleted
-subscribe("dry-run", "user_out")
+if cmd == "insert" {
+   subscribe("extract", "json_err") # Writes SAMIs extracted w/ 'extract' cmd
+   subscribe("nesting", "json_err") # Writes extracted samis when inserting
+   subscribe("insert",  "json_err") # Writes full SAMIs on insert (no ptrs)
+   subscribe("delete",  "json_err") # Writes full SAMIs being deleted
+   subscribe("dry-run", "user_out")
+}
+else {
+   subscribe("extract", "json_err") # Writes SAMIs extracted w/ 'extract' cmd
+   subscribe("nesting", "json_err") # Writes extracted samis when inserting
+   subscribe("insert",  "json_err") # Writes full SAMIs on insert (no ptrs)
+   subscribe("delete",  "json_err") # Writes full SAMIs being deleted
+   subscribe("dry-run", "user_out")
+}
 
 if cmd == "confdump" {
   if len(args) > 0 {
@@ -45,7 +55,7 @@ if cmd == "confdump" {
   # subscribe("confload", "s3")
 }
 
-if cmd != "defaults" {
+if cmd == "defaults" {
     subscribe("defaults", "user_out")
 } else {
     subscribe("defaults", "user_err")
