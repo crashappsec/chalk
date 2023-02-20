@@ -243,7 +243,7 @@ root {
 
   field config_path {
     type:       "[string]"
-    default:    [".", "~"]
+    default:    [".", "~/.config/chalk", "~"]
     write_lock: true
   }
   field config_filename {
