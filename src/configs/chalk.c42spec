@@ -1,0 +1,345 @@
+## This is the con4m specification to enable con4m to automatically
+## validate chalk config files.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
+
+default_key_priority := 500
+
+object key {
+  user_def_ok:   false
+  gen_fieldname: "keys"
+  gen_typename:  "KeySpec"
+  gen_setters:   false
+
+  field required {
+    type:        "bool"
+    default:     false
+  }
+  field system {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field squash {
+    type:     "bool"
+    default:  false
+  }
+  field type {
+    type:      "typespec"
+    require:    true
+    write_lock: true
+  }
+  field value {
+    type:     "=type"
+    require:  false
+  }
+  field standard {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field since {
+    type:       "string"
+    require:    false
+    write_lock: true
+  }
+  field skip {
+    type:     "bool"
+    default:  false
+  }
+  field in_ptr {
+    type:     "bool"
+    default:  false
+  }
+  field output_order {
+    type:       "int"
+    default:     default_key_priority
+    range:       (0, high())
+    write_lock:  true
+    stack_limit: 0  # Can't be provided when stacking, just on first run.
+  }
+  field docstring {
+    type:     "string"
+    require:  false
+  }
+  field codec {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+}
+
+object plugin {
+  gen_fieldname: "plugins"
+  gen_typename:  "PluginSpec"
+  user_def_ok:   false
+  gen_setters:   false
+
+  field priority {
+    type:     "int"
+    default:  50
+    range:    (0, high())
+  }
+  field ignore {
+    type:    "[string]"
+    default: []
+  }
+  field codec {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field keys {
+    type:       "[string]"
+    require:    true
+    write_lock: true
+    validator:  "key_check"
+  }
+  field enabled {
+    type:    "bool"
+    default: true
+  }
+  field overrides {
+    type:    "[string]"
+    default: []
+  }
+  field uses_fstream {
+    type:       "bool"
+    default:    true
+    write_lock: true
+  }
+  field docstring {
+    type:    "string"
+    require: false
+  }
+}
+
+func key_check(keyname, value: [string]) {
+  sects := sections("key")
+
+  for i from 0 to len(value) {
+    if value[i] == "*" {
+      continue
+    }
+    if sects.contains(value[i]) {
+      continue
+    } else {
+      return "'" + value[i] + "' is not a valid (specified) key."
+    }
+  }
+  return ""
+}
+
+object sink {
+  gen_fieldname: "sinks"
+  gen_typename:  "SinkSpec"
+  gen_setters:   false
+  user_def_ok:   false
+
+  field uses_secret {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field uses_uid {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field uses_filename {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field uses_uri {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field uses_region {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field uses_headers {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field uses_cacheid {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field uses_aux {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field needs_secret {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field needs_uid {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field needs_filename {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field needs_uri {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field needs_region {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field needs_aux {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field needs_headers {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field needs_cacheid {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field docstring {
+    type:       "string"
+    require:    false
+    write_lock: true
+  }
+}
+
+root {
+  prologue: """
+# This file is auto-generated as part of the chalk build.
+# Please do NOT edit it. Edit the specification file from
+# which it was generated instead: src/configs/chalk.c42spec
+# That will trigger a rebuild.
+
+"""
+  gen_typename: "ChalkConfig"
+  gen_setters:  false
+  user_def_ok:  false
+
+  allow key    { }
+  allow plugin { }
+  allow sink   { }
+
+  field config_path {
+    type:       "[string]"
+    default:    [".", "~"]
+    write_lock: true
+  }
+  field config_filename {
+    type:      "string"
+    default:   "chalk.conf"
+    write_lock: true
+  }
+  field default_command {
+    type:       "string"
+    require:    false
+    choice:     ["help", "insert", "extract", "delete", "help",
+                 "defaults", "confdump"]
+    write_lock: true
+  }
+  field color {
+    type:    "bool"
+    require: false
+  }
+  field log_level {
+    type:    "string"
+    default: "warn"
+    choice:  ["verbose", "trace", "info", "warn", "error", "none"]
+  }
+  field chalk_log_level {
+    type:    "string"
+    default: "warn"
+    choice:  ["verbose", "trace", "info", "warn", "error", "none"]
+  }
+  field dry_run {
+    type:    "bool"
+    default: false
+  }
+  field ignore_broken_conf {
+    type:    "bool"
+    default: true
+  }
+  field con4m_pinpoint {
+    type:    "bool"
+    default: true
+  }
+  field con4m_traces {
+    type:    "bool"
+    default: false
+  }
+  field cache_fd_limit {
+    type:    "int"
+    default: 50
+    range:   (0, high())
+  }
+  field publish_audit {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field artifact_search_path {
+    type:    "[string]"
+    default: ["."]
+  }
+  field ignore_patterns {
+    type:    "[string]"
+    default: [".*/**", "*.txt", "*.json"]
+  }
+  field recursive {
+    type:    "bool"
+    default: true
+  }
+  field can_dump {
+    type:       "bool"
+    default:    true
+    write_lock: true
+  }
+  field can_load {
+    type:       "bool"
+    default:    true
+    write_lock: true
+  }
+  field container_image_id {
+    type:     "string"
+    default:  ""
+  }
+  field container_image_name {
+    type:     "string"
+    default:  ""
+  }
+  field allow_external_config {
+    type:       "bool"
+    default:    true
+    write_lock: true
+  }
+  field publish_defaults {
+    type:       "bool"
+    default:    false
+    write_lock: true
+  }
+  field publish_unmarked {
+    type:    "bool"
+    default: true
+  }
+}

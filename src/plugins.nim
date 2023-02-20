@@ -9,15 +9,15 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import os, tables, strformat, strutils, algorithm, streams, options, glob
-import con4m, nimutils, config, io/[fromjson, json]
+import con4m, nimutils, types, config, io/[fromjson, json]
 
 const
   fmtTraceScanFile  = "{item}: scanning file"
   fmtTraceScanFileP = "{path}: scanning file"
-  fmtTraceFIP       = "{sami.fullpath}: Found @{$pt.startOffset}"
-  eBadBin           = "{sami.fullpath}: Found binary SAMI magic, " &
-                      "but SAMI didn't parse"
-  eBadJson          = "{sami.fullpath}: Invalid input JSON in file"
+  fmtTraceFIP       = "{chalk.fullpath}: Found @{$pt.startOffset}"
+  eBadBin           = "{chalk.fullpath}: Found binary chalk magic, " &
+                      "but chalk didn't parse"
+  eBadJson          = "{chalk.fullpath}: Invalid input JSON in file"
   ePathNotFound     = "{path}: No such file or directory"
   ePureVirtual      = "Method is not defined; it must be overridden"
 
@@ -51,7 +51,7 @@ proc getPluginsByPriority*(): seq[Plugin] =
 
   for name, plugin in installedPlugins:
     # This may need to be refreshed; the config can be updated
-    # after the self-sami loads.
+    # after the self-chalk loads.
     plugin.configInfo = getPluginConfig(name).get()
     if not plugin.configInfo.getEnabled():
       continue
@@ -69,7 +69,7 @@ proc getCodecsByPriority*(): seq[Codec] =
 
   for name, plugin in installedPlugins:
     # This may need to be refreshed; the config can be updated
-    # after the self-sami loads.
+    # after the self-chalk loads.
     plugin.configInfo = getPluginConfig(name).get()
     if not plugin.configInfo.getEnabled():
       continue
@@ -83,124 +83,126 @@ proc getCodecsByPriority*(): seq[Codec] =
   for (_, plugin) in preResult:
     result.add(plugin)
 
-method getArtifactInfo*(self: Plugin, sami: SamiObj): KeyInfo {.base.} =
+method getArtifactInfo*(self: Plugin, chalk: ChalkObj): KeyInfo {.base.} =
   var msg = "In plugin: " & self.name & ": " & ePureVirtual
   raise newException(Exception, msg)
 
-method doVirtualLoad*(self: Codec, sami: SamiObj): void {.base.} =
+method doVirtualLoad*(self: Codec, chalk: ChalkObj): void {.base.} =
   # Used to load a location when there's no file system object.
   var msg = "In plugin: " & self.name & ": " & ePureVirtual
   raise newException(Exception, msg)
 
-proc getSamis*(self: Codec): seq[SamiObj] {.inline.} =
-  return self.samis
+proc getChalks*(self: Codec): seq[ChalkObj] {.inline.} =
+  return self.chalks
 
-method scan*(self: Codec, sami: SamiObj): bool {.base.} =
+method scan*(self: Codec, chalk: ChalkObj): bool {.base.} =
   ## Return true if the codec is going to handle this file.  This
   ## function should add position information and presence
-  ## information into the sami.primary: SamiPoint object.
+  ## information into the chalk.primary: ChalkPoint object.
   ##
-  ## If the Codec handles embedded SAMIs, register them with
-  ## addEmbeddedSamiLoc()
+  ## If the Codec handles embedded chalks, register them with
+  ## addEmbeddedChalkLoc()
 
   discard
 
-proc loadSamiLoc(self: Codec, sami: SamiObj, pt: SamiPoint = sami.primary) =
-  var fields: SamiDict
+proc loadChalkLoc(self:  Codec,
+                  chalk: ChalkObj,
+                  pt:    ChalkPoint = chalk.primary) =
+  var fields: ChalkDict
 
   let swap = when system.cpuEndian == bigEndian:
-               if not BigEndian in sami.flags: true else: false
+               if not BigEndian in chalk.flags: true else: false
              else:
-               if BigEndian in sami.flags: true else: false
+               if BigEndian in chalk.flags: true else: false
 
   trace(fmtTraceFIP.fmt())
 
-  if SkipWrite in sami.flags:
-    self.doVirtualLoad(sami)
+  if SkipWrite in chalk.flags:
+    self.doVirtualLoad(chalk)
   else:
-    sami.stream.setPosition(pt.startOffset)
-    if not sami.stream.findJsonStart():
+    chalk.stream.setPosition(pt.startOffset)
+    if not chalk.stream.findJsonStart():
       pt.endOffset = pt.startOffset
       pt.valid = false
       return
 
-    var truestart = sami.stream.getPosition()
+    var truestart = chalk.stream.getPosition()
     try:
-      fields = sami.extractOneSamiJson()
-      pt.samiFields = some(fields)
+      fields = chalk.extractOneChalkJson()
+      pt.chalkFields = some(fields)
       pt.startOffset = truestart
-      pt.endOffset = sami.stream.getPosition()
+      pt.endOffset = chalk.stream.getPosition()
       pt.valid = true
     except:
       error(eBadJson.fmt() & ": " & getCurrentExceptionMsg())
       pt.startOffset = truestart
-      pt.endOffset = sami.stream.getPosition()
+      pt.endOffset = chalk.stream.getPosition()
       pt.valid = false
 
 var numCachedFds: int = 0
 
-proc acquireFileStream*(sami: SamiObj): Option[FileStream] =
-  if sami.stream == nil:
-    let handle = newFileStream(sami.fullpath, fmRead)
+proc acquireFileStream*(chalk: ChalkObj): Option[FileStream] =
+  if chalk.stream == nil:
+    let handle = newFileStream(chalk.fullpath, fmRead)
     if handle == nil:
-      error(fmt"{sami.fullpath}: could not open file.")
+      error(fmt"{chalk.fullpath}: could not open file.")
       return none(FileStream)
 
-    trace(fmt"{sami.fullpath}: File stream opened")
-    sami.stream = handle
+    trace(fmt"{chalk.fullpath}: File stream opened")
+    chalk.stream = handle
 
-    if numCachedFds < getCacheFdLimit():
+    if numCachedFds < chalkConfig.getCacheFdLimit():
       numCachedFds = numCachedFds + 1
 
     return some(handle)
   else:
-    result = some(sami.stream)
+    result = some(chalk.stream)
 
-proc closeFileStream*(sami: SamiObj) =
+proc closeFileStream*(chalk: ChalkObj) =
     try:
-      if sami.stream != nil:
-        sami.stream.close()
-        trace(fmt"{sami.fullpath}: File stream closed")
+      if chalk.stream != nil:
+        chalk.stream.close()
+        trace(fmt"{chalk.fullpath}: File stream closed")
     except:
-      warn(sami.fullpath & ": Error when attempting to close file.")
+      warn(chalk.fullpath & ": Error when attempting to close file.")
     finally:
-      sami.stream = nil
+      chalk.stream = nil
       numCachedFds -= 1
 
-proc yieldFileStream*(sami: SamiObj) =
-  if numCachedFds == getCacheFdLimit():
-    sami.closeFileStream()
+proc yieldFileStream*(chalk: ChalkObj) =
+  if numCachedFds == chalkConfig.getCacheFdLimit():
+    chalk.closeFileStream()
 
 proc dispatchFileScan(self:       Codec,
                       filepath:   string,
                       top:        string,
                       exclusions: var seq[string]): (bool, bool) =
   let
-    sami      = SamiObj(fullpath: filepath, toplevel: top, stream: nil)
-    `stream?` = sami.acquireFileStream()
+    chalk      = ChalkObj(fullpath: filepath, toplevel: top, stream: nil)
+    `stream?` = chalk.acquireFileStream()
 
   if `stream?`.isNone():
     return (false, true)
 
-  let success = self.scan(sami)
+  let success = self.scan(chalk)
 
   # If a file scan registers interest, returning the file will
   # automatically lead to the scan loop exclusing that file.  However,
   # we want to let codecs exclude multiple files if it makes sense,
   # without polluting the method signature with rarely used variables.
-  # So we'll check sami.exclude here, for extra exclusions.
+  # So we'll check chalk.exclude here, for extra exclusions.
 
   if success:
-    if len(sami.exclude) != 0:
-      for item in sami.exclude:
+    if len(chalk.exclude) != 0:
+      for item in chalk.exclude:
         exclusions.add(item)
-    self.samis.add(sami)
-    if sami.primary.present:
-      self.loadSamiLoc(sami)
-    sami.yieldFileStream()
-    return (true, StopScan in sami.flags)  # Found a codec to handle.
+    self.chalks.add(chalk)
+    if chalk.primary.present:
+      self.loadChalkLoc(chalk)
+    chalk.yieldFileStream()
+    return (true, StopScan in chalk.flags)  # Found a codec to handle.
   else:
-    sami.closeFileStream()
+    chalk.closeFileStream()
     return (false, false) # This codec isn't handling.
 
 proc mustIgnore*(path: string, globs: seq[Glob]): bool {.inline.} =
@@ -215,8 +217,8 @@ proc doScan*(self:       Codec,
              ignoreList: seq[Glob],
              recurse:    bool): bool =
   ## Generate a list of all insertion/extraction points this codec
-  ## belives it is responsible for, placing the resulting SamiPoint
-  ## objects into the `samis` field, whether or not there is a SAMI
+  ## belives it is responsible for, placing the resulting ChalkPoint
+  ## objects into the `chalks` field, whether or not there is a chalk
   ## there to extract.
   ##
   ## Whenever we identify files where we're the proper codec,
@@ -225,7 +227,7 @@ proc doScan*(self:       Codec,
   ## things).
   ##
   ## Note that, if we're scanning for extraction, in most contexts
-  ## we'd expect EITHER a single SAMI or a set of embedded SAMIs,
+  ## we'd expect EITHER a single chalk or a set of embedded chalks,
   ## but not both.  However, there could be exceptions to that rule,
   ## for instance, in client-side JavaScript.  Therefore, it's up to
   ## the concrete codec implementation to check for this condition
@@ -286,7 +288,7 @@ proc doScan*(self:       Codec,
         if stop:
           return false
 
-method getArtifactHash*(self: Codec, sami: SamiObj): string {.base.} =
+method getArtifactHash*(self: Codec, chalk: ChalkObj): string {.base.} =
   raise newException(Exception, ePureVirtual)
 
 proc processRawHash*(rawHash: string,
@@ -302,18 +304,18 @@ proc processRawHash*(rawHash: string,
 
   return (encodedHash, ulid)
 
-method getArtifactInfo*(self: Codec, sami: SamiObj): KeyInfo =
+method getArtifactInfo*(self: Codec, chalk: ChalkObj): KeyInfo =
   result = newTable[string, Box]()
 
   var
-    hashFilesBox          = pack(@[sami.fullpath])
-    (encodedHash, samiId) = processRawHash(self.getArtifactHash(sami))
+    hashFilesBox          = pack(@[chalk.fullpath])
+    (encodedHash, chalkId) = processRawHash(self.getArtifactHash(chalk))
 
   result["HASH"]          = pack(encodedHash)
   result["HASH_FILES"]    = hashFilesBox
-  result["ARTIFACT_PATH"] = pack(sami.fullpath)
-  result["SAMI_ID"]       = pack(samiId)
-  trace(fmt"samid: {samiId}")
+  result["ARTIFACT_PATH"] = pack(chalk.fullpath)
+  result["CHALK_ID"]       = pack(chalkId)
+  trace(fmt"chalkd: {chalkId}")
 
 method handleWrite*(self: Codec,
                     ctx: Stream,

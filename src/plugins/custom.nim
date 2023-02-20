@@ -4,7 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, nimutils, streams, ../config, ../plugins
+import tables, options, nimutils, streams, ../types, ../config, ../plugins
 import con4m/[eval, st]
 
 const pluginName       = "custom_metadata"
@@ -48,18 +48,17 @@ template processOneKeyType(cbNum: untyped, cbType: string) =
       result[k] = v
 
 method getArtifactInfo*(self: CustomMetadataPlugin,
-                        sami: SamiObj): KeyInfo =
+                        obj: ChalkObj): KeyInfo =
   result = newTable[string, Box]()
 
-  sami.stream.setPosition(0)
+  obj.stream.setPosition(0)
 
   let
-    contents = sami.stream.readAll()
-    args     = @[pack(sami.fullpath), pack(contents)]
-    state    = getConfigState()
-    optInfo1 = sCall(state, callback1Name, args, callback1Type)
-    optInfo2 = sCall(state, callback2Name, args, callback2Type)
-    optInfo3 = sCall(state, callback3Name, args, callback3Type)
+    contents = obj.stream.readAll()
+    args     = @[pack(obj.fullpath), pack(contents)]
+    optInfo1 = ctxChalkConf.sCall(callback1Name, args, callback1Type)
+    optInfo2 = ctxChalkConf.sCall(callback2Name, args, callback2Type)
+    optInfo3 = ctxChalkConf.sCall(callback3Name, args, callback3Type)
 
   processOneKeyType(1, "string")
   processOneKeyType(2, "int")

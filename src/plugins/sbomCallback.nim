@@ -5,7 +5,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import options, tables
-import nimutils/box, con4m/[eval, st], ../config, ../plugins
+import nimutils/box, con4m/[eval, st], ../types, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
@@ -18,12 +18,12 @@ let   callbackType    = callbackTypeStr.toCon4mType()
 type SbomCallbackPlugin* = ref object of Plugin
 
 method getArtifactInfo*(self: SbomCallbackPlugin,
-                        sami: SamiObj): KeyInfo =
+                        obj: ChalkObj): KeyInfo =
 
-  let optInfo = sCall(getConfigState(),
-                      callbackName,
-                      @[pack(sami.fullpath)],
-                      callbackType)
+  let
+    arg = @[pack(obj.fullpath)]
+    optInfo = ctxChalkConf.sCall(callbackName, arg, callbackType)
+
   if optInfo.isSome():
     let
       res = optinfo.get()

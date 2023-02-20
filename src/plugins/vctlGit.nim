@@ -6,7 +6,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import os, streams, tables, strutils, strformat
-import nimutils, ../config, ../plugins, ../io/gitConfig
+import nimutils, ../types, ../config, ../plugins, ../io/gitConfig
 
 const
   dirGit       = ".git"
@@ -43,14 +43,14 @@ type GitPlugin* = ref object of Plugin
   commitId:   string
   vcsDir*:    string
   origin:     string
-  samiPath:   string
+  chalkPath:   string
 
-template loadBasics(self: GitPlugin, sami: SamiObj) =
-  self.samiPath = sami.fullpath
-  self.vcsDir = findGitDir(self.samiPath)
+template loadBasics(self: GitPlugin, obj: ChalkObj) =
+  self.chalkPath = obj.fullpath
+  self.vcsDir = findGitDir(self.chalkPath)
   trace(trVcsDir.fmt())
 
-proc loadHead(self: GitPlugin, sami: SamiObj): bool =
+proc loadHead(self: GitPlugin, obj: ChalkObj): bool =
   # Don't want to commit to the order in which things get called,
   # so everything that might get called first someday calls this to
   # be safe.
@@ -148,8 +148,8 @@ proc calcOrigin(self: GitPlugin, conf: seq[SecInfo]): string =
   self.origin = ghLocal
   return ghLocal
 
-proc getOrigin(self: GitPlugin, sami: SamiObj): (bool, Box) =
-  if not self.loadHead(sami):
+proc getOrigin(self: GitPlugin, obj: ChalkObj): (bool, Box) =
+  if not self.loadHead(obj):
     return (false, nil)
 
   let
@@ -169,34 +169,34 @@ proc getOrigin(self: GitPlugin, sami: SamiObj): (bool, Box) =
 
 # Not sure I'm going to use this.  Stay tuned.
 #[
-proc getWorkingDir(self: GitPlugin, sami: SamiObj): (bool, Box) =
+proc getWorkingDir(self: GitPlugin, obj: ChalkObj): (bool, Box) =
   if self.vcsDir != "":
     return (true, pack(self.vcsDir.splitPath().head))
   return (false, nil)
 ]#
 
-proc getHead(self: GitPlugin, sami: SamiObj): (bool, Box) =
+proc getHead(self: GitPlugin, obj: ChalkObj): (bool, Box) =
   if self.commitID == "":
     return (false, nil)
   return (true, pack(self.commitID))
 
-proc getBranch(self: GitPlugin, sami: SamiObj): (bool, Box) =
+proc getBranch(self: GitPlugin, obj: ChalkObj): (bool, Box) =
   if self.branchName == "":
     return (false, nil)
   return (true, pack(self.branchName))
 
-method getArtifactInfo*(self: GitPlugin, sami: SamiObj): KeyInfo =
+method getArtifactInfo*(self: GitPlugin, obj: ChalkObj): KeyInfo =
   result = newTable[string, Box]()
 
-  self.loadBasics(sami)
+  self.loadBasics(obj)
 
   if self.vcsDir == "":
     return # No git directory, so no work to do.
 
   let
-    (originThere, origin) = self.getOrigin(sami)
-    (headThere, head) = self.getHead(sami)
-    (branchThere, name) = self.getBranch(sami)
+    (originThere, origin) = self.getOrigin(obj)
+    (headThere, head) = self.getHead(obj)
+    (branchThere, name) = self.getBranch(obj)
 
   if originThere: result["ORIGIN_URI"] = origin
   if headThere: result["COMMIT_ID"] = head

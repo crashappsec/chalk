@@ -1,5 +1,5 @@
 ## This module implements the "confload" command, which loads a con4m
-## configuration into the SAMI embedded in the executable itself.
+## configuration into the chalk embedded in the executable itself.
 ##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
@@ -9,16 +9,14 @@ import config, builtins, inject
 
 proc runCmdConfLoad*() =
   var newCon4m: string
-  let
-    ctxSamiConf = getConfigState()
-    filename    = getArgs()[0]
+  let filename = getArgs()[0]
 
   setArtifactSearchPath(@[resolvePath(getAppFileName())])
 
-  # The below protection is easily thwarted, especially since SAMI is open
-  # source.  So we don't try to guard against it too much.
+  # The below protection is easily thwarted, especially since chalk is
+  # open source.  So we don't try to guard against it too much.
   #
-  # Particularly, we'd happily inject a SAMI into a copy of the SAMI
+  # Particularly, we'd happily inject halk into a copy of the chalk
   # executable via just standard injection, which would allow us to
   # nuke any policy that locks loading.
   #
@@ -26,7 +24,7 @@ proc runCmdConfLoad*() =
   # the feature is here more to ensure there are clear operational
   # controls.
 
-  if not getCanLoad():
+  if not chalkConfig.getCanLoad():
     error("Loading embedded configurations is disabled.")
     return
 
@@ -54,63 +52,37 @@ proc runCmdConfLoad*() =
     # Now we need to validate the config, without stacking it over our
     # existing configuration. We really want to know that the file
     # will not only be a valid con4m file, but that it will meet the
-    # SAMI spec.
+    # chalk spec.
     #
-    # The only way we can be reasonably sure it will load is by running it
-    # once, as the spec validation check requires seeing the final
-    # configuration state.
+    # We go ahead and execute it, so that it can go through full
+    # validation, even though it could easily side-effect.
     #
-    # But, since configs are code that could have conditionals, evaluating
-    # isn't going to tell us whether the spec we're loading is ALWYS going to
-    # meet the spec, and has the unfortunate consequence of executing any
-    # side-effects that the code might have, which isn't ideal.
+    # To do that, we need to give it a valid base state, clear of any
+    # existing configuration.  So we stash the existing config state,
+    # reload the base configs, and then validate the existing spec.
     #
-    # Still, that's the best we can reasonably do, so we're going to go ahead
-    # and evaluate the thing once to give ourselves the best shot of detecting
-    # any errors early.  Since con4m is fully statically type checked, that
-    # does provide us a reasonable amount of confidence; the only issues we
-    # might have in the field are:
-    #
-    # 1) Spec validation failures when different conditional branches are taken.
-    # 2) Runtime errors, like index-out-of-bounds errors.
-    #
-    # To do this check, we first re-load the base configuration in a new
-    # universe, so that our checking doesn't conflict with our current
-    # configuration.
-    #
-    # Then, we nick the (read-only) schema spec and function table from the
-    # current configuration universe, to make sure we can properly check
-    # anything in the new configuration file.
-    #
-    # Finally, in that new universe, we "stack" the new config over the newly
-    # loaded base configuration.  The stack operation fully checks everything,
-    # so if it doesn't error, then we know the new config file is good enough,
-    # and we should load it.
+    # And then, of course, restore the old spec when done.
+
+    var
+      realEvalCtx = ctxChalkConf
+      realConfig  = chalkConfig
     try:
+      loadBaseConfiguration()
       var
-        builtins   = getCon4mBuiltins()
-        callbacks  = getCon4mCallbacks()
-        samiSpec   = newStringStream(samiSchema)
-        baseConfig = newStringStream(baseConfig)
         testConfig = newStringStream(newCon4m)
-        tree       = parse(samiSpec, "spec")
-        opt        = tree.evalTree(builtins, [], callbacks)
-        cnfObj     = opt.get() # This can break if the schema doesn't load.
-        baseStack  = cnfObj.stackConfig(baseConfig, "base")
-        `resConf?`: Option[Con4mScope]
+        tree       = parse(testConfig, filename)
 
-      cnfObj.spec = ctxSamiConf.spec
-      `resConf?`     = cnfObj.stackConfig(testConfig, "load candidate")
-
-      if `resConf?`.isNone():
-
-        error(fmt"{filename}: invalid configuration.")
-        if cnfObj.errors.len() != 0:
-          for err in cnfObj.errors:
-            error(err)
-        return
-
+      tree.checkTree(ctxChalkConf)
+      ctxChalkConf.preEvalCheck(c42Ctx)
+      tree.initRun(ctxChalkConf)
+      tree.evalNode(ctxChalkConf)
+      ctxChalkConf.validateState(c42Ctx)
+      # Replace the real state.
+      ctxChalkConf = realEvalCtx
+      chalkConfig  = realConfig
     except:
+      ctxChalkConf = realEvalCtx
+      chalkConfig  = realConfig
       publish("debug", getCurrentException().getStackTrace())
       error(fmt"Could not load config file: {getCurrentExceptionMsg()}")
       return
@@ -123,15 +95,15 @@ proc runCmdConfLoad*() =
     # tinkering with the config state.
     #
     # While we will leave any injection handlers in place, we will
-    # NOT use a SAMI pointer.
+    # NOT use a chalk pointer.
     #
     # These keys we are requesting are all in the base config, so
     # these lookups won't fail.
-    var samiPtrKey = getKeySpec("SAMI_PTR").get()
-    samiPtrKey.setKeyValue(none(Box))
+    var chalkPtrKey = getKeySpec("CHALK_PTR").get()
+    chalkPtrKey.setValue(none(Box))
 
-    var xSamiConfKey = getKeySpec("X_SAMI_CONFIG").get()
-    xSamiConfKey.setKeyValue(some(pack(newCon4m)))
+    var xChalkConfKey = getKeySpec("X_CHALK_CONFIG").get()
+    xChalkConfKey.setValue(some(pack(newCon4m)))
 
   trace(fmt"{filename}: installing configuration.")
   doInjection()

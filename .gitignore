@@ -1,8 +1,9 @@
 .TODO
-sami
+chalk
 # universal tags
 tags
 .DS_Store
 .vscode
-sami.conf
-sami.dSYM
+chalk.conf
+chalk.dSYM
+src/c4autoconf.nim

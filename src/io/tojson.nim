@@ -1,9 +1,10 @@
-## Turn a set of SAMI metadata key-value pairs into a JSON Sami object.
+## Turn a set of metadata key-value pairs into a JSON chalk object.
 ##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, strformat, strutils, std/json, ../config, nimutils
+import tables, options, strformat, strutils, std/json, nimutils
+import ../types, ../config
 
 const
   comfyItemSep = ", " # also used in extract.nim
@@ -11,8 +12,7 @@ const
   jSonObjFmt   = "{ $# }"
   jsonArrFmt   = "[ $# ]"
 
-
-proc foundToJson*(self: SamiDict): string
+proc foundToJson*(self: ChalkDict): string
 
 proc strValToJson*(s: string): string =
   # %* from the json module; this basically does any escaping
@@ -20,24 +20,17 @@ proc strValToJson*(s: string): string =
   # back to a string, with necessary quotes intact.
   return $( %* s)
 
-# This version of the function takes a SAMI dictionary object,
+# This version of the function takes a chalk dictionary object,
 # and is called on any nested / embedded objects; it reads from
 # the dict paramter, instead of the `newFields` item found in
-# the sami object.
+# the chalk object.
 #
 # Use the one below is for insertion.
-proc foundToJson*(self: SamiDict): string =
+proc foundToJson*(self: ChalkDict): string =
   var comma = ""
 
   for fullKey in getOrderedKeys():
     var outputKey = fullKey
-
-
-    if fullKey.contains("."):
-      let parts = fullKey.split(".")
-      if len(parts) != 2 or parts[1] != "json":
-        continue
-      outputKey = parts[0]
 
     if fullKey notin self:
       continue
@@ -51,27 +44,21 @@ proc foundToJson*(self: SamiDict): string =
 
   result = jSonObjFmt % [result]
 
-proc createdToJson*(sami: SamiObj, ptrOnly = false): string =
+proc createdToJson*(obj: ChalkObj, ptrOnly = false): string =
   var comma = ""
 
   for fullKey in getOrderedKeys():
     var outputKey = fullKey
 
-    if "." in fullKey:
-      let parts = fullKey.split(".")
-      if len(parts) != 2 or parts[1] != "json":
-        continue
-      outputKey = parts[0]
-
     # If this key is set, but ptrOnly is false, then we are
-    # outputting the "full" SAMI, in which case we do not
+    # outputting the "full" chalk, in which case we do not
     # write this field out.
-    if outputKey == "SAMI_PTR" and not ptrOnly:
+    if outputKey == "CHALK_PTR" and not ptrOnly:
       continue
 
     let spec = getKeySpec(fullKey).get()
 
-    if not sami.newFields.contains(fullKey):
+    if not obj.newFields.contains(fullKey):
       continue
 
     # Skip outputting this key if "skip" is set in the key's existing
@@ -79,7 +66,7 @@ proc createdToJson*(sami: SamiObj, ptrOnly = false): string =
     if spec.getSkip():
       continue
 
-    # If SAMI pointers are set up, and we're currently outputting
+    # If chalk pointers are set up, and we're currently outputting
     # a pointer, then we only output if the config has the in_ref
     # field set.
     if ptrOnly and not spec.getInPtr():
@@ -87,7 +74,7 @@ proc createdToJson*(sami: SamiObj, ptrOnly = false): string =
 
     let
       keyJson = strValToJson(outputKey)
-      valJson = boxToJson(sami.newFields[fullKey])
+      valJson = boxToJson(obj.newFields[fullKey])
 
     result = result & kvPairJFmt.fmt()
     comma = comfyItemSep

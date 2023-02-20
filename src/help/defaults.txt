@@ -3,7 +3,7 @@ Shows the results of evaluating the configuration, without actually doing any wo
 
 Even though they are related, there is a huge difference between the 'defaults' command and the --defaults flag.  They both dump the configuration after evaluating any config file, but they may easily produce different results.
 
-That's because SAMI uses {bold}con4m{reset} for configuration, which, while typically just looking like a regular config file, can have arbitrary code added, with conditionals, and so-on.  The default configuration does, for instance, configure different output handlers, depending on the command given.
+That's because chalk uses {bold}con4m{reset} for configuration, which, while typically just looking like a regular config file, can have arbitrary code added, with conditionals, and so-on.  The default configuration does, for instance, configure different output handlers, depending on the command given.
 
 Running {bold}{appName} defaults{reset} will therefore give you the information about the evaluation when you run the 'defaults' command.  Whereas, {bold}{appName} --publish-defaults extract{reset} will dump the config as it resolves when you run the 'extract' command, which could be very similar, or very different.
 

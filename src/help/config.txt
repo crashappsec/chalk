@@ -1,48 +1,48 @@
-%{H SAMI Configuration Files }%
+%{H Chalk Configuration Files }%
 
 In their simplest form, they are fairly typical key-value configuration files for setting default values:
 %{c
 color: true
 log_level: "warn" {brown}# Don't print out informational bits.
-key SAMI_PTR \{
+key CHALK_PTR \{
   {brown}# This field is meant to be a URL to redirect people from the artifact
   {brown}# to where the full metadata is kept.
-  value: {red}"https://www.myrepo.com/samilookup/$\{artifactid\}"
+  value: {red}"https://www.myrepo.com/chalklookup/$\{artifactid\}"
 \}
 }%
 
 There are a number of global options that can be configured.  See {bold}{appName} help globals{reset} for a list and description.
 
-Since SAMI's goal is to make it easy and flexible to capture arbitrary metadata about software artifacts, the fact that the world isn't homogenous requires a lot of flexibility. As a result, SAMI embeds a small, efficient language called {bold}con4m{reset} that can intertwine the two.
+Since chalk's goal is to make it easy and flexible to capture arbitrary metadata about software artifacts, the fact that the world isn't homogenous requires a lot of flexibility. As a result, chalk embeds a small, efficient language called {bold}con4m{reset} that can intertwine the two.
 
 For instance, if you have two data stores, one for things running AWS, and one for everything else, you could change the above code to do different things if AWS is going to get used.  For instance:
 
 %{c
-key SAMI_PTR \{
+key CHALK_PTR \{
   if envExists({red}"AWS_S3_BUCKET_URI"{cyan}) and envExists({red}"AWS_ACCESS_SECRET"{cyan}) \{
-    value: {red}"s3://some-bucket/sami-$\{artifactid\}"
+    value: {red}"s3://some-bucket/chalk-$\{artifactid\}"
   \} else \{
-    value: {red}"https://www.myrepo.com/samilookup/$\{artifactid\}"
+    value: {red}"https://www.myrepo.com/chalklookup/$\{artifactid\}"
   \}
 \}
 }%
 
-SAMI's got typical core data types, including strings, ints, floats, lists and dictionaries. Strings used as values need to be put in quotes.  See the con4m manual (link below) for more.
+Chalk has typical core data types, including strings, ints, floats, lists and dictionaries. Strings used as values need to be put in quotes.  See the con4m manual (link below) for more.
 
 %{h Configuration stacking}%
-SAMI configuration files {invert}stack{reset}. Specifically:
+Chalk configuration files {invert}stack{reset}. Specifically:
 
 - The system loads a base configuration file that loads the underlying schema and some core implementation details.
 
-- An 'embedded' configuration file loads, that is carried around with the SAMI executable (which can be changed). This configuration typically configures when and where to send different kinds of output, and can contain any custom metadata collection. See '{appName} help output' for more information on output.
+- An 'embedded' configuration file loads, that is carried around with the chalk executable (which can be changed). This configuration typically configures when and where to send different kinds of output, and can contain any custom metadata collection. See '{appName} help output' for more information on output.
 
 - A user configuration file loads.
 
 The result of the configuration file executing is a set of key / value pairs. For those pairs, items defined in the most recent configuration file take priority, unless fields get "locked" (primarily, key bits of the underlying metadata schema are locked to help ensure correct metadata collection).
 
-There are circumstances where, after the configuration file loads, SAMI may call back into it. For instance, callbacks can be used for user-defined SBOM collection, for creating a custom output sink, or for gathering custom metadata.
+There are circumstances where, after the configuration file loads, chalk may call back into it. For instance, callbacks can be used for user-defined SBOM collection, for creating a custom output sink, or for gathering custom metadata.
 
-Con4m's features are documented at {red}https://github.com/crashappsec/con4m{reset}. It comes with a number of built-in functions that can be called from the configuration file. SAMI exports all of those, and adds other builtins.
+Con4m's features are documented at {red}https://github.com/crashappsec/con4m{reset}. It comes with a number of built-in functions that can be called from the configuration file. chalk exports all of those, and adds other builtins.
 
 See {bold}{appName} help builtins{reset} for a list of builtin functions that can be called from the configuration file.
 

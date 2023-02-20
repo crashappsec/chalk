@@ -8,54 +8,54 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-## SAMI SCHEMA
-sami_version := "0.2.0"
+## CHALK SCHEMA
+chalk_version := "0.5.0"
 ascii_magic  := "dadfedabbadabbed"
 
-key _MAGIC json {
-    required:     true
-    system:       true
-    squash:       true
-    type:         "string"
-    value:        ascii_magic
-    standard:     true
-    since:        "0.1.0"
-    output_order: low()
-    in_ptr:       true
+key _MAGIC {
+    ~required:     true
+    ~system:       true
+    ~squash:       true
+    ~type:         "string"
+    ~value:        ascii_magic
+    ~standard:     true
+    ~since:        "0.1.0"
+    ~output_order: 0
+    ~in_ptr:       true
     docstring:    "Used to identify the start of JSON encoded output only"
 }
 
-key SAMI_ID {
-    required:     true
-    codec:        true
-    squash:       false
-    type:         "string"
-    standard:     true
-    since:        "0.1.0"
-    output_order: low() + 1
-    in_ptr:       true
+key CHALK_ID {
+    ~required:     true
+    ~codec:        true
+    ~squash:       false
+    ~type:         "string"
+    ~standard:     true
+    ~since:        "0.1.0"
+    ~output_order: 1
+    ~in_ptr:       true
     docstring:    "Unique luid with a 48 bit time stamp and 80 bit random value"
 }
 
-key SAMI_VERSION {
-    required:     true
-    system:       false
-    type:         "string"
-    value:        sami_version
-    standard:     true
-    since:        "0.1.0"
-    output_order: low() + 2
-    in_ptr:       true
+key CHALK_VERSION {
+    ~required:     true
+    ~system:       false
+    ~type:         "string"
+    ~value:        chalk_version
+    ~standard:     true
+    ~since:        "0.1.0"
+    ~output_order: 2
+    ~in_ptr:       true
     docstring:    "Spec version of inserted objects"
 }
 
-key SAMI_PTR {
-    required:     false
-    type:         "string"
-    standard:     true
-    since:        "0.1.0"
-    output_order: low() + 3
-    in_ptr:       true
+key CHALK_PTR {
+    ~required:     false
+    ~type:         "string"
+    ~standard:     true
+    ~since:        "0.1.0"
+    ~output_order: 3
+    ~in_ptr:       true
     docstring:    "When enabled, injects minimal metadata; this field then " +
                   "gets a URL you supply to point to the rest of the data. " +
 		  "Items marked as 'true' in the 'Ptr?' column are added in " +
@@ -63,91 +63,91 @@ key SAMI_PTR {
 }
 
 key EARLIEST_VERSION {
-    type:         "string"
-    since:        "0.1.0"
-    system:       true
-    skip:         true
-    value:        sami_version
-    output_order: low() + 4
-    standard:     true
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~system:       true
+    ~skip:         true
+    ~value:        chalk_version
+    ~output_order: 4
+    ~standard:     true
     docstring:    "Reserved for future use"
 }
 
 key ARTIFACT_PATH {
-    type:         "string"
-    since:        "0.1.0"
-    codec:        true
-    output_order: low() + 5
-    standard:     true
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~codec:        true
+    ~output_order: 5
+    ~standard:     true
     docstring:    "Path of artifact on host where injection occured"
 }
 
 key INSERTION_HOSTINFO {
-    type:         "string"
-    since:        "0.1.0"
-    output_order: low() + 6
-    standard:     true
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~output_order: 6
+    ~standard:     true
     docstring:    "Host information at injection; by default, uname -a"
 }
 
 key ORIGIN_URI {
-    type:        "string"
-    since:        "0.1.0"
-    output_order: low() + 7
-    standard:     true
+    ~type:        "string"
+    ~since:        "0.1.0"
+    ~output_order: 7
+    ~standard:     true
     docstring:    "URI of origin for repo from which artifact was built"
 }
 
 key ARTIFACT_VERSION {
-    type:         "string"
-    since:        "0.1.0"
-    output_order: low() + 8
-    standard:      true
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~output_order: 8
+    ~standard:      true
     docstring:    "Reserved for future use"
 }
 
 key STORE_URI {
-    type:         "string"
-    since:        "0.1.0"
-    output_order: low() + 9
-    standard:     true
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~output_order: 9
+    ~standard:     true
     docstring:    "URI for the artifact storage location"
 }
 
 key BRANCH {
-    type:        "string"
-    since:       "0.1.0"
-    standard:     true
-    output_order: low() + 10
+    ~type:        "string"
+    ~since:       "0.1.0"
+    ~standard:     true
+    ~output_order: 10
     docstring:    "Version control branch the artifact was built from"
 }
 
 key HASH {
-    type:         "string"
-    since:        "0.1.0"
-    codec:        true
-    standard:     true
-    output_order: low() + 11
-    docstring:    "Hash file of artifact w/o SAMI in it, to ensure extracted " +
-                  "SAMIs are intact"
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~codec:        true
+    ~standard:     true
+    ~output_order: 11
+    docstring:    "Hash file of artifact w/o chalk in it, to ensure extracted " +
+                  "chalk is intact"
 }
 
 key HASH_FILES {
-    type:         "[string]"
-    since:        "0.1.0"
-    codec:        true
-    standard:     true
-    output_order: low() + 12
+    ~type:         "[string]"
+    ~since:        "0.1.0"
+    ~codec:        true
+    ~standard:     true
+    ~output_order: 12
     docstring:    "Files that constitute the artifact, and used in the hash, " +
                   "if not just the ARTIFACT_PATH"
 }
 
 key COMPONENT_HASHES {
-    type:         "[string]"
-    since:        "0.1.0"
-    codec:        true
-    standard:     true
-    output_order: low() + 13
+    ~type:         "[string]"
+    ~since:        "0.1.0"
+    ~codec:        true
+    ~standard:     true
+    ~output_order: 13
     docstring:    "When there are multiple files hashed for a single " +
                   "artifact, this contains SHA256 hashes of the individual " +
 		  "component hashes. The ordering will match the order of " +
@@ -155,182 +155,182 @@ key COMPONENT_HASHES {
 }
 
 key COMMIT_ID {
-    type:         "string"
-    since:        "0.1.0"
-    standard:     true
-    output_order: low() + 14
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~standard:     true
+    ~output_order: 14
     docstring:    "The commit hash or id for the repository the artifact was " +
                   "built from"
 }
 
 key CODE_OWNERS {
-    type:         "string"
-    since:        "0.1.0"
-    standard:     true
-    output_order: low() + 15
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~standard:     true
+    ~output_order: 15
     docstring:    "Code owners associated with the artifact"
 }
 
 key INJECTOR_ID {
-    type:         "string"
-    since:        "0.1.0"
-    standard:     true
-    output_order: low() + 16
-    docstring:    "SAMI ID of the sami binary that inserted metadata"
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~standard:     true
+    ~output_order: 16
+    docstring:    "chalk ID of the chalk binary that inserted metadata"
 }
 
 key INJECTOR_VERSION {
-    type:         "string"
-    since:        "0.1.0"
-    standard:     true
-    system:       true
-    output_order: low() + 17
-    docstring:    "Version of the SAMI binary used for injection"
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~standard:     true
+    ~system:       true
+    ~output_order: 17
+    docstring:    "Version of the chalk binary used for injection"
 }
 
 key INJECTOR_PLATFORM {
-    type:         "string"
-    since:        "0.1.0"
-    standard:     true
-    system:       true
-    output_order: low() + 18
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~standard:     true
+    ~system:       true
+    ~output_order: 18
     docstring:    "OS / system info at time of insertion"
 }
 
 key INJECTOR_COMMIT_ID {
-    type:         "string"
-    since:        "0.1.0"
-    standard:     true
-    system:       true
-    output_order: low() + 19
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~standard:     true
+    ~system:       true
+    ~output_order: 19
     docstring:    "The commit hash or id from which the injector was built."
 }
 
 key BUILD_ID {
-    type:         "string"
-    since:        "0.1.0"
-    standard:     true
-    output_order: low() + 20
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~standard:     true
+    ~output_order: 20
     docstring:    "The ID of the CI/CD job"
 }
 
 key BUILD_URI {
-    type:         "string"
-    since:        "0.1.0"
-    output_order: low() + 21
-    standard:     true
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~output_order: 21
+    ~standard:     true
     docstring:    "URI to the CI/CD job"
 }
 
 key BUILD_API_URI {
-    type:         "string"
-    since:        "0.1.0"
-    output_order: low() + 22
-    standard:     true
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~output_order: 22
+    ~standard:     true
     docstring:    "URI to the CI/CD api if more information needs to be queried"
 }
 
 key BUILD_TRIGGER {
-    type:         "string"
-    since:        "0.1.0"
-    output_order: low() + 23
-    standard:     true
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~output_order: 23
+    ~standard:     true
     docstring:    "What event triggered CI/CD job"
 }
 
 key BUILD_CONTACT {
-    type:         "[string]"
-    since:        "0.1.0"
-    output_order: low() + 24
-    standard:     true
+    ~type:         "[string]"
+    ~since:        "0.1.0"
+    ~output_order: 24
+    ~standard:     true
     docstring:    "List of contacts which triggered CI/CD job"
 }
 
-key X_SAMI_CONFIG {
-    system:     true
-    type:       "string"
-    since:      "0.1.0"
+key X_CHALK_CONFIG {
+    ~system:     true
+    ~type:       "string"
+    ~since:      "0.1.0"
     docstring: "Embedded configuration file"
 }
 
-key OLD_SAMI {
-    type:         "sami"
-    since:        "0.1.0"
-    system:       true
-    standard:     true
-    output_order: high() - 6
+key OLD_CHALK {
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~system:       true
+    ~standard:     true
+    ~output_order: high() - 6
     skip: true
-    docstring:    "Old SAMI info associated with an artifact, when a new " +
-                  "SAMI is inserted"
+    docstring:    "Metadata ID of Old chalk info associated with an " +
+                  "artifact, when a new mark is inserted"
 }
 
-key EMBEDDED_SAMIS {
-    type:         "{string: sami}"
-    since:        "0.1.0"
-    system:       true
-    standard:     true
-    output_order: high() - 5
+key EMBEDDED_CHALK {
+    ~type:         "{string: string}"
+    ~since:        "0.1.0"
+    ~system:       true
+    ~standard:     true
+    ~output_order: high() - 5
     docstring:    "Other artifacts contained in this artifact"
 }
 
 key SBOMS {
-    type:         "{string, string}"
-    since:        "0.1.0"
-    standard:     true
-    output_order: high() - 4
+    ~type:         "{string, string}"
+    ~since:        "0.1.0"
+    ~standard:     true
+    ~output_order: high() - 4
     docstring:    "SBOMs associated with this artifact"
 }
 
 key ERR_INFO {
-    type:         "[string]"
-    standard:     true
-    since:        "0.1.0"
-    system:       true
-    output_order: high() - 3
+    ~type:         "[string]"
+    ~standard:     true
+    ~since:        "0.1.0"
+    ~system:       true
+    ~output_order: high() - 3
     docstring:    "Errors when inserting metadata"
 }
 
 key METADATA_HASH {
-    type:         "string"
-    since:        "0.1.0"
-    system:       true
-    standard:     true
-    output_order: high() - 2
-    in_ptr: true
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~system:       true
+    ~standard:     true
+    ~output_order: high() - 2
+    ~in_ptr: true
     docstring:    "A hash of all the preceding metadata, in a canonicalized " +
     		  "format. This includes user-defined keys."
 }
 
 key METADATA_ID {
-    type: "string"
-    since: "0.1.0"
-    system: true
-    standard: true
-    output_order: high() - 1
-    required:     true
-    in_ptr:       true
+    ~type: "string"
+    ~since: "0.1.0"
+    ~system: true
+    ~standard: true
+    ~output_order: high() - 1
+    ~required:     true
+    ~in_ptr:       true
     docstring:    "A unique ID for this metadata, derived in part from the " +
                   "hash of all the preceding metadata, in addition to the " +
 		  "current time."
 }
 
 key SIGN_PARAMS {
-    type:         "{string: string}"
-    since:        "0.1.0"
-    system:       true
-    standard:     true
-    output_order: high() - 1
-    in_ptr:       true
+    ~type:         "{string: string}"
+    ~since:        "0.1.0"
+    ~system:       true
+    ~standard:     true
+    ~output_order: high() - 1
+    ~in_ptr:       true
     docstring:    "Signing parameters for digital signatures."
 }
 
 key SIGNATURE {
-    type:         "string"
-    since:        "0.1.0"
-    system:       true
-    standard:     true
-    output_order: high()
-    in_ptr:       true
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~system:       true
+    ~standard:     true
+    ~output_order: high()
+    ~in_ptr:       true
     docstring:    "Embedded digital signature for artifact"
 }
 
@@ -339,19 +339,19 @@ key SIGNATURE {
 # non-codecs cannot set these keys.
 
 plugin elf {
-    codec: true
-    keys: []
+    ~codec: true
+    ~keys: []
 }
 
 plugin shebang {
-    codec: true
-    keys: []
+    ~codec: true
+    ~keys: []
 }
 
 plugin container {
-    codec:    true
-    keys:     []
-    priority: low()
+    ~codec:    true
+    ~keys:     []
+    priority: 0
     enabled:  true
 }
 
@@ -368,15 +368,17 @@ plugin ci_github {
 }
 
 plugin authors {
-    keys: ["CODE_OWNERS"]
+    # Since there's only one key it might export, go ahead and
+    # lock it; if you want to disable that key, turn off the whole plugin.
+    ~keys: ["CODE_OWNERS"]
 }
 
 plugin github_codeowners {
-    keys: ["CODE_OWNERS"]
+    ~keys: ["CODE_OWNERS"]
 }
 
 plugin sbom_callback {
-    keys: ["SBOMS"]
+    ~keys: ["SBOMS"]
 }
 
 # This plugin is the only thing allowed to set these keys. It goes first
@@ -384,13 +386,13 @@ plugin sbom_callback {
 # thus set to low(int64), but con4m currently doesn't get this right,
 # low(int64) in con4m is -high(int64), when it should be one less.
 plugin system {
-  keys:     ["INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
-            "INJECTOR_COMMIT_ID", "X_SAMI_CONFIG", "_MAGIC.json"]
-  priority: low()
+  ~keys:     ["INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
+            "INJECTOR_COMMIT_ID", "X_CHALK_CONFIG", "_MAGIC"]
+  ~priority: 0
 }
 
 # These keys would be set by the `metsys` plugin, but need to go LAST
-# not first.  The OLD_SAMI field needs to know what fields get written
+# not first.  The OLD_CHALK field needs to know what fields get written
 # before it can figure out what to write.
 #
 #
@@ -405,21 +407,21 @@ plugin system {
 #
 # The priority field is set to high(int64).
 plugin metsys {
-    keys:     ["METADATA_ID", "OLD_SAMI", "SIGNATURE", "ERR_INFO"]
-    priority: high()
+    ~keys:     ["METADATA_ID", "OLD_CHALK", "SIGNATURE", "ERR_INFO"]
+    ~priority: high()
 }
 
 # This plugin takes values from the conf file. By default, these
 # are of the lowest priority of anything that can conflict.
-# This will set SAMI_VERSION, EARLIEST_VERSION, SAMI_REF (if provided)
+# This will set CHALK_VERSION, EARLIEST_VERSION, CHALK_REF (if provided)
 # and _MAGIC.
 #
 # This plugin does attempt to apply substitutions to text strings.
 # If it fails, it just treats the value field as text.  See the
 # plugin implementation for details on the substitutions.
 plugin conffile {
-    keys:     ["*"]
-    priority: high() - 1
+    ~keys:     ["*"]
+    ~priority: high() - 1
 }
 
 plugin custom_metadata {
@@ -444,22 +446,22 @@ sink stderr {
 }
 
 sink file {
-  needs_filename: true
+  ~needs_filename: true
   docstring:      "A sink that writes a local file"
 }
 
 sink s3 {
-  needs_secret: true
-  needs_uid:    true
-  needs_uri:    true
-  uses_region:  true
-  uses_cacheid: true
+  ~needs_secret: true
+  ~needs_uid:    true
+  ~needs_uri:    true
+  ~uses_region:  true
+  ~uses_cacheid: true
   docstring:    "A sink for S3 buckets"
 }
 
 sink post {
-  needs_uri:    true
-  uses_headers: true
+  ~needs_uri:    true
+  ~uses_headers: true
   docstring:    "Generic HTTP/HTTPS post to a URL. Add custom headers " +
                 "by providing an implementation to the callback " +
 		"getPostHeaders(), which should return a dictionary where " +
@@ -467,12 +469,13 @@ sink post {
 }
 
 sink custom {
-  uses_secret:   true
-  uses_uid:      true
-  uses_filename: true
-  uses_uri:      true
-  uses_region:   true
-  uses_cacheid:  true
-  uses_aux:      true
+  ~uses_secret:   true
+  ~uses_uid:      true
+  ~uses_headers:  true
+  ~uses_filename: true
+  ~uses_uri:      true
+  ~uses_region:   true
+  ~uses_cacheid:  true
+  ~uses_aux:      true
   docstring:     "Implement a custom sink via a con4m callback"
 }

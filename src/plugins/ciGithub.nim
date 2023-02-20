@@ -6,7 +6,7 @@
 
 
 import tables, strformat, strutils, os
-import nimutils, ../config, ../plugins
+import nimutils, ../types, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
@@ -14,7 +14,7 @@ when (NimMajor, NimMinor) < (1, 7):
 type GithubCI = ref object of Plugin
 
 method getArtifactInfo*(self: GithubCI,
-                        sami: SamiObj): KeyInfo =
+                        obj:  ChalkObj): KeyInfo =
   result = newTable[string, Box]()
 
   # https://docs.github.com/en/actions/

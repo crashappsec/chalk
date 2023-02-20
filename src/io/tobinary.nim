@@ -1,14 +1,14 @@
-## Converts SAMI metadata keys into a canonical binary
-## representation. Originally, this was used to inject into binaries,
-## but we have moved that to JSON. This lives on though, to give us a
-## way to normalize metadata for hashing and/or signing.  We don't use
-## JSON for that, because it'd be too easy to lose interoperability if
+## Converts metadata keys into a canonical binary representation.
+## Originally, this was used to inject into binaries, but we have
+## moved that to JSON. This lives on though, to give us a way to
+## normalize metadata for hashing and/or signing.  We don't use JSON
+## for that, because it'd be too easy to lose interoperability if
 ## people whiff on whatever we decide for how to handle spaces, etc.
 ##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, strformat, strutils, nimutils, ../config
+import tables, options, strformat, strutils, nimutils, ../types, ../config
 
 const
   kvPairBinFmt   = "{result}{binEncodeStr(outputkey)}{binEncodeItem(val)}"
@@ -54,7 +54,7 @@ proc binEncodeArr(arr: seq[Box]): string =
   for item in arr:
     result = result & binEncodeItem(item)
 
-proc binEncodeObj(self: SamiDict): string =
+proc binEncodeObj(self: ChalkDict): string =
   result = binObjHdr.fmt()
 
   for outputKey in self.keys():
@@ -68,23 +68,21 @@ proc binEncodeItem(self: Box): string =
   of MkStr:
     return binEncodeStr(unpack[string](self))
   of MkTable:
-    return binEncodeObj(unpack[SamiDict](self))
+    return binEncodeObj(unpack[ChalkDict](self))
   of MkSeq:
     return binEncodeArr(unpack[seq[Box]](self))
   else:
     unreachable
 
-proc createdToBinary*(sami: SamiObj, ptrOnly = getOutputPointers()): string =
+proc createdToBinary*(obj: ChalkObj, ptrOnly = getOutputPointers()): string =
   # Currently, this is only called for the METADATA_HASH field, which only
   # signs things actually being written out.  We skip everything else.
   var fieldCount = 0
 
-  # Count how many fields we will write.  Ignore .json fields
-  for key, _ in sami.newFields:
-    if "." in key:
-      let parts = key.split(".")
-      if len(parts) != 2 or parts[1] != "binary":
-        continue
+  # Count how many fields we will write.
+  for key, _ in obj.newFields:
+    if key.startsWith("_"):
+      continue
     let spec = getKeySpec(key).get()
     if spec.getSkip():
       continue
@@ -104,21 +102,18 @@ proc createdToBinary*(sami: SamiObj, ptrOnly = getOutputPointers()): string =
     # the insertion ordering, so there is no ambiguity.
     var outputKey = fullKey
 
-    if "." in fullKey:
-      let parts = fullKey.split(".")
-      if len(parts) != 2 or parts[1] != "binary":
-        continue
-      outputKey = parts[0]
+    if fullKey.startsWith("_"):
+      continue
 
     # If this key is set, but ptrOnly is false, then we are
-    # outputting the "full" SAMI, in which case we do not
+    # outputting the "full" chalk, in which case we do not
     # write this field out.
-    if outputKey == "SAMI_PTR" and not ptrOnly:
+    if outputKey == "CHALK_PTR" and not ptrOnly:
       continue
 
     let spec = getKeySpec(fullKey).get()
 
-    if not sami.newFields.contains(fullKey):
+    if not obj.newFields.contains(fullKey):
       continue
 
     # Skip outputting this key if "skip" is set in the key's existing
@@ -126,16 +121,16 @@ proc createdToBinary*(sami: SamiObj, ptrOnly = getOutputPointers()): string =
     if spec.getSkip():
       continue
 
-    # If SAMI pointers are set up, and we're currently outputting
+    # If chalk pointers are set up, and we're currently outputting
     # a pointer, then we only output if the config has the in_ptr
     # field set.
     if ptrOnly and not spec.getInPtr():
       continue
 
-    let val = sami.newFields[outputKey]
+    let val = obj.newFields[outputKey]
     result = kvPairBinFmt.fmt()
 
-proc foundToBinary*(kvPairs: SamiDict): string =
+proc foundToBinary*(kvPairs: ChalkDict): string =
   var keys: seq[string]
 
   for k, v in kvPairs:

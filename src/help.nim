@@ -36,7 +36,6 @@ else:
       i        = 0
       curStart = 0
 
-
     result = ""
 
     while i < limit:
@@ -189,10 +188,10 @@ proc parseJankTable(s: string, width: int, plain: bool): JankBlock =
     while len(row) < maxCols:
       row.add("")
 
-  var t = samiTableFormatter(maxCols,
-                             rows=rows,
-                             wrapStyle=WrapLines,
-                             maxCellSz=0)
+  var t = chalkTableFormatter(maxCols,
+                              rows=rows,
+                              wrapStyle=WrapLines,
+                              maxCellSz=0)
 
   if options.len != 0:
     let specs = options.split(Rune(':'))
@@ -227,11 +226,11 @@ proc jankHeader2(s: string): JankBlock =
 proc jankCodeBlock(s: string, width: int): JankBlock =
   var
     formatted = s.jankyFormat()
-    t         = samiTableFormatter(1,
-                                   @[@[formatted]],
-                                   some(AlignLeft),
-                                   WrapLines,
-                                   0)
+    t         = chalkTableFormatter(1,
+                                    @[@[formatted]],
+                                    some(AlignLeft),
+                                    WrapLines,
+                                    0)
 
   return JankBlock(kind: JankCodeBlock, content: t.render(width))
 
@@ -314,7 +313,7 @@ proc doHelp*() {.noreturn.} =
           widest = len(item)
 
       let
-        numCols          = max(int(terminalWidth() / (widest+3)), 1)
+        numCols          = max(int(terminalWidth() / (widest + 3)), 1)
         remainder        = len(topics) mod numCols
       var
         table            = newTextTable(numCols)
@@ -334,7 +333,7 @@ proc doHelp*() {.noreturn.} =
           row.add("")
         table.addRow(row)
       jank.add(jankHeader1("Available help topics:\n"))
-      jank.add(JankBlock(kind: JankTable,
+      jank.add(JankBlock(kind:    JankTable,
                          content: table.render(max(terminalWidth(), 2*widest))))
     else:
       var processed = arg.replace('_', ' ')

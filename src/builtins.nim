@@ -1,5 +1,5 @@
 ## This is where we keep our customizations of platform stuff that is
-## specific to SAMI, including output setup and builtin con4m calls.
+## specific to chalk, including output setup and builtin con4m calls.
 ## That is, the output code and con4m calls here do not belong in
 ## con4m etc.
 ##
@@ -9,14 +9,12 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import config, streams, options, tables, strformat, uri
+import config, streams, options, tables, strformat, uri, types
 import nimutils, con4m
 
 discard subscribe(con4mTopic, defaultCon4mHook)
 
 const customSinkType = "f(string, {string : string}) -> bool"
-
-let ctxSamiConf = getConfigState()
 
 proc modedFileSinkOut*(msg: string, cfg: SinkConfig, t: StringTable): bool =
   try:
@@ -41,7 +39,7 @@ proc customOut(msg: string, record: SinkConfig, xtra: StringTable): bool =
   args.add(pack(msg))
   args.add(pack(cfg))
 
-  var retBox = runCallback(ctxSamiConf, "outhook", args, some(t)).get()
+  var retBox = runCallback(ctxChalkConf, "outhook", args, some(t)).get()
   return unpack[bool](retBox)
 
 const customKeys = { "secret" :  false, "uid"    : false, "filename": false,
@@ -92,133 +90,105 @@ proc setArgs*(a: seq[string]) =
 
 proc getArgs*(): seq[string] = args
 
-proc getArgv(args:    seq[Box],
-             unused1: Con4mScope,
-             unused2: VarStack,
-             unused3: Con4mScope): Option[Box] =
+proc getArgv(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getArgs()))
 
-proc getExeName(args:    seq[Box],
-                unused1: Con4mScope,
-                unused2: VarStack,
-                unused3: Con4mScope): Option[Box] =
-    return some(pack(getCommandName()))
+proc getExeName(args: seq[Box], unused: ConfigState): Option[Box] =
+  return some(pack(getCommandName()))
 
-proc topicSubscribe(args:    seq[Box],
-                    unused1: Con4mScope,
-                    unused2: VarStack,
-                    unused3: Con4mScope): Option[Box] =
-    let
-      topic  = unpack[string](args[0])
-      config = unpack[string](args[1])
-      `rec?` = getHookByName(config)
+proc topicSubscribe(args: seq[Box], unused: ConfigState): Option[Box] =
+  let
+    topic  = unpack[string](args[0])
+    config = unpack[string](args[1])
+    `rec?` = getHookByName(config)
 
-    if `rec?`.isNone():
-      return some(pack(false))
+  if `rec?`.isNone():
+    return some(pack(false))
 
-    let
-      record   = `rec?`.get()
-      `topic?` = subscribe(topic, record)
+  let
+    record   = `rec?`.get()
+    `topic?` = subscribe(topic, record)
 
-    if `topic?`.isNone():
-      return some(pack(false))
+  if `topic?`.isNone():
+    return some(pack(false))
 
-    return some(pack(true))
+  return some(pack(true))
 
-proc topicUnsubscribe(args:    seq[Box],
-                      unused1: Con4mScope,
-                      unused2: VarStack,
-                      unused3: Con4mScope): Option[Box] =
-    let
-      topic  = unpack[string](args[0])
-      config = unpack[string](args[1])
-      `rec?` = getHookByName(config)
+proc topicUnsubscribe(args: seq[Box], unused: ConfigState): Option[Box] =
+  let
+    topic  = unpack[string](args[0])
+    config = unpack[string](args[1])
+    `rec?` = getHookByName(config)
 
-    if `rec?`.isNone():
-      return some(pack(false))
+  if `rec?`.isNone():
+    return some(pack(false))
 
-    return some(pack(unsubscribe(topic, `rec?`.get())))
+  return some(pack(unsubscribe(topic, `rec?`.get())))
 
 
-var samiStack: seq[SamiObj] = @[]
+var chalkStack: seq[ChalkObj] = @[]
 
-proc pushTargetSamiForErrorMsgs*(s: SamiObj) =
-  samiStack.add(s)
+proc pushTargetChalkForErrorMsgs*(s: ChalkObj) =
+  chalkStack.add(s)
 
-proc popTargetSamiForErrorMsgs*() =
-  discard samiStack.pop()
+proc popTargetChalkForErrorMsgs*() =
+  discard chalkStack.pop()
 
 # This is private, not available from con4m.
-proc samiErrSink(msg: string, cfg: SinkConfig, arg: StringTable): bool =
-  if len(samiStack) == 0:
+proc chalkErrSink(msg: string, cfg: SinkConfig, arg: StringTable): bool =
+  if len(chalkStack) == 0:
     return false
-  if samiStack[^1] == nil:
-    samiStack[^1].err = @[msg]
+  if chalkStack[^1] == nil:
+    chalkStack[^1].err = @[msg]
   else:
-    samiStack[^1].err.add(msg)
+    chalkStack[^1].err.add(msg)
   return true
 
-proc samiErrFilter(msg: string, info: StringTable): (string, bool) =
-  if len(samiStack) > 0 and keyLogLevel in info:
+proc chalkErrFilter(msg: string, info: StringTable): (string, bool) =
+  if len(chalkStack) > 0 and keyLogLevel in info:
     let llStr = info[keyLogLevel]
 
     if (llStr in toLogLevelMap) and
-         (toLogLevelMap[llStr] <= toLogLevelMap[getSamiLogLevel()]):
+     (toLogLevelMap[llStr] <= toLogLevelMap[chalkConfig.getChalkLogLevel()]):
       return (msg, true)
+
   return ("", false)
 
-let errSinkObj = SinkRecord(outputFunction: samiErrSink)
+let errSinkObj = SinkRecord(outputFunction: chalkErrSink)
 
-registerSink("sami-err-log", errSinkObj)
+registerSink("chalk-err-log", errSinkObj)
 
-let errCfg = configSink(errSinkObj, filters = @[MsgFilter(samiErrFilter)]).get()
+let errCfg = configSink(errSinkObj,
+                        filters = @[MsgFilter(chalkErrFilter)]).get()
 
 subscribe("logs", errCfg)
 
-proc logBase(ll: string, args: seq[Box], globals: Con4mScope): Option[Box] =
+proc logBase(ll: string, args: seq[Box], s: ConfigState): Option[Box] =
   let
     msg      = unpack[string](args[0])
-    csym     = lookup(globals, "color").get()
-    cval     = csym.value.get()
-    `cOver?` = csym.override
-    lsym     = lookup(globals, "log_level").get()
-    lval     = lsym.value.get()
-    `lOver?` = lsym.override
+    color    = s.attrLookup("color").get()
+    llevel   = s.attrLookup("log_level").get()
 
-  # log level and color may have been set; con4m doesn't set that
-  # stuff where we can see it until it ends evaluation.
-  # TODO: add a simpler interface to con4m for this logic.
-
-  if `cOver?`.isSome():
-    setShowColors(unpack[bool](`cOver?`.get()))
-  else:
-    setShowColors(unpack[bool](cval))
-  if `lOver?`.isSome():
-    setLogLevel(unpack[string](`lOver?`.get()))
-  else:
-    setLogLevel(unpack[string](lval))
+  setShowColors(unpack[bool](color))
+  setLogLevel(unpack[string](llevel))
 
   log(ll, msg)
 
   return none(Box)
 
-proc logError(args: seq[Box], globals, u1, u2: auto): Option[Box] =
-  return logBase("error", args, globals)
+proc logError(args: seq[Box], s: ConfigState): Option[Box] =
+  return logBase("error", args, s)
 
-proc logWarn(args: seq[Box], globals, u1, u2: auto): Option[Box] =
-  return logBase("warn", args, globals)
+proc logWarn(args: seq[Box], s: ConfigState): Option[Box] =
+  return logBase("warn", args, s)
 
-proc logInfo(args: seq[Box], globals, u1, u2: auto): Option[Box] =
-  return logBase("info", args, globals)
+proc logInfo(args: seq[Box], s: ConfigState): Option[Box] =
+  return logBase("info", args, s)
 
-proc logTrace(args: seq[Box], globals, u1, u2: auto): Option[Box] =
-  return logBase("trace", args, globals)
+proc logTrace(args: seq[Box], s: ConfigState): Option[Box] =
+  return logBase("trace", args, s)
 
-
-proc sinkConfig(args:    seq[Box],
-                globals: Con4mScope,
-                unused1: VarStack,
-                unused2: Con4mScope): Option[Box] =
+proc sinkConfig(args: seq[Box], unused: ConfigState): Option[Box] =
     let
       sinkconf   = unpack[string](args[0])
       sinkName   = unpack[string](args[1])
@@ -256,7 +226,6 @@ proc sinkConfig(args:    seq[Box],
 
     # We currently pass through unknown keys to make life easier for
     # new sink writers.
-
     let theSinkOpt = getSink(sinkname)
 
     if theSinkOpt.isNone():
@@ -271,43 +240,12 @@ proc sinkConfig(args:    seq[Box],
     else:
       warn(fmt"Output sink configuration '{sinkconf}' failed to load.")
 
-proc getOsName(args:    seq[Box],
-               globals: Con4mScope,
-               unused1: VarStack,
-               unused2: Con4mScope): Option[Box] =
-    const retval = getBinaryOS()
+proc getExeVersion(args:    seq[Box], unused: ConfigState): Option[Box] =
+    const retval = getChalkExeVersion()
 
     return some(pack(retval))
 
-proc getArch(args:    seq[Box],
-             globals: Con4mScope,
-             unused1: VarStack,
-             unused2: Con4mScope): Option[Box] =
-    const retval = getBinaryArch()
-
-    return some(pack(retval))
-
-proc getExeVersion(args:    seq[Box],
-                   globals: Con4mScope,
-                   unused1: VarStack,
-                   unused2: Con4mScope): Option[Box] =
-    const retval = getSamiExeVersion()
-
-    return some(pack(retval))
-
-proc samiHigh(u1, u2, u3, u4: auto): Option[Box] =
-  return some(pack(high(int64)))
-
-
-proc samiLow(u1, u2, u3, u4: auto): Option[Box] =
-  # Note that this value the parser doesn't accept right now because
-  # I was super lazy when writing the tokenizer.
-  return some(pack(low(int64)))
-
-
-setSamiCon4mBuiltins(@[
-  ("osname",      BuiltInFn(getOsName),        "f() -> string"),
-  ("arch",        BuiltInFn(getArch),          "f() -> string"),
+setChalkCon4mBuiltins(@[
   ("version",     BuiltinFn(getExeVersion),    "f() -> string"),
   ("subscribe",   BuiltInFn(topicSubscribe),   "f(string, string)->bool"),
   ("unsubscribe", BuiltInFn(topicUnSubscribe), "f(string, string)->bool"),
@@ -317,8 +255,6 @@ setSamiCon4mBuiltins(@[
   ("trace",       BuiltInFn(logTrace),         "f(string)"),
   ("argv",        BuiltInFn(getArgv),          "f() -> [string]"),
   ("argv0",       BuiltInFn(getExeName),       "f() -> string"),
-  ("high",        BuiltInFn(samiHigh),         "f() -> int"),
-  ("low",         BuiltInFn(samiLow),          "f() -> int"),
   ("sink_config", BuiltInFn(sinkConfig),
                             "f(string, string, {string: string}, [string])")
   ])

@@ -5,7 +5,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import tables, options
-import nimutils, ../config, ../plugins, ../extract
+import nimutils, ../types, ../config, ../plugins, ../extract
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
@@ -13,14 +13,14 @@ when (NimMajor, NimMinor) < (1, 7):
 type SystemPlugin* = ref object of Plugin
 
 method getArtifactInfo*(self: SystemPlugin,
-                        sami: SamiObj): KeyInfo =
+                        obj:  ChalkObj): KeyInfo =
 
   result = newTable[string, Box]()
 
-  result["_MAGIC.json"]        = pack("dadfedabbadabbed")
-  result["INJECTOR_VERSION"]   = pack(getSamiExeVersion())
-  result["INJECTOR_PLATFORM"]  = pack(getSamiPlatform())
-  result["INJECTOR_COMMIT_ID"] = pack(getSamiCommitID())
+  result["_MAGIC"]             = pack(magicUTF8)
+  result["INJECTOR_VERSION"]   = pack(getChalkExeVersion())
+  result["INJECTOR_PLATFORM"]  = pack(getChalkPlatform())
+  result["INJECTOR_COMMIT_ID"] = pack(getChalkCommitID())
 
   let selfIdOpt = getSelfId()
 
@@ -28,11 +28,11 @@ method getArtifactInfo*(self: SystemPlugin,
     result["INJECTOR_ID"] = pack(selfIdOpt.get())
 
   let
-    spec = config.getKeySpec("X_SAMI_CONFIG").get()
+    spec = config.getKeySpec("X_CHALK_CONFIG").get()
     optVal = spec.getValue()
 
   if optVal.isSome():
-    result["X_SAMI_CONFIG"] = optVal.get()
+    result["X_CHALK_CONFIG"] = optVal.get()
 
 
 registerPlugin("system", SystemPlugin())

@@ -4,7 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, nimutils, ../config, ../plugins, formatstr
+import tables, options, nimutils, ../types, ../config, ../plugins, formatstr
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
@@ -12,16 +12,16 @@ when (NimMajor, NimMinor) < (1, 7):
 type ConfFilePlugin* = ref object of Plugin
 
 method getArtifactInfo*(self: ConfFilePlugin,
-                        sami: SamiObj): KeyInfo =
+                        obj: ChalkObj): KeyInfo =
   result = newTable[string, Box]()
 
   let
     keyList = getAllKeys()
-    samiID  = unpack[string](sami.newFields["SAMI_ID"])
+    chalkID  = unpack[string](obj.newFields["CHALK_ID"])
 
   for key in keyList:
     let
-      spec   = config.getKeySpec(key).get()
+      spec   = getKeySpec(key).get()
       optval = spec.getValue()
 
     if optval.isNone():  continue
@@ -35,7 +35,7 @@ method getArtifactInfo*(self: ConfFilePlugin,
         result[key] = pack(raw)
         continue
       try:
-        result[key] = pack(format(raw, { "artifactid":   samiId}))
+        result[key] = pack(format(raw, { "artifactid":   chalkId}))
       except:
         result[key] = pack(raw)
     else:

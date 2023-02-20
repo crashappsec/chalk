@@ -18,7 +18,7 @@ At the same time, it's very customizable. Administrators can easily produce stan
 -p,:: --publish-defaults::Show config info. See '{appName} help defaults'
 -P,:: --no-publish-defaults::Do not publish config info.  See '{appName} help defaults' for details.
 }%
-Currently, SAMI's behavior is easily customized, primarily via a flexible configuration file. The options provided at the command line are reserved for items where there's an obvious utilitiy in overriding without editing the config file.
+Currently, chalk's behavior is easily customized, primarily via a flexible configuration file. The options provided at the command line are reserved for items where there's an obvious utilitiy in overriding without editing the config file.
 
 %{h Available commands}%
 %{i commands}%See {bold}{appName} help config{reset} for an overview of the configuration file.

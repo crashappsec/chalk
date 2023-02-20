@@ -10,14 +10,11 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import options, tables, streams, strutils, strformat, os, std/tempfiles
-import nimutils, config, plugins, extract, io/tojson, builtins
+import nimutils, types, config, plugins, extract, io/tojson, builtins
 
 const
-  codecOnlyKeys = ["ARTIFACT_PATH",
-                   "HASH",
-                   "HASH_FILES",
-                   "COMPONENT_HASHES",
-                   "SAMI_ID"]
+  codecOnlyKeys = ["ARTIFACT_PATH", "HASH", "HASH_FILES",
+                   "COMPONENT_HASHES", "CHALK_ID"]
   optionalCodecKeys = ["COMPONENT_HASHES"]
 
 
@@ -29,25 +26,25 @@ proc getSystemPlugins(): array[2, Plugin] {.inline.} =
 
   return systeMetsys
 
-proc acquireStreamIfUsed(codec: Codec, infoObj: SamiObj) =
+proc acquireStreamIfUsed(codec: Codec, infoObj: ChalkObj) =
   if codec.configInfo.getUsesFstream():
     discard infoObj.acquireFileStream()
 
-proc isValidSami(obj: SamiObj): bool =
+proc isValidChalk(obj: ChalkObj): bool =
   result = true
   for key in getRequiredKeys():
     if key notin obj.newFields:
       error(fmt"{obj.fullPath} is missing key: {key}")
       result = false
 
-proc doOneInjection(obj: SamiObj, codec: Codec): string =
+proc doOneInjection(obj: ChalkObj, codec: Codec): string =
   result = obj.createdToJson(false)
 
   let toInject =  if getOutputPointers():
                     obj.createdToJson(true):
                   else:
                     result
-  if getDryRun():
+  if chalkConfig.getDryRun():
     info("{obj.fullPath}: would inject; publishing to 'dry-run' instead")
     publish("dry-run", toInject)
     return
@@ -106,7 +103,7 @@ proc doInjection*() =
   let
     codecs      = getCodecsByPriority()
     everyKey    = getOrderedKeys()
-    inDryRun    = getDryRun()
+    inDryRun    = chalkConfig.getDryRun()
     extractions = doExtraction()
     pluginInfo  = getPluginsByPriority()
 
@@ -119,19 +116,19 @@ proc doInjection*() =
     let
       name            = plugin.name
       codec           = Codec(plugin)
-      extracts        = codec.getSamis()
+      extracts        = codec.getChalks()
       codecIgnores    = codec.configInfo.getIgnore()
       xtraKeys        = codec.configInfo.getKeys()
       streamAvailable = codec.configInfo.getUsesFstream()
 
     for infoObj in extracts:
-      pushTargetSamiForErrorMsgs(infoObj)
+      pushTargetChalkForErrorMsgs(infoObj)
       let
         keyInfo = codec.getArtifactInfo(infoObj)
         path    = infoObj.fullPath
 
 
-      infoObj.newFields = SamiDict()
+      infoObj.newFields = ChalkDict()
       codec.acquireStreamIfUsed(infoObj)
 
       trace(fmt"{path}: Codec '{name}' beginning metadata collection.")
@@ -191,16 +188,16 @@ proc doInjection*() =
               continue
             infoObj.newFields[key] = value
 
-      if not infoObj.isValidSami():
-        error("{path}: generated SAMI is invalid (skipping)")
+      if not infoObj.isValidChalk():
+        error("{path}: generated chalk object is invalid (skipping)")
       else:
-        trace(fmt"{path}: SAMI built; injecting.")
+        trace(fmt"{path}: chalk object built; injecting.")
         let toPublish = infoObj.doOneInjection(codec)
         objsForPublish.add(toPublish)
 
       # Should be totally done with the file stream now.
       infoObj.closeFileStream()
-      popTargetSamiForErrorMsgs()
+      popTargetChalkForErrorMsgs()
 
   let fullJson = "[" & join(objsForPublish, ", ") & "]"
 

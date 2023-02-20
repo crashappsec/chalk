@@ -3,7 +3,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, os, streams, strformat, nimutils, ../config, ../plugins
+import tables, os, streams, strformat, nimutils, ../types, ../config, ../plugins
 
 const
   fNameAuthor  = "AUTHOR"
@@ -43,10 +43,10 @@ type AuthorsFileCodeOwner* = ref object of Plugin
 
 
 method getArtifactInfo*(self: AuthorsFileCodeOwner,
-                        sami: SamiObj): KeyInfo =
+                        obj: ChalkObj): KeyInfo =
   result = newTable[string, Box]()
 
-  let fname = sami.fullpath.findAuthorsFile()
+  let fname = obj.fullpath.findAuthorsFile()
 
   if fname == "":
     return

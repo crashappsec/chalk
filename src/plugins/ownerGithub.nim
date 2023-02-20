@@ -4,7 +4,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import tables, streams, strutils, strformat, os, glob
-import nimutils, ../config, ../plugins
+import nimutils, ../types, ../config, ../plugins
 
 
 const
@@ -81,7 +81,7 @@ proc findCodeOwner(contents, artifactPath, copath: string): string =
 type GithubCodeOwner = ref object of Plugin
 
 method getArtifactInfo*(self: GithubCodeOwner,
-                        sami: SamiObj): KeyInfo =
+                        obj: ChalkObj): KeyInfo =
   # CODEOWNERS can live in the root of a repo, the docs subdir, or
   # the .github directory of a repository.  The challenge is that we
   # don't actually know where the root directory is, relative to the
@@ -96,7 +96,7 @@ method getArtifactInfo*(self: GithubCodeOwner,
   # We let this go all the way up to the root of the fs \_("/)_/
   result = newTable[string, Box]()
 
-  let fname = sami.fullpath.findCOFile()
+  let fname = obj.fullpath.findCOFile()
 
   if fname == "":
     return
@@ -110,7 +110,7 @@ method getArtifactInfo*(self: GithubCodeOwner,
     else:
       let
         s = ctx.readAll()
-        m = s.findCodeOwner(sami.fullPath, fname.splitPath().head)
+        m = s.findCodeOwner(obj.fullPath, fname.splitPath().head)
 
       if m != "":
         result["CODE_OWNERS"] = pack(m)

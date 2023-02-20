@@ -1,22 +1,18 @@
-## This is the entry point for SAMI.
+## This is the entry point for chalk.
 ##
 ## Here's an overview of what happens:
 ## 0) Some **internal registration** happens as modules load.  Specifically:
-##      a) We register output topics that SAMI uses.
+##      a) We register output topics that chalk uses.
 ##      b) Plugins register themselves, and any con4m callbacks they support.
 ## 1) **Arguments** get parsed (but the values are not committed)
-## 2) We load in the SAMI **con4m schema**, and validate it. The schema
-##    definition lives in `configs/schema.c4m`
-## 3) We load in a small **base configuration** that does NOT change, which is
-##    in `configs/baseconfig.c4m`. This is fixed, because we don't want people
-##    accidentally deleting the I/O setup.
+## 2) We load in the base chalk configuration (written in con4m).
 ## 4) We load the **embedded configuration**, which shouldn't do much except
 ##    document the kinds of things people can do. This lives in
 ##    `configs/defaultconfig.c4m`
 ## 5) At this point, we **commit** any command-line flags that the embedded
 ##    configuration allows us to commit. (audit will still report what flags
 ##    people tried to use, even if they're not allowed).
-## 6) Run any **external configuration**, if it exists, as long as the
+## 6) We now nun any **external configuration**, if it exists, as long as the
 ##    embedded config allows it to run.
 ## 7) **Audit**, if the embedded configuration asked for it (it does NOT by
 ##    default, as we don't want to spam people who haven't set up a place for
@@ -30,33 +26,33 @@
 import tables, nativesockets, json, strutils, os, options
 # Note that importing builtins causes topics to register, and
 # importing plugins causes plugins to register.
-import nimutils, config, builtins, plugins
+import nimutils, types, config, builtins, plugins
 import inject, extract, delete, confload, defaults, help
 
-var `selfSami?` = none(SamiDict)
+var `selfChalk?` = none(ChalkDict)
 
 # Tiny commands live in this file. The major ones are broken out.
 proc runCmdConfDump() {.inline.} =
   var toDump  = defaultConfig
   var argList = getArgs()
 
-  if `selfSami?`.isSome():
-    let selfSami = `selfSami?`.get()
+  if `selfChalk?`.isSome():
+    let selfChalk = `selfChalk?`.get()
 
-    if selfSami.contains("X_SAMI_CONFIG"):
-      toDump   = unpack[string](selfSami["X_SAMI_CONFIG"])
+    if selfChalk.contains("X_CHALK_CONFIG"):
+      toDump   = unpack[string](selfChalk["X_CHALK_CONFIG"])
 
   publish("confdump", toDump)
 
 proc runCmdVersion() =
   var
-    rows = @[@["Sami version", getSamiExeVersion()],
-             @["Commit ID",    getSamiCommitID()],
-             @["Build OS",     hostOS],
-             @["Build CPU",    hostCPU],
-             @["Build Date",   CompileDate],
-             @["Build Time",   CompileTime & " UTC"]]
-    t    = samiTableFormatter(2, rows=rows)
+    rows = @[@["Chalk version", getChalkExeVersion()],
+             @["Commit ID",     getChalkCommitID()],
+             @["Build OS",      hostOS],
+             @["Build CPU",     hostCPU],
+             @["Build Date",    CompileDate],
+             @["Build Time",    CompileTime & " UTC"]]
+    t    = chalkTableFormatter(2, rows=rows)
 
   t.setTableBorders(false)
   t.setNoHeaders()
@@ -66,7 +62,7 @@ proc runCmdVersion() =
 proc doAudit(commandName: string,
              parsedFlags: TableRef[string, string],
              configFile:  Option[string]) =
-  if not getPublishAudit():
+  if not chalkConfig.getPublishAudit():
     return
 
   var flagStrs: seq[string] = @[]
@@ -82,7 +78,7 @@ proc doAudit(commandName: string,
                    "hostname"   : getHostName(),
                    "config"     : configFile.getOrElse(""),
                    "time"       : $(unixTimeInMs()),
-                   "platform"   : getSamiPlatform(),
+                   "platform"   : getChalkPlatform(),
                  }.toTable()
 
   publish("audit", $(%* prejson))
@@ -136,7 +132,7 @@ when isMainModule:
     doHelp()
 
   if "log-level" in flags:
-    # We can't call samiLogLevel yet b/c there's no config object
+    # We can't call chalkLogLevel yet b/c there's no config object
     # to set overrides on.
     setLogLevel(flags["log-level"])
 
@@ -161,14 +157,14 @@ when isMainModule:
   # that, put it in a once: block).
   validatePlugins()
   # Next, we need to load the embedded configuration, so we load our
-  # self-SAMI, if we have one, as loadEmbeddedConfig will check it for
+  # self-chalk, if we have any, as loadEmbeddedConfig will check it for
   # the embedded config, and select the default if it isn't there.
   # getSelfExtraction() is in extract.nim; loadEmbeddedConfig is in
   # config.nim
-  `selfSami?` = getSelfExtraction()
+  `selfChalk?` = getSelfExtraction()
 
   let
-    configLoaded = loadEmbeddedConfig(`selfSami?`)
+    configLoaded = loadEmbeddedConfig(`selfChalk?`)
     appName      = getAppFileName().splitPath().tail
 
   if not configLoaded and cmdName notin ["load", "help"]:
@@ -182,7 +178,7 @@ when isMainModule:
   # "default" as a command name, and if we had to ask the config file,
   # we now need the answer, so we can dispatch.
   if cmdName == "default":
-    var `cmd?` = getDefaultCommand()
+    var `cmd?` = chalkConfig.getDefaultCommand()
     if `cmd?`.isSome():
       cmdName = `cmd?`.get()
       setCommandName(cmdName)
@@ -195,9 +191,9 @@ when isMainModule:
         error("No valid command provided. See '" & appName & "help'.")
         cmdName = "help"
 
-  if getAllowExternalConfig() and cmdName != "help":
+  if chalkConfig.getAllowExternalConfig() and cmdName != "help":
     parsed.commit()  # Now if there is a config file flag we'll take it.
-    `configFile?` = loadUserConfigFile(cmdName, `selfSami?`)
+    `configFile?` = loadUserConfigFile(cmdName, `selfChalk?`)
   else:
     parsed.commit()
 

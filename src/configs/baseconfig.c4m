@@ -1,4 +1,4 @@
-## This is where we provide sane defaults for I/O.  SAMI is very
+## This is where we provide sane defaults for I/O.  Chalk is very
 ## flexible in this regard, and almost nothing is hardcoded.
 ##
 ## :Author: John Viega (john@crashoverride.com)
@@ -24,17 +24,17 @@ sink_config("json_out", "stdout", {}, ["pretty_json", "fix_new_line"])
 sink_config("json_err", "stderr", {}, ["pretty_json", "fix_new_line"])
 
 if cmd == "insert" {
-   subscribe("extract", "json_err") # Writes SAMIs extracted w/ 'extract' cmd
-   subscribe("nesting", "json_err") # Writes extracted samis when inserting
-   subscribe("insert",  "json_err") # Writes full SAMIs on insert (no ptrs)
-   subscribe("delete",  "json_err") # Writes full SAMIs being deleted
+   subscribe("extract", "json_err") # Writes chalk extracted w/ 'extract' cmd
+   subscribe("nesting", "json_err") # Writes extracted chalk when inserting
+   subscribe("insert",  "json_err") # Writes full chalk on insert (no ptrs)
+   subscribe("delete",  "json_err") # Writes full chalk being deleted
    subscribe("dry-run", "user_out")
 }
 else {
-   subscribe("extract", "json_err") # Writes SAMIs extracted w/ 'extract' cmd
-   subscribe("nesting", "json_err") # Writes extracted samis when inserting
-   subscribe("insert",  "json_err") # Writes full SAMIs on insert (no ptrs)
-   subscribe("delete",  "json_err") # Writes full SAMIs being deleted
+   subscribe("extract", "json_err") # Writes chalk extracted w/ 'extract' cmd
+   subscribe("nesting", "json_err") # Writes extracted chalk when inserting
+   subscribe("insert",  "json_err") # Writes full chalk on insert (no ptrs)
+   subscribe("delete",  "json_err") # Writes full chalk being deleted
    subscribe("dry-run", "user_out")
 }
 
@@ -67,7 +67,7 @@ subscribe("help", "user_out")
 # They are both subscribed to the 'stdout' sink.  You can remove those
 # subscriptions.
 #
-# - "log_hook",   to which SAMI log messages post. There are filters
+# - "log_hook",   to which chalk log messages post. There are filters
 #                 installed to add optional color, and to filter based
 #                 on your log-level setting.
 #

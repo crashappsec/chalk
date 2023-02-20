@@ -1,5 +1,5 @@
 %{H Output basics}%
-SAMI currently defines the following "sinks" that you can output to:
+Chalk currently defines the following "sinks" that you can output to:
 %{T
 Sink name::Description :: Configuration Parameters
 stdout :: Write to stdout::n/a
@@ -13,17 +13,17 @@ Via configuration file, you can {green}configure{reset} each sink, and then atta
 
 Each sink can have multiple attached configurations.  Each configuration can set up parameters such as credentials and locations, and can also set up output filters.
 
-Note that sinks are not used for data injection itself. But, when a codec injects a SAMI, the system will publish the "full" set of metadata you've configured to be collected for any given file, even if the codec was configured to only inject a small "pointer".
+Note that sinks are not used for data injection itself. But, when a codec injects a chalk, the system will publish the "full" set of metadata you've configured to be collected for any given file, even if the codec was configured to only inject a small "pointer".
 
 The current supported topics are:
 %{T
 Topic::What it's for
 extract:: Recording data extracted from artifacts.
 inject:: Record metadata about the artifact into which data is getting inserted.
-nesting:: Show SAMI objects already existing in an artifact during an insert.
+nesting:: Show chalk objects already existing in an artifact during an insert.
 defaults:: Show information about how the results of config file execution.
 dry-run:: To get messages about what *would* be inserted on injection, when the --dry-run flag is on.
-delete:: For recording when SAMIs are deleted from artifacts.
+delete:: For recording when chalk marks are deleted from artifacts.
 audit:: For recording use of the command, along w/ command line flags and any external configuration file.
 confload:: For recording the old configuration and the fact that a new configuration was loaded.
 confdump:: For outputting the embedded configuration file.

@@ -11,7 +11,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import options, streams, strutils, endians
-import nimSHA2, ../config, ../plugins
+import nimSHA2, ../types, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
@@ -28,16 +28,16 @@ const
 
 type CodecElf* = ref object of Codec
 
-proc extractKeyMetadata*(self: CodecElf, sami: SamiObj): bool =
-  if sami.stream == nil:
+proc extractKeyMetadata*(self: CodecElf, obj: ChalkObj): bool =
+  if obj.stream == nil:
     return false
-  sami.stream.setPosition(wsOffsetLoc)
+  obj.stream.setPosition(wsOffsetLoc)
   let
-    is64Bit = if sami.stream.readChar() == is64BitVal:
+    is64Bit = if obj.stream.readChar() == is64BitVal:
                 true
               else:
                 false
-    isBigEndian = if sami.stream.readChar() == bigEndianVal:
+    isBigEndian = if obj.stream.readChar() == bigEndianVal:
                     true
                   else:
                     false
@@ -48,12 +48,12 @@ proc extractKeyMetadata*(self: CodecElf, sami: SamiObj): bool =
   var offset:   int
 
   if isBigEndian:
-    sami.flags.incl(BigEndian)
+    obj.flags.incl(BigEndian)
 
   if is64Bit:
-    sami.flags.incl(Arch64Bit)
-    sami.stream.setPosition(b64OffsetLoc)
-    rawBytes = sami.stream.readUint64()
+    obj.flags.incl(Arch64Bit)
+    obj.stream.setPosition(b64OffsetLoc)
+    rawBytes = obj.stream.readUint64()
 
     when system.cpuEndian == bigEndian:
       if not isBigEndian:
@@ -66,9 +66,9 @@ proc extractKeyMetadata*(self: CodecElf, sami: SamiObj): bool =
       else:
         shStart = rawBytes
 
-    sami.stream.setPosition(int(shStart))
+    obj.stream.setPosition(int(shStart))
     let
-      secHdr = sami.stream.readAll()
+      secHdr = obj.stream.readAll()
       offset1 = secHdr.find(magicUTF8)
 
     if offset1 != -1:
@@ -78,20 +78,20 @@ proc extractKeyMetadata*(self: CodecElf, sami: SamiObj): bool =
       offset = int(shStart) + secHdr.len()
       present = false
 
-  sami.primary = SamiPoint(startOffset: offset, present: present)
+  obj.primary = ChalkPoint(startOffset: offset, present: present)
 
   return true
 
-method scan*(self: CodecElf, sami: SamiObj): bool =
-  sami.stream.setPosition(0)
+method scan*(self: CodecElf, obj: ChalkObj): bool =
+  obj.stream.setPosition(0)
 
   try: # Reads can fail, for instance on 0-byte files.
-    let magic = sami.stream.readUint32()
+    let magic = obj.stream.readUint32()
 
     if magic != elfMagic and magic != elfSwapped:
       return false
 
-    result = self.extractKeyMetadata(sami)
+    result = self.extractKeyMetadata(obj)
   except:
     result = false
 
@@ -104,12 +104,12 @@ method handleWrite*(self: CodecElf,
   if encoded.isSome():
     ctx.write(encoded.get())
 
-method getArtifactHash*(self: CodecElf, sami: SamiObj): string =
+method getArtifactHash*(self: CodecElf, obj: ChalkObj): string =
   var shaCtx = initSHA[SHA256]()
-  let offset = sami.primary.startOffset
+  let offset = obj.primary.startOffset
 
-  sami.stream.setPosition(0)
-  shaCtx.update(sami.stream.readStr(offset))
+  obj.stream.setPosition(0)
+  shaCtx.update(obj.stream.readStr(offset))
 
   return $shaCtx.final()
 

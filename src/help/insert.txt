@@ -4,7 +4,7 @@ Inserts metadata into artifacts specified in the search path.
 %{T:<26:
 Variable::Override::Type::Description
 recursive::-r, -R, --recursive, --no-recursive::bool::Determines whether a file scan will recursively walk paths.
-container-image-id::-I, --container-image-id::string::A SHA-256 hash identifier for a container to mark (in hex format). Currently, the SAMI to insert will ALWAYS be written to stdout, but should be baked into the top layer of the image where possible. Note that you should avoid having other sinks write to stdout if this flag might get used.  Generally, this stops all other codec processing, and will cause the 'insertion' piece to write to STDOUT so that it can be placed in a new wrapping container. SAMI currently does not do this wrapping itself.
+container-image-id::-I, --container-image-id::string::A SHA-256 hash identifier for a container to mark (in hex format). Currently, the chalk to insert will ALWAYS be written to stdout, but should be baked into the top layer of the image where possible. Note that you should avoid having other sinks write to stdout if this flag might get used.  Generally, this stops all other codec processing, and will cause the 'insertion' piece to write to STDOUT so that it can be placed in a new wrapping container. Chalk currently does not do this wrapping itself.
 container-image-name::-N, --container-image-name::string::The name of the container, which will be used as the ARTIFACT_PATH.   Only consulted when the container image ID is provided.
 }%
 

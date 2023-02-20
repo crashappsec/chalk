@@ -4,30 +4,30 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import strutils, options, streams, nimSHA2, ../config, ../plugins
+import strutils, options, streams, nimSHA2, ../types, ../config, ../plugins
 
 type CodecShebang* = ref object of Codec
 
-method scan*(self: CodecShebang, sami: SamiObj): bool =
+method scan*(self: CodecShebang, obj: ChalkObj): bool =
   var line1: string
 
-  if sami.stream == nil:
+  if obj.stream == nil:
     return false
-  sami.stream.setPosition(0)
+  obj.stream.setPosition(0)
   try:
-    line1 = sami.stream.readLine()
+    line1 = obj.stream.readLine()
     if not line1.startsWith("#!"):
       return false
     let
-      line2 = sami.stream.readLine()
+      line2 = obj.stream.readLine()
       ix = line2.find(magicUTF8)
       pos = ix + line1.len() + 1 # +1 for the newline
 
     let
       present = if ix == -1: false else: true
-      pointInfo = SamiPoint(startOffset: pos, present: present)
+      pointInfo = ChalkPoint(startOffset: pos, present: present)
 
-    sami.primary = pointInfo
+    obj.primary = pointInfo
     return true
   except:
     return false
@@ -47,17 +47,17 @@ method handleWrite*(self: CodecShebang,
     ctx.write(pre[0 ..< pre.find('\n')])
   ctx.write(post)
 
-method getArtifactHash*(self: CodecShebang, sami: SamiObj): string =
+method getArtifactHash*(self: CodecShebang, obj: ChalkObj): string =
   var shaCtx = initSHA[SHA256]()
-  let pt = sami.primary
+  let pt = obj.primary
 
-  sami.stream.setPosition(0)
+  obj.stream.setPosition(0)
   if pt.present:
-    shaCtx.update(sami.stream.readLine())
+    shaCtx.update(obj.stream.readLine())
     shaCtx.update("\n")
-    discard sami.stream.readLine() # Skip line w/ old SAMI object
+    discard obj.stream.readLine() # Skip line w/ old chalk object
 
-  shaCtx.update(sami.stream.readAll())
+  shaCtx.update(obj.stream.readAll())
 
   return $shaCtx.final()
 

@@ -20,7 +20,7 @@ const
     evenFmt*    = @[acFont0, acBGCyan, acBBlack]
     oddFmt*     = @[acFont0, acBGWhite, acBBlack]
 
-proc samiTableFormatter*(numColumns:  int,
+proc chalkTableFormatter*(numColumns:  int,
                          rows:        seq[seq[string]]      = @[],
                          headerAlign: Option[AlignmentType] = some(AlignCenter),
                          wrapStyle =  WrapBlock,
@@ -46,59 +46,55 @@ proc samiTableFormatter*(numColumns:  int,
 
 proc showGeneralOptions*(): int {.discardable.} =
   # Returns the width of the table.
-  var ot = samiTableFormatter(3)
+  var ot = chalkTableFormatter(3)
 
   ot.addRow(@["Option", "Value", "Con4m Variable"])
   ot.addRow(@["Color",
-              $(getColor()), "color"])
-  ot.addRow(@["Log level",
-              $(getLogLevel()), "log_level"])
-  ot.addRow(@["Dry run",
-              $(getDryRun()), "dry_run"])
+              $(chalkConfig.getColor().get()), "color"])
+  ot.addRow(@["Log level", $(chalkConfig.getLogLevel()), "log_level"])
+  ot.addRow(@["Dry run", $(chalkConfig.getDryRun()), "dry_run"])
   ot.addRow(@["Config files allowed",
-              $(getAllowExternalConfig()),
+              $(chalkConfig.getAllowExternalConfig()),
               "allow_external_config"])
   ot.addRow(@["Export builtin config ok",
-              $(getCanDump()),
+              $(chalkConfig.getCanDump()),
               "can_dump"])
   ot.addRow(@["Replace builtin config ok",
-              $(getCanLoad()),
+              $(chalkConfig.getCanLoad()),
               "can_load"])
   ot.addRow(@["Publish run config to audit topic",
-              $(getPublishAudit()),
+              $(chalkConfig.getPublishAudit()),
               "publish_audit"])
   ot.addRow(@["Always publish defaults",
-              $(getPublishDefaults()),
+              $(chalkConfig.getPublishDefaults()),
               "publish_defaults"])
   ot.addRow(@["Ignore compile errors",
-              $(getIgnoreBrokenConf()),
+              $(chalkConfig.getIgnoreBrokenConf()),
               "ignore_broken_conf"])
   ot.addRow(@["Artifact search path",
-              getArtifactSearchPath().join(", "),
+              chalkConfig.getArtifactSearchPath().join(", "),
               "artifact_search_path"])
   ot.addRow(@["Recurse for artifacts",
-              $(getRecursive()),
+              $(chalkConfig.getRecursive()),
               "recursive"])
   ot.addRow(@["Ignored patterns",
-              getIgnorePatterns(). join(", "),
+              chalkConfig.getIgnorePatterns(). join(", "),
               "ignore_patterns"])
   ot.addRow(@["Default exe command",
-              getOrElse(getDefaultCommand(), "none"),
+              getOrElse(chalkConfig.getDefaultCommand(), "none"),
               "default_command"])
   ot.addRow(@["Container image hash",
-              getContainerImageId(),
+              chalkConfig.getContainerImageId(),
               "container_image_id"])
   ot.addRow(@["Container image name",
-              getContainerImageName(),
+              chalkConfig.getContainerImageName(),
               "container_image_name"])
-
-
-  if getAllowExternalConfig():
+  if chalkConfig.getAllowExternalConfig():
     ot.addRow(@["Config file path",
-                getConfigPath().join(", "),
+                chalkConfig.getConfigPath().join(", "),
                 "config_path"])
     ot.addRow(@["Config file name",
-                $(getConfigFileName()),
+                $(chalkConfig.getConfigFileName()),
                 "config_filename"])
 
   let tableout = ot.render()
@@ -127,7 +123,7 @@ proc filterFmt(flist: seq[MsgFilter]): string =
 proc showSinkConfigs*(): int {.discardable.} =
   var
     sinkConfigs = getSinkConfigs()
-    ot          = samiTableFormatter(5)
+    ot          = chalkTableFormatter(5)
     subLists:     Table[SinkConfig, seq[string]]
     unusedTopics: seq[string]
 
@@ -166,7 +162,7 @@ proc showKeyConfigs*(): int {.discardable.} =
   var
     keyList  = getOrderedKeys()
     custom   = getCustomKeys()
-    ot       = samiTableFormatter(5)
+    ot       = chalkTableFormatter(5)
   let
     sysVal   = pack("*provided by system*")
     emptyVal = pack("*supplied via plugin*")
@@ -203,7 +199,7 @@ proc showKeyConfigs*(): int {.discardable.} =
       ot.addRow(@[key, enabled, default, inPtr, desc])
 
   let tableout = ot.render(-4)
-  publish("defaults", formatTitle("SAMI Key Configuration:") & tableout)
+  publish("defaults", formatTitle("Chalk Key Configuration:") & tableout)
 
   return tableout.find("\n")
 
@@ -223,7 +219,7 @@ proc showDisclaimer*(w: int) =
 proc showConfig*() =
   let isDefaultsCmd = getCommandName() == "defaults"
 
-  if getPublishDefaults() or isDefaultsCmd:
+  if chalkConfig.getPublishDefaults() or isDefaultsCmd:
     showGeneralOptions()
     showSinkConfigs()
     let w = showKeyConfigs()

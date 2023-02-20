@@ -9,19 +9,20 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 
-import os, tables, strutils, streams, nimutils, ../config, ../plugins, json
+import os, tables, strutils, streams, nimutils, json
+import ../types, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
 
 type CodecContainer* = ref object of Codec
 
-method scan*(self: CodecContainer, sami: SamiObj): bool =
-  # Never interfere with a self-SAMI.  Leave that to the real codecs.
-  if sami.fullpath == resolvePath(getAppFileName()):
+method scan*(self: CodecContainer, obj: ChalkObj): bool =
+  # Never interfere with self-chalk.  Leave that to the real codecs.
+  if obj.fullpath == resolvePath(getAppFileName()):
     return false
 
-  var idstr = getContainerImageId()
+  var idstr = chalkConfig.getContainerImageId()
 
   if idstr == "":
     return false
@@ -40,21 +41,21 @@ method scan*(self: CodecContainer, sami: SamiObj): bool =
       error("Invalid sh256 for container image ID given")
       return false
 
-    # Create a liar SAMI point.
-  # Should probably have a bit in the sami.flags field to control.
-  sami.primary = SamiPoint(startOffset: 0, present: true)
-  sami.exclude = @[]
+    # Create a liar chalk location.
+  # Should probably have a bit in the obj.flags field to control.
+  obj.primary = ChalkPoint(startOffset: 0, present: true)
+  obj.exclude = @[]
 
-  var path = sami.fullPath
-  dirWalk(true, sami.exclude.add(item))
+  var path = obj.fullPath
+  dirWalk(true, obj.exclude.add(item))
 
   once:
-    sami.flags.incl(SkipWrite)
-    sami.flags.incl(StopScan)
+    obj.flags.incl(SkipWrite)
+    obj.flags.incl(StopScan)
     return true
   return false
 
-method doVirtualLoad*(self: CodecContainer, sami: SamiObj) =
+method doVirtualLoad*(self: CodecContainer, obj: ChalkObj) =
   discard
 
 method handleWrite*(self:    CodecContainer,
@@ -64,10 +65,10 @@ method handleWrite*(self:    CodecContainer,
                     post:    string) =
   echo pretty(parseJson(encoded.get()))
 
-method getArtifactInfo*(self: CodecContainer, sami: SamiObj): KeyInfo =
+method getArtifactInfo*(self: CodecContainer, obj: ChalkObj): KeyInfo =
   var
-    idstr = getContainerImageId()
-    name  = getContainerImageName()
+    idstr = chalkConfig.getContainerImageId()
+    name  = chalkConfig.getContainerImageName()
 
   if idstr.startsWith("sha256:"):
     idstr = idstr[7 .. ^1]
@@ -84,6 +85,6 @@ method getArtifactInfo*(self: CodecContainer, sami: SamiObj): KeyInfo =
   result["HASH"]          = pack(idstr)
   result["HASH_FILES"]    = pack(@[name])
   result["ARTIFACT_PATH"] = pack(name)
-  result["SAMI_ID"]       = pack(ulid)
+  result["CHALK_ID"]       = pack(ulid)
 
 registerPlugin("container", CodecContainer())

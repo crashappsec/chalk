@@ -5,7 +5,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import tables, options, strutils, nimSHA2, nimutils, con4m
-import ../config, ../plugins, ../io/tobinary
+import ../types, ../config, ../plugins, ../io/tobinary
 
 when (NimMajor, NimMinor) < (1, 7):
   {.warning[LockLevel]: off.}
@@ -18,51 +18,45 @@ const
 let
   callbackType    = callbackTypeStr.toCon4mType()
 
-proc processOldSami(sami: SamiObj, olddict: SamiDict): Box =
-  var groomedDict: SamiDict = newTable[string, Box]()
+proc processOldChalk(obj: ChalkObj, olddict: ChalkDict): Box =
+  var groomedDict: ChalkDict = newTable[string, Box]()
 
   for k, v in olddict:
     var fullkey = k
     var specOpt = getKeySpec(k)
-    if specOpt.isNone():
-      fullkey = k & ".json"
-      specOpt = getKeySpec(fullkey)
-      if specOpt.isNone():
-        fullkey = k & ".binary"
-        specOpt = getKeySpec(fullkey)
 
     if specOpt.isNone():
-      error("Found unknown key (" & k & ") in a SAMI we're replacing")
+      error("Found unknown key (" & k & ") in a chalk object we're replacing")
     else:
       let spec = specOpt.get()
       if spec.getSkip():
         continue
       if spec.getSquash():
         # The ones we're inserting now...
-        if spec.getSystem() or sami.newFields.contains(k):
+        if spec.getSystem() or obj.newFields.contains(k):
           continue
     groomedDict[fullkey] = v
 
   result = pack(groomedDict)
 
 method getArtifactInfo*(self: MetsysPlugin,
-                        sami: SamiObj): KeyInfo =
+                        obj: ChalkObj): KeyInfo =
 
   new result
 
-  let oldSamiOpt = config.getKeySpec("OLD_SAMI")
+  let oldChalkOpt = config.getKeySpec("OLD_CHALK")
 
-  if oldSamiOpt.isSome() and sami.primary.present and sami.primary.valid:
-    let oldSamiSpec = oldSamiOpt.get()
-    if not oldSamiSpec.getSkip():
-      let oldpoint = sami.primary
-      if oldpoint.samiFields.isSome():
-        result["OLD_SAMI"] = processOldSami(sami, oldpoint.samiFields.get())
+  if oldChalkOpt.isSome() and obj.primary.present and obj.primary.valid:
+    let oldChalkSpec = oldChalkOpt.get()
+    if not oldChalkSpec.getSkip():
+      let oldpoint = obj.primary
+      if oldpoint.chalkFields.isSome():
+        result["OLD_CHALK"] = processOldChalk(obj, oldpoint.chalkFields.get())
 
-  if len(sami.err) != 0:
-    result["ERR_INFO"] = pack(sami.err)
+  if len(obj.err) != 0:
+    result["ERR_INFO"] = pack(obj.err)
 
-  let toHash = createdToBinary(sami)
+  let toHash = createdToBinary(obj)
   var shaCtx = initSHA[SHA256]()
   shaCtx.update(toHash)
 
@@ -79,10 +73,9 @@ method getArtifactInfo*(self: MetsysPlugin,
   result["METADATA_HASH"] = pack(metahash.toHex().toLowerAscii())
   result["METADATA_ID"]   = pack(metaId)
 
-  let optSigInfo = scall(getConfigState(),
-                         callbackName,
-                         @[sami.newFields["HASH"], pack(metaId)],
-                         callbackType)
+  let
+    args       = @[obj.newFields["HASH"], pack(metaId)]
+    optSigInfo = ctxChalkConf.sCall(callbackName, args, callbackType)
 
   if optSigInfo.isSome():
     let

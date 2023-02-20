@@ -4,7 +4,7 @@ The following functions are in addition to those documented at: {red}https://git
 Function::Description
 osname() -> string{font0}::Returns the name of operating system.
 arch() -> string::Returns information about the underlying architecture. Note that, when running under virtualization, this will return the virtualized platform.
-version() -> string::Returns the release version of the SAMI binary.
+version() -> string::Returns the release version of the chalk binary.
 argv0() -> string::Returns the command being run, per the command line. If you've set up a default action in the embedded configuration, that configuration will receive {brown}default{black} for this value when it runs.  Possible options are: {brown}"insert", {brown}"extract", {brown}"delete", {brown}"defaults", {brown}"confdump", {brown}"confload", {brown}"version", {brown}"help"
 argv() -> [string]::Returns the arguments being used for the command. This may not be what was passed at the command line; it will pick up default values from previous configuration files.  You may not change argv() with immediate effect, but for the {brown}"extract", {brown}"insert" and {brown}"delete" commands, setting the {bold}{magenta}artifact_path{black} variable will lead to argv updating after the script ends.
 log(string, string)::The first argument may be, {brown}"error", {brown}"warn", {brown}"info"{black} or {brown}"verbose"{black}. The second argument is a message. This dispatches a message to the {magenta}log{black} topic.

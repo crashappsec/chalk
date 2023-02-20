@@ -1,4 +1,4 @@
-## This is the default startup configuration that ships with SAMI. It
+## This is the default startup configuration that ships with Chalk. It
 ## runs after the base configuration. By default, not much happens
 ## here; there's a bit of example code that shows off I/O
 ## configuration, that doubles as an example to show how to allow
@@ -7,7 +7,7 @@
 ## you to customize.
 ##
 ## This config is meant to be edited and reloaded by users, and can be
-## used to embed defaults for any of SAMI's con4m configuration
+## used to embed defaults for any of chalk's con4m configuration
 ## variables.
 ##
 ## To do that, one can use the 'confdump' command to get the current
@@ -42,7 +42,7 @@
 
 log_level: "info"
 
-# info("Loading the default SAMI config")
+# info("Loading the default chalk config")
 
 # The following default commands are valid:
 # help, insert, extract, version
@@ -106,7 +106,8 @@ func linux_host_info() {
   platuuid_cmd := "cat /sys/class/dmi/id/board_serial /etc/machine-id " +
                       "/sys/class/dmi/id/product_uuid 2>/dev/null"
   ifcfg_cmd    := "ifconfig 2>/dev/null"
-  extip_cmd    := "dig +short myip.opendns.com @resolver1.opendns.com 2>/dev/null"
+  extip_cmd    := "dig +short myip.opendns.com @resolver1.opendns.com " +
+                      "2>/dev/null"
   gip_cmd_pre  := "curl \"https://api.geoiplookup.net/?query="
   gip_cmd_post := "&json=true\" 2>/dev/null"
 
@@ -175,7 +176,7 @@ if cmd == "extract" or cmd == "insert" or cmd == "delete" {
 }
 
 if len(ptr_url) > 0 {
-  key SAMI_PTR {
+  key CHALK_PTR {
     value: ptr_url
   }
 }
