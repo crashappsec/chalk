@@ -404,7 +404,7 @@ proc loadUserConfigFile*(commandName: string,
     try:
       var
         fd  = newFileStream(fname)
-        res = ctxChalkConf.stackConfig(fd, fname)
+        res = ctxChalkConf.stackConfig(fd, fname, c42ctx)
 
       if not res:
         error(fmt"{fname}: invalid configuration not loaded.")
@@ -415,7 +415,8 @@ proc loadUserConfigFile*(commandName: string,
         loaded = true
 
     except Con4mError: # config file didn't load:
-      info(fmt"{fname}: config file not loaded.")
+      error(getCurrentExceptionMsg())
+      info(fmt"{fname}: config file not loaded")
       if chalkConfig.ignoreBrokenConf:
         return none(string)
       trace("ignore_broken_conf is false: terminating.")
