@@ -26,6 +26,9 @@
 ## Note that configuration flags will override config files, except in
 ## some cases where the config file explicitly disallows such overrides.
 ##
+## Useful examples of collecting arbitrary metadata via the config file
+## can be found in the 'examples' dir of the official chalk repository.
+##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
@@ -42,7 +45,7 @@
 
 log_level: "info"
 
-# info("Loading the default chalk config")
+info("Using the default config. Use 'chalk confload' to load a new one.")
 
 # The following default commands are valid:
 # help, insert, extract, version
@@ -61,92 +64,19 @@ default_command = "help"
 
 cmd     := argv0()
 args    := argv()
+
+# By default, all collected metadata gets added to the chalk inserted
+# into the artifact.  If you provide the CHALK_PTR key, then most
+# things will NOT go into the chalk, which assumes you put it
+# somewhere else, where the CHALK_PTR points. In this example
+# configuration, if you provide a value for ptr_url (a local variable
+# specific to this config file), it'll use it.
+#
+# And, if you provide the right AWS S3 environment variables, this
+# config will automatically use the S3 bucket's URL as that pointer,
+# and only write a minimal chalk into artifacts.
+
 ptr_url := ""
-
-## KEY CONFIGURATION
-
-fallback_cmd       := "uname -a"
-
-
-func osx_host_info() {
-  hostinfo_cmd := "uname -a"
-  platuuid_cmd := "/usr/sbin/ioreg -d2 -c IOPlatformExpertDevice | " +
-                  "awk -F\\\" '/IOPlatformUUID/{print $(NF-1)}'"
-  ifaces_cmd   := "for i in $(ifconfig -lu); do if ifconfig $i | " +
-                  "grep -q \"status: active\" ; then echo $i\:; fi; done; "
-  ifcfg_cmd    := "ifconfig "
-  extip_cmd    := "/usr/bin/dig +short myip.opendns.com @resolver1.opendns.com"
-  gip_cmd_pre  := "curl \"https://api.geoiplookup.net/?query="
-  gip_cmd_post := "&json=true\" 2>/dev/null"
-
-
-  hostinfo     := strip(run(hostinfo_cmd))
-  platuuid     := strip(run(platuuid_cmd))
-  iface_str    := slice(strip(run(ifaces_cmd)), 0, -2)
-  extip        := strip(run(extip_cmd))
-  myip         := strip(run(extip_cmd))
-  gipinfo      := run(gip_cmd_pre + myip + gip_cmd_post)
-  ifaces       := split(iface_str, ":")
-  iface_detail := ""
-
-  for i from 0 to len(ifaces) {
-    iface_detail := iface_detail + run(ifcfg_cmd + strip(ifaces[i]))
-
-  }
-
-  result := "[[Host Info]]\n" + hostinfo + "\n\n[[Host UUID]]\n" + platuuid
-  result := result + "\n\n[[Active Interfaces]]\n" + iface_detail
-  result := result + "\n\n[[External Host Info]]" + gipinfo
-
-  return result
-}
-
-func linux_host_info() {
-  hostinfo_cmd := "uname -a"
-  platuuid_cmd := "cat /sys/class/dmi/id/board_serial /etc/machine-id " +
-                      "/sys/class/dmi/id/product_uuid 2>/dev/null"
-  ifcfg_cmd    := "ifconfig 2>/dev/null"
-  extip_cmd    := "dig +short myip.opendns.com @resolver1.opendns.com " +
-                      "2>/dev/null"
-  gip_cmd_pre  := "curl \"https://api.geoiplookup.net/?query="
-  gip_cmd_post := "&json=true\" 2>/dev/null"
-
-
-  hostinfo     := strip(run(hostinfo_cmd))
-  platuuid     := strip(run(platuuid_cmd))
-  extip        := strip(run(extip_cmd))
-  myip         := strip(run(extip_cmd))
-  gipinfo      := strip(run(gip_cmd_pre + myip + gip_cmd_post))
-  iface_detail := strip(run(ifcfg_cmd))
-
-  result := "[[Host Info]]\n" + hostinfo + "\n\n[[Host UUID]]\n" + platuuid
-  result := result + "\n\n[[Active Interfaces]]\n" + iface_detail
-  result := result + "\n\n[[External Host Info]]\n" + gipinfo
-
-  return result
-}
-
-os := osname()
-
-hostinfo := ""
-
-if os == "Darwin" {
-   hostinfo := osx_host_info()
-}
-elif contains(os, "Linux") {
-   hostinfo := linux_host_info()
-}
-else {
-   hostinfo := run(fallback_cmd)
-}
-
-if len(hostinfo) > 0 {
-  echo(hostinfo)
-
-  key INSERTION_HOSTINFO {
-    value: strip(hostinfo)
-  }
-}
 
 ## I/O CONFIGURATION
 
@@ -156,16 +86,18 @@ if len(hostinfo) > 0 {
 ## you can undo any of it if you really want!
 
 if cmd == "extract" or cmd == "insert" or cmd == "delete" {
-  if envExists("AWS_S3_BUCKET_URI") {
-    if not envExists("AWS_ACCESS_ID") {
+  if env_exists("AWS_S3_BUCKET_URI") {
+    if not env_exists("AWS_ACCESS_ID") {
        warn("To configure AWS must provide AWS_ACCESS_ID")
-    } elif not envExists("AWS_ACCESS_SECRET") {
+    } elif not env_exists("AWS_ACCESS_SECRET") {
        warn("To configure AWS must provide AWS_ACCESS_SECRET")
     } else {
       sink_config("s3", "s3", { "secret" : env("AWS_ACCESS_SECRET"),
                                 "uid"    : env("AWS_ACCESS_ID"),
                                 "uri"    : env("AWS_S3_BUCKET_URI") }, [])
-      ptr_url := env("AWS_S3_BUCKET_URI")
+      if len(strip(ptr_url)) == 0 {
+        ptr_url := env("AWS_S3_BUCKET_URI")
+      }
       #  Stuff you might do if the sink is configured...
       # subscribe("insert", "s3")
       # subscribe("extract", "s3")
@@ -175,9 +107,12 @@ if cmd == "extract" or cmd == "insert" or cmd == "delete" {
   }
 }
 
-if len(ptr_url) > 0 {
-  key CHALK_PTR {
-    value: ptr_url
+## KEY CONFIGURATION
+# Here we conditionally set the value of CHALK_PTR based on whether
+# we were provided an appropriate ptr_url.
+key CHALK_PTR {
+  if len(strip(ptr_url)) > 0 {
+    value: strip(ptr_url)
   }
 }
 
@@ -186,8 +121,8 @@ if len(ptr_url) > 0 {
 # default.  Your default doesn't go into effect until this script
 # finishes running.
 
-info("running command: " + argv0())
+info("Running command: " + cmd)
 
-# Configuration code that has already run, before your base configuration
-# loaded:
-#
+# Below this point is configuration code that has already run, before
+# your base configuration loaded. You can safely delete these comments
+# when you reload your base configuration.

@@ -1,0 +1,53 @@
+# gpg.c4m -- An example of using chalk to digitally sign artifacts and the
+#            generated metadata.
+#
+# :Author: John Viega (john@crashoverride.com)
+# :Copyright: 2023, Crash Override, Inc.
+
+# We don't want to pass a passphrase on the command line, because it
+# would show up in proc; so we use an environment variable to pass it.
+# Specify the environment variable here.
+PASSPHRASE_ENV_VAR := "GPG_PASSPHRASE"
+
+# The flags we're going to pass to GPG to get a PEM-encoded output,
+# use stdin for the passphrase, and be able to check status properly.
+GPG_CMD_LINE       := "gpg --clear-sign --batch --passphrase-fd 0 " +
+                      "--pinentry-mode loopback --status-fd 1 "
+
+# We'll turn this off automatically below if we can't find the command.
+HAVE_GPG           := true
+
+# echo being a shell builtin, it does not create a process, so won't
+# risk exposing the passphrase via ps, etc.
+PASSPHRASE_ECHO    := "echo " + env(PASSPHRASE_ENV_VAR) + " | "
+
+out, code := system("which gpg")
+if code != 0 {
+  HAVE_GPG := false
+}
+
+# con4m requires us to name global vars available to functions and callbacks.
+export HAVE_GPG, PASSPHRASE_ENV_VAR, PASSPHRASE_ECHO, GPG_CMD_LINE
+
+callback sign(to_sign) {
+  result := ("", {})
+  if HAVE_GPG and env_exists(PASSPHRASE_ENV_VAR) {
+    tmp_fname := to_tmp_file(to_sign, "")
+    out, code := system(PASSPHRASE_ECHO + GPG_CMD_LINE + tmp_fname +
+                        " | grep SIG_CREATED")
+    signature := read_file(tmp_fname + ".asc")
+    parts     := split(out, " ")
+
+    echo(parts)
+    if code == 0 and len(parts) == 8 {
+      result := ( signature, { "SCHEME"         : "OpenPGP",
+			       "TIMESTAMP"      : parts[6],
+			       "SIGNING_KEY_ID" : lower(strip(parts[7])) } )
+    }
+    rm_file(tmp_fname)
+    rm_file(tmp_fname + ".asc")
+  }
+  if len(result[1]) == 0 {
+    warn("Unable to sign. Make sure '" + PASSPHRASE_ENV_VAR + "' is set.")
+  }
+}

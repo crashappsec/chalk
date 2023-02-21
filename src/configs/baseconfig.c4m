@@ -6,7 +6,7 @@
 
 ## STARTUP CONFIGURATION
 
-if envExists("NO_COLOR") {
+if env_exists("NO_COLOR") {
   color: false
 } else {
   color: true

@@ -75,10 +75,13 @@ proc validateMetadata(codec: Codec, obj: ChalkObj, fields: ChalkDict): bool =
       error(fmt"{obj.fullPath}: METADATA_HASH field does not match " &
                "calculated value")
       result = false
-  if "METADATA_ID" in fields:
-    if chalkId[^15 .. ^1] != (unpack[string](fields["METADATA_ID"]))[^15 .. ^1]:
-      error(fmt"{obj.fullPath}: METADATA_HASH field does not match " &
-               "calculated value")
+    elif "METADATA_ID" in fields:
+      # This check was redundant, they were required to appear together.
+      # just being a little cautious.
+      let mdidValidator = (unpack[string](fields["METADATA_ID"]))[^15 .. ^1]
+      if chalkId[^15 .. ^1] != mdidValidator:
+        error(fmt"{obj.fullPath}: METADATA_ID field does not match " &
+                 "calculated value")
       result = false
 
 proc doExtraction*(): Option[string] =

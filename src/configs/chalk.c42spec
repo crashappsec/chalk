@@ -277,8 +277,11 @@ root {
     default: false
   }
   field ignore_broken_conf {
+    # If you use callbacks in a conf you could end up with
+    # runtime errors around variables that should be there via
+    # control flow, but aren't. So this isn't recommended.
     type:    "bool"
-    default: true
+    default: false
   }
   field con4m_pinpoint {
     type:    "bool"

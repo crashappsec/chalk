@@ -170,7 +170,6 @@ proc doInjection*() =
 
         if not run:
           trace(fmt"Plugin '{piname}': no work to do")
-          infoObj.closeFileStream()
           continue
 
         trace(fmt"Running Plugin '{piname}'")

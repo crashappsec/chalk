@@ -18,6 +18,9 @@ const
   binFalse       = "\x03\x00"
   binArrStartFmt = "\x04{u32ToStr(uint32(len(arr)))}"
   binObjHdr      = "\x05{u32ToStr(uint32(len(self)))}"
+  skipList       = ["_MAGIC", "METADATA_HASH", "METADATA_ID",
+                    "SIGN_PARAMS", "SIGNATURE"]
+
 
 
 proc u32ToStr*(i: uint32): string =
@@ -134,7 +137,7 @@ proc foundToBinary*(kvPairs: ChalkDict): string =
   var keys: seq[string]
 
   for k, v in kvPairs:
-    if k in ["_MAGIC", "METADATA_HASH", "METADATA_ID"]: continue
+    if k in skipList: continue
     keys.add(k)
 
   keys = orderKeys(keys)

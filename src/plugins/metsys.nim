@@ -14,7 +14,7 @@ type MetsysPlugin* = ref object of Plugin
 
 const
   callbackName    = "sign"
-  callbackTypeStr = "f(string, string) -> (string, {string: string})"
+  callbackTypeStr = "f(string) -> (string, {string: string})"
 let
   callbackType    = callbackTypeStr.toCon4mType()
 
@@ -64,17 +64,20 @@ method getArtifactInfo*(self: MetsysPlugin,
     metaHash     = shaCtx.final()
     ulidHiBytes  = metaHash[^10 .. ^9]
     ulidLowBytes = metaHash[^8 .. ^1]
+    metaHashStr  = metahash.toHex().toLowerAscii()
     ulidHiInt    = (cast[ptr uint16](addr ulidHiBytes[0]))[]
     ulidLowInt   = (cast[ptr uint64](addr ulidLowBytes[0]))[]
     now          = unixTimeInMs()
     metaId       = encodeUlid(now, ulidHiInt, ulidLowInt)
+    toSign       = unpack[string](obj.newFields["HASH"]) & "\n" &
+                     metaHashStr & "\n" & metaId & "\n"
 
 
-  result["METADATA_HASH"] = pack(metahash.toHex().toLowerAscii())
+  result["METADATA_HASH"] = pack(metaHashStr)
   result["METADATA_ID"]   = pack(metaId)
 
   let
-    args       = @[obj.newFields["HASH"], pack(metaId)]
+    args       = @[pack(toSign)]
     optSigInfo = ctxChalkConf.sCall(callbackName, args, callbackType)
 
   if optSigInfo.isSome():
