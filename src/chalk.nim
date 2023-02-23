@@ -39,8 +39,8 @@ proc runCmdConfDump() {.inline.} =
   if `selfChalk?`.isSome():
     let selfChalk = `selfChalk?`.get()
 
-    if selfChalk.contains("X_CHALK_CONFIG"):
-      toDump   = unpack[string](selfChalk["X_CHALK_CONFIG"])
+    if selfChalk.contains("_CHALK_CONFIG"):
+      toDump   = unpack[string](selfChalk["_CHALK_CONFIG"])
 
   publish("confdump", toDump)
 

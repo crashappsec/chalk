@@ -15,8 +15,8 @@ if env_exists("NO_COLOR") {
 cmd  := argv0()
 args := argv()
 
-sink_config("user_err", "stderr", {}, [])
-sink_config("user_out", "stdout", {}, [])
+sink_config("user_err", "stderr", {})
+sink_config("user_out", "stdout", {})
 
 # For commands that output JSON, default user output should get
 # JSON formatting and always get a newline per-publish.
@@ -40,7 +40,7 @@ else {
 
 if cmd == "confdump" {
   if len(args) > 0 {
-    sink_config("dump_out", "file", {"filename" : args[0]}, [])
+    sink_config("dump_out", "file", {"filename" : args[0]})
     subscribe("confdump", "dump_out")
   }
   else {

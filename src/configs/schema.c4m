@@ -246,7 +246,7 @@ key BUILD_CONTACT {
     docstring:    "List of contacts which triggered CI/CD job"
 }
 
-key X_CHALK_CONFIG {
+key _CHALK_CONFIG {
     ~system:     true
     ~type:       "string"
     ~since:      "0.1.0"
@@ -387,7 +387,7 @@ plugin sbom_callback {
 # low(int64) in con4m is -high(int64), when it should be one less.
 plugin system {
   ~keys:     ["INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
-            "INJECTOR_COMMIT_ID", "X_CHALK_CONFIG", "_MAGIC"]
+            "INJECTOR_COMMIT_ID", "_CHALK_CONFIG", "_MAGIC"]
   ~priority: 0
 }
 

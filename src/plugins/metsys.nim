@@ -41,7 +41,6 @@ proc processOldChalk(obj: ChalkObj, olddict: ChalkDict): Box =
 
 method getArtifactInfo*(self: MetsysPlugin,
                         obj: ChalkObj): KeyInfo =
-
   new result
 
   let oldChalkOpt = config.getKeySpec("OLD_CHALK")

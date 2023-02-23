@@ -1,6 +1,7 @@
-# gpg.c4m -- An example of using chalk to digitally sign artifacts and the
-#            generated metadata.
-#
+# gpg.c4m -- An example of using chalk to digitally sign artifacts
+#            with GPG, and to validate any artifacts signed via GPG /
+#            OpenPGP.
+
 # :Author: John Viega (john@crashoverride.com)
 # :Copyright: 2023, Crash Override, Inc.
 
@@ -11,8 +12,9 @@ PASSPHRASE_ENV_VAR := "GPG_PASSPHRASE"
 
 # The flags we're going to pass to GPG to get a PEM-encoded output,
 # use stdin for the passphrase, and be able to check status properly.
-GPG_CMD_LINE       := "gpg --clear-sign --batch --passphrase-fd 0 " +
-                      "--pinentry-mode loopback --status-fd 1 "
+SIGN_CMD_LINE      := "gpg --detach-sign --armor --batch --passphrase-fd 0 " +
+                      "--pinentry-mode loopback --status-fd 1 2>/dev/null "
+VERIFY_CMD_LINE    := "gpg --verify --batch --status-fd 1 2>/dev/null "
 
 # We'll turn this off automatically below if we can't find the command.
 HAVE_GPG           := true
@@ -27,18 +29,18 @@ if code != 0 {
 }
 
 # con4m requires us to name global vars available to functions and callbacks.
-export HAVE_GPG, PASSPHRASE_ENV_VAR, PASSPHRASE_ECHO, GPG_CMD_LINE
+export HAVE_GPG, PASSPHRASE_ENV_VAR, PASSPHRASE_ECHO
+export SIGN_CMD_LINE, VERIFY_CMD_LINE
 
 callback sign(to_sign) {
   result := ("", {})
   if HAVE_GPG and env_exists(PASSPHRASE_ENV_VAR) {
     tmp_fname := to_tmp_file(to_sign, "")
-    out, code := system(PASSPHRASE_ECHO + GPG_CMD_LINE + tmp_fname +
+    out, code := system(PASSPHRASE_ECHO + SIGN_CMD_LINE + tmp_fname +
                         " | grep SIG_CREATED")
     signature := read_file(tmp_fname + ".asc")
     parts     := split(out, " ")
 
-    echo(parts)
     if code == 0 and len(parts) == 8 {
       result := ( signature, { "SCHEME"         : "OpenPGP",
 			       "TIMESTAMP"      : parts[6],
@@ -49,5 +51,23 @@ callback sign(to_sign) {
   }
   if len(result[1]) == 0 {
     warn("Unable to sign. Make sure '" + PASSPHRASE_ENV_VAR + "' is set.")
+  }
+}
+
+callback verify(signature, to_validate, params) {
+  result := false
+  if params["SCHEME"] == "OpenPGP" {
+     tmp_fname := to_tmp_file(to_validate, "")
+     write_file(tmp_fname + ".asc", signature)
+     cmd_line  := format("{VERIFY_CMD_LINE} {tmp_fname} {tmp_fname}.asc")
+     out, code := system(cmd_line)
+     rm_file(tmp_fname)
+     rm_file(tmp_fname + ".asc")
+     if contains(out, "VALIDSIG") {
+       return true
+     }
+     else {
+       error(out)
+     }
   }
 }

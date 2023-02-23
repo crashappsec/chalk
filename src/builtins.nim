@@ -14,7 +14,10 @@ import nimutils, con4m
 
 discard subscribe(con4mTopic, defaultCon4mHook)
 
-const customSinkType = "f(string, {string : string}) -> bool"
+const
+  customSinkType    = "f(string, {string : string}) -> bool"
+  sinkConfSigShort  = "f(string, string, {string : string})"
+  sinkConfSigLong   = "f(string, string, {string : string}, [string])"
 
 proc modedFileSinkOut*(msg: string, cfg: SinkConfig, t: StringTable): bool =
   try:
@@ -188,7 +191,7 @@ proc logInfo(args: seq[Box], s: ConfigState): Option[Box] =
 proc logTrace(args: seq[Box], s: ConfigState): Option[Box] =
   return logBase("trace", args, s)
 
-proc sinkConfig(args: seq[Box], unused: ConfigState): Option[Box] =
+proc sinkConfigLong(args: seq[Box], unused: ConfigState): Option[Box] =
     let
       sinkconf   = unpack[string](args[0])
       sinkName   = unpack[string](args[1])
@@ -240,7 +243,12 @@ proc sinkConfig(args: seq[Box], unused: ConfigState): Option[Box] =
     else:
       warn(fmt"Output sink configuration '{sinkconf}' failed to load.")
 
-proc getExeVersion(args:    seq[Box], unused: ConfigState): Option[Box] =
+proc sinkConfigShort(args: seq[Box], unused: ConfigState): Option[Box] =
+  var a2 = args
+  a2.add(pack(@[""]))
+  return sinkConfigLong(a2, unused)
+
+proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
     const retval = getChalkExeVersion()
 
     return some(pack(retval))
@@ -255,8 +263,8 @@ setChalkCon4mBuiltins(@[
   ("trace",       BuiltInFn(logTrace),         "f(string)"),
   ("argv",        BuiltInFn(getArgv),          "f() -> [string]"),
   ("argv0",       BuiltInFn(getExeName),       "f() -> string"),
-  ("sink_config", BuiltInFn(sinkConfig),
-                            "f(string, string, {string: string}, [string])")
+  ("sink_config", BuiltInFn(sinkConfigShort),  sinkConfSigShort),
+  ("sink_config", BuiltInFn(sinkConfigLong),   sinkConfSigLong)
   ])
 
 # Can be used by codecs that aren't directly inserting.

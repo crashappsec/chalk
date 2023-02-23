@@ -102,7 +102,7 @@ proc runCmdConfLoad*() =
     var chalkPtrKey = getKeySpec("CHALK_PTR").get()
     chalkPtrKey.setValue(none(Box))
 
-    var xChalkConfKey = getKeySpec("X_CHALK_CONFIG").get()
+    var xChalkConfKey = getKeySpec("_CHALK_CONFIG").get()
     xChalkConfKey.setValue(some(pack(newCon4m)))
 
   trace(fmt"{filename}: installing configuration.")

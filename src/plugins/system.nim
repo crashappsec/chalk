@@ -28,11 +28,11 @@ method getArtifactInfo*(self: SystemPlugin,
     result["INJECTOR_ID"] = pack(selfIdOpt.get())
 
   let
-    spec = config.getKeySpec("X_CHALK_CONFIG").get()
+    spec = config.getKeySpec("_CHALK_CONFIG").get()
     optVal = spec.getValue()
 
   if optVal.isSome():
-    result["X_CHALK_CONFIG"] = optVal.get()
+    result["_CHALK_CONFIG"] = optVal.get()
 
 
 registerPlugin("system", SystemPlugin())

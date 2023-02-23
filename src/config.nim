@@ -352,13 +352,13 @@ proc loadEmbeddedConfig*(selfChalkOpt: Option[ChalkDict]): bool =
     let selfChalk = selfChalkOpt.get()
 
     # We extracted a CHALK object from our own executable.  Check for an
-    # X_CHALK_CONFIG key, and if there is one, run that configuration
+    # _CHALK_CONFIG key, and if there is one, run that configuration
     # file, before loading any on-disk configuration file.
-    if not selfChalk.contains("X_CHALK_CONFIG"):
+    if not selfChalk.contains("_CHALK_CONFIG"):
       trace("Embedded self-CHALK does not contain a configuration.")
       confString = defaultConfig
     else:
-      confString = unpack[string](selfChalk["X_CHALK_CONFIG"])
+      confString = unpack[string](selfChalk["_CHALK_CONFIG"])
 
   try:
     let res = ctxChalkConf.stackConfig(confString,

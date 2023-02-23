@@ -6,7 +6,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import tables, strformat, strutils, os, options, nativesockets, json, glob
-import nimSHA2, nimutils, types, config, plugins, io/[tojson, tobinary]
+import nimSHA2, con4m, nimutils, types, config, plugins, io/[tojson, tobinary]
 
 const
   # This is the logging template for JSON output.
@@ -21,6 +21,9 @@ const
   fmtInfoNoPrimary  = "{obj.fullpath}: couldn't find a primary chalk insertion"
   comfyItemSep      = ", "
   jsonArrFmt        = "[ $# ]"
+  verifyTypeStr     = "f(string, string, {string: string}) -> bool"
+let
+  verifyType        = verifyTypeStr.toCon4mType()
 
 proc validateMetadata(codec: Codec, obj: ChalkObj, fields: ChalkDict): bool =
   result = true
@@ -60,16 +63,16 @@ proc validateMetadata(codec: Codec, obj: ChalkObj, fields: ChalkDict): bool =
 
   shaCtx.update(toHash)
 
-  rawHash      = $(shaCtx.final())
-  ulidHiBytes  = rawHash[^10 .. ^9]
-  ulidLowBytes = rawHash[^8 .. ^1]
-  ulidHiInt    = (cast[ptr uint16](addr ulidHiBytes[0]))[]
-  ulidLowInt   = (cast[ptr uint64](addr ulidLowBytes[0]))[]
-  chalkId      = encodeUlid(now, ulidHiInt, ulidLowInt)
+  var mdRawHash = $(shaCtx.final())
+  ulidHiBytes   = mdRawHash[^10 .. ^9]
+  ulidLowBytes  = mdRawHash[^8 .. ^1]
+  ulidHiInt     = (cast[ptr uint16](addr ulidHiBytes[0]))[]
+  ulidLowInt    = (cast[ptr uint64](addr ulidLowBytes[0]))[]
+  chalkId       = encodeUlid(now, ulidHiInt, ulidLowInt)
 
   if "METADATA_HASH" in fields:
     let
-      ourHash   = rawHash.toHex.toLowerAscii()
+      ourHash   = mdRawHash.toHex().toLowerAscii()
       theirHash = unpack[string](fields["METADATA_HASH"]).toLowerAscii()
     if ourHash != theirHash:
       error(fmt"{obj.fullPath}: METADATA_HASH field does not match " &
@@ -82,7 +85,27 @@ proc validateMetadata(codec: Codec, obj: ChalkObj, fields: ChalkDict): bool =
       if chalkId[^15 .. ^1] != mdidValidator:
         error(fmt"{obj.fullPath}: METADATA_ID field does not match " &
                  "calculated value")
-      result = false
+        result = false
+      if "SIGNATURE" in fields:
+        # This matches code in metsys.nim that calls sign()
+        let
+          artHash  = rawHash.toHex().toLowerAscii()
+          mdid     = (unpack[string](fields["METADATA_ID"]))
+          toVerify = pack(artHash & "\n" & ourHash & "\n" & mdid & "\n")
+          args     = @[toVerify, fields["SIGNATURE"], fields["SIGN_PARAMS"]]
+          optValid = ctxChalkConf.sCall("verify", args, verifyType)
+
+        # If verify() isn't provided, the caller doesn't care about
+        # signature checking.
+        if optValid.isSome():
+          result = unpack[bool](optValid.get())
+          if not result:
+            error(fmt"{obj.fullPath}: signature verification failed.")
+          else:
+            info(fmt"{obj.fullPath}: signature successfully verified.")
+        else:
+          once:
+            warn(fmt"{obj.fullPath}: no signature validation routine provided.")
 
 proc doExtraction*(): Option[string] =
   # This function will extract chalk, leaving them in chalk objects
