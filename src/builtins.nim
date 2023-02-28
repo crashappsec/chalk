@@ -128,7 +128,6 @@ proc topicUnsubscribe(args: seq[Box], unused: ConfigState): Option[Box] =
 
   return some(pack(unsubscribe(topic, `rec?`.get())))
 
-
 var chalkStack: seq[ChalkObj] = @[]
 
 proc pushTargetChalkForErrorMsgs*(s: ChalkObj) =
@@ -245,7 +244,7 @@ proc sinkConfigLong(args: seq[Box], unused: ConfigState): Option[Box] =
 
 proc sinkConfigShort(args: seq[Box], unused: ConfigState): Option[Box] =
   var a2 = args
-  a2.add(pack(@[""]))
+  a2.add(pack[seq[string]](@[]))
   return sinkConfigLong(a2, unused)
 
 proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =

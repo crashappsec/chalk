@@ -132,6 +132,18 @@ func key_check(keyname, value: [string]) {
   return ""
 }
 
+# TODO: should add a "choices" constraint to con4m.
+func zip_check(keyname, value: [string]) {
+  valid_items := ["zip", "jar", "war", "ear"]
+
+  for i from 0 to len(value) {
+    if not contains(valid_items, value[i]) {
+      return "'" + value[i] + "' is not a supported zip-based file extension."
+    }
+  }
+  return ""
+}
+
 object sink {
   gen_fieldname: "sinks"
   gen_typename:  "SinkSpec"
@@ -275,6 +287,11 @@ root {
   field dry_run {
     type:    "bool"
     default: false
+  }
+  field zip_extensions {
+    type:       "[string]"
+    default:    ["zip", "jar", "war", "ear"]
+    validator:  "zip_check"
   }
   field ignore_broken_conf {
     # If you use callbacks in a conf you could end up with

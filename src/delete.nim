@@ -58,7 +58,7 @@ proc doDelete*() =
       try:
         (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
         ctx       = newFileStream(f)
-        codec.handleWrite(ctx, pre, none(string), post)
+        codec.handleWrite(item, ctx, pre, none(string), post)
         close(f)
         info(fmt"{item.fullPath}: chalk removed")
       except:

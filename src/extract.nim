@@ -11,9 +11,9 @@ import nimSHA2, con4m, nimutils, types, config, plugins, io/[tojson, tobinary]
 const
   # This is the logging template for JSON output.
   logTemplate       = """{
-  "ARTIFACT_PATH": $#,
-  "CHALK" : $#,
-  "EMBEDDED_CHALK" : $#,
+  "ARTIFACT_PATH"     : $#,
+  "CHALK"             : $#,
+  "EMBEDDED_CHALK"    : $#,
   "VALIDATION_PASSED" : $#
 }"""
   fmtInfoNoExtract  = "{obj.fullpath}: No chalk found for extraction"
@@ -161,9 +161,8 @@ proc doExtraction*(): Option[string] =
           else:
             info(fmtInfoNoExtract.fmt())
           unmarked.add(obj.fullpath)
-
           continue
-        if obj.chalkHasExisting():
+        elif obj.chalkHasExisting():
           let
             p = obj.primary
             s = p.chalkFields.get()

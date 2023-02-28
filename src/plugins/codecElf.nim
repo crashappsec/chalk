@@ -47,9 +47,6 @@ proc extractKeyMetadata*(self: CodecElf, obj: ChalkObj): bool =
   var present:  bool
   var offset:   int
 
-  if isBigEndian:
-    obj.flags.incl(BigEndian)
-
   if is64Bit:
     obj.flags.incl(Arch64Bit)
     obj.stream.setPosition(b64OffsetLoc)
@@ -95,11 +92,12 @@ method scan*(self: CodecElf, obj: ChalkObj): bool =
   except:
     result = false
 
-method handleWrite*(self: CodecElf,
-                    ctx: Stream,
-                    pre: string,
+method handleWrite*(self:    CodecElf,
+                    obj:     ChalkObj,
+                    ctx:     Stream,
+                    pre:     string,
                     encoded: Option[string],
-                    post: string) =
+                    post:    string) =
   ctx.write(pre)
   if encoded.isSome():
     ctx.write(encoded.get())

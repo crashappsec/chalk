@@ -105,19 +105,14 @@ method scan*(self: Codec, chalk: ChalkObj): bool {.base.} =
 
   discard
 
-proc loadChalkLoc(self:  Codec,
-                  chalk: ChalkObj,
-                  pt:    ChalkPoint = chalk.primary) =
+method loadChalkLoc*(self:  Codec,
+                     chalk: ChalkObj,
+                     pt:    ChalkPoint = chalk.primary) {.base.} =
   var fields: ChalkDict
-
-  let swap = when system.cpuEndian == bigEndian:
-               if not BigEndian in chalk.flags: true else: false
-             else:
-               if BigEndian in chalk.flags: true else: false
 
   trace(fmtTraceFIP.fmt())
 
-  if SkipWrite in chalk.flags:
+  if SkipAutoWrite in chalk.flags:
     self.doVirtualLoad(chalk)
   else:
     chalk.stream.setPosition(pt.startOffset)
@@ -128,16 +123,16 @@ proc loadChalkLoc(self:  Codec,
 
     var truestart = chalk.stream.getPosition()
     try:
-      fields = chalk.extractOneChalkJson()
+      fields         = chalk.stream.extractOneChalkJson(chalk.fullpath)
       pt.chalkFields = some(fields)
       pt.startOffset = truestart
-      pt.endOffset = chalk.stream.getPosition()
-      pt.valid = true
+      pt.endOffset   = chalk.stream.getPosition()
+      pt.valid       = true
     except:
       error(eBadJson.fmt() & ": " & getCurrentExceptionMsg())
       pt.startOffset = truestart
-      pt.endOffset = chalk.stream.getPosition()
-      pt.valid = false
+      pt.endOffset   = chalk.stream.getPosition()
+      pt.valid       = false
 
 var numCachedFds: int = 0
 
@@ -187,7 +182,7 @@ proc dispatchFileScan(self:       Codec,
   let success = self.scan(chalk)
 
   # If a file scan registers interest, returning the file will
-  # automatically lead to the scan loop exclusing that file.  However,
+  # automatically lead to the scan loop excluding that file.  However,
   # we want to let codecs exclude multiple files if it makes sense,
   # without polluting the method signature with rarely used variables.
   # So we'll check chalk.exclude here, for extra exclusions.
@@ -317,11 +312,12 @@ method getArtifactInfo*(self: Codec, chalk: ChalkObj): KeyInfo =
   result["CHALK_ID"]       = pack(chalkId)
   trace(fmt"chalkd: {chalkId}")
 
-method handleWrite*(self: Codec,
-                    ctx: Stream,
-                    pre: string,
+method handleWrite*(self:    Codec,
+                    obj:     ChalkObj,
+                    ctx:     Stream,
+                    pre:     string,
                     encoded: Option[string],
-                    post: string) {.base.} =
+                    post:    string) {.base.} =
   raise newException(Exception, ePureVirtual)
 
 
@@ -336,6 +332,7 @@ import plugins/conffile
 import plugins/codecShebang
 import plugins/codecElf
 import plugins/codecContainer
+import plugins/codecZip
 import plugins/custom
 import plugins/ownerAuthors
 import plugins/ownerGithub

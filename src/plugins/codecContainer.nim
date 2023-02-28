@@ -50,7 +50,7 @@ method scan*(self: CodecContainer, obj: ChalkObj): bool =
   dirWalk(true, obj.exclude.add(item))
 
   once:
-    obj.flags.incl(SkipWrite)
+    obj.flags.incl(SkipAutoWrite)
     obj.flags.incl(StopScan)
     return true
   return false
@@ -59,10 +59,12 @@ method doVirtualLoad*(self: CodecContainer, obj: ChalkObj) =
   discard
 
 method handleWrite*(self:    CodecContainer,
+                    obj:     ChalkObj,
                     ctx:     Stream,
                     pre:     string,
                     encoded: Option[string],
                     post:    string) =
+  # This gets called because we set the 'SkipAutoWrite' flag above.
   echo pretty(parseJson(encoded.get()))
 
 method getArtifactInfo*(self: CodecContainer, obj: ChalkObj): KeyInfo =

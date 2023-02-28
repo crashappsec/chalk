@@ -25,17 +25,17 @@ type
      ## will end up in the FileOfInterest object.
 
   FileFlags* = enum
-    BigEndian, Arch64Bit, SkipWrite, StopScan
+    Arch64Bit, SkipAutoWrite, StopScan
 
   ChalkPoint* = ref object
     ## The ChalkPoints object encodes all info known about a single point
     ## for a chalk, such as whether there's currently a chalk object
     ## there.
     chalkFields*:  Option[ChalkDict] ## The chalk fields found at a point.
-    startOffset*: int  ## When we're inserting chalk, where does it go?
-    endOffset*:   int  ## When we're inserting, where does the file resume?
-    present*:     bool ## Flag to indicate when there's magic at the location.
-    valid*:       bool
+    startOffset*:  int  ## When we're inserting chalk, where does it go?
+    endOffset*:    int  ## When we're inserting, where does the file resume?
+    present*:      bool ## Flag to indicate when there's magic at the location.
+    valid*:        bool
 
   ChalkObj* = ref object
     ## The chalk point info for a single artifact.
@@ -49,7 +49,13 @@ type
     exclude*:   seq[string] ## Extra files to exclude from the scan.
     flags*:     set[FileFlags]
     embeds*:    seq[(string, ChalkPoint)]
-    err*:       seq[string]
+    cache*:     RootRef     ## For the plugin to store state.
+    err*:       seq[string] ## runtime logs for chalking are filtered
+                            ## based on the "chalk log level". They
+                            ## end up here, until the end of chalking
+                            ## where, they get added to ERR_INFO, if
+                            ## any.  To disable, simply set the chalk
+                            ## log level to 'none'.
 
   Plugin* = ref object of RootObj
     name*:       string
@@ -71,11 +77,11 @@ proc chalkIsEmpty*(chalk: ChalkObj): bool {.inline.} =
          else:
            true
 
-# For use in binary JSON encoding.
+# For use in binary chalk encoding.
 const
   binTypeNull*    = 0'u8
   binTypeString*  = 1'u8
   binTypeInteger* = 2'u8
   binTypeBool*    = 3'u8
-  binTypeArray*   = 5'u8
-  binTypeObj*     = 6'u8
+  binTypeArray*   = 4'u8
+  binTypeObj*     = 5'u8

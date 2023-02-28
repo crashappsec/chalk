@@ -32,11 +32,12 @@ method scan*(self: CodecShebang, obj: ChalkObj): bool =
   except:
     return false
 
-method handleWrite*(self: CodecShebang,
-                    ctx: Stream,
-                    pre: string,
+method handleWrite*(self:    CodecShebang,
+                    obj:     ChalkObj,
+                    ctx:     Stream,
+                    pre:     string,
                     encoded: Option[string],
-                    post: string) =
+                    post:    string) =
 
   if encoded.isSome():
     ctx.write(pre)

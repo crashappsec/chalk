@@ -112,9 +112,9 @@ proc valueFromJson(jobj: JsonNode, fname: string): Box =
   of JArray:
     return pack(arrayFromJson(jobj, fname))
 
-proc extractOneChalkJson*(obj: ChalkObj): ChalkDict =
-  var jobj: JSonNode = obj.stream.parseJson()
+proc extractOneChalkJson*(stream: Stream, path: string): ChalkDict =
+  var jobj: JSonNode = stream.parseJson()
 
-  let fv = valueFromJson(jobj, obj.fullpath)
+  let fv = valueFromJson(jobj, path)
 
   return unpack[TableRef[string, Box]](fv)

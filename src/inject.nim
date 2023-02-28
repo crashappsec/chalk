@@ -49,8 +49,8 @@ proc doOneInjection(obj: ChalkObj, codec: Codec): string =
     publish("dry-run", toInject)
     return
 
-  if SkipWrite in obj.flags or not codec.configInfo.getUsesFstream():
-    codec.handleWrite(nil, "", some(toInject), "")
+  if SkipAutoWrite in obj.flags or not codec.configInfo.getUsesFstream():
+    codec.handleWrite(obj, nil, "", some(toInject), "")
     return
 
   let
@@ -76,7 +76,7 @@ proc doOneInjection(obj: ChalkObj, codec: Codec): string =
     (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
     ctx       = newFileStream(f)
 
-    codec.handleWrite(ctx, pre, some(toInject), post)
+    codec.handleWrite(obj, ctx, pre, some(toInject), post)
     if point.present:
       info(fmt"{obj.fullPath}: artifact metadata replaced.")
     else:

@@ -399,7 +399,7 @@ proc loadUserConfigFile*(commandName: string,
       break
     trace(fmt"No configuration file found in {dir}.")
 
-  if fname != "":
+  if fname != "" and fname.fileExists():
     info(fmt"Loading config file: {fname}")
     try:
       var
@@ -411,8 +411,10 @@ proc loadUserConfigFile*(commandName: string,
         return none(string)
       else:
         fd.setPosition(0)
-        contents = fd.readAll()
-        loaded = true
+        contents    = fd.readAll()
+        loaded      = true
+        chalkConfig = ctxChalkConf.attrs.loadChalkConfig()
+        postProcessConfig()
 
     except Con4mError: # config file didn't load:
       error(getCurrentExceptionMsg())
@@ -422,13 +424,10 @@ proc loadUserConfigFile*(commandName: string,
       trace("ignore_broken_conf is false: terminating.")
       quit()
 
-  chalkConfig = ctxChalkConf.attrs.loadChalkConfig()
-  postProcessConfig()
-
   if loaded:
-    trace(fmt"Loaded configuration file: {fname}")
+    info(fmt"Loaded configuration file: {fname}")
     return some(contents)
 
   else:
-    trace("No user config file loaded.")
+    info("No user config file loaded.")
     return none(string)
