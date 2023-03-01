@@ -8,13 +8,12 @@
 import tables, strformat, strutils, os
 import nimutils, ../types, ../plugins
 
-when (NimMajor, NimMinor) < (1, 7):
-  {.warning[LockLevel]: off.}
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 type GithubCI = ref object of Plugin
 
 method getArtifactInfo*(self: GithubCI,
-                        obj:  ChalkObj): KeyInfo =
+                        obj:  ChalkObj): ChalkDict =
   result = newTable[string, Box]()
 
   # https://docs.github.com/en/actions/

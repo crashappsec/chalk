@@ -339,8 +339,8 @@ key SIGNATURE {
 # non-codecs cannot set these keys.
 
 plugin elf {
-    ~codec: true
-    ~keys: []
+    ~codec:      true
+    ~keys:       []
 }
 
 plugin shebang {

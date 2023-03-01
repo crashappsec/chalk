@@ -12,8 +12,6 @@ const
   jSonObjFmt   = "{ $# }"
   jsonArrFmt   = "[ $# ]"
 
-proc foundToJson*(self: ChalkDict): string
-
 proc strValToJson*(s: string): string =
   # %* from the json module; this basically does any escaping
   # we need, which gives us a JsonNode object, that we then convert
@@ -26,18 +24,18 @@ proc strValToJson*(s: string): string =
 # the chalk object.
 #
 # Use the one below is for insertion.
-proc foundToJson*(self: ChalkDict): string =
+proc foundToJson*(self: ChalkObj): string =
   var comma = ""
 
   for fullKey in getOrderedKeys():
     var outputKey = fullKey
 
-    if fullKey notin self:
+    if fullKey notin self.extract:
       continue
 
     let
       keyJson = strValToJson(outputKey)
-      valJson = boxToJson(self[fullKey])
+      valJson = boxToJson(self.extract[fullKey])
 
     result = result & kvPairJFmt.fmt()
     comma = comfyItemSep

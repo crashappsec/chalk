@@ -8,73 +8,47 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-
-import os, tables, strutils, streams, nimutils, json
+import tables, strutils, nimutils, json, glob
 import ../types, ../config, ../plugins
 
-when (NimMajor, NimMinor) < (1, 7):
-  {.warning[LockLevel]: off.}
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
-type CodecContainer* = ref object of Codec
+type
+  CodecContainer* = ref object of Codec
+  ContainerCache  = ref object of RootRef
+    info: ChalkDict
 
-method scan*(self: CodecContainer, obj: ChalkObj): bool =
-  # Never interfere with self-chalk.  Leave that to the real codecs.
-  if obj.fullpath == resolvePath(getAppFileName()):
-    return false
+method usesFStream*(self: CodecContainer): bool = false
 
-  var idstr = chalkConfig.getContainerImageId()
+method scanArtifactLocations*(self:       CodecContainer,
+                              exclusions: var seq[string],
+                              ignoreList: seq[Glob],
+                              recurse:    bool) =
 
-  if idstr == "":
-    return false
+  var
+    idstr = chalkConfig.getContainerImageId().toLowerAscii()
+    name  = chalkConfig.getContainerImageName()
+    cache = ContainerCache(info: ChalkDict())
 
-  if idstr.startsWith("sha256:"):
-    idstr = idstr[7 .. ^1]
+  if idstr == "": return
 
-  idstr = idstr.toLowerAscii()
+  if idstr.startsWith("sha256:"): idstr = idstr[7 .. ^1]
+
   if len(idstr) != 64:
-    once:
-      error("Invalid container image ID given (expected 64 bytes of hex)")
-    return false
+    error("Invalid container image ID given (expected 64 bytes of hex)")
+    return
 
   for ch in idstr:
     if ch notin "0123456789abcdef":
       error("Invalid sh256 for container image ID given")
-      return false
+      return
 
-    # Create a liar chalk location.
-  # Should probably have a bit in the obj.flags field to control.
-  obj.primary = ChalkPoint(startOffset: 0, present: true)
-  obj.exclude = @[]
 
-  var path = obj.fullPath
-  dirWalk(true, obj.exclude.add(item))
-
-  once:
-    obj.flags.incl(SkipAutoWrite)
-    obj.flags.incl(StopScan)
-    return true
-  return false
-
-method doVirtualLoad*(self: CodecContainer, obj: ChalkObj) =
-  discard
-
-method handleWrite*(self:    CodecContainer,
-                    obj:     ChalkObj,
-                    ctx:     Stream,
-                    pre:     string,
-                    encoded: Option[string],
-                    post:    string) =
-  # This gets called because we set the 'SkipAutoWrite' flag above.
-  echo pretty(parseJson(encoded.get()))
-
-method getArtifactInfo*(self: CodecContainer, obj: ChalkObj): KeyInfo =
-  var
-    idstr = chalkConfig.getContainerImageId()
-    name  = chalkConfig.getContainerImageName()
-
-  if idstr.startsWith("sha256:"):
-    idstr = idstr[7 .. ^1]
-
+  self.chalks.add(ChalkObj(fullpath:  idstr,
+                           newFields: newTable[string, Box](),
+                           extract:   nil,
+                           valid:     false,
+                           cache:     cache))
   var
     shortBytes = idstr[^20 .. ^17]
     longBytes  = idstr[^16 .. ^1]
@@ -82,11 +56,19 @@ method getArtifactInfo*(self: CodecContainer, obj: ChalkObj): KeyInfo =
     longInt    = fromHex[uint64](longBytes)
     ulid       = encodeUlid(unixTimeInMs(), shortInt, longInt)
 
+  cache.info["HASH"]          = pack(idstr)
+  cache.info["HASH_FILES"]    = pack(@[name])
+  cache.info["ARTIFACT_PATH"] = pack(name)
+  cache.info["CHALK_ID"]      = pack(ulid)
 
-  result                  = newTable[string, Box]()
-  result["HASH"]          = pack(idstr)
-  result["HASH_FILES"]    = pack(@[name])
-  result["ARTIFACT_PATH"] = pack(name)
-  result["CHALK_ID"]       = pack(ulid)
+  # TODO: if there's a chalk already we should load it.
+
+method keepScanningOnSuccess*(self: CodecContainer): bool = false
+
+method handleWrite*(self: CodecContainer, obj: ChalkObj, enc: Option[string]) =
+  echo pretty(parseJson(enc.get()))
+
+method getArtifactInfo*(self: CodecContainer, chalk: ChalkObj): ChalkDict =
+  result = ContainerCache(chalk.cache).info
 
 registerPlugin("container", CodecContainer())

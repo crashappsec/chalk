@@ -7,8 +7,7 @@
 import tables, options, strutils, nimSHA2, nimutils, con4m
 import ../types, ../config, ../plugins, ../io/tobinary
 
-when (NimMajor, NimMinor) < (1, 7):
-  {.warning[LockLevel]: off.}
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 type MetsysPlugin* = ref object of Plugin
 
@@ -18,10 +17,12 @@ const
 let
   callbackType    = callbackTypeStr.toCon4mType()
 
-proc processOldChalk(obj: ChalkObj, olddict: ChalkDict): Box =
-  var groomedDict: ChalkDict = newTable[string, Box]()
+proc processOldChalk(obj: ChalkObj): Box =
+  var
+    groomedDict: ChalkDict = newTable[string, Box]()
+    oldDict:     ChalkDict = obj.extract
 
-  for k, v in olddict:
+  for k, v in oldDict:
     var fullkey = k
     var specOpt = getKeySpec(k)
 
@@ -39,18 +40,15 @@ proc processOldChalk(obj: ChalkObj, olddict: ChalkDict): Box =
 
   result = pack(groomedDict)
 
-method getArtifactInfo*(self: MetsysPlugin,
-                        obj: ChalkObj): KeyInfo =
+method getArtifactInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
   new result
 
   let oldChalkOpt = config.getKeySpec("OLD_CHALK")
 
-  if oldChalkOpt.isSome() and obj.primary.present and obj.primary.valid:
+  if oldChalkOpt.isSome() and obj.isMarked():
     let oldChalkSpec = oldChalkOpt.get()
     if not oldChalkSpec.getSkip():
-      let oldpoint = obj.primary
-      if oldpoint.chalkFields.isSome():
-        result["OLD_CHALK"] = processOldChalk(obj, oldpoint.chalkFields.get())
+      result["OLD_CHALK"] = processOldChalk(obj)
 
   if len(obj.err) != 0:
     result["ERR_INFO"] = pack(obj.err)
@@ -70,7 +68,6 @@ method getArtifactInfo*(self: MetsysPlugin,
     metaId       = encodeUlid(now, ulidHiInt, ulidLowInt)
     toSign       = unpack[string](obj.newFields["HASH"]) & "\n" &
                      metaHashStr & "\n" & metaId & "\n"
-
 
   result["METADATA_HASH"] = pack(metaHashStr)
   result["METADATA_ID"]   = pack(metaId)

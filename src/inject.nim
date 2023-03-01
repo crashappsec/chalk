@@ -27,7 +27,7 @@ proc getSystemPlugins(): array[2, Plugin] {.inline.} =
   return systeMetsys
 
 proc acquireStreamIfUsed(codec: Codec, infoObj: ChalkObj) =
-  if codec.configInfo.getUsesFstream():
+  if codec.usesFStream():
     discard infoObj.acquireFileStream()
 
 proc isValidChalk(obj: ChalkObj): bool =
@@ -37,36 +37,7 @@ proc isValidChalk(obj: ChalkObj): bool =
       error(fmt"{obj.fullPath} is missing key: {key}")
       result = false
 
-proc doOneInjection(obj: ChalkObj, codec: Codec): string =
-  result = obj.createdToJson(false)
-
-  let toInject =  if getOutputPointers():
-                    obj.createdToJson(true):
-                  else:
-                    result
-  if chalkConfig.getDryRun():
-    info("{obj.fullPath}: would inject; publishing to 'dry-run' instead")
-    publish("dry-run", toInject)
-    return
-
-  if SkipAutoWrite in obj.flags or not codec.configInfo.getUsesFstream():
-    codec.handleWrite(obj, nil, "", some(toInject), "")
-    return
-
-  let
-    stream = obj.stream
-    point  = obj.primary
-
-  stream.setPosition(0)
-
-  let pre = stream.readStr(point.startOffset)
-
-  if point.endOffset > point.startOffset:
-    stream.setPosition(point.endOffset)
-
-  let post = stream.readAll()
-
-  obj.closeFileStream()
+proc selfInject(obj: ChalkObj, codec: Codec): string =
   var
     f:    File
     path: string
@@ -76,14 +47,15 @@ proc doOneInjection(obj: ChalkObj, codec: Codec): string =
     (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
     ctx       = newFileStream(f)
 
-    codec.handleWrite(obj, ctx, pre, some(toInject), post)
-    if point.present:
-      info(fmt"{obj.fullPath}: artifact metadata replaced.")
+    codec.handleWrite(obj, some(obj.createdToJson(false)))
+    if obj.isMarked():
+      info(fmt"{obj.fullPath}: self-injection metadata replaced.")
     else:
-      info(fmt"{obj.fullPath}: new artifact metadata added.")
+      info(fmt"{obj.fullPath}: new self-injection metadata added.")
   except:
-    error(fmt"{obj.fullPath}: insertion failed.")
+    error(fmt"{obj.fullPath}: insertion failed: " & getCurrentExceptionMsg())
     removeFile(path)
+    obj.closeFileStream()
   finally:
     if ctx != nil:
       ctx.close()
@@ -91,13 +63,42 @@ proc doOneInjection(obj: ChalkObj, codec: Codec): string =
         let newPath = if getSelfInjecting(): obj.fullPath & ".new"
                       else: obj.fullPath
         moveFile(path, newPath)
-        if getSelfInjecting():
-          info(fmt"Wrote new binary with loading conf to {newpath}")
+        info(fmt"Wrote new binary with loading conf to {newpath}")
       except:
         removeFile(path)
         error(fmt"{obj.fullPath}: Could not write (no permission)")
 
-proc doInjection*() =
+proc doOneInjection(obj: ChalkObj, codec: Codec, deletion: bool): string =
+  # Preps what needs to be written for one chalk before hitting up the
+  # codec to do the actual writing.
+  var op = if deletion: "deletion" else: "insertion"
+  if getSelfInjecting():
+    return selfInject(obj, codec)
+
+  let
+    flag     = getOutputPointers()
+    toInject = if deletion: none(string) else: some(obj.createdToJson(flag))
+
+  if deletion: result = ""
+  else:        result = if flag: obj.createdToJson(false) else: toInject.get()
+
+  if chalkConfig.getDryRun():
+    info("{obj.fullPath}: would modify metadata; publishing to 'dry-run' instead")
+    publish("dry-run", result)
+    return
+  elif deletion and not obj.isMarked(): return # Nothing to delete.
+  try:
+    codec.handleWrite(obj, some(obj.createdToJson(flag)))
+    if deletion:
+      info(obj.fullPath & ": artifact metadata deleted.")
+    elif obj.startOffset < obj.endOffset:
+      info(obj.fullPath & ": artifact metadata replaced.")
+    else:
+      info(obj.fullPath & ": artifact metadata added.")
+  except:
+    error(obj.fullPath & ": " & op & " failed: " & getCurrentExceptionMsg())
+
+proc doInjection*(deletion = false) =
   var
     objsForPublish: seq[string] = @[]
   let
@@ -108,28 +109,32 @@ proc doInjection*() =
     pluginInfo  = getPluginsByPriority()
 
   # Anything we've extracted is for an artifact where we are about to
-  # inject over it.  Report these to the "replacing" output stream.
+  # inject over it.  Report these to the "delete" output stream.
   if extractions.isSome():
-    publish("replacing", extractions.get())
+    publish("delete", extractions.get())
 
   for plugin in codecs:
     let
       name            = plugin.name
       codec           = Codec(plugin)
-      extracts        = codec.getChalks()
+      extracts        = codec.chalks
       codecIgnores    = codec.configInfo.getIgnore()
       xtraKeys        = codec.configInfo.getKeys()
-      streamAvailable = codec.configInfo.getUsesFstream()
 
     for infoObj in extracts:
       pushTargetChalkForErrorMsgs(infoObj)
+      codec.acquireStreamIfUsed(infoObj)
+
+      if deletion:
+        discard infoObj.doOneInjection(codec, true)
+        infoObj.closeFileStream()
+        popTargetChalkForErrorMsgs()
+        continue
       let
         keyInfo = codec.getArtifactInfo(infoObj)
         path    = infoObj.fullPath
 
-
       infoObj.newFields = ChalkDict()
-      codec.acquireStreamIfUsed(infoObj)
 
       trace(fmt"{path}: Codec '{name}' beginning metadata collection.")
 
@@ -150,10 +155,6 @@ proc doInjection*() =
 
         if plugin.configInfo.getCodec(): continue
         if not plugin.configInfo.getEnabled(): continue
-        if not streamAvailable and plugin.configInfo.getUsesFstream():
-          trace("Plugin {piname} skipped; codec {name} " &
-                "does not supply required file stream")
-          continue
         let
           pluginKeys     = plugin.configInfo.getKeys()
           pluginIgnores  = plugin.configInfo.getIgnore()
@@ -191,13 +192,14 @@ proc doInjection*() =
         error("{path}: generated chalk object is invalid (skipping)")
       else:
         trace(fmt"{path}: chalk object built; injecting.")
-        let toPublish = infoObj.doOneInjection(codec)
+        let toPublish = infoObj.doOneInjection(codec, false)
         objsForPublish.add(toPublish)
 
       # Should be totally done with the file stream now.
       infoObj.closeFileStream()
       popTargetChalkForErrorMsgs()
 
+  if deletion: return
   let fullJson = "[" & join(objsForPublish, ", ") & "]"
 
   if getSelfInjecting():

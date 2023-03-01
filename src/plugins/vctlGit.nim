@@ -24,8 +24,7 @@ const
   ghOrigin     = "origin"
   ghLocal      = "local"
 
-when (NimMajor, NimMinor) < (1, 7):
-  {.warning[LockLevel]: off.}
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 proc findGitDir(fullpath: string): string =
   let
@@ -167,14 +166,6 @@ proc getOrigin(self: GitPlugin, obj: ChalkObj): (bool, Box) =
     error(wNotParsed.fmt())
     return (false, nil)
 
-# Not sure I'm going to use this.  Stay tuned.
-#[
-proc getWorkingDir(self: GitPlugin, obj: ChalkObj): (bool, Box) =
-  if self.vcsDir != "":
-    return (true, pack(self.vcsDir.splitPath().head))
-  return (false, nil)
-]#
-
 proc getHead(self: GitPlugin, obj: ChalkObj): (bool, Box) =
   if self.commitID == "":
     return (false, nil)
@@ -185,7 +176,7 @@ proc getBranch(self: GitPlugin, obj: ChalkObj): (bool, Box) =
     return (false, nil)
   return (true, pack(self.branchName))
 
-method getArtifactInfo*(self: GitPlugin, obj: ChalkObj): KeyInfo =
+method getArtifactInfo*(self: GitPlugin, obj: ChalkObj): ChalkDict =
   result = newTable[string, Box]()
 
   self.loadBasics(obj)
@@ -199,8 +190,8 @@ method getArtifactInfo*(self: GitPlugin, obj: ChalkObj): KeyInfo =
     (branchThere, name) = self.getBranch(obj)
 
   if originThere: result["ORIGIN_URI"] = origin
-  if headThere: result["COMMIT_ID"] = head
-  if branchThere: result["BRANCH"] = name
+  if headThere:   result["COMMIT_ID"]  = head
+  if branchThere: result["BRANCH"]     = name
 
 
 registerPlugin("vctl_git", GitPlugin())

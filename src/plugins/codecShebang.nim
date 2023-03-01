@@ -6,59 +6,65 @@
 
 import strutils, options, streams, nimSHA2, ../types, ../config, ../plugins
 
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
+
 type CodecShebang* = ref object of Codec
 
-method scan*(self: CodecShebang, obj: ChalkObj): bool =
-  var line1: string
-
-  if obj.stream == nil:
-    return false
-  obj.stream.setPosition(0)
+method scan*(self:   CodecShebang,
+             stream: FileStream,
+             loc:    string): Option[ChalkObj] =
   try:
-    line1 = obj.stream.readLine()
+    var chalk: ChalkObj
+    let line1 = stream.readLine()
     if not line1.startsWith("#!"):
-      return false
+      return none(ChalkObj)
     let
-      line2 = obj.stream.readLine()
-      ix = line2.find(magicUTF8)
-      pos = ix + line1.len() + 1 # +1 for the newline
-
-    let
-      present = if ix == -1: false else: true
-      pointInfo = ChalkPoint(startOffset: pos, present: present)
-
-    obj.primary = pointInfo
-    return true
+      line2   = stream.readLine()
+      ix      = line2.find(magicUTF8)
+      pos     = ix + line1.len() + 1 # +1 for the newline
+    if ix == -1:
+      chalk             = newChalk(stream, loc)
+      chalk.startOffset = len(line1)
+    else:
+      stream.setPosition(pos)
+      chalk              = stream.loadChalkFromFStream(loc)
+      chalk.startOffset = pos
+    return some(chalk)
   except:
-    return false
+    return none(ChalkObj)
 
 method handleWrite*(self:    CodecShebang,
-                    obj:     ChalkObj,
-                    ctx:     Stream,
-                    pre:     string,
-                    encoded: Option[string],
-                    post:    string) =
+                    chalk:   ChalkObj,
+                    encoded: Option[string]) =
+  chalk.stream.setPosition(0)
+  let pre  = chalk.stream.readStr(chalk.startOffset)
+  if chalk.endOffset > chalk.startOffset:
+    chalk.stream.setPosition(chalk.endOffset)
+  let post = chalk.stream.readAll()
+  var toWrite: string
 
   if encoded.isSome():
-    ctx.write(pre)
+    toWrite = pre
     if not pre.strip().endsWith("\n#"):
-      ctx.write("\n# ")
-    ctx.write(encoded.get())
+      toWrite &= "\n# "
+    toWrite &= encoded.get() & post
   else:
-    ctx.write(pre[0 ..< pre.find('\n')])
-  ctx.write(post)
+    toWrite = pre[0 ..< pre.find('\n')] & post
+  chalk.closeFileStream()
+  chalk.replaceFileContents(toWrite)
 
-method getArtifactHash*(self: CodecShebang, obj: ChalkObj): string =
+method getArtifactHash*(self: CodecShebang, chalk: ChalkObj): string =
   var shaCtx = initSHA[SHA256]()
-  let pt = obj.primary
+  var toHash = ""
+  chalk.stream.setPosition(0)
+  if chalk.isMarked():
+    toHash = chalk.stream.readLine() & "\n"
+    discard chalk.stream.readLine() # Skip line w/ old chalk object
+  toHash &= chalk.stream.readAll()
+  shaCtx.update(toHash)
 
-  obj.stream.setPosition(0)
-  if pt.present:
-    shaCtx.update(obj.stream.readLine())
-    shaCtx.update("\n")
-    discard obj.stream.readLine() # Skip line w/ old chalk object
 
-  shaCtx.update(obj.stream.readAll())
+  shaCtx.update(chalk.stream.readAll())
 
   return $shaCtx.final()
 

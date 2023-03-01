@@ -14,8 +14,7 @@ const
   eCantOpen = "{fname}: File found, but could not be read"
   eFileOpen = "{filename}: Could not open file."
 
-when (NimMajor, NimMinor) < (1, 7):
-  {.warning[LockLevel]: off.}
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 proc findCOFile(fullpath: string): string =
   let (head, tail) = splitPath(fullpath)
@@ -80,8 +79,7 @@ proc findCodeOwner(contents, artifactPath, copath: string): string =
 
 type GithubCodeOwner = ref object of Plugin
 
-method getArtifactInfo*(self: GithubCodeOwner,
-                        obj: ChalkObj): KeyInfo =
+method getArtifactInfo*(self: GithubCodeOwner, obj: ChalkObj): ChalkDict =
   # CODEOWNERS can live in the root of a repo, the docs subdir, or
   # the .github directory of a repository.  The challenge is that we
   # don't actually know where the root directory is, relative to the

@@ -18,8 +18,7 @@ let   callback1Type    = callback1TypeStr.toCon4mType()
 let   callback2Type    = callback2TypeStr.toCon4mType()
 let   callback3Type    = callback3TypeStr.toCon4mType()
 
-when (NimMajor, NimMinor) < (1, 7):
-  {.warning[LockLevel]: off.}
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 type CustomMetadataPlugin* = ref object of Plugin
 
@@ -47,8 +46,7 @@ template processOneKeyType(cbNum: untyped, cbType: string) =
         continue
       result[k] = v
 
-method getArtifactInfo*(self: CustomMetadataPlugin,
-                        obj: ChalkObj): KeyInfo =
+method getArtifactInfo*(self: CustomMetadataPlugin, obj: ChalkObj): ChalkDict =
   result = newTable[string, Box]()
 
   obj.stream.setPosition(0)

@@ -7,8 +7,7 @@
 import options, tables
 import nimutils/box, con4m/[eval, st], ../types, ../config, ../plugins
 
-when (NimMajor, NimMinor) < (1, 7):
-  {.warning[LockLevel]: off.}
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 const pluginName      = "sbom_callback"
 const callbackName    = "get_sboms"
@@ -17,8 +16,7 @@ let   callbackType    = callbackTypeStr.toCon4mType()
 
 type SbomCallbackPlugin* = ref object of Plugin
 
-method getArtifactInfo*(self: SbomCallbackPlugin,
-                        obj: ChalkObj): KeyInfo =
+method getArtifactInfo*(self: SbomCallbackPlugin, obj: ChalkObj): ChalkDict =
 
   let
     arg = @[pack(obj.fullpath)]

@@ -6,13 +6,12 @@
 
 import tables, options, nimutils, ../types, ../config, ../plugins, formatstr
 
-when (NimMajor, NimMinor) < (1, 7):
-  {.warning[LockLevel]: off.}
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 type ConfFilePlugin* = ref object of Plugin
 
 method getArtifactInfo*(self: ConfFilePlugin,
-                        obj: ChalkObj): KeyInfo =
+                        obj: ChalkObj): ChalkDict =
   result = newTable[string, Box]()
 
   let

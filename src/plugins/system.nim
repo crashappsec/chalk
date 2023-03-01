@@ -7,13 +7,12 @@
 import tables, options
 import nimutils, ../types, ../config, ../plugins, ../extract
 
-when (NimMajor, NimMinor) < (1, 7):
-  {.warning[LockLevel]: off.}
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 type SystemPlugin* = ref object of Plugin
 
 method getArtifactInfo*(self: SystemPlugin,
-                        obj:  ChalkObj): KeyInfo =
+                        obj:  ChalkObj): ChalkDict =
 
   result = newTable[string, Box]()
 

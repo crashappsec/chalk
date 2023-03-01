@@ -43,7 +43,6 @@ const
   baseConfig*        = staticRead(baseFname)
   defaultConfig*     = staticRead(defCfgFname) & comment(baseConfig)
   defaultKeyPriority = 50
-
 var
   chalkCon4mBuiltins: seq[(string, BuiltinFn, string)]
   ctxChalkConf*:      ConfigState
@@ -54,7 +53,6 @@ var
   builtinKeys:        seq[string]           = @[]
   systemKeys:         seq[string]           = @[]
   codecKeys:          seq[string]           = @[]
-
 let
   (c42Obj*, c42Ctx*) = c42Spec(chalkC42Spec, "<embedded spec>").get()
 
@@ -80,27 +78,15 @@ proc getChalkExeVersion*(): string =
   declareChalkExeVersion()
   return version
 
-proc getChalkCommitID*(): string =
-  return commitID
-
+proc getChalkCommitID*(): string = return commitID
 proc getBinaryOS*():     string = osStr
 proc getBinaryArch*():   string = archStr
 proc getChalkPlatform*(): string = osStr & " " & archStr
-
-proc setCommandName*(str: string) =
-  commandName = str
-
-proc getCommandName*(): string =
-  return commandName
-
-proc setNoSelfInjection*() =
-  `canSelfInject?` = false
-
-proc canSelfInject*(): bool =
-  return `canSelfInject?`
-
-proc getSelfInjecting*(): bool =
-  return commandName == "confload"
+proc setCommandName*(str: string) = commandName = str
+proc getCommandName*(): string = return commandName
+proc setNoSelfInjection*() = `canSelfInject?` = false
+proc canSelfInject*(): bool = return `canSelfInject?`
+proc getSelfInjecting*(): bool =  return commandName == "confload"
 
 template hookCheck(fieldname: untyped) =
   let s = astToStr(fieldName)
@@ -110,7 +96,6 @@ template hookCheck(fieldname: untyped) =
       warn("Sink config '" & sinkconf & "' is missing field '" & s &
            "', which is required by sink '" & sinkname &
            "' (config not installed)")
-
 
 proc checkHooks*(sinkname:     string,
                  sinkconf:     string,
@@ -140,7 +125,6 @@ when not defined(release):
     publish("debug", msg)
 else:
   template chalkDebug*(s: string) = discard
-
 
 proc setConfigPath*(val: seq[string]) =
   discard ctxChalkConf.setOverride("config_path", some(pack(val)))
@@ -263,24 +247,18 @@ proc getOutputPointers*(): bool =
 
   if contents.getValue().isSome() and not contents.getSkip():
     return true
+  else:
+    return false
 
-  return false
-
-proc isBuiltinKey*(name: string): bool =
-  return name in builtinKeys
-
-proc isSystemKey*(name: string): bool =
-  return name in systemKeys
-
-proc isCodecKey*(name: string): bool =
-  return name in codecKeys
+proc isBuiltinKey*(name: string): bool = return name in builtinKeys
+proc isSystemKey*(name: string): bool =  return name in systemKeys
+proc isCodecKey*(name: string): bool =  return name in codecKeys
 
 # Do last-minute sanity-checking so we can give better error messages
 # more easily.  This function currently runs once for each config
 # loading, to do any sanity checking.  Could probably do more with it.
 # A lot of what's currently here should eventually move to
 # auto-generated bits in the con4m spec, though.
-
 proc postProcessConfig() =
   # Actually, not validation, but get this done early.
 
@@ -306,7 +284,6 @@ proc postProcessConfig() =
       if getSink(sinkname).isNone():
         warn(fmt"Config declared sink '{sinkname}', but no " &
           "implementation exists")
-
 
 proc loadBaseConfiguration*() =
   ## This function loads the built-in configuration, which is split
@@ -341,15 +318,14 @@ proc loadBaseConfiguration*() =
   postProcessConfig()
   setCon4mVerbosity(c4vShowLoc)
 
-
-proc loadEmbeddedConfig*(selfChalkOpt: Option[ChalkDict]): bool =
+proc loadEmbeddedConfig*(selfChalkOpt: Option[ChalkObj]): bool =
   var
     confString:     string
 
   if selfChalkOpt.isNone():
     confString = defaultConfig
   else:
-    let selfChalk = selfChalkOpt.get()
+    let selfChalk = selfChalkOpt.get().extract
 
     # We extracted a CHALK object from our own executable.  Check for an
     # _CHALK_CONFIG key, and if there is one, run that configuration
@@ -384,8 +360,7 @@ proc loadEmbeddedConfig*(selfChalkOpt: Option[ChalkDict]): bool =
 
   return true
 
-proc loadUserConfigFile*(commandName: string,
-                         selfChalk:    Option[ChalkDict]): Option[string] =
+proc loadUserConfigFile*(commandName: string): Option[string] =
   var
     path     = chalkConfig.getConfigPath()
     filename = chalkConfig.getConfigFileName() # the base file name.

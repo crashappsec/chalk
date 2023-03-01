@@ -10,22 +10,16 @@ import nimSHA2, con4m, nimutils, types, config, plugins, io/[tojson, tobinary]
 
 const
   # This is the logging template for JSON output.
-  logTemplate       = """{
+  logFmt       = """{
   "ARTIFACT_PATH"     : $#,
   "CHALK"             : $#,
   "EMBEDDED_CHALK"    : $#,
   "VALIDATION_PASSED" : $#
 }"""
-  fmtInfoNoExtract  = "{obj.fullpath}: No chalk found for extraction"
-  fmtInfoYesExtract = "{obj.fullpath}: chalk extracted"
-  fmtInfoNoPrimary  = "{obj.fullpath}: couldn't find a primary chalk insertion"
-  comfyItemSep      = ", "
-  jsonArrFmt        = "[ $# ]"
   verifyTypeStr     = "f(string, string, {string: string}) -> bool"
-let
-  verifyType        = verifyTypeStr.toCon4mType()
+let verifyType      = verifyTypeStr.toCon4mType()
 
-proc validateMetadata(codec: Codec, obj: ChalkObj, fields: ChalkDict): bool =
+proc validateMetadata(codec: Codec, obj: ChalkObj): bool =
   result = true
 
   var
@@ -37,28 +31,26 @@ proc validateMetadata(codec: Codec, obj: ChalkObj, fields: ChalkDict): bool =
     now          = 0'u64
     chalkId      = encodeUlid(now, ulidHiInt, ulidLowInt)
 
-  if "CHALK_ID" notin fields:
+  if "CHALK_ID" notin obj.extract:
     error(fmt"{obj.fullPath}: required field 'CHALK_ID' is missing.")
     result = false
-
-  elif len(unpack[string](fields["CHALK_ID"])) != 26:
+  elif len(unpack[string](obj.extract["CHALK_ID"])) != 26:
     error(fmt"{obj.fullPath}: 'CHALK_ID' is invalid length (expected 26 bytes)")
     result = false
+  else:
+    let extractedId = (unpack[string](obj.extract["CHALK_ID"]))[^15 .. ^1]
+    if chalkId[^15 .. ^1] != extractedId:
+      error(fmt"{obj.fullPath}: Calculated CHALK_ID doesn't match extracted " &
+            fmt"ID '{chalkId[^15 .. ^1]}' vs '{extractedId}'")
+      result = false
 
-  elif chalkId[^15 .. ^1] != (unpack[string](fields["CHALK_ID"]))[^15 .. ^1]:
-    error(fmt"{obj.fullPath}: Calculated CHALK_ID doesn't match extracted ID " &
-          fmt"'{chalkId[^15 .. ^1]}' vs " &
-          (unpack[string](fields["CHALK_ID"]))[^15 .. ^1])
-    result = false
-
-  # TODO: else: validate metadata hash... use foundToBinary
-  if "METADATA_ID" notin fields:
+  if "METADATA_ID" notin obj.extract:
     error(fmt"{obj.fullPath}: Required field METADATA_ID is missing")
-    if "METADATA_HASH" notin fields:
+    if "METADATA_HASH" notin obj.extract:
       error(fmt"{obj.fullPath}: No information found for METAID validation")
       return false
   var
-    toHash = foundToBinary(fields)
+    toHash = obj.extract.foundToBinary()
     shaCtx = initSHA[SHA256]()
 
   shaCtx.update(toHash)
@@ -70,29 +62,33 @@ proc validateMetadata(codec: Codec, obj: ChalkObj, fields: ChalkDict): bool =
   ulidLowInt    = (cast[ptr uint64](addr ulidLowBytes[0]))[]
   chalkId       = encodeUlid(now, ulidHiInt, ulidLowInt)
 
-  if "METADATA_HASH" in fields:
+  if "METADATA_HASH" in obj.extract:
     let
       ourHash   = mdRawHash.toHex().toLowerAscii()
-      theirHash = unpack[string](fields["METADATA_HASH"]).toLowerAscii()
+      theirHash = unpack[string](obj.extract["METADATA_HASH"]).toLowerAscii()
     if ourHash != theirHash:
       error(fmt"{obj.fullPath}: METADATA_HASH field does not match " &
                "calculated value")
       result = false
-    elif "METADATA_ID" in fields:
+    elif "METADATA_ID" in obj.extract:
       # This check was redundant, they were required to appear together.
       # just being a little cautious.
-      let mdidValidator = (unpack[string](fields["METADATA_ID"]))[^15 .. ^1]
+      let
+        mdId          = unpack[string](obj.extract["METADATA_ID"])
+        mdidValidator = mdId[^15 .. ^1]
       if chalkId[^15 .. ^1] != mdidValidator:
         error(fmt"{obj.fullPath}: METADATA_ID field does not match " &
                  "calculated value")
         result = false
-      if "SIGNATURE" in fields:
+      if "SIGNATURE" in obj.extract:
         # This matches code in metsys.nim that calls sign()
         let
           artHash  = rawHash.toHex().toLowerAscii()
-          mdid     = (unpack[string](fields["METADATA_ID"]))
+          mdid     = (unpack[string](obj.extract["METADATA_ID"]))
           toVerify = pack(artHash & "\n" & ourHash & "\n" & mdid & "\n")
-          args     = @[toVerify, fields["SIGNATURE"], fields["SIGN_PARAMS"]]
+          args     = @[toVerify,
+                       obj.extract["SIGNATURE"],
+                       obj.extract["SIGN_PARAMS"]]
           optValid = ctxChalkConf.sCall("verify", args, verifyType)
 
         # If verify() isn't provided, the caller doesn't care about
@@ -120,96 +116,66 @@ proc doExtraction*(): Option[string] =
   var
     exclusions:  seq[string] = if getSelfInjecting(): @[]
                                else: @[resolvePath(getAppFileName())]
-    codecInfo:   seq[Codec]
+    codecInfo:   seq[Codec]  = getCodecsByPriority()
     chalksToRet: seq[string] = @[]
-    unmarked:    seq[string]       # Unmarked artifacts.
-    ignoreGlobs: seq[Glob]   = @[]
+    unmarked:    seq[string] # Unmarked artifacts.
+    skips:       seq[Glob]   = @[]
     artifactPath             = chalkConfig.getArtifactSearchPath()
-    ignorePatternsAsStr      = chalkConfig.getIgnorePatterns()
     recursive                = chalkConfig.getRecursive()
     numExtractions           = 0
 
-  for item in ignorePatternsAsStr:
-    ignoreGlobs.add(glob("**/" & item))
+  # We want extraction and deletion to not miss stuff, so don't use patterns.
+  if getCommandName() == "insert":
+    for item in chalkConfig.getIgnorePatterns():
+      skips.add(glob("**/" & item))
+  for codec in codecInfo:
+    var keepScanning = true
+    trace(fmt"Asking codec '{codec.name}' to scan for chalk.")
+    # A codec can return 'false' to short circuit all other plugins.
+    # This is used, for instance, with containers.
+    keepScanning = codec.extractAll(artifactPath, exclusions, skips, recursive)
+    for obj in codec.chalks:
+      if not obj.isMarked():
+        let err = obj.fullpath & ": Currently unchalked"
+        if obj.fullpath.mustIgnore(skips): trace(err): else: info(err)
+        unmarked.add(obj.fullpath)
+        continue
+      var
+        embededJson = ""
+        primaryJson = obj.foundToJson()
+        valid       = $(validateMetadata(codec, obj))
+        absPath     = escapeJson(resolvePath(obj.fullpath))
 
-  for plugin in getCodecsByPriority():
-    let codec = cast[Codec](plugin)
-    trace(fmt"Asking codec '{plugin.name}' to scan for chalk.")
-    if getCommandName() == "insert":
-      if not codec.doScan(artifactPath, exclusions, ignoreGlobs, recursive):
-        codecInfo.add(codec)
-        break
-    else:
-      if not codec.doScan(artifactPath, exclusions, @[], recursive):
-        codecInfo.add(codec)
-        break
-    codecInfo.add(codec)
+      for i, artifact in obj.embeds:
+        if i != 0: embededJson &= ", "
+        embededJson &= strValToJson(artifact.fullPath) & " : "
+        embededJson &= artifact.foundToJson()
 
-  trace("Beginning extraction attempts for any found chalk")
+      embededJson     = "[$#]" % [embededJson]
+      numExtractions += 1
 
-  try:
-    for codec in codecInfo:
+      chalksToRet.add(logFmt % [absPath, primaryJson, embededJson, valid])
+      info(obj.fullpath & ": chalk extracted")
+      if getCommandName() == "extract": obj.yieldFileStream()
 
-      for obj in codec.chalks:
-        var comma, primaryJson, embededJson: string
-        var isValid: bool
+      # Short circuit only if codec actually chalked something.
+    if not keepScanning and len(codec.chalks) > 0: break
 
-        if obj.chalkIsEmpty():
-          # mustIgnore is in plugins.nim
-          if mustIgnore(obj.fullpath, ignoreGlobs):
-            trace(fmtInfoNoExtract.fmt())
-          else:
-            info(fmtInfoNoExtract.fmt())
-          unmarked.add(obj.fullpath)
-          continue
-        elif obj.chalkHasExisting():
-          let
-            p = obj.primary
-            s = p.chalkFields.get()
-          primaryJson = s.foundToJson()
-          isValid = validateMetadata(codec, obj, s)
-          info(fmtInfoYesExtract.fmt())
-        else:
-          info(fmtInfoNoPrimary.fmt())
+  if numExtractions == 0: return none(string)
+  var toOut = "{ \"action\" : " & escapeJson(getCommandName()) & ", "
+  toOut &= "\"extractions\" : [ " & chalksToRet.join(", ") & " ] "
 
-        for (key, pt) in obj.embeds:
-          let
-            embstore = pt.chalkFields.get()
-            keyJson = strValToJson(key)
-            valJson = embstore.foundToJson()
+  if chalkConfig.getPublishUnmarked():
+    toOut &= ", \"unmarked\" : " & $( %* unmarked)
 
-          embededJson = fmt"{embededJson}{comma}{keyJson} : {valJson}"
-          comma = comfyItemSep
+  result = some(toOut & "}")
 
-        embededJson = jsonArrFmt % [embededJson]
+  info(fmt"Completed {numExtractions} extractions.")
 
-        numExtractions += 1
+var selfChalk: Option[ChalkObj] = none(ChalkObj)
+var selfID:    Option[string] = none(string)
 
-        let absPath = resolvePath(obj.fullpath)
-        chalksToRet.add(logTemplate %
-                 [escapeJson(absPath), primaryJson, embededJson, $isValid])
-  except:
-    publish("debug", getCurrentException().getStackTrace())
-    error(getCurrentExceptionMsg() & " (likely a bad chalk embed)")
-  finally:
-    if numExtractions == 0:
-      return none(string)
-    var toOut = "{ \"action\" : " & escapeJson(getCommandName()) & ", "
-    toOut &= "\"extractions\" : [ " & chalksToRet.join(", ") & " ] "
-
-    if chalkConfig.getPublishUnmarked():
-      toOut &= ", \"unmarked\" : " & $( %* unmarked)
-
-    toOut &= "}"
-    result = some(toOut)
-
-    info(fmt"Completed {numExtractions} extractions.")
-
-var selfChalkObj: Option[ChalkObj] = none(ChalkObj)
-var selfChalk:    Option[ChalkDict] = none(ChalkDict)
-var selfID:       Option[string] = none(string)
-
-proc getSelfChalkObj*(): Option[ChalkObj] =
+proc getSelfExtraction*(): Option[ChalkObj] =
   # If we call twice and we're on a platform where we don't
   # have a codec for this type of executable, avoid dupe errors.
   once:
@@ -219,42 +185,22 @@ proc getSelfChalkObj*(): Option[ChalkObj] =
 
     trace(fmt"Checking chalk binary {myPath[0]} for embedded config")
 
-    for plugin in getCodecsByPriority():
-      let codec = cast[Codec](plugin)
-      discard codec.doScan(myPath, exclusions, @[], false)
-      if len(codec.chalks) == 0: continue
-      selfChalkObj = some(codec.chalks[0])
+    for codec in getCodecsByPriority():
+      if hostOS notin codec.getNativeObjPlatforms(): continue
+      discard codec.extractAll(myPath, exclusions, @[], false)
+      if len(codec.chalks) == 0:
+        info("No embedded self-chalking found.")
+        return none(ChalkObj)
+      selfChalk = some(codec.chalks[0])
       codec.chalks = @[]
-      return selfChalkObj
+      if "CHALK_ID" notin selfChalk.get().extract:
+        error("Self-chalk is invalid.")
+        return none(ChalkObj)
+      selfId = some(unpack[string](selfChalk.get().extract["CHALK_ID"]))
+      return selfChalk
 
     warn(fmt"We have no codec for this platform's native executable type")
     setNoSelfInjection()
-
-  return selfChalkObj
-
-proc getSelfExtraction*(): Option[ChalkDict] =
-  once:
-    let chalkObjOpt = getSelfChalkObj()
-    if not chalkObjOpt.isSome():
-      trace(fmt"Binary does not have an embedded configuration.")
-      return none(ChalkDict)
-
-    let
-      obj = chalkObjOpt.get()
-      pt = obj.primary
-
-    # Keep this out of the let block; it's a module level variable!
-    selfChalk = pt.chalkFields
-
-    if obj.chalkIsEmpty() or not obj.chalkHasExisting():
-      trace(fmt"No embedded self-chalking found.")
-      return none(ChalkDict)
-    else:
-      trace(fmt"Found existing self-chalk.")
-      let obj = selfChalk.get()
-      # Should always be true, but just in case.
-      if obj.contains("CHALK_ID"):
-        selfID = some(unpack[string](obj["CHALK_ID"]))
 
   return selfChalk
 

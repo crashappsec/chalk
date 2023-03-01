@@ -13,8 +13,7 @@
 import options, streams, strutils, endians
 import nimSHA2, ../types, ../config, ../plugins
 
-when (NimMajor, NimMinor) < (1, 7):
-  {.warning[LockLevel]: off.}
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 const
   b64OffsetLoc = 0x28
@@ -28,87 +27,70 @@ const
 
 type CodecElf* = ref object of Codec
 
-proc extractKeyMetadata*(self: CodecElf, obj: ChalkObj): bool =
-  if obj.stream == nil:
-    return false
-  obj.stream.setPosition(wsOffsetLoc)
-  let
-    is64Bit = if obj.stream.readChar() == is64BitVal:
-                true
-              else:
-                false
-    isBigEndian = if obj.stream.readChar() == bigEndianVal:
-                    true
-                  else:
-                    false
-
-  var rawBytes: uint64
-  var shStart:  uint64
-  var present:  bool
-  var offset:   int
+proc extractKeyMetadata*(stream: FileStream, loc: string): ChalkObj =
+  stream.setPosition(wsOffsetLoc)
+  var
+    is64Bit     = if stream.readChar() == is64BitVal: true else: false
+    isBigEndian = if stream.readChar() == bigEndianVal: true else: false
+    swap        = if is64Bit: swapEndian64 else: swapEndian32
+    raw64, shSt64:     uint64
+    raw32, shSt32:     uint32
+    rawBytes, shStLoc: pointer
+    shStart, offset:   int
 
   if is64Bit:
-    obj.flags.incl(Arch64Bit)
-    obj.stream.setPosition(b64OffsetLoc)
-    rawBytes = obj.stream.readUint64()
+    stream.setPosition(b64OffsetLoc)
+    raw64    = stream.readUint64()
+    rawBytes = addr(raw64)
+    shStart  = int(raw64)
+  else:
+    stream.setPosition(b32OffsetLoc)
+    raw32    = stream.readUint32()
+    rawBytes = addr(raw32)
+    shStart  = int(raw32)
 
-    when system.cpuEndian == bigEndian:
-      if not isBigEndian:
-        swapEndian64(addr(shStart), addr(rawBytes))
-      else:
-        shStart = rawBytes
-    else:
-      if isBigEndian:
-        swapEndian64(addr(shStart), addr(rawBytes))
-      else:
-        shStart = rawBytes
+  when system.cpuEndian == bigEndian:
+    if not isBigEndian:
+      swap(addr(shStLoc), addr(rawBytes))
+      shStart = if is64Bit: raw64 else: raw32
+  else:
+    if isBigEndian:
+      swap(addr(shStLoc), addr(rawBytes))
+      shStart = if is64Bit: int(raw64) else: int(raw32)
 
-    obj.stream.setPosition(int(shStart))
-    let
-      secHdr = obj.stream.readAll()
-      offset1 = secHdr.find(magicUTF8)
+  stream.setPosition(int(shStart))
+  let
+    secHdr = stream.readAll()
+    offset1 = secHdr.find(magicUTF8)
 
-    if offset1 != -1:
-      offset = int(shStart) + offset1
-      present = true
-    else:
-      offset = int(shStart) + secHdr.len()
-      present = false
+  if offset1 != -1:
+    offset = int(shStart) + offset1
+    stream.setPosition(offset)
+    result = stream.loadChalkFromFStream(loc)
+  else:
+    result = newChalk(stream, loc)
+    result.startOffset = stream.getPosition()
 
-  obj.primary = ChalkPoint(startOffset: offset, present: present)
+method scan*(self:   CodecElf,
+             stream: FileStream,
+             loc:    string): Option[ChalkObj] =
 
-  return true
+  try:
+    let magic = stream.readUint32()
 
-method scan*(self: CodecElf, obj: ChalkObj): bool =
-  obj.stream.setPosition(0)
+    if magic != elfMagic and magic != elfSwapped: return none(ChalkObj)
+    result = some(extractKeyMetadata(stream, loc))
+  except: return none(ChalkObj)
 
-  try: # Reads can fail, for instance on 0-byte files.
-    let magic = obj.stream.readUint32()
-
-    if magic != elfMagic and magic != elfSwapped:
-      return false
-
-    result = self.extractKeyMetadata(obj)
-  except:
-    result = false
-
-method handleWrite*(self:    CodecElf,
-                    obj:     ChalkObj,
-                    ctx:     Stream,
-                    pre:     string,
-                    encoded: Option[string],
-                    post:    string) =
-  ctx.write(pre)
-  if encoded.isSome():
-    ctx.write(encoded.get())
-
-method getArtifactHash*(self: CodecElf, obj: ChalkObj): string =
+method getArtifactHash*(self: CodecElf, chalk: ChalkObj): string =
   var shaCtx = initSHA[SHA256]()
-  let offset = obj.primary.startOffset
+  let offset = chalk.startOffset
 
-  obj.stream.setPosition(0)
-  shaCtx.update(obj.stream.readStr(offset))
+  chalk.stream.setPosition(0)
+  shaCtx.update(chalk.stream.readStr(offset))
 
   return $shaCtx.final()
 
 registerPlugin("elf", CodecElf())
+
+method getNativeObjPlatforms*(s: CodecElf): seq[string] = @["linux"]

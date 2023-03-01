@@ -13,8 +13,7 @@ const
   eFileOpen    = "{filename}: Could not open file."
 
 
-when (NimMajor, NimMinor) < (1, 7):
-  {.warning[LockLevel]: off.}
+when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 proc findAuthorsFile(fullpath: string): string =
   let (head, tail) = splitPath(fullpath)
@@ -22,19 +21,19 @@ proc findAuthorsFile(fullpath: string): string =
   if tail == "": return ""
 
   let
-    authfname = head.joinPath(fNameAuthor)
+    authfname  = head.joinPath(fNameAuthor)
     authsfname = head.joinPath(fNameAuthors)
-    docdir = head.joinPath(dirDoc)
+    docdir     = head.joinPath(dirDoc)
 
-  if authfname.fileExists(): return authfname
+  if authfname.fileExists():  return authfname
   if authsfname.fileExists(): return authsfname
 
   if docdir.dirExists():
     let
-      authdoc = docdir.joinPath(fNameAuthor)
+      authdoc  = docdir.joinPath(fNameAuthor)
       authsdoc = docdir.joinPath(fNameAuthors)
 
-    if authdoc.fileExists(): return authdoc
+    if authdoc.fileExists():  return authdoc
     if authsdoc.fileExists(): return authsdoc
 
   return head.findAuthorsFile()
@@ -42,8 +41,7 @@ proc findAuthorsFile(fullpath: string): string =
 type AuthorsFileCodeOwner* = ref object of Plugin
 
 
-method getArtifactInfo*(self: AuthorsFileCodeOwner,
-                        obj: ChalkObj): KeyInfo =
+method getArtifactInfo*(self: AuthorsFileCodeOwner, obj: ChalkObj): ChalkDict =
   result = newTable[string, Box]()
 
   let fname = obj.fullpath.findAuthorsFile()
@@ -66,7 +64,5 @@ method getArtifactInfo*(self: AuthorsFileCodeOwner,
   finally:
     if ctx != nil:
       ctx.close()
-
-
 
 registerPlugin("authors", AuthorsFileCodeOwner())

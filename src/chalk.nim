@@ -27,9 +27,9 @@ import tables, nativesockets, json, strutils, os, options
 # Note that importing builtins causes topics to register, and
 # importing plugins causes plugins to register.
 import nimutils, types, config, builtins, plugins
-import inject, extract, delete, confload, defaults, help
+import inject, extract, confload, defaults, help
 
-var `selfChalk?` = none(ChalkDict)
+var `selfChalk?` = none(ChalkObj)
 
 # Tiny commands live in this file. The major ones are broken out.
 proc runCmdConfDump() {.inline.} =
@@ -39,8 +39,8 @@ proc runCmdConfDump() {.inline.} =
   if `selfChalk?`.isSome():
     let selfChalk = `selfChalk?`.get()
 
-    if selfChalk.contains("_CHALK_CONFIG"):
-      toDump   = unpack[string](selfChalk["_CHALK_CONFIG"])
+    if selfChalk.extract.contains("_CHALK_CONFIG"):
+      toDump   = unpack[string](selfChalk.extract["_CHALK_CONFIG"])
 
   publish("confdump", toDump)
 
@@ -193,7 +193,7 @@ when isMainModule:
 
   if chalkConfig.getAllowExternalConfig() and cmdName != "help":
     parsed.commit()  # Now if there is a config file flag we'll take it.
-    `configFile?` = loadUserConfigFile(cmdName, `selfChalk?`)
+    `configFile?` = loadUserConfigFile(cmdName)
   else:
     parsed.commit()
 
@@ -209,7 +209,7 @@ when isMainModule:
     else:
       warn("No items extracted")
   of "delete":
-    doDelete()
+    doInjection(deletion = true)
   of "confdump":
     runCmdConfDump()
   of "confload":

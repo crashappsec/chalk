@@ -105,11 +105,6 @@ object plugin {
     type:    "[string]"
     default: []
   }
-  field uses_fstream {
-    type:       "bool"
-    default:    true
-    write_lock: true
-  }
   field docstring {
     type:    "string"
     require: false
