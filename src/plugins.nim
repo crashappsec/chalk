@@ -110,8 +110,7 @@ proc newChalk*(stream: FileStream, loc: string): ChalkObj =
   return ChalkObj(fullpath:  loc,
                   newFields: newTable[string, Box](),
                   stream:    stream,
-                  extract:   nil,
-                  valid:     false)
+                  extract:   nil)
 
 proc loadChalkFromFStream*(stream: FileStream, loc: string): ChalkObj =
   result = newChalk(stream, loc)
@@ -130,7 +129,6 @@ proc loadChalkFromFStream*(stream: FileStream, loc: string): ChalkObj =
     result.startOffset = result.stream.getPosition()
     result.extract     = result.stream.extractOneChalkJson(result.fullpath)
     result.endOffset   = result.stream.getPosition()
-    result.valid       = true
   except:
     error(loc & ": Invalid JSON: " & getCurrentExceptionMsg())
 

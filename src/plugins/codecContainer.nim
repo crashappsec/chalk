@@ -47,7 +47,6 @@ method scanArtifactLocations*(self:       CodecContainer,
   self.chalks.add(ChalkObj(fullpath:  idstr,
                            newFields: newTable[string, Box](),
                            extract:   nil,
-                           valid:     false,
                            cache:     cache))
   var
     shortBytes = idstr[^20 .. ^17]

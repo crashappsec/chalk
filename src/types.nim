@@ -26,7 +26,7 @@ type
     stream*:      FileStream  # Plugins by default use file streams; we
     startOffset*: int         # keep state fields for that to bridge between
     endOffset*:   int         # extract and write. If the plugin needs to do
-    valid*:       bool        # something else, use the cache field
+                              # something else, use the cache field
                               # below, instead.
     ## PS: are we using this valid field now???
     err*:         seq[string] ## runtime logs for chalking are filtered
