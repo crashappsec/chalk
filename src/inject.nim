@@ -13,8 +13,8 @@ import options, tables, streams, strutils, strformat, os, std/tempfiles
 import nimutils, types, config, plugins, extract, io/tojson, builtins
 
 const
-  codecOnlyKeys = ["ARTIFACT_PATH", "HASH", "HASH_FILES",
-                   "COMPONENT_HASHES", "CHALK_ID"]
+  codecOnlyKeys    = ["ARTIFACT_PATH", "HASH", "HASH_FILES",
+                      "COMPONENT_HASHES", "CHALK_ID"]
   optionalCodecKeys = ["COMPONENT_HASHES"]
 
 
