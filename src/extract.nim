@@ -126,8 +126,7 @@ proc doExtraction*(): Option[string] =
 
   # We want extraction and deletion to not miss stuff, so don't use patterns.
   if getCommandName() == "insert":
-    for item in chalkConfig.getIgnorePatterns():
-      skips.add(glob("**/" & item))
+    for item in chalkConfig.getIgnorePatterns(): skips.add(glob("**/" & item))
   for codec in codecInfo:
     var keepScanning = true
     trace(fmt"Asking codec '{codec.name}' to scan for chalk.")
@@ -191,7 +190,7 @@ proc getSelfExtraction*(): Option[ChalkObj] =
       if len(codec.chalks) == 0:
         info("No embedded self-chalking found.")
         return none(ChalkObj)
-      selfChalk = some(codec.chalks[0])
+      selfChalk    = some(codec.chalks[0])
       codec.chalks = @[]
       if "CHALK_ID" notin selfChalk.get().extract:
         error("Self-chalk is invalid.")
@@ -204,5 +203,4 @@ proc getSelfExtraction*(): Option[ChalkObj] =
 
   return selfChalk
 
-proc getSelfID*(): Option[string] =
-  return selfID
+proc getSelfID*(): Option[string] = return selfID

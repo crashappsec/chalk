@@ -47,14 +47,4 @@ type
     magic*:      string
     searchPath*: seq[string]
 
-proc isMarked*(chalk: ChalkObj): bool {.inline.} =
-  return chalk.extract != nil
-
-# For use in binary chalk encoding.
-const
-  binTypeNull*    = 0'u8
-  binTypeString*  = 1'u8
-  binTypeInteger* = 2'u8
-  binTypeBool*    = 3'u8
-  binTypeArray*   = 4'u8
-  binTypeObj*     = 5'u8
+proc isMarked*(chalk: ChalkObj): bool {.inline.} = return chalk.extract != nil

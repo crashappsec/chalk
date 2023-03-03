@@ -23,9 +23,8 @@ const
 proc chalkTableFormatter*(numColumns:  int,
                          rows:        seq[seq[string]]      = @[],
                          headerAlign: Option[AlignmentType] = some(AlignCenter),
-                         wrapStyle =  WrapBlock,
-                         maxCellSz =  200
-                        ): TextTable =
+                         wrapStyle                          =  WrapBlock,
+                         maxCellSz                          =  200): TextTable =
   return newTextTable(numColumns      = numColumns,
                       rows            = rows,
                       fillWidth       = true,
@@ -44,58 +43,35 @@ proc chalkTableFormatter*(numColumns:  int,
                       wrapStyle       = wrapStyle,
                       maxCellBytes    = maxCellSz)
 
+template row(x, y, z: string) = ot.addRow(@[x, y, z])
 proc showGeneralOptions*(): int {.discardable.} =
   # Returns the width of the table.
-  var ot = chalkTableFormatter(3)
+  var
+    conf   = chalkConfig
+    ot     = chalkTableFormatter(3)
+    confOk = $(conf.getAllowExternalConfig())
+    def    = conf.getDefaultCommand().getOrElse("none")
+    path   = conf.getArtifactSearchPath().join(", ")
 
-  ot.addRow(@["Option", "Value", "Con4m Variable"])
-  ot.addRow(@["Color",
-              $(chalkConfig.getColor().get()), "color"])
-  ot.addRow(@["Log level", $(chalkConfig.getLogLevel()), "log_level"])
-  ot.addRow(@["Dry run", $(chalkConfig.getDryRun()), "dry_run"])
-  ot.addRow(@["Config files allowed",
-              $(chalkConfig.getAllowExternalConfig()),
-              "allow_external_config"])
-  ot.addRow(@["Export builtin config ok",
-              $(chalkConfig.getCanDump()),
-              "can_dump"])
-  ot.addRow(@["Replace builtin config ok",
-              $(chalkConfig.getCanLoad()),
-              "can_load"])
-  ot.addRow(@["Publish run config to audit topic",
-              $(chalkConfig.getPublishAudit()),
-              "publish_audit"])
-  ot.addRow(@["Always publish defaults",
-              $(chalkConfig.getPublishDefaults()),
-              "publish_defaults"])
-  ot.addRow(@["Ignore compile errors",
-              $(chalkConfig.getIgnoreBrokenConf()),
-              "ignore_broken_conf"])
-  ot.addRow(@["Artifact search path",
-              chalkConfig.getArtifactSearchPath().join(", "),
-              "artifact_search_path"])
-  ot.addRow(@["Recurse for artifacts",
-              $(chalkConfig.getRecursive()),
-              "recursive"])
-  ot.addRow(@["Ignored patterns",
-              chalkConfig.getIgnorePatterns(). join(", "),
-              "ignore_patterns"])
-  ot.addRow(@["Default exe command",
-              getOrElse(chalkConfig.getDefaultCommand(), "none"),
-              "default_command"])
-  ot.addRow(@["Container image hash",
-              chalkConfig.getContainerImageId(),
-              "container_image_id"])
-  ot.addRow(@["Container image name",
-              chalkConfig.getContainerImageName(),
-              "container_image_name"])
-  if chalkConfig.getAllowExternalConfig():
-    ot.addRow(@["Config file path",
-                chalkConfig.getConfigPath().join(", "),
-                "config_path"])
-    ot.addRow(@["Config file name",
-                $(chalkConfig.getConfigFileName()),
-                "config_filename"])
+  row("Option", "Value", "Con4m Variable")
+  row("Color",  $(conf.getColor().get()), "color")
+  row("Log level", conf.getLogLevel(), "log_level")
+  row("Dry run", $(conf.getDryRun()), "dry_run")
+  row("Allow config files", confOk, "allow_external_config")
+  row("Export builtin config ok", $(conf.getCanDump()), "can_dump")
+  row("Replace builtin config ok", $(conf.getCanLoad()), "can_load")
+  row("Audit config on load", $(conf.getPublishAudit()), "publish_audit")
+  row("Always publish defaults", $(conf.getPublishDefaults()), "publish_defaults")
+  row("Ignore config errors", $(conf.getIgnoreBrokenConf()), "ignore_broken_conf")
+  row("Artifact search path", path, "artifact_search_path")
+  row("Recurse for artifacts", $(conf.getRecursive()), "recursive")
+  row("Ignored patterns", conf.getIgnorePatterns().join(", "), "ignore_patterns")
+  row("Default exe command",  def, "default_command")
+  row("Container image hash", conf.getContainerImageId(), "container_image_id")
+  row("Container Image name", conf.getContainerImageName, "container_image_name")
+  if conf.getAllowExternalConfig():
+    row("Config file path", conf.getConfigPath().join(", "), "config_path")
+    row("Config file name", conf.getConfigFileName(), "config_filename")
 
   let tableout = ot.render()
   publish("defaults", formatTitle("General Options:") & tableout)
@@ -105,18 +81,15 @@ proc paramFmt(t: StringTable): string =
   var parts: seq[string] = @[]
 
   for key, val in t:
-    if key == "secret":
-      parts.add(key & " : " & "(redacted)")
-    else:
-      parts.add(key & " : " & val)
+    if key == "secret": parts.add(key & " : " & "(redacted)")
+    else:               parts.add(key & " : " & val)
 
   return parts.join(", ")
 
 proc filterFmt(flist: seq[MsgFilter]): string =
   var parts: seq[string] = @[]
 
-  for filter in flist:
-    parts.add(filter.getFilterName().get())
+  for filter in flist: parts.add(filter.getFilterName().get())
 
   return parts.join(", ")
 
@@ -128,24 +101,19 @@ proc showSinkConfigs*(): int {.discardable.} =
     unusedTopics: seq[string]
 
   for topic, obj in allTopics:
-    if len(obj.subscribers) == 0:
-      unusedTopics.add(topic)
+    if len(obj.subscribers) == 0: unusedTopics.add(topic)
     for config in obj.subscribers:
-      if config notin subLists:
-        subLists[config] = @[topic]
-      else:
-        subLists[config].add(topic)
+      if config notin subLists: subLists[config] = @[topic]
+      else:                     subLists[config].add(topic)
 
   ot.addRow(@["Config name", "Sink", "Parameters", "Filters", "Topics"])
   for key, config in sinkConfigs:
-    if config notin sublists:
-      sublists[config] = @[]
+    if config notin sublists: sublists[config] = @[]
     ot.addRow(@[key,
                 config.mySink.getSinkName(),
                 paramFmt(config.config),
                 filterFmt(config.filters),
-                sublists[config].join(", ")
-    ])
+                sublists[config].join(", ")])
 
   let specs       = ot.getColSpecs()
   specs[2].minChr = 15
@@ -163,7 +131,6 @@ proc showKeyConfigs*(): int {.discardable.} =
     keyList  = getOrderedKeys()
     custom   = getCustomKeys()
     ot       = chalkTableFormatter(5)
-  let
     sysVal   = pack("*provided by system*")
     emptyVal = pack("*supplied via plugin*")
 
@@ -223,5 +190,4 @@ proc showConfig*() =
     showGeneralOptions()
     showSinkConfigs()
     let w = showKeyConfigs()
-    if isDefaultsCmd:
-      showDisclaimer(w)
+    if isDefaultsCmd: showDisclaimer(w)

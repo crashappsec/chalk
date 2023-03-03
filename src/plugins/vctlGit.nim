@@ -12,11 +12,6 @@ const
   dirGit       = ".git"
   fNameHead    = "HEAD"
   fNameConfig  = "config"
-  trVcsDir     = "version control dir: {self.vcsDir}"
-  trBranch     = "branch: {self.branchName}"
-  trCommit     = "commit ID: {self.commitID}"
-  trOrigin     = "origin: {url}"
-  wNotParsed   = "{confFileName}: Github configuration file not parsed."
   ghRef        = "ref:"
   ghBranch     = "branch"
   ghRemote     = "remote"
@@ -40,21 +35,20 @@ proc findGitDir(fullpath: string): string =
 type GitPlugin* = ref object of Plugin
   branchName: string
   commitId:   string
-  vcsDir*:    string
   origin:     string
-  chalkPath:   string
+  chalkPath:  string
+  vcsDir*:    string
 
 template loadBasics(self: GitPlugin, obj: ChalkObj) =
   self.chalkPath = obj.fullpath
-  self.vcsDir = findGitDir(self.chalkPath)
-  trace(trVcsDir.fmt())
+  self.vcsDir    = findGitDir(self.chalkPath)
+  trace(fmt"version control dir: {self.vcsDir}")
 
 proc loadHead(self: GitPlugin, obj: ChalkObj): bool =
   # Don't want to commit to the order in which things get called,
   # so everything that might get called first someday calls this to
   # be safe.
-  if self.commitID != "":
-    return true
+  if self.commitID != "": return true
 
   var
     fs: FileStream
@@ -64,10 +58,8 @@ proc loadHead(self: GitPlugin, obj: ChalkObj): bool =
     fs = newFileStream(self.vcsDir.joinPath(fNameHead))
     hf = fs.readAll().strip()
 
-    try:
-      fs.close()
-    except:
-      discard
+    try:    fs.close()
+    except: discard
   except:
     error(fmt"{fNameHead}: github HEAD file couldn't be read")
     return false
@@ -89,12 +81,12 @@ proc loadHead(self: GitPlugin, obj: ChalkObj): bool =
     return false
 
   self.branchName = parts[2 .. ^1].join($DirSep)
-  var reffile = newFileStream(self.vcsDir.joinPath(fname))
-  self.commitID = reffile.readAll().strip()
+  var reffile     = newFileStream(self.vcsDir.joinPath(fname))
+  self.commitID   = reffile.readAll().strip()
   reffile.close()
 
-  trace(trBranch.fmt())
-  trace(trCommit.fmt())
+  trace(fmt"branch: {self.branchName}")
+  trace(fmt"commit ID: {self.commitID}")
   return true
 
 proc calcOrigin(self: GitPlugin, conf: seq[SecInfo]): string =
@@ -148,32 +140,29 @@ proc calcOrigin(self: GitPlugin, conf: seq[SecInfo]): string =
   return ghLocal
 
 proc getOrigin(self: GitPlugin, obj: ChalkObj): (bool, Box) =
-  if not self.loadHead(obj):
-    return (false, nil)
+  if not self.loadHead(obj): return (false, nil)
 
   let
     confFileName = self.vcsDir.joinPath(fNameConfig)
 
   try:
     let
-      f = newFileStream(confFileName)
+      f      = newFileStream(confFileName)
       config = f.parseGitConfig()
-      url = self.calcOrigin(config)
+      url    = self.calcOrigin(config)
 
-    trace(trOrigin.fmt())
+    trace(fmt"origin: {url}")
     return (true, pack(url))
   except:
-    error(wNotParsed.fmt())
+    error(fmt"{confFileName}: Github configuration file not parsed.")
     return (false, nil)
 
 proc getHead(self: GitPlugin, obj: ChalkObj): (bool, Box) =
-  if self.commitID == "":
-    return (false, nil)
+  if self.commitID == "": return (false, nil)
   return (true, pack(self.commitID))
 
 proc getBranch(self: GitPlugin, obj: ChalkObj): (bool, Box) =
-  if self.branchName == "":
-    return (false, nil)
+  if self.branchName == "": return (false, nil)
   return (true, pack(self.branchName))
 
 method getArtifactInfo*(self: GitPlugin, obj: ChalkObj): ChalkDict =

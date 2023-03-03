@@ -27,9 +27,7 @@ method getArtifactInfo*(self: SbomCallbackPlugin, obj: ChalkObj): ChalkDict =
       res = optinfo.get()
       dict = unpack[TableRef[string, Box]](res)
 
-    if len(dict) != 0:
-      new result
-      result["SBOMS"] = res
+    if len(dict) != 0: result = { "SBOMS" : res }.newTable()
 
 registerPlugin(pluginName, SbomCallbackPlugin())
 registerCon4mCallback(callbackName, callbackTypeStr)

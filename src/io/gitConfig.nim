@@ -19,13 +19,12 @@
 
 import streams
 
-const
-  eBadGitConf = "Github configuration file is invalid"
+const eBadGitConf = "Github configuration file is invalid"
 
-
-type KVPair* = (string, string)
-type KVPairs* = seq[KVPair]
-type SecInfo* = (string, string, KVPairs)
+type
+  KVPair*  = (string, string)
+  KVPairs* = seq[KVPair]
+  SecInfo* = (string, string, KVPairs)
 
 proc ws(s: Stream) =
   while true:
@@ -44,8 +43,7 @@ proc comment(s: Stream) =
     let c = s.readChar()
     case c
     of '\n', '\x00': return
-    else:
-      discard
+    else: discard
 
 # Comments aren't allowed in between the brackets
 proc header(s: Stream): (string, string) =
@@ -55,30 +53,24 @@ proc header(s: Stream): (string, string) =
   while true:
     let c = s.readChar()
     case c
-    of 'a'..'z', 'A'..'Z', '0'..'9', '-', '.':
-      sec = sec & $c
+    of 'a'..'z', 'A'..'Z', '0'..'9', '-', '.': sec = sec & $c
     of ' ', '\t':
       s.ws()
       let c = s.readChar()
       case c
-      of ']':
-        return (sec, sub)
+      of ']': return (sec, sub)
       of '"':
         while true:
           let c = s.readChar()
           case c
           of '\\': sub = sub & $(s.readChar())
           of '"': break
-          of '\x00':
-            raise newException(ValueError, eBadGitConf)
+          of '\x00': raise newException(ValueError, eBadGitConf)
           else:
             sub = sub & $c
-      else:
-        raise newException(ValueError, eBadGitConf)
-    of ']':
-      return (sec, sub)
-    else:
-      raise newException(ValueError, eBadGitConf)
+      else: raise newException(ValueError, eBadGitConf)
+    of ']': return (sec, sub)
+    else: raise newException(ValueError, eBadGitConf)
 
 proc kvPair(s: Stream): KVPair =
   var
@@ -92,10 +84,8 @@ proc kvPair(s: Stream): KVPair =
     of '#', ';':
       discard s.readChar()
       s.comment()
-      if key == "":
-        return ("", "")
-    of 'a'..'z', 'A'..'Z', '0'..'9', '-':
-      key = key & $s.readChar()
+      if key == "": return ("", "")
+    of 'a'..'z', 'A'..'Z', '0'..'9', '-': key = key & $s.readChar()
     of ' ', '\t':
       discard s.readChar()
       s.ws()
@@ -110,8 +100,7 @@ proc kvPair(s: Stream): KVPair =
       if s.readChar() != '\n':
         raise newException(ValueError, eBadGitConf)
       s.ws()
-    else:
-      raise newException(ValueError, eBadGitConf)
+    else: raise newException(ValueError, eBadGitConf)
 
   s.ws()
 
@@ -119,8 +108,7 @@ proc kvPair(s: Stream): KVPair =
     var inString = false
     let c = s.readChar()
     case c
-    of '\n', '\x00':
-      break
+    of '\n', '\x00': break
     of '#', ';':
       if not inString:
         s.comment()
@@ -132,21 +120,13 @@ proc kvPair(s: Stream): KVPair =
       case n
       of '\n':
         continue
-      of '\\', '"':
-        val = val & $n
-      of 'n':
-        val = val & "\n"
-      of 't':
-        val = val & "\t"
-      of 'b':
-        val = val & "\b"
-      else:
-        # Be permissive, have a heart!
-        val = val & $n
-    of '"':
-      inString = not inString
-    else:
-      val = val & $c
+      of '\\', '"': val = val & $n
+      of 'n':       val = val & "\n"
+      of 't':       val = val & "\t"
+      of 'b':       val = val & "\b"
+      else:         val = val & $n        # Be permissive, have a heart!
+    of '"': inString = not inString
+    else:   val = val & $c
 
   return (key, val)
 
@@ -156,22 +136,15 @@ proc kvpairs(s: Stream): KVPairs =
   while true:
     s.ws()
     case s.peekChar()
-    of '\x00', '[':
-      return
+    of '\x00', '[': return
     of '\n':
       s.newLine()
       continue
-    else:
-      discard
+    else: discard
     try:
       let (k, v) = s.kvPair()
-      if k != "":
-        result.add((k, v))
-    except:
-      # For now, ignore these errors.
-      # Later, scan to newline and warn.
-      discard
-
+      if k != "": result.add((k, v))
+    except: discard # Should we warn instead og ignroing?
 
 proc section(s: Stream): SecInfo =
   var sec, sub: string
@@ -188,15 +161,11 @@ proc section(s: Stream): SecInfo =
       s.ws()
       s.newLine()
       return (sec, sub, s.kvPairs())
-    of '\x00':
-      return ("", "", @[])
-    else:
-      raise newException(ValueError, eBadGitConf)
+    of '\x00': return ("", "", @[])
+    else:      raise newException(ValueError, eBadGitConf)
 
 proc parseGitConfig*(s: Stream): seq[SecInfo] =
   while true:
     let (sec, sub, pairs) = s.section()
-    if sec == "":
-      return
-    else:
-      result.add((sec, sub, pairs))
+    if sec == "": return
+    else:         result.add((sec, sub, pairs))

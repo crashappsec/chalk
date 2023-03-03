@@ -27,8 +27,7 @@ proc getSystemPlugins(): array[2, Plugin] {.inline.} =
   return systeMetsys
 
 proc acquireStreamIfUsed(codec: Codec, infoObj: ChalkObj) =
-  if codec.usesFStream():
-    discard infoObj.acquireFileStream()
+  if codec.usesFStream(): discard infoObj.acquireFileStream()
 
 proc isValidChalk(obj: ChalkObj): bool =
   result = true
@@ -110,8 +109,7 @@ proc doInjection*(deletion = false) =
 
   # Anything we've extracted is for an artifact where we are about to
   # inject over it.  Report these to the "delete" output stream.
-  if extractions.isSome():
-    publish("delete", extractions.get())
+  if extractions.isSome():  publish("delete", extractions.get())
 
   for plugin in codecs:
     let
@@ -143,8 +141,7 @@ proc doInjection*(deletion = false) =
           error(fmt"{name}: Did not provide required key {key} for " &
                 fmt"artifact at: {infoObj.full_path}")
           continue
-        if key in keyInfo:
-          infoObj.newFields[key] = keyInfo[key]
+        if key in keyInfo: infoObj.newFields[key] = keyInfo[key]
 
       for key in xtraKeys:
         if key in codecIgnores or key notin keyInfo: continue
@@ -202,7 +199,5 @@ proc doInjection*(deletion = false) =
   if deletion: return
   let fullJson = "[" & join(objsForPublish, ", ") & "]"
 
-  if getSelfInjecting():
-    publish("confload", fullJson)
-  else:
-    publish("insert", fullJson)
+  if getSelfInjecting(): publish("confload", fullJson)
+  else:                  publish("insert", fullJson)

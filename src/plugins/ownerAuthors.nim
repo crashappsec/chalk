@@ -46,23 +46,19 @@ method getArtifactInfo*(self: AuthorsFileCodeOwner, obj: ChalkObj): ChalkDict =
 
   let fname = obj.fullpath.findAuthorsFile()
 
-  if fname == "":
-    return
+  if fname == "": return
 
   var ctx: FileStream
 
   try:
     ctx = newFileStream(fname, fmRead)
-    if ctx == nil:
-      error(eFileOpen)
+    if ctx == nil: error(eFileOpen)
     else:
       let s = ctx.readAll()
-      if s != "":
-        result["CODE_OWNERS"] = pack(s)
+      if s != "": result["CODE_OWNERS"] = pack(s)
   except:
     error(eCantOpen.fmt())
   finally:
-    if ctx != nil:
-      ctx.close()
+    if ctx != nil: ctx.close()
 
 registerPlugin("authors", AuthorsFileCodeOwner())

@@ -16,8 +16,7 @@ method scan*(self:   CodecShebang,
   try:
     var chalk: ChalkObj
     let line1 = stream.readLine()
-    if not line1.startsWith("#!"):
-      return none(ChalkObj)
+    if not line1.startsWith("#!"): return none(ChalkObj)
     let
       line2   = stream.readLine()
       ix      = line2.find(magicUTF8)
@@ -45,8 +44,7 @@ method handleWrite*(self:    CodecShebang,
 
   if encoded.isSome():
     toWrite = pre
-    if not pre.strip().endsWith("\n#"):
-      toWrite &= "\n# "
+    if not pre.strip().endsWith("\n#"): toWrite &= "\n# "
     toWrite &= encoded.get() & post
   else:
     toWrite = pre[0 ..< pre.find('\n')] & post

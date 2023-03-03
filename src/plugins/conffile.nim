@@ -16,7 +16,7 @@ method getArtifactInfo*(self: ConfFilePlugin,
 
   let
     keyList = getAllKeys()
-    chalkID  = unpack[string](obj.newFields["CHALK_ID"])
+    chalkID = unpack[string](obj.newFields["CHALK_ID"])
 
   for key in keyList:
     let
@@ -33,12 +33,10 @@ method getArtifactInfo*(self: ConfFilePlugin,
         # a patch, so when it makes it in, we can remove this branch.
         result[key] = pack(raw)
         continue
-      try:
-        result[key] = pack(format(raw, { "artifactid":   chalkId}))
-      except:
-        result[key] = pack(raw)
+      try:     result[key] = pack(format(raw, { "artifactid":   chalkId}))
+      except:  result[key] = pack(raw)
     else:
-      result[key]   = optval.get()
+      result[key] = optval.get()
 
 
 registerPlugin("conffile", ConfFilePlugin())

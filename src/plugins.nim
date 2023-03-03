@@ -34,8 +34,7 @@ proc validatePlugins*() =
       plugin.configInfo = maybe.get()
       trace(fmt"Installed plugin {name}")
 
-proc getPluginByName*(name: string): Plugin =
-  return installedPlugins[name]
+proc getPluginByName*(name: string): Plugin = return installedPlugins[name]
 
 proc getPluginsByPriority*(): seq[Plugin] =
   var preResult: seq[(int, Plugin)] = @[]
@@ -44,16 +43,14 @@ proc getPluginsByPriority*(): seq[Plugin] =
     # This may need to be refreshed; the config can be updated
     # after the self-chalk loads.
     plugin.configInfo = getPluginConfig(name).get()
-    if not plugin.configInfo.getEnabled():
-      continue
+    if not plugin.configInfo.getEnabled(): continue
     preResult.add((plugin.configInfo.getPriority(), plugin))
 
   preResult.sort()
 
   result = @[]
 
-  for (_, plugin) in preResult:
-    result.add(plugin)
+  for (_, plugin) in preResult: result.add(plugin)
 
 proc getCodecsByPriority*(): seq[Codec] =
   var preResult: seq[(int, Codec)] = @[]
@@ -62,8 +59,7 @@ proc getCodecsByPriority*(): seq[Codec] =
     # This may need to be refreshed; the config can be updated
     # after the self-chalk loads.
     plugin.configInfo = getPluginConfig(name).get()
-    if not plugin.configInfo.getEnabled():
-      continue
+    if not plugin.configInfo.getEnabled(): continue
     if plugin.configInfo.getCodec():
       preResult.add((plugin.configInfo.getPriority(), Codec(plugin)))
 
@@ -71,8 +67,7 @@ proc getCodecsByPriority*(): seq[Codec] =
 
   result = @[]
 
-  for (_, plugin) in preResult:
-    result.add(plugin)
+  for (_, plugin) in preResult: result.add(plugin)
 
 var numCachedFds = 0
 
@@ -103,8 +98,7 @@ proc closeFileStream*(chalk: ChalkObj) =
       numCachedFds -= 1
 
 proc yieldFileStream*(chalk: ChalkObj) =
-  if numCachedFds == chalkConfig.getCacheFdLimit():
-    chalk.closeFileStream()
+  if numCachedFds == chalkConfig.getCacheFdLimit(): chalk.closeFileStream()
 
 proc newChalk*(stream: FileStream, loc: string): ChalkObj =
   return ChalkObj(fullpath:  loc,
@@ -172,8 +166,7 @@ proc scanLocation(self:       Codec,
 
 proc mustIgnore*(path: string, globs: seq[glob.Glob]): bool {.inline.} =
   for item in globs:
-    if path.matches(item):
-      return true
+    if path.matches(item): return true
   return false
 
 method scanArtifactLocations*(self:      Codec,
@@ -196,30 +189,22 @@ method scanArtifactLocations*(self:      Codec,
       continue
 
     if info.kind == pcFile:
-      if path in exclusions:
-        continue
-      if path.mustIgnore(ignoreList):
-        continue
+      if path in exclusions:          continue
+      if path.mustIgnore(ignoreList): continue
       trace("{path}: scanning file")
       self.scanLocation(path, exclusions)
     elif recurse:
       dirWalk(true):
-        if item in exclusions:
-          continue
-        if item.mustIgnore(ignoreList):
-          continue
-        if getFileInfo(item).kind != pcFile:
-          continue
+        if item in exclusions:               continue
+        if item.mustIgnore(ignoreList):      continue
+        if getFileInfo(item).kind != pcFile: continue
         trace(item & ": scanning file")
         self.scanLocation(item, exclusions)
     else:
       dirWalk(false):
-        if item in exclusions:
-          continue
-        if item.mustIgnore(ignoreList):
-          continue
-        if getFileInfo(item).kind != pcFile:
-          continue
+        if item in exclusions:               continue
+        if item.mustIgnore(ignoreList):      continue
+        if getFileInfo(item).kind != pcFile: continue
         trace(fmt"Non-recursive dir walk examining: {item}")
         self.scanLocation(item, exclusions)
 

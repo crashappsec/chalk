@@ -11,8 +11,7 @@ when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 type SystemPlugin* = ref object of Plugin
 
-method getArtifactInfo*(self: SystemPlugin,
-                        obj:  ChalkObj): ChalkDict =
+method getArtifactInfo*(self: SystemPlugin, obj:  ChalkObj): ChalkDict =
 
   result = newTable[string, Box]()
 
@@ -23,15 +22,12 @@ method getArtifactInfo*(self: SystemPlugin,
 
   let selfIdOpt = getSelfId()
 
-  if selfIdOpt.isSome():
-    result["INJECTOR_ID"] = pack(selfIdOpt.get())
+  if selfIdOpt.isSome(): result["INJECTOR_ID"] = pack(selfIdOpt.get())
 
   let
     spec = config.getKeySpec("_CHALK_CONFIG").get()
     optVal = spec.getValue()
 
-  if optVal.isSome():
-    result["_CHALK_CONFIG"] = optVal.get()
-
+  if optVal.isSome(): result["_CHALK_CONFIG"] = optVal.get()
 
 registerPlugin("system", SystemPlugin())

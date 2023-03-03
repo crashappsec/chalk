@@ -32,9 +32,15 @@ import inject, extract, confload, defaults, help
 var `selfChalk?` = none(ChalkObj)
 
 # Tiny commands live in this file. The major ones are broken out.
+proc runCmdExtraction() {.inline.} =
+  let extractions = doExtraction()
+  if extractions.isSome(): publish("extract", extractions.get())
+  else:                    warn("No items extracted")
+
 proc runCmdConfDump() {.inline.} =
-  var toDump  = defaultConfig
-  var argList = getArgs()
+  var
+    toDump  = defaultConfig
+    argList = getArgs()
 
   if `selfChalk?`.isSome():
     let selfChalk = `selfChalk?`.get()
@@ -62,16 +68,13 @@ proc runCmdVersion() =
 proc doAudit(commandName: string,
              parsedFlags: TableRef[string, string],
              configFile:  Option[string]) =
-  if not chalkConfig.getPublishAudit():
-    return
+  if not chalkConfig.getPublishAudit(): return
 
   var flagStrs: seq[string] = @[]
 
   for key, value in parsedFlags:
-    if value == "":
-      flagStrs.add("--" & key)
-    else:
-      flagStrs.add("--" & key & "=" & value)
+    if value == "": flagStrs.add("--" & key)
+    else:           flagStrs.add("--" & key & "=" & value)
 
   var preJson  = { "command"    : commandName,
                    "flags"      : flagStrs.join(","),
@@ -144,8 +147,7 @@ when isMainModule:
   # Now that we've set argv, we can do our own setup, including
   # loading the base configuration.  This is in config.nim
   loadBaseConfiguration()
-  if "log-level" in flags:
-    setConsoleLogLevel(flags["log-level"])
+  if "log-level" in flags: setConsoleLogLevel(flags["log-level"])
 
   # This is in plugin.nim, but can't easily live in our validation
   # code in the previous call, because it would add a cyclic module
@@ -200,27 +202,14 @@ when isMainModule:
   doAudit(cmdName, flags, `configFile?`)
 
   case cmdName
-  of "insert":
-    doInjection()
-  of "extract":
-    let extractions = doExtraction()
-    if extractions.isSome():
-      publish("extract", extractions.get())
-    else:
-      warn("No items extracted")
-  of "delete":
-    doInjection(deletion = true)
-  of "confdump":
-    runCmdConfDump()
-  of "confload":
-    runCmdConfLoad()
-  of "defaults":
-    discard # Will be handled by showConfig() below.
-  of "version":
-    runCmdVersion()
-  of "help":
-    doHelp() # doHelp() exits; it does NOT do a config dump or run the config.
-  else:
-    unreachable # Unless we add more commands.
+  of "extract":  runCmdExtraction()
+  of "insert":   doInjection()
+  of "delete":   doInjection(deletion = true)
+  of "confdump": runCmdConfDump()
+  of "confload": runCmdConfLoad()
+  of "defaults": discard # Will be handled by showConfig() below.
+  of "version":  runCmdVersion()
+  of "help":     doHelp() # noreturn; does NOT do a config dump or run the config.
+  else:          unreachable # Unless we add more commands.
 
   showConfig() # In defaults.

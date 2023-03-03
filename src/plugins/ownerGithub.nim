@@ -23,24 +23,20 @@ proc findCOFile(fullpath: string): string =
 
   let cofname = head.joinPath(fNameGHCO)
 
-  if cofname.fileExists():
-    return cofname
+  if cofname.fileExists(): return cofname
 
   let ghdir = head.joinPath(dirGH)
 
   if ghdir.dirExists():
     let cogh = ghdir.joinPath(fNameGHCO)
-    if cogh.fileExists():
-      return cogh
-    else:
-      return "" # Stop here.
+    if cogh.fileExists():  return cogh
+    else: return "" # Stop here.
 
   let docdir = head.joinPath(dirDoc)
 
   if docdir.dirExists():
     let codoc = docdir.joinPath(fNameGHCO)
-    if codoc.fileExists():
-      return codoc
+    if codoc.fileExists(): return codoc
 
   return head.findCOFile()
 
@@ -56,26 +52,22 @@ proc findCodeOwner(contents, artifactPath, copath: string): string =
   for line in lines:
     let cur = line.strip()
 
-    if cur == "" or cur[0] == '#':
-      continue
+    if cur == "" or cur[0] == '#': continue
 
     let ix = cur.find(' ')
     if ix == -1: continue
-    var
-      txt = cur[0 ..< ix].strip()
 
-    if not txt.startsWith("/"):
-      txt = "**/" & txt
-    if txt.endsWith("/"):
-      txt &= "**"
+    var txt = cur[0 ..< ix].strip()
+
+    if not txt.startsWith("/"):  txt = "**/" & txt
+    if txt.endsWith("/"):        txt &= "**"
     let
       pattern = glob(txt)
       owners = line[ix+1 .. ^1].strip()
 
 
-    if path.matches(pattern):
-      result = owners
-      # Keep going; the last match is the most specific and wins.
+    if path.matches(pattern): result = owners
+    # Keep looping; the last match is the most specific and wins.
 
 type GithubCodeOwner = ref object of Plugin
 
@@ -96,26 +88,22 @@ method getArtifactInfo*(self: GithubCodeOwner, obj: ChalkObj): ChalkDict =
 
   let fname = obj.fullpath.findCOFile()
 
-  if fname == "":
-    return
+  if fname == "": return
 
   var ctx: FileStream
 
   try:
     ctx = newFileStream(fname, fmRead)
-    if ctx == nil:
-      error(eFileOpen)
+    if ctx == nil: error(eFileOpen)
     else:
       let
         s = ctx.readAll()
         m = s.findCodeOwner(obj.fullPath, fname.splitPath().head)
 
-      if m != "":
-        result["CODE_OWNERS"] = pack(m)
+      if m != "": result["CODE_OWNERS"] = pack(m)
   except:
     error(eCantOpen.fmt())
   finally:
-    if ctx != nil:
-      ctx.close()
+    if ctx != nil: ctx.close()
 
 registerPlugin("github_codeowners", GithubCodeOwner())

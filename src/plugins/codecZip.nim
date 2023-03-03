@@ -64,8 +64,7 @@ method getArtifactHash*(self: CodecZip, chalk: ChalkObj): string =
 
   let cache = ZipCache(chalk.cache)
   for k, v in cache.archive.contents:
-    if k == zipChalkFile:
-      continue
+    if k == zipChalkFile: continue
     shaCtx.update(k)
     shaCtx.update(v.contents)
 

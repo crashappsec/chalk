@@ -16,7 +16,6 @@ const
   jFalseStr        = "false"
   eBadLiteral      = "Invalid JSON literal. Expected: "
   eDoubleNeg       = "Double negative in JSON not allowed"
-  eWTF             = "Programming mistake, shouldn't happen"
   eNoExponent      = "Exponent expected"
   eBadUniEscape    = "Invalid \\u escape in JSON"
   eBadEscape       = "Invalid JSON escape command after '\\'"
@@ -29,38 +28,32 @@ const
   eBadElementStart = "Bad JSon at position: {s.getPosition()}"
 
 
-type JSonError = ref object of ValueError
-
-proc parseError(msg: string): JsonError {.inline.} =
-  result = new(JsonError)
-
-  result.msg = msg
-
 type
-  JsonNode* = ref JsonNodeObj
+  JsonNode*     = ref JsonNodeObj
+  JSonError*    = ref object of ValueError
   JsonNodeKind* = enum JNull, JBool, JInt, JFloat, JString, JObject, JArray
+
   JsonNodeObj* {.acyclic.} = object
     case kind*: JsonNodeKind
-    of JNull: nil
-    of JBool: boolval*: bool
-    of JInt: intval*: int64
-    of JFloat: floatval*: float
-    of JString: strval*: string
-    of JObject: kvpairs*: OrderedTableRef[string, JsonNode]
-    of JArray: items*: seq[JSonNode]
+    of JNull:   nil
+    of JBool:   boolval*:  bool
+    of JInt:    intval*:   int64
+    of JFloat:  floatval*: float
+    of JString: strval*:   string
+    of JObject: kvpairs*:  OrderedTableRef[string, JsonNode]
+    of JArray:  items*:    seq[JSonNode]
 
 proc jsonNodeToBox*(n: JSonNode): Box =
   case n.kind
-  of JNull: return nil
-  of JBool: return pack(n.boolval)
-  of JInt: return pack(int(n.intval))
-  of JFloat: return pack(n.floatval)
+  of JNull:   return nil
+  of JBool:   return pack(n.boolval)
+  of JInt:    return pack(int(n.intval))
+  of JFloat:  return pack(n.floatval)
   of JString: return pack(n.strval)
   of JArray:
-    var res: seq[Box]
+    var res: seq[Box] = @[]
 
-    for item in n.items:
-      res.add(item.jsonNodeToBox())
+    for item in n.items: res.add(item.jsonNodeToBox())
 
     return pack[seq[Box]](res)
   of JObject:
@@ -72,30 +65,18 @@ proc jsonNodeToBox*(n: JSonNode): Box =
 
     return pack(res)
 
-when not defined(release) and defined(traceJson):
-  proc readOne(s: Stream): char {.inline.} =
-    var c = s.readChar()
-    trace(fmtReadTrace.fmt())
-    return c
-else:
-  proc readOne(s: Stream): char {.inline.} =
-    return s.readChar()
-
-proc peekOne(s: Stream): char {.inline.} =
-  return s.peekChar()
-
-proc jsonValue(s: Stream): JSonNode
-
+proc parseError(msg: string): JsonError {.inline.} = return JsonError(msg: msg)
+proc readOne(s: Stream): char {.inline.} = return s.readChar()
+proc peekOne(s: Stream): char {.inline.} = return s.peekChar()
 proc jsonWS(s: Stream) =
-  while s.peekOne() in jsonWSChars:
-    discard s.readChar()
+  while s.peekOne() in jsonWSChars: discard s.readChar()
+proc jsonValue(s: Stream): JSonNode
 
 template literalCheck(s: Stream, lit: static string) =
   const msg: string = eBadLiteral & lit
 
   for i in 1 .. (len(lit) - 1):
-    if s.readChar() != lit[i]:
-      raise parseError(msg)
+    if s.readChar() != lit[i]: raise parseError(msg)
 
 let
   jNullLit: JsonNode = JsonNode(kind: JNull)
@@ -120,7 +101,7 @@ proc jSonTrue(s: Stream): JsonNode =
 # TODO: Got to deal w/ overflow issues better.
 proc jsonNumber(s: Stream): JsonNode =
   var
-    buf: string
+    buf:    string
     gotNeg: bool
     c = s.readOne()
 
@@ -140,7 +121,7 @@ proc jsonNumber(s: Stream): JsonNode =
       of '0' .. '9':
         buf.add(s.readOne())
       else: break
-  else: raise parseError(eWTF)
+  else: unreachable
 
   c = s.peekOne()
   case c
@@ -180,8 +161,7 @@ proc jsonNumber(s: Stream): JsonNode =
 
   while true:
     c = s.peekOne()
-    if c < '0' or c > '9':
-      break
+    if c < '0' or c > '9': break
     buf.add(s.readOne())
 
   var f: BiggestFloat
@@ -224,15 +204,13 @@ proc jsonStringRaw(s: Stream): string =
             raise parseError(eBadUniEscape)
         let r: Rune = cast[Rune](codepoint)
         str.add($r)
-      else:
-        raise parseError(eBadEscape)
+      else: raise parseError(eBadEscape)
 
     of '"': break
     of '\x00': raise parseError(eEOFInStr)
     else: str.add(c)
 
-  if str.validateUtf8() != -1:
-    raise parseError(eBadUTF8)
+  if str.validateUtf8() != -1: raise parseError(eBadUTF8)
 
   return str
 
@@ -266,8 +244,7 @@ proc jsonMembers(s: Stream): OrderedTableRef[string, JsonNode] =
   while true:
     let k = s.jsonStringRaw()
     s.jsonWS()
-    if s.readOne() != ':':
-      raise parseError(eNoColon)
+    if s.readOne() != ':': raise parseError(eNoColon)
     s.jsonWS()
     let v = s.jsonValue()
     result[k] = v
@@ -285,27 +262,25 @@ proc jsonObject(s: Stream): JSonNode =
   of '}':
     discard s.readOne()
     return JsonNode(kind: JObject)
-  of '"':
-    return JSonNode(kind: JObject, kvpairs: s.jsonMembers())
-  else:
-    raise parseError(eBadObject)
+  of '"': return JSonNode(kind: JObject, kvpairs: s.jsonMembers())
+  else:   raise parseError(eBadObject)
 
 proc jsonValue(s: Stream): JSonNode =
   case s.peekOne()
-  of '{': return s.jsonObject()
-  of '[': return s.jsonArray()
-  of '"': return s.jsonString()
+  of '{':           return s.jsonObject()
+  of '[':           return s.jsonArray()
+  of '"':           return s.jsonString()
   of '0'..'9', '-': return s.jsonNumber()
-  of 't': return s.jsonTrue()
-  of 'f': return s.jsonFalse()
-  of 'n': return s.jsonNull()
+  of 't':           return s.jsonTrue()
+  of 'f':           return s.jsonFalse()
+  of 'n':           return s.jsonNull()
   else:
     raise parseError(eBadElementStart.fmt())
 
 proc parseJson*(s: Stream): JSonNode =
   s.jsonWS()
   result = s.jSonValue()
-  # Per the spec, we should advance the stream white space after the
+  # Per tho spec, we should advance the stream white space after the
   # extracted value.  However, we don't do this at the top level just
   # in case any space after the end of the element has semantic value
   # of some sort.

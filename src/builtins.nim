@@ -65,12 +65,10 @@ var availableHooks = { "log_hook"     : defaultLogHook,
                        "con4m_hook"   : defaultCon4mHook
                      }.toTable()
 
-when not defined(release):
-  availableHooks["debug_hook"] = defaultDebugHook
+when not defined(release): availableHooks["debug_hook"] = defaultDebugHook
 
 proc getFilterByName*(name: string): Option[MsgFilter] =
-  if name in availableFilters:
-    return some(availableFilters[name])
+  if name in availableFilters: return some(availableFilters[name])
   return none(MsgFilter)
 
 proc getFilterName*(filter: MsgFilter): Option[string] =
@@ -78,13 +76,10 @@ proc getFilterName*(filter: MsgFilter): Option[string] =
     if f == filter: return some(name)
 
 proc getHookByName*(name: string): Option[SinkConfig] =
-  if name in availableHooks:
-    return some(availableHooks[name])
-
+  if name in availableHooks: return some(availableHooks[name])
   return none(SinkConfig)
 
-proc getSinkConfigs*(): Table[string, SinkConfig] =
-  return availableHooks
+proc getSinkConfigs*(): Table[string, SinkConfig] = return availableHooks
 
 var args: seq[string]
 
@@ -105,15 +100,13 @@ proc topicSubscribe(args: seq[Box], unused: ConfigState): Option[Box] =
     config = unpack[string](args[1])
     `rec?` = getHookByName(config)
 
-  if `rec?`.isNone():
-    return some(pack(false))
+  if `rec?`.isNone(): return some(pack(false))
 
   let
     record   = `rec?`.get()
     `topic?` = subscribe(topic, record)
 
-  if `topic?`.isNone():
-    return some(pack(false))
+  if `topic?`.isNone(): return some(pack(false))
 
   return some(pack(true))
 
@@ -123,27 +116,20 @@ proc topicUnsubscribe(args: seq[Box], unused: ConfigState): Option[Box] =
     config = unpack[string](args[1])
     `rec?` = getHookByName(config)
 
-  if `rec?`.isNone():
-    return some(pack(false))
+  if `rec?`.isNone(): return some(pack(false))
 
   return some(pack(unsubscribe(topic, `rec?`.get())))
 
 var chalkStack: seq[ChalkObj] = @[]
 
-proc pushTargetChalkForErrorMsgs*(s: ChalkObj) =
-  chalkStack.add(s)
-
-proc popTargetChalkForErrorMsgs*() =
-  discard chalkStack.pop()
+proc pushTargetChalkForErrorMsgs*(s: ChalkObj) = chalkStack.add(s)
+proc popTargetChalkForErrorMsgs*()             = discard chalkStack.pop()
 
 # This is private, not available from con4m.
 proc chalkErrSink(msg: string, cfg: SinkConfig, arg: StringTable): bool =
-  if len(chalkStack) == 0:
-    return false
-  if chalkStack[^1] == nil:
-    chalkStack[^1].err = @[msg]
-  else:
-    chalkStack[^1].err.add(msg)
+  if len(chalkStack) == 0:  return false
+  if chalkStack[^1] == nil: chalkStack[^1].err = @[msg]
+  else:                     chalkStack[^1].err.add(msg)
   return true
 
 proc chalkErrFilter(msg: string, info: StringTable): (string, bool) =
@@ -237,10 +223,8 @@ proc sinkConfigLong(args: seq[Box], unused: ConfigState): Option[Box] =
 
     let `cfg?` = configSink(theSinkOpt.get(), some(sinkopts), filterObjs)
 
-    if `cfg?`.isSome():
-      availableHooks[sinkconf] = `cfg?`.get()
-    else:
-      warn(fmt"Output sink configuration '{sinkconf}' failed to load.")
+    if `cfg?`.isSome(): availableHooks[sinkconf] = `cfg?`.get()
+    else: warn(fmt"Output sink configuration '{sinkconf}' failed to load.")
 
 proc sinkConfigShort(args: seq[Box], unused: ConfigState): Option[Box] =
   var a2 = args
@@ -279,5 +263,4 @@ discard registerTopic("confdump")
 discard registerTopic("version")
 discard registerTopic("help")
 
-when not defined(release):
-    discard subscribe("debug", defaultDebugHook)
+when not defined(release): discard subscribe("debug", defaultDebugHook)

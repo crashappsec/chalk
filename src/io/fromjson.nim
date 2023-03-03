@@ -6,9 +6,7 @@
 import tables, strformat, streams, nimutils, ../types, ../config, ./json
 
 const
-  eDupeKey    = "{fname}: Duplicate entry for chalk key '{key}'"
-  eNoFloat    = "{fname}: JSon type for {key} is `float`, which is NOT " &
-                "a valid chalk type"
+  eNoFloat    = "{fname}: key type {key} is float (not valid in chalk)"
   rawMagicKey = "\"_MAGIC"
 
 
@@ -41,9 +39,8 @@ proc findJsonStart*(stream: FileStream): bool =
     pos = pos - 1
     stream.setPosition(pos)
     ch = stream.peekChar()
-    if ch != ' ':
-      break
-    if pos < 9: return false
+    if ch != ' ': break
+    if pos < 9:   return false
 
   # Now ch should be the colon, and if it isn't, that's a problem.
   if ch != ':': return false
@@ -53,9 +50,8 @@ proc findJsonStart*(stream: FileStream): bool =
     pos = pos - 1
     stream.setPosition(pos)
     ch = stream.peekChar()
-    if ch != ' ':
-      break
-    if pos < 8: return false
+    if ch != ' ': break
+    if pos < 8:   return false
 
   # Now ch should be the quote that ends "_MAGIC".
   if ch != '"': return false
@@ -63,17 +59,15 @@ proc findJsonStart*(stream: FileStream): bool =
   # Jump back 7 more chars and check the rest of the key.
   pos = pos - len(rawMagicKey)
   stream.setPosition(pos)
-  if stream.peekStr(len(rawMagicKey)) != rawMagicKey:
-    return false
+  if stream.peekStr(len(rawMagicKey)) != rawMagicKey: return false
 
   # One more batch of potential white space.
   while true:
     pos = pos - 1
     stream.setPosition(pos)
     ch = stream.peekChar()
-    if ch != ' ':
-      break
-    if pos == 0: return false
+    if ch != ' ': break
+    if pos == 0:  return false
 
   # Finally, ensure the leading {
   if ch != '{': return false
@@ -87,7 +81,7 @@ proc objFromJson(jobj: JsonNode, fname: string): ChalkDict =
 
   for key, value in jobj.kvpairs:
     if result.contains(key): # Chalk objects can't have duplicate keys.
-      warn(eDupeKey.fmt())
+      warn(fmt"{fname}: Duplicate entry for chalk key '{key}'")
       continue
 
     result[key] = valueFromJson(jobj = value, fname = fname)
@@ -95,22 +89,17 @@ proc objFromJson(jobj: JsonNode, fname: string): ChalkDict =
 proc arrayFromJson(jobj: JsonNode, fname: string): seq[Box] =
   result = newSeq[Box]()
 
-  for item in jobj.items:
-    result.add(valueFromJson(jobj = item, fname = fname))
+  for item in jobj.items: result.add(valueFromJson(jobj = item, fname = fname))
 
 proc valueFromJson(jobj: JsonNode, fname: string): Box =
   case jobj.kind
-  of JNull: return
-  of JBool: return pack(jobj.boolval)
-  of JInt:
-    return pack(jobj.intval)
-  of JFloat: raise newException(IOError, eNoFloat)
-  of JString:
-    return pack(jobj.strval)
-  of JObject:
-    return pack(objFromJson(jobj, fname))
-  of JArray:
-    return pack(arrayFromJson(jobj, fname))
+  of JNull:   return
+  of JBool:   return pack(jobj.boolval)
+  of JInt:    return pack(jobj.intval)
+  of JFloat:  raise newException(IOError, eNoFloat)
+  of JString: return pack(jobj.strval)
+  of JObject: return pack(objFromJson(jobj, fname))
+  of JArray:  return pack(arrayFromJson(jobj, fname))
 
 proc extractOneChalkJson*(stream: Stream, path: string): ChalkDict =
   var jobj: JSonNode = stream.parseJson()

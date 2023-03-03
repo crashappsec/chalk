@@ -30,12 +30,10 @@ proc processOldChalk(obj: ChalkObj): Box =
       error("Found unknown key (" & k & ") in a chalk object we're replacing")
     else:
       let spec = specOpt.get()
-      if spec.getSkip():
-        continue
+      if spec.getSkip():  continue
       if spec.getSquash():
         # The ones we're inserting now...
-        if spec.getSystem() or obj.newFields.contains(k):
-          continue
+        if spec.getSystem() or obj.newFields.contains(k): continue
     groomedDict[fullkey] = v
 
   result = pack(groomedDict)
@@ -47,11 +45,9 @@ method getArtifactInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
 
   if oldChalkOpt.isSome() and obj.isMarked():
     let oldChalkSpec = oldChalkOpt.get()
-    if not oldChalkSpec.getSkip():
-      result["OLD_CHALK"] = processOldChalk(obj)
+    if not oldChalkSpec.getSkip(): result["OLD_CHALK"] = processOldChalk(obj)
 
-  if len(obj.err) != 0:
-    result["ERR_INFO"] = pack(obj.err)
+  if len(obj.err) != 0: result["ERR_INFO"] = pack(obj.err)
 
   let toHash = createdToBinary(obj)
   var shaCtx = initSHA[SHA256]()
@@ -87,5 +83,4 @@ method getArtifactInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
       result["SIGN_PARAMS"] = tup[1]
 
 registerPlugin("metsys", MetsysPlugin())
-
 registerCon4mCallback("sign", callbackTypeStr)

@@ -8,8 +8,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, strutils, nimutils, json, glob
-import ../types, ../config, ../plugins
+import tables, strutils, nimutils, json, glob, ../types, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 

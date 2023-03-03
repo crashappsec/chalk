@@ -17,7 +17,7 @@
 
 
 import unicode, tables, os, nimutils, std/terminal, defaults,  options,
-       formatstr, builtins
+       formatstr, builtins, parseutils
 from strutils import replace, split, find
 
 when true:
@@ -40,20 +40,16 @@ else:
 
     while i < limit:
       case s[i]
-      of '\\':
-        i = i + 1
+      of '\\': i = i + 1
       of '{':
         result  &= s[curStart ..< i]
         i        = i + 1
         curstart = i
         while i < limit:
           case s[i]
-          of '\\':
-            i = i + 1
-          of '}':
-            break
-          else:
-            discard
+          of '\\': i = i + 1
+          of '}':  break
+          else:    discard
           i = i + 1
         if i == limit:
           raise newException(ValueError, "Missing } in format specifier")
@@ -66,16 +62,15 @@ else:
 
           for (k, v) in map:
             if k == key:
-              val = v
+              val   = v
               found = true
               break
           if not found:
             raise newException(ValueError, "invalid specifier: '" & key & "'")
-          result &= val
+          result  &= val
           i        = i + 1
           curstart = i
-      else:
-        discard
+      else: discard
       i = i + 1
     result &= s[curStart .. ^1]
 
@@ -150,14 +145,11 @@ proc parseJankText(s: string, width: int): seq[JankBlock] =
     lines     = processed.split("\n")
 
   for i, line in lines:
-    if line == "" and i + 1 == len(lines):
-      break
-    result.add(JankBlock(kind: JankText,
+    if line == "" and i + 1 == len(lines): break
+    result.add(JankBlock(kind:    JankText,
                          content: indentWrap(line.strip(),
                                              width,
                                              hangingIndent = 0) & "\n"))
-
-import parseutils
 
 template `not`(x: int): untyped = x == 0
 
@@ -175,23 +167,19 @@ proc parseJankTable(s: string, width: int, plain: bool): JankBlock =
       row = strutils.split(line, "::")
       n   = len(row)
 
-    if n > maxCols:
-      maxCols = n
+    if n > maxCols: maxCols = n
 
-    for i in 0 ..< n:
-      row[i] = row[i].strip()
-
+    for i in 0 ..< n: row[i] = row[i].strip()
     rows.add(row)
 
   for i in 0 ..< len(rows):
     var row = rows[i]
-    while len(row) < maxCols:
-      row.add("")
+    while len(row) < maxCols: row.add("")
 
   var t = chalkTableFormatter(maxCols,
-                              rows=rows,
-                              wrapStyle=WrapLines,
-                              maxCellSz=0)
+                              rows      = rows,
+                              wrapStyle = WrapLines,
+                              maxCellSz = 0)
 
   if options.len != 0:
     let specs = options.split(Rune(':'))
@@ -240,24 +228,13 @@ proc parseJank(s: string, width: int): seq[JankBlock]
 proc parseJankCtrl(s: string, width: int): seq[JankBlock] =
   var n = s[1 .. ^1]
   case s[0]
-  of 't': # Table, plain, no headers or borders.
-    return @[parseJankTable(n, width, true)]
-  of 'T': # Table, yes headers and borders.
-    return @[parseJankTable(n, width, false)]
-  of 'H':
-    n = n.strip()
-    return @[jankHeader1(n)]
-  of 'h':
-    n = n.strip()
-    return @[jankHeader2(n)]
-  of 'i', 'I':
-    n = n.strip()
-    return parseJank(helpCorpus[n].strip(), width)
-  of 'c':
-    n = n.strip()
-    return @[jankCodeBlock(n, width)]
-  else:
-    raise newException(ValueError, "Janky jank option: '" & $(Rune(s[0])))
+  of 't':       return @[parseJankTable(n, width, true)]  # No hrs/borders
+  of 'T':       return @[parseJankTable(n, width, false)] # Yes hrs/borders
+  of 'H':       return @[jankHeader1(n.strip())]
+  of 'h':       return @[jankHeader2(n.strip())]
+  of 'i', 'I':  return parseJank(helpCorpus[n.strip()].strip(), width)
+  of 'c':       return @[jankCodeBlock(n.strip(), width)]
+  else:   raise newException(ValueError, "Janky jank option: '" & $(Rune(s[0])))
 
 proc parseJank(s: string, width: int): seq[JankBlock] =
   result = @[]
@@ -294,8 +271,7 @@ proc doHelp*() {.noreturn.} =
     args:  seq[string]    = getArgs()
     width                 = terminalWidth()
 
-  if len(args) == 0:
-    args = @["main"]
+  if len(args) == 0: args = @["main"]
 
   for arg in args:
     if arg == "topics" or arg notin helpCorpus:
@@ -309,8 +285,7 @@ proc doHelp*() {.noreturn.} =
       for key, _ in helpCorpus: topics.add(key)
 
       for item in topics:
-        if len(item) > widest:
-          widest = len(item)
+        if len(item) > widest: widest = len(item)
 
       let
         numCols          = max(int(terminalWidth() / (widest + 3)), 1)
@@ -323,14 +298,12 @@ proc doHelp*() {.noreturn.} =
 
       for item in topics:
         row.add(item)
-
         if len(row) == numCols:
           table.addRow(row)
           row = @[]
 
       if remainder != 0:
-        for i in remainder ..< numCols:
-          row.add("")
+        for i in remainder ..< numCols: row.add("")
         table.addRow(row)
       jank.add(jankHeader1("Available help topics:\n"))
       jank.add(JankBlock(kind:    JankTable,
@@ -342,8 +315,7 @@ proc doHelp*() {.noreturn.} =
 
   var msg = ""
 
-  for item in jank:
-    msg &= item.content
+  for item in jank: msg &= item.content
 
   publish("help", msg)
   quit()

@@ -10,8 +10,8 @@
 
 import tables, options, strformat, strutils, nimutils, ../types, ../config
 
+# Use .fmt() instead of fmt".." below, as the later won't handle the escapes
 const
-  kvPairBinFmt   = "{result}{binEncodeStr(outputkey)}{binEncodeItem(val)}"
   binStrItemFmt  = "\x01{u32ToStr(uint32(len(s)))}{s}"
   binIntItemFmt  = "\x02{u64ToStr(uint64(i))}"
   binTrue        = "\x03\x01"
@@ -27,8 +27,7 @@ proc u32ToStr*(i: uint32): string =
   result = newStringOfCap(sizeof(uint32)+1)
   let arr = cast[array[4, char]](i)
 
-  for ch in arr:
-    result.add(ch)
+  for ch in arr: result.add(ch)
 
 proc u64ToStr*(i: uint64): string =
   result = newStringOfCap(sizeof(uint64)+1)
@@ -38,44 +37,29 @@ proc u64ToStr*(i: uint64): string =
     result.add(ch)
 
 proc binEncodeItem(self: Box): string
-
-proc binEncodeStr(s: string): string
-
-proc binEncodeStr(s: string): string =
-  return binStrItemFmt.fmt()
-
-proc binEncodeInt(i: uint64): string =
-  return binIntItemFmt.fmt()
-
-proc binEncodeBool(b: bool): string =
-  if b: return binTrue
-  else: return binFalse
-
+proc binEncodeStr(s: string): string = return binStrItemFmt.fmt()
+proc binEncodeInt(i: uint64): string = return binIntItemFmt.fmt()
+proc binEncodeBool(b: bool): string  = return if b: binTrue else: binFalse
 proc binEncodeArr(arr: seq[Box]): string =
   result = binArrStartFmt.fmt()
 
-  for item in arr:
-    result = result & binEncodeItem(item)
+  for item in arr: result = result & binEncodeItem(item)
 
 proc binEncodeObj(self: ChalkDict): string =
   result = binObjHdr.fmt()
 
   for outputKey in self.keys():
     let val = self[outputKey]
-    result = kvPairBinFmt.fmt()
+    result = fmt"{result}{binEncodeStr(outputkey)}{binEncodeItem(val)}"
 
 proc binEncodeItem(self: Box): string =
   case self.kind
-  of MkBool: return binEncodeBool(unpack[bool](self))
-  of MkInt: return binEncodeInt(unpack[uint64](self))
-  of MkStr:
-    return binEncodeStr(unpack[string](self))
-  of MkTable:
-    return binEncodeObj(unpack[ChalkDict](self))
-  of MkSeq:
-    return binEncodeArr(unpack[seq[Box]](self))
-  else:
-    unreachable
+  of MkBool:  return binEncodeBool(unpack[bool](self))
+  of MkInt:   return binEncodeInt(unpack[uint64](self))
+  of MkStr:   return binEncodeStr(unpack[string](self))
+  of MkTable: return binEncodeObj(unpack[ChalkDict](self))
+  of MkSeq:   return binEncodeArr(unpack[seq[Box]](self))
+  else:       unreachable
 
 proc createdToBinary*(obj: ChalkObj, ptrOnly = getOutputPointers()): string =
   # Currently, this is only called for the METADATA_HASH field, which only
@@ -84,13 +68,10 @@ proc createdToBinary*(obj: ChalkObj, ptrOnly = getOutputPointers()): string =
 
   # Count how many fields we will write.
   for key, _ in obj.newFields:
-    if key.startsWith("_"):
-      continue
+    if key.startsWith("_"):             continue
     let spec = getKeySpec(key).get()
-    if spec.getSkip():
-      continue
-    if ptrOnly and not spec.getInPtr():
-      continue
+    if spec.getSkip():                  continue
+    if ptrOnly and not spec.getInPtr(): continue
 
     fieldCount += 1
 
@@ -105,33 +86,28 @@ proc createdToBinary*(obj: ChalkObj, ptrOnly = getOutputPointers()): string =
     # the insertion ordering, so there is no ambiguity.
     var outputKey = fullKey
 
-    if fullKey.startsWith("_"):
-      continue
+    if fullKey.startsWith("_"): continue
 
     # If this key is set, but ptrOnly is false, then we are
     # outputting the "full" chalk, in which case we do not
     # write this field out.
-    if outputKey == "CHALK_PTR" and not ptrOnly:
-      continue
+    if outputKey == "CHALK_PTR" and not ptrOnly: continue
 
     let spec = getKeySpec(fullKey).get()
 
-    if not obj.newFields.contains(fullKey):
-      continue
+    if not obj.newFields.contains(fullKey): continue
 
     # Skip outputting this key if "skip" is set in the key's existing
     # configuration.
-    if spec.getSkip():
-      continue
+    if spec.getSkip(): continue
 
     # If chalk pointers are set up, and we're currently outputting
     # a pointer, then we only output if the config has the in_ptr
     # field set.
-    if ptrOnly and not spec.getInPtr():
-      continue
+    if ptrOnly and not spec.getInPtr(): continue
 
     let val = obj.newFields[outputKey]
-    result = kvPairBinFmt.fmt()
+    result  = fmt"{result}{binEncodeStr(outputkey)}{binEncodeItem(val)}"
 
 proc foundToBinary*(kvPairs: ChalkDict): string =
   var keys: seq[string]
@@ -140,10 +116,9 @@ proc foundToBinary*(kvPairs: ChalkDict): string =
     if k in skipList: continue
     keys.add(k)
 
-  keys = orderKeys(keys)
-
+  keys   = orderKeys(keys)
   result = u32ToStr(uint32(len(keys)))
 
   for outputkey in keys:
     let val = kvPairs[outputKey]
-    result = kvPairBinFmt.fmt()
+    result  = fmt"{result}{binEncodeStr(outputkey)}{binEncodeItem(val)}"
