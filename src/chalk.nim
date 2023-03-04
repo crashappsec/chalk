@@ -66,7 +66,7 @@ proc runCmdVersion() =
   publish("version", t.render() & "\n")
 
 proc doAudit(commandName: string,
-             parsedFlags: TableRef[string, string],
+             parsedFlags: Table[string, string],
              configFile:  Option[string]) =
   if not chalkConfig.getPublishAudit(): return
 
@@ -91,24 +91,24 @@ when isMainModule:
     parsed:        seq[ArgResult]
     cmdName:       string
     `configFile?`: Option[string]
-    flags:         TableRef[string, string]
+    cmdLine:       CommandSpec
 
-    cmdLine = newCmdLineSpec().
-      addYesNoFlag("color", some('c'), some('C'), callback = setColor).
-      addYesNoFlag("dry-run", some('d'), some('D'), callback = setDryRun).
-      addYesNoFlag("publish-defaults", some('p'), some('P'),
-                   callback = setPublishDefaults).
-      addBinaryFlag("help", ["h"], callback = BinaryCallback(doHelp)).
-      addChoiceFlag("log-level",
-                    ["verbose", "trace", "info", "warn", "error", "none"],
-                    true, ["l"],  callback = setConsoleLogLevel).
-      addFlagWithArg("config-file", ["f"], setConfigFile)
+  cmdLine = newCmdLineSpec().
+    addYesNoFlag("color", some('c'), some('C'), callback = setColor).
+    addYesNoFlag("dry-run", some('d'), some('D'), callback = setDryRun).
+    addYesNoFlag("publish-defaults", some('p'), some('P'),
+                 callback = setPublishDefaults).
+    addBinaryFlag("help", ["h"], callback = BinaryCallback(doHelp)).
+    addChoiceFlag("log-level",
+                  ["verbose", "trace", "info", "warn", "error", "none"],
+                  true, ["l"],  callback = setConsoleLogLevel).
+    addFlagWithArg("config-file", ["f"], setConfigFile)
 
-  discard cmdLine.addCommand("insert", ["inject", "ins", "in", "i"]).
+  cmdLine.addCommand("insert", ["inject", "ins", "in", "i"]).
     addArgs(callback = setArtifactSearchPath).
-    addYesNoFlag("recursive", some('r'), some('R'), callback = setRecursive).
     addFlagWithArg("container-image-id", ["I"], setContainerImageId).
-    addFlagWithArg("container-image-name", ["N"], setContainerImageName)
+    addFlagWithArg("container-image-name", ["N"], setContainerImageName).
+    addYesNoFlag("recursive", some('r'), some('R'), callback = setRecursive)
 
   cmdLine.addCommand("extract", ["ex", "e"]).
     addArgs(callback = setArtifactSearchPath).
@@ -122,6 +122,7 @@ when isMainModule:
   cmdLine.addCommand("confdump", ["dump"]).addArgs(min = 1)
   cmdLine.addCommand("confload", ["load"]).addArgs(min = 1, max = 1)
   cmdLine.addCommand("version", ["vers", "v"])
+  cmdLine.addCommand("entrypoint", noFlags = true).addArgs()
   cmdLine.addCommand("docker", noFlags = true).addArgs()
 
   try:
@@ -139,7 +140,7 @@ when isMainModule:
   if "log-level" in parsed[0].flags:
     # We can't call chalkLogLevel yet b/c there's no config object
     # to set overrides on.
-    setLogLevel(flags["log-level"])
+    setLogLevel(parsed[0].flags["log-level"])
 
   # Now that we've set argv, we can do our own setup, including
   # loading the base configuration.  This is in config.nim
@@ -149,14 +150,6 @@ when isMainModule:
   # Can set items from the command line. Due to our argument design,
   # even if the command is ambiguous it's safe to do this.
   if len(parsed) >= 1: parsed[0].runCallbacks()
-  # This is in plugin.nim, but can't easily live in our validation
-  # code in the previous call, because it would add a cyclic module
-  # dependency.  But this is conceptually part of the schema
-  # validation... are there any loaded plugins that do NOT show up in
-  # the schema?  It also will cause the plugin objects to cache a
-  # reference to the con4m configuration info about the plugin (this
-  # could easily wait until the plugin first gets used, but if we do
-  # that, put it in a once: block).
   validatePlugins()
   # Next, we need to load the embedded configuration, so we load our
   # self-chalk, if we have any, as loadEmbeddedConfig will check it for
@@ -187,13 +180,10 @@ when isMainModule:
     if len(parsed) > 1:
       error("No valid command provided. See '" & appName & "help'.")
       cmdName = "help"
-
-
-
   if chalkConfig.getAllowExternalConfig() and cmdName != "help":
     `configFile?` = loadUserConfigFile(cmdName)
 
-  doAudit(cmdName, flags, `configFile?`)
+  doAudit(cmdName, parsed[0].flags, `configFile?`)
 
   case cmdName
   of "extract":  runCmdExtraction()
