@@ -88,66 +88,64 @@ proc doAudit(commandName: string,
 
 when isMainModule:
   var
-    parsed:        ArgResult
-    done:          bool
+    parsed:        seq[ArgResult]
     cmdName:       string
     `configFile?`: Option[string]
     flags:         TableRef[string, string]
 
-    cmdLine = newArgSpec(defaultCmd = true).
-              addPairedFlag('c', 'C', "color", setColor).
-              addPairedFlag('d', 'D', "dry-run", setDryRun).
-              addPairedFlag('p', 'P', "publish-defaults", setPublishDefaults).
-              addBinaryFlag('h', "help", BinaryCallback(doHelp)).
-              addChoiceFlag('l', "log-level", @["verbose", "trace", "info",
-                                                "warn", "error", "none"],
-                            true,
-                            setConsoleLogLevel).
-              addFlagWithStrArg('f', "config-file", setConfigFile)
+    cmdLine = newCmdLineSpec().
+      addYesNoFlag("color", some('c'), some('C'), callback = setColor).
+      addYesNoFlag("dry-run", some('d'), some('D'), callback = setDryRun).
+      addYesNoFlag("publish-defaults", some('p'), some('P'),
+                   callback = setPublishDefaults).
+      addBinaryFlag("help", ["h"], callback = BinaryCallback(doHelp)).
+      addChoiceFlag("log-level",
+                    ["verbose", "trace", "info", "warn", "error", "none"],
+                    true, ["l"],  callback = setConsoleLogLevel).
+      addFlagWithArg("config-file", ["f"], setConfigFile)
 
-  cmdLine.addCommand("insert", ["inject", "ins", "in", "i"]).
-            addArgs(callback = setArtifactSearchPath).
-            addPairedFlag('r', 'R', "recursive", setRecursive).
-            addFlagWithStrArg('I', "container-image-id", setContainerImageId).
-            addFlagWithStrArg('N',
-                              "container-image-name",
-                              setContainerImageName)
+  discard cmdLine.addCommand("insert", ["inject", "ins", "in", "i"]).
+    addArgs(callback = setArtifactSearchPath).
+    addYesNoFlag("recursive", some('r'), some('R'), callback = setRecursive).
+    addFlagWithArg("container-image-id", ["I"], setContainerImageId).
+    addFlagWithArg("container-image-name", ["N"], setContainerImageName)
+
   cmdLine.addCommand("extract", ["ex", "e"]).
-            addArgs(callback = setArtifactSearchPath).
-            addPairedFlag('r', 'R', "recursive", setRecursive)
+    addArgs(callback = setArtifactSearchPath).
+    addYesNoFlag("recursive", some('r'), some('R'), callback = setRecursive)
 
-  cmdLine.addCommand("delete", ["del"]).
-            addArgs(callback = setArtifactSearchPath).
-            addPairedFlag('r', 'R', "recursive", setRecursive)
+  cmdLine.addCommand("delete", ["del"], unknownFlagsOk = true).
+    addArgs(callback = setArtifactSearchPath).
+    addYesNoFlag("recursive", some('r'), some('R'), callback = setRecursive)
 
   cmdLine.addCommand("defaults", ["def"])
-  cmdLine.addCommand("confdump", ["dump"]).addArgs(min = 0, max = 1)
+  cmdLine.addCommand("confdump", ["dump"]).addArgs(min = 1)
   cmdLine.addCommand("confload", ["load"]).addArgs(min = 1, max = 1)
   cmdLine.addCommand("version", ["vers", "v"])
-  cmdLine.addCommand("help", ["h"]).addArgs(min = 0, max = 1)
+  cmdLine.addCommand("docker", noFlags = true).addArgs()
 
   try:
-    (parsed, done) = cmdLine.mostlyParse(topHasDefault = true)
-    cmdName        = getOrElse(parsed.getCurrentCommandName(), "default")
-    flags          = parsed.getFlags()
+    parsed = cmdLine.ambiguousParse(defaultCmd = some(""))
+    if len(parsed) == 1:
+      cmdName = parsed[0].getCommand()
+      setArgs(parsed[0].getArgs(cmdName).get())
+    else:
+      cmdName = "default"
+    setCommandName(cmdName)
   except:
     error(getCurrentExceptionMsg())
     doHelp()
 
-  if "log-level" in flags:
+  if "log-level" in parsed[0].flags:
     # We can't call chalkLogLevel yet b/c there's no config object
     # to set overrides on.
     setLogLevel(flags["log-level"])
 
-  if parsed.getSubcommand().isSome():
-    setArgs(parsed.getSubcommand().get().getArgs())
-
-  setCommandName(cmdName)
-
   # Now that we've set argv, we can do our own setup, including
   # loading the base configuration.  This is in config.nim
   loadBaseConfiguration()
-  if "log-level" in flags: setConsoleLogLevel(flags["log-level"])
+  if "log-level" in parsed[0].flags:
+    setConsoleLogLevel(parsed[0].flags["log-level"])
 
   # This is in plugin.nim, but can't easily live in our validation
   # code in the previous call, because it would add a cyclic module
@@ -179,25 +177,20 @@ when isMainModule:
   # if the argument parsing didn't match a command, we had passed in
   # "default" as a command name, and if we had to ask the config file,
   # we now need the answer, so we can dispatch.
-  if cmdName == "default":
+  if len(parsed) > 1:
     var `cmd?` = chalkConfig.getDefaultCommand()
     if `cmd?`.isSome():
       cmdName = `cmd?`.get()
       setCommandName(cmdName)
-      try:
-        parsed.applyDefault(cmdName)
-      except:
-        error(getCurrentExceptionMsg())
-        cmdName = "help"
-    else:
-        error("No valid command provided. See '" & appName & "help'.")
-        cmdName = "help"
+      for item in parsed:
+        if item.getCommand() == cmdName:
+          item.runCallbacks()
+    if len(parsed) > 1:
+      error("No valid command provided. See '" & appName & "help'.")
+      cmdName = "help"
 
   if chalkConfig.getAllowExternalConfig() and cmdName != "help":
-    parsed.commit()  # Now if there is a config file flag we'll take it.
     `configFile?` = loadUserConfigFile(cmdName)
-  else:
-    parsed.commit()
 
   doAudit(cmdName, flags, `configFile?`)
 
@@ -209,7 +202,8 @@ when isMainModule:
   of "confload": runCmdConfLoad()
   of "defaults": discard # Will be handled by showConfig() below.
   of "version":  runCmdVersion()
-  of "help":     doHelp() # noreturn; does NOT do a config dump or run the config.
+  of "docker":   echo "called 'docker " & $(getArgs()) & "'"
+  of "help":     doHelp() # noreturn; does NOT do dump or run the config.
   else:          unreachable # Unless we add more commands.
 
   showConfig() # In defaults.
