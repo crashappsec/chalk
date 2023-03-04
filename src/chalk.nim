@@ -125,7 +125,7 @@ when isMainModule:
   cmdLine.addCommand("docker", noFlags = true).addArgs()
 
   try:
-    parsed = cmdLine.ambiguousParse(defaultCmd = some(""))
+    parsed = cmdLine.ambiguousParse(defaultCmd = some(""), runCallbacks = false)
     if len(parsed) == 1:
       cmdName = parsed[0].getCommand()
       setArgs(parsed[0].getArgs(cmdName).get())
@@ -146,7 +146,9 @@ when isMainModule:
   loadBaseConfiguration()
   if "log-level" in parsed[0].flags:
     setConsoleLogLevel(parsed[0].flags["log-level"])
-
+  # Can set items from the command line. Due to our argument design,
+  # even if the command is ambiguous it's safe to do this.
+  if len(parsed) >= 1: parsed[0].runCallbacks()
   # This is in plugin.nim, but can't easily live in our validation
   # code in the previous call, because it would add a cyclic module
   # dependency.  But this is conceptually part of the schema
@@ -182,12 +184,11 @@ when isMainModule:
     if `cmd?`.isSome():
       cmdName = `cmd?`.get()
       setCommandName(cmdName)
-      for item in parsed:
-        if item.getCommand() == cmdName:
-          item.runCallbacks()
     if len(parsed) > 1:
       error("No valid command provided. See '" & appName & "help'.")
       cmdName = "help"
+
+
 
   if chalkConfig.getAllowExternalConfig() and cmdName != "help":
     `configFile?` = loadUserConfigFile(cmdName)
