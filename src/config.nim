@@ -110,10 +110,6 @@ proc checkHooks*(sinkname:     string,
     hookCheck(cacheid)
     hookCheck(aux)
 
-template dryRun*(s: string) =
-  if chalkConfig.dryRun:
-    publish("dry-run", s)
-
 when not defined(release):
   template chalkDebug*(s: string) =
     const
@@ -150,9 +146,9 @@ proc setConsoleLogLevel*(val: string) =
   setLogLevel(val)
   chalkConfig.logLevel = val
 
-proc setDryRun*(val: bool) =
-  discard ctxChalkConf.setOverride("dry_run", some(pack(val)))
-  chalkConfig.dryRun = val
+proc setVirtualChalk*(val: bool) =
+  discard ctxChalkConf.setOverride("virtual_chalk", some(pack(val)))
+  chalkConfig.virtualChalk = val
 
 proc setPublishDefaults*(val: bool) =
   discard ctxChalkConf.setOverride("publish_defaults", some(pack(val)))

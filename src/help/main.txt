@@ -12,8 +12,6 @@ At the same time, it's very customizable. Administrators can easily produce stan
 -f,::--config-file=FILE_NAME::Location from which to read an external config file
 -c,::--color::Enable colors (overrides any config file)
 -C,:: --no-color::Disable colors (overrides any config file)
--d,:: --dry-run::When inserting, do NOT insert metadata (overrides config file)
--D,:: --no-dry-run::Disable dry run (overriding config file settings)
 -l,:: --log-level=LOG_LEVEL::Valid values: none, error, warn, info, verbose
 -p,:: --publish-defaults::Show config info. See '{appName} help defaults'
 -P,:: --no-publish-defaults::Do not publish config info.  See '{appName} help defaults' for details.

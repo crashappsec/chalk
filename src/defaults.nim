@@ -56,19 +56,23 @@ proc showGeneralOptions*(): int {.discardable.} =
   row("Option", "Value", "Con4m Variable")
   row("Color",  $(conf.getColor().get()), "color")
   row("Log level", conf.getLogLevel(), "log_level")
-  row("Dry run", $(conf.getDryRun()), "dry_run")
+  row("Don't modify artifacts", $(conf.getVirtualChalk()), "virtual_chalk")
   row("Allow config files", confOk, "allow_external_config")
   row("Export builtin config ok", $(conf.getCanDump()), "can_dump")
   row("Replace builtin config ok", $(conf.getCanLoad()), "can_load")
   row("Audit config on load", $(conf.getPublishAudit()), "publish_audit")
-  row("Always publish defaults", $(conf.getPublishDefaults()), "publish_defaults")
-  row("Ignore config errors", $(conf.getIgnoreBrokenConf()), "ignore_broken_conf")
+  row("Always publish defaults", $(conf.getPublishDefaults()),
+      "publish_defaults")
+  row("Ignore config errors", $(conf.getIgnoreBrokenConf()),
+      "ignore_broken_conf")
   row("Artifact search path", path, "artifact_search_path")
   row("Recurse for artifacts", $(conf.getRecursive()), "recursive")
-  row("Ignored patterns", conf.getIgnorePatterns().join(", "), "ignore_patterns")
+  row("Ignored patterns", conf.getIgnorePatterns().join(", "),
+      "ignore_patterns")
   row("Default exe command",  def, "default_command")
   row("Container image hash", conf.getContainerImageId(), "container_image_id")
-  row("Container Image name", conf.getContainerImageName, "container_image_name")
+  row("Container Image name", conf.getContainerImageName,
+      "container_image_name")
   if conf.getAllowExternalConfig():
     row("Config file path", conf.getConfigPath().join(", "), "config_path")
     row("Config file name", conf.getConfigFileName(), "config_filename")
@@ -183,11 +187,10 @@ proc showDisclaimer*(w: int) =
                       "the 'defaults' command always publishes, though."
   publish("defaults", "\n" & indentWrap(disclaimer, w - 1) & "\n")
 
-proc showConfig*() =
-  let isDefaultsCmd = getCommandName() == "defaults"
-
-  if chalkConfig.getPublishDefaults() or isDefaultsCmd:
-    showGeneralOptions()
-    showSinkConfigs()
-    let w = showKeyConfigs()
-    if isDefaultsCmd: showDisclaimer(w)
+proc showConfig*(force: bool = false) =
+  once:
+    if chalkConfig.getPublishDefaults() or force:
+      showGeneralOptions()
+      showSinkConfigs()
+      let w = showKeyConfigs()
+      if force: showDisclaimer(w)

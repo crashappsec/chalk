@@ -42,32 +42,29 @@ method scan*(self:   CodecZip,
     error(loc & ": Invalid input JSON in file: " & getCurrentExceptionMsg())
     return some(chalk)
 
-method handleWrite*(self: CodecZip, chalk: ChalkObj, encoded: Option[string]) =
-  # This really should reuse the file descriptor, but it currently means
-  # forking zippy, which doesn't thrill me.
+proc getZipAsString(chalk: ChalkObj, encoded: Option[string]): string =
   let cache = ZipCache(chalk.cache)
-
+  var stash: Option[ArchiveEntry] = none(ArchiveEntry)
   if encoded.isSome():
     cache.archive.contents[zipChalkFile] =
         ArchiveEntry(kind:         ekFile,
                      contents:     encoded.get(),
                      lastModified: getTime())
   elif cache.archive.contents.contains(zipChalkFile):
+    stash = some(cache.archive.contents[zipChalkFile])
     cache.archive.contents.del(zipChalkFile)
-  cache.archive.writeZipArchive(chalk.fullpath)
+  result = $(cache.archive)
+  if stash.isSome(): cache.archive.contents[zipChalkFile] = stash.get()
+
+method handleWrite*(self:    CodecZip,
+                    chalk:   ChalkObj,
+                    encoded: Option[string],
+                    virtual: bool): string =
+  let contents = chalk.getZipAsString(encoded)
+  if not virtual: chalk.replaceFileContents(contents)
+  return $(contents.computeSHA256())
 
 method getArtifactHash*(self: CodecZip, chalk: ChalkObj): string =
-  # This is NOT the hash of the zip-file pre-chalk. That would be
-  # a lot more work than we want.
-  var keys: seq[string] = @[]
-  var shaCtx            = initSHA[SHA256]()
-
-  let cache = ZipCache(chalk.cache)
-  for k, v in cache.archive.contents:
-    if k == zipChalkFile: continue
-    shaCtx.update(k)
-    shaCtx.update(v.contents)
-
-  return $shaCtx.final()
+  return $(chalk.getZipAsString(none(string)).computeSHA256())
 
 registerPlugin("zip", CodecZip())

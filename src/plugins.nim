@@ -8,8 +8,9 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import os, tables, strformat, strutils, algorithm, options, glob, streams, posix
-import con4m, nimutils, types, config, io/[fromjson, json], std/tempfiles
+import os, tables, strformat, strutils, algorithm, options, glob, streams,
+       posix, std/tempfiles
+import nimSHA2, con4m, nimutils, types, config, io/[fromjson, json]
 
 when (NimMajor, NimMinor) < (1, 7):  {.warning[LockLevel]: off.}
 
@@ -191,7 +192,7 @@ method scanArtifactLocations*(self:      Codec,
     if info.kind == pcFile:
       if path in exclusions:          continue
       if path.mustIgnore(ignoreList): continue
-      trace("{path}: scanning file")
+      trace(fmt"{path}: scanning file")
       self.scanLocation(path, exclusions)
     elif recurse:
       dirWalk(true):
@@ -267,7 +268,10 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string) =
         removeFile(path)
         error(fmt"{chalk.fullPath}: Could not write (no permission)")
 
-method handleWrite*(s: Codec, chalk: ChalkObj, enc: Option[string]) {.base.} =
+method handleWrite*(s:       Codec,
+                    chalk:   ChalkObj,
+                    enc:     Option[string],
+                    virtual: bool): string {.base.} =
   var pre, post: string
   chalk.stream.setPosition(0)
   pre = chalk.stream.readStr(chalk.startOffset)
@@ -275,7 +279,9 @@ method handleWrite*(s: Codec, chalk: ChalkObj, enc: Option[string]) {.base.} =
     chalk.stream.setPosition(chalk.endOffset)
     post = chalk.stream.readAll()
   chalk.closeFileStream()
-  chalk.replaceFileContents(pre & enc.getOrElse("") & post)
+  let contents = pre & enc.getOrElse("") & post
+  if not virtual: chalk.replaceFileContents(contents)
+  return $(contents.computeSHA256())
 
 # We need to turn off UnusedImport here, because the nim static
 # analyzer thinks the below imports are unused. When we first import,

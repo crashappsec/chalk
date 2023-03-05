@@ -63,8 +63,12 @@ method scanArtifactLocations*(self:       CodecContainer,
 
 method keepScanningOnSuccess*(self: CodecContainer): bool = false
 
-method handleWrite*(self: CodecContainer, obj: ChalkObj, enc: Option[string]) =
+method handleWrite*(self:    CodecContainer,
+                    obj:     ChalkObj,
+                    enc:     Option[string],
+                    virtual: bool): string =
   echo pretty(parseJson(enc.get()))
+  return "return a hash"
 
 method getArtifactInfo*(self: CodecContainer, chalk: ChalkObj): ChalkDict =
   result = ContainerCache(chalk.cache).info

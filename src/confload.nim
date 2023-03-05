@@ -89,8 +89,6 @@ proc runCmdConfLoad*() =
 
     trace(fmt"{filename}: Configuration successfully validated.")
 
-    dryRun("The provided configuration file would be loaded.")
-
     # Now we're going to set up the injection properly solely by
     # tinkering with the config state.
     #

@@ -95,7 +95,6 @@ when isMainModule:
 
   cmdLine = newCmdLineSpec().
     addYesNoFlag("color", some('c'), some('C'), callback = setColor).
-    addYesNoFlag("dry-run", some('d'), some('D'), callback = setDryRun).
     addYesNoFlag("publish-defaults", some('p'), some('P'),
                  callback = setPublishDefaults).
     addBinaryFlag("help", ["h"], callback = BinaryCallback(doHelp)).
@@ -108,6 +107,7 @@ when isMainModule:
     addArgs(callback = setArtifactSearchPath).
     addFlagWithArg("container-image-id", ["I"], setContainerImageId).
     addFlagWithArg("container-image-name", ["N"], setContainerImageName).
+    addYesNoFlag("virtual", some('v'), some('V'), callback = setVirtualChalk).
     addYesNoFlag("recursive", some('r'), some('R'), callback = setRecursive)
 
   cmdLine.addCommand("extract", ["ex", "e"]).
@@ -124,6 +124,7 @@ when isMainModule:
   cmdLine.addCommand("version", ["vers", "v"])
   cmdLine.addCommand("entrypoint", noFlags = true).addArgs()
   cmdLine.addCommand("docker", noFlags = true).addArgs()
+  cmdLine.addCommand("help").addArgs()
 
   try:
     parsed = cmdLine.ambiguousParse(defaultCmd = some(""), runCallbacks = false)
@@ -177,24 +178,22 @@ when isMainModule:
     if `cmd?`.isSome():
       cmdName = `cmd?`.get()
       setCommandName(cmdName)
-    if len(parsed) > 1:
-      error("No valid command provided. See '" & appName & "help'.")
-      cmdName = "help"
   if chalkConfig.getAllowExternalConfig() and cmdName != "help":
     `configFile?` = loadUserConfigFile(cmdName)
 
   doAudit(cmdName, parsed[0].flags, `configFile?`)
 
   case cmdName
-  of "extract":  runCmdExtraction()
-  of "insert":   doInjection()
-  of "delete":   doInjection(deletion = true)
-  of "confdump": runCmdConfDump()
-  of "confload": runCmdConfLoad()
-  of "defaults": discard # Will be handled by showConfig() below.
-  of "version":  runCmdVersion()
-  of "docker":   echo "called 'docker " & $(getArgs()) & "'"
-  of "help":     doHelp() # noreturn; does NOT do dump or run the config.
-  else:          unreachable # Unless we add more commands.
+  of "extract":    runCmdExtraction()
+  of "insert":     doInjection()
+  of "delete":     doInjection(deletion = true)
+  of "confdump":   runCmdConfDump()
+  of "confload":   runCmdConfLoad()
+  of "defaults":   showConfig(force = true)
+  of "version":    runCmdVersion()
+  of "docker":     echo "called 'docker " & $(getArgs()) & "'"
+  of "entrypoint": echo "entry point."
+  of "help":       doHelp() # noreturn; does NOT do dump or run the config.
+  else:            unreachable # Unless we add more commands.
 
   showConfig() # In defaults.

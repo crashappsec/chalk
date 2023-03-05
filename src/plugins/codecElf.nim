@@ -83,13 +83,9 @@ method scan*(self:   CodecElf,
   except: return none(ChalkObj)
 
 method getArtifactHash*(self: CodecElf, chalk: ChalkObj): string =
-  var shaCtx = initSHA[SHA256]()
-  let offset = chalk.startOffset
-
   chalk.stream.setPosition(0)
-  shaCtx.update(chalk.stream.readStr(offset))
+  return $(chalk.stream.readStr(chalk.startOffset).computeSHA256())
 
-  return $shaCtx.final()
 
 registerPlugin("elf", CodecElf())
 

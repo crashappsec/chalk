@@ -28,7 +28,6 @@ type
     endOffset*:   int         # extract and write. If the plugin needs to do
                               # something else, use the cache field
                               # below, instead.
-    ## PS: are we using this valid field now???
     err*:         seq[string] ## runtime logs for chalking are filtered
                               ## based on the "chalk log level". They
                               ## end up here, until the end of chalking

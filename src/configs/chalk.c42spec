@@ -279,7 +279,7 @@ root {
     default: "warn"
     choice:  ["verbose", "trace", "info", "warn", "error", "none"]
   }
-  field dry_run {
+  field virtual_chalk {
     type:    "bool"
     default: false
   }

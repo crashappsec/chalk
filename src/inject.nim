@@ -38,15 +38,17 @@ proc isValidChalk(obj: ChalkObj): bool =
 
 proc selfInject(obj: ChalkObj, codec: Codec): string =
   var
-    f:    File
-    path: string
-    ctx:  FileStream
+    f:          File
+    path:       string
+    ctx:        FileStream
+    endingHash: string
 
   try:
-    (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
-    ctx       = newFileStream(f)
+    (f, path)   = createTempFile(tmpFilePrefix, tmpFileSuffix)
+    ctx         = newFileStream(f)
+    let rawHash = codec.handleWrite(obj, some(obj.createdToJson(false)), false)
+    endingHash  = rawHash.toHex().toLowerAscii()
 
-    codec.handleWrite(obj, some(obj.createdToJson(false)))
     if obj.isMarked():
       info(fmt"{obj.fullPath}: self-injection metadata replaced.")
     else:
@@ -62,7 +64,9 @@ proc selfInject(obj: ChalkObj, codec: Codec): string =
         let newPath = if getSelfInjecting(): obj.fullPath & ".new"
                       else: obj.fullPath
         moveFile(path, newPath)
-        info(fmt"Wrote new binary with loading conf to {newpath}")
+        info(fmt"Wrote binary with new config to {newpath}: {endingHash}")
+        obj.newFields["_FINAL_HASH"] = pack(endingHash)
+        result = obj.createdToJson(false)
       except:
         removeFile(path)
         error(fmt"{obj.fullPath}: Could not write (no permission)")
@@ -77,23 +81,24 @@ proc doOneInjection(obj: ChalkObj, codec: Codec, deletion: bool): string =
   let
     flag     = getOutputPointers()
     toInject = if deletion: none(string) else: some(obj.createdToJson(flag))
+    virtual  = chalkConfig.getVirtualChalk()
 
-  if deletion: result = ""
-  else:        result = if flag: obj.createdToJson(false) else: toInject.get()
-
-  if chalkConfig.getDryRun():
-    info("{obj.fullPath}: would modify metadata; publishing to 'dry-run' instead")
-    publish("dry-run", result)
-    return
-  elif deletion and not obj.isMarked(): return # Nothing to delete.
+  if deletion and not obj.isMarked(): return # Nothing to delete.
   try:
-    codec.handleWrite(obj, some(obj.createdToJson(flag)))
+    let
+      toWrite    = if deletion: none(string) else: some(obj.createdToJson(flag))
+      rawHash    = codec.handleWrite(obj, toWrite, virtual)
+      endingHash = rawHash.toHex().toLowerAscii()
     if deletion:
-      info(obj.fullPath & ": artifact metadata deleted.")
+      info(fmt"{obj.fullPath}: chalk mark deleted (now: {endingHash})")
+    elif virtual:
+      info(fmt"{obj.fullPath}: virtual chalk created")
     elif obj.startOffset < obj.endOffset:
-      info(obj.fullPath & ": artifact metadata replaced.")
+      info(fmt"{obj.fullPath}: chalk mark replaced (now: {endingHash})")
     else:
-      info(obj.fullPath & ": artifact metadata added.")
+      info(fmt"{obj.fullPath}: chalk mark added (now: {endingHash})")
+    obj.newFields["_FINAL_HASH"] = pack(endingHash)
+    result = obj.createdToJson(false)
   except:
     error(obj.fullPath & ": " & op & " failed: " & getCurrentExceptionMsg())
 
@@ -103,7 +108,6 @@ proc doInjection*(deletion = false) =
   let
     codecs      = getCodecsByPriority()
     everyKey    = getOrderedKeys()
-    inDryRun    = chalkConfig.getDryRun()
     extractions = doExtraction()
     pluginInfo  = getPluginsByPriority()
 
