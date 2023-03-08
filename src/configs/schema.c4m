@@ -246,6 +246,17 @@ key BUILD_CONTACT {
     docstring:     "List of contacts which triggered CI/CD job"
 }
 
+key CHALK_RAND {
+    ~type:         "string"
+    ~since:        "0.1.0"
+    ~output_order: 25
+    ~standard:     true
+    ~value:         $(lower(hex(rand())))
+    docstring:     "64-bit random value selected per chalk-section " +
+                   "(if enabled), intended to help ensure unique metadata " +
+		   " IDs in all circumstances."
+}
+
 key _CHALK_CONFIG {
     ~system:       true
     ~type:         "string"
