@@ -190,12 +190,18 @@ proc getSelfExtraction*(): Option[ChalkObj] =
       if len(codec.chalks) == 0:
         info("No embedded self-chalking found.")
         return none(ChalkObj)
-      selfChalk    = some(codec.chalks[0])
+
+      let myChalk  = codec.chalks[0]
       codec.chalks = @[]
-      if "CHALK_ID" notin selfChalk.get().extract:
+
+      if myChalk.extract == nil:
+        info("No embedded self-chalking found.")
+        return none(ChalkObj)
+      elif "CHALK_ID" notin myChalk.extract:
         error("Self-chalk is invalid.")
         return none(ChalkObj)
-      selfId = some(unpack[string](selfChalk.get().extract["CHALK_ID"]))
+      selfChalk = some(myChalk)
+      selfId    = some(unpack[string](myChalk.extract["CHALK_ID"]))
       return selfChalk
 
     warn(fmt"We have no codec for this platform's native executable type")

@@ -1,4 +1,4 @@
-import zippy/ziparchives_v1, streams, nimSha2, tables, times, strutils, options
+import zippy/ziparchives_v1, streams, nimSHA2, tables, times, strutils, options
 import os, ../config, ../types, ../io/fromjson, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
