@@ -933,6 +933,11 @@ plugin ci_github {
                      "BUILD_TRIGGER", "BUILD_CONTACT"]
 }
 
+plugin ci_jenkins {
+    enabled:         true
+    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI"]
+}
+
 plugin authors {
     # Since there's only one key it might export, go ahead and
     # lock it; if you want to disable that key, turn off the whole plugin.

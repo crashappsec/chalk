@@ -308,6 +308,7 @@ import plugins/codecElf
 import plugins/codecContainer
 import plugins/codecZip
 import plugins/ciGithub
+import plugins/ciJenkins
 import plugins/conffile
 import plugins/ownerAuthors
 import plugins/ownerGithub
