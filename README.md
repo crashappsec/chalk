@@ -1,13 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
-
-- [Chalk: Mark software for visibility; security teams bug you a lot less.](#chalk-mark-software-for-visibility-security-teams-bug-you-a-lot-less)
-  - [Background](#background)
-  - [](#)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 # Chalk: Mark software for visibility; security teams bug you a lot less.
 
 Chalk is an incredibly easy-to-use approach to mark software artifacts at build time, and record arbitrary metadata.  It can just as easily recover metadata from production.
