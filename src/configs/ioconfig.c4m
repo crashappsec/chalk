@@ -1,0 +1,68 @@
+## This is where we provide sane defaults for I/O.  Chalk is very
+## flexible in this regard, and almost nothing is hardcoded.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
+if env_exists("NO_COLOR") {
+  color: false
+} else {
+  color: true
+}
+
+sink_config("console_err", "stderr", {})
+sink_config("console_out", "stdout", {})
+
+# For commands that output JSON, default user output should get
+# JSON formatting and always get a newline per-publish.
+sink_config("json_console_out", "stdout", {}, ["pretty_json", "fix_new_line"])
+sink_config("json_console_err", "stderr", {}, ["pretty_json", "fix_new_line"])
+
+subscribe("report",   "json_console_err")
+subscribe("virtual",  "json_console_out")
+subscribe("audit",    "json_console_out")
+subscribe("version",  "console_out")
+subscribe("help",     "console_out")
+
+cmd := argv0()
+
+if cmd == "confdump" {
+  args := argv()
+
+  if len(args) > 0 {
+    sink_config("dump_out", "file", {"filename" : args[0]})
+    subscribe("confdump", "dump_out")
+  }
+  else {
+    subscribe("confdump", "console_out")
+  }
+}
+elif cmd == "defaults" {
+    subscribe("defaults", "console_out")
+} else {
+    subscribe("defaults", "console_err")
+}
+
+# custom_report stats {
+#  sink_configs: ["tbd"]
+#  host_profile: "beacon_report"
+#  use_when:     ["insert", "docker", "delete", "confload"]
+# }
+
+# Note that there are already two pre-built output configurations.
+# They are both subscribed to the 'stderr' sink.  You can remove those
+# subscriptions.
+#
+# - "log_hook",   to which chalk log messages post. There are filters
+#                 installed to add optional color, and to filter based
+#                 on your log-level setting.
+#
+# - "con4m_hook", to which errors in the configuration file post. The
+#                 same filters are installed; it respects the same
+#                 'log-level' setting, but all messages posted to it
+#                 will be 'error' messages.
+#
+# You can, if you like, configure subscriptions to the underlying
+# topics, in order to hook up other sinks.  The logging topic is
+# called, appropriately enough, "logs".  The topic for configuration
+# file errors is "con4m".

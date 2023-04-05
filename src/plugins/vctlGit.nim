@@ -5,8 +5,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import os, streams, tables, strutils, strformat
-import nimutils, ../types, ../config, ../plugins, ../io/gitConfig
+import os, streams, tables, strutils, ../config, ../plugins
 
 const
   dirGit       = ".git"
@@ -18,6 +17,162 @@ const
   ghUrl        = "url"
   ghOrigin     = "origin"
   ghLocal      = "local"
+  eBadGitConf  = "Github configuration file is invalid"
+
+type
+  KVPair*  = (string, string)
+  KVPairs* = seq[KVPair]
+  SecInfo* = (string, string, KVPairs)
+
+proc ws(s: Stream) =
+  while true:
+    if s.peekChar() in[' ', '\t']: discard s.readChar()
+    else: return
+
+proc newLine(s: Stream) =
+  if s.readChar() != '\n': raise newException(ValueError, eBadGitConf)
+
+proc comment(s: Stream) =
+  while s.readChar() notin ['\n', '\x00']: discard
+
+# Comments aren't allowed in between the brackets
+proc header(s: Stream): (string, string) =
+  var sec: string
+  var sub: string
+
+  while true:
+    let c = s.readChar()
+    case c
+    of 'a'..'z', 'A'..'Z', '0'..'9', '-', '.': sec = sec & $c
+    of ' ', '\t':
+      s.ws()
+      let c = s.readChar()
+      case c
+      of ']': return (sec, sub)
+      of '"':
+        while true:
+          let c = s.readChar()
+          case c
+          of '\\': sub = sub & $(s.readChar())
+          of '"': break
+          of '\x00': raise newException(ValueError, eBadGitConf)
+          else:
+            sub = sub & $c
+      else: raise newException(ValueError, eBadGitConf)
+    of ']': return (sec, sub)
+    else: raise newException(ValueError, eBadGitConf)
+
+proc kvPair(s: Stream): KVPair =
+  var
+    key: string
+    val: string
+
+  s.ws()
+  while true:
+    let c = s.peekChar()
+    case c
+    of '#', ';':
+      discard s.readChar()
+      s.comment()
+      if key == "": return ("", "")
+    of 'a'..'z', 'A'..'Z', '0'..'9', '-': key = key & $s.readChar()
+    of ' ', '\t':
+      discard s.readChar()
+      s.ws()
+    of '=':
+      discard s.readChar()
+      break
+    of '\n', '\x00':
+      discard s.readChar()
+      return (key, "")
+    of '\\':
+      discard s.readChar()
+      if s.readChar() != '\n':
+        raise newException(ValueError, eBadGitConf)
+      s.ws()
+    else: raise newException(ValueError, eBadGitConf)
+
+  s.ws()
+
+  while true:
+    var inString = false
+    let c = s.readChar()
+    case c
+    of '\n', '\x00': break
+    of '#', ';':
+      if not inString:
+        s.comment()
+        break
+      else:
+        val = val & $c
+    of '\\':
+      let n = s.readChar()
+      case n
+      of '\n':
+        continue
+      of '\\', '"': val = val & $n
+      of 'n':       val = val & "\n"
+      of 't':       val = val & "\t"
+      of 'b':       val = val & "\b"
+      else:         val = val & $n        # Be permissive, have a heart!
+    of '"': inString = not inString
+    else:   val = val & $c
+
+  return (key, val)
+
+proc kvpairs(s: Stream): KVPairs =
+  result = @[]
+
+  while true:
+    s.ws()
+    case s.peekChar()
+    of '\x00', '[': return
+    of '\n':
+      s.newLine()
+      continue
+    else: discard
+    try:
+      let (k, v) = s.kvPair()
+      if k != "": result.add((k, v))
+    except: discard # Should we warn instead og ignroing?
+
+proc section(s: Stream): SecInfo =
+  var sec, sub: string
+
+  while true:
+    s.ws()
+    let c = s.readChar()
+    case c
+    of '#', ';': s.comment()
+    of ' ', '\t', '\n': continue
+    of '[':
+      s.ws()
+      (sec, sub) = s.header()
+      s.ws()
+      s.newLine()
+      return (sec, sub, s.kvPairs())
+    of '\x00': return ("", "", @[])
+    else:      raise newException(ValueError, eBadGitConf)
+
+# TODO: This doesn't handle the include.path mechanism yet
+# TODO: Some more grace on parse errors.
+#
+# This doesn't actually parse ints or bool, just returns
+# everything as strings.
+#
+# config: section*
+# section: header '\n' kvpair*
+# header: '[' string subsection? ']'
+# subsection: ([ \t]+ '"' string '"'
+# kvpair: name [ \t]+ ([\\n']?('=' string)?)*
+# name: [a-zA-Z0-9-]+
+# # and ; are comments.
+proc parseGitConfig(s: Stream): seq[SecInfo] =
+  while true:
+    let (sec, sub, pairs) = s.section()
+    if sec == "": return
+    else:         result.add((sec, sub, pairs))
+
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
@@ -36,15 +191,17 @@ type GitPlugin* = ref object of Plugin
   branchName: string
   commitId:   string
   origin:     string
-  chalkPath:  string
   vcsDir*:    string
 
-template loadBasics(self: GitPlugin, obj: ChalkObj) =
-  self.chalkPath = obj.fullpath
-  self.vcsDir    = findGitDir(self.chalkPath)
-  trace(fmt"version control dir: {self.vcsDir}")
+template loadBasics(self: GitPlugin, path: seq[string]) =
 
-proc loadHead(self: GitPlugin, obj: ChalkObj): bool =
+  for item in path:
+    self.vcsDir = item.findGitDir()
+    if self.vcsDir != "":
+      trace("Version control dir: " & self.vcsDir)
+      return
+
+proc loadHead(self: GitPlugin): bool =
   # Don't want to commit to the order in which things get called,
   # so everything that might get called first someday calls this to
   # be safe.
@@ -61,7 +218,7 @@ proc loadHead(self: GitPlugin, obj: ChalkObj): bool =
     try:    fs.close()
     except: discard
   except:
-    error(fmt"{fNameHead}: github HEAD file couldn't be read")
+    error(fNameHead & ": github HEAD file couldn't be read")
     return false
 
 
@@ -77,7 +234,7 @@ proc loadHead(self: GitPlugin, obj: ChalkObj): bool =
               fname.split("/")
 
   if parts.len() < 3:
-    error(fmt"{fNameHead}: github HEAD file couldn't be loaded")
+    error(fNameHead & ": github HEAD file couldn't be loaded")
     return false
 
   self.branchName = parts[2 .. ^1].join($DirSep)
@@ -85,8 +242,8 @@ proc loadHead(self: GitPlugin, obj: ChalkObj): bool =
   self.commitID   = reffile.readAll().strip()
   reffile.close()
 
-  trace(fmt"branch: {self.branchName}")
-  trace(fmt"commit ID: {self.commitID}")
+  trace("branch: " & self.branchName)
+  trace("commit ID: " & self.commitID)
   return true
 
 proc calcOrigin(self: GitPlugin, conf: seq[SecInfo]): string =
@@ -139,8 +296,8 @@ proc calcOrigin(self: GitPlugin, conf: seq[SecInfo]): string =
   self.origin = ghLocal
   return ghLocal
 
-proc getOrigin(self: GitPlugin, obj: ChalkObj): (bool, Box) =
-  if not self.loadHead(obj): return (false, nil)
+proc getOrigin(self: GitPlugin): (bool, Box) =
+  if not self.loadHead(): return (false, nil)
 
   let
     confFileName = self.vcsDir.joinPath(fNameConfig)
@@ -151,36 +308,36 @@ proc getOrigin(self: GitPlugin, obj: ChalkObj): (bool, Box) =
       config = f.parseGitConfig()
       url    = self.calcOrigin(config)
 
-    trace(fmt"origin: {url}")
+    trace("origin: " & url)
     return (true, pack(url))
   except:
-    error(fmt"{confFileName}: Github configuration file not parsed.")
+    error(confFileName & ": Github configuration file not parsed.")
     return (false, nil)
 
-proc getHead(self: GitPlugin, obj: ChalkObj): (bool, Box) =
+proc getHead(self: GitPlugin): (bool, Box) =
   if self.commitID == "": return (false, nil)
   return (true, pack(self.commitID))
 
-proc getBranch(self: GitPlugin, obj: ChalkObj): (bool, Box) =
+proc getBranch(self: GitPlugin): (bool, Box) =
   if self.branchName == "": return (false, nil)
   return (true, pack(self.branchName))
 
-method getArtifactInfo*(self: GitPlugin, obj: ChalkObj): ChalkDict =
-  result = newTable[string, Box]()
+method getHostInfo*(self: GitPlugin,
+                    path: seq[string],
+                    ins:  bool): ChalkDict =
+  result = ChalkDict()
 
-  self.loadBasics(obj)
+  self.loadBasics(path)
 
-  if self.vcsDir == "":
-    return # No git directory, so no work to do.
+  if self.vcsDir == "": return # No git directory, so no work to do.
 
   let
-    (originThere, origin) = self.getOrigin(obj)
-    (headThere, head) = self.getHead(obj)
-    (branchThere, name) = self.getBranch(obj)
+    (originThere, origin) = self.getOrigin()
+    (headThere, head)     = self.getHead()
+    (branchThere, name)   = self.getBranch()
 
   if originThere: result["ORIGIN_URI"] = origin
   if headThere:   result["COMMIT_ID"]  = head
   if branchThere: result["BRANCH"]     = name
-
 
 registerPlugin("vctl_git", GitPlugin())

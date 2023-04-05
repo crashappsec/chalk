@@ -1,0 +1,53 @@
+## Builtin sign/verify implementation.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
+HAVE_GPG           := true
+PASSPHRASE_ENV_VAR := "GPG_PASSPHRASE"
+PASSPHRASE_ECHO    := "echo " + env(PASSPHRASE_ENV_VAR) + " | "
+SIGN_CMD_LINE      := "gpg --detach-sign --armor --batch --passphrase-fd 0 " +
+                      "--pinentry-mode loopback --status-fd 1 2>/dev/null "
+VERIFY_CMD_LINE    := "gpg --verify --batch --status-fd 1 2>/dev/null "
+
+export HAVE_GPG, PASSPHRASE_ENV_VAR, PASSPHRASE_ECHO
+export SIGN_CMD_LINE, VERIFY_CMD_LINE
+
+func sign(to_sign) {
+  result := ("", {})
+  if HAVE_GPG and env_exists(PASSPHRASE_ENV_VAR) {
+    tmp_fname := to_tmp_file(to_sign, "")
+    out       := run(PASSPHRASE_ECHO + SIGN_CMD_LINE + tmp_fname +
+                        " | grep SIG_CREATED")
+    signature := read_file(tmp_fname + ".asc")
+    parts     := split(out, " ")
+
+    if len(parts) == 8 {
+      result := ( signature, { "SCHEME"         : "OpenPGP",
+			       "TIMESTAMP"      : parts[6],
+			       "SIGNING_KEY_ID" : lower(strip(parts[7])) } )
+    }
+    rm_file(tmp_fname)
+    rm_file(tmp_fname + ".asc")
+  }
+  if len(result[1]) == 0 {
+    warn("Unable to sign. Make sure '" + PASSPHRASE_ENV_VAR + "' is set.")
+  }
+}
+
+func verify(signature, to_validate, params) {
+  result := false
+  if (not HAVE_GPG) { return; }
+  tmp_fname := to_tmp_file(to_validate, "")
+  write_file(tmp_fname + ".asc", signature)
+  cmd_line  := format("{VERIFY_CMD_LINE} {tmp_fname} {tmp_fname}.asc")
+  out       := run(cmd_line)
+  rm_file(tmp_fname)
+  rm_file(tmp_fname + ".asc")
+  if contains(out, "VALIDSIG") {
+     return true
+   }
+   else {
+     error(out)
+   }
+}

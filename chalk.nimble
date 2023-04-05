@@ -1,4 +1,4 @@
-version       = "0.3.0"
+version       = "0.4.0"
 author        = "John Viega"
 description   = "Software artifact metadata to make it easy to tie " &
                 "deployments to source code and collect metadata."
@@ -8,11 +8,10 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 1.6.8"
-requires "https://github.com/crashappsec/con4m ~= 0.6.4"
-requires "https://github.com/crashappsec/nimutils ~= 0.2.4"
+requires "https://github.com/crashappsec/con4m >= 0.7.3"
+requires "https://github.com/crashappsec/nimutils >= 0.3.0"
 requires "nimSHA2 == 0.1.1"
 requires "glob == 0.11.2"
-requires "https://github.com/guibar64/formatstr == 0.2.0"
 requires "https://github.com/viega/zippy == 0.10.7"
 
 task debug, "Package the debug build":

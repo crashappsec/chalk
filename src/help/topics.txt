@@ -1,0 +1,16 @@
+%{H Chalk Help Topics }%
+For info on metadata keys: 'chalk help keys'
+
+For info on config file sections, use 'chalk help' with the metadata section as an argument.
+
+%{H Available sections: }%
+keyspec, tool, plugin, sink, outconf, custom_report, profile
+
+For each section, you'll get an overview by default.  To then examine the properties, add 'props' after the command.  For instance:
+
+%{T
+Command::Description
+chalk help keyspec        :: Gives detailed info about keyspecs & metadata keys
+chalk help keyspec props  :: Gives info about each important keyspec field.
+}%
+%{h Additional topics: }%

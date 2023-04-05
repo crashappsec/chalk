@@ -4,7 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import strutils, options, streams, nimSHA2, ../types, ../config, ../plugins
+import strutils, options, streams, nimSHA2, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
@@ -55,11 +55,11 @@ method handleWrite*(self:    CodecShebang,
 method getArtifactHash*(self: CodecShebang, chalk: ChalkObj): string =
   var toHash = ""
   chalk.stream.setPosition(0)
-  if chalk.isMarked():
+  chalk.stream.setPosition(0)
+  if chalk.isMarked() and getCommandName() != "delete":
     toHash = chalk.stream.readLine() & "\n"
-    discard chalk.stream.readLine() # Skip line w/ old chalk object
+    chalk.stream.setPosition(chalk.endOffset)
   toHash &= chalk.stream.readAll()
-
   return $(toHash.computeSHA256())
 
 registerPlugin("shebang", CodecShebang())

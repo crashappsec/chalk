@@ -6,11 +6,10 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import strformat, tables, streams, unicode, parseutils, nimutils
+import tables, streams, unicode, parseutils, std/json, config
 
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']
-  fmtReadTrace     = "read: {$c}; position now: {$s.getPosition()}"
   jNullStr         = "null"
   jTrueStr         = "true"
   jFalseStr        = "false"
@@ -23,15 +22,13 @@ const
   eBadUTF8         = "Invalid UTF-8 in JSON string literal"
   eBadArrayItem    = "Expected comma or end of array"
   eNoColon         = "Colon expected"
-  eBadObjMember    = "Invalid JSON obj, expected , or }}, got: '{$c}'"
   eBadObject       = "Bad object, expected either } or a string key"
-  eBadElementStart = "Bad JSon at position: {s.getPosition()}"
-
+  rawMagicKey      = "\"MAGIC"
 
 type
-  JsonNode*     = ref JsonNodeObj
-  JSonError*    = ref object of ValueError
-  JsonNodeKind* = enum JNull, JBool, JInt, JFloat, JString, JObject, JArray
+  ChalkJsonNode*     = ref JsonNodeObj
+  JSonError*         = ref object of ValueError
+  JsonNodeKind*      = enum JNull, JBool, JInt, JFloat, JString, JObject, JArray
 
   JsonNodeObj* {.acyclic.} = object
     case kind*: JsonNodeKind
@@ -40,10 +37,105 @@ type
     of JInt:    intval*:   int64
     of JFloat:  floatval*: float
     of JString: strval*:   string
-    of JObject: kvpairs*:  OrderedTableRef[string, JsonNode]
-    of JArray:  items*:    seq[JSonNode]
+    of JObject: kvpairs*:  OrderedTableRef[string, ChalkJsonNode]
+    of JArray:  items*:    seq[ChalkJsonNode]
 
-proc jsonNodeToBox*(n: JSonNode): Box =
+proc chalkParseJson(s: Stream): ChalkJSonNode
+
+proc findJsonStart*(stream: FileStream): bool =
+  ## Seeks the stream to the start of the JSON blob, when the stream
+  ## is positioned over the start of the actual magic value.
+  var
+    ch: char
+    pos: int = stream.getPosition()
+
+  #  When we get here, the stream will be positioned over the first
+  #  byte of the magic. But we need to find the start of the JSON, so
+  #  we scan backwards. We are looking for the pattern:
+  #
+  #  "[ ]*:[ ]*"CIGAM"[ ]*{
+  #
+  #  At each step we check the position against the minimum # of
+  #  chars we MUST see.
+
+  # Back up just one byte.
+  if pos < 9: return false
+  pos = pos - 1
+  stream.setPosition(pos)
+
+  if stream.peekChar() != '"': return false
+
+  # Now we might see white space.  Back up until we are off white
+  # space, or until position is less than 9 (we won't have room
+  # to finish if it is)
+
+  while true:
+    pos = pos - 1
+    stream.setPosition(pos)
+    ch = stream.peekChar()
+    if ch != ' ': break
+    if pos < 8:   return false
+
+  # Now ch should be the colon, and if it isn't, that's a problem.
+  if ch != ':': return false
+
+  # Another batch of possible whitespace
+  while true:
+    pos = pos - 1
+    stream.setPosition(pos)
+    ch = stream.peekChar()
+    if ch != ' ': break
+    if pos < 7:   return false
+
+  # Now ch should be the quote that ends "MAGIC".
+  if ch != '"': return false
+
+  # Jump back 6 more chars and check the rest of the key.
+  pos = pos - len(rawMagicKey)
+  stream.setPosition(pos)
+  if stream.peekStr(len(rawMagicKey)) != rawMagicKey: return false
+
+  # One more batch of potential white space.
+  while true:
+    pos = pos - 1
+    stream.setPosition(pos)
+    ch = stream.peekChar()
+    if ch != ' ': break
+    if pos == 0:  return false
+
+  # Finally, ensure the leading {
+  if ch != '{': return false
+
+  return true
+
+proc valueFromJson(jobj: ChalkJsonNode, fname: string): Box
+
+proc objFromJson(jobj: ChalkJsonNode, fname: string): ChalkDict =
+  result = new(ChalkDict)
+
+  for key, value in jobj.kvpairs:
+    if result.contains(key): # Chalk objects can't have duplicate keys.
+      warn(fname & ": Duplicate entry for chalk key '" & key & "'")
+      continue
+
+    result[key] = valueFromJson(jobj = value, fname = fname)
+
+proc arrayFromJson(jobj: ChalkJsonNode, fname: string): seq[Box] =
+  result = newSeq[Box]()
+
+  for item in jobj.items: result.add(valueFromJson(jobj = item, fname = fname))
+
+proc valueFromJson(jobj: ChalkJsonNode, fname: string): Box =
+  case jobj.kind
+  of JNull:   return
+  of JBool:   return pack(jobj.boolval)
+  of JInt:    return pack(jobj.intval)
+  of JFloat:  raise newException(IOError, fname & ": float keys aren't valid")
+  of JString: return pack(jobj.strval)
+  of JObject: return pack(objFromJson(jobj, fname))
+  of JArray:  return pack(arrayFromJson(jobj, fname))
+
+proc jsonNodeToBox(n: ChalkJSonNode): Box =
   case n.kind
   of JNull:   return nil
   of JBool:   return pack(n.boolval)
@@ -70,7 +162,7 @@ proc readOne(s: Stream): char {.inline.} = return s.readChar()
 proc peekOne(s: Stream): char {.inline.} = return s.peekChar()
 proc jsonWS(s: Stream) =
   while s.peekOne() in jsonWSChars: discard s.readChar()
-proc jsonValue(s: Stream): JSonNode
+proc jsonValue(s: Stream): ChalkJSonNode
 
 template literalCheck(s: Stream, lit: static string) =
   const msg: string = eBadLiteral & lit
@@ -79,19 +171,19 @@ template literalCheck(s: Stream, lit: static string) =
     if s.readChar() != lit[i]: raise parseError(msg)
 
 let
-  jNullLit: JsonNode = JsonNode(kind: JNull)
-  jFalse: JSonNode = JsonNode(kind: JBool, boolval: false)
-  jTrue: JsonNode = JsonNode(kind: JBool, boolval: true)
+  jNullLit: ChalkJsonNode = ChalkJsonNode(kind: JNull)
+  jFalse:   ChalkJSonNode = ChalkJsonNode(kind: JBool, boolval: false)
+  jTrue:    ChalkJsonNode = ChalkJsonNode(kind: JBool, boolval: true)
 
-proc jSonNull(s: Stream): JsonNode =
+proc jSonNull(s: Stream): ChalkJsonNode =
   literalCheck(s, jNullStr)
   return jNullLit
 
-proc jSonFalse(s: Stream): JsonNode =
+proc jSonFalse(s: Stream): ChalkJsonNode =
   literalCheck(s, jFalseStr)
   return jFalse
 
-proc jSonTrue(s: Stream): JsonNode =
+proc jSonTrue(s: Stream): ChalkJsonNode =
   literalCheck(s, jTrueStr)
   return jTrue
 
@@ -99,7 +191,7 @@ proc jSonTrue(s: Stream): JsonNode =
 # we just copy into a buffer and validate, then let nim do the actual
 # conversion into the IEEE floating point format.
 # TODO: Got to deal w/ overflow issues better.
-proc jsonNumber(s: Stream): JsonNode =
+proc jsonNumber(s: Stream): ChalkJsonNode =
   var
     buf:    string
     gotNeg: bool
@@ -138,13 +230,13 @@ proc jsonNumber(s: Stream): JsonNode =
       else:
         var b: BiggestUInt
         discard parseBiggestUInt(buf, b)
-        return JsonNode(kind: JInt, intval: cast[int64](b))
+        return ChalkJsonNode(kind: JInt, intval: cast[int64](b))
   of 'E', 'e':
     buf.add(s.readOne())
   else:
     var b: BiggestUInt
     discard parseBiggestUInt(buf, b)
-    return JsonNode(kind: JInt, intval: cast[int64](b))
+    return ChalkJsonNode(kind: JInt, intval: cast[int64](b))
 
   c = s.readOne()
   case c
@@ -166,7 +258,7 @@ proc jsonNumber(s: Stream): JsonNode =
 
   var f: BiggestFloat
   discard parseBiggestFloat(buf, f)
-  return JSonNode(kind: JFloat, floatval: f)
+  return ChalkJSonNode(kind: JFloat, floatval: f)
 
 when (NimMajor, NimMinor) >= (1, 7):
   {.warning[CastSizes]: off.}
@@ -214,13 +306,13 @@ proc jsonStringRaw(s: Stream): string =
 
   return str
 
-proc jsonString(s: Stream): JSonNode =
-  result = JSonNode(kind: JString, strval: s.jsonStringRaw())
+proc jsonString(s: Stream): ChalkJSonNode =
+  result = ChalkJsonNode(kind: JString, strval: s.jsonStringRaw())
 
-proc jsonArray(s: Stream): JSonNode =
+proc jsonArray(s: Stream): ChalkJSonNode =
   discard s.readOne()
   s.jsonWS()
-  result = JSonNode(kind: JArray)
+  result = ChalkJSonNode(kind: JArray)
   if s.peekOne() == ']':
     discard s.readOne()
     return
@@ -238,8 +330,8 @@ proc jsonArray(s: Stream): JSonNode =
     else:
       raise parseError(eBadArrayItem)
 
-proc jsonMembers(s: Stream): OrderedTableRef[string, JsonNode] =
-  result = newOrderedTable[string, JsonNode]()
+proc jsonMembers(s: Stream): OrderedTableRef[string, ChalkJsonNode] =
+  result = newOrderedTable[string, ChalkJsonNode]()
 
   while true:
     let k = s.jsonStringRaw()
@@ -253,19 +345,20 @@ proc jsonMembers(s: Stream): OrderedTableRef[string, JsonNode] =
     case c
     of '}': return
     of ',': s.jsonWS()
-    else: raise parseError(eBadObjMember.fmt())
+    else:
+      raise parseError("Invalid JSON obj, expected ',' or }, got: '" & $c & "'")
 
-proc jsonObject(s: Stream): JSonNode =
+proc jsonObject(s: Stream): ChalkJSonNode =
   discard s.readOne()
   s.jsonWS()
   case s.peekOne()
   of '}':
     discard s.readOne()
-    return JsonNode(kind: JObject)
-  of '"': return JSonNode(kind: JObject, kvpairs: s.jsonMembers())
+    return ChalkJsonNode(kind: JObject)
+  of '"': return ChalkJSonNode(kind: JObject, kvpairs: s.jsonMembers())
   else:   raise parseError(eBadObject)
 
-proc jsonValue(s: Stream): JSonNode =
+proc jsonValue(s: Stream): ChalkJSonNode =
   case s.peekOne()
   of '{':           return s.jsonObject()
   of '[':           return s.jsonArray()
@@ -275,12 +368,34 @@ proc jsonValue(s: Stream): JSonNode =
   of 'f':           return s.jsonFalse()
   of 'n':           return s.jsonNull()
   else:
-    raise parseError(eBadElementStart.fmt())
+    raise parseError("Bad JSon at position: " & $(s.getPosition()))
 
-proc parseJson*(s: Stream): JSonNode =
+proc chalkParseJson(s: Stream): ChalkJSonNode =
   s.jsonWS()
   result = s.jSonValue()
-  # Per tho spec, we should advance the stream white space after the
+  # Per the spec, we should advance the stream white space after the
   # extracted value.  However, we don't do this at the top level just
   # in case any space after the end of the element has semantic value
   # of some sort.
+
+proc extractOneChalkJson*(stream: Stream, path: string): ChalkDict =
+  return unpack[ChalkDict](valueFromJson(stream.chalkParseJson(), path))
+
+# %* from the json module; this basically does any escaping
+# we need, which gives us a JsonNode object, that we then convert
+# back to a string, with necessary quotes intact.
+
+proc toJson*(dict: ChalkDict): string =
+  result    = ""
+  var comma = ""
+  let keys = dict.orderKeys()
+
+  for fullKey in keys:
+    let
+      keyJson = $(%* fullKey)
+      valJson = boxToJson(dict[fullKey])
+
+    result = result & comma & keyJson & " : " & valJson
+    comma  = ", "
+
+  result = "{ " & result & " }"

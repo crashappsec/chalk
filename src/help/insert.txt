@@ -10,6 +10,13 @@ Flags::Config Variable::Type::Description
 -N, --container-image-name::container-image-name::string::The name of the container, which will be used as the ARTIFACT_PATH.   Only consulted when the container image ID is provided.
 }%
 
-There are two styles of marking, one where all metadata is directly attached to the artifact, and one where the artifact is marked primarily with a 'pointer', and then the rest of the metadata is stored elsewhere.  Generally, we recommend writing a 'pointer' by default.
+On chalking, what gets put into the chalk mark will be determined by the active chalk profile after any user config file has loaded.  Each command's output configuration can be specified using the {bold}outconf{reset} section in the configuration file.
 
-It is easy to choose which keys in the full set of possible metadata get put either into a pointer, and it's easy to select which metadata isn't collected at all.  Similarly, it's easy to write full metadata to multiple different places, and include different keys in each place.  See {bold}{appName} help output{reset} for details.
+For instance, if you create a new profile named {red}my_chalk_mark{reset}, you can activate it for both regular and docker insertions with the following in your configuration file:
+%{c
+outconf.insert.chalk = "myconf"
+outconf.docker.chalk = "myconf"
+}%
+
+For information on profiles, see:
+{bold}{appName} help profile{reset}

@@ -1,11 +1,12 @@
 %{T
 Command     ::Description
-inject      ::Insert chalk metadata into software artifacts.
+insert      ::Insert chalk metadata into software artifacts.
 extract     ::Retrieve locally-stored metadata from software artifacts.
 delete      ::Delete locally stored metadata from software objects.
 defaults    ::Loads configuration and shows keys defaults. See 'help defaults'.
 confdump    ::Export the self-contained configuration file.
 confload    ::Load a new configuration file.
+docker      ::Adds a chalk mark to docker containers, and weaps the entry point.
 version     ::Shows program version information
 help        ::You're doing it now!
 }%

@@ -13,24 +13,20 @@ Via configuration file, you can {green}configure{reset} each sink, and then atta
 
 Each sink can have multiple attached configurations.  Each configuration can set up parameters such as credentials and locations, and can also set up output filters.
 
-Note that sinks are not used for data injection itself. But, when a codec injects a chalk, the system will publish the "full" set of metadata you've configured to be collected for any given file, even if the codec was configured to only inject a small "pointer".
+Note that sinks are not used for data injection itself. But, before it exits, the system will publish chalk metadata, filtering based on profiles you control (it can be different keys than what you injected), and sending reports to any outputs you've configured.
 
-The current supported topics are:
+The default output profiles attached to each command publish to the "report" topic.  You can also set up custom reports, to send different metadata to different places. For instacnce, there are built-in auditing profiles, and a built-in stat beacon upon insertion.  Each custom report automatically defines its own topic.  You just need to hook up an output sink.
+
+The output system has the following built-in topics:
 %{T
 Topic::What it's for
-extract:: Recording data extracted from artifacts.
-inject:: Record metadata about the artifact into which data is getting inserted.
-nesting:: Show chalk objects already existing in an artifact during an insert.
-defaults:: Show information about how the results of config file execution.
-dry-run:: To get messages about what *would* be inserted on injection, when the --dry-run flag is on.
-delete:: For recording when chalk marks are deleted from artifacts.
-audit:: For recording use of the command, along w/ command line flags and any external configuration file.
+report:: Default output reports go to this topic in JSON format. By default, this is attached to a local (self-truncating) log file, and stdout.  If you add an external sink, we recommend you unsubscribing stdout (but, unless you're using immutable or transient infra, not the log file, which is intended for redundancy).
+defaults:: Show information about how the results of config file execution. Generally this goes to stderr by default.
+audit:: For recording use of the command, along w/ command line flags and any external configuration file.  This goes to a self-truncating log file by default.
 confload:: For recording the old configuration and the fact that a new configuration was loaded.
-confdump:: For outputting the embedded configuration file.
-version:: Outputting basic command version info. Should usually be connected to stderr.
-help::Outputting help messages.  Should usually be connected to stderr.
-log::Printing error messages, that are filtered based on the global log-level setting.
-debug::Receiving debug output when using a non-release executable build.
+version:: Outputting basic command version info, when you run the {appName}version command. By default, this is connected to stderr.
+help::Outputting help messages.  Connected to stderr.
+log::Printing error messages, that are filtered based on the global log-level setting. Connected to stderr, and internally to chalk output (you can control them going into reports with the ERR_INFO and _OP_ERRORS keys... see {appName} help keys search ERR for a starting point on more info.
 }%
 
 There are also a few available filters:
@@ -44,27 +40,24 @@ logPrefix::Adds the colored prefix to the log message.  Only works with the 'log
 
 %{h Examples }%
 
-This first example connects the output of the {green}defaults{reset} command to stdout when you run it, but if you don't run it, and pass the --defaults flag (which also publishes to the 'defaults' topic, publishing will go to stderr instead. This is taken from the 'default' configuration file.
+This first example connects the output of the {bold}defaults{reset} command to stdout when you run it, but if you don't run it, and pass the --defaults flag (which also publishes to the 'defaults' topic, publishing will go to stderr instead. This is taken from the 'default' configuration file.
 %{c
-sink_config({red}"redirectableOut"{cyan}, {red}"stdout"{cyan}, \{\}, [])
-sink_config({red}"defaultOut"{cyan},      {red}"stderr"{cyan}, \{\}, [])
+sink_config({green}"redirectableOut"{cyan}, {green}"stdout"{cyan}, \{\})
+sink_config({green}"defaultOut"{cyan},      {green}"stderr"{cyan}, \{\})
 {brown} #argv() gets the command name.
-if argv0() != {red}"defaults"{cyan} \{
-    subscribe({red}"defaults"{cyan}, {red}"defaultOut"{cyan})
+if argv0() != {green}"defaults"{cyan} \{
+    subscribe({green}"defaults"{cyan}, {green}"defaultOut"{cyan})
 \} else \{
-    subscribe({red}"defaults"{cyan}, {red}"redirectableOut"{cyan})
+    subscribe({green}"defaults"{cyan}, {green}"redirectableOut"{cyan})
 \}
 }%
 
 This example configures S3 as a sink, taking the configuration needed for that sink from environment variables.  You could test the existence of these environment variables first (and indeed we do that in the default configuration).
 %{c
-if cmd == {red}"extract"{cyan} or cmd == {red}"insert"{cyan} or cmd == {red}"delete"{cyan} \{
-  sink_config({red}"s3"{cyan}, {red}"s3"{cyan}, \{ {red}"secret"{cyan} : env({red}"AWS_ACCESS_SECRET"{cyan}),
-                            {red}"uid"{cyan}    : env({red}"AWS_ACCESS_ID"{cyan}),
-                            {red}"uri"{cyan}    : env({red}"AWS_S3_BUCKET_URI"{cyan}) \}, [] )
-\}
+sink_config({green}"s3"{cyan}, {green}"s3"{cyan}, \{ {green}"secret"{cyan} : env({green}"AWS_ACCESS_SECRET"{cyan}),
+                            {green}"uid"{cyan}    : env({green}"AWS_ACCESS_ID"{cyan}),
+                            {green}"uri"{cyan}    : env({green}"AWS_S3_BUCKET_URI"{cyan}) \} )
 
-{brown}# these are NOT done in the default config, you'd have to add them yourself.
-subscribe({red}"insert"{cyan}, {red}"s3"{cyan})
-subscribe({red}"extract"{cyan}, {red}"s3"{cyan})
+{brown}# This is NOT done in the default config, you'd have to add it yourself.
+subscribe({green}"report"{cyan}, {green}"s3"{cyan})
 }%

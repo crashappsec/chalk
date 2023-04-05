@@ -1,0 +1,82 @@
+## Builtin SBOM tool implementation(s).
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
+tool syft {
+  ~kind: "sbom"
+  ~get_tool_location: func find_syft(string) -> string
+  ~attempt_install:   func install_syft(string) -> bool
+  ~get_command_args:  func get_syft_args(string) -> string
+  ~produce_keys:      (func extract_syft_sbom(string, int) ->
+                                                  dict[string, string])
+  syft_exe_dir:      "/tmp"
+  syft_installer:    "raw.githubusercontent.com/anchore/syft/main/install.sh"
+  syft_argv:         " -o cyclonedx-json"  # CycloneDX by default.
+  ~doc:              """
+This runs the syft SBOM tool.  If it can't be found in the current path,
+chalk will attempt to install it into /tmp, via the official installer,
+using 'curl'.
+
+You can configure the following fields in the tool.syft object:
+
+syft_exe_dir:   Where to try to install syft, if not found.  Defaults to "/tmp"
+syft_installer: Location of the official syft installer.
+syft_argv:      Command-line flags to pass to syft. Defaults to:
+                -o cyclone-json
+"""
+}
+
+func find_syft(ignore) {
+  output, code := system("export PATH=$PATH:" + tool.syft.syft_exe_dir +
+                         "; which syft")
+  if code != 0 {
+    trace("find_syft: Unable to find syft in $PATH")
+    return ""
+  }
+  output := output.strip()
+  trace("found syft at: " + output)
+  return output
+}
+
+func install_syft(ignore) {
+syft_download := ("curl -sSfL https://" + tool.syft.syft_installer +
+                     " | sh -s -- -b " + tool.syft.syft_exe_dir)
+  output, code := system(syft_download)
+  if code == 0 {
+    trace("Successfully installed syft into: " + tool.syft.syft_exe_dir)
+    return true
+  }
+  else {
+    error("Unable to install syft into: " + tool.syft.syft_exe_dir)
+    return false
+  }
+}
+
+func get_syft_args(path) {
+  result := path + tool.syft.syft_argv + " 2>/dev/null"
+
+  trace("args to syft: " + result)
+}
+
+func extract_syft_sbom(out: string, code) {
+  result := {}
+
+  if code != 0 {
+    error("syft failed to run properly; ignoring")
+    echo(out)
+  }
+
+  validIndicator := "\"components\": "
+  emptyIndicator := "\"components\": []"
+
+  if not contains(out, validIndicator) {
+    warn("syft did not run properly; ignoring")
+  }
+  elif contains(out, emptyIndicator) {
+    info("syft didn't find any components; ignoring.")
+  }
+  else {
+     return { "SBOM" : out }
+  }
+}

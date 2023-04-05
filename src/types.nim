@@ -6,44 +6,64 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-# At compile time, this will generate c4autoconf if the file doesn't exist,
-# or if the spec file has a newer timestamp.  We do this before importing it.
-static:
-  discard staticexec("if test \\! c4autoconf.nim -nt configs/chalk.c42spec; " &
-                     "then con4m spec configs/chalk.c42spec --language=nim " &
-                     "--output-file=c4autoconf.nim; fi")
-
-import c4autoconf, streams, tables, nimutils
+import c4autoconf, streams, tables, options, nimutils
 
 type
-  ChalkDict* = TableRef[string, Box]
+  ChalkDict* = OrderedTableRef[string, Box]
   ## The chalk info for a single artifact.
   ChalkObj* = ref object
-    fullpath*:    string      ## The path to the artifact.
-    newFields*:   ChalkDict   ## What we're adding during insertion.
-    extract*:     ChalkDict
-    embeds*:      seq[ChalkObj]
-    stream*:      FileStream  # Plugins by default use file streams; we
-    startOffset*: int         # keep state fields for that to bridge between
-    endOffset*:   int         # extract and write. If the plugin needs to do
-                              # something else, use the cache field
-                              # below, instead.
-    err*:         seq[string] ## runtime logs for chalking are filtered
-                              ## based on the "chalk log level". They
-                              ## end up here, until the end of chalking
-                              ## where, they get added to ERR_INFO, if
-                              ## any.  To disable, simply set the chalk
-                              ## log level to 'none'.
-    cache*:       RootRef     ## Generic pointer a plugin can use to
-                              ## store any state it might want to stash.
+    fullpath*:      string      ## The path to the artifact.
+    rawHash*:       string      ## Raw hash of the unchalked artifact.
+    postHash*:      string      ## Cached post-op hash if an insert op.
+    collectedData*: ChalkDict   ## What we're adding during insertion.
+    extract*:       ChalkDict   ## What we extracted, or nil if no extract.
+    opFailed*:      bool
+    embeds*:        seq[ChalkObj]
+    stream*:        FileStream  # Plugins by default use file streams; we
+    startOffset*:   int         # keep state fields for that to bridge between
+    endOffset*:     int         # extract and write. If the plugin needs to do
+                                # something else, use the cache field
+                                # below, instead.
+    err*:           seq[string] ## runtime logs for chalking are filtered
+                                ## based on the "chalk log level". They
+                                ## end up here, until the end of chalking
+                                ## where, they get added to ERR_INFO, if
+                                ## any.  To disable, simply set the chalk
+                                ## log level to 'none'.
+    cache*:         RootRef     ## Generic pointer a plugin can use to
+                                ## store any state it might want to stash.
+    myCodec*:       Codec
 
   Plugin* = ref object of RootObj
     name*:       string
     configInfo*: PluginSpec
 
   Codec* = ref object of Plugin
-    chalks*:     seq[ChalkObj]
-    magic*:      string
     searchPath*: seq[string]
 
+  KeyType* = enum KtChalkableHost, KtChalk, KtNonChalk, KtHostOnly
+
+var
+  currentErrorObject* = none(ChalkObj)
+  systemErrors*       = seq[string](@[])
+  hostInfo*           = ChalkDict()
+  subscribedKeys*     = Table[string, bool]()
+  allChalks*          = seq[ChalkObj](@[])
+  unmarked*           = seq[string](@[])
+  selfChalk*          = ChalkObj(nil)
+  selfID*             = Option[string](none(string))
+  canSelfInject*      = true
+
+
 proc isMarked*(chalk: ChalkObj): bool {.inline.} = return chalk.extract != nil
+proc newChalk*(stream: FileStream, loc: string): ChalkObj =
+  result = ChalkObj(fullpath:      loc,
+                    collectedData: ChalkDict(),
+                    opFailed:      false,
+                    stream:        stream,
+                    extract:       nil)
+  currentErrorObject = some(result)
+
+proc idFormat*(rawHash: string): string =
+  let s = base32vEncode(rawHash)
+  s[0 ..< 6] & "-" & s[6 ..< 10] & "-" & s[10 ..< 14] & "-" & s[14 ..< 20]

@@ -8,6 +8,4 @@ Variable::Override::Type::Description
 recursive::-r, -R, --recursive, --no-recursive::bool::Determines whether a file scan will recursively walk paths.
 }%
 
- In the absense of any output configuration, data will be published in JSON format, but pretty-printed (somewhat), to stdout.  See 'help output' for an overview of the outputting system, which includes filters.
-
-Also, unless configured otherwise, the 'extract' command will report a list of artifacts it found in the search, where an insertion would have been configured to insert, but there was nothing to extract.
+ In the absense of any other output configuration, data will be published in JSON format, but pretty-printed (somewhat), to stdout, and written to a local log file.  See 'help output' for an overview of the outputting system, which includes filters.

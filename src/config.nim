@@ -15,83 +15,101 @@
 import c4autoconf
 export c4autoconf # This is conceptually part of our API.
 
-import options, tables, strutils, strformat, algorithm, os, json, streams
-import con4m, con4m/st, nimutils, nimutils/logging, types
+import options, tables, strutils, algorithm, os, streams, sugar
+import con4m, nimutils, nimutils/logging, types
 import macros except error
-export logging
+export logging, types, nimutils, con4m
 
-proc comment(s: string): string =
+proc commentC4mCode(s: string): string =
   let lines = s.split("\n")
   result    = ""
-  for line in lines:
-    result &= "# " & line & "\n"
-
-const
-  versionStr  = staticexec("cat ../chalk.nimble | grep ^version")
-  commitID    = staticexec("git rev-parse HEAD")
-  archStr     = staticexec("uname -m")
-  osStr       = staticexec("uname -o")
+  for line in lines: result &= "# " & line & "\n"
 
   # Some string constants used in multiple places.
+const
   magicUTF8*         = "dadfedabbadabbed"
   tmpFilePrefix*     = "chalk"
   tmpFileSuffix*     = "-file.tmp"
+  defCfgFname        = "configs/defaultconfig.c4m"  # Default embedded config.
   chalkC42Spec       = staticRead("configs/chalk.c42spec")
-  chalkSchema*       = staticRead("configs/schema.c4m")
-  baseFName          = "configs/baseconfig.c4m"
-  defCfgFname        = "configs/defaultconfig.c4m"
-  baseConfig*        = staticRead(baseFname)
-  defaultConfig*     = staticRead(defCfgFname) & comment(baseConfig)
-  defaultKeyPriority = 50
+  baseConfig         = staticRead("configs/baseconfig.c4m")
+  signConfig         = staticRead("configs/signconfig.c4m")
+  sbomConfig         = staticRead("configs/sbomconfig.c4m")
+  sastConfig         = staticRead("configs/sastconfig.c4m")
+  ioConfig*          = staticRead("configs/ioconfig.c4m")
+  defaultConfig*     = staticRead(defCfgFname) & commentC4mCode(ioConfig)
+  versionStr         = staticexec("cat ../chalk.nimble | grep ^version")
+  commitID           = staticexec("git rev-parse HEAD")
+  archStr            = staticexec("uname -m")
+  osStr              = staticexec("uname -o")
+
 var
-  chalkCon4mBuiltins: seq[(string, BuiltinFn, string)]
+  chalkCon4mBuiltins: seq[(string, BuiltinFn)]
   ctxChalkConf*:      ConfigState
-  chalkConfig*:       ChalkConfig   # Type from the con4m macro.
-  con4mCallbacks:     seq[(string, string)] = @[]
+  chalkConfig*:       ChalkConfig
   commandName:        string
-  `canSelfInject?`:   bool                  = true
-  builtinKeys:        seq[string]           = @[]
-  systemKeys:         seq[string]           = @[]
-  codecKeys:          seq[string]           = @[]
+  currentOutputCfg:   OutputConfig
+  `isChalkingOp?`:    bool
 let
   (c42Obj*, c42Ctx*) = c42Spec(chalkC42Spec, "<embedded spec>").get()
 
-# These two procs are needed externally to test new conf files when loading.
-proc getCon4mBuiltins*(): seq[(string, BuiltinFn, string)] =
-  return chalkCon4mBuiltins
+macro declareChalkExeVersion(): untyped = parseStmt("const " & versionStr)
+declareChalkExeVersion()
 
-proc getCon4mCallbacks*(): seq[(string, string)] =
-  return con4mCallbacks
+proc getChalkExeVersion*(): string = version
+proc getChalkCommitId*(): string   = commitID
+proc getChalkPlatform*(): string   = osStr & " " & archStr
+proc getCon4mBuiltins*(): seq[(string, BuiltinFn)] = chalkCon4mBuiltins
+proc getCommandName*(): string = commandName
+proc setCommandName*(s: string) =
+  commandName = s
 
-proc registerCon4mCallback*(con4mName: string, con4mType: string) =
-  con4mCallbacks.add((con4mName, con4mType))
+proc isChalkingOp*(): bool =
+  once:
+    `isChalkingOp?` = commandName in chalkConfig.getValidChalkCommandNames()
+  return `isChalkingOp?`
 
-proc setChalkCon4mBuiltIns*(fns: seq[(string, BuiltinFn, string)]) {.inline.} =
+proc getOutputConfig*(): OutputConfig =
+  once: currentOutputCfg = chalkConfig.outputConfigs[getCommandName()]
+  return currentOutputCfg
+
+proc filterByProfile*(dict: ChalkDict, p: Profile): ChalkDict =
+  result = ChalkDict()
+  for k, v in dict:
+    if k in p.keys and p.keys[k].report: result[k] = v
+
+proc filterByProfile*(host, obj: ChalkDict, p: Profile): ChalkDict =
+  result = ChalkDict()
+  # Let obj-level clobber host-level.
+  for k, v in host:
+    if k in p.keys and p.keys[k].report: result[k] = v
+  for k, v in obj:
+    if k in p.keys and p.keys[k].report: result[k] = v
+
+proc lookupCollectedKey*(obj: ChalkObj, k: string): Option[Box] =
+  if k in hostInfo:          return some(hostInfo[k])
+  if k in obj.collectedData: return some(obj.collectedData[k])
+  return none(Box)
+
+proc getChalkMark*(obj: ChalkObj): ChalkDict =
+  let profile = chalkConfig.profiles[getOutputConfig().chalk]
+
+  if profile.enabled == false:
+    error("FATAL: invalid to disable the chalk profile when inserting." &
+          " did you mean to use the virtual chalk feature?")
+    quit(1)
+  return hostInfo.filterByProfile(obj.collectedData, profile)
+
+proc setChalkCon4mBuiltIns*(fns: seq[(string, BuiltinFn)]) {.inline.} =
   # Set from builtins.nim; instead of a cross-dependency, we let it
   # call us to set.
   chalkCon4mBuiltins = fns
 
-macro declareChalkExeVersion(): untyped =
-  return parseStmt("const " & versionStr)
-
-proc getChalkExeVersion*(): string =
-  declareChalkExeVersion()
-  return version
-
-proc getChalkCommitID*(): string = return commitID
-proc getBinaryOS*():     string = osStr
-proc getBinaryArch*():   string = archStr
-proc getChalkPlatform*(): string = osStr & " " & archStr
-proc setCommandName*(str: string) = commandName = str
-proc getCommandName*(): string = return commandName
-proc setNoSelfInjection*() = `canSelfInject?` = false
-proc canSelfInject*(): bool = return `canSelfInject?`
-proc getSelfInjecting*(): bool =  return commandName == "confload"
-
 template hookCheck(fieldname: untyped) =
   let s = astToStr(fieldName)
+  let d = sinkConfData.`needs fieldName`
 
-  if sinkConfData.`needs fieldName`:
+  if d.isSome() and d.get():
     if not sinkopts.contains(s):
       warn("Sink config '" & sinkconf & "' is missing field '" & s &
            "', which is required by sink '" & sinkname &
@@ -110,49 +128,40 @@ proc checkHooks*(sinkname:     string,
     hookCheck(cacheid)
     hookCheck(aux)
 
-when not defined(release):
-  template chalkDebug*(s: string) =
-    const
-      pre  = "\e[1;35m"
-      post = "\e[0m"
-    let
-      msg = pre & "DEBUG: " & post & s & "\n"
+macro addSetter(funcName, varType: untyped, s: static[string]) =
+  let varName = newLit(s)
+  let varSym  = newIdentNode(s)
+  result = quote do:
+    proc `funcName`*(val: `varType`) =
+      discard ctxChalkConf.setOverride(`varName`, some(pack(val)))
+      chalkConfig.`varSym` = val
 
-    publish("debug", msg)
-else:
-  template chalkDebug*(s: string) = discard
-
-proc setConfigPath*(val: seq[string]) =
-  discard ctxChalkConf.setOverride("config_path", some(pack(val)))
-  chalkConfig.configPath = val
-
-proc setConfigFileName*(val: string) =
-  discard ctxChalkConf.setOverride("config_filename", some(pack(val)))
-  chalkConfig.configFileName = val
+addSetter(setLoadSbomTools,       bool,        "load_sbom_tools")
+addSetter(setLoadSastTools,       bool,        "load_sast_tools")
+addSetter(setLoadDefaultSigning,  bool,        "load_default_signing")
+addSetter(setConfigPath,          seq[string], "config_path")
+addSetter(setConfigFileName,      string,      "config_filename")
+addSetter(setAllowExternalConfig, bool,        "allow_external_config")
+addSetter(setConsoleLogLevel,     string,      "log_level")
+addSetter(setVirtualChalk,        bool,        "virtual_chalk")
+addSetter(setPublishDefaults,     bool,        "publish_defaults")
+addSetter(setRecursive,           bool,        "recursive")
+addSetter(setUseReportCache,      bool,        "use_report_cache")
+addSetter(setReportCacheLocation, string,      "report_cache_location")
+addSetter(setContainerImageId,    string,      "container_image_id")
+addSetter(setContainerImageName,  string,      "container_image_name")
 
 proc setConfigFile*(val: string) =
   let (head, tail) = val.splitPath()
 
   setConfigPath(@[head])
   setConfigFileName(tail)
+  setAllowExternalConfig(true)
 
 proc setColor*(val: bool) =
   discard ctxChalkConf.setOverride("color", some(pack(val)))
   setShowColors(val)
   chalkConfig.color = some(val)
-
-proc setConsoleLogLevel*(val: string) =
-  discard ctxChalkConf.setOverride("log_level", some(pack(val)))
-  setLogLevel(val)
-  chalkConfig.logLevel = val
-
-proc setVirtualChalk*(val: bool) =
-  discard ctxChalkConf.setOverride("virtual_chalk", some(pack(val)))
-  chalkConfig.virtualChalk = val
-
-proc setPublishDefaults*(val: bool) =
-  discard ctxChalkConf.setOverride("publish_defaults", some(pack(val)))
-  chalkConfig.publishDefaults = val
 
 proc setArtifactSearchPath*(val: seq[string]) =
   if len(val) == 0:
@@ -165,69 +174,50 @@ proc setArtifactSearchPath*(val: seq[string]) =
 
   discard ctxChalkConf.setOverride("artifact_search_path", some(pack(val)))
 
-proc setRecursive*(val: bool) =
-  discard ctxChalkConf.setOverride("recursive", some(pack(val)))
-  chalkConfig.recursive = val
+template disableObject(c4mName:    string,
+                       objtype:    untyped,
+                       possiblelist: string) =
+  let list = possiblelist.split(",")
+  for objname in list:
+    if objname notin chalkConfig.objtype:
+      warn(objname & ": Could not disable-- not found")
+    else:
+      let field = c4mName & "." & objname & ".enabled"
+      discard ctxChalkConf.setOverride(field, some(pack(false)))
+      chalkConfig.objtype[objname].enabled = false
 
-proc setContainerImageId*(s: string) =
-  discard ctxChalkConf.setOverride("container_image_id", some(pack(s)))
-  chalkConfig.containerImageId = s
+template enableObject(c4mName:      string,
+                      objtype:      untyped,
+                      possiblelist: string) =
+  let list = possiblelist.split(",")
+  for objname in list:
+    if objname notin chalkConfig.objtype:
+      warn(objname & ": Could not enable-- not found")
+    else:
+      let field = c4mName & "." & objname & ".enabled"
+      discard ctxChalkConf.setOverride(field, some(pack(true)))
+      chalkConfig.objtype[objname].enabled = true
 
-proc setContainerImageName*(s: string) =
-  discard ctxChalkConf.setOverride("container_image_name", some(pack(s)))
-  chalkConfig.containerImageId = s
+proc disableProfile*(s: string) = disableObject("profile", profiles, s)
+proc disableReport*(s: string)  = disableObject("custom_report", reportSpecs, s)
+proc disablePlugin*(s: string)  = disableObject("plugin", plugins, s)
+proc disableTool*(s: string)    = disableObject("tool", tools, s)
+proc enableProfile*(s: string)  = enableObject("profile", profiles, s)
+proc enableReport*(s: string)   = enableObject("custom_report", reportSpecs, s)
+proc enablePlugin*(s: string)   = enableObject("plugin", plugins, s)
+proc enableTool*(s: string)     = enableObject("tool", tools, s)
 
-proc setValue*(spec: KeySpec, value: Option[Box]) =
-  discard spec.getAttrScope().setOverride("value", value)
-  spec.value = value
+proc orderKeys*(dict: ChalkDict): seq[string] =
+  var tmp: seq[(int, string)] = @[]
+  for k, _ in dict:
+    tmp.add((chalkConfig.keySpecs[k].outputOrder, k))
 
-proc getAllKeys*(): seq[string] =
+  tmp.sort()
   result = @[]
-
-  for key, val in chalkConfig.keys:
-    result.add(key)
-
-proc getRequiredKeys*(): seq[string] =
-  result = @[]
-
-  for key, val in chalkConfig.keys:
-    if val.required:
-      result.add(key)
+  for (_, key) in tmp: result.add(key)
 
 proc getKeySpec*(name: string): Option[KeySpec] =
-  if name in chalkConfig.keys:
-    return some(chalkConfig.keys[name])
-
-proc orderKeys*(keys: openarray[string]): seq[string] =
-  var list: seq[(int, string)] = @[]
-
-  result = @[]
-
-  for key in keys:
-    try:
-      let spec = getKeySpec(key).get()
-      if spec.getStandard():
-        list.add((spec.outputOrder, key))
-      else:
-        list.add((defaultKeyPriority, key))
-    except:
-      warn(fmt"Unknown key found in extraction: {key}")
-      list.add((defaultKeyPriority, key))
-
-  list.sort()
-
-  for (_, key) in list:
-    result.add(key)
-
-proc getOrderedKeys*(): seq[string] =
-  return orderKeys(getAllKeys())
-
-proc getCustomKeys*(): seq[string] =
-  result = @[]
-
-  for key, val in chalkConfig.keys:
-    if val.since.isNone():
-      result.add(key)
+  if name in chalkConfig.keyspecs: return some(chalkConfig.keyspecs[name])
 
 proc getPluginConfig*(name: string): Option[PluginSpec] =
   if name in chalkConfig.plugins:
@@ -238,18 +228,6 @@ proc getSinkConfig*(hook: string): Option[SinkSpec] =
     return some(chalkConfig.sinks[hook])
   return none(SinkSpec)
 
-proc getOutputPointers*(): bool =
-  let contents = chalkConfig.keys["CHALK_PTR"]
-
-  if contents.getValue().isSome() and not contents.getSkip():
-    return true
-  else:
-    return false
-
-proc isBuiltinKey*(name: string): bool = return name in builtinKeys
-proc isSystemKey*(name: string): bool =  return name in systemKeys
-proc isCodecKey*(name: string): bool =  return name in codecKeys
-
 # Do last-minute sanity-checking so we can give better error messages
 # more easily.  This function currently runs once for each config
 # loading, to do any sanity checking.  Could probably do more with it.
@@ -258,8 +236,7 @@ proc isCodecKey*(name: string): bool =  return name in codecKeys
 proc postProcessConfig() =
   # Actually, not validation, but get this done early.
 
-  if chalkConfig.color.isSome():
-    setShowColors(chalkConfig.color.get())
+  if chalkConfig.color.isSome(): setShowColors(chalkConfig.color.get())
 
   setLogLevel(chalkConfig.logLevel)
 
@@ -271,19 +248,27 @@ proc postProcessConfig() =
   for i in 0 ..< len(chalkConfig.configPath):
     chalkConfig.configPath[i] = chalkConfig.configPath[i].resolvePath()
 
-  # Make sure the sinks specified are all sinks we haveimplementations
+  # Make sure the sinks specified are all sinks we have implementations
   # for; this should always be true in the base config, but is nice
   # to have the check for development.
 
   when not defined(release):
     for sinkname, _ in chalkConfig.sinks:
       if getSink(sinkname).isNone():
-        warn(fmt"Config declared sink '{sinkname}', but no " &
+        warn("Config declared sink '" & sinkname & "', but no " &
           "implementation exists")
+
+const baseRep = "<compile_location>/src/configs/"
+template internalStack(config, name: string, gettr: (ChalkConfig) -> bool) =
+  if chalkConfig.gettr():
+    if not ctxChalkConf.stackConfig(config, baseRep & name, c42Ctx): quit(1)
+    trace("loaded:  " & name)
+  else:
+    trace("skipped loading: " & name)
 
 proc loadBaseConfiguration*() =
   ## This function loads the built-in configuration, which is split
-  ## into two con4m files, the 'schema' for metadata, and the default
+  ## into two con4m files, the base definitions file, and the default
   ## I/O configuration.
 
   # For our internal configurations, if we mess up, we want to see
@@ -291,55 +276,57 @@ proc loadBaseConfiguration*() =
   setCon4mVerbosity(c4vMax)
 
   let
-    (x, ok) = firstRun(contents       = chalkSchema,
-                       filename       = "<builtin-schema>",
+    (x, ok) = firstRun(contents       = baseConfig,
+                       filename       = "<base-configuration>",
                        spec           = c42Obj,
                        addBuiltins    = true,
                        customFuncs    = chalkCon4mBuiltins,
-                       callbacks      = con4mCallbacks,
                        evalCtx        = c42Ctx)
   if not ok: quit(1)
   ctxChalkConf = x
-
-  # We make the base config available and then load it again
-  # because the subscribe() unsubscribe() funcs use it. We
-  # should prob change that.
-  chalkConfig = ctxChalkConf.attrs.loadChalkConfig()
+  # We need to make chalkConfig is made available for the other configs.
+  chalkConfig  = ctxChalkConf.attrs.loadChalkConfig()
   postProcessConfig()
-  if not ctxChalkConf.stackConfig(baseConfig,
-                                  "<compile_location>/src/" & baseFname,
-                                   c42Ctx): quit(1)
 
+proc loadOptionalConfigurations*() =
+  internalStack(signConfig, "signconfig.c4m", getLoadDefaultSigning)
+  internalStack(sbomConfig, "sbomconfig.c4m", getLoadSbomTools)
+  internalStack(sastConfig, "sastconfig.c4m", getLoadSastTools)
+  # This one isn't technically optional, we load it no matter what,
+  # and you have to undo its actions explicitly if you want, to make sure
+  # it's hard to get in a state where there's no good output configuration.
+  # Still, it couldn't go in the base config, b/c it needs chalkConfig to
+  # have loaded.
+  if not ctxChalkConf.stackConfig(ioConfig, baseRep & "ioconfig.c4m", c42Ctx):
+    quit(1)
+  # Make all our changes available directly from our generated data structures.
   chalkConfig = ctxChalkConf.attrs.loadChalkConfig()
   postProcessConfig()
   setCon4mVerbosity(c4vShowLoc)
 
-proc loadEmbeddedConfig*(selfChalkOpt: Option[ChalkObj]): bool =
-  var
-    confString:     string
+proc loadEmbeddedConfig*(selfOpt: Option[ChalkObj]): bool =
+  var confString: string
 
-  if selfChalkOpt.isNone():
-    confString = defaultConfig
+  if selfOpt.isNone(): confString = defaultConfig
   else:
-    let selfChalk = selfChalkOpt.get().extract
+    let selfChalk = selfOpt.get().extract
 
-    # We extracted a CHALK object from our own executable.  Check for an
-    # _CHALK_CONFIG key, and if there is one, run that configuration
+    # We extracted a CHALK object from our own executable.  Check for a
+    # $CHALK_CONFIG key, and if there is one, run that configuration
     # file, before loading any on-disk configuration file.
-    if not selfChalk.contains("_CHALK_CONFIG"):
-      trace("Embedded self-CHALK does not contain a configuration.")
+    if selfChalk == nil or not selfChalk.contains("$CHALK_CONFIG"):
+      trace("No embedded configuration found.")
       confString = defaultConfig
     else:
-      confString = unpack[string](selfChalk["_CHALK_CONFIG"])
+      confString = unpack[string](selfChalk["$CHALK_CONFIG"])
 
   try:
-    let res = ctxChalkConf.stackConfig(confString,
-                                       "<embedded configuration>",
-                                       c42Ctx)
+    discard ctxChalkConf.stackConfig(confString, "<embedded conf>", c42Ctx)
   except:
     if getCommandName() == "setconf":
       return true
     else:
+      error("(when loading embedded config): " & getCurrentExceptionMsg())
       error("Embedded configuration is invalid. Use 'setconf' command to fix")
       return false
 
@@ -366,19 +353,18 @@ proc loadUserConfigFile*(commandName: string): Option[string] =
 
   for dir in path:
     fname = dir.joinPath(filename)
-    if fname.fileExists():
-      break
-    trace(fmt"No configuration file found in {dir}.")
+    if fname.fileExists(): break
+    trace("No configuration file found in " & dir)
 
   if fname != "" and fname.fileExists():
-    info(fmt"Loading config file: {fname}")
+    info(fname & ": Loading config file")
     try:
       var
         fd  = newFileStream(fname)
         res = ctxChalkConf.stackConfig(fd, fname, c42ctx)
 
       if not res:
-        error(fmt"{fname}: invalid configuration not loaded.")
+        error(fname & ": invalid configuration not loaded.")
         return none(string)
       else:
         fd.setPosition(0)
@@ -389,14 +375,12 @@ proc loadUserConfigFile*(commandName: string): Option[string] =
 
     except Con4mError: # config file didn't load:
       error(getCurrentExceptionMsg())
-      info(fmt"{fname}: config file not loaded")
-      if chalkConfig.ignoreBrokenConf:
-        return none(string)
+      info(fname & ": config file not loaded")
       trace("ignore_broken_conf is false: terminating.")
       quit()
 
   if loaded:
-    info(fmt"Loaded configuration file: {fname}")
+    info(fname & ": Loaded configuration file")
     return some(contents)
 
   else:

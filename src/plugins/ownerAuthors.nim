@@ -3,15 +3,12 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, os, streams, strformat, nimutils, ../types, ../config, ../plugins
+import tables, os, streams, ../config, ../plugins
 
 const
   fNameAuthor  = "AUTHOR"
   fNameAuthors = "AUTHORS"
   dirDoc       = "docs"
-  eCantOpen    = "{fname}: File found, but could not be read"
-  eFileOpen    = "{filename}: Could not open file."
-
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
@@ -41,10 +38,16 @@ proc findAuthorsFile(fullpath: string): string =
 type AuthorsFileCodeOwner* = ref object of Plugin
 
 
-method getArtifactInfo*(self: AuthorsFileCodeOwner, obj: ChalkObj): ChalkDict =
-  result = newTable[string, Box]()
+method getHostInfo*(self: AuthorsFileCodeOwner,
+                    path: seq[string],
+                    ins:  bool): ChalkDict =
+  result = ChalkDict()
 
-  let fname = obj.fullpath.findAuthorsFile()
+  var fname: string
+
+  for item in path:
+    fname = item.findAuthorsFile()
+    if fname != "": break
 
   if fname == "": return
 
@@ -52,12 +55,12 @@ method getArtifactInfo*(self: AuthorsFileCodeOwner, obj: ChalkObj): ChalkDict =
 
   try:
     ctx = newFileStream(fname, fmRead)
-    if ctx == nil: error(eFileOpen)
+    if ctx == nil: error(fname & ": Could not open file")
     else:
       let s = ctx.readAll()
       if s != "": result["CODE_OWNERS"] = pack(s)
   except:
-    error(eCantOpen.fmt())
+    error(fname & ": File found, but could not be read")
   finally:
     if ctx != nil: ctx.close()
 

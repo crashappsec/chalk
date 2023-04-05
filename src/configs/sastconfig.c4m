@@ -1,0 +1,75 @@
+## Builtin SAST tool implementation(s).
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
+tool semgrep {
+  kind: "sast"
+  get_tool_location:  func find_semgrep(string) -> string
+  attempt_install:    func install_semgrep(string) -> bool
+  get_command_args:   func get_semgrep_args(string) -> string
+  produce_keys:       (func load_semgrep_results(string, int) ->
+                                                   dict[string, string])
+  semgrep_config_profile: "auto"
+  semgrep_format:         "sarif"
+  semgrep_metrics:        "off"
+  semgrep_other_flags:    ""
+  doc: """
+This runs the semgrep static analyizer.  If it doesn't exist in the
+path, chalk will attempt to install it via 'python3 -m pip install semgrep'.
+
+You can configure the following fields in the tool.semgrep object:
+
+semgrep_config_profile: The semgrep profile to use.  Defaults to 'auto'
+semgrep_format:         The output format flag to pass. Defaults to 'sarif'
+semgrep_metrics:        Whether to ping semgrep. 'on' or 'off'. Defaults to 'off'
+"""
+}
+
+func find_semgrep(ignore) {
+  output, code := system("which semgrep")
+
+  if code != 0 {
+    trace("find_semgrep: Unable to find semgrep in $PATH")
+    return ""
+  }
+  output := output.strip()
+  trace("found semgrep at: " + output)
+  return output
+}
+
+func install_semgrep(ignore) {
+  output, code := system("python3 -m pip install semgrep")
+  if code != 0 {
+    output, code := system("python -m pip install semgrep")
+  }
+  if code != 0 {
+    return false
+  }
+  return true
+}
+
+func get_semgrep_args(artifact) {
+  result := "ci --config=" + tool.semgrep.semgrep_config_profile
+  result := result + " --" + tool.semgrep.semgrep_format + " "
+  result := result + "--metrics " + tool.semgrep.semgrep_metrics + " "
+  result := result + tool.semgrep.semgrep_other_flags + " 2>/dev/null"
+  trace("semgrep args: " + result)
+}
+
+func load_semgrep_results(out: string, code) {
+  result := {}
+
+  validIndicator := "\"results\": "
+  emptyIndicator := "\"results\": []"
+
+  if not contains(out, validIndicator) {
+    warn("semgrep did not run properly; ignoring")
+  }
+  elif contains(out, emptyIndicator) {
+    info("semgrep didn't find any components; ignoring.")
+  }
+  else {
+     return { "SAST" : out }
+  }
+}

@@ -5,15 +5,14 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 
-import tables, strformat, strutils, os
-import nimutils, ../types, ../plugins
+import tables, strutils, os, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 type GithubCI = ref object of Plugin
 
-method getArtifactInfo*(self: GithubCI, obj:  ChalkObj): ChalkDict =
-  result = newTable[string, Box]()
+method getHostInfo*(self: GithubCI, path: seq[string], ins: bool): ChalkDict =
+  result = ChalkDict()
 
   # https://docs.github.com/en/actions/
   #              learn-github-actions/variables#default-environment-variables
@@ -57,7 +56,7 @@ method getArtifactInfo*(self: GithubCI, obj:  ChalkObj): ChalkDict =
     elif GITHUB_EVENT_NAME == "schedule":
       result["BUILD_TRIGGER"] = pack("schedule")
     else:
-      result["BUILD_TRIGGER"] = pack(fmt"other:{GITHUB_EVENT_NAME}")
+      result["BUILD_TRIGGER"] = pack("other: " & GITHUB_EVENT_NAME)
 
   if GITHUB_ACTOR != "": result["BUILD_CONTACT"] = pack(@[GITHUB_ACTOR])
 

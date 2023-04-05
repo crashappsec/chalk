@@ -7,8 +7,6 @@ That's because chalk uses {bold}con4m{reset} for configuration, which, while typ
 
 Running {bold}{appName} defaults{reset} will therefore give you the information about the evaluation when you run the 'defaults' command.  Whereas, {bold}{appName} --publish-defaults extract{reset} will dump the config as it resolves when you run the 'extract' command, which could be very similar, or very different.
 
-However, note that running {bold}{appName} --publish-defaults extract{reset} still runs the 'extract' command.  Currently, there is no way to prevent i/o, for instance if you have 'extract' set up to write to an S3 bucket.  The exception there is for actual metadata insertion with the 'inject' command: --dry-run will turn it off.
+However, note that running {bold}{appName} --publish-defaults extract{reset} still runs the 'extract' command.
 
-We do expect to provide a flag to override specific output sources at some point.
-
-This command does not show any of the config file(s) used.  And, generally there will be at least two 'stacked' configuration files.  See {bold}{appName} help config{reset} for more information on the configuration file and con4m.
+This command does not show the contents of the config file(s) used, just key results from executing those config files.  And, generally there will be at least two 'stacked' configuration files.  See {bold}{appName} help config{reset} for more information on the configuration file and con4m.

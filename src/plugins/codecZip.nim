@@ -1,11 +1,15 @@
-import zippy/ziparchives_v1, streams, nimSHA2, tables, times, strutils, options
-import os, ../config, ../types, ../io/fromjson, ../plugins
+## Handle JAR, WAR and other ZIP-based formats.  Works fine w/ JAR
+## signing, because it only signs what's in the manifest.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
+import zippy/ziparchives_v1, streams, nimSHA2, tables, times, strutils, options,
+       os, ../config, ../chalkjson, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
-const
-  zipChalkFile = ".chalk.json"
-  eBadFmt      = "{chalk.fullpath}: Invalid input JSON in file: "
+const zipChalkFile = ".chalk.json"
 
 type
   CodecZip = ref object of Codec
@@ -66,5 +70,10 @@ method handleWrite*(self:    CodecZip,
 
 method getArtifactHash*(self: CodecZip, chalk: ChalkObj): string =
   return $(chalk.getZipAsString(none(string)).computeSHA256())
+
+# Normalize in case there are zip issues.
+method getHashAsOnDisk*(self: CodecZip, chalk: ChalkObj): Option[string] =
+  let toHash = $(ZipCache(chalk.cache).archive)
+  return some($(toHash.computeSHA256()))
 
 registerPlugin("zip", CodecZip())

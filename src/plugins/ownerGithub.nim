@@ -3,16 +3,13 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, streams, strutils, strformat, os, glob
-import nimutils, ../types, ../config, ../plugins
+import tables, streams, strutils, os, glob, ../config, ../plugins
 
 
 const
   fNameGHCO = "CODEOWNERS"
   dirGH     = ".github"
   dirDoc    = "docs"
-  eCantOpen = "{fname}: File found, but could not be read"
-  eFileOpen = "{filename}: Could not open file."
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
@@ -41,7 +38,7 @@ proc findCOFile(fullpath: string): string =
   return head.findCOFile()
 
 proc findCodeOwner(contents, artifactPath, copath: string): string =
-  assert artifactPath.startsWith(copath)
+  if not artifactPath.startsWith(copath): return
 
   let
     lines   = contents.split("\n")
@@ -71,7 +68,7 @@ proc findCodeOwner(contents, artifactPath, copath: string): string =
 
 type GithubCodeOwner = ref object of Plugin
 
-method getArtifactInfo*(self: GithubCodeOwner, obj: ChalkObj): ChalkDict =
+method getChalkInfo*(self: GithubCodeOwner, obj: ChalkObj): ChalkDict =
   # CODEOWNERS can live in the root of a repo, the docs subdir, or
   # the .github directory of a repository.  The challenge is that we
   # don't actually know where the root directory is, relative to the
@@ -84,17 +81,16 @@ method getArtifactInfo*(self: GithubCodeOwner, obj: ChalkObj): ChalkDict =
   # docs dire in it.
   #
   # We let this go all the way up to the root of the fs \_("/)_/
-  result = newTable[string, Box]()
+  result = ChalkDict()
 
-  let fname = obj.fullpath.findCOFile()
-
+  var fname = obj.fullPath.findCOFile()
   if fname == "": return
 
   var ctx: FileStream
 
   try:
     ctx = newFileStream(fname, fmRead)
-    if ctx == nil: error(eFileOpen)
+    if ctx == nil: error(fname & ": Could not open file.")
     else:
       let
         s = ctx.readAll()
@@ -102,7 +98,8 @@ method getArtifactInfo*(self: GithubCodeOwner, obj: ChalkObj): ChalkDict =
 
       if m != "": result["CODE_OWNERS"] = pack(m)
   except:
-    error(eCantOpen.fmt())
+    error(fname & ": File found, but could not be read: " &
+                                           getCurrentExceptionMsg())
   finally:
     if ctx != nil: ctx.close()
 

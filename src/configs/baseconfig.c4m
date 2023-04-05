@@ -1,82 +1,1389 @@
-## This is where we provide sane defaults for I/O.  Chalk is very
-## flexible in this regard, and almost nothing is hardcoded.
+## This is the first configuration file loaded, and basically provides
+## data and defaults. The bulk of it specifies the default metadata
+## schema (key blocks).
+##
+## There's also metadata about the plugin modules and sinks we have
+## available.
 ##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-## STARTUP CONFIGURATION
+## CHALK SCHEMA
+chalk_version :=   "0.5.0"
+ascii_magic   :=   "dadfedabbadabbed"
 
-if env_exists("NO_COLOR") {
-  color: false
-} else {
-  color: true
-}
+# Field starting with an underscore (_) are "system" metadata fields, that
+# are not conceptually part of the chalked metadata.
 
-cmd  := argv0()
-args := argv()
-
-sink_config("user_err", "stderr", {})
-sink_config("user_out", "stdout", {})
-
-# For commands that output JSON, default user output should get
-# JSON formatting and always get a newline per-publish.
-sink_config("json_out", "stdout", {}, ["pretty_json", "fix_new_line"])
-sink_config("json_err", "stderr", {}, ["pretty_json", "fix_new_line"])
-
-if cmd == "insert" {
-   subscribe("extract", "json_err") # Writes chalk extracted w/ 'extract' cmd
-   subscribe("nesting", "json_err") # Writes extracted chalk when inserting
-   subscribe("insert",  "json_err") # Writes full chalk on insert (no ptrs)
-   subscribe("delete",  "json_err") # Writes full chalk being deleted
-   subscribe("dry-run", "user_out")
-}
-else {
-   subscribe("extract", "json_err") # Writes chalk extracted w/ 'extract' cmd
-   subscribe("nesting", "json_err") # Writes extracted chalk when inserting
-   subscribe("insert",  "json_err") # Writes full chalk on insert (no ptrs)
-   subscribe("delete",  "json_err") # Writes full chalk being deleted
-   subscribe("dry-run", "user_out")
-}
-
-if cmd == "confdump" {
-  if len(args) > 0 {
-    sink_config("dump_out", "file", {"filename" : args[0]})
-    subscribe("confdump", "dump_out")
-  }
-  else {
-    subscribe("confdump", "user_out")
-  }
-} elif cmd == "version" {
-  # Send to stdout so people can more easily grep from scripts.
-  subscribe("version",  "user_out")
-} elif cmd == "confload" {
-  # Do nothing; the "confload" topic publishes the new config file.
-  # But, if you had an s3 sink set up and wanted to record it, could do:
-  # subscribe("confload", "s3")
-}
-
-if cmd == "defaults" {
-    subscribe("defaults", "user_out")
-} else {
-    subscribe("defaults", "user_err")
-}
-
-subscribe("help", "user_out")
-
-# Note that there are already two pre-built output configurations.
-# They are both subscribed to the 'stdout' sink.  You can remove those
-# subscriptions.
+# Some of these fields may still get added to the chalk mark.
 #
-# - "log_hook",   to which chalk log messages post. There are filters
-#                 installed to add optional color, and to filter based
-#                 on your log-level setting.
+# Specifically: MAGIC must always be added, as in many contexts it
+# might be necessary for finding the start of the mark.  But it generally
+# must not be reported.
 #
-# - "con4m_hook", to which errors in the configuration file post. The
-#                 same filters are installed; it respects the same
-#                 'log-level' setting, but all messages posted to it
-#                 will be 'error' messages.
+# _OPERATION, _VALIDATED, _CURRENT_HASH, and _OP_ERRORS are metadata on the
+# current chalk operation, and will not be embedded into chalk marks.
 #
-# You can, if you like, configure subscriptions to the underlying
-# topics, in order to hook up other sinks.  The logging topic is
-# called, appropriately enough, "logs".  The topic for configuration
-# file errors is "con4m".
+#
+# Any other keys starting with $'s are meant to be reserved for the
+# tool's internal use.  This reference implementation adds one,
+# $CHALK_CONFIG, which is used for self-injection of default config
+# data. Like MAGIC, it *does* get added to the mark.
+#
+# Conforming tools MUST NOT output items consisting of underscores as part
+# of a chalk mark (i.e., any extract operations).
+#
+# Similarly, system metadata fields unknown to the implementation SHOULD
+# NOT be output under any circumstances, to discourage users from adding
+# new metadata keys to the space.
+#
+# User-defined MUST begin with the X- prefix.
+enum   ChalkableHost, Chalk, NonChalk, HostOnly
+export ChalkableHost, Chalk, NonChalk, HostOnly
+
+keyspec MAGIC {
+    required:       true
+    kind:           ChalkableHost
+    type:           string
+    standard:       true
+    system:         true
+    conf_as_system: true
+    ~value:         ascii_magic
+    since:          "0.1.0"
+    ~output_order:  0
+    doc:            "Used to identify the start of JSON encoded output only"
+}
+
+keyspec CHALK_ID {
+    required:       true
+    kind:           Chalk
+    never_early:    true
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    ~output_order:  1
+    doc:           "A unique ID for the artifact, taken from the artifact " +
+                   "hash provided by the codec"
+}
+
+keyspec CHALK_VERSION {
+    required:       true
+    kind:           ChalkableHost
+    type:           string
+    standard:       true
+    system:         true
+    conf_as_system: true
+    ~value:         chalk_version
+    since:          "0.1.0"
+    output_order:   2
+    doc:            "Spec version used for inserted objects"
+}
+
+keyspec TIMESTAMP {
+    kind:             Chalk
+    type:             int
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    output_order:     3
+    doc:              """
+Milliseconds since the Unix epoch for each chalk. Should generally show the time
+between chalks, and will not be the same as _TIMESTAMP, or other time formatting,
+which only happens once at the beginning of each chalk run.
+"""
+}
+
+keyspec DATE {
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    output_order:     4
+    doc:              """
+_TIMESTAMP, converted to a date string, in the local time zone.  Note that this
+only has one value per run-- when chalking, TIMESTAMP gives per-chalk time values,
+but all other fields only time to the run.
+"""
+}
+
+keyspec TIME {
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    output_order:     5
+    doc:              """
+_TIMESTAMP, converted to the current time, in the local time zone. Note that this
+only has one value per run-- when chalking, TIMESTAMP gives per-chalk time values,
+but all other fields only time to the run.
+"""
+}
+
+keyspec TZ_OFFSET {
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    output_order:     6
+    doc:              "Time Zone offset from UTC for any non-numeric date-time objects."
+}
+
+keyspec DATETIME {
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    output_order:     7
+    doc:              "Full ISO-8601 Date-time w/ timezone, base on the value of _TIMESTAMP."
+}
+
+keyspec CHALK_PTR {
+    kind:                Chalk
+    type:                string
+    standard:            true
+    since:               "0.1.0"
+    output_order:        400
+    apply_substitutions: true
+    doc:                 """
+When enabled, injects minimal metadata; this field then gets a URL you supply
+to point to the rest of the data.
+"""
+}
+
+keyspec EARLIEST_VERSION {
+    kind:           ChalkableHost
+    type:           string
+    standard:       true
+    system:         true
+    conf_as_system: true
+    ~value:         chalk_version
+    since:          "0.1.0"
+    output_order:   500
+    doc:            "Reserved for future use"
+}
+
+keyspec INSERTION_HOSTINFO {
+    kind:           ChalkableHost
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   600
+    doc:            "Host information at injection"
+}
+
+keyspec ARTIFACT_PATH {
+    kind:           Chalk
+    never_early:    true
+    type:           string
+    standard:       true
+    codec:          true
+    since:          "0.1.0"
+    output_order:   700
+    doc:            "Path of artifact on host where injection occured"
+}
+
+keyspec HASH {
+    kind:           Chalk
+    never_early:    true
+    type:           string
+    standard:       true
+    codec:          true
+    since:          "0.1.0"
+    output_order:   800
+    doc:            "Hash file of artifact w/o chalk in it, to ensure " +
+                    "extracted chalk is intact"
+}
+
+keyspec HASH_FILES {
+    kind:           Chalk
+    type:           list[string]
+    never_early:    true
+    standard:       true
+    codec:          true
+    since:          "0.1.0"
+    output_order:   900
+    doc:            "Files that constitute the artifact, and used in the " +
+                    " hash, if not just the ARTIFACT_PATH"
+}
+
+keyspec COMPONENT_HASHES {
+    kind:           Chalk
+    type:           list[string]
+    never_early:    true
+    standard:       true
+    codec:          true
+    since:          "0.1.0"
+    output_order:   1000
+    doc:            "When there are multiple files hashed for a single " +
+                    "artifact, this contains SHA256 hashes of the individual " +
+		    "component hashes. The ordering will match the order of " +
+		    " the HASH_FILES field"
+}
+
+# This is one that could be different per-artifact, but our current
+# collectors only collect at a host level.
+keyspec ORIGIN_URI {
+    kind:                Chalk
+    type:                string
+    standard:            true
+    since:               "0.1.0"
+    output_order:        1100
+    apply_substitutions: true
+    doc:                 "URI of origin for repo from which artifact was built"
+}
+
+keyspec BRANCH {
+    kind:           Chalk
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   1200
+    doc:            "Version control branch the artifact was built from"
+}
+
+keyspec COMMIT_ID {
+    kind:           Chalk
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   1300
+    doc:            "The commit hash or id for the repository the artifact " +
+                    "was built from"
+}
+
+keyspec ARTIFACT_VERSION {
+    kind:           Chalk
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   1400
+    doc:            "Reserved for future use; can be custom."
+}
+
+keyspec STORE_URI {
+    kind:                Chalk
+    type:                string
+    standard:            true
+    since:               "0.1.0"
+    output_order:        1500
+    apply_substitutions: true
+    doc:                 "URI for the intended artifact storage location, at the" +
+                         " time of chalking."
+}
+
+keyspec PACKAGE_URI {
+    kind:                Chalk
+    type:                string
+    standard:            true
+    since:               "0.1.0"
+    output_order:        1600
+    apply_substitutions: true
+    doc:                 "Public distribution point."
+}
+
+keyspec CODE_OWNERS {
+    kind:           Chalk
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   1700
+    doc:            "Code owners associated with the artifact."
+}
+
+keyspec INJECTOR_ID {
+    kind:           ChalkableHost
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   1800
+    doc:            "chalk ID of the chalk binary"
+}
+
+keyspec INJECTOR_VERSION {
+    kind:           ChalkableHost
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   1900
+    doc:            "Version of the chalk binary used for injection"
+}
+
+keyspec INJECTOR_PLATFORM {
+    kind:           ChalkableHost
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   2000
+    doc:            "OS / system info at time of insertion"
+}
+
+keyspec INJECTOR_COMMIT_ID {
+    kind:           ChalkableHost
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   2100
+    doc:            "The commit hash or id from which the injector was built."
+}
+
+keyspec BUILD_ID {
+    kind:           Chalk
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   2200
+    doc:            "The ID of the CI/CD job"
+}
+
+keyspec BUILD_URI {
+    kind:                Chalk
+    type:                string
+    standard:            true
+    since:               "0.1.0"
+    output_order:        2300
+    apply_substitutions: true
+    doc:                 "URI to the CI/CD job"
+}
+
+keyspec BUILD_API_URI {
+    kind:                Chalk
+    type:                string
+    standard:            true
+    since:               "0.1.0"
+    output_order:        2400
+    apply_substitutions: true
+    doc:                 "URI to the CI/CD api if more information needs to be " +
+                         "queried"
+}
+
+keyspec BUILD_TRIGGER {
+    kind:           Chalk
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   2500
+    doc:            "What event triggered CI/CD job"
+}
+
+keyspec BUILD_CONTACT {
+    kind:           Chalk
+    type:           list[string]
+    standard:       true
+    since:          "0.1.0"
+    output_order:   2600
+    doc:            "List of contacts which triggered CI/CD job"
+}
+
+keyspec CHALK_RAND {
+    kind:             Chalk
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    ~callback:        func call_rand
+    since:            "0.1.0"
+    output_order:     2700
+    doc:              "64-bit random value generally selected per chalk " +
+                      "(if enabled), intended to help ensure unique metadata " +
+		      " IDs in all circumstances."
+}
+
+keyspec TENANT_ID {
+    kind:           ChalkableHost
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   high() - 1000
+    doc:            """
+A user-defined unique identifier intended to capture any meaningful user data.
+"""
+}
+
+keyspec OLD_CHALK_METADATA_HASH {
+    kind:           Chalk
+    never_early:    true
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 900
+    doc:            "Metadata hash of old chalk info associated with an " +
+                    "artifact, when a new mark is inserted"
+}
+
+keyspec OLD_CHALK_METADATA_ID {
+    kind:           Chalk
+    never_early:    true
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 800
+    doc:            "Metadata ID of old chalk info associated with an " +
+                    "artifact, when a new mark is inserted"
+}
+
+keyspec EMBEDDED_CHALK {
+    kind:           Chalk
+    never_early:    true
+    type:           dict[string, string]
+    standard:       true
+    codec:          true
+    since:          "0.1.0"
+    output_order:   high() - 700
+    doc:            "Other artifacts contained in this artifact"
+}
+
+keyspec SBOM {
+    kind:           Chalk
+    type:           dict[string, string]
+    standard:       true
+    since:          "0.1.0"
+    output_order:   high() - 600
+    doc:            "SBOMs associated with this artifact"
+}
+
+keyspec SAST {
+    kind:           Chalk
+    type:           dict[string, string]
+    standard:       true
+    since:          "0.1.0"
+    output_order:   high() - 550
+    doc:            "Static analysis scan results"
+}
+
+keyspec ERR_INFO {
+    kind:           Chalk
+    never_early:    true
+    type:           list[string]
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    ~output_order:  high() - 500
+    doc:            "Errors when inserting metadata"
+}
+
+keyspec SIGNING {
+    kind:           Chalk
+    never_early:    true
+    type:           bool
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    ~output_order:  high() - 400
+    doc:            "Must be added per-chalk when signing to ensure that " +
+                    "deleted signatures can be detected (which is why this " +
+		    "may not be lifted to the host-reporting level; " +
+		    "generally, there is no good reason to ever report it)"
+}
+
+keyspec METADATA_HASH {
+    required:       true
+    kind:           Chalk
+    never_early:    true
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    ~output_order:  high() - 300
+    doc:            "A hash of all the preceding metadata, in a " +
+    		    "canonicalized format. This includes user-defined keys."
+}
+
+keyspec METADATA_ID {
+    required:       true
+    kind:           Chalk
+    never_early:    true
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    ~output_order:  high() - 200
+    doc:            "A more readable unique identifier for all metadata."
+}
+
+keyspec SIGN_PARAMS {
+    kind:           Chalk
+    type:           dict[string, string]
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    ~output_order:  high() - 100
+    doc:            "Signing parameters for digital signatures."
+}
+
+keyspec SIGNATURE {
+    kind:           Chalk
+    never_early:    true
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    ~output_order:  high()
+    doc:            "Embedded digital signature for artifact"
+}
+
+keyspec _OPERATION {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   0
+    doc:            "Added to reporting data to distinguish operations. " +
+                    "Not intended for artifact embedding."
+}
+
+keyspec _TIMESTAMP {
+    kind:             HostOnly
+    type:             int
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    output_order:     1
+    doc:              "Milliseconds since the Unix epoch for the current op."
+}
+
+keyspec _DATE {
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    output_order:     2
+    doc:              "_TIMESTAMP, converted to a date string, in the local time zone."
+}
+
+keyspec _TIME {
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    output_order:     3
+    doc:              "_TIMESTAMP, converted to the current time, in the local time zone."
+}
+
+keyspec _TZ_OFFSET {
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    output_order:     4
+    doc:              "Time Zone offset from UTC for the current operation."
+}
+
+keyspec _DATETIME {
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    output_order:     5
+    doc:              "Full ISO-8601 Date-time w/ Timezone offset for the current operation."
+}
+
+
+keyspec _CHALKS {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   6
+    doc:            "Used to report chalks the operation worked on. " +
+                    "A host report without this key set will not output " +
+		    "chalks"
+}
+
+keyspec _OP_CHALK_COUNT {
+    kind:           HostOnly
+    type:           int
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   1000000
+    doc:            "The number of chalks the operation worked on, meant " +
+                    "primarily for contexts where the chalks themselves " +
+		    "are not being reported."
+}
+
+keyspec _OP_UNMARKED_COUNT {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   1000100
+    doc:            "The number of unmarked artifacts that codecs saw. " +
+                    "For inserts, this will be items seen but ignored. " +
+		    "For other ops, it will be artifacts w/o chalk marks."
+}
+
+keyspec _OP_ARTIFACT_PATH {
+    kind:           NonChalk
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   1000200
+    doc:            "Artifact location as found for the current op only"
+}
+
+keyspec _CURRENT_HASH {
+    kind:           NonChalk
+    type:           string
+    standard:       true
+    codec:          true
+    since:          "0.1.0"
+    output_order:   1000300
+    doc:            "Hash of the artifact at the end of the current op. " +
+                    "In a chalk operation, it will be the hash after " +
+                    "the chalk is fully inserted. Otherwise, it will be " +
+                    "the hash calculated on the object in its current state."
+}
+
+keyspec _OP_CMD_FLAGS {
+    kind:           HostOnly
+    type:           list[string]
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   1000400
+    doc:            "Fully resolved command-line flags and values used in " +
+                    "the current command invocation."
+}
+
+keyspec _OP_SEARCH_PATH {
+    kind:           HostOnly
+    type:           list[string]
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   1000500
+    doc:            "Artifact search path used for the current command"
+}
+
+keyspec _OP_EXE_NAME {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   1000600
+    doc:            "The executable name, approximately argv[0]"
+}
+
+keyspec _OP_EXE_PATH {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   1000700
+    doc:            "The local path to this chalk executable (does not " +
+                    "include the actual exe name"
+}
+
+keyspec _OP_ARGV {
+    kind:           HostOnly
+    type:           list[string]
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   1000800
+    doc:            "Full value of the command-line as passed to the process;" +
+                    " should contain the raw data used to determine " +
+		    " _OP_EXE_NAME, _OP_SEARCH_PATH and _OP_CMD_FLAGS"
+}
+
+keyspec _OP_CONFIG {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   1000900
+    doc:            "The contents of any user-definable configuration file, " +
+                    "if an external configuration file is used (otherwise, " +
+		    "even if requested, no value will be returned)"
+}
+
+# This must be skipped under any insertion context.
+keyspec _VALIDATED {
+    kind:           NonChalk
+    type:           bool
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 3300
+    doc:            "Hash of artifact after a chalk operation. This is not " +
+                    "written into the artifact, but is meant to be provided " +
+		    "to wherever the chalk operation is logged."
+}
+
+keyspec _UNMARKED {
+    kind:           HostOnly
+    type:           list[string]
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 3200
+    doc:            "Artifacts seen in the artifact search path that were " +
+                    "not marked."
+}
+
+keyspec _VIRTUAL {
+    kind:           NonChalk
+    type:           bool
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 3150
+    doc:            "Set on chalking ops only, indicating if the chalk was virtual."
+}
+
+keyspec _OP_CHALKER_COMMIT_ID {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 3100
+    doc:            "The commit hash or id for this chalk command."
+}
+
+keyspec _OP_CHALKER_VERSION {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 3000
+    doc:            "Version info for this chalk command."
+}
+
+keyspec _OP_PLATFORM {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   high() - 2900
+    doc:            "The platform information for this chalk command."
+}
+
+keyspec _OP_HOSTNAME {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   high() - 2800
+    doc:            "Hostname information for this chalk command."
+}
+
+keyspec _OP_HOSTINFO {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   high() - 2700
+    doc:            "Detailed host info reported at the time of the " +
+                    "operation.  System provides a default."
+}
+
+keyspec $CHALK_CONFIG {
+    kind:           Chalk
+    type:           string
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 2600
+    doc:            "Embedded configuration file; this is special-purpose" +
+                    "and may be ignored outsde of confdump / confload cmds"
+}
+
+keyspec _OP_ERRORS {
+    kind:           HostOnly
+    type:           list[string]
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 2500
+    doc:            "Errors on the current operation."
+}
+
+keyspec _OP_CHALKED_KEYS {
+    kind:           NonChalk
+    type:           list[string]
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 2400
+    doc:            "For insert operations only, a list of all keys that " +
+                    "were added to the chalk"
+}
+
+keyspec _OP_ARTIFACT_REPORT_KEYS {
+    kind:           NonChalk
+    type:           list[string]
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 2300
+    doc:            "For insert operations only, a list of all keys that " +
+                    "were added to the chalk"
+}
+
+keyspec _OP_HOST_REPORT_KEYS {
+    kind:           HostOnly
+    type:           list[string]
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    output_order:   high() - 2200
+    doc:            "For insert operations only, a list of all keys that " +
+                    "were added to the chalk"
+}
+
+# Doesn't do any keys other than the codec defaults, which are:
+# ARTIFACT_PATH, HASH, HASH_FILES, COMPONENT_HASHES.  Note that
+# non-codecs cannot set these keys.
+plugin elf {
+    codec:           true
+    artifact_keys:   ["HASH_FILES"]
+    post_chalk_keys: ["_CURRENT_HASH"]
+}
+
+plugin shebang {
+    codec:           true
+    artifact_keys:   ["HASH_FILES"]
+    post_chalk_keys: ["_CURRENT_HASH"]
+}
+
+plugin container {
+    codec:           true
+    priority:        1
+    enabled:         true
+    artifact_keys:   ["HASH_FILES"]
+    post_chalk_keys: ["_CURRENT_HASH"]
+
+}
+
+plugin zip {
+    codec:           true
+    priority:        1
+    enabled:         true
+    artifact_keys:   ["HASH_FILES"]
+    post_chalk_keys: ["_CURRENT_HASH"]
+}
+
+plugin tool {
+    enabled:         true
+    pre_run_keys:    ["*"]
+    artifact_keys:   ["*"]
+}
+
+# Probably should add file time of artifact, date of branch
+# and any tag associated.
+plugin vctl_git {
+    enabled:         true
+    pre_run_keys:    ["COMMIT_ID", "BRANCH", "ORIGIN_URI"]
+}
+
+plugin ci_github {
+    enabled:         true
+    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
+                     "BUILD_TRIGGER", "BUILD_CONTACT"]
+}
+
+plugin authors {
+    # Since there's only one key it might export, go ahead and
+    # lock it; if you want to disable that key, turn off the whole plugin.
+    enabled:         true
+    pre_run_keys:    ["CODE_OWNERS"]
+}
+
+plugin github_codeowners {
+    enabled:         true
+    artifact_keys:   ["CODE_OWNERS"]
+}
+
+# This plugin is the only thing allowed to set these keys.
+plugin system {
+  pre_run_keys:    ["INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
+                     "INJECTOR_COMMIT_ID", "DATE", "TIME", "TZ_OFFSET",
+		     "DATETIME"]
+  artifact_keys:   ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
+                    "TIMESTAMP"]
+  post_chalk_keys: ["_VALIDATED", "_OP_ARTIFACT_PATH", "_CURRENT_HASH",
+                    "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS",  "_VIRTUAL"]
+  post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
+                    "_OP_HOSTINFO", "_OP_PLATFORM", "_OP_CHALKER_COMMIT_ID",
+                    "_OP_CHALKER_VERSION", "_OP_CHALK_COUNT", "_OP_CMD_FLAGS",
+		    "_OP_EXE_NAME", "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
+		    "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
+		    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME"]
+
+  ~priority:       0
+}
+
+# These keys are system keys, but need to go LAST, not first.  The
+# OLD_CHALK field needs to know what fields get written before it can
+# figure out what to write.
+#
+# `metsys` is essentially meant to be "system end" in the sense of the
+# old algol days where an if statement's end delimeter was `fi` and a
+# case statement's end was `esac`. But also, this is where system
+# stuff goes that needs other metadata before it can write its own, so
+# I thought it was particularly appropriate.
+#
+# The priority field is set to high(int64).
+
+plugin metsys {
+    artifact_keys: ["METADATA_HASH", "SIGNATURE", "SIGN_PARAMS", "ERR_INFO",
+                    "METADATA_ID"]
+    ~priority:     high()
+}
+
+# This plugin takes values from the conf file, whether they're static
+# values, or callbacks. By default, these are of the lowest priority
+# of anything that can conflict.
+#
+# For static values read from the profile, this plugin attempts to
+# apply substitutions to text strings, where appropriate. See the plugin
+# implementation for details on the substitutions.
+#
+# For callbacks, it passes in the artifact path as a first parameter, and
+# expects the callback to return the proper value.
+#
+# This really should go next to last, since it fills in default values
+# when no other plugin does.  For string fields, it will do string
+# substitutions too:
+#
+# {chalkid} -> value of CHALK_ID
+# {now}     -> value of TIMESTAMP
+# {path}    -> value of ARTIFACT_PATH
+# {hash}    -> value of HASH
+# {tenant}  -> value of TENANT_ID
+#
+#
+# While we don't enforce that, if you want to ensure callbacks are called,
+# and that provided values clobber plugin values, you can leave the
+# priority as is, and set the overrides field.
+
+plugin conffile {
+    pre_run_keys:     ["*"]  # Host-only keys are evaluated here.
+    artifact_keys:    ["*"]  # Chalk-only keys are evaluated here.
+    post_chalk_keys:  ["*"]  # Non-chalkable artifact keys here.
+    post_run_keys:    ["*"]  # Post-run keys here.
+    priority:         high() - 1
+}
+
+# The default sink implementations are currently in the nimutils
+# library, except for 'custom', which is in output.nim.  That one
+# allows you to define your own sink in con4m by supplying the
+# callback outhook() If you do add more hardcoded sinks, please do
+# make sure they get locked in the lockBuiltinKeys() function in
+# config.nim.
+
+sink stdout {
+  doc:             "A sink that writes to stdout"
+}
+
+sink stderr {
+  doc:             "A sink that writes to stderr"
+}
+
+sink file {
+  ~needs_filename: true
+  doc:             "A sink that writes a local file"
+}
+
+sink s3 {
+  ~needs_secret:   true
+  ~needs_uid:      true
+  ~needs_uri:      true
+  ~uses_region:    true
+  ~uses_cacheid:   true
+  doc:             "A sink for S3 buckets"
+}
+
+sink post {
+  ~needs_uri:      true
+  ~uses_headers:   true
+  doc:             "Generic HTTP/HTTPS post to a URL. Add custom headers " +
+                   "by providing an implementation to the callback " +
+		   "getPostHeaders(), which should return a dictionary where " +
+		   "all keys and values are strings."
+}
+
+sink custom {
+  ~uses_secret:    true
+  ~uses_uid:       true
+  ~uses_headers:   true
+  ~uses_filename:  true
+  ~uses_uri:       true
+  ~uses_region:    true
+  ~uses_cacheid:   true
+  ~uses_aux:       true
+  doc:             "Implement a custom sink via a con4m callback"
+}
+
+# This profile is meant to be used for insertion, where we are not
+# doing any 'virtual' chalking-- all the metadata we want to collect
+# needs to be stuffed into the artifact.
+#
+# Default fields skip (i.e., value for skip by default is true)
+# But we list them all here to make it easier to cut, paste and change.
+profile chalking_default {
+  key.MAGIC.report                    = true
+  key.CHALK_ID.report                 = true
+  key.TIMESTAMP.report                = false
+  key.DATETIME.report                 = true
+  key.CHALK_VERSION.report            = true
+  # This key we skip because its primary purpose is to point to an
+  # external metadata location.
+  key.CHALK_PTR.report                = false
+  # This one isn't used by anything yet, so no need to output it.
+  key.EARLIEST_VERSION.report         = false
+  key.ARTIFACT_PATH.report            = true
+  key.INSERTION_HOSTINFO.report       = true
+  key.ORIGIN_URI.report               = true
+  key.ARTIFACT_VERSION.report         = true
+  key.STORE_URI.report                = true
+  key.BRANCH.report                   = true
+  key.HASH.report                     = true
+  key.HASH_FILES.report               = true
+  key.COMPONENT_HASHES.report         = true
+  key.COMMIT_ID.report                = true
+  key.CODE_OWNERS.report              = true
+  key.INJECTOR_ID.report              = true
+  key.INJECTOR_VERSION.report         = true
+  key.INJECTOR_PLATFORM.report        = true
+  key.INJECTOR_COMMIT_ID.report       = true
+  key.BUILD_ID.report                 = true
+  key.BUILD_URI.report                = true
+  key.BUILD_API_URI.report            = true
+  key.BUILD_TRIGGER.report            = true
+  key.BUILD_CONTACT.report            = true
+  key.CHALK_RAND.report               = true
+  key.OLD_CHALK_METADATA_HASH.report  = true
+  key.OLD_CHALK_METADATA_ID.report    = true
+  key.EMBEDDED_CHALK.report           = true
+  key.SBOM.report                     = true
+  key.SAST.report                     = true
+  key.ERR_INFO.report                 = true
+  key.SIGNING.report                  = true
+  key.METADATA_HASH.report            = true
+  key.METADATA_ID.report              = true
+  key.SIGN_PARAMS.report              = true
+  key.SIGNATURE.report                = true
+  # This would embed info on any config changes used when chalking.
+  # Generally, we assume that's not a good use of space in artifacts.
+  key.$CHALK_CONFIG.report            = false
+}
+
+# This profile is for what gets inserted into artifacts when we are
+# sending metadata to a configured sink.  It's minimal.  Signatures
+# will sign what's in the chalk mark, but don't themselves strictly
+# need to be in the mark; they can just be reported up.
+
+profile chalking_ptr {
+  key.MAGIC.report                    = true
+  key.CHALK_ID.report                 = true
+  key.TIMESTAMP.report                = false
+  key.DATETIME.report                 = true
+  key.CHALK_VERSION.report            = true
+  key.CHALK_PTR.report                = true
+  key.CHALK_RAND.report               = true
+  key.SIGNING.report                  = true
+  key.METADATA_HASH.report            = true
+  key.METADATA_ID.report              = true
+  key.$CHALK_CONFIG.report            = true  # Only used for self-chalks.
+}
+
+# This is what gets posted to any sinks on a per-artifact basis, by
+# default, when chalking, and a sink is configured.  This pairs with
+# the above.  Skipped keyspecs are not included here (the default will
+# skip).  Generally, we skip things that are either not appropriate
+# for the context, or are reported once-per run to avoid unneeded
+# duplicate data, so will appear in the host report.
+#
+# Some of the skips are to avoid things our defaults (e.g., collection
+# plugins) only ever do on a host-basis. If you want to do a callback
+# yourself on a per-artifact basis, then you should enable in a
+# per-artifact report but disable on a per-host basis.  Leaving those
+# explicitly in.
+profile artifact_report_insert_base {
+  key.CHALK_ID.report                 = true
+  key.TIMESTAMP.report                = true
+  key.ARTIFACT_PATH.report            = true
+  key.INSERTION_HOSTINFO.report       = true
+  key.ORIGIN_URI.report               = true
+  key.ARTIFACT_VERSION.report         = true
+  key.STORE_URI.report                = true
+  key.BRANCH.report                   = true
+  key.HASH.report                     = true
+  key.HASH_FILES.report               = true
+  key.COMPONENT_HASHES.report         = true
+  key.COMMIT_ID.report                = true
+  key.CODE_OWNERS.report              = true
+  key.BUILD_ID.report                 = true
+  key.BUILD_URI.report                = true
+  key.BUILD_API_URI.report            = true
+  key.BUILD_TRIGGER.report            = true
+  key.BUILD_CONTACT.report            = true
+  key.CHALK_RAND.report               = true
+  key.OLD_CHALK_METADATA_HASH.report  = true
+  key.OLD_CHALK_METADATA_ID.report    = true
+  key.EMBEDDED_CHALK.report           = true
+  key.SBOM.report                     = true
+  key.SAST.report                     = true
+  key.ERR_INFO.report                 = true
+  key.METADATA_HASH.report            = true
+  key.METADATA_ID.report              = true
+  key.SIGN_PARAMS.report              = true
+  key.SIGNATURE.report                = true
+  key.$CHALK_CONFIG.report            = true
+  key._VIRTUAL.report                 = true
+}
+
+# This is what gets posted to any sinks at the time of insert, on a
+# per-chalk run basis (by default).  Such profiles must not enable
+# fields that have `artifact_only = true`
+profile host_report_insert_base {
+  key.TIMESTAMP.report                = true
+  key.DATETIME.report                 = true
+  key.CHALK_VERSION.report            = true
+  key.INSERTION_HOSTINFO.report       = true
+  key.ORIGIN_URI.report               = true
+  key.BRANCH.report                   = true
+  key.COMMIT_ID.report                = true
+  key.BUILD_ID.report                 = true
+  key.BUILD_URI.report                = true
+  key.BUILD_API_URI.report            = true
+  key.BUILD_TRIGGER.report            = true
+  key.BUILD_CONTACT.report            = true
+  key.CHALK_RAND.report               = true
+  key._OPERATION.report               = true
+  key._CHALKS.report                  = true
+  key._UNMARKED.report                = true
+  key._OP_SEARCH_PATH.report          = false
+  key._OP_CHALKER_COMMIT_ID.report    = false
+  key._OP_CHALKER_VERSION.report      = false
+  key._OP_PLATFORM.report             = false
+  key._OP_HOSTINFO.report             = false
+  key._OP_ERRORS.report               = true
+}
+
+# This is what gets reported per-artifact, by default, on extraction
+# operations, where we generally want to pull *almost* anything in a
+# mark with the exception of things like MAGIC, and things that we're
+# collecting per op (which start with an underscore) that should be
+# reported on the host-level instead.  There are also some host-level
+# items that are more meant for basic stats / health check stuff that
+# we skip.
+#
+# Host keys are in the host_report_other_base (i.e., non-insert)
+# profile below.
+
+profile artifact_report_extract_base {
+  key.MAGIC.report                    = false
+  key.CHALK_ID.report                 = true
+  key.TIMESTAMP.report                = true
+  key.DATETIME.report                 = true
+  key.CHALK_VERSION.report            = true
+  key.CHALK_PTR.report                = true
+  key.EARLIEST_VERSION.report         = true
+  key.INSERTION_HOSTINFO.report       = true
+  key.ARTIFACT_PATH.report            = true
+  key.HASH.report                     = true
+  key.HASH_FILES.report               = true
+  key.COMPONENT_HASHES.report         = true
+  key.ORIGIN_URI.report               = true
+  key.BRANCH.report                   = true
+  key.COMMIT_ID.report                = true
+  key.ARTIFACT_VERSION.report         = true
+  key.STORE_URI.report                = true
+  key.CODE_OWNERS.report              = true
+  key.INJECTOR_ID.report              = true
+  key.INJECTOR_VERSION.report         = true
+  key.INJECTOR_PLATFORM.report        = true
+  key.INJECTOR_COMMIT_ID.report       = true
+  key.BUILD_ID.report                 = true
+  key.BUILD_URI.report                = true
+  key.BUILD_API_URI.report            = true
+  key.BUILD_TRIGGER.report            = true
+  key.BUILD_CONTACT.report            = true
+  key.CHALK_RAND.report               = true
+  key.OLD_CHALK_METADATA_HASH.report  = true
+  key.OLD_CHALK_METADATA_ID.report    = true
+  key.EMBEDDED_CHALK.report           = true
+  key.SBOM.report                     = true
+  key.SAST.report                     = true
+  key.ERR_INFO.report                 = true
+  key.SIGNING.report                  = false
+  key.METADATA_HASH.report            = true
+  key.METADATA_ID.report              = true
+  key.SIGN_PARAMS.report              = true
+  key.SIGNATURE.report                = true
+  key._OP_ARTIFACT_PATH.report        = true
+  key._CURRENT_HASH.report            = true
+  key._VALIDATED.report               = true
+  key._OP_CHALKED_KEYS.report         = false
+  key._OP_ARTIFACT_REPORT_KEYS.report = false
+}
+
+# Here we could report the whole extraction, but we stick with a bare
+# bones minimum. If the chalk was tampered with, we probably don't care
+# much to try to figure out what changed.
+#
+# Note that _CURRENT_HASH should be 0 on deletion.
+
+profile artifact_report_delete_base {
+  key.CHALK_ID.report                 = true
+  key.HASH.report                     = true
+  key.METADATA_HASH.report            = true
+  key.METADATA_ID.report              = true
+  key._OP_ARTIFACT_PATH.report        = true
+  key._VALIDATED.report               = true
+}
+
+# This is what gets posted to sinks on non-insert ops, on a per-run basis,
+# by default.  Only keys beginning with _ make any sense in this context.
+# If it doesn't start with _, the implication is static to what's in
+# the chalk mark.
+#
+# And some keys starting with _ are per-artifact, so appear above,
+# instead.
+
+profile host_report_other_base {
+  key._OPERATION.report               = true
+  key._TIMESTAMP.report               = true
+  key._DATETIME.report                = true
+  key._CHALKS.report                  = true
+  key._OP_CHALK_COUNT.report          = false
+  key._OP_CMD_FLAGS.report            = false
+  key._OP_SEARCH_PATH.report          = false
+  key._OP_EXE_NAME.report             = false
+  key._OP_EXE_PATH.report             = false
+  key._OP_ARGV.report                 = false
+  key._OP_CONFIG.report               = false
+  key._UNMARKED.report                = true
+  key._OP_UNMARKED_COUNT.report       = false
+  key._OP_CHALKER_COMMIT_ID.report    = true
+  key._OP_CHALKER_VERSION.report      = true
+  key._OP_PLATFORM.report             = true
+  key._OP_HOSTINFO.report             = true
+  key._OP_ERRORS.report               = true
+  key._OP_HOST_REPORT_KEYS.report     = false
+}
+
+
+profile audit_report {
+  # Here, we only report key bits about the configuration used, for
+  # audit purposes. This is implemented as the "audit" report below;
+  # the implementation special-cases it a bit; the "publish_audit"
+  # variable can be used to control this (right now, just turn it on
+  # or off).
+
+  key._OPERATION.report              = true
+  key._TIMESTAMP.report              = true
+  key._DATETIME.report               = true
+  key._OP_CHALK_COUNT.report         = true
+  key._OP_CMD_FLAGS.report           = true
+  key._OP_CONFIG.report              = true
+}
+
+profile beacon_report {
+  key._OPERATION.report              = true
+}
+
+custom_report audit {
+  sink_configs: [] # Must be overridden to produce output.
+  host_profile: "audit_report"
+}
+
+outconf insert {
+  chalk:           "chalking_default"
+  artifact_report: "artifact_report_insert_base"
+  host_report:     "host_report_insert_base"
+}
+
+outconf extract {
+  artifact_report: "artifact_report_extract_base"
+  host_report:     "host_report_other_base"
+}
+
+outconf delete {
+  artifact_report: "artifact_report_delete_base"
+  host_report:     "host_report_other_base"
+}
+
+outconf confload {
+  # Always do the more minimal chalk.
+  chalk:           "chalking_ptr"
+  artifact_report: "artifact_report_insert_base"
+  host_report:     "host_report_insert_base"
+}
+
+outconf confdump {
+  artifact_report: "artifact_report_delete_base"
+  host_report:     "host_report_other_base"
+}
+
+outconf docker {
+  chalk:           "chalking_default"
+  artifact_report: "artifact_report_insert_base"
+  host_report:     "host_report_insert_base"
+}
+
+outconf entrypoint {
+  artifact_report: "artifact_report_extract_base"
+  host_report:     "host_report_other_base"
+}
+
+outconf help {}
+outconf defaults {}
+
+func call_rand(key) { return $(lower(hex(rand())));  }
+
+# # Stubs for testing via con4m command line (uncomment to use)
+# func argv0() {
+#   return ""
+# }
+
+# func argv() {
+#   return [""]
+# }
+
+# func sink_config(x, y, z) {
+#   return true
+# }
+
+# func sink_config(a, b, c, d) {
+#   return true
+# }
+
+# func subscribe(a, b) {
+#   return true
+# }

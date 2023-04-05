@@ -4,39 +4,41 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, nimutils, ../types, ../config, ../plugins, formatstr
+import tables, options, strutils, ../plugins, ../config
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 type ConfFilePlugin* = ref object of Plugin
 
-method getArtifactInfo*(self: ConfFilePlugin,
-                        obj: ChalkObj): ChalkDict =
-  result = newTable[string, Box]()
+proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
+  result = ChalkDict()
+  for k, v in chalkConfig.keySpecs:
+    if opt.isNone() and k in hostInfo:                continue
+    if opt.isSome() and k in opt.get().collectedData: continue
+    if v.kind != int(kt): continue
+    if k notin subscribedKeys: continue
+    if v.value.isSome():
+      result[k] = v.value.get()
+    elif v.callback.isSome():
+      let cbOpt = ctxChalkConf.sCall(v.callback.get(), args)
+      if cbOpt.isSome(): result[k] = cbOpt.get()
 
-  let
-    keyList = getAllKeys()
-    chalkID = unpack[string](obj.newFields["CHALK_ID"])
+method getHostInfo*(self: ConfFilePlugin,
+                    p:    seq[string],
+                    ins:  bool): ChalkDict =
+  if not ins: return ChalkDict(nil)  # No callbacks
+  return scanForWork(KtChalkableHost, none(ChalkObj), @[pack(p.join(":"))])
 
-  for key in keyList:
-    let
-      spec   = getKeySpec(key).get()
-      optval = spec.getValue()
+method getChalkInfo*(self: ConfFilePlugin, obj: ChalkObj): ChalkDict =
+  return scanForWork(KtChalk, some(obj), @[pack(obj.fullpath)])
 
-    if optval.isNone():  continue
-    if spec.getSystem(): continue # This plugin doesn't handle system keys.
+method getPostChalkInfo*(self: ConfFilePlugin,
+                         obj:  ChalkObj,
+                         ins:  bool): ChalkDict =
+  return scanForWork(KtNonChalk, some(obj), @[pack(obj.fullpath)])
 
-    if spec.getType() == "string":
-      let raw = unpack[string](optval.get())
-      if '\\' in raw:
-        # This is a temporary fix for a bug in formatstr; I submitted
-        # a patch, so when it makes it in, we can remove this branch.
-        result[key] = pack(raw)
-        continue
-      try:     result[key] = pack(format(raw, { "artifactid":   chalkId}))
-      except:  result[key] = pack(raw)
-    else:
-      result[key] = optval.get()
 
+method getPostRunInfo*(self: ConfFilePlugin, objs: seq[ChalkObj]): ChalkDict =
+  return scanForWork(KtHostOnly, none(ChalkObj), @[pack("")])
 
 registerPlugin("conffile", ConfFilePlugin())

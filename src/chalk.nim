@@ -23,68 +23,34 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, nativesockets, json, strutils, os, options
+# At compile time, this will generate c4autoconf if the file doesn't
+# exist, or if the spec file has a newer timestamp.  We do this before
+# any submodule imports it.
+
+static:
+  echo staticexec("if test \\! c4autoconf.nim -nt configs/chalk.c42spec; " &
+                  "then con4m spec configs/chalk.c42spec --language=nim " &
+                  "--output-file=c4autoconf.nim; fi")
+
 # Note that importing builtins causes topics to register, and
 # importing plugins causes plugins to register.
-import nimutils, types, config, builtins, plugins
-import inject, extract, confload, defaults, help
+import tables, nativesockets, os, options, config, builtins, commands, collect
 
-var `selfChalk?` = none(ChalkObj)
 
-# Tiny commands live in this file. The major ones are broken out.
-proc runCmdExtraction() {.inline.} =
-  let extractions = doExtraction()
-  if extractions.isSome(): publish("extract", extractions.get())
-  else:                    warn("No items extracted")
-
-proc runCmdConfDump() {.inline.} =
-  var
-    toDump  = defaultConfig
-    argList = getArgs()
-
-  if `selfChalk?`.isSome():
-    let selfChalk = `selfChalk?`.get()
-
-    if selfChalk.extract.contains("_CHALK_CONFIG"):
-      toDump   = unpack[string](selfChalk.extract["_CHALK_CONFIG"])
-
-  publish("confdump", toDump)
-
-proc runCmdVersion() =
-  var
-    rows = @[@["Chalk version", getChalkExeVersion()],
-             @["Commit ID",     getChalkCommitID()],
-             @["Build OS",      hostOS],
-             @["Build CPU",     hostCPU],
-             @["Build Date",    CompileDate],
-             @["Build Time",    CompileTime & " UTC"]]
-    t    = chalkTableFormatter(2, rows=rows)
-
-  t.setTableBorders(false)
-  t.setNoHeaders()
-
-  publish("version", t.render() & "\n")
-
-proc doAudit(commandName: string,
-             parsedFlags: Table[string, string],
-             configFile:  Option[string]) =
-  if not chalkConfig.getPublishAudit(): return
-
+# Since these are system keys, we are the only one able to write them,
+# and it's easier to do it directly here than in the system plugin.
+proc stashCommandlineInfo(parsedFlags: Table[string, string],
+                          configFile:  Option[string]) =
   var flagStrs: seq[string] = @[]
 
   for key, value in parsedFlags:
     if value == "": flagStrs.add("--" & key)
     else:           flagStrs.add("--" & key & "=" & value)
 
-  var preJson  = { "command"    : commandName,
-                   "flags"      : flagStrs.join(","),
-                   "hostname"   : getHostName(),
-                   "config"     : configFile.getOrElse(""),
-                   "time"       : $(unixTimeInMs()),
-                   "platform"   : getChalkPlatform(),
-                 }.toTable()
+  hostInfo["_OP_CMD_FLAGS"] = pack(flagStrs)
 
-  publish("audit", $(%* prejson))
+  if configFile.isSome():
+    hostInfo["_OP_CONFIG"]  = pack(configFile.get())
 
 when isMainModule:
   var
@@ -95,13 +61,25 @@ when isMainModule:
 
   cmdLine = newCmdLineSpec().
     addYesNoFlag("color", some('c'), some('C'), callback = setColor).
-    addYesNoFlag("publish-defaults", some('p'), some('P'),
-                 callback = setPublishDefaults).
-    addBinaryFlag("help", ["h"], callback = BinaryCallback(doHelp)).
+    addBinaryFlag("help", ["h"], callback = BinaryCallback(runCmdHelp)).
     addChoiceFlag("log-level",
                   ["verbose", "trace", "info", "warn", "error", "none"],
                   true, ["l"],  callback = setConsoleLogLevel).
-    addFlagWithArg("config-file", ["f"], setConfigFile)
+    addFlagWithArg("config-file", ["f"], setConfigFile).
+    addFlagWithArg("disable-profile", [], callback = disableProfile).
+    addFlagWithArg("disable-report", [], callback = disableReport).
+    addFlagWithArg("disable-plugin", [], callback = disablePlugin).
+    addFlagWithArg("disable-tool",   [], callback = disableTool).
+    addFlagWithArg("enable-profile", [], callback = enableProfile).
+    addFlagWithArg("enable-report",  [], callback = enableReport).
+    addFlagWithArg("enable-plugin",  [], callback = enablePlugin).
+    addFlagWithArg("enable-tool",    [], callback = enableTool).
+    addFlagWithArg("report-cache-file", [], callback = setReportCacheLocation).
+    addYesNoFlag("publish-defaults", callback = setPublishDefaults).
+    addYesNoFlag("default-sbom",     callback = setLoadSbomTools).
+    addYesNoFlag("default-sast",     callback = setLoadSastTools).
+    addYesNoFlag("default-sign",     callback = setLoadDefaultSigning).
+    addYesNoFlag("use-report-cache", callback = setUseReportCache)
 
   cmdLine.addCommand("insert", ["inject", "ins", "in", "i"]).
     addArgs(callback = setArtifactSearchPath).
@@ -124,7 +102,22 @@ when isMainModule:
   cmdLine.addCommand("version", ["vers", "v"])
   cmdLine.addCommand("entrypoint", noFlags = true).addArgs()
   cmdLine.addCommand("docker", noFlags = true).addArgs()
-  cmdLine.addCommand("help").addArgs()
+
+  let helpCmd = cmdLine.addCommand("help", ["h"],
+                                   unknownFlagsOk = true,
+                                   subOptional=true).addArgs()
+  helpCmd.addCommand("key", ["keys"], unknownFlagsOk = true).addArgs()
+  helpCmd.addCommand("keyspec", ["keyspecs"], unknownFlagsOk = true).addArgs()
+  helpCmd.addCommand("profile", ["profiles"], unknownFlagsOk = true).addArgs()
+  helpCmd.addCommand("tool", ["tools"], unknownFlagsOk = true).addArgs()
+  helpCmd.addCommand("plugin", ["plugins"], unknownFlagsOk = true).addArgs()
+  helpCmd.addCommand("sink", ["sinks"], unknownFlagsOk = true).addArgs()
+  helpCmd.addCommand("outconf", ["outconf"], unknownFlagsOk = true).addArgs()
+  helpCmd.addCommand("report", ["reports", "custom_report", "custom_reports"],
+                     unknownFlagsOk = true).addArgs()
+  helpCmd.addCommand("sast", unknownFlagsOk = true).addArgs()
+  helpCmd.addCommand("sbom", ["sboms"], unknownFlagsOk = true).addArgs()
+  helpCmd.addCommand("topics", unknownFlagsOk = true).addArgs()
 
   try:
     parsed = cmdLine.ambiguousParse(defaultCmd = some(""), runCallbacks = false)
@@ -136,7 +129,7 @@ when isMainModule:
     setCommandName(cmdName)
   except:
     error(getCurrentExceptionMsg())
-    doHelp()
+    runCmdHelp()
 
   if "log-level" in parsed[0].flags:
     # We can't call chalkLogLevel yet b/c there's no config object
@@ -151,16 +144,17 @@ when isMainModule:
   # Can set items from the command line. Due to our argument design,
   # even if the command is ambiguous it's safe to do this.
   if len(parsed) >= 1: parsed[0].runCallbacks()
-  validatePlugins()
+  loadOptionalConfigurations()
   # Next, we need to load the embedded configuration, so we load our
   # self-chalk, if we have any, as loadEmbeddedConfig will check it for
   # the embedded config, and select the default if it isn't there.
-  # getSelfExtraction() is in extract.nim; loadEmbeddedConfig is in
-  # config.nim
-  `selfChalk?` = getSelfExtraction()
-
+  # getSelfExtraction() is in collect.nim; loadEmbeddedConfig is in
+  # config.nim.
+  #
+  # We call this for config to make sure it has no unneeded
+  # dependencies.
   let
-    configLoaded = loadEmbeddedConfig(`selfChalk?`)
+    configLoaded = loadEmbeddedConfig(getSelfExtraction())
     appName      = getAppFileName().splitPath().tail
 
   if not configLoaded and cmdName notin ["load", "help"]:
@@ -180,20 +174,20 @@ when isMainModule:
       setCommandName(cmdName)
   if chalkConfig.getAllowExternalConfig() and cmdName != "help":
     `configFile?` = loadUserConfigFile(cmdName)
-
-  doAudit(cmdName, parsed[0].flags, `configFile?`)
+  stashCommandLineInfo(parsed[0].flags, `configFile?`)
+  setupDefaultLogConfigs()
 
   case cmdName
-  of "extract":    runCmdExtraction()
-  of "insert":     doInjection()
-  of "delete":     doInjection(deletion = true)
+  of "extract":    runCmdExtract()
+  of "insert":     runCmdInsert()
+  of "delete":     runCmdDelete()
   of "confdump":   runCmdConfDump()
   of "confload":   runCmdConfLoad()
   of "defaults":   showConfig(force = true)
   of "version":    runCmdVersion()
   of "docker":     echo "called 'docker " & $(getArgs()) & "'"
   of "entrypoint": echo "entry point."
-  of "help":       doHelp() # noreturn; does NOT do dump or run the config.
-  else:            unreachable # Unless we add more commands.
+  else:
+    runCmdHelp(cmdName) # noreturn, will not show config.
 
-  showConfig() # In defaults.
+  showConfig()

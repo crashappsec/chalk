@@ -10,8 +10,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import options, streams, strutils, endians
-import nimSHA2, ../types, ../config, ../plugins
+import options, streams, strutils, endians, nimSHA2, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
@@ -27,14 +26,14 @@ const
 
 type CodecElf* = ref object of Codec
 
-proc extractKeyMetadata*(stream: FileStream, loc: string): ChalkObj =
+proc extractKeyMetadata(stream: FileStream, loc: string): ChalkObj =
   stream.setPosition(wsOffsetLoc)
   var
     is64Bit     = if stream.readChar() == is64BitVal: true else: false
     isBigEndian = if stream.readChar() == bigEndianVal: true else: false
     swap        = if is64Bit: swapEndian64 else: swapEndian32
-    raw64, shSt64:     uint64
-    raw32, shSt32:     uint32
+    raw64:     uint64
+    raw32:     uint32
     rawBytes, shStLoc: pointer
     shStart, offset:   int
 
@@ -85,7 +84,6 @@ method scan*(self:   CodecElf,
 method getArtifactHash*(self: CodecElf, chalk: ChalkObj): string =
   chalk.stream.setPosition(0)
   return $(chalk.stream.readStr(chalk.startOffset).computeSHA256())
-
 
 registerPlugin("elf", CodecElf())
 
