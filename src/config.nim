@@ -91,15 +91,6 @@ proc lookupCollectedKey*(obj: ChalkObj, k: string): Option[Box] =
   if k in obj.collectedData: return some(obj.collectedData[k])
   return none(Box)
 
-proc getChalkMark*(obj: ChalkObj): ChalkDict =
-  let profile = chalkConfig.profiles[getOutputConfig().chalk]
-
-  if profile.enabled == false:
-    error("FATAL: invalid to disable the chalk profile when inserting." &
-          " did you mean to use the virtual chalk feature?")
-    quit(1)
-  return hostInfo.filterByProfile(obj.collectedData, profile)
-
 proc setChalkCon4mBuiltIns*(fns: seq[(string, BuiltinFn)]) {.inline.} =
   # Set from builtins.nim; instead of a cross-dependency, we let it
   # call us to set.
@@ -207,10 +198,15 @@ proc enableReport*(s: string)   = enableObject("custom_report", reportSpecs, s)
 proc enablePlugin*(s: string)   = enableObject("plugin", plugins, s)
 proc enableTool*(s: string)     = enableObject("tool", tools, s)
 
-proc orderKeys*(dict: ChalkDict): seq[string] =
+proc orderKeys*(dict: ChalkDict, profile: Profile = nil): seq[string] =
   var tmp: seq[(int, string)] = @[]
   for k, _ in dict:
-    tmp.add((chalkConfig.keySpecs[k].outputOrder, k))
+    var order = chalkConfig.keySpecs[k].normalizedOrder
+    if profile != nil and k in profile.keys:
+      let orderOpt = profile.keys[k].order
+      if orderOpt.isSome():
+        order = orderOpt.get()
+    tmp.add((order, k))
 
   tmp.sort()
   result = @[]

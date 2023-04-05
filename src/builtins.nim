@@ -297,7 +297,6 @@ proc setupDefaultLogConfigs*() =
     headers   = "X-Crashoverride-Workspace-Id: " & workspace & "\n" &
                 "Content-Type: application/json"
 
- # same.
     params  = some(newOrderedTable({ "uri": uri, "headers" : headers }))
     useConf = configSink(getSink("post").get(), params)
 

@@ -5,7 +5,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import os, nativesockets, tables, options, strutils, nimSHA2, sequtils, times,
-       ../config, ../plugins, ../normalize
+       ../config, ../plugins, ../normalize, ../chalkjson
 
 when defined(posix): import posix
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}

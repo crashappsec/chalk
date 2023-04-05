@@ -385,17 +385,44 @@ proc extractOneChalkJson*(stream: Stream, path: string): ChalkDict =
 # we need, which gives us a JsonNode object, that we then convert
 # back to a string, with necessary quotes intact.
 
-proc toJson*(dict: ChalkDict): string =
+proc toJson*(dict: ChalkDict, profile: Profile = nil): string =
   result    = ""
   var comma = ""
-  let keys = dict.orderKeys()
+  let keys = dict.orderKeys(profile)
 
   for fullKey in keys:
     let
       keyJson = $(%* fullKey)
-      valJson = boxToJson(dict[fullKey])
+      # _CHALKS key is special-cased so we don't have to keep re-sorting.
+      valJson = if fullKey == "_CHALKS": unpack[string](dict[fullKey])
+                else:                    boxToJson(dict[fullKey])
 
     result = result & comma & keyJson & " : " & valJson
     comma  = ", "
 
   result = "{ " & result & " }"
+
+proc prepareContents*(dict: ChalkDict, p: Profile): string =
+  return dict.filterByProfile(p).toJson(p)
+
+proc prepareContents*(host, obj: ChalkDict, oneProfile: Profile): string =
+  return host.filterByProfile(obj, oneProfile).toJson(oneProfile)
+
+
+template profileEnabledCheck(profile: Profile) =
+  if profile.enabled == false:
+    error("FATAL: invalid to disable the chalk profile when inserting." &
+          " did you mean to use the virtual chalk feature?")
+    quit(1)
+
+proc getChalkMark*(obj: ChalkObj): ChalkDict =
+  let profile = chalkConfig.profiles[getOutputConfig().chalk]
+  profile.profileEnabledCheck()
+
+  return hostInfo.filterByProfile(obj.collectedData, profile)
+
+proc getChalkMarkAsStr*(obj: ChalkObj): string =
+  let profile = chalkConfig.profiles[getOutputConfig().chalk]
+  profile.profileEnabledCheck()
+
+  return hostInfo.prepareContents(obj.collectedData, profile)

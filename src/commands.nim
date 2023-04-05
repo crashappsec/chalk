@@ -11,7 +11,7 @@ import macros except error
 # Helper to load profiles.
 proc setPerChalkReports(successProfileName, invalidProfileName: string) =
   var
-    reports     = seq[ChalkDict](@[])
+    reports     = seq[string](@[])
     goodProfile = Profile(nil)
     badProfile  = Profile(nil)
 
@@ -29,11 +29,12 @@ proc setPerChalkReports(successProfileName, invalidProfileName: string) =
   for chalk in allChalks:
     let
       profile   = if not chalk.opFailed: goodProfile else: badProfile
-      oneReport = hostInfo.filterByProfile(chalk.collectedData, profile)
+      oneReport = hostInfo.prepareContents(chalk.collectedData, profile)
 
     if len(oneReport) != 0: reports.add(oneReport)
 
-  if len(reports) != 0:       hostInfo["_CHALKS"] = pack(reports)
+  let reportJson = "[ " & reports.join(", ") & "]"
+  if len(reports) != 0:       hostInfo["_CHALKS"] = pack(reportJson)
   elif "_CHALKS" in hostInfo: hostInfo.del("_CHALKS")
 
 # Next, our reporting.
@@ -46,7 +47,7 @@ template doCommandReport() =
 
   setPerChalkReports(conf.artifactReport, conf.invalidChalkReport)
   if len(unmarked) != 0: hostInfo["_UNMARKED"] = pack(unmarked)
-  publish("report", hostInfo.filterByProfile(hostProfile).toJson())
+  publish("report", hostInfo.prepareContents(hostProfile))
 
 template doCustomReporting() =
   for topic, spec in chalkConfig.reportSpecs:
@@ -70,7 +71,7 @@ template doCustomReporting() =
     setPerChalkReports(spec.artifactProfile, spec.invalidChalkProfile)
     let profile = chalkConfig.profiles[spec.hostProfile]
     if profile.enabled:
-      publish(topic, hostInfo.filterByProfile(profile).toJson())
+      publish(topic, hostInfo.prepareContents(profile))
 
 proc doReporting() =
   collectPostRunInfo()
@@ -96,7 +97,7 @@ proc runCmdInsert*() =
     trace(item.fullPath & ": chalk data collection finished.")
     try:
       let
-        toWrite = some(item.getChalkMark().toJson())
+        toWrite = some(item.getChalkMarkAsStr())
         rawHash = item.myCodec.handleWrite(item, toWrite, virtual)
 
       if virtual: info(item.fullPath & ": virtual chalk created")
@@ -431,8 +432,8 @@ proc runCmdConfLoad*() =
   try:
     copyFile(oldLocation, selfChalk.fullPath)
     let
-      toWrite = selfChalk.getChalkMark().toJson()
-      rawHash = selfChalk.myCodec.handleWrite(selfChalk, some(toWrite), false)
+      toWrite = some(selfChalk.getChalkMarkAsStr())
+      rawHash = selfChalk.myCodec.handleWrite(selfChalk, toWrite, false)
 
     info("Configuration written to new binary: " & selfChalk.fullPath)
     selfChalk.postHash = rawHash

@@ -5,7 +5,7 @@
 ## :Copyright: 2023, Crash Override, Inc.
 
 
-default_key_priority := 500
+default_key_priority := 4611686018427387904  # 2^62.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
                          "confload", "confdump", "docker", "entrypoint"]
 all_cmds_that_insert := ["insert", "docker", "confload"]
@@ -459,13 +459,14 @@ appear with a 'value' field.
     doc: "Version of the standard in which this key first appeared."
   }
 
-  field output_order {
+  field normalized_order {
     type:        int
     default:     default_key_priority
     range:       (0, high())
     doc: """
-Things that must appear in a particular order are write-locked using the
-~ operator in definitions.c4m.
+The normalization order used for signing and hashing metadata.
+This only works for built-in keys; everything else is given the same
+priority and should be sorted alphabetically.
 """
   }
 

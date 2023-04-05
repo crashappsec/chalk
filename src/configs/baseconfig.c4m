@@ -42,42 +42,42 @@ enum   ChalkableHost, Chalk, NonChalk, HostOnly
 export ChalkableHost, Chalk, NonChalk, HostOnly
 
 keyspec MAGIC {
-    required:       true
-    kind:           ChalkableHost
-    type:           string
-    standard:       true
-    system:         true
-    conf_as_system: true
-    ~value:         ascii_magic
-    since:          "0.1.0"
-    ~output_order:  0
-    doc:            "Used to identify the start of JSON encoded output only"
+    required:         true
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    ~value:           ascii_magic
+    since:            "0.1.0"
+    normalized_order: 0
+    doc:              "Used to identify the start of JSON encoded output only"
 }
 
 keyspec CHALK_ID {
-    required:       true
-    kind:           Chalk
-    never_early:    true
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    ~output_order:  1
-    doc:           "A unique ID for the artifact, taken from the artifact " +
-                   "hash provided by the codec"
+    required:         true
+    kind:             Chalk
+    never_early:      true
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1
+    doc:              "A unique ID for the artifact, taken from the artifact " +
+                      "hash provided by the codec"
 }
 
 keyspec CHALK_VERSION {
-    required:       true
-    kind:           ChalkableHost
-    type:           string
-    standard:       true
-    system:         true
-    conf_as_system: true
-    ~value:         chalk_version
-    since:          "0.1.0"
-    output_order:   2
-    doc:            "Spec version used for inserted objects"
+    required:         true
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    ~value:           chalk_version
+    since:            "0.1.0"
+    normalized_order: 2
+    doc:              "Spec version used for inserted objects"
 }
 
 keyspec TIMESTAMP {
@@ -87,11 +87,11 @@ keyspec TIMESTAMP {
     system:           true
     conf_as_system:   true
     since:            "0.1.0"
-    output_order:     3
+    normalized_order: 3
     doc:              """
-Milliseconds since the Unix epoch for each chalk. Should generally show the time
-between chalks, and will not be the same as _TIMESTAMP, or other time formatting,
-which only happens once at the beginning of each chalk run.
+Milliseconds since the Unix epoch for each chalk. Should generally show the
+time between chalks, and will not be the same as _TIMESTAMP, or other time
+formatting, which only happens once at the beginning of each chalk run.
 """
 }
 
@@ -102,11 +102,11 @@ keyspec DATE {
     system:           true
     conf_as_system:   true
     since:            "0.1.0"
-    output_order:     4
+    normalized_order:  4
     doc:              """
 _TIMESTAMP, converted to a date string, in the local time zone.  Note that this
-only has one value per run-- when chalking, TIMESTAMP gives per-chalk time values,
-but all other fields only time to the run.
+only has one value per run-- when chalking, TIMESTAMP gives per-chalk time
+values, but all other fields only time to the run.
 """
 }
 
@@ -117,11 +117,11 @@ keyspec TIME {
     system:           true
     conf_as_system:   true
     since:            "0.1.0"
-    output_order:     5
+    normalized_order:  5
     doc:              """
-_TIMESTAMP, converted to the current time, in the local time zone. Note that this
-only has one value per run-- when chalking, TIMESTAMP gives per-chalk time values,
-but all other fields only time to the run.
+_TIMESTAMP, converted to the current time, in the local time zone. Note that
+this only has one value per run-- when chalking, TIMESTAMP gives per-chalk
+time values, but all other fields only time to the run.
 """
 }
 
@@ -132,8 +132,9 @@ keyspec TZ_OFFSET {
     system:           true
     conf_as_system:   true
     since:            "0.1.0"
-    output_order:     6
-    doc:              "Time Zone offset from UTC for any non-numeric date-time objects."
+    normalized_order: 6
+    doc:              "Time Zone offset from UTC for any non-numeric " +
+                      "date-time objects."
 }
 
 keyspec DATETIME {
@@ -143,91 +144,93 @@ keyspec DATETIME {
     system:           true
     conf_as_system:   true
     since:            "0.1.0"
-    output_order:     7
-    doc:              "Full ISO-8601 Date-time w/ timezone, base on the value of _TIMESTAMP."
+    normalized_order: 7
+    doc:              "Full ISO-8601 Date-time w/ timezone, base on the " +
+                      "value of _TIMESTAMP."
 }
 
 keyspec CHALK_PTR {
-    kind:                Chalk
-    type:                string
-    standard:            true
-    since:               "0.1.0"
-    output_order:        400
-    apply_substitutions: true
-    doc:                 """
+    kind:                  Chalk
+    type:                  string
+    standard:              true
+    since:                 "0.1.0"
+    normalized_order:       400
+    apply_substitutions:   true
+    doc:                   """
 When enabled, injects minimal metadata; this field then gets a URL you supply
 to point to the rest of the data.
 """
 }
 
 keyspec EARLIEST_VERSION {
-    kind:           ChalkableHost
-    type:           string
-    standard:       true
-    system:         true
-    conf_as_system: true
-    ~value:         chalk_version
-    since:          "0.1.0"
-    output_order:   500
-    doc:            "Reserved for future use"
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    ~value:           chalk_version
+    since:            "0.1.0"
+    normalized_order: 500
+    doc:              "Reserved for future use"
 }
 
 keyspec INSERTION_HOSTINFO {
-    kind:           ChalkableHost
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   600
-    doc:            "Host information at injection"
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: 600
+    doc:              "Host information at injection"
 }
 
 keyspec ARTIFACT_PATH {
-    kind:           Chalk
-    never_early:    true
-    type:           string
-    standard:       true
-    codec:          true
-    since:          "0.1.0"
-    output_order:   700
-    doc:            "Path of artifact on host where injection occured"
+    kind:             Chalk
+    never_early:      true
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    normalized_order: 700
+    doc:              "Path of artifact on host where injection occured"
 }
 
 keyspec HASH {
-    kind:           Chalk
-    never_early:    true
-    type:           string
-    standard:       true
-    codec:          true
-    since:          "0.1.0"
-    output_order:   800
-    doc:            "Hash file of artifact w/o chalk in it, to ensure " +
-                    "extracted chalk is intact"
+    kind:             Chalk
+    never_early:      true
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    normalized_order: 800
+    doc:              "Hash file of artifact w/o chalk in it, to ensure " +
+                      "extracted chalk is intact"
 }
 
 keyspec HASH_FILES {
-    kind:           Chalk
-    type:           list[string]
-    never_early:    true
-    standard:       true
-    codec:          true
-    since:          "0.1.0"
-    output_order:   900
-    doc:            "Files that constitute the artifact, and used in the " +
-                    " hash, if not just the ARTIFACT_PATH"
+    kind:             Chalk
+    type:             list[string]
+    never_early:      true
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    normalized_order: 900
+    doc:              "Files that constitute the artifact, and used in the " +
+                      " hash, if not just the ARTIFACT_PATH"
 }
 
 keyspec COMPONENT_HASHES {
-    kind:           Chalk
-    type:           list[string]
-    never_early:    true
-    standard:       true
-    codec:          true
-    since:          "0.1.0"
-    output_order:   1000
-    doc:            "When there are multiple files hashed for a single " +
-                    "artifact, this contains SHA256 hashes of the individual " +
-		    "component hashes. The ordering will match the order of " +
-		    " the HASH_FILES field"
+    kind:             Chalk
+    type:             list[string]
+    never_early:      true
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    normalized_order: 1000
+    doc:              """
+When there are multiple files hashed for a single artifact, this contains
+SHA256 hashes of the individual component hashes. The ordering will match
+the order of the HASH_FILES field
+"""
 }
 
 # This is one that could be different per-artifact, but our current
@@ -237,37 +240,37 @@ keyspec ORIGIN_URI {
     type:                string
     standard:            true
     since:               "0.1.0"
-    output_order:        1100
+    normalized_order:    1100
     apply_substitutions: true
     doc:                 "URI of origin for repo from which artifact was built"
 }
 
 keyspec BRANCH {
-    kind:           Chalk
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   1200
-    doc:            "Version control branch the artifact was built from"
+    kind:             Chalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: 1200
+    doc:              "Version control branch the artifact was built from"
 }
 
 keyspec COMMIT_ID {
-    kind:           Chalk
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   1300
-    doc:            "The commit hash or id for the repository the artifact " +
-                    "was built from"
+    kind:             Chalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: 1300
+    doc:              "The commit hash or id for the repository the artifact " +
+                      "was built from"
 }
 
 keyspec ARTIFACT_VERSION {
-    kind:           Chalk
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   1400
-    doc:            "Reserved for future use; can be custom."
+    kind:             Chalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: 1400
+    doc:              "Reserved for future use; can be custom."
 }
 
 keyspec STORE_URI {
@@ -275,77 +278,77 @@ keyspec STORE_URI {
     type:                string
     standard:            true
     since:               "0.1.0"
-    output_order:        1500
+    normalized_order:    1500
     apply_substitutions: true
-    doc:                 "URI for the intended artifact storage location, at the" +
-                         " time of chalking."
+    doc:                 "URI for the intended artifact storage location," +
+                         " at the time of chalking."
 }
 
 keyspec PACKAGE_URI {
-    kind:                Chalk
-    type:                string
-    standard:            true
-    since:               "0.1.0"
-    output_order:        1600
+    kind:               Chalk
+    type:               string
+    standard:           true
+    since:              "0.1.0"
+    normalized_order:    1600
     apply_substitutions: true
     doc:                 "Public distribution point."
 }
 
 keyspec CODE_OWNERS {
-    kind:           Chalk
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   1700
-    doc:            "Code owners associated with the artifact."
+    kind:             Chalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: 1700
+    doc:              "Code owners associated with the artifact."
 }
 
 keyspec INJECTOR_ID {
-    kind:           ChalkableHost
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   1800
-    doc:            "chalk ID of the chalk binary"
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: 1800
+    doc:              "chalk ID of the chalk binary"
 }
 
 keyspec INJECTOR_VERSION {
-    kind:           ChalkableHost
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   1900
-    doc:            "Version of the chalk binary used for injection"
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1900
+    doc:              "Version of the chalk binary used for injection"
 }
 
 keyspec INJECTOR_PLATFORM {
-    kind:           ChalkableHost
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   2000
-    doc:            "OS / system info at time of insertion"
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 2000
+    doc:              "OS / system info at time of insertion"
 }
 
 keyspec INJECTOR_COMMIT_ID {
-    kind:           ChalkableHost
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   2100
-    doc:            "The commit hash or id from which the injector was built."
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 2100
+    doc:              "The commit hash or id from which the injector was built."
 }
 
 keyspec BUILD_ID {
-    kind:           Chalk
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   2200
-    doc:            "The ID of the CI/CD job"
+    kind:             Chalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: 2200
+    doc:              "The ID of the CI/CD job"
 }
 
 keyspec BUILD_URI {
@@ -353,7 +356,7 @@ keyspec BUILD_URI {
     type:                string
     standard:            true
     since:               "0.1.0"
-    output_order:        2300
+    normalized_order:    2300
     apply_substitutions: true
     doc:                 "URI to the CI/CD job"
 }
@@ -363,28 +366,28 @@ keyspec BUILD_API_URI {
     type:                string
     standard:            true
     since:               "0.1.0"
-    output_order:        2400
+    normalized_order:    2400
     apply_substitutions: true
-    doc:                 "URI to the CI/CD api if more information needs to be " +
-                         "queried"
+    doc:                 "URI to the CI/CD api if more information needs to  " +
+                         "be queried"
 }
 
 keyspec BUILD_TRIGGER {
-    kind:           Chalk
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   2500
-    doc:            "What event triggered CI/CD job"
+    kind:             Chalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: 2500
+    doc:              "What event triggered CI/CD job"
 }
 
 keyspec BUILD_CONTACT {
-    kind:           Chalk
-    type:           list[string]
-    standard:       true
-    since:          "0.1.0"
-    output_order:   2600
-    doc:            "List of contacts which triggered CI/CD job"
+    kind:             Chalk
+    type:             list[string]
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: 2600
+    doc:              "List of contacts which triggered CI/CD job"
 }
 
 keyspec CHALK_RAND {
@@ -395,167 +398,167 @@ keyspec CHALK_RAND {
     conf_as_system:   true
     ~callback:        func call_rand
     since:            "0.1.0"
-    output_order:     2700
+    normalized_order: 2700
     doc:              "64-bit random value generally selected per chalk " +
                       "(if enabled), intended to help ensure unique metadata " +
 		      " IDs in all circumstances."
 }
 
 keyspec TENANT_ID {
-    kind:           ChalkableHost
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   high() - 1000
-    doc:            """
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 1000
+    doc:              """
 A user-defined unique identifier intended to capture any meaningful user data.
 """
 }
 
 keyspec _TENANT_ID {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   high() - 1000
-    doc:            """
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 1000
+    doc:              """
 A user-defined unique identifier intended to capture any meaningful user data.
 """
 }
 
 keyspec OLD_CHALK_METADATA_HASH {
-    kind:           Chalk
-    never_early:    true
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 900
-    doc:            "Metadata hash of old chalk info associated with an " +
-                    "artifact, when a new mark is inserted"
+    kind:             Chalk
+    never_early:      true
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 900
+    doc:              "Metadata hash of old chalk info associated with an " +
+                      "artifact, when a new mark is inserted"
 }
 
 keyspec OLD_CHALK_METADATA_ID {
-    kind:           Chalk
-    never_early:    true
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 800
-    doc:            "Metadata ID of old chalk info associated with an " +
-                    "artifact, when a new mark is inserted"
+    kind:             Chalk
+    never_early:      true
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 800
+    doc:              "Metadata ID of old chalk info associated with an " +
+                      "artifact, when a new mark is inserted"
 }
 
 keyspec EMBEDDED_CHALK {
-    kind:           Chalk
-    never_early:    true
-    type:           dict[string, string]
-    standard:       true
-    codec:          true
-    since:          "0.1.0"
-    output_order:   high() - 700
-    doc:            "Other artifacts contained in this artifact"
+    kind:             Chalk
+    never_early:      true
+    type:             dict[string, string]
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    normalized_order: high() - 700
+    doc:              "Other artifacts contained in this artifact"
 }
 
 keyspec SBOM {
-    kind:           Chalk
-    type:           dict[string, string]
-    standard:       true
-    since:          "0.1.0"
-    output_order:   high() - 600
-    doc:            "SBOMs associated with this artifact"
+    kind:             Chalk
+    type:             dict[string, string]
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 600
+    doc:              "SBOMs associated with this artifact"
 }
 
 keyspec SAST {
-    kind:           Chalk
-    type:           dict[string, string]
-    standard:       true
-    since:          "0.1.0"
-    output_order:   high() - 550
-    doc:            "Static analysis scan results"
+    kind:             Chalk
+    type:             dict[string, string]
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 550
+    doc:              "Static analysis scan results"
 }
 
 keyspec ERR_INFO {
-    kind:           Chalk
-    never_early:    true
-    type:           list[string]
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    ~output_order:  high() - 500
-    doc:            "Errors when inserting metadata"
+    kind:             Chalk
+    never_early:      true
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 500
+    doc:              "Errors when inserting metadata"
 }
 
 keyspec SIGNING {
-    kind:           Chalk
-    never_early:    true
-    type:           bool
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    ~output_order:  high() - 400
-    doc:            "Must be added per-chalk when signing to ensure that " +
-                    "deleted signatures can be detected (which is why this " +
-		    "may not be lifted to the host-reporting level; " +
-		    "generally, there is no good reason to ever report it)"
+    kind:             Chalk
+    never_early:      true
+    type:             bool
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 400
+    doc:              "Must be added per-chalk when signing to ensure that " +
+                      "deleted signatures can be detected (which is why this " +
+		      "may not be lifted to the host-reporting level; " +
+		      "generally, there is no good reason to ever report it)"
 }
 
 keyspec METADATA_HASH {
-    required:       true
-    kind:           Chalk
-    never_early:    true
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    ~output_order:  high() - 300
+    required:         true
+    kind:             Chalk
+    never_early:      true
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 300
     doc:            "A hash of all the preceding metadata, in a " +
     		    "canonicalized format. This includes user-defined keys."
 }
 
 keyspec METADATA_ID {
-    required:       true
-    kind:           Chalk
-    never_early:    true
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    ~output_order:  high() - 200
-    doc:            "A more readable unique identifier for all metadata."
+    required:         true
+    kind:             Chalk
+    never_early:      true
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 200
+    doc:              "A more readable unique identifier for all metadata."
 }
 
 keyspec SIGN_PARAMS {
-    kind:           Chalk
-    type:           dict[string, string]
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    ~output_order:  high() - 100
-    doc:            "Signing parameters for digital signatures."
+    kind:             Chalk
+    type:             dict[string, string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 100
+    doc:              "Signing parameters for digital signatures."
 }
 
 keyspec SIGNATURE {
-    kind:           Chalk
-    never_early:    true
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    ~output_order:  high()
-    doc:            "Embedded digital signature for artifact"
+    kind:             Chalk
+    never_early:      true
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high()
+    doc:              "Embedded digital signature for artifact"
 }
 
 keyspec _OPERATION {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   0
-    doc:            "Added to reporting data to distinguish operations. " +
-                    "Not intended for artifact embedding."
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 0
+    doc:              "Added to reporting data to distinguish operations. " +
+                      "Not intended for artifact embedding."
 }
 
 keyspec _TIMESTAMP {
@@ -565,7 +568,7 @@ keyspec _TIMESTAMP {
     system:           true
     conf_as_system:   true
     since:            "0.1.0"
-    output_order:     1
+    normalized_order: 1
     doc:              "Milliseconds since the Unix epoch for the current op."
 }
 
@@ -576,7 +579,7 @@ keyspec _DATE {
     system:           true
     conf_as_system:   true
     since:            "0.1.0"
-    output_order:     2
+    normalized_order: 2
     doc:              "_TIMESTAMP, converted to a date string, in the local time zone."
 }
 
@@ -587,7 +590,7 @@ keyspec _TIME {
     system:           true
     conf_as_system:   true
     since:            "0.1.0"
-    output_order:     3
+    normalized_order: 3
     doc:              "_TIMESTAMP, converted to the current time, in the local time zone."
 }
 
@@ -598,121 +601,122 @@ keyspec _TZ_OFFSET {
     system:           true
     conf_as_system:   true
     since:            "0.1.0"
-    output_order:     4
+    normalized_order: 4
     doc:              "Time Zone offset from UTC for the current operation."
 }
 
 keyspec _DATETIME {
-    kind:             HostOnly
-    type:             string
-    standard:         true
-    system:           true
-    conf_as_system:   true
-    since:            "0.1.0"
-    output_order:     5
-    doc:              "Full ISO-8601 Date-time w/ Timezone offset for the current operation."
+    kind:              HostOnly
+    type:              string
+    standard:          true
+    system:            true
+    conf_as_system:    true
+    since:             "0.1.0"
+    normalized_order:  5
+    doc:               "Full ISO-8601 Date-time w/ Timezone offset for the " +
+                       "current operation."
 }
 
 
 keyspec _CHALKS {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   6
-    doc:            "Used to report chalks the operation worked on. " +
-                    "A host report without this key set will not output " +
-		    "chalks"
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 6
+    doc:              "Used to report chalks the operation worked on. " +
+                      "A host report without this key set will not output " +
+		      "chalks"
 }
 
 keyspec _OP_CHALK_COUNT {
-    kind:           HostOnly
-    type:           int
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   1000000
-    doc:            "The number of chalks the operation worked on, meant " +
-                    "primarily for contexts where the chalks themselves " +
-		    "are not being reported."
+    kind:             HostOnly
+    type:             int
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000000
+    doc:              "The number of chalks the operation worked on, meant " +
+                      "primarily for contexts where the chalks themselves " +
+		      "are not being reported."
 }
 
 keyspec _OP_UNMARKED_COUNT {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   1000100
-    doc:            "The number of unmarked artifacts that codecs saw. " +
-                    "For inserts, this will be items seen but ignored. " +
-		    "For other ops, it will be artifacts w/o chalk marks."
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000100
+    doc:              "The number of unmarked artifacts that codecs saw. " +
+                      "For inserts, this will be items seen but ignored. " +
+		      "For other ops, it will be artifacts w/o chalk marks."
 }
 
 keyspec _OP_ARTIFACT_PATH {
-    kind:           NonChalk
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   1000200
-    doc:            "Artifact location as found for the current op only"
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000200
+    doc:              "Artifact location as found for the current op only"
 }
 
 keyspec _CURRENT_HASH {
-    kind:           NonChalk
-    type:           string
-    standard:       true
-    codec:          true
-    since:          "0.1.0"
-    output_order:   1000300
-    doc:            "Hash of the artifact at the end of the current op. " +
-                    "In a chalk operation, it will be the hash after " +
-                    "the chalk is fully inserted. Otherwise, it will be " +
-                    "the hash calculated on the object in its current state."
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    normalized_order: 1000300
+    doc:              "Hash of the artifact at the end of the current op. " +
+                      "In a chalk operation, it will be the hash after " +
+                      "the chalk is fully inserted. Otherwise, it will be " +
+                      "the hash calculated on the object in its current state."
 }
 
 keyspec _OP_CMD_FLAGS {
-    kind:           HostOnly
-    type:           list[string]
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   1000400
-    doc:            "Fully resolved command-line flags and values used in " +
-                    "the current command invocation."
+    kind:             HostOnly
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000400
+    doc:              "Fully resolved command-line flags and values used in " +
+                      "the current command invocation."
 }
 
 keyspec _OP_SEARCH_PATH {
-    kind:           HostOnly
-    type:           list[string]
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   1000500
-    doc:            "Artifact search path used for the current command"
+    kind:             HostOnly
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000500
+    doc:              "Artifact search path used for the current command"
 }
 
 keyspec _OP_EXE_NAME {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   1000600
-    doc:            "The executable name, approximately argv[0]"
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000600
+    doc:              "The executable name, approximately argv[0]"
 }
 
 keyspec _OP_EXE_PATH {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   1000700
-    doc:            "The local path to this chalk executable (does not " +
-                    "include the actual exe name"
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000700
+    doc:              "The local path to this chalk executable (does not " +
+                      "include the actual exe name"
 }
 
 keyspec _OP_ARGV {
@@ -721,158 +725,161 @@ keyspec _OP_ARGV {
     standard:       true
     system:         true
     since:          "0.1.0"
-    output_order:   1000800
-    doc:            "Full value of the command-line as passed to the process;" +
-                    " should contain the raw data used to determine " +
-		    " _OP_EXE_NAME, _OP_SEARCH_PATH and _OP_CMD_FLAGS"
+    normalized_order : 1000800
+    doc:              """
+Full value of the command-line as passed to the process; should contain the
+raw data used to determine _OP_EXE_NAME, _OP_SEARCH_PATH and _OP_CMD_FLAGS
+"""
 }
 
 keyspec _OP_CONFIG {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   1000900
-    doc:            "The contents of any user-definable configuration file, " +
-                    "if an external configuration file is used (otherwise, " +
-		    "even if requested, no value will be returned)"
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000900
+    doc:              """
+The contents of any user-definable configuration file, if an external
+ configuration file is used (otherwise, even if requested, no value will be
+ returned)
+"""
 }
 
 # This must be skipped under any insertion context.
 keyspec _VALIDATED {
-    kind:           NonChalk
-    type:           bool
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 3300
-    doc:            "Hash of artifact after a chalk operation. This is not " +
-                    "written into the artifact, but is meant to be provided " +
-		    "to wherever the chalk operation is logged."
+    kind:             NonChalk
+    type:             bool
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 3300
+    doc:              "Hash of artifact after a chalk operation. This is not " +
+                      "written into the artifact, but is meant to be provided " +
+		      "to wherever the chalk operation is logged."
 }
 
 keyspec _UNMARKED {
-    kind:           HostOnly
-    type:           list[string]
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 3200
-    doc:            "Artifacts seen in the artifact search path that were " +
-                    "not marked."
+    kind:             HostOnly
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 3200
+    doc:              "Artifacts seen in the artifact search path that were " +
+                      "not marked."
 }
 
 keyspec _VIRTUAL {
-    kind:           NonChalk
-    type:           bool
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 3150
-    doc:            "Set on chalking ops only, indicating if the chalk was virtual."
+    kind:             NonChalk
+    type:             bool
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 3150
+    doc:              "Set on chalking ops only, indicating if the chalk was virtual."
 }
 
 keyspec _OP_CHALKER_COMMIT_ID {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 3100
-    doc:            "The commit hash or id for this chalk command."
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 3100
+    doc:              "The commit hash or id for this chalk command."
 }
 
 keyspec _OP_CHALKER_VERSION {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 3000
-    doc:            "Version info for this chalk command."
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 3000
+    doc:              "Version info for this chalk command."
 }
 
 keyspec _OP_PLATFORM {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   high() - 2900
-    doc:            "The platform information for this chalk command."
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 2900
+    doc:              "The platform information for this chalk command."
 }
 
 keyspec _OP_HOSTNAME {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   high() - 2800
-    doc:            "Hostname information for this chalk command."
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 2800
+    doc:              "Hostname information for this chalk command."
 }
 
 keyspec _OP_HOSTINFO {
-    kind:           HostOnly
-    type:           string
-    standard:       true
-    since:          "0.1.0"
-    output_order:   high() - 2700
-    doc:            "Detailed host info reported at the time of the " +
-                    "operation.  System provides a default."
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 2700
+    doc:              "Detailed host info reported at the time of the " +
+                      "operation.  System provides a default."
 }
 
 keyspec $CHALK_CONFIG {
-    kind:           Chalk
-    type:           string
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 2600
-    doc:            "Embedded configuration file; this is special-purpose" +
-                    "and may be ignored outsde of confdump / confload cmds"
+    kind:             Chalk
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order:  high() - 2600
+    doc:              "Embedded configuration file; this is special-purpose" +
+                      "and may be ignored outsde of confdump / confload cmds"
 }
 
 keyspec _OP_ERRORS {
-    kind:           HostOnly
-    type:           list[string]
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 2500
-    doc:            "Errors on the current operation."
+    kind:             HostOnly
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 2500
+    doc:              "Errors on the current operation."
 }
 
 keyspec _OP_CHALKED_KEYS {
-    kind:           NonChalk
-    type:           list[string]
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 2400
-    doc:            "For insert operations only, a list of all keys that " +
-                    "were added to the chalk"
+    kind:             NonChalk
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 2400
+    doc:              "For insert operations only, a list of all keys that " +
+                      "were added to the chalk"
 }
 
 keyspec _OP_ARTIFACT_REPORT_KEYS {
-    kind:           NonChalk
-    type:           list[string]
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 2300
-    doc:            "For insert operations only, a list of all keys that " +
-                    "were added to the chalk"
+    kind:             NonChalk
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 2300
+    doc:              "For insert operations only, a list of all keys that " +
+                      "were added to the chalk"
 }
 
 keyspec _OP_HOST_REPORT_KEYS {
-    kind:           HostOnly
-    type:           list[string]
-    standard:       true
-    system:         true
-    since:          "0.1.0"
-    output_order:   high() - 2200
-    doc:            "For insert operations only, a list of all keys that " +
-                    "were added to the chalk"
+    kind:             HostOnly
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 2200
+    doc:              "For insert operations only, a list of all keys that " +
+                      "were added to the chalk"
 }
 
 # Doesn't do any keys other than the codec defaults, which are:
