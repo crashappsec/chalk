@@ -193,6 +193,7 @@ iterator allArtifacts*(): ChalkObj =
     # This is used, for instance, with containers.
     (goOn, chalks) = codec.findChalk(artifactPath, exclude, skips, recursive)
     for obj in chalks:
+      discard obj.acquireFileStream()
       obj.myCodec = codec
       let path    = obj.fullPath
       if isChalkingOp():

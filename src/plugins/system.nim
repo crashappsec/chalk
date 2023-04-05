@@ -246,7 +246,7 @@ method getChalkInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
       result["SIGNATURE"]   = tup[0]
       result["SIGN_PARAMS"] = tup[1]
   else:
-    warn("No implementation of sign() provided; cannot sign.")
+    trace("No implementation of sign() provided; cannot sign.")
 
 registerPlugin("system", SystemPlugin())
 registerPlugin("metsys", MetsysPlugin())

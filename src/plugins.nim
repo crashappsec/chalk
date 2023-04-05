@@ -206,7 +206,9 @@ method scanArtifactLocations*(self:       Codec,
       if path.mustIgnore(ignoreList): continue
       trace(path & ": scanning file")
       let opt = self.scanLocation(path, exclusions)
-      if opt.isSome(): result.add(opt.get())
+      if opt.isSome():
+        result.add(opt.get())
+        opt.get().yieldFileStream()
     elif recurse:
       dirWalk(true):
         if item in exclusions:               continue
@@ -214,7 +216,9 @@ method scanArtifactLocations*(self:       Codec,
         if getFileInfo(item).kind != pcFile: continue
         trace(item & ": scanning file")
         let opt = self.scanLocation(item, exclusions)
-        if opt.isSome(): result.add(opt.get())
+        if opt.isSome():
+          result.add(opt.get())
+          opt.get().yieldFileStream()
     else:
       dirWalk(false):
         if item in exclusions:               continue
@@ -222,7 +226,9 @@ method scanArtifactLocations*(self:       Codec,
         if getFileInfo(item).kind != pcFile: continue
         trace("Non-recursive dir walk examining: " & item)
         let opt = self.scanLocation(item, exclusions)
-        if opt.isSome(): result.add(opt.get())
+        if opt.isSome():
+          result.add(opt.get())
+          opt.get().yieldFileStream()
 
 method getArtifactHash*(self: Codec, chalk: ChalkObj): string {.base.} =
   raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
