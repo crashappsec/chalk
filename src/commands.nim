@@ -12,16 +12,19 @@ import macros except error
 proc setPerChalkReports(successProfileName, invalidProfileName: string) =
   var
     reports     = seq[ChalkDict](@[])
+    goodProfile = Profile(nil)
+    badProfile  = Profile(nil)
+
+  if successProfileName != "" and successProfileName in chalkConfig.profiles:
     goodProfile = chalkConfig.profiles[successProfileName]
-    badProfile  = if invalidProfileName != "":
-                    chalkConfig.profiles[invalidProfileName]
-                  else:
-                    goodProfile
 
-  if   not goodProfile.enabled: goodProfile = badProfile
-  elif not badProfile.enabled:  badProfile = goodProfile
+  if invalidProfileName != "" and invalidProfileName in chalkConfig.profiles:
+    badProfile = chalkConfig.profiles[invalidProfileName]
 
-  if not goodProfile.enabled: return
+  if   goodProfile == nil or not goodProfile.enabled: goodProfile = badProfile
+  elif badProfile  == nil or not  badProfile.enabled: badProfile = goodProfile
+
+  if goodProfile == nil or not goodProfile.enabled: return
 
   for chalk in allChalks:
     let
@@ -50,17 +53,17 @@ template doCustomReporting() =
     if not spec.enabled: continue
     var
       sinkConfs = spec.sinkConfigs
-      topicBox  = pack(topic)
+      topicObj  = registerTopic(topic)
 
     if getCommandName() notin spec.use_when and "*" notin spec.useWhen:
       continue
     if topic == "audit" and not chalkConfig.getPublishAudit():
       continue
-    if len(sinkConfs) == 0:
+    if len(sinkConfs) == 0 and topic notin ["audit", "chalk_usage_stats"]:
       warn("Report '" & topic & "' has no configured sinks.  Skipping.")
 
     for sinkConfName in sinkConfs:
-      let res = topicSubscribe(@[topicBox, pack(sinkConfName)]).get()
+      let res = topicSubscribe((@[pack(topic), pack(sinkConfName)])).get()
       if not unpack[bool](res):
         warn("Report '" & topic & "' sink config is invalid. Skipping.")
 

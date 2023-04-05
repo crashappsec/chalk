@@ -412,6 +412,17 @@ A user-defined unique identifier intended to capture any meaningful user data.
 """
 }
 
+keyspec _TENANT_ID {
+    kind:           HostOnly
+    type:           string
+    standard:       true
+    since:          "0.1.0"
+    output_order:   high() - 1000
+    doc:            """
+A user-defined unique identifier intended to capture any meaningful user data.
+"""
+}
+
 keyspec OLD_CHALK_METADATA_HASH {
     kind:           Chalk
     never_early:    true
@@ -1314,12 +1325,25 @@ profile audit_report {
   key._OP_CONFIG.report              = true
 }
 
-profile beacon_report {
+profile usage_report {
   key._OPERATION.report              = true
+  key._TIMESTAMP.report              = true
+  key._OP_CHALK_COUNT.report         = true
+  key._TENANT_ID.report              = true
+  key._OP_CHALKER_COMMIT_ID.report   = true
+  key._OP_CHALKER_VERSION.report     = true
+  key._OP_PLATFORM.report            = true
 }
 
+custom_report chalk_usage_stats {
+  sink_configs:  []
+  host_profile:  "usage_report"
+  use_when:      ["insert", "docker", "delete"]
+}
+
+
 custom_report audit {
-  sink_configs: [] # Must be overridden to produce output.
+  sink_configs: [] # "audit_file" is auto-subscribed.
   host_profile: "audit_report"
 }
 

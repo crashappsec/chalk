@@ -32,8 +32,6 @@ proc truncatingLog(msg: string, cfg: SinkConfig, t: StringTable): bool =
   try:
     f.write(msg & "\n")
     let loc = f.getPosition()
-    echo loc
-    echo maxsize
     f.close()
     if loc > maxSize:
       var
@@ -265,7 +263,6 @@ proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
 
     return some(pack(retval))
 
-
 proc setupDefaultLogConfigs*() =
   let
     cacheFile = chalkConfig.getReportCacheLocation()
@@ -294,6 +291,17 @@ proc setupDefaultLogConfigs*() =
     else:
       trace("Report cache subscription enabled")
 
+  let
+    uri       = chalkConfig.getCrashOverrideUsageReportingUrl()
+    workspace = chalkConfig.getCrashOverrideWorkspaceId()
+    headers   = "X-Crashoverride-Workspace-Id: " & workspace & "\n" &
+                "Content-Type: application/json"
+
+ # same.
+    params  = some(newOrderedTable({ "uri": uri, "headers" : headers }))
+    useConf = configSink(getSink("post").get(), params)
+
+  discard subscribe("chalk_usage_stats", useConf.get())
 
 let
   scSigShort = "sink_config(string, string, dict[string, string])"
@@ -328,6 +336,7 @@ discard registerTopic("version")   # Where to output version info.
 discard registerTopic("help")      # Where to print help info.
 discard registerTopic("confdump")  # Where to write out a config dump.
 discard registerTopic("virtual")   # If 'virtual' chalking, where to write?
+discard registerTopic("chalk_usage_stats")
 
 
 when not defined(release): discard subscribe("debug", defaultDebugHook)

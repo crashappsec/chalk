@@ -59,7 +59,6 @@ See 'chalk help keyspec' for an overview of how keys are specified,
 for all information on a single key.
 """
 
-
   field report {
     type:     bool
     default:  true
@@ -69,6 +68,15 @@ Whether to include the specific key when the profile reports.
 Note that, when you explicitly enable keys in a profile, any reporting
 context using the profile must be valid for the keys set to 'report',
 or else you will get an error.
+"""
+  }
+
+  field order {
+    type:     int
+    require:  false
+    doc:      """
+Used to set the reporting order. If not provided, this will inherit
+the normalization order from the associated keyspec.
 """
   }
 }
@@ -1312,9 +1320,22 @@ for transient infrastructure. In such a case, configure and attach multiple
     shortdoc:   "Report cache size"
     default:    <<10mb>>
     doc:        """
-If a write to the cache would exceed this amount, the system will truncate down to 75% of
-this size before doing the write.
+If a write to the cache would exceed this amount, the system will truncate down to 75% of this size before doing the write.
 """
+  }
+
+  field crashoverride_usage_reporting_url {
+    type:       string
+    default:    "https://chalk.crashoverride.run/report"
+    hidden:     true
+    doc:        "Used to approximate overall chalk usage. See the usage report"
+  }
+
+  field crashoverride_workspace_id {
+    type:       string
+    default:    "470f1ff7-8b26-43a5-a31d-45c2fcecfaa2"
+    hidden:     true
+    doc:        "The default value is the one used for anonymous users."
   }
 }
 
