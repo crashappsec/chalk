@@ -309,6 +309,7 @@ import plugins/codecContainer
 import plugins/codecZip
 import plugins/ciGithub
 import plugins/ciJenkins
+import plugins/ciGitlab
 import plugins/conffile
 import plugins/ownerAuthors
 import plugins/ownerGithub

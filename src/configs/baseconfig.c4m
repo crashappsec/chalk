@@ -938,6 +938,12 @@ plugin ci_jenkins {
     pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI"]
 }
 
+plugin ci_gitlab {
+    enabled:         true
+    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
+                      "BUILD_TRIGGER", "BUILD_CONTACT"]
+}
+
 plugin authors {
     # Since there's only one key it might export, go ahead and
     # lock it; if you want to disable that key, turn off the whole plugin.
