@@ -245,7 +245,8 @@ proc getSelfExtraction*(): Option[ChalkObj] =
         warn("No existing self-chalk mark found.")
       elif "CHALK_ID" notin chalks[0].extract:
         error("Self-chalk mark found, but is invalid.")
-      selfId    = some(unpack[string](selfChalk.extract["CHALK_ID"]))
+      selfId  = some(codec.getChalkId(selfChalk))
+      selfChalk.myCodec = codec
       return some(selfChalk)
 
     warn("We have no codec for this platform's native executable type")
