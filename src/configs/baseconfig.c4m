@@ -21,8 +21,9 @@ ascii_magic   :=   "dadfedabbadabbed"
 # might be necessary for finding the start of the mark.  But it generally
 # must not be reported.
 #
-# _OPERATION, _VALIDATED, _CURRENT_HASH, and _OP_ERRORS are metadata on the
-# current chalk operation, and will not be embedded into chalk marks.
+# _OPERATION, _ACTION_ID, _VALIDATED, _CURRENT_HASH, and _OP_ERRORS are
+# metadata on the current chalk operation, and will not be embedded into
+# chalk marks.
 #
 #
 # Any other keys starting with $'s are meant to be reserved for the
@@ -390,6 +391,7 @@ keyspec BUILD_CONTACT {
     doc:              "List of contacts which triggered CI/CD job"
 }
 
+
 keyspec CHALK_RAND {
     kind:             Chalk
     type:             string
@@ -401,7 +403,20 @@ keyspec CHALK_RAND {
     normalized_order: 2700
     doc:              "64-bit random value generally selected per chalk " +
                       "(if enabled), intended to help ensure unique metadata " +
-		      " IDs in all circumstances."
+		      " IDs in all circumstances.  Presented as hex digits."
+}
+
+keyspec _ACTION_ID {
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    ~callback:        func call_rand
+    since:            "0.1.0"
+    normalized_order: 100
+    doc:              "Unique identifier per-action (i.e., per run of chalk), " +
+                      "Which is a 64-bit random value presented as hex digits."
 }
 
 keyspec TENANT_ID {
@@ -1214,6 +1229,7 @@ profile host_report_insert_base {
   key.BUILD_CONTACT.report            = true
   key.CHALK_RAND.report               = true
   key._OPERATION.report               = true
+  key._ACTION_ID.report               = true
   key._CHALKS.report                  = true
   key._UNMARKED.report                = true
   key._OP_SEARCH_PATH.report          = false
@@ -1307,6 +1323,7 @@ profile artifact_report_delete_base {
 
 profile host_report_other_base {
   key._OPERATION.report               = true
+  key._ACTION_ID.report               = true
   key._TIMESTAMP.report               = true
   key._DATETIME.report                = true
   key._CHALKS.report                  = true
@@ -1336,6 +1353,7 @@ profile audit_report {
   # or off).
 
   key._OPERATION.report              = true
+  key._ACTION_ID.report              = true
   key._TIMESTAMP.report              = true
   key._DATETIME.report               = true
   key._OP_CHALK_COUNT.report         = true
