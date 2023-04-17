@@ -118,8 +118,13 @@ if len(strip(ptr_url)) > 0 {
 # default.  Your default doesn't go into effect until this script
 # finishes running.
 
-info("Running command: " + cmd)
+if cmd != "ambiguous" {
+  info("Running command: " + cmd)
+} else {
+  info("Trying default command (if any)")
+}
 
+default_command  = "help"
 use_report_cache = true
 
 # Below this point is configuration code that has already run, before

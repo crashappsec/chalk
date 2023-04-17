@@ -1214,6 +1214,20 @@ profile artifact_report_insert_base {
 # This is what gets posted to any sinks at the time of insert, on a
 # per-chalk run basis (by default).  Such profiles must not enable
 # fields that have `artifact_only = true`
+
+# Note that SBOM, SAST and CODE_OWNERS are named both here and in the
+# previous report. When a key is in both the host report and the
+# artifact report for one outconf or custom_report, the host report
+# will be used IF all artifacts have the same value.  Otherwise, it
+# will fall back to per-artifact.
+
+# If you were to put these items in per-host reports, but not the
+# artifact report, you are asking to ONLY get an output if they can be
+# lifted.
+
+# This happens to per-chalk keys in any context except for actual
+# chalking.
+
 profile host_report_insert_base {
   key.TIMESTAMP.report                = true
   key.DATETIME.report                 = true
@@ -1227,6 +1241,9 @@ profile host_report_insert_base {
   key.BUILD_API_URI.report            = true
   key.BUILD_TRIGGER.report            = true
   key.BUILD_CONTACT.report            = true
+  key.SBOM.report                     = true
+  key.SAST.report                     = true
+  key.CODE_OWNERS.report              = true
   key.CHALK_RAND.report               = true
   key._OPERATION.report               = true
   key._ACTION_ID.report               = true
@@ -1238,6 +1255,7 @@ profile host_report_insert_base {
   key._OP_PLATFORM.report             = false
   key._OP_HOSTINFO.report             = false
   key._OP_ERRORS.report               = true
+  #key._VIRTUAL.report                 = true
 }
 
 # This is what gets reported per-artifact, by default, on extraction
@@ -1424,6 +1442,8 @@ outconf entrypoint {
 
 outconf help {}
 outconf defaults {}
+
+default_command = "help"
 
 func call_rand(key) { return $(lower(hex(rand())));  }
 

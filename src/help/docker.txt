@@ -1,3 +1,0 @@
-%{H Usage: {appName} docker [args to docker] }%
-
-Coming soon.

@@ -68,7 +68,7 @@ proc customOut(msg: string, record: SinkConfig, xtra: StringTable): bool =
   args.add(pack(msg))
   args.add(pack(cfg))
 
-  var retBox = sCall(ctxChalkConf, sig, args).get()
+  var retBox = runCallback(sig, args).get()
   return unpack[bool](retBox)
 
 const customKeys = { "secret" :  false, "uid"    : false, "filename": false,
@@ -259,9 +259,7 @@ proc sinkConfigShort(args: seq[Box], unused: ConfigState): Option[Box] =
   return sinkConfigLong(a2, unused)
 
 proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
-    const retval = getChalkExeVersion()
-
-    return some(pack(retval))
+  return some(pack(getChalkExeVersion()))
 
 proc setupDefaultLogConfigs*() =
   let
@@ -306,7 +304,7 @@ let
   scSigShort = "sink_config(string, string, dict[string, string])"
   scSigLong  = "sink_config(string, string, dict[string, string], list[string])"
 
-setChalkCon4mBuiltins(@[
+let chalkCon4mBuiltins* = [
     ("version() -> string",                 BuiltinFn(getExeVersion)),
     ("subscribe(string, string) -> bool",   BuiltInFn(topicSubscribe)),
     ("unsubscribe(string, string) -> bool", BuiltInFn(topicUnSubscribe)),
@@ -318,7 +316,7 @@ setChalkCon4mBuiltins(@[
     ("argv() -> list[string]",              BuiltInFn(getArgv)),
     ("argv0() -> string",                   BuiltInFn(getExeName)),
     (scSigShort,                            BuiltInFn(sinkConfigShort)),
-    (scSigLong,                             BuiltInFn(sinkConfigLong)) ])
+    (scSigLong,                             BuiltInFn(sinkConfigLong)) ]
 
 let errSinkObj = SinkRecord(outputFunction: chalkErrSink)
 registerSink("chalk-err-log", errSinkObj)

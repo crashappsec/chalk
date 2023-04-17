@@ -21,28 +21,28 @@ template broken(cb: CallbackObj, info: PIInfo) =
 proc runOneTool(info: PIInfo, path: string, dict: var ChalkDict): bool =
   var
     args   = @[pack(path)]
-    locbox = ctxChalkConf.sCall(info.obj.getToolLocation, args)
+    locbox = runCallback(info.obj.getToolLocation, args)
 
   if locBox.isNone(): broken(info.obj.getToolLocation, info)
   var
     path   = unpack[string](locBox.get()).strip()
 
   if path == "":
-    let installed = ctxChalkConf.sCall(info.obj.attemptInstall, args)
+    let installed = runCallback(info.obj.attemptInstall, args)
     if installed.isNone(): broken(info.obj.attemptInstall, info)
     if not unpack[bool](installed.get()): return false
-    locbox = ctxChalkConf.sCall(info.obj.getToolLocation, args)
+    locbox = runCallback(info.obj.getToolLocation, args)
     if locBox.isNone(): broken(info.obj.getToolLocation, info)
     path = unpack[string](locBox.get()).strip()
 
-  let argv = ctxChalkConf.sCall(info.obj.getCommandArgs, args)
+  let argv = runCallback(info.obj.getCommandArgs, args)
   if argv.isNone(): broken(info.obj.getCommandArgs, info)
   let
     cmd    = pack(path & " " & unpack[string](argv.get()).strip())
     outs   = unpack[seq[Box]](c4mSystem(@[cmd]).get())
 
   let
-    retOpt = ctxChalkConf.sCall(info.obj.produceKeys, outs)
+    retOpt = runCallback(info.obj.produceKeys, outs)
   if retOpt.isNone(): broken(info.obj.produceKeys, info)
   let
     d   = unpack[ChalkDict](retOpt.get())

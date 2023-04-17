@@ -7,7 +7,8 @@
 
 default_key_priority := 4611686018427387904  # 2^62.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
-                         "confload", "confdump", "docker", "entrypoint"]
+                         "confload", "confdump", "docker", "version",
+			 "entrypoint"]
 all_cmds_that_insert := ["insert", "docker", "confload"]
 tool_types           := ["sbom", "sast"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
@@ -961,6 +962,14 @@ root {
     shortdoc:   "Configuration Path"
   }
 
+  field config_filename {
+    type:       string
+    default:    "chalk.conf"
+    write_lock: true
+    doc:        "The file name to look for when searching for a file"
+    shortdoc:   "Configuration File Name"
+  }
+
   field valid_chalk_command_names {
     type:       list[string]
     default:    all_cmds_that_insert
@@ -977,6 +986,13 @@ root {
     doc:        "Expose the full list of command names to the implementation"
   }
 
+  field chalk_debug {
+    type:       bool
+    default:    false
+    hidden:     true
+    doc:        "Show con4m stack traces when true."
+  }
+
   field ignore_when_normalizing {
     type:       list[string]
     default:    ["MAGIC", "METADATA_HASH", "METADATA_ID", "SIGN_PARAMS",
@@ -989,24 +1005,33 @@ normalization operations used for computing metadata hashes and signatures.
 """
   }
 
-  field config_filename {
-    type:       string
-    default:    "chalk.conf"
-    write_lock: true
-    doc:        "The file name to look for when searching for a file"
-    shortdoc:   "Configuration File Name"
-  }
-
   field default_command {
     type:       string
     require:    false
-    choice:     valid_chalk_cmds
-    write_lock: true
+    write_lock: false
+    validator:  func default_command_check
     shortdoc:   "Default Command"
     doc:        """
 If no top-level command is passed on the command line, this command is
 assumed.  By default, if the config file does not resolve the ambiguity,
 then chalk will produce a help message.
+"""
+  }
+
+  field selected_command {
+    type:       string
+    default:    ""
+    write_lock: false
+    shortdoc:   "The run command"
+    doc:        """
+
+Once the command line is fully parsed, this will get the value of the
+selected command.  If the command is ambiguous, fill it in with the
+value 'default_commmand'.
+
+In that case, this field doesn't get set with a real value until after
+all your configuration files run.  Instead, it will be an empty
+string.
 """
   }
 
@@ -1168,7 +1193,7 @@ the := operator (it is *not* an attribute).
 
   field load_sbom_tools {
     type:     bool
-    default:  true
+    default:  false
     shortdoc: "Load default SBOM tools"
     hidden:   true # This happens before the user config runs.
     doc: """
@@ -1189,7 +1214,7 @@ value is:
 
   field load_sast_tools {
     type:     bool
-    default:  true
+    default:  false
     shortdoc: "Load default SAST tools"
     hidden:   true  # This happens before the user config runs.
     doc: """
@@ -1348,7 +1373,7 @@ func keyspec_exists(name) {
 func key_callback_check(keyname, callback: func (string) -> `x) {
   path      := split(keyname, ".")
   key_name  := path[1]
-  fieldType := $(get_attr("keyspec." + key_name + ".type", typespec))
+  fieldType := $(attr_get("keyspec." + key_name + ".type", typespec))
   expected  := to_type("(string) -> " + fieldType)
   actual    := typeof(callback)
 
@@ -1367,7 +1392,7 @@ func never_early_check(keyname, val) {
   if val == true {
     path       := split(keyname, ".")
     kind_field := "keyspec." + path[1] + ".kind"
-    kind       := get_attr(kind_field, int)
+    kind       := attr_get(kind_field, int)
 
     if kind != Chalk {
       return "'never_early' can only be set for fields of type Chalk"
@@ -1395,13 +1420,13 @@ func plugin_keyspec_check(keyname, val: list[string], context) {
 
     base              := "keyspec." + item + "."
     kind_field        := base + "kind"
-    kind              := get_attr(kind_field, int)
+    kind              := attr_get(kind_field, int)
 
     if context == CCPreRun {
       if kind == ChalkableHost { continue }
       elif kind == Chalk {
         never_early_field := base + "never_early"
-        if get_attr(never_early_field, bool) == false {
+        if attr_get(never_early_field, bool) == false {
   	  continue
 	}
       }
@@ -1447,10 +1472,10 @@ func override_key_check(keyname: string, val: list[string]) {
   result := ""
   parts := keyname.split(".")
   base  := "plugin." + parts[1] + "."
-  k1    := get_attr(base + "pre_run_keys",    list[string])
-  k2    := get_attr(base + "artifact_keys",   list[string])
-  k3    := get_attr(base + "post_chalk_keys", list[string])
-  k4    := get_attr(base + "post_run_keys",   list[string])
+  k1    := attr_get(base + "pre_run_keys",    list[string])
+  k2    := attr_get(base + "artifact_keys",   list[string])
+  k3    := attr_get(base + "post_chalk_keys", list[string])
+  k4    := attr_get(base + "post_run_keys",   list[string])
 
   for i from 0 to len(val) {
     if k1.contains(val[i]) or k1.contains("*") { continue; }
@@ -1490,12 +1515,12 @@ func profile_check_base(profile_name, profile_type) {
   }
   for i from 0 to len(specs) {
     key_name   := specs[i]
-    key_kind   := get_attr("keyspec." + key_name + ".kind", int)
+    key_kind   := attr_get("keyspec." + key_name + ".kind", int)
 
     if not profile_keys.contains(key_name) {
       if profile_type == PTChalk {
         if key_kind == NonChalk or key_kind == HostOnly { continue }
-        if get_attr("keyspec." + key_name + ".required", bool) == true {
+        if attr_get("keyspec." + key_name + ".required", bool) == true {
           return pc_err(profile_name, key_name,
                         "that key is required to be in chalk marks.")
         }
@@ -1504,10 +1529,10 @@ func profile_check_base(profile_name, profile_type) {
     }
 
     keyconfbase := "profile." + profile_name + ".key." + key_name + "."
-    if get_attr(keyconfbase + "report", bool) == false {
+    if attr_get(keyconfbase + "report", bool) == false {
       if profile_type == PTChalk {
         if key_kind == NonChalk or key_kind == HostOnly { continue }
-        if get_attr("keyspec." + key_name + ".required", bool) == true {
+        if attr_get("keyspec." + key_name + ".required", bool) == true {
           return pc_err(profile_name, key_name,
                         " that key is required to be in chalk marks.")
         }
@@ -1540,7 +1565,7 @@ func profile_check_base(profile_name, profile_type) {
           "non-chalkable artifact info can't be in a host-level report spec")
     }
     elif key_kind == Chalk {
-      if get_attr("keyspec." + key_name + ".never_early", bool) == true {
+      if attr_get("keyspec." + key_name + ".never_early", bool) == true {
         return pc_err(profile_name, key_name,
         "that key is artifact specific, so can't be in host-level report spec")
       }
@@ -1650,7 +1675,7 @@ func custom_report_host_check(name, profile_name) {
 }
 
 func sink_check(name, sink: string) {
-  if not get_attr("private_installed_sinks", list[string]).contains(sink) {
+  if not attr_get("private_installed_sinks", list[string]).contains(sink) {
     report := name.split(".")[1]
 
     return ("The report '" + report + "' applies sink configuration '" + sink +
@@ -1678,14 +1703,23 @@ func zip_check(keyname: string, value: list[string]) {
   return ""
 }
 
+func default_command_check(keyname, value) {
+  if contains(valid_chalk_cmds, value) or find(value, "help.") == 0 {
+    return ""
+  }
+  return ("The attribute 'default_command' is set to '" + value +
+          "', which is not a valid chalk command. Must be one of: " +
+	  join(valid_chalk_cmds, ", "))
+}
+
 # Run any checks across fields that we haven't yet done...
 func custom_report_extra_validation() {
   result       := ""
   report_sects := sections("custom_report")
   for i from 0 to len(report_sects) {
     base := "custom_report." + report_sects[i] + "."
-    s1   := get_attr(base + "artifact_profile", string)
-    s2   := get_attr(base + "host_profile", string)
+    s1   := attr_get(base + "artifact_profile", string)
+    s2   := attr_get(base + "host_profile", string)
     if s1 == "" and s2 == "" {
       return "Custom Report '" + report_sects[i] + "' must set a valid profile"
     }
@@ -1698,8 +1732,8 @@ func key_name_validation() {
   for i from 0 to len(spec_sects) {
     key_name := spec_sects[i]
     base     := "keyspec." + key_name + "."
-    if get_attr(base + "standard", bool) { continue; }
-    kind     := get_attr(base + "kind", int)
+    if attr_get(base + "standard", bool) { continue; }
+    kind     := attr_get(base + "kind", int)
     if kind == ChalkableHost or kind == Chalk {
       if key_name.find("X-") == 0 { continue; }
     }

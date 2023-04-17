@@ -5,15 +5,22 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import tables, options, strutils, unicode, os, streams
-import config, builtins, collect, chalkjson, plugins, nimutils/help
+import config, builtins, collect, chalkjson, plugins
 import macros except error
 
-# Helper to load profiles.
-proc setPerChalkReports(successProfileName, invalidProfileName: string) =
+const egg = staticRead(".egg")
+var liftableKeys: seq[string] = @[]
+
+proc setPerChalkReports(successProfileName: string,
+                        invalidProfileName: string,
+                        hostProfileName:    string) =
   var
     reports     = seq[string](@[])
     goodProfile = Profile(nil)
     badProfile  = Profile(nil)
+    goodName    = successProfileName
+    badName     = invalidProfileName
+    hostProfile = chalkConfig.profiles[hostProfileName]
 
   if successProfileName != "" and successProfileName in chalkConfig.profiles:
     goodProfile = chalkConfig.profiles[successProfileName]
@@ -21,10 +28,48 @@ proc setPerChalkReports(successProfileName, invalidProfileName: string) =
   if invalidProfileName != "" and invalidProfileName in chalkConfig.profiles:
     badProfile = chalkConfig.profiles[invalidProfileName]
 
-  if   goodProfile == nil or not goodProfile.enabled: goodProfile = badProfile
-  elif badProfile  == nil or not  badProfile.enabled: badProfile = goodProfile
+  if goodProfile == nil or not goodProfile.enabled:
+    goodProfile = badProfile
+    goodName    = badName
+
+  elif badProfile == nil or not badProfile.enabled:
+    badProfile = goodProfile
+    badName    = goodName
 
   if goodProfile == nil or not goodProfile.enabled: return
+
+  # The below implements "lifting".  Lifting occurs when both a host
+  # profile and artifact profile want to report on an artifact key.
+  # The host report can only report it if the value is the same for
+  # each artifact.  If it is, however, the intent is to NOT duplicate.
+  # Therefore, what we do is explicitly turn off reporting at the
+  # artifact level for any liftable key where the host profile is
+  # going to report on it.
+  #
+  # However, we then need to turn those keys back on if we changed
+  # them, because other custom reports this run may *only* ask for
+  # something at the artifact level.  Therefore, we stash the key
+  # objects, deleting them from the profile (absent means don't
+  # report), and restore them at the end of the function.
+
+  var
+    goodStash: Table[string, KeyConfig]
+    badStash:  Table[string, KeyConfig]
+
+  if hostProfile != nil and hostProfile.enabled:
+    for key in liftableKeys:
+      if key notin hostProfile.keys or not hostProfile.keys[key].report:
+        continue
+      if key in goodProfile.keys and goodProfile.keys[key].report:
+        goodStash[key] = goodProfile.keys[key]
+        goodProfile.keys.del(key)
+        trace("Lifting key '" & key & "' when host profile = '" &
+          hostProfileName & "' and artifact profile = '" & goodName)
+      if key in badProfile.keys and badProfile.keys[key].report:
+        badStash[key] = badProfile.keys[key]
+        badProfile.keys.del(key)
+        trace("Lifting key '" & key & "' when host profile = '" &
+          hostProfileName & "' and artifact profile = '" & badName)
 
   for chalk in allChalks:
     let
@@ -32,6 +77,10 @@ proc setPerChalkReports(successProfileName, invalidProfileName: string) =
       oneReport = hostInfo.prepareContents(chalk.collectedData, profile)
 
     if len(oneReport) != 0: reports.add(oneReport)
+
+  # Now, reset any profiles where we performed lifting.
+  for key, conf in goodStash: goodProfile.keys[key] = conf
+  for key, conf in badStash:  badProfile.keys[key] = conf
 
   let reportJson = "[ " & reports.join(", ") & "]"
   if len(reports) != 0:       hostInfo["_CHALKS"] = pack(reportJson)
@@ -45,7 +94,8 @@ template doCommandReport() =
 
   if not hostProfile.enabled: return
 
-  setPerChalkReports(conf.artifactReport, conf.invalidChalkReport)
+  setPerChalkReports(conf.artifactReport, conf.invalidChalkReport,
+                     conf.hostReport)
   if len(unmarked) != 0: hostInfo["_UNMARKED"] = pack(unmarked)
   publish("report", hostInfo.prepareContents(hostProfile))
 
@@ -56,7 +106,7 @@ template doCustomReporting() =
       sinkConfs = spec.sinkConfigs
       topicObj  = registerTopic(topic)
 
-    if getCommandName() notin spec.use_when and "*" notin spec.useWhen:
+    if getCommandName() notin spec.useWhen and "*" notin spec.useWhen:
       continue
     if topic == "audit" and not chalkConfig.getPublishAudit():
       continue
@@ -68,13 +118,43 @@ template doCustomReporting() =
       if not unpack[bool](res):
         warn("Report '" & topic & "' sink config is invalid. Skipping.")
 
-    setPerChalkReports(spec.artifactProfile, spec.invalidChalkProfile)
+    setPerChalkReports(spec.artifactProfile, spec.invalidChalkProfile,
+                       spec.hostProfile)
     let profile = chalkConfig.profiles[spec.hostProfile]
     if profile.enabled:
       publish(topic, hostInfo.prepareContents(profile))
 
+proc liftUniformKeys() =
+  for key, spec in chalkConfig.keyspecs:
+    # Host keys don't make sense to be lifted, so just skip.
+    if spec.kind notin [int(KtChalk), int(KtNonChalk)]: continue
+    var
+      lift = true
+      box: Option[Box] = none(Box)
+    for chalk in allChalks:
+      if key notin chalk.collectedData:
+        lift = false
+        if key in hostInfo:
+          liftableKeys.add(key)
+          trace("Key  '" & key &
+            "' was put in the host context by plugin and is liftable.")
+        break
+      if box.isNone():
+        box = some(chalk.collectedData[key])
+      else:
+        if chalk.collectedData[key] != box.get():
+          lift = false
+          break
+    if not lift: continue
+    for chalk in allChalks:
+      chalk.collectedData.del(key)
+    trace("Key '" & key & "' is liftable.")
+    liftableKeys.add(key)
+    hostInfo[key] = box.get()
+
 proc doReporting() =
   collectPostRunInfo()
+  liftUniformKeys()
   doCommandReport()
   doCustomReporting()
 
@@ -159,15 +239,13 @@ proc runCmdVersion*() =
 
 proc formatTitle(text: string): string {.inline.} =
   let
-    titleCode = toAnsiCode(@[acFont4, acBGreen])
+    titleCode = toAnsiCode(@[acFont4, acBRed])
     endCode   = toAnsiCode(@[acReset])
 
   return titleCode & text & endCode & "\n"
 
 template row(x, y, z: string) = ot.addRow(@[x, y, z])
 
-const helpPath   = staticExec("pwd") & "/help/"
-const helpCorpus = newOrderedFileTable(helpPath)
 proc transformKind(s: string): string =
   chalkConfig.getKtypeNames()[byte(s[0]) - 48]
 proc fChalk(s: seq[string]): bool =
@@ -179,34 +257,6 @@ proc fArtifact(s: seq[string]): bool =
 proc fReport(s: seq[string]): bool =
   if s[1] != "Chalk": return true
 
-template restAreSearch() =
-  if len(args) > 1 and args[1].toLowerAscii() in ["s", "search"]:
-    search = args[2 .. ^1]
-  else:
-    search = args[1 .. ^1]
-
-template handleObjTypeHelp(name: string) =
-    if len(args) == 0:
-      output = formatTitle("'" & name & "' Objects")
-      output &= ctxChalkConf.getSectionDocStr(name).get()
-      output &= "\n"
-      output &= "See 'chalk help " & name
-      output &= " props' for info on the key properties for " & name
-      output &= " objects\n"
-    else:
-      if len(args) > 1:
-        warn("'chalk help " & name & "' either takes 0 args, 'props' / 'p'" &
-           " to list properties, or 'help' / 'h' for help. Ignoring extra.")
-      case args[0]
-      of "props", "prop", "p":
-        output &= "Important Properties: \n"
-        output &= ctxChalkConf.spec.get().oneObjTypeToTable(name)
-      of "help", "h":
-          output = getHelp(helpCorpus, @["help." & name & ".help"])
-      else:
-        output  = "Invalid argument to 'chalk help " & name
-        output &= "'. See 'chalk help " & name & " help' for details\n"
-
 proc filterBySbom(row: seq[string]): bool = return row[1] == "sbom"
 proc filterBySast(row: seq[string]): bool = return row[1] == "sast"
 proc filterCallbacks(row: seq[string]): bool =
@@ -214,99 +264,47 @@ proc filterCallbacks(row: seq[string]): bool =
                 "produce_keys", "kind"]: return false
   return true
 
-template handleToolHelp(name: string, toolFilter: untyped) =
-  if len(args) == 0:
-    let
-      sec  = ctxChalkConf.attrs.contents["tool"].get(AttrScope)
-      hdrs = @["Tool", "Kind", "Enabled", "Priority"]
-      cols = @["kind", "enabled", "priority"]
+template removeDots(s: string): string = replace(s, ".", " ")
+template noExtraArgs(cmdName: string) =
+ if len(args) > 0:
+  warn("Additional arguments to " & removeDots(cmdName) & " ignored.")
 
-    output  = sec.objectsToTable(cols, hdrs, filter = toolFilter)
-    output &= "See 'chalk help " & name &
-           " <TOOLNAME>' for specifics on a tool\n"
-  else:
-    for arg in args:
-      if arg notin chalkConfig.tools:
-        error(arg & ": tool not found.")
-        continue
+proc getKeyHelp(filter: Con4mRowFilter, noSearch: bool = false): string =
+  let
+    args   = getArgs()
+    xform  = { "kind" : Con4mDocXForm(transformKind) }.newTable()
+    cols   = @["kind", "type", "doc"]
+    kcf    = getChalkRuntime().attrs.contents["keyspec"].get(AttrScope)
+
+  if noSearch and len(args) > 0:
       let
-        tool  = chalkConfig.tools[arg]
-        scope = tool.getAttrScope()
-
-      if tool.kind != name:
-        error(arg & ": tool is not a " & name & " tool.  Showing you anyway.")
-
-      output &= scope.oneObjToTable(objType = "tool",
-                                    filter = filterCallbacks,
-                                    cols = @[fcName, fcValue])
-      if tool.doc.isSome():
-        output &= tool.doc.get()
-
-proc runCmdHelp*(cmdName: string) {.noreturn.} =
-  var
-    output: string = ""
-    filter: Con4mRowFilter = nil
-    args = getArgs()
-
-  case cmdName
-  of "help.key":
-    var
-      skip                = false
-      search: seq[string] = @[]
-      addFooter           = true
-    let
-      xform  = { "kind" : Con4mDocXForm(transformKind) }.newTable()
-      cols   = @["kind", "type", "doc"]
-      kcf    = ctxChalkConf.attrs.contents["keyspec"].get(AttrScope)
-
-    if len(args) > 0:
-      case args[0].toLowerAscii():
-        of "chalk", "c":
-          filter = fChalk
-          restAreSearch()
-        of "host":
-          filter = fHost
-          restAreSearch()
-        of "artifact", "art", "a":
-          filter = fArtifact
-          restAreSearch()
-        of "report", "r":
-          filter = fReport
-          restAreSearch()
-        of "search", "s":
-          search = args[1 .. ^1]
-        of "help", "h":
-          output = getHelp(helpCorpus, @["help.key.help"])
+        cols = @[fcName, fcValue]
+        hdrs = @["Property", "Value"]
+      for keyname in args:
+        let
+          formalKey = keyname.toUpperAscii()
+          specOpt   = formalKey.getKeySpec()
+        if specOpt.isNone():
+          error(formalKey & ": unknown Chalk key.\n")
         else:
           let
-            cols = @[fcName, fcValue]
-            hdrs = @["Property", "Value"]
-          for keyname in args:
-            let
-              formalKey = keyname.toUpperAscii()
-              specOpt   = formalKey.getKeySpec()
-            if specOpt.isNone():
-              error(formalKey & ": unknown key.\n")
-            else:
-              let
-                keyspec = specOpt.get()
-                docOpt  = keySpec.getDoc()
-                keyObj  = keySpec.getAttrScope()
+            keyspec = specOpt.get()
+            docOpt  = keySpec.getDoc()
+            keyObj  = keySpec.getAttrScope()
 
-              output &= formatTitle(formalKey)
-              output &= keyObj.oneObjToTable(cols = cols, hdrs = hdrs,
-                                   xforms = xform, objType = "keyspec")
-          addFooter = false
-    if output == "":
-      let hdrs = @["Key Name", "Kind of Key", "Data Type", "Overview"]
-      output = kcf.objectsToTable(cols, hdrs, xforms = xform,
-                                  filter = filter, searchTerms = search)
-    if output == "":
-      output = (formatTitle("No results returned for command: '")[0 ..< ^1] &
-                "help key " & args.join(" ") & "'\nSee 'help key help'\n")
-    elif addFooter:
-      output &= "\n"
-      output &= """
+          result &= formatTitle(formalKey)
+          result &= keyObj.oneObjToTable(cols = cols, hdrs = hdrs,
+                               xforms = xform, objType = "keyspec")
+  else:
+    let hdrs = @["Key Name", "Kind of Key", "Data Type", "Overview"]
+    result   = kcf.objectsToTable(cols, hdrs, xforms = xform,
+                                  filter = filter, searchTerms = args)
+    if result == "":
+      result = (formatTitle("No results returned for key search: '")[0 ..< ^1] &
+                args.join(" ") & "'\nSee 'help key'\n")
+    if noSearch:
+      result &= "\n"
+      result &= """
 See: 'chalk help keys <KEYNAME>' for details on specific keys.  OR:
 'chalk help keys chalk'         -- Will show all keys usable in chalk marks.
 'chalk help keys host'          -- Will show all keys usable in host reports.
@@ -316,39 +314,103 @@ See: 'chalk help keys <KEYNAME>' for details on specific keys.  OR:
 
 The first letter for each sub-command also works. 'key' and 'keys' both work.
 """
-      output &= "\n"
-  of "help.keyspec":
-    handleObjTypeHelp("keyspec")
-  of "help.tool":
-    handleObjTypeHelp("tool")
-    output &= "See 'chalk help sast' and 'chalk help sbom' for tool info\n"
-  of "help.plugin":
-    handleObjTypeHelp("plugin")
-  of "help.sink":
-    handleObjTypeHelp("sink")
-  of "help.outconf":
-    handleObjTypeHelp("outconf")
-  of "help.report":
-    handleObjTypeHelp("custom_report")
-  of "help.profile":
-    handleObjTypeHelp("profile")
-  of "help.sbom":
-    handleToolHelp("sbom", filterBySbom)
-  of "help.sast":
-    handleToolHelp("sast", filterBySast)
-  of "help.topics":
-    output = getHelp(helpCorpus, @["topics"])
-    var otherTopics: seq[string] = @[]
-    for key, _ in helpCorpus:
-       if "." notin key: otherTopics.add(key)
-    output &= "\n" & otherTopics.join(", ") & "\n"
+
+proc runChalkHelp*(cmdName: string) {.noreturn.} =
+  var
+    output: string = ""
+    filter: Con4mRowFilter = nil
+    args = getArgs()
+
+  case cmdName
+  of "help":
+    output = getAutoHelp()
+    if output == "":
+      output = getCmdHelp(getArgCmdSpec(), args)
+  of "help.key":
+      output = getKeyHelp(filter = nil, noSearch = true)
+  of "help.key.chalk":
+      output = getKeyHelp(filter = fChalk)
+  of "help.key.host":
+      output = getKeyHelp(filter = fHost)
+  of "help.key.art":
+      output = getKeyHelp(filter = fArtifact)
+  of "help.key.report":
+      output = getKeyHelp(filter = fReport)
+  of "help.key.search":
+      output = getKeyHelp(filter = nil)
+
+  of "help.keyspec", "help.tool", "help.plugin", "help.sink", "help.outconf",
+     "help.custom_report":
+       cmdName.noExtraArgs()
+       let name = cmdName.split(".")[^1]
+
+       output = formatTitle("'" & name & "' Objects")
+       output &= getChalkRuntime().getSectionDocStr(name).get()
+       output &= "\n"
+       output &= "See 'chalk help " & name
+       output &= " props' for info on the key properties for " & name
+       output &= " objects\n"
+
+  of "help.keyspec.props", "help.tool.props", "help.plugin.props",
+     "help.sink.props", "help.outconf.props", "help.report.props",
+     "help.key.props":
+       cmdName.noExtraArgs()
+       let name = cmdName.split(".")[^2]
+       output &= "Important Properties: \n"
+       output &= getChalkRuntime().spec.get().oneObjTypeToTable(name)
+
+  of "help.sbom", "help.sast":
+    let name       = cmdName.split(".")[^1]
+    let toolFilter = if name == "sbom": filterBySbom else: filterBySast
+
+    if len(args) == 0:
+      let
+        sec  = getChalkRuntime().attrs.contents["tool"].get(AttrScope)
+        hdrs = @["Tool", "Kind", "Enabled", "Priority"]
+        cols = @["kind", "enabled", "priority"]
+
+      output  = sec.objectsToTable(cols, hdrs, filter = toolFilter)
+      output &= "See 'chalk help " & name &
+             " <TOOLNAME>' for specifics on a tool\n"
+    else:
+      for arg in args:
+        if arg notin chalkConfig.tools:
+          error(arg & ": tool not found.")
+          continue
+        let
+          tool  = chalkConfig.tools[arg]
+          scope = tool.getAttrScope()
+
+        if tool.kind != name:
+          error(arg & ": tool is not a " & name & " tool.  Showing you anyway.")
+
+        output &= scope.oneObjToTable(objType = "tool",
+                                      filter = filterCallbacks,
+                                      cols = @[fcName, fcValue])
+        if tool.doc.isSome():
+          output &= tool.doc.get()
   else:
-    output = getHelp(helpCorpus, getArgs())
+    output = egg  & "\n" & "***" & cmdName
 
   publish("help", output)
   quit()
 
-proc runCmdHelp*() {.noreturn.} = runCmdHelp("help")
+proc runChalkHelp*() {.noreturn.} = runChalkHelp("help")
+
+template cantLoad(s: string) =
+  error(s)
+  unmarked = @[selfChalk.fullPath]
+  selfChalk.opFailed = true
+  doReporting()
+  return
+
+proc cmdlineError(err, tb: string): bool =
+  error(err)
+  return false
+
+proc newConfFileError(err, tb: string): bool =
+  error(err & "\n" & tb)
+  return false
 
 proc runCmdConfLoad*() =
   initCollection()
@@ -356,75 +418,51 @@ proc runCmdConfLoad*() =
   var newCon4m: string
   let filename = getArgs()[0]
 
-  setArtifactSearchPath(@[resolvePath(getAppFileName())])
-
   let selfChalk = getSelfExtraction().getOrElse(nil)
   allChalks     = @[selfChalk]
 
   if selfChalk == nil or not canSelfInject:
-    error("Platform does not support self-injection.")
-    unmarked = @[selfChalk.fullPath]
-    return
+    cantLoad("Platform does not support self-injection.")
 
   if filename == "default":
     newCon4m = defaultConfig
-    info("Installing the default confiuration file.")
+    info("Installing the default configuration file.")
   else:
     let f = newFileStream(resolvePath(filename))
     if f == nil:
-      error(filename & ": could not open configuration file")
-      return
+      cantLoad(filename & ": could not open configuration file")
     try:
       newCon4m = f.readAll()
       f.close()
     except:
-      error(filename & ": could not read configuration file")
-      return
+      cantLoad(filename & ": could not read configuration file")
 
     info(filename & ": Validating configuration.")
 
-    # Now we need to validate the config, without stacking it over our
-    # existing configuration. We really want to know that the file
-    # will not only be a valid con4m file, but that it will meet the
-    # chalk spec.
-    #
-    # We go ahead and execute it, so that it can go through full
-    # validation, even though it could easily side-effect.
-    #
-    # To do that, we need to give it a valid base state, clear of any
-    # existing configuration.  So we stash the existing config state,
-    # reload the base configs, and then validate the existing spec.
-    #
-    # And then, of course, restore the old spec when done.
+    let
+      toStream = newStringStream
+      stack    = newConfigStack().addSystemBuiltins().
+                 addCustomBuiltins(chalkCon4mBuiltins).
+                 addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
+                 addConfLoad(baseConfName, toStream(baseConfig), false, false).
+                 setErrorHandler(newConfFileError).
+                 addConfLoad(ioConfName,   toStream(ioConfig),   false, false).
+                 addConfLoad(signConfName, toStream(signConfig), false, false).
+                 addConfLoad(sbomConfName, toStream(sbomConfig), false, false).
+                 addConfLoad(sastConfName, toStream(sastConfig), false, false)
+    stack.run()
+    stack.addConfLoad(filename, toStream(newCon4m)).run()
 
-    var
-      realEvalCtx = ctxChalkConf
-      realConfig  = chalkConfig
-    try:
-      loadBaseConfiguration()
-      var
-        testConfig = newStringStream(newCon4m)
-        tree       = parse(testConfig, filename)
-
-      tree.checkTree(ctxChalkConf)
-      ctxChalkConf.preEvalCheck(c42Ctx)
-      tree.initRun(ctxChalkConf)
-      tree.evalNode(ctxChalkConf)
-      ctxChalkConf.validateState(c42Ctx)
-      # Replace the real state.
-      ctxChalkConf = realEvalCtx
-      chalkConfig  = realConfig
-    except:
-      ctxChalkConf = realEvalCtx
-      chalkConfig  = realConfig
-      publish("debug", getCurrentException().getStackTrace())
-      error("Could not load config file: " & getCurrentExceptionMsg())
+    if not stack.errored:
+      trace(filename & ": Configuration successfully validated.")
+    else:
+      unmarked = @[selfChalk.fullPath]
+      selfChalk.opFailed = true
+      doReporting()
       return
 
-    trace(filename & ": Configuration successfully validated.")
-
-    selfChalk.collectChalkInfo()
-    selfChalk.collectedData["$CHALK_CONFIG"] = pack(newCon4m)
+  selfChalk.collectChalkInfo()
+  selfChalk.collectedData["$CHALK_CONFIG"] = pack(newCon4m)
 
   trace(filename & ": installing configuration.")
   let oldLocation = selfChalk.fullPath
@@ -438,8 +476,7 @@ proc runCmdConfLoad*() =
     info("Configuration written to new binary: " & selfChalk.fullPath)
     selfChalk.postHash = rawHash
   except:
-    error("Configuration loading failed: " & getCurrentExceptionMsg())
-    selfChalk.opFailed = true
+    cantLoad("Configuration loading failed: " & getCurrentExceptionMsg())
 
   doReporting()
 
@@ -506,6 +543,7 @@ proc showConfig*(force: bool = false) =
   once:
     const nope = "none\n\n"
     if not (chalkConfig.getPublishDefaults() or force): return
+    let chalkRuntime = getChalkRuntime()
     var toPublish = ""
     let
       genCols  = @[fcShort, fcValue, fcName]
@@ -514,24 +552,24 @@ proc showConfig*(force: bool = false) =
       outHdrs  = @["Report Type", "Profile"]
       ocCol    = @["chalk", "artifact_report", "host_report",
                    "invalid_chalk_report"]
-      outconfs = if "outconf" in ctxChalkConf.attrs.contents:
-                   ctxChalkConf.attrs.contents["outconf"].get(AttrScope)
+      outconfs = if "outconf" in chalkRuntime.attrs.contents:
+                   chalkRuntime.attrs.contents["outconf"].get(AttrScope)
                  else: nil
       crCol    = @["enabled", "artifact_profile", "host_profile",
                    "invalid_chalk_profile", "use_when"]
-      reports  = if "custom_report" in ctxChalkConf.attrs.contents:
-                   ctxChalkConf.attrs.contents["custom_report"].get(AttrScope)
+      reports  = if "custom_report" in chalkRuntime.attrs.contents:
+                   chalkRuntime.attrs.contents["custom_report"].get(AttrScope)
                  else: nil
       tCol     = @["kind", "enabled", "priority", "stop_on_success"]
-      tools    = if "tool" in ctxChalkConf.attrs.contents:
-                   ctxChalkConf.attrs.contents["tool"].get(AttrScope)
+      tools    = if "tool" in chalkRuntime.attrs.contents:
+                   chalkRuntime.attrs.contents["tool"].get(AttrScope)
                  else: nil
       piCol    = @["codec", "enabled", "priority", "ignore", "overrides"]
-      plugs    = if "plugin" in ctxChalkConf.attrs.contents:
-                   ctxChalkConf.attrs.contents["plugin"].get(AttrScope)
+      plugs    = if "plugin" in chalkRuntime.attrs.contents:
+                   chalkRuntime.attrs.contents["plugin"].get(AttrScope)
                  else: nil
-      profs    = if "profile" in ctxChalkConf.attrs.contents:
-                   ctxChalkConf.attrs.contents["profile"].get(AttrScope)
+      profs    = if "profile" in chalkRuntime.attrs.contents:
+                   chalkRuntime.attrs.contents["profile"].get(AttrScope)
                  else: nil
 
     if getCommandName() in outconfs.contents:
@@ -572,7 +610,7 @@ proc showConfig*(force: bool = false) =
       toPublish &= profs.listSections("Profile Name")
 
     toPublish &= formatTitle("General configuration")
-    toPublish &= ctxChalkConf.attrs.oneObjToTable(genCols, genHdrs)
+    toPublish &= chalkRuntime.attrs.oneObjToTable(genCols, genHdrs)
 
     publish("defaults", toPublish)
     if force: showDisclaimer(80)

@@ -51,7 +51,7 @@ proc validateMetadata(obj: ChalkObj): bool =
       artHash  = obj.myCodec.getArtifactHash(obj).toHex().toLowerAscii()
       toVerify = pack(artHash & "\n" & computed & "\n")
       args     = @[toVerify, fields["SIGNATURE"], fields["SIGN_PARAMS"]]
-      optValid = ctxChalkConf.sCall(verifySig, args)
+      optValid = runCallback(verifySig, args)
 
     if optValid.isSome():
       result = unpack[bool](optValid.get())
@@ -234,7 +234,7 @@ method getChalkInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
 
   let
     toSign = @[pack(obj.rawHash.toHex().toLowerAscii() & "\n" & encHash & "\n")]
-    sigOpt = ctxChalkConf.scall(signSig, toSign)
+    sigOpt = runCallback(signSig, toSign)
 
   if sigOpt.isSome():
     let

@@ -15,7 +15,7 @@
 import c4autoconf
 export c4autoconf # This is conceptually part of our API.
 
-import options, tables, strutils, algorithm, os, streams, sugar
+import options, tables, strutils, algorithm, os, streams
 import con4m, nimutils, nimutils/logging, types
 import macros except error
 export logging, types, nimutils, con4m
@@ -30,13 +30,21 @@ const
   magicUTF8*         = "dadfedabbadabbed"
   tmpFilePrefix*     = "chalk"
   tmpFileSuffix*     = "-file.tmp"
-  defCfgFname        = "configs/defaultconfig.c4m"  # Default embedded config.
-  chalkC42Spec       = staticRead("configs/chalk.c42spec")
-  baseConfig         = staticRead("configs/baseconfig.c4m")
-  signConfig         = staticRead("configs/signconfig.c4m")
-  sbomConfig         = staticRead("configs/sbomconfig.c4m")
-  sastConfig         = staticRead("configs/sastconfig.c4m")
-  ioConfig*          = staticRead("configs/ioconfig.c4m")
+  chalkSpecName*     = "configs/chalk.c42spec"
+  getoptConfName*    = "configs/getopts.c4m"
+  baseConfName*      = "configs/baseconfig.c4m"
+  signConfName*      = "configs/signconfig.c4m"
+  sbomConfName*      = "configs/sbomconfig.c4m"
+  sastConfName*      = "configs/sastconfig.c4m"
+  ioConfName*        = "configs/ioconfig.c4m"
+  defCfgFname*       = "configs/defaultconfig.c4m"  # Default embedded config.
+  chalkC42Spec*      = staticRead(chalkSpecName)
+  getoptConfig*      = staticRead(getoptConfName)
+  baseConfig*        = staticRead(baseConfName)
+  signConfig*        = staticRead(signConfName)
+  sbomConfig*        = staticRead(sbomConfName)
+  sastConfig*        = staticRead(sastConfName)
+  ioConfig*          = staticRead(ioConfNAme)
   defaultConfig*     = staticRead(defCfgFname) & commentC4mCode(ioConfig)
   versionStr         = staticexec("cat ../chalk.nimble | grep ^version")
   commitID           = staticexec("git rev-parse HEAD")
@@ -44,25 +52,25 @@ const
   osStr              = staticexec("uname -o")
 
 var
-  chalkCon4mBuiltins: seq[(string, BuiltinFn)]
-  ctxChalkConf*:      ConfigState
+  configRuntime:      ConfigState
   chalkConfig*:       ChalkConfig
   commandName:        string
   currentOutputCfg:   OutputConfig
   `isChalkingOp?`:    bool
-let
-  (c42Obj*, c42Ctx*) = c42Spec(chalkC42Spec, "<embedded spec>").get()
+
+proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
+  return configRuntime.sCall(cb, args)
+proc runCallback*(s: string, args: seq[Box]): Option[Box] =
+  return configRuntime.scall(s, args)
 
 macro declareChalkExeVersion(): untyped = parseStmt("const " & versionStr)
 declareChalkExeVersion()
 
-proc getChalkExeVersion*(): string = version
-proc getChalkCommitId*(): string   = commitID
-proc getChalkPlatform*(): string   = osStr & " " & archStr
-proc getCon4mBuiltins*(): seq[(string, BuiltinFn)] = chalkCon4mBuiltins
-proc getCommandName*(): string = commandName
-proc setCommandName*(s: string) =
-  commandName = s
+proc getChalkExeVersion*(): string   = version
+proc getChalkCommitId*(): string     = commitID
+proc getChalkPlatform*(): string     = osStr & " " & archStr
+proc getCommandName*(): string       = commandName
+proc getChalkRuntime*(): ConfigState = configRuntime
 
 proc isChalkingOp*(): bool =
   once:
@@ -91,11 +99,6 @@ proc lookupCollectedKey*(obj: ChalkObj, k: string): Option[Box] =
   if k in obj.collectedData: return some(obj.collectedData[k])
   return none(Box)
 
-proc setChalkCon4mBuiltIns*(fns: seq[(string, BuiltinFn)]) {.inline.} =
-  # Set from builtins.nim; instead of a cross-dependency, we let it
-  # call us to set.
-  chalkCon4mBuiltins = fns
-
 template hookCheck(fieldname: untyped) =
   let s = astToStr(fieldName)
   let d = sinkConfData.`needs fieldName`
@@ -118,85 +121,6 @@ proc checkHooks*(sinkname:     string,
     hookCheck(headers)
     hookCheck(cacheid)
     hookCheck(aux)
-
-macro addSetter(funcName, varType: untyped, s: static[string]) =
-  let varName = newLit(s)
-  let varSym  = newIdentNode(s)
-  result = quote do:
-    proc `funcName`*(val: `varType`) =
-      discard ctxChalkConf.setOverride(`varName`, some(pack(val)))
-      chalkConfig.`varSym` = val
-
-addSetter(setLoadSbomTools,       bool,        "load_sbom_tools")
-addSetter(setLoadSastTools,       bool,        "load_sast_tools")
-addSetter(setLoadDefaultSigning,  bool,        "load_default_signing")
-addSetter(setConfigPath,          seq[string], "config_path")
-addSetter(setConfigFileName,      string,      "config_filename")
-addSetter(setAllowExternalConfig, bool,        "allow_external_config")
-addSetter(setConsoleLogLevel,     string,      "log_level")
-addSetter(setVirtualChalk,        bool,        "virtual_chalk")
-addSetter(setPublishDefaults,     bool,        "publish_defaults")
-addSetter(setRecursive,           bool,        "recursive")
-addSetter(setUseReportCache,      bool,        "use_report_cache")
-addSetter(setReportCacheLocation, string,      "report_cache_location")
-addSetter(setContainerImageId,    string,      "container_image_id")
-addSetter(setContainerImageName,  string,      "container_image_name")
-
-proc setConfigFile*(val: string) =
-  let (head, tail) = val.splitPath()
-
-  setConfigPath(@[head])
-  setConfigFileName(tail)
-  setAllowExternalConfig(true)
-
-proc setColor*(val: bool) =
-  discard ctxChalkConf.setOverride("color", some(pack(val)))
-  setShowColors(val)
-  chalkConfig.color = some(val)
-
-proc setArtifactSearchPath*(val: seq[string]) =
-  if len(val) == 0:
-    return
-
-  chalkConfig.artifactSearchPath = @[]
-
-  for item in val:
-    chalkConfig.artifactSearchPath.add(item.resolvePath())
-
-  discard ctxChalkConf.setOverride("artifact_search_path", some(pack(val)))
-
-template disableObject(c4mName:    string,
-                       objtype:    untyped,
-                       possiblelist: string) =
-  let list = possiblelist.split(",")
-  for objname in list:
-    if objname notin chalkConfig.objtype:
-      warn(objname & ": Could not disable-- not found")
-    else:
-      let field = c4mName & "." & objname & ".enabled"
-      discard ctxChalkConf.setOverride(field, some(pack(false)))
-      chalkConfig.objtype[objname].enabled = false
-
-template enableObject(c4mName:      string,
-                      objtype:      untyped,
-                      possiblelist: string) =
-  let list = possiblelist.split(",")
-  for objname in list:
-    if objname notin chalkConfig.objtype:
-      warn(objname & ": Could not enable-- not found")
-    else:
-      let field = c4mName & "." & objname & ".enabled"
-      discard ctxChalkConf.setOverride(field, some(pack(true)))
-      chalkConfig.objtype[objname].enabled = true
-
-proc disableProfile*(s: string) = disableObject("profile", profiles, s)
-proc disableReport*(s: string)  = disableObject("custom_report", reportSpecs, s)
-proc disablePlugin*(s: string)  = disableObject("plugin", plugins, s)
-proc disableTool*(s: string)    = disableObject("tool", tools, s)
-proc enableProfile*(s: string)  = enableObject("profile", profiles, s)
-proc enableReport*(s: string)   = enableObject("custom_report", reportSpecs, s)
-proc enablePlugin*(s: string)   = enableObject("plugin", plugins, s)
-proc enableTool*(s: string)     = enableObject("tool", tools, s)
 
 proc orderKeys*(dict: ChalkDict, profile: Profile = nil): seq[string] =
   var tmp: seq[(int, string)] = @[]
@@ -224,112 +148,58 @@ proc getSinkConfig*(hook: string): Option[SinkSpec] =
     return some(chalkConfig.sinks[hook])
   return none(SinkSpec)
 
-# Do last-minute sanity-checking so we can give better error messages
-# more easily.  This function currently runs once for each config
-# loading, to do any sanity checking.  Could probably do more with it.
-# A lot of what's currently here should eventually move to
-# auto-generated bits in the con4m spec, though.
-proc postProcessConfig() =
-  # Actually, not validation, but get this done early.
+import builtins, collect # Cyclical, but get chalkCon4mBuiltins here.
 
+# Since these are system keys, we are the only one able to write them,
+# and it's easier to do it directly here than in the system plugin.
+proc stashFlags(winner: ArgResult) =
+  var flagStrs: seq[string] = @[]
+
+  for key, value in winner.stringizeFlags():
+    if value == "": flagStrs.add("--" & key)
+    else:           flagStrs.add("--" & key & "=" & value)
+
+  hostInfo["_OP_CMD_FLAGS"] = pack(flagStrs)
+
+# TODO: static code to validate loaded specs.
+
+proc getEmbeddedConfig(): string =
+  result         = defaultConfig
+  let extraction = getSelfExtraction()
+  if extraction.isSome():
+    let selfChalk = extraction.get().extract
+    if selfChalk != nil and selfChalk.contains("$CHALK_CONFIG"):
+      trace("Found embedded config file in self-chalk.")
+      return unpack[string](selfChalk["$CHALK_CONFIG"])
+
+proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
+  result = none((string, FileStream))
+  let
+    path     = unpack[seq[string]](state.attrLookup("config_path").get())
+    filename = unpack[string](state.attrLookup("config_filename").get())
+  for dir in path:
+    let fname = dir.joinPath(filename)
+    if fname.fileExists():
+      info(fname & ": Found config file")
+      try:
+        return some((fname, newFileStream(fname)))
+      except:
+        error(fname & ": Could not read configuration file")
+        break
+    else:
+        trace("No configuration file found in " & dir)
+
+var cmdSpec: CommandSpec = nil
+proc getArgCmdSpec*(): CommandSpec = cmdSpec
+var autoHelp: string = ""
+proc getAutoHelp*(): string = autoHelp
+
+proc loadLocalStructs(state: ConfigState) =
+  chalkConfig = state.attrs.loadChalkConfig()
   if chalkConfig.color.isSome(): setShowColors(chalkConfig.color.get())
-
   setLogLevel(chalkConfig.logLevel)
-
-  # Take any paths and turn them into absolute paths.
-  for i in 0 ..< len(chalkConfig.artifactSearchPath):
-    chalkConfig.artifactSearchPath[i] =
-      chalkConfig.artifactSearchPath[i].resolvePath()
-
   for i in 0 ..< len(chalkConfig.configPath):
     chalkConfig.configPath[i] = chalkConfig.configPath[i].resolvePath()
-
-  # Make sure the sinks specified are all sinks we have implementations
-  # for; this should always be true in the base config, but is nice
-  # to have the check for development.
-
-  when not defined(release):
-    for sinkname, _ in chalkConfig.sinks:
-      if getSink(sinkname).isNone():
-        warn("Config declared sink '" & sinkname & "', but no " &
-          "implementation exists")
-
-const baseRep = "<compile_location>/src/configs/"
-template internalStack(config, name: string, gettr: (ChalkConfig) -> bool) =
-  if chalkConfig.gettr():
-    if not ctxChalkConf.stackConfig(config, baseRep & name, c42Ctx): quit(1)
-    trace("loaded:  " & name)
-  else:
-    trace("skipped loading: " & name)
-
-proc loadBaseConfiguration*() =
-  ## This function loads the built-in configuration, which is split
-  ## into two con4m files, the base definitions file, and the default
-  ## I/O configuration.
-
-  # For our internal configurations, if we mess up, we want to see
-  # all the debug info.  We'll turn that off later though.
-  setCon4mVerbosity(c4vMax)
-
-  let
-    (x, ok) = firstRun(contents       = baseConfig,
-                       filename       = "<base-configuration>",
-                       spec           = c42Obj,
-                       addBuiltins    = true,
-                       customFuncs    = chalkCon4mBuiltins,
-                       evalCtx        = c42Ctx)
-  if not ok: quit(1)
-  ctxChalkConf = x
-  # We need to make chalkConfig is made available for the other configs.
-  chalkConfig  = ctxChalkConf.attrs.loadChalkConfig()
-  postProcessConfig()
-
-proc loadOptionalConfigurations*() =
-  internalStack(signConfig, "signconfig.c4m", getLoadDefaultSigning)
-  internalStack(sbomConfig, "sbomconfig.c4m", getLoadSbomTools)
-  internalStack(sastConfig, "sastconfig.c4m", getLoadSastTools)
-  # This one isn't technically optional, we load it no matter what,
-  # and you have to undo its actions explicitly if you want, to make sure
-  # it's hard to get in a state where there's no good output configuration.
-  # Still, it couldn't go in the base config, b/c it needs chalkConfig to
-  # have loaded.
-  if not ctxChalkConf.stackConfig(ioConfig, baseRep & "ioconfig.c4m", c42Ctx):
-    quit(1)
-  # Make all our changes available directly from our generated data structures.
-  chalkConfig = ctxChalkConf.attrs.loadChalkConfig()
-  postProcessConfig()
-  setCon4mVerbosity(c4vShowLoc)
-
-proc loadEmbeddedConfig*(selfOpt: Option[ChalkObj]): bool =
-  var confString: string
-
-  if selfOpt.isNone(): confString = defaultConfig
-  else:
-    let selfChalk = selfOpt.get().extract
-
-    # We extracted a CHALK object from our own executable.  Check for a
-    # $CHALK_CONFIG key, and if there is one, run that configuration
-    # file, before loading any on-disk configuration file.
-    if selfChalk == nil or not selfChalk.contains("$CHALK_CONFIG"):
-      trace("No embedded configuration found.")
-      confString = defaultConfig
-    else:
-      confString = unpack[string](selfChalk["$CHALK_CONFIG"])
-
-  try:
-    discard ctxChalkConf.stackConfig(confString, "<embedded conf>", c42Ctx)
-  except:
-    if getCommandName() == "setconf":
-      return true
-    else:
-      error("(when loading embedded config): " & getCurrentExceptionMsg())
-      error("Embedded configuration is invalid. Use 'setconf' command to fix")
-      return false
-
-  chalkConfig = ctxChalkConf.attrs.loadChalkConfig()
-  postProcessConfig()
-  trace("Loaded embedded configuration file")
-
   var c4errLevel =  if chalkConfig.con4mPinpoint: c4vShowLoc else: c4vBasic
 
   if chalkConfig.con4mTraces:
@@ -337,48 +207,87 @@ proc loadEmbeddedConfig*(selfOpt: Option[ChalkObj]): bool =
 
   setCon4mVerbosity(c4errLevel)
 
+proc stashRuntime(state: ConfigState) =
+  configRuntime = state
+
+proc handleCon4mErrors(err, tb: string): bool =
+  if chalkConfig == nil or chalkConfig.chalkDebug or true:
+    error(err & "\n" & tb)
+  else:
+    error(err)
   return true
 
-proc loadUserConfigFile*(commandName: string): Option[string] =
-  var
-    path     = chalkConfig.getConfigPath()
-    filename = chalkConfig.getConfigFileName() # the base file name.
-    fname:     string              # configPath / baseFileName
-    loaded:    bool   = false
-    contents:  string = ""
+proc handleOtherErrors(err, tb: string): bool =
+  error(err)
+  return true
 
-  for dir in path:
-    fname = dir.joinPath(filename)
-    if fname.fileExists(): break
-    trace("No configuration file found in " & dir)
+# TODO: static tests to validate the c42 configs.
+template cmdlineStashTry() =
+  if commandName == "ambiguous" and chalkConfig.defaultCommand.isSome():
+    setErrorHandler(stack, handleOtherErrors)
+    addFinalizeGetOpts(stack, printAutoHelp = false)
+    addCallback(stack, loadLocalStructs).run()
 
-  if fname != "" and fname.fileExists():
-    info(fname & ": Loading config file")
-    try:
-      var
-        fd  = newFileStream(fname)
-        res = ctxChalkConf.stackConfig(fd, fname, c42ctx)
+  if cmdSpec == nil:
+    if stack.getOptOptions.len() > 1:
+      if commandName != "ambiguous":
+        commandName = "ambiguous"
+    else:
+      res         = getArgResult(stack)
+      commandName = res.command
+      cmdSpec     = res.parseCtx.finalCmd
+      autoHelp    = res.getHelpStr()
+      setArgs(res.args[commandName])
 
-      if not res:
-        error(fname & ": invalid configuration not loaded.")
-        return none(string)
-      else:
-        fd.setPosition(0)
-        contents    = fd.readAll()
-        loaded      = true
-        chalkConfig = ctxChalkConf.attrs.loadChalkConfig()
-        postProcessConfig()
+      res.stashFlags()
 
-    except Con4mError: # config file didn't load:
-      error(getCurrentExceptionMsg())
-      info(fname & ": config file not loaded")
-      trace("ignore_broken_conf is false: terminating.")
-      quit()
+template doRun() =
+  try:
+    discard run(stack)
+    cmdlineStashTry()
+  except:
+    error("Could not load configuration files. exiting.")
+    quit(1)
 
-  if loaded:
-    info(fname & ": Loaded configuration file")
-    return some(contents)
+proc loadAllConfigs*() =
+  var res: ArgResult # Used across macros above.
 
-  else:
-    info("No user config file loaded.")
-    return none(string)
+  let
+    toStream = newStringStream
+    stack    = newConfigStack()
+
+  stack.addSystemBuiltins().
+      addCustomBuiltins(chalkCon4mBuiltins).
+      setErrorHandler(handleCon4mErrors).
+      addGetoptSpecLoad().
+      addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
+      addCallback(stashRuntime).
+      addConfLoad(baseConfName, toStream(baseConfig)).
+      addCallback(loadLocalStructs).
+      addConfLoad(getoptConfName, toStream(getoptConfig)).
+      setErrorHandler(handleOtherErrors).
+      addStartGetOpts(printAutoHelp = false).addCallback(loadLocalStructs).
+      setErrorHandler(handleCon4mErrors).
+      addConfLoad(ioConfName,   toStream(ioConfig)).
+      addConfLoad(signConfName, toStream(signConfig)).
+      addConfLoad(sbomConfName, toStream(sbomConfig)).
+      addConfLoad(sastConfName, toStream(sastConfig)).
+      addCallback(stashRuntime).
+      addCallback(loadLocalStructs)
+  doRun()
+
+  # Next, do self extraction, and get the embedded config.
+  # The embedded config has already been validated.
+  let configFile = getEmbeddedConfig()
+
+  stack.addConfLoad("<<embedded config>>", toStream(configFile)).
+        addCallback(loadLocalStructs)
+  doRun()
+
+  let optConf = stack.configState.findOptionalConf()
+  if optConf.isSome():
+    let (fName, stream) = optConf.get()
+    var embed = stream.readAll()
+    stack.addConfLoad(fName, toStream(embed)).addCallback(loadLocalStructs)
+    doRun()
+    hostInfo["_OP_CONFIG"] = pack(configFile)

@@ -1,3 +1,0 @@
-%{H Usage: {appName} version }%
-
-Outputs basic version information for the chalk binary.

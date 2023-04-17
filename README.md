@@ -1,10 +1,14 @@
-# Chalk: Mark software for visibility; security teams bug you a lot less.
+# Chalk: Your Software is art. Make sure it gets seen.
 
-Chalk is an incredibly easy-to-use approach to mark software artifacts at build time, and record arbitrary metadata.  It can just as easily recover metadata from production.
+Chalk is designed to make it incredibly easy to correlate knowledge about code in your dev environment to what's actually running in production.
 
-It's also easy to collect custom metadata, and control where metadata goes.
+Chalk can capture metadata at build time, and can, at that point, add a small 'chalk mark' to any artifacts, so they can be identified in production.  Chalk can also extract chalk marks and collect metadata about the operating environment when it does so.
+
+It's also very easy to collect custom metadata, and control where metadata goes.
 
 This visibility can help people operationally-- security teams can find what they need and prioritize their work, without bugging developers unnecessarily. Finance can get visibility into who's spending money, without bugging developers unnecessarily.
+
+Developers can better understand what builds are actually in production, etc.
 
 Chalk comes with both a tool and a specification.
 

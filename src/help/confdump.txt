@@ -1,5 +1,0 @@
-%{H Usage: {appName} confdump [FILE] }%
-
-Reads the embedded configuration file, and outputs it, based on your output configuration (see 'help output').  In the default configuration, if no argument is given, the config file is written to stdout; and if an argument is provided, it will try write the configuration to the file specified by the argument.
-
-This behavior can be overridden by the configuration file, where you can specify different output configurations.  See {bold}'{appName} help config'{reset} for an overview of the configuration file format, and {bold}'{appName} help output'{reset} for an overview of the output system.

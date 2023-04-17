@@ -1,7 +1,0 @@
-%{H Usage: {appName} delete [COMMAND_OPTION]... [search path] }%
-Deletes metadata from all artifacts specified in the search path.
-
-%{T:<14:
-Variable::Override::Type::Description
-recursive::-r, -R, --recursive, --no-recursive::bool::Determines whether a file scan will recursively walk paths.
-}%

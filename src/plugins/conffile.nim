@@ -20,7 +20,7 @@ proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
     if v.value.isSome():
       result[k] = v.value.get()
     elif v.callback.isSome():
-      let cbOpt = ctxChalkConf.sCall(v.callback.get(), args)
+      let cbOpt = runCallback(v.callback.get(), args)
       if cbOpt.isSome(): result[k] = cbOpt.get()
 
 method getHostInfo*(self: ConfFilePlugin,

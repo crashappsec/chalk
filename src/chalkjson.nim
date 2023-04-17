@@ -408,7 +408,6 @@ proc prepareContents*(dict: ChalkDict, p: Profile): string =
 proc prepareContents*(host, obj: ChalkDict, oneProfile: Profile): string =
   return host.filterByProfile(obj, oneProfile).toJson(oneProfile)
 
-
 template profileEnabledCheck(profile: Profile) =
   if profile.enabled == false:
     error("FATAL: invalid to disable the chalk profile when inserting." &
