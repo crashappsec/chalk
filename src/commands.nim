@@ -390,7 +390,7 @@ proc runChalkHelp*(cmdName: string) {.noreturn.} =
         if tool.doc.isSome():
           output &= tool.doc.get()
   else:
-    output = egg  & "\n" & "***" & cmdName
+    output = egg  & "\n" & cmdName
 
   publish("help", output)
   quit()

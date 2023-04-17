@@ -428,12 +428,12 @@ For instance, you can set some basic properties like so:
 
 %{c
 color: true
-log_level: "warn"{brown}# Don't print out informational bits.
-keyspec {red}CHALK_PTR{cyan} \{
+log_level: "warn"{brown} # Don't print out informational bits.
+keyspec {red}CHALK_PTR{cyan} {{
   {brown}# This field is meant to be a URL to redirect people from the artifact
   {brown}# to where the full metadata is kept.
-  value: {green}"https://www.myrepo.com/chalklookup/$\{chalkid\}"
-\}
+  value: {green}"https://www.myrepo.com/chalklookup/${{chalkid}}"
+}}
 }%
 
 If you run {bold}{appName} defaults{reset}, the last table will show configuration variables you can set in your configs.
@@ -448,7 +448,7 @@ If you want to override a field, you just need to redefine it.  For instance, if
 
 First, let's look at the base configuration for the timestamp field:
 %{c
-keyspec {red}TIMESTAMP{cyan} \{
+keyspec {red}TIMESTAMP{cyan} {{
     kind:             {green}Chalk   {brown} # An inherited enum value
     type:             {green}int     {brown} # An actual type literal
     standard:         {green}true    {brown} # A bool literal
@@ -456,7 +456,7 @@ keyspec {red}TIMESTAMP{cyan} \{
     conf_as_system:   {green}true
     since:            {green}"0.1.0" {brown} # A string literal
     output_order:     {green}3
-\}
+}}
 }%
 
 You can simply write:
@@ -466,9 +466,9 @@ You can simply write:
 
 This will clobber the output_order field for the base configuration.  Note that this syntax is identical to the following:
 %{c
-keyspec {red}TIMESTAMP{cyan} \{
+keyspec {red}TIMESTAMP{cyan} {{
   output_order: {green}401
-\}
+}}
 }%
 
 The section style and property style are the same, and : and = do the same thing too.  The format should be really familiar to anyone who has ever written a configuration file.
@@ -486,9 +486,9 @@ For instance, even though you cannot override it, the {red}CHALK_RAND{reset} met
 %{c
   keyspec.{red}CHALK_RAND.{cyan}callback: {green}func call_rand
 
-  func {red}call_rand{cyan}({green}key{cyan}) \{
+  func {red}call_rand{cyan}({green}key{cyan}) {{
     return {green} $(lower(hex(rand())))  {brown}# $() converts items to strings
-  \}
+  }}
 }%
 
 Chalk embeds a small, efficient DSL called {bold}con4m{reset}, specifically made to intertwine configuration and customization with lightweight code.
@@ -500,22 +500,22 @@ Everything is strongly typed statically wherever possible, and almost fully type
 This gives us the flexibility to change how Chalk behaves based on the operating environment. For instance, if you have two data stores, one for things running AWS, and one for everything else, you could decide to do different things with a key, depending on whether AWS is going to get used.  For instance:
 
 %{c
-keyspec {red}CHALK_PTR{cyan} \{
-  if envExists({green}"AWS_S3_BUCKET_URI"{cyan}) and envExists({green}"AWS_ACCESS_SECRET"{cyan}) \{
-    value: {green}"s3://some-bucket/chalk-$\{artifactid\}"
-  \} else \{
-    value: {green}"https://www.myrepo.com/chalklookup/$\{artifactid\}"
-  \}
-\}
+keyspec {red}CHALK_PTR{cyan} {{
+  if envExists({green}"AWS_S3_BUCKET_URI"{cyan}) and envExists({green}"AWS_ACCESS_SECRET"{cyan}) {{
+    value: {green}"s3://some-bucket/chalk-${{artifactid}}"
+  }} else {{
+    value: {green}"https://www.myrepo.com/chalklookup/${{artifactid}}"
+  }}
+}}
 }%
 
 This is equally written as:
 %{c
-  if envExists({green}"AWS_S3_BUCKET_URI"{cyan}) and envExists({green}"AWS_ACCESS_SECRET"{cyan}) \{
-    keyspec.{red}CHALK_PTR.{cyan}value = {green}"s3://some-bucket/chalk-$\{artifactid\}"
-  \} else \{
-    keyspec.{red}CHALK_PTR.{cyan}value = {green}"https://www.myrepo.com/chalklookup/$\{artifactid\}"
-  \}
+  if envExists({green}"AWS_S3_BUCKET_URI"{cyan}) and envExists({green}"AWS_ACCESS_SECRET"{cyan}) {{
+    keyspec.{red}CHALK_PTR.{cyan}value = {green}"s3://some-bucket/chalk-${{artifactid}}"
+  }} else {{
+    keyspec.{red}CHALK_PTR.{cyan}value = {green}"https://www.myrepo.com/chalklookup/${{artifactid}}"
+  }}
 }%
 
 Chalk has typical core data types, including strings, ints, floats, lists and dictionaries. Strings used as values need to be put in quotes. It also has a bunch of other data types that are used internally.  See the con4m manual (link below) for more.
@@ -582,21 +582,21 @@ logPrefix::Adds the colored prefix to the log message.  Only works with the 'log
 
 This first example connects the output of the {bold}defaults{reset} command to stdout when you run it, but if you don't run it, and pass the --defaults flag (which also publishes to the 'defaults' topic, publishing will go to stderr instead. This is taken from the 'default' configuration file.
 %{c
-sink_config({green}"redirectableOut"{cyan}, {green}"stdout"{cyan}, \{\})
-sink_config({green}"defaultOut"{cyan},      {green}"stderr"{cyan}, \{\})
+sink_config({green}"redirectableOut"{cyan}, {green}"stdout"{cyan}, {{}})
+sink_config({green}"defaultOut"{cyan},      {green}"stderr"{cyan}, {{}})
 {brown} #argv() gets the command name.
-if argv0() != {green}"defaults"{cyan} \{
+if argv0() != {green}"defaults"{cyan} {{
     subscribe({green}"defaults"{cyan}, {green}"defaultOut"{cyan})
-\} else \{
+}} else {{
     subscribe({green}"defaults"{cyan}, {green}"redirectableOut"{cyan})
-\}
+}}
 }%
 
 This example configures S3 as a sink, taking the configuration needed for that sink from environment variables.  You could test the existence of these environment variables first (and indeed we do that in the default configuration).
 %{c
-sink_config({green}"s3"{cyan}, {green}"s3"{cyan}, \{ {green}"secret"{cyan} : env({green}"AWS_ACCESS_SECRET"{cyan}),
+sink_config({green}"s3"{cyan}, {green}"s3"{cyan}, {{ {green}"secret"{cyan} : env({green}"AWS_ACCESS_SECRET"{cyan}),
                             {green}"uid"{cyan}    : env({green}"AWS_ACCESS_ID"{cyan}),
-                            {green}"uri"{cyan}    : env({green}"AWS_S3_BUCKET_URI"{cyan}) \} )
+                            {green}"uri"{cyan}    : env({green}"AWS_S3_BUCKET_URI"{cyan}) }} )
 
 {brown}# This is NOT done in the default config, you'd have to add it yourself.
 subscribe({green}"report"{cyan}, {green}"s3"{cyan})
