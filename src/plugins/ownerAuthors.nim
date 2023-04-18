@@ -61,6 +61,7 @@ method getHostInfo*(self: AuthorsFileCodeOwner,
       if s != "": result["CODE_OWNERS"] = pack(s)
   except:
     error(fname & ": File found, but could not be read")
+    dumpExOnDebug()
   finally:
     if ctx != nil: ctx.close()
 

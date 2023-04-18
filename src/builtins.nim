@@ -18,6 +18,12 @@ proc modedFileSinkOut(msg: string, cfg: SinkConfig, t: StringTable): bool =
     info("Wrote to file: " & cfg.config["filename"])
     return true
   except:
+    once:
+      # Let's not get too spammy here.  This will not error once per
+      # file, but it's better than spam.
+      error("Unable to write to file: " & cfg.config["filename"])
+      dumpExOnDebug()
+
     return false
 
 allSinks["file"].outputFunction = OutputCallback(modedFileSinkOut)
@@ -50,6 +56,7 @@ proc truncatingLog(msg: string, cfg: SinkConfig, t: StringTable): bool =
       moveFile(path, fileName)
   except:
     error(fileName & ": error truncating file: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
 
 let conf = SinkRecord(outputFunction: truncatingLog,
                       keys:           {"filename" : true}.toTable())
@@ -221,6 +228,7 @@ proc sinkConfigLong(args: seq[Box], s: ConfigState): Option[Box] =
              "the form s3://bucket-name/object-path (skipped)")
     except:
         warn("Sink config '" & sinkconf & "' contains an invalid URI (skipped)")
+        dumpExOnDebug()
 
   var filterObjs: seq[MsgFilter] = @[]
   for filter in filters:

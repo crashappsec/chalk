@@ -7,7 +7,7 @@
 
 static:
   echo staticexec("if test \\! c4autoconf.nim -nt configs/chalk.c42spec; " &
-                  "then con4m spec configs/chalk.c42spec --language=nim " &
+                  "then con4m gen configs/chalk.c42spec --language=nim " &
                   "--output-file=c4autoconf.nim; fi")
 
 # Note that importing builtins causes topics to register, and

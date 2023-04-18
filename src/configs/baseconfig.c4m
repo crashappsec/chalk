@@ -496,7 +496,6 @@ keyspec SAST {
 
 keyspec ERR_INFO {
     kind:             Chalk
-    never_early:      true
     type:             list[string]
     standard:         true
     system:           true
@@ -1329,6 +1328,9 @@ profile artifact_report_delete_base {
   key.METADATA_ID.report              = true
   key._OP_ARTIFACT_PATH.report        = true
   key._VALIDATED.report               = true
+  key.SBOM.report                     = true
+  key.SAST.report                     = true
+  key.ERR_INFO.report                 = true
 }
 
 # This is what gets posted to sinks on non-insert ops, on a per-run basis,
@@ -1360,6 +1362,9 @@ profile host_report_other_base {
   key._OP_HOSTINFO.report             = true
   key._OP_ERRORS.report               = true
   key._OP_HOST_REPORT_KEYS.report     = false
+  key.SBOM.report                     = true
+  key.SAST.report                     = true
+  key.ERR_INFO.report                 = true
 }
 
 

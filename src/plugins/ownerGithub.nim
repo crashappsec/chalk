@@ -100,6 +100,7 @@ method getChalkInfo*(self: GithubCodeOwner, obj: ChalkObj): ChalkDict =
   except:
     error(fname & ": File found, but could not be read: " &
                                            getCurrentExceptionMsg())
+    dumpExOnDebug()
   finally:
     if ctx != nil: ctx.close()
 

@@ -80,6 +80,7 @@ method scan*(self:   CodecElf,
     if magic != elfMagic and magic != elfSwapped: return none(ChalkObj)
     result = some(extractKeyMetadata(stream, loc))
   except: return none(ChalkObj)
+  # This is usally a 0-length file and not worth a stack-trace.
 
 method getArtifactHash*(self: CodecElf, chalk: ChalkObj): string =
   chalk.stream.setPosition(0)

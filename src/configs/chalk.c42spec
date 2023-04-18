@@ -986,13 +986,6 @@ root {
     doc:        "Expose the full list of command names to the implementation"
   }
 
-  field chalk_debug {
-    type:       bool
-    default:    false
-    hidden:     true
-    doc:        "Show con4m stack traces when true."
-  }
-
   field ignore_when_normalizing {
     type:       list[string]
     default:    ["MAGIC", "METADATA_HASH", "METADATA_ID", "SIGN_PARAMS",
@@ -1058,7 +1051,7 @@ everything, use 'trace' or 'verbose' (they are aliases).
 
   field chalk_log_level {
     type:     string
-    default:  "warn"
+    default:  "error"
     choice:   valid_log_levels
     shortdoc: "Reporting Log Level"
     doc:      """
@@ -1105,11 +1098,11 @@ where the compiler found an error to show the exact location.
 """
   }
 
-  field con4m_traces {
+  field chalk_debug {
     type:    bool
     default: false
     hidden:  true
-    doc:     "Show stack traces for con4m errors."
+    doc:     "Show Nim stack traces, including for con4m errors."
   }
 
   field cache_fd_limit {

@@ -87,6 +87,7 @@ proc acquireFileStream*(chalk: ChalkObj): Option[FileStream] =
     numCachedFds += 1
     return some(handle)
   else:
+    trace(chalk.fullpath & ": existing stream acquired")
     result = some(chalk.stream)
 
 proc closeFileStream*(chalk: ChalkObj) =
@@ -100,6 +101,7 @@ proc closeFileStream*(chalk: ChalkObj) =
       trace(chalk.fullpath & ": File stream closed")
   except:
     warn(chalk.fullpath & ": Error when attempting to close file.")
+    dumpExOnDebug()
   finally:
     chalk.stream = nil
     numCachedFds -= 1
@@ -125,6 +127,7 @@ proc loadChalkFromFStream*(stream: FileStream, loc: string): ChalkObj =
     result.endOffset     = result.stream.getPosition()
   except:
     error(loc & ": Invalid JSON: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
 
 # These are the base methods for all plugins.  They don't have to
 # implement them; we only try to call these methods if the config for
@@ -198,7 +201,9 @@ method scanArtifactLocations*(self:       Codec,
     try:
       info = getFileInfo(path)
     except:
-      error(path & ": No such file or directory")
+      error("In codec '" & self.name & "': " & path &
+            ": No such file or directory")
+      dumpExOnDebug()
       continue
 
     if info.kind == pcFile:
@@ -281,6 +286,7 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string) =
       except:
         removeFile(path)
         error(chalk.fullPath & ": Could not write (no permission)")
+        dumpExOnDebug()
 
 method handleWrite*(s:       Codec,
                     chalk:   ChalkObj,

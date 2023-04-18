@@ -8,7 +8,8 @@ import tables, options, strutils, unicode, os, streams
 import config, builtins, collect, chalkjson, plugins
 import macros except error
 
-const egg = staticRead(".egg")
+const egg       = staticRead(".egg")
+let emptyReport = toJson(ChalkDict())
 var liftableKeys: seq[string] = @[]
 
 proc setPerChalkReports(successProfileName: string,
@@ -76,7 +77,7 @@ proc setPerChalkReports(successProfileName: string,
       profile   = if not chalk.opFailed: goodProfile else: badProfile
       oneReport = hostInfo.prepareContents(chalk.collectedData, profile)
 
-    if len(oneReport) != 0: reports.add(oneReport)
+    if oneReport != emptyReport: reports.add(oneReport)
 
   # Now, reset any profiles where we performed lifting.
   for key, conf in goodStash: goodProfile.keys[key] = conf
@@ -125,6 +126,10 @@ template doCustomReporting() =
       publish(topic, hostInfo.prepareContents(profile))
 
 proc liftUniformKeys() =
+  if len(allChalks) == 0: return
+
+  var dictToUse: ChalkDict
+
   for key, spec in chalkConfig.keyspecs:
     # Host keys don't make sense to be lifted, so just skip.
     if spec.kind notin [int(KtChalk), int(KtNonChalk)]: continue
@@ -132,7 +137,12 @@ proc liftUniformKeys() =
       lift = true
       box: Option[Box] = none(Box)
     for chalk in allChalks:
-      if key notin chalk.collectedData:
+      if getCommandName() in chalkConfig.getValidChalkCommandNames():
+        dictToUse = chalk.collectedData
+      else:
+        dictToUse = chalk.extract
+
+      if dictToUse == nil or key notin dictToUse:
         lift = false
         if key in hostInfo:
           liftableKeys.add(key)
@@ -140,14 +150,16 @@ proc liftUniformKeys() =
             "' was put in the host context by plugin and is liftable.")
         break
       if box.isNone():
-        box = some(chalk.collectedData[key])
+        box = some(dictToUse[key])
       else:
-        if chalk.collectedData[key] != box.get():
+        if dictToUse[key] != box.get():
           lift = false
           break
-    if not lift: continue
+    if not lift:  continue
+
     for chalk in allChalks:
-      chalk.collectedData.del(key)
+      if key in chalk.collectedData:
+        chalk.collectedData.del(key)
     trace("Key '" & key & "' is liftable.")
     liftableKeys.add(key)
     hostInfo[key] = box.get()
@@ -186,6 +198,7 @@ proc runCmdInsert*() =
       item.postHash = rawHash
     except:
       error(item.fullPath & ": insertion failed: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
       item.opFailed = true
 
   doReporting()
@@ -205,6 +218,7 @@ proc runCmdDelete*() =
       item.postHash = rawHash
     except:
       error(item.fullPath & ": deletion failed: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
       item.opFailed = true
 
   doReporting()
@@ -436,6 +450,7 @@ proc runCmdConfLoad*() =
       f.close()
     except:
       cantLoad(filename & ": could not read configuration file")
+      dumpExOnDebug()
 
     info(filename & ": Validating configuration.")
 
@@ -477,7 +492,7 @@ proc runCmdConfLoad*() =
     selfChalk.postHash = rawHash
   except:
     cantLoad("Configuration loading failed: " & getCurrentExceptionMsg())
-
+    dumpExOnDebug()
   doReporting()
 
 proc paramFmt(t: StringTable): string =

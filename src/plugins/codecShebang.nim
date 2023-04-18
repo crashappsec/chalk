@@ -29,13 +29,13 @@ method scan*(self:   CodecShebang,
       chalk              = stream.loadChalkFromFStream(loc)
     return some(chalk)
   except:
+    dumpExOnDebug()
     return none(ChalkObj)
 
 method handleWrite*(self:    CodecShebang,
                     chalk:   ChalkObj,
                     encoded: Option[string],
                     virtual: bool): string =
-  chalk.stream.setPosition(0)
   let pre  = chalk.stream.readStr(chalk.startOffset)
   if chalk.endOffset > chalk.startOffset:
     chalk.stream.setPosition(chalk.endOffset)
@@ -45,9 +45,12 @@ method handleWrite*(self:    CodecShebang,
   if encoded.isSome():
     toWrite = pre
     if not pre.strip().endsWith("\n#"): toWrite &= "\n# "
-    toWrite &= encoded.get() & post
+    toWrite &= encoded.get()
+    chalk.endOffset = len(toWrite)
+    toWrite &= post
   else:
-    toWrite = pre[0 ..< pre.find('\n')] & post
+    chalk.endOffset = pre.find('\n')
+    toWrite = pre[0 ..< chalk.endOffset] & post
   chalk.closeFileStream()
   if not virtual: chalk.replaceFileContents(toWrite)
   return $(toWrite.computeSHA256())
@@ -55,10 +58,9 @@ method handleWrite*(self:    CodecShebang,
 method getArtifactHash*(self: CodecShebang, chalk: ChalkObj): string =
   var toHash = ""
   chalk.stream.setPosition(0)
-  chalk.stream.setPosition(0)
   if chalk.isMarked() and getCommandName() != "delete":
     toHash = chalk.stream.readLine() & "\n"
-    chalk.stream.setPosition(chalk.endOffset)
+    chalk.stream.setPosition(chalk.endOffset + 1)
   toHash &= chalk.stream.readAll()
   return $(toHash.computeSHA256())
 

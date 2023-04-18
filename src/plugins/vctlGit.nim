@@ -134,7 +134,7 @@ proc kvpairs(s: Stream): KVPairs =
     try:
       let (k, v) = s.kvPair()
       if k != "": result.add((k, v))
-    except: discard # Should we warn instead og ignroing?
+    except: discard # Should we warn instead of ignroing?
 
 proc section(s: Stream): SecInfo =
   var sec, sub: string
@@ -219,6 +219,7 @@ proc loadHead(self: GitPlugin): bool =
     except: discard
   except:
     error(fNameHead & ": github HEAD file couldn't be read")
+    dumpExOnDebug()
     return false
 
 
@@ -312,6 +313,7 @@ proc getOrigin(self: GitPlugin): (bool, Box) =
     return (true, pack(url))
   except:
     error(confFileName & ": Github configuration file not parsed.")
+    dumpExOnDebug()
     return (false, nil)
 
 proc getHead(self: GitPlugin): (bool, Box) =

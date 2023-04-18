@@ -102,6 +102,16 @@ The reporting cache keeps a local copy of any reports made, to provide redundanc
     doc: "Enables or disables the reporting cache."
   }
 
+  flag_yn debug {
+    field_to_set: "chalk_debug"
+
+    doc: """
+Shows nim stack traces where appropriate, generally where exceptions were caught.
+"""
+  }
+
+
+
   command insert {
     aliases:  ["inject", "ins", "in", "i"]
     args:     (0, high())

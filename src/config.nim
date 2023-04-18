@@ -58,6 +58,10 @@ var
   currentOutputCfg:   OutputConfig
   `isChalkingOp?`:    bool
 
+template dumpExOnDebug*() =
+  if chalkConfig != nil and chalkConfig.getChalkDebug():
+    publish("debug", getCurrentException().getStackTrace())
+
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
   return configRuntime.sCall(cb, args)
 proc runCallback*(s: string, args: seq[Box]): Option[Box] =
@@ -185,6 +189,7 @@ proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
         return some((fname, newFileStream(fname)))
       except:
         error(fname & ": Could not read configuration file")
+        dumpExOnDebug()
         break
     else:
         trace("No configuration file found in " & dir)
@@ -202,7 +207,7 @@ proc loadLocalStructs(state: ConfigState) =
     chalkConfig.configPath[i] = chalkConfig.configPath[i].resolvePath()
   var c4errLevel =  if chalkConfig.con4mPinpoint: c4vShowLoc else: c4vBasic
 
-  if chalkConfig.con4mTraces:
+  if chalkConfig.chalkDebug:
     c4errLevel = if c4errLevel == c4vBasic: c4vTrace else: c4vMax
 
   setCon4mVerbosity(c4errLevel)
@@ -247,6 +252,7 @@ template doRun() =
     cmdlineStashTry()
   except:
     error("Could not load configuration files. exiting.")
+    dumpExOnDebug()
     quit(1)
 
 proc loadAllConfigs*() =
