@@ -1088,6 +1088,22 @@ but you can use the output system to send them anywhere.
     doc:        "Extensions that we assume are in ZIP format for the zip codec"
   }
 
+  field py_extensions {
+    type:       list[string]
+    default:    ["py", "pyw", "ipy"]
+    validator:  func py_check
+    hidden:     true
+    doc:        "Extensions that we assume are Python source files for the python .py codec"
+  }
+
+    field pyc_extensions {
+    type:       list[string]
+    default:    ["pyc", "pyo", "pyd"]
+    validator:  func pyc_check
+    hidden:     true
+    doc:        "Extensions that we assume are Python bytecode files for the python .pyc codec"
+  }
+
   field con4m_pinpoint {
     type:    bool
     default: true
@@ -1695,6 +1711,27 @@ func zip_check(keyname: string, value: list[string]) {
   }
   return ""
 }
+
+func py_check(keyname: string, value: list[string]) {
+  valid_items := ["py", "pyw", "ipy"]
+
+  for i from 0 to len(value) {
+    if not contains(valid_items, value[i]) {
+      return "'" + value[i] + "' is not a supported python source file extension."
+    }
+  }
+  return ""
+}
+
+func pyc_check(keyname: string, value: list[string]) {
+  valid_items := ["pyc", "pyo", "pyd"]
+
+  for i from 0 to len(value) {
+    if not contains(valid_items, value[i]) {
+      return "'" + value[i] + "' is not a supported python bytecode file extension."
+    }
+  }
+  return ""
 
 func default_command_check(keyname, value) {
   if contains(valid_chalk_cmds, value) or find(value, "help.") == 0 {

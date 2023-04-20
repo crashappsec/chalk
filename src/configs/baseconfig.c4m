@@ -928,6 +928,22 @@ plugin zip {
     post_chalk_keys: ["_CURRENT_HASH"]
 }
 
+plugin python_py {
+    codec:           true
+    priority:        1
+    enabled:         true
+    artifact_keys:   ["HASH_FILES"]
+    post_chalk_keys: ["_CURRENT_HASH"]
+}
+
+plugin python_pyc {
+    codec:           true
+    priority:        1
+    enabled:         true
+    artifact_keys:   ["HASH_FILES"]
+    post_chalk_keys: ["_CURRENT_HASH"]
+}
+
 plugin tool {
     enabled:         true
     pre_run_keys:    ["*"]

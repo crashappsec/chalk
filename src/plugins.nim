@@ -313,6 +313,8 @@ import plugins/codecShebang
 import plugins/codecElf
 import plugins/codecContainer
 import plugins/codecZip
+import plugins/codecPythonPy
+import plugins/codecPythonPyc
 import plugins/ciGithub
 import plugins/ciJenkins
 import plugins/ciGitlab
