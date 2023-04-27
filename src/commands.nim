@@ -457,14 +457,14 @@ proc runCmdConfLoad*() =
     let
       toStream = newStringStream
       stack    = newConfigStack().addSystemBuiltins().
-                 addCustomBuiltins(chalkCon4mBuiltins).
-                 addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
-                 addConfLoad(baseConfName, toStream(baseConfig), false, false).
-                 setErrorHandler(newConfFileError).
-                 addConfLoad(ioConfName,   toStream(ioConfig),   false, false).
-                 addConfLoad(signConfName, toStream(signConfig), false, false).
-                 addConfLoad(sbomConfName, toStream(sbomConfig), false, false).
-                 addConfLoad(sastConfName, toStream(sastConfig), false, false)
+                   addCustomBuiltins(chalkCon4mBuiltins).
+                   addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
+                   addConfLoad(baseConfName, toStream(baseConfig)).
+                   setErrorHandler(newConfFileError).
+                   addConfLoad(ioConfName,   toStream(ioConfig)).
+                   addConfLoad(signConfName, toStream(signConfig)).
+                   addConfLoad(sbomConfName, toStream(sbomConfig)).
+                   addConfLoad(sastConfName, toStream(sastConfig))
     stack.run()
     stack.addConfLoad(filename, toStream(newCon4m)).run()
 

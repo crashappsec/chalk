@@ -1732,6 +1732,7 @@ func pyc_check(keyname: string, value: list[string]) {
     }
   }
   return ""
+}
 
 func default_command_check(keyname, value) {
   if contains(valid_chalk_cmds, value) or find(value, "help.") == 0 {
