@@ -1278,6 +1278,7 @@ profile chalking_default {
   key.METADATA_ID.report              = true
   key.SIGN_PARAMS.report              = true
   key.SIGNATURE.report                = true
+  key._CURRENT_HASH.report            = true # Only needed for docker rn
   # This would embed info on any config changes used when chalking.
   # Generally, we assume that's not a good use of space in artifacts.
   key.$CHALK_CONFIG.report            = false
@@ -1299,6 +1300,7 @@ profile chalking_ptr {
   key.SIGNING.report                  = true
   key.METADATA_HASH.report            = true
   key.METADATA_ID.report              = true
+  key._CURRENT_HASH.report            = true # Only needed for docker rn
   key.$CHALK_CONFIG.report            = true  # Only used for self-chalks.
 }
 
@@ -1392,7 +1394,6 @@ profile host_report_insert_base {
   key._OP_PLATFORM.report             = false
   key._OP_HOSTINFO.report             = false
   key._OP_ERRORS.report               = true
-  key._CURRENT_HASH.report            = true # Only needed for docker rn
   #key._VIRTUAL.report                 = true
 }
 
