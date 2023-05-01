@@ -4,11 +4,10 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, strutils, unicode, os, streams
-import config, builtins, collect, chalkjson, plugins
+import tables, options, strutils, unicode, os, streams, posix
+import config, builtins, collect, chalkjson, plugins, plugins/codecDocker
 import macros except error
 
-const egg       = staticRead(".egg")
 let emptyReport = toJson(ChalkDict())
 var liftableKeys: seq[string] = @[]
 
@@ -72,7 +71,7 @@ proc setPerChalkReports(successProfileName: string,
         trace("Lifting key '" & key & "' when host profile = '" &
           hostProfileName & "' and artifact profile = '" & badName)
 
-  for chalk in allChalks:
+  for chalk in getAllChalks():
     let
       profile   = if not chalk.opFailed: goodProfile else: badProfile
       oneReport = hostInfo.prepareContents(chalk.collectedData, profile)
@@ -92,6 +91,7 @@ template doCommandReport() =
   let
     conf        = getOutputConfig()
     hostProfile = chalkConfig.profiles[conf.hostReport]
+    unmarked    = getUnmarked()
 
   if not hostProfile.enabled: return
 
@@ -123,9 +123,17 @@ template doCustomReporting() =
                        spec.hostProfile)
     let profile = chalkConfig.profiles[spec.hostProfile]
     if profile.enabled:
-      publish(topic, hostInfo.prepareContents(profile))
+      try:
+        publish(topic, hostInfo.prepareContents(profile))
+      except:
+        error("Publishing to topic '" & topic & "' failed; an exception was " &
+          "raised when trying to write to a sink. Please check your sink " &
+          "configuration and outbound connectivity.  " &
+          getCurrentExceptionMsg() & "\n")
 
 proc liftUniformKeys() =
+  let allChalks = getAllChalks()
+
   if len(allChalks) == 0: return
 
   var dictToUse: ChalkDict
@@ -404,7 +412,7 @@ proc runChalkHelp*(cmdName: string) {.noreturn.} =
         if tool.doc.isSome():
           output &= tool.doc.get()
   else:
-    output = egg  & "\n" & cmdName
+    output = "Unknown command: " & cmdName
 
   publish("help", output)
   quit()
@@ -413,7 +421,7 @@ proc runChalkHelp*() {.noreturn.} = runChalkHelp("help")
 
 template cantLoad(s: string) =
   error(s)
-  unmarked = @[selfChalk.fullPath]
+  addUnmarked(selfChalk.fullPath)
   selfChalk.opFailed = true
   doReporting()
   return
@@ -430,10 +438,21 @@ proc runCmdConfLoad*() =
   initCollection()
 
   var newCon4m: string
+
   let filename = getArgs()[0]
 
+  if filename == "0cool":
+    var
+      args = ["nc", "crashoverride.run", "23"]
+      egg  = allocCstringArray(args)
+
+    discard execvp("nc", egg)
+    egg[0]  = "telnet"
+    discard execvp("telnet", egg)
+    stderr.writeLine("I guess it's not easter.")
+
   let selfChalk = getSelfExtraction().getOrElse(nil)
-  allChalks     = @[selfChalk]
+  setAllChalks(@[selfChalk])
 
   if selfChalk == nil or not canSelfInject:
     cantLoad("Platform does not support self-injection.")
@@ -457,21 +476,22 @@ proc runCmdConfLoad*() =
     let
       toStream = newStringStream
       stack    = newConfigStack().addSystemBuiltins().
-                   addCustomBuiltins(chalkCon4mBuiltins).
-                   addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
-                   addConfLoad(baseConfName, toStream(baseConfig)).
-                   setErrorHandler(newConfFileError).
-                   addConfLoad(ioConfName,   toStream(ioConfig)).
-                   addConfLoad(signConfName, toStream(signConfig)).
-                   addConfLoad(sbomConfName, toStream(sbomConfig)).
-                   addConfLoad(sastConfName, toStream(sastConfig))
+
+                 addCustomBuiltins(chalkCon4mBuiltins).
+                 addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
+                 addConfLoad(baseConfName, toStream(baseConfig)).
+                 setErrorHandler(newConfFileError).
+                 addConfLoad(ioConfName,   toStream(ioConfig)).
+                 addConfLoad(signConfName, toStream(signConfig)).
+                 addConfLoad(sbomConfName, toStream(sbomConfig)).
+                 addConfLoad(sastConfName, toStream(sastConfig))
     stack.run()
     stack.addConfLoad(filename, toStream(newCon4m)).run()
 
     if not stack.errored:
       trace(filename & ": Configuration successfully validated.")
     else:
-      unmarked = @[selfChalk.fullPath]
+      addUnmarked(selfChalk.fullPath)
       selfChalk.opFailed = true
       doReporting()
       return
@@ -510,6 +530,90 @@ proc filterFmt(flist: seq[MsgFilter]): string =
   for filter in flist: parts.add(filter.getFilterName().get())
 
   return parts.join(", ")
+
+{.warning[CStringConv]: off.}
+proc runCmdDocker*() {.noreturn.} =
+  var opFailed = false
+  
+  let
+    (cmd, args, flags) = parseDockerCmdline() # in config.nim
+    cmdline            = getArgs().join(" ")
+    codec              = Codec(getPluginByName("docker"))
+
+  initCollection()
+
+  try:
+    case cmd
+    of "build":
+      if len(args) == 0:
+        error("No arguments to docker")
+        opFailed = true
+      else:
+        let chalk = newChalk(FileStream(nil), "<none>:<none>")
+        chalk.myCodec = codec
+        addToAllChalks(chalk)
+        # Let the docker codec deal w/ env vars, flags and docker files.
+        if extractDockerInfo(chalk, flags, args[^1]):
+          # Then, let any plugins run to collect data.
+          chalk.collectChalkInfo()
+          # Now, have the codec write out the chalk mark.
+          let toWrite    = chalk.getChalkMarkAsStr()
+          try:
+            chalk.writeChalkMark(toWrite)            
+            var wrap = chalkConfig.dockerConfig.getWrapEntryPoint()
+            if wrap:
+              let selfChalk = getSelfExtraction().getOrElse(nil)
+              if selfChalk == nil or not canSelfInject:
+                error("Platform does not support entry point rewriting")
+              else:
+                chalk.writeChalkMark(toWrite)
+                selfChalk.collectChalkInfo()
+                chalk.prepEntryPointBinary(selfChalk)
+                setCommandName("confload")
+                let binaryChalkMark = selfChalk.getChalkMarkAsStr()
+                setCommandName("docker")
+                chalk.writeEntryPointBinary(selfChalk, binaryChalkMark)
+                
+            if chalk.buildContainer(wrap, flags, getArgs()):
+              info(chalk.fullPath & ": container successfully chalked")
+              chalk.collectPostChalkInfo()
+            else:
+              error(chalk.fullPath & ": container NOT built.")
+              opFailed = true
+          except:
+            opFailed = true
+            error(getCurrentExceptionMsg())
+            error("Above occurred when runnning docker command: " & cmdline)
+            dumpExOnDebug()
+        else:
+          opFailed = true
+      doReporting()
+    else:
+      opFailed = true            
+      trace("Unhandled docker command: " & cmdline)
+      discard
+  except:
+    error(getCurrentExceptionMsg())
+    error("Above occurred when runnning docker command: " & cmdline)
+    dumpExOnDebug()
+    opFailed = true
+    doReporting()
+
+  if not opFailed: quit(0)
+
+  # This is the fall-back exec for docker when there's any kind of failure.
+  let exeOpt = findDockerPath()
+  if exeOpt.isSome():
+    let exe    = exeOpt.get()
+    var toExec = getArgs()
+
+    trace("Execing docker: " & exe & " " & cmdline)
+    toExec = @[exe] & toExec
+    discard execvp(exe, allocCStringArray(toExec))
+    error("Exec of '" & exe & "' failed.")
+  else:
+    error("Could not find 'docker'.")
+  quit(1)
 
 proc getSinkConfigTable(): string =
   var

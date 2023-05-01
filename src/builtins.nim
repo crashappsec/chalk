@@ -9,7 +9,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import config, streams, options, tables, uri, std/tempfiles, os
+import config, streams, options, tables, std/tempfiles, os
 
 proc modedFileSinkOut(msg: string, cfg: SinkConfig, t: StringTable): bool =
   try:
@@ -61,53 +61,8 @@ proc truncatingLog(msg: string, cfg: SinkConfig, t: StringTable): bool =
 let conf = SinkRecord(outputFunction: truncatingLog,
                       keys:           {"filename" : true}.toTable())
 
-register_sink("truncating_log", conf)
+registerSink("truncating_log", conf)
 
-proc customOut(msg: string, record: SinkConfig, xtra: StringTable): bool =
-  var
-    cfg:  StringTable = newOrderedTable[string, string]()
-    args: seq[Box]
-    sig  = "outhook(string, dict[string, string]) -> bool"
-
-  for key, val in xtra:          cfg[key] = val
-  for key, val in record.config: cfg[key] = val
-
-  args.add(pack(msg))
-  args.add(pack(cfg))
-
-  var retBox = runCallback(sig, args).get()
-  return unpack[bool](retBox)
-
-const customKeys = { "secret" :  false, "uid"    : false, "filename": false,
-                     "uri" :     false, "region" : false, "headers":  false,
-                     "cacheid" : false, "aux"    : false }.toTable()
-
-registerSink("custom", SinkRecord(outputFunction: customOut, keys: customKeys))
-
-const
-  availableFilters = { "log_level"     : MsgFilter(logLevelFilter),
-                       "log_prefix"    : MsgFilter(logPrefixFilter),
-                       "pretty_json"   : MsgFilter(prettyJson),
-                       "fix_new_line"  : MsgFilter(fixNewline),
-                       "add_topic"     : MsgFilter(addTopic),
-                       "wrap"          : MsgFilter(wrapToWidth)
-                     }.toTable()
-
-var availableHooks = { "log_hook"     : defaultLogHook,
-                       "con4m_hook"   : defaultCon4mHook
-                     }.toTable()
-
-when not defined(release): availableHooks["debug_hook"] = defaultDebugHook
-
-proc getFilterName*(filter: MsgFilter): Option[string] =
-  for name, f in availableFilters:
-    if f == filter: return some(name)
-
-proc getHookByName(name: string): Option[SinkConfig] =
-  if name in availableHooks: return some(availableHooks[name])
-  return none(SinkConfig)
-
-proc getSinkConfigs*(): Table[string, SinkConfig] = return availableHooks
 
 var args: seq[string]
 
@@ -122,10 +77,13 @@ proc getArgv(args: seq[Box], unused: ConfigState): Option[Box] =
 proc getExeName(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
 
+proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
+  return some(pack(getChalkExeVersion()))
+
 proc subscriptionExists(args: seq[Box], unused: ConfigState): Option[Box] =
   let
     config = unpack[string](args[0])
-    `rec?` = getHookByName(config)
+    `rec?` = getSinkConfigByName(config)
 
   return some(pack(`rec?`.isSome()))
 
@@ -133,7 +91,7 @@ proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   let
     topic  = unpack[string](args[0])
     config = unpack[string](args[1])
-    `rec?` = getHookByName(config)
+    `rec?` = getSinkConfigByName(config)
 
   if `rec?`.isNone():
     error(config & ": unknown sink configuration")
@@ -153,7 +111,7 @@ proc topicUnsubscribe(args: seq[Box], unused: ConfigState): Option[Box] =
   let
     topic  = unpack[string](args[0])
     config = unpack[string](args[1])
-    `rec?` = getHookByName(config)
+    `rec?` = getSinkConfigByName(config)
 
   if `rec?`.isNone(): return some(pack(false))
 
@@ -161,8 +119,9 @@ proc topicUnsubscribe(args: seq[Box], unused: ConfigState): Option[Box] =
 
 proc chalkErrSink(msg: string, cfg: SinkConfig, arg: StringTable): bool =
   result = true
-  if not isChalkingOp() or currentErrorObject.isNone(): systemErrors.add(msg)
-  else: currentErrorObject.get().err.add(msg)
+  let errObject = getErrorObject()
+  if not isChalkingOp() or errObject.isNone(): systemErrors.add(msg)
+  else: errObject.get().err.add(msg)
 
 proc chalkErrFilter(msg: string, info: StringTable): (string, bool) =
   if keyLogLevel in info:
@@ -199,119 +158,6 @@ proc logInfo(args: seq[Box], s: ConfigState): Option[Box] =
 proc logTrace(args: seq[Box], s: ConfigState): Option[Box] =
   return logBase("trace", args, s)
 
-var installed_sink_configs: seq[string] = @[]
-
-proc sinkConfigLong(args: seq[Box], s: ConfigState): Option[Box] =
-  let
-    sinkConf   = unpack[string](args[0])
-    sinkName   = unpack[string](args[1])
-    sinkopts   = unpack[OrderedTableRef[string, string]](args[2])
-    filters    = unpack[seq[string]](args[3])
-    cfgopt     = getSinkConfig(sinkName)
-
-  if cfgOpt.isNone():
-    warn("When running sinkConfig for config named '" & sinkconf &
-         "': no such sink named '" & sinkname & "'")
-    return
-
-  let sinkConfData = cfgopt.get()
-
-  # Need to call info config.nim for now because we don't have perms
-  # to check the fields and have not set up accessors.
-  checkHooks(sinkname, sinkconf, sinkConfData, sinkopts)
-
-  if sinkname == "s3":
-    try:
-      let dstUri = parseUri(sinkopts["uri"])
-      if dstUri.scheme != "s3":
-        warn("Sink config '" & sinkconf & "' requires a URI of " &
-             "the form s3://bucket-name/object-path (skipped)")
-    except:
-        warn("Sink config '" & sinkconf & "' contains an invalid URI (skipped)")
-        dumpExOnDebug()
-
-  var filterObjs: seq[MsgFilter] = @[]
-  for filter in filters:
-    if filter notin availableFilters:
-      warn("Invalid filter named '" & filter & "': skipping filter.")
-    else:
-      filterObjs.add(availableFilters[filter])
-      trace("Config " & sinkconf & ": added filter '" & filter & "'")
-
-  # We currently pass through unknown keys to make life easier for
-  # new sink writers.
-  let theSinkOpt = getSink(sinkname)
-
-  if theSinkOpt.isNone():
-    warn("Sink '" & sinkname & "' is configured, and the config file specs " &
-         "it, but there is no implementation for that sink.")
-    return
-
-  let `cfg?` = configSink(theSinkOpt.get(), some(sinkopts), filterObjs)
-
-  if `cfg?`.isSome():
-    availableHooks[sinkconf] = `cfg?`.get()
-
-    # Update what we've installed so validation can check whether custom
-    # reports have proper sink specs attached to them.
-    installed_sink_configs.add(sinkConf)
-    discard attrSet(s.attrs,
-                    "private_installed_sinks",
-                    pack(installed_sink_configs))
-  else:
-    warn("Output sink configuration '" & sinkconf & "' failed to load.")
-
-proc sinkConfigShort(args: seq[Box], unused: ConfigState): Option[Box] =
-  var a2 = args
-  a2.add(pack[seq[string]](@[]))
-  return sinkConfigLong(a2, unused)
-
-proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
-  return some(pack(getChalkExeVersion()))
-
-proc setupDefaultLogConfigs*() =
-  let
-    cacheFile = chalkConfig.getReportCacheLocation()
-    doCache   = chalkConfig.getUseReportCache()
-    auditFile = chalkConfig.getAuditLocation()
-    doAudit   = chalkConfig.getPublishAudit()
-
-  if doAudit and auditFile != "":
-    let
-      f         = some(newOrderedTable({ "filename" : auditFile}))
-      auditConf = configSink(getSink("truncating_log").get(), f).get()
-
-    availableHooks["audit_file"] = auditConf
-    if subscribe("audit", auditConf).isNone():
-      error("Unknown error initializing audit log.")
-    else:
-      trace("Audit log subscription enabled")
-  if doCache:
-    let
-      f         = some(newOrderedTable({"filename" : cacheFile}))
-      cacheConf = configSink(getSink("truncating_log").get(), f).get()
-
-    availableHooks["report_cache"] = cacheConf
-    if subscribe("report", cacheConf).isNone():
-      error("Unknown error initializing report cache.")
-    else:
-      trace("Report cache subscription enabled")
-
-  let
-    uri       = chalkConfig.getCrashOverrideUsageReportingUrl()
-    workspace = chalkConfig.getCrashOverrideWorkspaceId()
-    headers   = "X-Crashoverride-Workspace-Id: " & workspace & "\n" &
-                "Content-Type: application/json"
-
-    params  = some(newOrderedTable({ "uri": uri, "headers" : headers }))
-    useConf = configSink(getSink("post").get(), params)
-
-  discard subscribe("chalk_usage_stats", useConf.get())
-
-let
-  scSigShort = "sink_config(string, string, dict[string, string])"
-  scSigLong  = "sink_config(string, string, dict[string, string], list[string])"
-
 let chalkCon4mBuiltins* = [
     ("version() -> string",                 BuiltinFn(getExeVersion)),
     ("subscribe(string, string) -> bool",   BuiltInFn(topicSubscribe)),
@@ -322,9 +168,7 @@ let chalkCon4mBuiltins* = [
     ("info(string)",                        BuiltInFn(logInfo)),
     ("trace(string)",                       BuiltInFn(logTrace)),
     ("argv() -> list[string]",              BuiltInFn(getArgv)),
-    ("argv0() -> string",                   BuiltInFn(getExeName)),
-    (scSigShort,                            BuiltInFn(sinkConfigShort)),
-    (scSigLong,                             BuiltInFn(sinkConfigLong)) ]
+    ("argv0() -> string",                   BuiltInFn(getExeName)) ]
 
 let errSinkObj = SinkRecord(outputFunction: chalkErrSink)
 registerSink("chalk-err-log", errSinkObj)

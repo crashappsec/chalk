@@ -13,6 +13,8 @@ all_cmds_that_insert := ["insert", "docker", "confload"]
 tool_types           := ["sbom", "sast"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
 key_types            := ["Chalkable Host", "Chalk", "Non-Chalk", "Host Only"]
+known_sink_filters   := ["log_level", "log_prefix", "pretty_json",
+                         "fix_new_line", "add_topic", "wrap"]
 
 # This is the enum for key types.   See 'key' object documentation below
 # for more details.
@@ -44,6 +46,7 @@ enum PTChalk, PTArtifact, PTHost
 # Make these available through stacks.  Enums are automatically
 # avalable through stacks.
 export default_key_priority, valid_chalk_cmds, all_cmds_that_insert
+export known_sink_filters
 
 object key {
   # TODO: no callbacks or value fields when system is set on the keyspec.
@@ -605,137 +608,78 @@ object sink {
   gen_fieldname: "sinks"
   gen_typename:  "SinkSpec"
   gen_setters:   false
-  user_def_ok:   false
+  user_def_ok:   true
+  validator:     func sink_object_check
   doc:           """
 This object type is needed to add new data sinks to chalk.  Note that
-sinks configurations are not made with con4m objects currently,
-because we want the results to be available immediately-- for
-instance, if you connect the logging topic to an additional sink, or
-turn off the current configuration, that should take effect
-immediately, for the duration of the config file's execution.
+sinks configurations are loaded after all config files are run, so if
+you want to add a sink_config object to configure one of these sinks,
+and then you want to use that configuration in I/O immediately, you
+need to call load_sink_configs() explicitly.
 
-The easiest way to deal with this is to use con4m functions to do the
-sink configuration.  This may change in future versions, though the
-function-based API is unlikely to go away for compatability purposes.
+When adding a sink to Chalk, the fields you add should be the fields
+you may take as parameters in a sink_config. All parameters will be of
+type 'string'. If the parameter is required, then set the value to
+'true'.  If it is not required, then set the value to 'false', unless
+you want to provide a default value, in which case, set the value as a
+string.
 
-Each field for this object type is intended to specify what
-configuration keys can be passed to sink_config().  For each field,
-there are two variants, one that requires the field exist
-("needs_..."), and one that makes it optional ("uses_...").
+For the moment, each 'sink' object is expected to tie to a sink
+implementation loaded in chalk.
 """
 
-  field uses_secret {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field uses_uid {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field uses_filename {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field uses_uri {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field uses_region {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field uses_headers {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field uses_cacheid {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field uses_aux {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field needs_secret {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field needs_uid {
-    type:       bool
-    default:    false
-     write_lock: true
-  }
-
-  field needs_filename {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field needs_uri {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field needs_region {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field needs_aux {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field needs_headers {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
-  field needs_cacheid {
-    type:       bool
-    default:    false
-    write_lock: true
-  }
-
   field doc {
-    type:       string
-    require:    false
-    write_lock: true
-    hidden:     true
+    type:    string
+    require: false
+    hidden:  true
+  }
+}
+
+object sink_config {
+  gen_fieldname: "sinkConfs"
+  gen_typename:  "SinkConfigObj"
+  gen_setters:   false
+  user_def_ok:   true
+  validator:     func sink_config_check
+  doc: """
+Configure a sink, using the fields provided in that sink spec.
+"""
+
+  field enabled {
+    type:    bool
+    default: true
+    doc: """
+Set to false to leave in the config but disable it.
+"""
   }
 
-  exclusions {
-    needs_secret:   "uses_secret"
-    needs_uid:      "uses_uid"
-    needs_filename: "uses_filename"
-    needs_uri:      "uses_uri"
-    needs_region:   "uses_region"
-    needs_headers:  "uses_headers"
-    needs_cacheid:  "uses_cacheid"
-    needs_aux:      "uses_aux"
+  field filters {
+    type:    list[string]
+    default: []
+    validator: func sink_filter_check
+    doc: """
+Filters to install.  Valid options are:
+{bold}log_level{reset} -- Used for reporting to the log sink, this completely filters out messages that aren't as 'important' as the current log level.  The default output configuration has this installed.
+{bold}log_prefix{reset} -- Used to add the name of the log level to log messages.  This is added in the default log configuration.
+{bold}pretty_json{reset} -- Assumes the input is JSON, and then formats it for human output, mainly adding newlines and a bit of indentation.
+{bold}fix_new_line{reset} -- Add a newline to the end of any published message if it doesn't already have one.
+{bold}add_topic{reset} -- Not used by default, but adds a header to any message noting the topic.
+{bold}wrap{reset} -- Wrap text, taking the current terminal width into account.
+"""
+  }
+
+  field loaded {
+    type:    bool
+    default: false
+    hidden:  true
+
+  }
+
+  field sink {
+    type:       string
+    require:    true
+    write_lock: true
+    doc: "The base sink; other attrs in this section are based on this value."
   }
 }
 
@@ -934,6 +878,66 @@ If not specified, reports apply to any command that reports.
   }
 }
 
+singleton docker {
+  gen_fieldname: "dockerConfig"
+  gen_typename:  "DockerConfig"
+  gen_setters:   false
+  user_def_ok:   false
+  doc: """
+Internal configuration information for the docker command.
+"""
+  allow getopts { }
+
+  field wrap_entrypoint {
+    type:    bool
+    default: false
+    doc:     """
+When running the docker command, this option modifies the container
+to, on entry, report as if running the 'chalk extract' command, and
+then exec the actual entry point.
+"""
+  }
+
+  field entrypoint_report_sink {
+     type:      string
+     default:   ""
+     validator: func sink_ref_check
+     doc:  """
+When wrapping a container to run in entrypoint mode, you need to configure an output sink.  For this, specify the name of a sink configuration.
+"""
+  }
+
+  field entrypoint_host_report_profile {
+    type:      string
+    require:   false
+    validator: func custom_report_artifact_check
+    doc:       """
+The named profile is used to determine which host-level metadata keys
+will be used for reporting when a docker container entry point is run.
+If not provided, a default policy is added.
+"""
+  }
+
+  field entrypoint_artifact_report_profile {
+    type:      string
+    require:   false
+    validator: func custom_report_artifact_check
+    doc: """
+The named profile is used for when reporting on per-artifact any
+information, when run from the docker entry point.
+If not provided, a default policy is added.
+"""
+  }
+
+  field chalk_file_location {
+    type: string
+    default: "/chalk.json"
+    doc: """
+When wrapping a container to run in entrypoint mode, this controls where on the file system the 'inner' chalk lives.
+"""
+  }
+}
+
 root {
   prologue: """
 # This file is auto-generated as part of the chalk build.
@@ -949,10 +953,12 @@ root {
   allow keyspec       { }
   allow plugin        { }
   allow sink          { }
+  allow sink_config   { }
   allow profile       { }
   allow outconf       { }
   allow custom_report { }
   allow tool          { }
+  allow docker        { }
 
   field config_path {
     type:       list[string]
@@ -1184,7 +1190,7 @@ The 'extract' operation ignores this.
 
   field load_default_signing {
     type:     bool
-    default:  false
+    default:  true
     shortdoc: "Load GPG module"
     hidden:   true # This happens before the user config runs.
     doc: """
@@ -1267,6 +1273,30 @@ the artifact's hash.
 This field should generally be passed at the command line. It is only
 intended for manually 'virtually' chalking containers, and should be
 the image name, which will be put into the ARTIFACT_PATH field.
+"""
+  }
+
+  field docker_exe {
+    type:     string
+    require:  false
+    shortdoc: "Docker command location"
+    doc: """
+When running the 'docker' command, this tells chalk where to look for the docker executable to exec.
+
+If this is not provided, or if the file is not found, chalk will search the PATH for the first instance of 'docker' that is not itself (We generally expect renaming chalk to docker and using this variable to point to the actual docker EXE will be the most seamless approach).
+
+Note that, when chalk is invoked with 'docker' as its EXE name, the default IO configuration is to *NOT* anything chalk-specific on the console.
+"""
+  }
+
+  field chalk_contained_items {
+    type:    bool
+    default: true
+    shortdoc: "Add chalk to embedded chalkable objects"
+    doc: """
+When chalking an artifact that can itself contain artifacts, this field dictates whether the contents should be chalked, or if just the outer artifact.
+
+Currently, this is only respected for artifacts in ZIP format (e.g., JAR files)
 """
   }
 
@@ -1356,6 +1386,53 @@ for transient infrastructure. In such a case, configure and attach multiple
     default:    <<10mb>>
     doc:        """
 If a write to the cache would exceed this amount, the system will truncate down to 75% of this size before doing the write.
+"""
+  }
+
+  field env_always_show {
+    type:       list[string]
+    default:    []
+    shortdoc:   "Env Vars to show full data for"
+    doc:        """
+For the ENV and _ENV metadata keys, any environment variable listed here will get reported with its actual value at the time the chalk command is invoked.
+"""
+  }
+
+  field env_never_show {
+    type:       list[string]
+    default:    []
+    shortdoc:   "Env Vars to ignore"
+    doc:        """
+For the ENV and _ENV metadata keys, any environment variable listed here will get ignored.
+"""
+  }
+
+  field env_redact {
+    type:       list[string]
+    default:    []
+    shortdoc:   "Env Vars to redact"
+    doc:        """
+For the ENV and _ENV metadata keys, any environment variable listed here will get redacted for privacy.  Currently, that means we give the value <<redacted>>; we do not try to detect sensitive data and redact it.
+"""
+  }
+
+  field env_default_action {
+    type:     string
+    choice:   ["show", "redact", "ignore"]
+    default:  "redact"
+    shortdoc: "Default envvar action"
+    doc:        """
+For the ENV and _ENV metadata keys, any environment variable that is not listed explicitly in the above lists will be handled as specified here.
+"""
+  }
+
+  field entrypoint {
+    type:    string
+    require: false
+    doc:  """
+When running in entrypoint mode, this is the command line to exec on startup.
+Note that this is generally set by the 'docker' command.  If it is set, then
+command line parsing won't happen.
 """
   }
 
@@ -1657,6 +1734,16 @@ func custom_report_artifact_check(name, profile_name) {
   }
 }
 
+func sink_ref_check(name, sink_config_name) {
+  result := ""
+
+  # No sink config means use the default crashoveride one.
+  if sink_config_name == "" { return; }
+  if not sections("sink_config").contains(sink_config_name) {
+    return "No sink configuration named: '" + sink_config_name + "'"
+  }
+}
+
 func use_when_check(name, value: list[string]) {
   result := ""
 
@@ -1697,6 +1784,15 @@ func sink_list_check(name, sinklist: list[string]) {
   for i from 0 to len(sinklist) {
      result := sink_check(name, sinklist[i])
      if result != "" { return; }
+  }
+}
+
+func sink_filter_check(name, filterList: list[string]) {
+  result := ""
+  for i from 0 to len(filterList) {
+    if not known_sink_filters.contains(filterList[i]) {
+      return "Unknown filter in sink configuration: " + filterList[i]
+    }
   }
 }
 
@@ -1771,6 +1867,65 @@ func key_name_validation() {
     elif key_name.find("_X-") == 0 { continue; }
     return ("Custom key '" + key_name + "' is invalid. Chalkable custom " +
             "keys must start with X- (or _X- for non-chalkable keys)")
+  }
+}
+
+func sink_object_check(path) {
+  result := ""
+  f := fields(path)
+
+  for i from 0 to len(f) {
+    fieldname := path + "." + f[i]
+    fieldtype := attr_type(fieldname)
+    if typecmp(fieldtype, bool) or typecmp(fieldtype, string) {
+      continue
+    }
+    return ("All sink fields must be a bool indicating whether a field is " +
+            "required, or a string specifying a default value " +
+	    "(offending field: '" + f[i] + "' has type: " + $(fieldtype))
+  }
+}
+
+sink_config_skip_fields := ["enabled", "loaded", "sink", "filters"]
+export sink_config_skip_fields
+
+func sink_config_check(path) {
+  result   := ""
+  sinkname := attr_get(path + ".sink", string)
+  if not attr_exists("sink." + sinkname) {
+    return "No such sink configured: '" + sinkname + "'"
+  }
+  sinkfields := fields("sink." + sinkname)
+  conffields := fields(path)
+
+  for i from 0 to len(conffields) {
+    conffield := conffields[i]
+    if sink_config_skip_fields.contains(conffield) {
+      continue
+    }
+
+    if not sinkfields.contains(conffield) {
+      return ("sink config provides field '" + conffield +
+              "', but the specified sink '" + sinkname +
+	      "' does not use that field.")
+    }
+    if not typecmp(attr_type(path + "." + conffield), string) {
+      return "All sink_config fields must be strings."
+    }
+  }
+
+  for i from 0 to len(sinkfields) {
+    fullname := "sink." + sinkname + "." + sinkfields[i]
+     t := attr_type(fullname)
+     if not typecmp(t, bool) {   # TODO-- short circuit didn't work??
+       continue
+     }
+     if not attr_get(fullname, bool) {
+       continue
+     }
+     if not conffields.contains(sinkfields[i]) {
+       return "sink config is missing required field: '" + sinkfields[i] + "'"
+     }
   }
 }
 

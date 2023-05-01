@@ -9,15 +9,6 @@ if env_exists("NO_COLOR") {
 } else {
   color: true
 }
-
-sink_config("console_err", "stderr", {})
-sink_config("console_out", "stdout", {})
-
-# For commands that output JSON, default user output should get
-# JSON formatting and always get a newline per-publish.
-sink_config("json_console_out", "stdout", {}, ["pretty_json", "fix_new_line"])
-sink_config("json_console_err", "stderr", {}, ["pretty_json", "fix_new_line"])
-
 subscribe("report",   "json_console_err")
 subscribe("virtual",  "json_console_out")
 subscribe("audit",    "json_console_out")
@@ -30,7 +21,8 @@ if cmd == "confdump" {
   args := argv()
 
   if len(args) > 0 {
-    sink_config("dump_out", "file", {"filename" : args[0]})
+    sink_config.dump_out.enabled  = true
+    sink_config.dump_out.filename = args[0]
     subscribe("confdump", "dump_out")
   }
   else {
@@ -42,12 +34,6 @@ elif cmd == "defaults" {
 } else {
     subscribe("defaults", "console_err")
 }
-
-# custom_report stats {
-#  sink_configs: ["tbd"]
-#  host_profile: "beacon_report"
-#  use_when:     ["insert", "docker", "delete", "confload"]
-# }
 
 # Note that there are already two pre-built output configurations.
 # They are both subscribed to the 'stderr' sink.  You can remove those

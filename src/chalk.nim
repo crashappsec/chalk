@@ -6,12 +6,16 @@
 # any submodule imports it.
 
 static:
+  echo "Running dependency test on chalk.c42spec"
   echo staticexec("if test \\! c4autoconf.nim -nt configs/chalk.c42spec; " &
-                  "then con4m gen configs/chalk.c42spec --language=nim " &
-                  "--output-file=c4autoconf.nim; fi")
+                     "then echo 'Config file schema changed. Regenerating " &
+                     "c4autoconf.nim.' ; con4m gen configs/chalk.c42spec " &
+                     "--language=nim --output-file=c4autoconf.nim; else " &
+                     "echo No change to chalk.c42spec; fi")
 
 # Note that importing builtins causes topics to register, and
 # importing plugins causes plugins to register.
+{.warning[UnusedImport]: off.}
 import config, builtins, commands, plugins
 
 when isMainModule:
@@ -25,7 +29,7 @@ when isMainModule:
   of "confload":   runCmdConfLoad()
   of "defaults":   showConfig(force = true)
   of "version":    runCmdVersion()
-  of "docker":     echo "called 'docker " & $(getArgs()) & "'"
+  of "docker":     runCmdDocker()
   of "entrypoint": echo "entry point."
   else:
     runChalkHelp(getCommandName()) # noreturn, will not show config.

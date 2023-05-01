@@ -36,6 +36,7 @@ method handleWrite*(self:    CodecShebang,
                     chalk:   ChalkObj,
                     encoded: Option[string],
                     virtual: bool): string =
+  chalk.stream.setPosition(0)
   let pre  = chalk.stream.readStr(chalk.startOffset)
   if chalk.endOffset > chalk.startOffset:
     chalk.stream.setPosition(chalk.endOffset)

@@ -1,0 +1,33 @@
+## This is the base configuration file that will be loaded when the
+## chalk command is run as an entrypoint.
+##
+## While you can modify this file, note that it is not directly
+## written out when creating the entry point. Instead, substitutions
+## are applied.  They are all of the form $$$SUBNAME$$$, with
+## the tri-string block quotes.
+##
+## The substitutions you can make are generally settable variables in
+## the 'docker' section of your config file.  You also have the ability
+## to write a custom con4m function to do any sink / report installation
+## that you'd like to do (the default is an https post).
+
+recursive:                 false
+allow_external_config:     false
+default_command:           "entrypoint"
+artifact_search_path:      "$$$CHALKFILE$$$"   # default = "/chalk.json"
+entrypoint:                "$$$ENTRYPOINT$$$"
+
+unsubscribe("report", "json_console_err")
+unsubscribe("audit",  "json_console_out")
+
+$$$HOSTPROFILE$$$
+$$$ARTIFACTPROFILE$$$
+
+outconf entrypoint {
+ artifact_report: "$$$ARTPROFILEREF$$$"
+ host_report:     "$$$HOSTPROFILEREF$$$"
+}
+
+$$$SINKCONFIG$$$
+
+subscribe("report", "$$$SINKNAME$$$")

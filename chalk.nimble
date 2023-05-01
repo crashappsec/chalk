@@ -2,13 +2,13 @@ version       = "0.4.0"
 author        = "John Viega"
 description   = "Software artifact metadata to make it easy to tie " &
                 "deployments to source code and collect metadata."
-license       = "Apache-2.0"
+license       = "GPLv3"
 srcDir        = "src"
 bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 1.6.8"
-requires "https://github.com/crashappsec/con4m >= 0.7.4"
+requires "https://github.com/crashappsec/con4m >= 0.7.7"
 requires "https://github.com/crashappsec/nimutils >= 0.3.3"
 requires "nimSHA2 == 0.1.1"
 requires "glob == 0.11.2"

@@ -15,7 +15,7 @@
 import c4autoconf
 export c4autoconf # This is conceptually part of our API.
 
-import options, tables, strutils, algorithm, os, streams
+import options, tables, strutils, algorithm, os, streams, uri
 import con4m, nimutils, nimutils/logging, types
 import macros except error
 export logging, types, nimutils, con4m
@@ -27,32 +27,36 @@ proc commentC4mCode(s: string): string =
 
   # Some string constants used in multiple places.
 const
-  magicUTF8*         = "dadfedabbadabbed"
-  tmpFilePrefix*     = "chalk"
-  tmpFileSuffix*     = "-file.tmp"
-  chalkSpecName*     = "configs/chalk.c42spec"
-  getoptConfName*    = "configs/getopts.c4m"
-  baseConfName*      = "configs/baseconfig.c4m"
-  signConfName*      = "configs/signconfig.c4m"
-  sbomConfName*      = "configs/sbomconfig.c4m"
-  sastConfName*      = "configs/sastconfig.c4m"
-  ioConfName*        = "configs/ioconfig.c4m"
-  defCfgFname*       = "configs/defaultconfig.c4m"  # Default embedded config.
-  chalkC42Spec*      = staticRead(chalkSpecName)
-  getoptConfig*      = staticRead(getoptConfName)
-  baseConfig*        = staticRead(baseConfName)
-  signConfig*        = staticRead(signConfName)
-  sbomConfig*        = staticRead(sbomConfName)
-  sastConfig*        = staticRead(sastConfName)
-  ioConfig*          = staticRead(ioConfNAme)
-  defaultConfig*     = staticRead(defCfgFname) & commentC4mCode(ioConfig)
-  versionStr         = staticexec("cat ../chalk.nimble | grep ^version")
-  commitID           = staticexec("git rev-parse HEAD")
-  archStr            = staticexec("uname -m")
-  osStr              = staticexec("uname -o")
+  magicUTF8*          = "dadfedabbadabbed"
+  tmpFilePrefix*      = "chalk"
+  tmpFileSuffix*      = "-file.tmp"
+  chalkSpecName*      = "configs/chalk.c42spec"
+  getoptConfName*     = "configs/getopts.c4m"
+  baseConfName*       = "configs/baseconfig.c4m"
+  signConfName*       = "configs/signconfig.c4m"
+  sbomConfName*       = "configs/sbomconfig.c4m"
+  sastConfName*       = "configs/sastconfig.c4m"
+  ioConfName*         = "configs/ioconfig.c4m"
+  dockerConfName*     = "configs/dockercmd.c4m"
+  defCfgFname*        = "configs/defaultconfig.c4m"  # Default embedded config.
+  entryPtTemplateLoc* = "configs/entrypoint.c4m"
+  chalkC42Spec*       = staticRead(chalkSpecName)
+  getoptConfig*       = staticRead(getoptConfName)
+  baseConfig*         = staticRead(baseConfName)
+  signConfig*         = staticRead(signConfName)
+  sbomConfig*         = staticRead(sbomConfName)
+  sastConfig*         = staticRead(sastConfName)
+  ioConfig*           = staticRead(ioConfNAme)
+  dockerConfig*       = staticRead(dockerConfName)
+  defaultConfig*      = staticRead(defCfgFname) & commentC4mCode(ioConfig)
+  entryPtTemplate*    = staticRead(entryPtTemplateLoc)
+  versionStr          = staticexec("cat ../chalk.nimble | grep ^version")
+  commitID            = staticexec("git rev-parse HEAD")
+  archStr             = staticexec("uname -m")
+  osStr               = staticexec("uname -o")
 
 var
-  configRuntime:      ConfigState
+  con4mRuntime:       ConfigStack
   chalkConfig*:       ChalkConfig
   commandName:        string
   currentOutputCfg:   OutputConfig
@@ -63,9 +67,9 @@ template dumpExOnDebug*() =
     publish("debug", getCurrentException().getStackTrace())
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
-  return configRuntime.sCall(cb, args)
+  return con4mRuntime.configState.sCall(cb, args)
 proc runCallback*(s: string, args: seq[Box]): Option[Box] =
-  return configRuntime.scall(s, args)
+  return con4mRuntime.configState.scall(s, args)
 
 macro declareChalkExeVersion(): untyped = parseStmt("const " & versionStr)
 declareChalkExeVersion()
@@ -74,7 +78,11 @@ proc getChalkExeVersion*(): string   = version
 proc getChalkCommitId*(): string     = commitID
 proc getChalkPlatform*(): string     = osStr & " " & archStr
 proc getCommandName*(): string       = commandName
-proc getChalkRuntime*(): ConfigState = configRuntime
+proc setCommandName*(s: string) =
+  ## Used to temporarily borrow the confload output context when writing
+  ## entry points, e.g., with docker.
+  commandName = s
+proc getChalkRuntime*(): ConfigState = con4mRuntime.configState
 
 proc isChalkingOp*(): bool =
   once:
@@ -103,29 +111,6 @@ proc lookupCollectedKey*(obj: ChalkObj, k: string): Option[Box] =
   if k in obj.collectedData: return some(obj.collectedData[k])
   return none(Box)
 
-template hookCheck(fieldname: untyped) =
-  let s = astToStr(fieldName)
-  let d = sinkConfData.`needs fieldName`
-
-  if d.isSome() and d.get():
-    if not sinkopts.contains(s):
-      warn("Sink config '" & sinkconf & "' is missing field '" & s &
-           "', which is required by sink '" & sinkname &
-           "' (config not installed)")
-
-proc checkHooks*(sinkname:     string,
-                 sinkconf:     string,
-                 sinkConfData: SinkSpec,
-                 sinkopts:     StringTable) =
-    hookCheck(secret)
-    hookCheck(uid)
-    hookCheck(filename)
-    hookCheck(uri)
-    hookCheck(region)
-    hookCheck(headers)
-    hookCheck(cacheid)
-    hookCheck(aux)
-
 proc orderKeys*(dict: ChalkDict, profile: Profile = nil): seq[string] =
   var tmp: seq[(int, string)] = @[]
   for k, _ in dict:
@@ -152,7 +137,7 @@ proc getSinkConfig*(hook: string): Option[SinkSpec] =
     return some(chalkConfig.sinks[hook])
   return none(SinkSpec)
 
-import builtins, collect # Cyclical, but get chalkCon4mBuiltins here.
+import collect # Cyclical, but get chalkCon4mBuiltins here.
 
 # Since these are system keys, we are the only one able to write them,
 # and it's easier to do it directly here than in the system plugin.
@@ -199,7 +184,133 @@ proc getArgCmdSpec*(): CommandSpec = cmdSpec
 var autoHelp: string = ""
 proc getAutoHelp*(): string = autoHelp
 
-proc loadLocalStructs(state: ConfigState) =
+const
+  availableFilters = { "log_level"     : MsgFilter(logLevelFilter),
+                       "log_prefix"    : MsgFilter(logPrefixFilter),
+                       "pretty_json"   : MsgFilter(prettyJson),
+                       "fix_new_line"  : MsgFilter(fixNewline),
+                       "add_topic"     : MsgFilter(addTopic),
+                       "wrap"          : MsgFilter(wrapToWidth)
+                     }.toTable()
+
+proc getFilterName*(filter: MsgFilter): Option[string] =
+  for name, f in availableFilters:
+    if f == filter: return some(name)
+
+
+var installedSinkConfigs: seq[string] = @[]
+var availableSinkConfigs = { "log_hook"     : defaultLogHook,
+                             "con4m_hook"   : defaultCon4mHook,
+                     }.toTable()
+
+when not defined(release):
+  availableSinkConfigs["debug_hook"] = defaultDebugHook
+
+proc getSinkConfigByName*(name: string): Option[SinkConfig] =
+  if name in availableSinkConfigs: return some(availableSinkConfigs[name])
+  return none(SinkConfig)
+
+proc getSinkConfigs*(): Table[string, SinkConfig] = return availableSinkConfigs
+
+proc setupDefaultLogConfigs*() =
+  let
+    cacheFile = chalkConfig.getReportCacheLocation()
+    doCache   = chalkConfig.getUseReportCache()
+    auditFile = chalkConfig.getAuditLocation()
+    doAudit   = chalkConfig.getPublishAudit()
+
+  if doAudit and auditFile != "":
+    let
+      f         = some(newOrderedTable({ "filename" : auditFile}))
+      auditConf = configSink(getSink("truncating_log").get(), f).get()
+
+    availableSinkConfigs["audit_file"] = auditConf
+    if subscribe("audit", auditConf).isNone():
+      error("Unknown error initializing audit log.")
+    else:
+      trace("Audit log subscription enabled")
+  if doCache:
+    let
+      f         = some(newOrderedTable({"filename" : cacheFile}))
+      cacheConf = configSink(getSink("truncating_log").get(), f).get()
+
+    availableSinkConfigs["report_cache"] = cacheConf
+    if subscribe("report", cacheConf).isNone():
+      error("Unknown error initializing report cache.")
+    else:
+      trace("Report cache subscription enabled")
+
+  let
+    uri       = chalkConfig.getCrashOverrideUsageReportingUrl()
+    workspace = chalkConfig.getCrashOverrideWorkspaceId()
+    headers   = "X-Crashoverride-Workspace-Id: " & workspace & "\n" &
+                "Content-Type: application/json"
+
+    params  = some(newOrderedTable({ "uri": uri, "headers" : headers }))
+    useConf = configSink(getSink("post").get(), params)
+
+  discard subscribe("chalk_usage_stats", useConf.get())
+
+proc loadSinkConfigs*() =
+  for name, confInfo in chalkConfig.sinkConfs:
+    var opts = OrderedTableRef[string, string]()
+
+    if confInfo.loaded or not confInfo.enabled: continue
+    let
+      sinkName = confInfo.sink
+      attrs    = confInfo.`@@attrscope@@`
+
+    for k, _ in attrs.contents:
+      if k in ["enabled", "loaded", "sink", "filters"]:
+        continue
+      let v = getOpt[string](attrs, k)
+      opts[k] = v.getOrElse("")
+
+    discard attrs.setOverride("loaded", some(pack(true)))
+    confInfo.loaded = true
+
+    # Still going to do some validation here that we *should* push to con4m
+    # but haven't foten around to it yet.
+    if sinkName == "s3":
+      try:
+        let dstUri = parseUri(opts["uri"])
+        if dstUri.scheme != "s3":
+          warn("Sink config '" & name & "' requires a URI of " &
+               "the form s3://bucket-name/object-path (skipped)")
+      except:
+          warn("Sink config '" & name & "' has an invalid URI (skipped)")
+          dumpExOnDebug()
+    let theSinkOpt = getSink(sinkName)
+    if theSinkOpt.isNone():
+      warn("Sink '" & sinkname & "' is configured, and the config file specs " &
+           "it, but there is no implementation for that sink.")
+      return
+
+    let filterNames = get[seq[string]](attrs, "filters")
+    var filters: seq[MsgFilter] = @[]
+
+    for item in filterNames:
+      if item notin availableFilters:
+        error("Message filter '" & item & "' cannot be found.")
+      else:
+       filters.add(availableFilters[item])
+
+    let `cfg?`  = configSink(theSinkOpt.get(), some(opts), filters)
+
+    if `cfg?`.isSome():
+      availableSinkConfigs[name] = `cfg?`.get()
+
+      # Update what we've installed so validation can check whether custom
+      # reports have proper sink specs attached to them.
+      installedSinkConfigs.add(name)
+      discard setOverride(getChalkRuntime().attrs,
+                          "private_installed_sinks",
+                          some(pack(installedSinkConfigs)))
+    else:
+      warn("Output sink configuration '" & name & "' failed to load.")
+
+
+proc loadLocalStructs*(state: ConfigState) =
   chalkConfig = state.attrs.loadChalkConfig()
   if chalkConfig.color.isSome(): setShowColors(chalkConfig.color.get())
   setLogLevel(chalkConfig.logLevel)
@@ -211,9 +322,7 @@ proc loadLocalStructs(state: ConfigState) =
     c4errLevel = if c4errLevel == c4vBasic: c4vTrace else: c4vMax
 
   setCon4mVerbosity(c4errLevel)
-
-proc stashRuntime(state: ConfigState) =
-  configRuntime = state
+  loadSinkConfigs()
 
 proc handleCon4mErrors(err, tb: string): bool =
   if chalkConfig == nil or chalkConfig.chalkDebug or true:
@@ -255,6 +364,8 @@ template doRun() =
     dumpExOnDebug()
     quit(1)
 
+import builtins
+
 proc loadAllConfigs*() =
   var res: ArgResult # Used across macros above.
 
@@ -262,24 +373,30 @@ proc loadAllConfigs*() =
     toStream = newStringStream
     stack    = newConfigStack()
 
+  con4mRuntime = stack
+
   stack.addSystemBuiltins().
       addCustomBuiltins(chalkCon4mBuiltins).
       setErrorHandler(handleCon4mErrors).
       addGetoptSpecLoad().
-      addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
-      addCallback(stashRuntime).
-      addConfLoad(baseConfName, toStream(baseConfig)).
+      addSpecLoad(chalkSpecName, toStream(chalkC42Spec), notEvenDefaults).
+      addConfLoad(baseConfName, toStream(baseConfig), checkNone).
       addCallback(loadLocalStructs).
-      addConfLoad(getoptConfName, toStream(getoptConfig)).
+      addConfLoad(getoptConfName, toStream(getoptConfig), checkNone).
       setErrorHandler(handleOtherErrors).
       addStartGetOpts(printAutoHelp = false).addCallback(loadLocalStructs).
-      setErrorHandler(handleCon4mErrors).
-      addConfLoad(ioConfName,   toStream(ioConfig)).
-      addConfLoad(signConfName, toStream(signConfig)).
-      addConfLoad(sbomConfName, toStream(sbomConfig)).
-      addConfLoad(sastConfName, toStream(sastConfig)).
-      addCallback(stashRuntime).
-      addCallback(loadLocalStructs)
+      setErrorHandler(handleCon4mErrors)
+  doRun()
+  stack.addConfLoad(ioConfName, toStream(ioConfig), notEvenDefaults).
+      addConfLoad(dockerConfName, toStream(dockerConfig), checkNone)
+
+  if chalkConfig.getLoadDefaultSigning():
+    stack.addConfLoad(signConfName, toStream(signConfig), checkNone)
+  if chalkConfig.getLoadSbomTools():
+    stack.addConfLoad(sbomConfName, toStream(sbomConfig), checkNone)
+  if chalkConfig.getLoadSastTools():
+    stack.addConfLoad(sastConfName, toStream(sastConfig), checkNone)
+  stack.addCallback(loadLocalStructs)
   doRun()
 
   # Next, do self extraction, and get the embedded config.
@@ -297,3 +414,8 @@ proc loadAllConfigs*() =
     stack.addConfLoad(fName, toStream(embed)).addCallback(loadLocalStructs)
     doRun()
     hostInfo["_OP_CONFIG"] = pack(configFile)
+
+template parseDockerCmdline*(): (string, seq[string],
+                             OrderedTable[string, FlagSpec])  =
+  con4mRuntime.addStartGetopts("docker.getopts", args = getArgs()).run()
+  (con4mRuntime.getCommand(), con4mRuntime.getArgs(), con4mRuntime.getFlags())

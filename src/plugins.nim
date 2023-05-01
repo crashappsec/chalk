@@ -9,7 +9,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import os, tables, strutils, algorithm, options, glob, streams,
-       posix, std/tempfiles, nimSHA2, config, chalkjson
+       posix, std/tempfiles, nimSHA2, config, chalkjson, json
 
 when (NimMajor, NimMinor) < (1, 7):  {.warning[LockLevel]: off.}
 
@@ -50,6 +50,9 @@ proc getPlugins*(): seq[Plugin] =
     for (_, plugin) in preResult: plugins.add(plugin)
 
   return plugins
+
+proc getPluginByName*(s: string): Plugin =
+  return installedPlugins[s]
 
 proc getCodecs*(): seq[Codec] =
   once:
@@ -246,12 +249,20 @@ method getHashAsOnDisk*(self: Codec, chalk: ChalkObj): Option[string] {.base.} =
 
   chalk.closeFileStream()
 
-proc getChalkId*(self: Codec, chalk: ChalkObj): string =
-  discard chalk.acquireFileStream()
-  chalk.rawHash = self.getArtifactHash(chalk)
-  result = idFormat(chalk.rawHash)
+method noPreArtifactHash*(self: Codec): bool {.base.} = false
+method autoArtifactPath*(self: Codec): bool {.base.}  = true
 
-  chalk.yieldFileStream()
+method getChalkId*(self: Codec, chalk: ChalkObj): string {.base.} =
+  ## The CHALK_ID should be a hash of the artifact whenever possible.
+  ## Try not to override this if it can be avoided.
+  if self.usesFStream():
+    discard chalk.acquireFileStream()
+    chalk.rawHash = self.getArtifactHash(chalk)
+    result = idFormat(chalk.rawHash)
+    chalk.yieldFileStream()
+  else:
+    chalk.rawHash = self.getArtifactHash(chalk)
+    result = idFormat(chalk.rawHash)
 
 method getChalkInfo*(self: Codec, chalk: ChalkObj): ChalkDict =
   result               = ChalkDict()
@@ -304,6 +315,54 @@ method handleWrite*(s:       Codec,
   else:             publish("virtual", enc.get()) # Can't do virtual on delete.
   return $(contents.computeSHA256()).toHex().toLowerAscii()
 
+
+
+# This is docker specific stuff that shouldn't be here, but am dealing
+# with some cyclic dependencies.
+const
+  hostDefault = "host_report_other_base"
+  artDefault  = "artifact_report_extract_base"
+
+proc profileToString(name: string): string =
+  if name in ["", hostDefault, artDefault]: return ""
+
+  result      = "profile " & name & " {\n"
+  let profile = chalkConfig.profiles[name]
+
+  for k, obj in profile.keys:
+    let
+      scope  = obj.getAttrScope()
+      report = get[bool](scope, "report")
+      order  = getOpt[int](scope, "order")
+
+    result &= "  key." & k & ".report = " & $(report) & "\n"
+    if order.isSome():
+      result &= "  key." & k & ".order = " & $(order.get()) & "\n"
+
+  result &= "}\n\n"
+
+proc sinkConfToString(name: string): string =
+  result     = "sink_config " & name & " {\n  filters: ["
+  var frepr  = seq[string](@[])
+  let
+    config   = chalkConfig.sinkConfs[name]
+    scope    = config.getAttrScope()
+
+  for item in config.filters: frepr.add("\"" & item & "\"")
+
+  result &= frepr.join(", ") & "]\n"
+  result &= "  sink: \"" & config.sink & "\"\n"
+
+  # copy out the config-specific variables.
+  for k, v in scope.contents:
+    if k in ["enabled", "filters", "loaded", "sink"]: continue
+    if v.isA(AttrScope): continue
+    echo k
+    let val = getOpt[string](scope, k).getOrElse("")
+    result &= "  " & k & ": \"" & val & "\"\n"
+
+  result &= "}\n\n"
+
 # We need to turn off UnusedImport here, because the nim static
 # analyzer thinks the below imports are unused. When we first import,
 # they call registerPlugin(), which absolutely will get called.
@@ -311,6 +370,7 @@ method handleWrite*(s:       Codec,
 
 import plugins/codecShebang
 import plugins/codecElf
+import plugins/codecDocker
 import plugins/codecContainer
 import plugins/codecZip
 import plugins/codecPythonPy

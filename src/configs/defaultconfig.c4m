@@ -80,6 +80,14 @@ ptr_url := ""
 
 ## I/O CONFIGURATION
 
+sink_config s3 {
+  enabled: false
+  sink:    "s3"
+  secret:  env("AWS_ACCESS_SECRET")
+  uid:     env("AWS_ACCESS_ID")
+  uri:     env("AWS_S3_BUCKET_URI")
+}
+
 ## This is an example of what you can do.  At this point, you will
 ## have some subscriptions set up, based on the command.  The code
 ## used for I/O in the base configuration is in the comments below;
@@ -92,12 +100,10 @@ if cmd == "extract" or cmd == "insert" or cmd == "delete" {
     } elif not env_exists("AWS_ACCESS_SECRET") {
        warn("To configure AWS must provide AWS_ACCESS_SECRET")
     } else {
-      sink_config("s3", "s3", { "secret" : env("AWS_ACCESS_SECRET"),
-                                "uid"    : env("AWS_ACCESS_ID"),
-                                "uri"    : env("AWS_S3_BUCKET_URI") }, [])
       if len(strip(ptr_url)) == 0 {
         ptr_url := env("AWS_S3_BUCKET_URI")
       }
+      sink_config.s3.enabled = true
       #  Stuff you might do if the sink is configured...
       # subscribe("insert", "s3")
       # subscribe("extract", "s3")
@@ -126,6 +132,9 @@ if cmd != "ambiguous" {
 
 default_command  = "help"
 use_report_cache = true
+
+docker.wrap_entrypoint = false
+docker.entrypoint_report_sink = "s3"
 
 # Below this point is configuration code that has already run, before
 # your base configuration loaded. You can safely delete these comments

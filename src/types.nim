@@ -43,17 +43,41 @@ type
 
   KeyType* = enum KtChalkableHost, KtChalk, KtNonChalk, KtHostOnly
 
+  CollectionCtx = ref object
+    currentErrorObject: Option[ChalkObj]
+    allChalks:          seq[ChalkObj]
+    unmarked:           seq[string]
+
 var
-  currentErrorObject* = none(ChalkObj)
-  systemErrors*       = seq[string](@[])
+  ctxStack            = seq[CollectionCtx](@[])
+  collectionCtx       = CollectionCtx()
   hostInfo*           = ChalkDict()
   subscribedKeys*     = Table[string, bool]()
-  allChalks*          = seq[ChalkObj](@[])
-  unmarked*           = seq[string](@[])
+  systemErrors*       = seq[string](@[])
   selfChalk*          = ChalkObj(nil)
   selfID*             = Option[string](none(string))
   canSelfInject*      = true
 
+proc pushCollectionCtx*() =
+  ctxStack.add(collectionCtx)
+  collectionCtx = CollectionCtx()
+
+proc popCollectionCtx*() =
+  collectionCtx = ctxStack.pop()
+
+proc getErrorObject*(): Option[ChalkObj] = collectionCtx.currentErrorObject
+proc setErrorObject*(o: ChalkObj) =
+  collectionCtx.currentErrorObject = some(o)
+proc clearErrorObject*() =
+  collectionCtx.currentErrorObject = none(ChalkObj)
+proc getAllChalks*():   seq[ChalkObj] = collectionCtx.allChalks
+proc addToAllChalks*(o: ChalkObj) =
+  collectionCtx.allChalks.add(o)
+proc setAllChalks*(s: seq[ChalkObj]) =
+  collectionCtx.allChalks = s
+proc getUnmarked*():    seq[string] = collectionCtx.unmarked
+proc addUnmarked*(s: string) =
+  collectionCtx.unmarked.add(s)
 
 proc isMarked*(chalk: ChalkObj): bool {.inline.} = return chalk.extract != nil
 proc newChalk*(stream: FileStream, loc: string): ChalkObj =
@@ -62,7 +86,7 @@ proc newChalk*(stream: FileStream, loc: string): ChalkObj =
                     opFailed:      false,
                     stream:        stream,
                     extract:       nil)
-  currentErrorObject = some(result)
+  setErrorObject(result)
 
 proc idFormat*(rawHash: string): string =
   let s = base32vEncode(rawHash)

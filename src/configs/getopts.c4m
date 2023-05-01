@@ -110,8 +110,6 @@ Shows nim stack traces where appropriate, generally where exceptions were caught
 """
   }
 
-
-
   command insert {
     aliases:  ["inject", "ins", "in", "i"]
     args:     (0, high())

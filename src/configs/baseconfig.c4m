@@ -419,6 +419,61 @@ keyspec _ACTION_ID {
                       "Which is a 64-bit random value presented as hex digits."
 }
 
+cmdline_args := argv()
+
+keyspec ARGV {
+    kind:             ChalkableHost
+    type:             list[string]
+    standard:         true
+    system:           true
+    ~value:           cmdline_args
+    since:            "0.1.0"
+    normalized_order: 2800
+    doc:              "The full contents of argv used on invocation"
+}
+
+keyspec ENV {
+    kind:             ChalkableHost
+    type:             dict[string, string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 2900
+    doc:              """
+Environment variables set when the process is run. Because chalk may be used to proxy container entry points that could contain sensitive data, it's possible to redact variables, or skip them outright.  The behavior is configured with the following configuration attributes:
+
+- {bold}env_always_show{reset}, a list of environment variables to show unredacted.
+- {bold}env_never_show{reset}, a list of environment variables NOT to show in this report.
+- {bold}env_redact{reset}, a list of environment variables to redact.
+- {bold}env_default_action{reset}, a value ("show", "redact", "ignore") that indicates what to do for unnamed environment variables.  This defaults to "redact"
+
+Currently, this filtering is not handled per-report.
+"""
+}
+
+keyspec _ARGV {
+    kind:             HostOnly
+    type:             list[string]
+    standard:         true
+    system:           true
+    ~value:           cmdline_args
+    since:            "0.1.0"
+    normalized_order: 200
+    doc:              "The full contents of argv used on invocation"
+}
+
+
+keyspec _ENV {
+    kind:             HostOnly
+    type:             dict[string, string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 300
+    doc:              """
+Same as ENV, but for a non-chalking context (e.g., extraction time). It respects the same environment variables.
+"""
+}
 keyspec TENANT_ID {
     kind:             ChalkableHost
     type:             string
@@ -896,6 +951,79 @@ keyspec _OP_HOST_REPORT_KEYS {
                       "were added to the chalk"
 }
 
+keyspec DOCKER_FILE {
+    kind:             Chalk
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.1.0"
+    normalized_order: high() - 20000
+    doc: """
+When chalking docker containers, this gets the contents of the topmost docker file passed to the docker command line, prior to any entry point wrapping.
+"""
+}
+
+keyspec DOCKERFILE_PATH {
+    kind:             Chalk
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.1.0"
+    normalized_order: high() - 19990
+    doc: """
+Path to the docker file on the system on which it was built.
+"""
+}
+
+keyspec DOCKER_PLATFORM {
+    kind:             Chalk
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.1.0"
+    normalized_order: high() - 19980
+    doc: """
+Platform passed when performing 'docker build', if any.
+"""
+}
+
+keyspec DOCKER_LABELS {
+    kind:              Chalk
+    type:              dict[string, string]
+    standard:          true
+    system:            false
+    since:             "0.1.0"
+    normalized_order:  high() - 19970
+    doc: """
+Labels added to a docker image.
+"""
+}
+
+keyspec DOCKER_TAGS {
+    kind:              Chalk
+    type:              list[string]
+    standard:          true
+    system:            false
+    since:             "0.1.0"
+    normalized_order:  high() - 19960
+    doc: """
+Tags added to a docker image.  Will be in the form: REPOSITORY:TAG
+"""
+}
+
+keyspec DOCKER_CONTEXT {
+    kind:              Chalk
+    type:              string
+    standard:          true
+    system:            false
+    since:             "0.1.0"
+    normalized_order:  high() - 19950
+    doc: """
+Context used when building a container.
+"""
+}
+
+
 # Doesn't do any keys other than the codec defaults, which are:
 # ARTIFACT_PATH, HASH, HASH_FILES, COMPONENT_HASHES.  Note that
 # non-codecs cannot set these keys.
@@ -907,6 +1035,14 @@ plugin elf {
 
 plugin shebang {
     codec:           true
+    artifact_keys:   ["HASH_FILES"]
+    post_chalk_keys: ["_CURRENT_HASH"]
+}
+
+plugin docker {
+    codec:    true
+    priority: 1
+    enabled:  true
     artifact_keys:   ["HASH_FILES"]
     post_chalk_keys: ["_CURRENT_HASH"]
 }
@@ -990,7 +1126,7 @@ plugin github_codeowners {
 plugin system {
   pre_run_keys:    ["INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
                      "INJECTOR_COMMIT_ID", "DATE", "TIME", "TZ_OFFSET",
-		     "DATETIME"]
+		     "DATETIME", "ENV"]
   artifact_keys:   ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
                     "TIMESTAMP"]
   post_chalk_keys: ["_VALIDATED", "_OP_ARTIFACT_PATH", "_CURRENT_HASH",
@@ -1000,7 +1136,7 @@ plugin system {
                     "_OP_CHALKER_VERSION", "_OP_CHALK_COUNT", "_OP_CMD_FLAGS",
 		    "_OP_EXE_NAME", "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
 		    "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
-		    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME"]
+		    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV"]
 
   ~priority:       0
 }
@@ -1073,39 +1209,25 @@ sink stderr {
 }
 
 sink file {
-  ~needs_filename: true
-  doc:             "A sink that writes a local file"
+  ~filename: true
+  doc:       "A sink that writes a local file"
 }
 
 sink s3 {
-  ~needs_secret:   true
-  ~needs_uid:      true
-  ~needs_uri:      true
-  ~uses_region:    true
-  ~uses_cacheid:   true
-  doc:             "A sink for S3 buckets"
+  ~secret:   true
+  ~uid:      true
+  ~uri:      true
+  ~region:   false
+  ~cacheid:  false
+  doc:       "A sink for S3 buckets"
 }
 
 sink post {
-  ~needs_uri:      true
-  ~uses_headers:   true
-  doc:             "Generic HTTP/HTTPS post to a URL. Add custom headers " +
-                   "by providing an implementation to the callback " +
-		   "getPostHeaders(), which should return a dictionary where " +
-		   "all keys and values are strings."
+  ~uri:      true
+  ~headers:  false
+  doc:       "Generic HTTP/HTTPS post to a URL. Headers must be one per-line."
 }
 
-sink custom {
-  ~uses_secret:    true
-  ~uses_uid:       true
-  ~uses_headers:   true
-  ~uses_filename:  true
-  ~uses_uri:       true
-  ~uses_region:    true
-  ~uses_cacheid:   true
-  ~uses_aux:       true
-  doc:             "Implement a custom sink via a con4m callback"
-}
 
 # This profile is meant to be used for insertion, where we are not
 # doing any 'virtual' chalking-- all the metadata we want to collect
@@ -1270,6 +1392,7 @@ profile host_report_insert_base {
   key._OP_PLATFORM.report             = false
   key._OP_HOSTINFO.report             = false
   key._OP_ERRORS.report               = true
+  key._CURRENT_HASH.report            = true # Only needed for docker rn
   #key._VIRTUAL.report                 = true
 }
 
@@ -1383,7 +1506,6 @@ profile host_report_other_base {
   key.ERR_INFO.report                 = true
 }
 
-
 profile audit_report {
   # Here, we only report key bits about the configuration used, for
   # audit purposes. This is implemented as the "audit" report below;
@@ -1415,7 +1537,6 @@ custom_report chalk_usage_stats {
   host_profile:  "usage_report"
   use_when:      ["insert", "docker", "delete"]
 }
-
 
 custom_report audit {
   sink_configs: [] # "audit_file" is auto-subscribed.
@@ -1468,23 +1589,31 @@ default_command = "help"
 
 func call_rand(key) { return $(lower(hex(rand())));  }
 
-# # Stubs for testing via con4m command line (uncomment to use)
-# func argv0() {
-#   return ""
-# }
 
-# func argv() {
-#   return [""]
-# }
+# These should be moved back to ioconf once we get rid of loadConfig
 
-# func sink_config(x, y, z) {
-#   return true
-# }
+sink_config console_err {
+  sink: "stderr"
+}
 
-# func sink_config(a, b, c, d) {
-#   return true
-# }
+sink_config console_out {
+  sink: "stdout"
+}
 
-# func subscribe(a, b) {
-#   return true
-# }
+# For commands that output JSON, default user output should get
+# JSON formatting and always get a newline per-publish.
+sink_config json_console_out {
+  sink: "stdout"
+  filters: ["pretty_json", "fix_new_line"]
+}
+
+sink_config json_console_err {
+  sink: "stderr"
+  filters: ["pretty_json", "fix_new_line"]
+}
+
+sink_config dump_out {
+  enabled:  false
+  sink:     "file"
+  filename: ""  # Set below.
+}

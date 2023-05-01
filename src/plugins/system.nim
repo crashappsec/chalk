@@ -143,20 +143,21 @@ let
 method getPostRunInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
   result = ChalkDict()
 
-  if len(systemErrors) != 0: result["_OP_ERRORS"] = pack(systemErrors)
-  if len(unmarked)     != 0: result["_UNMARKED"]  = pack(unmarked)
+  if len(systemErrors)  != 0: result["_OP_ERRORS"] = pack(systemErrors)
+  if len(getUnmarked()) != 0: result["_UNMARKED"]  = pack(getUnmarked())
 
   result["_OPERATION"]            = pack(getCommandName())
   result["_OP_CHALKER_VERSION"]   = pack(getChalkExeVersion())
   result["_OP_PLATFORM"]          = pack(getChalkPlatform())
   result["_OP_CHALKER_COMMIT_ID"] = pack(getChalkCommitId())
-  result["_OP_CHALK_COUNT"]       = pack(len(allChalks) - len(unmarked))
+  result["_OP_CHALK_COUNT"]       = pack(len(getAllChalks()) -
+                                         len(getUnmarked()))
   result["_OP_EXE_NAME"]          = pack(getAppFilename())
   result["_OP_EXE_PATH"]          = pack(getAppDir())
   result["_OP_ARGV"]              = pack(@[getAppFileName()] &
                                           commandLineParams())
   result["_OP_HOSTNAME"]          = pack(getHostName())
-  result["_OP_UNMARKED_COUNT"]    = pack(len(unmarked))
+  result["_OP_UNMARKED_COUNT"]    = pack(len(getUnmarked()))
   result["_TIMESTAMP"]            = pack(uint64(instant * 1000.0))
   result["_DATE"]                 = pack(date)
   result["_TIME"]                 = pack(time)
@@ -176,8 +177,33 @@ method getPostRunInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
 
     result["_OP_HOSTINFO"] = pack($((cast[cstring](addr unameInfo.version[0]))))
 
+proc buildEnvDict(): Con4mDict[string, string] =
+  result = Con4mDict[string, string]()
+  let
+    always = chalkConfig.getEnvAlwaysShow()
+    never  = chalkConfig.getEnvNeverShow()
+    redact = chalkConfig.getEnvRedact()
+    def    = chalkConfig.getEnvDefaultAction()[0]
+
+  for (k, v) in envPairs():
+    # TODO: could add some con4m to warn on overlap across these 3. For now,
+    # we treat it conservatively.
+    if k in never:    continue
+    elif k in redact: result[k] = "<<redact>>"
+    elif k in always: result[k] = v
+    elif def == 'n':  continue
+    elif def == 'r':  result[k] = "<<redact>>"
+    else: result[k] = v
+
 method getHostInfo*(self: SystemPlugin, p: seq[string], ins: bool): ChalkDict =
-  result = ChalkDict()
+  result  = ChalkDict()
+  var env = buildEnvDict()
+
+  # We have thse info now, and it is harder to get later, so cheat a bit
+  # by injecting it directly into hostInfo.  We're the only one who should
+  # ever touch these keys anyway.
+  hostInfo["_OP_SEARCH_PATH"] = pack(p)
+  hostInfo["_ENV"]            = pack(env)
 
   if ins:
     result["INJECTOR_VERSION"]   = pack(getChalkExeVersion())
@@ -187,15 +213,10 @@ method getHostInfo*(self: SystemPlugin, p: seq[string], ins: bool): ChalkDict =
     result["TIME"]               = pack(time)
     result["TZ_OFFSET"]          = pack(offset)
     result["DATETIME"]           = pack(date & "T" & time & offset)
+    result["ENV"]                = pack(env)
 
     let selfIdOpt = selfID
     if selfIdOpt.isSome(): result["INJECTOR_ID"] = pack(selfIdOpt.get())
-
-  # We have this info now, and it is harder to get later, so cheat a bit
-  # by injecting it directly into hostInfo.  We're the only one who should
-  # ever touch this key anyway.
-  hostInfo["_OP_SEARCH_PATH"] = pack(p)
-
 
 method getChalkInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
   result = ChalkDict()

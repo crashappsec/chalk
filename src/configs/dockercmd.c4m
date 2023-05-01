@@ -1,0 +1,428 @@
+docker {
+  getopts {
+    args: (0, high())
+    default_yes_prefixes: []
+    default_no_prefixes:  []
+    show_doc_on_err:      false
+    add_help_commands:    false
+    ignore_bad_flags:     true
+    colon_ok:             false
+    # space_ok:           false   This is the default, but ok for some.
+    #                             Need to go through and test, but for now,
+    #                             Assume if it's wrong docker will fail.
+    flag_multi_arg config { }
+    flag_multi_arg context {
+      aliases: ["c"]
+    }
+    flag_multi_arg debug {
+      optional_arg: true
+      aliases: ["D"]
+    }
+    flag_multi_arg host {
+      aliases: ["H"]
+    }
+    flag_multi_arg log_level {
+      aliases: ["l"]
+    }
+    flag_multi_arg tls {
+      optional_arg: true
+    }
+    flag_multi_arg tlscacert { }
+    flag_multi_arg tlscert { }
+    flag_multi_arg tlskey { }
+    flag_multi_arg tlsverify {
+      optional_arg: true
+    }
+    # First, commands we aren't yet processing.
+    command attach {
+      args: (0, high())
+    }
+    command builder {
+      args: (0, high())
+    }
+    command checkpoint {
+      args: (0, high())
+    }
+    command commit {
+      args: (0, high())
+    }
+    command config {
+      args: (0, high())
+    }
+    command container {
+      args: (0, high())
+    }
+    command context {
+      args: (0, high())
+    }
+    command cp {
+      args: (0, high())
+    }
+    command create {
+      args: (0, high())
+    }
+    command diff {
+      args: (0, high())
+    }
+    command events {
+      args: (0, high())
+    }
+    command exec {
+      args: (0, high())
+    }
+    command "export" {
+      args: (0, high())
+    }
+    command history {
+      args: (0, high())
+    }
+    command image {
+      args: (0, high())
+    }
+    command images {
+      args: (0, high())
+    }
+    command import {
+      args: (0, high())
+    }
+    command info {
+      args: (0, high())
+    }
+    command inspect {
+      args: (0, high())
+    }
+    command kill {
+      args: (0, high())
+    }
+    command load {
+      args: (0, high())
+    }
+    command login {
+      args: (0, high())
+    }
+    command logout {
+      args: (0, high())
+    }
+    command logs {
+      args: (0, high())
+    }
+    command manifest {
+      args: (0, high())
+    }
+    command network {
+      args: (0, high())
+    }
+    command node {
+      args: (0, high())
+    }
+    command pause {
+      args: (0, high())
+    }
+    command plugin {
+      args: (0, high())
+    }
+    command port {
+      args: (0, high())
+    }
+    command ps {
+      args: (0, high())
+    }
+    command pull {
+      args: (0, high())
+    }
+    command push {
+      args: (0, high())
+    }
+    command rename {
+      args: (0, high())
+    }
+    command restart {
+      args: (0, high())
+    }
+    command rm {
+      args: (0, high())
+    }
+    command rmi {
+      args: (0, high())
+    }
+    command run {
+      args: (0, high())
+    }
+    command save {
+      args: (0, high())
+    }
+    command search {
+      args: (0, high())
+    }
+    command secret {
+      args: (0, high())
+    }
+    command service {
+      args: (0, high())
+    }
+    command stack {
+      args: (0, high())
+    }
+    command start {
+      args: (0, high())
+    }
+    command stats {
+      args: (0, high())
+    }
+    command stop {
+      args: (0, high())
+    }
+    command swarm {
+      args: (0, high())
+    }
+    command system {
+      args: (0, high())
+    }
+    command tag {
+      args: (0, high())
+    }
+    command top {
+      args: (0, high())
+    }
+    command trust {
+      args: (0, high())
+    }
+    command unpause {
+      args: (0, high())
+    }
+    command update {
+      args: (0, high())
+    }
+    command version {
+      args: (0, high())
+    }
+    command volume {
+      args: (0, high())
+    }
+    command wait {
+      args: (0, high())
+    }
+    command build {
+      args: (0, high())
+
+      flag_multi_arg add_host {
+        optional_arg: true
+      }
+      flag_multi_arg build_arg { }
+      flag_multi_arg cache_from { }
+      flag_multi_arg cgroup_parent { }
+      flag_multi_arg compress {
+        optional_arg: true
+      }
+      flag_multi_arg cpu_period { }
+      flag_multi_arg cpu_quota { }
+      flag_multi_arg cpu_shares { }
+      flag_multi_arg cpuset_mems { }
+      flag_multi_arg disable_content_trust {
+        optional_arg: true
+      }
+      flag_multi_arg file {
+        aliases: ["f"]
+	optional_arg: true
+      }
+      flag_multi_arg force_rm {
+	optional_arg: true
+      }
+      flag_multi_arg iidfile { }
+      flag_multi_arg isolation { }
+      flag_multi_arg label { }
+      flag_multi_arg memory {
+        aliases: ["m"]
+      }
+      flag_multi_arg memory_swap { }
+      flag_multi_arg network { }
+      flag_multi_arg no_cache {
+        optional_arg: true
+      }
+      flag_multi_arg platform { }
+      flag_multi_arg pull {
+        optional_arg: true
+      }
+      flag_multi_arg quiet {
+        aliases: ["q"]
+	optional_arg: true
+      }
+      flag_multi_arg rm {
+        optional_arg: true
+      }
+      flag_multi_arg security_opt { }
+      flag_multi_arg shm_size { }
+      flag_multi_arg squash {
+        optional_arg: true
+      }
+      flag_multi_arg tag {
+        aliases: ["t"]
+      }
+      flag_multi_arg target { }
+      flag_multi_arg ulimit { }
+    }
+   command run {
+     args: (0, high())
+
+     flag_multi_arg add_host { }
+     flag_multi_arg attach {
+       aliases: ["a"]
+     }
+     flag_multi_arg blkio_weight { }
+     flag_multi_arg blkio_weight_device { }
+     flag_multi_arg cap_add { }
+     flag_multi_arg cap_drop { }
+     flag_multi_arg cgroup_parent { }
+     flag_multi_arg cgroupns { }
+     flag_multi_arg cidfile { }
+     flag_multi_arg cpu_count { }
+     flag_multi_arg cpu_percent { }
+     flag_multi_arg cpu_period { }
+     flag_multi_arg cpu_quota { }
+     flag_multi_arg cpu_rt_period { }
+     flag_multi_arg cpu_rt_runtime { }
+     flag_multi_arg cpu_shares {
+       aliases: ["c"]
+     }
+     flag_multi_arg cpus { }
+     flag_multi_arg cpuset_cpus { }
+     flag_multi_arg cpuset_mems { }
+     flag_multi_arg detatch {
+       aliases: ["d"]
+       optional_arg: true
+     }
+     flag_multi_arg detatch_keys {
+       optional_arg: true
+     }
+     flag_multi_arg device { }
+     flag_multi_arg device_cgroup_rule { }
+     flag_multi_arg device_read_bps { }
+     flag_multi_arg device_read_iops { }
+     flag_multi_arg device_write_bps { }
+     flag_multi_arg device_write_iops { }
+     flag_multi_arg disable_content_trust {
+       optional_arg: true
+     }
+     flag_multi_arg dns { }
+     flag_multi_arg dns_option { }
+     flag_multi_arg dns_search { }
+     flag_multi_arg domainname { }
+     flag_multi_arg entrypoint { }
+     flag_multi_arg env {
+       aliases: ["e"]
+     }
+
+     flag_multi_arg expose { }
+
+     flag_multi_arg gpus { }
+     flag_multi_arg group_add { }
+     flag_multi_arg health_cmd { }
+     flag_multi_arg health_interval { }
+     flag_multi_arg health_retries { }
+     flag_multi_arg health_start_period { }
+     flag_multi_arg health_timeout { }
+     flag_multi_arg help {
+       optional_arg: true
+     }
+     flag_multi_arg hostname {
+       aliases: ["h"]
+     }
+     flag_multi_arg init {
+       optional_arg: true
+     }
+     flag_multi_arg interactive {
+     	aliases: ["i"]
+	optional_arg: true
+     }
+     flag_multi_arg io_maxbandwidth { }
+     flag_multi_arg io_maxiops { }
+     flag_multi_arg ip { }
+     flag_multi_arg ip6 { }
+     flag_multi_arg ipc { }
+     flag_multi_arg isolation { }
+     flag_multi_arg kernel_memory { }
+     flag_multi_arg label { }
+     flag_multi_arg label_file { }
+     flag_multi_arg link { }
+     flag_multi_arg link_local_ip { }
+     flag_multi_arg log_drive { }
+     flag_multi_arg log_opt { }
+     flag_multi_arg mac_address { }
+     flag_multi_arg memory {
+       aliases: ["m"]
+     }
+     flag_multi_arg memory_reservation { }
+
+     flag_multi_arg memory_swap { }
+
+     flag_multi_arg memory_swappiness {
+       aliases: ["1"]
+     }
+     flag_multi_arg mount { }
+     flag_multi_arg name { }
+     flag_multi_arg network { }
+     flag_multi_arg network_alias { }
+     flag_multi_arg no_healthcheck {
+       optional_arg: true
+     }
+     flag_multi_arg oom_kill_disable {
+       optional_arg: true
+     }
+     flag_multi_arg oom_score_adj { }
+     flag_multi_arg pid { }
+     flag_multi_arg pids_limit { }
+     flag_multi_arg platform { }
+     flag_multi_arg privileged {
+       optional_arg: true
+     }
+     flag_multi_arg publish {
+       aliases: ["p"]
+     }
+     flag_multi_arg plublish_all {
+       aliases: ["P"]
+     }
+     flag_multi_arg pull { }
+     flag_multi_arg quiet {
+       optional_arg: true
+     }
+     flag_multi_arg read_only {
+       optional_arg: true
+     }
+     flag_multi_arg restart {
+       optional_arg: true
+     }
+     flag_multi_arg rm {
+       optional_arg: true
+     }
+     flag_multi_arg runtime { }
+     flag_multi_arg security_opt { }
+     flag_multi_arg shm_size { }
+     flag_multi_arg sig_proxy {
+       optional_arg: true
+     }
+     flag_multi_arg stop_signal { }
+     flag_multi_arg stop_timeout { }
+     flag_multi_arg storage_opt { }
+     flag_multi_arg sysctl { }
+     flag_multi_arg tmpfs { }
+     flag_multi_arg tty {
+       aliases: ["t"]
+       optional_arg: true
+     }
+     flag_multi_arg ulimit { }
+     flag_multi_arg user {
+       aliases: ["u"]
+     }
+     flag_multi_arg userns { }
+     flag_multi_arg uts { }
+     flag_multi_arg volume {
+       aliases: ["v"]
+     }
+     flag_multi_arg volume_drive { }
+     flag_multi_arg volumes_from { }
+     flag_multi_arg workdir {
+       aliases: ["w"]
+     }
+   }
+  }
+}

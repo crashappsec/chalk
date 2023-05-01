@@ -87,7 +87,7 @@ proc collectHostInfo() =
       if k notin hostInfo or k in plugin.configInfo.overrides:
         hostInfo[k] = v
 
-proc collectPostChalkInfo(artifact: ChalkObj) =
+proc collectPostChalkInfo*(artifact: ChalkObj) =
   let
     isInserting = getCommandName() in chalkConfig.getValidChalkCommandNames()
 
@@ -117,11 +117,13 @@ proc collectChalkInfo*(obj: ChalkObj) =
   let data          = obj.collectedData
 
   for plugin in getPlugins():
-
     if plugin == Plugin(obj.myCodec):
       data["CHALK_ID"]      = pack(obj.myCodec.getChalkID(obj))
-      data["HASH"]          = pack(obj.rawHash.toHex().toLowerAscii())
-      data["ARTIFACT_PATH"] = pack(resolvePath(obj.fullpath))
+      if not obj.myCodec.noPreArtifactHash():
+        data["HASH"]          = pack(obj.rawHash.toHex().toLowerAscii())
+      if obj.myCodec.autoArtifactPath():
+        data["ARTIFACT_PATH"] = pack(resolvePath(obj.fullpath))
+      
     elif plugin.configInfo.codec and plugin != obj.myCodec: continue
 
     let subscribed = plugin.configInfo.artifactKeys
@@ -142,7 +144,7 @@ proc collectPostRunInfo*() =
     let subscribed = plugin.configInfo.postRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
 
-    let dict = plugin.getPostRunInfo(allChalks)
+    let dict = plugin.getPostRunInfo(getAllChalks())
     if dict == nil or len(dict) == 0: continue
 
     for k, v in dict:
@@ -198,17 +200,17 @@ iterator allArtifacts*(): ChalkObj =
       let path    = obj.fullPath
       if isChalkingOp():
         if path.ignoreArtifact(skips):
-          unmarked.add(path)
+          addUnmarked(path)
           if obj.isMarked(): info(path & ": Ignoring, but previously chalked")
           else:              trace(path & ": ignoring artifact")
         else:
-          allChalks.add(obj)
+          obj.addToAllChalks()
           if obj.isMarked(): info(path & ": Existing chalk mark extracted")
           else:              trace(path & ": Currently unchalked")
       else:
-        allChalks.add(obj)
+        obj.addToAllChalks()
         if not obj.isMarked():
-          unmarked.add(path)
+          addUnmarked(path)
           warn(path & ": Artifact is unchalked")
         else:
           for k, v in obj.extract:
@@ -219,11 +221,10 @@ iterator allArtifacts*(): ChalkObj =
       yield obj
       # On an insert, any more errors in this object are going to be
       # post-chalk, so need to go to the system errors list.
-      currentErrorObject = none(ChalkObj)
-      if obj.fullpath notin unmarked: obj.collectPostChalkInfo()
+      clearErrorObject()
+      if obj.fullpath notin getUnmarked(): obj.collectPostChalkInfo()
       obj.closeFileStream()
     if len(chalks) > 0 and not goOn: break
-
 
 proc getSelfExtraction*(): Option[ChalkObj] =
   # If we call twice and we're on a platform where we don't
