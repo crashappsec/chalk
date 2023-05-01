@@ -533,7 +533,9 @@ proc filterFmt(flist: seq[MsgFilter]): string =
 
 {.warning[CStringConv]: off.}
 proc runCmdDocker*() {.noreturn.} =
-  var opFailed = false
+  var
+    opFailed = false
+    chalk: ChalkObj
   
   let
     (cmd, args, flags) = parseDockerCmdline() # in config.nim
@@ -549,7 +551,7 @@ proc runCmdDocker*() {.noreturn.} =
         error("No arguments to docker")
         opFailed = true
       else:
-        let chalk = newChalk(FileStream(nil), "<none>:<none>")
+        chalk = newChalk(FileStream(nil), "<none>:<none>")
         chalk.myCodec = codec
         addToAllChalks(chalk)
         # Let the docker codec deal w/ env vars, flags and docker files.
@@ -566,7 +568,6 @@ proc runCmdDocker*() {.noreturn.} =
               if selfChalk == nil or not canSelfInject:
                 error("Platform does not support entry point rewriting")
               else:
-                chalk.writeChalkMark(toWrite)
                 selfChalk.collectChalkInfo()
                 chalk.prepEntryPointBinary(selfChalk)
                 setCommandName("confload")
@@ -598,6 +599,8 @@ proc runCmdDocker*() {.noreturn.} =
     dumpExOnDebug()
     opFailed = true
     doReporting()
+  finally:
+    chalk.cleanupTmpFiles()
 
   if not opFailed: quit(0)
 

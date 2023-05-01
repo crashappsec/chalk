@@ -28,6 +28,8 @@ type
     execNoArgs:             seq[string]
     execWithArgs:           seq[string]
     tmpDockerFile:          string
+    tmpChalkMark:           string
+    tmpEntryPoint:          string
     inspectOut:             JSonNode
 
 proc extractArgv(json: string): seq[string] {.inline.} =
@@ -149,7 +151,7 @@ method getPostChalkInfo*(self:  CodecDocker,
   result  = ChalkDict()
   let
     cache = DockerInfoCache(chalk.cache)
-    ascii = cache.inspectOut.getStr().split(":")[1].toLowerAscii()
+    ascii = cache.inspectOut["Id"].getStr().split(":")[1].toLowerAscii()
 
   chalk.collectedData["_CURRENT_HASH"] = pack(ascii)
 
@@ -261,7 +263,6 @@ proc extractDockerInfo*(chalk:          ChalkObj,
     sectionTable = Table[string, DockerFileSection]()
 
   for item in cmds:
-    echo "item type is " & item.repr(parse)
     if item of FromInfo:
       if section != nil:
         if len(section.alias) > 0:
@@ -422,8 +423,8 @@ proc writeChalkMark*(chalk: ChalkObj, mark: string) =
   try:
     ctx.writeLine(mark)
     ctx.close()
-    moveFile(path, cache.context.joinPath("chalk.json"))
-    cache.additionalInstructions = "COPY " & path & "/chalk.json\n"
+    cache.tmpChalkMark = path
+    cache.additionalInstructions = "COPY " & path.splitPath().tail & " /chalk.json\n"
   finally:
     if ctx != nil:
       try:
@@ -471,7 +472,6 @@ proc sinkConfToString(name: string): string =
   for k, v in scope.contents:
     if k in ["enabled", "filters", "loaded", "sink"]: continue
     if v.isA(AttrScope): continue
-    echo k
     let val = getOpt[string](scope, k).getOrElse("")
     result &= "  " & k & ": \"" & val & "\"\n"
 
@@ -560,23 +560,25 @@ proc buildContainer*(chalk:  ChalkObj,
   # but otherwise will pass through all arguments.
   let
     cache     = DockerInfoCache(chalk.cache)
-    fullFile  = cache.dockerFileContents & cache.additionalInstructions
+    fullFile  = cache.dockerFileContents & "\n" & cache.additionalInstructions
     (f, path) = createTempFile(tmpFilePrefix, tmpFilesuffix, cache.context)
     reparse   = newSpecObj(maxArgs = high(int), unknownFlagsOk = true,
                            noColon = true)
     cmd       = findDockerPath().get()
 
   cache.tmpDockerFile = path
-  f.writeLine(cache.dockerFileContents) # Add an extra \n if line terminated
-
+  f.write(fullFile)
+  f.close()
   reparse.addFlagWithArg("file", ["f"], true, optArg = true)
 
   var args = reparse.parse(inargs).args[""]
   
   args = args[0 ..< ^1] & @["--file=" & path, args[^1]]
 
-  discard execProcess(cmd, args = args, options = {})
-
+  let
+    subp = startProcess(cmd, args = args, options = {poParentStreams})
+    code = subp.waitForExit()
+  
   let
     res   = execProcess(cmd, args = @["inspect", cache.tags[0]], options = {})
     items = res.parseJson().getElems()
@@ -584,6 +586,13 @@ proc buildContainer*(chalk:  ChalkObj,
   if len(items) == 0: return false
   cache.inspectOut = items[0]
   return true
+
+proc cleanupTmpFiles*(chalk: ChalkObj) =
+  let cache = DockerInfoCache(chalk.cache)
+
+  if cache.tmpDockerFile != "": removeFile(cache.tmpDockerFile)
+  if cache.tmpChalkMark  != "": removeFile(cache.tmpChalkMark)
+  if cache.tmpEntryPoint != "": removeFile(cache.tmpEntryPoint)
 
   
 # This stuff needs to get done somewhere...
