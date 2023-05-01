@@ -126,7 +126,7 @@ proc dockerStringToArgv(cmd:   string,
                         shell: seq[string],
                         json:  bool): seq[string] =
   if json: return extractArgv(cmd)
-  
+
   for value in shell: result.add(value)
   result.add(cmd)
 
@@ -514,7 +514,7 @@ proc writeEntryPointBinary*(chalk, selfChalk: ChalkObj, toWrite: string) =
     # build should fail, and the container should re-build without us.
     if cache.relativeEntry != "":
       cache.additionalInstructions &= "RUN which " & cache.relativeEntry & "\n"
-      
+
     # Here's the rationale around the random string:
     # 1. Unlikely, but two builds could use the same context dir concurrently
     # 2. Docker caches layers from RUN commands, and possibly from COPY,
@@ -526,7 +526,7 @@ proc writeEntryPointBinary*(chalk, selfChalk: ChalkObj, toWrite: string) =
     #    if it's there
     if chalkConfig.getRecursive():
       cache.additionalInstructions &= "RUN /" & path & " insert\n"
-      cache.additionalInstructions &= "COPY " & path & " /" & path & "\n"      
+      cache.additionalInstructions &= "COPY " & path & " /" & path & "\n"
     else:
       cache.additionalInstructions &= "COPY " & path & " /chalk\n"
     cache.additionalInstructions &= "ENTRYPOINT [\"/chalk\"]\n"
@@ -564,7 +564,7 @@ proc buildContainer*(chalk:  ChalkObj,
   reparse.addFlagWithArg("file", ["f"], true, optArg = true)
 
   var args = reparse.parse(inargs).args[""]
-  
+
   args = args[0 ..< ^1] & @["--file=" & path, args[^1]]
 
   let
@@ -572,7 +572,7 @@ proc buildContainer*(chalk:  ChalkObj,
     code = subp.waitForExit()
 
   if code != 0: return false
-  
+
   let
     res   = execProcess(cmd, args = @["inspect", cache.tags[0]], options = {})
     items = res.parseJson().getElems()
@@ -588,7 +588,7 @@ proc cleanupTmpFiles*(chalk: ChalkObj) =
   if cache.tmpChalkMark  != "": removeFile(cache.tmpChalkMark)
   if cache.tmpEntryPoint != "": removeFile(cache.tmpEntryPoint)
 
-  
+
 # This stuff needs to get done somewhere...
 #
 # when we execute docker build (using user's original commandline):

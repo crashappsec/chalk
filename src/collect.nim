@@ -123,7 +123,7 @@ proc collectChalkInfo*(obj: ChalkObj) =
         data["HASH"]          = pack(obj.rawHash.toHex().toLowerAscii())
       if obj.myCodec.autoArtifactPath():
         data["ARTIFACT_PATH"] = pack(resolvePath(obj.fullpath))
-      
+
     elif plugin.configInfo.codec and plugin != obj.myCodec: continue
 
     let subscribed = plugin.configInfo.artifactKeys

@@ -536,7 +536,7 @@ proc runCmdDocker*() {.noreturn.} =
   var
     opFailed = false
     chalk: ChalkObj
-  
+
   let
     (cmd, args, flags) = parseDockerCmdline() # in config.nim
     cmdline            = getArgs().join(" ")
@@ -561,7 +561,7 @@ proc runCmdDocker*() {.noreturn.} =
           # Now, have the codec write out the chalk mark.
           let toWrite    = chalk.getChalkMarkAsStr()
           try:
-            chalk.writeChalkMark(toWrite)            
+            chalk.writeChalkMark(toWrite)
             var wrap = chalkConfig.dockerConfig.getWrapEntryPoint()
             if wrap:
               let selfChalk = getSelfExtraction().getOrElse(nil)
@@ -574,7 +574,7 @@ proc runCmdDocker*() {.noreturn.} =
                 let binaryChalkMark = selfChalk.getChalkMarkAsStr()
                 setCommandName("docker")
                 chalk.writeEntryPointBinary(selfChalk, binaryChalkMark)
-                
+
             if chalk.buildContainer(wrap, flags, getArgs()):
               info(chalk.fullPath & ": container successfully chalked")
               chalk.collectPostChalkInfo()
@@ -590,7 +590,7 @@ proc runCmdDocker*() {.noreturn.} =
           opFailed = true
       doReporting()
     else:
-      opFailed = true            
+      opFailed = true
       trace("Unhandled docker command: " & cmdline)
       discard
   except:

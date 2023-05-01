@@ -369,7 +369,7 @@ proc lexQuoted(ctx: DockerParse, s: seq[Rune], q: Rune, i: var int):
 
 const nonWordRunes = [Rune('$'), Rune('"'), Rune('\''), Rune('#'), Rune('='),
                       Rune('{'), Rune('}')]
-                    
+
 proc lexWord(ctx: DockerParse, s: seq[Rune], i: var int): LineToken =
   result = LineToken(kind: ltWord, startix: i)
   var val = ""
