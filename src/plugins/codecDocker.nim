@@ -31,6 +31,7 @@ type
     tmpChalkMark:           string
     tmpEntryPoint:          string
     inspectOut:             JSonNode
+    relativeEntry:          string
 
 proc extractArgv(json: string): seq[string] {.inline.} =
   for item in parseJson(json).getElems():
@@ -189,7 +190,7 @@ proc extractDockerInfo*(chalk:          ChalkObj,
   chalk.fullPath = cache.tags[0]
 
   if "platform" in flags:
-    cache.platform = unpack[string](flags["platform"].getValue())
+    cache.platform = (unpack[seq[string]](flags["platform"].getValue()))[0]
     if cache.platform != "linux/amd64":
       error("skipping unsupported platform: " & cache.platform)
       return false
@@ -363,7 +364,7 @@ proc extractDockerInfo*(chalk:          ChalkObj,
       # check that foundEntry.json == true, because entrypoints defined
       # in shellform supposedly discard cmd.. except that behavior is a
       # byproduct of `/bin/sh -c`, which treats the next argv entry as
-      # the only command to execute..
+      # the only command to execute.
       if foundShell == nil and not foundCmd.json:
         inspected = dockerInspectEntryAndCmd(curSection.image, errors)
         if len(errors) > 0:
@@ -380,30 +381,14 @@ proc extractDockerInfo*(chalk:          ChalkObj,
       error("skipping currently unsupported case of !entrypoint && !cmd")
       return false
 
-    # If cmd is specified in exec form, and the first item doesn't have
-    # an explicitly defined /path/to/file, then $PATH is searched.
-    # We can search the default PATH seen in `docker inspect`:
-    # "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    # but not until we actually execute in the context of the container during
-    # container build time (as the last steps in the Dockerfile). We would
-    # need a way to fail the build (maybe doing like a RUN </tmp/last_command>
-    # at the very bottom, where we would only write to /tmp/last_command from
-    # inside the container if everything went ok (i.e. we found cmd in $PATH).
-    # But this doesn't account for the docker run --env PATH=/something/obscure
-    # which could be the reason we don't find a CMD at run time (but we did find
-    # in a diff path at build time), or alternately that we are now able to find
-    # a CMD at run time that we couldn't see at build time (assuming we didn't
-    # take the /tmp/last_command approach to fail the build). Why is any of this
-    # important to get right? Because when the user executes: `docker run foo`
-    # and the CMD isn't found in PATH docker reports that it couldn't start the
-    # container because it couldn't find CMD--but if we become the entrypoint
-    # we cannot report the same error back because printing to stdout isn't the
-    # same, the error the user normally gets is by way of docker daemon telling
-    # the docker client that the container couldn't be started.
-    # Note that this only applies to exec form
+    # If cmd is specified in exec form, and the first item doesn't
+    # have an explicitly defined /path/to/file, then we should be sure
+    # that, if we wrap the entry point, we can find the command at
+    # build time.  Sure, they might come in and slam the path, but if
+    # they do something crazy like that, we'll just fail and re-build
+    # the container without chalking.
     if cmdArgv[0][0] != '/':
-      error("skipping runtime-dependent PATH CMD case for now: " & cmdArgv[0])
-      return false
+      cache.relativeEntry = cmdArgv[0].split(" ")[0]
 
     cache.execNoArgs   = cmdArgv
     cache.execWithArgs = @[]
@@ -523,6 +508,13 @@ proc writeEntryPointBinary*(chalk, selfChalk: ChalkObj, toWrite: string) =
     selfChalk.postHash  = codec.handleWrite(selfChalk, some(toWrite), false)
     info("New entrypoint binary written to: " & path)
 
+    # If we saw a relative path for the entry point binary, we should make sure
+    # that we're going to find it in the container, so that we don't silently
+    # fail when running as an entry point.  If the 'which' command fails, the
+    # build should fail, and the container should re-build without us.
+    if cache.relativeEntry != "":
+      cache.additionalInstructions &= "RUN which " & cache.relativeEntry & "\n"
+      
     # Here's the rationale around the random string:
     # 1. Unlikely, but two builds could use the same context dir concurrently
     # 2. Docker caches layers from RUN commands, and possibly from COPY,
@@ -578,6 +570,8 @@ proc buildContainer*(chalk:  ChalkObj,
   let
     subp = startProcess(cmd, args = args, options = {poParentStreams})
     code = subp.waitForExit()
+
+  if code != 0: return false
   
   let
     res   = execProcess(cmd, args = @["inspect", cache.tags[0]], options = {})

@@ -579,7 +579,7 @@ proc runCmdDocker*() {.noreturn.} =
               info(chalk.fullPath & ": container successfully chalked")
               chalk.collectPostChalkInfo()
             else:
-              error(chalk.fullPath & ": container NOT built.")
+              error(chalk.fullPath & ": chalking the container FAILED.  Rebuilding without chalking.")
               opFailed = true
           except:
             opFailed = true
