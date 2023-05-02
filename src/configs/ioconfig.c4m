@@ -10,7 +10,6 @@ if env_exists("NO_COLOR") {
   color: true
 }
 subscribe("report",   "json_console_err")
-subscribe("virtual",  "json_console_out")
 subscribe("audit",    "json_console_out")
 subscribe("version",  "console_out")
 subscribe("help",     "console_out")

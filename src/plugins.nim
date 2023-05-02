@@ -310,8 +310,12 @@ method handleWrite*(s:       Codec,
     post = chalk.stream.readAll()
   chalk.closeFileStream()
   let contents = pre & enc.getOrElse("") & post
-  if not virtual:   chalk.replaceFileContents(contents)
-  else:             publish("virtual", enc.get()) # Can't do virtual on delete.
+  if not virtual:
+    chalk.replaceFileContents(contents)
+  else:
+    # Can't do virtual on delete.
+    publish("virtual", enc.get())
+    info(chalk.fullPath & "Virtual chalk published.")
   return $(contents.computeSHA256()).toHex().toLowerAscii()
 
 

@@ -332,8 +332,8 @@ proc handleCon4mErrors(err, tb: string): bool =
   return true
 
 proc handleOtherErrors(err, tb: string): bool =
-  error(err)
-  return true
+  error(getAppFilename().splitPath().tail & ": " & err)
+  quit(1)
 
 # TODO: static tests to validate the c42 configs.
 template cmdlineStashTry() =

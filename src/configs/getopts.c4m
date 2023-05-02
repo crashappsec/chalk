@@ -102,6 +102,16 @@ The reporting cache keeps a local copy of any reports made, to provide redundanc
     doc: "Enables or disables the reporting cache."
   }
 
+  flag_yn virtual {
+    yes_aliases: ["v", "dry-run"]
+    no_aliases: ["V", "no-dry-run"]
+    doc: """
+When chalking, do NOT modify artifacts (overrides config file).  Ignored for non-chalking operations.
+By default, this will write to {bold}./virtual-chalk.json{reset}.
+"""
+      field_to_set: "virtual_chalk"
+  }
+
   flag_yn debug {
     field_to_set: "chalk_debug"
 
@@ -142,13 +152,6 @@ Generally, this stops all other codec processing, and will cause the 'insertion'
       doc: """
 The name of the container, which will be used as the ARTIFACT_PATH. Only consulted when the container image ID is provided.
 """
-    }
-
-    flag_yn virtual {
-      yes_aliases: ["v"]
-      no_aliases: ["V"]
-      doc: "When chalking, do NOT modify artifacts (overrides config file)"
-      field_to_set: "virtual_chalk"
     }
 
     flag_yn recursive {

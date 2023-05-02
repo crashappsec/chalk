@@ -80,6 +80,8 @@ ptr_url := ""
 
 ## I/O CONFIGURATION
 
+subscribe("virtual", "virtual_chalk_log")
+
 sink_config s3 {
   enabled: false
   sink:    "s3"

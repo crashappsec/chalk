@@ -4,7 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, strutils, unicode, os, streams, posix
+import tables, options, strutils, unicode, os, streams, posix, osproc
 import config, builtins, collect, chalkjson, plugins, plugins/codecDocker
 import macros except error
 
@@ -541,7 +541,6 @@ proc runCmdDocker*() {.noreturn.} =
     (cmd, args, flags) = parseDockerCmdline() # in config.nim
     cmdline            = getArgs().join(" ")
     codec              = Codec(getPluginByName("docker"))
-
   initCollection()
 
   try:
@@ -560,32 +559,51 @@ proc runCmdDocker*() {.noreturn.} =
           chalk.collectChalkInfo()
           # Now, have the codec write out the chalk mark.
           let toWrite    = chalk.getChalkMarkAsStr()
-          try:
-            chalk.writeChalkMark(toWrite)
-            var wrap = chalkConfig.dockerConfig.getWrapEntryPoint()
-            if wrap:
-              let selfChalk = getSelfExtraction().getOrElse(nil)
-              if selfChalk == nil or not canSelfInject:
-                error("Platform does not support entry point rewriting")
+          if chalkConfig.getVirtualChalk():
+            publish("virtual", toWrite)
+            info(chalk.fullPath & "Virtual chalk published.")
+            let exe = findDockerPath().getOrElse("")
+            if exe != "":
+              trace("Building container by calling: " & exe & cmdline)
+              let
+                subp = startProcess(exe, args = getArgs(),
+                                    options = {poParentStreams})
+                code = subp.waitForExit()
+              if code != 0 or not runInspectOnImage(exe, chalk):
+                opFailed = true
               else:
-                selfChalk.collectChalkInfo()
-                chalk.prepEntryPointBinary(selfChalk)
-                setCommandName("confload")
-                let binaryChalkMark = selfChalk.getChalkMarkAsStr()
-                setCommandName("docker")
-                chalk.writeEntryPointBinary(selfChalk, binaryChalkMark)
+                chalk.collectPostChalkInfo()
 
-            if chalk.buildContainer(wrap, flags, getArgs()):
-              info(chalk.fullPath & ": container successfully chalked")
-              chalk.collectPostChalkInfo()
             else:
-              error(chalk.fullPath & ": chalking the container FAILED.  Rebuilding without chalking.")
               opFailed = true
-          except:
-            opFailed = true
-            error(getCurrentExceptionMsg())
-            error("Above occurred when runnning docker command: " & cmdline)
-            dumpExOnDebug()
+          else:
+            try:
+              chalk.writeChalkMark(toWrite)
+              var wrap = chalkConfig.dockerConfig.getWrapEntryPoint()
+              if wrap:
+                let selfChalk = getSelfExtraction().getOrElse(nil)
+                if selfChalk == nil or not canSelfInject:
+                  error("Platform does not support entry point rewriting")
+                else:
+                  selfChalk.collectChalkInfo()
+                  chalk.prepEntryPointBinary(selfChalk)
+                  setCommandName("confload")
+                  let binaryChalkMark = selfChalk.getChalkMarkAsStr()
+                  setCommandName("docker")
+                  chalk.writeEntryPointBinary(selfChalk, binaryChalkMark)
+
+              if chalk.buildContainer(wrap, flags, getArgs()):
+                info(chalk.fullPath & ": container successfully chalked")
+                chalk.collectPostChalkInfo()
+              else:
+                error(chalk.fullPath & ": chalking the container FAILED. " &
+                      "Rebuilding without chalking.")
+                opFailed = true
+            except:
+              opFailed = true
+              error(getCurrentExceptionMsg())
+              error("Above occurred when runnning docker command: " & cmdline)
+              dumpExOnDebug()
         else:
           opFailed = true
       doReporting()

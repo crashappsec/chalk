@@ -1643,3 +1643,11 @@ sink_config dump_out {
   sink:     "file"
   filename: ""  # Set below.
 }
+
+# This is the default sink for virtual chalking.
+sink_config virtual_chalk_log {
+  enabled:  true
+  sink:     "file"
+  filters:  ["fix_new_line"]
+  filename: "./virtual-chalk.json"
+}

@@ -1087,10 +1087,9 @@ Everything else will go to _ERR_INFO.
 This option implements 'virtual' chalking, where the chalk mark is not
 inserted into an artifact via codec. Instead, the chalk mark gets
 published to the "virtual" topic, and it is the user's responsibility
-to do something about it.
+to do something about it.  Or else, you could treat it as a dry-run mode.
 
-By default, virtual chalk marks will get appended to "./chalk.log",
-but you can use the output system to send them anywhere.
+By default, virtual chalk marks will get appended to {bold}"./virtual-chalk.json"{reset}, but you can use the output system to send them anywhere (this is setup in the default configuration file).
 """
   }
 

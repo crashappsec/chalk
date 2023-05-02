@@ -545,6 +545,17 @@ proc writeEntryPointBinary*(chalk, selfChalk: ChalkObj, toWrite: string) =
   except:
     discard
 
+proc runInspectOnImage*(cmd: string, chalk: ChalkObj): bool =
+  let
+    cache  = DockerInfoCache(chalk.cache)
+    output = execProcess(cmd, args = @["inspect", cache.tags[0]], options = {})
+    items  = output.parseJson().getElems()
+
+  if len(items) != 0:
+    cache.inspectOut = items[0]
+    return true
+
+
 proc buildContainer*(chalk:  ChalkObj,
                      wrap:   bool,
                      flags:  OrderedTable[string, FlagSpec],
@@ -574,13 +585,7 @@ proc buildContainer*(chalk:  ChalkObj,
 
   if code != 0: return false
 
-  let
-    res   = execProcess(cmd, args = @["inspect", cache.tags[0]], options = {})
-    items = res.parseJson().getElems()
-
-  if len(items) == 0: return false
-  cache.inspectOut = items[0]
-  return true
+  return runInspectOnImage(cmd, chalk)
 
 proc cleanupTmpFiles*(chalk: ChalkObj) =
   let cache = DockerInfoCache(chalk.cache)
