@@ -409,7 +409,8 @@ proc writeChalkMark*(chalk: ChalkObj, mark: string) =
     ctx.writeLine(mark)
     ctx.close()
     cache.tmpChalkMark = path
-    cache.additionalInstructions = "COPY " & path.splitPath().tail & " /chalk.json\n"
+    cache.additionalInstructions = "COPY " & path.splitPath().tail &
+                                   " /chalk.json\n"
   finally:
     if ctx != nil:
       try:
