@@ -551,7 +551,7 @@ proc runCmdDocker*() {.noreturn.} =
         error("No arguments to docker")
         opFailed = true
       else:
-        chalk = newChalk(FileStream(nil), "<none>:<none>")
+        chalk = newChalk(FileStream(nil), resolvePath(args[^1]))
         chalk.myCodec = codec
         addToAllChalks(chalk)
         # Let the docker codec deal w/ env vars, flags and docker files.

@@ -199,7 +199,7 @@ template loadBasics(self: GitPlugin, path: seq[string]) =
     self.vcsDir = item.findGitDir()
     if self.vcsDir != "":
       trace("Version control dir: " & self.vcsDir)
-      return
+      break
 
 proc loadHead(self: GitPlugin): bool =
   # Don't want to commit to the order in which things get called,
@@ -330,7 +330,6 @@ method getHostInfo*(self: GitPlugin,
   result = ChalkDict()
 
   self.loadBasics(path)
-
   if self.vcsDir == "": return # No git directory, so no work to do.
 
   let

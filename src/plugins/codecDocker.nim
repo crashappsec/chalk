@@ -184,8 +184,6 @@ proc extractDockerInfo*(chalk:          ChalkObj,
   else:
     cache.tags = @["<none>:<none>"]
 
-  chalk.fullPath = cache.tags[0]
-
   if "platform" in flags:
     cache.platform = (unpack[seq[string]](flags["platform"].getValue()))[0]
     if cache.platform != "linux/amd64":
