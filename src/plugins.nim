@@ -278,7 +278,6 @@ method getPostChalkInfo*(self: Codec, chalk: ChalkObj, ins: bool): ChalkDict =
     if v.isSome():
       result["_CURRENT_HASH"] = pack(v.get().toHex().toLowerAscii())
 
-
 ## Codecs override this if they're for a binary format and can self-inject.
 method getNativeObjPlatforms*(s: Codec): seq[string] {.base.} = @[]
 

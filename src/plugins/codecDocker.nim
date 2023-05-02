@@ -42,9 +42,7 @@ method usesFStream*(self: CodecDocker): bool = false
 method noPreArtifactHash*(self: CodecDocker): bool = true
 method autoArtifactPath*(self: Codec): bool        = false
 
-# In chalk, this is supposed to represent the artifact hash of the
-# unchalked artifact. For the moment, we're not calculating this, and
-# we are using a random chalk ID.
+#
 method getArtifactHash*(self: CodecDocker, chalk: ChalkObj): string =
   return ""
 
@@ -138,7 +136,6 @@ method getChalkInfo*(self: CodecDocker, chalk: ChalkObj): ChalkDict =
   chalk.collectedData["DOCKERFILE_PATH"] = pack(cache.dockerFilePath) #TODO
   chalk.collectedData["DOCKER_FILE"]     = pack(cache.dockerFileContents)
   chalk.collectedData["DOCKER_CONTEXT"]  = pack(cache.context)
-  chalk.collectedData["HASH"]            = pack("") # TMP KLUDGE
 
   if cache.platform != "":
     chalk.collectedData["DOCKER_PLATFORM"] = pack(cache.platform)

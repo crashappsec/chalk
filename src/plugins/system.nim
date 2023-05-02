@@ -7,7 +7,7 @@
 import os, nativesockets, tables, options, strutils, nimSHA2, sequtils, times,
        ../config, ../plugins, ../normalize, ../chalkjson
 
-when defined(posix): import posix
+when defined(posix): import posix_utils
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 type
@@ -81,15 +81,15 @@ proc applySubstitutions(obj: ChalkObj) {.inline.} =
     chalkId   = unpack[string](obj.lookupCollectedKey("CHALK_ID").get())
     now       = $(unpack[int](obj.lookupCollectedKey("TIMESTAMP").get()))
     path      = unpack[string](obj.lookupCollectedKey("ARTIFACT_PATH").get())
-    hash      = unpack[string](obj.lookupCollectedKey("HASH").get())
+    `hash?`   = obj.lookupCollectedKey("HASH")
     `tenant?` = obj.lookupCollectedKey("TENANT_ID")
     `random?` = obj.lookupCollectedKey("CHALK_RAND")
   var
-    subs      = @[("{chalk_id}", chalkId), ("{now}", now), ("{path}", path),
-                  ("{hash}", hash)]
+    subs      = @[("{chalk_id}", chalkId), ("{now}", now), ("{path}", path)]
 
   if `tenant?`.isSome(): subs.add(("{tenant}", unpack[string](`tenant?`.get())))
   if `random?`.isSome(): subs.add(("{random}", unpack[string](`random?`.get())))
+  if `hash?`.isSome():   subs.add(("{hash}",   unpack[string](`hash?`.get())))
 
   for k, v in obj.collectedData:
     if v.kind != MkStr: continue    # If it's not a string object, no sub to do.
@@ -99,12 +99,10 @@ proc applySubstitutions(obj: ChalkObj) {.inline.} =
     if not s.contains("{"): continue
     obj.collectedData[k] = pack(s.multiReplace(subs))
 
-
 method getPostChalkInfo*(self: SystemPlugin,
                          obj:  ChalkObj,
                          ins:  bool): ChalkDict =
   result = ChalkDict()
-
 
   if not ins:
     obj.opFailed                       = obj.validateMetadata()
@@ -172,10 +170,9 @@ method getPostRunInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
     result["_OP_HOST_REPORT_KEYS"] = pack(reportKeys)
 
   when defined(posix):
-    var unameInfo: Utsname
-    discard posix.uname(unameInfo)
-
-    result["_OP_HOSTINFO"] = pack($((cast[cstring](addr unameInfo.version[0]))))
+    let uinfo = uname()
+    result["_OP_HOSTINFO"] = pack(uinfo.version)
+    result["_OP_NODENAME"] = pack(uinfo.nodename)
 
 proc buildEnvDict(): Con4mDict[string, string] =
   result = Con4mDict[string, string]()
@@ -214,6 +211,11 @@ method getHostInfo*(self: SystemPlugin, p: seq[string], ins: bool): ChalkDict =
     result["TZ_OFFSET"]          = pack(offset)
     result["DATETIME"]           = pack(date & "T" & time & offset)
     result["ENV"]                = pack(env)
+
+    when defined(posix):
+      let uinfo = uname()
+      result["INSERTION_HOSTINFO"] = pack(uinfo.version)
+      result["INSERTION_NODENAME"] = pack(uinfo.nodename)
 
     let selfIdOpt = selfID
     if selfIdOpt.isSome(): result["INJECTOR_ID"] = pack(selfIdOpt.get())

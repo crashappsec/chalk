@@ -184,6 +184,17 @@ keyspec INSERTION_HOSTINFO {
     doc:              "Host information at injection"
 }
 
+keyspec INSERTION_NODENAME {
+    kind:             ChalkableHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: 650
+    doc:              """
+The node name at the time of insertion. On posix systems, this should be equivolent to the uname 'nodename' field.
+"""
+}
+
 keyspec ARTIFACT_PATH {
     kind:             Chalk
     never_early:      true
@@ -897,6 +908,17 @@ keyspec _OP_HOSTINFO {
                       "operation.  System provides a default."
 }
 
+keyspec _OP_NODENAME {
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 2650
+    doc:              """
+The node name at the time of the current operation. On posix systems, this should be equivolent to the uname 'nodename' field.
+"""
+}
+
 keyspec $CHALK_CONFIG {
     kind:             Chalk
     type:             string
@@ -1126,18 +1148,19 @@ plugin github_codeowners {
 plugin system {
   pre_run_keys:    ["INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
                      "INJECTOR_COMMIT_ID", "DATE", "TIME", "TZ_OFFSET",
-		     "DATETIME", "ENV"]
+		     "DATETIME", "ENV", "INSERTION_HOSTINFO",
+		     "INSERTION_NODENAME"]
   artifact_keys:   ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
                     "TIMESTAMP"]
   post_chalk_keys: ["_VALIDATED", "_OP_ARTIFACT_PATH", "_CURRENT_HASH",
                     "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS",  "_VIRTUAL"]
   post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
-                    "_OP_HOSTINFO", "_OP_PLATFORM", "_OP_CHALKER_COMMIT_ID",
-                    "_OP_CHALKER_VERSION", "_OP_CHALK_COUNT", "_OP_CMD_FLAGS",
-		    "_OP_EXE_NAME", "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
+                    "_OP_HOSTINFO", "_OP_NODENAME", "_OP_PLATFORM",
+		    "_OP_CHALKER_COMMIT_ID", "_OP_CHALKER_VERSION",
+		    "_OP_CHALK_COUNT", "_OP_CMD_FLAGS", "_OP_EXE_NAME",
+		    "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
 		    "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
 		    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV"]
-
   ~priority:       0
 }
 
@@ -1278,7 +1301,6 @@ profile chalking_default {
   key.METADATA_ID.report              = true
   key.SIGN_PARAMS.report              = true
   key.SIGNATURE.report                = true
-  key._CURRENT_HASH.report            = true # Only needed for docker rn
   # This would embed info on any config changes used when chalking.
   # Generally, we assume that's not a good use of space in artifacts.
   key.$CHALK_CONFIG.report            = false
@@ -1300,7 +1322,6 @@ profile chalking_ptr {
   key.SIGNING.report                  = true
   key.METADATA_HASH.report            = true
   key.METADATA_ID.report              = true
-  key._CURRENT_HASH.report            = true # Only needed for docker rn
   key.$CHALK_CONFIG.report            = true  # Only used for self-chalks.
 }
 
@@ -1321,6 +1342,7 @@ profile artifact_report_insert_base {
   key.TIMESTAMP.report                = true
   key.ARTIFACT_PATH.report            = true
   key.INSERTION_HOSTINFO.report       = true
+  key.INSERTION_NODENAME.report       = true
   key.ORIGIN_URI.report               = true
   key.ARTIFACT_VERSION.report         = true
   key.STORE_URI.report                = true
@@ -1348,6 +1370,7 @@ profile artifact_report_insert_base {
   key.SIGNATURE.report                = true
   key.$CHALK_CONFIG.report            = true
   key._VIRTUAL.report                 = true
+  key._CURRENT_HASH.report            = true # Only needed for docker rn
 }
 
 # This is what gets posted to any sinks at the time of insert, on a
@@ -1393,8 +1416,9 @@ profile host_report_insert_base {
   key._OP_CHALKER_VERSION.report      = false
   key._OP_PLATFORM.report             = false
   key._OP_HOSTINFO.report             = false
+  key._OP_NODENAME.report             = false
   key._OP_ERRORS.report               = true
-  #key._VIRTUAL.report                 = true
+  #key._VIRTUAL.report                = true
 }
 
 # This is what gets reported per-artifact, by default, on extraction
@@ -1500,6 +1524,7 @@ profile host_report_other_base {
   key._OP_CHALKER_VERSION.report      = true
   key._OP_PLATFORM.report             = true
   key._OP_HOSTINFO.report             = true
+  key._OP_NODENAME.report             = true
   key._OP_ERRORS.report               = true
   key._OP_HOST_REPORT_KEYS.report     = false
   key.SBOM.report                     = true
@@ -1573,7 +1598,7 @@ outconf confdump {
 }
 
 outconf docker {
-  chalk:           "chalking_default"
+  chalk:           "chalking_ptr"
   artifact_report: "artifact_report_insert_base"
   host_report:     "host_report_insert_base"
 }
