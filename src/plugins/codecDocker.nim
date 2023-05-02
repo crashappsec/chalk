@@ -590,10 +590,14 @@ proc buildContainer*(chalk:  ChalkObj,
 proc cleanupTmpFiles*(chalk: ChalkObj) =
   let cache = DockerInfoCache(chalk.cache)
 
-  if cache == nil:              return
-  if cache.tmpDockerFile != "": removeFile(cache.tmpDockerFile)
-  if cache.tmpChalkMark  != "": removeFile(cache.tmpChalkMark)
-  if cache.tmpEntryPoint != "": removeFile(cache.tmpEntryPoint)
+  if not chalkConfig.getChalkDebug():
+    if cache == nil:              return
+    if cache.tmpDockerFile != "": removeFile(cache.tmpDockerFile)
+    if cache.tmpChalkMark  != "": removeFile(cache.tmpChalkMark)
+    if cache.tmpEntryPoint != "": removeFile(cache.tmpEntryPoint)
+  else:
+    # This generally won't print since --log-level defaults to 'error' for chalk
+    info("Skipping deletion of temporary files due to chalk_debug = true")
 
 
 # This stuff needs to get done somewhere...
