@@ -542,6 +542,17 @@ keyspec EMBEDDED_CHALK {
     doc:              "Other artifacts contained in this artifact"
 }
 
+keyspec CLOUD_METADATA {
+    kind:             Chalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 650
+    doc:              """
+Metadata reported by the local cloud provider.  The contents are specific to the provider, but should generally be a string that can itself be interpreted as JSON.
+"""
+}
+
 keyspec SBOM {
     kind:             Chalk
     type:             dict[string, string]
@@ -930,6 +941,17 @@ keyspec $CHALK_CONFIG {
                       "and may be ignored outsde of confdump / confload cmds"
 }
 
+keyspec _OP_CLOUD_METADATA {
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 650
+    doc:              """
+Metadata reported by the local cloud provider.  The contents are specific to the provider, but should generally be a string that can itself be interpreted as JSON.
+"""
+}
+
 keyspec _OP_ERRORS {
     kind:             HostOnly
     type:             list[string]
@@ -1144,6 +1166,12 @@ plugin github_codeowners {
     artifact_keys:   ["CODE_OWNERS"]
 }
 
+plugin aws_ecs {
+    enabled:         true
+    pre_run_keys:    ["CLOUD_METADATA"]
+    post_run_keys:   ["_OP_CLOUD_METADATA"]
+}
+
 # This plugin is the only thing allowed to set these keys.
 plugin system {
   pre_run_keys:    ["INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
@@ -1341,8 +1369,6 @@ profile artifact_report_insert_base {
   key.CHALK_ID.report                 = true
   key.TIMESTAMP.report                = true
   key.ARTIFACT_PATH.report            = true
-  key.INSERTION_HOSTINFO.report       = true
-  key.INSERTION_NODENAME.report       = true
   key.ORIGIN_URI.report               = true
   key.ARTIFACT_VERSION.report         = true
   key.STORE_URI.report                = true
@@ -1395,6 +1421,7 @@ profile host_report_insert_base {
   key.DATETIME.report                 = true
   key.CHALK_VERSION.report            = true
   key.INSERTION_HOSTINFO.report       = true
+  key.INSERTION_NODENAME.report       = true
   key.ORIGIN_URI.report               = true
   key.BRANCH.report                   = true
   key.COMMIT_ID.report                = true
@@ -1441,6 +1468,7 @@ profile artifact_report_extract_base {
   key.CHALK_PTR.report                = true
   key.EARLIEST_VERSION.report         = true
   key.INSERTION_HOSTINFO.report       = true
+  key.INSERTION_NODENAME.report       = true
   key.ARTIFACT_PATH.report            = true
   key.HASH.report                     = true
   key.HASH_FILES.report               = true

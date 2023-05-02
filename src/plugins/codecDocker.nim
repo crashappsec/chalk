@@ -590,6 +590,7 @@ proc buildContainer*(chalk:  ChalkObj,
 proc cleanupTmpFiles*(chalk: ChalkObj) =
   let cache = DockerInfoCache(chalk.cache)
 
+  if cache == nil:              return
   if cache.tmpDockerFile != "": removeFile(cache.tmpDockerFile)
   if cache.tmpChalkMark  != "": removeFile(cache.tmpChalkMark)
   if cache.tmpEntryPoint != "": removeFile(cache.tmpEntryPoint)

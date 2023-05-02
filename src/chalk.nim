@@ -20,6 +20,9 @@ import config, builtins, commands, plugins
 
 when isMainModule:
   loadAllConfigs()
+  # Wait for this warning until after configs load.
+  if not canSelfInject:
+    warn("We have no codec for this platform's native executable type")
   setupDefaultLogConfigs()
   case getCommandName()
   of "extract":    runCmdExtract()

@@ -32,23 +32,8 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-# If not provided, log_level will default to "warn".
-# Options for log_level are:
-# "trace" (show verbose messages)
-# "info"  (show default messages)
-# "warn"  (don't show informational messages, but do show warnings and errors)
-# "error" (show ONLY actual fatal errors)
-# "none"  (show nothing, not even errors)
-#
-# You can configure where these messages go; they get published to the
-# "logs" topic, which automatically is hooked to stderr by default.
-
-log_level: "info"
-
-info("Using the default config. Use 'chalk confload' to load a new one.")
-
-# The following default commands are valid:
-# help, insert, extract, version
+# The following default commands are currently valid:
+# help, insert, extract, version, docker
 #
 # The default only gets used if nothing else is given at the command
 # line, at all.  If you pass any flags at all, you must pass in a
@@ -64,6 +49,32 @@ default_command = "help"
 
 cmd     := argv0()
 args    := argv()
+
+# If not provided, log_level will default to "warn".
+# Options for log_level are:
+# "trace" (show verbose messages)
+# "info"  (show default messages)
+# "warn"  (don't show informational messages, but do show warnings and errors)
+# "error" (show ONLY actual fatal errors)
+# "none"  (show nothing, not even errors)
+#
+# You can configure where these messages go; they get published to the
+# "logs" topic, which automatically is hooked to stderr by default.
+
+if cmd == "docker" {
+  # For docker, only show error output on console if it's bad.  If you
+  # want every message to be recorded in the chalk report (but not
+  # sent to the console), you can change the value of
+  # `chalk_log_level`, to "info" or "warn" (default is "error" only)
+  log_level: "error"
+}
+else {
+  log_level: "info"
+  info("Using the default config. Use 'chalk confload' to load a new one.")
+}
+
+
+
 
 # By default, all collected metadata gets added to the chalk inserted
 # into the artifact.  If you provide the CHALK_PTR key, then most

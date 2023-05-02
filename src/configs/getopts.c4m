@@ -107,7 +107,7 @@ The reporting cache keeps a local copy of any reports made, to provide redundanc
     no_aliases: ["V", "no-dry-run"]
     doc: """
 When chalking, do NOT modify artifacts (overrides config file).  Ignored for non-chalking operations.
-By default, this will write to {bold}./virtual-chalk.json{reset}.
+By default, this will write to "./virtual-chalk.json"
 """
       field_to_set: "virtual_chalk"
   }

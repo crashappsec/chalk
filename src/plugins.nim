@@ -385,5 +385,6 @@ import plugins/conffile
 import plugins/ownerAuthors
 import plugins/ownerGithub
 import plugins/vctlGit
+import plugins/ecs
 import plugins/externalTool
 import plugins/system

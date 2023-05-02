@@ -226,6 +226,15 @@ iterator allArtifacts*(): ChalkObj =
       obj.closeFileStream()
     if len(chalks) > 0 and not goOn: break
 
+proc handleSelfChalkWarnings*() =
+  if not canSelfInject:
+    warn("We have no codec for this platform's native executable type")
+  else:
+    if not selfChalk.isMarked():
+        warn("No existing self-chalk mark found.")
+    elif "CHALK_ID" notin selfChalk.extract:
+        error("Self-chalk mark found, but is invalid.")
+
 proc getSelfExtraction*(): Option[ChalkObj] =
   # If we call twice and we're on a platform where we don't
   # have a codec for this type of executable, avoid dupe errors.
@@ -236,21 +245,19 @@ proc getSelfExtraction*(): Option[ChalkObj] =
       chalks:     seq[ChalkObj]
       ignore:     bool
 
+    # This can stay here, but won't show if the log level is set in the
+    # config file, since this function runs before the config files load.
+    # It will only be seen if running via --trace.
     trace("Checking chalk binary '" & myPath[0] & "' for embedded config")
 
     for codec in getCodecs():
       if hostOS notin codec.getNativeObjPlatforms(): continue
       (ignore, chalks) = codec.findChalk(myPath, exclusions, @[], false)
       selfChalk = chalks[0]
-      if not selfChalk.isMarked():
-        warn("No existing self-chalk mark found.")
-      elif "CHALK_ID" notin chalks[0].extract:
-        error("Self-chalk mark found, but is invalid.")
       selfId  = some(codec.getChalkId(selfChalk))
       selfChalk.myCodec = codec
       return some(selfChalk)
 
-    warn("We have no codec for this platform's native executable type")
     canSelfInject = false
 
   if selfChalk != nil: return some(selfChalk)

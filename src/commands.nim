@@ -618,7 +618,8 @@ proc runCmdDocker*() {.noreturn.} =
     opFailed = true
     doReporting()
   finally:
-    chalk.cleanupTmpFiles()
+    if chalk != nil:
+      chalk.cleanupTmpFiles()
 
   if not opFailed: quit(0)
 
