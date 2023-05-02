@@ -367,12 +367,19 @@ template doRun() =
 import builtins
 
 proc loadAllConfigs*() =
-  var res: ArgResult # Used across macros above.
+  var
+    params: seq[string] = commandLineParams()
+    res:    ArgResult # Used across macros above.
 
   let
     toStream = newStringStream
     stack    = newConfigStack()
 
+  case getAppFileName().splitPath().tail
+  of "docker":
+    if "docker" notin params: params = @["docker"] & params
+  else: discard
+    
   con4mRuntime = stack
 
   stack.addSystemBuiltins().
@@ -384,7 +391,8 @@ proc loadAllConfigs*() =
       addCallback(loadLocalStructs).
       addConfLoad(getoptConfName, toStream(getoptConfig), checkNone).
       setErrorHandler(handleOtherErrors).
-      addStartGetOpts(printAutoHelp = false).addCallback(loadLocalStructs).
+      addStartGetOpts(printAutoHelp = false, args=params).
+      addCallback(loadLocalStructs).
       setErrorHandler(handleCon4mErrors)
   doRun()
   stack.addConfLoad(ioConfName, toStream(ioConfig), notEvenDefaults).
