@@ -936,6 +936,14 @@ If not provided, a default policy is added.
 When wrapping a container to run in entrypoint mode, this controls where on the file system the 'inner' chalk lives.
 """
   }
+
+  field custom_labels {
+    type: dict[string, string]
+    require: false
+    doc: """
+Any labels added here will be added as a LABEL line to the chalked container.
+"""
+  }
 }
 
 root {

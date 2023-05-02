@@ -401,6 +401,7 @@ proc writeChalkMark*(chalk: ChalkObj, mark: string) =
     cache     = DockerInfoCache(chalk.cache)
     (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix, cache.context)
     ctx       = newFileStream(f)
+    labelOps  = chalkConfig.dockerConfig.getCustomLabels()
 
   try:
     ctx.writeLine(mark)
@@ -408,6 +409,10 @@ proc writeChalkMark*(chalk: ChalkObj, mark: string) =
     cache.tmpChalkMark = path
     cache.additionalInstructions = "COPY " & path.splitPath().tail &
                                    " /chalk.json\n"
+    if labelOps.isSome():
+      for k, v in labelOps.get():
+        cache.additionalInstructions &= "LABEL " & k & "=\"" & v & "\"\n"
+
   finally:
     if ctx != nil:
       try:
