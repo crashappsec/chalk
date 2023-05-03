@@ -379,7 +379,7 @@ proc loadAllConfigs*() =
   of "docker":
     if "docker" notin params: params = @["docker"] & params
   else: discard
-    
+
   con4mRuntime = stack
 
   stack.addSystemBuiltins().

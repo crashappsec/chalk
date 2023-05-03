@@ -1104,7 +1104,7 @@ plugin zip {
     codec:           true
     priority:        1
     enabled:         true
-    artifact_keys:   ["HASH_FILES"]
+    artifact_keys:   ["HASH_FILES", "EMBEDDED_CHALK"]
     post_chalk_keys: ["_CURRENT_HASH"]
 }
 

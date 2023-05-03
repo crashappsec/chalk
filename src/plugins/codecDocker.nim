@@ -82,8 +82,7 @@ proc findDockerPath*(): Option[string] =
 
   return dockerPathOpt
 
-proc dockerInspectEntryAndCmd(imageName: string,
-                              errors:    var seq[string]): InspectedImage =
+proc dockerInspectEntryAndCmd(imageName: string): InspectedImage =
   # `docker inspect imageName`
   #FIXME another thing: this probably needs to be aware of if docker sock
   # or context or docker config is specified to the original docker command!
@@ -119,6 +118,10 @@ proc dockerInspectEntryAndCmd(imageName: string,
       let items = config["Cmd"]
       for item in items:
         result.cmdArgv.add(item.getStr())
+
+template inspectionFailed(image: InspectedImage): bool =
+  len(image.entryArgv) + len(cmdArgv) + len(shellArgv) == 0
+
 
 proc dockerStringToArgv(cmd:   string,
                         shell: seq[string],
@@ -288,14 +291,18 @@ proc extractDockerInfo*(chalk:          ChalkObj,
     # to save the source location as a hint for where to look for git info
 
   # might have had errors walking the Dockerfile commands
-  if len(errors) > 0:
-      return false
+  for err in errors:
+    error(chalk.fullPath & ": " & err)
 
   # Command line flags replace what's in the docker file if there's a key
   # collision.
   for k, v in labels:
     if k notin cache.labels:
       cache.labels[k] = v
+
+  if section == nil:
+    warn("No content found in the docker file")
+    return false
 
   # walk the sections from the most-recently-defined section.
   curSection = section
@@ -330,8 +337,9 @@ proc extractDockerInfo*(chalk:          ChalkObj,
     #     might not have
     #   - we found the entrypoint but in shell-form and we didn't find a shell
     # if we don't have cmd, we should also populate that from inspect results
-    inspected       = dockerInspectEntryAndCmd(curSection.image, errors)
-    if len(errors) > 0:
+    inspected       = dockerInspectEntryAndCmd(curSection.image)
+    if inspected.inspectionFailed():
+      warn("Docker inspect failed.")
       return false
     if foundEntry == nil:
       # we don't have entrypoint, so use the one from inspect, which might also
@@ -361,8 +369,9 @@ proc extractDockerInfo*(chalk:          ChalkObj,
       # byproduct of `/bin/sh -c`, which treats the next argv entry as
       # the only command to execute.
       if foundShell == nil and not foundCmd.json:
-        inspected = dockerInspectEntryAndCmd(curSection.image, errors)
-        if len(errors) > 0:
+        inspected = dockerInspectEntryAndCmd(curSection.image)
+        if inspected.inspectionFailed():
+          warn("Docker inspect failed.")
           return false
         shellArgv = inspected.shellArgv
       cmdArgv = dockerStringToArgv(foundCmd.contents, shellArgv, foundCmd.json)

@@ -5,7 +5,7 @@
 ## :Copyright: 2023, Crash Override, Inc.
 
 import zippy/ziparchives_v1, streams, nimSHA2, tables, times, strutils, options,
-       os, ../config, ../chalkjson, ../plugins
+       os, ../config, ../chalkjson, ../plugins, std/tempfiles
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
@@ -75,5 +75,28 @@ method getArtifactHash*(self: CodecZip, chalk: ChalkObj): string =
 method getHashAsOnDisk*(self: CodecZip, chalk: ChalkObj): Option[string] =
   let toHash = $(ZipCache(chalk.cache).archive)
   return some($(toHash.computeSHA256()))
+
+method getChalkInfo*(self: CodecZip, obj: ChalkObj): ChalkDict =
+  result = ChalkDict()
+  let
+    tmpdir = createTempDir(tmpFilePrefix, tmpFileSuffix)
+    cache  = ZipCache(obj.cache)
+
+  when false:
+    try:
+      cache.archive.extractAll(tmpDir)
+      pushCollectionCtx()
+      case getCommandName()
+      of "insert", "docker":    runCmdInsert(@[tmpdir])
+      of "extract":             runCmdExtract(@[tmpdir])
+      of "delete":              runCmdDelete(@[tmpdir])
+
+      for item in getUnmarked():
+        echo item
+
+    except:                     discard
+    finally:
+      popCollectionCtx()
+
 
 registerPlugin("zip", CodecZip())

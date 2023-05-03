@@ -36,6 +36,11 @@ proc truncatingLog(msg: string, cfg: SinkConfig, t: StringTable): bool =
   var f       = newFileStream(filename, mode = fmAppend)
 
   try:
+    if f == nil:
+      f = newFileStream(filename, mode = fmWrite)
+      if f == nil:
+        error(filename & ": cannot create log file (permissions issue?)")
+        return
     f.write(msg & "\n")
     let loc = f.getPosition()
     f.close()

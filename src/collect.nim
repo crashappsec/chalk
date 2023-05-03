@@ -109,7 +109,6 @@ proc collectPostChalkInfo*(artifact: ChalkObj) =
   if not isInserting and artifact.postHash != "":
     artifact.collectedData["_CURRENT_HASH"] = pack(artifact.postHash)
 
-
 proc collectChalkInfo*(obj: ChalkObj) =
   # Called from the appropriate commands.
   obj.opFailed      = false
@@ -174,10 +173,9 @@ proc findChalk(codec:      Codec,
 
   return (goOn, chalks)
 
-iterator allArtifacts*(): ChalkObj =
+iterator artifacts*(artifactPath: seq[string]): ChalkObj =
   let
     cmd          = getCommandName()
-    artifactPath = chalkConfig.getArtifactSearchPath()
     recursive    = chalkConfig.getRecursive()
 
   var

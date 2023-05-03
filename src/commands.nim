@@ -178,20 +178,21 @@ proc doReporting() =
   doCommandReport()
   doCustomReporting()
 
-proc runCmdExtract*() =
+proc runCmdExtract*(path: seq[string]) =
   initCollection()
 
   var numExtracts = 0
-  for item in allArtifacts(): numExtracts += 1
+  for item in artifacts(path):
+    numExtracts += 1
 
   if numExtracts == 0: warn("No items extracted")
   doReporting()
 
-proc runCmdInsert*() =
+proc runCmdInsert*(path: seq[string]) =
   initCollection()
   let virtual = chalkConfig.getVirtualChalk()
 
-  for item in allArtifacts():
+  for item in artifacts(path):
     trace(item.fullPath & ": begin chalking")
     item.collectChalkInfo()
     trace(item.fullPath & ": chalk data collection finished.")
@@ -211,10 +212,10 @@ proc runCmdInsert*() =
 
   doReporting()
 
-proc runCmdDelete*() =
+proc runCmdDelete*(path: seq[string]) =
   initCollection()
 
-  for item in allArtifacts():
+  for item in artifacts(path):
     if not item.isMarked():
       info(item.fullPath & ": no chalk mark to delete.")
       continue
@@ -555,6 +556,7 @@ proc runCmdDocker*() {.noreturn.} =
         addToAllChalks(chalk)
         # Let the docker codec deal w/ env vars, flags and docker files.
         if extractDockerInfo(chalk, flags, args[^1]):
+          trace("Successful parsing of docker cmdline and dockerfile")
           # Then, let any plugins run to collect data.
           chalk.collectChalkInfo()
           # Now, have the codec write out the chalk mark.
@@ -605,6 +607,7 @@ proc runCmdDocker*() {.noreturn.} =
               error("Above occurred when runnning docker command: " & cmdline)
               dumpExOnDebug()
         else:
+          info("Failed to extract docker info.  Calling docker.")
           opFailed = true
       doReporting()
     else:

@@ -1,4 +1,4 @@
-import tables, streams, strutils, options, unicode, json, nimutils
+import tables, streams, strutils, options, unicode, json, nimutils, os
 
 # RUN and COPY accept << and <<-
 # This one is particularly a HFS:
@@ -122,6 +122,7 @@ type
     seenRun:            bool
     curLine:            int
     directives:         OrderedTable[string, DockerDirective]
+    cachedCommand:      DockerCommand
     args*:              Table[string, string]  # Name to default value
     envs*:              Table[string, string]
     commands*:          seq[DockerCommand]
@@ -177,7 +178,7 @@ proc evalSubstitutions*(ctx:    DockerParse,
                         errors: var seq[string]): string =
   for i, s in t.contents:
     result &= s
-    if i + 1 != len(t.contents):
+    if i != len(t.varSubs):
       result &= ctx.evalOneVarSub(t.varSubs[i], errors)
 
 proc evalSubstitutions*(ctx:    DockerParse,
@@ -532,26 +533,31 @@ proc parseEnvWithEq(ctx: DockerParse, toks: seq[LineToken]): seq[string] =
     toApply: Table[string, string]
     errs:    seq[string] = @[]
     i:       int         = 0
+    n:       int
+    rhs:     string
 
-  while i <= len(toks) - 3:
+  while true:
+    n = i
     if toks[i].kind != ltWord or len(toks[i].varSubs) != 0:
-      if toks[i + 1].contents[0] != "=":
-        errs.add("Invalid word value on the RHS, must be a single item")
-        i += high(int32)
-        continue
-      errs.add("Expected a single non-quoted word w/o $ subs on the LHS")
-      i += 3
-      continue
-    if toks[i+1].kind != ltOther or toks[i+1].contents[0] != "=":
-      errs.add("Expected the 3rd token to be a = or a space")
-      i += 3
-      continue
-    toApply[toks[i].contents[0]] = ctx.evalSubstitutions(toks[i+2], errs)
-    i += 3
-    continue
+      errs.add("Invalid word value on the RHS, must be a single item")
+      return
+    i = i + 1
+    if toks[i].contents[0] != "=":
+      errs.add("Expected '=' after " & toks[i].contents)
+      return
+    i = i + 1
+    rhs = ""
 
-  if i < len(toks):
-    errs.add("Stray crap at end of line")
+    while i < len(toks) and toks[i].kind != ltSpace:
+      rhs &= ctx.evalSubstitutions(toks[i], errs)
+      i = i + 1
+
+    toApply[toks[n].contents[0]] = rhs
+    toks.skipWhiteSpace(i)
+    if i == len(toks): break
+
+  for k, v in toApply:
+    ctx.envs[k] = v
 
   return errs
 
@@ -779,7 +785,7 @@ proc parseHashLine(ctx: DockerParse, line: string) =
       tok.errors.add("Escape character is multi-byte... not allowed.")
 
   if name notin validDockerDirectives:
-    tok.errors.add("Unknown docker directive: '" & name & " '")
+    return
 
   if name in ctx.directives:
     tok.errors.add("Docker directive '" & name & "' has already appeared")
@@ -815,13 +821,14 @@ proc parseCommandLine(ctx: DockerParse) =
   let line = ctx.sourceLines[ctx.curLine]
 
   if ctx.expectContinuation:
-    cmd = ctx.commands[^1]
+    cmd = ctx.cachedCommand
     cmd.rawArg &= line
     cmd.continuationLines.add(ctx.curLine)
   else:
     let tok = ctx.newTok(tltCommand)
     # Not parsing the command until after we read the joined lines
     cmd = DockerCommand(rawArg: line)
+    ctx.commands.add(cmd)
     tok.cmd = cmd
 
   let (runeLast, rlen) = cmd.rawArg.lastRune(cmd.rawArg.len() - 1)
@@ -829,8 +836,11 @@ proc parseCommandLine(ctx: DockerParse) =
   if runeLast == ctx.currentEscape:
     cmd.rawArg = cmd.rawArg[0 ..< cmd.rawArg.len() - rlen]
     ctx.expectContinuation = true
+
+    ctx.cachedCommand = cmd
     return
 
+  ctx.expectContinuation = false
   (cmd.name, cmd.rawArg) = topLevelCmdParse(cmd.rawArg)
 
   ctx.commands.add(cmd)
@@ -840,15 +850,19 @@ proc topLevelLex(ctx: DockerParse) =
     ctx.curLine = i
     let line = unicode.strip(srcline)
     if len(line) == 0:
+      ctx.expectContinuation = false
       discard ctx.newTok(tltWhiteSpace)
-    elif line[0] == '#':
-      ctx.parseHashLine(line)
-    else:
+    elif ctx.expectContinuation or line[0] != '#':
       ctx.parseCommandLine() # Don't send me the stripped version.
+    else:
+      ctx.expectContinuation = false
+      ctx.parseHashLine(line)
 
 proc baseDockerParse*(s: Stream): DockerParse =
   result = DockerParse(stream: s, sourceLines: s.readAll().split("\n"),
                        currentEscape: Rune('\\'))
+
+  for k, v in envPairs(): result.envs[k] = v
   result.topLevelLex()
 
 template firstFromCheck() =
@@ -871,6 +885,7 @@ proc parseAndEval*(s:      Stream,
       errors &= tok.errors
 
     if tok.kind != tltCommand: continue
+
     let cmd = tok.cmd
     if len(cmd.errors) == 0:
       errors &= cmd.errors
