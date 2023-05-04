@@ -33,7 +33,9 @@ when isMainModule:
   of "defaults":   showConfig(force = true)
   of "version":    runCmdVersion()
   of "docker":     runCmdDocker()
+  #% INTERNAL
   of "entrypoint": echo "entry point."
+  #% END
   else:
     runChalkHelp(getCommandName()) # noreturn, will not show config.
 

@@ -14,25 +14,30 @@ type
     entryPoint:   EntryPointInfo
     cmd:          CmdInfo
     shell:        ShellInfo
+  #% INTERNAL  
   InspectedImage = tuple[entryArgv: seq[string],
                          cmdArgv:   seq[string],
                          shellArgv: seq[string],
                          success:   bool]
+  #% END
   DockerInfoCache = ref object of RootObj
     context:                string
     dockerFilePath:         string
     dockerFileContents:     string
     additionalInstructions: string
     tags:                   seq[string]
+    ourTag:                 string
     platform:               string
     labels:                 Con4mDict[string, string]
     execNoArgs:             seq[string]
     execWithArgs:           seq[string]
     tmpDockerFile:          string
     tmpChalkMark:           string
-    tmpEntryPoint:          string
     inspectOut:             JSonNode
     relativeEntry:          string
+    #% INTERNAL
+    tmpEntryPoint:          string
+    #% END
 
 proc extractArgv(json: string): seq[string] {.inline.} =
   for item in parseJson(json).getElems():
@@ -83,6 +88,7 @@ proc findDockerPath*(): Option[string] =
 
   return dockerPathOpt
 
+#% INTERNAL  
 proc dockerInspectEntryAndCmd(imageName: string): InspectedImage =
   # `docker inspect imageName`
   #FIXME another thing: this probably needs to be aware of if docker sock
@@ -121,6 +127,7 @@ proc dockerInspectEntryAndCmd(imageName: string): InspectedImage =
 
 template inspectionFailed(image: InspectedImage): bool =
   image.success == false
+#% END  
 
 proc dockerStringToArgv(cmd:   string,
                         shell: seq[string],
@@ -174,7 +181,12 @@ proc extractDockerInfo*(chalk:          ChalkObj,
   chalk.cache = cache
   cache.labels = Con4mDict[string, string]()
 
-  # Part 1: pull data from flags we care about.
+  # Choose a temporary tag that we can use to look up the image after
+  # chalking. We can remove it later.
+  let randint: uint = secureRand[uint]()
+  cache.ourTag = "chalk:" & $(randint)
+  
+  # Pull data from flags we care about.
   if "tag" in flags:
     let rawTags = unpack[seq[string]](flags["tag"].getValue())
 
@@ -183,8 +195,6 @@ proc extractDockerInfo*(chalk:          ChalkObj,
         cache.tags.add(tag)
       else:
         cache.tags.add(tag & ":latest")
-  else:
-    cache.tags = @["<none>:<none>"]
 
   if "platform" in flags:
     cache.platform = (unpack[seq[string]](flags["platform"].getValue()))[0]
@@ -237,8 +247,11 @@ proc extractDockerInfo*(chalk:          ChalkObj,
   else:
     try:
       let s                    = newFileStream(cache.dockerFilePath, fmRead)
-      cache.dockerFileContents = s.readAll()
-      s.close()
+      if s != nil:
+        cache.dockerFileContents = s.readAll()
+        s.close()
+      else:
+        error(cache.dockerFilePath & ": Dockerfile not found")
     except:
       error(cache.dockerFilePath & ": docker build failed to read Dockerfile")
       return false
@@ -301,6 +314,7 @@ proc extractDockerInfo*(chalk:          ChalkObj,
     warn("No content found in the docker file")
     return false
 
+  #% INTERNAL
   # walk the sections from the most-recently-defined section.
   curSection = section
   while true:
@@ -396,7 +410,7 @@ proc extractDockerInfo*(chalk:          ChalkObj,
   else:
     cache.execNoArgs   = entryArgv & cmdArgv
     cache.execWithArgs = entryArgv
-
+  #% END
   stream.close()
   return true
 
@@ -411,8 +425,9 @@ proc writeChalkMark*(chalk: ChalkObj, mark: string) =
     ctx.writeLine(mark)
     ctx.close()
     cache.tmpChalkMark = path
-    cache.additionalInstructions = "COPY " & path.splitPath().tail &
-                                   " /chalk.json\n"
+    info("Creating temporary chalk file: " & path)
+    cache.additionalInstructions = "COPY " & path.splitPath().tail & " " &
+      chalkConfig.dockerConfig.getChalkFileLocation() & "\n"
     if labelOps.isSome():
       for k, v in labelOps.get():
         cache.additionalInstructions &= "LABEL " & k & "=\"" & v & "\"\n"
@@ -426,6 +441,7 @@ proc writeChalkMark*(chalk: ChalkObj, mark: string) =
         error("Could not write chalk mark (no permission)")
         raise
 
+#% INTERNAL        
 const
   hostDefault = "host_report_other_base"
   artDefault  = "artifact_report_extract_base"
@@ -550,11 +566,11 @@ proc writeEntryPointBinary*(chalk, selfChalk: ChalkObj, toWrite: string) =
     # but if we have concurrent accesses ... well it could get ugly
   except:
     discard
-
+#% END
 proc runInspectOnImage*(cmd: string, chalk: ChalkObj): bool =
   let
     cache  = DockerInfoCache(chalk.cache)
-    output = execProcess(cmd, args = @["inspect", cache.tags[0]], options = {})
+    output = execProcess(cmd, args = @["inspect", cache.ourTag], options = {})
     items  = output.parseJson().getElems()
 
   if len(items) != 0:
@@ -563,7 +579,6 @@ proc runInspectOnImage*(cmd: string, chalk: ChalkObj): bool =
 
 
 proc buildContainer*(chalk:  ChalkObj,
-                     wrap:   bool,
                      flags:  OrderedTable[string, FlagSpec],
                      inargs: seq[string]): bool =
   # Going to reparse the original argument to lift out any -f/--file
@@ -576,6 +591,7 @@ proc buildContainer*(chalk:  ChalkObj,
                            noColon = true)
     cmd       = findDockerPath().get()
 
+  info("Created temporary docker file: " & path)
   cache.tmpDockerFile = path
   f.write(fullFile)
   f.close()
@@ -583,7 +599,7 @@ proc buildContainer*(chalk:  ChalkObj,
 
   var args = reparse.parse(inargs).args[""]
 
-  args = args[0 ..< ^1] & @["--file=" & path, args[^1]]
+  args = args[0 ..< ^1] & @["--file=" & path, "-t=" & cache.ourTag, args[^1]]
 
   let
     subp = startProcess(cmd, args = args, options = {poParentStreams})
@@ -591,7 +607,12 @@ proc buildContainer*(chalk:  ChalkObj,
 
   if code != 0: return false
 
-  return runInspectOnImage(cmd, chalk)
+  result = runInspectOnImage(cmd, chalk)
+
+  # If the user supplied tags, remove the tag we added.
+  if len(cache.tags) != 0:
+    discard execProcess(cmd, args = @["rmi", cache.ourTag], options = {})
+  
 
 proc cleanupTmpFiles*(chalk: ChalkObj) =
   let cache = DockerInfoCache(chalk.cache)
@@ -600,12 +621,14 @@ proc cleanupTmpFiles*(chalk: ChalkObj) =
     if cache == nil:              return
     if cache.tmpDockerFile != "": removeFile(cache.tmpDockerFile)
     if cache.tmpChalkMark  != "": removeFile(cache.tmpChalkMark)
+    #% INTERNAL
     if cache.tmpEntryPoint != "": removeFile(cache.tmpEntryPoint)
+    #% END
   else:
     # This generally won't print since --log-level defaults to 'error' for chalk
     info("Skipping deletion of temporary files due to chalk_debug = true")
 
-
+#% INTERNAL
 # This stuff needs to get done somewhere...
 #
 # when we execute docker build (using user's original commandline):
@@ -629,5 +652,6 @@ proc cleanupTmpFiles*(chalk: ChalkObj) =
 # TODO: add chalk.postHash
 # TODO: remove chalk and chalk.json from the context if they exist.
 # TODO: report the image ID as the post-hash (needs appropriate formatting)
+#% END    
 
 registerPlugin("docker", CodecDocker())

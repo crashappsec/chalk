@@ -50,7 +50,7 @@ const
   dockerConfig*       = staticRead(dockerConfName)
   defaultConfig*      = staticRead(defCfgFname) & commentC4mCode(ioConfig)
   entryPtTemplate*    = staticRead(entryPtTemplateLoc)
-  versionStr          = staticexec("cat ../chalk.nimble | grep ^version")
+  versionStr          = staticexec("cat ../*.nimble | grep ^version")
   commitID            = staticexec("git rev-parse HEAD")
   archStr             = staticexec("uname -m")
   osStr               = staticexec("uname -o")

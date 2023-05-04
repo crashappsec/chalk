@@ -578,6 +578,7 @@ proc runCmdDocker*() {.noreturn.} =
 
             else:
               opFailed = true
+          #% INTERNAL
           else:
             try:
               chalk.writeChalkMark(toWrite)
@@ -593,8 +594,9 @@ proc runCmdDocker*() {.noreturn.} =
                   let binaryChalkMark = selfChalk.getChalkMarkAsStr()
                   setCommandName("docker")
                   chalk.writeEntryPointBinary(selfChalk, binaryChalkMark)
+              #% END
 
-              if chalk.buildContainer(wrap, flags, getArgs()):
+              if chalk.buildContainer(flags, getArgs()):
                 info(chalk.fullPath & ": container successfully chalked")
                 chalk.collectPostChalkInfo()
               else:

@@ -7,8 +7,11 @@
 
 default_key_priority := 4611686018427387904  # 2^62.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
+		         #% REWRITE ,$ ]
                          "confload", "confdump", "docker", "version",
+			 #% INTERNAL
 			 "entrypoint"]
+			 #% END
 all_cmds_that_insert := ["insert", "docker", "confload"]
 tool_types           := ["sbom", "sast"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
@@ -887,7 +890,7 @@ singleton docker {
 Internal configuration information for the docker command.
 """
   allow getopts { }
-
+  #% INTERNAL
   field wrap_entrypoint {
     type:    bool
     default: false
@@ -928,12 +931,12 @@ information, when run from the docker entry point.
 If not provided, a default policy is added.
 """
   }
-
+#% END
   field chalk_file_location {
     type: string
     default: "/chalk.json"
     doc: """
-When wrapping a container to run in entrypoint mode, this controls where on the file system the 'inner' chalk lives.
+This controls where the chalk file gets written.  Should generally be in the root, just in case the path doesn't exist in a container.
 """
   }
 
@@ -1432,7 +1435,7 @@ For the ENV and _ENV metadata keys, any environment variable listed here will ge
 For the ENV and _ENV metadata keys, any environment variable that is not listed explicitly in the above lists will be handled as specified here.
 """
   }
-
+  #% INTERNAL
   field entrypoint {
     type:    string
     require: false
@@ -1442,6 +1445,7 @@ Note that this is generally set by the 'docker' command.  If it is set, then
 command line parsing won't happen.
 """
   }
+  #% END
 
   field crashoverride_usage_reporting_url {
     type:       string
