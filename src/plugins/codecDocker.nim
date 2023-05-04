@@ -16,7 +16,8 @@ type
     shell:        ShellInfo
   InspectedImage = tuple[entryArgv: seq[string],
                          cmdArgv:   seq[string],
-                         shellArgv: seq[string]]
+                         shellArgv: seq[string],
+                         success:   bool]
   DockerInfoCache = ref object of RootObj
     context:                string
     dockerFilePath:         string
@@ -88,9 +89,6 @@ proc dockerInspectEntryAndCmd(imageName: string): InspectedImage =
   # or context or docker config is specified to the original docker command!
   #FIXME also needs to return `Shell`
 
-  # Implicit default, don't need to uncomment.
-  #result = InspectedImage(entryArgv: @[], cmdArgv: @[], shellArgv: @[])
-
   if imageName == "scratch": return
 
   let
@@ -99,6 +97,8 @@ proc dockerInspectEntryAndCmd(imageName: string): InspectedImage =
     arr  = json.parseJson().getElems()
 
   if len(arr) == 0: return
+
+  result.success = true
 
   if hasKey(arr[0], "ContainerConfig"):
     let containerConfig = arr[0]["ContainerConfig"]
@@ -120,8 +120,7 @@ proc dockerInspectEntryAndCmd(imageName: string): InspectedImage =
         result.cmdArgv.add(item.getStr())
 
 template inspectionFailed(image: InspectedImage): bool =
-  len(image.entryArgv) + len(cmdArgv) + len(shellArgv) == 0
-
+  image.success == false
 
 proc dockerStringToArgv(cmd:   string,
                         shell: seq[string],
@@ -249,8 +248,6 @@ proc extractDockerInfo*(chalk:          ChalkObj,
   let (parse, cmds) = stream.parseAndEval(fileArgs, errors)
   for err in errors:
     error(chalk.fullPath & ": " & err)
-  if len(errors) > 0:
-    return false
 
   var
     section:    DockerFileSection
