@@ -1,38 +1,29 @@
 #!/usr/bin/env python3
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import sys, os, tempfile, re, shutil
 
 dirs_to_skip       = ["./.git", "./.github", "./customers", "./bin", "./tests",
-                      "./chalk.dSYM"]
+                      "./chalk.dSYM", "./oss"]
 files_to_skip      = ["./.editorconfig", "./.envrc", "./chalk", "./lto.o",
                       "./.pre-commit-config.yaml"]
-files_to_move      = [("./chalk_internal.nimble", "./chalk.nimble")]
-dont_delete        = ["./.git"]
+files_to_move      = {"./chalk_internal.nimble" : "./chalk.nimble"}
 dont_process_files = []
+oss_dont_delete    = [".git"]
 
 if len(sys.argv) != 2:
   print("Usage: " + sys.argv[0] + " [branch]")
-  print("This will create a new branch that removes proprietary code, " +
-  "leaving code that can PRd against the OSS repo.")
+  print("This will create a new branch in the OSS repo populated with " +
+        "code from this branch, with internal bits removed.\n" +
+        "Internal code blocks starting with #% INTERNAL (ending with #% END)" +
+        " will not be moved over, nor will files or directories listed " +
+        "in the dirs_to_skip / files_to_skip arrays in this script.\n" +
+        "Any files in files_to_move will be renamed in the new branch.\n" +
+        "The resulting repo will be in oss/chalk/, and the code will NOT be " +
+        "checked in.")
   quit(1)
 tmpdir = tempfile.mkdtemp()
-
-print("WARNING: this will blow away files in the following directories " +
-      "if those files are not checked in: ")
-print(", ".join(dirs_to_skip[1:]))
-while True:
-  x = input("Proceed? (y) or (n) ")
-  if x == "y":
-    break
-  elif x == "n":
-    quit(1)
-
-
-branches = os.popen("git branch").readlines()
-for line in branches:
-  if line[2:].strip() == sys.argv[1]:
-    print("ERROR: branch " + sys.argv[1] + " already exists.")
-    quit(1)
 
 def preprocess(text, fname):
   result = ""
@@ -59,7 +50,7 @@ def preprocess(text, fname):
         print("ERROR (file: ", fname, "line: ", i + 1,
               "): Got #% when not skipping.")
       skipping = False
-      i += 1      
+      i += 1
       continue
     elif s.startswith("rewrite "):
       skipping = False
@@ -78,9 +69,9 @@ def preprocess(text, fname):
       print("ERROR, unknown directive: ", s)
       i += 1
       continue
-    
+
   return result
-    
+
 def process_dir(dir, files):
   target_dir = os.path.abspath(os.path.join(tmpdir, dir))
   if target_dir != tmpdir:
@@ -88,9 +79,12 @@ def process_dir(dir, files):
   for filename in files:
     if os.path.join(dir, filename) in files_to_skip:
       continue
-    print(os.path.join(dir, filename)) ##
     infile  = os.path.join(dir, filename)
     outfile = os.path.join(target_dir, filename)
+
+    if infile in files_to_move:
+      outfile = os.path.join(target_dir, files_to_move[infile])
+
     with open(infile, "r") as file:
       try:
         text = file.read()
@@ -99,9 +93,10 @@ def process_dir(dir, files):
         raise
       if "#%" in text and not dir in dont_process_files:
         text = preprocess(text, infile)
-        with open(outfile, "w") as out:
-          out.write(text)
-        
+
+      with open(outfile, "w") as out:
+        out.write(text)
+
 try:
   for dir, subdirs, files in os.walk("."):
     if dir in dirs_to_skip:
@@ -109,42 +104,53 @@ try:
         del subdirs[0]
       continue
     process_dir(dir, files)
+
+  # At this point, everything is in /tmp.
+  # now, we essentially:
+  # rm -rf ./oss
+  # mkdir oss
+  # cd oss
+  # git clone https://github.com/crashappsec/chalk.git
+  # cd ..
+  # rm -rf everything in oss/chalk except the stuff in dont_delete
+  # Relace it all from the tmp directory.
+  try:
+    shutil.rmtree("oss")
+  except:
+    pass
+  os.mkdir("oss")
+  os.chdir("oss")
+  os.popen("git clone https://github.com/crashappsec/chalk.git").read()
+  os.chdir("chalk")
+  branches = os.popen("git branch").readlines()
+  for line in branches:
+    if line[2:].strip() == sys.argv[1]:
+      print("ERROR: branch " + sys.argv[1] + " already exists.")
+      shutil.rmtree(tmpdir)
+      os.chdir("../..")
+      shutil.rmtree("oss")
+      quit(1)
+
   os.popen("git checkout -b " + sys.argv[1]).read()
-  # Clean up any files we don't want in the OSS repo.
-  for dir in dirs_to_skip:
-    if not dir in dont_delete:
+
+  # Clean up any files we don't want in the OSS repo before we copy.
+  for name in os.listdir("."):
+    if not name in oss_dont_delete:
       try:
-        shutil.rmtree(dir)
+        shutil.rmtree(name)
       except:
-        pass
-  for file in files_to_skip:
-    if not file in dont_delete:
-      try:
-        os.remove(file)
-      except:
-        pass
-  for dir, subdirs, files in os.walk("."):
-    if dir in dirs_to_skip:
-      while len(subdirs):
-        del subdirs[0]
-      continue
-    rewrite_dir = os.path.abspath(os.path.join(tmpdir, dir))
-    for filename in files:
-      infile  = os.path.join(rewrite_dir, filename)
-      if not os.path.exists(infile):
-        continue
-      outfile = os.path.join(dir, filename)
-      with open(infile, "r") as file:
-        text = file.read()
-        with open(outfile, "w") as out:
-          out.write(text)
-  for (fromfname, tofname) in files_to_move:
-    shutil.move(fromfname, tofname)
-  os.popen("git add chalk.nimble").read()
-  os.popen('git commit -am "Create an export branch."').read()
-finally:            
+        try:
+          os.remove(name)
+        except:
+          pass
+
+  for name in os.listdir(tmpdir):
+    shutil.move(os.path.join(tmpdir, name), name)
+
+  os.chdir("../..")
+finally:
   shutil.rmtree(tmpdir)
 
-print("Switched to new branch: ", sys.argv[1])
-print("This branch has no proprietary bits and can be merged into the " +
-      "OSS repo. But PLEASE do not merge into main.")
+print("Cloned chalk into oss/chalk.")
+print("In that repo, created branch: ", sys.argv[1])
+print("This branch has no proprietary bits and can be merged.")
