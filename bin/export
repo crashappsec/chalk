@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+
+import sys, os, tempfile, re, shutil
+
+dirs_to_skip       = ["./.git", "./.github", "./customers", "./bin", "./tests",
+                      "./chalk.dSYM"]
+files_to_skip      = ["./.editorconfig", "./.envrc", "./chalk", "./lto.o",
+                      "./.pre-commit-config.yaml"]
+files_to_move      = [("./chalk_internal.nimble", "./chalk.nimble")]
+dont_delete        = ["./.git"]
+dont_process_files = []
+
+if len(sys.argv) != 2:
+  print("Usage: " + sys.argv[0] + " [branch]")
+  print("This will create a new branch that removes proprietary code, " +
+  "leaving code that can PRd against the OSS repo.")
+  quit(1)
+tmpdir = tempfile.mkdtemp()
+
+print("WARNING: this will blow away files in the following directories " +
+      "if those files are not checked in: ")
+print(", ".join(dirs_to_skip[1:]))
+while True:
+  x = input("Proceed? (y) or (n) ")
+  if x == "y":
+    break
+  elif x == "n":
+    quit(1)
+
+
+branches = os.popen("git branch").readlines()
+for line in branches:
+  if line[2:].strip() == sys.argv[1]:
+    print("ERROR: branch " + sys.argv[1] + " already exists.")
+    quit(1)
+
+def preprocess(text, fname):
+  result = ""
+  lines = text.split("\n")
+  skipping = False
+  i = 0
+  while i < len(lines):
+    s = lines[i].strip()
+    if not s.startswith("#%"):
+      if not skipping:
+        result += lines[i] + "\n"
+      i      += 1
+      continue
+    s = s[2:].strip().lower()
+    if s == "internal":
+      if skipping:
+        print("ERROR (file: ", fname, "line: ", i + 1,
+              "): Got #% INTERNAL when already in an internal block.")
+      skipping = True
+      i += 1
+      continue
+    elif s == "end":
+      if not skipping:
+        print("ERROR (file: ", fname, "line: ", i + 1,
+              "): Got #% when not skipping.")
+      skipping = False
+      i += 1      
+      continue
+    elif s.startswith("rewrite "):
+      skipping = False
+      i += 1
+      both = s[8:]
+      ix = both.find(" ")
+      if ix == -1:
+        print("ERROR (file: ", fname, "line: ", i + 1,
+              "): REWRITE takes two args.")
+        continue
+      first   = both[:ix]
+      rest    = both[ix+1:]
+      result += re.sub(first, rest, lines[i]) + "\n"
+      i      += 1
+    else:
+      print("ERROR, unknown directive: ", s)
+      i += 1
+      continue
+    
+  return result
+    
+def process_dir(dir, files):
+  target_dir = os.path.abspath(os.path.join(tmpdir, dir))
+  if target_dir != tmpdir:
+    os.mkdir(target_dir)
+  for filename in files:
+    if os.path.join(dir, filename) in files_to_skip:
+      continue
+    print(os.path.join(dir, filename)) ##
+    infile  = os.path.join(dir, filename)
+    outfile = os.path.join(target_dir, filename)
+    with open(infile, "r") as file:
+      try:
+        text = file.read()
+      except:
+        print("Error when processing file: ", infile)
+        raise
+      if "#%" in text and not dir in dont_process_files:
+        text = preprocess(text, infile)
+        with open(outfile, "w") as out:
+          out.write(text)
+        
+try:
+  for dir, subdirs, files in os.walk("."):
+    if dir in dirs_to_skip:
+      while len(subdirs):
+        del subdirs[0]
+      continue
+    process_dir(dir, files)
+  os.popen("git checkout -b " + sys.argv[1]).read()
+  # Clean up any files we don't want in the OSS repo.
+  for dir in dirs_to_skip:
+    if not dir in dont_delete:
+      try:
+        shutil.rmtree(dir)
+      except:
+        pass
+  for file in files_to_skip:
+    if not file in dont_delete:
+      try:
+        os.remove(file)
+      except:
+        pass
+  for dir, subdirs, files in os.walk("."):
+    if dir in dirs_to_skip:
+      while len(subdirs):
+        del subdirs[0]
+      continue
+    rewrite_dir = os.path.abspath(os.path.join(tmpdir, dir))
+    for filename in files:
+      infile  = os.path.join(rewrite_dir, filename)
+      if not os.path.exists(infile):
+        continue
+      outfile = os.path.join(dir, filename)
+      with open(infile, "r") as file:
+        text = file.read()
+        with open(outfile, "w") as out:
+          out.write(text)
+  for (fromfname, tofname) in files_to_move:
+    shutil.move(fromfname, tofname)
+  os.popen("git add chalk.nimble").read()
+  os.popen('git commit -am "Create an export branch."').read()
+finally:            
+  shutil.rmtree(tmpdir)
+
+print("Switched to new branch: ", sys.argv[1])
+print("This branch has no proprietary bits and can be merged into the " +
+      "OSS repo. But PLEASE do not merge into main.")

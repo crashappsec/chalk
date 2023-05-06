@@ -14,6 +14,7 @@ requires "nimSHA2 == 0.1.1"
 requires "glob == 0.11.2"
 requires "https://github.com/viega/zippy == 0.10.7"
 
+#% INTERNAL
 task debug, "Package the debug build":
   # additional flags are configured in config.nims
   exec "nimble build"

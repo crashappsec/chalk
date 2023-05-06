@@ -14,7 +14,7 @@ type
     entryPoint:   EntryPointInfo
     cmd:          CmdInfo
     shell:        ShellInfo
-  #% INTERNAL  
+  #% INTERNAL
   InspectedImage = tuple[entryArgv: seq[string],
                          cmdArgv:   seq[string],
                          shellArgv: seq[string],
@@ -88,7 +88,7 @@ proc findDockerPath*(): Option[string] =
 
   return dockerPathOpt
 
-#% INTERNAL  
+#% INTERNAL
 proc dockerInspectEntryAndCmd(imageName: string): InspectedImage =
   # `docker inspect imageName`
   #FIXME another thing: this probably needs to be aware of if docker sock
@@ -127,7 +127,7 @@ proc dockerInspectEntryAndCmd(imageName: string): InspectedImage =
 
 template inspectionFailed(image: InspectedImage): bool =
   image.success == false
-#% END  
+#% END
 
 proc dockerStringToArgv(cmd:   string,
                         shell: seq[string],
@@ -185,7 +185,7 @@ proc extractDockerInfo*(chalk:          ChalkObj,
   # chalking. We can remove it later.
   let randint: uint = secureRand[uint]()
   cache.ourTag = "chalk:" & $(randint)
-  
+
   # Pull data from flags we care about.
   if "tag" in flags:
     let rawTags = unpack[seq[string]](flags["tag"].getValue())
@@ -441,7 +441,7 @@ proc writeChalkMark*(chalk: ChalkObj, mark: string) =
         error("Could not write chalk mark (no permission)")
         raise
 
-#% INTERNAL        
+#% INTERNAL
 const
   hostDefault = "host_report_other_base"
   artDefault  = "artifact_report_extract_base"
@@ -612,7 +612,7 @@ proc buildContainer*(chalk:  ChalkObj,
   # If the user supplied tags, remove the tag we added.
   if len(cache.tags) != 0:
     discard execProcess(cmd, args = @["rmi", cache.ourTag], options = {})
-  
+
 
 proc cleanupTmpFiles*(chalk: ChalkObj) =
   let cache = DockerInfoCache(chalk.cache)
@@ -652,6 +652,6 @@ proc cleanupTmpFiles*(chalk: ChalkObj) =
 # TODO: add chalk.postHash
 # TODO: remove chalk and chalk.json from the context if they exist.
 # TODO: report the image ID as the post-hash (needs appropriate formatting)
-#% END    
+#% END
 
 registerPlugin("docker", CodecDocker())

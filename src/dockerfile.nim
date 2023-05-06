@@ -547,7 +547,7 @@ proc parseEnvWithEq(ctx: DockerParse, toks: seq[LineToken]): seq[string] =
       return
     i = i + 1
     rhs = ""
-    
+
     while i < len(toks) and toks[i].kind != ltSpace:
       rhs &= ctx.evalSubstitutions(toks[i], errs)
       i = i + 1
@@ -853,7 +853,7 @@ proc topLevelLex(ctx: DockerParse) =
       ctx.expectContinuation = false
       discard ctx.newTok(tltWhiteSpace)
     elif ctx.expectContinuation or line[0] != '#':
-      ctx.parseCommandLine() # Don't send me the stripped version.      
+      ctx.parseCommandLine() # Don't send me the stripped version.
     else:
       ctx.expectContinuation = false
       ctx.parseHashLine(line)
@@ -885,7 +885,7 @@ proc parseAndEval*(s:      Stream,
       errors &= tok.errors
 
     if tok.kind != tltCommand: continue
-    
+
     let cmd = tok.cmd
     if len(cmd.errors) == 0:
       errors &= cmd.errors

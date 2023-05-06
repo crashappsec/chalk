@@ -477,15 +477,12 @@ proc runCmdConfLoad*() =
     let
       toStream = newStringStream
       stack    = newConfigStack().addSystemBuiltins().
-
                  addCustomBuiltins(chalkCon4mBuiltins).
+                 addGetoptSpecLoad().
                  addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
                  addConfLoad(baseConfName, toStream(baseConfig)).
                  setErrorHandler(newConfFileError).
-                 addConfLoad(ioConfName,   toStream(ioConfig)).
-                 addConfLoad(signConfName, toStream(signConfig)).
-                 addConfLoad(sbomConfName, toStream(sbomConfig)).
-                 addConfLoad(sastConfName, toStream(sastConfig))
+                 addConfLoad(ioConfName,   toStream(ioConfig))
     stack.run()
     stack.addConfLoad(filename, toStream(newCon4m)).run()
 
@@ -578,10 +575,10 @@ proc runCmdDocker*() {.noreturn.} =
 
             else:
               opFailed = true
-          #% INTERNAL
           else:
             try:
               chalk.writeChalkMark(toWrite)
+              #% INTERNAL
               var wrap = chalkConfig.dockerConfig.getWrapEntryPoint()
               if wrap:
                 let selfChalk = getSelfExtraction().getOrElse(nil)
