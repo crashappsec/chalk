@@ -315,6 +315,10 @@ proc extractDockerInfo*(chalk:          ChalkObj,
     return false
 
   #% INTERNAL
+  if not chalkConfig.dockerConfig.getWrapEntryPoint():
+    stream.close()
+    return true
+    
   # walk the sections from the most-recently-defined section.
   curSection = section
   while true:
@@ -414,6 +418,16 @@ proc extractDockerInfo*(chalk:          ChalkObj,
   stream.close()
   return true
 
+proc processLabel(s: string): string =
+  let
+    prefix = chalkConfig.dockerConfig.getLabelPrefix()
+    joined = if prefix.endsWith('.'): prefix & s else: prefix & "." & s
+    lower  = joined.toLowerAscii()
+
+  result = lower.replace("_", "-")
+  if result.contains("$"):
+    result = result.replace("$", "_")
+
 proc writeChalkMark*(chalk: ChalkObj, mark: string) =
   var
     cache     = DockerInfoCache(chalk.cache)
@@ -430,8 +444,20 @@ proc writeChalkMark*(chalk: ChalkObj, mark: string) =
       chalkConfig.dockerConfig.getChalkFileLocation() & "\n"
     if labelOps.isSome():
       for k, v in labelOps.get():
-        cache.additionalInstructions &= "LABEL " & k & "=\"" & v & "\"\n"
-
+        let jtxt = if v.startsWith('"'): v else: escapeJson(v)
+        cache.additionalInstructions &= "LABEL " & processLabel(k) &
+          "=" & jtxt & "\n"
+    let labelProfileName = chalkConfig.dockerConfig.getLabelProfile()
+    if labelProfileName != "":
+      let lprof = chalkConfig.profiles[labelProfileName]
+      if lprof.enabled:
+        let toLabel = filterByProfile(hostInfo, chalk.collectedData, lprof)
+        for k, v in toLabel:
+          let
+            jraw = boxToJson(v)
+            jtxt = if jraw.startswith('"'): jraw else: jraw.escapeJson()
+          cache.additionalInstructions &= "LABEL " & processLabel(k) &
+            "=" & jtxt & "\n"
   finally:
     if ctx != nil:
       try:

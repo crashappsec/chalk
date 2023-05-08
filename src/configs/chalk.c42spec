@@ -44,7 +44,7 @@ enum ChalkableHost, Chalk, NonChalk, HostOnly
 #                   Nothing here can be chalkable.
 # These are just used internally as part of validation routines.
 enum CCPreRun, CCArtifact, CCPostChalk, CCPostRun
-enum PTChalk, PTArtifact, PTHost
+enum PTChalk, PTArtifact, PTHost, PTChalkTimeArtifact
 
 # Make these available through stacks.  Enums are automatically
 # avalable through stacks.
@@ -940,11 +940,31 @@ This controls where the chalk file gets written.  Should generally be in the roo
 """
   }
 
+  field label_prefix {
+    type:    string
+    default: "run.crashoverride."
+    validator: func label_prefix_check
+    doc: """
+When locker labels are used, they are supposed to have a reverse-DNS prefix for the organization that added them. You generally should add your own organization here.
+"""
+  }
+
+  field label_profile {
+    type:    string
+    default: "chalk_labels"
+    validator: func label_profile_check
+    doc: """
+This profile guides what labels will be automatically added to docker images when we successfully chalk them. The only allowed keys are Chalk keys and Chalkable Host keys.  And, if the metadata is not available, then no key will be added.
+For instance, the HASH key cannot currently appear in docker chalks, because it is not available for docker chalking, so will not appear as a label.  But, you can add METADATA_ID, CHALK_ID, etc. or anything else that is collectable before the build.
+"""
+  }
+
   field custom_labels {
     type: dict[string, string]
     require: false
+    validator: func custom_labels_check
     doc: """
-Any labels added here will be added as a LABEL line to the chalked container.
+Any labels added here will be added as a LABEL line to the chalked container.  This will add label_prefix before the keys, and will not add if the key is not an alphanumeric value.
 """
   }
 }
@@ -1648,11 +1668,18 @@ func profile_check_base(profile_name, profile_type) {
     #   as long as the keyspec set never_early to 'false'
     # - NonChalk keys can appear in per-artifact reports only.
     # - HostOnly keys can appear in host reports only.
+    #
+    # If the profile type is PTChalkTimeArtifact, we don't allow NonChalk
+    # or HostOnly keys.
 
-    if profile_type == PTArtifact {
+    if profile_type == PTArtifact or profile_type == PTChalkTimeArtifact {
       if key_kind == HostOnly {
         return pc_err(profile_name, key_name,
                       "that key cannot appear in artifact report spec")
+      }
+      if key_kind == NonChalk and profile_type == PTChalkTimeArtifact {
+        return pc_err(profile_name, key_name, "This report is used at build " +
+	"time, so keys collected post-chalk aren't allowed.")
       }
       continue
     }
@@ -1742,6 +1769,54 @@ func custom_report_artifact_check(name, profile_name) {
   result := profile_check_base(profile_name, PTArtifact)
   if result != "" {
     result := in_report(name) + result
+  }
+}
+
+func label_profile_check(name, profile_name) {
+  if profile_name == "" {
+    return ""
+  }
+  result := profile_check_base(profile_name, PTChalkTimeArtifact)
+  if result != "" {
+    result := in_report(name) + result
+  }
+}
+
+func is_valid_label(label) {
+  result := true
+  chars := to_chars(label)
+  l     := chars.len()
+  for i from 0 to l {
+    c := chars[i]
+    if is_alphanum(c) {
+      continue
+    }
+    if contains(['.', '-', '$'], c) {
+      continue
+    }
+    return false
+  }
+}
+
+func label_prefix_check(name, value) {
+
+  if value.is_valid_label() {
+    return ""
+  } else {
+    return ("Docker label prefix must only contain letters, numbers, " +
+            "'.' or '-' (when processing label '" + value + "'")
+  }
+}
+
+func custom_labels_check(name, value) {
+  result := ""
+  stuff := value.keys()
+  l     := len(stuff)
+  for i from 0 to l {
+    if not is_valid_label(stuff[i]) {
+      return ("Docker label prefix must only contain letters, numbers, " +
+              "'.' or '-' (when processing label '" + stuff[i] + "'")
+    }
   }
 }
 

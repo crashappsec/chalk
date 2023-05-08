@@ -1396,6 +1396,12 @@ profile artifact_report_insert_base {
   key.SIGNATURE.report                = true
   key.$CHALK_CONFIG.report            = true
   key._VIRTUAL.report                 = true
+  key.DOCKER_FILE.report              = true
+  key.DOCKERFILE_PATH.report          = true
+  key.DOCKER_PLATFORM.report          = true
+  key.DOCKER_LABELS.report            = true
+  key.DOCKER_TAGS.report              = true
+  key.DOCKER_CONTEXT.report           = true
   key._CURRENT_HASH.report            = true # Only needed for docker rn
 }
 
@@ -1491,6 +1497,12 @@ profile artifact_report_extract_base {
   key.CHALK_RAND.report               = true
   key.OLD_CHALK_METADATA_HASH.report  = true
   key.OLD_CHALK_METADATA_ID.report    = true
+  key.DOCKER_FILE.report              = true
+  key.DOCKERFILE_PATH.report          = true
+  key.DOCKER_PLATFORM.report          = true
+  key.DOCKER_LABELS.report            = true
+  key.DOCKER_TAGS.report              = true
+  key.DOCKER_CONTEXT.report           = true
   key.EMBEDDED_CHALK.report           = true
   key.SBOM.report                     = true
   key.SAST.report                     = true
@@ -1584,6 +1596,12 @@ profile usage_report {
   key._OP_CHALKER_COMMIT_ID.report   = true
   key._OP_CHALKER_VERSION.report     = true
   key._OP_PLATFORM.report            = true
+}
+
+profile chalk_labels {
+  key.COMMIT_ID.report               = true
+  key.ORIGIN_URI.report              = true
+  key.BRANCH.report                  = true
 }
 
 custom_report chalk_usage_stats {
