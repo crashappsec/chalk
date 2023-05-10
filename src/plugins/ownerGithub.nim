@@ -9,33 +9,41 @@ import tables, streams, strutils, os, glob, ../config, ../plugins
 const
   fNameGHCO = "CODEOWNERS"
   dirGH     = ".github"
+  gitRoot   = ".git"
   dirDoc    = "docs"
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 proc findCOFile(fullpath: string): string =
   let (head, tail) = splitPath(fullpath)
-
   if tail == "": return ""
 
-  let cofname = head.joinPath(fNameGHCO)
+  if fullpath.dirExists():
+    # if we are in a directory, we only care about the root of the repo
+    let gitDir = fullpath.joinPath(gitRoot)
+    if not gitDir.dirExists(): return head.findCOFile()
+  else:
+    # otherwise either we are examining a CODEOWNERS file or traverse up
+    if tail == fNameGHCO: return fullpath
+    return head.findCOFile()
 
+  let cofname = fullpath.joinPath(fNameGHCO)
   if cofname.fileExists(): return cofname
 
-  let ghdir = head.joinPath(dirGH)
+  let ghdir = fullpath.joinPath(dirGH)
 
   if ghdir.dirExists():
     let cogh = ghdir.joinPath(fNameGHCO)
     if cogh.fileExists():  return cogh
     else: return "" # Stop here.
 
-  let docdir = head.joinPath(dirDoc)
+  let docdir = fullpath.joinPath(dirDoc)
 
   if docdir.dirExists():
     let codoc = docdir.joinPath(fNameGHCO)
     if codoc.fileExists(): return codoc
 
-  return head.findCOFile()
+  return "" # nothing here
 
 proc findCodeOwner(contents, artifactPath, copath: string): string =
   if not artifactPath.startsWith(copath): return
@@ -85,7 +93,6 @@ method getChalkInfo*(self: GithubCodeOwner, obj: ChalkObj): ChalkDict =
 
   var fname = obj.fullPath.findCOFile()
   if fname == "": return
-
   var ctx: FileStream
 
   try:

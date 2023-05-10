@@ -9,18 +9,27 @@ const
   fNameAuthor  = "AUTHOR"
   fNameAuthors = "AUTHORS"
   dirDoc       = "docs"
+  gitRoot      = ".git"
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 proc findAuthorsFile(fullpath: string): string =
   let (head, tail) = splitPath(fullpath)
-
   if tail == "": return ""
 
+  if fullpath.dirExists():
+    # if we are in a directory, we only care about the root of the repo
+    let gitDir = fullpath.joinPath(gitRoot)
+    if not gitDir.dirExists(): return head.findAuthorsFile()
+  else:
+    # otherwise either we are examining an AUTHOR(s) file or traverse up
+    if tail == fNameAuthor or tail == fnameAuthors: return fullpath
+    return head.findAuthorsFile()
+
   let
-    authfname  = head.joinPath(fNameAuthor)
-    authsfname = head.joinPath(fNameAuthors)
-    docdir     = head.joinPath(dirDoc)
+    authfname  = fullpath.joinPath(fNameAuthor)
+    authsfname = fullpath.joinPath(fNameAuthors)
+    docdir     = fullpath.joinPath(dirDoc)
 
   if authfname.fileExists():  return authfname
   if authsfname.fileExists(): return authsfname
@@ -33,7 +42,7 @@ proc findAuthorsFile(fullpath: string): string =
     if authdoc.fileExists():  return authdoc
     if authsdoc.fileExists(): return authsdoc
 
-  return head.findAuthorsFile()
+  return ""
 
 type AuthorsFileCodeOwner* = ref object of Plugin
 

@@ -318,7 +318,7 @@ proc extractDockerInfo*(chalk:          ChalkObj,
   if not chalkConfig.dockerConfig.getWrapEntryPoint():
     stream.close()
     return true
-    
+
   # walk the sections from the most-recently-defined section.
   curSection = section
   while true:
