@@ -238,31 +238,39 @@ method scanArtifactLocations*(self:       Codec,
           result.add(opt.get())
           opt.get().yieldFileStream()
 
-method getArtifactHash*(self: Codec, chalk: ChalkObj): string {.base.} =
+proc simpleHash(self: Codec, chalk: ChalkObj): Option[string] =
+  var s: Stream
+
+  if self.usesFStream():
+    s = chalk.acquireFileStream().getOrElse(nil)
+
+  if s == nil:
+    return none(string)
+
+  s.setPosition(0)
+  let txt = $(s.readAll().computeSHA256())
+  chalk.yieldFileStream()
+
+  result = some(hashFmt(txt))
+
+method getUnchalkedHash*(self: Codec, obj: ChalkObj): Option[string] {.base.} =
+  ## This is called in computing the CHALK_ID. If the artifact already
+  ## hash chalk marks they need to be removed.
   raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
 
-method getHashAsOnDisk*(self: Codec, chalk: ChalkObj): Option[string] {.base.} =
-  let s = chalk.acquireFileStream().getOrElse(nil)
-  if s == nil: return none(string)
+method getEndingHash*(self: Codec, chalk: ChalkObj): Option[string] {.base.} =
+  ## This is called after chalking is done.  We check the cache first.
+  if chalk.cachedHash != "": return some(chalk.cachedHash)
+  return simpleHash(self, chalk)
 
-  result = some($(s.readAll().computeSHA256()))
-
-  chalk.closeFileStream()
-
-method noPreArtifactHash*(self: Codec): bool {.base.} = false
 method autoArtifactPath*(self: Codec): bool {.base.}  = true
 
 method getChalkId*(self: Codec, chalk: ChalkObj): string {.base.} =
-  ## The CHALK_ID should be a hash of the artifact whenever possible.
-  ## Try not to override this if it can be avoided.
-  if self.usesFStream():
-    discard chalk.acquireFileStream()
-    chalk.rawHash = self.getArtifactHash(chalk)
-    result = idFormat(chalk.rawHash)
-    chalk.yieldFileStream()
-  else:
-    chalk.rawHash = self.getArtifactHash(chalk)
-    result = idFormat(chalk.rawHash)
+  let hashOpt = self.getUnchalkedHash(chalk)
+  if hashOpt.isNone():
+    raise newException(Exception, "In plugin: " & self.name &
+      ": no hash for chalk ID")
+  return hashOpt.get().idFormat()
 
 method getChalkInfo*(self: Codec, chalk: ChalkObj): ChalkDict =
   result               = ChalkDict()
@@ -271,12 +279,12 @@ method getChalkInfo*(self: Codec, chalk: ChalkObj): ChalkDict =
 method getPostChalkInfo*(self: Codec, chalk: ChalkObj, ins: bool): ChalkDict =
   result = ChalkDict()
 
-  if chalk.postHash != "":
-    result["_CURRENT_HASH"] = pack(chalk.postHash.toHex().toLowerAscii())
-  else:
-    let v = self.getHashAsOnDisk(chalk)
-    if v.isSome():
-      result["_CURRENT_HASH"] = pack(v.get().toHex().toLowerAscii())
+  let postHashOpt = self.getEndingHash(chalk)
+
+  if postHashOpt.isSome():
+    result["_CURRENT_HASH"] = pack(postHashOpt.get())
+
+method cleanup*(self: Codec, chalk: ChalkObj) {.base.} = discard
 
 ## Codecs override this if they're for a binary format and can self-inject.
 method getNativeObjPlatforms*(s: Codec): seq[string] {.base.} = @[]
@@ -301,7 +309,7 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string) =
 method handleWrite*(s:       Codec,
                     chalk:   ChalkObj,
                     enc:     Option[string],
-                    virtual: bool): string {.base.} =
+                    virtual: bool) {.base.} =
   var pre, post: string
   chalk.stream.setPosition(0)
   pre = chalk.stream.readStr(chalk.startOffset)
@@ -316,9 +324,6 @@ method handleWrite*(s:       Codec,
     # Can't do virtual on delete.
     publish("virtual", enc.get())
     info(chalk.fullPath & "Virtual chalk published.")
-  return $(contents.computeSHA256()).toHex().toLowerAscii()
-
-
 
 # This is docker specific stuff that shouldn't be here, but am dealing
 # with some cyclic dependencies.

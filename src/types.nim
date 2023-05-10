@@ -6,15 +6,14 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import c4autoconf, streams, tables, options, nimutils
+import c4autoconf, streams, tables, options, nimutils, sugar
 
 type
   ChalkDict* = OrderedTableRef[string, Box]
   ## The chalk info for a single artifact.
   ChalkObj* = ref object
     fullpath*:      string      ## The path to the artifact.
-    rawHash*:       string      ## Raw hash of the unchalked artifact.
-    postHash*:      string      ## Cached post-op hash if an insert op.
+    cachedHash*:    string      ## Cached hash.
     collectedData*: ChalkDict   ## What we're adding during insertion.
     extract*:       ChalkDict   ## What we extracted, or nil if no extract.
     opFailed*:      bool
@@ -43,10 +42,12 @@ type
 
   KeyType* = enum KtChalkableHost, KtChalk, KtNonChalk, KtHostOnly
 
-  CollectionCtx = ref object
-    currentErrorObject: Option[ChalkObj]
-    allChalks:          seq[ChalkObj]
-    unmarked:           seq[string]
+  CollectionCtx* = ref object
+    currentErrorObject*: Option[ChalkObj]
+    allChalks*:          seq[ChalkObj]
+    unmarked*:           seq[string]
+    report*:             Box
+    postprocessor*:      (CollectionCtx) -> void
 
 var
   ctxStack            = seq[CollectionCtx](@[])
@@ -58,13 +59,15 @@ var
   selfID*             = Option[string](none(string))
   canSelfInject*      = true
 
-proc pushCollectionCtx*() =
+proc pushCollectionCtx*(callback: (CollectionCtx) -> void): CollectionCtx =
   ctxStack.add(collectionCtx)
-  collectionCtx = CollectionCtx()
-
+  collectionCtx = CollectionCtx(postprocessor: callback)
+  result        = collectionCtx
 proc popCollectionCtx*() =
-  collectionCtx = ctxStack.pop()
-
+  if len(ctxStack) != 0: collectionCtx = ctxStack.pop()
+proc inSubscan*(): bool =
+  return len(ctxStack) != 0
+proc getCurrentCollectionCtx*(): CollectionCtx = collectionCtx
 proc getErrorObject*(): Option[ChalkObj] = collectionCtx.currentErrorObject
 proc setErrorObject*(o: ChalkObj) =
   collectionCtx.currentErrorObject = some(o)
@@ -91,3 +94,6 @@ proc newChalk*(stream: FileStream, loc: string): ChalkObj =
 proc idFormat*(rawHash: string): string =
   let s = base32vEncode(rawHash)
   s[0 ..< 6] & "-" & s[6 ..< 10] & "-" & s[10 ..< 14] & "-" & s[14 ..< 20]
+
+template hashFmt*(s: string): string =
+  s.toHex().toLowerAscii()

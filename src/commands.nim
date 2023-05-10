@@ -4,7 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, strutils, unicode, os, streams, posix, osproc
+import tables, options, strutils, unicode, os, streams, posix, osproc, sugar
 import config, builtins, collect, chalkjson, plugins, plugins/codecDocker
 import macros except error
 
@@ -87,18 +87,33 @@ proc setPerChalkReports(successProfileName: string,
   elif "_CHALKS" in hostInfo: hostInfo.del("_CHALKS")
 
 # Next, our reporting.
-template doCommandReport() =
+template doCommandReport(): string =
   let
     conf        = getOutputConfig()
     hostProfile = chalkConfig.profiles[conf.hostReport]
     unmarked    = getUnmarked()
 
-  if not hostProfile.enabled: return
+  if not hostProfile.enabled: ""
+  else:
+    setPerChalkReports(conf.artifactReport, conf.invalidChalkReport,
+                       conf.hostReport)
+    if len(unmarked) != 0: hostInfo["_UNMARKED"] = pack(unmarked)
+    hostInfo.prepareContents(hostProfile)
 
-  setPerChalkReports(conf.artifactReport, conf.invalidChalkReport,
-                     conf.hostReport)
-  if len(unmarked) != 0: hostInfo["_UNMARKED"] = pack(unmarked)
-  publish("report", hostInfo.prepareContents(hostProfile))
+template doEmbeddedReport(): Box =
+  let
+    conf        = getOutputConfig()
+    hostProfile = chalkConfig.profiles[conf.hostReport]
+    unmarked    = getUnmarked()
+
+  if not hostProfile.enabled: pack("")
+  else:
+    setPerChalkReports(conf.artifactReport, conf.invalidChalkReport,
+                       conf.hostReport)
+    if "_CHALKS" in hostInfo:
+      hostInfo["_CHALKS"]
+    else:
+      pack("")
 
 template doCustomReporting() =
   for topic, spec in chalkConfig.reportSpecs:
@@ -173,10 +188,19 @@ proc liftUniformKeys() =
     hostInfo[key] = box.get()
 
 proc doReporting() =
-  collectPostRunInfo()
-  liftUniformKeys()
-  doCommandReport()
-  doCustomReporting()
+  if inSubscan():
+    let ctx = getCurrentCollectionCtx()
+    if ctx.postprocessor != nil:
+      ctx.postprocessor(ctx)
+    liftUniformKeys()
+    ctx.report = doEmbeddedReport()
+  else:
+    collectPostRunInfo()
+    liftUniformKeys()
+    let report = doCommandReport()
+    if report != "":
+      publish("report", report)
+    doCustomReporting()
 
 proc runCmdExtract*(path: seq[string]) =
   initCollection()
@@ -199,12 +223,11 @@ proc runCmdInsert*(path: seq[string]) =
     try:
       let
         toWrite = some(item.getChalkMarkAsStr())
-        rawHash = item.myCodec.handleWrite(item, toWrite, virtual)
+      item.myCodec.handleWrite(item, toWrite, virtual)
 
       if virtual: info(item.fullPath & ": virtual chalk created")
       else:       info(item.fullPath & ": chalk mark successfully added")
 
-      item.postHash = rawHash
     except:
       error(item.fullPath & ": insertion failed: " & getCurrentExceptionMsg())
       dumpExOnDebug()
@@ -220,17 +243,39 @@ proc runCmdDelete*(path: seq[string]) =
       info(item.fullPath & ": no chalk mark to delete.")
       continue
     try:
-      let rawHash = item.myCodec.handleWrite(item, none(string), false)
-
+      item.myCodec.handleWrite(item, none(string), false)
       info(item.fullPath & ": chalk mark successfully deleted")
-
-      item.postHash = rawHash
     except:
       error(item.fullPath & ": deletion failed: " & getCurrentExceptionMsg())
       dumpExOnDebug()
       item.opFailed = true
 
   doReporting()
+
+proc runSubScan*(location: string,
+                 cmd:      string,
+                 callback: (CollectionCtx) -> void): CollectionCtx =
+  # Currently, we always recurse in subscans.
+  let
+    oldRecursive = chalkConfig.recursive
+    oldCmd       = getCommandName()
+
+  setCommandName(cmd)
+
+  try:
+    chalkConfig.recursive = true
+    result                = pushCollectionCtx(callback)
+    case cmd
+    of "insert", "docker": runCmdInsert (@[location])
+    of "extract":          runCmdExtract(@[location])
+    of "delete":           runCmdDelete (@[location])
+    else: discard
+  finally:
+    popCollectionCtx()
+    setCommandName(oldCmd)
+    chalkConfig.recursive = oldRecursive
+
+chalkSubScanFunc = runSubScan
 
 proc runCmdConfDump*() =
   var
@@ -504,10 +549,9 @@ proc runCmdConfLoad*() =
     copyFile(oldLocation, selfChalk.fullPath)
     let
       toWrite = some(selfChalk.getChalkMarkAsStr())
-      rawHash = selfChalk.myCodec.handleWrite(selfChalk, toWrite, false)
+    selfChalk.myCodec.handleWrite(selfChalk, toWrite, false)
 
     info("Configuration written to new binary: " & selfChalk.fullPath)
-    selfChalk.postHash = rawHash
   except:
     cantLoad("Configuration loading failed: " & getCurrentExceptionMsg())
     dumpExOnDebug()

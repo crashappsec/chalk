@@ -31,7 +31,7 @@ func sign(to_sign) {
     rm_file(tmp_fname + ".asc")
   }
   if len(result[1]) == 0 {
-    warn("Unable to sign. Make sure '" + PASSPHRASE_ENV_VAR + "' is set.")
+    info("Unable to sign. Make sure '" + PASSPHRASE_ENV_VAR + "' is set.")
   }
 }
 

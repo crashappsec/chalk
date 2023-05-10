@@ -534,12 +534,25 @@ keyspec OLD_CHALK_METADATA_ID {
 keyspec EMBEDDED_CHALK {
     kind:             Chalk
     never_early:      true
-    type:             dict[string, string]
+    type:             string
     standard:         true
     codec:            true
     since:            "0.1.0"
     normalized_order: high() - 700
     doc:              "Other artifacts contained in this artifact"
+}
+
+keyspec EMBEDDED_TMPDIR {
+    kind:             Chalk
+    never_early:      true
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    normalized_order: high() - 675
+    doc:              """
+Temporary directory for embedded contents that was used when chalking. Any directories in the sub-chalk should be under this path.
+"""
 }
 
 keyspec CLOUD_METADATA {
@@ -1104,7 +1117,7 @@ plugin zip {
     codec:           true
     priority:        1
     enabled:         true
-    artifact_keys:   ["HASH_FILES", "EMBEDDED_CHALK"]
+    artifact_keys:   ["HASH_FILES", "EMBEDDED_CHALK", "EMBEDDED_TMPDIR"]
     post_chalk_keys: ["_CURRENT_HASH"]
 }
 
@@ -1320,7 +1333,8 @@ profile chalking_default {
   key.CHALK_RAND.report               = true
   key.OLD_CHALK_METADATA_HASH.report  = true
   key.OLD_CHALK_METADATA_ID.report    = true
-  key.EMBEDDED_CHALK.report           = true
+  key.EMBEDDED_CHALK.report           = false
+  key.EMBEDDED_TMPDIR.report          = false
   key.SBOM.report                     = true
   key.SAST.report                     = true
   key.ERR_INFO.report                 = true
@@ -1504,6 +1518,7 @@ profile artifact_report_extract_base {
   key.DOCKER_TAGS.report              = true
   key.DOCKER_CONTEXT.report           = true
   key.EMBEDDED_CHALK.report           = true
+  key.EMBEDDED_TMPDIR.report          = true
   key.SBOM.report                     = true
   key.SAST.report                     = true
   key.ERR_INFO.report                 = true

@@ -19,9 +19,11 @@ type
 
 method usesFStream*(self: CodecContainer): bool = false
 
+method getUnchalkedHash*(self: CodecContainer, obj: ChalkObj): Option[string] =
+  return none(string)
 
-method getArtifactHash*(self: CodecContainer, chalk: ChalkObj): string =
-  return chalk.rawHash
+method getEndingHash*(self: CodecContainer, chalk: ChalkObj): Option[string] =
+  return some(chalk.cachedHash)
 
 let byteMap = { '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6,
                 '7': 7, '8': 8, '9': 9, 'a': 10, 'b': 11, 'c': 12, 'd': 13,
@@ -58,9 +60,9 @@ method scanArtifactLocations*(self:       CodecContainer,
     else:
       hash.add(char(b or byte(bytemap[ch])))
 
-  let obj     = newChalk(nil, name)
-  obj.cache   = cache
-  obj.rawHash = hash
+  let obj        = newChalk(nil, name)
+  obj.cache      = cache
+  obj.cachedHash = hash
 
   # Go ahead and add this now!
   obj.collectedData["HASH_FILES"] = pack(@[name])
@@ -71,9 +73,8 @@ method keepScanningOnSuccess*(self: CodecContainer): bool = false
 method handleWrite*(self:    CodecContainer,
                     obj:     ChalkObj,
                     enc:     Option[string],
-                    virtual: bool): string =
+                    virtual: bool) =
   echo pretty(parseJson(enc.get()))
-  return "return a hash"
 
 method getChalkInfo*(self: CodecContainer, chalk: ChalkObj): ChalkDict =
   result = ContainerCache(chalk.cache).info
@@ -82,8 +83,5 @@ method getPostChalkInfo*(self:  CodecContainer,
                          chalk: ChalkObj,
                          ins:   bool): ChalkDict =
   ChalkDict()  # Don't know how to pull the post-chalk value.
-
-method getHashAsOnDisk*(self: CodecContainer, chalk: ChalkObj): Option[string] =
-  return none(string)
 
 registerPlugin("container", CodecContainer())

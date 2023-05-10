@@ -1026,7 +1026,7 @@ root {
   field ignore_when_normalizing {
     type:       list[string]
     default:    ["MAGIC", "METADATA_HASH", "METADATA_ID", "SIGN_PARAMS",
-                 "SIGNING", "SIGNATURE"]
+                 "SIGNING", "SIGNATURE", "EMBEDDED_CHALK"]
     write_lock: true
     hidden:     true
     doc:        """
@@ -1324,7 +1324,7 @@ Note that, when chalk is invoked with 'docker' as its EXE name, the default IO c
     default: true
     shortdoc: "Add chalk to embedded chalkable objects"
     doc: """
-When chalking an artifact that can itself contain artifacts, this field dictates whether the contents should be chalked, or if just the outer artifact.
+When chalking an artifact that can itself contain artifacts, this field dictates whether the contents should be chalked, or if just the outer artifact.  This also controls whether, on extraction, chalk will report contents.
 
 Currently, this is only respected for artifacts in ZIP format (e.g., JAR files)
 """

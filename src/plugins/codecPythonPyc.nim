@@ -42,7 +42,7 @@ method scan*(self:   CodecPythonPyc,
 method handleWrite*(self:    CodecPythonPyc,
                     chalk:   ChalkObj,
                     encoded: Option[string],
-                    virtual: bool): string =
+                    virtual: bool) =
   #Reset to start of file
   chalk.stream.setPosition(0)
   #Read up to previously set offset indicating where magic began
@@ -67,11 +67,10 @@ method handleWrite*(self:    CodecPythonPyc,
   #If NOT a dry-run replace file contents
   if not virtual: chalk.replaceFileContents(toWrite)
 
-  ##Return sha256 hash
-  return $(toWrite.computeSHA256())
-
-method getArtifactHash*(self: CodecPythonPyc, chalk: ChalkObj): string =
+method getUnchalkedHash*(self:  CodecPythonPyc,
+                         chalk: ChalkObj): Option[string] =
   chalk.stream.setPosition(0)
-  return $(chalk.stream.readStr(chalk.startOffset).computeSHA256())
+  let toHash = $(chalk.stream.readStr(chalk.startOffset))
+  return some(hashFmt($(toHash.computeSHA256())))
 
 registerPlugin("python_pyc", CodecPythonPyc())

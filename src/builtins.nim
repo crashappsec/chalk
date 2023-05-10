@@ -129,7 +129,7 @@ proc chalkErrSink(msg: string, cfg: SinkConfig, arg: StringTable): bool =
   else: errObject.get().err.add(msg)
 
 proc chalkErrFilter(msg: string, info: StringTable): (string, bool) =
-  if keyLogLevel in info:
+  if not getSuspendLogging() and keyLogLevel in info:
     let llStr = info[keyLogLevel]
 
     if (llStr in toLogLevelMap) and chalkConfig != nil and

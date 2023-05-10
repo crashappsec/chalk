@@ -45,12 +45,10 @@ proc extractArgv(json: string): seq[string] {.inline.} =
 
 method usesFStream*(self: CodecDocker): bool = false
 
-method noPreArtifactHash*(self: CodecDocker): bool = true
 method autoArtifactPath*(self: Codec): bool        = false
 
-#
-method getArtifactHash*(self: CodecDocker, chalk: ChalkObj): string =
-  return ""
+method getUnchalkedHash*(self: CodecDocker, chalk: ChalkObj): Option[string] =
+  return none(string)
 
 method getChalkId*(self: CodecDocker, chalk: ChalkObj): string =
   var
@@ -63,8 +61,6 @@ method getChalkId*(self: CodecDocker, chalk: ChalkObj): string =
 method scan*(self: CodecDocker, stream: FileStream, loc: string):
        Option[ChalkObj] = none(ChalkObj)
 
-method getHashAsOnDisk*(self: CodecDocker, chalk: ChalkObj): Option[string] =
-  return none(string)
 
 var dockerPathOpt: Option[string] = none(string)
 
@@ -155,12 +151,11 @@ method getChalkInfo*(self: CodecDocker, chalk: ChalkObj): ChalkDict =
 method getPostChalkInfo*(self:  CodecDocker,
                          chalk: ChalkObj,
                          ins:   bool): ChalkDict =
-  result  = ChalkDict()
-  let
-    cache = DockerInfoCache(chalk.cache)
-    ascii = cache.inspectOut["Id"].getStr().split(":")[1].toLowerAscii()
+  result    = ChalkDict()
+  let cache = DockerInfoCache(chalk.cache)
+  let hash  = cache.inspectOut["Id"].getStr().split(":")[1].toLowerAscii()
 
-  chalk.collectedData["_CURRENT_HASH"] = pack(ascii)
+  chalk.cachedHash = hash
 
 proc extractDockerInfo*(chalk:          ChalkObj,
                         flags:          OrderedTable[string, FlagSpec],
@@ -554,7 +549,7 @@ proc writeEntryPointBinary*(chalk, selfChalk: ChalkObj, toWrite: string) =
   # If we cannot write to the file system, we should write the chalk
   # mark to a label (TODO)
   try:
-    selfChalk.postHash  = codec.handleWrite(selfChalk, some(toWrite), false)
+    codec.handleWrite(selfChalk, some(toWrite), false)
     info("New entrypoint binary written to: " & path)
 
     # If we saw a relative path for the entry point binary, we should make sure

@@ -82,9 +82,13 @@ method scan*(self:   CodecElf,
   except: return none(ChalkObj)
   # This is usally a 0-length file and not worth a stack-trace.
 
-method getArtifactHash*(self: CodecElf, chalk: ChalkObj): string =
+method getUnchalkedHash*(self: CodecElf, chalk: ChalkObj): Option[string] =
+  let s = chalk.acquireFileStream()
+  if s.isNone(): return none(string)
+
   chalk.stream.setPosition(0)
-  return $(chalk.stream.readStr(chalk.startOffset).computeSHA256())
+  let toHash = chalk.stream.readStr(chalk.startOffset)
+  return some(hashFmt($(toHash.computeSHA256())))
 
 registerPlugin("elf", CodecElf())
 

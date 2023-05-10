@@ -5,7 +5,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import config, plugins, options, tables, strutils, glob, os
+import config, plugins, options, tables, glob, os
 
 # We collect things in four different places
 
@@ -106,8 +106,9 @@ proc collectPostChalkInfo*(artifact: ChalkObj) =
       if k notin artifact.collectedData or k in plugin.configInfo.overrides:
         artifact.collectedData[k] = v
 
-  if not isInserting and artifact.postHash != "":
-    artifact.collectedData["_CURRENT_HASH"] = pack(artifact.postHash)
+  let hashOpt = artifact.myCodec.getEndingHash(artifact)
+  if hashOpt.isSome():
+    artifact.collectedData["_CURRENT_HASH"] = pack(hashOpt.get())
 
 proc collectChalkInfo*(obj: ChalkObj) =
   # Called from the appropriate commands.
@@ -118,8 +119,9 @@ proc collectChalkInfo*(obj: ChalkObj) =
   for plugin in getPlugins():
     if plugin == Plugin(obj.myCodec):
       data["CHALK_ID"]      = pack(obj.myCodec.getChalkID(obj))
-      if not obj.myCodec.noPreArtifactHash():
-        data["HASH"]          = pack(obj.rawHash.toHex().toLowerAscii())
+      let preHashOpt = obj.myCodec.getUnchalkedHash(obj)
+      if preHashOpt.isSome():
+        data["HASH"]          = pack(preHashOpt.get())
       if obj.myCodec.autoArtifactPath():
         data["ARTIFACT_PATH"] = pack(resolvePath(obj.fullpath))
 
@@ -220,7 +222,9 @@ iterator artifacts*(artifactPath: seq[string]): ChalkObj =
       # On an insert, any more errors in this object are going to be
       # post-chalk, so need to go to the system errors list.
       clearErrorObject()
-      if obj.fullpath notin getUnmarked(): obj.collectPostChalkInfo()
+      if not inSubScan() and obj.fullpath notin getUnmarked():
+        obj.collectPostChalkInfo()
+      obj.myCodec.cleanup(obj)
       obj.closeFileStream()
     if len(chalks) > 0 and not goOn: break
 

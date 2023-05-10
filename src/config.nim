@@ -16,7 +16,7 @@ import c4autoconf
 export c4autoconf # This is conceptually part of our API.
 
 import options, tables, strutils, algorithm, os, streams, uri
-import con4m, nimutils, nimutils/logging, types
+import con4m, nimutils, nimutils/logging, types, sugar
 import macros except error
 export logging, types, nimutils, con4m
 
@@ -136,6 +136,22 @@ proc getSinkConfig*(hook: string): Option[SinkSpec] =
   if chalkConfig.sinks.contains(hook):
     return some(chalkConfig.sinks[hook])
   return none(SinkSpec)
+
+# Nim doesn't do well with recursive imports.  Our main path imports
+# plugins, but some plugins need to recursively scan into a temporary
+# file system (e.g., ZIP files).
+#
+# To enable codecs to call back into commands.nim, we set a function
+# pointer here that commands.nim will set once it's imported us.
+# Then, when needed, codecs can trigger a nested scan by dereferencing
+# this function pointer.
+
+var chalkSubScanFunc*: (string, string,
+                       (CollectionCtx) -> void) -> CollectionCtx
+
+proc runChalkSubScan*(loc: string, cmd: string,
+                      f: (CollectionCtx) -> void = nil): CollectionCtx =
+  return chalkSubScanFunc(loc, cmd, f)
 
 import collect # Cyclical, but get chalkCon4mBuiltins here.
 

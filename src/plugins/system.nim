@@ -32,13 +32,15 @@ proc validateMetadata(obj: ChalkObj): bool =
     return
   elif obj.myCodec.getChalkID(obj) != unpack[string](fields["CHALK_ID"]):
     error(obj.fullPath & ": extracted CHALK_ID doesn't match computed CHALK_ID")
+    error(obj.myCodec.getChalkID(obj) & " vs: " &
+      unpack[string](fields["CHALK_ID"]))
     return
   elif "METADATA_HASH" notin fields:
     error(obj.fullPath & ": extracted chalk mark missing METADATA_HASH field")
     return
   var
     toHash   = fields.normalizeChalk()
-    computed = $(toHash.computeSHA256()).toHex().toLowerAscii()
+    computed = hashFmt($(toHash.computeSHA256()))
 
   if computed != unpack[string](fields["METADATA_HASH"]):
     error(obj.fullPath & ": extracted METADATA_HASH doesn't validate")
@@ -47,21 +49,23 @@ proc validateMetadata(obj: ChalkObj): bool =
     if "SIGNING" in fields and unpack[bool](fields["SIGNING"]):
       error(obj.fullPath & ": SIGNING was set, but SIGNATURE was not found")
   else:
-    let
-      artHash  = obj.myCodec.getArtifactHash(obj).toHex().toLowerAscii()
-      toVerify = pack(artHash & "\n" & computed & "\n")
-      args     = @[toVerify, fields["SIGNATURE"], fields["SIGN_PARAMS"]]
-      optValid = runCallback(verifySig, args)
+    let artHash = obj.myCodec.getUnchalkedHash(obj)
 
-    if optValid.isSome():
-      result = unpack[bool](optValid.get())
-      if not result:
-        error(obj.fullPath & ": signature verification failed.")
+    if artHash.isSome():
+      let
+        toVerify = pack(artHash.get() & "\n" & computed & "\n")
+        args     = @[toVerify, fields["SIGNATURE"], fields["SIGN_PARAMS"]]
+        optValid = runCallback(verifySig, args)
+
+      if optValid.isSome():
+        result = unpack[bool](optValid.get())
+        if not result:
+          error(obj.fullPath & ": signature verification failed.")
+        else:
+          info(obj.fullPath & ": signature successfully verified.")
+          return true
       else:
-        info(obj.fullPath & ": signature successfully verified.")
-        return true
-    else:
-      once: warn(obj.fullPath & ": no signature validation routine provided.")
+        once(warn(obj.fullPath & ": no signature validation routine provided."))
 
 method getChalkInfo*(self: SystemPlugin, obj: ChalkObj): ChalkDict =
   result              = ChalkDict()
@@ -232,15 +236,13 @@ method getChalkInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
   let
     toHash   = obj.getChalkMark().normalizeChalk()
     mdHash   = $(toHash.computeSHA256())
-    encHash  = mdHash.toHex().toLowerAscii()
+    encHash  = hashFmt(mdHash)
     outconf  = getOutputConfig()
     ckeys    = chalkConfig.profiles[outconf.chalk].getKeys()
     rkeys    = chalkConfig.profiles[outconf.artifactReport].getKeys()
 
   result["METADATA_HASH"] = pack(encHash)
   result["METADATA_ID"]   = pack(idFormat(mdHash))
-
-
 
   # Signing is expensive enough that we check to make sure signing is on.
   if "SIGNATURE" in ckeys and ckeys["SIGNATURE"].report:
@@ -256,20 +258,26 @@ method getChalkInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
   if not shouldSign: return
 
   let
-    toSign = @[pack(obj.rawHash.toHex().toLowerAscii() & "\n" & encHash & "\n")]
-    sigOpt = runCallback(signSig, toSign)
+    hashOpt = obj.myCodec.getUnchalkedHash(obj)
 
-  if sigOpt.isSome():
+  if hashOpt.isSome():
     let
-      res  = sigOpt.get()
-      tup  = unpack[seq[Box]](res)
-      hash = unpack[string](tup[0])
+      toSign  = @[pack(hashFmt(hashOpt.get()) & "\n" & encHash & "\n")]
+      sigOpt  = runCallback(signSig, toSign)
 
-    if hash != "":
-      result["SIGNATURE"]   = tup[0]
-      result["SIGN_PARAMS"] = tup[1]
+    if sigOpt.isSome():
+      let
+        res  = sigOpt.get()
+        tup  = unpack[seq[Box]](res)
+        hash = unpack[string](tup[0])
+
+      if hash != "":
+        result["SIGNATURE"]   = tup[0]
+        result["SIGN_PARAMS"] = tup[1]
+    else:
+      trace("No implementation of sign() provided; cannot sign.")
   else:
-    trace("No implementation of sign() provided; cannot sign.")
+    trace("No hash available for this artifact at time of signing.")
 
 registerPlugin("system", SystemPlugin())
 registerPlugin("metsys", MetsysPlugin())
