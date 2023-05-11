@@ -70,10 +70,7 @@ method scanArtifactLocations*(self:       CodecContainer,
 
 method keepScanningOnSuccess*(self: CodecContainer): bool = false
 
-method handleWrite*(self:    CodecContainer,
-                    obj:     ChalkObj,
-                    enc:     Option[string],
-                    virtual: bool) =
+method handleWrite*(self: CodecContainer, obj:ChalkObj, enc: Option[string]) =
   echo pretty(parseJson(enc.get()))
 
 method getChalkInfo*(self: CodecContainer, chalk: ChalkObj): ChalkDict =

@@ -1400,6 +1400,8 @@ The report cache is a self-truncating local log file, indended to add protection
 against reporting not reaching its destination. This is obviously not worthwhile
 for transient infrastructure. In such a case, configure and attach multiple
  sinks instead.
+
+Note that this can be set on the command line with --log. 
 """
   }
 

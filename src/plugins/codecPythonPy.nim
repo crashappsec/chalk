@@ -59,8 +59,7 @@ method scan*(self:   CodecPythonPy,
 
 method handleWrite*(self:    CodecPythonPy,
                     chalk:   ChalkObj,
-                    encoded: Option[string],
-                    virtual: bool) =
+                    encoded: Option[string]) =
   #Reset to start of file
   chalk.stream.setPosition(0)
   #Read up to previously set offset indicating where magic began
@@ -94,7 +93,7 @@ method handleWrite*(self:    CodecPythonPy,
   chalk.closeFileStream()
 
   #If NOT a dry-run replace file contents
-  if not virtual: chalk.replaceFileContents(toWrite)
+  chalk.replaceFileContents(toWrite)
 
   chalk.cachedHash = hashFmt($(toWrite.computeSHA256()))
 

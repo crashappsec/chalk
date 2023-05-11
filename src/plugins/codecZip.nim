@@ -145,10 +145,8 @@ proc hashZip(toHash: ZipArchive): string =
 
   result = hashFmt($(sha.final))
 
-method handleWrite*(self:    CodecZip,
-                    chalk:   ChalkObj,
-                    encoded: Option[string],
-                    virtual: bool) =
+proc doWrite(self: CodecZip, chalk: ChalkObj, encoded: Option[string],
+             virtual: bool) =
   let
     cache     = ZipCache(chalk.cache)
     chalkFile = joinPath(cache.tmpDir, "contents", zipChalkFile)
@@ -174,7 +172,10 @@ method handleWrite*(self:    CodecZip,
   except:
     error(chalk.fullPath & ": " & getCurrentExceptionMsg())
     dumpExOnDebug()
-
+  
+method handleWrite*(self: CodecZip, chalk: ChalkObj, encoded: Option[string]) =
+  self.doWrite(chalk, encoded, virtual = false)
+  
 method getUnchalkedHash*(self: CodecZip, chalk: ChalkObj): Option[string] =
   if chalk.cachedHash != "": return some(chalk.cachedHash)
   let
@@ -189,7 +190,11 @@ method getEndingHash*(self: CodecZip, chalk: ChalkObj): Option[string] =
   let
     cache  = ZipCache(chalk.cache)
 
-  return some(cache.endingHash)
+  if cache.endingHash != "":
+    return some(cache.endingHash)
+  else:
+    # --virtual was passed.
+    self.doWrite(chalk, none(string), virtual = true)
 
 method getChalkInfo*(self: CodecZip, obj: ChalkObj): ChalkDict =
   let cache = ZipCache(obj.cache)

@@ -32,10 +32,7 @@ method scan*(self:   CodecShebang,
     dumpExOnDebug()
     return none(ChalkObj)
 
-method handleWrite*(self:    CodecShebang,
-                    chalk:   ChalkObj,
-                    encoded: Option[string],
-                    virtual: bool) =
+method handleWrite*(self: CodecShebang, chalk: ChalkObj, enc: Option[string]) =
   chalk.stream.setPosition(0)
   let pre  = chalk.stream.readStr(chalk.startOffset)
   if chalk.endOffset > chalk.startOffset:
@@ -43,22 +40,21 @@ method handleWrite*(self:    CodecShebang,
   let post = chalk.stream.readAll()
   var toWrite: string
 
-  if encoded.isSome():
+  if enc.isSome():
     toWrite = pre
     if not pre.strip().endsWith("\n#"): toWrite &= "\n# "
-    toWrite &= encoded.get()
+    toWrite &= enc.get()
     chalk.endOffset = len(toWrite)
     toWrite &= post
   else:
     chalk.endOffset = pre.find('\n')
     toWrite = pre[0 ..< chalk.endOffset] & post
   chalk.closeFileStream()
-  if not virtual: chalk.replaceFileContents(toWrite)
+  chalk.replaceFileContents(toWrite)
 
 method getUnchalkedHash*(self: CodecShebang, chalk: ChalkObj): Option[string] =
   var toHash = ""
   let s = chalk.acquireFileStream()
-
   if s.isNone(): return none(string)
 
   chalk.stream.setPosition(0)

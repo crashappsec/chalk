@@ -306,10 +306,7 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string) =
         error(chalk.fullPath & ": Could not write (no permission)")
         dumpExOnDebug()
 
-method handleWrite*(s:       Codec,
-                    chalk:   ChalkObj,
-                    enc:     Option[string],
-                    virtual: bool) {.base.} =
+method handleWrite*(s: Codec, chalk: ChalkObj, enc: Option[string]) {.base.} =
   var pre, post: string
   chalk.stream.setPosition(0)
   pre = chalk.stream.readStr(chalk.startOffset)
@@ -318,12 +315,7 @@ method handleWrite*(s:       Codec,
     post = chalk.stream.readAll()
   chalk.closeFileStream()
   let contents = pre & enc.getOrElse("") & post
-  if not virtual:
-    chalk.replaceFileContents(contents)
-  else:
-    # Can't do virtual on delete.
-    publish("virtual", enc.get())
-    info(chalk.fullPath & "Virtual chalk published.")
+  chalk.replaceFileContents(contents)
 
 # This is docker specific stuff that shouldn't be here, but am dealing
 # with some cyclic dependencies.

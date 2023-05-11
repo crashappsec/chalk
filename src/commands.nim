@@ -221,12 +221,14 @@ proc runCmdInsert*(path: seq[string]) =
     item.collectChalkInfo()
     trace(item.fullPath & ": chalk data collection finished.")
     try:
-      let
-        toWrite = some(item.getChalkMarkAsStr())
-      item.myCodec.handleWrite(item, toWrite, virtual)
+      let toWrite = item.getChalkMarkAsStr()
 
-      if virtual: info(item.fullPath & ": virtual chalk created")
-      else:       info(item.fullPath & ": chalk mark successfully added")
+      if virtual:
+        publish("virtual", toWrite)
+        info(item.fullPath & ": virtual chalk created.")
+      else:
+        item.myCodec.handleWrite(item, some(toWrite))
+        info(item.fullPath & ": chalk mark successfully added")
 
     except:
       error(item.fullPath & ": insertion failed: " & getCurrentExceptionMsg())
@@ -243,7 +245,7 @@ proc runCmdDelete*(path: seq[string]) =
       info(item.fullPath & ": no chalk mark to delete.")
       continue
     try:
-      item.myCodec.handleWrite(item, none(string), false)
+      item.myCodec.handleWrite(item, none(string))
       info(item.fullPath & ": chalk mark successfully deleted")
     except:
       error(item.fullPath & ": deletion failed: " & getCurrentExceptionMsg())
@@ -549,7 +551,7 @@ proc runCmdConfLoad*() =
     copyFile(oldLocation, selfChalk.fullPath)
     let
       toWrite = some(selfChalk.getChalkMarkAsStr())
-    selfChalk.myCodec.handleWrite(selfChalk, toWrite, false)
+    selfChalk.myCodec.handleWrite(selfChalk, toWrite)
 
     info("Configuration written to new binary: " & selfChalk.fullPath)
   except:
@@ -604,7 +606,7 @@ proc runCmdDocker*() {.noreturn.} =
           let toWrite    = chalk.getChalkMarkAsStr()
           if chalkConfig.getVirtualChalk():
             publish("virtual", toWrite)
-            info(chalk.fullPath & "Virtual chalk published.")
+            info(chalk.fullPath & ": virtual chalk created.")
             let exe = findDockerPath().getOrElse("")
             if exe != "":
               trace("Building container by calling: " & exe & cmdline)

@@ -549,7 +549,7 @@ proc writeEntryPointBinary*(chalk, selfChalk: ChalkObj, toWrite: string) =
   # If we cannot write to the file system, we should write the chalk
   # mark to a label (TODO)
   try:
-    codec.handleWrite(selfChalk, some(toWrite), false)
+    codec.handleWrite(selfChalk, some(toWrite))
     info("New entrypoint binary written to: " & path)
 
     # If we saw a relative path for the entry point binary, we should make sure
