@@ -85,13 +85,6 @@ proc getExeName(args: seq[Box], unused: ConfigState): Option[Box] =
 proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getChalkExeVersion()))
 
-proc subscriptionExists(args: seq[Box], unused: ConfigState): Option[Box] =
-  let
-    config = unpack[string](args[0])
-    `rec?` = getSinkConfigByName(config)
-
-  return some(pack(`rec?`.isSome()))
-
 proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   let
     topic  = unpack[string](args[0])
@@ -167,7 +160,6 @@ let chalkCon4mBuiltins* = [
     ("version() -> string",                 BuiltinFn(getExeVersion)),
     ("subscribe(string, string) -> bool",   BuiltInFn(topicSubscribe)),
     ("unsubscribe(string, string) -> bool", BuiltInFn(topicUnSubscribe)),
-    ("subscription_exists(string) -> bool", BuiltInFn(subscriptionExists)),
     ("error(string)",                       BuiltInFn(logError)),
     ("warn(string)",                        BuiltInFn(logWarn)),
     ("info(string)",                        BuiltInFn(logInfo)),

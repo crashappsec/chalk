@@ -172,10 +172,10 @@ proc doWrite(self: CodecZip, chalk: ChalkObj, encoded: Option[string],
   except:
     error(chalk.fullPath & ": " & getCurrentExceptionMsg())
     dumpExOnDebug()
-  
+
 method handleWrite*(self: CodecZip, chalk: ChalkObj, encoded: Option[string]) =
   self.doWrite(chalk, encoded, virtual = false)
-  
+
 method getUnchalkedHash*(self: CodecZip, chalk: ChalkObj): Option[string] =
   if chalk.cachedHash != "": return some(chalk.cachedHash)
   let

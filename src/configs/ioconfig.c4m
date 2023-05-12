@@ -14,18 +14,16 @@ subscribe("audit",    "json_console_out")
 subscribe("version",  "console_out")
 subscribe("help",     "console_out")
 
-cmd := argv0()
+cmd  := argv0()
 
 if cmd == "confdump" {
   args := argv()
-
-  if len(args) > 0 {
+  if len(args) == 0 {
+    subscribe("confdump", "console_out")
+  } else {
     sink_config.dump_out.enabled  = true
     sink_config.dump_out.filename = args[0]
     subscribe("confdump", "dump_out")
-  }
-  else {
-    subscribe("confdump", "console_out")
   }
 }
 elif cmd == "defaults" {

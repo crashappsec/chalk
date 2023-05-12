@@ -46,7 +46,7 @@ const
   signConfig*         = staticRead(signConfName)
   sbomConfig*         = staticRead(sbomConfName)
   sastConfig*         = staticRead(sastConfName)
-  ioConfig*           = staticRead(ioConfNAme)
+  ioConfig*           = staticRead(ioConfName)
   dockerConfig*       = staticRead(dockerConfName)
   defaultConfig*      = staticRead(defCfgFname) & commentC4mCode(ioConfig)
   entryPtTemplate*    = staticRead(entryPtTemplateLoc)
@@ -132,11 +132,6 @@ proc getPluginConfig*(name: string): Option[PluginSpec] =
   if name in chalkConfig.plugins:
     return some(chalkConfig.plugins[name])
 
-proc getSinkConfig*(hook: string): Option[SinkSpec] =
-  if chalkConfig.sinks.contains(hook):
-    return some(chalkConfig.sinks[hook])
-  return none(SinkSpec)
-
 # Nim doesn't do well with recursive imports.  Our main path imports
 # plugins, but some plugins need to recursively scan into a temporary
 # file system (e.g., ZIP files).
@@ -214,7 +209,6 @@ proc getFilterName*(filter: MsgFilter): Option[string] =
     if f == filter: return some(name)
 
 
-var installedSinkConfigs: seq[string] = @[]
 var availableSinkConfigs = { "log_hook"     : defaultLogHook,
                              "con4m_hook"   : defaultCon4mHook,
                      }.toTable()
@@ -223,8 +217,60 @@ when not defined(release):
   availableSinkConfigs["debug_hook"] = defaultDebugHook
 
 proc getSinkConfigByName*(name: string): Option[SinkConfig] =
-  if name in availableSinkConfigs: return some(availableSinkConfigs[name])
-  return none(SinkConfig)
+  if name in availableSinkConfigs:
+    return some(availableSinkConfigs[name])
+
+  if name notin chalkConfig.sinkConfs:
+    return none(SinkConfig)
+
+  let attrs = chalkConfig.sinkConfs[name].`@@attrscope@@`
+  var
+    sinkName:    string
+    filterNames: seq[string]
+    filters:     seq[MsgFilter] = @[]
+    opts                        = OrderedTableRef[string, string]()
+
+  for k, _ in attrs.contents:
+    case k
+    of "enabled":
+      if not get[bool](attrs, k):
+        error("Sink configuration '" & name & " is disabled.")
+        return none(SinkConfig)
+    of "filters":                  filterNames = get[seq[string]](attrs, k)
+    of "sink":                     sinkName    = get[string](attrs, k)
+    else:                          opts[k]     = get[string](attrs, k)
+
+  if sinkName == "s3":
+      try:
+        let dstUri = parseUri(opts["uri"])
+        if dstUri.scheme != "s3":
+          error("Sink config '" & name & "' requires a URI of " &
+                "the form s3://bucket-name/object-path")
+          return none(SinkConfig)
+      except:
+          error("Sink config '" & name & "' has an invalid URI.")
+          dumpExOnDebug()
+          return none(SinkConfig)
+  let theSinkOpt = getSink(sinkName)
+  if theSinkOpt.isNone():
+    error("Sink '" & sinkname & "' is configured, and the config file " &
+         "specs it, but there is no implementation for that sink.")
+    return none(SinkConfig)
+
+  for item in filterNames:
+    if item notin availableFilters:
+      error("Message filter '" & item & "' cannot be found.")
+    else:
+     filters.add(availableFilters[item])
+
+  result = configSink(theSinkOpt.get(), some(opts), filters)
+
+  if result.isSome():
+    availableSinkConfigs[name] = result.get()
+    info("Loaded sink config for '" & name & "'")
+  else:
+    error("Output sink configuration '" & name & "' failed to load.")
+    return none(SinkConfig)
 
 proc getSinkConfigs*(): Table[string, SinkConfig] = return availableSinkConfigs
 
@@ -267,65 +313,6 @@ proc setupDefaultLogConfigs*() =
 
   discard subscribe("chalk_usage_stats", useConf.get())
 
-proc loadSinkConfigs*() =
-  for name, confInfo in chalkConfig.sinkConfs:
-    var opts = OrderedTableRef[string, string]()
-
-    if confInfo.loaded or not confInfo.enabled: continue
-    let
-      sinkName = confInfo.sink
-      attrs    = confInfo.`@@attrscope@@`
-
-    for k, _ in attrs.contents:
-      if k in ["enabled", "loaded", "sink", "filters"]:
-        continue
-      let v = getOpt[string](attrs, k)
-      opts[k] = v.getOrElse("")
-
-    discard attrs.setOverride("loaded", some(pack(true)))
-    confInfo.loaded = true
-
-    # Still going to do some validation here that we *should* push to con4m
-    # but haven't foten around to it yet.
-    if sinkName == "s3":
-      try:
-        let dstUri = parseUri(opts["uri"])
-        if dstUri.scheme != "s3":
-          warn("Sink config '" & name & "' requires a URI of " &
-               "the form s3://bucket-name/object-path (skipped)")
-      except:
-          warn("Sink config '" & name & "' has an invalid URI (skipped)")
-          dumpExOnDebug()
-    let theSinkOpt = getSink(sinkName)
-    if theSinkOpt.isNone():
-      warn("Sink '" & sinkname & "' is configured, and the config file specs " &
-           "it, but there is no implementation for that sink.")
-      return
-
-    let filterNames = get[seq[string]](attrs, "filters")
-    var filters: seq[MsgFilter] = @[]
-
-    for item in filterNames:
-      if item notin availableFilters:
-        error("Message filter '" & item & "' cannot be found.")
-      else:
-       filters.add(availableFilters[item])
-
-    let `cfg?`  = configSink(theSinkOpt.get(), some(opts), filters)
-
-    if `cfg?`.isSome():
-      availableSinkConfigs[name] = `cfg?`.get()
-
-      # Update what we've installed so validation can check whether custom
-      # reports have proper sink specs attached to them.
-      installedSinkConfigs.add(name)
-      discard setOverride(getChalkRuntime().attrs,
-                          "private_installed_sinks",
-                          some(pack(installedSinkConfigs)))
-    else:
-      warn("Output sink configuration '" & name & "' failed to load.")
-
-
 proc loadLocalStructs*(state: ConfigState) =
   chalkConfig = state.attrs.loadChalkConfig()
   if chalkConfig.color.isSome(): setShowColors(chalkConfig.color.get())
@@ -338,7 +325,6 @@ proc loadLocalStructs*(state: ConfigState) =
     c4errLevel = if c4errLevel == c4vBasic: c4vTrace else: c4vMax
 
   setCon4mVerbosity(c4errLevel)
-  loadSinkConfigs()
 
 proc handleCon4mErrors(err, tb: string): bool =
   if chalkConfig == nil or chalkConfig.chalkDebug or true:
@@ -413,6 +399,7 @@ proc loadAllConfigs*() =
   doRun()
   stack.addConfLoad(ioConfName, toStream(ioConfig), notEvenDefaults).
       addConfLoad(dockerConfName, toStream(dockerConfig), checkNone)
+
 
   if chalkConfig.getLoadDefaultSigning():
     stack.addConfLoad(signConfName, toStream(signConfig), checkNone)

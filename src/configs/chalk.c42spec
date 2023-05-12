@@ -671,13 +671,6 @@ Filters to install.  Valid options are:
 """
   }
 
-  field loaded {
-    type:    bool
-    default: false
-    hidden:  true
-
-  }
-
   field sink {
     type:       string
     require:    true
@@ -1373,13 +1366,6 @@ specific sets of command-line arguments.
     doc:        "Internal; used to map key type enum values back to text."
   }
 
-  field private_installed_sinks {
-    type:     list[string]
-    default:  []
-    hidden:   true
-    doc:      "Not meant for users; shuttles info from chalk back to the config"
-  }
-
   field defaults_disclaimer {
     type:       string
     hidden:     true
@@ -1401,7 +1387,7 @@ against reporting not reaching its destination. This is obviously not worthwhile
 for transient infrastructure. In such a case, configure and attach multiple
  sinks instead.
 
-Note that this can be set on the command line with --log. 
+Note that this can be set on the command line with --log.
 """
   }
 

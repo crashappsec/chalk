@@ -1699,16 +1699,16 @@ sink_config json_console_err {
   filters: ["pretty_json", "fix_new_line"]
 }
 
-sink_config dump_out {
-  enabled:  false
-  sink:     "file"
-  filename: ""  # Set below.
-}
-
 # This is the default sink for virtual chalking.
 sink_config virtual_chalk_log {
   enabled:  true
   sink:     "file"
   filters:  ["fix_new_line"]
   filename: "./virtual-chalk.json"
+}
+
+sink_config dump_out {
+  enabled:  false
+  sink:     "file"
+  filename: ""  # Set via command line in ioconfig.
 }

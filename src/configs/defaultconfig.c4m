@@ -91,7 +91,12 @@ ptr_url := ""
 
 ## I/O CONFIGURATION
 
-subscribe("virtual", "virtual_chalk_log")
+
+# The sink config gets loaded on first subscription, so if
+# virtual isn't on, let's not ever create an empty file.
+if virtual_chalk {
+ subscribe("virtual", "virtual_chalk_log")
+}
 
 sink_config s3 {
   enabled: false
@@ -106,23 +111,17 @@ sink_config s3 {
 ## used for I/O in the base configuration is in the comments below;
 ## you can undo any of it if you really want!
 
-if cmd == "extract" or cmd == "insert" or cmd == "delete" {
-  if env_exists("AWS_S3_BUCKET_URI") {
-    if not env_exists("AWS_ACCESS_ID") {
-       warn("To configure AWS must provide AWS_ACCESS_ID")
-    } elif not env_exists("AWS_ACCESS_SECRET") {
-       warn("To configure AWS must provide AWS_ACCESS_SECRET")
-    } else {
-      if len(strip(ptr_url)) == 0 {
-        ptr_url := env("AWS_S3_BUCKET_URI")
-      }
-      sink_config.s3.enabled = true
-      #  Stuff you might do if the sink is configured...
-      # subscribe("insert", "s3")
-      # subscribe("extract", "s3")
-      # subscribe("delete", "s3")
-      # unsubscribe("insert", "user_out")  # Stop JSON from going to console.
+if env_exists("AWS_S3_BUCKET_URI") {
+  if not env_exists("AWS_ACCESS_ID") {
+     warn("To configure AWS must provide AWS_ACCESS_ID")
+  } elif not env_exists("AWS_ACCESS_SECRET") {
+     warn("To configure AWS must provide AWS_ACCESS_SECRET")
+  } else {
+    if len(strip(ptr_url)) == 0 {
+      ptr_url := env("AWS_S3_BUCKET_URI")
     }
+    sink_config.s3.enabled = true
+    subscribe("report", "s3")
   }
 }
 
