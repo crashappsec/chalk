@@ -298,7 +298,7 @@ proc setupDefaultLogConfigs*() =
   if doAudit and auditFile != "":
     let
       f         = some(newOrderedTable({ "filename" : auditFile}))
-      auditConf = configSink(getSink("truncating_log").get(), f).get()
+      auditConf = configSink(getSink("rotating_log").get(), f).get()
 
     availableSinkConfigs["audit_file"] = auditConf
     if subscribe("audit", auditConf).isNone():
@@ -308,7 +308,7 @@ proc setupDefaultLogConfigs*() =
   if doCache:
     let
       f         = some(newOrderedTable({"filename" : cacheFile}))
-      cacheConf = configSink(getSink("truncating_log").get(), f).get()
+      cacheConf = configSink(getSink("rotating_log").get(), f).get()
 
     availableSinkConfigs["report_cache"] = cacheConf
     if subscribe("report", cacheConf).isNone():
