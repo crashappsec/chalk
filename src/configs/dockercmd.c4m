@@ -76,9 +76,11 @@ docker {
     command history {
       args: (0, high())
     }
-    command image {
-      args: (0, high())
-    }
+    # Removing this, we will treat it as an unknown "argument" to the
+    # top-level docker command, which gets ignored.
+    # command image {
+    #  args: (0, high())
+    # }
     command images {
       args: (0, high())
     }
@@ -128,9 +130,6 @@ docker {
       args: (0, high())
     }
     command pull {
-      args: (0, high())
-    }
-    command push {
       args: (0, high())
     }
     command rename {
@@ -260,6 +259,9 @@ docker {
       }
       flag_multi_arg target { }
       flag_multi_arg ulimit { }
+    }
+    command push {
+      args: (0, high())
     }
    command run {
      args: (0, high())
