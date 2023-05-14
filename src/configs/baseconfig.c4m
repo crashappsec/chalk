@@ -1674,7 +1674,6 @@ outconf entrypoint {
   artifact_report: "artifact_report_extract_base"
   host_report:     "host_report_other_base"
 }
-
 #% END
 
 outconf help {}

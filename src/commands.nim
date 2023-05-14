@@ -72,6 +72,7 @@ proc setPerChalkReports(successProfileName: string,
           hostProfileName & "' and artifact profile = '" & badName)
 
   for chalk in getAllChalks():
+    if not chalk.isMarked(): continue
     let
       profile   = if not chalk.opFailed: goodProfile else: badProfile
       oneReport = hostInfo.prepareContents(chalk.collectedData, profile)
