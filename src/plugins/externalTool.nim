@@ -81,9 +81,14 @@ template toolBase(s: untyped, hostScope: static[bool]) {.dirty.} =
   var
     toolInfo: Table[string, seq[(int, PIInfo)]]
     dict:     ChalkDict = ChalkDict()
+  let
+    runSbom = chalkConfig.getRunSbomTools()
+    runSast = chalkConfig.getRunSastTools()
 
   for k, v in chalkConfig.tools:
     if not v.enabled or hostScope != v.runs_once: continue
+    if not runSbom and v.kind == "sbom":          continue
+    if not runSast and v.kind == "sast":          continue
     let priority = v.priority
     if v.kind notin toolInfo:
       toolInfo[v.kind] =  @[(priority, PIInfo(name: k, obj: v))]

@@ -401,9 +401,10 @@ proc loadAllConfigs*() =
 
   if chalkConfig.getLoadDefaultSigning():
     stack.addConfLoad(signConfName, toStream(signConfig), checkNone)
-  if chalkConfig.getLoadSbomTools():
+  let chalkOps = chalkConfig.getValidChalkCommandNames()
+  if commandName in chalkOps or (commandName == "not_supplied" and
+    chalkConfig.defaultCommand.getOrElse("") in chalkOps):
     stack.addConfLoad(sbomConfName, toStream(sbomConfig), checkNone)
-  if chalkConfig.getLoadSastTools():
     stack.addConfLoad(sastConfName, toStream(sastConfig), checkNone)
   stack.addCallback(loadLocalStructs)
   doRun()

@@ -94,14 +94,18 @@ Turn on/off checking for (and running) any external configuration file.
     doc: "Show config info. See 'help defaults' for more info."
   }
 
-  flag_yn load_sbom_tools {
-    field_to_set: "load_sbom_tools"
-    doc: "Explicitly load any available tools for SBOM generation."
+  flag_yn run_sbom_tools {
+    field_to_set: "run_sbom_tools"
+    doc: """
+Run any configured tools for static analysis. Ignored if not inserting.
+"""
   }
 
-  flag_yn load_sast_tools {
-    field_to_set: "load_sast_tools"
-    doc: "Explicitly load any available tools for static analysis."
+  flag_yn run_sast_tools {
+    field_to_set: "run_sast_tools"
+    doc: """
+Run any configured tools for static analysis. Ignored if not inserting.
+"""
   }
 
   flag_yn load_sign_tools {

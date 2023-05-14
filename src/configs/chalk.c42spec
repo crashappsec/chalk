@@ -1249,38 +1249,29 @@ the := operator (it is *not* an attribute).
 """
   }
 
-  field load_sbom_tools {
+  field run_sbom_tools {
     type:     bool
     default:  false
-    shortdoc: "Load default SBOM tools"
-    hidden:   true # This happens before the user config runs.
+    shortdoc: "Run any configured SBOM tools"
     doc: """
-When true, this will cause chalk to load the default SBOM tool
-implementations.  Currently, this is just syft, which will be
-downloaded into /tmp if not found on the system.
+When true, this will cause chalk to run any configured and enabled SBOM tool implementations. Currently, this is just syft, which will be downloaded into /tmp if not found on the system.
 
-You can change that directory by setting the global variable
-SYFT_EXE_DIR with the := operator (it is *not* an attribute).
+You can change that directory by setting the global variable SYFT_EXE_DIR with the := operator (it is *not* an attribute).
 
-The syft command line arguments used at invocation (minus the target
-location) can be set via the SYFT_ARGV global variable.  It's default
-value is:
+The syft command line arguments used at invocation (minus the target location) can be set via the SYFT_ARGV global variable.  It's default value is:
 
 -o cyclonedx-json 2>/dev/null
 """
   }
 
-  field load_sast_tools {
+  field run_sast_tools {
     type:     bool
     default:  false
-    shortdoc: "Load default SAST tools"
-    hidden:   true  # This happens before the user config runs.
+    shortdoc: "Run any configured SAST tools"
     doc: """
-When true, this will cause chalk to load the default static analysis
-security testing (SAST) tools.
+When true, this will cause chalk to run any configured static analysis security testing (SAST) tools.  This is off by default, since it could add a noticable delay to build time for large code bases.
 
-Currently, this is just semgrep, and will only work on machines that
-either already have semgrep installed, or have Python3 installed.
+Currently, the only available tool out of the box is semgrep, and will only work on machines that either already have semgrep installed, or have Python3 installed.
 """
   }
 
