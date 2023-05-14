@@ -223,10 +223,13 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
   if name in availableSinkConfigs:
     return some(availableSinkConfigs[name])
 
-  if name notin chalkConfig.sinkConfs:
+  let
+    attrRoot = chalkConfig.`@@attrscope@@`
+    attrs    = attrRoot.getObjectOpt("sink_config." & name).getOrElse(nil)
+
+  if attrs == nil:
     return none(SinkConfig)
 
-  let attrs = chalkConfig.sinkConfs[name].`@@attrscope@@`
   var
     sinkName:    string
     filterNames: seq[string]
@@ -243,17 +246,25 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     of "sink":                     sinkName    = get[string](attrs, k)
     else:                          opts[k]     = get[string](attrs, k)
 
-  if sinkName == "s3":
-      try:
-        let dstUri = parseUri(opts["uri"])
-        if dstUri.scheme != "s3":
-          error("Sink config '" & name & "' requires a URI of " &
-                "the form s3://bucket-name/object-path")
-          return none(SinkConfig)
-      except:
-          error("Sink config '" & name & "' has an invalid URI.")
-          dumpExOnDebug()
-          return none(SinkConfig)
+  case sinkName
+  of "":
+    error("Sink config '" & name & "' does not specify a sink type.")
+    dumpExOnDebug()
+    return none(SinkConfig)
+  of "s3":
+    try:
+      let dstUri = parseUri(opts["uri"])
+      if dstUri.scheme != "s3":
+        error("Sink config '" & name & "' requires a URI of " &
+              "the form s3://bucket-name/object-path")
+        return none(SinkConfig)
+    except:
+        error("Sink config '" & name & "' has an invalid URI.")
+        dumpExOnDebug()
+        return none(SinkConfig)
+  else:
+    discard
+
   let theSinkOpt = getSink(sinkName)
   if theSinkOpt.isNone():
     error("Sink '" & sinkname & "' is configured, and the config file " &
@@ -369,7 +380,7 @@ proc loadAllConfigs*() =
     params:   seq[string] = commandLineParams()
     res:      ArgResult # Used across macros above.
     resFound: bool
-    
+
 
   let
     toStream = newStringStream

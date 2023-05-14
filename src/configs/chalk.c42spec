@@ -673,7 +673,7 @@ Filters to install.  Valid options are:
 
   field sink {
     type:       string
-    require:    true
+    default:    ""  # Will cause this to get ignored.
     write_lock: true
     doc: "The base sink; other attrs in this section are based on this value."
   }
@@ -1961,6 +1961,9 @@ export sink_config_skip_fields
 func sink_config_check(path) {
   result   := ""
   sinkname := attr_get(path + ".sink", string)
+  if sinkname == "" {
+    return # Unconfigured.
+  }
   if not attr_exists("sink." + sinkname) {
     return "No such sink configured: '" + sinkname + "'"
   }

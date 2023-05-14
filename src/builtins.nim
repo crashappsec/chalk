@@ -66,7 +66,7 @@ proc truncatingLog(msg: string, cfg: SinkConfig, t: StringTable): bool =
 let conf = SinkRecord(outputFunction: truncatingLog,
                       keys:           {"filename" : true}.toTable())
 
-registerSink("truncating_log", conf)
+registerSink("rotating_log", conf)
 
 
 var args: seq[string]

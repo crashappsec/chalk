@@ -81,7 +81,7 @@ The reporting cache keeps a local copy of any reports made, to provide redundanc
     field_to_set: "load_embedded_config"
     doc: "Turn off running the embedded configuration."
   }
- 
+
   flag_yn external_config {
     field_to_set: "load_external_config"
     doc: """

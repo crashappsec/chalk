@@ -50,6 +50,9 @@
 
 # default_command = "docker"
 
+# Note that the := assignment operator keeps variables local to your
+# configuration. If you use just : or =, the configuration checker
+# will reject your configuration.
 cmd     := argv0()
 args    := argv()
 
@@ -77,9 +80,6 @@ else {
   # info("Using the default config. Use 'chalk load' to load a new one.")
 }
 
-
-
-
 # By default, all collected metadata gets added to the chalk inserted
 # into the artifact.  If you provide the CHALK_PTR key, then most
 # things will NOT go into the chalk, which assumes you put it
@@ -90,30 +90,54 @@ else {
 # And, if you provide the right AWS S3 environment variables, this
 # config will automatically use the S3 bucket's URL as that pointer,
 # and only write a minimal chalk into artifacts.
-
 ptr_url := ""
 
 ## I/O CONFIGURATION
 
+# This makes sure the built-in functionality for keeping a backup log
+# of reporting output is enabled. This is meant to be useful if
+# there's a network connectivity issue.  We turn it back off if a
+# file-based sink is configured.
+
+use_report_cache: true
+
 
 # The sink config gets loaded on first subscription, so if
 # virtual isn't on, let's not ever create an empty file.
+#
+# Note that `virtual_chalk` is a pre-defined configuration attribute.
+
 if virtual_chalk {
  subscribe("virtual", "virtual_chalk_log")
 }
 
-sink_config s3 {
-  enabled: false
-  sink:    "s3"
-  secret:  env("AWS_ACCESS_SECRET")
-  uid:     env("AWS_ACCESS_ID")
-  uri:     env("AWS_S3_BUCKET_URI")
-}
+# This private variable tracks whether we have a sink configured via
+# environment variable.  If you do, we will turn off console reporting
+# later in the config.
+configured_sink := false
 
-## This is an example of what you can do.  At this point, you will
-## have some subscriptions set up, based on the command.  The code
-## used for I/O in the base configuration is in the comments below;
-## you can undo any of it if you really want!
+# Here we're going to check envionment variables to see what sinks are
+# configured.  They are all subscribed to the "primary" report.  Note
+# that, if you configure a log file, and have the "report_cache" on,
+# this config turns it off, but can be re-enabled by removing the
+# appropriate line(s) below, or by overriding at the command line.
+
+if env_exists("CHALK_POST_URL") {
+  sink_config my_https_config {
+    sink:    "post"
+    enabled: true
+    uri:     env("CHALK_POST_URL")
+
+    if env_exists("CHALK_POST_HEADERS") {
+      headers: env("CHALK_POST_HEADERS")
+    }
+  }
+  subscribe("report", "my_https_config")
+  configured_sink := true
+  if ptr_url == "" {
+    ptr_url := env("CHALK_POST_URL")
+  }
+}
 
 if env_exists("AWS_S3_BUCKET_URI") {
   if not env_exists("AWS_ACCESS_ID") {
@@ -121,24 +145,63 @@ if env_exists("AWS_S3_BUCKET_URI") {
   } elif not env_exists("AWS_ACCESS_SECRET") {
      warn("To configure AWS must provide AWS_ACCESS_SECRET")
   } else {
-    if len(strip(ptr_url)) == 0 {
+    sink_config my_s3_config {
+      enabled: true
+      sink:    "s3"
+      uri:     env("AWS_S3_BUCKET_URI")
+      secret:  env("AWS_ACCESS_SECRET")
+      uid:     env("AWS_ACCESS_ID")
+    }
+    subscribe("report", "my_s3_config")
+    configured_sink := true
+    if ptr_url == "" {
       ptr_url := env("AWS_S3_BUCKET_URI")
     }
-    sink_config.s3.enabled = true
-    subscribe("report", "s3")
   }
 }
 
-# Set up chalk pointers if we have a ptr_url set.
-if len(strip(ptr_url)) > 0 {
+if env_exists("CHALK_REPORT_LOG") {
+  sink_config my_file_config {
+    enabled:  true
+    sink:     "file"
+    filename: env("CHALK_REPORT_LOG")
+  }
+  subscribe("report", "my_file_config")
+  configured_sink := true
+  use_report_cache: false
+}
+
+if env_exists("CHALK_ROTATING_LOG") {
+  sink_config my_rotating_config {
+    enabled:  true
+    sink:     "rotating_log"
+    filename: env("CHALK_ROTATING_LOG")
+  }
+  subscribe("report", "my_rotating_config")
+  configured_sink := true
+  use_report_cache: false
+}
+
+if configured_sink {
+  # 'json_console_err' is the default sink configuration for reporting if
+  # the user doesn't do anything different. Here, we're undoing it.
+  unsubscribe("report", "json_console_err")
+}
+
+# This switches which default report we use for actual chalking, to
+# insert more minimal data.  We do this when we see ptr_url set, which
+# can either be done manually, or is done above if the right environment
+# variables are provided.
+
+if ptr_url != "" {
     keyspec.CHALK_PTR.value = strip(ptr_url)
     outconf.insert.chalk = "chalking_ptr"
 }
-use_report_cache = true
 
 #% INTERNAL
 docker.wrap_entrypoint = false
-docker.entrypoint_report_sink = "s3"
+# Set this to the sink you want entry points to use for reporting.
+# docker.entrypoint_report_sink = ""
 #% END
 
 # Below this point is configuration code that has already run, before

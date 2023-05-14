@@ -951,7 +951,7 @@ keyspec $CHALK_CONFIG {
     since:            "0.1.0"
     normalized_order:  high() - 2600
     doc:              "Embedded configuration file; this is special-purpose" +
-                      "and may be ignored outsde of dump / load cmds"
+                      "and will be ignored outsde of dump / load cmds"
 }
 
 keyspec _OP_CLOUD_METADATA {
@@ -1275,6 +1275,11 @@ sink stderr {
 sink file {
   ~filename: true
   doc:       "A sink that writes a local file"
+}
+
+sink rotating_log {
+  ~filename: true
+  doc:       "A truncating log file."
 }
 
 sink s3 {
