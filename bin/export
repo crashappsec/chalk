@@ -7,7 +7,8 @@ import sys, os, tempfile, re, shutil
 dirs_to_skip       = ["./.git", "./.github", "./customers", "./bin", "./tests",
                       "./chalk.dSYM", "./oss"]
 files_to_skip      = ["./.editorconfig", "./.envrc", "./chalk", "./lto.o",
-                      "./.pre-commit-config.yaml"]
+                      "./.pre-commit-config.yaml",
+                      "./src/configs/entrypoint.c4m"]
 files_to_move      = {"./chalk_internal.nimble" : "./chalk.nimble"}
 dont_process_files = []
 oss_dont_delete    = [".git"]

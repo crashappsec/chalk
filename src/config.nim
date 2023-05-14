@@ -39,7 +39,6 @@ const
   ioConfName*         = "configs/ioconfig.c4m"
   dockerConfName*     = "configs/dockercmd.c4m"
   defCfgFname*        = "configs/defaultconfig.c4m"  # Default embedded config.
-  entryPtTemplateLoc* = "configs/entrypoint.c4m"
   chalkC42Spec*       = staticRead(chalkSpecName)
   getoptConfig*       = staticRead(getoptConfName)
   baseConfig*         = staticRead(baseConfName)
@@ -49,11 +48,14 @@ const
   ioConfig*           = staticRead(ioConfName)
   dockerConfig*       = staticRead(dockerConfName)
   defaultConfig*      = staticRead(defCfgFname) & commentC4mCode(ioConfig)
-  entryPtTemplate*    = staticRead(entryPtTemplateLoc)
   versionStr          = staticexec("cat ../*.nimble | grep ^version")
   commitID            = staticexec("git rev-parse HEAD")
   archStr             = staticexec("uname -m")
   osStr               = staticexec("uname -o")
+  #% INTERNAL
+  entryPtTemplateLoc* = "configs/entrypoint.c4m"
+  entryPtTemplate*    = staticRead(entryPtTemplateLoc)
+  #% END
 
 var
   con4mRuntime:       ConfigStack
@@ -410,17 +412,19 @@ proc loadAllConfigs*() =
   # The embedded config has already been validated.
   let configFile = getEmbeddedConfig()
 
-  stack.addConfLoad("<<embedded config>>", toStream(configFile)).
-        addCallback(loadLocalStructs)
-  doRun()
-
-  let optConf = stack.configState.findOptionalConf()
-  if optConf.isSome():
-    let (fName, stream) = optConf.get()
-    var embed = stream.readAll()
-    stack.addConfLoad(fName, toStream(embed)).addCallback(loadLocalStructs)
+  if chalkConfig.getLoadEmbeddedConfig():
+    stack.addConfLoad("<<embedded config>>", toStream(configFile)).
+          addCallback(loadLocalStructs)
     doRun()
-    hostInfo["_OP_CONFIG"] = pack(configFile)
+
+  if chalkConfig.getLoadExternalConfig():
+    let optConf = stack.configState.findOptionalConf()
+    if optConf.isSome():
+      let (fName, stream) = optConf.get()
+      var embed = stream.readAll()
+      stack.addConfLoad(fName, toStream(embed)).addCallback(loadLocalStructs)
+      doRun()
+      hostInfo["_OP_CONFIG"] = pack(configFile)
 
   if commandName == "not_supplied" and chalkConfig.defaultCommand.isSome():
     setErrorHandler(stack, handleOtherErrors)

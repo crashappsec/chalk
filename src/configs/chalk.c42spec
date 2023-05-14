@@ -1033,7 +1033,7 @@ normalization operations used for computing metadata hashes and signatures.
     require:    false
     write_lock: false
     validator:  func default_command_check
-    shortdoc:   "Default Command"
+    shortdoc:   "Default Command (when not provided)"
     doc:        """
 If no top-level command is passed on the command line, this command is
 assumed.  By default, if the config file does not resolve the ambiguity,
@@ -1045,7 +1045,7 @@ then chalk will produce a help message.
     type:       string
     default:    ""
     write_lock: false
-    shortdoc:   "The run command"
+    shortdoc:   "The command we just ran"
     doc:        """
 
 Once the command line is fully parsed, this will get the value of the
@@ -1211,6 +1211,26 @@ The 'extract' operation ignores this.
 """
   }
 
+  field load_external_config {
+    type:     bool
+    default:  true
+    shortdoc: "Run any external configuration file, if found"
+    doc: """
+Turn this off to prevent accidentally picking up an external configuration file. You can always re-enable at the command line with --yes-external-config
+"""
+  }
+
+  field load_embedded_config {
+    type:     bool
+    default:  true
+    shortdoc: "Run the embedded configuration file"
+    doc: """
+This variable controls whether the embedded configuration file runs. Obviously, setting this from within the embedded configuration file is pointless, as it's used before then. But, you can set this with --no-embedded-config at the command line.
+
+This is primarily meant to make it easier to test new configurations by disabling the embedded config and only running the external (candidate) config.
+"""
+  }
+
   field load_default_signing {
     type:     bool
     default:  true
@@ -1320,22 +1340,6 @@ Note that, when chalk is invoked with 'docker' as its EXE name, the default IO c
 When chalking an artifact that can itself contain artifacts, this field dictates whether the contents should be chalked, or if just the outer artifact.  This also controls whether, on extraction, chalk will report contents.
 
 Currently, this is only respected for artifacts in ZIP format (e.g., JAR files)
-"""
-  }
-
-  field allow_external_config {
-    type:       bool
-    default:    false
-    write_lock: true
-    shortdoc:   "External Configs"
-    doc:        """
-If this is set to false in the configuration file, then no external
-configuration file will be run.
-
-Generally, it's best to use the embedded configuration, except when
-you're testing a configuration file.  That way, you can have full
-confidence that you're not accidentally picking up some other external
-configuration file.
 """
   }
 
