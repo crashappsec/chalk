@@ -25,14 +25,14 @@ when isMainModule:
     warn("We have no codec for this platform's native executable type")
   setupDefaultLogConfigs()
   case getCommandName()
-  of "extract":    runCmdExtract(chalkConfig.getArtifactSearchPath())
-  of "insert":     runCmdInsert(chalkConfig.getArtifactSearchPath())
-  of "delete":     runCmdDelete(chalkConfig.getArtifactSearchPath())
-  of "confdump":   runCmdConfDump()
-  of "confload":   runCmdConfLoad()
-  of "defaults":   showConfig(force = true)
-  of "version":    runCmdVersion()
-  of "docker":     runCmdDocker()
+  of "extract":  runCmdExtract(chalkConfig.getArtifactSearchPath())
+  of "insert":   runCmdInsert(chalkConfig.getArtifactSearchPath())
+  of "delete":   runCmdDelete(chalkConfig.getArtifactSearchPath())
+  of "dump":     runCmdConfDump()
+  of "load":     runCmdConfLoad()
+  of "defaults": showConfig(force = true)
+  of "version":  runCmdVersion()
+  of "docker":   runCmdDocker()
   #% INTERNAL
   of "entrypoint": echo "entry point."
   #% END

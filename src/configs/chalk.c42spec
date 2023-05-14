@@ -8,11 +8,11 @@
 default_key_priority := 4611686018427387904  # 2^62.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
 		         #% REWRITE ,$ ]
-                         "confload", "confdump", "docker", "version",
+                         "load", "dump", "docker", "version",
 			 #% INTERNAL
 			 "entrypoint"]
 			 #% END
-all_cmds_that_insert := ["insert", "docker", "confload"]
+all_cmds_that_insert := ["insert", "docker", "load"]
 tool_types           := ["sbom", "sast"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
 key_types            := ["Chalkable Host", "Chalk", "Non-Chalk", "Host Only"]

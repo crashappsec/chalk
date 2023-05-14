@@ -210,8 +210,8 @@ This command does not show the contents of the config file(s) used, just key res
 """
   }
 
-  command confdump {
-    aliases: ["dump"]
+  command dump {
+    aliases: ["confdump"]
     args:    (0, 1)
     doc: """
 Reads the embedded configuration file, and outputs it, based on your output configuration (see 'help output').  In the default configuration, if no argument is given, the config file is written to stdout; and if an argument is provided, it will try write the configuration to the file specified by the argument.
@@ -221,15 +221,15 @@ This behavior can be overridden by the configuration file, where you can specify
 """
   }
 
-  command confload {
-    aliases:  ["load"]
+  command load {
+    aliases:  ["confload"]
     args:     (1, 1)
     callback: func on_conf_load(list[string])
     doc: """
 Attempt to replaces the embedded configuration file, reading from the
 specified file name.
 
-You can use the 'confdump' command to dump the output first.
+You can use the 'dump' command to dump the output first.
 
 See 'help config' for an overview of the configuration file format.
 """
@@ -406,7 +406,7 @@ The following functions are in addition to those documented at: {red}https://git
 %{T <30:
 Function::Description
 version() -> string::Returns the release version of the chalk binary.
-argv0() -> string::Returns the command being run, per the command line. If you've set up a default action in the embedded configuration, that configuration will receive {brown}default{black} for this value when it runs.  Possible options are: {brown}"insert", {brown}"extract", {brown}"delete", {brown}"defaults", {brown}"confdump", {brown}"confload", {brown}"version", {brown}"help"
+argv0() -> string::Returns the command being run, per the command line. If you've set up a default action in the embedded configuration, that configuration will receive {brown}default{black} for this value when it runs.  Possible options are: {brown}"insert", {brown}"extract", {brown}"delete", {brown}"defaults", {brown}"dump", {brown}"load", {brown}"version", {brown}"help"
 argv() -> [string]::Returns the arguments being used for the command. This may not be what was passed at the command line; it will pick up default values from previous configuration files.  You may not change argv() with immediate effect, but for the {brown}"extract", {brown}"insert" and {brown}"delete" commands, setting the {bold}{magenta}artifact_path{black} variable will lead to argv updating after the script ends.
 error(string)::This prints an error message. Or, more precisely, publishes a message to the {magenta}log{black} topic. This is output subject to the i/o configuration. In the default configuration, it would go both to the console, and into any appropriate reports.
 sink_config(string, string, dict[string, string], list[string])::Set up a configuration for an output sink.  The first parameter is the name of the configuration, the second the name of the sink, the third, configuration parameters specific to that sink, and the fourth, any desired filters. Sinks may have multiple configurations. Sink configurations are immediately available from the configuration file, via {magenta}subscribe() {black}or {magenta}unsubscribe(){black}. See {red}{appName} help output{black} for more details.
@@ -417,16 +417,16 @@ unsubscribe(string, string)::Unsubscribes the sink configuration named in the fi
 """
   commands: """
 %{T
-Command     ::Description
-insert      ::Insert chalk metadata into software artifacts.
-extract     ::Retrieve locally-stored metadata from software artifacts.
-delete      ::Delete locally stored metadata from software objects.
-defaults    ::Loads configuration and shows keys defaults. See 'help defaults'.
-confdump    ::Export the self-contained configuration file.
-confload    ::Load a new configuration file.
-docker      ::Adds a chalk mark to docker containers, and weaps the entry point.
-version     ::Shows program version information
-help        ::You're doing it now!
+Command  ::Description
+insert   ::Insert chalk metadata into software artifacts.
+extract  ::Retrieve locally-stored metadata from software artifacts.
+delete   ::Delete locally stored metadata from software objects.
+defaults ::Loads configuration and shows keys defaults. See 'help defaults'.
+dump     ::Export the self-contained configuration file.
+load     ::Load a new configuration file.
+docker   ::Adds a chalk mark to docker containers, and weaps the entry point.
+version  ::Shows program version information
+help     ::You're doing it now!
 }%
 See {bold}{appName} help 'command'{reset} for help on individual commands.
 """
@@ -574,7 +574,7 @@ Topic::What it's for
 report:: Default output reports go to this topic in JSON format. By default, this is attached to a local (self-truncating) log file, and stdout.  If you add an external sink, we recommend you unsubscribing stdout (but, unless you're using immutable or transient infra, not the log file, which is intended for redundancy).
 defaults:: Show information about how the results of config file execution. Generally this goes to stderr by default.
 audit:: For recording use of the command, along w/ command line flags and any external configuration file.  This goes to a self-truncating log file by default.
-confload:: For recording the old configuration and the fact that a new configuration was loaded.
+confdump:: For where to output the configuration when the "dump" command is invoked. By default, this will be stdout if no args are given, or to the file specified if one arg is given.
 version:: Outputting basic command version info, when you run the {appName}version command. By default, this is connected to stderr.
 help::Outputting help messages.  Connected to stderr.
 log::Printing error messages, that are filtered based on the global log-level setting. Connected to stderr, and internally to chalk output (you can control them going into reports with the ERR_INFO and _OP_ERRORS keys... see {appName} help keys search ERR for a starting point on more info.

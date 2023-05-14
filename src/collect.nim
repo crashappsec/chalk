@@ -183,7 +183,7 @@ iterator artifacts*(artifactPath: seq[string]): ChalkObj =
   var
     skips:        seq[Glob]     = @[]
     chalks:       seq[ChalkObj]
-    exclude:      seq[string]   = if cmd == "confload": @[]
+    exclude:      seq[string]   = if cmd == "load": @[]
                                   else: @[resolvePath(getAppFileName())]
 
   if isChalkingOp():

@@ -11,7 +11,7 @@
 ## variables.
 ##
 ## To do that, one can use the 'confdump' command to get the current
-## config, and the 'confload' command to load a new one.
+## config, and the 'load' command to load a new one.
 ##
 ## Note that the initial I/O setup can be overridden here, but is
 ## codified in baseconfig.c4m to make sure that it is easy to get to a
@@ -44,8 +44,11 @@
 # the value you pick.  So make sure to set up your output
 # configuration properly if you change this value.
 #
-# You can comment this out, and people will get a terse error message.
-default_command = "help"
+
+# Uncomment the next line for chalk to assume 'docker' when no command is
+# provided.
+
+# default_command = "docker"
 
 cmd     := argv0()
 args    := argv()
@@ -70,7 +73,8 @@ if cmd == "docker" {
 }
 else {
   log_level: "info"
-  info("Using the default config. Use 'chalk confload' to load a new one.")
+  # Uncomment to output log messages from within the config.
+  # info("Using the default config. Use 'chalk load' to load a new one.")
 }
 
 
@@ -130,13 +134,6 @@ if len(strip(ptr_url)) > 0 {
     keyspec.CHALK_PTR.value = strip(ptr_url)
     outconf.insert.chalk = "chalking_ptr"
 }
-
-# Note that, if there is no command given, the value of "cmd" here
-# will be 'default' here, instead of the value you picked as a
-# default.  Your default doesn't go into effect until this script
-# finishes running.
-
-default_command  = "help"
 use_report_cache = true
 
 #% INTERNAL

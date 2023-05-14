@@ -633,7 +633,7 @@ proc runCmdDocker*() {.noreturn.} =
                 else:
                   selfChalk.collectChalkInfo()
                   chalk.prepEntryPointBinary(selfChalk)
-                  setCommandName("confload")
+                  setCommandName("load")
                   let binaryChalkMark = selfChalk.getChalkMarkAsStr()
                   setCommandName("docker")
                   chalk.writeEntryPointBinary(selfChalk, binaryChalkMark)

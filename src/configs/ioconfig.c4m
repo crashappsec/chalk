@@ -16,7 +16,7 @@ subscribe("help",     "console_out")
 
 cmd  := argv0()
 
-if cmd == "confdump" {
+if cmd == "dump" {
   args := argv()
   if len(args) == 0 {
     subscribe("confdump", "console_out")

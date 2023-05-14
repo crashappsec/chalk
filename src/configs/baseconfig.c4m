@@ -951,7 +951,7 @@ keyspec $CHALK_CONFIG {
     since:            "0.1.0"
     normalized_order:  high() - 2600
     doc:              "Embedded configuration file; this is special-purpose" +
-                      "and may be ignored outsde of confdump / confload cmds"
+                      "and may be ignored outsde of dump / load cmds"
 }
 
 keyspec _OP_CLOUD_METADATA {
@@ -1646,14 +1646,14 @@ outconf delete {
   host_report:     "host_report_other_base"
 }
 
-outconf confload {
+outconf load {
   # Always do the more minimal chalk.
   chalk:           "chalking_ptr"
   artifact_report: "artifact_report_insert_base"
   host_report:     "host_report_insert_base"
 }
 
-outconf confdump {
+outconf dump {
   artifact_report: "artifact_report_delete_base"
   host_report:     "host_report_other_base"
 }
@@ -1664,15 +1664,16 @@ outconf docker {
   host_report:     "host_report_insert_base"
 }
 
+#% INTERNAL
 outconf entrypoint {
   artifact_report: "artifact_report_extract_base"
   host_report:     "host_report_other_base"
 }
 
+#% END
+
 outconf help {}
 outconf defaults {}
-
-default_command = "help"
 
 func call_rand(key) { return $(lower(hex(rand())));  }
 
@@ -1712,3 +1713,5 @@ sink_config dump_out {
   sink:     "file"
   filename: ""  # Set via command line in ioconfig.
 }
+
+default_command = "help"

@@ -79,8 +79,9 @@ proc getChalkCommitId*(): string     = commitID
 proc getChalkPlatform*(): string     = osStr & " " & archStr
 proc getCommandName*(): string       = commandName
 proc setCommandName*(s: string) =
-  ## Used to temporarily borrow the confload output context when writing
-  ## entry points, e.g., with docker.
+  ## Used when nesting operations.  For instance, when recursively
+  ## chalking Zip files, we run a 'delete' over a copy of the Zip
+  ## to calculate the unchalked hash.
   commandName = s
 proc getChalkRuntime*(): ConfigState = con4mRuntime.configState
 
@@ -337,25 +338,18 @@ proc handleOtherErrors(err, tb: string): bool =
   error(getAppFilename().splitPath().tail & ": " & err)
   quit(1)
 
-# TODO: static tests to validate the c42 configs.
 template cmdlineStashTry() =
-  if commandName == "ambiguous" and chalkConfig.defaultCommand.isSome():
-    setErrorHandler(stack, handleOtherErrors)
-    addFinalizeGetOpts(stack, printAutoHelp = false)
-    addCallback(stack, loadLocalStructs).run()
-
   if cmdSpec == nil:
     if stack.getOptOptions.len() > 1:
-      if commandName != "ambiguous":
-        commandName = "ambiguous"
-    else:
+      commandName = "not_supplied"
+    elif not resFound:
       res         = getArgResult(stack)
       commandName = res.command
       cmdSpec     = res.parseCtx.finalCmd
       autoHelp    = res.getHelpStr()
       setArgs(res.args[commandName])
-
       res.stashFlags()
+      resFound = true
 
 template doRun() =
   try:
@@ -370,8 +364,10 @@ import builtins
 
 proc loadAllConfigs*() =
   var
-    params: seq[string] = commandLineParams()
-    res:    ArgResult # Used across macros above.
+    params:   seq[string] = commandLineParams()
+    res:      ArgResult # Used across macros above.
+    resFound: bool
+    
 
   let
     toStream = newStringStream
@@ -425,6 +421,12 @@ proc loadAllConfigs*() =
     stack.addConfLoad(fName, toStream(embed)).addCallback(loadLocalStructs)
     doRun()
     hostInfo["_OP_CONFIG"] = pack(configFile)
+
+  if commandName == "not_supplied" and chalkConfig.defaultCommand.isSome():
+    setErrorHandler(stack, handleOtherErrors)
+    addFinalizeGetOpts(stack, printAutoHelp = false)
+    addCallback(stack, loadLocalStructs)
+    doRun()
 
 template parseDockerCmdline*(): (string, seq[string],
                              OrderedTable[string, FlagSpec])  =
