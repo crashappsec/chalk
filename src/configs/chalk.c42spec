@@ -10,7 +10,7 @@ default_key_priority := 4611686018427387904  # 2^62.
 # These are the valid command-line commands.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
 		         #% REWRITE ,$ ]
-                         "load", "dump", "docker", "version", "env",
+                         "load", "dump", "docker", "version", "env", "profile",
 			 #% INTERNAL
 			 "entrypoint"]
 			 #% END
@@ -118,21 +118,13 @@ all (or can't chalk if an insert command), then chalk will not run.
   }
 
   allow key {}
+  # This doc string is shown w/ help profile props
   doc: """
-Profiles are part of how you can customize what metadata goes
-where.
+Each profile can have a number of "key" objects, the name of which should be a key.
 
-On insert operations, there's a profile that governs what goes into
-chalk marks.
+The sole variable in a "key" object is "report", which is a boolean, indicating whether this profile should report on that key.
 
-For each command to chalk, there will be at least two profiles
-that govern the command, a host-level reporting profile, and an
-artifact-level reporting profile. These reports are discussed in the
-documentation for the 'outconf' section type, as is configuring output
-sinks for reporting.
-
-You can also set up custom reports that output whatever metadata you
-like in addition to the 'standard' reporting.
+See 'chalk help keys' for more on individual keys.
 """
 }
 
@@ -894,6 +886,7 @@ Internal configuration information for the docker command.
   field wrap_entrypoint {
     type:    bool
     default: false
+    shortdoc: "Wrap entrypoints"
     doc:     """
 When running the docker command, this option modifies the container
 to, on entry, report as if running the 'chalk extract' command, and
@@ -905,6 +898,7 @@ then exec the actual entry point.
      type:      string
      default:   ""
      validator: func sink_ref_check
+    shortdoc: "Entrypoint reporting sink"
      doc:  """
 When wrapping a container to run in entrypoint mode, you need to configure an output sink.  For this, specify the name of a sink configuration.
 """
@@ -914,6 +908,7 @@ When wrapping a container to run in entrypoint mode, you need to configure an ou
     type:      string
     require:   false
     validator: func custom_report_artifact_check
+    shortdoc: "Entrypoint host report profile"
     doc:       """
 The named profile is used to determine which host-level metadata keys
 will be used for reporting when a docker container entry point is run.
@@ -925,6 +920,7 @@ If not provided, a default policy is added.
     type:      string
     require:   false
     validator: func custom_report_artifact_check
+    shortdoc: "Entrypoint artifact report profile"
     doc: """
 The named profile is used for when reporting on per-artifact any
 information, when run from the docker entry point.
@@ -935,17 +931,19 @@ If not provided, a default policy is added.
   field chalk_file_location {
     type: string
     default: "/chalk.json"
+    shortdoc: "Chalk file location"
     doc: """
-This controls where the chalk file gets written.  Should generally be in the root, just in case the path doesn't exist in a container.
+This controls where the chalk file gets written, when chalking a docker image.  Should generally be in the root, just in case the path doesn't exist in a container.
 """
   }
 
   field label_prefix {
     type:    string
     default: "run.crashoverride."
+    shortdoc: "Prefix for added labels"
     validator: func label_prefix_check
     doc: """
-When locker labels are used, they are supposed to have a reverse-DNS prefix for the organization that added them. You generally should add your own organization here.
+When docker labels are used, they are supposed to have a reverse-DNS prefix for the organization that added them. You generally should add your own organization here.
 """
   }
 
@@ -953,6 +951,7 @@ When locker labels are used, they are supposed to have a reverse-DNS prefix for 
     type:    string
     default: "chalk_labels"
     validator: func label_profile_check
+    shortdoc: "Auto-added label profile"
     doc: """
 This profile guides what labels will be automatically added to docker images when we successfully chalk them. The only allowed keys are Chalk keys and Chalkable Host keys.  And, if the metadata is not available, then no key will be added.
 For instance, the HASH key cannot currently appear in docker chalks, because it is not available for docker chalking, so will not appear as a label.  But, you can add METADATA_ID, CHALK_ID, etc. or anything else that is collectable before the build.
@@ -963,6 +962,7 @@ For instance, the HASH key cannot currently appear in docker chalks, because it 
     type: dict[string, string]
     require: false
     validator: func custom_labels_check
+    shortdoc: "Custom labels"
     doc: """
 Any labels added here will be added as a LABEL line to the chalked container.  This will add label_prefix before the keys, and will not add if the key is not an alphanumeric value.
 """
@@ -971,6 +971,7 @@ Any labels added here will be added as a LABEL line to the chalked container.  T
   field report_unwrapped_commands {
     type:    bool
     default: false
+    shortdoc: "Report on unwrapped commands"
     doc: """
 If true, host reports will be generated for docker commands we do not wrap.
 By default, we do not report.  If you set this to 'true', it's helpful to
@@ -992,6 +993,7 @@ Internal configuration information for the 'env' command.
   field chalk_id {
     type:    string
     require: false
+    shortdoc: "CHALK_ID to report"
     doc: """
 If passed, will be reported as if it is an extracted CHALK_ID field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
 """
@@ -1000,6 +1002,7 @@ If passed, will be reported as if it is an extracted CHALK_ID field, when the 'e
   field metadata_id {
     type:    string
     require: false
+    shortdoc: "METADATA_ID to report"
     doc: """
 If passed, will be reported as if it is an extracted METADATA_ID field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
 """
@@ -1008,6 +1011,7 @@ If passed, will be reported as if it is an extracted METADATA_ID field, when the
   field artifact_hash {
     type:    string
     require: false
+    shortdoc: "ARTIFACT_HASH to report"
     doc: """
 If passed, will be reported as if it is an extracted ARTIFACT_HASH field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
 """
@@ -1016,6 +1020,7 @@ If passed, will be reported as if it is an extracted ARTIFACT_HASH field, when t
   field metadata_hash {
     type:    string
     require: false
+    shortdoc: "METADATA_HASH to report"
     doc: """
 If passed, will be reported as if it is an extracted METADATA_HASH field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
 """
@@ -1024,6 +1029,7 @@ If passed, will be reported as if it is an extracted METADATA_HASH field, when t
   field artifact_path {
     type:    string
     require: false
+    shortdoc: "_ARTIFACT_PATH to report"
     doc: """
 If passed, will be reported as if it is an _ARTIFACT_PATH field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
 """

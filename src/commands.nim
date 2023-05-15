@@ -436,7 +436,7 @@ proc runChalkHelp*(cmdName: string) {.noreturn.} =
       output = getKeyHelp(filter = nil)
 
   of "help.keyspec", "help.tool", "help.plugin", "help.sink", "help.outconf",
-     "help.custom_report":
+     "help.profile", "help.custom_report":
        cmdName.noExtraArgs()
        let name = cmdName.split(".")[^1]
 
@@ -449,7 +449,7 @@ proc runChalkHelp*(cmdName: string) {.noreturn.} =
 
   of "help.keyspec.props", "help.tool.props", "help.plugin.props",
      "help.sink.props", "help.outconf.props", "help.report.props",
-     "help.key.props":
+     "help.key.props", "help.profile.props":
        cmdName.noExtraArgs()
        let name = cmdName.split(".")[^2]
        output &= "Important Properties: \n"
@@ -487,6 +487,8 @@ proc runChalkHelp*(cmdName: string) {.noreturn.} =
           output &= tool.doc.get()
   else:
     output = "Unknown command: " & cmdName
+
+  if len(output) == 0 or output[^1] != '\n': output &= "\n"
 
   publish("help", output)
   quit()
@@ -738,6 +740,48 @@ proc runCmdDocker*() {.noreturn.} =
     error("Could not find 'docker'.")
   quit(1)
 
+proc runCmdProfile*(args: seq[string]) =
+  var
+    toPublish = ""
+    profiles: seq[string] = @[]
+
+  if len(args) == 0:
+      let profs = getChalkRuntime().attrs.contents["profile"].get(AttrScope)
+      toPublish &= formatTitle("Available Profiles (see 'chalk profile " &
+        "NAME' for details on a specific profile)")
+      toPublish &= profs.listSections("Profile Name")
+  else:
+    if "all" in args:
+      for k, v in chalkConfig.profiles:
+        profiles.add(k)
+    else:
+      for profile in args:
+        if profile notin chalkConfig.profiles:
+          error("No such profile: " & profile)
+          continue
+        else:
+          profiles.add(profile)
+
+    for profile in profiles:
+      var
+        table = tableC4mStyle(2)
+        prof  = chalkConfig.profiles[profile]
+
+      toPublish &= formatTitle("Profile: " & profile)
+      if prof.doc.isSome():
+        toPublish &= unicode.strip(prof.doc.get()) & "\n"
+      if prof.enabled != true:
+        toPublish &= "WARNING! Profile is currently disabled."
+      table.addRow(@["Key Name", "Report?"])
+      for k, v in prof.keys:
+        table.addRow(@[k, $(v.report)])
+      toPublish &= table.render()
+
+    toPublish &= "\nIf keys are NOT listed, they will not be reported.\n"
+    toPublish &= "Any keys set to 'false' were set explicitly.\n"
+  publish("defaults", toPublish)
+  quit()
+
 proc getSinkConfigTable(): string =
   var
     sinkConfigs = getSinkConfigs()
@@ -779,7 +823,7 @@ macro buildProfile(title: untyped, varName: untyped): untyped =
       let
         oneProf = profs.contents[outConf.`varName`].get(AttrScope)
         keyArr  = oneProf.contents["key"].get(AttrScope)
-      toPublish &= keyArr.arrayToTable(@["report"], @["Key", "Use?"])
+      toPublish &= keyArr.arrayToTable(@["report"], @["Key Name", "Report?"])
 
 proc showConfig*(force: bool = false) =
   once:
@@ -788,8 +832,8 @@ proc showConfig*(force: bool = false) =
     let chalkRuntime = getChalkRuntime()
     var toPublish = ""
     let
-      genCols  = @[fcShort, fcValue, fcName]
-      genHdrs  = @["Option", "Value", "Config Key"]
+      genCols  = @[fcFullName, fcShort, fcValue]
+      genHdrs  = @["Conf variable", "Descrition", "Value"]
       outCols  = @[fcName, fcValue]
       outHdrs  = @["Report Type", "Profile"]
       ocCol    = @["chalk", "artifact_report", "host_report",
@@ -848,11 +892,23 @@ proc showConfig*(force: bool = false) =
     toPublish &= getSinkConfigTable()
 
     if getCommandName() == "defaults" and profs != nil:
-      toPublish &= formatTitle("Available Profiles")
+      toPublish &= formatTitle("Available Profiles (see 'chalk profile NAME'" &
+        "for details on a specific profile)")
       toPublish &= profs.listSections("Profile Name")
 
     toPublish &= formatTitle("General configuration")
     toPublish &= chalkRuntime.attrs.oneObjToTable(genCols, genHdrs)
+
+    let dockerInfo = chalkConfig.dockerConfig.`@@attrscope@@`
+    toPublish &= formatTitle("Docker configuration")
+    toPublish &= dockerInfo.oneObjToTable(genCols, genHdrs, objType = "docker")
+
+    let
+      envInfo = chalkConfig.envConfig.`@@attrscope@@`
+      toAdd   = envInfo.oneObjToTable(genCols, genHdrs, objType = "env_cache")
+
+    if toAdd != "":
+      toPublish &= formatTitle("Cached fields for env command") & toAdd
 
     publish("defaults", toPublish)
     if force: showDisclaimer(80)

@@ -34,6 +34,7 @@ when isMainModule:
   of "defaults": showConfig(force = true)
   of "version":  runCmdVersion()
   of "docker":   runCmdDocker()
+  of "profile":  runCmdProfile(getArgs())
   #% INTERNAL
   of "entrypoint": echo "entry point."
   #% END

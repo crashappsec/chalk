@@ -1352,6 +1352,11 @@ sink post {
 # Default fields skip (i.e., value for skip by default is true)
 # But we list them all here to make it easier to cut, paste and change.
 profile chalking_default {
+  doc: """
+This profile is intended to be used for chalking artifacts, when you want to put all reasonable metadata into a chalk mark.
+
+By default, CHALK_RAND is on for unique builds. If you want reproducable builds, turn it off.
+"""
   key.MAGIC.report                    = true
   key.CHALK_ID.report                 = true
   key.TIMESTAMP.report                = false
@@ -1400,12 +1405,12 @@ profile chalking_default {
   key.$CHALK_CONFIG.report            = false
 }
 
-# This profile is for what gets inserted into artifacts when we are
-# sending metadata to a configured sink.  It's minimal.  Signatures
-# will sign what's in the chalk mark, but don't themselves strictly
-# need to be in the mark; they can just be reported up.
-
 profile chalking_ptr {
+  doc: """
+This profile is for what gets inserted into artifacts when we are sending metadata somewhere (the default configuration discriminates based on whether you're setting a pointer URL).  This profile is meant to be minimal.  Signatures  will sign what's in the chalk mark, but don't themselves strictly  need to be in the mark; they can just be reported up.
+
+By default, CHALK_RAND is on for unique builds. If you want reproducable builds, turn it off.
+"""
   key.MAGIC.report                    = true
   key.CHALK_ID.report                 = true
   key.TIMESTAMP.report                = false
@@ -1419,19 +1424,13 @@ profile chalking_ptr {
   key.$CHALK_CONFIG.report            = true  # Only used for self-chalks.
 }
 
-# This is what gets posted to any sinks on a per-artifact basis, by
-# default, when chalking, and a sink is configured.  This pairs with
-# the above.  Skipped keyspecs are not included here (the default will
-# skip).  Generally, we skip things that are either not appropriate
-# for the context, or are reported once-per run to avoid unneeded
-# duplicate data, so will appear in the host report.
-#
-# Some of the skips are to avoid things our defaults (e.g., collection
-# plugins) only ever do on a host-basis. If you want to do a callback
-# yourself on a per-artifact basis, then you should enable in a
-# per-artifact report but disable on a per-host basis.  Leaving those
-# explicitly in.
 profile artifact_report_insert_base {
+  doc: """
+This is what gets posted to any sinks on a per-artifact basis, by default, when doing a chalking operation (insert or docker build).
+
+If you want to do a callback yourself on a per-artifact basis, then you should enable in a
+per-artifact report but disable on a per-host basis.
+"""
   key.CHALK_ID.report                 = true
   key.TIMESTAMP.report                = true
   key.ARTIFACT_PATH.report            = true
@@ -1471,24 +1470,17 @@ profile artifact_report_insert_base {
   key._CURRENT_HASH.report            = true # Only needed for docker rn
 }
 
-# This is what gets posted to any sinks at the time of insert, on a
-# per-chalk run basis (by default).  Such profiles must not enable
-# fields that have `artifact_only = true`
-
-# Note that SBOM, SAST and CODE_OWNERS are named both here and in the
-# previous report. When a key is in both the host report and the
-# artifact report for one outconf or custom_report, the host report
-# will be used IF all artifacts have the same value.  Otherwise, it
-# will fall back to per-artifact.
-
-# If you were to put these items in per-host reports, but not the
-# artifact report, you are asking to ONLY get an output if they can be
-# lifted.
-
-# This happens to per-chalk keys in any context except for actual
-# chalking.
-
 profile host_report_insert_base {
+doc = """
+This is what gets posted to any sinks at the time of insert, on a per-chalk run basis (by default).  Such profiles must not enable fields that have `artifact_only = true`
+
+Note that SBOM, SAST and CODE_OWNERS are named both here and in the host-level report. When a key is in both the host report and the artifact report for one outconf or custom_report, the host report will be used IF all artifacts have the same value.  Otherwise, it will fall back to per-artifact.
+
+If you were to put these items in per-host reports, but not the artifact report, you are asking to ONLY get an output if they can be lifted.
+
+This happens to per-chalk keys in any context except for actual chalking.
+"""
+
   key.TIMESTAMP.report                = true
   key.DATETIME.report                 = true
   key.CHALK_VERSION.report            = true
@@ -1520,18 +1512,14 @@ profile host_report_insert_base {
   #key._VIRTUAL.report                = true
 }
 
-# This is what gets reported per-artifact, by default, on extraction
-# operations, where we generally want to pull *almost* anything in a
-# mark with the exception of things like MAGIC, and things that we're
-# collecting per op (which start with an underscore) that should be
-# reported on the host-level instead.  There are also some host-level
-# items that are more meant for basic stats / health check stuff that
-# we skip.
-#
-# Host keys are in the host_report_other_base (i.e., non-insert)
-# profile below.
-
 profile artifact_report_extract_base {
+  doc: """
+This is what gets reported per-artifact, by default, on extraction operations, where we generally want to pull *almost* anything in a mark with the exception of things like MAGIC, and things that we're collecting per op (which start with an underscore) that should be reported on the host-level instead.
+
+There are also some host-level items that are more meant for basic stats / health check stuff that we skip.
+
+Host keys are in the host_report_other_base (i.e., non-insert) profile.
+"""
   key.MAGIC.report                    = false
   key.CHALK_ID.report                 = true
   key.TIMESTAMP.report                = true
@@ -1586,13 +1574,12 @@ profile artifact_report_extract_base {
   key._OP_ARTIFACT_REPORT_KEYS.report = false
 }
 
-# Here we could report the whole extraction, but we stick with a bare
-# bones minimum. If the chalk was tampered with, we probably don't care
-# much to try to figure out what changed.
-#
-# Note that _CURRENT_HASH should be 0 on deletion.
-
 profile artifact_report_delete_base {
+doc: """
+Here we could report the whole extraction, but we stick with a bare bones minimum. If the chalk was tampered with, we probably don't care much to try to figure out what changed.
+
+Note that _CURRENT_HASH will be empty when deleting, since that key represents the hash value at the END of an operation.
+"""
   key.CHALK_ID.report                 = true
   key.HASH.report                     = true
   key.METADATA_HASH.report            = true
@@ -1604,15 +1591,15 @@ profile artifact_report_delete_base {
   key.ERR_INFO.report                 = true
 }
 
-# This is what gets posted to sinks on non-insert ops, on a per-run basis,
-# by default.  Only keys beginning with _ make any sense in this context.
-# If it doesn't start with _, the implication is static to what's in
-# the chalk mark.
-#
-# And some keys starting with _ are per-artifact, so appear above,
-# instead.
-
 profile host_report_other_base {
+  doc: """
+This is what gets posted to sinks on non-insert ops, on a per-run basis,
+by default.  Only keys beginning with _ make any sense in this context.
+If it doesn't start with _, the implication is static to what's in
+the chalk mark.
+
+And some keys starting with _ are per-artifact, so appear in artifact reports.
+"""
   key._OPERATION.report               = true
   key._ACTION_ID.report               = true
   key._TIMESTAMP.report               = true
@@ -1642,18 +1629,20 @@ profile host_report_other_base {
 }
 
 profile artifact_report_push_base {
-  key._CURRENT_HASH.report            = true
+  doc: """
+When we report on a 'docker push', these are the only per-artifact items we collect, as we don't open up the image.  The CURRENT_HASH and REPO_DIGESTS fields are both necessary for following the breadcrumbs, so are locked, and can't be turned off in this report.
+"""
+  ~key._CURRENT_HASH.report           = true
   key._REPO_TAGS.report               = true
-  key._REPO_DIGESTS.report            = true
+  ~key._REPO_DIGESTS.report           = true
 }
 
 profile audit_report {
-  # Here, we only report key bits about the configuration used, for
-  # audit purposes. This is implemented as the "audit" report below;
-  # the implementation special-cases it a bit; the "publish_audit"
-  # variable can be used to control this (right now, just turn it on
-  # or off).
+  doc: """
+Here, we only report key bits about the configuration used, for audit purposes. This is implemented as the "audit" report below; the implementation special-cases it a bit; the "publish_audit" variable can be used to control this (right now, just turn it on or off).
 
+Note that in the default configuration, "publish_audit" is OFF.
+"""
   key._OPERATION.report              = true
   key._ACTION_ID.report              = true
   key._TIMESTAMP.report              = true
@@ -1664,6 +1653,14 @@ profile audit_report {
 }
 
 profile usage_report {
+  enabled: true
+  doc: """
+These fields are, by default, sent back up to Crash Override to keep high-level statistics on Chalk usage (via an attempted post to an HTTPS endpoint).
+
+This is important for supporting our development of Chalk.  However, you may disable it by adding to your configuration file:
+
+profile.usage_report.enabled = false
+"""
   key._OPERATION.report              = true
   key._TIMESTAMP.report              = true
   key._OP_CHALK_COUNT.report         = true
@@ -1674,6 +1671,9 @@ profile usage_report {
 }
 
 profile chalk_labels {
+  doc: """
+This profile is for chalkable keys that are automatically added as labels to a container when running 'docker build'.
+"""
   key.COMMIT_ID.report               = true
   key.ORIGIN_URI.report              = true
   key.BRANCH.report                  = true
@@ -1748,7 +1748,6 @@ outconf entrypoint {
 #% END
 
 outconf help {}
-outconf defaults {}
 
 func call_rand(key) { return $(lower(hex(rand())));  }
 

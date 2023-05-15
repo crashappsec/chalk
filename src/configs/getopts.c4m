@@ -198,7 +198,9 @@ This command looks for existing chalk marks in artifacts, and reports on what it
     aliases:  ["del"]
     args:     (0, high())
     callback: func set_artifact_search_path(list[string])
-    doc: "Deletes metadata from all artifacts specified in the search path."
+    doc: """
+Deletes metadata from all artifacts specified in the search path.
+"""
 
     flag_yn recursive {
       yes_aliases: ["r"]
@@ -270,6 +272,14 @@ Importantly though, running '--publish-defaults extract' still runs the 'extract
 
 This command does not show the contents of the config file(s) used, just key results from executing those config files.  And, generally there will be at least two 'stacked' configuration files.  See 'help config' for more information on the configuration file and con4m.
 """
+}
+
+command profile {
+   aliases: ["prof"]
+   args: (0, high())
+   doc: """
+Show details of individual profiles.
+"""
   }
 
   command dump {
@@ -299,25 +309,39 @@ See 'help config' for an overview of the configuration file format.
 
   command version {
     aliases: ["vers", "v"]
-    doc: "Outputs basic version information for the chalk binary."
+    doc: """
+Outputs basic version information for the chalk binary.
+"""
   }
-
+#% INTERNAL
   command entrypoint {
     args:    (0, high())
     ignore_all_flags: true
-    doc: "coming soon."
+    doc: """
+coming soon.
+"""
   }
+#% END
 
   command docker {
     args:    (0, high())
     ignore_all_flags: true
-    doc: "coming soon."
+    doc: """
+Chalk a container operation.  This always transparently calls docker, as long as it is anywhere in your path (even if 'chalk' is named 'docker').
+
+Currently, Chalk only collects metadata for 'docker' and 'push' commands.
+
+All arguments appearing after the word 'docker' are passed to docker.  No flags to chalk can appear after the command.
+"""
   }
 
   command help {
     ignore_bad_flags:   true
     arg_sub_mutex: false # should be the default?
     args: (0, high())
+    doc: """
+You're living it!
+"""
 
     command key {
       aliases:            ["keys", "k"]
