@@ -61,8 +61,6 @@ var
   con4mRuntime:       ConfigStack
   chalkConfig*:       ChalkConfig
   commandName:        string
-  currentOutputCfg:   OutputConfig
-  `isChalkingOp?`:    bool
 
 template dumpExOnDebug*() =
   if chalkConfig != nil and chalkConfig.getChalkDebug():
@@ -84,17 +82,19 @@ proc setCommandName*(s: string) =
   ## Used when nesting operations.  For instance, when recursively
   ## chalking Zip files, we run a 'delete' over a copy of the Zip
   ## to calculate the unchalked hash.
+  ##
+  ## Also, used by 'docker' to change command names for the _OPERATION
+  ## key.  'chalk docker build' gives "docker", whereas 'chalk docker push'
+  ## gives "docker-push".  Unwrapped docker commands aren't reported.
   commandName = s
+
 proc getChalkRuntime*(): ConfigState = con4mRuntime.configState
 
 proc isChalkingOp*(): bool =
-  once:
-    `isChalkingOp?` = commandName in chalkConfig.getValidChalkCommandNames()
-  return `isChalkingOp?`
+  return getCommandName() in chalkConfig.getValidChalkCommandNames()
 
 proc getOutputConfig*(): OutputConfig =
-  once: currentOutputCfg = chalkConfig.outputConfigs[getCommandName()]
-  return currentOutputCfg
+  return chalkConfig.outputConfigs[getCommandName()]
 
 proc filterByProfile*(dict: ChalkDict, p: Profile): ChalkDict =
   result = ChalkDict()

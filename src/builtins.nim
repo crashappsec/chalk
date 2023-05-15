@@ -79,7 +79,7 @@ proc getArgs*(): seq[string] = args
 proc getArgv(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getArgs()))
 
-proc getExeName(args: seq[Box], unused: ConfigState): Option[Box] =
+proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
 
 proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
@@ -165,7 +165,7 @@ let chalkCon4mBuiltins* = [
     ("info(string)",                        BuiltInFn(logInfo)),
     ("trace(string)",                       BuiltInFn(logTrace)),
     ("argv() -> list[string]",              BuiltInFn(getArgv)),
-    ("argv0() -> string",                   BuiltInFn(getExeName)) ]
+    ("argv0() -> string",                   BuiltInFn(getChalkCommand)) ]
 
 let errSinkObj = SinkRecord(outputFunction: chalkErrSink)
 registerSink("chalk-err-log", errSinkObj)

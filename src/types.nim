@@ -17,6 +17,7 @@ type
     collectedData*: ChalkDict   ## What we're adding during insertion.
     extract*:       ChalkDict   ## What we extracted, or nil if no extract.
     opFailed*:      bool
+    marked*:        bool
     embeds*:        seq[ChalkObj]
     stream*:        FileStream  # Plugins by default use file streams; we
     startOffset*:   int         # keep state fields for that to bridge between
@@ -73,16 +74,15 @@ proc setErrorObject*(o: ChalkObj) =
   collectionCtx.currentErrorObject = some(o)
 proc clearErrorObject*() =
   collectionCtx.currentErrorObject = none(ChalkObj)
-proc getAllChalks*():   seq[ChalkObj] = collectionCtx.allChalks
+proc getAllChalks*(): seq[ChalkObj] = collectionCtx.allChalks
 proc addToAllChalks*(o: ChalkObj) =
   collectionCtx.allChalks.add(o)
 proc setAllChalks*(s: seq[ChalkObj]) =
   collectionCtx.allChalks = s
-proc getUnmarked*():    seq[string] = collectionCtx.unmarked
+proc getUnmarked*(): seq[string] = collectionCtx.unmarked
 proc addUnmarked*(s: string) =
   collectionCtx.unmarked.add(s)
-
-proc isMarked*(chalk: ChalkObj): bool {.inline.} = return chalk.extract != nil
+proc isMarked*(chalk: ChalkObj): bool {.inline.} = return chalk.marked
 proc newChalk*(stream: FileStream, loc: string): ChalkObj =
   result = ChalkObj(fullpath:      loc,
                     collectedData: ChalkDict(),

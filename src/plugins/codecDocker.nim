@@ -1,8 +1,9 @@
 ## :Author: John Viega, Brandon Edwards
 ## :Copyright: 2023, Crash Override, Inc.
 
-import tables, strutils, json, nimutils, options, os, osproc, streams,
-       posix_utils, std/tempfiles, ../config, ../plugins, ../dockerfile, con4m
+import tables, strutils, json, options, os, osproc, streams, parseutils,
+       posix_utils, std/tempfiles, nimutils, con4m, ../config, ../plugins,
+       ../dockerfile
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
@@ -598,7 +599,6 @@ proc runInspectOnImage*(cmd: string, chalk: ChalkObj): bool =
     cache.inspectOut = items[0]
     return true
 
-
 proc buildContainer*(chalk:  ChalkObj,
                      flags:  OrderedTable[string, FlagSpec],
                      inargs: seq[string]): bool =
@@ -648,6 +648,56 @@ proc cleanupTmpFiles*(chalk: ChalkObj) =
   else:
     # This generally won't print since --log-level defaults to 'error' for chalk
     info("Skipping deletion of temporary files due to chalk_debug = true")
+
+proc processPushInfo*(arr: seq[JSonNode], arg: string) =
+  let
+    slashIx  = arg.find('/')
+    endIx    = if slashIx == -1: len(arg) else: slashIx
+    fullRepo = arg[0 ..< endIx]
+    parts    = fullRepo.split(':')
+  if len(parts) > 0:
+    hostInfo["_REPO_HOST"] = pack(parts[0])
+  if len(parts) > 1:
+    var port: int
+    try:
+      discard parseInt(parts[1], port)
+      hostInfo["_REPO_PORT"] = pack(port)
+    except:
+      hostInfo["_REPO_HOST"] = pack(fullRepo)
+
+  # Really should only have one, but just in case...
+  for item in arr:
+    if "Id" notin item:
+      continue
+    let
+      id    = item["Id"].getStr()
+      chalk = newChalk(FileStream(nil), id)
+
+    # We're assuming it's marked; we don't want to bother looking for the mark
+    chalk.marked = true
+    chalk.addToAllChalks()
+    chalk.collectedData["_CURRENT_HASH"] = pack(id.split(":")[^1])
+    if "RepoTags" in item:
+      var
+        tags: seq[string] = @[]
+        jsonArr           = item["RepoTags"].getElems()
+      for item in jsonArr:
+        tags.add(item.getStr())
+      if len(tags) != 0:
+        chalk.collectedData["_REPO_TAGS"] = pack(tags)
+    if "RepoDigests" in item:
+      var
+        digests: seq[string] = @[]
+        jsonArr              = item["RepoDigests"].getElems()
+      for item in jsonArr:
+        digests.add(item.getStr().split(":")[^1])
+      if len(digests) != 0:
+        chalk.collectedData["_REPO_DIGESTS"] = pack(digests)
+
+
+
+
+
 
 #% INTERNAL
 # This stuff needs to get done somewhere...

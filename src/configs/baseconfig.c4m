@@ -1080,6 +1080,53 @@ Context used when building a container.
 """
 }
 
+keyspec _REPO_HOST {
+    kind:             HostOnly
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 10000
+    doc: """
+When reporting on operations involving a repository (e.g., a push or pull), the
+ host name of the associated repository.
+"""
+}
+
+keyspec _REPO_PORT {
+    kind:             HostOnly
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 9900
+    doc: """
+When reporting on operations involving a repository (e.g., a push or pull), the
+port number of the associated repository.
+"""
+}
+
+keyspec _REPO_TAGS {
+    kind:             NonChalk
+    type:             list[string]
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 9800
+    doc: """
+When reporting on operations involving a repository (e.g., a push or pull), any
+tags associated with the artifact in the operation.
+"""
+}
+
+keyspec _REPO_DIGESTS {
+    kind:             NonChalk
+    type:             list[string]
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 9700
+    doc: """
+When reporting on operations involving a repository (e.g., a push or pull), any
+SHA256 digests associated with the artifact in the operation.
+"""
+}
 
 # Doesn't do any keys other than the codec defaults, which are:
 # ARTIFACT_PATH, HASH, HASH_FILES, COMPONENT_HASHES.  Note that
@@ -1421,7 +1468,7 @@ profile artifact_report_insert_base {
   key.DOCKER_LABELS.report            = true
   key.DOCKER_TAGS.report              = true
   key.DOCKER_CONTEXT.report           = true
-  key._CURRENT_HASH.report            = true # Only needed for docker rn
+  key._CURRENT_HASH.report            = true # Only needed for docker rn  
 }
 
 # This is what gets posted to any sinks at the time of insert, on a
@@ -1590,6 +1637,14 @@ profile host_report_other_base {
   key.SBOM.report                     = true
   key.SAST.report                     = true
   key.ERR_INFO.report                 = true
+  key._REPO_HOST.report               = true
+  key._REPO_PORT.report               = true
+}
+
+profile artifact_report_push_base {
+  key._CURRENT_HASH.report            = true 
+  key._REPO_TAGS.report               = true
+  key._REPO_DIGESTS.report            = true  
 }
 
 profile audit_report {
@@ -1663,10 +1718,21 @@ outconf dump {
   host_report:     "host_report_other_base"
 }
 
+# This is only used when the 'docker' command errors.
 outconf docker {
+  artifact_report: "artifact_report_extract_base"
+  host_report:     "host_report_other_base"
+}
+
+outconf build {
   chalk:           "chalking_ptr"
   artifact_report: "artifact_report_insert_base"
   host_report:     "host_report_insert_base"
+}
+
+outconf push {
+  artifact_report: "artifact_report_push_base"
+  host_report:     "host_report_other_base"
 }
 
 #% INTERNAL

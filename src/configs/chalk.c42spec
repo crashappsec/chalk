@@ -6,13 +6,27 @@
 
 
 default_key_priority := 4611686018427387904  # 2^62.
+
+# These are the valid command-line commands.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
 		         #% REWRITE ,$ ]
                          "load", "dump", "docker", "version",
 			 #% INTERNAL
 			 "entrypoint"]
 			 #% END
-all_cmds_that_insert := ["insert", "docker", "load"]
+all_cmds_that_insert := ["insert", "build", "load"]
+
+# These will all either be command names, or will set by the
+# appropriate plugin.  Eg., the docker plugin only reports 'docker' if
+# it does nothing except pass through the docker command due to the
+# docker verb being unwrapped.  On a 'docker build', the report op is 'build'
+# and on a 'docker push' the report op is 'push'.
+#
+# This value isn't actually checked; the runtime is trusted to get the correct.
+#
+# valid_report_ops   := valid_chalk_cmds + ["build", "push"]
+
+
 tool_types           := ["sbom", "sast"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
 key_types            := ["Chalkable Host", "Chalk", "Non-Chalk", "Host Only"]
@@ -958,6 +972,16 @@ For instance, the HASH key cannot currently appear in docker chalks, because it 
     validator: func custom_labels_check
     doc: """
 Any labels added here will be added as a LABEL line to the chalked container.  This will add label_prefix before the keys, and will not add if the key is not an alphanumeric value.
+"""
+  }
+
+  field report_unwrapped_commands {
+    type:    bool
+    default: false
+    doc: """
+If true, host reports will be generated for docker commands we do not wrap.
+By default, we do not report.  If you set this to 'true', it's helpful to 
+have _ARGV in your report, to get more telemetry.
 """
   }
 }

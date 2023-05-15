@@ -141,7 +141,6 @@ let
   time      = timestamp.format("HH:mm:ss") & "." & timestamp.format("fff")
   offset    = timestamp.format("zzz")
 
-
 method getPostRunInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
   result = ChalkDict()
 

@@ -262,6 +262,17 @@ docker {
     }
     command push {
       args: (0, high())
+      flag_multi_arg all_tags {
+        aliases: ["a"]
+        optional_arg: true
+      }
+      flag_multi_arg disable_content_trust {
+        optional_arg: true
+      }
+      flag_multi_arg quiet {
+        aliases: ["q"]
+        optional_arg: true
+      }
     }
    command run {
      args: (0, high())
