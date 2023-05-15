@@ -1061,7 +1061,7 @@ root {
 
   field config_path {
     type:       list[string]
-    default:    [".", "~/.config/chalk", "~"]
+    default:    [".", "~/.config/chalk", "~", "/etc/chalk/", "/etc/"]
     write_lock: true
     doc:        "The path to search for an external configuration file."
     shortdoc:   "Configuration Path"
