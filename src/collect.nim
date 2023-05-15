@@ -260,9 +260,12 @@ proc getSelfExtraction*(): Option[ChalkObj] =
 
     for codec in getCodecs():
       if hostOS notin codec.getNativeObjPlatforms(): continue
-      (ignore, chalks) = codec.findChalk(myPath, exclusions, @[], false)
-      selfChalk = chalks[0]
-      selfId  = some(codec.getChalkId(selfChalk))
+      (ignore, chalks)  = codec.findChalk(myPath, exclusions, @[], false)
+      selfChalk         = chalks[0]
+      if selfChalk.extract == nil:
+        selfChalk.marked = false
+        selfChalk.extract = ChalkDict()
+      selfId            = some(codec.getChalkId(selfChalk))
       selfChalk.myCodec = codec
       return some(selfChalk)
 
