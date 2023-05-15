@@ -206,7 +206,53 @@ This command looks for existing chalk marks in artifacts, and reports on what it
       doc: default_recursive_doc
       field_to_set: "recursive"
     }
+  }
 
+  command env {
+    aliases: ["environment"]
+    doc: """
+Reports environmental information, without scanning for chalk.  If a chalk ID or metadata ID is passed at the command line, then a chalk can be reported with just that metadata.  This is intended to be a lightweight version of 'extract' tied to a single artifact.
+"""
+
+    flag_arg chalk_id {
+      aliases: ["cid"]
+      field_to_set: "env_cache.chalk_id"
+      doc: """
+If passed, will be reported as if it is an extracted CHALK_ID field.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+    }
+
+    flag_arg metadata_id {
+      aliases: ["mid"]
+      field_to_set: "env_cache.metadata_id"
+      doc: """
+If passed, will be reported as if it is an extracted METADATA_ID field.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+    }
+
+    flag_arg artifact_hash {
+      aliases: ["hash"]
+      field_to_set: "env_cache.artifact_hash"
+      doc: """
+If passed, will be reported as if it is an extracted ARTIFACT_HASH field.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+    }
+
+    flag_arg metadata_hash {
+      aliases: ["meta_hash", "mhash"]
+      field_to_set: "env_cache.metadata_hash"
+      doc: """
+If passed, will be reported as if it is an extracted METADATA_HASH field.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+    }
+
+    flag_arg artifact_path {
+      aliases: ["loc"]
+      field_to_set: "env_cache.artifact_path"
+      doc: """
+If passed, will be reported as if it is an _ARTIFACT_PATH field.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+    }
   }
 
   command defaults {

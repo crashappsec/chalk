@@ -28,6 +28,7 @@ when isMainModule:
   of "extract":  runCmdExtract(chalkConfig.getArtifactSearchPath())
   of "insert":   runCmdInsert(chalkConfig.getArtifactSearchPath())
   of "delete":   runCmdDelete(chalkConfig.getArtifactSearchPath())
+  of "env":      runCmdEnv()
   of "dump":     runCmdConfDump()
   of "load":     runCmdConfLoad()
   of "defaults": showConfig(force = true)

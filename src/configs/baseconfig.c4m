@@ -1468,7 +1468,7 @@ profile artifact_report_insert_base {
   key.DOCKER_LABELS.report            = true
   key.DOCKER_TAGS.report              = true
   key.DOCKER_CONTEXT.report           = true
-  key._CURRENT_HASH.report            = true # Only needed for docker rn  
+  key._CURRENT_HASH.report            = true # Only needed for docker rn
 }
 
 # This is what gets posted to any sinks at the time of insert, on a
@@ -1642,9 +1642,9 @@ profile host_report_other_base {
 }
 
 profile artifact_report_push_base {
-  key._CURRENT_HASH.report            = true 
+  key._CURRENT_HASH.report            = true
   key._REPO_TAGS.report               = true
-  key._REPO_DIGESTS.report            = true  
+  key._REPO_DIGESTS.report            = true
 }
 
 profile audit_report {
@@ -1682,7 +1682,7 @@ profile chalk_labels {
 custom_report chalk_usage_stats {
   sink_configs:  []
   host_profile:  "usage_report"
-  use_when:      ["insert", "docker", "delete"]
+  use_when:      ["insert", "build", "delete"]
 }
 
 custom_report audit {
@@ -1697,6 +1697,11 @@ outconf insert {
 }
 
 outconf extract {
+  artifact_report: "artifact_report_extract_base"
+  host_report:     "host_report_other_base"
+}
+
+outconf env {
   artifact_report: "artifact_report_extract_base"
   host_report:     "host_report_other_base"
 }

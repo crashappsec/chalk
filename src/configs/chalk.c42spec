@@ -10,21 +10,14 @@ default_key_priority := 4611686018427387904  # 2^62.
 # These are the valid command-line commands.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
 		         #% REWRITE ,$ ]
-                         "load", "dump", "docker", "version",
+                         "load", "dump", "docker", "version", "env",
 			 #% INTERNAL
 			 "entrypoint"]
 			 #% END
 all_cmds_that_insert := ["insert", "build", "load"]
 
-# These will all either be command names, or will set by the
-# appropriate plugin.  Eg., the docker plugin only reports 'docker' if
-# it does nothing except pass through the docker command due to the
-# docker verb being unwrapped.  On a 'docker build', the report op is 'build'
-# and on a 'docker push' the report op is 'push'.
-#
-# This value isn't actually checked; the runtime is trusted to get the correct.
-#
-# valid_report_ops   := valid_chalk_cmds + ["build", "push"]
+# Beyond valid chalk commands, these can generate reports.
+other_report_ops     := ["build", "push"]
 
 
 tool_types           := ["sbom", "sast"]
@@ -63,7 +56,7 @@ enum PTChalk, PTArtifact, PTHost, PTChalkTimeArtifact
 # Make these available through stacks.  Enums are automatically
 # avalable through stacks.
 export default_key_priority, valid_chalk_cmds, all_cmds_that_insert
-export known_sink_filters
+export known_sink_filters, other_report_ops
 
 object key {
   # TODO: no callbacks or value fields when system is set on the keyspec.
@@ -980,8 +973,59 @@ Any labels added here will be added as a LABEL line to the chalked container.  T
     default: false
     doc: """
 If true, host reports will be generated for docker commands we do not wrap.
-By default, we do not report.  If you set this to 'true', it's helpful to 
+By default, we do not report.  If you set this to 'true', it's helpful to
 have _ARGV in your report, to get more telemetry.
+"""
+  }
+}
+
+singleton env_cache {
+  gen_fieldname: "envConfig"
+  gen_typename:  "EnvConfig"
+  gen_setters:   false
+  user_def_ok:   false
+  doc: """
+Internal configuration information for the 'env' command.
+"""
+
+
+  field chalk_id {
+    type:    string
+    require: false
+    doc: """
+If passed, will be reported as if it is an extracted CHALK_ID field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+  }
+
+  field metadata_id {
+    type:    string
+    require: false
+    doc: """
+If passed, will be reported as if it is an extracted METADATA_ID field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+  }
+
+  field artifact_hash {
+    type:    string
+    require: false
+    doc: """
+If passed, will be reported as if it is an extracted ARTIFACT_HASH field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+  }
+
+  field metadata_hash {
+    type:    string
+    require: false
+    doc: """
+If passed, will be reported as if it is an extracted METADATA_HASH field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+  }
+
+  field artifact_path {
+    type:    string
+    require: false
+    doc: """
+If passed, will be reported as if it is an _ARTIFACT_PATH field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
 """
   }
 }
@@ -1007,6 +1051,7 @@ root {
   allow custom_report { }
   allow tool          { }
   allow docker        { }
+  allow env_cache     { }
 
   field config_path {
     type:       list[string]
@@ -1850,9 +1895,14 @@ func use_when_check(name, value: list[string]) {
     if valid_chalk_cmds.contains(value[i]) {
       continue
     }
-    return ("'use_when' must be a valid chalk command-line command, or a '*' " +
-           " to indicate all commands. '" + value[i] +
-	   "' isn't a chalk command")
+    if other_report_ops.contains(value[i]) {
+      continue
+    }
+    return ("'use_when' must be a valid chalk report type, or a '*' " +
+           " to indicate all of them. '" + value[i] +
+	   "' isn't a chalk command.  Valid report types are: " +
+	   valid_chalk_cmds.join(", ") + ", " + other_report_ops.join(", ")
+	   )
   }
 }
 

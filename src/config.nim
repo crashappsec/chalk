@@ -61,6 +61,8 @@ var
   con4mRuntime:       ConfigStack
   chalkConfig*:       ChalkConfig
   commandName:        string
+  currentOutputCfg:   OutputConfig
+  `isChalkingOp?`:    bool
 
 template dumpExOnDebug*() =
   if chalkConfig != nil and chalkConfig.getChalkDebug():
@@ -82,19 +84,17 @@ proc setCommandName*(s: string) =
   ## Used when nesting operations.  For instance, when recursively
   ## chalking Zip files, we run a 'delete' over a copy of the Zip
   ## to calculate the unchalked hash.
-  ##
-  ## Also, used by 'docker' to change command names for the _OPERATION
-  ## key.  'chalk docker build' gives "docker", whereas 'chalk docker push'
-  ## gives "docker-push".  Unwrapped docker commands aren't reported.
   commandName = s
-
 proc getChalkRuntime*(): ConfigState = con4mRuntime.configState
 
 proc isChalkingOp*(): bool =
-  return getCommandName() in chalkConfig.getValidChalkCommandNames()
+  once:
+    `isChalkingOp?` = commandName in chalkConfig.getValidChalkCommandNames()
+  return `isChalkingOp?`
 
 proc getOutputConfig*(): OutputConfig =
-  return chalkConfig.outputConfigs[getCommandName()]
+  once: currentOutputCfg = chalkConfig.outputConfigs[getCommandName()]
+  return currentOutputCfg
 
 proc filterByProfile*(dict: ChalkDict, p: Profile): ChalkDict =
   result = ChalkDict()
@@ -412,11 +412,13 @@ proc loadAllConfigs*() =
 
   if chalkConfig.getLoadDefaultSigning():
     stack.addConfLoad(signConfName, toStream(signConfig), checkNone)
+
   let chalkOps = chalkConfig.getValidChalkCommandNames()
   if commandName in chalkOps or (commandName == "not_supplied" and
     chalkConfig.defaultCommand.getOrElse("") in chalkOps):
     stack.addConfLoad(sbomConfName, toStream(sbomConfig), checkNone)
     stack.addConfLoad(sastConfName, toStream(sastConfig), checkNone)
+
   stack.addCallback(loadLocalStructs)
   doRun()
 

@@ -694,11 +694,6 @@ proc processPushInfo*(arr: seq[JSonNode], arg: string) =
       if len(digests) != 0:
         chalk.collectedData["_REPO_DIGESTS"] = pack(digests)
 
-
-
-
-
-
 #% INTERNAL
 # This stuff needs to get done somewhere...
 #
@@ -724,5 +719,4 @@ proc processPushInfo*(arr: seq[JSonNode], arg: string) =
 # TODO: remove chalk and chalk.json from the context if they exist.
 # TODO: report the image ID as the post-hash (needs appropriate formatting)
 #% END
-
 registerPlugin("docker", CodecDocker())
