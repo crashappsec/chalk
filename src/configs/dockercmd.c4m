@@ -202,6 +202,7 @@ docker {
       args: (0, high())
     }
     command build {
+      aliases: ["b"]  # Only in buildx, but no reason not to handle it here.
       args: (0, high())
 
       flag_multi_arg add_host {
