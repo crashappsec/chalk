@@ -106,7 +106,6 @@ use_report_cache: true
 # virtual isn't on, let's not ever create an empty file.
 #
 # Note that `virtual_chalk` is a pre-defined configuration attribute.
-
 if virtual_chalk {
  subscribe("virtual", "virtual_chalk_log")
 }

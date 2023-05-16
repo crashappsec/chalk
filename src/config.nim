@@ -406,9 +406,9 @@ proc loadAllConfigs*() =
       addCallback(loadLocalStructs).
       setErrorHandler(handleCon4mErrors)
   doRun()
+
   stack.addConfLoad(ioConfName, toStream(ioConfig), notEvenDefaults).
       addConfLoad(dockerConfName, toStream(dockerConfig), checkNone)
-
 
   if chalkConfig.getLoadDefaultSigning():
     stack.addConfLoad(signConfName, toStream(signConfig), checkNone)

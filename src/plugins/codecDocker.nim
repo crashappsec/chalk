@@ -21,13 +21,13 @@ type
                          shellArgv: seq[string],
                          success:   bool]
   #% END
-  DockerInfoCache = ref object of RootObj
+  DockerInfoCache* = ref object of RootObj
     context:                string
     dockerFilePath:         string
     dockerFileContents:     string
     additionalInstructions: string
-    tags:                   seq[string]
-    ourTag:                 string
+    tags*:                  seq[string]
+    ourTag*:                string
     platform:               string
     labels:                 Con4mDict[string, string]
     execNoArgs:             seq[string]
@@ -177,20 +177,12 @@ proc extractDockerInfo*(chalk:          ChalkObj,
   chalk.cache = cache
   cache.labels = Con4mDict[string, string]()
 
-  # Choose a temporary tag that we can use to look up the image after
-  # chalking. We can remove it later.
-  let randint: uint = secureRand[uint]()
-  cache.ourTag = "chalk:" & $(randint)
-
   # Pull data from flags we care about.
   if "tag" in flags:
-    let rawTags = unpack[seq[string]](flags["tag"].getValue())
+    cache.tags = unpack[seq[string]](flags["tag"].getValue())
 
-    for tag in rawTags:
-      if tag.contains(":"):
-        cache.tags.add(tag)
-      else:
-        cache.tags.add(tag & ":latest")
+  let randint: uint = secureRand[uint]()
+  cache.ourTag      = "chalk:" & $(randint)
 
   if "platform" in flags:
     cache.platform = (unpack[seq[string]](flags["platform"].getValue()))[0]
@@ -631,7 +623,7 @@ proc buildContainer*(chalk:  ChalkObj,
   result = runInspectOnImage(cmd, chalk)
 
   # If the user supplied tags, remove the tag we added.
-  if len(cache.tags) != 0:
+  if cache.tags.len() != 0:
     discard execProcess(cmd, args = @["rmi", cache.ourTag], options = {})
 
 

@@ -9,8 +9,10 @@ import tables, options, strutils, unicode, os, streams, posix, osproc, sugar,
 from json import parseJson, getElems
 import macros except error
 
-let emptyReport = toJson(ChalkDict())
+let emptyReport               = toJson(ChalkDict())
 var liftableKeys: seq[string] = @[]
+
+proc showConfig*(force: bool = false)
 
 proc setPerChalkReports(successProfileName: string,
                         invalidProfileName: string,
@@ -606,9 +608,9 @@ proc filterFmt(flist: seq[MsgFilter]): string =
 template dockerPassthroughExec() {.dirty.} =
   let exe = findDockerPath().getOrElse("")
   if exe != "":
-    trace("Running docker by calling: " & exe & " " & cmdline)
+    trace("Running docker by calling: " & exe & " " & myargs.join(" "))
     let
-      subp = startProcess(exe, args = getArgs(), options = {poParentStreams})
+      subp = startProcess(exe, args = myargs, options = {poParentStreams})
       code = subp.waitForExit()
     if code != 0:
       opFailed = true
@@ -623,8 +625,10 @@ proc runCmdDocker*() {.noreturn.} =
 
   let
     (cmd, args, flags) = parseDockerCmdline() # in config.nim
-    cmdline            = getArgs().join(" ")
     codec              = Codec(getPluginByName("docker"))
+
+  var
+    myargs             = getArgs()
 
   try:
     case cmd
@@ -636,24 +640,29 @@ proc runCmdDocker*() {.noreturn.} =
         error("No arguments to 'docker build'")
         opFailed = true
       else:
-        chalk = newChalk(FileStream(nil), resolvePath(args[^1]))
+        chalk = newChalk(FileStream(nil), resolvePath(myargs[^1]))
         chalk.myCodec = codec
         chalk.extract = ChalkDict() # Treat this as marked.
         addToAllChalks(chalk)
         # Let the docker codec deal w/ env vars, flags and docker files.
-        if extractDockerInfo(chalk, flags, args[^1]):
+        if extractDockerInfo(chalk, flags, myargs[^1]):
           trace("Successful parsing of docker cmdline and dockerfile")
           # Then, let any plugins run to collect data.
           chalk.collectChalkInfo()
           # Now, have the codec write out the chalk mark.
           let toWrite    = chalk.getChalkMarkAsStr()
+
           if chalkConfig.getVirtualChalk():
-            publish("virtual", toWrite)
-            info(chalk.fullPath & ": virtual chalk created.")
+            let cache = DockerInfoCache(chalk.cache)
+            myargs = myargs[0 ..< ^1] & @["-t=" & cache.ourTag, myargs[^1]]
+
             dockerPassthroughExec()
             if not runInspectOnImage(exe, chalk):
+              error("Docker inspect failed")
               opFailed = true
             else:
+              publish("virtual", toWrite)
+              info(chalk.fullPath & ": virtual chalk created.")
               chalk.collectPostChalkInfo()
           else:
             try:
@@ -672,6 +681,8 @@ proc runCmdDocker*() {.noreturn.} =
                   setCommandName("build")
                   chalk.writeEntryPointBinary(selfChalk, binaryChalkMark)
               #% END
+              # We pass the full getArgs() in, as it will get re-parsed to
+              # make sure all original flags stay in their order.
               if chalk.buildContainer(flags, getArgs()):
                 info(chalk.fullPath & ": container successfully chalked")
                 chalk.collectPostChalkInfo()
@@ -682,7 +693,8 @@ proc runCmdDocker*() {.noreturn.} =
             except:
               opFailed = true
               error(getCurrentExceptionMsg())
-              error("Above occurred when runnning docker command: " & cmdline)
+              error("Above occurred when runnning docker command: " &
+                myargs.join(" "))
               dumpExOnDebug()
         else:
           info("Failed to extract docker info.  Calling docker.")
@@ -694,7 +706,7 @@ proc runCmdDocker*() {.noreturn.} =
       dockerPassthroughExec()
       if not opFailed:
         let
-          passedTag  = getArgs()[^1]
+          passedTag  = myargs[^1]
           args       = ["inspect", passedTag]
           inspectOut = execProcess(exe, args = args, options = {})
           items      = parseJson(inspectOut).getElems()
@@ -711,12 +723,12 @@ proc runCmdDocker*() {.noreturn.} =
     else:
       initCollection()
       opFailed = true
-      trace("Unhandled docker command: " & cmdline)
+      trace("Unhandled docker command: " & myargs.join(" "))
       if chalkConfig.dockerConfig.getReportUnwrappedCommands():
         doReporting()
   except:
     error(getCurrentExceptionMsg())
-    error("Above occurred when runnning docker command: " & cmdline)
+    error("Above occurred when runnning docker command: " & myargs.join(" "))
     dumpExOnDebug()
     opFailed = true
     doReporting()
@@ -724,7 +736,10 @@ proc runCmdDocker*() {.noreturn.} =
     if chalk != nil:
       chalk.cleanupTmpFiles()
 
-  if not opFailed: quit(0)
+  showConfig()
+
+  if not opFailed:
+    quit(0)
 
   # This is the fall-back exec for docker when there's any kind of failure.
   let exeOpt = findDockerPath()
@@ -732,7 +747,7 @@ proc runCmdDocker*() {.noreturn.} =
     let exe    = exeOpt.get()
     var toExec = getArgs()
 
-    trace("Execing docker: " & exe & " " & cmdline)
+    trace("Execing docker: " & exe & " " & toExec.join(" "))
     toExec = @[exe] & toExec
     discard execvp(exe, allocCStringArray(toExec))
     error("Exec of '" & exe & "' failed.")

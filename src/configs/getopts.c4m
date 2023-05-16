@@ -119,13 +119,14 @@ Run any configured tools for static analysis. Ignored if not inserting.
   }
 
   flag_yn virtual {
-    yes_aliases: ["v", "dry-run"]
-    no_aliases: ["V", "no-dry-run"]
+    yes_aliases:  ["v", "dry-run"]
+    no_aliases:   ["V", "no-dry-run"]
+    field_to_set: "virtual_chalk"
+
     doc: """
 When chalking, do NOT modify artifacts (overrides config file).  Ignored for non-chalking operations.
 By default, this will write to "./virtual-chalk.json"
 """
-      field_to_set: "virtual_chalk"
   }
 
   flag_yn debug {
