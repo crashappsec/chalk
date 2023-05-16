@@ -783,7 +783,7 @@ proc runCmdDocker*() {.noreturn.} =
   showConfig()
 
   if not reExecDocker:
-    quit(0)
+    quit(if opFailed: 1 else: 0)
 
   # This is the fall-back exec for docker when there's any kind of failure.
   let exeOpt = findDockerPath()
