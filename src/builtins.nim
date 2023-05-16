@@ -182,6 +182,9 @@ discard registerTopic("version")   # Where to output version info.
 discard registerTopic("help")      # Where to print help info.
 discard registerTopic("confdump")  # Where to write out a config dump.
 discard registerTopic("virtual")   # If 'virtual' chalking, where to write?
+discard registerTopic("fail")      # This gets aborted reports that we
+                                   # don't send by default, but might be
+                                   # good telemetry for some people.
 discard registerTopic("chalk_usage_stats")
 
 

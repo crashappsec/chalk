@@ -976,6 +976,9 @@ Any labels added here will be added as a LABEL line to the chalked container.  T
 If true, host reports will be generated for docker commands we do not wrap.
 By default, we do not report.  If you set this to 'true', it's helpful to
 have _ARGV in your report, to get more telemetry.
+
+Note that failed chalk attempts get published to the 'fail' topic, and there
+are no default output sinks subscribed to this topic.
 """
   }
 }

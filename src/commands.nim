@@ -191,7 +191,7 @@ proc liftUniformKeys() =
     liftableKeys.add(key)
     hostInfo[key] = box.get()
 
-proc doReporting() =
+proc doReporting(topic="report") =
   if inSubscan():
     let ctx = getCurrentCollectionCtx()
     if ctx.postprocessor != nil:
@@ -203,7 +203,7 @@ proc doReporting() =
     liftUniformKeys()
     let report = doCommandReport()
     if report != "":
-      publish("report", report)
+      publish(topic, report)
     doCustomReporting()
 
 proc runCmdExtract*(path: seq[string]) =
@@ -613,14 +613,39 @@ template dockerPassthroughExec() {.dirty.} =
       subp = startProcess(exe, args = myargs, options = {poParentStreams})
       code = subp.waitForExit()
     if code != 0:
+      trace("Docker exited with code: " & $(code))
       opFailed = true
   else:
     opFailed = true
 
+# Files get opened when the subscription happens, not the first time a
+# write is attempted. If this gets called, it's because the mark file
+# was opened, but not written to.
+#
+# So if we see it, AND it's zero bytes in length, we try to clean it up,
+# but if we can't, no harm, no foul.
+#
+# Note that we're not really checking to see whether the sink is actually
+# subscribed to the 'virtual' topic right now!
+proc virtualMarkCleanup() =
+  if "virtual_chalk_log" notin chalkConfig.sinkConfs:
+    return
+
+  let conf = chalkConfig.sinkConfs["virtual_chalk_log"]
+
+  if conf.enabled == false:                    return
+  if conf.sink notin ["file", "rotating_log"]: return
+
+  try:
+    removeFile(get[string](conf.`@@attrscope@@`, "filename"))
+  except:
+    discard
+
 {.warning[CStringConv]: off.}
 proc runCmdDocker*() {.noreturn.} =
   var
-    opFailed = false
+    opFailed     = false
+    reExecDocker = false
     chalk: ChalkObj
 
   let
@@ -637,8 +662,9 @@ proc runCmdDocker*() {.noreturn.} =
       initCollection()
 
       if len(args) == 0:
-        error("No arguments to 'docker build'")
-        opFailed = true
+        trace("No arguments to 'docker build'; passing through to docker")
+        opFailed     = true
+        reExecDocker = true
       else:
         chalk = newChalk(FileStream(nil), resolvePath(myargs[^1]))
         chalk.myCodec = codec
@@ -657,9 +683,23 @@ proc runCmdDocker*() {.noreturn.} =
             myargs = myargs[0 ..< ^1] & @["-t=" & cache.ourTag, myargs[^1]]
 
             dockerPassthroughExec()
-            if not runInspectOnImage(exe, chalk):
+            if opFailed:
+              # Since docker didn't fail because of us, we don't run it again.
+              # We don't have to do anything to make that happen, as
+              # reExecDocker is already false.
+              #
+              # Similarly, if we output an error here, it may look like it's
+              # our fault, so better to be silent unless they explicitly
+              # run with --trace.
+              trace("'docker build' failed for a Dockerfile that we didn't " &
+                    "modify, so we won't rerun it.")
+              virtualMarkCleanup()
+            elif not runInspectOnImage(exe, chalk):
+              # This might have been because of us, so play it safe and re-exec
               error("Docker inspect failed")
-              opFailed = true
+              opFailed     = true
+              reExecDocker = true
+              virtualMarkCleanup()
             else:
               publish("virtual", toWrite)
               info(chalk.fullPath & ": virtual chalk created.")
@@ -689,17 +729,21 @@ proc runCmdDocker*() {.noreturn.} =
               else:
                 error(chalk.fullPath & ": chalking the container FAILED. " &
                       "Rebuilding without chalking.")
-                opFailed = true
+                opFailed     = true
+                reExecDocker = true
             except:
-              opFailed = true
+              opFailed     = true
+              reExecDocker = true
               error(getCurrentExceptionMsg())
               error("Above occurred when runnning docker command: " &
                 myargs.join(" "))
               dumpExOnDebug()
         else:
-          info("Failed to extract docker info.  Calling docker.")
-          opFailed = true
-      doReporting()
+          # In this branch, we never actually tried to exec docker.
+          info("Failed to extract docker info.  Calling docker directly.")
+          opFailed     = true
+          reExecDocker = true
+      doReporting(if opFailed: "fail" else: "report")
     of "push":
       setCommandName("push")
       initCollection()
@@ -718,27 +762,27 @@ proc runCmdDocker*() {.noreturn.} =
           doReporting()
       else:
         # The push *did* fail, but we don't need to re-run docker, because
-        # we didn't munge the command line.
-        opFailed = false
+        # we didn't munge the command line; it was going to fail anyway.
+        reExecDocker = false
     else:
       initCollection()
-      opFailed = true
+      reExecDocker = true
       trace("Unhandled docker command: " & myargs.join(" "))
       if chalkConfig.dockerConfig.getReportUnwrappedCommands():
-        doReporting()
+        doReporting("fail")
   except:
     error(getCurrentExceptionMsg())
     error("Above occurred when runnning docker command: " & myargs.join(" "))
     dumpExOnDebug()
-    opFailed = true
-    doReporting()
+    reExecDocker = true
+    doReporting("fail")
   finally:
     if chalk != nil:
       chalk.cleanupTmpFiles()
 
   showConfig()
 
-  if not opFailed:
+  if not reExecDocker:
     quit(0)
 
   # This is the fall-back exec for docker when there's any kind of failure.
