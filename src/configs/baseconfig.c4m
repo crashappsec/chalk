@@ -1172,15 +1172,6 @@ plugin docker {
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 }
 
-plugin container {
-    codec:           true
-    priority:        1
-    enabled:         true
-    artifact_keys:   ["HASH_FILES", "ARTIFACT_TYPE"]
-    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
-
-}
-
 plugin zip {
     codec:           true
     priority:        1

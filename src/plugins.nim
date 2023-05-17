@@ -371,7 +371,6 @@ proc sinkConfToString(name: string): string =
 import plugins/codecShebang
 import plugins/codecElf
 import plugins/codecDocker
-import plugins/codecContainer
 import plugins/codecZip
 import plugins/codecPythonPy
 import plugins/codecPythonPyc

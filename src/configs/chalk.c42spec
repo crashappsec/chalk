@@ -1363,31 +1363,6 @@ artifact search path will be traversed recursively.
 """
   }
 
-  field container_image_id {
-    type:     string
-    default:  ""
-    hidden:   true
-    shortdoc: "Image ID"
-    doc:      """
-This field should generally be passed at the command line. It is only
-intended for manually 'virtually' chalking containers, and should
-contain the ascii SHA256 hash of a container, which will be taken as
-the artifact's hash.
-"""
-  }
-
-  field container_image_name {
-    type:     string
-    default:  ""
-    hidden:   true
-    shortdoc: "Image Name"
-    doc:      """
-This field should generally be passed at the command line. It is only
-intended for manually 'virtually' chalking containers, and should be
-the image name, which will be put into the ARTIFACT_PATH field.
-"""
-  }
-
   field docker_exe {
     type:     string
     require:  false
