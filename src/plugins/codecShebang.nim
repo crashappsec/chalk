@@ -4,7 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import strutils, options, streams, nimSHA2, ../config, ../plugins
+import tables, strutils, options, streams, nimSHA2, ../config, ../plugins
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
@@ -63,5 +63,15 @@ method getUnchalkedHash*(self: CodecShebang, chalk: ChalkObj): Option[string] =
     chalk.stream.setPosition(chalk.endOffset + 1)
   toHash &= chalk.stream.readAll()
   return some(hashFmt($(toHash.computeSHA256())))
+
+method getChalkInfo*(self: CodecShebang, chalk: ChalkObj): ChalkDict =
+  result                      = ChalkDict()
+  result["ARTIFACT_TYPE"]     = artTypeShebang
+
+method getPostChalkInfo*(self:  CodecShebang,
+                         chalk: ChalkObj,
+                         ins:   bool): ChalkDict =
+  result                      = ChalkDict()       
+  result["_OP_ARTIFACT_TYPE"] = artTypeShebang
 
 registerPlugin("shebang", CodecShebang())

@@ -206,6 +206,25 @@ keyspec ARTIFACT_PATH {
     doc:              "Path of artifact on host where injection occured"
 }
 
+keyspec ARTIFACT_TYPE {
+    kind:             Chalk
+    never_early:      true
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    normalized_order: 750
+}
+
+keyspec _OP_ARTIFACT_TYPE {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    normalized_order: 750
+}
+
 keyspec HASH {
     kind:             Chalk
     never_early:      true
@@ -753,9 +772,9 @@ keyspec _OP_UNMARKED_COUNT {
     system:           true
     since:            "0.1.0"
     normalized_order: 1000100
-    doc:              "The number of unmarked artifacts that codecs saw. " +
-                      "For inserts, this will be items seen but ignored. " +
-		      "For other ops, it will be artifacts w/o chalk marks."
+    doc:              """
+The number of unmarked artifacts that codecs saw. For inserts, this will be items seen but ignored. For other ops, it will be artifacts w/o chalk marks.
+"""
 }
 
 keyspec _OP_ARTIFACT_PATH {
@@ -1133,30 +1152,32 @@ SHA256 digests associated with the artifact in the operation.
 # non-codecs cannot set these keys.
 plugin elf {
     codec:           true
-    artifact_keys:   ["HASH_FILES"]
-    post_chalk_keys: ["_CURRENT_HASH"]
+    artifact_keys:   ["HASH_FILES", "ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 }
 
 plugin shebang {
     codec:           true
-    artifact_keys:   ["HASH_FILES"]
-    post_chalk_keys: ["_CURRENT_HASH"]
+    artifact_keys:   ["HASH_FILES", "ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 }
 
 plugin docker {
     codec:    true
     priority: 1
     enabled:  true
-    artifact_keys:   ["HASH_FILES"]
-    post_chalk_keys: ["_CURRENT_HASH"]
+    artifact_keys:   ["HASH_FILES", "ARTIFACT_TYPE", "DOCKER_TAGS",
+                      "DOCKERFILE_PATH", "DOCKER_FILE",
+		      "DOCKER_CONTEXT"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 }
 
 plugin container {
     codec:           true
     priority:        1
     enabled:         true
-    artifact_keys:   ["HASH_FILES"]
-    post_chalk_keys: ["_CURRENT_HASH"]
+    artifact_keys:   ["HASH_FILES", "ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 
 }
 
@@ -1164,24 +1185,25 @@ plugin zip {
     codec:           true
     priority:        1
     enabled:         true
-    artifact_keys:   ["HASH_FILES", "EMBEDDED_CHALK", "EMBEDDED_TMPDIR"]
-    post_chalk_keys: ["_CURRENT_HASH"]
+    artifact_keys:   ["HASH_FILES", "EMBEDDED_CHALK",
+                      "EMBEDDED_TMPDIR", "ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 }
 
 plugin python_py {
     codec:           true
     priority:        1
     enabled:         true
-    artifact_keys:   ["HASH_FILES"]
-    post_chalk_keys: ["_CURRENT_HASH"]
+    artifact_keys:   ["HASH_FILES", "ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 }
 
 plugin python_pyc {
     codec:           true
     priority:        1
     enabled:         true
-    artifact_keys:   ["HASH_FILES"]
-    post_chalk_keys: ["_CURRENT_HASH"]
+    artifact_keys:   ["HASH_FILES", "ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 }
 
 plugin tool {
@@ -1368,6 +1390,7 @@ By default, CHALK_RAND is on for unique builds. If you want reproducable builds,
   # This one isn't used by anything yet, so no need to output it.
   key.EARLIEST_VERSION.report         = false
   key.ARTIFACT_PATH.report            = true
+  key.ARTIFACT_TYPE.report            = true
   key.INSERTION_HOSTINFO.report       = true
   key.ORIGIN_URI.report               = true
   key.ARTIFACT_VERSION.report         = true
@@ -1434,6 +1457,7 @@ per-artifact report but disable on a per-host basis.
   key.CHALK_ID.report                 = true
   key.TIMESTAMP.report                = true
   key.ARTIFACT_PATH.report            = true
+  key.ARTIFACT_TYPE.report            = true  
   key.ORIGIN_URI.report               = true
   key.ARTIFACT_VERSION.report         = true
   key.STORE_URI.report                = true
@@ -1530,6 +1554,7 @@ Host keys are in the host_report_other_base (i.e., non-insert) profile.
   key.INSERTION_HOSTINFO.report       = true
   key.INSERTION_NODENAME.report       = true
   key.ARTIFACT_PATH.report            = true
+  key.ARTIFACT_TYPE.report            = true  
   key.HASH.report                     = true
   key.HASH_FILES.report               = true
   key.COMPONENT_HASHES.report         = true
@@ -1568,6 +1593,7 @@ Host keys are in the host_report_other_base (i.e., non-insert) profile.
   key.SIGN_PARAMS.report              = true
   key.SIGNATURE.report                = true
   key._OP_ARTIFACT_PATH.report        = true
+  key._OP_ARTIFACT_TYPE.report        = true  
   key._CURRENT_HASH.report            = true
   key._VALIDATED.report               = true
   key._OP_CHALKED_KEYS.report         = false
@@ -1585,6 +1611,7 @@ Note that _CURRENT_HASH will be empty when deleting, since that key represents t
   key.METADATA_HASH.report            = true
   key.METADATA_ID.report              = true
   key._OP_ARTIFACT_PATH.report        = true
+  key._OP_ARTIFACT_TYPE.report        = true  
   key._VALIDATED.report               = true
   key.SBOM.report                     = true
   key.SAST.report                     = true

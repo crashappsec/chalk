@@ -112,7 +112,6 @@ proc collectPostChalkInfo*(artifact: ChalkObj) =
 
 proc collectChalkInfo*(obj: ChalkObj) =
   # Called from the appropriate commands.
-  obj.marked        = true
   obj.opFailed      = false
   obj.collectedData = ChalkDict()
   let data          = obj.collectedData
@@ -196,9 +195,7 @@ iterator artifacts*(artifactPath: seq[string]): ChalkObj =
     # This is used, for instance, with containers.
     (goOn, chalks) = codec.findChalk(artifactPath, exclude, skips, recursive)
     for obj in chalks:
-      if not isChalkingOp():
-        obj.marked = true
-      elif obj.extract != nil and len(obj.extract) != 0:
+      if obj.extract != nil and "MAGIC" in obj.extract:
         obj.marked = true
 
       discard obj.acquireFileStream()

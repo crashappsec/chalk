@@ -10,7 +10,8 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import options, streams, strutils, endians, nimSHA2, ../config, ../plugins
+import tables, options, streams, strutils, endians, nimSHA2, ../config,
+       ../plugins
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
@@ -90,6 +91,16 @@ method getUnchalkedHash*(self: CodecElf, chalk: ChalkObj): Option[string] =
   let toHash = chalk.stream.readStr(chalk.startOffset)
   return some(hashFmt($(toHash.computeSHA256())))
 
-registerPlugin("elf", CodecElf())
+method getChalkInfo*(self: CodecElf, chalk: ChalkObj): ChalkDict =
+  result                      = ChalkDict()
+  result["ARTIFACT_TYPE"]     = artTypeElf
 
+method getPostChalkInfo*(self:  CodecElf,
+                         chalk: ChalkObj,
+                         ins:   bool): ChalkDict =
+  result                      = ChalkDict()       
+  result["_OP_ARTIFACT_TYPE"] = artTypeElf
+  
 method getNativeObjPlatforms*(s: CodecElf): seq[string] = @["linux"]
+
+registerPlugin("elf", CodecElf())

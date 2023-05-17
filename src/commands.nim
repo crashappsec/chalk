@@ -75,7 +75,7 @@ proc setPerChalkReports(successProfileName: string,
           hostProfileName & "' and artifact profile = '" & badName)
 
   for chalk in getAllChalks():
-    if not chalk.isMarked(): continue
+    if not chalk.isMarked() and len(chalk.collectedData) == 0: continue
     let
       profile   = if not chalk.opFailed: goodProfile else: badProfile
       oneReport = hostInfo.prepareContents(chalk.collectedData, profile)
@@ -208,7 +208,7 @@ proc doReporting(topic="report") =
 
 proc runCmdExtract*(path: seq[string]) =
   initCollection()
-
+  
   var numExtracts = 0
   for item in artifacts(path):
     numExtracts += 1

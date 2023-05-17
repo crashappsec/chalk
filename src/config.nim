@@ -56,7 +56,18 @@ const
   entryPtTemplateLoc* = "configs/entrypoint.c4m"
   entryPtTemplate*    = staticRead(entryPtTemplateLoc)
   #% END
-
+  # Make sure that ARTIFACT_TYPE fields are consistently named. I'd love
+  # these to be const, but nim doesn't seem to be able to handle that :(
+let
+  artTypeElf*         = pack("ELF")
+  artTypeShebang*     = pack("Unix Script")
+  artTypeZip*         = pack("ZIP")
+  artTypeJAR*         = pack("JAR")
+  artTypeWAR*         = pack("WAR")
+  artTypeEAR*         = pack("EAR")
+  artTypeDocker*      = pack("Docker")
+  artTypePy*          = pack("Python")
+  artTypePyc*         = pack("Python Bytecode")
 var
   con4mRuntime:       ConfigStack
   chalkConfig*:       ChalkConfig

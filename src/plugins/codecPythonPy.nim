@@ -8,7 +8,7 @@
 # :Author: Rich Smith (rich@crashoverride.com)
 # :Copyright: 2022, 2023, Crash Override, Inc.
 
-import strutils, options, streams, nimSHA2, ../config, ../plugins, os
+import tables, strutils, options, streams, nimSHA2, ../config, ../plugins, os
 
 when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
@@ -106,4 +106,14 @@ method getUnchalkedHash*(self: CodecPythonPy, chalk: ChalkObj): Option[string] =
   toHash &= chalk.stream.readAll()
   return some(hashFmt($(toHash.computeSHA256())))
 
+method getChalkInfo*(self: CodecPythonPy, chalk: ChalkObj): ChalkDict =
+  result                  = ChalkDict()
+  result["ARTIFACT_TYPE"] = artTypePy
+
+method getPostChalkInfo*(self:  CodecPythonPy,
+                         chalk: ChalkObj,
+                         ins:   bool): ChalkDict =
+  result                      = ChalkDict()       
+  result["_OP_ARTIFACT_TYPE"] = artTypePy
+  
 registerPlugin("python_py", CodecPythonPy())

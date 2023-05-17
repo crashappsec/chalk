@@ -205,4 +205,22 @@ method getChalkInfo*(self: CodecZip, obj: ChalkObj): ChalkDict =
     result["EMBEDDED_CHALK"]  = cache.embeddedChalk
     result["EMBEDDED_TMPDIR"] = pack(cache.tmpDir)
 
+  let extension = obj.fullPath.splitFile().ext.toLowerAscii()
+  
+  result["ARTIFACT_TYPE"] = case extension
+                            of ".jar": artTypeJAR
+                            of ".war": artTypeWAR
+                            of ".ear": artTypeEAR
+                            else:      artTypeZip
+                                     
+method getPostChalkInfo*(self: CodecZip, obj: ChalkObj, ins: bool): ChalkDict =
+  result        = ChalkDict()
+  let extension = obj.fullPath.splitFile().ext.toLowerAscii()
+  
+  result["_OP_ARTIFACT_TYPE"] = case extension
+                            of ".jar": artTypeJAR
+                            of ".war": artTypeWAR
+                            of ".ear": artTypeEAR
+                            else:      artTypeZip
+  
 registerPlugin("zip", CodecZip())
