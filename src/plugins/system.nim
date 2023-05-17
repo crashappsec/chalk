@@ -74,12 +74,9 @@ method getChalkInfo*(self: SystemPlugin, obj: ChalkObj): ChalkDict =
 
   if obj.isMarked() and "METADATA_HASH" in obj.extract:
     let h = unpack[string](obj.extract["METADATA_HASH"]).strip().parseHexStr()
-    echo "..."
 
     result["OLD_CHALK_METADATA_HASH"] = obj.extract["METADATA_HASH"]
     result["OLD_CHALK_METADATA_ID"]   = pack(idFormat(h))
-  echo "2..."    
-
 
 proc applySubstitutions(obj: ChalkObj) {.inline.} =
   # Apply {}-style substitutions to artifact chalking keys where appropriate.
