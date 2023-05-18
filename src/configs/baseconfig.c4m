@@ -1168,6 +1168,7 @@ plugin docker {
     enabled:  true
     artifact_keys:   ["HASH_FILES", "ARTIFACT_TYPE", "DOCKER_TAGS",
                       "DOCKERFILE_PATH", "DOCKER_FILE",
+		      "DOCKER_PLATFORM", "DOCKER_LABELS",
 		      "DOCKER_CONTEXT"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 }
