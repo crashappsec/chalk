@@ -162,9 +162,11 @@ For information on profiles, see: 'help profile'
   }
 
   command extract {
-    aliases:  ["ex", "e"]
-    args:     (0, high())
-    callback: func set_artifact_search_path(list[string])
+    aliases:       ["ex", "e"]
+    args:          (0, high())
+    callback:      func set_artifact_search_path(list[string])
+    arg_sub_mutex: false 
+
     doc: """
 This command looks for existing chalk marks in artifacts, and reports on what it finds.  The reporting configuration is specified by the configuration file, but will default to simply reporting to stdout if nothing is configured.
 """
@@ -174,6 +176,12 @@ This command looks for existing chalk marks in artifacts, and reports on what it
       no_aliases: ["R"]
       doc: default_recursive_doc
       field_to_set: "recursive"
+    }
+
+    command docker {
+      aliases:  ["d"]
+      args:     (0, high())
+      callback: func set_docker_image_list(
     }
   }
 

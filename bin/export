@@ -5,7 +5,7 @@
 import sys, os, tempfile, re, shutil
 
 dirs_to_skip       = ["./.git", "./.github", "./customers", "./bin", "./tests",
-                      "./chalk.dSYM", "./oss"]
+                      "./chalk.dSYM", "./oss", "./installer"]
 files_to_skip      = ["./.editorconfig", "./.envrc", "./chalk", "./lto.o",
                       "./.pre-commit-config.yaml",
                       "./src/configs/entrypoint.c4m"]
