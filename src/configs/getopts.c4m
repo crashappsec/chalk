@@ -181,7 +181,7 @@ This command looks for existing chalk marks in artifacts, and reports on what it
     command docker {
       aliases:  ["d"]
       args:     (0, high())
-      callback: func set_docker_image_list(
+      callback: func set_docker_image_list(list[string])
     }
   }
 
@@ -773,6 +773,10 @@ func set_artifact_search_path(args: list[string]) {
   }
 
   add_override("artifact_search_path", path)
+}
+
+func set_docker_image_list(args: list[string]) {
+  add_override("artifact_search_path", args)
 }
 
 func on_conf_load(args: list[string]) {
