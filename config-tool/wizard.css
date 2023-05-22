@@ -1,0 +1,203 @@
+* {
+    transition: background 500ms in_out_cubic, color 500ms in_out_cubic;
+}
+
+Screen {
+    layers: base overlay help notifications;
+    overflow: hidden;
+}
+
+WizardSidebar {
+    margin: 2 1;
+    width: 20;
+    dock: left;
+}
+
+Wizard {
+    content-align: center middle;
+    align: center middle;
+}
+
+Body {
+    margin: 0 0;
+    height: 100%;
+    width: 100%;
+    overflow-y: scroll;
+    align: center top;    
+}
+
+ReportingContainer {
+    height: auto;
+}
+
+ContentSwitcher {
+    height: auto;
+    min-height: 100vh;
+    align: center top;
+    overflow: hidden;
+}    
+
+WelcomePane {
+    background: $boost;
+    max-width: 100;
+    min-width: 40;
+    border: wide $primary;
+    padding: 1 2;
+    margin: 1 2;
+    box-sizing: border-box;
+}
+
+Switch {
+    height: auto;
+    width: auto;
+}
+
+.label {
+    height: 3;
+    content-align: center middle;
+    width: auto;
+}
+
+Input {
+    width: auto;
+    min-width: 40;
+}
+
+Horizontal {
+    height: auto;
+    align: left top;
+}
+
+.emphLabel {
+    color: $secondary;
+    text-style: bold;
+}
+
+Nav {
+    dock: bottom;
+    max-width: 80;
+    max-height: 4;
+    margin: 1 2;
+    padding: 1 2;
+    box-sizing: border-box;
+    align: center top;
+}
+
+RadioSet {
+    margin: 1 2;
+    padding: 1 2;
+}
+
+NavButton {
+    margin: 1 1;
+}
+
+WizSidebarButton {
+    background: $secondary-background-darken-3;
+    border: hkey $secondary-background-lighten-1;
+    color: $text;
+    background: $secondary-background;
+    text-align: left;
+}
+
+SidebarItem:hover {
+    background: $accent;
+    color: $text;
+    text-style: bold;
+}
+
+HelpWindow {
+    background: $surface;
+    color: $text;
+    height: 80vh;
+    dock: right;
+    width: 40%;
+    layer: help;
+    border-left: wide $primary;
+    border-top: wide $primary;
+    border-bottom: wide $primary;
+    offset: 1 1;
+    transition: offset 400ms in_out_cubic;
+    text-align: left;
+    content-align: left top;
+    align: left top;
+    padding: 1 1 1 1;
+    overflow-y: scroll;
+}
+
+MarkdownH1 {
+    background: $secondary-darken-3;
+}
+
+HelpWindow:focus {
+    offset: 0 0 !important;
+}
+
+HelpWindow.-hidden {
+    offset-x: 120%;
+}
+
+ConfigName {
+    width: 20;
+}
+
+ConfigDate {
+    width: 26;
+}
+
+ConfigVersion {
+    width: 34;
+}
+
+ConfigEdit {
+    border: none;
+    content-align: left top;
+    width: 9;
+    max-width: 9;
+    color: $accent;    
+}
+
+ConfigDelete {
+    border: none;
+    content-align: left top;
+    width: 9;    
+    max-width: 9;
+    color: $accent;    
+}
+
+ConfigExport {
+    border: none;
+    content-align: left top;
+    width: 9;    
+    max-width: 9;
+    color: $accent;    
+}
+
+ConfigHdr {
+    color: $secondary;
+    text-style: bold;
+    background: $primary;
+}
+
+.config_hdr {
+    height: 1;
+}
+
+ConfigRow {
+    margin: 0 0;
+    content-align: left top;
+    align: left top;
+    height: 1;
+    box-sizing: content-box;
+}
+
+ConfigTable {
+    layer: notifications;
+}
+
+Footer {
+    layer: notifications;
+}
+
+
+

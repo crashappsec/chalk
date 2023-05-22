@@ -1,0 +1,61 @@
+CHALK_VERSION = "0.4.3"
+CHALK_TITLE = "Chalk v." + CHALK_VERSION + " Configuration Tool"
+
+ERROR_TEXT = """An error occurred during [red]Chalk[/] installation.
+
+Press Enter to return to Windows, or
+
+Press CTRL+ALT+DEL to restart your computer. If you do this,
+you will lose any unsaved information in all open applications.
+
+Error: 0E : 016F : BFF9B3D4
+"""
+
+INTRO_TEXT    = """# Welcome to the **Chalk** configuration tool!
+
+Chalk is like GPS for your software. 
+
+In CI/CD, Chalk captures data about software, marking executables and containers. Then, wherever you see an artifact, you can extract the mark, so that you can easily look up the info you have, add new info, etc.
+
+This wizard allows you to configure the most common functionality.  If you need more customization, please refer to the documentation for manual configurations.
+"""
+
+BEGIN_LABEL = "Begin!"
+ABORT_LABEL = "Nope, sorry."
+
+KEYPRESS_QUIT = "Quit install"
+KEYPRESS_GO   = "Begin install"
+
+BASICS_PANE_MAIN = "How are you primarily intending to use this Chalk binary?"
+BASICS_PANE_CMDLINE = "On the command line"
+BASICS_PANE_DOCKER  = "In CI/CD, wrapping the docker command"
+BASICS_PANE_OTHER   = "In CI/CD, after building stand-alone artifacts"
+
+REPORTING_PANE_MAIN= """\
+When Chalk finishes running, where should output get sent by default? (Select all that apply)"""
+
+REPORTING_PANE_CO = "Send it to Crash Override"
+REPORTING_PANE_STDOUT = "Output to stdout"
+REPORTING_PANE_LOG = "Output to a log file"
+REPORTING_PANE_HTTPS = "Output to an https URL"
+REPORTING_PANE_S3 = "Output to an S3 bucket"
+
+REPORTING_PANE_ENV="""
+Note that you can use environment variables to configure output sinks as well.  Environment variables can be used to re-configure the defaults, or to add additional reporting.
+
+You can also customize the names of environment variables. If you choose to do that, you will do so on the next screen.
+"""
+
+REPORTING_ENV_LABEL="Env vars create additional report"
+
+REPORTING_ENV2_LABEL="Customize environment variables?"
+
+
+LOG_PARAMS = """Configuration for the log file. The path to the file must already exist on any machine on which this runs, and the file must be writable."""
+
+HTTPS_PARAMS = """Configuration for HTTPS posting. Data gets sent with the following header:
+[bold white]Content-Type: application/json[/]
+
+If you need to add a custom MIME header to the POST (e.g., for authentication), please do so below, exactly as it should appear.  Eg:
+[bold white]X-My-Auth-Id: WRGFsdf-sdfasdf-SDFkdj[/]
+"""
