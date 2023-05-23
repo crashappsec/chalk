@@ -253,9 +253,12 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       if not get[bool](attrs, k):
         error("Sink configuration '" & name & " is disabled.")
         return none(SinkConfig)
-    of "filters":                  filterNames = get[seq[string]](attrs, k)
-    of "sink":                     sinkName    = get[string](attrs, k)
-    else:                          opts[k]     = get[string](attrs, k)
+    of "filters":
+      filterNames = getOpt[seq[string]](attrs, k).getOrElse(@[])
+    of "sink":
+      sinkName    = getOpt[string](attrs, k).getOrElse("")
+    else:
+      opts[k]     = getOpt[string](attrs, k).getOrElse("")
 
   case sinkName
   of "":

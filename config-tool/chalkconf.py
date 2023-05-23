@@ -767,6 +767,10 @@ class NavButton(Button):
     def on_button_pressed(self):
         self.wiz.action_label(self.id)
 
+class RunWizardButton(Button):
+    def on_button_pressed(self):
+        push_screen('confwiz')
+
 class WizContainer(Container):
     def entered(self):
         self.has_entered = True
@@ -799,7 +803,7 @@ class BuildBinary(WizContainer):
                          Label("Name this configuration to save it",
                                classes="label"))
         yield Horizontal(Switch(value = True, id="overwrite_config"),
-                         Label("Overwrite any config with the same name"))
+                         Label("Overwrite any config with the same name", classes="label"))
         
 
 class ChalkOpts(WizContainer):
@@ -1160,9 +1164,178 @@ sectionBinGen.add_step("final", BuildBinary())
 
 sidebar_buttons = []
 
-class Wizard(App):
+class ConfPicker(Screen):
+    TITLE    = CHALK_TITLE
+    BINDINGS = [
+        Binding(key="q", action="pop_screen()", description="back"),
+        Binding(key="up", action="<scroll-up>", show=False),
+        Binding(key="down", action="<scroll-down>", show=False),
+        ]
+    def compose(self):
+        yield Header(show_clock=True)
+        yield ConfigTable()
+        yield RunWizardButton()
+        yield Footer()
+
+
+class Wizard(Container):
+    def __init__(self, end_callback="pop_screen()"):
+        super().__init__()
+        self.end_callback = end_callback
+        self.sections = []
+        self.by_name = {}
+        self.section_index = 0
+        self.sidebar_contents = []
+        
+    def add_section(self, s: WizardSection):
+        self.sections.append(s)
+        self.by_name[s.name] = s
+        button = WizSidebarButton(s.name, self)
+        sidebar_buttons.append(button)
+        self.sidebar_contents.append(button)
+
+    def build_panels(self):
+        self.panels = []
+        for section in self.sections:
+            for step in section.step_order:
+                self.panels.append(step.widget)
+        return ContentSwitcher(*self.panels, initial=self.panels[0].id)
+    
+    def _load_sections(self):
+        self.load_sections()
+        for i in range(len(self.sections)):
+            self.by_name[self.sections[i].name] = i
+        self.update_menu()
+        
+    def compose(self):
+        global helpwin
+        self._load_sections()
+        self.switcher = self.build_panels()
+        self.current_panel = self.panels[0]
+        self.first_panel   = self.current_panel
+        helpwin = HelpWindow(id="helpwin", name="Help Window",
+                             classes="-hidden",
+                             markdown=self.first_panel.doc())        
+        helpwin.wiz = self
+        yield helpwin
+        yield WizardSidebar(*self.sidebar_contents)
+        self.next_button = NavButton("Next", self)
+        self.help_button = NavButton("Help", self)
+        self.prev_button = NavButton("Back", self, disabled = True)
+        buttons = Nav(self.prev_button, self.next_button, self.help_button)
+        helpwin.update(self.first_panel.doc()) 
+        body   = Body(self.switcher)
+        yield body
+        yield buttons
+
+    def set_panel(self, new_panel):
+      self.current_panel = new_panel
+      self.switcher.current = new_panel.id
+      new_panel.entered()
+      helpwin.update(new_panel.doc())
+      self.update_menu()
+      
+    def action_section(self, label):
+        self.section_index = self.by_name[str(label)]
+        step = self.sections[self.section_index].start_section()
+        self.set_panel(step.widget)
+
+    def action_section_end(self, label):
+        self.section_index = self.by_name[str(label)]
+        step = self.sections[self.section_index].goto_section_end()
+        self.set_panel(step.widget)
+
+    def update_menu(self):
+        try:
+            self.current_panel
+        except:
+            self.current_panel = None
+            self.first_panel   = None
+
+        if self.current_panel and not self.current_panel.complete():
+            self.next_button.disabled = True
+        elif self.current_panel:
+            self.next_button.disabled = False
+        if self.current_panel:
+            if self.current_panel == self.first_panel:
+                self.prev_button.disabled = True
+            else:
+                self.prev_button.disabled = False
+        for i in range(len(sidebar_buttons)):
+            if self.section_index >= i:
+                disable = False
+            else:
+                disable = True
+            sidebar_buttons[i].disabled = disable
+    
+    def action_label(self, id):
+        if id == "Help":
+            self.action_help()
+        elif id == "Next":
+            return self.action_next()
+        else:
+            return self.action_prev()
+
+    def action_next(self):
+        sqlite_init()
+        new_step = self.sections[self.section_index].advance()
+        if not new_step:
+            self.section_index += 1
+            if self.section_index == len(self.sections):
+                self.end_callback()
+            self.action_section(str(self.sections[self.section_index].name))
+        else:
+            self.set_panel(new_step.widget)
+
+    def action_help(self):
+        if helpwin.has_class("-hidden"):
+            helpwin.remove_class("-hidden")
+        else:
+            helpwin.add_class("-hidden")
+
+    def action_prev(self):
+        if self.current_panel == self.first_panel:
+            return
+        new_step = self.sections[self.section_index].backwards()
+        if not new_step:
+            self.section_index -= 1
+            name = str(self.sections[self.section_index].name)
+            self.action_section_end(name)
+        else:
+            self.set_panel(new_step.widget)
+
+class ConfWiz(Wiz):
+    def load_sections():
+        self.add_section(sectionIntro)
+        self.add_section(sectionBasics)
+        self.add_section(sectionOutputConf)
+        self.add_section(sectionChalking)
+        self.add_section(sectionReporting)
+        self.add_section(sectionBinGen)
+            
+class ConfWizScreen(Screen):
     CSS_PATH = "wizard.css"
     TITLE    = CHALK_TITLE
+    BINDINGS = [
+        Binding(key="q", action="pop_screen()", description="Abort installer"),
+        Binding(key="left", action="prev()", description="Previous Screen"),
+        Binding(key="right", action="next()", description="Next Screen"),
+        Binding(key="space", action="next()", show=False),
+        Binding(key="up", action="<scroll-up>", show=False),
+        Binding(key="down", action="<scroll-down>", show=False),
+        Binding(key="h", action="app.toggle_class('HelpWindow', '-hidden')",
+                description="Toggle Help"),
+    def compose(self):
+        yield Header(show_clock=True)
+        yield ConfWiz()
+        yield Footer()
+
+
+
+class OldWizard(App):
+    CSS_PATH = "wizard.css"
+    TITLE    = CHALK_TITLE
+    SCREENS  = {'picker' : ConfPicker() }
     BINDINGS = [
         Binding(key="q", action="quit", description=KEYPRESS_QUIT),
         Binding(key="left", action="prev()", description="Previous Screen"),
@@ -1171,7 +1344,8 @@ class Wizard(App):
         Binding(key="up", action="<scroll-up>", show=False),
         Binding(key="down", action="<scroll-down>", show=False),
         Binding(key="h", action="app.toggle_class('HelpWindow', '-hidden')",
-                description="Toggle Help")
+                description="Toggle Help"),
+        Binding(key="t", action="push_screen('picker')", show='...')
     ]        
 
     def __init__(self, end_callback):
@@ -1191,7 +1365,6 @@ class Wizard(App):
             for step in section.step_order:
                 self.panels.append(step.widget)
         return ContentSwitcher(*self.panels, initial=self.panels[0].id)
-
     def load_sections(self):
         self.sections = []
         self.by_name = {}
@@ -1226,7 +1399,6 @@ class Wizard(App):
         helpwin.update(self.first_panel.doc()) 
         body   = Body(self.switcher)
         yield Header(show_clock=True)
-        #yield ConfigTable()
         yield body
         yield buttons
         yield Footer()
