@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # John Viega. john@crashoverride.com
 
+INTRO_TEXT = """
+
+Welcome to the Chalk configuration tool
+"""
+
 chalk_version = "0.4.3"
 from textual.app     import *
 from textual.containers import *
@@ -20,7 +25,7 @@ import datetime, hashlib
 
 all_fields = [
     # Basics pane
-    "use_cmd", "use_docker", "use_cicd", "use_extract", "lx86", "m1",
+    "use_cmd", "use_docker", "use_cicd", "use_extract", "lx86", "m1", "macosx86",
     # Main output config pane
     "report_co", "report_stdout", "report_stderr", "report_log", "report_http",
     "report_s3", "env_adds_report", "env_custom",
@@ -58,7 +63,7 @@ radio_set_dbg    = (["release_build", "debug_build"], 0)
 radio_set_minmax = (["chalk_minimal", "chalk_maximal"], 0)
 radio_set_crep   = (["crpt_minimal", "crpt_maximal"], 0)
 radio_set_use    = (["use_cmd", "use_docker", "use_cicd", "use_extract"], 0)
-radio_set_arch   = (["lx86", "m1"], 0)
+radio_set_arch   = (["lx86", "m1", "macosx86"], 0)
 
 all_radio_sets = [radio_set_dbg, radio_set_minmax, radio_set_crep,
                   radio_set_use, radio_set_arch]
@@ -131,7 +136,7 @@ text_defaults = {
     "s3_uri"        : "",
     "s3_access_id"  : "",
     "s3_secret"     : ""
-}    
+}
 
 def is_true(d, k):
     if not k in d: return false
@@ -148,7 +153,7 @@ profile_name_map = {
     "x_max_host" : "host_report_other_base",
     "x_min_art"  : "artifact_report_minimal",
     "x_max_art"  : "artifact_report_extract_base"
-}    
+}
 
 def profile_set(profile, k, val):
     return 'profile.%s.key.%s.report = %s' % (profile_name_map[profile], k, val)
@@ -161,18 +166,18 @@ def no_reporting(d):
         is_true(d, "report_stderr") or is_true(d, "report_log") or
         is_true(d, "report_http") or is_true(d, "report_s3")):
         return False
-    
+
     return True
-    
+
 def dict_to_con4m(d):
     if is_true(d, "lx86"):
         forLinux = True
     else:
         forLinux = False
     lines = []
-    
+
     lines.append("cmd := argv0()")
-    
+
     if is_true(d, "use_docker"):
         lines.append('default_command = "docker"')
         lines.append('log_level = "error"')
@@ -201,7 +206,7 @@ sink_config env_var_log_file {
   sink: "%s"
   filters: ["fix_new_line"]
   filename: env("%s")
-} 
+}
 
 sink_config env_var_post {
   sink:    "post"
@@ -255,7 +260,7 @@ ptr_value := ""
        d["env_s3_uri"], d["env_s3_secret"], d["env_s3_aid"], filesink,
        d["log_loc"], d["https_url"], d["https_header"], s3_uri,
        d["s3_secret"], d["s3_access_id"]))
-                 
+
     if is_true(d, "env_adds_report"):
         extra_set_log  = ""
         extra_set_post = ""
@@ -265,12 +270,12 @@ ptr_value := ""
         extra_set_log  = "\n  add_log_subscription  := false"
         extra_set_post = "\n  add_post_subscription := false"
         extra_set_s3   = "\n  add_s3_subscription   := false"
-        
+
     lines.append("""
 if sink_config.env_var_log_file.filename != "" {
   subscribe("report", "env_var_log_file")%s
   set_sink := true
-}  
+}
 
 if sink_config.env_var_post.uri != "" {
   subscribe("report", "env_var_post")%s
@@ -294,15 +299,15 @@ if s3_fields_found == 3 {
   if ptr_value == "" {
     ptr_value := sink_config.env_var_s3.uri
   }
-} 
+}
 elif s3_fields_found != 0 {
-  error("environment variable setting for S3 output requires setting " + 
+  error("environment variable setting for S3 output requires setting " +
         "3 variables, but only " + $(s3_fields_found) + " were set.")
 }
 """ % (extra_set_log, extra_set_post, extra_set_s3))
 
     if is_true(d, "report_s3"):
-        lines.append("""            
+        lines.append("""
 if add_s3_subscription {
       subscribe("report", "pre_config_s3")
       set_sink := true
@@ -345,7 +350,7 @@ set_sink := true
 # becomes the storage location of record.  But, when running other operations,
 # specifically an 'extract', we will leave the default subscription to
 # stderr, if no other output sink is configured.
-       
+
 if set_sink == true or ["build", "insert", "delete"].contains(cmd) {
     unsubscribe("report", "json_console_error")
 }
@@ -361,7 +366,7 @@ unsubscribe("report", "json_console_error")
     # tools too.
     enable_sbom = False
     enable_sast = False
-              
+
     if is_true(d, "chalk_minimal"):
         lines.append("""
 outconf.insert.chalk = "chalking_ptr"
@@ -369,7 +374,7 @@ outconf.build.chalk  = "chalking_ptr"
 
 keyspec.CHALK_PTR.value = strip(ptr_value)
 """)
-              
+
         if not is_true(d, "chalk_ptr"):
             lines.append(profile_set('chalk_min', 'CHALK_PTR', 'false'))
         if not is_true(d, "chalk_datetime"):
@@ -378,13 +383,13 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
             lines.append(profile_set('chalk_min', 'EMBEDDED_CHALK', 'true'))
         if is_true(d, "chalk_repo"):
             lines.append(profile_set('chalk_min', 'ORIGIN_URI', 'true'))
-            lines.append(profile_set('chalk_min', 'BRANCH', 'true'))            
+            lines.append(profile_set('chalk_min', 'BRANCH', 'true'))
             lines.append(profile_set('chalk_min', 'COMMIT_ID', 'true'))
         if is_true(d, "chalk_rand"):
             lines.append(profile_set('chalk_min', 'CHALK_RAND', 'true'))
         if is_true(d, "chalk_build_env"):
             lines.append(profile_set('chalk_min', 'INSERTION_HOSTINFO', 'true'))
-            lines.append(profile_set('chalk_min', 'INSERTION_NODENAME', 'true'))            
+            lines.append(profile_set('chalk_min', 'INSERTION_NODENAME', 'true'))
         if is_true(d, "chalk_sig"):
             lines.append(profile_set('chalk_min', 'SIGNATURE', 'true'))
             lines.append(profile_set('chalk_min', 'SIGN_PARAMS', 'true'))
@@ -411,7 +416,7 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
             lines.append(profile_set('chalk_max', 'CHALK_RAND', 'false'))
         if is_true(d, "chalk_build_env"):
             lines.append(profile_set('chalk_max', 'INSERTION_HOSTINFO', 'false'))
-            lines.append(profile_set('chalk_max', 'INSERTION_NODENAME', 'false'))            
+            lines.append(profile_set('chalk_max', 'INSERTION_NODENAME', 'false'))
         if is_true(d, "chalk_sig"):
             lines.append(profile_set('chalk_max', 'SIGNATURE', 'false'))
             lines.append(profile_set('chalk_max', 'SIGN_PARAMS', 'false'))
@@ -429,14 +434,14 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
     if is_true(d, "label_cid"):
         lines.append(profile_set('labels', 'CHALK_ID', 'true'))
     if is_true(d, "label_mdid"):
-        lines.append(profile_set('labels', 'METADATA_ID', 'true'))        
+        lines.append(profile_set('labels', 'METADATA_ID', 'true'))
     if not is_true(d, "label_repo"):
-        lines.append(profile_set('labels', 'ORIGIN_URI', 'false'))        
+        lines.append(profile_set('labels', 'ORIGIN_URI', 'false'))
     if not is_true(d, "label_commit"):
         lines.append(profile_set('labels', 'COMMIT_ID', 'false'))
     if not is_true(d, "label_branch"):
         lines.append(profile_set('labels', 'BRANCH', 'false'))
-        
+
     lines.append('docker.label_prefix = "' + d["label_prefix"] + '"')
 
     if is_true(d, "crpt_minimal"):
@@ -455,7 +460,7 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         lines.append(profile_set('chalk_art',  'OLD_CHALK_METADATA_HASH', 'false'))
         lines.append(profile_set('chalk_art',  'OLD_CHALK_METADATA_ID', 'false'))
         lines.append(profile_set('chalk_art',  '_VIRTUAL', 'false'))
-        
+
         if not is_true(d, "crpt_errs"):
             lines.append(profile_set('chalk_host', '_OP_ERRORS', 'false'))
             lines.append(profile_set('chalk_art',  'ERR_INFO', 'false'))
@@ -509,19 +514,19 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         lines.append(profile_set('chalk_host',  'DOCKER_LABELS', 'true'))
     else:
         lines.append(profile_set('chalk_art',   'DOCKER_LABELS', 'false'))
-        lines.append(profile_set('chalk_host',  'DOCKER_LABELS', 'false'))        
+        lines.append(profile_set('chalk_host',  'DOCKER_LABELS', 'false'))
     if is_true(d, "drpt_tags"):
         lines.append(profile_set('chalk_art',   'DOCKER_TAGS', 'true'))
-        lines.append(profile_set('chalk_host',  'DOCKER_TAGS', 'true'))        
+        lines.append(profile_set('chalk_host',  'DOCKER_TAGS', 'true'))
     else:
         lines.append(profile_set('chalk_art',   'DOCKER_TAGS', 'false'))
-        lines.append(profile_set('chalk_host',  'DOCKER_TAGS', 'false'))        
+        lines.append(profile_set('chalk_host',  'DOCKER_TAGS', 'false'))
     if is_true(d, "drpt_dfile"):
         lines.append(profile_set('chalk_art',   'DOCKER_FILE', 'true'))
-        lines.append(profile_set('chalk_host',  'DOCKER_FILE', 'true'))        
+        lines.append(profile_set('chalk_host',  'DOCKER_FILE', 'true'))
     else:
         lines.append(profile_set('chalk_art',   'DOCKER_FILE', 'false'))
-        lines.append(profile_set('chalk_host',  'DOCKER_FILE', 'false'))        
+        lines.append(profile_set('chalk_host',  'DOCKER_FILE', 'false'))
     if is_true(d, "drpt_dfpath"):
         lines.append(profile_set('chalk_art',   'DOCKERFILE_PATH', 'true'))
         lines.append(profile_set('chalk_host',  'DOCKERFILE_PATH', 'true'))
@@ -530,14 +535,14 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         lines.append(profile_set('chalk_host',  'DOCKERFILE_PATH', 'false'))
     if is_true(d, "drpt_platform"):
         lines.append(profile_set('chalk_art',   'DOCKER_PLATFORM', 'true'))
-        lines.append(profile_set('chalk_host',  'DOCKER_PLATFORM', 'true'))        
+        lines.append(profile_set('chalk_host',  'DOCKER_PLATFORM', 'true'))
     else:
         lines.append(profile_set('chalk_art',   'DOCKER_PLATFORM', 'false'))
         lines.append(profile_set('chalk_host',  'DOCKER_PLATFORM', 'false'))
     if is_true(d, "drpt_cmd"):
         lines.append(profile_set('chalk_host',  'ARGV', 'true'))
     else:
-        lines.append(profile_set('chalk_host',  'ARGV', 'false'))                  
+        lines.append(profile_set('chalk_host',  'ARGV', 'false'))
     if is_true(d, "drpt_ctx"):
         lines.append(profile_set('chalk_art',   'DOCKER_CONTEXT', 'true'))
         lines.append(profile_set('chalk_host',  'DOCKER_CONTEXT', 'true'))
@@ -546,16 +551,16 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         lines.append(profile_set('chalk_host',  'DOCKER_CONTEXT', 'false'))
     if is_true(d, "xrpt_fullmark"):
         x_rept_host = "x_min_host"
-        x_rept_art  = "x_min_art"                  
+        x_rept_art  = "x_min_art"
     else:
         x_rept_host = "x_max_host"
         x_rept_art  = "x_max_art"
-                  
+
     lines.append('outconf.extract.artifact_report = "%s"' %
                  profile_name_map[x_rept_art])
     lines.append('outconf.extract.host_report     = "%s"' %
                  profile_name_map[x_rept_host])
-                  
+
     if not is_true(d, "xrpt_env"):
         lines.append(profile_set(x_rept_host, '_OP_CHALKER_COMMIT_ID', 'false'))
         lines.append(profile_set(x_rept_host, '_OP_CHALKER_VERSION', 'false'))
@@ -569,13 +574,13 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         lines.append(profile_set(x_rept_art, '_OP_NODENAME', 'false'))
     if is_true(d, "xrpt_containers"):
         pass # not implemented yet.
-              
+
     # Turn on sbom / sast if need be.
     if enable_sast:
         lines.append('run_sast_tools = true')
     if enable_sbom:
         lines.append('run_sbom_tools = true')
-    
+
     return "\n".join(lines)
 
 def config_to_json():
@@ -607,7 +612,6 @@ def dict_to_id(d):
         else:
             value = str(d[item])
         to_hash += item + ":" + value + "\n"
-    print(to_hash)
     return hashlib.sha256(to_hash.encode("utf-8")).hexdigest()[:32]
 
 def json_to_dict(s):
@@ -645,7 +649,7 @@ def json_to_dict(s):
 def load_from_json(json_blob):
     configset = json_to_dict(json_blob)
     for k in configset:
-        widget = app.query_one("#" + k)
+        widget = app.query_one(k)
         widget.value = configset[k]
         # The above all sets values; this enables or disables panes
         # based on the variables that control whether or not they are
@@ -657,46 +661,22 @@ def load_from_json(json_blob):
             elif pane.disabled == False and widget.value == False:
                 pane.disabled = True
 
-sqlite_inited = False
-
 def sqlite_init():
-    global db, cursor, sqlite_inited
-    if sqlite_inited:
-        return
-    sqlite_inited = True
+    global db, cursor, sqlite_inited, create
     base = os.path.expanduser('~')
     dir  = os.path.join(base, Path(".config") / Path("chalk"))
     os.makedirs(dir, exist_ok=True)
     fullpath = os.path.join(dir, "chalk-config.db")
     db = sqlite3.connect(fullpath)
     cursor = db.cursor()
-    create = False
+
     try:
-        r = cursor.execute("SELECT name FROM sqlite_master where name='configs'").fetchone()
-        if r == None:
-            create = True
-    except:
-        create = True
-    if create:
-        default_config = config_to_json()
-        as_dict        = json_to_dict(default_config)
-        internal_id    = dict_to_id(as_dict)
-        timestamp      = datetime.datetime.now().ctime()
         cursor.execute("CREATE TABLE configs(name, date, chalk_version, id, " +
-                       "json)")
-        row = ['default', timestamp, chalk_version,
-               internal_id, default_config]
-        cursor.execute("INSERT INTO configs VALUES(?, ?, ?, ?, ?)", row)
-        db.commit()
-        
-def test_stuff():
-    json = config_to_json()
-    print(json)
-    d = json_to_dict(json)
-    f = open('chalk.conf', 'w')
-    f.write(dict_to_con4m(d))
-    f.close()
-    quit()
+                        "json)")
+    except:
+        pass # Already created.
+
+sqlite_init()
 
 class ConfigName(Label):
     pass
@@ -708,7 +688,12 @@ class ConfigVersion(Label):
     pass
 
 class ConfigEdit(Button):
-    pass
+    def on_button_pressed(self):
+        iid  = self.id[2:]
+        r = cursor.execute("SELECT json FROM configs WHERE id='" + iid + "'")
+        json = r.fetchone()[0]
+        app.push_screen('confwiz')
+        load_from_json(json)
 
 class ConfigDelete(Button):
     pass
@@ -719,9 +704,12 @@ class ConfigExport(Button):
 class ConfigHdr(Horizontal):
     pass
 
+table_row_num = 0
 class ConfigRow(Horizontal):
     def __init__(self, name, date, iid, version, json):
-        Horizontal.__init__(self, id="confrow_" + name)
+        global table_row_num
+        Horizontal.__init__(self, id="confrow_" + iid + str(table_row_num))
+        table_row_num += 1
         self.iid = iid
         self.name_label = name
         self.date_label = date
@@ -738,17 +726,32 @@ class ConfigRow(Horizontal):
         yield ConfigDelete(label="Delete", id = "d_" + self.iid)
         yield ConfigExport(label="Export", id="x_" + self.iid)
 
+
 class ConfigTable(Container):
     def compose(self):
-        yield ConfigHdr(ConfigName("Configuration Name"),
-                        ConfigDate("Date Created"),
-                        ConfigVersion("Chalk Version"))
-
-        sqlite_init()
-        rows = cursor.execute("SELECT * FROM configs").fetchall()
-        for row in rows:
-            yield ConfigRow(row[0], row[1], row[2], row[3], row[4])
-        
+        t = DataTable(id="the_table")
+        t.cursor_type = "row"
+        yield t
+        yield Horizontal(RunWizardButton(id="wizbutt",
+                                         label="New Configuration"),
+                         classes="padme")
+    def on_mount(self):
+        global the_table
+        cols = ("Configuration Name", "Date Created", "Chalk Version")
+        tbl = self.query_one(DataTable)
+        tbl.add_columns(*cols)
+        the_table = tbl
+        r = cursor.execute("SELECT * FROM configs").fetchall()
+        rows = []
+        for row in r:
+            r = [row[0], row[1][0:11] + row[1][-4:], row[2]]
+            #r.append(ConfigEdit(label="Edit", id="e_" + row[3]))
+            #r.append(ConfigDelete(label="Delete", id="d_" + row[3]))
+            #r.append(ConfigExport(label="Export", id="x_" + row[3]))
+            try:
+                tbl.add_row(*r, key=row[3])
+            except:
+                pass
 
 class ReportingContainer(Container):
     pass
@@ -769,7 +772,7 @@ class NavButton(Button):
 
 class RunWizardButton(Button):
     def on_button_pressed(self):
-        push_screen('confwiz')
+        app.push_screen('confwiz')
 
 class WizContainer(Container):
     def entered(self):
@@ -793,10 +796,10 @@ class BuildBinary(WizContainer):
         self.has_entered = False
         yield Static("""Do you want a release build?""")
         yield RadioSet(RadioButton("Yes", True, id="release_build"),
-                       RadioButton("No, give me a debug build", id="debug_build"))        
+                       RadioButton("No, give me a debug build", id="debug_build"))
         yield Horizontal(Input(placeholder="exe name", id = "exe_name",
                                value=text_defaults["exe_name"]),
-                         Label("File to output", classes="label"))
+                         Label("Binary name (will output here)", classes="label"))
         yield Horizontal(Input(placeholder="configuration name",
                                id = "conf_name",
                                value = text_defaults["conf_name"]),
@@ -804,7 +807,7 @@ class BuildBinary(WizContainer):
                                classes="label"))
         yield Horizontal(Switch(value = True, id="overwrite_config"),
                          Label("Overwrite any config with the same name", classes="label"))
-        
+
 
 class ChalkOpts(WizContainer):
     def compose(self):
@@ -833,7 +836,7 @@ Note that things listed as 'coming soon' can be configured manually, but are not
                      id="chalk_sast"),
             Checkbox("SBOM -- a 'Software Bill Of Materials'.  " +
                      "This can get large", id="chalk_sbom"),
-            Checkbox("Actually, don't put them in the artifact, " + 
+            Checkbox("Actually, don't put them in the artifact, " +
                      "write to a file", id="chalk_virtual")
         )
 
@@ -858,12 +861,12 @@ We also can automatically label containers as we chalk them. You can configure y
             Checkbox("Label the commit ID found at build", value=True, id="label_commit"),
             Checkbox("Label the branch found at build", value=True, id="label_branch")
         )
-        
+
 class ReportingOptsChalkTime(WizContainer):
     def compose(self):
         self.has_entered = False
         yield MDown("""
-In the report we generate after a chalk mark is written, what kind of information do you want?  
+In the report we generate after a chalk mark is written, what kind of information do you want?
 
 Note that things listed as 'coming soon' can be configured manually, but are not yet in this user interface.
 """)
@@ -872,10 +875,10 @@ Note that things listed as 'coming soon' can be configured manually, but are not
         yield ReportingContainer(
             Checkbox("Info on any significant errors found during chalking", id="crpt_errs"),
             Checkbox("Info about embedded executable content (e.g., scripts in Zip files)", id="crpt_embed"),
-            Checkbox("Information about the build host", id="crpt_host"),            
+            Checkbox("Information about the build host", id="crpt_host"),
             EnablingCheckbox("redaction", "Build-time environment vars (redaction options on next screen if selected) -- coming soon", disabled=True, id="crpt_env"),
             EnablingCheckbox("sig", "A digitial signature -- coming soon", disabled=True, id="crpt_sig"),
-            
+
             Checkbox("Semgrep scan results -- Can impact build speeds", id="crpt_sast", value=True),
             Checkbox("SBOM -- a 'Software Bill Of Materials'. Significant build speed impact is typical.", id="crpt_sbom", value=True)
         )
@@ -922,7 +925,7 @@ class CustomEnv(WizContainer):
     # CHALK_POST_URL, CHALK_POST_HEADERS
     # AWS_S3_BUCKET_URI, AWS_ACCESS_SECRET, AWS_ACCESS_ID
     # CHALK_LOG
-    
+
     def compose(self):
         self.has_entered = False
         yield Container(
@@ -970,7 +973,7 @@ class HttpParams(WizContainer):
                          Input(id = "https_header")
             )
 
-class S3Params(WizContainer):        
+class S3Params(WizContainer):
     def compose(self):
         self.has_entered  = False
         yield Static("Enter values for S3 parameters")
@@ -1017,7 +1020,7 @@ class WizardStep:
         return self.widget.entered()
     def complete(self):
         return self.widget.complete()
-    
+
 class WizardSection:
     def __init__(self, name):
         self.name       = name
@@ -1063,7 +1066,7 @@ class EnablingCheckbox(Checkbox):
     def __init__(self, target, title, value=False, disabled=False, id=None):
         Checkbox.__init__(self, title, value, disabled=disabled, id=id)
         self.refd_id = "#" + target
-       
+
     def on_checkbox_changed(self, event: Checkbox.Changed):
         app.query_one(self.refd_id).toggle()
 
@@ -1071,7 +1074,7 @@ class EnvToggle(Switch):
     def on_click(self):
         envpane = app.query_one("#envconf")
         envpane.disabled = not envpane.disabled
-        
+
 class ReportingPane(WizContainer):
     def compose(self):
         self.has_entered = False
@@ -1094,7 +1097,7 @@ class ReportingPane(WizContainer):
                                    Label(REPORTING_ENV2_LABEL, classes="label")))
     def complete(self):
         return self.has_entered
-    
+
 class WizardSidebar(Container):  pass
 class Body(ScrollableContainer): pass
 
@@ -1106,6 +1109,7 @@ class WizSidebarButton(Button):
     def on_click(self):
         self.wiz.action_section(self.label)
 
+
 class UsagePane(Container):
     def entered(self):
         self.has_entered = True
@@ -1116,11 +1120,12 @@ class UsagePane(Container):
                        RadioButton(BASICS_PANE_DOCKER, id="use_docker"),
                        RadioButton(BASICS_PANE_OTHER, id="use_cicd"),
                        RadioButton("In production, as a chalk mark scanner",
-                                   id="use_extract")
-                       )
+                                   id="use_extract"))
         yield Container(Label("""What platform are we configuring the binary for?"""),
                         RadioSet(RadioButton("Linux (x86 family only)", True, id="lx86"),
-                                 RadioButton("OS X (M1 family only)", id="m1")))
+                                 RadioButton("OS X (M1 family)", id="m1"),
+                                 RadioButton("OS X (x86)", id="macosx86")))
+
 
     def complete(self):
         try:
@@ -1130,21 +1135,21 @@ class UsagePane(Container):
             return False
     def doc(self):
         return """# Usage
-    
+
 Here's some more help for you.
 """
-    
+
 class Nav(Horizontal):
     pass
 
-sectionIntro      = WizardSection("Intro")    
+#sectionIntro      = WizardSection("Intro")
 sectionBasics     = WizardSection("Basics")
 sectionOutputConf = WizardSection("Output Config")
 sectionChalking   = WizardSection("Chalking")
 sectionReporting  = WizardSection("Reporting")
 sectionBinGen     = WizardSection("Finish")
 
-sectionIntro.add_step("intro", WelcomePane(INTRO_TEXT))
+#sectionIntro.add_step("intro", WelcomePane(INTRO_TEXT))
 sectionBasics.add_step("basics", UsagePane())
 sectionOutputConf.add_step("reporting", ReportingPane())
 sectionOutputConf.add_step("envconf", CustomEnv(disabled=True))
@@ -1159,34 +1164,37 @@ sectionReporting.add_step("reporting_base", ReportingOptsChalkTime())
 sectionReporting.add_step("reporting_docker", ReportingOptsDocker())
 sectionReporting.add_step("reporting_extract", ReportingExtraction())
 
-                     
+
 sectionBinGen.add_step("final", BuildBinary())
 
 sidebar_buttons = []
 
-class ConfPicker(Screen):
-    TITLE    = CHALK_TITLE
-    BINDINGS = [
-        Binding(key="q", action="pop_screen()", description="back"),
-        Binding(key="up", action="<scroll-up>", show=False),
-        Binding(key="down", action="<scroll-down>", show=False),
-        ]
-    def compose(self):
-        yield Header(show_clock=True)
-        yield ConfigTable()
-        yield RunWizardButton()
-        yield Footer()
+def finish_up():
+    config      = config_to_json()
+    as_dict     = json_to_dict(config)
+    internal_id = dict_to_id(as_dict)
+    timestamp   = datetime.datetime.now().ctime()
+    confname    = app.query_one("#conf_name").value
+    slam        = app.query_one("#overwrite_config").value
+    debug       = app.query_one("#debug_build").value
+    exe         = app.query_one("#exe_name").value
 
+    row = [confname, timestamp, chalk_version, internal_id, config]
+    cursor.execute("INSERT INTO configs VALUES(?, ?, ?, ?, ?)", row)
+    db.commit()
+    date = timestamp[0:11] + timestamp[-4:]
+    the_table.add_row(confname, date, chalk_version,
+                                           key=internal_id)
 
 class Wizard(Container):
-    def __init__(self, end_callback="pop_screen()"):
+    def __init__(self, end_callback=finish_up):
         super().__init__()
         self.end_callback = end_callback
         self.sections = []
         self.by_name = {}
         self.section_index = 0
         self.sidebar_contents = []
-        
+
     def add_section(self, s: WizardSection):
         self.sections.append(s)
         self.by_name[s.name] = s
@@ -1199,14 +1207,15 @@ class Wizard(Container):
         for section in self.sections:
             for step in section.step_order:
                 self.panels.append(step.widget)
-        return ContentSwitcher(*self.panels, initial=self.panels[0].id)
-    
+        return ContentSwitcher(*self.panels, initial=self.panels[0].id,
+                               classes="wizpanel")
+
     def _load_sections(self):
         self.load_sections()
         for i in range(len(self.sections)):
             self.by_name[self.sections[i].name] = i
         self.update_menu()
-        
+
     def compose(self):
         global helpwin
         self._load_sections()
@@ -1215,7 +1224,7 @@ class Wizard(Container):
         self.first_panel   = self.current_panel
         helpwin = HelpWindow(id="helpwin", name="Help Window",
                              classes="-hidden",
-                             markdown=self.first_panel.doc())        
+                             markdown=self.first_panel.doc())
         helpwin.wiz = self
         yield helpwin
         yield WizardSidebar(*self.sidebar_contents)
@@ -1223,7 +1232,7 @@ class Wizard(Container):
         self.help_button = NavButton("Help", self)
         self.prev_button = NavButton("Back", self, disabled = True)
         buttons = Nav(self.prev_button, self.next_button, self.help_button)
-        helpwin.update(self.first_panel.doc()) 
+        helpwin.update(self.first_panel.doc())
         body   = Body(self.switcher)
         yield body
         yield buttons
@@ -1234,7 +1243,7 @@ class Wizard(Container):
       new_panel.entered()
       helpwin.update(new_panel.doc())
       self.update_menu()
-      
+
     def action_section(self, label):
         self.section_index = self.by_name[str(label)]
         step = self.sections[self.section_index].start_section()
@@ -1267,7 +1276,7 @@ class Wizard(Container):
             else:
                 disable = True
             sidebar_buttons[i].disabled = disable
-    
+
     def action_label(self, id):
         if id == "Help":
             self.action_help()
@@ -1277,13 +1286,16 @@ class Wizard(Container):
             return self.action_prev()
 
     def action_next(self):
-        sqlite_init()
         new_step = self.sections[self.section_index].advance()
         if not new_step:
             self.section_index += 1
             if self.section_index == len(self.sections):
+                self.section_index = 0
+                self.set_panel(self.first_panel)
                 self.end_callback()
-            self.action_section(str(self.sections[self.section_index].name))
+                app.pop_screen()
+            else:
+                self.action_section(str(self.sections[self.section_index].name))
         else:
             self.set_panel(new_step.widget)
 
@@ -1304,15 +1316,15 @@ class Wizard(Container):
         else:
             self.set_panel(new_step.widget)
 
-class ConfWiz(Wiz):
-    def load_sections():
-        self.add_section(sectionIntro)
+class ConfWiz(Wizard):
+    def load_sections(self):
+        #self.add_section(sectionIntro)
         self.add_section(sectionBasics)
         self.add_section(sectionOutputConf)
         self.add_section(sectionChalking)
         self.add_section(sectionReporting)
         self.add_section(sectionBinGen)
-            
+
 class ConfWizScreen(Screen):
     CSS_PATH = "wizard.css"
     TITLE    = CHALK_TITLE
@@ -1325,162 +1337,45 @@ class ConfWizScreen(Screen):
         Binding(key="down", action="<scroll-down>", show=False),
         Binding(key="h", action="app.toggle_class('HelpWindow', '-hidden')",
                 description="Toggle Help"),
+        Binding(key="ctrl+q", action="quit", description="Quit")
+    ]
     def compose(self):
+        self.wiz = ConfWiz()
         yield Header(show_clock=True)
-        yield ConfWiz()
+        yield self.wiz
         yield Footer()
-
-
-
-class OldWizard(App):
-    CSS_PATH = "wizard.css"
-    TITLE    = CHALK_TITLE
-    SCREENS  = {'picker' : ConfPicker() }
-    BINDINGS = [
-        Binding(key="q", action="quit", description=KEYPRESS_QUIT),
-        Binding(key="left", action="prev()", description="Previous Screen"),
-        Binding(key="right", action="next()", description="Next Screen"),
-        Binding(key="space", action="next()", show=False),
-        Binding(key="up", action="<scroll-up>", show=False),
-        Binding(key="down", action="<scroll-down>", show=False),
-        Binding(key="h", action="app.toggle_class('HelpWindow', '-hidden')",
-                description="Toggle Help"),
-        Binding(key="t", action="push_screen('picker')", show='...')
-    ]        
-
-    def __init__(self, end_callback):
-        super().__init__()
-        self.end_callback = end_callback
-        
-    def add_section(self, s: WizardSection):
-        self.sections.append(s)
-        self.by_name[s.name] = s
-        button = WizSidebarButton(s.name, self)
-        sidebar_buttons.append(button)
-        self.sidebar_contents.append(button)
-
-    def build_panels(self):
-        self.panels = []
-        for section in self.sections:
-            for step in section.step_order:
-                self.panels.append(step.widget)
-        return ContentSwitcher(*self.panels, initial=self.panels[0].id)
-    def load_sections(self):
-        self.sections = []
-        self.by_name = {}
-        self.section_index = 0
-        self.sidebar_contents = []
-        self.add_section(sectionIntro)
-        self.add_section(sectionBasics)
-        self.add_section(sectionOutputConf)
-        self.add_section(sectionChalking)
-        self.add_section(sectionReporting)
-        self.add_section(sectionBinGen)
-        for i in range(len(self.sections)):
-            self.by_name[self.sections[i].name] = i
-        self.update_menu()
-        
-    def compose(self):
-        global helpwin
-        self.load_sections()
-        self.switcher = self.build_panels()
-        self.current_panel = self.panels[0]
-        self.first_panel   = self.current_panel
-        helpwin = HelpWindow(id="helpwin", name="Help Window",
-                             classes="-hidden",
-                             markdown=self.first_panel.doc())        
-        helpwin.wiz = self
-        yield helpwin
-        yield WizardSidebar(*self.sidebar_contents)
-        self.next_button = NavButton("Next", self)
-        self.help_button = NavButton("Help", self)
-        self.prev_button = NavButton("Back", self, disabled = True)
-        buttons = Nav(self.prev_button, self.next_button, self.help_button)
-        helpwin.update(self.first_panel.doc()) 
-        body   = Body(self.switcher)
-        yield Header(show_clock=True)
-        yield body
-        yield buttons
-        yield Footer()
-
-    def set_panel(self, new_panel):
-      self.current_panel = new_panel
-      self.switcher.current = new_panel.id
-      new_panel.entered()
-      helpwin.update(new_panel.doc())
-      self.update_menu()
-      
-    def action_section(self, label):
-        self.section_index = self.by_name[str(label)]
-        step = self.sections[self.section_index].start_section()
-        self.set_panel(step.widget)
-
-    def action_section_end(self, label):
-        self.section_index = self.by_name[str(label)]
-        step = self.sections[self.section_index].goto_section_end()
-        self.set_panel(step.widget)
-
-    def update_menu(self):
-        try:
-            self.current_panel
-        except:
-            self.current_panel = None
-            self.first_panel   = None
-
-        if self.current_panel and not self.current_panel.complete():
-            self.next_button.disabled = True
-        elif self.current_panel:
-            self.next_button.disabled = False
-        if self.current_panel:
-            if self.current_panel == self.first_panel:
-                self.prev_button.disabled = True
-            else:
-                self.prev_button.disabled = False
-        for i in range(len(sidebar_buttons)):
-            if self.section_index >= i:
-                disable = False
-            else:
-                disable = True
-            sidebar_buttons[i].disabled = disable
-    
-    def action_label(self, id):
-        if id == "Help":
-            self.action_help()
-        elif id == "Next":
-            return self.action_next()
-        else:
-            return self.action_prev()
 
     def action_next(self):
-        sqlite_init()
-        new_step = self.sections[self.section_index].advance()
-        if not new_step:
-            self.section_index += 1
-            if self.section_index == len(self.sections):
-                self.end_callback()
-            self.action_section(str(self.sections[self.section_index].name))
-        else:
-            self.set_panel(new_step.widget)
-
-    def action_help(self):
-        if helpwin.has_class("-hidden"):
-            helpwin.remove_class("-hidden")
-        else:
-            helpwin.add_class("-hidden")
+        self.wiz.action_next()
 
     def action_prev(self):
-        if self.current_panel == self.first_panel:
-            return
-        new_step = self.sections[self.section_index].backwards()
-        if not new_step:
-            self.section_index -= 1
-            name = str(self.sections[self.section_index].name)
-            self.action_section_end(name)
-        else:
-            self.set_panel(new_step.widget)
+        self.wiz.action_prev()
+
+wizard = ConfWizScreen()
+
+class NewApp(App):
+    CSS_PATH = "wizard.css"
+    TITLE    = CHALK_TITLE
+    SCREENS  = {'confwiz' : wizard }
+    BINDINGS = [
+        Binding(key="q", action="quit()", description="Quit"),
+        Binding(key="up", action="<scroll-up>", show=False),
+        Binding(key="down", action="<scroll-down>", show=False),
+        ]
+
+    def compose(self):
+        global tablehack
+        global switcher
+        yield Header(show_clock=True)
+        yield MDown(INTRO_TEXT)
+        table    = ConfigTable(id="table0")
+        tablehack = table
+        switcher = ContentSwitcher(table, id="tbl_shell", initial="table0", classes="picker")
+        yield switcher
+        yield Footer()
 
 if __name__ == "__main__":
     cached_stdout_fd = sys.stdout
-    app = Wizard(end_callback=test_stuff)
+    app = NewApp()
     app.run()
-   
+

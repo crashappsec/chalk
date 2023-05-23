@@ -143,7 +143,7 @@ method getChalkInfo*(self: CodecDocker, chalk: ChalkObj): ChalkDict =
   result["DOCKERFILE_PATH"] = pack(cache.dockerFilePath) #TODO
   result["DOCKER_FILE"]     = pack(cache.dockerFileContents)
   result["DOCKER_CONTEXT"]  = pack(cache.context)
-  result["ARTIFACT_TYPE"]   = artTypeDocker  
+  result["ARTIFACT_TYPE"]   = artTypeDocker
 
   if cache.platform != "":
     result["DOCKER_PLATFORM"] = pack(cache.platform)
@@ -159,7 +159,7 @@ method getPostChalkInfo*(self:  CodecDocker,
   let hash  = cache.inspectOut["Id"].getStr().split(":")[1].toLowerAscii()
 
   chalk.cachedHash            = hash
-  result["_OP_ARTIFACT_TYPE"] = artTypeDocker  
+  result["_OP_ARTIFACT_TYPE"] = artTypeDocker
 
 proc extractDockerInfo*(chalk:          ChalkObj,
                         flags:          OrderedTable[string, FlagSpec],
@@ -688,7 +688,7 @@ proc processPushInfo*(arr: seq[JSonNode], arg: string) =
         digests.add(item.getStr().split(":")[^1])
       if len(digests) != 0:
         chalk.collectedData["_REPO_DIGESTS"] = pack(digests)
-      
+
 #% INTERNAL
 # This stuff needs to get done somewhere...
 #

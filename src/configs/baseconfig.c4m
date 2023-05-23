@@ -1384,7 +1384,7 @@ By default, CHALK_RAND is on for unique builds. If you want reproducable builds,
   key.ARTIFACT_PATH.report            = true
   key.ARTIFACT_TYPE.report            = true
   key.INSERTION_HOSTINFO.report       = true
-  key.INSERTION_NODENAME.report       = true  
+  key.INSERTION_NODENAME.report       = true
   key.ORIGIN_URI.report               = true
   key.ARTIFACT_VERSION.report         = true
   key.STORE_URI.report                = true
@@ -1450,7 +1450,7 @@ per-artifact report but disable on a per-host basis.
   key.CHALK_ID.report                 = true
   key.TIMESTAMP.report                = true
   key.ARTIFACT_PATH.report            = true
-  key.ARTIFACT_TYPE.report            = true  
+  key.ARTIFACT_TYPE.report            = true
   key.ORIGIN_URI.report               = true
   key.ARTIFACT_VERSION.report         = true
   key.STORE_URI.report                = true
@@ -1547,7 +1547,7 @@ Host keys are in the host_report_other_base (i.e., non-insert) profile.
   key.INSERTION_HOSTINFO.report       = true
   key.INSERTION_NODENAME.report       = true
   key.ARTIFACT_PATH.report            = true
-  key.ARTIFACT_TYPE.report            = true  
+  key.ARTIFACT_TYPE.report            = true
   key.HASH.report                     = true
   key.HASH_FILES.report               = true
   key.COMPONENT_HASHES.report         = true
@@ -1586,7 +1586,7 @@ Host keys are in the host_report_other_base (i.e., non-insert) profile.
   key.SIGN_PARAMS.report              = true
   key.SIGNATURE.report                = true
   key._OP_ARTIFACT_PATH.report        = true
-  key._OP_ARTIFACT_TYPE.report        = true  
+  key._OP_ARTIFACT_TYPE.report        = true
   key._CURRENT_HASH.report            = true
   key._VALIDATED.report               = true
   key._OP_CHALKED_KEYS.report         = false
@@ -1602,7 +1602,7 @@ info.
   key.CHALK_ID.report                 = true
   key.METADATA_ID.report              = true
   key._OP_ARTIFACT_PATH.report        = true
-  key._OP_ARTIFACT_TYPE.report        = true  
+  key._OP_ARTIFACT_TYPE.report        = true
   key._CURRENT_HASH.report            = true
   key._VALIDATED.report               = true
   key._CURRENT_HASH.report            = true
@@ -1620,7 +1620,7 @@ Note that _CURRENT_HASH will be empty when deleting, since that key represents t
   key.METADATA_HASH.report            = true
   key.METADATA_ID.report              = true
   key._OP_ARTIFACT_PATH.report        = true
-  key._OP_ARTIFACT_TYPE.report        = true  
+  key._OP_ARTIFACT_TYPE.report        = true
   key._VALIDATED.report               = true
   key.SBOM.report                     = true
   key.SAST.report                     = true

@@ -148,7 +148,7 @@ sink_config my_rotating_config {
     sink:     "rotating_log"
     filename: env("CHALK_ROTATING_LOG")
 }
- 
+
 if env_exists("CHALK_POST_URL") {
   subscribe("report", "my_https_config")
   configured_sink := true

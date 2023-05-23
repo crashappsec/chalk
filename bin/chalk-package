@@ -30,4 +30,3 @@ scp triforce:$remotedir/chalk-release-amd64  $releasedir/chalk-${VERSION}-releas
 scp triforce:$remotedir/chalk-debug-blackstone $releasedir/chalk-${VERSION}-debug-blackstone
 scp triforce:$remotedir/chalk-release-blackstone $releasedir/chalk-${VERSION}-release-blackstone
 #ssh triforce rm $remotedir/chalk-debug-amd64 $remotedir/chalk-release-amd64 $remotedir/chalk-debug-blackstone $remotedir/chalk-release-blackstone
-

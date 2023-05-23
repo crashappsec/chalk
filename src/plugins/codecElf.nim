@@ -98,9 +98,9 @@ method getChalkInfo*(self: CodecElf, chalk: ChalkObj): ChalkDict =
 method getPostChalkInfo*(self:  CodecElf,
                          chalk: ChalkObj,
                          ins:   bool): ChalkDict =
-  result                      = ChalkDict()       
+  result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypeElf
-  
+
 method getNativeObjPlatforms*(s: CodecElf): seq[string] = @["linux"]
 
 registerPlugin("elf", CodecElf())

@@ -208,7 +208,7 @@ proc doReporting(topic="report") =
 
 proc runCmdExtract*(path: seq[string]) =
   initCollection()
-  
+
   var numExtracts = 0
   for item in artifacts(path):
     numExtracts += 1

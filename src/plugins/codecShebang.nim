@@ -71,7 +71,7 @@ method getChalkInfo*(self: CodecShebang, chalk: ChalkObj): ChalkDict =
 method getPostChalkInfo*(self:  CodecShebang,
                          chalk: ChalkObj,
                          ins:   bool): ChalkDict =
-  result                      = ChalkDict()       
+  result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypeShebang
 
 registerPlugin("shebang", CodecShebang())

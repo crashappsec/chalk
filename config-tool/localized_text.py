@@ -11,13 +11,16 @@ you will lose any unsaved information in all open applications.
 Error: 0E : 016F : BFF9B3D4
 """
 
-INTRO_TEXT    = """# Welcome to the **Chalk** configuration tool!
+INTRO_TEXT    = """
+# Chalk Configuration Tool (alpha 1)
+## Welcome to the **Chalk** configuration tool!
 
-Chalk is like GPS for your software. 
+Chalk is like GPS for your software.
 
 In CI/CD, Chalk captures data about software, marking executables and containers. Then, wherever you see an artifact, you can extract the mark, so that you can easily look up the info you have, add new info, etc.
 
-This wizard allows you to configure the most common functionality.  If you need more customization, please refer to the documentation for manual configurations.
+This wizard currently allows you to setup and manage chalk configurations via Wizard.  The wizard covers the most common functionality, but if you want more customization, you can manually create a configuration.  See the documentation.
+
 """
 
 BEGIN_LABEL = "Begin!"

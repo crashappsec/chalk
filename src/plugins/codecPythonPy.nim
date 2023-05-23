@@ -113,7 +113,7 @@ method getChalkInfo*(self: CodecPythonPy, chalk: ChalkObj): ChalkDict =
 method getPostChalkInfo*(self:  CodecPythonPy,
                          chalk: ChalkObj,
                          ins:   bool): ChalkDict =
-  result                      = ChalkDict()       
+  result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypePy
-  
+
 registerPlugin("python_py", CodecPythonPy())
