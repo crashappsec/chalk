@@ -973,6 +973,24 @@ keyspec $CHALK_CONFIG {
                       "and will be ignored outsde of dump / load cmds"
 }
 
+#% INTERNAL
+keyspec $ELF_VALUES {
+    kind:             Chalk
+    type:             list[tuple[int, int, int]]
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 750
+}
+
+keyspec $ELF_INSERTIONS {
+    kind:             Chalk
+    type:             list[tuple[int, int]]
+    standard:         true
+    since:            "0.1.0"
+    normalized_order: high() - 700    
+}
+#% END
+
 keyspec _OP_CLOUD_METADATA {
     kind:             HostOnly
     type:             string
