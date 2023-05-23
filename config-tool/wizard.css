@@ -152,7 +152,6 @@ HelpWindow.-hidden {
 }
 
 ConfigName {
-    width: 18;
     margin: 0 2;
 }
 
@@ -166,34 +165,14 @@ ConfigVersion {
     margin: 0 2;
 }
 
-ConfigEdit {
-    border: none;
-    content-align: left top;
-    width: 9;
-    max-width: 9;
-    color: $accent;
-}
-
-ConfigDelete {
-    border: none;
-    content-align: left top;
-    width: 9;
-    max-width: 9;
-    color: $accent;
-}
-
-ConfigExport {
-    border: none;
-    content-align: left top;
-    width: 9;
-    max-width: 9;
-    color: $accent;
-}
-
 ConfigHdr {
     color: $secondary;
     text-style: bold;
     background: $primary;
+}
+
+#the_table {
+    width: 100%;
 }
 
 .config_hdr {
@@ -201,6 +180,7 @@ ConfigHdr {
 }
 
 ConfigRow {
+    width: 100%;
     margin: 0 0;
     content-align: center top;
     align: center top;
@@ -213,6 +193,7 @@ ConfigTable {
     align: center top;
     overflow-y: scroll;
     height: auto;
+    width: 100%;
 }
 
 Footer {
@@ -224,4 +205,36 @@ Horizontal.padme {
     padding: 1 0;
     align: center middle;
     content-align: center middle;
+}
+
+ModalError {
+    align: center middle;
+}
+
+#errcol {
+    padding: 0 1;
+    width: 60;
+    height: 11;
+    border: thick $background 80%;
+    background: $surface;
+}
+
+#errmsg {
+    height: 1fr;
+    width: 1fr;
+    content-align: center middle;
+}
+
+#exportview {
+    width: 100%;
+    content-align: center middle;
+}
+
+#export_view {
+    width: 100%;
+}
+
+#errbutt {
+    width: 100%;
+    align: center middle;
 }

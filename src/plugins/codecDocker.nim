@@ -220,7 +220,7 @@ proc extractDockerInfo*(chalk:          ChalkObj,
     cache.context = possibility
 
     if "file" in flags:
-      cache.dockerFilePath = unpack[string](flags["file"].getValue())
+      cache.dockerFilePath = unpack[seq[string]](flags["file"].getValue())[0]
       if cache.dockerFilePath == "-":
         #NOTE: this is distinct from `docker build -`,
         # this for cases like `docker build -f - .`

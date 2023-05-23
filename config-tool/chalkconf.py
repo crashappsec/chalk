@@ -727,27 +727,70 @@ class ConfigRow(Horizontal):
         yield ConfigExport(label="Export", id="x_" + self.iid)
 
 
+class ModalError(Screen):
+    CSS_PATH = "wizard.css"
+    BINDINGS = [("q", "pop_screen()", "Back")]
+
+    def __init__(self, msg):
+        super().__init__()
+        self.msg = msg
+
+    def compose(self):
+        yield Vertical (
+            Label(self.msg, id="errmsg"),
+            Button("Back", id="errbutt"),
+            id="errcol"
+            )
+    def on_button_pressed(self):
+        self.app.pop_screen()
+
+class ExportViewer(Screen):
+    CSS_PATH = "wizard.css"
+    BINDINGS = [("q", "pop_screen()", "Back")]
+
+    def __init__(self, msg):
+        super().__init__()
+        self.msg = msg
+
+    def compose(self):
+        logwidget = TextLog(id="export_view")
+        logwidget.write(self.msg)
+        yield Vertical (
+            logwidget,
+            Button("Back", id="errbutt"),
+            id="exportviewer"
+            )
+    def on_button_pressed(self):
+        self.app.pop_screen()
+
+
 class ConfigTable(Container):
     def compose(self):
         t = DataTable(id="the_table")
         t.cursor_type = "row"
         yield t
         yield Horizontal(RunWizardButton(id="wizbutt",
-                                         label="New Configuration"),
-                         classes="padme")
+                                         label="New"),
+                         EditConfigButton(id="edbutt",
+                                          label="Edit"),
+                         DelConfigButton(id="debutt",
+                                         label="Delete"),
+                         ExConfigButton(id="exbutt",
+                                        label="Export"),
+                                 classes="padme")
+
     def on_mount(self):
-        global the_table
+        global the_table, row_ids
         cols = ("Configuration Name", "Date Created", "Chalk Version")
         tbl = self.query_one(DataTable)
         tbl.add_columns(*cols)
         the_table = tbl
         r = cursor.execute("SELECT * FROM configs").fetchall()
         rows = []
+        row_ids = []
         for row in r:
-            r = [row[0], row[1][0:11] + row[1][-4:], row[2]]
-            #r.append(ConfigEdit(label="Edit", id="e_" + row[3]))
-            #r.append(ConfigDelete(label="Delete", id="d_" + row[3]))
-            #r.append(ConfigExport(label="Export", id="x_" + row[3]))
+            r = [row[0], row[1], row[2]]
+            row_ids.append(row[3])
             try:
                 tbl.add_row(*r, key=row[3])
             except:
@@ -773,6 +816,24 @@ class NavButton(Button):
 class RunWizardButton(Button):
     def on_button_pressed(self):
         app.push_screen('confwiz')
+
+class EditConfigButton(Button):
+    def on_button_pressed(self):
+        pass
+
+class DelConfigButton(Button):
+    def on_button_pressed(self):
+        pass
+
+class ExConfigButton(Button):
+    def on_button_pressed(self):
+        cursor_row = the_table.cursor_row
+        msg = cursor.execute('SELECT json FROM configs where id="%s"' %
+                             row_ids[cursor_row]).fetchone()[0]
+        dict = json_to_dict(msg)
+        code = dict_to_con4m(dict)
+        app.push_screen(ExportViewer(code))
+
 
 class WizContainer(Container):
     def entered(self):
@@ -1170,6 +1231,8 @@ sectionBinGen.add_step("final", BuildBinary())
 sidebar_buttons = []
 
 def finish_up():
+    global the_table, row_ids
+
     config      = config_to_json()
     as_dict     = json_to_dict(config)
     internal_id = dict_to_id(as_dict)
@@ -1179,12 +1242,26 @@ def finish_up():
     debug       = app.query_one("#debug_build").value
     exe         = app.query_one("#exe_name").value
 
-    row = [confname, timestamp, chalk_version, internal_id, config]
-    cursor.execute("INSERT INTO configs VALUES(?, ?, ?, ?, ?)", row)
+    existing = cursor.execute('SELECT id FROM configs WHERE name="' +
+                              confname + '"').fetchone()
+    update = False
+    if existing != None:
+        if not slam:
+          return ("Configuration already exists. Please rename, or select " +
+                 "the option to replace the existing configuration.")
+        else:
+            update = True
+            query = 'UPDATE configs SET date=?, SET chalk_version=?, SET id=?, SET json=? WHERE name=?'
+            row = [timestamp, chalk_version, internal_id, config, confname]
+    else:
+        row = [confname, timestamp, chalk_version, internal_id, config]
+        query = "INSERT INTO configs VALUES(?, ?, ?, ?, ?)"
+    cursor.execute(query, row)
     db.commit()
     date = timestamp[0:11] + timestamp[-4:]
-    the_table.add_row(confname, date, chalk_version,
-                                           key=internal_id)
+    if not update:
+        the_table.add_row(confname, date, chalk_version, key=internal_id)
+        row_ids.append(internal_id)
 
 class Wizard(Container):
     def __init__(self, end_callback=finish_up):
@@ -1290,10 +1367,14 @@ class Wizard(Container):
         if not new_step:
             self.section_index += 1
             if self.section_index == len(self.sections):
-                self.section_index = 0
-                self.set_panel(self.first_panel)
-                self.end_callback()
-                app.pop_screen()
+                cb_results = self.end_callback()
+                if not cb_results:
+                    self.section_index = 0
+                    self.set_panel(self.first_panel)
+                    app.pop_screen()
+                else:
+                    self.section_index -= 1
+                    app.push_screen(ModalError(cb_results))
             else:
                 self.action_section(str(self.sections[self.section_index].name))
         else:
@@ -1378,4 +1459,3 @@ if __name__ == "__main__":
     cached_stdout_fd = sys.stdout
     app = NewApp()
     app.run()
-
