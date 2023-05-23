@@ -144,6 +144,7 @@ template doCustomReporting() =
     if profile.enabled:
       try:
         publish(topic, hostInfo.prepareContents(profile))
+        trace("Published to topic '" & topic & "'")
       except:
         error("Publishing to topic '" & topic & "' failed; an exception was " &
           "raised when trying to write to a sink. Please check your sink " &
@@ -204,6 +205,7 @@ proc doReporting(topic="report") =
     let report = doCommandReport()
     if report != "":
       publish(topic, report)
+      trace("Published to topic '" & topic & "'")
     doCustomReporting()
 
 proc runCmdExtract*(path: seq[string]) =
