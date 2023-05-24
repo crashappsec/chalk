@@ -13,11 +13,11 @@ from textual.widgets import *
 from textual.screen import *
 from localized_text import *
 from rich.markdown import *
-import subprocess, json
 from textual.widgets import Markdown as MDown
 from pathlib import *
-import sqlite3, os
-import datetime, hashlib
+import sqlite3, os, urllib, tempfile, datetime, hashlib, subprocess, json, stat
+
+current_binary_url = "file://" + os.getcwd() + "/bin/chalk"
 
 # This is a normalized list, for instance, for getting the ID of
 # a config.  Thus, the order matters, and it can't be a set;
@@ -25,7 +25,7 @@ import datetime, hashlib
 
 all_fields = [
     # Basics pane
-    "use_cmd", "use_docker", "use_cicd", "use_extract", "lx86", "m1", "macosx86",
+    "use_cmd", "use_docker", "use_cicd", "use_extract", #"lx86", "m1", "macosx86",
     # Main output config pane
     "report_co", "report_stdout", "report_stderr", "report_log", "report_http",
     "report_s3", "env_adds_report", "env_custom",
@@ -41,7 +41,7 @@ all_fields = [
     # Default Chalking behavior
     "chalk_minimal", "chalk_maximal", "chalk_ptr", "chalk_datetime",
     "chalk_embeds", "chalk_repo", "chalk_rand", "chalk_build_env",
-    "chalk_sig", "chalk_sast", "chalk_sbom", "chalk_virtual",
+    "chalk_sast", "chalk_sbom", "chalk_virtual", #"chalk_sig",
     # Docker Auto-labeling
     "label_cid", "label_mdid", "label_repo", "label_commit", "label_branch",
     "label_prefix",
@@ -54,19 +54,20 @@ all_fields = [
     # Extraction reporting
     "xrpt_env", "xrpt_containers", "xrpt_fullmark",
     # Final screen
-    "release_build", "debug_build", "exe_name", "conf_name", "overwrite_config"
+    "release_build", "debug_build", "exe_name", "conf_name", "overwrite_config",
+    "note"
 ]
 
 not_in_id = ["conf_name", "overwrite_config"]
 
 radio_set_dbg    = (["release_build", "debug_build"], 0)
 radio_set_minmax = (["chalk_minimal", "chalk_maximal"], 0)
-radio_set_crep   = (["crpt_minimal", "crpt_maximal"], 0)
+radio_set_crep   = (["crpt_minimal", "crpt_maximal" ], 1)
 radio_set_use    = (["use_cmd", "use_docker", "use_cicd", "use_extract"], 0)
-radio_set_arch   = (["lx86", "m1", "macosx86"], 0)
+#radio_set_arch   = (["lx86", "m1", "macosx86"], 0)
 
 all_radio_sets = [radio_set_dbg, radio_set_minmax, radio_set_crep,
-                  radio_set_use, radio_set_arch]
+                  radio_set_use] #, radio_set_arch
 
 pane_switch_map = {
     "report_log" : "#log_conf",
@@ -82,7 +83,7 @@ bool_defaults = {
     "chalk_repo"       : False,
     "chalk_rand"       : False,
     "chalk_build_env"  : False,
-    "chalk_sig"        : True,
+#    "chalk_sig"        : True,
     "chalk_sast"       : False,
     "chalk_sbom"       : False,
     "chalk_virtual"    : False,
@@ -135,13 +136,28 @@ text_defaults = {
     "https_header"  : "",
     "s3_uri"        : "",
     "s3_access_id"  : "",
-    "s3_secret"     : ""
+    "s3_secret"     : "",
+    "note"          : "Outputs to a logfile and stderr"
 }
 
-def is_true(d, k):
-    if not k in d: return false
-    return d[k] == True
 
+base_config = text_defaults | bool_defaults
+for s in all_radio_sets:
+    items, ix = s
+    base_config[items[ix]] = True
+
+
+default_configs = [
+    (base_config, "default")
+]
+
+
+default_config_json = json.dumps(base_config)
+json_txt = default_config_json
+
+def is_true(d, k):
+    if not k in d: return False
+    return d[k] == True
 
 profile_name_map = {
     "chalk_min"  : "chalking_ptr",
@@ -390,9 +406,9 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         if is_true(d, "chalk_build_env"):
             lines.append(profile_set('chalk_min', 'INSERTION_HOSTINFO', 'true'))
             lines.append(profile_set('chalk_min', 'INSERTION_NODENAME', 'true'))
-        if is_true(d, "chalk_sig"):
-            lines.append(profile_set('chalk_min', 'SIGNATURE', 'true'))
-            lines.append(profile_set('chalk_min', 'SIGN_PARAMS', 'true'))
+        #if is_true(d, "chalk_sig"):
+        #    lines.append(profile_set('chalk_min', 'SIGNATURE', 'true'))
+        #    lines.append(profile_set('chalk_min', 'SIGN_PARAMS', 'true'))
         if is_true(d, "chalk_sbom"):
             lines.append(profile_set('chalk_min', 'SBOM', 'true'))
             enable_sbom = True
@@ -417,9 +433,9 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         if is_true(d, "chalk_build_env"):
             lines.append(profile_set('chalk_max', 'INSERTION_HOSTINFO', 'false'))
             lines.append(profile_set('chalk_max', 'INSERTION_NODENAME', 'false'))
-        if is_true(d, "chalk_sig"):
-            lines.append(profile_set('chalk_max', 'SIGNATURE', 'false'))
-            lines.append(profile_set('chalk_max', 'SIGN_PARAMS', 'false'))
+        #if is_true(d, "chalk_sig"):
+        #    lines.append(profile_set('chalk_max', 'SIGNATURE', 'false'))
+        #    lines.append(profile_set('chalk_max', 'SIGN_PARAMS', 'false'))
         if is_true(d, "chalk_sbom"):
             lines.append(profile_set('chalk_max', 'SBOM', 'false'))
         else:
@@ -577,8 +593,10 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
 
     # Turn on sbom / sast if need be.
     if enable_sast:
+        lines.append('# Turn on running Semgrep')
         lines.append('run_sast_tools = true')
     if enable_sbom:
+        lines.append('# Turn on running SBOM tools')
         lines.append('run_sbom_tools = true')
 
     return "\n".join(lines)
@@ -648,12 +666,20 @@ def json_to_dict(s):
 
 def load_from_json(json_blob):
     configset = json_to_dict(json_blob)
-    for k in configset:
-        widget = app.query_one(k)
-        widget.value = configset[k]
-        # The above all sets values; this enables or disables panes
-        # based on the variables that control whether or not they are
-        # enabled.
+    for k in all_fields:
+        widget = app.query_one("#" + k)
+        if k in configset:
+            widget.value = configset[k]
+            # The above all sets values; this enables or disables panes
+            # based on the variables that control whether or not they are
+            # enabled.
+        else:
+            if k in text_defaults:
+                widget.value = ""
+            else:
+                if widget.value == True:
+                    widget.value = False
+
         if k in pane_switch_map:
             pane = app.query_one(pane_switch_map[k])
             if pane.disabled == True and widget.value == True:
@@ -672,11 +698,46 @@ def sqlite_init():
 
     try:
         cursor.execute("CREATE TABLE configs(name, date, chalk_version, id, " +
-                        "json)")
+                        "json, note)")
+        timestamp = datetime.datetime.now().ctime()
+        rows = []
+        for config in default_configs:
+            (d, name) = config
+            if "note" in d:
+                note = d["note"]
+            else:
+                note = ""
+            internal_id = dict_to_id(d)
+            jstr = json.dumps(d)
+            row = [name, timestamp, chalk_version, internal_id, jstr, note]
+            cursor.execute('INSERT INTO configs VALUES(?, ?, ?, ?, ?, ?)', row)
+        db.commit()
     except:
         pass # Already created.
 
 sqlite_init()
+
+
+class AckModal(ModalScreen):
+    CSS_PATH = "wizard.css"
+
+    def __init__(self, msg, pops=1):
+        super().__init__()
+        self.msg = msg
+        self.pops = pops
+
+    def compose(self):
+        yield Header(show_clock=True)
+        yield Vertical (
+            MDown(self.msg, id="modalmsg"),
+            Button("Okay", id="acked"),
+            )
+        yield Footer()
+
+    def on_button_pressed(self):
+        while self.pops:
+            self.app.pop_screen()
+            self.pops = self.pops - 1
 
 class ConfigName(Label):
     pass
@@ -687,14 +748,6 @@ class ConfigDate(Label):
 class ConfigVersion(Label):
     pass
 
-class ConfigEdit(Button):
-    def on_button_pressed(self):
-        iid  = self.id[2:]
-        r = cursor.execute("SELECT json FROM configs WHERE id='" + iid + "'")
-        json = r.fetchone()[0]
-        app.push_screen('confwiz')
-        load_from_json(json)
-
 class ConfigDelete(Button):
     pass
 
@@ -704,65 +757,108 @@ class ConfigExport(Button):
 class ConfigHdr(Horizontal):
     pass
 
-table_row_num = 0
-class ConfigRow(Horizontal):
-    def __init__(self, name, date, iid, version, json):
-        global table_row_num
-        Horizontal.__init__(self, id="confrow_" + iid + str(table_row_num))
-        table_row_num += 1
-        self.iid = iid
-        self.name_label = name
-        self.date_label = date
-        self.vers_label = version
-        self.json       = json
-
-    def compose(self):
-        yield ConfigName(self.name_label, classes="conflabel")
-        yield ConfigDate(self.date_label, classes="confdate")
-        yield ConfigVersion(self.vers_label, classes="confvers")
-        edit = ConfigEdit(label="Edit", id="e_" + self.iid)
-        edit.json = self.json
-        yield edit
-        yield ConfigDelete(label="Delete", id = "d_" + self.iid)
-        yield ConfigExport(label="Export", id="x_" + self.iid)
-
-
-class ModalError(Screen):
+class ModalError(ModalScreen):
     CSS_PATH = "wizard.css"
     BINDINGS = [("q", "pop_screen()", "Back")]
 
-    def __init__(self, msg):
+    def __init__(self, msg, wiz=None):
         super().__init__()
         self.msg = msg
+        self.wiz = wiz
 
     def compose(self):
+        yield Header(show_clock=True)
         yield Vertical (
             Label(self.msg, id="errmsg"),
             Button("Back", id="errbutt"),
             id="errcol"
             )
+        yield Footer()
     def on_button_pressed(self):
         self.app.pop_screen()
 
-class ExportViewer(Screen):
+class ModalDelete(ModalScreen):
     CSS_PATH = "wizard.css"
-    BINDINGS = [("q", "pop_screen()", "Back")]
+    BINDINGS = [("q", "pop_screen()", "Cancel"), ("d", "delete", "Delete")]
 
-    def __init__(self, msg):
+    def __init__(self, name, iid):
         super().__init__()
-        self.msg = msg
+        self.profilename = name
+        self.iid = iid
 
     def compose(self):
-        logwidget = TextLog(id="export_view")
-        logwidget.write(self.msg)
-        yield Vertical (
-            logwidget,
-            Button("Back", id="errbutt"),
-            id="exportviewer"
+        yield Header(show_clock=True)
+        yield Grid(
+            Label('Really delete profile "' + self.profilename + '"?',
+                  classes="model_q"),
+            Button("Yes", id="delete_confirm", classes="modal_button"),
+            Button("No", id="delete_nope",  classes="modal_button"),
+            id="del_modal",
+            classes = "modal_grid"
             )
-    def on_button_pressed(self):
+        yield Footer()
+    def on_button_pressed(self, event):
+        if event.button.id == "delete_confirm":
+            cursor.execute('DELETE FROM configs WHERE id="' + self.iid + '"')
+            db.commit()
+            the_table.remove_row(self.iid)
         self.app.pop_screen()
 
+class OutfileRow(Horizontal): pass
+
+class ExportMenu(Screen):
+    CSS_PATH = "wizard.css"
+    BINDINGS = [("q", "pop_screen()", "Cancel")]
+
+    def __init__(self, iid, name, jconf):
+        super().__init__()
+        self.iid = iid
+        self.confname = name
+        self.jconf = jconf
+
+    def compose(self):
+        yield Header(show_clock=True)
+        yield MDown("""
+# Export Configuration
+
+Export your configuration to share or back it up, if you like. Note
+that, for backups, you may consider copying the SQLite database, which lives in
+`~/.config/chalk/chalk-config.db`.
+
+JSON is only read and written by this configuration tool (though currently, we have not yet added a feature to directly import this).  **Con4m** is Chalk's native configuration file, and can do far more than this configuration tool does.  However, this tool cannot import Chalk.  Similarly, Chalk does not import this tool's JSON files.
+
+If you do not provide an extension below, we use the default (.json or .c4m depending on the type).
+""")
+        yield RadioSet(RadioButton("JSON",
+                                   True, id = "export_json"),
+                       RadioButton("Con4m", id = "export_con4m"))
+        yield OutfileRow(Input(placeholder= "Enter file name",
+                               id="conf_outfile", value = self.confname),
+                         Label("Output File Name", classes="label"))
+        yield Horizontal( Button("Export", id="export_go",
+                                 classes="basicbutton"),
+                          Button("Cancel", id="export_cancel",
+                                 classes="basicbutton"))
+        yield Footer()
+    def on_button_pressed(self, event):
+        if event.button.id == "export_go":
+            val_is_json = self.app.query_one("#export_json").value
+            if val_is_json:
+                to_out = self.jconf
+                ext    = ".json"
+            else:
+                to_out = dict_to_con4m(json_to_dict(self.jconf))
+                ext    = ".c4m"
+            fname = self.app.query_one("#conf_outfile").value
+            if not '.' in fname:
+                fname += ext
+            f = open(fname, 'w')
+            f.write(to_out)
+            f.close()
+            msg = "Configuration successfully saved to: " + fname
+            self.app.push_screen(AckModal(msg, pops=2))
+        else:
+            self.app.pop_screen()
 
 class ConfigTable(Container):
     def compose(self):
@@ -770,18 +866,19 @@ class ConfigTable(Container):
         t.cursor_type = "row"
         yield t
         yield Horizontal(RunWizardButton(id="wizbutt",
-                                         label="New"),
+                                         label="New Config"),
                          EditConfigButton(id="edbutt",
-                                          label="Edit"),
+                                          label="Edit",
+                                          classes="basicbutton"),
                          DelConfigButton(id="debutt",
-                                         label="Delete"),
+                                         label="Delete", classes="basicbutton"),
                          ExConfigButton(id="exbutt",
-                                        label="Export"),
+                                        label="Export", classes="basicbutton"),
                                  classes="padme")
 
     def on_mount(self):
         global the_table, row_ids
-        cols = ("Configuration Name", "Date Created", "Chalk Version")
+        cols = ("Configuration Name", "Date Created", "Chalk Version", "Note")
         tbl = self.query_one(DataTable)
         tbl.add_columns(*cols)
         the_table = tbl
@@ -789,7 +886,7 @@ class ConfigTable(Container):
         rows = []
         row_ids = []
         for row in r:
-            r = [row[0], row[1], row[2]]
+            r = [row[0], row[1], row[2], row[5]]
             row_ids.append(row[3])
             try:
                 tbl.add_row(*r, key=row[3])
@@ -815,24 +912,39 @@ class NavButton(Button):
 
 class RunWizardButton(Button):
     def on_button_pressed(self):
+        json_txt = default_config_json
         app.push_screen('confwiz')
 
 class EditConfigButton(Button):
     def on_button_pressed(self):
-        pass
+        global json_txt
+        cursor_row = the_table.cursor_row
+        r = cursor.execute("SELECT json FROM configs WHERE id=?",
+                           [row_ids[cursor_row]])
+        json_txt = r.fetchone()[0]
+        try:
+            # If we haven't actually gone into the wizard, then load_from_json
+            # will fail, because the Wiz screen won't have mounted.  So
+            # on_mount will check the json_txt global, and if it's not None,
+            # then it loads it for us.
+            load_from_json(json_txt)
+        except:
+            pass
+        app.push_screen('confwiz')
 
 class DelConfigButton(Button):
     def on_button_pressed(self):
-        pass
+        cursor_row = the_table.cursor_row
+        name = cursor.execute('SELECT name FROM configs where id="%s"' %
+                             row_ids[cursor_row]).fetchone()[0]
+        self.app.push_screen(ModalDelete(name=name, iid=row_ids[cursor_row]))
 
 class ExConfigButton(Button):
     def on_button_pressed(self):
         cursor_row = the_table.cursor_row
-        msg = cursor.execute('SELECT json FROM configs where id="%s"' %
-                             row_ids[cursor_row]).fetchone()[0]
-        dict = json_to_dict(msg)
-        code = dict_to_con4m(dict)
-        app.push_screen(ExportViewer(code))
+        items = cursor.execute('SELECT name, json FROM configs where id="%s"' %
+                             row_ids[cursor_row]).fetchone()
+        app.push_screen(ExportMenu(row_ids[cursor_row], items[0], items[1]))
 
 
 class WizContainer(Container):
@@ -855,28 +967,29 @@ Some content
 class BuildBinary(WizContainer):
     def compose(self):
         self.has_entered = False
-        yield Static("""Do you want a release build?""")
+        yield MDown("""# Output a Configured Binary
+Do you want a release build?""")
         yield RadioSet(RadioButton("Yes", True, id="release_build"),
                        RadioButton("No, give me a debug build", id="debug_build"))
-        yield Horizontal(Input(placeholder="exe name", id = "exe_name",
-                               value=text_defaults["exe_name"]),
+        yield Horizontal(Input(placeholder="exe name", id = "exe_name"),
                          Label("Binary name (will output here)", classes="label"))
         yield Horizontal(Input(placeholder="configuration name",
-                               id = "conf_name",
-                               value = text_defaults["conf_name"]),
-                         Label("Name this configuration to save it",
+                               id = "conf_name"),
+                         Label("Configuration Name (renaming doesn't delete the old config)",
                                classes="label"))
-        yield Horizontal(Switch(value = True, id="overwrite_config"),
-                         Label("Overwrite any config with the same name", classes="label"))
+        yield Horizontal(Switch(id="overwrite_config"),
+                         Label("Overwrite existing config (if any)",
+                               classes="label"))
+        yield MDown("### Build comment", id="note_label")
+        yield Input(placeholder="Enter note (optional)", id="note")
 
 
 class ChalkOpts(WizContainer):
     def compose(self):
         self.has_entered = False
         yield MDown("""
-When we add chalk marks to software, what kinds of information do you want to put into the software itself?  Note that this is separate from what gets reported when chalking.
-
-Note that things listed as 'coming soon' can be configured manually, but are not yet in this user interface.
+# Chalk Mark Config
+When we add chalk marks to software, what kinds of information do you want to put into the software itself?
 """)
         yield RadioSet(RadioButton("Basic Chalk IDing info, plus:", value=True,
                                    id="chalk_minimal"),
@@ -891,8 +1004,8 @@ Note that things listed as 'coming soon' can be configured manually, but are not
                      id="chalk_repo"),
             Checkbox("A random value for unique builds", id="chalk_rand"),
             Checkbox("Information about the build host", id="chalk_build_env"),
-            EnablingCheckbox("sigmenu", "A digitial signature -- coming soon",
-                             id="chalk_sig", disabled=True),
+            #EnablingCheckbox("sigmenu", "A digitial signature -- coming soon",
+            #                 id="chalk_sig", disabled=True),
             Checkbox("Semgrep scan results -- This can get large",
                      id="chalk_sast"),
             Checkbox("SBOM -- a 'Software Bill Of Materials'.  " +
@@ -900,11 +1013,39 @@ Note that things listed as 'coming soon' can be configured manually, but are not
             Checkbox("Actually, don't put them in the artifact, " +
                      "write to a file", id="chalk_virtual")
         )
+    def doc(self):
+        return """
+# Chalking basics
+Chalk marks are, by default, stored as JSON in benign part of artifacts.  That makes them easy to find when needed.
+
+ The JSON will always appear on a single line, and will start with: `{"MAGIC" : "dadfedabbadabbed",`.  That makes it easy to extract marks in binaries with:
+```bash
+strings mybinary | grep dadfedabbadabbed
+```
+
+The mark always is JSON, but might be embedded differently depending on the file type. For instance, in Unix scripts (i.e., starting with `#!`), it will generally be embedded in a comment starting with '#'.
+
+## What to Chalk
+Generally, you can put any metadata you want in the chalk mark. Most metadata we collect will be small, though SBOMs and SAST tool results could be large.  You can go minimal, and only put in identifying information, and then send the rest of the metadata you're interested in from the build environment somewhere else.  The identifying info will get reported, AND go into the mark, so you can easily tie things together.
+
+Some of the identifiers of note:
+
+- `CHALK_ID` is unique per code artifact, calculated whenever possible from the hash of the UNCHALKED artifact.  That hash will generally be available as `ARTIFACT_HASH`.
+- `METADATA_HASH` is essentially a hash of the metadata that actually got inserted into the chalk mark.
+
+- `METADATA_ID` is a more readable version derived from the metadata hash value.
+
+If you do not want to add chalk marks directly to an artifact, you don't have to.  The chalk mark still gets produced.  With binaries configured via this Wizard, they currently will get dropped in a file named *virtual.json*.
+
+However, we recommend only using these for dry runs, as keeping track of the marks becomes far more error prone.
+
+"""
 
 class DockerChalking(WizContainer):
     def compose(self):
         self.has_entered = False
         yield MDown("""
+# Docker Auto-Labeling
 When chalking Docker containers, it's best to wrap every call to Docker, but it's important to wrap **docker build** and **docker push** to make it easy to track containers you create.
 
 When running in Docker mode, there are some things we currently cannot chalk (we ignore them), such as remote contexts and images built via **docker compose**.
@@ -922,17 +1063,20 @@ We also can automatically label containers as we chalk them. You can configure y
             Checkbox("Label the commit ID found at build", value=True, id="label_commit"),
             Checkbox("Label the branch found at build", value=True, id="label_branch")
         )
+    def doc(self):
+        return """Some info on how Docker chalking works coming tomorrow."""
 
 class ReportingOptsChalkTime(WizContainer):
     def compose(self):
         self.has_entered = False
-        yield MDown("""
+        yield MDown("""# Post-Chalking Report Contents
+
 In the report we generate after a chalk mark is written, what kind of information do you want?
 
 Note that things listed as 'coming soon' can be configured manually, but are not yet in this user interface.
 """)
         yield RadioSet(RadioButton("Key build-time information, plus:", id="crpt_minimal"),
-                       RadioButton("Everything, except: ", value=True, id="crpt_maximal"))
+                       RadioButton("Everything, except: ", id="crpt_maximal"))
         yield ReportingContainer(
             Checkbox("Info on any significant errors found during chalking", id="crpt_errs"),
             Checkbox("Info about embedded executable content (e.g., scripts in Zip files)", id="crpt_embed"),
@@ -940,33 +1084,46 @@ Note that things listed as 'coming soon' can be configured manually, but are not
             EnablingCheckbox("redaction", "Build-time environment vars (redaction options on next screen if selected) -- coming soon", disabled=True, id="crpt_env"),
             EnablingCheckbox("sig", "A digitial signature -- coming soon", disabled=True, id="crpt_sig"),
 
-            Checkbox("Semgrep scan results -- Can impact build speeds", id="crpt_sast", value=True),
-            Checkbox("SBOM -- a 'Software Bill Of Materials'. Significant build speed impact is typical.", id="crpt_sbom", value=True)
+            Checkbox("Semgrep scan results -- Can impact build speeds", id="crpt_sast"),
+            Checkbox("SBOM -- a 'Software Bill Of Materials'. Significant build speed impact is typical.", id="crpt_sbom")
         )
+    def doc(self):
+        return """
+        Chalk Report info.
+
+        ### RE: "coming soon"
+
+Note that things listed as 'coming soon' can be configured manually, but are not yet working through this wizard.
+"""
 
 class ReportingOptsDocker(WizContainer):
     def compose(self):
         self.has_entered = False
-        yield MDown("""
+        yield MDown("""# Additional Chalk report configuration for Docker
+
 When chalking Docker containers, what Docker-specific info would you like reported back at chalk time?""")
         yield ReportingContainer(
-            Checkbox("Any labels added during the build (minus ones added automatically via Chalk", value=True, id="drpt_labels"),
-            Checkbox("Any tags added during the build", value=True, id="drpt_tags"),
+            Checkbox("Any labels added during the build (minus ones added automatically via Chalk", id="drpt_labels"),
+            Checkbox("Any tags added during the build", id="drpt_tags"),
             Checkbox("The Dockerfile used to build the container", id="drpt_dfile"),
             Checkbox("The path to the Dockerfile on the build system", id="drpt_dfpath"),
             Checkbox("The platform passed to [grey bold]docker build[/]", id="drpt_platform"),
             Checkbox("The full command-line arguments", id="drpt_cmd"),
             Checkbox("The docker context used during the build", id="drpt_ctx")
         )
+    def doc(self):
+        return """More docker help coming soon."""
 
 class ReportingExtraction(WizContainer):
     def compose(self):
         self.has_entered = False
-        yield MDown("""
-If running chalk to extract marks from software, what do you want to report, beyond basic identifying information?""")
+        yield MDown("""# Extraction Reporting
+
+If running chalk to extract marks from software, what do you want to report, beyond basic identifying information?
+""")
         yield ReportingContainer(
-            Checkbox("Information about the operating environment", value=True, id="xrpt_env"),
-            Checkbox("Automatically report on any running containers seen locally (coming soon)", value=True, disabled=True, id="xrpt_containers"),
+            Checkbox("Information about the operating environment", id="xrpt_env"),
+            Checkbox("Automatically report on any running containers seen locally (coming soon)", disabled=True, id="xrpt_containers"),
             Checkbox("All data found in the chalk mark", id="xrpt_fullmark")
         )
 
@@ -974,12 +1131,11 @@ If running chalk to extract marks from software, what do you want to report, bey
 class LogParams(WizContainer):
     def compose(self):
         self.has_entered  = False
-        yield Static(LOG_PARAMS)
+        yield MDown(LOG_PARAMS)
         yield Horizontal(Label("Log file location: ", classes="label"),
                          Input(placeholder="/path/to/log/file",
-                               id = "log_loc",
-                               value = text_defaults["log_loc"]))
-        yield Horizontal(Switch(value=True, id="log_truncate"),
+                               id = "log_loc"))
+        yield Horizontal(Switch(id="log_truncate"),
                          Static("Enforce max size", classes="label"))
 
 class CustomEnv(WizContainer):
@@ -990,10 +1146,11 @@ class CustomEnv(WizContainer):
     def compose(self):
         self.has_entered = False
         yield Container(
-            Label("Environment Variable Configuration"),
+            MDown("""
+# Environment Variable Configuration"""),
             Horizontal(
                 Input(placeholder="Enter name or leave blank to disallow",
-                      id = "env_log", value = text_defaults["env_log"]),
+                      id = "env_log"),
                 Label("Log file path", classes="label")),
             Horizontal(
                 Input(placeholder="Enter name or leave blank to disallow",
@@ -1022,22 +1179,21 @@ class CustomEnv(WizContainer):
 class HttpParams(WizContainer):
     def compose(self):
         self.has_entered  = False
-        yield Static(HTTPS_PARAMS)
-        yield Horizontal(Label("URL for POST: ", classes="label"),
+        yield MDown(HTTPS_PARAMS)
+        yield Grid(Label("URL for POST: ", classes="label"),
                          Label("https://", classes="label emphLabel"),
                          Input(placeholder="Enter url",
                                id = "https_url",
-                               value = text_defaults["https_url"])
-                         )
-        yield Horizontal(
+                               value = text_defaults["https_url"]),
                          Label("Extra MIME header: ", classes="label"),
+                         Label(""),
                          Input(id = "https_header")
             )
 
 class S3Params(WizContainer):
     def compose(self):
         self.has_entered  = False
-        yield Static("Enter values for S3 parameters")
+        yield MDown("# S3 output configuration parameters")
         yield Horizontal(Label("s3://", classes="label emphLabel"),
                          Input(placeholder="Enter bucket path",
                                id = "s3_uri"),
@@ -1139,7 +1295,7 @@ class EnvToggle(Switch):
 class ReportingPane(WizContainer):
     def compose(self):
         self.has_entered = False
-        yield Static(REPORTING_PANE_MAIN)
+        yield MDown(REPORTING_PANE_MAIN)
         yield ReportingContainer(Checkbox(REPORTING_PANE_CO, value=True,
                                           id="report_co"),
                        Checkbox(REPORTING_PANE_STDOUT, value=True,
@@ -1158,6 +1314,19 @@ class ReportingPane(WizContainer):
                                    Label(REPORTING_ENV2_LABEL, classes="label")))
     def complete(self):
         return self.has_entered
+    def doc(self):
+        return """
+# Output Reporting
+
+These reports are always run after Chalk is invoked. If artifacts have been marked, key data from the chalk mark will get reported, potentially along with other info that wasn't put into the mark.  You can select what goes into reports and what goes into the chalk marks later in the wizard.
+
+## Note
+There are things you cannot do through this Wizard, such as having each output configuration get different data sent to it.
+
+This Wizard is only designed to handle the most common cases.  If you need more flexibility, you should consider writing a configuration file directly, instead of generating one.
+
+For documentation on that, please see our web page.
+"""
 
 class WizardSidebar(Container):  pass
 class Body(ScrollableContainer): pass
@@ -1182,10 +1351,10 @@ class UsagePane(Container):
                        RadioButton(BASICS_PANE_OTHER, id="use_cicd"),
                        RadioButton("In production, as a chalk mark scanner",
                                    id="use_extract"))
-        yield Container(Label("""What platform are we configuring the binary for?"""),
-                        RadioSet(RadioButton("Linux (x86 family only)", True, id="lx86"),
-                                 RadioButton("OS X (M1 family)", id="m1"),
-                                 RadioButton("OS X (x86)", id="macosx86")))
+        # yield Container(Label("""What platform are we configuring the binary for?"""),
+        #                 RadioSet(RadioButton("Linux (x86-64 only)", True, id="lx86"),
+        #                          RadioButton("OS X (M1 family)", id="m1"),
+        #                          RadioButton("OS X (x86)", id="macosx86")))
 
 
     def complete(self):
@@ -1197,8 +1366,11 @@ class UsagePane(Container):
     def doc(self):
         return """# Usage
 
-Here's some more help for you.
+If you're not using it as a command-line tool, we will set the default command so that no command need be provided on the command line by default.
+
+For instance, if running as a docker wrapper, this allows you to alias docker to the chalk binary.
 """
+
 
 class Nav(Horizontal):
     pass
@@ -1217,18 +1389,48 @@ sectionOutputConf.add_step("envconf", CustomEnv(disabled=True))
 sectionOutputConf.add_step("log_conf", LogParams(disabled=True))
 sectionOutputConf.add_step("http_conf", HttpParams(disabled=True))
 sectionOutputConf.add_step("s3_conf", S3Params(disabled=True))
-
 sectionChalking.add_step("chalking_base", ChalkOpts())
-sectionChalking.add_step("chalking_docker", DockerChalking())
-
 sectionReporting.add_step("reporting_base", ReportingOptsChalkTime())
 sectionReporting.add_step("reporting_docker", ReportingOptsDocker())
+sectionChalking.add_step("chalking_docker", DockerChalking())
 sectionReporting.add_step("reporting_extract", ReportingExtraction())
-
-
 sectionBinGen.add_step("final", BuildBinary())
 
 sidebar_buttons = []
+
+def write_binary(dict, config, d):
+    binname = d["exe_name"]
+    base_binary = urllib.request.urlopen(current_binary_url).read()
+    dir = Path(tempfile.mkdtemp())
+    loc = dir / Path(binname)
+    f = loc.open("wb")
+    f.write(base_binary)
+    f.close()
+    loc.chmod(stat.S_IEXEC | stat.S_IWRITE | stat.S_IREAD | stat.S_IXGRP)
+    loc.rename(Path(".") / Path(binname))
+
+    c4mfile = tempfile.NamedTemporaryFile()
+    c4mfile.write(dict_to_con4m(d).encode('utf-8'))
+    c4mfile.flush()
+    c4mfilename = c4mfile.name
+    if subprocess.run([binname, "load", c4mfilename]):
+        app.push_screen(AckModal("""## Binary Generation Failed
+Generally, this is one of two issues:
+1. Connectivity to the base binary (currently, it should go in ./bin/chalk)
+2. You're running on a Mac; we only inject on Linux.  Export the con4m config from the main menu, and on a Linux machine run:
+```
+chalk load [yourconfig]
+```"""))
+        return False
+    else:
+        app.push_screen(AckModal(
+                        """## Success!
+The configuration has been saved, and your binary written to:
+```
+%s
+```""" % binname, pops=2))
+        return True
+
 
 def finish_up():
     global the_table, row_ids
@@ -1241,6 +1443,7 @@ def finish_up():
     slam        = app.query_one("#overwrite_config").value
     debug       = app.query_one("#debug_build").value
     exe         = app.query_one("#exe_name").value
+    note        = app.query_one("#note").value
 
     existing = cursor.execute('SELECT id FROM configs WHERE name="' +
                               confname + '"').fetchone()
@@ -1251,17 +1454,19 @@ def finish_up():
                  "the option to replace the existing configuration.")
         else:
             update = True
-            query = 'UPDATE configs SET date=?, SET chalk_version=?, SET id=?, SET json=? WHERE name=?'
-            row = [timestamp, chalk_version, internal_id, config, confname]
+            query = 'UPDATE configs SET date=?, chalk_version=?, id=?, json=?,  note=? WHERE name=?'
+            row = [timestamp, chalk_version, internal_id, config, note, confname]
     else:
-        row = [confname, timestamp, chalk_version, internal_id, config]
-        query = "INSERT INTO configs VALUES(?, ?, ?, ?, ?)"
-    cursor.execute(query, row)
-    db.commit()
-    date = timestamp[0:11] + timestamp[-4:]
-    if not update:
-        the_table.add_row(confname, date, chalk_version, key=internal_id)
-        row_ids.append(internal_id)
+        row = [confname, timestamp, chalk_version, internal_id, config, note]
+        query = "INSERT INTO configs VALUES(?, ?, ?, ?, ?, ?)"
+
+    if write_binary(confname, config, as_dict):
+        cursor.execute(query, row)
+        db.commit()
+        if not update:
+            the_table.add_row(confname, timestamp, chalk_version, note,
+                              key=internal_id)
+            row_ids.append(internal_id)
 
 class Wizard(Container):
     def __init__(self, end_callback=finish_up):
@@ -1271,6 +1476,19 @@ class Wizard(Container):
         self.by_name = {}
         self.section_index = 0
         self.sidebar_contents = []
+        self.suspend_reset = False
+
+    def on_mount(self):
+        load_from_json(json_txt)
+
+    # Sometimes errors yield weird problems; this version helps avoid them.
+    # async def on_mount(self):
+    #     while 1:
+    #         try:
+    #             load_from_json(json_txt)
+    #             return
+    #         except:
+    #             yield
 
     def add_section(self, s: WizardSection):
         self.sections.append(s)
@@ -1307,7 +1525,7 @@ class Wizard(Container):
         yield WizardSidebar(*self.sidebar_contents)
         self.next_button = NavButton("Next", self)
         self.help_button = NavButton("Help", self)
-        self.prev_button = NavButton("Back", self, disabled = True)
+        self.prev_button = NavButton("Back", self)
         buttons = Nav(self.prev_button, self.next_button, self.help_button)
         helpwin.update(self.first_panel.doc())
         body   = Body(self.switcher)
@@ -1342,11 +1560,6 @@ class Wizard(Container):
             self.next_button.disabled = True
         elif self.current_panel:
             self.next_button.disabled = False
-        if self.current_panel:
-            if self.current_panel == self.first_panel:
-                self.prev_button.disabled = True
-            else:
-                self.prev_button.disabled = False
         for i in range(len(sidebar_buttons)):
             if self.section_index >= i:
                 disable = False
@@ -1371,10 +1584,10 @@ class Wizard(Container):
                 if not cb_results:
                     self.section_index = 0
                     self.set_panel(self.first_panel)
-                    app.pop_screen()
                 else:
                     self.section_index -= 1
-                    app.push_screen(ModalError(cb_results))
+                    self.suspend_reset = True
+                    app.push_screen(ModalError(cb_results, self))
             else:
                 self.action_section(str(self.sections[self.section_index].name))
         else:
@@ -1388,6 +1601,7 @@ class Wizard(Container):
 
     def action_prev(self):
         if self.current_panel == self.first_panel:
+            self.app.pop_screen()
             return
         new_step = self.sections[self.section_index].backwards()
         if not new_step:
@@ -1406,7 +1620,7 @@ class ConfWiz(Wizard):
         self.add_section(sectionReporting)
         self.add_section(sectionBinGen)
 
-class ConfWizScreen(Screen):
+class ConfWizScreen(ModalScreen):
     CSS_PATH = "wizard.css"
     TITLE    = CHALK_TITLE
     BINDINGS = [
@@ -1431,6 +1645,14 @@ class ConfWizScreen(Screen):
 
     def action_prev(self):
         self.wiz.action_prev()
+
+    def on_screen_resume(self):
+        if not self.wiz.suspend_reset:
+            self.wiz.suspend_reset = True
+            self.wiz.section_index = 0
+            self.wiz.current_panel = self.wiz.first_panel
+            self.wiz.set_panel(self.wiz.first_panel)
+
 
 wizard = ConfWizScreen()
 

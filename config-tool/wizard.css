@@ -56,6 +56,7 @@ WelcomePane {
 Switch {
     height: auto;
     width: auto;
+    margin: 0 0 0 4;
 }
 
 .label {
@@ -67,6 +68,7 @@ Switch {
 Input {
     width: auto;
     min-width: 40;
+    margin: 0 0 1 4;
 }
 
 Horizontal {
@@ -74,9 +76,100 @@ Horizontal {
     align: left top;
 }
 
+ExportMenu > RadioSet {
+    content-align: center top;
+}
+
+RadioSet {
+    margin: 0 0 2 4;
+}
+
+ReportingContainer {
+    margin: 0 0 0 4;
+}
+
+#note {
+    width: 100%;
+    margin: 0 2 0 0;
+}
+
+ModalDelete {
+    align: center middle;
+}
+
+AckModal {
+    align: center middle;
+}
+
+.modal_grid {
+    grid-size: 2;
+    grid-gutter: 1 2;
+    grid-rows: 1fr 3;
+    padding: 0 1;
+    width: 80;
+    height: 11;
+    border: thick $background 80%;
+    background: $surface;
+}
+
+.modal_vertical {
+    padding: 0 1;
+    width: 60;
+    height: 11;
+    border: thick $background 80%;
+    background: $surface;
+}
+
+.model_q {
+    align: center top;
+}
+
+AckModal > Vertical {
+    padding: 0 1;
+    width: 60;
+    height: auto;
+    border: thick $background 80%;
+    background: $surface;
+    align: center middle;
+    content-align: center middle;
+}
+
+AckModal > Vertical > Label {
+    width: 1fr;
+    content-align: center middle;
+}
+
+AckModal > Vertical > Button {
+    width: 1fr;
+    background: $primary;
+    content-align: center middle;
+    margin: 0 4;
+}
+
+.model_q {
+    column-span: 2;
+    height: 1fr;
+    width: 1fr;
+    content-align: center middle;
+}
+
+.modal_button {
+    width: 100%;
+    margin: 0 1;
+    background: $primary;
+}
+
 .emphLabel {
     color: $secondary;
     text-style: bold;
+}
+
+S3Params > Horizontal {
+    margin: 0 0 0 4;
+}
+
+HttpParams > Horizontal {
+    margin: 0 0 0 4;
 }
 
 Nav {
@@ -90,16 +183,18 @@ Nav {
 
 }
 
-RadioSet {
-    margin: 1 2;
-    padding: 1 2;
-}
-
 NavButton {
     margin: 1 1;
 }
 
 RunWizardButton {
+    margin: 0 1;
+    background: $primary;
+    content-align: center middle;
+    align: center middle;
+}
+
+.basicbutton {
     margin: 0 1;
     background: $primary;
     content-align: center middle;
@@ -114,10 +209,21 @@ WizSidebarButton {
     text-align: left;
 }
 
-SidebarItem:hover {
+WizSidebarButton:hover {
     background: $accent;
     color: $text;
     text-style: bold;
+}
+
+HttpParams > Grid {
+    grid-size: 3;
+    grid-columns: 22 8 50;
+    grid-rows: 3;
+    margin: 0 0 0 4;
+}
+
+Grid > Input {
+    margin: 0 0 0 0;
 }
 
 HelpWindow {
@@ -173,6 +279,7 @@ ConfigHdr {
 
 #the_table {
     width: 100%;
+    padding: 0 1;
 }
 
 .config_hdr {
@@ -211,6 +318,18 @@ ModalError {
     align: center middle;
 }
 
+#errmsg {
+    margin: 0 1;
+}
+
+#errbutt {
+    width: 100%;
+    margin: 0 1;
+    background: $primary;
+    align: center middle;
+    content-align: center middle;
+}
+
 #errcol {
     padding: 0 1;
     width: 60;
@@ -237,4 +356,13 @@ ModalError {
 #errbutt {
     width: 100%;
     align: center middle;
+}
+
+#note_label {
+    margin: 2 0 0 4;
+}
+
+#note {
+    margin: 0 0 0 3;
+    width: 90%;
 }

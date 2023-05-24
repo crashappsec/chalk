@@ -987,7 +987,7 @@ keyspec $ELF_INSERTIONS {
     type:             list[tuple[int, int]]
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 700    
+    normalized_order: high() - 700
 }
 #% END
 

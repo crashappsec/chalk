@@ -501,10 +501,7 @@ proc runChalkHelp*() {.noreturn.} = runChalkHelp("help")
 
 template cantLoad(s: string) =
   error(s)
-  addUnmarked(selfChalk.fullPath)
-  selfChalk.opFailed = true
-  doReporting()
-  return
+  quit(1)
 
 proc cmdlineError(err, tb: string): bool =
   error(err)
