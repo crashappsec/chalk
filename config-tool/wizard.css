@@ -28,6 +28,7 @@ Body {
 
 ReportingContainer {
     height: auto;
+    border: solid $primary;
 }
 
 .wizpanel {
@@ -61,14 +62,21 @@ Switch {
 
 .label {
     height: 3;
+    margin: 0 0 0 1;
     content-align: center middle;
     width: auto;
+}
+
+RadioSet {
+    border: solid $primary;
 }
 
 Input {
     width: auto;
     min-width: 40;
     margin: 0 0 1 4;
+    border: solid $primary;
+    color: $secondary;
 }
 
 Horizontal {
@@ -101,6 +109,15 @@ AckModal {
     align: center middle;
 }
 
+.ack_md > MarkdownH2 {
+    background:  $error;
+    width: 100%;
+}
+
+ModalError > MarkdownH2 {
+    background:  $error;    
+}
+
 .modal_grid {
     grid-size: 2;
     grid-gutter: 1 2;
@@ -128,7 +145,7 @@ AckModal > Vertical {
     padding: 0 1;
     width: 60;
     height: auto;
-    border: thick $background 80%;
+    border: thick $primary 80%;
     background: $surface;
     align: center middle;
     content-align: center middle;
@@ -160,7 +177,7 @@ AckModal > Vertical > Button {
 }
 
 .emphLabel {
-    color: $secondary;
+    color: $primary-lighten-2;
     text-style: bold;
 }
 
@@ -217,7 +234,7 @@ WizSidebarButton:hover {
 
 HttpParams > Grid {
     grid-size: 3;
-    grid-columns: 22 8 50;
+    grid-columns: 22 9 50;
     grid-rows: 3;
     margin: 0 0 0 4;
 }
@@ -236,13 +253,17 @@ HelpWindow {
     border-left: wide $primary;
     border-top: wide $primary;
     border-bottom: wide $primary;
-    offset: 1 1;
     transition: offset 400ms in_out_cubic;
     text-align: left;
-    content-align: left top;
     align: left top;
     padding: 1 1 1 1;
     overflow-y: scroll;
+    content-align: center top;
+}
+
+#help_dismiss {
+    align: center bottom;
+    margin: 0 0 0 4;
 }
 
 MarkdownH1 {
