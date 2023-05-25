@@ -6,15 +6,20 @@ from textual.screen import *
 from localized_text import *
 from rich.markdown import *
 from textual.widgets import Markdown as MDown
+from localized_text import *
 from pathlib import *
 import sqlite3, os, urllib, tempfile, datetime, hashlib, subprocess, json, stat
 from wizard import *
-from conf_options import *
+import conf_options
 
-global cursor
+global cursor, conftable
 cursor = None
+conftable = None
 
-
+def set_conf_table(t):
+    global conftable
+    conftable = t
+        
 def sqlite_init():
     global db, cursor, first_run
     base = os.path.expanduser('~')
@@ -25,16 +30,15 @@ def sqlite_init():
     cursor = db.cursor()
 
     try:
-        cursor.execute("CREATE TABLE configs(name, date, chalk_version, id, " +
+        cursor.execute("CREATE TABLE configs(name, date, CHALK_VERSION, id, " +
                         "json, note)")
         timestamp = datetime.datetime.now().ctime()
         rows = []
         for config in default_configs:
             (d, name, note) = config
-            print(d, name, note)
             internal_id = dict_to_id(d)
             jstr = json.dumps(d)
-            row = [name, timestamp, chalk_version, internal_id, jstr, note]
+            row = [name, timestamp, CHALK_VERSION, internal_id, jstr, note]
             cursor.execute('INSERT INTO configs VALUES(?, ?, ?, ?, ?, ?)', row)
         db.commit()
         first_run = True
@@ -45,28 +49,21 @@ sqlite_init()
 
 global row_ids
 row_ids = []
-    
-class ConfigName(Label):
-    pass
 
-class ConfigDate(Label):
-    pass
-
-class ConfigVersion(Label):
-    pass
-
-class ConfigDelete(Button):
-    pass
-
-class ConfigExport(Button):
-    pass
-
-class ConfigHdr(Horizontal):
-    pass
+# Empty parents for the sake of CSS addressing.
+class ConfigName(Label): pass
+class ConfigDate(Label): pass
+class ConfigVersion(Label): pass
+class ConfigDelete(Button): pass
+class ConfigExport(Button): pass
+class ConfigHdr(Horizontal): pass
+class OutfileRow(Horizontal): pass
+class ReportingContainer(Container): pass
 
 class ModalDelete(ModalScreen):
     CSS_PATH = "wizard.css"
-    BINDINGS = [("q", "pop_screen()", "Cancel"), ("d", "delete", "Delete")]
+    BINDINGS = [("q", "pop_screen()", CANCEL_LABEL),
+                ("d", "delete", DELETE_LABEL)]
 
     def __init__(self, name, iid):
         super().__init__()
@@ -76,32 +73,27 @@ class ModalDelete(ModalScreen):
     def compose(self):
         yield Header(show_clock=True)
         yield Grid(
-            Label('Really delete profile "' + self.profilename + '"?',
-                  classes="model_q"),
-            Button("Yes", id="delete_confirm", classes="modal_button"),
-            Button("No", id="delete_nope",  classes="modal_button"),
-            id="del_modal",
+            Label(CONFIRM_DELETE % self.profilename, classes="model_q"),
+            Button(YES_LABEL, id="delete_confirm", classes="modal_button"),
+            Button(NO_LABEL, id="delete_nope",  classes="modal_button"),
             classes = "modal_grid"
             )
         yield Footer()
+        
     async def on_button_pressed(self, event):
         if event.button.id == "delete_confirm":
             cursor.execute('DELETE FROM configs WHERE id="' + self.iid + '"')
             db.commit()
-            self.app.query_one("#the_table").remove_row(self.iid)
-            msg = "Configuration '" + self.profilename + """' has been deleted.
+            conftable.the_table.remove_row(self.iid)
+            msg = ACK_DELETE % self.profilename 
 
-Note that this does NOT remove any binaries generated for this configuration.
-"""
-            await self.app.push_screen(AckModal("# Success!\n" + msg, pops=2))
-        self.app.pop_screen()
-
-class OutfileRow(Horizontal):
-    pass
+            self.app.push_screen(AckModal(msg, pops=2))
+        else:
+            self.app.pop_screen()
 
 class ExportMenu(Screen):
     CSS_PATH = "wizard.css"
-    BINDINGS = [("q", "pop_screen()", "Cancel")]
+    BINDINGS = [("q", "pop_screen()", CANCEL_LABEL)]
 
     def __init__(self, iid, name, jconf):
         super().__init__()
@@ -111,28 +103,18 @@ class ExportMenu(Screen):
 
     def compose(self):
         yield Header(show_clock=True)
-        yield MDown("""
-# Export Configuration
-
-Export your configuration to share or back it up, if you like. Note
-that, for backups, you may consider copying the SQLite database, which lives in
-`~/.config/chalk/chalk-config.db`.
-
-JSON is only read and written by this configuration tool (though currently, we have not yet added a feature to directly import this).  **Con4m** is Chalk's native configuration file, and can do far more than this configuration tool does.  However, this tool cannot import Chalk.  Similarly, Chalk does not import this tool's JSON files.
-
-If you do not provide an extension below, we use the default (.json or .c4m depending on the type).
-""")
-        yield RadioSet(RadioButton("JSON",
-                                   True, id = "export_json"),
-                       RadioButton("Con4m", id = "export_con4m"))
-        yield OutfileRow(Input(placeholder= "Enter file name",
+        yield MDown(EXPORT_MENU_INTRO)
+        yield RadioSet(RadioButton(JSON_LABEL, True, id = "export_json"),
+                       RadioButton(CON4M_LABEL, id = "export_con4m"))
+        yield OutfileRow(Input(placeholder= PLACEHOLD_FILE,
                                id="conf_outfile", value = self.confname),
-                         Label("Output File Name", classes="label"))
-        yield Horizontal( Button("Export", id="export_go",
+                         Label(PLACEHOLD_OUTFILE, classes="label"))
+        yield Horizontal(Button(EXPORT_LABEL, id="export_go",
                                  classes="basicbutton"),
-                          Button("Cancel", id="export_cancel",
+                         Button(CANCEL_LABEL, id="export_cancel",
                                  classes="basicbutton"))
         yield Footer()
+        
     async def on_button_pressed(self, event):
         if event.button.id == "export_go":
             val_is_json = self.query_one("#export_json").value
@@ -148,8 +130,8 @@ If you do not provide an extension below, we use the default (.json or .c4m depe
             f = open(fname, 'w')
             f.write(to_out)
             f.close()
-            msg = "Configuration saved to: " + fname
-            await self.app.push_screen(AckModal("# Success!\n" + msg, pops=2))
+            msg = ACK_EXPORT % fname
+            await self.app.push_screen(AckModal(msg, pops=2))
         else:
             self.app.pop_screen()
 
@@ -159,9 +141,10 @@ class ConfigTable(Container):
         self.the_table = DataTable(id="the_table")
         self.the_table.cursor_type = "row"
 
-    def on_mount(self):
+    async def on_mount(self):
+        await self.the_table.mount()
         global row_ids
-        cols = ("Configuration Name", "Date Created", "Chalk Version", "Note")
+        cols = (COL_NAME, COL_DATE, COL_VERS, COL_NOTE)
         self.the_table.add_columns(*cols)
         r = cursor.execute("SELECT * FROM configs").fetchall()
         rows = []
@@ -172,57 +155,40 @@ class ConfigTable(Container):
             try:
                 self.the_table.add_row(*r, key=row[3])
             except:
+                # The above should only fail if the same key appears
+                # twice, which shouldn't happen when we're managing it,
+                # but just be defensive for when people have munged the DB
+                # manually.
+                # 
+                # This basically causes us to skip displaying anything that's
+                # inserted into the DB that's the same config, different name,
+                # past the first one seen.
                 pass
-        
+                
     def compose(self):
         yield self.the_table
-        yield Horizontal(RunWizardButton(id="wizbutt",
-                                         label="New Config"),
-                         EditConfigButton(id="edbutt",
-                                          label="Edit",
+        yield Horizontal(RunWizardButton(label=NEW_LABEL),
+                         EditConfigButton(label=EDIT_LABEL,
                                           classes="basicbutton"),
-                         DelConfigButton(id="debutt",
-                                         label="Delete", classes="basicbutton"),
-                         ExConfigButton(id="exbutt",
-                                        label="Export", classes="basicbutton"),
+                         DelConfigButton(label=DELETE_LABEL,
+                                         classes="basicbutton"),
+                         ExConfigButton(label=EXPORT_LABEL,
+                                        classes="basicbutton"),
                                  classes="padme")
-
-class ReportingContainer(Container):
-    pass
 
 class RunWizardButton(Button):
     async def on_button_pressed(self):
-        try:
-            load_from_json(default_config_json)
-        except:
-            json_text = default_config_json
-            name_kludge = None
-            note_kludge = None
-            # If we haven't actually gone into the wizard, then load_from_json
-            # will fail, because the Wiz screen won't have mounted.  So
-            # on_mount will check the json_txt global, and if it's not None,
-            # then it loads it for us.
-
         await self.app.push_screen('confwiz')
-        get_wiz_screen().query_one("#conf_name").value = ""
-
+        load_from_json(default_config_json)
+    
 class EditConfigButton(Button):
-    def on_button_pressed(self):
-        global json_txt, name_kludge, note_kludge
-        
-        cursor_row = self.app.query_one("#the_table").cursor_row
+    async def on_button_pressed(self):
+        await self.app.push_screen('confwiz')
+        cursor_row = conftable.the_table.cursor_row
         r = cursor.execute("SELECT json, name, note FROM configs WHERE id=?",
                            [row_ids[cursor_row]])
-        (json_txt, name_kludge, note_kludge) = r.fetchone()
-        try:
-           load_from_json(json_txt, name_kludge, note_kludge)
-            # If we haven't actually gone into the wizard, then load_from_json
-            # will fail, because the Wiz screen won't have mounted.  So
-            # on_mount will check the json_txt global, and if it's not None,
-            # then it loads it for us.
-        except:
-            pass
-        self.app.push_screen('confwiz')
+        json_txt, name, note = r.fetchone()
+        load_from_json(json_txt, name, note)
 
 class DelConfigButton(Button):
     def on_button_pressed(self):
@@ -243,6 +209,11 @@ class EnablingCheckbox(Checkbox):
     def __init__(self, target, title, value=False, disabled=False, id=None):
         Checkbox.__init__(self, title, value, disabled=disabled, id=id)
         self.refd_id = "#" + target
+        self.original_state = value
+
+    def reset(self):
+        if self.value != self.original_state:
+            self.value = self.original_state
 
     def on_checkbox_changed(self, event: Checkbox.Changed):
         get_wizard().query_one(self.refd_id).toggle()
@@ -274,32 +245,13 @@ def write_binary(dict, config, d):
     try:
         if subprocess.run(["./" + binname, "load", c4mfilename]):
             get_app().push_screen(
-                AckModal("""# Warning: Binary Generation Failed
-Your configuration has been saved, but no binary has been produced.
-
-Generally, this is one of two issues:
-1. Connectivity to the base binary (currently, it should go in ./bin/chalk)
-2. You're running on a Mac; we only inject on Linux.  Export the con4m config from the main menu, and on a Linux machine run:
-```
-chalk load [yourconfig]
-```""", pops=2))
+                AckModal(GENERATION_FAILED, pops=2))
             return True
         else:
-            get_app().push_screen(AckModal("""# Success!
-The configuration has been saved, and your binary written to:
-```
-%s
-```""" % binname, pops=2))
+            get_app().push_screen(AckModal(GENERATION_OK % binname, pops=2))
             return True
     except Exception as e:
-        get_app().push_screen(AckModal("""## Error
-Binary generation failed with the following message:
-```
-%s
-```
-
-Your configuration has been saved, but no binary was produced.""" % repr(e)))
+        get_app().push_screen(AckModal(GENERATION_EXCEPTION % repr(e)))
         
-
 
         

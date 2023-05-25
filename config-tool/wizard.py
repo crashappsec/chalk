@@ -6,14 +6,20 @@ from textual.screen import *
 from localized_text import *
 from rich.markdown import *
 from textual.widgets import Markdown as MDown
-
+import time
 from conf_options import *
+from localized_text import *
+
+class Nav(Horizontal):           pass
+class WizardSidebar(Container):  pass
+class Body(ScrollableContainer): pass
 
 class AckModal(ModalScreen):
     CSS_PATH = "wizard.css"
 
-    def __init__(self, msg, pops=1, button_text="Okay"):
+    def __init__(self, msg, pops=1, wiz=None, button_text="Okay"):
         super().__init__()
+        self.wiz = wiz
         self.msg = msg
         self.pops = pops
         self.button_text = button_text
@@ -38,7 +44,7 @@ class HelpWindow(Container):
         self.toggle_class('-hidden')
     def compose(self):
         yield self.md_widget
-        yield Button("Dismiss", classes="basicbutton", id="help_dismiss")
+        yield Button(DISMISS_LABEL, classes="basicbutton", id="help_dismiss")
     def update(self, contents):
         self.md_widget.update(contents)
     def on_button_pressed(self):
@@ -51,12 +57,6 @@ class NavButton(Button):
         self.wiz = wiz
     def on_button_pressed(self):
         self.wiz.action_label(self.id)
-
-class Nav(Horizontal):
-    pass
-
-class WizardSidebar(Container):  pass
-class Body(ScrollableContainer): pass
 
 class WizSidebarButton(Button):
     def __init__(self, label, wiz):
@@ -81,7 +81,7 @@ class WizContainer(Container):
     def validate_inputs(self):
         return None # No errors to block moving.
     def doc(self):
-        return "No help provided."
+        return YOU_ARE_NO_HELP
 
 class WizardStep:
     def __init__(self, name, widget, disabled=False, help=None):
@@ -148,25 +148,27 @@ class Wizard(Container):
         self.by_name = {}
         self.section_index = 0
         self.sidebar_contents = []
-        self.suspend_reset = False
         self.helpwin = HelpWindow(id="helpwin",
                                   name="Help Window",
                                   classes="-hidden")
         self.helpwin.md_widget = MDown()
         self.helpwin.wiz = self
         self._load_sections()
+        self.build_panels()
+        self.switcher = ContentSwitcher(*self.panels,
+                                        initial = self.panels[0].id,
+                                        classes = "wizpanel")
+        self.suspend_reset = False
 
-    def on_mount(self):
-        load_from_json(json_txt, name_kludge, note_kludge)
-
-    # Sometimes errors yield weird problems; this version helps avoid them.
-    # async def on_mount(self):
-    #     while 1:
-    #         try:
-    #             load_from_json(json_txt)
-    #             return
-    #         except:
-    #             yield
+    def reset(self, force=False):
+        if not self.suspend_reset or force:
+            self.section_index = 0
+            self.set_panel(self.first_panel)
+            for item in self.query("EnablingCheckbox"):
+                item.reset()
+            if not self.helpwin.has_class('-hidden'):
+                helpwin.toggle_class('-hidden')
+            self.suspend_reset = True
 
     def add_section(self, s: WizardSection):
         self.sections.append(s)
@@ -180,8 +182,9 @@ class Wizard(Container):
         for section in self.sections:
             for step in section.step_order:
                 self.panels.append(step.widget)
-        return ContentSwitcher(*self.panels, initial=self.panels[0].id,
-                               classes="wizpanel")
+
+        self.current_panel = self.panels[0]
+        self.first_panel   = self.current_panel
 
     def _load_sections(self):
         self.load_sections()
@@ -190,19 +193,15 @@ class Wizard(Container):
         self.update_menu()
 
     def compose(self):
-        self.switcher = self.build_panels()
-        self.current_panel = self.panels[0]
-        self.first_panel   = self.current_panel
-        self.helpwin.update(self.first_panel.doc())
         yield self.helpwin
         yield WizardSidebar(*self.sidebar_contents)
         self.next_button = NavButton("Next", self)
         self.help_button = NavButton("Help", self)
         self.prev_button = NavButton("Back", self)
-        buttons = Nav(self.prev_button, self.next_button, self.help_button)
-        self.helpwin.update(self.first_panel.doc())
         body   = Body(self.switcher)
         yield body
+        buttons = Nav(self.prev_button, self.next_button, self.help_button)
+        self.helpwin.update(self.first_panel.doc())
         yield buttons
 
     def set_panel(self, new_panel):
@@ -240,18 +239,20 @@ class Wizard(Container):
                 disable = True
             self.sidebar_buttons[i].disabled = disable
 
+    def require_ack(self, msg, pops = 1):
+        self.app.push_screen(AckModal(msg = ERR_HDR + msg, wiz = self))
+
+    def abort_wizard(self):
+        self.app.pop_screen()
+        self.reset(force=True)
+        
     def action_label(self, id):
         if id == "Help":
             self.action_help()
         elif id == "Next":
-            err = self.current_panel.validate_inputs()
-            if err:
-                self.app.push_screen(AckModal(msg = "## Error\n" + err,
-                                              pops = 1))
-                return
-            return self.action_next()
+            self.action_next()
         else:
-            return self.action_prev()
+            self.action_prev()
 
     def run_callback(self):
         cb_results = self.end_callback()
@@ -259,16 +260,18 @@ class Wizard(Container):
         if not cb_results:
             self.section_index = 0
             self.set_panel(self.first_panel)
+            self.reset(force = True)
         else:
             self.section_index -= 1
-            self.suspend_reset = True
-            self.app.push_screen(AckModal(msg = "## Error: \n" +
-                                          cb_results))
+            self.require_ack(cb_results)
             self.sections[self.section_index].unadvance()
         
-
-        
     def action_next(self):
+        err = self.current_panel.validate_inputs()
+        if err:
+            self.require_ack(err)
+            return
+        
         new_step = self.sections[self.section_index].advance()
         if not new_step:
             self.section_index += 1

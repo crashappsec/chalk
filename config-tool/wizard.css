@@ -26,9 +26,23 @@ Body {
     align: center top;
 }
 
+BuildBinary {
+    height: auto;
+    content-align: left top;
+}
+
+BuildBinary > Container {
+}
+
+#conf_status {
+    color: $secondary;
+}
+
 ReportingContainer {
     height: auto;
     border: solid $primary;
+    width: auto;
+    padding: 0 2 0 2;
 }
 
 .wizpanel {
@@ -54,10 +68,14 @@ WelcomePane {
     box-sizing: border-box;
 }
 
+#note_label {
+    text-style: underline bold;
+}
+
 Switch {
     height: auto;
     width: auto;
-    margin: 0 0 0 4;
+    margin: 0 0 0 0;
 }
 
 .label {
@@ -68,13 +86,14 @@ Switch {
 }
 
 RadioSet {
+    padding: 0 2 0 2;
     border: solid $primary;
 }
 
 Input {
     width: auto;
     min-width: 40;
-    margin: 0 0 1 4;
+    margin: 0 0 1 0;
     border: solid $primary;
     color: $secondary;
 }
@@ -82,6 +101,7 @@ Input {
 Horizontal {
     height: auto;
     align: left top;
+    margin: 0 0 0 4;
 }
 
 ExportMenu > RadioSet {
@@ -127,6 +147,17 @@ ModalError > MarkdownH2 {
     height: 11;
     border: thick $background 80%;
     background: $surface;
+}
+
+S3Params > Grid {
+    grid-size: 3;
+    grid-gutter: 1 2;
+    grid-columns: 5 46 20;
+    padding: 0 1;
+    height: 14;
+    border: thick $background 80%;
+    background: $surface;
+    margin: 0 0 0 3;
 }
 
 .modal_vertical {

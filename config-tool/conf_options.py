@@ -1,8 +1,7 @@
 from pathlib import *
 import sqlite3, os, urllib, tempfile, datetime, hashlib, subprocess, json, stat
-from conf_pieces import *
+from localized_text import *
 
-chalk_version = "0.4.3"
 current_binary_url = "file://" + os.getcwd() + "/bin/chalk"
 
 app = None
@@ -97,7 +96,7 @@ all_fields = [
     "note"
 ]
 
-not_in_json = ["conf_name", "overwrite_config", "note"]
+not_in_json = ["conf_name", "overwrite_config"]
 
 radio_set_dbg    = (["release_build", "debug_build"], 0)
 radio_set_minmax = (["chalk_minimal", "chalk_maximal"], 0)
@@ -241,7 +240,7 @@ def config_to_json():
     return json.dumps(result)
 
 def dict_to_id(d):
-    to_hash = chalk_version + "\n"
+    to_hash = CHALK_VERSION + "\n"
     for item in all_fields:
         if item in not_in_json:
             continue
@@ -265,6 +264,8 @@ def dict_to_id(d):
     return hashlib.sha256(to_hash.encode("utf-8")).hexdigest()[:32]
 
 def json_to_dict(s):
+    # The exception values are just hardcoded, because these should
+    # be seen only due to programmer error, not user error.
     d = json.loads(s)
     if type(d) != type({}):
         raise ValueError("Saved Json is not an object type")
@@ -329,6 +330,8 @@ def dict_to_con4m(d):
         if not s3_uri.startswith("s3://"):
             s3_uri = "s3://" + s3_uri
 
+    # Not going to bother pulling this out for translation; we get to 
+    # expect that other developers can deal w/ english only.
     lines.append("""# WARNING: This configuration was automatically generated
 # by the Chalk install wizard.  Please do not edit it.  Instead, re-run it.
 
