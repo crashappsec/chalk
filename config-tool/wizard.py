@@ -49,7 +49,7 @@ class HelpWindow(Container):
         self.md_widget.update(contents)
     def on_button_pressed(self):
         self.toggle_class('-hidden')
-    
+
 class NavButton(Button):
     def __init__(self, id, wiz, disabled=False):
         Button.__init__(self, label=id, id=id, variant="primary",
@@ -65,8 +65,8 @@ class WizSidebarButton(Button):
         self.wiz      = wiz
     def on_click(self):
         self.wiz.action_section(self.label)
-        
-# Container object specific to wizard "steps".        
+
+# Container object specific to wizard "steps".
 class WizContainer(Container):
     def enter_step(self):
         self.has_entered = True
@@ -245,7 +245,7 @@ class Wizard(Container):
     def abort_wizard(self):
         self.app.pop_screen()
         self.reset(force=True)
-        
+
     def action_label(self, id):
         if id == "Help":
             self.action_help()
@@ -256,7 +256,7 @@ class Wizard(Container):
 
     def run_callback(self):
         cb_results = self.end_callback()
-        
+
         if not cb_results:
             self.section_index = 0
             self.set_panel(self.first_panel)
@@ -265,13 +265,13 @@ class Wizard(Container):
             self.section_index -= 1
             self.require_ack(cb_results)
             self.sections[self.section_index].unadvance()
-        
+
     def action_next(self):
         err = self.current_panel.validate_inputs()
         if err:
             self.require_ack(err)
             return
-        
+
         new_step = self.sections[self.section_index].advance()
         if not new_step:
             self.section_index += 1

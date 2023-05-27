@@ -335,7 +335,7 @@ Without this option, you're responsible for dealing with disk space issues.
 """
 
 ENV_DOC =  """# Custom Environment Variables
-This tool generates a config file that consults environment variables for configuring output to various places like HTTPS endpoints or S3 buckets.  Generally, if the required environment variables are present, then Chalk will use them to set up an output.  
+This tool generates a config file that consults environment variables for configuring output to various places like HTTPS endpoints or S3 buckets.  Generally, if the required environment variables are present, then Chalk will use them to set up an output.
 
 That output might be instead of the default configuration for that output type... that behavior is set on the previous screen.
 
@@ -347,9 +347,9 @@ Though, that would be silly, really.
 HTTP_PARAMS_DOC = """# About Chalk's use of HTTPS POST
 Important things to note about https output:
 1. Chalk currently *requires* HTTPS, not HTTP
-2. Chalk currently *requires* certificate validation.  
+2. Chalk currently *requires* certificate validation.
 3. Chalk will always just post the JSON blob containing its report as a document of ```Content-Type: application/json```
-4. The additional MIME header is strictly optional.  It may be necessary for authentication.  
+4. The additional MIME header is strictly optional.  It may be necessary for authentication.
 
 We might relax the first things real soon now, if you sign a waiver allowing you to shoot yourself in the foot :)
 
@@ -383,9 +383,9 @@ DOCKER_LABEL_DOC = """# Docker Auto-Labeling
 
 The metadata Chalk reports on can be automatically added to docker labels to your image when you run *'chalk docker build ...'*
 
-The OCI standard for labels requires them to start with reverse-DNS entries.  The value you provide will be added to the label name, with a suffix consisting of a value derived from the metadata key, adhering to OSI name standards.  
+The OCI standard for labels requires them to start with reverse-DNS entries.  The value you provide will be added to the label name, with a suffix consisting of a value derived from the metadata key, adhering to OSI name standards.
 
-For instance, by default, the label for the Chalk ID would be: 
+For instance, by default, the label for the Chalk ID would be:
 ```
 run.crashoverride.chalk-id
 ```
@@ -401,7 +401,7 @@ When you run 'chalk extract', Chalk will generate a report that can include:
 2. Data about the operating environment at the time extraction ran.
 3. Data about artifacts at the time of extraction (e.g., their current hash, and where they live on the file system).
 
-By default, we only report back basic identification information and runtime information; we assume you already stashed the full mark.  
+By default, we only report back basic identification information and runtime information; we assume you already stashed the full mark.
 
 If you want to selectively report some fields, that's outside the scope of this wizard, and requires a custom configuration.
 """
@@ -434,7 +434,7 @@ tool, or the actual **con4m** code generated from it.
 """
 
 FIRST_TIME_INTRO = """# Chalk Config Tool ALPHA 1: WARNING!
-This is an early beta of this configuration tool. Currently, it only works with Linux binaries, and it requires you to have the binaries locally. 
+This is an early beta of this configuration tool. Currently, it only works with Linux binaries, and it requires you to have the binaries locally.
 
  Specifically, it looks for them under the current working directory, in:
 ```
@@ -443,4 +443,3 @@ bin/chalk
 
 Also, some Wizard functionality is not available yet through the wizard (e.g., sending back to Crash Override).
 """
-

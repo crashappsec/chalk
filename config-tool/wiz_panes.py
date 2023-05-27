@@ -23,7 +23,7 @@ def deal_with_overwrite_widget():
     status            = wiz.query_one("#conf_status")
 
     show_switch = False
-    
+
     v = config_name_field.value.strip()
     if v != "":
         arr = cursor.execute("SELECT id from configs where name=?",
@@ -41,7 +41,7 @@ def deal_with_overwrite_widget():
             status.update(L_NEW_CONF)
     else:
         status.update(L_NO_NAME)
-        
+
     if show_switch:
         switch_row.visible = True
     else:
@@ -54,7 +54,8 @@ class BuildBinary(WizContainer):
         yield Container(
             MDown(BUILD_BIN_INTRO),
             RadioSet(RadioButton(RELEASE_BUILD, True, id = "release_build"),
-                       RadioButton(DEBUG_BUILD, id = "debug_build")),
+                       RadioButton(DEBUG_BUILD, id = "debug_build"),
+                     id = "set_bin_debug"),
             Horizontal(Input(placeholder = PLACEHOLD_EXE, id = "exe_name"),
                          Label(L_BIN_NAME, classes="label")),
             Horizontal(Input(placeholder = PLACEHOLD_CONF, id = "conf_name"),
@@ -70,8 +71,8 @@ class BuildBinary(WizContainer):
         deal_with_overwrite_widget()
 
     def on_focus(self):
-        deal_with_overwrite_widget()        
-        
+        deal_with_overwrite_widget()
+
     def on_descendant_blur(self, event):
         deal_with_overwrite_widget()
 
@@ -81,25 +82,26 @@ class BuildBinary(WizContainer):
 
     def on_descendant_focus(self, event):
         deal_with_overwrite_widget()
-        
+
     def validate_inputs(self):
         binname = get_wizard().query_one("#exe_name").value.strip()
         confname = get_wizard().query_one("#conf_name").value.strip()
-        
+
         if binname == "":
             return E_BNAME
         if confname == "":
             return E_CNAME
-    
+
     def doc(self):
         return BUILD_BIN_DOC
-        
+
 class ChalkOpts(WizContainer):
     def compose(self):
         self.has_entered = False
         yield MDown(CHALK_OPTS_INTRO)
         yield RadioSet(RadioButton(R_CMIN, value=True, id="chalk_minimal"),
-                       RadioButton(R_CMAX, id="chalk_maximal"))
+                       RadioButton(R_CMAX, id="chalk_maximal"),
+                       id = "set_chalk_min")
         yield ReportingContainer(
             Checkbox(CC_URL, value=True, id="chalk_ptr"),
             Checkbox(CC_DATE, value=True, id="chalk_datetime"),
@@ -132,7 +134,7 @@ class DockerChalking(WizContainer):
             Checkbox(CL_COMMIT, value=True, id="label_commit"),
             Checkbox(CL_BRANCH, value=True, id="label_branch")
         )
-        
+
     def doc(self):
         return DOCKER_LABEL_DOC
 
@@ -141,7 +143,8 @@ class ReportingOptsChalkTime(WizContainer):
         self.has_entered = False
         yield MDown(REPORTING_INTRO)
         yield RadioSet(RadioButton(R_RMIN, id="crpt_minimal"),
-                       RadioButton(R_RMAX, id="crpt_maximal"))
+                       RadioButton(R_RMAX, id="crpt_maximal"),
+                       id = "set_report_min")
         yield ReportingContainer(
             Checkbox(CR_ERRS, id="crpt_errs"),
             Checkbox(CR_EMBED, id="crpt_embed"),
@@ -170,7 +173,7 @@ class ReportingOptsDocker(WizContainer):
         )
     def doc(self):
         return DOCKER_REPORT_DOC
-    
+
 class ReportingExtraction(WizContainer):
     def compose(self):
         self.has_entered = False
@@ -242,18 +245,18 @@ class HttpParams(WizContainer):
         url = field.value
         http_start = "http://"
         https_start = "https://"
-        
+
         if url.startswith(http_start):
             return ERR_HTTP
 
         if url.startswith(https_start):
             field.value = field.value[len(https_start):]
-            
+
         if not "." in url:
             return ERR_NO_URL
 
         return None
-        
+
     def doc(self):
         return HTTP_PARAMS_DOC
 
@@ -270,7 +273,7 @@ class S3Params(WizContainer):
                    Label(""),
                    Input(placeholder= PLACEHOLD_S3_AID, id = "s3_access_id"),
                    Label(L_S3_AID, classes="label"))
-        
+
     def validate_inputs(self):
         f1 = get_wizard().query_one("#s3_uri").value.strip()
         f2 = get_wizard().query_one("#s3_access_id").value.strip()
@@ -279,7 +282,7 @@ class S3Params(WizContainer):
 
         if f1.startswith(s3_start):
             get_wizard().query_one("#s3_uri").value = f1[len(s3_start):]
-            
+
         if f1 == "" or f2 == "" or f3 == "":
             return ERR_ALL_REQUIRED
 
@@ -305,7 +308,7 @@ class ReportingPane(WizContainer):
         return self.has_entered
     def doc(self):
         return OUT_DOC
-    
+
 class UsagePane(WizContainer):
     def enter_step(self):
         self.has_entered = True
@@ -314,7 +317,8 @@ class UsagePane(WizContainer):
         yield RadioSet(RadioButton(R_UCMD, id="use_cmd"),
                        RadioButton(R_UDOCKER, id="use_docker"),
                        RadioButton(R_UCICD, id="use_cicd"),
-                       RadioButton(R_UEXTRACT, id="use_extract"))
+                       RadioButton(R_UEXTRACT, id="use_extract"),
+                       id = "set_usage")
         # yield Container(Label("""What platform are we configuring the binary for?"""),
         #                 RadioSet(RadioButton("Linux (x86-64 only)", True, id="lx86"),
         #                          RadioButton("OS X (M1 family)", id="m1"),
@@ -334,7 +338,7 @@ If you're not using it as a command-line tool, we will set the default command s
 
 For instance, if running as a docker wrapper, this allows you to alias docker to the chalk binary.
 """
-    
+
 sectionBasics     = WizardSection(SB_BASICS)
 sectionOutputConf = WizardSection(SB_OUTPUT)
 sectionChalking   = WizardSection(SB_CHALK)
@@ -353,4 +357,3 @@ sectionReporting.add_step("reporting_docker", ReportingOptsDocker())
 sectionChalking.add_step("chalking_docker", DockerChalking())
 sectionReporting.add_step("reporting_extract", ReportingExtraction())
 sectionBinGen.add_step("final", BuildBinary())
-

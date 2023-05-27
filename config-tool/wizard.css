@@ -135,7 +135,7 @@ AckModal {
 }
 
 ModalError > MarkdownH2 {
-    background:  $error;    
+    background:  $error;
 }
 
 .modal_grid {

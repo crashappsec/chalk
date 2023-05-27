@@ -41,7 +41,7 @@ def finish_up():
     update = False
     if existing != None:
         if not slam:
-          return ERR_EXISTS % confname 
+          return ERR_EXISTS % confname
         else:
             update = True
             query = ("UPDATE configs SET date=?, CHALK_VERSION=?, id=?, " +
@@ -72,7 +72,7 @@ def finish_up():
             conftable.the_table.remove_row(conf_widgets.row_ids[to_delete])
             conf_widgets.row_ids = (conf_widgets.row_ids[0:to_delete] +
                                     conf_widgets.row_ids[to_delete+1:])
-            
+
         conftable.the_table.add_row(confname, timestamp, CHALK_VERSION, note,
                                     key=internal_id)
         conf_widgets.row_ids.append(internal_id)
@@ -85,7 +85,7 @@ class ConfWiz(Wizard):
         self.add_section(sectionChalking)
         self.add_section(sectionReporting)
         self.add_section(sectionBinGen)
-  
+
 class ConfWizScreen(ModalScreen):
     CSS_PATH = "wizard.css"
     TITLE    = CHALK_TITLE
@@ -114,13 +114,13 @@ class ConfWizScreen(ModalScreen):
 
     def on_screen_resume(self):
         self.wiz.reset()
-        
+
     def action_abort_wizard(self):
         self.wiz.abort_wizard()
-            
+
 # Convenience vars.
 
-wiz            = ConfWiz(finish_up)           
+wiz            = ConfWiz(finish_up)
 wiz_screen     = ConfWizScreen()
 wiz_screen.wiz = wiz
 

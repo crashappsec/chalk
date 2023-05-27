@@ -26,29 +26,47 @@ def set_wizard(w):
 
 def get_wizard():
     return wizard
-        
+
 def load_from_json(json_blob, confname=None, note=None):
+    # Loading is broken out into two loops, one to clear existing
+    # values to false / the empty string, and then one to set the
+    # desired value.  It's done this way because it's was the most
+    # clear way I could handle Textualize's RadioSet semantics
+    # without some refactoring.
+    #
+    # Specifically, if we just try to loop once, and reset each value
+    # if it needs resetting, you will end up with multiple radio
+    # buttons set any time you've changed something from the default
+    # value.  This is true even if you muck with the RadioSet state
+    # directly.
+    #
+    # I could do this more efficiently without any real refactoring
+    # (outside this function), but I don't think it is worth the more
+    # verbose code; nobody is going to notice the 'performance
+    # impact'.
+
+    for k in all_fields:
+        widget = wizard.query_one("#" + k)
+        if type(widget.value) != type(""):
+            widget.value = False
+        else:
+            widget.value = ""
+
     configset = json_to_dict(json_blob)
     for k in all_fields:
         widget = wizard.query_one("#" + k)
+
         if k in configset:
-            widget.value = configset[k]
-            # The above all sets values; this enables or disables panes
-            # based on the variables that control whether or not they are
-            # enabled.
-        else:
-            if k in text_defaults:
-                widget.value = ""
-            else:
-                if widget.value == True:
-                    widget.value = False
+            if type(configset[k]) == str:
+                widget.value = configset[k]
+                continue
+
+            if configset[k]:
+                widget.toggle()
 
         if k in pane_switch_map:
             pane = wizard.query_one(pane_switch_map[k])
-            if pane.disabled == True and widget.value == True:
-                pane.disabled = False
-            elif pane.disabled == False and widget.value == False:
-                pane.disabled = True
+            pane.disabled = not widget.value
 
     if confname != None:
         wizard.query_one("#conf_name").value = confname
@@ -233,9 +251,9 @@ def config_to_json():
     for item in all_fields:
         if item in not_in_json:
             continue
-        
+
         widget = wizard.query_one("#" + item)
-                
+
         result[item] = widget.value
     return json.dumps(result)
 
@@ -281,15 +299,15 @@ def json_to_dict(s):
                 d[item] = text_defaults[item]
     for group in all_radio_sets:
         items, default_ix = group
-        found_value     = False
+        found_value     = None
         found_anything  = False
         for item in items:
             if item in d and d[item] == True:
                 found_anything = True
                 if found_value:
-                    raise ValueError("Multiple radio buttons in the same set are enabled.")
+                    raise ValueError("Multiple radio buttons in the same set are enabled (got: '%s' and '%s')" % (found_value, item))
                 else:
-                    found_value = True
+                    found_value = item
         if not found_anything:
             default_name = items[default_ix]
             d[default_name] = True
@@ -330,7 +348,7 @@ def dict_to_con4m(d):
         if not s3_uri.startswith("s3://"):
             s3_uri = "s3://" + s3_uri
 
-    # Not going to bother pulling this out for translation; we get to 
+    # Not going to bother pulling this out for translation; we get to
     # expect that other developers can deal w/ english only.
     lines.append("""# WARNING: This configuration was automatically generated
 # by the Chalk install wizard.  Please do not edit it.  Instead, re-run it.
@@ -720,7 +738,7 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         lines.append(profile_set(x_rept_art, '_OP_PLATFORM', 'false'))
         lines.append(profile_set(x_rept_art, '_OP_HOSTINFO', 'false'))
         lines.append(profile_set(x_rept_art, '_OP_NODENAME', 'false'))
-        
+
     if is_true(d, "xrpt_containers"):
         pass # not implemented yet.
 
@@ -733,4 +751,3 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         lines.append('run_sbom_tools = true')
 
     return "\n".join(lines)
-

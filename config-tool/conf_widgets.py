@@ -1,4 +1,4 @@
-from textual.app     import *
+from textual.app import *
 from textual.containers import *
 from textual.coordinate import *
 from textual.widgets import *
@@ -19,7 +19,7 @@ conftable = None
 def set_conf_table(t):
     global conftable
     conftable = t
-        
+
 def sqlite_init():
     global db, cursor, first_run
     base = os.path.expanduser('~')
@@ -45,7 +45,7 @@ def sqlite_init():
     except:
         pass # Already created.
 
-sqlite_init()    
+sqlite_init()
 
 global row_ids
 row_ids = []
@@ -79,13 +79,13 @@ class ModalDelete(ModalScreen):
             classes = "modal_grid"
             )
         yield Footer()
-        
+
     async def on_button_pressed(self, event):
         if event.button.id == "delete_confirm":
             cursor.execute('DELETE FROM configs WHERE id="' + self.iid + '"')
             db.commit()
             conftable.the_table.remove_row(self.iid)
-            msg = ACK_DELETE % self.profilename 
+            msg = ACK_DELETE % self.profilename
 
             self.app.push_screen(AckModal(msg, pops=2))
         else:
@@ -105,7 +105,8 @@ class ExportMenu(Screen):
         yield Header(show_clock=True)
         yield MDown(EXPORT_MENU_INTRO)
         yield RadioSet(RadioButton(JSON_LABEL, True, id = "export_json"),
-                       RadioButton(CON4M_LABEL, id = "export_con4m"))
+                       RadioButton(CON4M_LABEL, id = "export_con4m"),
+                       id = "set_export")
         yield OutfileRow(Input(placeholder= PLACEHOLD_FILE,
                                id="conf_outfile", value = self.confname),
                          Label(PLACEHOLD_OUTFILE, classes="label"))
@@ -114,7 +115,7 @@ class ExportMenu(Screen):
                          Button(CANCEL_LABEL, id="export_cancel",
                                  classes="basicbutton"))
         yield Footer()
-        
+
     async def on_button_pressed(self, event):
         if event.button.id == "export_go":
             val_is_json = self.query_one("#export_json").value
@@ -159,12 +160,12 @@ class ConfigTable(Container):
                 # twice, which shouldn't happen when we're managing it,
                 # but just be defensive for when people have munged the DB
                 # manually.
-                # 
+                #
                 # This basically causes us to skip displaying anything that's
                 # inserted into the DB that's the same config, different name,
                 # past the first one seen.
                 pass
-                
+
     def compose(self):
         yield self.the_table
         yield Horizontal(RunWizardButton(label=NEW_LABEL),
@@ -180,7 +181,7 @@ class RunWizardButton(Button):
     async def on_button_pressed(self):
         await self.app.push_screen('confwiz')
         load_from_json(default_config_json)
-    
+
 class EditConfigButton(Button):
     async def on_button_pressed(self):
         await self.app.push_screen('confwiz')
@@ -222,7 +223,7 @@ class EnvToggle(Switch):
     def on_click(self):
         envpane = get_wizard().query_one("#envconf")
         envpane.disabled = not envpane.disabled
-        
+
 class AlphaModal(AckModal):
     def on_mount(self):
         intro_md.update(INTRO_TEXT)
@@ -252,6 +253,3 @@ def write_binary(dict, config, d):
             return True
     except Exception as e:
         get_app().push_screen(AckModal(GENERATION_EXCEPTION % repr(e)))
-        
-
-        
