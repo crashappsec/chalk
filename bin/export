@@ -4,7 +4,7 @@
 
 import sys, os, tempfile, re, shutil
 
-dirs_to_skip       = ["./.git", "./.github", "./customers", "./bin", "./tests",
+dirs_to_skip       = ["./.git", "./.github", "./testbed", "./customers", "./bin", "./tests",
                       "./chalk.dSYM", "./oss", "./config-tool", "./docker"]
 files_to_skip      = ["./.editorconfig", "./.envrc", "./chalk", "./lto.o",
                       "./.pre-commit-config.yaml",

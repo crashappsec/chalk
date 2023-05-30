@@ -1,0 +1,9 @@
+services:
+  chalk:
+    build:
+      context: .
+      args:
+        CHALK_BUILD: ${CHALK_BUILD:-debug}
+    working_dir: $PWD
+    volumes:
+      - $PWD:$PWD
