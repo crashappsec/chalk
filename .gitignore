@@ -10,3 +10,4 @@ src/c4autoconf.nim
 *.o
 *.json
 *.jsonl
+*.pyc
