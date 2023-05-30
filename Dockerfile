@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/root/.nimble,sharing=locked \
 
 FROM alpine:latest as prod
 
-RUN apk add --no-cache g++ pcre gcompat
+RUN apk add --no-cache pcre gcompat
 
 WORKDIR /
 
