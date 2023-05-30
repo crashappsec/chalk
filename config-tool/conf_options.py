@@ -2,7 +2,20 @@ from pathlib import *
 import sqlite3, os, urllib, tempfile, datetime, hashlib, subprocess, json, stat
 from localized_text import *
 
-current_binary_url = "file://" + os.getcwd() + "/bin/chalk"
+
+
+DB_PATH_LOCAL          = Path(os.path.expanduser("~/.config/chalk"))
+DB_PATH_SYSTEM         = Path("/var/chalk-config/")
+DB_FILE                = Path("chalk-config.db")
+BINARY_DEBUG_URL       = "file://" + os.getcwd() + "/bin/chalk"
+BINARY_RELEASE_URL     = "file://" + os.getcwd() + "/bin/chalk-release"
+CONTAINER_DEBUG_PATH   = "/chalk-config/chalk"
+CONTAINER_RELEASE_PATH = "/chalk-config/chalk-release"
+
+if os.path.isdir("/outdir/"):
+    OUTPUT_DIRECTORY = "/outdir/"
+else:
+    OUTPUT_DIRECTORY   = os.getcwd()
 
 app = None
 

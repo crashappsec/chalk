@@ -1,3 +1,4 @@
+WIZARD_CSS = """
 * {
     transition: background 500ms in_out_cubic, color 500ms in_out_cubic;
 }
@@ -418,3 +419,4 @@ ModalError {
     margin: 0 0 0 3;
     width: 90%;
 }
+"""

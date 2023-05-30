@@ -9,14 +9,15 @@ from textual.widgets import Markdown as MDown
 import time
 from conf_options import *
 from localized_text import *
+from css import WIZARD_CSS
 
 class Nav(Horizontal):           pass
 class WizardSidebar(Container):  pass
 class Body(ScrollableContainer): pass
 
 class AckModal(ModalScreen):
-    CSS_PATH = "wizard.css"
-
+    DEFAULT_CSS=WIZARD_CSS
+    
     def __init__(self, msg, pops=1, wiz=None, button_text="Okay"):
         super().__init__()
         self.wiz = wiz

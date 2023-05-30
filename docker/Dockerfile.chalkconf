@@ -1,0 +1,8 @@
+FROM python:3.11.3-alpine3.17
+RUN apk add gcompat pcre &&\
+    apk add --update binutils
+COPY bin/chalk bin/chalk-release chalkconf /chalk-config/
+WORKDIR /chalk-config
+ENV CHALK_BINARIES_ARE_LOCAL=1
+ENV TERM=xterm-256color
+CMD /chalk-config/chalkconf

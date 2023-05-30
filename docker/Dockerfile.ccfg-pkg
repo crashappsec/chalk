@@ -1,0 +1,9 @@
+FROM python:3.11.3-alpine3.17
+RUN pip install textual markdown-it-py typing-extensions &&\
+    apk add gcompat pcre                                 &&\
+    apk add upx --update binutils
+WORKDIR /chalk-config
+RUN pip install pyinstaller
+COPY config-tool/*.py /chalk-config/
+CMD pyinstaller --onefile chalkconf.py --collect-all textual --collect-all rich && mv dist/chalkconf /mnt/ 
+

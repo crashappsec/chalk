@@ -9,8 +9,10 @@ from textual.widgets import Markdown as MDown
 from localized_text import *
 from pathlib import *
 import sqlite3, os, urllib, tempfile, datetime, hashlib, subprocess, json, stat
+import urllib.request, shutil
 from wizard import *
-import conf_options
+from conf_options import *
+from css import WIZARD_CSS
 
 global cursor, conftable
 cursor = None
@@ -20,13 +22,25 @@ def set_conf_table(t):
     global conftable
     conftable = t
 
+def try_system_init():
+    global db
+    try:
+        db = sqlite3.connect(os.path.join(DB_PATH_SYSTEM, DB_FILE))
+        return True
+    except:
+        return False
+
+def local_init():
+    global db
+    os.makedirs(DB_PATH_LOCAL, exist_ok=True)
+    db = sqlite3.connect(os.path.join(DB_PATH_LOCAL, DB_FILE))
+    
 def sqlite_init():
-    global db, cursor, first_run
-    base = os.path.expanduser('~')
-    dir  = os.path.join(base, Path(".config") / Path("chalk"))
-    os.makedirs(dir, exist_ok=True)
-    fullpath = os.path.join(dir, "chalk-config.db")
-    db = sqlite3.connect(fullpath)
+    global cursor, first_run
+
+    if not try_system_init():
+        local_init()
+
     cursor = db.cursor()
 
     try:
@@ -61,7 +75,7 @@ class OutfileRow(Horizontal): pass
 class ReportingContainer(Container): pass
 
 class ModalDelete(ModalScreen):
-    CSS_PATH = "wizard.css"
+    DEFAULT_CSS=WIZARD_CSS    
     BINDINGS = [("q", "pop_screen()", CANCEL_LABEL),
                 ("d", "delete", DELETE_LABEL)]
 
@@ -92,7 +106,7 @@ class ModalDelete(ModalScreen):
             self.app.pop_screen()
 
 class ExportMenu(Screen):
-    CSS_PATH = "wizard.css"
+    DEFAULT_CSS=WIZARD_CSS
     BINDINGS = [("q", "pop_screen()", CANCEL_LABEL)]
 
     def __init__(self, iid, name, jconf):
@@ -228,28 +242,74 @@ class AlphaModal(AckModal):
     def on_mount(self):
         intro_md.update(INTRO_TEXT)
 
-def write_binary(dict, config, d):
-    binname = d["exe_name"]
-    base_binary = urllib.request.urlopen(current_binary_url).read()
+def write_from_local(dict, config, d):
+    binname  = d["exe_name"]
+    
+    if d["release_build"]:
+        chalk_bin = CONTAINER_RELEASE_PATH
+    else:
+        chalk_bin = CONTAINER_DEBUG_PATH
+
+    c4mfilename = "/tmp/c4mfile"
+    c4mfile = open(c4mfilename, "wb")
+    c4mfile.write(dict_to_con4m(d).encode('utf-8'))
+    c4mfile.close()
+
+    try:
+        subproc = subprocess.run([chalk_bin, "--error", "load", c4mfilename])
+        if subproc.returncode:
+            get_app().push_screen(
+                AckModal(GENERATION_FAILED, pops=2))
+            return True
+        else:
+            newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
+            shutil.move(chalk_bin + ".new", newloc)
+            newloc.chmod(0o774)
+            get_app().push_screen(AckModal(GENERATION_OK % newloc, pops=2))
+            return True
+    except Exception as e:
+        err = chalk_bin + " load " + c4mfilename + ": "
+        get_app().push_screen(AckModal(GENERATION_EXCEPTION % (err + repr(e))))
+            
+def write_from_url(dict, config, d):
+    binname  = d["exe_name"]
+    
+    if d["release_build"]:
+        chalk_url = BINARY_RELEASE_URL
+    else:
+        chalk_url = BINARY_DEBUG_URL
+
+    base_binary = urllib.request.urlopen(chalk_url).read()
     dir = Path(tempfile.mkdtemp())
     loc = dir / Path(binname)
     f = loc.open("wb")
     f.write(base_binary)
     f.close()
-    loc.chmod(stat.S_IEXEC | stat.S_IWRITE | stat.S_IREAD | stat.S_IXGRP)
-    loc.rename(Path(".") / Path(binname))
 
     c4mfile = tempfile.NamedTemporaryFile()
     c4mfile.write(dict_to_con4m(d).encode('utf-8'))
     c4mfile.flush()
     c4mfilename = c4mfile.name
+    loc.chmod(0o774)    
     try:
-        if subprocess.run(["./" + binname, "load", c4mfilename]):
+        subproc = subprocess.run([loc, "--error", "load", c4mfilename])
+        if subproc.returncode:
             get_app().push_screen(
                 AckModal(GENERATION_FAILED, pops=2))
             return True
         else:
+            newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
+            shutil.move(loc.as_posix() + ".new", newloc)
+            newloc.chmod(0o774)
             get_app().push_screen(AckModal(GENERATION_OK % binname, pops=2))
             return True
     except Exception as e:
-        get_app().push_screen(AckModal(GENERATION_EXCEPTION % repr(e)))
+        raise
+        get_app().push_screen(AckModal(loc.as_posix() + ": " + GENERATION_EXCEPTION % repr(e)))
+
+    
+def write_binary(dict, config, d):
+    if "CHALK_BINARIES_ARE_LOCAL" in os.environ:
+        return write_from_local(dict, config, d)
+    else:
+        return write_from_url(dict, config, d)

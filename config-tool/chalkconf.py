@@ -16,6 +16,7 @@ from conf_options import *
 from conf_widgets import *
 from wiz_panes import *
 import conf_widgets
+from css import WIZARD_CSS
 
 first_run = False
 
@@ -87,7 +88,7 @@ class ConfWiz(Wizard):
         self.add_section(sectionBinGen)
 
 class ConfWizScreen(ModalScreen):
-    CSS_PATH = "wizard.css"
+    DEFAULT_CSS=WIZARD_CSS
     TITLE    = CHALK_TITLE
     BINDINGS = [
         Binding(key="q", action="abort_wizard", description = MAIN_MENU),
@@ -130,7 +131,7 @@ set_wizard(wiz)
 
 class NewApp(App):
 
-    CSS_PATH = "wizard.css"
+    DEFAULT_CSS=WIZARD_CSS
     TITLE    = CHALK_TITLE
     SCREENS  = {'confwiz' : wiz_screen }
     BINDINGS = [

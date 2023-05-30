@@ -1,0 +1,90 @@
+#!/bin/bash
+
+function runit {
+    docker run -v "${CHALK_DB}:/var/chalk-config/":Z -e"TERM=${TERM}" -e"COLORTERM=${COLORTERM}" -v "${CHALK_CWD}:/outdir/":Z --rm -it "chalkconf-local:${CHALK_TAG}"
+}
+
+function usage {
+    COLS=`tput cols`
+    COLS=${COLS:-80}
+
+    if command -v fold >/dev/null ; then
+        wrap="fold -s -w ${COLS}"
+    else
+        wrap='cat'
+    fi
+
+    echo "Usage: $0 [flags]"
+    echo
+    echo "This command takes no arguments."
+    echo
+    echo "Available flags:"
+    grep -h "##" $0 | sed "s/) ##/:/" | sed -e 's/[a-zA-Z]/-&/' | \
+        sed -e 's/^ */  /' | grep -v grep | $wrap
+    echo
+    echo "Note that the Chalk configuration tool looks best on terminals that support 'truecolor'. It will look particularly bad in the default MacOS terminal, which only supports 256 colors." | $wrap
+    echo
+    echo "If you have such a terminal, you COLORTERM env var needs to be forwarded through the entire path. This script does it for the call to docker, but if you are connecting via 'ssh', 'kubectl exec' or similar, you may need to set this manually in the place where you're executing this command." | $wrap
+    exit 0
+}
+
+while getopts "dt:o:s:rh" flag
+do
+    case ${flag} in
+        d) ## Run the development container.
+            CHALK_DEV=1
+            ;;
+        t) ## Select the image tag.  Default is 'dev' if -d is passed, or 'latest' otherwise.
+            CHALK_TAG="${OPTARG}"
+            ;;
+        o) ## Set the output directory. Defaults to your working directory.
+            CHALK_CWD="${OPTARG}"
+            ;;
+        r) ## Reset the terminal after exit.  On some platforms this will automatically happen when exiting the GUI.
+            CHALK_RESET=1
+            ;;
+        s) ## SQLlite DB directory on your local file system.  Defaults to ${HOME}/.config/chalk/
+            CHALK_DB="${OPTARG}"
+            ;;
+        h) ## This help message.
+            usage
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done    
+
+if [ ${OPTIND} -le $# ]; then
+    usage
+fi
+
+CHALK_CWD="${CHALK_CWD:$(pwd)}"
+CHALK_DB="${CHALK_DB:${HOME}/.config/chalk/}"
+
+if [ ${CHALK_DEV} ]; then
+    CHALK_TAG="${CHALK_TAG:-dev}"
+    runit
+else
+    CHALK_TAG="${CHALK_TAG:-latest}"
+    runit
+    if [ $? -eq 125 ]; then
+        if [ ${CHALK_TAG} = "latest" ]; then
+            echo "Tag not found.  Trying 'dev'."
+            CHALK_TAG="dev"
+            runit
+        fi
+    else
+        echo "Tag not found.  Trying 'lastest'."
+        CHALK_TAG="latest"
+        runit
+        if [ $? -eq 125 ]; then
+            echo "Tag 'latest' also not found.  Trying 'dev'."
+            CHALK_TAG="dev"
+            runit
+        fi
+    fi
+fi
+            
+if [ ${CHALK_RESET} ]; then reset; fi
+

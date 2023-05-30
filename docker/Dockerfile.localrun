@@ -1,0 +1,11 @@
+FROM python:3.11.3-alpine3.17
+RUN pip install textual markdown-it-py typing-extensions &&\
+    apk add gcompat pcre                                 &&\
+    apk add upx --update binutils
+WORKDIR /chalk-config
+ENV CHALK_BINARIES_ARE_LOCAL=1
+ENV TERM=xterm-256color
+COPY config-tool/*.py bin/chalk bin/chalk-release /chalk-config/
+CMD python chalkconf.py
+
+
