@@ -5,7 +5,11 @@ from pathlib import Path
 from typing import List, Optional
 
 from ..utils.chalk_run_info import ChalkRunInfo
-from ..utils.output import clean_previous_chalk_artifacts, write_exceptions
+from ..utils.output import (
+    clean_previous_chalk_artifacts,
+    handle_chalk_output,
+    write_exceptions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +81,6 @@ def _run_chalk_in_dir(
     clean_previous_chalk_artifacts(bin_cache_dir)
 
     logger.debug("...running chalk in directory %s", bin_cache_dir)
-    # FIXME: ensure chalk is available before running
     process = subprocess.run(
         [
             "chalk",
@@ -92,39 +95,9 @@ def _run_chalk_in_dir(
 
     # chalk should not fail if the binaries are valid, which they all should be
     if process.returncode != 0:
-        logger.error("process failed: %s", process.stderr.decode())
+        logger.error("chalking binary %s failed: %s", bin_name, process.stderr.decode())
 
-    with open(os.path.join(bin_result_dir, "chalk.err"), "w") as errf:
-        errf.write(process.stderr.decode())
-    with open(os.path.join(bin_result_dir, "chalk.out"), "w") as choutf:
-        choutf.write(process.stdout.decode())
-
-    # TODO: move this to output in utils
-    try:
-        if process.returncode == 0:
-            subprocess.run(
-                [
-                    "cp",
-                    "virtual-chalk.json",
-                    bin_result_dir,
-                ],
-                check=True,
-            )
-    except subprocess.CalledProcessError as e:
-        exceptions.append(e)
-
-    try:
-        if process.returncode == 0:
-            subprocess.run(
-                [
-                    "cp",
-                    "chalk-reports.jsonl",
-                    bin_result_dir,
-                ],
-                check=True,
-            )
-    except subprocess.CalledProcessError as e:
-        exceptions.append(e)
+    handle_chalk_output(bin_result_dir, process, exceptions)
 
     os.chdir(cwd)
 

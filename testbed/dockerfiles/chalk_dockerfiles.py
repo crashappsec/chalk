@@ -1,17 +1,22 @@
+import json
 import logging
 import multiprocessing
 import os
 import shutil
 import subprocess
-import sys
 from functools import partial
 from pathlib import Path
 from typing import Any, List, Optional
 
 from ..utils.chalk_run_info import ChalkRunInfo, check_results
-from ..utils.output import clean_previous_chalk_artifacts, write_exceptions
+from ..utils.output import (
+    clean_previous_chalk_artifacts,
+    handle_chalk_output,
+    write_exceptions,
+)
 
 logger = logging.getLogger(__name__)
+
 
 def _run_chalk_in_dir(
     repo_url: str,
@@ -27,7 +32,7 @@ def _run_chalk_in_dir(
     cwd = os.getcwd()
     logger.debug("...building dockerfile")
     os.chdir(repo_cache_dir)
-    
+
     exceptions = []
     try:
         info_commit = (
@@ -42,14 +47,17 @@ def _run_chalk_in_dir(
     # in theory this shouldn't happen as we are filtering them out
     # so for now clean and retry
     # but in the future we should check for this case
+
+    # tag name of form org/repo, or valid/sample
+    tag_name = "/".join(str(repo_result_dir).split("/")[-2:]).lower()
     docker_build = subprocess.run(
         [
             "docker",
             "build",
+            "-t",
+            tag_name,
             "--platform=linux/amd64",
             ".",
-            # TODO: add tags for image inspect
-            # "-t",
         ],
         capture_output=True,
     )
@@ -74,11 +82,17 @@ def _run_chalk_in_dir(
             "--virtual",
             "docker",
             "build",
+            "-t",
+            tag_name,
             "--platform=linux/amd64",
             ".",
         ],
         capture_output=True,
     )
+
+    # chalk should not fail if the docker builds are valid
+    if process.returncode != 0:
+        logger.error("chalking docker build failed")
 
     # if docker passes, chalk should never fail
     if docker_build.returncode == 0 and process.returncode != 0:
@@ -91,7 +105,7 @@ def _run_chalk_in_dir(
         )
     # it is also weird if the docker fails but the chalk passes
     elif docker_build.returncode != 0 and process.returncode == 0:
-                exceptions.append(
+        exceptions.append(
             RuntimeError(
                 f"Docker build failed with {docker_build.returncode} but running chalk succeeded on on {repo_cache_dir}",
                 docker_build.returncode,
@@ -99,63 +113,34 @@ def _run_chalk_in_dir(
             )
         )
 
-    with open(os.path.join(repo_result_dir, "chalk.err"), "w") as errf:
-        errf.write(process.stderr.decode())
-    with open(os.path.join(repo_result_dir, "chalk.out"), "w") as choutf:
-        choutf.write(process.stdout.decode())
-
-    # FIXME: if the build failed, just skip everything that follows
-    # since the chalking will be pointless?
-
-    # TODO: move this to output in utils
-    try:
-        if process.returncode == 0:
-            subprocess.run(
-                [
-                    "cp",
-                    "virtual-chalk.json",
-                    repo_result_dir,
-                ],
-                check=True,
-            )
-    except subprocess.CalledProcessError as e:
-        exceptions.append(e)
-
-    try:
-        if process.returncode == 0:
-            subprocess.run(
-                [
-                    "cp",
-                    "chalk-reports.jsonl",
-                    repo_result_dir,
-                ],
-                check=True,
-            )
-    except subprocess.CalledProcessError as e:
-        exceptions.append(e)
+    handle_chalk_output(repo_result_dir, process, exceptions)
 
     os.chdir(cwd)
 
-    images = list(
-        filter(
-            lambda x: "writing image sha256" in x,
-            docker_build.stderr.decode().split("\n"),
+    # try to find image hash from image tag
+    try:
+        logger.debug("...inspecting docker image %s for hash", tag_name)
+        docker_inspect = subprocess.run(
+            ["docker", "inspect", tag_name], capture_output=True
         )
-    )
+    except Exception as e:
+        logger.error("docker inspect failed")
+        exceptions.append(e)
 
-    # TODO: use this to validate docker images created
-    # and also for cleanup
-    print("images:")
-    for i in images:
-        print(i)
+    # this returns an array of json for some reason
+    inspect_json = json.loads(docker_inspect.stdout.decode())
+    images = []
+    for i in inspect_json:
+        hash = i["Id"].split("sha256:")[1]
+        images.append(hash)
 
     info_img_hash = None
-    for image in images[::-1]:
-        img = image.split("sha256:")[1].split()[0]
-        info_img_hash = img
+    for image in images:
+        info_img_hash = image
+        logger.debug("removing image %s", info_img_hash)
         try:
             subprocess.run(
-                ["docker", "image", "rm", img],
+                ["docker", "image", "rm", info_img_hash],
                 check=False,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -163,13 +148,17 @@ def _run_chalk_in_dir(
         except subprocess.CalledProcessError as e:
             # it's probably fine but alert just in case
             logger.warning("[WARN] docker image removal failed: %s", str(e))
+    if info_img_hash is None:
+        logger.error("image hash info not stored")
 
     write_exceptions(exceptions, repo_result_dir)
+
+    logger.debug("...generating chalk run info")
 
     if local_test:
         # we are running on hardcoded tests, so git commit + url will not make sense
         info_commit = ""
-        repo_url = ""
+        repo_url = str(repo_result_dir)
 
     info = ChalkRunInfo(
         local_test=local_test,
@@ -183,12 +172,13 @@ def _run_chalk_in_dir(
 
     with open(os.path.join(repo_result_dir, "chalk.info"), "w") as choutf:
         choutf.write(info.to_json())
-    
+
     logger.debug("...chalk run info generated")
     return info
 
+
 def _chalk_dockerfile_in_repo(
-    repo: List[str], 
+    repo: List[str],
     *,
     cache_dir: Path,
     result_dir: Path,
@@ -197,7 +187,7 @@ def _chalk_dockerfile_in_repo(
     # repo is tuple of org name and repo name
     repo_url = "https://github.com/" + repo[0] + "/" + repo[1]
     repo_cache_dir = cache_dir / repo[0] / repo[1]
-    
+
     logger.info("[START] chalking %s", repo_cache_dir)
     # check that local cache exists for this repository
     assert repo_cache_dir.is_dir(), f"bad cached repo at {repo_cache_dir}"
@@ -212,7 +202,9 @@ def _chalk_dockerfile_in_repo(
     os.makedirs(repo_result_dir, exist_ok=True)
 
     try:
-        chalk_run_info = _run_chalk_in_dir(repo_url, repo_cache_dir, repo_result_dir, local_test)
+        chalk_run_info = _run_chalk_in_dir(
+            repo_url, repo_cache_dir, repo_result_dir, local_test
+        )
     except KeyboardInterrupt:
         logger.info("chalking interrupted, cleaning up current repository...")
         clean_previous_chalk_artifacts(repo_cache_dir)
@@ -220,6 +212,7 @@ def _chalk_dockerfile_in_repo(
     logger.info("[END] done chalking %s", repo_url)
 
     return chalk_run_info
+
 
 def validate_results(results: List[ChalkRunInfo]):
     if results:
@@ -240,13 +233,18 @@ def validate_results(results: List[ChalkRunInfo]):
     else:
         logger.error("Did not get any results back")
 
+
 def chalk_dockerfiles(
     results_dir: Path,
     cache_dir: Path,
     local_test: bool,
 ) -> List[ChalkRunInfo]:
-    
-    chalk_all = partial(_chalk_dockerfile_in_repo, cache_dir=cache_dir, result_dir=results_dir, local_test=local_test)
+    chalk_all = partial(
+        _chalk_dockerfile_in_repo,
+        cache_dir=cache_dir,
+        result_dir=results_dir,
+        local_test=local_test,
+    )
 
     # list of cached repositories to chalk
     repo_list = []
@@ -257,7 +255,10 @@ def chalk_dockerfiles(
         for repo in os.listdir(cache_dir / org):
             repo_list.append([org, repo])
     if len(repo_list) == 0:
-        logger.error("repository cache at %s is empty! fetch repositories to populate cache before attempting to chalk", cache_dir)
+        logger.error(
+            "repository cache at %s is empty! fetch repositories to populate cache before attempting to chalk",
+            cache_dir,
+        )
         # empty results so we don't break anything
         # technically this isn't an error so we don't raise
         return results
@@ -269,6 +270,7 @@ def chalk_dockerfiles(
     res.wait()
 
     return results
+
 
 def run_dockerfile_tests(
     local_test: bool,
@@ -294,6 +296,9 @@ def run_dockerfile_tests(
         dockerfile_cache = top_level_cache / "dockerfiles"
         assert dockerfile_cache.is_dir(), "repo cache for dockerfiles does not exist!"
 
-    
-    results = chalk_dockerfiles(results_dir=dockerfile_results, cache_dir=dockerfile_cache, local_test=local_test)
+    results = chalk_dockerfiles(
+        results_dir=dockerfile_results,
+        cache_dir=dockerfile_cache,
+        local_test=local_test,
+    )
     validate_results(results)

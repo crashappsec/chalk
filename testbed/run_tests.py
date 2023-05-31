@@ -1,17 +1,21 @@
-from pathlib import Path
-import logging, sys
+import logging
 import shutil
+import subprocess
+import sys
+from pathlib import Path
 
-from .utils.flag import parse_arguments
-from .dockerfiles.fetch_repos import repo_fetch
-from .dockerfiles.chalk_dockerfiles import run_dockerfile_tests
 from .binaries.binaries import fetch_binaries, run_binaries_tests
+from .dockerfiles.chalk_dockerfiles import run_dockerfile_tests
+from .dockerfiles.fetch_repos import repo_fetch
+from .utils.flag import parse_arguments
 
 logger = logging.getLogger(__name__)
+
 
 def clean(dir: Path, module: str):
     logger.info("cleaning %s", dir / module)
     shutil.rmtree(dir / module, ignore_errors=True, onerror=None)
+
 
 def fetch(dir: Path, module: str, count: int):
     logger.info("populating cache for %s", module)
@@ -24,15 +28,39 @@ def fetch(dir: Path, module: str, count: int):
     else:
         logger.error("unknown module %s", module)
 
+
+def _check_chalk_exists() -> bool:
+    try:
+        which_chalk = subprocess.run(
+            ["which", "chalk"],
+            capture_output=True,
+        )
+        chalk_path = which_chalk.stdout.decode().strip()
+        assert chalk_path != "", "empty chalk path"
+        return True
+    except Exception as e:
+        logger.error("chalk binary could not be found: %s", str(e))
+        return False
+
+
 def chalk_and_validate(cache_dir: Path, result_dir: Path, module: str):
     logger.info("chalk and validate %s", module)
+
+    # check that chalk can be found
+    if not _check_chalk_exists():
+        sys.exit(1)
+
     if module == "dockerfiles":
         try:
             # first run tests for locally stored dockerfiles
             run_dockerfile_tests(local_test=True)
 
             # run tests on cached repos
-            run_dockerfile_tests(local_test=False, top_level_results=result_dir, top_level_cache=cache_dir)
+            run_dockerfile_tests(
+                local_test=False,
+                top_level_results=result_dir,
+                top_level_cache=cache_dir,
+            )
         except AssertionError as e:
             logger.error("dockerfile tests broke")
             logger.error(e)
@@ -41,12 +69,17 @@ def chalk_and_validate(cache_dir: Path, result_dir: Path, module: str):
             # tests on stored binaries
             run_binaries_tests(local_test=True)
             # run tests on cached binaries
-            run_binaries_tests(local_test=False, top_level_results=result_dir, top_level_cache=cache_dir)
+            run_binaries_tests(
+                local_test=False,
+                top_level_results=result_dir,
+                top_level_cache=cache_dir,
+            )
         except AssertionError as e:
             logger.error("binaries tests broke")
             logger.error(e)
     else:
         logger.error("unknown module %s", module)
+
 
 if __name__ == "__main__":
     args = parse_arguments()
@@ -61,7 +94,7 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.INFO)
         handler.setLevel(logging.INFO)
-        
+
     logger.addHandler(handler)
     logging.debug("debug on")
 
@@ -78,9 +111,6 @@ if __name__ == "__main__":
             logger.error("unknown module %s", args.module)
             sys.exit(1)
         modules = [args.module]
-
-    # TODO: remove
-    print(cache_dir, result_dir, modules)
 
     # clean results and cache, then exit
     if args.clean:

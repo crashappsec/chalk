@@ -7,11 +7,13 @@ from mashumaro.mixins.json import DataClassJSONMixin
 
 
 # FIXME: remove kw_only and also re-order attributes so that fields with default values follow after the ones without, so that this is compatible with older versions of python like 3.9
-@dataclass(kw_only=True)
+@dataclass
 class ChalkRunInfo(DataClassJSONMixin):
     # local test is true if we are running on hardcoded dockerfiles
     # and false if we are running on repo_cache from github
     local_test: bool
+    result_dir: Path
+    """path with the results for this repo"""
 
     # only valid for repositories we've downloaded from github
     repo_url: str
@@ -19,8 +21,6 @@ class ChalkRunInfo(DataClassJSONMixin):
     commit: Optional[str] = field(default=None)
     """commit hash in the repo as cloned"""
 
-    result_dir: Path
-    """path with the results for this repo"""
     image_hash: Optional[str] = field(default=None)
     """hash of the image built by docker"""
     exceptions: Optional[List[str]] = field(default=None)
@@ -78,9 +78,10 @@ def _check_chalk_reports(info: ChalkRunInfo) -> str:
                         len(vchalk["_CHALKS"]) == 1
                     ), f"Unexpected entries in _CHALKS (got {len(vchalk['_CHALKS'])})"
                     chalk = vchalk["_CHALKS"][0]
+                    current_hash = chalk["_CURRENT_HASH"]
                     assert (
-                        chalk["_CURRENT_HASH"] == info.image_hash
-                    ), "Bad docker image hash"
+                        current_hash == info.image_hash
+                    ), f"Bad docker image hash, expected {info.image_hash} but got {current_hash}"
                     chalk_id = chalk["CHALK_ID"]
                 else:
                     assert (
