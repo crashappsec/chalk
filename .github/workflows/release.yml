@@ -33,6 +33,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v1
 
+      - name: Get chalk version
+        run: |
+          echo "CHALK_VERSION=$(cat chalk_internal.nimble | grep version | grep "=" | cut -d'"' -f2)" >> $GITHUB_ENV
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -43,12 +47,14 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
-      - name: Docker versions
+      - name: Check versions
+        if: env.CHALK_VERSION != ''
         run: |
+          echo "Building with the following versions"
+          echo ${{ env.CHALK_VERSION }}
           docker info
           docker version
 
-      # FIXME add chalk version here possibly?
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v4
         with:
@@ -59,6 +65,7 @@ jobs:
           platforms: linux/${{ matrix.platform }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-latest-${{ matrix.platform }}
+            ghcr.io/${{ github.repository_owner }}/nim:${{ inputs.BASE }}-${{ env.CHALK_VERSION }}-${{ matrix.platform }}
 
   manifest:
     runs-on: ubuntu-latest
@@ -77,4 +84,11 @@ jobs:
         with:
           inputs: ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-latest
           images: ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-latest-amd64,ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-latest-arm64
+          push: true
+
+      - name: Create and push manifest images for specific version
+        uses: Noelware/docker-manifest-action@0.3.1
+        with:
+          inputs: ghcr.io/${{ github.repository_owner }}/nim:${{ inputs.BASE }}-${{ env.CHALK_VERSION }}
+          images: ghcr.io/${{ github.repository_owner }}/nim:${{ inputs.BASE }}-${{ env.CHALK_VERSION }}-amd64,ghcr.io/${{ github.repository_owner }}/nim:${{ inputs.BASE }}-${{ env.CHALK_VERSION }}-arm64
           push: true
