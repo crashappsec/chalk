@@ -1,0 +1,29 @@
+name: test
+
+on: pull_request
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          fetch-depth: 0
+
+      - name: Compile chalk
+        run: docker-compose run chalk-ubuntu
+
+      - name: Initialize python
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.11
+
+      - name: Run docker tests natively on worker
+        run: |
+          pip install pytest structlog
+          python -m pytest tests/test_docker.py
+
+      - name: Run rest of tests
+        run: docker-compose run --rm tests

@@ -7,3 +7,27 @@ services:
     working_dir: $PWD
     volumes:
       - $PWD:$PWD
+
+  chalk-ubuntu:
+    build:
+      context: .
+      # we are using an ubuntu runner by default as this is what gh action
+      # workflows run in and thus we have a binary that can execute directly
+      # in the github worker for any tests needing to run outside docker
+      dockerfile: docker/Dockerfile.chalk-ubuntu
+      target: compile
+    command: sh -c "nimble build"
+    working_dir: $PWD
+    volumes:
+      - $PWD:$PWD
+
+  tests:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.pytests
+    command: pytest tests
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    environment:
+      CONTAINERIZED: "yep"

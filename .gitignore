@@ -1,5 +1,6 @@
 .TODO
-chalk
+/bin/chalk
+/chalk
 # universal tags
 tags
 .DS_Store
@@ -11,3 +12,4 @@ src/c4autoconf.nim
 *.json
 *.jsonl
 *.pyc
+*/__pycache__/*

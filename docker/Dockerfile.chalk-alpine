@@ -1,6 +1,6 @@
 FROM ghcr.io/crashappsec/nim:alpine-latest as compile
 
-# FIXME
+# FIXME get these dynamically
 RUN nimble install -y https://github.com/crashappsec/con4m \
         https://github.com/crashappsec/nimutils \
         nimSHA2@0.1.1 \
@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.nimble,sharing=locked \
 
 # -------------------------------------------------------------------
 
-# published as ghcr.io/crashappsec/chalk:latest
+# published as ghcr.io/crashappsec/chalk:alpine-latest
 
 FROM alpine:latest as release
 

@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "tests"
+version = "0.1.0"
+description = ""
+authors = []
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+structlog = "^23.1.0"
+pytest = "^7.3.1"
+pytest-dependency = "^0.5.1"
+pytest-profiling = "^1.7.0"
+pytest-skip-slow = "^0.0.3"
+pytest-timeout = "^2.1.0"
+python-dateutil = "^2.8.2"
+
+[tool.poetry.group.neovim.dependencies]
+mypy = {version = "^0.991", optional = true}
+neovim = {version = "^0.3.1", optional = true}
+
+[tool.poetry.group.dev.dependencies]
+black = "^22.10.0"
+flake8 = "^5.0.4"
+flake8-bugbear = "^22.8.23"
+flake8-comprehensions = "^3.10.0"
+flake8-print = "^5.0.0"
+isort = "^5.12.0"
+pep8-naming = "^0.13.2"
+ptpython = "^3.0.22"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,6 +1,10 @@
-FROM ghcr.io/crashappsec/nim:alpine-latest as compile
+FROM ghcr.io/crashappsec/nim:ubuntu-1.6.12 as compile
 
-# FIXME
+# XXX this is needed for the github worker
+# https://github.com/actions/runner/issues/2033
+RUN if which git; then git config --global --add safe.directory "*"; fi
+
+# FIXME get these dynamically
 RUN nimble install -y https://github.com/crashappsec/con4m \
         https://github.com/crashappsec/nimutils \
         nimSHA2@0.1.1 \
@@ -27,11 +31,13 @@ RUN --mount=type=cache,target=/root/.nimble,sharing=locked \
 
 # -------------------------------------------------------------------
 
-# published as ghcr.io/crashappsec/chalk:latest
+# published as ghcr.io/crashappsec/chalk:ubuntu-latest
 
-FROM alpine:latest as release
+FROM ubuntu:jammy-20230126 as release
 
-RUN apk add --no-cache pcre gcompat
+RUN apt-get update -y \
+    && apt-get install -y libpcre3 libpcre3-dev \
+    && apt-get clean -y
 
 WORKDIR /
 
