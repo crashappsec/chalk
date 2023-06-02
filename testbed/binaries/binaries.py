@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
-from ..utils.chalk_run_info import ChalkRunInfo
+from ..utils.chalkruninfo import ChalkRunInfo
 from ..utils.output import (
     clean_previous_chalk_artifacts,
     handle_chalk_output,

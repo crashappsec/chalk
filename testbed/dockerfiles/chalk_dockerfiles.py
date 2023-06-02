@@ -8,7 +8,13 @@ from functools import partial
 from pathlib import Path
 from typing import Any, List, Optional
 
-from ..utils.chalk_run_info import ChalkRunInfo, check_results
+from ..utils.chalkruninfo import (
+    CHALK_MAGIC,
+    ChalkRunInfo,
+    check_results,
+    get_insertion_hostinfo,
+    get_insertion_nodename,
+)
 from ..utils.output import (
     clean_previous_chalk_artifacts,
     handle_chalk_output,
@@ -41,6 +47,12 @@ def _run_chalk_in_dir(
     except Exception as e:
         exceptions.append(e)
         info_commit = None
+
+    try:
+        branch = os.popen("git rev-parse --abbrev-ref HEAD").read().rstrip()
+    except Exception as e:
+        exceptions.append(e)
+        branch = None
 
     # TODO: sometimes dockerfiles are not called Dockerfile which breaks this build
     # even though they are valid (ex: example.dockerfile will fail here)
@@ -162,11 +174,21 @@ def _run_chalk_in_dir(
 
     info = ChalkRunInfo(
         local_test=local_test,
-        commit=info_commit,
-        repo_url=repo_url,
         result_dir=repo_result_dir,
-        image_hash=info_img_hash,
         exceptions=[str(x) for x in exceptions],
+        module="dockerfiles",
+        insertion_hostinfo=get_insertion_hostinfo(),
+        insertion_nodename=get_insertion_nodename(),
+        virtual=True,
+        artifact_path=str(repo_cache_dir.absolute()),
+        artifact_type="Docker",
+        operation="build",
+        chalk_ok=process.returncode == 0,
+        # dockerfiles specific info
+        repo_url=repo_url,
+        commit=info_commit,
+        branch=branch,
+        image_hash=info_img_hash,
         docker_build_succeded=docker_build.returncode == 0,
     )
 
@@ -214,22 +236,85 @@ def _chalk_dockerfile_in_repo(
     return chalk_run_info
 
 
+# docker-specific fields in chalkruninfo checked here
+def _validate_dockerfiles_results(info: ChalkRunInfo) -> tuple[bool, str]:
+    if info.docker_build_succeded is True:
+        # if docker succeeded, we should be able to check virtual chalks/chalk reports
+        # taken from validate chalk_reports.jsonl
+        jsonpath = info.result_dir / "chalk-reports.jsonl"
+        if not jsonpath or not jsonpath.is_file():
+            raise AssertionError("File chalk-reports.jsonl does not exist")
+
+        try:
+            contents = jsonpath.read_bytes()
+            if not contents:
+                raise AssertionError("Empty chalk-reports.jsonl")
+            vchalk = json.loads(contents)
+        except json.decoder.JSONDecodeError as e:
+            raise AssertionError("Error decoding chalk-reports.jsonl: %s", e)
+
+        vchalk = json.loads(contents)
+        try:
+            if not info.local_test:
+                # only "real" github repos will have this
+                assert vchalk["COMMIT_ID"] == info.commit, "commit ID mismatch"
+                assert vchalk["ORIGIN_URI"] == info.repo_url, "Bad ORIGIN URI"
+                assert vchalk["BRANCH"] == info.branch, "branch mismatch"
+            if info.docker_build_succeded:
+                assert (
+                    len(vchalk["_CHALKS"]) == 1
+                ), f"Unexpected entries in _CHALKS (got {len(vchalk['_CHALKS'])})"
+                chalk = vchalk["_CHALKS"][0]
+                current_hash = chalk["_CURRENT_HASH"]
+                assert (
+                    current_hash == info.image_hash
+                ), f"Bad docker image hash, expected {info.image_hash} but got {current_hash}"
+            else:
+                assert (
+                    vchalk.get("_CHALKS") is None
+                ), "Docker build did not succeed but we have a _CHALK"
+        except KeyError as e:
+            raise AssertionError("Broken chalk") from e
+        return True, ""
+    elif not (info.result_dir / "chalk.exceptions").is_file():
+        # otherwise, check if there are any unexpected exceptions, and if not return true but with a warning
+        return (
+            True,
+            f"docker build for {info.repo_url} failed, errors match but no chalking has been done",
+        )
+    else:
+        # any other errors are unexpected (ex: cp failed in a way that wasn't file doesn't exist)
+        assert not (
+            info.result_dir / "chalk.exceptions"
+        ).is_file(), "encountered unexpected exceptions, check chalk.exceptions file"
+    return True, ""
+
+
 def validate_results(results: List[ChalkRunInfo]):
     if results:
         for result in results[0]:
             try:
+                # check_results checks common chalkruninfo fields
                 check = check_results(result)
-                if check[0]:
+
+                # check dockerfiles specific fields, like repo_url
+                dockerfiles_check = _validate_dockerfiles_results(result)
+                if check[0] and dockerfiles_check[0]:
                     logger.info("[PASS] %s", result.repo_url)
                 else:
-                    logger.info("========== [FAIL]")
+                    logger.info("========== [FAIL] %s", result.repo_url)
 
                 # pass or fail might both have warnings
                 if check[1] != "":
                     logger.info("========== [WARN] %s", check[1])
-            except Exception as e:
-                logger.error("check results has error " + str(e))
+                if dockerfiles_check[1] != "":
+                    logger.info("========== [WARN] %s", dockerfiles_check[1])
+            except AssertionError as e:
+                logger.info("========== [FAIL] %s", result.repo_url)
+                logger.info("failed validation: %s" + str(e))
                 continue
+            except Exception as e:
+                logger.error("Unexpected exception: %s", str(e))
     else:
         logger.error("Did not get any results back")
 
