@@ -21,6 +21,9 @@ jobs:
   release:
     runs-on: ${{ matrix.builder }}
 
+    outputs:
+      chalkversion: ${{ steps.chalkversion.outputs.version }}
+
     strategy:
       matrix:
         include:
@@ -34,8 +37,10 @@ jobs:
         uses: actions/checkout@v1
 
       - name: Get chalk version
+        id: chalkversion
         run: |
-          echo "CHALK_VERSION=$(cat chalk_internal.nimble | grep version | grep "=" | cut -d'"' -f2)" >> $GITHUB_ENV
+          echo "CHALK_VERSION=$(cat chalk_internal.nimble | grep version | grep "=" | cut -d'"' -f2)" >> "$GITHUB_ENV"
+          echo "version=$(cat chalk_internal.nimble | grep version | grep "=" | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -89,6 +94,6 @@ jobs:
       - name: Create and push manifest images for specific version
         uses: Noelware/docker-manifest-action@0.3.1
         with:
-          inputs: ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-${{ env.CHALK_VERSION }}
-          images: ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-${{ env.CHALK_VERSION }}-amd64,ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-${{ env.CHALK_VERSION }}-arm64
+          inputs: ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-${{ needs.release.outputs.chalkversion }}
+          images: ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-${{ needs.release.outputs.chalkversion }}-amd64,ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-${{ needs.release.outputs.chalkversion }}-arm64
           push: true
