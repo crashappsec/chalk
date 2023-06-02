@@ -1,0 +1,11 @@
+services:
+  dev:
+    build: .
+    volumes:
+      - ./include:/workspace/include
+      - ./src:/workspace/src
+      - ./bin:/workspace/bin
+      - ./scratch:/workspace/scratch
+    platform: linux/amd64
+      
+    
