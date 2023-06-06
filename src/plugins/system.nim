@@ -8,7 +8,6 @@ import os, nativesockets, tables, options, strutils, nimSHA2, sequtils, times,
        ../config, ../plugins, ../normalize, ../chalkjson
 
 when defined(posix): import posix_utils
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 
 type
   SystemPlugin* = ref object of Plugin

@@ -5,7 +5,6 @@
 import os, tables, httpclient, json, options, nimutils, ../config, ../plugins
 
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
 type AwsEcs = ref object of Plugin
 
 var cloudMetadataUrl = os.getEnv("ECS_CONTAINER_METADATA_URI")

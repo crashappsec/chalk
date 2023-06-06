@@ -75,6 +75,9 @@ var
   currentOutputCfg:   OutputConfig
   `isChalkingOp?`:    bool
 
+
+addDefaultSinks()
+
 template dumpExOnDebug*() =
   if chalkConfig != nil and chalkConfig.getChalkDebug():
     publish("debug", getCurrentException().getStackTrace())
@@ -181,10 +184,19 @@ proc getEmbeddedConfig(): string =
   result         = defaultConfig
   let extraction = getSelfExtraction()
   if extraction.isSome():
-    let selfChalk = extraction.get().extract
-    if selfChalk != nil and selfChalk.contains("$CHALK_CONFIG"):
+    let
+      selfChalk = extraction.get()
+    if selfChalk.extract != nil and selfChalk.extract.contains("$CHALK_CONFIG"):
       trace("Found embedded config file in self-chalk.")
-      return unpack[string](selfChalk["$CHALK_CONFIG"])
+      return unpack[string](selfChalk.extract["$CHALK_CONFIG"])
+    else:
+      if selfChalk.marked:
+        trace("Found an embedded chalk mark, but it did not contain a config.")
+      else:
+        trace("No embedded chalk mark.")
+      trace("Using the default user config.  See 'chalk dump' to view.")
+  else:
+    trace("Since this binary can't be marked, using the default config.")
 
 proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
   result = none((string, FileStream))
@@ -212,7 +224,7 @@ proc getAutoHelp*(): string = autoHelp
 const
   availableFilters = { "log_level"     : MsgFilter(logLevelFilter),
                        "log_prefix"    : MsgFilter(logPrefixFilter),
-                       "pretty_json"   : MsgFilter(prettyJson),
+                       "pretty_json"   : MsgFilter(prettyJsonl),
                        "fix_new_line"  : MsgFilter(fixNewline),
                        "add_topic"     : MsgFilter(addTopic),
                        "wrap"          : MsgFilter(wrapToWidth)
@@ -229,6 +241,28 @@ var availableSinkConfigs = { "log_hook"     : defaultLogHook,
 
 when not defined(release):
   availableSinkConfigs["debug_hook"] = defaultDebugHook
+
+
+# This is used by reportcache.nim
+var sinkErrors*: seq[SinkConfig] = @[]
+
+proc getSinkConfigNameByObject*(cfg: SinkConfig): Option[string] =
+  result = none(string)
+
+  for name, obj in availableSinkConfigs:
+    if obj == cfg:
+      return some(name)
+
+
+proc ioErrorHandler(cfg: SinkConfig, t: Topic, msg, err, tb: string) =
+  sinkErrors.add(cfg)
+
+  let name = cfg.getSinkConfigNameByObject.getOrElse("<error: invalid>")
+
+  error("When sending data via sink configuration " & name & ": " & err)
+  if chalkConfig != nil and chalkConfig.getChalkDebug():
+    publish("debug", tb)
+
 
 proc getSinkConfigByName*(name: string): Option[SinkConfig] =
   if name in availableSinkConfigs:
@@ -257,8 +291,16 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       filterNames = getOpt[seq[string]](attrs, k).getOrElse(@[])
     of "sink":
       sinkName    = getOpt[string](attrs, k).getOrElse("")
+    of "max":
+      try:
+        # This will accept con4m size types; they're auto-converted to int.
+        let asInt = getOpt[int64](attrs, k).getOrElse(int64(10 * 1048576))
+        opts[k] = $(asInt)
+      except:
+        error("'max' key in sink config must be a size specification")
+        continue
     else:
-      opts[k]     = getOpt[string](attrs, k).getOrElse("")
+      opts[k] = getOpt[string](attrs, k).getOrElse("")
 
   case sinkName
   of "":
@@ -291,7 +333,8 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     else:
      filters.add(availableFilters[item])
 
-  result = configSink(theSinkOpt.get(), some(opts), filters)
+  result = configSink(theSinkOpt.get(), some(opts), filters,
+                      some(FailCallback(ioErrorHandler)))
 
   if result.isSome():
     availableSinkConfigs[name] = result.get()
@@ -305,13 +348,14 @@ proc getSinkConfigs*(): Table[string, SinkConfig] = return availableSinkConfigs
 proc setupDefaultLogConfigs*() =
   let
     cacheFile = chalkConfig.getReportCacheLocation()
-    doCache   = chalkConfig.getUseReportCache()
     auditFile = chalkConfig.getAuditLocation()
     doAudit   = chalkConfig.getPublishAudit()
 
   if doAudit and auditFile != "":
     let
-      f         = some(newOrderedTable({ "filename" : auditFile}))
+      f         = some(newOrderedTable({ "filename" : auditFile,
+                                         "max" :
+                                         $(chalkConfig.getAuditFileSize())}))
       auditConf = configSink(getSink("rotating_log").get(), f).get()
 
     availableSinkConfigs["audit_file"] = auditConf
@@ -319,22 +363,9 @@ proc setupDefaultLogConfigs*() =
       error("Unknown error initializing audit log.")
     else:
       trace("Audit log subscription enabled")
-  if doCache:
-    let
-      f         = some(newOrderedTable({"filename" : cacheFile}))
-      cacheConf = configSink(getSink("rotating_log").get(), f).get()
-
-    availableSinkConfigs["report_cache"] = cacheConf
-    if subscribe("report", cacheConf).isNone():
-      error("Unknown error initializing report cache.")
-    else:
-      trace("Report cache subscription enabled")
-
   let
     uri       = chalkConfig.getCrashOverrideUsageReportingUrl()
-    workspace = chalkConfig.getCrashOverrideWorkspaceId()
-    headers   = "X-Crashoverride-Workspace-Id: " & workspace & "\n" &
-                "Content-Type: application/json"
+    headers   = "Content-Type: application/jsonl"
 
     params  = some(newOrderedTable({ "uri": uri, "headers" : headers }))
     useConf = configSink(getSink("post").get(), params)

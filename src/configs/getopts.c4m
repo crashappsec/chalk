@@ -134,6 +134,8 @@ By default, this will write to "./virtual-chalk.json"
 
     doc: """
 Shows nim stack traces where appropriate, generally where exceptions were caught.
+
+Additionally, if temporary files might be useful to inspect, this causes them to not get deleted.  Specifically, docker temporary files (most notably any docker file modifications) get left behind.
 """
   }
 
@@ -296,6 +298,20 @@ You can use the 'dump' command to dump the output first.
 
 See 'help config' for an overview of the configuration file format.
 """
+
+    flag_yn validation {
+      field_to_set: "validate_configs_on_load"
+      doc: """
+When on, validate config files before loading them, by doing a trial run.
+"""
+    }
+
+    flag_yn validation_warning {
+      field_to_set: "validation_warning"
+      doc: """
+This verbose flag controls whether or not you get the verbose warning.  It's much better turning this off in your embedded configuration :)
+"""      
+    }
   }
 
   command version {

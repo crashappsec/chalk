@@ -6,8 +6,6 @@
 
 import tables, options, algorithm, strutils, ../plugins, ../config
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 type
   ToolPlugin* = ref object of Plugin
   PIInfo      = ref object

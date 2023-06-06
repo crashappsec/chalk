@@ -7,8 +7,6 @@
 
 import tables, strutils, os, ../config, ../plugins
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 type GithubCI = ref object of Plugin
 
 method getHostInfo*(self: GithubCI, path: seq[string], ins: bool): ChalkDict =

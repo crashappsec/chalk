@@ -8,7 +8,7 @@ services:
     volumes:
       - $PWD:$PWD
 
-  chalk-ubuntu:
+  chalk-compile-ubuntu:
     build:
       context: .
       # we are using an ubuntu runner by default as this is what gh action
@@ -16,7 +16,16 @@ services:
       # in the github worker for any tests needing to run outside docker
       dockerfile: docker/Dockerfile.chalk-ubuntu
       target: compile
-    command: sh -c "nimble build"
+    command: sh -c "nimble debug"
+    working_dir: $PWD
+    volumes:
+      - $PWD:$PWD
+
+  chalk-compile:
+    build:
+      context: .
+      target: compile
+    command: sh -c "nimble debug"
     working_dir: $PWD
     volumes:
       - $PWD:$PWD
@@ -28,6 +37,5 @@ services:
     command: pytest tests
     volumes:
       - $PWD:$PWD
+      - /var/run/docker.sock:/var/run/docker.sock
     working_dir: $PWD
-    environment:
-      CONTAINERIZED: "yep"

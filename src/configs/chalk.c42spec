@@ -1250,7 +1250,8 @@ This controls whether the default 'usage' audit is published. The
 usage audit is a pre-configured report called 'audit'.
 
 By default, it is hooked up to a file sink, the location of which is
-specified by the audit_location variable.
+specified by the audit_location variable, and the max size of which is
+specified  by the audit_file_size variable.
 """
   }
 
@@ -1265,6 +1266,17 @@ that subscribes to the 'audit' topic.
 ./chalk-audit.jsonl
 """
   }
+
+  field audit_file_size {
+    type:       Size
+    shortdoc:   "Audit Report log max size"
+    default:    <<100mb>>
+    doc:        """
+When using the default log file for the built-in audit report (which, by the way, is off by default), this controls the maximum size allowable for the audit log. If a write to the cache would exceed this amount, the system will truncate down to 75% of the size.
+"""
+  }
+
+
 
   field artifact_search_path {
     type:     list[string]
@@ -1427,15 +1439,26 @@ Note that '--no-publish-defaults' at the command line will block this feature, e
   }
   field use_report_cache {
     type:       bool
-    default:    false
+    default:    true
     shortdoc:   "Report cache on"
     doc:       """
-The report cache is a self-truncating local log file, indended to add protection
-against reporting not reaching its destination. This is obviously not worthwhile
-for transient infrastructure. In such a case, configure and attach multiple
- sinks instead.
+The report cache is a self-truncating local log file, indended to add protection against reporting not reaching its destination. This will get used any time publishing to *any* sink fails to write.  
 
-Note that this can be set on the command line with --log.
+The report cache will re-publish on subsequent runs by appending any unsent messages to the jsonl report.  It does so on a sink-by-sink basis, based on the name of the sink.  It will never publish to the same sink twice.
+
+A few important notes:
+
+1. This functionality applies both to the default 'report' topic, and for custom reports.
+
+2. If the report cache successfully flushes all its contents, it will leave a zero-byte file (it does not remove the file).  Still, it doesn't write the file for the first time until there is a failure.
+
+3. If, for any reason, writing to the report cache fails, there will be a forced write to stderr, whether you've subscribed to it or not, in an attempt to prevent data loss.
+
+4. There is currently not a way to specify a 'fallback' sink.
+
+5. If this is off, there is no check for previously cached data.
+
+Note that this field is set on the command line with --log / --no-log.
 """
   }
 
@@ -1446,12 +1469,14 @@ Note that this can be set on the command line with --log.
     doc:        "Where to write the report cache, if in use."
   }
 
-  field report_cache_size {
-    type:       Size
-    shortdoc:   "Report cache size"
-    default:    <<10mb>>
-    doc:        """
-If a write to the cache would exceed this amount, the system will truncate down to 75% of this size before doing the write.
+  field force_output_on_reporting_fails {
+    type:       bool
+    default:    true
+    shortdoc:  "Force stderr reporting on io error"
+    doc: """
+If this is true, and no reporting configurations successfully handle the metadata, then this will cause the report that should have been output to write to the user's terminal if there is one, or stderr if not.
+
+Note that this is NOT checked if there is a report cache enabled; even if the report cache fails, then there will be console output. 
 """
   }
 
@@ -1491,6 +1516,24 @@ For the ENV and _ENV metadata keys, any environment variable listed here will ge
 For the ENV and _ENV metadata keys, any environment variable that is not listed explicitly in the above lists will be handled as specified here.
 """
   }
+
+  field validate_configs_on_load {
+    type:        bool
+    default:     true
+    hidden:      true
+    doc:         """
+Suppress validation of configuration files on loading.  Please don't do this!
+"""
+  }
+
+  field validation_warning {
+    type:        bool
+    default:     true
+    doc:         """
+Show the (admittedly verbose) warning you get when running 'chalk load'.
+"""    
+  }
+  
   #% INTERNAL
   field entrypoint {
     type:    string
@@ -1505,7 +1548,7 @@ command line parsing won't happen.
 
   field crashoverride_usage_reporting_url {
     type:       string
-    default:    "https://chalk.crashoverride.run/report"
+    default:    "https://chalk.crashoverride.run/v0.1/usage"
     hidden:     true
     doc:        "Used to approximate overall chalk usage. See the usage report"
   }
@@ -2039,8 +2082,15 @@ func sink_config_check(path) {
               "', but the specified sink '" + sinkname +
 	      "' does not use that field.")
     }
-    if not typecmp(attr_type(path + "." + conffield), string) {
-      return "All sink_config fields must be strings."
+    
+    if (conffield == "max") {
+      t := attr_type(path + "." + conffield)
+      if not typecmp(t, Size) and not typecmp(t, int) {
+          return "This field must be a con4m Size, or an int (in bytes)"
+      }
+    }
+    elif not typecmp(attr_type(path + "." + conffield), string) {
+      return "This field must be a string."
     }
   }
 

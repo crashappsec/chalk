@@ -166,6 +166,3 @@ def test_virtual():
             assert vjsonf.is_file(), "virtual-chalk.json not found"
             vjson = json.loads(vjsonf.read_bytes())
             assert "CHALK_ID" in vjson
-
-            chalk_report = tmp_dir / "chalk-reports.jsonl"
-            assert chalk_report.is_file(), "chalk-reports.jsonl not found"

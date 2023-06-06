@@ -11,8 +11,6 @@ const
   dirDoc       = "docs"
   gitRoot      = ".git"
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 proc findAuthorsFile(fullpath: string): string =
   let (head, tail) = splitPath(fullpath)
   if tail == "": return ""

@@ -253,6 +253,12 @@ proc getSelfExtraction*(): Option[ChalkObj] =
     # This can stay here, but won't show if the log level is set in the
     # config file, since this function runs before the config files load.
     # It will only be seen if running via --trace.
+    #
+    # Also, note that this function extracts any chalk, but our first
+    # caller, getEmbededConfig() in config.nim, checks the results to
+    # see if the mark is there, and reports whether it's found or not.
+    # This trace happens here mainly because we easily have the
+    # resolved path here.
     trace("Checking chalk binary '" & myPath[0] & "' for embedded config")
 
     for codec in getCodecs():

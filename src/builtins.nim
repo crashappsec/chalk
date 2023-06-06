@@ -9,65 +9,48 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import config, streams, options, tables, std/tempfiles, os
+import config, streams, options, tables
 
-proc modedFileSinkOut(msg: string, cfg: SinkConfig, t: StringTable): bool =
-  try:
-    var stream = cast[FileStream](cfg.private)
-    stream.write(msg)
+var doingTestRun = false
+
+proc startTestRun*() =
+  doingTestRun = true
+
+proc endTestRun*() =
+  doingTestRun = false
+
+proc moddedFileSinkOut(msg: string, cfg: SinkConfig, t: StringTable) =
+  var
+    reportOpen = false
+    stream     = FileStream(cfg.private)
+
+  if stream == nil:
+    reportOpen = true
+
+  fileSinkOut(msg, cfg, t)
+  if reportOpen:
+    info("Opened file: " & cfg.config["filename"])
+
+  info("Wrote to file: " & cfg.config["filename"])
+
+proc moddedRotoOut(msg: string, cfg: SinkConfig, t: StringTable) =
+  var
+    reportOpen = false
+    logState   = LogSinkState(cfg.private)
+
+  if logState.stream == nil:
+    reportOpen = true
+
+  rotoLogSinkOut(msg, cfg, t)
+  if reportOpen:
+    info("Opened file: " & cfg.config["filename"])
+  if logState.truncated:
+    info("Wrote log then truncated by 25%: " & cfg.config["filename"])
+  else:
     info("Wrote to file: " & cfg.config["filename"])
-    return true
-  except:
-    once:
-      # Let's not get too spammy here.  This will not error once per
-      # file, but it's better than spam.
-      error("Unable to write to file: " & cfg.config["filename"])
-      dumpExOnDebug()
 
-    return false
-
-allSinks["file"].outputFunction = OutputCallback(modedFileSinkOut)
-
-proc truncatingLog(msg: string, cfg: SinkConfig, t: StringTable): bool =
-  let
-    maxSize   = int(chalkConfig.reportCacheSize)
-    truncSize =  maxSize shr 2    # 25%
-    filename  = resolvePath(cfg.config["filename"])
-  var f       = newFileStream(filename, mode = fmAppend)
-
-  try:
-    if f == nil:
-      f = newFileStream(filename, mode = fmWrite)
-      if f == nil:
-        error(filename & ": cannot create log file (permissions issue?)")
-        return
-    f.write(msg & "\n")
-    let loc = f.getPosition()
-    f.close()
-    if loc > maxSize:
-      var
-        oldf             = newFileStream(fileName, fmRead)
-        (newfptr, path)  = createTempFile(tmpFilePrefix, tmpFileSuffix)
-        newf             = newFileStream(newfptr)
-
-      while oldf.getPosition() < truncSize:
-        discard oldf.readLine()
-
-      while oldf.getPosition() < loc:
-        newf.writeLine(oldf.readLine())
-
-      oldf.close()
-      newf.close()
-      moveFile(path, fileName)
-  except:
-    error(fileName & ": error truncating file: " & getCurrentExceptionMsg())
-    dumpExOnDebug()
-
-let conf = SinkRecord(outputFunction: truncatingLog,
-                      keys:           {"filename" : true}.toTable())
-
-registerSink("rotating_log", conf)
-
+allSinks["file"].outputFunction         = OutputCallback(moddedFileSinkOut)
+allSinks["rotating_log"].outputFunction = OutputCallback(moddedRotoOut)
 
 var args: seq[string]
 
@@ -86,6 +69,10 @@ proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getChalkExeVersion()))
 
 proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
+
+  if doingTestRun:
+    return some(pack(true))
+
   let
     topic  = unpack[string](args[0])
     config = unpack[string](args[1])
@@ -106,6 +93,9 @@ proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   return some(pack(true))
 
 proc topicUnsubscribe(args: seq[Box], unused: ConfigState): Option[Box] =
+  if doingTestRun:
+    return some(pack(true))
+
   let
     topic  = unpack[string](args[0])
     config = unpack[string](args[1])
@@ -115,8 +105,7 @@ proc topicUnsubscribe(args: seq[Box], unused: ConfigState): Option[Box] =
 
   return some(pack(unsubscribe(topic, `rec?`.get())))
 
-proc chalkErrSink(msg: string, cfg: SinkConfig, arg: StringTable): bool =
-  result = true
+proc chalkErrSink(msg: string, cfg: SinkConfig, arg: StringTable) =
   let errObject = getErrorObject()
   if not isChalkingOp() or errObject.isNone(): systemErrors.add(msg)
   else: errObject.get().err.add(msg)
@@ -145,15 +134,27 @@ proc logBase(ll: string, args: seq[Box], s: ConfigState): Option[Box] =
   return none(Box)
 
 proc logError(args: seq[Box], s: ConfigState): Option[Box] =
+  if doingTestRun:
+    return some(pack(true))
+
   return logBase("error", args, s)
 
 proc logWarn(args: seq[Box], s: ConfigState): Option[Box] =
+  if doingTestRun:
+    return some(pack(true))
+
   return logBase("warn", args, s)
 
 proc logInfo(args: seq[Box], s: ConfigState): Option[Box] =
+  if doingTestRun:
+    return some(pack(true))
+
   return logBase("info", args, s)
 
 proc logTrace(args: seq[Box], s: ConfigState): Option[Box] =
+  if doingTestRun:
+    return some(pack(true))
+
   return logBase("trace", args, s)
 
 let chalkCon4mBuiltins* = [

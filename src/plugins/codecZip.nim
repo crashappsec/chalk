@@ -7,8 +7,6 @@
 import zippy/ziparchives_v1, streams, nimSHA2, tables, strutils, options, os,
        std/algorithm, std/tempfiles, ../config, ../chalkjson, ../plugins
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 const zipChalkFile = ".chalk.json"
 
 type

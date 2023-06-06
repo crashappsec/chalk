@@ -9,8 +9,6 @@
 import tables, os
 import nimutils, ../types, ../plugins
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 type GitlabCI = ref object of Plugin
 
 method getHostInfo*(self: GitlabCI, path: seq[string], ins: bool): ChalkDict =

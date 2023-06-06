@@ -5,7 +5,8 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import tables, options, strutils, unicode, os, streams, posix, osproc, sugar,
-       config, builtins, collect, chalkjson, plugins, plugins/codecDocker
+       config, builtins, collect, chalkjson, reportcache, plugins,
+       plugins/codecDocker
 from json import parseJson, getElems
 import macros except error
 
@@ -90,7 +91,6 @@ proc setPerChalkReports(successProfileName: string,
   if len(reports) != 0:       hostInfo["_CHALKS"] = pack(reportJson)
   elif "_CHALKS" in hostInfo: hostInfo.del("_CHALKS")
 
-# Next, our reporting.
 template doCommandReport(): string =
   let
     conf        = getOutputConfig()
@@ -142,14 +142,7 @@ template doCustomReporting() =
                        spec.hostProfile)
     let profile = chalkConfig.profiles[spec.hostProfile]
     if profile.enabled:
-      try:
-        publish(topic, hostInfo.prepareContents(profile))
-        trace("Published to topic '" & topic & "'")
-      except:
-        error("Publishing to topic '" & topic & "' failed; an exception was " &
-          "raised when trying to write to a sink. Please check your sink " &
-          "configuration and outbound connectivity.  " &
-          getCurrentExceptionMsg() & "\n")
+      safePublish(topic, hostInfo.prepareContents(profile))
 
 proc liftUniformKeys() =
   let allChalks = getAllChalks()
@@ -204,9 +197,9 @@ proc doReporting(topic="report") =
     liftUniformKeys()
     let report = doCommandReport()
     if report != "":
-      publish(topic, report)
-      trace("Published to topic '" & topic & "'")
+      safePublish(topic, report)
     doCustomReporting()
+    writeReportCache()
 
 proc runCmdExtract*(path: seq[string]) =
   initCollection()
@@ -548,27 +541,42 @@ proc runCmdConfLoad*() =
       cantLoad(filename & ": could not read configuration file")
       dumpExOnDebug()
 
-    info(filename & ": Validating configuration.")
+    if chalkConfig.getValidateConfigsOnLoad():
+      info(filename & ": Validating configuration.")
+      if chalkConfig.getValidationWarning():
+        warn("Note: validation involves creating a new configuration context"  &
+             " and evaluating your code to make sure it at least evaluates "   &
+             "fine on a default path.  subscribe() and unsubscribe() will "    &
+             "ignore any calls, but if your config always shells out, it will" &
+             " happen here.  To skip error checking, you can add "             &
+             "--no-validation.  But, if there's a basic error, chalk may not " &
+             "run without passing --no-embedded-config.  Suppress this "       &
+             "message in the future by setting `no_validation_warning` in the" &
+             " config, or passing --no-validation-warning on the command line.")
 
-    let
-      toStream = newStringStream
-      stack    = newConfigStack().addSystemBuiltins().
-                 addCustomBuiltins(chalkCon4mBuiltins).
-                 addGetoptSpecLoad().
-                 addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
-                 addConfLoad(baseConfName, toStream(baseConfig)).
-                 setErrorHandler(newConfFileError).
-                 addConfLoad(ioConfName,   toStream(ioConfig))
-    stack.run()
-    stack.addConfLoad(filename, toStream(newCon4m)).run()
+      let
+        toStream = newStringStream
+        stack    = newConfigStack().addSystemBuiltins().
+                   addCustomBuiltins(chalkCon4mBuiltins).
+                   addGetoptSpecLoad().
+                   addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
+                   addConfLoad(baseConfName, toStream(baseConfig)).
+                   setErrorHandler(newConfFileError).
+                   addConfLoad(ioConfName,   toStream(ioConfig))
+      stack.run()
+      startTestRun()
+      stack.addConfLoad(filename, toStream(newCon4m)).run()
+      endTestRun()
 
-    if not stack.errored:
-      trace(filename & ": Configuration successfully validated.")
+      if not stack.errored:
+        trace(filename & ": Configuration successfully validated.")
+      else:
+        addUnmarked(selfChalk.fullPath)
+        selfChalk.opFailed = true
+        doReporting()
+        return
     else:
-      addUnmarked(selfChalk.fullPath)
-      selfChalk.opFailed = true
-      doReporting()
-      return
+      trace("Skipping configuration validation.")
 
   selfChalk.collectChalkInfo()
   selfChalk.collectedData["$CHALK_CONFIG"] = pack(newCon4m)
@@ -637,6 +645,7 @@ proc virtualMarkCleanup() =
 
   try:
     removeFile(get[string](conf.`@@attrscope@@`, "filename"))
+    trace("Removed empty virtual chalk file.");
   except:
     discard
 
@@ -706,6 +715,7 @@ proc runCmdDocker*() {.noreturn.} =
           else:
             try:
               chalk.writeChalkMark(toWrite)
+              virtualMarkCleanup()
               #% INTERNAL
               var wrap = chalkConfig.dockerConfig.getWrapEntryPoint()
               if wrap:

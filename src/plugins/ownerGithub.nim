@@ -12,8 +12,6 @@ const
   gitRoot   = ".git"
   dirDoc    = "docs"
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 proc findCOFile(fullpath: string): string =
   let (head, tail) = splitPath(fullpath)
   if tail == "": return ""

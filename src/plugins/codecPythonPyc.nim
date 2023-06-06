@@ -6,8 +6,6 @@
 
 import tables, strutils, options, streams, nimSHA2, ../config, ../plugins, os
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 type CodecPythonPyc* = ref object of Codec
 
 method scan*(self:   CodecPythonPyc,

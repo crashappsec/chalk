@@ -133,6 +133,7 @@ sink_config my_https_config {
 }
 
 sink_config my_s3_config {
+  sink:    "s3"
   enabled: true
   uri:     env("AWS_S3_BUCKET_URI")
   secret:  env("AWS_ACCESS_SECRET")

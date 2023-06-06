@@ -9,8 +9,6 @@
 import tables,os
 import nimutils, ../types, ../plugins
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 type JenkinsCI = ref object of Plugin
 
 method getHostInfo*(self: JenkinsCI, path: seq[string], ins: bool): ChalkDict =

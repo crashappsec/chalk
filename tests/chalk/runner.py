@@ -73,6 +73,9 @@ class Chalk:
             logger.error(
                 "Chalk invocation failed",
                 error=e,
+                output=e.output,
+                stderr=e.stderr,
+                returncode=e.returncode,
                 target=target,
                 params=params,
                 chalk_cmd=chalk_cmd,

@@ -173,9 +173,6 @@ proc parseGitConfig(s: Stream): seq[SecInfo] =
     if sec == "": return
     else:         result.add((sec, sub, pairs))
 
-
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 proc findGitDir(fullpath: string): string =
   let
     (head, tail) = fullpath.splitPath()

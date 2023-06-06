@@ -30,4 +30,4 @@ COPY tests/pyproject.toml tests/poetry.lock $WORKDIR/
 RUN poetry install --no-plugins
 
 # install chalk deps
-RUN apk add --no-cache pcre gcompat
+RUN apk add --no-cache pcre gcompat docker docker-compose

@@ -13,8 +13,6 @@
 import tables, options, streams, strutils, endians, nimSHA2, ../config,
        ../plugins
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 const
   b64OffsetLoc = 0x28
   b32OffsetLoc = 0x20

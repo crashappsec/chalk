@@ -5,8 +5,6 @@ import tables, strutils, json, options, os, osproc, streams, parseutils,
        posix_utils, std/tempfiles, nimutils, con4m, ../config, ../plugins,
        ../dockerfile
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 type
   CodecDocker* = ref object of Codec
   DockerFileSection = ref object

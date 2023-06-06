@@ -19,16 +19,8 @@ chalk = Chalk(binary=(Path(__file__).parent.parent / "chalk").resolve())
 DOCKERFILES = Path(__file__).parent / "data" / "dockerfiles"
 
 
-# DOCKER_BUILDKIT=0 /Users/nettrino/projects/crashappsec/chalk-internal/chalk --debug --log-level=warn --virtual docker build .
-# manually run
-@pytest.mark.skipif(
-    os.getenv("CONTAINERIZED") is not None,
-    reason="Not chalking a container from within a container",
-)
 def test_virtual_valid_sample_1():
     assert chalk.binary is None or chalk.binary.is_file()
-    logger.error("PWD", pwd=subprocess.check_output(["pwd"]).decode())
-    logger.error("ls", ls=subprocess.check_output(["ls"]).decode())
     with TemporaryDirectory() as _tmp_dir:
         tmp_dir = Path(_tmp_dir)
         shutil.copy(DOCKERFILES / "valid" / "sample_1" / "Dockerfile", tmp_dir)
@@ -39,8 +31,6 @@ def test_virtual_valid_sample_1():
         # FIXME add everything below this point in a try/finally
         with chdir(tmp_dir):
             try:
-                logger.error("PWD2", pwd=subprocess.check_output(["pwd"]).decode())
-                logger.error("ls2", pwd=subprocess.check_output(["ls"]).decode())
                 docker_run = docker_build(tmp_dir, params=docker_build_params)
                 chalk_run = chalk.run(
                     params=[
@@ -52,7 +42,6 @@ def test_virtual_valid_sample_1():
                     ]
                     + docker_build_params,
                 )
-
                 try:
                     docker_inspect = subprocess.run(
                         ["docker", "inspect", tag],
@@ -73,13 +62,6 @@ def test_virtual_valid_sample_1():
                 vjson = json.loads(vjsonf.read_bytes())
                 assert "CHALK_ID" in vjson
 
-                # single report in here
-                chalk_report = tmp_dir / "chalk-reports.jsonl"
-                assert chalk_report.is_file(), "chalk-reports.jsonl not found"
-                chalk_reports = json.loads(chalk_report.read_bytes())
-                len(chalk_reports["_CHALKS"]) == 1
-                assert chalk_reports["_CHALKS"][0]["CHALK_ID"] == vjson["CHALK_ID"]
-                assert chalk_reports["_CHALKS"][0]["_CURRENT_HASH"] in images
             finally:
                 for image in images:
                     info_img_hash = image

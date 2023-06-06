@@ -6,8 +6,6 @@
 
 import tables, options, strutils, ../plugins, ../config
 
-when (NimMajor, NimMinor) < (1, 7): {.warning[LockLevel]: off.}
-
 type ConfFilePlugin* = ref object of Plugin
 
 proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
