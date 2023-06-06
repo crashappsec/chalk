@@ -1,35 +1,43 @@
 ## This is the default user configuration that ships with Chalk.
-
+##
 ## This config lays out reasonable defaults, but you're free to
 ## customize it.  You probably are seeing this because you ran 'chalk
 ## dump'; you can edit this file and load a new one into the Chalk
 ## binary via 'chalk load' (well, at least you can on Linux machines).
-
-## This file will run before any external configuration file.  I
-
-## Note that command-line flags will generally override all config
-## file behavior.
-
-## 
 ##
-## To do that, one can use the 'confdump' command to get the current
-## config, and the 'load' command to load a new one.
+## This file will run before any external configuration file.
+## Command-line flags get evaluated before this runs, and end up
+## getting priority over everything by default.
 ##
-## Note that the initial I/O setup can be overridden here, but is
-## codified in baseconfig.c4m to make sure that it is easy to get to a
-## good known state if there are catastrophic configuration mistakes.
+## If you somehow mess up your configuration, you can run:
+## 'chalk load default'
 ##
-## Also, if allowed by this file (and by default, it's allowed), it
-## is possible to run an external configuration file.  Generally, the
-## best use for such a file is testing functionality before loading it
-## into this default configuration! It tends to make debugging problems
-## much easier.
 ##
-## Note that configuration flags will override config files, except in
-## some cases where the config file explicitly disallows such overrides.
+## To test a configuration file, we recommend running it as an
+## external configuration before loading it.  HOWEVER:
 ##
-## Useful examples of collecting arbitrary metadata via the config file
-## can be found in the 'examples' dir of the official chalk repository.
+## WARNING! WARNING! WARNING! IMPORTANT!
+## Some things in this config file are "write-once" values to prevent
+## validation errors for things that could be very subtle issues.
+##
+## Generally, if you just export this file and use it as both an
+## internal configuration and an external configuration, you will get
+## errors telling you that you're trying to set a value that has
+## already been set, and can't be set again.
+##
+## Specifically, you will probably get this error:
+##
+##  You cannot assign to the (locked) attribute sink.
+##  sink:    "post"
+##
+## This happens because your embedded config already set it, and your
+## external one tries to do it again.  Specifically, the first defined
+## sink output configuration below already was set by the base config.
+## The value is locked to prevent you from accidentally changing it to
+## "file" yet having the other parameters be for http POST.
+## Therefore, when testing a configuration using an external
+## configuration file, you need to pass the --no-embedded-config flag
+## at the command line.
 ##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
