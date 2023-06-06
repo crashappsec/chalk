@@ -4,7 +4,10 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-if env_exists("NO_COLOR") {
+if not using_tty() {
+  color: false
+}
+elif env_exists("NO_COLOR") {
   color: false
 } else {
   color: true
