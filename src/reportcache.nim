@@ -81,22 +81,37 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
   if m[^1] != '\n':
     msg &= "\n"
 
+  let startSubscriptions = len(allTopics[topic].subscribers)
+
+  if startSubscriptions == 0 and prevSuccesses:
+    return # Individual sinks got pulled out by the report cache logic to publish seprately.
+
   var n = publish(topic, msg)
-  trace("Published report on topic '" & topic & "' (" & $n & " subscribers)")
+  trace("Published the report for topic '" & topic & "' (" & $n & " subscribers)")
 
-  if n == 0 and not prevSuccesses:
-    error("For topic '" & topic & "': ")
-    error("No output configuration is working for this report, and there is " &
-          "no report cache configured, so no metadata was recorded.")
-
-    if chalkConfig.getForceOutputOnReportingFails():
-      error("Here is the orphaned report:")
-      doPanicWrite(msg)
-      error("Run with --use-report-cache to automatically buffer failures " &
-            "between chalk runs")
+  if n == 0:
+    if chalkConfig.getUseReportCache():
+      error("For topic '" & topic & ": No output config is working, but failures will be stored in the report cache")
     else:
-      error("Re-run with --force-output to try again, getting a report " &
-        "on the console if io config fails again.")
+      error("For topic '" & topic & "': ")
+      error("No output configuration is working for this report, and there is " &
+        "no report cache configured, so no metadata was recorded.")
+
+      if chalkConfig.getForceOutputOnReportingFails():
+        error("Here is the orphaned report:")
+        doPanicWrite(msg)
+        error("Run with --use-report-cache to automatically buffer failures " &
+              "between chalk runs")
+      else:
+        error("Re-run with --force-output to try again, getting a report " &
+          "on the console if io config fails again.")
+  elif n != startSubscriptions:
+    if chalkConfig.getUseReportCache():
+      error("For topic '" & topic & "': publish failures will be cached.")
+    else:
+      error("No report cache is enabled; sink configs with failures will not receive this report")
+  else:
+    discard # Success for anything w/o a previous failure (seprately published), but no need to report on it.
 
 proc loadReportCache(fname: string) =
   once:
