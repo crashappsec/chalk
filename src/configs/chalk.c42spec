@@ -12,7 +12,7 @@ valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
 		         #% REWRITE ,$ ]
                          "load", "dump", "docker", "version", "env", "profile",
 			 #% INTERNAL
-			 "entrypoint"]
+			 "helpdump", "entrypoint"]
 			 #% END
 all_cmds_that_insert := ["insert", "build", "load"]
 

@@ -5,9 +5,8 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import tables, options, strutils, unicode, os, streams, posix, osproc, sugar,
-       config, builtins, collect, chalkjson, reportcache, plugins,
+       json, config, builtins, collect, chalkjson, reportcache, plugins,
        plugins/codecDocker
-from json import parseJson, getElems
 import macros except error
 
 let emptyReport               = toJson(ChalkDict())
@@ -980,3 +979,74 @@ proc showConfig*(force: bool = false) =
 
     publish("defaults", toPublish)
     if force: showDisclaimer(80)
+
+#% INTERNAL
+
+const cmdlineKeys  = ["doc", "shortdoc", "args", "aliases", "field_to_set",
+                      "yes_aliases", "no_aliases", "default_no_prefixes"]
+const keyspecKeys  = ["kind", "type", "doc"]
+const schemaKeys   = ["type", "require", "default", "hidden", "write_lock",
+                      "range", "choice", "doc", "shortdoc"]
+
+
+proc docFilter(s: JsonNode, targetKeys: openarray[string]): Option[JsonNode] =
+  case s.kind
+  of JNull:
+    return none(JsonNode)
+  of JBool, JInt, JFloat, JString:
+    return some(s)
+  of JArray:
+    var resItems: seq[JSonNode]
+    for item in s.items():
+      let subres = item.docFilter(targetKeys)
+      if subres.isSome():
+        resItems.add(subres.get())
+    if len(resItems) != 0:
+      var arr = newJArray()
+      arr.elems = resItems
+      return some(arr)
+    else:
+      return none(JsonNode)
+  of JObject:
+    var outObj = newJObject()
+    for k, v in s.fields:
+      if k in targetKeys:
+        case v.kind
+        of JNull, JBool, JInt, JFloat, JString, JArray:
+          outObj[k] = v
+        else:
+          let subres = v.docFilter(targetKeys)
+          outObj[k] = subres.getOrElse(newJNull())
+      else:
+        let subres = v.docFilter(targetKeys)
+        if subres.isSome():
+          outObj[k] = subres.get()
+    if outObj.len() == 0:
+      return none(JSonNode)
+    else:
+      return some(outObj)
+
+
+proc getHelpJson(): string =
+  let
+    chalkRuntime  = getChalkRuntime()
+    cmdlineInfo   = chalkRuntime.attrs.getObject("getopts")
+    keyspecInfo   = chalkRuntime.attrs.getObject("keyspec")
+    schemaInfo    = getValidationRuntime().attrs
+    cmdlineJson   = cmdlineInfo.scopeToJson().parseJson().docFilter(cmdlineKeys)
+    keyspecJson   = keyspecInfo.scopeToJson().parseJson().docFilter(keyspecKeys)
+    schemaJson    = schemaInfo.scopeToJson().parseJson().docFilter(schemaKeys)
+
+  var
+    preRes = newJObject()
+
+  preRes["command_line"]        = cmdlineJson.get()
+  preRes["key_specs"]           = keyspecJson.get()
+  preRes["config_file_schema"]  = schemaJson.get()
+
+  result = $(preRes)
+
+proc runCmdHelpDump*() =
+
+  publish("help", getHelpJson())
+#% END

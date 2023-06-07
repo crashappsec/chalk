@@ -328,6 +328,12 @@ Outputs basic version information for the chalk binary.
 coming soon.
 """
   }
+
+   command helpdump {
+     doc: """
+Dumps documentation into a single JSON structure.  Currently, this only captures static structure, not configuration.
+"""
+   }
 #% END
 
   command docker {

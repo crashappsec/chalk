@@ -13,7 +13,7 @@ jobs:
           fetch-depth: 0
 
       - name: Compile chalk
-        run: docker-compose run chalk-compile-ubuntu
+        run: docker-compose run chalk-compile
 
       - name: Run tests
         run: docker-compose run --rm tests

@@ -8,19 +8,6 @@ services:
     volumes:
       - $PWD:$PWD
 
-  chalk-compile-ubuntu:
-    build:
-      context: .
-      # we are using an ubuntu runner by default as this is what gh action
-      # workflows run in and thus we have a binary that can execute directly
-      # in the github worker for any tests needing to run outside docker
-      dockerfile: docker/Dockerfile.chalk-ubuntu
-      target: compile
-    command: sh -c "nimble debug"
-    working_dir: $PWD
-    volumes:
-      - $PWD:$PWD
-
   chalk-compile:
     build:
       context: .

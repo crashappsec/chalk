@@ -175,7 +175,6 @@ let errCfg = configSink(errSinkObj,
 subscribe("logs", errCfg)
 subscribe(con4mTopic, defaultCon4mHook)
 
-
 discard registerTopic("report")    # Place(s) to send reporting.
 discard registerTopic("defaults")  # Where to output config info to.
 discard registerTopic("audit")     # Where to output audit info to.

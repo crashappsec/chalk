@@ -36,6 +36,7 @@ when isMainModule:
   of "docker":   runCmdDocker()
   of "profile":  runCmdProfile(getArgs())
   #% INTERNAL
+  of "helpdump": runCmdHelpDump()
   of "entrypoint": echo "entry point."
   #% END
   else:

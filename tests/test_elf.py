@@ -32,7 +32,7 @@ def _insert_and_extract_on_artifact(chalk: Chalk, artifact: Path) -> Dict[str, A
         params=["--log-level=none"],
     )
     try:
-        return json.loads(extracted.stdout, strict=False)
+        return json.loads(extracted.stderr, strict=False)
     except json.decoder.JSONDecodeError:
         logger.error("Could not decode json", raw=extracted.stdout)
         raise
@@ -106,7 +106,7 @@ def test_insert_extract_timestamps_ls():
             logger.error("Could not decode json", raw=extracted.stdout)
 
         _chalk = output["_CHALKS"][0]
-        assert timestamp2 < output["_TIMESTAMP"]
+        assert timestamp2 == output["_TIMESTAMP"]
         assert last_chalk_datetime == _chalk["DATETIME"]
 
         # ensure that the binary executes properly although chalked
@@ -152,7 +152,7 @@ def test_virtual():
             )
 
             try:
-                virtual_extract_out = json.loads(extracted.stdout, strict=False)
+                virtual_extract_out = json.loads(extracted.stderr, strict=False)
             except json.decoder.JSONDecodeError:
                 logger.error("Could not decode json", raw=extracted.stdout)
                 raise

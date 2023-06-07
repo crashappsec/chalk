@@ -26,9 +26,9 @@ const
   rawMagicKey      = "\"MAGIC"
 
 type
-  ChalkJsonNode*     = ref JsonNodeObj
-  JSonError*         = ref object of ValueError
-  JsonNodeKind*      = enum JNull, JBool, JInt, JFloat, JString, JObject, JArray
+  ChalkJsonNode*   = ref JsonNodeObj
+  JSonError*       = ref object of ValueError
+  JsonNodeKind     = enum JNull, JBool, JInt, JFloat, JString, JObject, JArray
 
   JsonNodeObj* {.acyclic.} = object
     case kind*: JsonNodeKind

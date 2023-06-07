@@ -75,7 +75,6 @@ var
   currentOutputCfg:   OutputConfig
   `isChalkingOp?`:    bool
 
-
 addDefaultSinks()
 
 template dumpExOnDebug*() =
@@ -99,7 +98,8 @@ proc setCommandName*(s: string) =
   ## chalking Zip files, we run a 'delete' over a copy of the Zip
   ## to calculate the unchalked hash.
   commandName = s
-proc getChalkRuntime*(): ConfigState = con4mRuntime.configState
+proc getChalkRuntime*(): ConfigState      = con4mRuntime.configState
+proc getValidationRuntime*(): ConfigState = con4mRuntime.validationState
 
 proc isChalkingOp*(): bool =
   once:

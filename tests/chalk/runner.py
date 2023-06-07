@@ -10,6 +10,16 @@ ChalkCmd = Literal["insert", "extract"]
 logger = get_logger()
 
 
+def has_errors(stderr: bytes) -> bool:
+    """returns true if there were error logged by nim"""
+    errored = False
+    for out in stderr.decode().split("\n"):
+        if out.startswith("error:"):
+            logger.error(out)
+            errored = True
+    return errored
+
+
 class Chalk:
     def __init__(
         self,
@@ -68,7 +78,16 @@ class Chalk:
         my_env = os.environ.copy()
         my_env["DOCKER_BUILDKIT"] = "0"
         try:
-            return run(cmd, capture_output=True, check=True, env=my_env)
+            run_process = run(cmd, capture_output=True, check=True, env=my_env)
+            if run_process.returncode != 0 or has_errors(run_process.stderr):
+                logger.error(
+                    "Chalk invocation had errors",
+                    cmd=cmd,
+                    output=run_process.stdout,
+                    stderr=run_process.stderr,
+                    returncode=run_process.returncode,
+                )
+            return run_process
         except CalledProcessError as e:
             logger.error(
                 "Chalk invocation failed",
