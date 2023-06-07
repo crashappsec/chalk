@@ -90,6 +90,10 @@ else {
   # info("Using the default config. Use 'chalk load' to load a new one.")
 }
 
+if env_exists("CHALK_LOG_LEVEL") {
+  log_level: env("CHALK_LOG_LEVEL")
+}
+
 # By default, all collected metadata gets added to the chalk inserted
 # into the artifact.  If you provide the CHALK_PTR key, then most
 # things will NOT go into the chalk, which assumes you put it
