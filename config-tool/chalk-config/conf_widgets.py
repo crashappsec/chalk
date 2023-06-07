@@ -1,26 +1,37 @@
+import datetime
+import hashlib
+import json
+import os
+import shutil
+import sqlite3
+import stat
+import subprocess
+import tempfile
+import urllib
+import urllib.request
+from pathlib import *
+
+from conf_options import *
+from css import WIZARD_CSS
+from localized_text import *
+from rich.markdown import *
 from textual.app import *
 from textual.containers import *
 from textual.coordinate import *
-from textual.widgets import *
 from textual.screen import *
-from localized_text import *
-from rich.markdown import *
 from textual.widgets import Markdown as MDown
-from localized_text import *
-from pathlib import *
-import sqlite3, os, urllib, tempfile, datetime, hashlib, subprocess, json, stat
-import urllib.request, shutil
+from textual.widgets import *
 from wizard import *
-from conf_options import *
-from css import WIZARD_CSS
 
 global cursor, conftable
 cursor = None
 conftable = None
 
+
 def set_conf_table(t):
     global conftable
     conftable = t
+
 
 def try_system_init():
     global db
@@ -30,11 +41,13 @@ def try_system_init():
     except:
         return False
 
+
 def local_init():
     global db
     os.makedirs(DB_PATH_LOCAL, exist_ok=True)
     db = sqlite3.connect(os.path.join(DB_PATH_LOCAL, DB_FILE))
-    
+
+
 def sqlite_init():
     global cursor, first_run
 
@@ -44,8 +57,9 @@ def sqlite_init():
     cursor = db.cursor()
 
     try:
-        cursor.execute("CREATE TABLE configs(name, date, CHALK_VERSION, id, " +
-                        "json, note)")
+        cursor.execute(
+            "CREATE TABLE configs(name, date, CHALK_VERSION, id, " + "json, note)"
+        )
         timestamp = datetime.datetime.now().ctime()
         rows = []
         for config in default_configs:
@@ -53,31 +67,55 @@ def sqlite_init():
             internal_id = dict_to_id(d)
             jstr = json.dumps(d)
             row = [name, timestamp, CHALK_VERSION, internal_id, jstr, note]
-            cursor.execute('INSERT INTO configs VALUES(?, ?, ?, ?, ?, ?)', row)
+            cursor.execute("INSERT INTO configs VALUES(?, ?, ?, ?, ?, ?)", row)
         db.commit()
         first_run = True
     except:
-        pass # Already created.
+        pass  # Already created.
+
 
 sqlite_init()
 
 global row_ids
 row_ids = []
 
+
 # Empty parents for the sake of CSS addressing.
-class ConfigName(Label): pass
-class ConfigDate(Label): pass
-class ConfigVersion(Label): pass
-class ConfigDelete(Button): pass
-class ConfigExport(Button): pass
-class ConfigHdr(Horizontal): pass
-class OutfileRow(Horizontal): pass
-class ReportingContainer(Container): pass
+class ConfigName(Label):
+    pass
+
+
+class ConfigDate(Label):
+    pass
+
+
+class ConfigVersion(Label):
+    pass
+
+
+class ConfigDelete(Button):
+    pass
+
+
+class ConfigExport(Button):
+    pass
+
+
+class ConfigHdr(Horizontal):
+    pass
+
+
+class OutfileRow(Horizontal):
+    pass
+
+
+class ReportingContainer(Container):
+    pass
+
 
 class ModalDelete(ModalScreen):
-    DEFAULT_CSS=WIZARD_CSS    
-    BINDINGS = [("q", "pop_screen()", CANCEL_LABEL),
-                ("d", "delete", DELETE_LABEL)]
+    DEFAULT_CSS = WIZARD_CSS
+    BINDINGS = [("q", "pop_screen()", CANCEL_LABEL), ("d", "delete", DELETE_LABEL)]
 
     def __init__(self, name, iid):
         super().__init__()
@@ -89,9 +127,9 @@ class ModalDelete(ModalScreen):
         yield Grid(
             Label(CONFIRM_DELETE % self.profilename, classes="model_q"),
             Button(YES_LABEL, id="delete_confirm", classes="modal_button"),
-            Button(NO_LABEL, id="delete_nope",  classes="modal_button"),
-            classes = "modal_grid"
-            )
+            Button(NO_LABEL, id="delete_nope", classes="modal_button"),
+            classes="modal_grid",
+        )
         yield Footer()
 
     async def on_button_pressed(self, event):
@@ -105,8 +143,9 @@ class ModalDelete(ModalScreen):
         else:
             self.app.pop_screen()
 
+
 class ExportMenu(Screen):
-    DEFAULT_CSS=WIZARD_CSS
+    DEFAULT_CSS = WIZARD_CSS
     BINDINGS = [("q", "pop_screen()", CANCEL_LABEL)]
 
     def __init__(self, iid, name, jconf):
@@ -118,16 +157,19 @@ class ExportMenu(Screen):
     def compose(self):
         yield Header(show_clock=True)
         yield MDown(EXPORT_MENU_INTRO)
-        yield RadioSet(RadioButton(JSON_LABEL, True, id = "export_json"),
-                       RadioButton(CON4M_LABEL, id = "export_con4m"),
-                       id = "set_export")
-        yield OutfileRow(Input(placeholder= PLACEHOLD_FILE,
-                               id="conf_outfile", value = self.confname),
-                         Label(PLACEHOLD_OUTFILE, classes="label"))
-        yield Horizontal(Button(EXPORT_LABEL, id="export_go",
-                                 classes="basicbutton"),
-                         Button(CANCEL_LABEL, id="export_cancel",
-                                 classes="basicbutton"))
+        yield RadioSet(
+            RadioButton(JSON_LABEL, True, id="export_json"),
+            RadioButton(CON4M_LABEL, id="export_con4m"),
+            id="set_export",
+        )
+        yield OutfileRow(
+            Input(placeholder=PLACEHOLD_FILE, id="conf_outfile", value=self.confname),
+            Label(PLACEHOLD_OUTFILE, classes="label"),
+        )
+        yield Horizontal(
+            Button(EXPORT_LABEL, id="export_go", classes="basicbutton"),
+            Button(CANCEL_LABEL, id="export_cancel", classes="basicbutton"),
+        )
         yield Footer()
 
     async def on_button_pressed(self, event):
@@ -135,20 +177,21 @@ class ExportMenu(Screen):
             val_is_json = self.query_one("#export_json").value
             if val_is_json:
                 to_out = self.jconf
-                ext    = ".json"
+                ext = ".json"
             else:
                 to_out = dict_to_con4m(json_to_dict(self.jconf))
-                ext    = ".c4m"
+                ext = ".c4m"
             fname = self.query_one("#conf_outfile").value
-            if not '.' in fname:
+            if not "." in fname:
                 fname += ext
-            f = open(fname, 'w')
+            f = open(fname, "w")
             f.write(to_out)
             f.close()
             msg = ACK_EXPORT % fname
             await self.app.push_screen(AckModal(msg, pops=2))
         else:
             self.app.pop_screen()
+
 
 class ConfigTable(Container):
     def __init__(self):
@@ -182,43 +225,52 @@ class ConfigTable(Container):
 
     def compose(self):
         yield self.the_table
-        yield Horizontal(RunWizardButton(label=NEW_LABEL),
-                         EditConfigButton(label=EDIT_LABEL,
-                                          classes="basicbutton"),
-                         DelConfigButton(label=DELETE_LABEL,
-                                         classes="basicbutton"),
-                         ExConfigButton(label=EXPORT_LABEL,
-                                        classes="basicbutton"),
-                                 classes="padme")
+        yield Horizontal(
+            RunWizardButton(label=NEW_LABEL),
+            EditConfigButton(label=EDIT_LABEL, classes="basicbutton"),
+            DelConfigButton(label=DELETE_LABEL, classes="basicbutton"),
+            ExConfigButton(label=EXPORT_LABEL, classes="basicbutton"),
+            classes="padme",
+        )
+
 
 class RunWizardButton(Button):
     async def on_button_pressed(self):
-        await self.app.push_screen('confwiz')
+        await self.app.push_screen("confwiz")
         load_from_json(default_config_json)
+
 
 class EditConfigButton(Button):
     async def on_button_pressed(self):
-        await self.app.push_screen('confwiz')
+        await self.app.push_screen("confwiz")
         cursor_row = conftable.the_table.cursor_row
-        r = cursor.execute("SELECT json, name, note FROM configs WHERE id=?",
-                           [row_ids[cursor_row]])
+        r = cursor.execute(
+            "SELECT json, name, note FROM configs WHERE id=?", [row_ids[cursor_row]]
+        )
         json_txt, name, note = r.fetchone()
         load_from_json(json_txt, name, note)
+
 
 class DelConfigButton(Button):
     def on_button_pressed(self):
         cursor_row = self.app.query_one("#the_table").cursor_row
-        name = cursor.execute('SELECT name FROM configs where id="%s"' %
-                             row_ids[cursor_row]).fetchone()[0]
-        self.app.push_screen(ModalDelete(name=name, iid=row_ids[cursor_row]))
+        # FIXME make button stransparent
+        names = cursor.execute(
+            'SELECT name FROM configs where id="%s"' % row_ids[cursor_row]
+        ).fetchone()
+        if names:
+            self.app.push_screen(ModalDelete(name=names[0], iid=row_ids[cursor_row]))
+
 
 class ExConfigButton(Button):
     def on_button_pressed(self):
         cursor_row = self.app.query_one("#the_table").cursor_row
-        items = cursor.execute('SELECT name, json FROM configs where id="%s"' %
-                             row_ids[cursor_row]).fetchone()
+        items = cursor.execute(
+            'SELECT name, json FROM configs where id="%s"' % row_ids[cursor_row]
+        ).fetchone()
         menu = ExportMenu(row_ids[cursor_row], items[0], items[1])
         self.app.push_screen(menu)
+
 
 class EnablingCheckbox(Checkbox):
     def __init__(self, target, title, value=False, disabled=False, id=None):
@@ -233,18 +285,21 @@ class EnablingCheckbox(Checkbox):
     def on_checkbox_changed(self, event: Checkbox.Changed):
         get_wizard().query_one(self.refd_id).toggle()
 
+
 class EnvToggle(Switch):
     def on_click(self):
         envpane = get_wizard().query_one("#envconf")
         envpane.disabled = not envpane.disabled
 
+
 class AlphaModal(AckModal):
     def on_mount(self):
         intro_md.update(INTRO_TEXT)
 
+
 def write_from_local(dict, config, d):
-    binname  = d["exe_name"]
-    
+    binname = d["exe_name"]
+
     if d["release_build"]:
         chalk_bin = CONTAINER_RELEASE_PATH
     else:
@@ -252,14 +307,13 @@ def write_from_local(dict, config, d):
 
     c4mfilename = "/tmp/c4mfile"
     c4mfile = open(c4mfilename, "wb")
-    c4mfile.write(dict_to_con4m(d).encode('utf-8'))
+    c4mfile.write(dict_to_con4m(d).encode("utf-8"))
     c4mfile.close()
 
     try:
         subproc = subprocess.run([chalk_bin, "--error", "load", c4mfilename])
         if subproc.returncode:
-            get_app().push_screen(
-                AckModal(GENERATION_FAILED, pops=2))
+            get_app().push_screen(AckModal(GENERATION_FAILED, pops=2))
             return True
         else:
             newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
@@ -270,10 +324,11 @@ def write_from_local(dict, config, d):
     except Exception as e:
         err = chalk_bin + " load " + c4mfilename + ": "
         get_app().push_screen(AckModal(GENERATION_EXCEPTION % (err + repr(e))))
-            
+
+
 def write_from_url(dict, config, d):
-    binname  = d["exe_name"]
-    
+    binname = d["exe_name"]
+
     if d["release_build"]:
         chalk_url = BINARY_RELEASE_URL
     else:
@@ -287,15 +342,14 @@ def write_from_url(dict, config, d):
     f.close()
 
     c4mfile = tempfile.NamedTemporaryFile()
-    c4mfile.write(dict_to_con4m(d).encode('utf-8'))
+    c4mfile.write(dict_to_con4m(d).encode("utf-8"))
     c4mfile.flush()
     c4mfilename = c4mfile.name
-    loc.chmod(0o774)    
+    loc.chmod(0o774)
     try:
         subproc = subprocess.run([loc, "--error", "load", c4mfilename])
         if subproc.returncode:
-            get_app().push_screen(
-                AckModal(GENERATION_FAILED, pops=2))
+            get_app().push_screen(AckModal(GENERATION_FAILED, pops=2))
             return True
         else:
             newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
@@ -305,9 +359,11 @@ def write_from_url(dict, config, d):
             return True
     except Exception as e:
         raise
-        get_app().push_screen(AckModal(loc.as_posix() + ": " + GENERATION_EXCEPTION % repr(e)))
+        get_app().push_screen(
+            AckModal(loc.as_posix() + ": " + GENERATION_EXCEPTION % repr(e))
+        )
 
-    
+
 def write_binary(dict, config, d):
     if "CHALK_BINARIES_ARE_LOCAL" in os.environ:
         return write_from_local(dict, config, d)

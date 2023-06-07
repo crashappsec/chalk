@@ -1,6 +1,8 @@
 FROM python:3.11.3-alpine3.17
-RUN pip install textual markdown-it-py typing-extensions &&\
-    apk add gcompat pcre                                 &&\
+RUN apk add gcc alpine-sdk gcompat pcre libffi-dev       &&\
+    pip install textual markdown-it-py typing-extensions &&\
+    pip install jwt ascii_magic pyqrcode requests        &&\
+    pip install auth0-python                             &&\
     apk add upx --update binutils
 WORKDIR /chalk-config
 ENV CHALK_BINARIES_ARE_LOCAL=1
