@@ -1,7 +1,10 @@
 ## Core JSON parsing library; we couldn't use the default NIM library
 ## because it requires we know up front where the end of our input
-## is. But we don't know as there is no length encoded; we only find
+## is. But we don't know as there is no length encoding; we only find
 ## out when we reach the end of the top-level object.
+##
+## Additionally, any utilities around the Nim JSON (which we do use
+## where possible), are here.
 ##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
@@ -26,19 +29,20 @@ const
   rawMagicKey      = "\"MAGIC"
 
 type
-  ChalkJsonNode*   = ref JsonNodeObj
-  JSonError*       = ref object of ValueError
-  JsonNodeKind     = enum JNull, JBool, JInt, JFloat, JString, JObject, JArray
+  ChalkJsonNode*   = ref CJsonNodeObj
+  CJSonError*      = ref object of ValueError
+  CJsonNodeKind    = enum
+    CJNull, CJBool, CJInt, CJFloat, CJString, CJObject, CJArray
 
-  JsonNodeObj* {.acyclic.} = object
-    case kind*: JsonNodeKind
-    of JNull:   nil
-    of JBool:   boolval*:  bool
-    of JInt:    intval*:   int64
-    of JFloat:  floatval*: float
-    of JString: strval*:   string
-    of JObject: kvpairs*:  OrderedTableRef[string, ChalkJsonNode]
-    of JArray:  items*:    seq[ChalkJsonNode]
+  CJsonNodeObj* {.acyclic.} = object
+    case kind*: CJsonNodeKind
+    of CJNull:   nil
+    of CJBool:   boolval*:  bool
+    of CJInt:    intval*:   int64
+    of CJFloat:  floatval*: float
+    of CJString: strval*:   string
+    of CJObject: kvpairs*:  OrderedTableRef[string, ChalkJsonNode]
+    of CJArray:  items*:    seq[ChalkJsonNode]
 
 proc chalkParseJson(s: Stream): ChalkJSonNode
 
@@ -127,28 +131,28 @@ proc arrayFromJson(jobj: ChalkJsonNode, fname: string): seq[Box] =
 
 proc valueFromJson(jobj: ChalkJsonNode, fname: string): Box =
   case jobj.kind
-  of JNull:   return
-  of JBool:   return pack(jobj.boolval)
-  of JInt:    return pack(jobj.intval)
-  of JFloat:  raise newException(IOError, fname & ": float keys aren't valid")
-  of JString: return pack(jobj.strval)
-  of JObject: return pack(objFromJson(jobj, fname))
-  of JArray:  return pack(arrayFromJson(jobj, fname))
+  of CJNull:   return
+  of CJBool:   return pack(jobj.boolval)
+  of CJInt:    return pack(jobj.intval)
+  of CJFloat:  raise newException(IOError, fname & ": float keys aren't valid")
+  of CJString: return pack(jobj.strval)
+  of CJObject: return pack(objFromJson(jobj, fname))
+  of CJArray:  return pack(arrayFromJson(jobj, fname))
 
 proc jsonNodeToBox(n: ChalkJSonNode): Box =
   case n.kind
-  of JNull:   return nil
-  of JBool:   return pack(n.boolval)
-  of JInt:    return pack(int(n.intval))
-  of JFloat:  return pack(n.floatval)
-  of JString: return pack(n.strval)
-  of JArray:
+  of CJNull:   return nil
+  of CJBool:   return pack(n.boolval)
+  of CJInt:    return pack(int(n.intval))
+  of CJFloat:  return pack(n.floatval)
+  of CJString: return pack(n.strval)
+  of CJArray:
     var res: seq[Box] = @[]
 
     for item in n.items: res.add(item.jsonNodeToBox())
 
     return pack[seq[Box]](res)
-  of JObject:
+  of CJObject:
     var res: TableRef[string, Box] = newTable[string, Box]()
 
     for k, v in n.kvpairs:
@@ -157,7 +161,39 @@ proc jsonNodeToBox(n: ChalkJSonNode): Box =
 
     return pack(res)
 
-proc parseError(msg: string): JsonError {.inline.} = return JsonError(msg: msg)
+proc nimJsonToBox*(node: JsonNode): Box =
+  # Box doesn't really currently have a 'Null' type the way JSON does.
+  # But, we're also passing the type, so we go ahead and box an object;
+  # we don't need that for anything else, so it's distinct.
+  #
+  # Since we're using this to convert Docker inspect output, we can
+  # expect to see values come back as 'null' that we might want to
+  # represent in the final JSon; thankfully, Box automatically turns
+  # MkObj types to 'null' when it encounters them.
+  case node.kind
+  of JString:
+    return pack[string](node.getStr())
+  of JInt:
+    return pack[int64](node.getInt())
+  of JFloat:
+    return pack[float](node.getFloat())
+  of JBool:
+    return pack[bool](node.getBool())
+  of JArray:
+    var arr: seq[Box] = @[]
+    for item in node.getElems():
+      arr.add(item.nimJsonToBox())
+    return pack[seq[Box]](arr)
+  of JObject:
+    var tbl = OrderedTableRef[string, Box]()
+    for k, v in node.pairs():
+      tbl[k] = nimJsonToBox(v)
+    return pack[OrderedTableRef[string, Box]](tbl)
+  of JNull:
+    return Box(kind: MkObj)
+
+
+proc parseError(msg: string): CJsonError {.inline.} = return CJsonError(msg: msg)
 proc readOne(s: Stream): char {.inline.} = return s.readChar()
 proc peekOne(s: Stream): char {.inline.} = return s.peekChar()
 proc jsonWS(s: Stream) =
@@ -171,9 +207,9 @@ template literalCheck(s: Stream, lit: static string) =
     if s.readChar() != lit[i]: raise parseError(msg)
 
 let
-  jNullLit: ChalkJsonNode = ChalkJsonNode(kind: JNull)
-  jFalse:   ChalkJSonNode = ChalkJsonNode(kind: JBool, boolval: false)
-  jTrue:    ChalkJsonNode = ChalkJsonNode(kind: JBool, boolval: true)
+  jNullLit: ChalkJsonNode = ChalkJsonNode(kind: CJNull)
+  jFalse:   ChalkJSonNode = ChalkJsonNode(kind: CJBool, boolval: false)
+  jTrue:    ChalkJsonNode = ChalkJsonNode(kind: CJBool, boolval: true)
 
 proc jSonNull(s: Stream): ChalkJsonNode =
   literalCheck(s, jNullStr)
@@ -230,13 +266,13 @@ proc jsonNumber(s: Stream): ChalkJsonNode =
       else:
         var b: BiggestUInt
         discard parseBiggestUInt(buf, b)
-        return ChalkJsonNode(kind: JInt, intval: cast[int64](b))
+        return ChalkJsonNode(kind: CJInt, intval: cast[int64](b))
   of 'E', 'e':
     buf.add(s.readOne())
   else:
     var b: BiggestUInt
     discard parseBiggestUInt(buf, b)
-    return ChalkJsonNode(kind: JInt, intval: cast[int64](b))
+    return ChalkJsonNode(kind: CJInt, intval: cast[int64](b))
 
   c = s.readOne()
   case c
@@ -258,7 +294,7 @@ proc jsonNumber(s: Stream): ChalkJsonNode =
 
   var f: BiggestFloat
   discard parseBiggestFloat(buf, f)
-  return ChalkJSonNode(kind: JFloat, floatval: f)
+  return ChalkJSonNode(kind: CJFloat, floatval: f)
 
 when (NimMajor, NimMinor) >= (1, 7):
   {.warning[CastSizes]: off.}
@@ -307,12 +343,12 @@ proc jsonStringRaw(s: Stream): string =
   return str
 
 proc jsonString(s: Stream): ChalkJSonNode =
-  result = ChalkJsonNode(kind: JString, strval: s.jsonStringRaw())
+  result = ChalkJsonNode(kind: CJString, strval: s.jsonStringRaw())
 
 proc jsonArray(s: Stream): ChalkJSonNode =
   discard s.readOne()
   s.jsonWS()
-  result = ChalkJSonNode(kind: JArray)
+  result = ChalkJSonNode(kind: CJArray)
   if s.peekOne() == ']':
     discard s.readOne()
     return
@@ -354,8 +390,8 @@ proc jsonObject(s: Stream): ChalkJSonNode =
   case s.peekOne()
   of '}':
     discard s.readOne()
-    return ChalkJsonNode(kind: JObject)
-  of '"': return ChalkJSonNode(kind: JObject, kvpairs: s.jsonMembers())
+    return ChalkJsonNode(kind: CJObject)
+  of '"': return ChalkJSonNode(kind: CJObject, kvpairs: s.jsonMembers())
   else:   raise parseError(eBadObject)
 
 proc jsonValue(s: Stream): ChalkJSonNode =
@@ -393,9 +429,7 @@ proc toJson*(dict: ChalkDict, profile: Profile = nil): string =
   for fullKey in keys:
     let
       keyJson = $(%* fullKey)
-      # _CHALKS key is special-cased so we don't have to keep re-sorting.
-      valJson = if fullKey == "_CHALKS": unpack[string](dict[fullKey])
-                else:                    boxToJson(dict[fullKey])
+      valJson = boxToJson(dict[fullKey])
 
     result = result & comma & keyJson & " : " & valJson
     comma  = ", "

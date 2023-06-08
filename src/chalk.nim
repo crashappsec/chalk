@@ -25,20 +25,22 @@ when isMainModule:
     warn("We have no codec for this platform's native executable type")
   setupDefaultLogConfigs()
   case getCommandName()
-  of "extract":  runCmdExtract(chalkConfig.getArtifactSearchPath())
-  of "insert":   runCmdInsert(chalkConfig.getArtifactSearchPath())
-  of "delete":   runCmdDelete(chalkConfig.getArtifactSearchPath())
-  of "env":      runCmdEnv()
-  of "dump":     runCmdConfDump()
-  of "load":     runCmdConfLoad()
-  of "defaults": showConfig(force = true)
-  of "version":  runCmdVersion()
-  of "docker":   runCmdDocker()
-  of "profile":  runCmdProfile(getArgs())
+  of "extract":        runCmdExtract(chalkConfig.getArtifactSearchPath())
+  of "insert":         runCmdInsert(chalkConfig.getArtifactSearchPath())
+  of "delete":         runCmdDelete(chalkConfig.getArtifactSearchPath())
+  of "env":            runCmdEnv()
+  of "dump":           runCmdConfDump()
+  of "load":           runCmdConfLoad()
+  of "defaults":       showConfig(force = true)
+  of "version":        runCmdVersion()
+  of "docker":         runCmdDocker()
+  of "profile":        runCmdProfile(getArgs())
   #% INTERNAL
-  of "helpdump": runCmdHelpDump()
-  of "entrypoint": echo "entry point."
+  of "helpdump":       runCmdHelpDump()
+  of "entrypoint":     echo "entry point."
   #% END
+  of "extract.containers":
+    runCmdExtractContainers(chalkConfig.getArtifactSearchPath())
   else:
     runChalkHelp(getCommandName()) # noreturn, will not show config.
 

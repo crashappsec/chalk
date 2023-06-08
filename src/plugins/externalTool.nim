@@ -4,7 +4,8 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, algorithm, strutils, ../plugins, ../config
+import tables, options, algorithm, strutils, json,
+       ../plugins, ../config, ../chalkjson
 
 type
   ToolPlugin* = ref object of Plugin
@@ -57,9 +58,15 @@ proc runOneTool(info: PIInfo, path: string, dict: var ChalkDict): bool =
     d.del("info")
 
   # The ChalkDict returned is of the form: chalkKey: chalkContents.
-  # For instance, it might come back SBOM : "{arbitrary sbom as a string}"
+  # For instance, it might come back SBOM : "{arbitrary sbom as a
+  # string}" If the string we get back parses as valid JSON, we will
+  # expand it out.  If not, we use it as-is.
+  #
   # These k/v pairs will be merged into the dict field, which will take
-  # the form, SBOM : { info.name : "arbitrary sbom as string" }
+  # the form, SBOM : { info.name : chalkContents }
+  #
+  # Where the ChalkContents is either a JSON object or a string
+  # literal.
 
   for k, v in d:
     var kindChalkDict: ChalkDict
@@ -69,6 +76,17 @@ proc runOneTool(info: PIInfo, path: string, dict: var ChalkDict): bool =
       kindChalkDict = ChalkDict()
 
     kindChalkDict[info.name] = v
+    for k, v in kindChalkDict:
+      try:
+        # Attempt to parse as a JSON object.  If not, treat it as a string,
+        # but encode it into a JSON object.
+        let
+          asJson = parseJson(unpack[string](v))
+          asBox  = asJson.nimJsonToBox()
+        kindChalkDict[k] = asBox
+      except:
+        kindChalkDict[k] = pack[string](escapeJson(unpack[string](v)))
+
     dict[k] = pack(kindChalkDict)
 
   return info.obj.stopOnSuccess

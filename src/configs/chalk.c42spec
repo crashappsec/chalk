@@ -981,6 +981,24 @@ Note that failed chalk attempts get published to the 'fail' topic, and there
 are no default output sinks subscribed to this topic.
 """
   }
+
+  field report_unmarked {
+    type:    bool
+    default: true
+    shortdoc: "Report non-marked containers and images"
+    doc: """
+When running 'chalk extract containers', if this is true, then you will get back
+"""
+  }
+
+  field report_empty_fields {
+    type:     bool
+    default:  false
+    shortdoc: "Report on empty docker metadata"
+    doc: """
+Docker's internal reporting often gives results that are empty when not set.  If this is on, such fields are elided on reporting.
+"""
+  }
 }
 
 singleton env_cache {
@@ -2018,7 +2036,8 @@ func pyc_check(keyname: string, value: list[string]) {
 }
 
 func default_command_check(keyname, value) {
-  if contains(valid_chalk_cmds, value) or find(value, "help.") == 0 {
+  value := value.split(".")[0]
+  if contains(valid_chalk_cmds, value) {
     return ""
   }
   return ("The attribute 'default_command' is set to '" + value +

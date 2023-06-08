@@ -180,10 +180,20 @@ This command looks for existing chalk marks in artifacts, and reports on what it
       field_to_set: "recursive"
     }
 
-    command docker {
-      aliases:  ["d"]
+    command containers {
+      aliases:  ["c", "cont", "container", "docker", "d"]
       args:     (0, high())
       callback: func set_docker_image_list(list[string])
+
+      flag_yn report_unmarked {
+        yes_aliases: ["u"]
+        field_to_set: "report_unmarked"
+        doc: """
+If the 'report_unmarked' config variable is off in the config, --report-unmarked will turn it on.  Conversely, --no-report-unmarked will turn it off.
+
+In this context, it will cause 'chalk extract containers' to report metadata found on *any* running container, not just ones with chalk marks.
+"""
+      }
     }
   }
 
@@ -201,6 +211,7 @@ Deletes metadata from all artifacts specified in the search path.
       doc: default_recursive_doc
       field_to_set: "recursive"
     }
+
   }
 
   command env {

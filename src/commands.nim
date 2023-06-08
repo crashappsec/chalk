@@ -18,7 +18,7 @@ proc setPerChalkReports(successProfileName: string,
                         invalidProfileName: string,
                         hostProfileName:    string) =
   var
-    reports     = seq[string](@[])
+    reports     = seq[Box](@[])
     goodProfile = Profile(nil)
     badProfile  = Profile(nil)
     goodName    = successProfileName
@@ -78,16 +78,15 @@ proc setPerChalkReports(successProfileName: string,
     if not chalk.isMarked() and len(chalk.collectedData) == 0: continue
     let
       profile   = if not chalk.opFailed: goodProfile else: badProfile
-      oneReport = hostInfo.prepareContents(chalk.collectedData, profile)
+      oneReport = hostInfo.filterByProfile(chalk.collectedData, profile)
 
-    if oneReport != emptyReport: reports.add(oneReport)
+    if len(oneReport) != 0: reports.add(pack(oneReport))
 
   # Now, reset any profiles where we performed lifting.
   for key, conf in goodStash: goodProfile.keys[key] = conf
   for key, conf in badStash:  badProfile.keys[key] = conf
 
-  let reportJson = "[ " & reports.join(", ") & "]"
-  if len(reports) != 0:       hostInfo["_CHALKS"] = pack(reportJson)
+  if len(reports) != 0:       hostInfo["_CHALKS"] = pack(reports)
   elif "_CHALKS" in hostInfo: hostInfo.del("_CHALKS")
 
 template doCommandReport(): string =
@@ -116,7 +115,7 @@ template doEmbeddedReport(): Box =
     if "_CHALKS" in hostInfo:
       hostInfo["_CHALKS"]
     else:
-      pack("")
+      pack[seq[Box]](@[])
 
 template doCustomReporting() =
   for topic, spec in chalkConfig.reportSpecs:
@@ -207,7 +206,7 @@ proc runCmdExtract*(path: seq[string]) =
   for item in artifacts(path):
     numExtracts += 1
 
-  if numExtracts == 0: warn("No items extracted")
+  if numExtracts == 0: warn("No chalk marks extracted")
   doReporting()
 
 template oneEnvItem(key: string, f: untyped) =
@@ -807,6 +806,97 @@ proc runCmdDocker*() {.noreturn.} =
     error("Could not find 'docker'.")
   quit(1)
 
+proc getContainerIds(dockerExe: string): seq[string] =
+  let
+    cmd = [dockerExe, "ps", "--quiet"].join(" ")
+    (idlist, errCode) = execCmdEx(cmd, options = {})
+  if errCode == 0:
+    return unicode.strip(idList).split("\n")
+
+proc runCmdExtractContainers*(images: seq[string]) =
+  let
+    dockerExe      = findDockerPath().getOrElse("")
+    chalkLoc       = chalkConfig.dockerConfig.getChalkFileLocation()
+    dockerCodec    = Codec(getPluginByName("docker"))
+    reportUnmarked = chalkConfig.dockerConfig.getReportUnmarked()
+
+  var
+    toCheck    = images
+    oneExtract = false
+    chalk: ChalkObj
+
+  initCollection()
+
+  if len(images) == 0 or "all" in images:
+    toCheck = getContainerIds(dockerExe)
+
+  for item in toCheck:
+    var extracted = false
+
+    # Typically will read, "docker cp 1094ddfde117:/chalk.json -"
+    # Where the - sends the result to stdout
+    let cmdline = [dockerExe, "cp", item & ":" & chalkLoc, "-"].join(" ")
+    let (mark, errCode) = execCmdEx(cmdline, options = {poStdErrToStdOut})
+
+    if errCode != 0:
+      if mark.contains("No such container"):
+        error("Container " & item & " not found")
+        continue # Don't create a chalk object if there's no container.
+      elif mark.contains("Could not find the file"):
+        warn("Container " & item & " is unmarked.")
+      else:
+        error("Error when extracting from container " & item & ": " & mark)
+        # Hopefully this doesn't happen?  Let's try to report anyway.
+    else:
+      try:
+        let extract = extractOneChalkJson(newStringStream(mark), item)
+
+        extracted  = true
+        oneExtract = true
+        chalk      = ChalkObj(collectedData: ChalkDict(),
+                              extract:       extract,
+                              marked:        true,
+                              myCodec:       dockerCodec)
+      except:
+        error("In container with id " & item & ": Invalid chalk mark")
+
+    if not extracted:
+      if reportUnmarked:
+        chalk = ChalkObj(collectedData: ChalkDict(),
+                         extract:       nil,
+                         marked:        false,
+                         myCodec:       dockerCodec)
+      else:
+        addUnmarked(item)
+
+    chalk.addToAllChalks()
+
+    let
+      cache         = DockerInfoCache(container: true)
+      (output, err) = execCmdEx([dockerExe,"inspect", item].join(" "),
+                                options = {})
+    var
+      jsonElems: seq[JsonNode]
+
+    if err != 0:
+      error("Could not run 'docker inspect " & item & "'")
+      continue
+    try:
+      jsonElems = unicode.strip(output).parseJson().getElems()
+    except:
+      error("Did not get valid JSon from 'docker inspect " & item & "'")
+      continue
+
+    if len(jsonElems) != 0:
+      cache.inspectOut = jsonElems[0]
+
+    chalk.cache = cache
+    chalk.collectPostChalkInfo()
+    chalk.myCodec.cleanup(chalk)
+
+  if not oneExtract: warn("No chalk marks extracted")
+  doReporting()
+
 proc runCmdProfile*(args: seq[string]) =
   var
     toPublish = ""
@@ -847,7 +937,6 @@ proc runCmdProfile*(args: seq[string]) =
     toPublish &= "\nIf keys are NOT listed, they will not be reported.\n"
     toPublish &= "Any keys set to 'false' were set explicitly.\n"
   publish("defaults", toPublish)
-  quit()
 
 proc getSinkConfigTable(): string =
   var
@@ -1047,6 +1136,5 @@ proc getHelpJson(): string =
   result = $(preRes)
 
 proc runCmdHelpDump*() =
-
   publish("help", getHelpJson())
 #% END

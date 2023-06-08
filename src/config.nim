@@ -59,15 +59,16 @@ const
   # Make sure that ARTIFACT_TYPE fields are consistently named. I'd love
   # these to be const, but nim doesn't seem to be able to handle that :(
 let
-  artTypeElf*         = pack("ELF")
-  artTypeShebang*     = pack("Unix Script")
-  artTypeZip*         = pack("ZIP")
-  artTypeJAR*         = pack("JAR")
-  artTypeWAR*         = pack("WAR")
-  artTypeEAR*         = pack("EAR")
-  artTypeDocker*      = pack("Docker")
-  artTypePy*          = pack("Python")
-  artTypePyc*         = pack("Python Bytecode")
+  artTypeElf*             = pack("ELF")
+  artTypeShebang*         = pack("Unix Script")
+  artTypeZip*             = pack("ZIP")
+  artTypeJAR*             = pack("JAR")
+  artTypeWAR*             = pack("WAR")
+  artTypeEAR*             = pack("EAR")
+  artTypeDockerImage*     = pack("Docker Image")
+  artTypeDockerContainer* = pack("Docker Container")
+  artTypePy*              = pack("Python")
+  artTypePyc*             = pack("Python Bytecode")
 var
   con4mRuntime:       ConfigStack
   chalkConfig*:       ChalkConfig
@@ -106,8 +107,14 @@ proc isChalkingOp*(): bool =
     `isChalkingOp?` = commandName in chalkConfig.getValidChalkCommandNames()
   return `isChalkingOp?`
 
+proc getBaseCommandName*(): string =
+  if '.' in commandName:
+    result = commandName.split('.')[0]
+  else:
+    result = commandName
+
 proc getOutputConfig*(): OutputConfig =
-  once: currentOutputCfg = chalkConfig.outputConfigs[getCommandName()]
+  once: currentOutputCfg = chalkConfig.outputConfigs[getBaseCommandName()]
   return currentOutputCfg
 
 proc filterByProfile*(dict: ChalkDict, p: Profile): ChalkDict =

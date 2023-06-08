@@ -95,8 +95,9 @@ proc collectPostChalkInfo*(artifact: ChalkObj) =
     let
       data       = artifact.collectedData
       subscribed = plugin.configInfo.postChalkKeys
-    if not plugin.hasSubscribedKey(subscribed, data): continue
-    if plugin.configInfo.codec and plugin != artifact.myCodec:  continue
+    if not plugin.hasSubscribedKey(subscribed, data):          continue
+    if plugin.configInfo.codec and plugin != artifact.myCodec: continue
+
 
     let dict = plugin.getPostChalkInfo(artifact, isInserting)
     if dict == nil or len(dict) == 0: continue
@@ -153,7 +154,7 @@ proc collectPostRunInfo*() =
       if k notin hostInfo or k in plugin.configInfo.overrides:
         hostInfo[k] = v
 
-# The two below functions are helpers for the allArtifacts() iterator
+# The two below functions are helpers for the artifacts() iterator
 # and the self-extractor (in the case of findChalk anyway).
 proc ignoreArtifact(path: string, globs: seq[glob.Glob]): bool {.inline.} =
   for item in globs:
@@ -278,18 +279,19 @@ proc getSelfExtraction*(): Option[ChalkObj] =
   else:                return none(ChalkObj)
 
 proc initCollection*() =
-  let config       = getOutputConfig()
-  let cmdprofnames = [config.chalk, config.hostreport, config.artifactReport,
-                      config.invalidChalkReport]
-  if registerProfileKeys(cmdprofnames) == 0:
-    error("FATAL: no output reporting configured (all specs in the " &
-          "command's 'outconf' object are disabled")
-    quit(1)
-  for name, report in chalkConfig.reportSpecs:
-    if getCommandName() notin report.use_when and "*" notin report.use_when:
-      continue
-
-    registerProfileKeys([report.artifactProfile,
-                         report.hostProfile,
-                         report.invalidChalkProfile])
-  collectHostInfo()
+  once:
+    let config       = getOutputConfig()
+    let cmdprofnames = [config.chalk, config.hostreport, config.artifactReport,
+                        config.invalidChalkReport]
+    if registerProfileKeys(cmdprofnames) == 0:
+      error("FATAL: no output reporting configured (all specs in the " &
+            "command's 'outconf' object are disabled")
+      quit(1)
+    for name, report in chalkConfig.reportSpecs:
+      if (getBaseCommandName() notin report.use_when and
+          "*" notin report.use_when):
+        continue
+      registerProfileKeys([report.artifactProfile,
+                           report.hostProfile,
+                           report.invalidChalkProfile])
+    collectHostInfo()

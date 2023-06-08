@@ -92,13 +92,13 @@ method scan*(self:   CodecZip,
 
     if subscans:
       extractCtx = runChalkSubScan(origD, "extract")
-      if unpack[string](extractCtx.report) != "":
-        if chalk.extract == nil:
-          warn(chalk.fullPath & ": contains chalked contents, but is not " &
-               "itself chalked.")
-          chalk.extract = ChalkDict()
-        chalk.extract["EMBEDDED_CHALK"] = extractCtx.report
-
+      if extractCtx.report.kind == MkSeq:
+        if len(unpack[seq[Box]](extractCtx.report)) != 0:
+          if chalk.extract == nil:
+            warn(chalk.fullPath & ": contains chalked contents, but is not " &
+                 "itself chalked.")
+            chalk.extract = ChalkDict()
+          chalk.extract["EMBEDDED_CHALK"] = extractCtx.report
       if getCommandName() != "extract":
         let collectionCtx = runChalkSubScan(origD, getCommandName(),
                                             postProcessContext)
@@ -198,8 +198,7 @@ method getChalkInfo*(self: CodecZip, obj: ChalkObj): ChalkDict =
   let cache = ZipCache(obj.cache)
   result    = ChalkDict()
 
-  if chalkConfig.getChalkContainedItems() and
-     unpack[string](cache.embeddedChalk) != "":
+  if chalkConfig.getChalkContainedItems() and cache.embeddedChalk.kind != MkObj:
     result["EMBEDDED_CHALK"]  = cache.embeddedChalk
     result["EMBEDDED_TMPDIR"] = pack(cache.tmpDir)
 

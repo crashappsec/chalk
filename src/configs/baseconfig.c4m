@@ -553,7 +553,7 @@ keyspec OLD_CHALK_METADATA_ID {
 keyspec EMBEDDED_CHALK {
     kind:             Chalk
     never_early:      true
-    type:             string
+    type:             `x
     standard:         true
     codec:            true
     since:            "0.1.0"
@@ -587,7 +587,7 @@ Metadata reported by the local cloud provider.  The contents are specific to the
 
 keyspec SBOM {
     kind:             Chalk
-    type:             dict[string, string]
+    type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
     normalized_order: high() - 600
@@ -596,7 +596,7 @@ keyspec SBOM {
 
 keyspec SAST {
     kind:             Chalk
-    type:             dict[string, string]
+    type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
     normalized_order: high() - 550
@@ -1117,6 +1117,359 @@ Context used when building a container.
 """
 }
 
+keyspec _OP_ALL_IMAGE_METADATA {
+    kind:             NonChalk
+    type:             `x
+    standard:         true
+    doc: """
+All reported metadata for am image as examined, in JSON format.  With docker, this is equivolent to running 'docker inspect' on the image.
+"""
+}
+
+keyspec _OP_ALL_CONTAINER_METADATA {
+    kind:             NonChalk
+    type:             `x
+    standard:         true
+    doc: """
+All reported metadata for the running container, as reported by the container runtime, in JSON format.  With docker, this is equivolent to running 'docker inspect' on a running container.
+"""
+}
+
+keyspec _INSTANCE_ID {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    doc: """
+Any reported instance ID, such as the container ID for a running container.
+"""
+}
+
+keyspec _INSTANCE_CREATION_DATETIME {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    doc: """
+The DATETIME formatted string for the reported container creation time.
+"""
+}
+
+keyspec _INSTANCE_ENTRYPOINT {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    doc: """
+The path to the command, if running in a containerized / virtual environment.  The path is relative to the root of the environment.
+"""
+}
+
+keyspec _INSTANCE_ARGV {
+    kind:             NonChalk
+    type:             list[string]
+    standard:         true
+    doc: """
+The arguments used when starting the instance.
+"""
+}
+
+keyspec _INSTANCE_ENV {
+    kind:             NonChalk
+    type:             list[string]
+    standard:         true
+    doc: """
+Environment variables made available to the instance, in VAR=value format.
+"""
+}
+
+keyspec _INSTANCE_IMAGE_ID {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    doc: """
+The image ID associated with the instance, as a hash.  Will generally
+be lower-case ASCII prefixed with 'sha256:'
+"""
+}
+
+keyspec _INSTANCE_IMAGE_NAME {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    doc: """
+The image name associated with a container, as reported by the runtime.
+"""
+}
+
+keyspec _INSTANCE_STATUS {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    doc: """
+The status of a container or virtual instance (running, paused, stopped, etc) as reported by the container runtime.
+"""
+}
+
+keyspec _INSTANCE_EXIT_CODE {
+    kind:             NonChalk
+    type:             int
+    standard:         true
+    doc: """
+The exit code of a instance, as reported by the runtime.  Note that currently, this should almost always be 0 unless you explicitly run 'extract' on a stopped container, because, otherwise, Chalk collection is only happening on containers that are running (though there's a potential race condition where you could occasionally get a real exited process).
+"""
+}
+
+keyspec _INSTANCE_PID {
+    kind:             NonChalk
+    type:             int
+    standard:         true
+    doc: """
+The process ID of the instance as reported by the container runtime.  This will generally be the actual PID, not a virtualized PID.
+"""
+}
+
+keyspec _INSTANCE_NAME {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    doc: """
+The name this instance has been given by the container runtime.
+"""
+}
+
+keyspec _INSTANCE_RESTART_COUNT {
+    kind:             NonChalk
+    type:             int
+    standard:         true
+    doc: """
+The number of restarts the runtime reports associated with the container.
+"""
+}
+
+keyspec _INSTANCE_PLATFORM {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    doc: """
+Platform of an instance, as reported by the runtime.
+"""
+}
+
+keyspec _INSTANCE_MOUNTS {
+    kind:             NonChalk
+    type:             list[dict[string, `x]]
+    standard:         true
+    doc: """
+Mounts associated with the running container.  Items in the dictionary
+objects come from the container runtime, and the type may vary. 
+"""
+}
+
+keyspec _INSTANCE_CGROUP {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """
+CGroup associated with the instance, as reported by the container runtime
+"""
+}
+
+keyspec _INSTANCE_ISOLATION {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """
+Isolation technology in use for the instance, if reported by the container runtime.
+"""
+}
+
+keyspec _INSTANCE_IS_PRIVILEGED {
+    kind: NonChalk
+    type: bool
+    standard: true
+    doc: """
+Whether or not the workload is running with admin privileges on the underlying node.
+"""
+}
+
+keyspec _INSTANCE_ADDED_CAPS {
+    kind: NonChalk
+    type: list[string]
+    standard: true
+    doc: """
+Capabilities explicitly added to an instance.
+"""
+}
+
+keyspec _INSTANCE_DROPPED_CAPS {
+    kind: NonChalk
+    type: list[string]
+    standard: true
+    doc: """
+Capabilities explicitly dropped from an instance.
+ """
+}
+
+keyspec _INSTANCE_IMMUTABLE {
+    kind: NonChalk
+    type: bool
+    standard: true
+    doc: """
+Whether the root file system is immutable.  Note that this does not preclude filesystem mounts that allow writing.
+ """
+}
+
+keyspec _INSTANCE_RUNTIME {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """
+The container runtime associated with the instance.
+ """
+}
+
+keyspec _INSTANCE_HOSTNAME {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """
+The hostname of the instance, if reported by the container runtime.
+ """
+}
+
+keyspec _INSTANCE_DOMAINNAME {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """
+The domain name of the instance, if any.
+ """
+}
+
+keyspec _INSTANCE_USER {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """
+The user reported by the runtime, if any.
+ """
+}
+
+keyspec _INSTANCE_HAS_TTY {
+    kind: NonChalk
+    type: bool
+    standard: true
+    doc: """
+Whether the instance is using a TTY.
+"""
+}
+
+keyspec _INSTANCE_LABELS {
+    kind: NonChalk
+    type: dict[string, string]
+    standard: true
+    doc: """
+Labels attached to the instance.
+"""
+}
+
+keyspec _INSTANCE_EXPOSED_PORTS {
+    kind: NonChalk
+    type: dict[string, dict[string, `x]]
+    standard: true
+    doc: """ 
+Explicitly configured ports that the instance may bind to on external interfaces. The keys will be of the form 'port/family', e.g., 446/tcp'.  The values are info about specific interfaces where those ports are bound, if provided.  Otherwise, it's expected to be across all interfaces.
+"""
+}
+
+keyspec _INSTANCE_BOUND_PORTS {
+    kind:             NonChalk
+    type:             dict[string, dict[string, `x]]
+    standard:         true
+    doc: """
+Information on bound ports from the runtime.  The keys will be of the form 'port/family', e.g., 446/tcp'.  The values are info about specific interfaces where those ports are bound, if provided.  Otherwise, it's expected to be across all interfaces.
+"""
+}
+
+keyspec _INSTANCE_IP {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """
+The primary IP address for the instance.
+"""
+}
+
+keyspec _INSTANCE_IPV6 {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """
+The primary IPv6 address for the instance, if any.
+ """
+}
+
+keyspec _INSTANCE_GATEWAY {
+    kind: NonChalk
+    type: string
+    standard: true    
+    doc: """
+The network gateway used by the instance.
+ """
+}
+
+keyspec _INSTANCE_GATEWAYV6 {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """ 
+The network gateway used by the instance for IPv6 traffic, if any.
+"""
+}
+
+keyspec _INSTANCE_MAC {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """ 
+The MAC address associated with the instance's primary network instance.
+"""
+}
+
+keyspec _INSTANCE_COMMENT {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """
+Any comment explicitly set for the instance.
+"""
+}
+
+keyspec _INSTANCE_ARCH {
+    kind: NonChalk
+    type: string
+    standard: true    
+    doc: """ 
+The reported architecture that the instance targets.
+"""
+}
+
+keyspec _INSTANCE_OS {
+    kind: NonChalk
+    type: string
+    standard: true
+    doc: """
+The underlying OS reported by the runtime.
+ """
+}
+
+keyspec _INSTANCE_SIZE {
+    kind: NonChalk
+    type: int
+    standard: true
+    doc: """
+The reported size of the image.
+"""
+}
+
 keyspec _REPO_HOST {
     kind:             HostOnly
     type:             string
@@ -1165,6 +1518,15 @@ SHA256 digests associated with the artifact in the operation.
 """
 }
 
+keyspec _OP_ALL_CONTAINER_METADATA {
+    kind: NonChalk
+    type: `x
+    standard: true
+    doc: """
+All container metadata, as returned by the container runtime when performing the current chalk operation.
+"""
+}
+
 # Doesn't do any keys other than the codec defaults, which are:
 # ARTIFACT_PATH, HASH, HASH_FILES, COMPONENT_HASHES.  Note that
 # non-codecs cannot set these keys.
@@ -1188,7 +1550,25 @@ plugin docker {
                       "DOCKERFILE_PATH", "DOCKER_FILE",
 		      "DOCKER_PLATFORM", "DOCKER_LABELS",
 		      "DOCKER_CONTEXT"]
-    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE", "_REPO_TAGS",
+                      "_REPO_DIGESTS", "_INSTANCE_ARGV", "_INSTANCE_ENV",
+                      "_INSTANCE_ID", "_INSTANCE_CREATION_DATETIME",
+                      "_INSTANCE_ENTRYPOINT", "_INSTANCE_IMAGE_NAME",
+                      "_INSTANCE_IMAGE_ID", "_INSTANCE_STATUS",
+                      "_INSTANCE_EXIT_CODE", "_INSTANCE_PID", "_INSTANCE_NAME",
+                      "_INSTANCE_RESTART_COUNT", "_INSTANCE_PLATFORM",
+                      "_INSTANCE_MOUNTS", "_INSTANCE_BOUND_PORTS",
+                      "_INSTANCE_EXPOSED_PORTS", "_INSTANCE_CGROUP",
+                      "_INSTANCE_ISOLATION", "_INSTANCE_IS_PRIVILEGED",
+                      "_INSTANCE_ADDED_CAPS", "_INSTANCE_DROPPED_CAPS",
+                      "_INSTANCE_IMMUTABLE", "_INSTANCE_RUNTIME",
+                      "_INSTANCE_HOSTNAME", "_INSTANCE_DOMAINNAME",
+                      "_INSTANCE_USER", "_INSTANCE_HAS_TTY", "_INSTANCE_LABELS",
+                       "_INSTANCE_IP", "_INSTANCE_IPV6", "_INSTANCE_GATEWAY",
+                      "_INSTANCE_GATEWAYV6", "_INSTANCE_MAC",
+                      "_INSTANCE_COMMENT", "_INSTANCE_ARCH", "_INSTANCE_OS",
+                      "_INSTANCE_SIZE", "_OP_ALL_CONTAINER_METADATA"
+                     ]
 }
 
 plugin zip {
@@ -1556,60 +1936,102 @@ There are also some host-level items that are more meant for basic stats / healt
 
 Host keys are in the host_report_other_base (i.e., non-insert) profile.
 """
-  key.MAGIC.report                    = false
-  key.CHALK_ID.report                 = true
-  key.TIMESTAMP.report                = true
-  key.DATETIME.report                 = true
-  key.CHALK_VERSION.report            = true
-  key.CHALK_PTR.report                = true
-  key.EARLIEST_VERSION.report         = true
-  key.INSERTION_HOSTINFO.report       = true
-  key.INSERTION_NODENAME.report       = true
-  key.ARTIFACT_PATH.report            = true
-  key.ARTIFACT_TYPE.report            = true
-  key.HASH.report                     = true
-  key.HASH_FILES.report               = true
-  key.COMPONENT_HASHES.report         = true
-  key.ORIGIN_URI.report               = true
-  key.BRANCH.report                   = true
-  key.COMMIT_ID.report                = true
-  key.ARTIFACT_VERSION.report         = true
-  key.STORE_URI.report                = true
-  key.CODE_OWNERS.report              = true
-  key.INJECTOR_ID.report              = true
-  key.INJECTOR_VERSION.report         = true
-  key.INJECTOR_PLATFORM.report        = true
-  key.INJECTOR_COMMIT_ID.report       = true
-  key.BUILD_ID.report                 = true
-  key.BUILD_URI.report                = true
-  key.BUILD_API_URI.report            = true
-  key.BUILD_TRIGGER.report            = true
-  key.BUILD_CONTACT.report            = true
-  key.CHALK_RAND.report               = true
-  key.OLD_CHALK_METADATA_HASH.report  = true
-  key.OLD_CHALK_METADATA_ID.report    = true
-  key.DOCKER_FILE.report              = false
-  key.DOCKERFILE_PATH.report          = true
-  key.DOCKER_PLATFORM.report          = true
-  key.DOCKER_LABELS.report            = true
-  key.DOCKER_TAGS.report              = true
-  key.DOCKER_CONTEXT.report           = true
-  key.EMBEDDED_CHALK.report           = true
-  key.EMBEDDED_TMPDIR.report          = true
-  key.SBOM.report                     = true
-  key.SAST.report                     = true
-  key.ERR_INFO.report                 = true
-  key.SIGNING.report                  = false
-  key.METADATA_HASH.report            = true
-  key.METADATA_ID.report              = true
-  key.SIGN_PARAMS.report              = true
-  key.SIGNATURE.report                = true
-  key._OP_ARTIFACT_PATH.report        = true
-  key._OP_ARTIFACT_TYPE.report        = true
-  key._CURRENT_HASH.report            = true
-  key._VALIDATED.report               = true
-  key._OP_CHALKED_KEYS.report         = false
-  key._OP_ARTIFACT_REPORT_KEYS.report = false
+  key.MAGIC.report                       = false
+  key.CHALK_ID.report                    = true
+  key.TIMESTAMP.report                   = true
+  key.DATETIME.report                    = true
+  key.CHALK_VERSION.report               = true
+  key.CHALK_PTR.report                   = true
+  key.EARLIEST_VERSION.report            = true
+  key.INSERTION_HOSTINFO.report          = true
+  key.INSERTION_NODENAME.report          = true
+  key.ARTIFACT_PATH.report               = true
+  key.ARTIFACT_TYPE.report               = true
+  key.HASH.report                        = true
+  key.HASH_FILES.report                  = true
+  key.COMPONENT_HASHES.report            = true
+  key.ORIGIN_URI.report                  = true
+  key.BRANCH.report                      = true
+  key.COMMIT_ID.report                   = true
+  key.ARTIFACT_VERSION.report            = true
+  key.STORE_URI.report                   = true
+  key.CODE_OWNERS.report                 = true
+  key.INJECTOR_ID.report                 = true
+  key.INJECTOR_VERSION.report            = true
+  key.INJECTOR_PLATFORM.report           = true
+  key.INJECTOR_COMMIT_ID.report          = true
+  key.BUILD_ID.report                    = true
+  key.BUILD_URI.report                   = true
+  key.BUILD_API_URI.report               = true
+  key.BUILD_TRIGGER.report               = true
+  key.BUILD_CONTACT.report               = true
+  key.CHALK_RAND.report                  = true
+  key.OLD_CHALK_METADATA_HASH.report     = true
+  key.OLD_CHALK_METADATA_ID.report       = true
+  key.DOCKER_FILE.report                 = false
+  key.DOCKERFILE_PATH.report             = true
+  key.DOCKER_PLATFORM.report             = true
+  key.DOCKER_LABELS.report               = true
+  key.DOCKER_TAGS.report                 = true
+  key.DOCKER_CONTEXT.report              = true
+  key.EMBEDDED_CHALK.report              = true
+  key.EMBEDDED_TMPDIR.report             = true
+  key.SBOM.report                        = true
+  key.SAST.report                        = true
+  key.ERR_INFO.report                    = true
+  key.SIGNING.report                     = false
+  key.METADATA_HASH.report               = true
+  key.METADATA_ID.report                 = true
+  key.SIGN_PARAMS.report                 = true
+  key.SIGNATURE.report                   = true
+  key._OP_ARTIFACT_PATH.report           = true
+  key._OP_ARTIFACT_TYPE.report           = true
+  key._CURRENT_HASH.report               = true
+  key._VALIDATED.report                  = true
+  key._OP_CHALKED_KEYS.report            = false
+  key._OP_ARTIFACT_REPORT_KEYS.report    = false
+  key._REPO_TAGS.report                  = true
+  key._REPO_DIGESTS.report               = true
+  key._INSTANCE_ARGV.report              = true
+  key._INSTANCE_ENV.report               = true
+  key._INSTANCE_ID.report                = true
+  key._INSTANCE_CREATION_DATETIME.report = true
+  key._INSTANCE_ENTRYPOINT.report        = true
+  key._INSTANCE_ENTRYPOINT.report        = true
+  key._INSTANCE_ENTRYPOINT.report        = true
+  key._INSTANCE_IMAGE_NAME.report        = true
+  key._INSTANCE_IMAGE_ID.report          = true
+  key._INSTANCE_STATUS.report            = true
+  key._INSTANCE_EXIT_CODE.report         = true
+  key._INSTANCE_PID.report               = true
+  key._INSTANCE_NAME.report              = true
+  key._INSTANCE_RESTART_COUNT.report     = true
+  key._INSTANCE_PLATFORM.report          = true
+  key._INSTANCE_MOUNTS.report            = true
+  key._INSTANCE_BOUND_PORTS.report       = true
+  key._INSTANCE_CGROUP.report            = true
+  key._INSTANCE_ISOLATION.report         = true
+  key._INSTANCE_IS_PRIVILEGED.report     = true
+  key._INSTANCE_ADDED_CAPS.report        = true
+  key._INSTANCE_DROPPED_CAPS.report      = true
+  key._INSTANCE_IMMUTABLE.report         = true
+  key._INSTANCE_RUNTIME.report           = true
+  key._INSTANCE_HOSTNAME.report          = true
+  key._INSTANCE_DOMAINNAME.report        = true
+  key._INSTANCE_USER.report              = true
+  key._INSTANCE_HAS_TTY.report           = true
+  key._INSTANCE_LABELS.report            = true
+  key._INSTANCE_EXPOSED_PORTS.report     = true
+  key._INSTANCE_BOUND_PORTS.report       = true
+  key._INSTANCE_IP.report                = true
+  key._INSTANCE_IPV6.report              = true
+  key._INSTANCE_GATEWAY.report           = true
+  key._INSTANCE_GATEWAYV6.report         = true
+  key._INSTANCE_MAC.report               = true
+  key._INSTANCE_COMMENT.report           = true
+  key._INSTANCE_ARCH.report              = true
+  key._INSTANCE_OS.report                = true
+  key._INSTANCE_SIZE.report              = true
 }
 
 profile artifact_report_minimal {
@@ -1618,14 +2040,56 @@ profile artifact_report_minimal {
 info.
 """
 
-  key.CHALK_ID.report                 = true
-  key.METADATA_ID.report              = true
-  key._OP_ARTIFACT_PATH.report        = true
-  key._OP_ARTIFACT_TYPE.report        = true
-  key._CURRENT_HASH.report            = true
-  key._VALIDATED.report               = true
-  key._CURRENT_HASH.report            = true
-  key._OP_ARTIFACT_PATH.report        = true
+  key.CHALK_ID.report                    = true
+  key.METADATA_ID.report                 = true
+  key._OP_ARTIFACT_PATH.report           = true
+  key._OP_ARTIFACT_TYPE.report           = true
+  key._CURRENT_HASH.report               = true
+  key._VALIDATED.report                  = true
+  key._CURRENT_HASH.report               = true
+  key._OP_ARTIFACT_PATH.report           = true
+  key._REPO_TAGS.report                  = true
+  key._REPO_DIGESTS.report               = true
+  key._INSTANCE_ARGV.report              = true
+  key._INSTANCE_ENV.report               = true
+  key._INSTANCE_ID.report                = true
+  key._INSTANCE_CREATION_DATETIME.report = true
+  key._INSTANCE_ENTRYPOINT.report        = true
+  key._INSTANCE_ENTRYPOINT.report        = true
+  key._INSTANCE_ENTRYPOINT.report        = true
+  key._INSTANCE_IMAGE_NAME.report        = true
+  key._INSTANCE_IMAGE_ID.report          = true
+  key._INSTANCE_STATUS.report            = true
+  key._INSTANCE_EXIT_CODE.report         = true
+  key._INSTANCE_PID.report               = true
+  key._INSTANCE_NAME.report              = true
+  key._INSTANCE_RESTART_COUNT.report     = true
+  key._INSTANCE_PLATFORM.report          = true
+  key._INSTANCE_MOUNTS.report            = true
+  key._INSTANCE_BOUND_PORTS.report       = true
+  key._INSTANCE_CGROUP.report            = true
+  key._INSTANCE_ISOLATION.report         = true
+  key._INSTANCE_IS_PRIVILEGED.report     = true
+  key._INSTANCE_ADDED_CAPS.report        = true
+  key._INSTANCE_DROPPED_CAPS.report      = true
+  key._INSTANCE_IMMUTABLE.report         = true
+  key._INSTANCE_RUNTIME.report           = true
+  key._INSTANCE_HOSTNAME.report          = true
+  key._INSTANCE_DOMAINNAME.report        = true
+  key._INSTANCE_USER.report              = true
+  key._INSTANCE_HAS_TTY.report           = true
+  key._INSTANCE_LABELS.report            = true
+  key._INSTANCE_EXPOSED_PORTS.report     = true
+  key._INSTANCE_BOUND_PORTS.report       = true
+  key._INSTANCE_IP.report                = true
+  key._INSTANCE_IPV6.report              = true
+  key._INSTANCE_GATEWAY.report           = true
+  key._INSTANCE_GATEWAYV6.report         = true
+  key._INSTANCE_MAC.report               = true
+  key._INSTANCE_COMMENT.report           = true
+  key._INSTANCE_ARCH.report              = true
+  key._INSTANCE_OS.report                = true
+  key._INSTANCE_SIZE.report              = true
 }
 
 profile artifact_report_delete_base {

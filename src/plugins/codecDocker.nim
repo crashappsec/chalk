@@ -3,7 +3,7 @@
 
 import tables, strutils, json, options, os, osproc, streams, parseutils,
        posix_utils, std/tempfiles, nimutils, con4m, ../config, ../plugins,
-       ../dockerfile
+       ../dockerfile, ../chalkjson
 
 type
   CodecDocker* = ref object of Codec
@@ -20,6 +20,10 @@ type
                          success:   bool]
   #% END
   DockerInfoCache* = ref object of RootObj
+    # These fields apply to all artifacts
+    container*:             bool     # Whether it's a container or an image.
+    inspectOut*:            JSonNode
+    # These fields are used on insertion for image artifacts.
     context:                string
     dockerFilePath:         string
     dockerFileContents:     string
@@ -32,7 +36,6 @@ type
     execWithArgs:           seq[string]
     tmpDockerFile:          string
     tmpChalkMark:           string
-    inspectOut:             JSonNode
     relativeEntry:          string
     #% INTERNAL
     tmpEntryPoint:          string
@@ -59,7 +62,6 @@ method getChalkId*(self: CodecDocker, chalk: ChalkObj): string =
 # This codec is hard-wired to the docker command at the moment.
 method scan*(self: CodecDocker, stream: FileStream, loc: string):
        Option[ChalkObj] = none(ChalkObj)
-
 
 var dockerPathOpt: Option[string] = none(string)
 
@@ -141,7 +143,7 @@ method getChalkInfo*(self: CodecDocker, chalk: ChalkObj): ChalkDict =
   result["DOCKERFILE_PATH"] = pack(cache.dockerFilePath) #TODO
   result["DOCKER_FILE"]     = pack(cache.dockerFileContents)
   result["DOCKER_CONTEXT"]  = pack(cache.context)
-  result["ARTIFACT_TYPE"]   = artTypeDocker
+  result["ARTIFACT_TYPE"]   = artTypeDockerImage
 
   if cache.platform != "":
     result["DOCKER_PLATFORM"] = pack(cache.platform)
@@ -149,15 +151,154 @@ method getChalkInfo*(self: CodecDocker, chalk: ChalkObj): ChalkDict =
   if cache.labels.len() != 0:
     result["DOCKER_LABELS"]   = pack(cache.labels)
 
+template extractDockerHash(s: string): string =
+  s.split(":")[1].toLowerAscii()
+
+proc getBoxType(b: Box): Con4mType =
+  case b.kind
+  of MkStr:   return stringType
+  of MkInt:   return intType
+  of MkFloat: return floatType
+  of MkBool:  return boolType
+  of MkSeq:
+    var itemTypes: seq[Con4mType]
+    let l = unpack[seq[Box]](b)
+
+    if l.len() == 0:
+      return newListType(newTypeVar())
+
+    for item in l:
+      itemTypes.add(item.getBoxType())
+    for item in itemTypes[1..^1]:
+      if item.unify(itemTypes[0]).isBottom():
+        return Con4mType(kind: TypeTuple, itemTypes: itemTypes)
+    return newListType(itemTypes[0])
+  of MkTable:
+    # This is a lie, but con4m doesn't have real objects, or a "Json" / Mixed
+    # type, so we'll just continue to special case dicts.
+    return newDictType(stringType, newTypeVar())
+  else:
+    return newTypeVar() # The JSON "Null" can stand in for any type.
+
+proc checkAutoType(b: Box, t: Con4mType): bool =
+  return not b.getBoxType().unify(t).isBottom()
+
+proc jsonOneAutoKey(node:        JsonNode,
+                    chalkKey:    string,
+                    dict:        ChalkDict,
+                    reportEmpty: bool) =
+  let value = node.nimJsonToBox()
+
+  if value.kind == MkObj: # Using this to represent 'null' / not provided
+    return
+
+  if not reportEmpty:
+    case value.kind
+    of MkStr:
+      if unpack[string](value) == "": return
+    of MkSeq:
+      if len(unpack[seq[Box]](value)) == 0: return
+    of MkTable:
+      if len(unpack[OrderedTableRef[string, Box]](value)) == 0: return
+    else:
+      discard
+
+  if not value.checkAutoType(chalkConfig.keyspecs[chalkKey].`type`):
+    warn("Docker-provided JSON associated with chalk key '" & chalkKey &
+      "' is not of the expected type.  Using it anyway.")
+
+  dict[chalkKey] = value
+
+proc getPartialJsonObject(top: JSonNode, key: string): Option[JSonNode] =
+  var cur = top
+
+  let keyParts = key.split('.')
+  for item in keyParts:
+    if item notin cur:
+      return none(JSonNode)
+    cur = cur[item]
+
+  return some(cur)
+
+# These are the keys we can auto-convert without any special-casing.
+# Types of the JSon will be checked against the key's declared type.
+let dockerContainerAutoMap = {
+  "RepoTags":                           "_REPO_TAGS",
+  "RepoDigests":                        "_REPO_DIGESTS",
+  "Args" :                              "_INSTANCE_ARGV",
+  "Config.Env" :                        "_INSTANCE_ENV",
+  "Id" :                                "_INSTANCE_ID",
+  "Created" :                           "_INSTANCE_CREATION_DATETIME",
+  "Path" :                              "_INSTANCE_ENTRYPOINT",
+  "EntryPoint":                         "_INSTANCE_ENTRYPOINT",
+  "Cmd":                                "_INSTANCE_ENTRYPOINT",
+  "Config.Image" :                      "_INSTANCE_IMAGE_NAME",
+  "Image":                              "_INSTANCE_IMAGE_ID",
+  "State.Status" :                      "_INSTANCE_STATUS",
+  "State.ExitCode" :                    "_INSTANCE_EXIT_CODE",
+  "State.Pid" :                         "_INSTANCE_PID",
+  "Name" :                              "_INSTANCE_NAME",
+  "RestartCount" :                      "_INSTANCE_RESTART_COUNT",
+  "Platform" :                          "_INSTANCE_PLATFORM",
+  "HostConfig.Mounts" :                 "_INSTANCE_MOUNTS",
+  "HostConfig.PortBindings" :           "_INSTANCE_BOUND_PORTS",
+  "HostConfig.Cgroup" :                 "_INSTANCE_CGROUP",
+  "HostConfig.Isolation":               "_INSTANCE_ISOLATION",
+  "HostConfig.Privileged" :             "_INSTANCE_IS_PRIVILEGED",
+  "HostConfig.CapAdd" :                 "_INSTANCE_ADDED_CAPS",
+  "HostConfig.CapDrop" :                "_INSTANCE_DROPPED_CAPS",
+  "HostConfig.ReadonlyRootfs" :         "_INSTANCE_IMMUTABLE",
+  "HostConfig.Runtime" :                "_INSTANCE_RUNTIME",
+  "Config.Hostname" :                   "_INSTANCE_HOSTNAME",
+  "Config.Domainname" :                 "_INSTANCE_DOMAINNAME",
+  "Config.User" :                       "_INSTANCE_USER",
+  "Config.Tty" :                        "_INSTANCE_HAS_TTY",
+  "Config.Labels" :                     "_INSTANCE_LABELS",
+  "Config.ExposedPorts":                "_INSTANCE_EXPOSED_PORTS",
+  "NetworkSettings.Ports" :             "_INSTANCE_BOUND_PORTS",
+  "NetworkSettings.IPAddress" :         "_INSTANCE_IP",
+  "NetworkSettings.GlobalIPv6Address" : "_INSTANCE_IPV6",
+  "NetworkSettings.Gateway" :           "_INSTANCE_GATEWAY",
+  "NetworkSettings.IPv6Gateway" :       "_INSTANCE_GATEWAYV6",
+  "NetworkSettings.MacAddress" :        "_INSTANCE_MAC",
+  "Comment":                            "_INSTANCE_COMMENT",
+  "Architecture":                       "_INSTANCE_ARCH",
+  "Os":                                 "_INSTANCE_OS",
+  "Size":                               "_INSTANCE_SIZE"
+}.toOrderedTable()
+
+proc jsonAutoKey(map:  OrderedTable[string, string],
+                 top:  JsonNode,
+                 dict: ChalkDict) =
+  let reportEmpty = chalkConfig.dockerConfig.getReportEmptyFields()
+
+  for jsonKey, chalkKey in map:
+    let subJsonOpt = top.getPartialJsonObject(jsonKey)
+
+    if subJsonOpt.isNone():
+      continue
+
+    jsonOneAutoKey(subJsonOpt.get(), chalkKey, dict, reportEmpty)
+
 method getPostChalkInfo*(self:  CodecDocker,
                          chalk: ChalkObj,
                          ins:   bool): ChalkDict =
   result    = ChalkDict()
-  let cache = DockerInfoCache(chalk.cache)
-  let hash  = cache.inspectOut["Id"].getStr().split(":")[1].toLowerAscii()
+  let
+    cache      = DockerInfoCache(chalk.cache)
+    inspectOut = cache.inspectOut
 
-  chalk.cachedHash            = hash
-  result["_OP_ARTIFACT_TYPE"] = artTypeDocker
+
+  if not cache.container:
+    chalk.cachedHash = inspectOut["Id"].getStr().extractDockerHash()
+    result["_OP_ALL_IMAGE_METADATA"] = inspectOut.nimJsonToBox()
+    result["_OP_ARTIFACT_TYPE"]      = artTypeDockerImage
+    return
+  chalk.cachedHash = inspectOut["Image"].getStr().extractDockerHash()
+  result["_OP_ALL_CONTAINER_METADATA"] = inspectOut.nimJsonToBox()
+  result["_OP_ARTIFACT_TYPE"]          = artTypeDockerContainer
+
+  jsonAutoKey(dockerContainerAutoMap, inspectOut, result)
 
 proc extractDockerInfo*(chalk:          ChalkObj,
                         flags:          OrderedTable[string, FlagSpec],

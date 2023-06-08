@@ -145,7 +145,7 @@ method getPostRunInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
   if len(systemErrors)  != 0: result["_OP_ERRORS"] = pack(systemErrors)
   if len(getUnmarked()) != 0: result["_UNMARKED"]  = pack(getUnmarked())
 
-  result["_OPERATION"]            = pack(getCommandName())
+  result["_OPERATION"]            = pack(getBaseCommandName())
   result["_OP_CHALKER_VERSION"]   = pack(getChalkExeVersion())
   result["_OP_PLATFORM"]          = pack(getChalkPlatform())
   result["_OP_CHALKER_COMMIT_ID"] = pack(getChalkCommitId())
