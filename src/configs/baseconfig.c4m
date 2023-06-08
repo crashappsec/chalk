@@ -1358,6 +1358,7 @@ sink file {
 
 sink rotating_log {
   ~filename: true
+  ~max:      true
   doc:       "A truncating log file."
 }
 
