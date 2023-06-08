@@ -19,8 +19,7 @@ Install [`docker`](https://docs.docker.com/engine/install/) and
 
 #### Compiling & Running
 
-- **Compile** via `docker compose build chalk`
-- **Run** via `docker compose run --rm chalk --help`
+- **Run** via `docker compose run --rm chalk`
 
 ##### Common Issues
 

@@ -5,7 +5,7 @@ Runs basic tests for chalk
 # Setup
 
 Assumes that chalk has already been compiled.
-To do so run `docker compose build chalk-compile` and subsequently run tests
+To do so run `docker compose run --rm chalk-compile` and subsequently run tests
 via `docker compose run --rm tests` from
 the root level repo (for non docker tests) or directly invoking pytest locally
 for docker tests. Alternatively type `make test`, however this step will
