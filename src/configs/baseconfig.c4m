@@ -1518,15 +1518,6 @@ SHA256 digests associated with the artifact in the operation.
 """
 }
 
-keyspec _OP_ALL_CONTAINER_METADATA {
-    kind: NonChalk
-    type: `x
-    standard: true
-    doc: """
-All container metadata, as returned by the container runtime when performing the current chalk operation.
-"""
-}
-
 # Doesn't do any keys other than the codec defaults, which are:
 # ARTIFACT_PATH, HASH, HASH_FILES, COMPONENT_HASHES.  Note that
 # non-codecs cannot set these keys.
@@ -1567,7 +1558,8 @@ plugin docker {
                        "_INSTANCE_IP", "_INSTANCE_IPV6", "_INSTANCE_GATEWAY",
                       "_INSTANCE_GATEWAYV6", "_INSTANCE_MAC",
                       "_INSTANCE_COMMENT", "_INSTANCE_ARCH", "_INSTANCE_OS",
-                      "_INSTANCE_SIZE", "_OP_ALL_CONTAINER_METADATA"
+                      "_INSTANCE_SIZE", "_OP_ALL_CONTAINER_METADATA",
+                      "_OP_ALL_IMAGE_METADATA"
                      ]
 }
 
