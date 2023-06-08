@@ -18,8 +18,6 @@ CHALK_MAGIC = "dadfedabbadabbed"
 @dataclass
 class ChalkRunInfo(DataClassJSONMixin):
     # chalk common fields
-    local_test: bool
-    """local test is true if we are running on hardcoded testdata and false if we are running on populated caches"""
     result_dir: Path
     """path with the results for this repo"""
     exceptions: List[str]

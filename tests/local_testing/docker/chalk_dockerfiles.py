@@ -8,14 +8,14 @@ from functools import partial
 from pathlib import Path
 from typing import Any, List, Optional
 
-from ..utils.chalkruninfo import (
+from ..chalkruninfo import (
     CHALK_MAGIC,
     ChalkRunInfo,
     check_results,
     get_insertion_hostinfo,
     get_insertion_nodename,
 )
-from ..utils.output import (
+from ..output import (
     clean_previous_chalk_artifacts,
     handle_chalk_output,
     write_exceptions,
@@ -28,7 +28,6 @@ def _run_chalk_in_dir(
     repo_url: str,
     repo_cache_dir: Path,
     repo_result_dir: Path,
-    local_test: bool,
 ) -> ChalkRunInfo:
     """
     @repo_cache_dir: local dir with cached repo
@@ -101,6 +100,7 @@ def _run_chalk_in_dir(
         ],
         capture_output=True,
     )
+    print(process.stdout.decode())
 
     # chalk should not fail if the docker builds are valid
     if process.returncode != 0:
@@ -167,13 +167,7 @@ def _run_chalk_in_dir(
 
     logger.debug("...generating chalk run info")
 
-    if local_test:
-        # we are running on hardcoded tests, so git commit + url will not make sense
-        info_commit = ""
-        repo_url = str(repo_result_dir)
-
     info = ChalkRunInfo(
-        local_test=local_test,
         result_dir=repo_result_dir,
         exceptions=[str(x) for x in exceptions],
         module="dockerfiles",
@@ -204,7 +198,6 @@ def _chalk_dockerfile_in_repo(
     *,
     cache_dir: Path,
     result_dir: Path,
-    local_test: bool,
 ) -> ChalkRunInfo:
     # repo is tuple of org name and repo name
     repo_url = "https://github.com/" + repo[0] + "/" + repo[1]
@@ -224,9 +217,7 @@ def _chalk_dockerfile_in_repo(
     os.makedirs(repo_result_dir, exist_ok=True)
 
     try:
-        chalk_run_info = _run_chalk_in_dir(
-            repo_url, repo_cache_dir, repo_result_dir, local_test
-        )
+        chalk_run_info = _run_chalk_in_dir(repo_url, repo_cache_dir, repo_result_dir)
     except KeyboardInterrupt:
         logger.info("chalking interrupted, cleaning up current repository...")
         clean_previous_chalk_artifacts(repo_cache_dir)
@@ -255,11 +246,10 @@ def _validate_dockerfiles_results(info: ChalkRunInfo) -> tuple[bool, str]:
 
         vchalk = json.loads(contents)
         try:
-            if not info.local_test:
-                # only "real" github repos will have this
-                assert vchalk["COMMIT_ID"] == info.commit, "commit ID mismatch"
-                assert vchalk["ORIGIN_URI"] == info.repo_url, "Bad ORIGIN URI"
-                assert vchalk["BRANCH"] == info.branch, "branch mismatch"
+            # only "real" github repos will have this
+            assert vchalk["COMMIT_ID"] == info.commit, "commit ID mismatch"
+            assert vchalk["ORIGIN_URI"] == info.repo_url, "Bad ORIGIN URI"
+            assert vchalk["BRANCH"] == info.branch, "branch mismatch"
             if info.docker_build_succeded:
                 assert (
                     len(vchalk["_CHALKS"]) == 1
@@ -292,7 +282,7 @@ def _validate_dockerfiles_results(info: ChalkRunInfo) -> tuple[bool, str]:
 
 def validate_results(results: List[ChalkRunInfo]):
     if results:
-        for result in results[0]:
+        for result in results:
             try:
                 # check_results checks common chalkruninfo fields
                 check = check_results(result)
@@ -322,15 +312,7 @@ def validate_results(results: List[ChalkRunInfo]):
 def chalk_dockerfiles(
     results_dir: Path,
     cache_dir: Path,
-    local_test: bool,
 ) -> List[ChalkRunInfo]:
-    chalk_all = partial(
-        _chalk_dockerfile_in_repo,
-        cache_dir=cache_dir,
-        result_dir=results_dir,
-        local_test=local_test,
-    )
-
     # list of cached repositories to chalk
     repo_list = []
     results: List[ChalkRunInfo] = []
@@ -348,42 +330,33 @@ def chalk_dockerfiles(
         # technically this isn't an error so we don't raise
         return results
 
-    # TODO: remove
-    # pool = multiprocessing.Pool(processes=multiprocessing.cpu_count() // 2 + 1)
-    pool = multiprocessing.Pool(processes=1)
-    res = pool.map_async(chalk_all, repo_list, callback=results.append)
-    res.wait()
+    for repo in repo_list:
+        result = _chalk_dockerfile_in_repo(
+            repo=repo,
+            cache_dir=cache_dir,
+            result_dir=results_dir,
+        )
+        results.append(result)
 
     return results
 
 
 def run_dockerfile_tests(
-    local_test: bool,
     top_level_results: Optional[Path] = None,
     top_level_cache: Optional[Path] = None,
 ):
-    if local_test:
-        # local tests are stored already
-        dockerfile_cache = Path(__file__).absolute().parent / "test_dockerfiles"
-        assert dockerfile_cache.is_dir(), "local test does not exist"
-        # create results
-        dockerfile_results = Path(__file__).absolute().parent / "test_results"
-        os.makedirs(dockerfile_results, exist_ok=True)
-    else:
-        assert top_level_results is not None, "must specify result output directory"
-        # create top level result directory in case it doesn't exist
-        os.makedirs(top_level_results, exist_ok=True)
-        # create results subdirectory for dockerfiles
-        dockerfile_results = top_level_results / "dockerfiles"
-        os.makedirs(dockerfile_results, exist_ok=True)
+    assert top_level_results is not None, "must specify result output directory"
+    # create top level result directory in case it doesn't exist
+    os.makedirs(top_level_results, exist_ok=True)
+    # create results subdirectory for dockerfiles
+    dockerfile_results = top_level_results / "dockerfiles"
+    os.makedirs(dockerfile_results, exist_ok=True)
 
-        assert top_level_cache is not None, "must specify cache location"
-        dockerfile_cache = top_level_cache / "dockerfiles"
-        assert dockerfile_cache.is_dir(), "repo cache for dockerfiles does not exist!"
+    assert top_level_cache is not None, "must specify cache location"
+    dockerfile_cache = top_level_cache / "dockerfiles"
+    assert dockerfile_cache.is_dir(), "repo cache for dockerfiles does not exist!"
 
     results = chalk_dockerfiles(
-        results_dir=dockerfile_results,
-        cache_dir=dockerfile_cache,
-        local_test=local_test,
+        results_dir=dockerfile_results, cache_dir=dockerfile_cache
     )
     validate_results(results)

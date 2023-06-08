@@ -1,5 +1,6 @@
 # Readme
-Fetches repositories with Dockerfiles from github, runs chalk, and checks results.
+
+These tests are slow and require downloading a lot of data into the cache directory, and are not meant to be run on buildkite.
 
 # Setup
 To run tests on github reposities, repo cache must first be populated

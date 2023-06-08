@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 import pytest
 
 from .chalk.runner import Chalk
-from .utils.docker import docker_build
+from .utils.docker import docker_build, docker_image_cleanup, docker_inspect
 from .utils.log import get_logger
 
 logger = get_logger()
@@ -42,20 +42,7 @@ def test_virtual_valid_sample_1():
                     ]
                     + docker_build_params,
                 )
-                try:
-                    docker_inspect = subprocess.run(
-                        ["docker", "inspect", tag],
-                        capture_output=True,
-                        check=True,
-                    )
-                except subprocess.CalledProcessError as e:
-                    logger.error("docker inspect failed", error=e)
-                    raise
-
-                inspect_json = json.loads(docker_inspect.stdout.decode())
-                for i in inspect_json:
-                    hash = i["Id"].split("sha256:")[1]
-                    images.append(hash)
+                images = docker_inspect(tag=tag)
 
                 vjsonf = tmp_dir / "virtual-chalk.json"
                 assert vjsonf.is_file(), "virtual-chalk.json not found"
@@ -63,17 +50,8 @@ def test_virtual_valid_sample_1():
                 assert "CHALK_ID" in vjson
 
             finally:
-                for image in images:
-                    info_img_hash = image
-                    logger.debug("removing image %s", info_img_hash)
-                    try:
-                        subprocess.run(
-                            ["docker", "image", "rm", info_img_hash],
-                            check=False,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                        )
-                    except subprocess.CalledProcessError as e:
-                        logger.warning(
-                            "[WARN] docker image removal failed", error=str(e)
-                        )
+                docker_image_cleanup(images=images)
+
+
+def test_virtual_valid_sample_2():
+    assert True

@@ -4,8 +4,8 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
-from ..utils.chalkruninfo import ChalkRunInfo
-from ..utils.output import (
+from ..chalkruninfo import ChalkRunInfo
+from ..output import (
     clean_previous_chalk_artifacts,
     handle_chalk_output,
     write_exceptions,
@@ -59,10 +59,7 @@ def fetch_binaries(top_level_cache: Path, count: int):
 
 
 def _run_chalk_in_dir(
-    bin_name: str,
-    bin_cache_dir: Path,
-    bin_result_dir: Path,
-    local_test: bool,
+    bin_name: str, bin_cache_dir: Path, bin_result_dir: Path
 ) -> ChalkRunInfo:
     logger.info("[START] chalking %s", bin_cache_dir)
     # results directory in case that doesn't exist
@@ -105,7 +102,6 @@ def _run_chalk_in_dir(
 
     # TODO: fill this out
     info = ChalkRunInfo(
-        local_test=local_test,
         # commit=info_commit,
         repo_url=bin_name,
         result_dir=bin_result_dir,
@@ -125,10 +121,9 @@ def _run_chalk_in_dir(
 def chalk_binaries(
     results_dir: Path,
     cache_dir: Path,
-    local_test: bool,
 ) -> List[ChalkRunInfo]:
     # TODO: remove
-    print(results_dir, cache_dir, local_test)
+    print(results_dir, cache_dir)
 
     bin_list = []
     for name in os.listdir(cache_dir):
@@ -141,40 +136,30 @@ def chalk_binaries(
 
     results: List[ChalkRunInfo] = []
     for bin in bin_list:
-        res = _run_chalk_in_dir(bin, cache_dir / bin, results_dir / bin, local_test)
+        res = _run_chalk_in_dir(bin, cache_dir / bin, results_dir / bin)
         results.append(res)
 
     return results
 
 
 def run_binaries_tests(
-    local_test: bool,
     top_level_results: Optional[Path] = None,
     top_level_cache: Optional[Path] = None,
 ):
-    logger.debug("running tests for chalking binaries, local: %s", local_test)
-    if local_test:
-        # local tests are stored already
-        bin_cache = Path(__file__).absolute().parent / "test_binaries"
-        assert bin_cache.is_dir(), "local test directory does not exist"
-        # create results
-        bin_results = Path(__file__).absolute().parent / "test_results"
-        os.makedirs(bin_results, exist_ok=True)
-    else:
-        # create top level result directory in case it doesn't exist
-        assert top_level_results is not None, "must specify result output directory"
-        os.makedirs(top_level_results, exist_ok=True)
-        # create results subdirectory for binaries
-        bin_results = top_level_results / "binaries"
-        os.makedirs(bin_results, exist_ok=True)
+    logger.debug("running tests for chalking binaries")
 
-        assert top_level_cache is not None, "must specify cache location"
-        bin_cache = top_level_cache / "binaries"
-        assert bin_cache.is_dir(), "cache for binaries does not exist!"
+    # create top level result directory in case it doesn't exist
+    assert top_level_results is not None, "must specify result output directory"
+    os.makedirs(top_level_results, exist_ok=True)
+    # create results subdirectory for binaries
+    bin_results = top_level_results / "binaries"
+    os.makedirs(bin_results, exist_ok=True)
 
-    results = chalk_binaries(
-        results_dir=bin_results, cache_dir=bin_cache, local_test=local_test
-    )
+    assert top_level_cache is not None, "must specify cache location"
+    bin_cache = top_level_cache / "binaries"
+    assert bin_cache.is_dir(), "cache for binaries does not exist!"
+
+    results = chalk_binaries(results_dir=bin_results, cache_dir=bin_cache)
     # TODO:
     logger.error("validate results not implemented")
     # validate_results(results)
