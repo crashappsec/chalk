@@ -1257,13 +1257,16 @@ specified  by the audit_file_size variable.
 
   field audit_location {
     type:       string
-    default:    "./.chalk-audit.jsonl"
+    default:    "chalk-audit.jsonl"
     shortdoc:   "Audit file location"
     doc:  """
-This controls where the default audit log goes, if enabled.  If you enable
-and set this to "", then you need to provide your own output configuration
-that subscribes to the 'audit' topic.
-./chalk-audit.jsonl
+This controls where the default audit log goes, if enabled.  If you enable and set this to "", then you need to provide your own output configuration that subscribes to the 'audit' topic.
+
+If you provide a file name only, the directories in log_search_path are tried in order.  Failing that, it uses /tmp.
+
+If you provide an absolute path, and the log file cannot be opened, then it falls back on the search path (keeping the file name oprtion).
+
+Defaults to 'chalk-audit.jsonl'
 """
   }
 
@@ -1276,6 +1279,18 @@ When using the default log file for the built-in audit report (which, by the way
 """
   }
 
+  field log_search_path {
+    type:    list[string]
+    default: ["/var/log/chalk/", "~/.log/chalk/", "."]
+    shortdoc: "Log file location search path"
+    doc: """
+Any time you open a log file (for instance, with the output sink configurations, or with the builtin (optional) audit log, relative paths attempt to open a log fle, checking each one of these locations until one succeeds (making any directories necessary).
+
+This path is also searched if there is a problem writing log files where an explicit path is given.
+
+Note that if nothing in this path works, Chalk tries to create a temporary directory for log files, just for that invocation.
+"""
+  }
 
 
   field artifact_search_path {
@@ -1442,7 +1457,7 @@ Note that '--no-publish-defaults' at the command line will block this feature, e
     default:    true
     shortdoc:   "Report cache on"
     doc:       """
-The report cache is a self-truncating local log file, indended to add protection against reporting not reaching its destination. This will get used any time publishing to *any* sink fails to write.  
+The report cache is a localfile in JSON format that stores any reports that don't reach their destination. This will get used any time publishing to *any* sink fails to write.
 
 The report cache will re-publish on subsequent runs by appending any unsent messages to the jsonl report.  It does so on a sink-by-sink basis, based on the name of the sink.  It will never publish to the same sink twice.
 
@@ -1458,7 +1473,7 @@ A few important notes:
 
 5. If this is off, there is no check for previously cached data.
 
-Note that this field is set on the command line with --log / --no-log.
+Note that this field is set on the command line with --use-report-cache / --no-use-report-cache.
 """
   }
 
@@ -1466,7 +1481,9 @@ Note that this field is set on the command line with --log / --no-log.
     type:       string
     default:    "./chalk-reports.jsonl"
     shortdoc:   "Report cache location"
-    doc:        "Where to write the report cache, if in use."
+    doc:        """
+Where to write the report cache, if in use.  Note that Chalk does not try to write this where log files go, since it is not really a log file.  It only tries to write to the one configured location, and failing that will try a tmp file or writing to the user (see the docs for use_report_cache).
+"""
   }
 
   field force_output_on_reporting_fails {

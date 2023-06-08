@@ -351,10 +351,10 @@ proc writeReportCache*() =
   let fname = resolvePath(chalkConfig.getReportCacheLocation())
 
   if not dirtyCache and len(reportCache) != 0:
-    warn("Report cache contains " & $(len(reportCache)) &
-         " unreported message(s); Cached entries only report when there is " &
-         "an identically named output configuration for the current run " &
-         "subscribed the topic associated with cached entries.")
+    warn("Report cache contains unreported message(s); Cached entries " &
+         "only report when there is an identically named output " &
+         "configuration for the current run subscribed the topic " &
+         "associated with cached entries.")
 
   if len(reportCache) != 0:
     var
@@ -383,8 +383,9 @@ proc writeReportCache*() =
 
   else:
     try:
-      removeFile(fname)
-      info("Reporting cache was successfully flushed.")
+      if dirtyCache:
+        removeFile(fname)
+        info("Reporting cache was successfully flushed.")
     except:
       error(fname & ": could not remove (successfully flushed) report cache:" &
         getCurrentExceptionMsg())

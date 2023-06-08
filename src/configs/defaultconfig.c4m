@@ -161,6 +161,7 @@ sink_config my_file_config {
 sink_config my_rotating_config {
     enabled:  true
     sink:     "rotating_log"
+    max:      <<100mb>>
     filename: env("CHALK_ROTATING_LOG")
 }
 
