@@ -14,6 +14,8 @@ pytest-profiling = "^1.7.0"
 pytest-skip-slow = "^0.0.3"
 pytest-timeout = "^2.1.0"
 python-dateutil = "^2.8.2"
+boto3 = "^1.26.149"
+requests = "^2.31.0"
 
 [tool.poetry.group.neovim.dependencies]
 mypy = {version = "^0.991", optional = true}

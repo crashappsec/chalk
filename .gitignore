@@ -1,4 +1,8 @@
 .TODO
+.config-tool-bin/
+config-tool-outdir
+*/chalk
+*/chalkconf.spec
 /bin/chalk
 /chalk
 # universal tags

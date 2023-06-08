@@ -76,7 +76,9 @@ class Chalk:
             cmd.append(target)
 
         my_env = os.environ.copy()
+        # FIXME
         my_env["DOCKER_BUILDKIT"] = "0"
+        logger.debug("running chalk command: %s", cmd)
         try:
             run_process = run(cmd, capture_output=True, check=True, env=my_env)
             if run_process.returncode != 0 or has_errors(run_process.stderr):
