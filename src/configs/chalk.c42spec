@@ -1310,7 +1310,6 @@ Note that if nothing in this path works, Chalk tries to create a temporary direc
 """
   }
 
-
   field artifact_search_path {
     type:     list[string]
     default:  ["."]

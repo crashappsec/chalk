@@ -1724,13 +1724,17 @@ sink stderr {
 }
 
 sink file {
-  ~filename: true
+  ~filename:        true
+  ~log_search_path: false
+  ~use_search_path: false
   doc:       "A sink that writes a local file"
 }
 
 sink rotating_log {
-  ~filename: true
-  ~max:      true
+  ~filename:          true
+  ~max:               true
+  ~log_search_path:   false
+  ~truncation_amount: false
   doc:       "A truncating log file."
 }
 
@@ -1739,13 +1743,16 @@ sink s3 {
   ~uid:      true
   ~uri:      true
   ~region:   false
-  ~cacheid:  false
+  ~extra:    false
   doc:       "A sink for S3 buckets"
 }
 
 sink post {
-  ~uri:      true
-  ~headers:  false
+  ~uri:           true
+  ~headers:       false
+  ~content_type:  false
+  ~disallow_http: false
+  ~timeout:       false
   doc:       "Generic HTTP/HTTPS post to a URL. Headers must be one per-line."
 }
 

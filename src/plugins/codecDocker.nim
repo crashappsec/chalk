@@ -354,7 +354,9 @@ proc extractDockerInfo*(chalk:          ChalkObj,
     try:
       discard possibility.stat()
     except:
-      error("Couldn't find local context. Remote is currently unsupported")
+      error("When trying to find: " & possibility &
+        ": couldn't find local context: " & getCurrentExceptionMsg())
+      error("Remote contexts are not currently supported.")
       return false
     cache.context = possibility
 

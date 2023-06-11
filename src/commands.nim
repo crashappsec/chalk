@@ -659,7 +659,7 @@ proc runCmdDocker*() {.noreturn.} =
     codec              = Codec(getPluginByName("docker"))
 
   var
-    myargs             = getArgs()
+    myargs             = getArgs() # The original command lines
 
   try:
     case cmd
@@ -672,12 +672,12 @@ proc runCmdDocker*() {.noreturn.} =
         opFailed     = true
         reExecDocker = true
       else:
-        chalk = newChalk(FileStream(nil), resolvePath(myargs[^1]))
+        chalk = newChalk(FileStream(nil), resolvePath(args[^1]))
         chalk.myCodec = codec
         chalk.extract = ChalkDict() # Treat this as marked.
         addToAllChalks(chalk)
         # Let the docker codec deal w/ env vars, flags and docker files.
-        if extractDockerInfo(chalk, flags, myargs[^1]):
+        if extractDockerInfo(chalk, flags, args[^1]):
           trace("Successful parsing of docker cmdline and dockerfile")
           # Then, let any plugins run to collect data.
           chalk.collectChalkInfo()
@@ -686,7 +686,7 @@ proc runCmdDocker*() {.noreturn.} =
 
           if chalkConfig.getVirtualChalk():
             let cache = DockerInfoCache(chalk.cache)
-            myargs = myargs[0 ..< ^1] & @["-t=" & cache.ourTag, myargs[^1]]
+            myargs = myargs & @["-t=" & cache.ourTag]
 
             dockerPassthroughExec()
             if opFailed:
@@ -946,8 +946,9 @@ proc getSinkConfigTable(): string =
     unusedTopics: seq[string]
 
   for topic, obj in allTopics:
-    if len(obj.subscribers) == 0: unusedTopics.add(topic)
-    for config in obj.subscribers:
+    let subscribers = obj.getSubscribers()
+    if subscribers.len() == 0: unusedTopics.add(topic)
+    for config in subscribers:
       if config notin subLists: subLists[config] = @[topic]
       else:                     subLists[config].add(topic)
 
@@ -955,8 +956,8 @@ proc getSinkConfigTable(): string =
   for key, config in sinkConfigs:
     if config notin sublists: sublists[config] = @[]
     ot.addRow(@[key,
-                config.mySink.getSinkName(),
-                paramFmt(config.config),
+                config.mySink.getName(),
+                paramFmt(config.params),
                 filterFmt(config.filters),
                 sublists[config].join(", ")])
 

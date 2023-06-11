@@ -15,8 +15,8 @@
 import c4autoconf
 export c4autoconf # This is conceptually part of our API.
 
-import options, tables, strutils, algorithm, os, streams, uri
-import con4m, nimutils, nimutils/logging, types, sugar
+import options, tables, strutils, algorithm, os, streams, uri, json,
+       con4m, nimutils, nimutils/logging, types, sugar
 import macros except error
 export logging, types, nimutils, con4m
 
@@ -250,25 +250,113 @@ when not defined(release):
   availableSinkConfigs["debug_hook"] = defaultDebugHook
 
 
-# This is used by reportcache.nim
-var sinkErrors*: seq[SinkConfig] = @[]
+# These are used by reportcache.nim
+var   sinkErrors*: seq[SinkConfig] = @[]
+const quietTopics* = ["chalk_usage_stats"]
 
-proc getSinkConfigNameByObject*(cfg: SinkConfig): Option[string] =
-  result = none(string)
+template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
+  let base = "Publishing" & t.name & ": "
+  var line = ""
 
-  for name, obj in availableSinkConfigs:
-    if obj == cfg:
-      return some(name)
+  case cfg.mySink.name
+  of "rotating_log", "file":
+    line &= cfg.params["actual_file"] & ": "
+  else:
+    discard
 
+  line &= err
+
+  if msg != "":
+    line &= ": " & msg
+
+  line &= " (sink conf='" & cfg.name & "')"
+
+  if chalkconfig.getLogLevel() == "trace":
+    case cfg.mySink.name
+    of "post":
+      let
+        timeout = if "timeout" in cfg.params:
+                    cfg.params["timeout"] & " ms"
+                  else:
+                    "none"
+        headers = if "headers" in cfg.params:
+                    "\"\"\"\n" & cfg.params["headers"] & "\n\"\"\""
+                  else:
+                    "none"
+      line &= "\n\turi          = " & cfg.params["uri"]
+      line &= "\n\tcontent_type = " & cfg.params["content_type"]
+      line &= "\n\ttimeout      = " & timeout
+      line &= "\n\theaders      = " & headers & "\n"
+    of "s3":
+      let state = S3SinkState(cfg.private)
+      line &= "\n\turi    = " & cfg.params["uri"]
+      line &= "\n\tuid    = " & state.uid
+      line &= "\n\tregion = " & state.region
+      line &= "\n\textra  = "
+      if state.extra == "":
+        line &= "<not provided>\n"
+      else:
+        line &= state.extra & "\n"
+    of "rotating_log", "file":
+      let fname     = cfg.params["filename"]
+      var log_parts = cfg.params["log_search_path"].split(":")
+
+      for i in 0 ..< log_parts.len():
+        log_parts[i] = log_parts[i].escapeJson()
+
+      let log_path = "[" & log_parts.join(", ") & "]"
+
+      line &= "\n\tfilename        = " & escapeJson(fname)
+      line &= "\n\tlog_search_path = " & log_path
+
+      if cfg.mysink.name != "file":
+        let
+          max      = cfg.params["max"]
+          trunc    = if "truncation_amount" in cfg.params:
+                       cfg.params["truncation_amount"]
+                     else:
+                       "25%"
+        line &= "\n\tmax               = " & max
+        line &= "\n\ttruncation_amount = " & trunc
+
+
+    else:
+      discard
+
+  line
 
 proc ioErrorHandler(cfg: SinkConfig, t: Topic, msg, err, tb: string) =
-  sinkErrors.add(cfg)
+  let quiet = t.name in quietTopics
+  if not quiet:
+    sinkErrors.add(cfg)
 
-  let name = cfg.getSinkConfigNameByObject.getOrElse("<error: invalid>")
+  let
+    name  = cfg.name
+    toOut = formatIo(cfg, t, err, msg)
 
-  error("When sending data via sink configuration " & name & ": " & err)
+  if not quiet or chalkConfig.getChalkDebug():
+    error(toOut)
+  else:
+    trace(toOut)
   if chalkConfig != nil and chalkConfig.getChalkDebug():
     publish("debug", tb)
+
+proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
+  let quiet = t.name in quietTopics
+
+  if quiet and not chalkConfig.getChalkDebug():
+    return
+
+  let toOut = formatIo(cfg, t, errmsg, "")
+
+  if quiet:
+    trace(toOut)
+  else:
+    info(toOut)
+
+var
+  errCbOpt = some(FailCallback(ioErrorHandler))
+  okCbOpt  = some(LogCallback(successHandler))
 
 
 proc getSinkConfigByName*(name: string): Option[SinkConfig] =
@@ -298,13 +386,52 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       filterNames = getOpt[seq[string]](attrs, k).getOrElse(@[])
     of "sink":
       sinkName    = getOpt[string](attrs, k).getOrElse("")
+    of "use_search_path", "disallow_http":
+      let boxOpt = getOpt[Box](attrs, k)
+      if boxOpt.isSome():
+        if boxOpt.get().kind != MkBool:
+          error(k & " (sink config key) must be 'true' or 'false'")
+        else:
+          opts[k] = $(unpack[bool](boxOpt.get()))
+    of "log_search_path":
+      let boxOpt = getOpt[Box](attrs, k)
+      if boxOpt.isSome():
+        try:
+          let path = unpack[seq[string]](boxOpt.get())
+          opts[k]  = path.join(":")  # Nimutils wants shell-like.
+        except:
+          error(k & "(sink config key) must be a list of string paths.")
+    of "headers":
+      let boxOpt = getOpt[Box](attrs, k)
+      if boxOpt.isSome():
+        try:
+          let hdrs    = unpack[seq[seq[string]]](boxOpt.get())
+          var content = ""
+
+          for item in hdrs:
+            if len(hdrs) != 2: raise newException(ValueError, "")
+            content &= item[0] & ": " & item[1] & "\n"
+          opts[k]  = content
+        except:
+          error(k & "(sink config key) must be a list of tuples that map " &
+                    "header names to values (which must be strings).")
+    of "timeout", "truncation_amount":
+      let boxOpt = getOpt[Box](attrs, k)
+      if boxOpt.isSome():
+        # TODO: move this check to the spec.
+        if boxOpt.get().kind != MkInt:
+          error(k & " (sink config key) must be an int value in miliseconds")
+        else:
+          # Nimutils wants this param as a string.
+          opts[k] = $(unpack[int](boxOpt.get()))
     of "max":
       try:
+        # Todo: move this check to a type check in the spec.
         # This will accept con4m size types; they're auto-converted to int.
         let asInt = getOpt[int64](attrs, k).getOrElse(int64(10 * 1048576))
         opts[k] = $(asInt)
       except:
-        error("'max' key in sink config must be a size specification")
+        error(k & " (sink config key) must be a size specification")
         continue
     else:
       opts[k] = getOpt[string](attrs, k).getOrElse("")
@@ -325,10 +452,19 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
         error("Sink config '" & name & "' has an invalid URI.")
         dumpExOnDebug()
         return none(SinkConfig)
+  of "post":
+    if "content_type" notin opts:
+      opts["content_type"] = "application/jsonl"
+  of "file":
+    if "log_search_path" notin opts:
+      opts["log_search_path"] = chalkConfig.getLogSearchPath().join(":")
+  of "rotating_log":
+    if "log_search_path" notin opts:
+      opts["log_search_path"] = chalkConfig.getLogSearchPath().join(":")
   else:
     discard
 
-  let theSinkOpt = getSink(sinkName)
+  let theSinkOpt = getSinkImplementation(sinkName)
   if theSinkOpt.isNone():
     error("Sink '" & sinkname & "' is configured, and the config file " &
          "specs it, but there is no implementation for that sink.")
@@ -340,8 +476,8 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     else:
      filters.add(availableFilters[item])
 
-  result = configSink(theSinkOpt.get(), some(opts), filters,
-                      some(FailCallback(ioErrorHandler)))
+  result = configSink(theSinkOpt.get(), name, some(opts), filters,
+                      errCbOpt, okCbOpt)
 
   if result.isSome():
     availableSinkConfigs[name] = result.get()
@@ -363,7 +499,9 @@ proc setupDefaultLogConfigs*() =
       f         = some(newOrderedTable({ "filename" : auditFile,
                                          "max" :
                                          $(chalkConfig.getAuditFileSize())}))
-      auditConf = configSink(getSink("rotating_log").get(), f).get()
+      sink      = getSinkImplementation("rotating_log").get()
+      auditConf = configSink(sink, "audit", f, handler=errCbOpt,
+                             logger=okCbOpt).get()
 
     availableSinkConfigs["audit_file"] = auditConf
     if subscribe("audit", auditConf).isNone():
@@ -371,13 +509,14 @@ proc setupDefaultLogConfigs*() =
     else:
       trace("Audit log subscription enabled")
   let
-    uri       = chalkConfig.getCrashOverrideUsageReportingUrl()
-    headers   = "Content-Type: application/jsonl"
+    uri     = chalkConfig.getCrashOverrideUsageReportingUrl()
+    params  = some(newOrderedTable({ "uri":          uri,
+                                     "content_type": "application/jsonl" }))
+    sink    = getSinkImplementation("post").get()
+    useConf = configSink(sink, "usage_stats_conf", params, handler=errCbOpt,
+                             logger=okCbOpt).get()
 
-    params  = some(newOrderedTable({ "uri": uri, "headers" : headers }))
-    useConf = configSink(getSink("post").get(), params)
-
-  discard subscribe("chalk_usage_stats", useConf.get())
+  discard subscribe("chalk_usage_stats", useConf)
 
 proc loadLocalStructs*(state: ConfigState) =
   chalkConfig = state.attrs.loadChalkConfig()

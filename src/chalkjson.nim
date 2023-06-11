@@ -16,11 +16,11 @@ const
   jNullStr         = "null"
   jTrueStr         = "true"
   jFalseStr        = "false"
-  eBadLiteral      = "Invalid JSON literal. Expected: "
+  eBadLiteral      = "Bad literal. Expected: "
   eDoubleNeg       = "Double negative in JSON not allowed"
   eNoExponent      = "Exponent expected"
   eBadUniEscape    = "Invalid \\u escape in JSON"
-  eBadEscape       = "Invalid JSON escape command after '\\'"
+  eBadEscape       = "Invalid escape command after '\\'"
   eEOFInStr        = "End of file in string"
   eBadUTF8         = "Invalid UTF-8 in JSON string literal"
   eBadArrayItem    = "Expected comma or end of array"
@@ -117,16 +117,19 @@ proc valueFromJson(jobj: ChalkJsonNode, fname: string): Box
 proc objFromJson(jobj: ChalkJsonNode, fname: string): ChalkDict =
   result = new(ChalkDict)
 
+  if jobj == nil or jobj.kvpairs == nil:
+    return
   for key, value in jobj.kvpairs:
     if result.contains(key): # Chalk objects can't have duplicate keys.
       warn(fname & ": Duplicate entry for chalk key '" & key & "'")
       continue
-
     result[key] = valueFromJson(jobj = value, fname = fname)
 
 proc arrayFromJson(jobj: ChalkJsonNode, fname: string): seq[Box] =
   result = newSeq[Box]()
 
+  if jobj == nil:
+    return
   for item in jobj.items: result.add(valueFromJson(jobj = item, fname = fname))
 
 proc valueFromJson(jobj: ChalkJsonNode, fname: string): Box =
@@ -203,8 +206,10 @@ proc jsonValue(s: Stream): ChalkJSonNode
 template literalCheck(s: Stream, lit: static string) =
   const msg: string = eBadLiteral & lit
 
-  for i in 1 .. (len(lit) - 1):
-    if s.readChar() != lit[i]: raise parseError(msg)
+  for i in 0 .. (len(lit) - 1):
+    let c = s.readChar()
+    if c != lit[i]:
+      raise parseError(msg)
 
 let
   jNullLit: ChalkJsonNode = ChalkJsonNode(kind: CJNull)
@@ -390,7 +395,8 @@ proc jsonObject(s: Stream): ChalkJSonNode =
   case s.peekOne()
   of '}':
     discard s.readOne()
-    return ChalkJsonNode(kind: CJObject)
+    let empty = OrderedTableRef[string, ChalkJsonNode]()
+    return ChalkJsonNode(kind: CJObject, kvPairs: empty)
   of '"': return ChalkJSonNode(kind: CJObject, kvpairs: s.jsonMembers())
   else:   raise parseError(eBadObject)
 

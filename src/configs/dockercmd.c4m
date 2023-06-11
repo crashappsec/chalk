@@ -7,9 +7,8 @@ docker {
     add_help_commands:    false
     ignore_bad_flags:     true
     colon_ok:             false
-    # space_ok:           false   This is the default, but ok for some.
-    #                             Need to go through and test, but for now,
-    #                             Assume if it's wrong docker will fail.
+    space_ok:             true
+
     flag_multi_arg config { }
     flag_multi_arg context {
       aliases: ["c"]

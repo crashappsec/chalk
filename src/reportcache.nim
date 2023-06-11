@@ -74,44 +74,59 @@ template doPanicWrite(s: string) =
         quit(100)
       # If this doesn't work, we just have to give up :(
 
+const quietTopics = ["chalk_usage_stats"]
 
 template tracePublish(topic, m: string, prevSuccesses = false) =
-  var msg = m
+  var
+    msg = m
 
   if m[^1] != '\n':
     msg &= "\n"
 
-  let startSubscriptions = len(allTopics[topic].subscribers)
+  let startSubscriptions = allTopics[topic].getNumSubscribers()
+
+  # Individual sinks got pulled out by the report cache logic to
+  # publish seprately.  So when the condition below is true,
+  # there's nothing to do, but we don't want to force the parent to
+  # return
 
   if startSubscriptions == 0 and prevSuccesses:
-    return # Individual sinks got pulled out by the report cache logic to publish seprately.
-
-  var n = publish(topic, msg)
-  trace("Published the report for topic '" & topic & "' (" & $n & " subscribers)")
-
-  if n == 0:
-    if chalkConfig.getUseReportCache():
-      error("For topic '" & topic & ": No output config is working, but failures will be stored in the report cache")
-    else:
-      error("For topic '" & topic & "': ")
-      error("No output configuration is working for this report, and there is " &
-        "no report cache configured, so no metadata was recorded.")
-
-      if chalkConfig.getForceOutputOnReportingFails():
-        error("Here is the orphaned report:")
-        doPanicWrite(msg)
-        error("Run with --use-report-cache to automatically buffer failures " &
-              "between chalk runs")
-      else:
-        error("Re-run with --force-output to try again, getting a report " &
-          "on the console if io config fails again.")
-  elif n != startSubscriptions:
-    if chalkConfig.getUseReportCache():
-      error("For topic '" & topic & "': publish failures will be cached.")
-    else:
-      error("No report cache is enabled; sink configs with failures will not receive this report")
+    discard
   else:
-    discard # Success for anything w/o a previous failure (seprately published), but no need to report on it.
+    var n = publish(topic, msg)
+
+    if topic in quietTopics:
+      # Here we DO Will not get added to the report cache.
+      return
+
+    trace("Published the report for topic '" & topic & "' (" & $n &
+      " subscribers)")
+
+    if n == 0 and startSubscriptions != 0:
+      if chalkConfig.getUseReportCache():
+        error("For topic '" & topic & "': No output config is working, but " &
+              "failures will be stored in the report cache")
+      else:
+        error("For topic '" & topic & "': ")
+        error("No output configuration is working for this report, and there " &
+          "is no report cache configured, so no metadata was recorded.")
+
+        if chalkConfig.getForceOutputOnReportingFails():
+          error("Here is the orphaned report:")
+          doPanicWrite(msg)
+          error("Run with --use-report-cache to automatically buffer failures " &
+                "between chalk runs")
+        else:
+          error("Re-run with --force-output to try again, getting a report " &
+            "on the console if io config fails again.")
+    elif n != startSubscriptions:
+      if chalkConfig.getUseReportCache():
+        error("For topic '" & topic & "': publish failures will be cached.")
+      else:
+        error("No report cache is enabled; sink configs with failures will not " &
+              "receive this report")
+    elif n == 0:
+      info("Nothing subscribed to topic: " & topic)
 
 proc loadReportCache(fname: string) =
   once:
@@ -223,20 +238,15 @@ proc handleCacheFlushing(topic, msg: string): bool =
     return
 
   var unsubs: seq[(string, SinkConfig)]
-  for subscriber in allTopics[topic].subscribers:
-    # TODO: keep sink names in the SinkConfig in nimutils.
-    var sinkName = subscriber.getSinkConfigNameByObject().getOrElse("")
-
-    if sinkName == "":
+  for subscriber in allTopics[topic].getSubscribers():
+    if subscriber.name notin reportCache:
       continue
-    if sinkName notin reportCache:
-      continue
-    if topic notin reportCache[sinkName]:
+    if topic notin reportCache[subscriber.name]:
       continue
 
     # Once we're here, the current sink has data to try to flush, so
     # we follow the above plan.
-    let tmpTopicObj = register_topic("$tmp$" & topic & "$" & sinkName)
+    let tmpTopicObj = register_topic("$tmp$" & topic & "$" & subscriber.name)
     subscribe(tmpTopicObj, subscriber)
     unsubs.add((topic, subscriber))
 
@@ -246,11 +256,11 @@ proc handleCacheFlushing(topic, msg: string): bool =
     else:
       newMsg = msg
 
-    newMsg &= reportCache[sinkName][topic].join("\n")
+    newMsg &= reportCache[subscriber.name][topic].join("\n")
 
     if publish(tmpTopicObj, newMsg) >= 1:
       # Re-publishing was successful!  Remove the entry from the cache.
-      reportCache[sinkName].del(topic)
+      reportCache[subscriber.name].del(topic)
       dirtyCache = true
       result = true
 
@@ -259,8 +269,8 @@ proc handleCacheFlushing(topic, msg: string): bool =
       # configuration may have changed, orphaning this config, or we could
       # be running a different command that isn't using the same config
       # for publishing as the one that errored, ...
-      if len(reportCache[sinkName]) == 0:
-        reportCache.del(sinkName)
+      if len(reportCache[subscriber.name]) == 0:
+        reportCache.del(subscriber.name)
 
     # else, we do nothing; the failure will lead to the entry being added
     # when addSinkErrorsToCache() is called at the end of the full
