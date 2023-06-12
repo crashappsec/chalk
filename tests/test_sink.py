@@ -170,11 +170,11 @@ def test_s3():
             # print(proc.stderr.decode())
             # print(proc.stdout.decode())
 
-            # TODO: wait for john to add logging for s3 key otherwise this is too annoying
-            bucket_name = "crashoverride-chalk-tests"
-            s3_key = "1686166753582-XEFP5V3A0Q0QTTRFFGSZSWHK0W-sink-test"
-            x = s3.get_object(Bucket=bucket_name, Key=s3_key)["Body"]
-            pprint.pprint(json.loads(x.read()))
+            # TODO: fetch s3 bucket object and then validate
+            # bucket_name = "crashoverride-chalk-tests"
+            # s3_key = "1686166753582-XEFP5V3A0Q0QTTRFFGSZSWHK0W-sink-test"
+            # x = s3.get_object(Bucket=bucket_name, Key=s3_key)["Body"]
+            # pprint.pprint(json.loads(x.read()))
 
             # TODO: check that s3 output is correct
             # must pull from s3 and validate
@@ -193,14 +193,13 @@ def test_s3():
             # _validate_chalk(top_level_chalk, tmp_bin)
 
             # TODO: aws s3 cp s3://crashoverride-chalk-tests/1686146210733-7NK9AKEPCGCSJZ78N5BJTZX8YM-haha /dev/stdout
-            "s3://crashoverride-chalk-tests/1686146210733-7NK9AKEPCGCSJZ78N5BJTZX8YM-haha"
         finally:
             os.environ["AWS_PROFILE"] = aws_profile
 
 
 # TODO: currently post only accepts docker events
 # fix test when that is added
-@pytest.mark.skip("currently POST only accepts docker events")
+# @pytest.mark.skip("currently POST only accepts docker events")
 @mock.patch.dict(
     os.environ,
     {

@@ -22,23 +22,34 @@ def remove_img(img: str) -> None:
 
 
 # run docker build with parameters
-def docker_build(dir: Path, params: Optional[List[str]] = None) -> CompletedProcess:
+def docker_build(
+    dir: Path, params: Optional[List[str]] = None, expected_success: bool = True
+) -> CompletedProcess:
     with chdir(dir):
         cmd = ["docker", "build"]
         if params:
             cmd.extend(params)
 
         _build = run(cmd, capture_output=True)
-        if _build.returncode != 0:
+        if _build.returncode != 0 and expected_success == True:
             # if docker build fails, it might be because docker is down
             # or throttling us, so print error in case we want to check
-            logger.error("Docker build failed", error=_build.stderr.decode())
+            logger.error(
+                "Docker build failed unexpectedly", error=_build.stderr.decode()
+            )
+        if _build.returncode == 0 and expected_success == False:
+            # if docker build fails, it might be because docker is down
+            # or throttling us, so print error in case we want to check
+            logger.error(
+                "Docker build should have failed but did not",
+                error=_build.stderr.decode(),
+            )
         return _build
 
 
 # look up docker image hash from docker tag
 # returns a list of all hashes from the docker inspect
-def docker_inspect(tag: str) -> List[str]:
+def docker_inspect_image_hashes(tag: str) -> List[str]:
     images = []
     try:
         docker_inspect = run(
@@ -57,8 +68,11 @@ def docker_inspect(tag: str) -> List[str]:
         return images
 
     for i in inspect_json:
-        hash = i["Id"].split("sha256:")[1]
-        images.append(hash)
+        try:
+            hash = i["Id"].split("sha256:")[1]
+            images.append(hash)
+        except KeyError:
+            logger.warn("docker inspect json missing Id field")
 
     return images
 

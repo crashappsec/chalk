@@ -49,12 +49,12 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.pytests
-    command: pytest tests
+    command: pytest
     volumes:
       - $PWD:$PWD
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HOME}/.aws:/root/.aws
-    working_dir: $PWD
+    working_dir: $PWD/tests
     environment:
       AWS_PROFILE: ${AWS_PROFILE:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}

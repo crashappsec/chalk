@@ -62,6 +62,7 @@ class Chalk:
         chalk_cmd: Optional[ChalkCmd] = None,
         target: Optional[Path] = None,
         params: Optional[List[str]] = None,
+        expected_success: Optional[bool] = True,
     ) -> CompletedProcess:
         logger.info("Running chalk", binary=self.binary)
         assert self.binary.is_file()
@@ -91,19 +92,20 @@ class Chalk:
                 )
             return run_process
         except CalledProcessError as e:
-            logger.error(
-                "Chalk invocation failed",
-                error=e,
-                output=e.output,
-                stderr=e.stderr,
-                returncode=e.returncode,
-                target=target,
-                params=params,
-                chalk_cmd=chalk_cmd,
-                cur_dir=check_output(["pwd"]).decode().strip(),
-                contents=check_output(["ls"]).decode().strip(),
-            )
-            raise
+            if expected_success:
+                logger.error(
+                    "Chalk invocation failed",
+                    error=e,
+                    output=e.output,
+                    stderr=e.stderr,
+                    returncode=e.returncode,
+                    target=target,
+                    params=params,
+                    chalk_cmd=chalk_cmd,
+                    cur_dir=check_output(["pwd"]).decode().strip(),
+                    contents=check_output(["ls"]).decode().strip(),
+                )
+                raise
         except FileNotFoundError as e:
             if self.binary.is_file() and (target is None or target.exists()):
                 logger.error(
