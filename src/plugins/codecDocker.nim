@@ -362,7 +362,6 @@ proc extractDockerInfo*(chalk:          ChalkObj,
 
     if "file" in flags:
       cache.dockerFilePath = unpack[seq[string]](flags["file"].getValue())[0]
-      echo cache.dockerFilePath
       if cache.dockerFilePath == "-":
         #NOTE: this is distinct from `docker build -`,
         # this for cases like `docker build -f - .`
@@ -745,19 +744,25 @@ proc buildContainer*(chalk:  ChalkObj,
     cache     = DockerInfoCache(chalk.cache)
     fullFile  = cache.dockerFileContents & "\n" & cache.additionalInstructions
     (f, path) = createTempFile(tmpFilePrefix, tmpFilesuffix, cache.context)
-    reparse   = newSpecObj(maxArgs = high(int), unknownFlagsOk = true,
-                           noColon = true)
+    # This line should be semantically the same as the one after it.
+    # However, for some reason, even if I pass every arg by position,
+    # noSpace ends up 'true' immediately after???  Oddest thing I've seen
+    # in a while. TODO: WTF is going on??
+    #
+    # reparse   = newSpecObj(maxArgs = high(int), unknownFlagsOk = true,
+    #                        noSpace = false)
+    reparse = CommandSpec(maxArgs: high(int), dockerSingleArg: true,
+                                  unknownFlagsOk: true, noSpace: false)
+
+  let
     cmd       = findDockerPath().get()
 
   info("Created temporary docker file: " & path)
   cache.tmpDockerFile = path
   f.write(fullFile)
   f.close()
-  reparse.addFlagWithArg("file", ["f"], true, optArg = true)
-
-  var args = reparse.parse(inargs).args[""]
-
-  args = args[0 ..< ^1] & @["--file=" & path, "-t=" & cache.ourTag, args[^1]]
+  reparse.addFlagWithArg("file", ["f", "file"], true, true, optArg = false)
+  var args = reparse.parse(inargs).args[""] & @["-f", path, "-t", cache.ourTag]
 
   let
     subp = startProcess(cmd, args = args, options = {poParentStreams})
