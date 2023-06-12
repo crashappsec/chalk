@@ -17,7 +17,6 @@ from .utils.log import get_logger
 
 logger = get_logger()
 
-chalk = Chalk(binary=(Path(__file__).parent.parent / "chalk").resolve())
 CONFIG_DIR = (Path(__file__).parent / "data" / "sink_configs").resolve()
 
 
@@ -36,7 +35,7 @@ def aws_secrets_configured() -> bool:
 
 
 def _run_chalk_with_custom_config(
-    config_path: Path, target_path: Path
+    chalk: Chalk, config_path: Path, target_path: Path
 ) -> CompletedProcess:
     proc = chalk.run(
         chalk_cmd="insert",
@@ -66,140 +65,131 @@ def _validate_chalk(
 
 # TODO add a test for the file not being present
 @mock.patch.dict(os.environ, {"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"})
-def test_file_present():
+def test_file_present(tmp_data_dir: Path, chalk: Chalk):
     logger.debug("testing file sink with an existing file...")
-    with TemporaryDirectory() as _tmp_bin:
-        tmp_bin = Path(_tmp_bin)
-        artifact = Path(tmp_bin) / "cat"
-        shutil.copy("/bin/cat", artifact)
+    artifact = tmp_data_dir / "cat"
+    shutil.copy("/bin/cat", artifact)
 
-        # prep config file
-        file_output_path = Path(os.environ["SINK_TEST_OUTPUT_FILE"])
-        if not file_output_path.is_file():
-            # touch the file
-            open(file_output_path, "a").close()
-            os.utime(file_output_path, None)
-        assert file_output_path.is_file(), "file sink path must be a valid path"
+    # prep config file
+    file_output_path = Path(os.environ["SINK_TEST_OUTPUT_FILE"])
+    if not file_output_path.is_file():
+        # touch the file
+        open(file_output_path, "a").close()
+        os.utime(file_output_path, None)
+    assert file_output_path.is_file(), "file sink path must be a valid path"
 
-        config = CONFIG_DIR / "file.conf"
-        proc = _run_chalk_with_custom_config(config_path=config, target_path=artifact)
+    config = CONFIG_DIR / "file.conf"
+    proc = _run_chalk_with_custom_config(
+        chalk=chalk, config_path=config, target_path=artifact
+    )
 
-        # check that file output is correct
-        if not file_output_path or not file_output_path.is_file():
-            logger.error("output file %s does not exist", file_output_path)
-            return
+    # check that file output is correct
+    if not file_output_path or not file_output_path.is_file():
+        logger.error("output file %s does not exist", file_output_path)
+        raise AssertionError
 
-        try:
-            contents = file_output_path.read_bytes()
-            if not contents:
-                raise AssertionError("file output is empty!?")
-            top_level_chalk = json.loads(contents)
-        except json.JSONDecodeError as e:
-            logger.error("could not read %s: %s", file_output_path, str(e))
+    contents = file_output_path.read_bytes()
+    if not contents:
+        raise AssertionError("file output is empty!?")
+    top_level_chalk = json.loads(contents)
 
-        _validate_chalk(top_level_chalk, tmp_bin)
+    _validate_chalk(top_level_chalk, tmp_data_dir)
 
 
 @mock.patch.dict(
     os.environ, {"SINK_TEST_OUTPUT_ROTATING_LOG": "/tmp/sink_rotating.json"}
 )
-def test_rotating_log():
+def test_rotating_log(tmp_data_dir: Path, chalk: Chalk):
     logger.debug("testing rotating log sink...")
-    with TemporaryDirectory() as _tmp_bin:
-        tmp_bin = Path(_tmp_bin)
-        artifact = Path(tmp_bin) / "cat"
-        shutil.copy("/bin/cat", artifact)
+    artifact = Path(tmp_data_dir) / "cat"
+    shutil.copy("/bin/cat", artifact)
 
-        assert (
-            os.environ["SINK_TEST_OUTPUT_ROTATING_LOG"] != ""
-        ), "rotating log output not set"
-        rotating_log_output_path = Path(os.environ["SINK_TEST_OUTPUT_ROTATING_LOG"])
-        try:
-            os.remove(rotating_log_output_path)
-        except FileNotFoundError:
-            # okay if file doesn't exist
-            pass
+    assert (
+        os.environ["SINK_TEST_OUTPUT_ROTATING_LOG"] != ""
+    ), "rotating log output not set"
+    rotating_log_output_path = Path(os.environ["SINK_TEST_OUTPUT_ROTATING_LOG"])
+    try:
+        os.remove(rotating_log_output_path)
+    except FileNotFoundError:
+        # okay if file doesn't exist
+        pass
 
-        config = CONFIG_DIR / "rotating_log.conf"
-        proc = _run_chalk_with_custom_config(config_path=config, target_path=artifact)
+    config = CONFIG_DIR / "rotating_log.conf"
+    proc = _run_chalk_with_custom_config(
+        chalk=chalk, config_path=config, target_path=artifact
+    )
 
-        print(proc.stderr.decode())
+    # check that file output is correct
+    if not rotating_log_output_path or not rotating_log_output_path.is_file():
+        logger.error("output file %s does not exist", rotating_log_output_path)
+        raise AssertionError
 
-        # check that file output is correct
-        if not rotating_log_output_path or not rotating_log_output_path.is_file():
-            logger.error("output file %s does not exist", rotating_log_output_path)
-            return
+    contents = rotating_log_output_path.read_bytes()
+    if not contents:
+        raise AssertionError("file output is empty!?")
+    top_level_chalk = json.loads(contents)
 
-        try:
-            contents = rotating_log_output_path.read_bytes()
-            if not contents:
-                raise AssertionError("file output is empty!?")
-            top_level_chalk = json.loads(contents)
-        except Exception as e:
-            logger.error("could not read: %s", str(e))
-
-        _validate_chalk(top_level_chalk, tmp_bin)
+    _validate_chalk(top_level_chalk, tmp_data_dir)
 
 
 @pytest.mark.skipif(not aws_secrets_configured(), reason="AWS secrets not configured")
 @mock.patch.dict(
     os.environ, {"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/sink-test"}
 )
-def test_s3():
+def test_s3(tmp_data_dir: Path, chalk: Chalk):
     logger.debug("testing s3 sink...")
-    with TemporaryDirectory() as _tmp_bin:
-        tmp_bin = Path(_tmp_bin)
-        artifact = Path(tmp_bin) / "cat"
-        shutil.copy("/bin/cat", artifact)
+    artifact = Path(tmp_data_dir) / "cat"
+    shutil.copy("/bin/cat", artifact)
 
-        has_access_key = os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get(
-            "AWS_SECRET_ACCESS_KEY"
+    has_access_key = os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get(
+        "AWS_SECRET_ACCESS_KEY"
+    )
+    logger.info(os.environ.get("AWS_ACCESS_KEY_ID"))
+    logger.info(os.environ.get("AWS_SECRET_ACCESS_KEY"))
+
+    aws_profile = os.environ.get("AWS_PROFILE")
+    if has_access_key:
+        os.environ.pop("AWS_PROFILE")
+    try:
+        s3 = boto3.client("s3")
+        # basic validation of s3 env vars
+        assert os.environ["AWS_S3_BUCKET_URI"], "s3 bucket uri must not be empty"
+
+        config = CONFIG_DIR / "s3.conf"
+        proc = _run_chalk_with_custom_config(
+            chalk=chalk, config_path=config, target_path=artifact
         )
 
-        aws_profile = os.environ.get("AWS_PROFILE")
-        if has_access_key:
-            os.environ.pop("AWS_PROFILE")
-        try:
-            s3 = boto3.client("s3")
-            # basic validation of s3 env vars
-            assert os.environ["AWS_S3_BUCKET_URI"], "s3 bucket uri must not be empty"
+        # get object name out of response code
+        logs = proc.stderr.decode().split("\n")
+        object_name = ""
+        for line in logs:
+            # expecting log line from chalk of form `info: Post to: 1686605005558-CSP9AXH5CMXKAE3D9BN8G25K0G-sink-test; response = 200 OK (sink conf='my_s3_config')`
+            if "Post to" in line:
+                object_name = line.split(" ")[3].strip(";")
 
-            # config = CONFIG_DIR / "s3.conf"
-            # proc = _run_chalk_with_custom_config(config_path=config, target_path=artifact)
+        assert object_name != "", "object name could not be found"
+        logger.debug("object name fetched from s3 %s", object_name)
 
-            # print(proc.stderr.decode())
-            # print(proc.stdout.decode())
+        # fetch s3 bucket object and then validate
+        bucket_name = "crashoverride-chalk-tests"
+        response = s3.get_object(Bucket=bucket_name, Key=object_name)["Body"]
+        if not response:
+            raise AssertionError("s3 sent empty response?")
+        top_level_chalk = json.loads(response.read())
 
-            # TODO: fetch s3 bucket object and then validate
-            # bucket_name = "crashoverride-chalk-tests"
-            # s3_key = "1686166753582-XEFP5V3A0Q0QTTRFFGSZSWHK0W-sink-test"
-            # x = s3.get_object(Bucket=bucket_name, Key=s3_key)["Body"]
-            # pprint.pprint(json.loads(x.read()))
+        if not top_level_chalk:
+            raise AssertionError("s3 fetched empty chalk json?!")
 
-            # TODO: check that s3 output is correct
-            # must pull from s3 and validate
-            # jsonpath = tmp_bin / "tmp_file.json"
-            # if not jsonpath or not jsonpath.is_file():
-            #     logger.error("output file does not exist")
+        _validate_chalk(top_level_chalk, tmp_data_dir)
 
-            # try:
-            #     contents = jsonpath.read_bytes()
-            #     if not contents:
-            #         raise AssertionError("file output is empty!?")
-            #     top_level_chalk = json.loads(contents)
-            # except Exception as e:
-            #     logger.error("could not read: %s", str(e))
-
-            # _validate_chalk(top_level_chalk, tmp_bin)
-
-            # TODO: aws s3 cp s3://crashoverride-chalk-tests/1686146210733-7NK9AKEPCGCSJZ78N5BJTZX8YM-haha /dev/stdout
-        finally:
-            os.environ["AWS_PROFILE"] = aws_profile
+    finally:
+        os.environ["AWS_PROFILE"] = aws_profile
 
 
 # TODO: currently post only accepts docker events
 # fix test when that is added
-# @pytest.mark.skip("currently POST only accepts docker events")
+@pytest.mark.skip("currently POST only accepts docker events")
 @mock.patch.dict(
     os.environ,
     {
