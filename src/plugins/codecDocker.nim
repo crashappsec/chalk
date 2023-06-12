@@ -329,7 +329,7 @@ proc extractDockerInfo*(chalk:          ChalkObj,
   if "platform" in flags:
     cache.platform = (unpack[seq[string]](flags["platform"].getValue()))[0]
     if cache.platform != "linux/amd64":
-      error("skipping unsupported platform: " & cache.platform)
+      error("chalk: skipping unsupported platform: " & cache.platform)
       return false
 
   if "label" in flags:
@@ -354,7 +354,7 @@ proc extractDockerInfo*(chalk:          ChalkObj,
     try:
       discard possibility.stat()
     except:
-      error("When trying to find: " & possibility &
+      error("Chalk: When trying to find: " & possibility &
         ": couldn't find local context: " & getCurrentExceptionMsg())
       error("Remote contexts are not currently supported.")
       return false
@@ -362,6 +362,7 @@ proc extractDockerInfo*(chalk:          ChalkObj,
 
     if "file" in flags:
       cache.dockerFilePath = unpack[seq[string]](flags["file"].getValue())[0]
+      echo cache.dockerFilePath
       if cache.dockerFilePath == "-":
         #NOTE: this is distinct from `docker build -`,
         # this for cases like `docker build -f - .`
