@@ -502,6 +502,21 @@ proc newConfFileError(err, tb: string): bool =
   error(err & "\n" & tb)
   return false
 
+proc makeExecutable(f: File) =
+  when defined(posix):
+    let fd = f.getOsFileHandle()
+    var statRes: Stat
+    var mode:    int
+
+    if fstat(fd, statRes) == 0:
+      mode = int(statRes.st_mode)
+      if (mode and 0x6000) != 0:
+        mode = mode or 0x100
+      else:
+        mode = mode or 0x111
+
+      discard fchmod(fd, Mode(mode))
+
 proc runCmdConfLoad*() =
   initCollection()
 
@@ -587,6 +602,10 @@ proc runCmdConfLoad*() =
     let
       toWrite = some(selfChalk.getChalkMarkAsStr())
     selfChalk.myCodec.handleWrite(selfChalk, toWrite)
+    when defined(posix):
+      let f = open(selfChalk.fullPath)
+      f.makeExecutable()
+      f.close()
 
     info("Configuration written to new binary: " & selfChalk.fullPath)
   except:

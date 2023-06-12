@@ -11,8 +11,6 @@
 import os, tables, strutils, algorithm, options, glob, streams,
        posix, std/tempfiles, nimSHA2, config, chalkjson, json
 
-when (NimMajor, NimMinor) < (1, 7):  {.warning[LockLevel]: off.}
-
 const  ePureVirtual = "Method is not defined; it must be overridden"
 
 var
@@ -94,9 +92,9 @@ proc acquireFileStream*(chalk: ChalkObj): Option[FileStream] =
     result = some(chalk.stream)
 
 proc closeFileStream*(chalk: ChalkObj) =
-  ## This only gets called after we're totally done w/ the artifact.
-  ## Prior to that, when an operation finishes, we call yieldFileStream,
-  ## which decides whether to cache or close.
+  ## This generally only gets called after we're totally done w/ the
+  ## artifact.  Prior to that, when an operation finishes, we call
+  ## yieldFileStream, which decides whether to cache or close.
   try:
     if chalk.stream != nil:
       chalk.stream.close()
@@ -306,7 +304,9 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string) =
         error(chalk.fullPath & ": Could not write (no permission)")
         dumpExOnDebug()
 
-method handleWrite*(s: Codec, chalk: ChalkObj, enc: Option[string]) {.base.} =
+method handleWrite*(s:       Codec,
+                    chalk:   ChalkObj,
+                    enc:     Option[string]) {.base.} =
   var pre, post: string
   chalk.stream.setPosition(0)
   pre = chalk.stream.readStr(chalk.startOffset)

@@ -222,7 +222,6 @@ docker {
       }
       flag_multi_arg file {
         aliases: ["f"]
-	optional_arg: true
       }
       flag_multi_arg force_rm {
 	optional_arg: true
