@@ -19,30 +19,20 @@ method scan*(self:   CodecPythonPy,
         var chalk: ChalkObj
         var ext = loc.splitFile().ext.strip()
 
-        #Does this artefact have a python source file extension?
-        #If so chalk it, else skip
-        if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.getPyExtensions():
+        #Does this artifact have a python source file extension?  If
+        #so chalk it, else skip
+        if (not ext.startsWith(".") or
+            ext[1..^1] notin chalkConfig.getPyExtensions()):
             return none(ChalkObj)
 
         let line1 = stream.readLine()
-        #If the first line starts with a #!
-        #treat like a shebang file and
-        #add in the chalk on the 2nd line
+        # If the first line starts with a #!
+        # let the shebang plugin handle it.
         if line1.startsWith("#!"):
-            let
-                line2   = stream.readLine()
-                ix      = line2.find(magicUTF8)
-                pos     = ix + line1.len() + 1 # +1 for the newline
-            if ix == -1:
-                chalk             = newChalk(stream, loc)
-                chalk.startOffset = len(line1)
-            else:
-                stream.setPosition(pos)
-                chalk              = stream.loadChalkFromFStream(loc)
-            return some(chalk)
+          return none(ChalkObj)
         else:
-            #No shebang found so insert chalk
-            #data as new first line behind a '#'
+            # No shebang found so insert chalk data as new first line
+            # behind a '#'
             let ix  = line1.find(magicUTF8)
             if ix == -1:
                 #No magic == no existing chalk, new chalk created
@@ -58,6 +48,7 @@ method scan*(self:   CodecPythonPy,
 method handleWrite*(self:    CodecPythonPy,
                     chalk:   ChalkObj,
                     encoded: Option[string]) =
+  discard chalk.acquireFileStream()
   #Reset to start of file
   chalk.stream.setPosition(0)
   #Read up to previously set offset indicating where magic began
@@ -87,16 +78,21 @@ method handleWrite*(self:    CodecPythonPy,
     toWrite &= encoded.get() & "\n" & post.strip(chars = {' ', '\n'}, trailing = false)
   else:
     #TODO clean up like above
-    toWrite = pre[0 ..< pre.find('\n')] & "\n" & post
+    var endPos = pre.find('\n')
+    if endPos == -1:
+      endPos = len(pre)
+    toWrite = pre[0 ..< endPos] & "\n" & post
   chalk.closeFileStream()
 
-  #If NOT a dry-run replace file contents
   chalk.replaceFileContents(toWrite)
 
   chalk.cachedHash = hashFmt($(toWrite.computeSHA256()))
 
 method getUnchalkedHash*(self: CodecPythonPy, chalk: ChalkObj): Option[string] =
   var toHash = ""
+  let s = chalk.acquireFileStream()
+  if s.isNone(): return none(string)
+
   chalk.stream.setPosition(0)
   if chalk.isMarked():
     toHash = chalk.stream.readLine() & "\n"
