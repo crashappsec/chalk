@@ -53,7 +53,7 @@ services:
       context: .
       dockerfile: Dockerfile.server
     command: >
-      sh -c "if [ ! -f \"$PWD/server/app/data/chalk-selfsigned-private.key\" ] || [ ! -f \"/Users/rich.smith/Repositories/CrashOverride/chalk-internal/server/app/data/chalk-selfsigned-certificate.crt\" ];then python $PWD/server/app/main.py generate_certificate ${CHALK_SERVER_CERT_GEN_DOMAIN};fi &&
+      sh -c "if [ ! -f \"$PWD/server/app/data/chalk-selfsigned-private.key\" ] || [ ! -f \"/Users/rich.smith/Repositories/CrashOverride/chalk-internal/server/app/data/chalk-selfsigned-certificate.crt\" ];then python $PWD/server/app/main.py generate_certificate ${CHALK_SERVER_CERT_GEN_DOMAIN:-};fi &&
              gunicorn -b :8585 --workers=4 --preload --error-logfile=- --access-logfile=- --timeout 30 --keyfile $PWD/server/app/data/chalk-selfsigned-private.key --certfile=$PWD/server/app/data/chalk-selfsigned-certificate.crt -k uvicorn.workers.UvicornH11Worker main:app --reload"
     networks:
       chalk:
