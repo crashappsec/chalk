@@ -673,7 +673,10 @@ Filters to install.  Valid options are:
   field sink {
     type:       string
     default:    ""  # Will cause this to get ignored.
-    write_lock: true
+    # Turning off, because attempts to copy the default config will generally
+    # fail due to this, and it seems to lead to plenty of confusion that I do
+    # not want.
+    # write_lock: true
     doc: "The base sink; other attrs in this section are based on this value."
   }
 }
