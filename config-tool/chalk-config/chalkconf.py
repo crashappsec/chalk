@@ -150,6 +150,9 @@ class LoginScreen(ModalScreen):
         Binding(key="escape", action="abort_wizard", description = MAIN_MENU),
         Binding(key="a", action="open_authn_webpage", description = LOGIN_LABEL),
         Binding(key="q", action="display_qr", description = QR_LABEL),
+        Binding(key="ctrl+q", action=None, description = MAIN_MENU, show=False),
+        Binding(key="c", action=None, description = MAIN_MENU, show=False),
+        Binding(key="l", action=None, description = MAIN_MENU, show=False),
         Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')",
                 description = HELP_TOGGLE)
     ]
@@ -188,8 +191,12 @@ class LoginScreen(ModalScreen):
         except:
             pass
 
+        f=open("/tmp/hhh", "w")
+        f.write("%s"%(my_app.login_widget.get_id_token_json()) )
+        f.close()
+
         ##Show the user authentication successful in a pop-up
-        pop_user_profile(event.curr_user_json, success_msg=True, pop_off=2)
+        pop_user_profile(my_app.login_widget.get_id_token_json(), success_msg=True, pop_off=2)
            
     def compose(self):
         yield Header(show_clock=True)
@@ -255,8 +262,11 @@ Follow the white rabbit. Knock, Knock, %s .... 🐇🐇🐇"""%(id_token_json["g
                                                      
     user_profile_data+="\n### Logged in user profile:\n\n Name: %s\n\n Email: %s (verified = %s)\n\n Auth Expires: %s UTC"%(id_token_json["name"],id_token_json["email"],id_token_json["email_verified"],str(time.asctime(time.gmtime(id_token_json["exp"]))))
 
-    pic = ProfilePicture().generate(get_app().id_token_json["picture"])
-    get_app().push_screen(AckModal(user_profile_data, ascii_art=pic, pops=pop_off))
+    #ToDo - Breaks rendering in Textual right now, will come back to
+    #pic = ProfilePicture().generate(get_app().id_token_json["picture"])
+    #get_app().push_screen(AckModal(user_profile_data, ascii_art=pic, pops=pop_off))
+
+    get_app().push_screen(AckModal(user_profile_data, pops=pop_off))
 
 # Convenience vars.
 
@@ -296,7 +306,7 @@ class NewApp(App):
         Binding(key = "l", action = "login()", description = LOGIN_LABEL),
         Binding(key = "up", action = "<scroll-up>", show = False),
         Binding(key = "down", action = "<scroll-down>", show = False),
-        Binding(key = "c", action = "changelog()", description = "Changelog" ), #CHANGELOG_LABEL
+        Binding(key = "c", action = "changelog()", description = "View Changelogs" ), #CHANGELOG_LABEL
         #Binding(key="n", action="newconfig()", show = False),
     ]
     use_c0_api     = True
@@ -338,7 +348,7 @@ class NewApp(App):
             conftable.app.push_screen("loginscreen")
         else:
             ##If we are already authentcated just show the user profile of logged in user
-            pop_user_profile(self.curr_user_json)
+            pop_user_profile(self.id_token_json)
 
     def action_display_qr(self):
         """
@@ -352,15 +362,15 @@ class NewApp(App):
         """
         Pop up a screen to show the changelogs for both chalk and config-tool
         """
-        changelog_data_chalk       = "changelog empty"
+        changelog_data_chalk       = "changelog empty" #Todo localize these
         changelog_data_config_tool = "changelog empty"
 
         try:
             with open(os.path.join(MODULE_LOCATION,"CHANGELOG.md"), "r") as fo:
-                changelog_data_chalk       = fo.read()
+                changelog_data_config_tool = fo.read()
 
-            with open(os.path.join("%s"%(os.path.sep).join(MODULE_LOCATION.split(os.path.sep)[:-1]),"..","CHANGELOG.md"), "r") as fo:
-                 changelog_data_config_tool = fo.read()
+            with open(os.path.join("%s"%(os.path.sep).join(MODULE_LOCATION.split(os.path.sep)),"..","..","CHANGELOG.md"), "r") as fo:
+                 changelog_data_chalk = fo.read()
             
             self.push_screen(ChangelogModal([changelog_data_chalk, changelog_data_config_tool]))
         except:

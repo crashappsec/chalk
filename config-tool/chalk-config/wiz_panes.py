@@ -163,8 +163,9 @@ class ApiAuth(WizContainer):
 
         if resp.status_code == 200:
  
+            #ToDo
             #Validate id token
-            self.oidc_auth_obj.oidc_token_validate(self.oidc_auth_obj.token_json["id_token"])
+            #self.oidc_auth_obj.oidc_token_validate(self.oidc_auth_obj.token_json["id_token"])
         
             #Decode the id_token jwt
             id_token_json = self.oidc_auth_obj.decode_id_token(self.oidc_auth_obj.token_json["id_token"])
@@ -497,7 +498,9 @@ class ReportingPane(WizContainer):
         self.has_entered = False
 
         yield MDown(REPORTING_PANE_INTRO)
-        yield ReportingContainer(Checkbox(CO_STDOUT, value=True, id="report_stdout"),
+        yield ReportingContainer(
+                        Checkbox(CO_CRASH, value=True, id="report_co"),
+                        Checkbox(CO_STDOUT, value=True, id="report_stdout"),
                         Checkbox(CO_STDERR, id="report_stderr"),
                         EnablingCheckbox("log_conf", CO_LOG,  id="report_log"),
                         EnablingCheckbox("http_conf", CO_POST ,id="report_http"),

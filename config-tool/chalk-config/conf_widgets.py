@@ -233,17 +233,19 @@ class ConfigTable(Container):
     def compose(self):
         yield self.the_table
         yield Horizontal(
+            self.login_button,
             RunWizardButton(label=NEW_LABEL),
             EditConfigButton(label=EDIT_LABEL, classes="basicbutton"),
             DelConfigButton(label=DELETE_LABEL, classes="basicbutton"),
             ExConfigButton(label=EXPORT_LABEL, classes="basicbutton"),
-            Button(label="Changelog", classes="basicbutton"),
+            ChangelogButton(label="Changelog", classes="basicbutton"),
             classes="padme",
         )
 
-    def on_button_pressed(self):
+class ChangelogButton(Button):
+    async def on_button_pressed(self):
         """
-        Pop open changelog
+        Pop open changelog modal
         """
         get_app().action_changelog()
   

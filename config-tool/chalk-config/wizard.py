@@ -48,33 +48,64 @@ class ChangelogModal(ModalScreen):
     """
     Pop-up to show changelogs
     """
-    DEFAULT_CSS=WIZARD_CSS
+    #DEFAULT_CSS=WIZARD_CSS
     BINDINGS = [
-        Binding(key="escape", action="button_pressed", description = MAIN_MENU),
+        Binding(key="escape,left,space,enter", action="button_pressed", description = BACK_LABEL),
+        Binding(key="c", action="button_pressed", description = MAIN_MENU, show=False),
+        Binding(key="l", action="button_pressed", description = MAIN_MENU, show=False),
+        #Binding(key="ctrl+q", action="button_pressed", description = MAIN_MENU, show=False),
     ]
+    CSS = """
+    Tabs {
+        dock: top;
+        overflow-y: scroll;
+    }
+    Tab {
+        dock: top;
+        width: 60;
+        height: auto;
+        
+    }
+    MarkdownViewer {
+        dock: top
+        height: 100%
+    }
+    """
     def __init__(self, tab_data_list, pops=1,  button_text="Close"):
         super().__init__()
         self.tab_data_list = tab_data_list
         self.pops          = pops
-        self.button_text   = button_text
+        self.back_button   = Button(button_text)
+        self.back_button.styles.align = ("center", "middle")
+        self.back_button.styles.margin = 4,4
 
     def compose(self):
         """
         Build tabbed pane with a tab for each changelog
         """
-        with TabbedContent():       
-            with TabPane("Chalk"):
-                yield Button(self.button_text)
-                yield MDown(self.tab_data_list[0])
-                
-            with TabPane("Config-Tool"):
-                yield Button(self.button_text)
-                yield MDown(self.tab_data_list[1])
-                
+        yield Tabs(
+                    Tab("Chalk", id="chalk_changelog_md"), 
+                    Tab("Config-Tool", id="configtool_changelog_md")
+                )
+        with ContentSwitcher(initial="chalk_changelog_md"):  
+            yield MarkdownViewer(self.tab_data_list[0], id="chalk_changelog_md")
+            yield MarkdownViewer(self.tab_data_list[1], id="configtool_changelog_md")
+        yield Footer()
+
+    def on_tabs_tab_activated(self, event: Tabs.TabActivated) -> None:
+        """Handle TabActivated message sent by Tabs."""
+        self.query_one(ContentSwitcher).current = event.tab.id
+
     def on_button_pressed(self):
         while self.pops:
             self.app.pop_screen()
             self.pops = self.pops - 1
+
+    def action_button_pressed(self):
+        while self.pops:
+            self.app.pop_screen()
+            self.pops = self.pops - 1
+ 
         
 class HelpWindow(Container):
     def action_help(self):

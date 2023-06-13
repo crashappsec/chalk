@@ -201,22 +201,6 @@ AckModal > Vertical > Button {
     margin: 0 4;
 }
 
-ChangelogModal > TabbedContent {
-    padding: 0 1;
-    width: 120;
-    height: auto;
-    background: $surface;
-    align: center middle;
-    content-align: center middle;
-    overflow-y: scroll;
-}
-
-ChangelogModal > TabbedContent > TabPane >  Button {
-    background: $primary;
-    align: center middle;
-    content-align: center middle;
-}
-
 .model_q {
     column-span: 2;
     height: 1fr;

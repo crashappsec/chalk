@@ -59,7 +59,6 @@ class CLIAuth(object):
             self.id_token_json = dec_token
             self.current_user_name = dec_token["given_name"]
             return dec_token
-            #return jwt.decode(self.token_json["id_token"], algorithm=["RS256"], options={"verify_signature": True})
         #ToDo fix
         except:
             raise
