@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width" name="viewport">
+<title>Overview | Crash Override</title>
+<link href="https://www.crashoverride.com/docs/chalk/overview/" rel="canonical"/>
+<link href="../../css/reset.css" rel="stylesheet"/>
+<link href="../../css/syntax-highlighting.css" rel="stylesheet"/>
+<link href="../../css/vars.css" rel="stylesheet"/>
+<link href="../../css/theme.css" rel="stylesheet"/>
+<script>window.base_url = '../..';</script>
+<script defer="" src="../../js/stimulus.js"></script>
+<script defer="" src="../../js/a11y-dialog.js"></script>
+<script defer="" src="../../js/theme.js"></script>
+<script src="../../search/main.js"></script>
+<link href="../../favicon.ico" rel="icon">
+</link></meta></head>
+<body class="page">
+<aside class="sidebar" data-controller="dropdown" data-dropdown-body-class="has-open-sidebar">
+<div class="sidebar__inner">
+<div class="sidebar__header">
+<button aria-controls="sidebar-navigation" aria-expanded="false" aria-label="Toggle navigation" class="sidebar__toggle" data-dropdown-target="toggle" type="button">
+<svg class="feather feather-more-vertical" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg">
+<circle cx="12" cy="12" r="1"></circle>
+<circle cx="12" cy="5" r="1"></circle>
+<circle cx="12" cy="19" r="1"></circle>
+</svg>
+</button>
+<p class="sidebar__topic">Overview</p>
+<div class="sidebar__search">
+<button class="sidebar__search__toggle" data-action="click-&gt;modal-link#open" data-controller="modal-link" data-modal-link-id="modal-search" type="button">
+<span class="sidebar__search__label">Search</span>
+<svg aria-hidden="true" class="sidebar__search__toggle__icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<circle cx="11" cy="11" r="8"></circle>
+<path d="M21 21l-4.35-4.35"></path>
+</svg>
+</button>
+</div>
+</div><nav class="sidebar__navigation" data-action="keydown-&gt;dropdown#onElementKeydown" data-dropdown-target="content" id="sidebar-navigation">
+<button aria-label="Close navigation" class="sidebar__close" data-action="click-&gt;dropdown#close" type="button">
+<svg aria-hidden="true" class="feather feather-x" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg">
+<path d="M18 6L6 18M6 6l12 12"></path>
+</svg>
+</button>
+<ul class="sidebar__list"><li class="sidebar__section is-current">
+<p class="sidebar__title">
+									Chalk
+								</p>
+<ul class="sidebar__documents">
+<li class="sidebar__document">
+<a class="sidebar__document__toggle is-open" href="./">
+												Overview
+												<svg aria-hidden="true" class="sidebar__document__toggle__icon" viewbox="0 0 9 9" xmlns="http://www.w3.org/2000/svg">
+<path d="M.9 8.889a.276.276 0 01-.108.036c-.096 0-.144-.066-.144-.198v-1.98c0-.12.054-.204.162-.252l4.806-1.944c.072-.036.072-.072 0-.108L.81 2.481c-.108-.06-.162-.144-.162-.252V.267C.648.183.672.126.72.096.768.066.828.069.9.105l7.29 3.222a.255.255 0 01.162.252v1.836c0 .108-.054.192-.162.252L.9 8.889z" fill="currentColor"></path>
+</svg>
+</a>
+<ul class="sidebar__anchors" data-controller="page-nav">
+<li class="sidebar__anchor">
+<a class="sidebar__anchor__link" data-action="click-&gt;dropdown#close" data-page-nav-target="link" href="#what-is-chalk">What is Chalk</a>
+</li>
+<li class="sidebar__anchor">
+<a class="sidebar__anchor__link" data-action="click-&gt;dropdown#close" data-page-nav-target="link" href="#background">Background</a>
+</li>
+<li class="sidebar__anchor">
+<a class="sidebar__anchor__link" data-action="click-&gt;dropdown#close" data-page-nav-target="link" href="#chalk-overview">Chalk Overview</a>
+</li>
+<li class="sidebar__anchor">
+<a class="sidebar__anchor__link" data-action="click-&gt;dropdown#close" data-page-nav-target="link" href="#the-chalk-specification">The Chalk specification</a>
+</li>
+<li class="sidebar__anchor">
+<a class="sidebar__anchor__link" data-action="click-&gt;dropdown#close" data-page-nav-target="link" href="#getting-started">Getting Started</a>
+</li>
+<li class="sidebar__anchor">
+<a class="sidebar__anchor__link" data-action="click-&gt;dropdown#close" data-page-nav-target="link" href="#customization-overview">Customization Overview</a>
+</li>
+<li class="sidebar__anchor">
+<a class="sidebar__anchor__link" data-action="click-&gt;dropdown#close" data-page-nav-target="link" href="#basic-customization">Basic customization</a>
+</li>
+<li class="sidebar__anchor">
+<a class="sidebar__anchor__link" data-action="click-&gt;dropdown#close" data-page-nav-target="link" href="#learn-more">Learn more</a>
+</li>
+<li class="sidebar__anchor">
+<a class="sidebar__anchor__link" data-action="click-&gt;dropdown#close" data-page-nav-target="link" href="#why-con4m">Why con4m?</a>
+</li>
+<li class="sidebar__anchor">
+<a class="sidebar__anchor__link" data-action="click-&gt;dropdown#close" data-page-nav-target="link" href="#relationship-to-slsa">Relationship to SLSA</a>
+</li>
+</ul>
+</li>
+<li class="sidebar__document">
+<a class="sidebar__document__toggle" href="../api/">
+												API Docs
+												<svg aria-hidden="true" class="sidebar__document__toggle__icon" viewbox="0 0 9 9" xmlns="http://www.w3.org/2000/svg">
+<path d="M.9 8.889a.276.276 0 01-.108.036c-.096 0-.144-.066-.144-.198v-1.98c0-.12.054-.204.162-.252l4.806-1.944c.072-.036.072-.072 0-.108L.81 2.481c-.108-.06-.162-.144-.162-.252V.267C.648.183.672.126.72.096.768.066.828.069.9.105l7.29 3.222a.255.255 0 01.162.252v1.836c0 .108-.054.192-.162.252L.9 8.889z" fill="currentColor"></path>
+</svg>
+</a></li>
+</ul>
+</li><li class="sidebar__section">
+<p class="sidebar__title">
+									FAQ
+								</p>
+<ul class="sidebar__documents">
+<li class="sidebar__document">
+<a class="sidebar__document__toggle" href="../../faq/data/">
+												Data Collection
+												<svg aria-hidden="true" class="sidebar__document__toggle__icon" viewbox="0 0 9 9" xmlns="http://www.w3.org/2000/svg">
+<path d="M.9 8.889a.276.276 0 01-.108.036c-.096 0-.144-.066-.144-.198v-1.98c0-.12.054-.204.162-.252l4.806-1.944c.072-.036.072-.072 0-.108L.81 2.481c-.108-.06-.162-.144-.162-.252V.267C.648.183.672.126.72.096.768.066.828.069.9.105l7.29 3.222a.255.255 0 01.162.252v1.836c0 .108-.054.192-.162.252L.9 8.889z" fill="currentColor"></path>
+</svg>
+</a></li>
+</ul>
+</li></ul>
+</nav></div>
+</aside>
+<main class="content">
+<div class="content__inner">
+<div class="rich-text">
+<h1 id="overview">Overview</h1>
+<h2 id="what-is-chalk">What is Chalk</h2>
+<p><img alt="Chalk" src="../hero%402x.png"/></p>
+<p><code>Chalk</code> is an incredibly easy-to-use approach to mark software artifacts at build time, and record arbitrary metadata.  The chalk tool can collect and store metadata about builds, and just as easily recover metadata from production. It's also easy to collect custom metadata, and control where that metadata goes.</p>
+<p>The goal is, as much as possible, people should just be able to put a single command in their build and deployment pipelines in the right place, and then can forget about it.</p>
+<p>The project consists of the open source tool that can chalk artifacts, and recover chalk from the wild.  Additionally, the project includes the <code>chalk</code> specification, which specifies the metadata keys and format, as well as guidance for dealing with artifact metadata in a wide variety of environments.</p>
+<p>The visibility <code>chalk</code> provides can help people operationally-- security teams can have they data at their fingertips, that they often need to prioritize their work, where usually they have to ask around to get it. Finance can get visibility into who's spending money, also without having to go talk to people unnecessarily.</p>
+<p>In short, if you chalk your software, security teams won’t have to go to developers for basic info, which is a win for everyone.</p>
+<h2 id="background">Background</h2>
+<p>Last year, we went out and interviewed many dozens of people about their problems around application security. One thing we noticed is that MANY people suffer because they cannot easily look at software in production and tie it back to the repo it came from.  That is, there's a software provenance problem.</p>
+<p>For instance, I watched multiple people work from their cloud security posture management (CSPM) tool, and they all still had plenty of Log4J alerts, more than a year after that bomb dropped. I always heard the same story:</p>
+<ol>
+<li>Often their CSPM sees Log4J in a container, but it isn't actually in use.</li>
+<li>But they'd have to find the developers, which involves some asking around.</li>
+<li>The developers don't want to spend cycles on something that is probably not an issue at this point anyway.</li>
+</ol>
+<p>I also saw the problem from the other direction:</p>
+<ol>
+<li>"Our code analysis tools are reporting a ton of alerts across our repos".</li>
+<li>"For many of the repos, we have no idea where and whether they're deployed, or whether vulnerable versions are deployed".</li>
+<li>"We couldn't possibly tackle all this, but we also don't know how to prioritize".</li>
+</ol>
+<p>Everyone could see it would be great to attach metadata to software at build, yet very few people were doing anything effective. The real problem was that "developer friction" problem. When we talked to people who had tried to address the problem, they had always asked the developers to make a significant process change, which never went over well.</p>
+<p>As it turns out, <em>collecting metadata is easy. Operationalizing it turns out to be a huge pain.</em></p>
+<p>It would be one thing if the work was all in the hands of the people who need the data. Asking devs to do the work is a bridge too far.</p>
+<h2 id="chalk-overview">Chalk Overview</h2>
+<p><code>Chalk</code>'s focus is on operationalizing metadata collection and retrieval, without requiring the developer to do more than drop a single command into their build pipelines, a single time.</p>
+<p>Meanwhile, beyond being able to tie specific commits in specific repos to production artifacts, <code>chalk</code> can automatically capture other interesting metadata for people around the org:</p>
+<ul>
+<li>Contact points (e.g., from a github-style <code>CODEOWNERS</code> file or more old school <code>AUTHORS</code> file).</li>
+<li>Software composition (yes, we can automatically collect SBOMs)</li>
+<li>Attestation info (yes, we can automatically sign artifacts)</li>
+<li>Build environment information.</li>
+<li>Anything else your heart desires, because it's easy to customize.</li>
+</ul>
+<p>For insertion, <code>chalk</code> does a bit of discovery to determine the context in which it’s running, identifying artifacts associated with the current pipeline, which can include executables, scripts, containers and so on.</p>
+<p>Then, we place a <em>chalk mark</em> into those artifacts, in a way that won’t interfere with execution, but can be easily retrieved from production systems. We have techniques for automatically chalking many kinds of software artifacts, including containers, ELF executables, Unix “shebang” files, JARs, javascript, and so on.</p>
+<p>This is all done in a way that, for common cases, you can get good results with no configuration.  And nobody has to worry about managing a bunch of extra metadata files!</p>
+<p><code>Chalk</code> can stuff an artifact with metadata, but typically we prefer to collect metadata at chalk time, but only chalk artifacts with barebones info, including a “chalk pointer”, providing more information on where to find the associated info, but not including things that an attacker might use to target, such as repository location, code authors, etc.</p>
+<p>Chalking makes it really easy to operationalize pushing metadata where you need it. You can easily configure sending data to logs, to object storage, via an https POST, etc.  Need to send it to five different systems?  No problem.</p>
+<p>If no information is provided about where to send metadata, any collected metadata added to the artifact.  If you configure sending to an https endpoint or to object storage, then we only add the pointer, plus a few required items by default. But, it’s all customizable.</p>
+<p><em>You can fully customize <code>chalk</code> without having to be able to compile the software.  When you set things up the way you want, it, <code>chalk</code> will chalk itself!</em></p>
+<p>The same command can automatically extract data from production environments. Though, it often isn’t necessary, since, if you deploy and chalk containers, the basic image information that your cloud provider or CSPM will provide will give you what you need to find the metadata.  In fact, in such environments, containers can be <em>virtually chalked</em>, meaning that no metadata is stored in the artifact.  If you want this behavior without having to do your own configuration to set up any output configurations, you can use our free service to do it.</p>
+<p>Once things are being chalked as a matter of course, security will not need to ask around to figure out which alerts from static analysis tools map to production software.  They won’t have to engage with developers to figure out the exact version of the codebase for that thing flagged in production.</p>
+<p>Everybody wins!</p>
+<h2 id="the-chalk-specification">The Chalk specification</h2>
+<p>See these links if you’re interested in more details on the base specification. Again, we’re quite happy with other implementations of chalk to exist, but want to maximize interoperability.</p>
+<ul>
+<li>See the chalk metadata specification.</li>
+<li>See the chalk mark injection specification, and guidance for various artifact types.</li>
+</ul>
+<h2 id="getting-started">Getting Started</h2>
+<p>We’ll fill installation instructions later in later.  This section should cover:</p>
+<ul>
+<li>Running locally</li>
+<li>Installation within build / deploy pipelines.</li>
+<li>Extraction</li>
+</ul>
+<h2 id="customization-overview">Customization Overview</h2>
+<p>While <code>chalk</code> is intended to be simple enough that anyone could install the default release and get good behavior, it is also designed to be flexible enough to meet any reasonable need.</p>
+<p>Configurations can be easily dumped and loaded into the chalk executable itself, and that configuration can easily be signed.  You can audit reconfigurations or overrides, or disallow them outright.</p>
+<p>Chalk configurations can look like a typical nginx-style configuration file for setting attributes, until you need to add any conditional logic to it, at which point, you can interleave code using a simple go-like language that’s seamlessly integrated, called <code>con4m</code>.</p>
+<h2 id="basic-customization">Basic customization</h2>
+<p>If you run:</p>
+<pre class="highlight"><code class="language-bash">$ chalk defaults</code></pre>
+<p>You’ll see there are three basic areas for configuration:</p>
+<ul>
+<li>General options, which mainly revolve around search paths and other feature flags.</li>
+<li>Metadata keys. There are a bunch of standard ones, most of which chalk will try to populate on its own, that you can configure or customize.  You can also add your own custom metadata keys, though these must start with the prefix “X-”.</li>
+<li>Output configuration, which basically uses a pub/sub model to connect internal “topics” to “data sinks” that you configure.  There’s a reasonable output configuration installed by default.  Note that this controls many types of output, but any chalking done to an artifact is done outside of the pub-sub system.</li>
+</ul>
+<p>General options are straightforward top-level key-value pairs.  For instance:</p>
+<pre class="highlight"><code class="language-bash">log_level: “warn”
+color:     false</code></pre>
+<p>Key configurations use “objects”.  The default metadata keys all have objects and you can, in some cases, mask their properties, for instance, to provide your own values, to control what gets put into chalk pointers (as opposed to being simply collected and sent to output sinks):</p>
+<pre class="highlight"><code class="language-go">key CODE_OWNERS {
+  value:  "john@crashoverride.com"
+  in_ptr: true  // write it into the artifact, don't just collect the metadata.
+}
+
+key SBOMS {
+  skip: true    // Do not attempt to collect SBOM information.
+}</code></pre>
+<p>If you want to have a key set based on an environment variable (if, for instance, it’s a best practice in your organization already), you can call the <code>env()</code> builtin function.  For instance:</p>
+<pre class="highlight"><code class="language-bash">key BUILD_ID {
+  value: env("JOB_ID")
+}</code></pre>
+<p>Of course, if you’re not running in CI/CD, the environment variable may not be set. To avoid getting the extra field when it’s not needed, you could skip setting the value if the environment variable doesn’t exist:</p>
+<pre class="highlight"><code class="language-bash">key BUILD_ID {
+  if env_exists("JOB_ID") {
+     value: env("JOB_ID")
+  }
+}</code></pre>
+<p>The if statement will control whether or not the attribute <code>BUILD_ID.value</code> gets set, and it would do the same thing if you surrounded the whole object in the if statement instead.</p>
+<p>Output configurations require configuring a sink, then subscribing it to a topic. For instance, if you want to simply post full-metadata associated with a chalk insertion to an S3 bucket, and if you use standard environment variables for these buckets, in its simplest form you can do:</p>
+<pre class="highlight"><code class="language-bash">sink_config("my_s3_conf", "s3", { "secret" : env("AWS_ACCESS_SECRET"),
+                                  "uid"    : env("AWS_ACCESS_ID"),
+                                  "uri"    : env("AWS_S3_BUCKET_URI"))
+subscribe("insert", "my_s3_conf")</code></pre>
+<p>Of course, you can have much more sophisticated conditional handling based on the environment.</p>
+<p>Note that the config file gets loaded at configuration time, but if you need to set a value on a per-artifact basis, you can do it using con4m callbacks.</p>
+<h2 id="learn-more">Learn more</h2>
+<ul>
+<li>See how to dump out an executable’s configuration, and create a new version of the executable with your changes.</li>
+<li>Read our tutorial on customizing output configurations.</li>
+<li>Read our tutorial on building your own custom metadata.</li>
+<li>Read our tutorial on building SBOM collection.</li>
+<li>Read our tutorial on using gpg to sign artifacts and metadata.</li>
+</ul>
+<h2 id="why-con4m">Why con4m?</h2>
+<p>We built the language specifically for this project— we wanted something that maximized flexibility, was intuitive and easy, and validated everything possible— configurations are fully type checked before running, and the language handles automatic validation of attribute constraints.</p>
+<p>You can even add callbacks to handle things that <code>chalk</code> itself doesn’t know how to do.  For instance, if you want to collect custom metadata, you can configure it to run a <code>con4m</code> callback for each artifact it identifies in the discovery phase (which is guaranteed to terminate).</p>
+<p>Another need was the ability to “stack” configs. An invocation of <code>chalk</code> will, by default, do the following:</p>
+<ol>
+<li>Load an internal config that basically represents the schema for default con4m keys, and metadata about our implementation of them, and sets up the default input/output configuration.</li>
+<li>Load any configuration chalked into the con4m binary.</li>
+<li>Load an externally stored configuration file, if present.</li>
+</ol>
+<p>These loads all have their own private scope, but things like the attribute state carry over across invocations.</p>
+<p>While they were developed together, the <code>con4m</code> project is separately maintained from <code>chalk</code>. It has its own C library, and we will soon build interfaces for Go and Python, so that any project can have simple config files that are automatically error-checked, where you can export integrated programability to power users who need it.</p>
+<p>We did this because we got sick of the pattern of using YAML and essentially layering on a custom DSL each time.  YAML’s complex syntax rules make it <em>really</em> bad for such things. The only other alternative that was even in the ballpark was HCL, which is currently only usable with Go, and is a lot more complicated than we thought appropriate.  If someone’s going to inline a bit of code, the learning curve should be very low, especially if they’ve done any programming at all.  And if they never use it, then it should just feel like they’re editing a normal configuration file.</p>
+<h2 id="relationship-to-slsa">Relationship to SLSA</h2>
+<p>SLSA (Supply-chain Levels for Software Artifacts), does focus on software provenance. But, it does so by providing a heavyweight framework with multiple “maturity levels” that have compliance requirements.  The focus is on providence from VENDORS more than traceability within one’s own ecosystem… the focus is on supply-chain… provenance for cross-vendor transactions, more than “how do I tie these bits together in my org”?</p>
+<p>They want software vendors to do the heavy lifting and provide attestation data to vendors about all components and their provenance, and want people to go through an accreditation process. They’re expecting people to put a lot of work into this.</p>
+<p>Frankly, SLSA is so heavyweight, I kept falling asleep when trying to grok it. I didn’t even really get that it tries to handle provenance, until I was a few months in.</p>
+<p>Their specification is heavily focused on the framework, and the tooling is a hodge-podge, certainly without consideration to making it EASY to collect information.</p>
+<p>And they’ve not given any guidance about how people are actually going to operationalize all this information on the other end.  They basically say, “that’s still a lot of data, and a lot of work”. That’s because they’re not worried about the last-mile problem.</p>
+<p>Chalk is more concerned about, once the software is in the org, how do we map between production and the other places it lives in an org (particularly, any repositories).  That’s in some respects a more important problem, because that mapping is critical for security prioritization, and is ripe for automation.</p>
+<p>Yet the SLSA project isn’t concerned at all with how to make this mapping.</p>
+<p>On the other hand, chalk is maniacally focused on trying to provide an “easy” button wherever possible, and shift the friction from the dev team to the people who need the data, which will help remove adoption barriers.</p>
+<p>In practice, our read of SLSA is that, if you ignore specific requirements on data format, and focus on the actual meaningful requirements, chalk provides a really easy path to get to level 3 compliance, being all of the tooling anyone would need for creating and extracting provenance information.</p>
+<p>Plus, we do it all in a way that solves a somewhat different (and in our view, more fundamental) problem, that internal mapping of resources to repositories.</p>
+<p>So, SLSA is an important framework, and we should fit into it, if it becomes important. In the meantime, we’re more focused on providing tooling that will bring quick value in a wide variety of organizations, by focusing on how to operationalize everything effectively, without a heavyweight retooling of practices.    And, for those who are working on the basics, and are far from the point where they’d think about full attestation across all build environments, chalk actually makes a big impact on those basics… giving people internal traceability with incredibly low effort, helping security (and others) answer questions more efficiently on their own, and removing their need to take time from development teams.</p>
+<p>But maybe I’ll have a better opinion when I can consume all their stuff without nodding off.</p>
+</div>
+</div>
+</main>
+<template id="modal-search">
+<div class="modal" data-action="modal:close-&gt;modal#close" data-controller="modal" data-modal-id="modal-search">
+<div class="modal__inner" data-modal-target="inner" role="dialog">
+<button aria-label="Close dialog" class="modal__close" data-a11y-dialog-hide="" type="button">
+<svg aria-hidden="true" class="feather feather-x" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg">
+<path d="M18 6L6 18M6 6l12 12"></path>
+</svg>
+</button>
+<div class="modal__content">
+<h2 class="modal__title">Search</h2>
+<div class="search" data-controller="search">
+<form>
+<div class="search__input__wrap input__wrap">
+<input aria-label="Search terms" autofocus="" class="input" data-action="input-&gt;search#input" data-search-target="input" id="mkdocs-search-query" placeholder="Search…" type="search"/>
+</div>
+</form>
+<div class="search__results" data-no-results-text="No results found" data-search-target="results" id="mkdocs-search-results"></div>
+</div>
+</div>
+</div>
+</div>
+</template>
+<script>
+		(function () {
+			const resize = () => {
+				document.documentElement.style.setProperty('--scrollbar-width', `${window.innerWidth - document.body.offsetWidth}px`);
+			}
+			resize();
+			document.addEventListener('DOMContentLoaded', resize);
+			window.addEventListener('resize', resize);
+		})();
+	</script>
+<script>
+            window.update_swagger_ui_iframe_height = function (id) {
+                var iFrameID = document.getElementById(id);
+                if (iFrameID) {
+                    full_height = (iFrameID.contentWindow.document.body.scrollHeight + 80) + "px";
+                    iFrameID.height = full_height;
+                    iFrameID.style.height = full_height;
+                }
+            }
+        
+            let iframe_id_list = []
+            var iframes = document.getElementsByClassName("swagger-ui-iframe");
+            for (var i = 0; i < iframes.length; i++) { 
+                iframe_id_list.push(iframes[i].getAttribute("id"))
+            }
+        
+            let ticking = true;
+            
+            document.addEventListener('scroll', function(e) {
+                if (!ticking) {
+                    window.requestAnimationFrame(()=> {
+                        let half_vh = window.innerHeight/2;
+                        for(var i = 0; i < iframe_id_list.length; i++) {
+                            let element = document.getElementById(iframe_id_list[i])
+                            if(element==null){
+                                return
+                            }
+                            let diff = element.getBoundingClientRect().top
+                            if(element.contentWindow.update_top_val){
+                                element.contentWindow.update_top_val(half_vh - diff)
+                            }
+                        }
+                        ticking = false;
+                    });
+                    ticking = true;
+                }
+            });
+        </script></body>
+</html>

@@ -2,6 +2,8 @@ import json
 import os
 import pprint
 import shutil
+import sqlite3
+import unittest
 from pathlib import Path
 from subprocess import CompletedProcess
 from tempfile import TemporaryDirectory
@@ -133,9 +135,7 @@ def test_rotating_log(tmp_data_dir: Path, chalk: Chalk):
 
 
 @pytest.mark.skipif(not aws_secrets_configured(), reason="AWS secrets not configured")
-@mock.patch.dict(
-    os.environ, {"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/sink-test"}
-)
+@mock.patch.dict(os.environ, {"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests"})
 def test_s3(tmp_data_dir: Path, chalk: Chalk):
     logger.debug("testing s3 sink...")
     artifact = Path(tmp_data_dir) / "cat"
@@ -230,19 +230,62 @@ def test_post():
         print("response...")
         res = requests.get(check_url, allow_redirects=True)
         print(res)
-        # TODO: fetch the chalk from api and validate
-        # check that file output is correct
-        # jsonpath = tmp_bin / "tmp_file.json"
-        # if not jsonpath or not jsonpath.is_file():
-        #     logger.error("output file does not exist")
 
-        # try:
-        #     contents = jsonpath.read_bytes()
-        #     if not contents:
-        #         raise AssertionError("file output is empty!?")
-        #     top_level_chalk = json.loads(contents)
-        # except Exception as e:
-        #     logger.error("could not read: %s", str(e))
 
-        # _validate_chalk(top_level_chalk, tmp_bin)
-        # TODO: curl https://chalkapi-test.crashoverride.run/v0.1/chalks/JYWRN6-XFNV-6R1T-BWRVVZ
+@mock.patch.dict(
+    os.environ,
+    {
+        "CHALK_POST_URL": "http://tests.crashoverride.run:8585/report",
+    },
+)
+def test_post_http_fastapi():
+    try:
+        r = requests.get("http://tests.crashoverride.run:8585/health")
+        if r.status_code != 200:
+            raise unittest.SkipTest("Chalk Ingestion Server Down - Skipping")
+    except requests.exceptions.ConnectionError:
+        raise unittest.SkipTest("Chalk ingestion server unreachable - skipping")
+    try:
+        dbfile = (
+            Path(__file__).parent.parent / "server" / "app" / "data" / "sql_app.db"
+        ).resolve()
+        if not dbfile.is_file():
+            raise unittest.SkipTest("Bad server state - DB file not found - skipping")
+        conn = sqlite3.connect(dbfile)
+        cur = conn.cursor()
+        res = cur.execute("SELECT count(id) FROM stats")
+        chalks_cnt = res.fetchone()[0]
+
+        with TemporaryDirectory() as _tmp_bin:
+            tmp_bin = Path(_tmp_bin)
+            artifact = Path(tmp_bin) / "ls"
+            shutil.copy("/bin/ls", artifact)
+
+            # post url must be set
+            assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
+
+            config = CONFIG_DIR / "post_beacon_local.conf"
+            proc = chalk.run(
+                chalk_cmd="insert",
+                target=artifact,
+                params=[
+                    "--no-embedded-config",
+                    "--config-file=",
+                    str(config.absolute()),
+                ],
+            )
+
+            stderr_output = proc.stderr.decode()
+            for line in stderr_output.split("\n"):
+                line = line.strip()
+                if line.startswith('"CHALK_ID":'):
+                    chalk_id = line.split('CHALK_ID":')[1].split(",")[0].strip()[1:-1]
+            assert chalk_id, "metadata id for created chalk not found in stderr"
+            cur = conn.cursor()
+            res = cur.execute(f"SELECT id FROM chalks WHERE id='{chalk_id}'")
+            assert res.fetchone() is not None
+            res = cur.execute("SELECT count(id) FROM stats")
+            assert res.fetchone()[0] >= chalks_cnt
+    finally:
+        if conn:
+            conn.close()

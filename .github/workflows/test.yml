@@ -19,5 +19,8 @@ jobs:
       - name: Compile chalk
         run: docker-compose run chalk-compile
 
+      - name: Bring server up
+        run: docker-compose up -d server
+
       - name: Run tests
         run: docker-compose run --rm tests

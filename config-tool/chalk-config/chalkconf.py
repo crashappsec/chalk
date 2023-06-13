@@ -18,6 +18,8 @@ from wiz_panes import *
 import conf_widgets
 from css import WIZARD_CSS
 
+__version__ = "0.1"
+
 first_run = False
 
 conftable = ConfigTable()
