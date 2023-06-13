@@ -15,4 +15,4 @@ in your platform.
 # Running tests
 
 - Run all tests via `make test`
-- Run a single test passing by invoking pytest directly `docker compose run --rm tests sh -c "pytest test_elf.py::test_virtual"`
+- Run a single test passing by invoking pytest directly `docker compose run --rm tests sh -c "pytest tests/test_elf.py::test_virtual"`

@@ -135,7 +135,9 @@ def test_rotating_log(tmp_data_dir: Path, chalk: Chalk):
 
 
 @pytest.mark.skipif(not aws_secrets_configured(), reason="AWS secrets not configured")
-@mock.patch.dict(os.environ, {"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests"})
+@mock.patch.dict(
+    os.environ, {"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/sink-test"}
+)
 def test_s3(tmp_data_dir: Path, chalk: Chalk):
     logger.debug("testing s3 sink...")
     artifact = Path(tmp_data_dir) / "cat"
@@ -144,8 +146,6 @@ def test_s3(tmp_data_dir: Path, chalk: Chalk):
     has_access_key = os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get(
         "AWS_SECRET_ACCESS_KEY"
     )
-    logger.info(os.environ.get("AWS_ACCESS_KEY_ID"))
-    logger.info(os.environ.get("AWS_SECRET_ACCESS_KEY"))
 
     aws_profile = os.environ.get("AWS_PROFILE")
     if has_access_key:

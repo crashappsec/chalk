@@ -2,12 +2,10 @@ import json
 import os
 import shutil
 import stat
-from contextlib import chdir
 from datetime import timezone
 from pathlib import Path
 from subprocess import check_output
-from tempfile import TemporaryDirectory
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import dateutil.parser
 
@@ -17,15 +15,15 @@ from .utils.log import get_logger
 
 logger = get_logger()
 
-# FIXME make fixture
-chalk = Chalk(binary=(Path(__file__).parent.parent / "chalk").resolve())
 
+def _insert_and_extract_on_artifact(
+    chalk: Chalk, artifact: Path, virtual: bool = False
+) -> Dict[str, Any]:
+    params = []
+    if virtual:
+        params.append("--virtual")
 
-def _insert_and_extract_on_artifact(chalk: Chalk, artifact: Path) -> Dict[str, Any]:
-    chalk.run(
-        chalk_cmd="insert",
-        target=artifact,
-    )
+    chalk.run(chalk_cmd="insert", target=artifact, params=params)
     extracted = chalk.run(
         chalk_cmd="extract",
         target=artifact,
@@ -38,131 +36,168 @@ def _insert_and_extract_on_artifact(chalk: Chalk, artifact: Path) -> Dict[str, A
         raise
 
 
-def insert_and_extract_on_artifact(
-    *, chalk: Chalk, artifact: Path, change_cwd: Optional[Path] = None
-) -> Dict[str, Any]:
-    if change_cwd is None:
-        return _insert_and_extract_on_artifact(chalk, artifact)
+def _validate_extracted_chalk(
+    top_level_chalk: Any,
+    # dict of path to hash
+    artfact_info: Dict[str, str],
+) -> None:
+    assert (
+        top_level_chalk["_OPERATION"] == "extract"
+    ), "operation expected to be extract"
+    assert len(top_level_chalk["_CHALKS"]) == len(
+        artfact_info
+    ), "wrong number of chalks"
 
-    with chdir(change_cwd):
-        return _insert_and_extract_on_artifact(chalk, artifact)
+    try:
+        assert len(top_level_chalk["_OP_ERRORS"]) == 0
+    except KeyError:
+        # fine if this key doesn't exist
+        pass
 
+    for _chalk in top_level_chalk["_CHALKS"]:
+        artifact_path = _chalk["ARTIFACT_PATH"]
+        assert artfact_info[artifact_path] == _chalk["HASH"]
 
-def test_insert_extract_timestamps_ls():
-    with TemporaryDirectory() as _tmp_bin:
-        tmp_bin = Path(_tmp_bin)
-        artifact = Path(tmp_bin) / "ls"
-        shutil.copy("/bin/ls", artifact)
-
-        output = insert_and_extract_on_artifact(
-            chalk=chalk, artifact=artifact, change_cwd=tmp_bin
-        )
-
-        assert output["_OPERATION"] == "extract"
-        assert len(output["_CHALKS"]) == 1
-        _chalk = output["_CHALKS"][0]
         assert _chalk["ARTIFACT_TYPE"] == "ELF"
-        assert _chalk["ARTIFACT_PATH"] == str(artifact)
-        assert _chalk["HASH"] == sha256(Path("/bin/ls"))
-        assert _chalk["INJECTOR_PLATFORM"] == output["_OP_PLATFORM"]
-        assert _chalk["INJECTOR_COMMIT_ID"] == output["_OP_CHALKER_COMMIT_ID"]
-        assert (
-            # timestamp in milliseconds so multiply by 1000
-            dateutil.parser.isoparse(output["_DATETIME"])
-            .replace(tzinfo=timezone.utc)
-            .timestamp()
-            * 1000
-            == output["_TIMESTAMP"]
-        )
-        assert output["_DATETIME"] > _chalk["DATETIME"]
-        rand1 = _chalk["CHALK_RAND"]
-        timestamp1 = output["_TIMESTAMP"]
-
-        # repeat the above process re-chalking the same binary and assert that the
-        # fields are appropriately updated
-        output = insert_and_extract_on_artifact(
-            chalk=chalk, artifact=artifact, change_cwd=tmp_bin
-        )
-
-        # we still should have only one chalk
-        assert len(output["_CHALKS"]) == 1
-
-        # but this time timestamps and random values should be different
-        _chalk = output["_CHALKS"][0]
-        assert rand1 != _chalk["CHALK_RAND"]
-        timestamp2 = output["_TIMESTAMP"]
-        assert timestamp1 < timestamp2
-        last_chalk_datetime = _chalk["DATETIME"]
-
-        # do one final extraction
-        extracted = chalk.run(
-            chalk_cmd="extract",
-            target=artifact,
-            params=["--log-level=none"],
-        )
-        try:
-            output = json.loads(extracted.stdout, strict=False)
-        except json.decoder.JSONDecodeError:
-            logger.error("Could not decode json", raw=extracted.stdout)
-
-        _chalk = output["_CHALKS"][0]
-        assert timestamp2 == output["_TIMESTAMP"]
-        assert last_chalk_datetime == _chalk["DATETIME"]
-
-        # ensure that the binary executes properly although chalked
-        st = os.stat(artifact)
-        os.chmod(artifact, st.st_mode | stat.S_IEXEC)
-        assert (
-            check_output([str(artifact)]).decode() == check_output(["/bin/ls"]).decode()
-        )
+        assert _chalk["INJECTOR_PLATFORM"] == top_level_chalk["_OP_PLATFORM"]
+        assert _chalk["INJECTOR_COMMIT_ID"] == top_level_chalk["_OP_CHALKER_COMMIT_ID"]
 
 
-def test_insert_extract_directory():
-    with TemporaryDirectory() as tmp_bin:
-        artifact = Path(tmp_bin)
-        shutil.copy("/bin/ls", artifact / "ls")
-        shutil.copy("/bin/date", artifact / "date")
+# tests multiple insertions and extractions on the same binary
+def test_insert_extract_repeated(tmp_data_dir: Path, chalk: Chalk):
+    bin_path = "/bin/ls"
+    assert Path(bin_path).is_file, f"{bin_path} does not exist!"
+    bin_hash = sha256(Path(bin_path))
 
-        output = insert_and_extract_on_artifact(
-            chalk=chalk, artifact=artifact, change_cwd=artifact
-        )
+    artifact = Path(tmp_data_dir) / "ls"
+    shutil.copy(bin_path, artifact)
 
-        assert output["_OPERATION"] == "extract"
-        assert len(output["_CHALKS"]) == 2
-        paths = sorted([c["ARTIFACT_PATH"] for c in output["_CHALKS"]])
-        assert paths == sorted([str(artifact / "ls"), str(artifact / "date")])
+    first_chalk = _insert_and_extract_on_artifact(
+        chalk=chalk, artifact=artifact, virtual=False
+    )
+
+    _validate_extracted_chalk(
+        top_level_chalk=first_chalk, artfact_info={str(artifact): bin_hash}
+    )
+    _chalk = first_chalk["_CHALKS"][0]
+    assert (
+        # timestamp in milliseconds so multiply by 1000
+        dateutil.parser.isoparse(first_chalk["_DATETIME"])
+        .replace(tzinfo=timezone.utc)
+        .timestamp()
+        * 1000
+        == first_chalk["_TIMESTAMP"]
+    )
+    assert first_chalk["_DATETIME"] > _chalk["DATETIME"]
+
+    # store chalk_rand and timestamp1 to compare agaisnt second chalk
+    rand1 = _chalk["CHALK_RAND"]
+    timestamp1 = first_chalk["_TIMESTAMP"]
+
+    # repeat the above process re-chalking the same binary and assert that the
+    # fields are appropriately updated
+    second_chalk = _insert_and_extract_on_artifact(
+        chalk=chalk, artifact=artifact, virtual=False
+    )
+    # basic fields
+    _validate_extracted_chalk(
+        top_level_chalk=second_chalk, artfact_info={str(artifact): bin_hash}
+    )
+
+    # but this time timestamps and random values should be different
+    _chalk = second_chalk["_CHALKS"][0]
+    assert rand1 != _chalk["CHALK_RAND"]
+    timestamp2 = second_chalk["_TIMESTAMP"]
+    assert timestamp1 < timestamp2
+    last_chalk_datetime = _chalk["DATETIME"]
+
+    # do one final extraction
+    extracted = chalk.run(
+        chalk_cmd="extract",
+        target=artifact,
+        params=["--log-level=none"],
+    )
+
+    third_chalk = json.loads(extracted.stderr, strict=False)
+    # basic fields
+    _validate_extracted_chalk(
+        top_level_chalk=third_chalk, artfact_info={str(artifact): bin_hash}
+    )
+    _chalk = third_chalk["_CHALKS"][0]
+    # _TIMESTAMP is time at extraction time, so these will be different
+    assert timestamp2 < third_chalk["_TIMESTAMP"]
+    assert last_chalk_datetime == _chalk["DATETIME"]
+
+    # ensure that the binary executes properly although chalked
+    st = os.stat(artifact)
+    os.chmod(artifact, st.st_mode | stat.S_IEXEC)
+    assert check_output([str(artifact)]).decode() == check_output(["/bin/ls"]).decode()
 
 
-def test_virtual():
-    with TemporaryDirectory() as _tmp_dir:
-        tmp_dir = Path(_tmp_dir)
+# test insertion and extraction on a directory with multiple binaries
+def test_insert_extract_directory(tmp_data_dir: Path, chalk: Chalk):
+    artifact = tmp_data_dir
 
-        shutil.copy("/bin/ls", tmp_dir / "ls")
+    ls_path = "/bin/ls"
+    assert Path(ls_path).is_file, f"{ls_path} does not exist!"
+    shutil.copy(ls_path, artifact / "ls")
+    ls_hash = sha256(Path(ls_path))
 
-        with chdir(_tmp_dir):
-            chalk.run(
-                chalk_cmd="insert",
-                params=["--log-level=none", "--virtual"],
-                target=tmp_dir / "ls",
-            )
-            extracted = chalk.run(
-                chalk_cmd="extract",
-                target=tmp_dir / "ls",
-                params=["--log-level=none"],
-            )
+    date_path = "/bin/date"
+    assert Path(date_path).is_file, f"{date_path} does not exist!"
+    shutil.copy(date_path, artifact / "date")
+    date_hash = sha256(Path(date_path))
 
-            try:
-                virtual_extract_out = json.loads(extracted.stderr, strict=False)
-            except json.decoder.JSONDecodeError:
-                logger.error("Could not decode json", raw=extracted.stdout)
-                raise
+    output = _insert_and_extract_on_artifact(
+        chalk=chalk, artifact=artifact, virtual=False
+    )
 
-            assert (
-                "_UNMARKED" in virtual_extract_out
-                and "_CHALKS" not in virtual_extract_out
-            ), "Expected that artifact to not not have chalks embedded"
+    _validate_extracted_chalk(
+        top_level_chalk=output,
+        artfact_info={
+            str(artifact / "ls"): ls_hash,
+            str(artifact / "date"): date_hash,
+        },
+    )
 
-            vjsonf = tmp_dir / "virtual-chalk.json"
-            assert vjsonf.is_file(), "virtual-chalk.json not found"
-            vjson = json.loads(vjsonf.read_bytes())
-            assert "CHALK_ID" in vjson
+
+def test_virtual(tmp_data_dir: Path, chalk: Chalk):
+    ls_path = "/bin/ls"
+    assert Path(ls_path).is_file, f"{ls_path} does not exist!"
+    shutil.copy(ls_path, tmp_data_dir / "ls")
+    ls_hash = sha256(Path(ls_path))
+
+    virtual_extract_out = _insert_and_extract_on_artifact(
+        chalk=chalk, artifact=tmp_data_dir, virtual=True
+    )
+
+    # virtual output validation
+    assert (
+        "_UNMARKED" in virtual_extract_out and "_CHALKS" not in virtual_extract_out
+    ), "Expected that artifact to not not have chalks embedded"
+    assert len(virtual_extract_out["_UNMARKED"]) == 1, "should only be one unmarked"
+    assert virtual_extract_out["_UNMARKED"][0] == str(tmp_data_dir / "ls")
+
+    # store to compare later
+    timestamp_1 = virtual_extract_out["_TIMESTAMP"]
+
+    try:
+        assert len(virtual_extract_out["_OP_ERRORS"]) == 0
+    except KeyError:
+        # fine if this key doesn't exist
+        pass
+
+    vjsonf = tmp_data_dir / "virtual-chalk.json"
+    assert vjsonf.is_file(), "virtual-chalk.json not found"
+    vjson = json.loads(vjsonf.read_bytes())
+    assert "CHALK_ID" in vjson
+    assert vjson["HASH"] == ls_hash
+
+    # compare extractions
+    proc = chalk.run(
+        chalk_cmd="extract",
+        target=tmp_data_dir / "ls",
+        params=["--log-level=none"],
+    )
+    virtual_extract_2 = json.loads(proc.stderr, strict=False)
+    assert timestamp_1 < virtual_extract_2["_TIMESTAMP"]
