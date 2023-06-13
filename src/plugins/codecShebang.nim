@@ -31,8 +31,6 @@ method scan*(self:   CodecShebang,
     return none(ChalkObj)
 
 method handleWrite*(self: CodecShebang, chalk: ChalkObj, enc: Option[string]) =
-  discard chalk.acquireFileStream()
-
   chalk.stream.setPosition(0)
   let pre  = chalk.stream.readStr(chalk.startOffset)
   if chalk.endOffset > chalk.startOffset:
