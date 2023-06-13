@@ -368,13 +368,22 @@ class NewApp(App):
         try:
             with open(os.path.join(MODULE_LOCATION,"CHANGELOG.md"), "r") as fo:
                 changelog_data_config_tool = fo.read()
-
-            with open(os.path.join("%s"%(os.path.sep).join(MODULE_LOCATION.split(os.path.sep)),"..","..","CHANGELOG.md"), "r") as fo:
-                 changelog_data_chalk = fo.read()
-            
-            self.push_screen(ChangelogModal([changelog_data_chalk, changelog_data_config_tool]))
         except:
-            raise
+            pass
+        
+        try:
+            ##When running wrapped in pyinstaller/ pyinstaller & docker
+            with open("/CHALK-CHANGELOG.md","r") as fo:
+                    changelog_data_chalk = fo.read()
+        except:
+            ##When running natively
+            try:
+                with open(os.path.join("%s"%(os.path.sep).join(MODULE_LOCATION.split(os.path.sep)),"..","..","CHANGELOG.md"), "r") as fo:
+                    changelog_data_chalk = fo.read()
+            except:
+                raise
+        self.push_screen(ChangelogModal([changelog_data_chalk, changelog_data_config_tool]))
+        
 
 if __name__ == "__main__":
     cached_stdout_fd = sys.stdout

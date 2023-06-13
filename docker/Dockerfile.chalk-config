@@ -26,6 +26,8 @@ WORKDIR /config-tool
 COPY config-tool/pyproject.toml config-tool/poetry.lock $WORKDIR/
 RUN poetry install --no-plugins --no-root
 
+COPY CHANGELOG.md $WORKDIR/CHALK-CHANGELOG.md
+
 RUN apk add --update --no-cache alpine-sdk \
         pcre \
         gcompat \
