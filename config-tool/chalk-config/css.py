@@ -135,6 +135,12 @@ AckModal {
     width: 100%;
 }
 
+ChangelogModal {
+    align: center top;
+    width: 60;
+    overflow-y: scroll;
+}
+
 ModalError > MarkdownH2 {
     background:  $error;
 }
@@ -193,6 +199,22 @@ AckModal > Vertical > Button {
     background: $primary;
     content-align: center middle;
     margin: 0 4;
+}
+
+ChangelogModal > TabbedContent {
+    padding: 0 1;
+    width: 120;
+    height: auto;
+    background: $surface;
+    align: center middle;
+    content-align: center middle;
+    overflow-y: scroll;
+}
+
+ChangelogModal > TabbedContent > TabPane >  Button {
+    background: $primary;
+    align: center middle;
+    content-align: center middle;
 }
 
 .model_q {

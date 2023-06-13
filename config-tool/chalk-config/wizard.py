@@ -18,17 +18,23 @@ class Body(ScrollableContainer): pass
 class AckModal(ModalScreen):
     DEFAULT_CSS=WIZARD_CSS
     
-    def __init__(self, msg, pops=1, wiz=None, button_text="Okay"):
+    def __init__(self, msg, pops=1, wiz=None, button_text="Okay", ascii_art=""):
         super().__init__()
         self.wiz = wiz
         self.msg = msg
         self.pops = pops
         self.button_text = button_text
+        self.ascii_art = ascii_art
+
+        self.ascii_art_widget = MDown()
 
     def compose(self):
+        self.ascii_art_widget.markdown = self.ascii_art
+        #self.ascii_art_widget.styles.overflow_x = "scroll"
         yield Header(show_clock=True)
         yield Vertical (
             MDown(self.msg, id="modalmsg", classes="ack_md"),
+            self.ascii_art_widget,
             Button(self.button_text, id="acked"),
             )
         yield Footer()
@@ -38,6 +44,38 @@ class AckModal(ModalScreen):
             self.app.pop_screen()
             self.pops = self.pops - 1
 
+class ChangelogModal(ModalScreen):
+    """
+    Pop-up to show changelogs
+    """
+    DEFAULT_CSS=WIZARD_CSS
+    BINDINGS = [
+        Binding(key="escape", action="button_pressed", description = MAIN_MENU),
+    ]
+    def __init__(self, tab_data_list, pops=1,  button_text="Close"):
+        super().__init__()
+        self.tab_data_list = tab_data_list
+        self.pops          = pops
+        self.button_text   = button_text
+
+    def compose(self):
+        """
+        Build tabbed pane with a tab for each changelog
+        """
+        with TabbedContent():       
+            with TabPane("Chalk"):
+                yield Button(self.button_text)
+                yield MDown(self.tab_data_list[0])
+                
+            with TabPane("Config-Tool"):
+                yield Button(self.button_text)
+                yield MDown(self.tab_data_list[1])
+                
+    def on_button_pressed(self):
+        while self.pops:
+            self.app.pop_screen()
+            self.pops = self.pops - 1
+        
 class HelpWindow(Container):
     def action_help(self):
         self.wiz.action_help()
@@ -201,16 +239,16 @@ class Wizard(Container):
         self.prev_button = NavButton("Back", self)
         body   = Body(self.switcher)
         yield body
-        buttons = Nav(self.prev_button, self.next_button, self.help_button)
+        self.nav_buttons = Nav(self.prev_button, self.next_button, self.help_button)
         self.helpwin.update(self.first_panel.doc())
-        yield buttons
+        yield self.nav_buttons
 
     def set_panel(self, new_panel):
-      self.current_panel = new_panel
-      self.switcher.current = new_panel.id
-      new_panel.enter_step()
-      self.helpwin.update(new_panel.doc())
-      self.update_menu()
+        self.current_panel = new_panel
+        self.switcher.current = new_panel.id
+        new_panel.enter_step()
+        self.helpwin.update(new_panel.doc())
+        self.update_menu()
 
     def action_section(self, label):
         self.section_index = self.by_name[str(label)]
@@ -272,7 +310,6 @@ class Wizard(Container):
         if err:
             self.require_ack(err)
             return
-
         new_step = self.sections[self.section_index].advance()
         if not new_step:
             self.section_index += 1

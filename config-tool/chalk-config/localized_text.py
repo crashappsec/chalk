@@ -1,6 +1,10 @@
 CHALK_VERSION = "0.4.3"
 CHALK_TITLE = "Chalk v." + CHALK_VERSION + " Configuration Tool"
 
+# Screen titless (used on modals / sub-screens)
+LOGIN_TITLE   = "Login to, or Register, your Crash Override API" 
+QR_CODE_TITLE = "# Scan the QR code to login via your mobile device"
+
 # Action labels (used for buttons and bindings)
 NEW_LABEL     = "New Config"
 EDIT_LABEL    = "Edit"
@@ -24,6 +28,12 @@ NEXT_LABEL    = "Next Screen"
 HELP_TOGGLE   = "Toggle Help"
 QUIT_LABEL    = "Quit"
 CHEEKY_OK     = "Got it."
+LOGIN_LABEL   = "Login to Crash ⍉verride"
+QR_LABEL      = "Show QR Code"
+BACK_LABEL    = "Go Back"
+LOGIN_SUCCESS = "# Authentication Successful\n"
+PROFILE_LABEL = "# User Profile\n"
+AUTHN_LABEL   = "Authenticate"
 
 # Wizard sidebar labels
 
@@ -59,6 +69,7 @@ L_NEW_CONF    = "New configuration (not yet saved)"
 L_MODIFIED    = "Existing config modified (needs saving)"
 L_UNMODIFIED  = "Configuration unchanged"
 L_NO_NAME     = "Unsaved (config name required)"
+L_C0API_USE   = "Make use of Crash Override API and services"
 
 # Placeholder text in Input widgets.
 PLACEHOLD_FILE    = "Enter file name"
@@ -333,6 +344,8 @@ The max-size option is currently not configurable through this wizard, only a co
 
 Without this option, you're responsible for dealing with disk space issues.
 """
+
+API_DOC = "### Crash Override's API Configuration\n The Crash Override API adds features and long term data storage to your Chalking experience ...."
 
 ENV_DOC =  """# Custom Environment Variables
 This tool generates a config file that consults environment variables for configuring output to various places like HTTPS endpoints or S3 buckets.  Generally, if the required environment variables are present, then Chalk will use them to set up an output.

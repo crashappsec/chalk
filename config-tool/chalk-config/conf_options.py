@@ -104,7 +104,6 @@ def load_from_json(json_blob, confname=None, note=None):
 # This is a normalized list, for instance, for getting the ID of
 # a config.  Thus, the order matters, and it can't be a set;
 # Python seems to randomize the order?
-
 all_fields = [
     # Basics pane
     "use_cmd",
@@ -121,6 +120,8 @@ all_fields = [
     "report_s3",
     "env_adds_report",
     "env_custom",
+    # Crash Override API config
+    "c0api_toggle",
     # Env var customization
     "env_log",
     "env_post_url",
@@ -190,6 +191,7 @@ all_fields = [
 
 not_in_json = ["conf_name", "overwrite_config"]
 
+
 radio_set_dbg = (["release_build", "debug_build"], 0)
 radio_set_minmax = (["chalk_minimal", "chalk_maximal"], 0)
 radio_set_crep = (["crpt_minimal", "crpt_maximal"], 1)
@@ -208,6 +210,8 @@ pane_switch_map = {
     "report_http": "#http_conf",
     "report_s3": "#s3_conf",
     "env_custom": "#envconf",
+    "api_auth" : "#c0apiuse",
+    "auth_success_message" : "#c0authsuccess"
 }
 
 bool_defaults = {
@@ -253,6 +257,7 @@ bool_defaults = {
     "env_custom": False,
     "overwrite_config": False,
     "log_truncate": True,
+    "c0api_toggle"     : True,
 }
 
 text_defaults = {

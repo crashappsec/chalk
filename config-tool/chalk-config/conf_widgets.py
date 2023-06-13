@@ -9,8 +9,10 @@ import subprocess
 import tempfile
 import urllib
 import urllib.request
+import webbrowser
 from pathlib import *
 
+import ascii_magic
 from conf_options import *
 from css import WIZARD_CSS
 from localized_text import *
@@ -18,6 +20,7 @@ from rich.markdown import *
 from textual.app import *
 from textual.containers import *
 from textual.coordinate import *
+from textual.reactive import Reactive
 from textual.screen import *
 from textual.widgets import Markdown as MDown
 from textual.widgets import *
@@ -145,8 +148,8 @@ class ModalDelete(ModalScreen):
 
 
 class ExportMenu(Screen):
-    DEFAULT_CSS = WIZARD_CSS
-    BINDINGS = [("q", "pop_screen()", CANCEL_LABEL)]
+    DEFAULT_CSS=WIZARD_CSS
+    BINDINGS = [("escape", "pop_screen()", CANCEL_LABEL)]
 
     def __init__(self, iid, name, jconf):
         super().__init__()
@@ -197,8 +200,12 @@ class ConfigTable(Container):
     def __init__(self):
         super().__init__(id="conftbl")
         self.the_table = DataTable(id="the_table")
-        self.the_table.cursor_type = "row"
+        self.the_table.cursor_type = "row"   
+        self.the_table.styles.margin = (0,3)
 
+        #ToDo update proper localized strings
+        self.login_button = LoginButton(label="L⍉gin", classes="basicbutton", id="login_button")
+             
     async def on_mount(self):
         await self.the_table.mount()
         global row_ids
@@ -230,10 +237,16 @@ class ConfigTable(Container):
             EditConfigButton(label=EDIT_LABEL, classes="basicbutton"),
             DelConfigButton(label=DELETE_LABEL, classes="basicbutton"),
             ExConfigButton(label=EXPORT_LABEL, classes="basicbutton"),
+            Button(label="Changelog", classes="basicbutton"),
             classes="padme",
         )
 
-
+    def on_button_pressed(self):
+        """
+        Pop open changelog
+        """
+        get_app().action_changelog()
+  
 class RunWizardButton(Button):
     async def on_button_pressed(self):
         await self.app.push_screen("confwiz")
@@ -296,10 +309,69 @@ class AlphaModal(AckModal):
     def on_mount(self):
         intro_md.update(INTRO_TEXT)
 
+class LoginButton(Button):
+    async def on_button_pressed(self):
+        get_app().action_login()
+
+class QRButton(Button):
+    async def on_button_pressed(self):
+        get_app().action_display_qr()
+
+class PopBrowserButton(Button):
+    async def on_button_pressed(self):
+        webbrowser.open(get_app().login_widget.device_code_json['verification_uri_complete'])
+
+class ProfilePicture(Static):
+    ascii_picture = Reactive("")
+    def render(self) -> str:
+        return self.ascii_picture
+    
+    def generate(self, data):
+        #Todo exceptions
+        a = ascii_magic.AsciiArt.from_url(data)
+        self.ascii_picture = "\n\n%s\n\n\n\n"%(a.to_ascii(columns=30))
+        return self.ascii_picture
+
+class OidcLinks(MDown):
+    """
+    Markdown object that will contain the genrated OIDC links
+    """
+    markdown = Reactive("")
+    def render(self) -> str:
+        return self.markdown
+
+class QrCode(Static):
+    """
+    Object that will hold an ASCII art QRcode
+    """
+    qr_string = Reactive("")
+    def render(self) -> str:
+        return self.qr_string
+
+class C0ApiToggle(Switch):
+
+    def on_switch_changed(self):
+        
+        #ToDo WRITE THE CONFIG OPTIONS to file
+        
+        ##Set the app level state of whether to use the API or not
+        get_app().use_c0_api = self.value
+
+        ##Based on switch position......
+        if self.value:
+            ##Enable the inline login button
+            get_wizard().query_one("#wiz_login_button").disabled = False
+        
+            ##Disable the Next button if we are not yet authenticated and wanting to use the API 
+            if not get_app().authenticated and get_wizard().current_panel == get_wizard().panels[1]:
+                get_wizard().next_button.disabled = True
+        else:
+            get_wizard().query_one("#wiz_login_button").disabled = True
+            get_wizard().next_button.disabled = False
 
 def write_from_local(dict, config, d):
-    binname = d["exe_name"]
-
+    binname  = d["exe_name"]
+    
     if d["release_build"]:
         chalk_bin = CONTAINER_RELEASE_PATH
     else:
