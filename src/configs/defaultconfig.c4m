@@ -135,6 +135,10 @@ configured_sink := false
 # this config turns it off, but can be re-enabled by removing the
 # appropriate line(s) below, or by overriding at the command line.
 
+if env_exists("CHALK_USAGE_URL") {
+    crashoverride_usage_reporting_url: env("CHALK_USAGE_URL")
+}
+
 sink_config my_https_config {
   sink:    "post"
   uri:     env("CHALK_POST_URL")
