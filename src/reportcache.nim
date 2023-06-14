@@ -77,11 +77,13 @@ template doPanicWrite(s: string) =
 const quietTopics = ["chalk_usage_stats"]
 
 template tracePublish(topic, m: string, prevSuccesses = false) =
+  # This is the place where, if the report cache isn't being hit, we
+  # wrap the JSON object we originally called "safePublish" on in a
+  # JSON array.
   var
-    msg = m
+    msg = m.strip()
 
-  if m[^1] != '\n':
-    msg &= "\n"
+  msg = "[ " & msg & " ]\n"
 
   let startSubscriptions = allTopics[topic].getNumSubscribers()
 
@@ -123,8 +125,8 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
       if chalkConfig.getUseReportCache():
         error("For topic '" & topic & "': publish failures will be cached.")
       else:
-        error("No report cache is enabled; sink configs with failures will not " &
-              "receive this report")
+        error("No report cache is enabled; sink configs with failures will " &
+              "not receive this report")
     elif n == 0:
       info("Nothing subscribed to topic: " & topic)
 
@@ -238,6 +240,7 @@ proc handleCacheFlushing(topic, msg: string): bool =
     return
 
   var unsubs: seq[(string, SinkConfig)]
+
   for subscriber in allTopics[topic].getSubscribers():
     if subscriber.name notin reportCache:
       continue
@@ -250,15 +253,10 @@ proc handleCacheFlushing(topic, msg: string): bool =
     subscribe(tmpTopicObj, subscriber)
     unsubs.add((topic, subscriber))
 
-    var newMsg: string
-    if msg[^1] != '\n':
-      newMsg = msg & "\n"
-    else:
-      newMsg = msg
+    let msgs = @[msg.strip()] & reportCache[subscriber.name][topic]
 
-    newMsg &= reportCache[subscriber.name][topic].join("\n")
-
-    if publish(tmpTopicObj, newMsg) >= 1:
+    # Each string is well-formed JSON already.  We combine them in an array.
+    if publish(tmpTopicObj, "[ " & msgs.join(", ") & " ]") >= 1:
       # Re-publishing was successful!  Remove the entry from the cache.
       reportCache[subscriber.name].del(topic)
       dirtyCache = true

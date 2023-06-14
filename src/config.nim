@@ -232,7 +232,7 @@ proc getAutoHelp*(): string = autoHelp
 const
   availableFilters = { "log_level"     : MsgFilter(logLevelFilter),
                        "log_prefix"    : MsgFilter(logPrefixFilter),
-                       "pretty_json"   : MsgFilter(prettyJsonl),
+                       "pretty_json"   : MsgFilter(prettyJson),
                        "fix_new_line"  : MsgFilter(fixNewline),
                        "add_topic"     : MsgFilter(addTopic),
                        "wrap"          : MsgFilter(wrapToWidth)
@@ -453,7 +453,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
         return none(SinkConfig)
   of "post":
     if "content_type" notin opts:
-      opts["content_type"] = "application/jsonl"
+      opts["content_type"] = "application/json"
   of "file":
     if "log_search_path" notin opts:
       opts["log_search_path"] = chalkConfig.getLogSearchPath().join(":")
@@ -510,7 +510,7 @@ proc setupDefaultLogConfigs*() =
   let
     uri     = chalkConfig.getCrashOverrideUsageReportingUrl()
     params  = some(newOrderedTable({ "uri":          uri,
-                                     "content_type": "application/jsonl" }))
+                                     "content_type": "application/json" }))
     sink    = getSinkImplementation("post").get()
     useConf = configSink(sink, "usage_stats_conf", params, handler=errCbOpt,
                              logger=okCbOpt).get()

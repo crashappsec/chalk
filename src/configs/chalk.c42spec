@@ -1278,7 +1278,7 @@ specified  by the audit_file_size variable.
 
   field audit_location {
     type:       string
-    default:    "chalk-audit.jsonl"
+    default:    "chalk-audit.json"
     shortdoc:   "Audit file location"
     doc:  """
 This controls where the default audit log goes, if enabled.  If you enable and set this to "", then you need to provide your own output configuration that subscribes to the 'audit' topic.
@@ -1287,7 +1287,7 @@ If you provide a file name only, the directories in log_search_path are tried in
 
 If you provide an absolute path, and the log file cannot be opened, then it falls back on the search path (keeping the file name oprtion).
 
-Defaults to 'chalk-audit.jsonl'
+Defaults to 'chalk-audit.json'
 """
   }
 
@@ -1479,7 +1479,7 @@ Note that '--no-publish-defaults' at the command line will block this feature, e
     doc:       """
 The report cache is a localfile in JSON format that stores any reports that don't reach their destination. This will get used any time publishing to *any* sink fails to write.
 
-The report cache will re-publish on subsequent runs by appending any unsent messages to the jsonl report.  It does so on a sink-by-sink basis, based on the name of the sink.  It will never publish to the same sink twice.
+The report cache will re-publish on subsequent runs by appending any unsent messages to the json report (this is why reports are an array).  It does so on a sink-by-sink basis, based on the name of the sink.  It will never publish to the same sink twice.
 
 A few important notes:
 
