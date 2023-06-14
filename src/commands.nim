@@ -5,7 +5,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import tables, options, strutils, unicode, os, streams, posix, osproc, sugar,
-       json, config, builtins, collect, chalkjson, reportcache, plugins,
+       json, config, builtins, collect, chalkjson, reportcache, plugins, exec,
        plugins/codecDocker
 import macros except error
 
@@ -612,6 +612,51 @@ proc runCmdConfLoad*() =
     cantLoad("Configuration loading failed: " & getCurrentExceptionMsg())
     dumpExOnDebug()
   doReporting()
+
+proc runCmdExec*(args: seq[string]) =
+  when not defined(posix):
+    error("'exec' command not supported on this platform.")
+    quit(1)
+
+  let
+    execConfig = chalkConfig.execConfig
+    cmdName    = execConfig.getCommandName()
+    cmdPath    = execConfig.getSearchPath()
+    defaults   = execConfig.getDefaultArgs()
+    appendArgs = execConfig.getAppendCommandLineArgs()
+    overrideOk = execConfig.getOverrideOk()
+    usePath    = execConfig.getUsePath()
+    allOpts    = findAllExePaths(cmdName, cmdPath, usePath)
+
+  if cmdName == "":
+    error("This chalk instance has no configured process to exec.")
+    error("At the command line, you can pass --exec-command-name to " &
+      "set the program name (PATH is searched).")
+    error("Add extra directories to search with --exec-search-path.")
+    error("In a config file, set exec.command_name and/or exec.search_path")
+    quit(1)
+
+  if len(allOpts) == 0:
+    error("No executable named '" & cmdName & "' found in your path.")
+    quit(1)
+
+  var argsToPass = defaults
+
+  if appendArgs:
+    argsToPass &= args
+  elif len(args) != 0 and not overrideOk:
+    error("Cannot override default arguments on the command line.")
+    quit(1)
+  elif len(args) != 0:
+    argsToPass = args
+
+  let pid = fork()
+  if pid != 0:
+    handleExec(allOpts, argsToPass)
+  else:
+    discard setpgid(0, 0); # Detach from the process group.
+    runCmdEnv()
+
 
 proc paramFmt(t: StringTable): string =
   var parts: seq[string] = @[]

@@ -9,8 +9,9 @@ default_key_priority := 4611686018427387904  # 2^62.
 
 # These are the valid command-line commands.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
+                         "load", "dump", "docker", "version", "env", "exec",
 		         #% REWRITE ,$ ]
-                         "load", "dump", "docker", "version", "env", "profile",
+                         "profile",
 			 #% INTERNAL
 			 "helpdump", "entrypoint"]
 			 #% END
@@ -1004,13 +1005,96 @@ Docker's internal reporting often gives results that are empty when not set.  If
   }
 }
 
+singleton exec {
+gen_fieldname: "execConfig"
+gen_typename:  "ExecConfig"
+gen_setters:   false
+user_def_ok:   false
+doc: """
+Configuration information for when running the chalk 'exec' command.
+
+The 'exec' command works by forking, and having the child do the chalk reporting.  The parent becomes whatever process you configure in this section.
+"""
+
+  field command_name {
+    type:     string
+    default:  ""
+    shortdoc: "Exec: command name"
+    doc: """
+This is the name of the program to run, when running the 'exec' command.  This command will end up being the process you directly spawned; chalking happens in a fforked-off process.
+
+You must set a value for this variable or pass the --exec-command-name flag to be able to use the 'exec' command.
+"""
+  }
+
+  field search_path {
+  type:     list[string]
+  default:  []
+  shortdoc: "Exec: extra search directories"
+  doc: """
+While the 'exec' command does, by default, search the PATH environment variable looking for what you want to run, this array gets searched first, so if you know where the executable should be, or if you're worried that PATH won't be set, you can put it here.
+
+Also, you can turn off use of PATH via exec.use_path, in which case this becomes the sole search path.
+"""
+  }
+
+  field default_args {
+  type:     list[string]
+  default:  []
+  shortdoc: "Exec: Default arguments"
+  doc: """
+When running chalk in 'exec' mode, these are the arguments that should, by default, be passed to the spawned process.
+
+If command-line arguments are provided, you have three options:
+
+1. Always send these arguments, and have any additional arguments be appeneded to these arguments.  For these semantics, set append_command_line_args to true.
+2. Have the command line arguments REPLACE these arguments.  For these semantics, set override_ok to true.  This is chalk's default behavior, absent of any other configuration.
+3. Disallow any command-line argument passing.  For this behavior, set both of the above variables to 'false'.
+
+Setting both to 'true' at the same time is not semantically valid, and will give you an error message; nothing will run.
+"""
+  }
+
+  field append_command_line_args {
+    type:      bool
+    default:   false
+    shortdoc: "Exec: append command-line args"
+    doc: """
+When true, any command-line arguments will be appeneded to exec.default_args instead of replacing them.
+"""
+  }
+
+  field override_ok {
+    type:     bool
+    default:  true
+    validator: func exec_arg_semantics_check
+    shortdoc: "Exec: override default_args"
+    doc: """
+When true, if the 'chalk exec' command has any arguments passed, they will replace any arguments provided in default_args. 
+"""
+  }
+
+  field use_path {
+    type:    bool
+    default: true
+    shortdoc: "Exec: use PATH"
+    doc: """
+When this is true, the PATH environment variable will be searched for your executable (skipping this executable, in case you want to rename it for convenience).
+
+If it is NOT true, set exec.searchpath to provide any locations Chalk should check for the executable to exec.
+"""
+  }
+}
+
 singleton env_cache {
   gen_fieldname: "envConfig"
   gen_typename:  "EnvConfig"
   gen_setters:   false
   user_def_ok:   false
   doc: """
-Internal configuration information for the 'env' command.
+Internal configuration information gathering runtime environment information when running runtime environmental information.  Note that this is generally done either the 'env' command or the 'exec' command.
+
+The difference is that 'exec' explicitly spawns a workload (the chalk reporting happens in a separate thread), whereas 'env' is usable as an environmental report at any point (processes can run a chalk instance).
 """
 
 
@@ -1081,6 +1165,7 @@ root {
   allow custom_report { }
   allow tool          { }
   allow docker        { }
+  allow exec          { }
   allow env_cache     { }
 
   field config_path {
@@ -1933,6 +2018,14 @@ func custom_labels_check(name, value) {
       return ("Docker label prefix must only contain letters, numbers, " +
               "'.' or '-' (when processing label '" + stuff[i] + "'")
     }
+  }
+}
+
+func exec_arg_semantics_check(name, value) {
+  result := ""
+  if value and attr_get("exec.append_command_line_args", bool) {
+    return ("Cannot have both exec.append_command_line_args = true and " +
+            "exec.override_ok = true")
   }
 }
 

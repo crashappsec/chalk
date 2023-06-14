@@ -3,7 +3,7 @@
 
 import tables, strutils, json, options, os, osproc, streams, parseutils,
        posix_utils, std/tempfiles, nimutils, con4m, ../config, ../plugins,
-       ../dockerfile, ../chalkjson
+       ../dockerfile, ../chalkjson, ../exec
 
 type
   CodecDocker* = ref object of Codec
@@ -67,22 +67,14 @@ var dockerPathOpt: Option[string] = none(string)
 
 proc findDockerPath*(): Option[string] =
   once:
-    dockerPathOpt = chalkConfig.getDockerExe()
-    if dockerPathOpt.isSome():
-      let potential = resolvePath(dockerPathOpt.get())
-      if fileExists(potential):
-        dockerPathOpt = some(potential)
-        return dockerPathOpt
-    let (mydir, me) = getAppFileName().splitPath()
-    for path in getEnv("PATH").split(":"):
-      if me == "docker" and path == mydir: continue # Don't find ourself.
+    var
+      userPath: seq[string]
+      exeOpt   = chalkConfig.getDockerExe()
 
-      let candidate = joinPath(path, "docker")
-      if fileExists(candidate):
-        dockerPathOpt = some(candidate)
-        return dockerPathOpt
-    dockerPathOpt = none(string)
+    if exeOpt.isSome():
+      userPath.add(exeOpt.get())
 
+    dockerPathOpt = findExePath("docker", userPath)
   return dockerPathOpt
 
 #% INTERNAL

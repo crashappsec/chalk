@@ -261,6 +261,62 @@ If passed, will be reported as if it is an _ARTIFACT_PATH field.  This field is 
     }
   }
 
+  command exec {
+    args:     (0, high())
+    ignore_bad_flags: true  # If it's not one of our flags, pass them on to the subprogram as args.
+    doc: """
+Directly execs a specified process, and in parallel forks off to reports environmental information, without scanning for chalk.  If a chalk ID or metadata ID is passed at the command line, then a chalk can be reported with just that metadata.
+
+This is like the 'env' command, except for the exec'ing.  The configuration for 'exec' is best put into the configuration file.
+"""
+
+    flag_arg exec_command_name {
+      field_to_set: "exec.command_name"
+      doc: """
+When using the 'exec' command, this allows you to explicitly set the command to call at the command line.  Arguments may be passed as arguments to 'chalk exec'.
+"""
+    }
+
+    flag_arg chalk_id {
+      aliases: ["cid"]
+      field_to_set: "env_cache.chalk_id"
+      doc: """
+If passed, will be reported as if it is an extracted CHALK_ID field.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+    }
+
+    flag_arg metadata_id {
+      aliases: ["mid"]
+      field_to_set: "env_cache.metadata_id"
+      doc: """
+If passed, will be reported as if it is an extracted METADATA_ID field.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+    }
+
+    flag_arg artifact_hash {
+      aliases: ["hash"]
+      field_to_set: "env_cache.artifact_hash"
+      doc: """
+If passed, will be reported as if it is an extracted ARTIFACT_HASH field.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+    }
+
+    flag_arg metadata_hash {
+      aliases: ["meta_hash", "mhash"]
+      field_to_set: "env_cache.metadata_hash"
+      doc: """
+If passed, will be reported as if it is an extracted METADATA_HASH field.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+    }
+
+    flag_arg artifact_path {
+      aliases: ["loc"]
+      field_to_set: "env_cache.artifact_path"
+      doc: """
+If passed, will be reported as if it is an _ARTIFACT_PATH field.  This field is currently not checked, just passed on to the reporting system directly.
+"""
+    }
+  }
   command defaults {
     aliases:  ["def"]
     doc: """

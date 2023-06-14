@@ -35,6 +35,7 @@ when isMainModule:
   of "version":        runCmdVersion()
   of "docker":         runCmdDocker()
   of "profile":        runCmdProfile(getArgs())
+  of "exec":           runCmdExec(getArgs())
   #% INTERNAL
   of "helpdump":       runCmdHelpDump()
   of "entrypoint":     echo "entry point."

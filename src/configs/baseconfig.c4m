@@ -2241,6 +2241,11 @@ outconf env {
   host_report:     "host_report_other_base"
 }
 
+outconf exec {
+  artifact_report: "artifact_report_extract_base"
+  host_report:     "host_report_other_base"
+}
+
 outconf delete {
   artifact_report: "artifact_report_delete_base"
   host_report:     "host_report_other_base"
@@ -2324,3 +2329,5 @@ sink_config dump_out {
 }
 
 default_command = "help"
+
+exec { }
