@@ -472,7 +472,7 @@ sink_config env_var_log_file {
 sink_config env_var_post {
   sink:    "post"
   uri:     env("%s")
-  headers: env("%s")
+  headers: mime_to_dict(env("%s"))
 }
 
 sink_config env_var_s3 {
@@ -491,7 +491,7 @@ sink_config pre_config_log {
 sink_config pre_config_post {
   sink:    "post"
   uri:     "%s"
-  headers: "%s"
+  headers: mime_to_dict("%s")
 }
 
 sink_config pre_config_s3 {

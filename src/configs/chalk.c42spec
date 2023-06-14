@@ -1513,7 +1513,7 @@ Where to write the report cache, if in use.  Note that Chalk does not try to wri
     doc: """
 If this is true, and no reporting configurations successfully handle the metadata, then this will cause the report that should have been output to write to the user's terminal if there is one, or stderr if not.
 
-Note that this is NOT checked if there is a report cache enabled; even if the report cache fails, then there will be console output. 
+Note that this is NOT checked if there is a report cache enabled; even if the report cache fails, then there will be console output.
 """
   }
 
@@ -1568,9 +1568,9 @@ Suppress validation of configuration files on loading.  Please don't do this!
     default:     true
     doc:         """
 Show the (admittedly verbose) warning you get when running 'chalk load'.
-"""    
+"""
   }
-  
+
   #% INTERNAL
   field entrypoint {
     type:    string
@@ -2120,11 +2120,17 @@ func sink_config_check(path) {
               "', but the specified sink '" + sinkname +
 	      "' does not use that field.")
     }
-    
+
     if (conffield == "max") {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, Size) and not typecmp(t, int) {
           return "This field must be a con4m Size, or an int (in bytes)"
+      }
+    }
+    elif (conffield == "headers") {
+      t := attr_type(path + "." + conffield)
+      if not typecmp(t, dict[string, string]) {
+          return "This field must be a dict[string, string]"
       }
     }
     elif not typecmp(attr_type(path + "." + conffield), string) {

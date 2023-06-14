@@ -3,10 +3,9 @@
 From the root of the repo run
 `docker compose run --rm --service-ports server`
 
-or, if you want to generate certificates for a different domain than [tests.crashoverride.run]() 
+or, if you want to generate certificates for a different domain than [tests.crashoverride.run]()
 
 `CHALK_SERVER_CERT_GEN_DOMAIN="your.domain.here" docker compose run --rm --service-ports server`
-
 
 Inject some data. For instance given the following config
 
@@ -18,7 +17,7 @@ sink_config my_https_config {
   uri:     env("CHALK_POST_URL")
 
   if env_exists("CHALK_POST_HEADERS") {
-    headers: env("CHALK_POST_HEADERS")
+    headers: mime_to_dict(env("CHALK_POST_HEADERS"))
   }
 }
 

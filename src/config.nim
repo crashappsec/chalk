@@ -401,20 +401,18 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
           let path = unpack[seq[string]](boxOpt.get())
           opts[k]  = path.join(":")  # Nimutils wants shell-like.
         except:
-          error(k & "(sink config key) must be a list of string paths.")
+          error(k & " (sink config key) must be a list of string paths.")
     of "headers":
       let boxOpt = getOpt[Box](attrs, k)
       if boxOpt.isSome():
         try:
-          let hdrs    = unpack[seq[seq[string]]](boxOpt.get())
+          let hdrs    = unpack[Con4mDict[string, string]](boxOpt.get())
           var content = ""
-
-          for item in hdrs:
-            if len(hdrs) != 2: raise newException(ValueError, "")
-            content &= item[0] & ": " & item[1] & "\n"
+          for name, value in hdrs:
+            content &= name & ": " & value & "\n"
           opts[k]  = content
         except:
-          error(k & "(sink config key) must be a list of tuples that map " &
+          error(k & " (sink config key) must be a dict that map " &
                     "header names to values (which must be strings).")
     of "timeout", "truncation_amount":
       let boxOpt = getOpt[Box](attrs, k)
