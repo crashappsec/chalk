@@ -1,37 +1,49 @@
-## Running the server
+## Running the server via gunicorn (HTTP)
 
-From the root of the repo run
-`docker compose run --rm --service-ports server`
+From the root of the repo run `docker compose run --rm --service-ports --use-aliases server`. Visit
+localhost:8585 in your browser and you should be seeing the chalk docs.
 
-or, if you want to generate certificates for a different domain than [tests.crashoverride.run]()
+#### Invoking this as a python program (HTTP)
 
-`CHALK_SERVER_CERT_GEN_DOMAIN="your.domain.here" docker compose run --rm --service-ports server`
+- `docker compose run --rm --service-ports server sh -c "python $PWD/server/app/main.py --help"`
+- go to `http://0.0.0.0:8585` in your browser
 
-Inject some data. For instance given the following config
+## Running the server without keys (HTTPS)
 
-```
-crashoverride_usage_reporting_url = "http://tests.crashoverride.run:8585/beacon"
-sink_config my_https_config {
-  enabled: true
-  sink:    "post"
-  uri:     env("CHALK_POST_URL")
+- `docker compose run --rm --service-ports --use-aliases server sh -c "python $PWD/server/app/main.py --domain chalk.crashoverride.local"`
 
-  if env_exists("CHALK_POST_HEADERS") {
-    headers: mime_to_dict(env("CHALK_POST_HEADERS"))
-  }
-}
+## Running the server with existing keys (HTTPS)
 
-log_level = "trace"
+- `docker compose run --rm --service-ports --use-aliases --env "CHALK_CERT_PARAMS=--keyfile=keys/host.key --certfile=keys/host.cert" server`
 
-ptr_url := ""
-if env_exists("CHALK_POST_URL") {
-  subscribe("report", "my_https_config")
-  configured_sink := true
-  if ptr_url == "" {
-    ptr_url := env("CHALK_POST_URL")
-  }
-}
-```
+#### Invoking this as a python program (HTTPS)
+
+- Place your keys in a location under `server/app` (e.g., `mkdir -p server/app/keys`), and pass them as arguments
+  relative to server/app:
+- `docker compose run --rm --service-ports --use-aliases server sh -c "python $PWD/server/app/main.py --keyfile keys/host.key --certfile keys/host.cert"`
+- go to `https://0.0.0.0:8585` in your browser
+
+## Browsing data
+
+- Spin up sqlitebrowser via `docker compose run --rm --service-ports sqlitebrowser`. Navigate to
+  `http://localhost:3000/`, select `"Open Database"` from the UI and select
+  your database. Only databases in `/server/app/db/data` are visible to the
+  container.
+
+### Run a test to insert data
+
+- Check that `chalk.crashoverride.local` is in your /etc/hosts or equivalent
+  entry based on your OS.
+
+  - `/etc/hosts` on OS X should have an entry like:
+    `127.0.0.1 chalk.crashoverride.local`
+
+- from the root of the repo run `docker compose run --rm tests test_sink.py::test_post_http_fastapi`.
+  The test should pass.
+
+- Spin up sqlitebrowser via `docker compose up -d sqlitebrowser`. Navigate to
+  `http://localhost:3000/`, select `"Open Database"` from the UI and select `chalkdb.sqlite` as
+  your database. You should see two tables, one for chalks one for stats
 
 make a temp directory in the `chalk-internal` root if not already present:
 

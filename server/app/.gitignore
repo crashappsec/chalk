@@ -1,1 +1,3 @@
 sql_app.db
+keys/*
+db/data/*

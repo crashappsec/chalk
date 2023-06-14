@@ -31,3 +31,5 @@ RUN poetry install --no-plugins
 
 # install chalk deps
 RUN apk add --no-cache pcre gcompat docker docker-compose
+
+ENTRYPOINT ["/tests.env/bin/pytest"]

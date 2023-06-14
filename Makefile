@@ -1,7 +1,10 @@
-.PHONY: test
-test:
+.PHONY: testdeps
+testdeps:
 	rm -f chalk
 	docker compose run --rm chalk-compile
+
+.PHONY: test
+test:
 	docker compose run --rm tests
 
 .PHONY: configdeps

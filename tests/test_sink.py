@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from subprocess import CompletedProcess
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, Dict, List
 from unittest import mock
 
 import boto3
@@ -55,12 +55,12 @@ def _run_chalk_with_custom_config(
 # validates some basic fields on the chalk output, which should be all the same
 # since we will only be chalking one target
 def _validate_chalk(
-    top_level_chalk: Any,
+    single_chalk: Dict[str, Any],
     path: Path,
 ) -> None:
-    assert top_level_chalk["_OPERATION"] == "insert", "operation expected to be insert"
-    assert len(top_level_chalk["_CHALKS"]) == 1, "wrong number of chalks"
-    chalk = top_level_chalk["_CHALKS"][0]
+    assert single_chalk["_OPERATION"] == "insert", "operation expected to be insert"
+    assert len(single_chalk["_CHALKS"]) == 1, "wrong number of chalks"
+    chalk = single_chalk["_CHALKS"][0]
     assert chalk["ARTIFACT_PATH"] == str(path / "cat")
     assert chalk["ARTIFACT_TYPE"] == "ELF"
 
@@ -81,9 +81,7 @@ def test_file_present(tmp_data_dir: Path, chalk: Chalk):
     assert file_output_path.is_file(), "file sink path must be a valid path"
 
     config = CONFIG_DIR / "file.conf"
-    proc = _run_chalk_with_custom_config(
-        chalk=chalk, config_path=config, target_path=artifact
-    )
+    _run_chalk_with_custom_config(chalk=chalk, config_path=config, target_path=artifact)
 
     # check that file output is correct
     if not file_output_path or not file_output_path.is_file():
@@ -93,9 +91,9 @@ def test_file_present(tmp_data_dir: Path, chalk: Chalk):
     contents = file_output_path.read_bytes()
     if not contents:
         raise AssertionError("file output is empty!?")
-    top_level_chalk = json.loads(contents)
-
-    _validate_chalk(top_level_chalk, tmp_data_dir)
+    chalks = json.loads(contents)
+    assert len(chalks) == 1
+    _validate_chalk(chalks[0], tmp_data_dir)
 
 
 @mock.patch.dict(
@@ -117,9 +115,7 @@ def test_rotating_log(tmp_data_dir: Path, chalk: Chalk):
         pass
 
     config = CONFIG_DIR / "rotating_log.conf"
-    proc = _run_chalk_with_custom_config(
-        chalk=chalk, config_path=config, target_path=artifact
-    )
+    _run_chalk_with_custom_config(chalk=chalk, config_path=config, target_path=artifact)
 
     # check that file output is correct
     if not rotating_log_output_path or not rotating_log_output_path.is_file():
@@ -129,15 +125,14 @@ def test_rotating_log(tmp_data_dir: Path, chalk: Chalk):
     contents = rotating_log_output_path.read_bytes()
     if not contents:
         raise AssertionError("file output is empty!?")
-    top_level_chalk = json.loads(contents)
+    chalks = json.loads(contents)
 
-    _validate_chalk(top_level_chalk, tmp_data_dir)
+    _validate_chalk(chalks[0], tmp_data_dir)
 
 
 @pytest.mark.skipif(not aws_secrets_configured(), reason="AWS secrets not configured")
-@mock.patch.dict(
-    os.environ, {"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/sink-test"}
-)
+# FIXME add some tests for the different options of `/` in S3 URIs
+@mock.patch.dict(os.environ, {"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/"})
 def test_s3(tmp_data_dir: Path, chalk: Chalk):
     logger.debug("testing s3 sink...")
     artifact = Path(tmp_data_dir) / "cat"
@@ -167,7 +162,6 @@ def test_s3(tmp_data_dir: Path, chalk: Chalk):
             # expecting log line from chalk of form `info: Post to: 1686605005558-CSP9AXH5CMXKAE3D9BN8G25K0G-sink-test; response = 200 OK (sink conf='my_s3_config')`
             if "Post to" in line:
                 object_name = line.split(" ")[3].strip(";")
-
         assert object_name != "", "object name could not be found"
         logger.debug("object name fetched from s3 %s", object_name)
 
@@ -176,12 +170,12 @@ def test_s3(tmp_data_dir: Path, chalk: Chalk):
         response = s3.get_object(Bucket=bucket_name, Key=object_name)["Body"]
         if not response:
             raise AssertionError("s3 sent empty response?")
-        top_level_chalk = json.loads(response.read())
+        chalks = json.loads(response.read())
 
-        if not top_level_chalk:
+        if not chalks:
             raise AssertionError("s3 fetched empty chalk json?!")
 
-        _validate_chalk(top_level_chalk, tmp_data_dir)
+        _validate_chalk(chalks[0], tmp_data_dir)
 
     finally:
         os.environ["AWS_PROFILE"] = aws_profile
@@ -197,7 +191,7 @@ def test_s3(tmp_data_dir: Path, chalk: Chalk):
         "CHALK_POST_HEADERS": "X-Crashoverride-Id:a779384b-ed4a-441a-95b6-577caeeec081",
     },
 )
-def test_post():
+def test_post(tmp_data_dir: Path, chalk: Chalk):
     logger.debug("testing https sink...")
     with TemporaryDirectory() as _tmp_bin:
         tmp_bin = Path(_tmp_bin)
@@ -208,14 +202,16 @@ def test_post():
         assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
 
         config = CONFIG_DIR / "post.conf"
-        proc = _run_chalk_with_custom_config(config_path=config, target_path=artifact)
+        proc = _run_chalk_with_custom_config(
+            chalk=chalk, config_path=config, target_path=artifact
+        )
 
         # take the metadata id from stderr where chalk mark is put
         stderr_output = proc.stderr.decode()
         metadata_id = ""
         for line in stderr_output.split("\n"):
-            if "METADATA_ID" in line:
-                metadata_id = line.split(":")[1].strip().strip('"').lower()
+            if line.startswith('"METADATA_ID":'):
+                chalk_id = line.split('METADATA_ID":')[1].split(",")[0].strip()[1:-1]
 
         assert metadata_id != "", "metadata id for created chalk not found in stderr"
 
@@ -235,19 +231,24 @@ def test_post():
 @mock.patch.dict(
     os.environ,
     {
-        "CHALK_POST_URL": "http://tests.crashoverride.run:8585/report",
+        "CHALK_POST_URL": "http://chalk.crashoverride.local:8585/report",
     },
 )
-def test_post_http_fastapi():
+def test_post_http_fastapi(tmp_data_dir: Path, chalk: Chalk):
     try:
-        r = requests.get("http://tests.crashoverride.run:8585/health")
+        r = requests.get("http://chalk.crashoverride.local:8585/health")
         if r.status_code != 200:
             raise unittest.SkipTest("Chalk Ingestion Server Down - Skipping")
     except requests.exceptions.ConnectionError:
         raise unittest.SkipTest("Chalk ingestion server unreachable - skipping")
     try:
         dbfile = (
-            Path(__file__).parent.parent / "server" / "app" / "data" / "sql_app.db"
+            Path(__file__).parent.parent
+            / "server"
+            / "app"
+            / "db"
+            / "data"
+            / "chalkdb.sqlite"
         ).resolve()
         if not dbfile.is_file():
             raise unittest.SkipTest("Bad server state - DB file not found - skipping")
@@ -264,7 +265,7 @@ def test_post_http_fastapi():
             # post url must be set
             assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
 
-            config = CONFIG_DIR / "post_beacon_local.conf"
+            config = CONFIG_DIR / "post_http_local.conf"
             proc = chalk.run(
                 chalk_cmd="insert",
                 target=artifact,
@@ -285,7 +286,71 @@ def test_post_http_fastapi():
             res = cur.execute(f"SELECT id FROM chalks WHERE id='{chalk_id}'")
             assert res.fetchone() is not None
             res = cur.execute("SELECT count(id) FROM stats")
-            assert res.fetchone()[0] >= chalks_cnt
+            assert res.fetchone()[0] > chalks_cnt
+    finally:
+        if conn:
+            conn.close()
+
+
+@mock.patch.dict(
+    os.environ,
+    {
+        "CHALK_POST_URL": "https://chalk.crashoverride.local:8585/report",
+    },
+)
+def test_post_https_fastapi(tmp_data_dir: Path, chalk: Chalk):
+    try:
+        r = requests.get("https://chalk.crashoverride.local:8585/health", verify=False)
+        if r.status_code != 200:
+            raise unittest.SkipTest("Chalk Ingestion Server Down - Skipping")
+    except requests.exceptions.ConnectionError:
+        raise unittest.SkipTest("Chalk ingestion server unreachable - skipping")
+    try:
+        dbfile = (
+            Path(__file__).parent.parent
+            / "server"
+            / "app"
+            / "db"
+            / "data"
+            / "chalkdb.sqlite"
+        ).resolve()
+        if not dbfile.is_file():
+            raise unittest.SkipTest("Bad server state - DB file not found - skipping")
+        conn = sqlite3.connect(dbfile)
+        cur = conn.cursor()
+        res = cur.execute("SELECT count(id) FROM stats")
+        chalks_cnt = res.fetchone()[0]
+
+        with TemporaryDirectory() as _tmp_bin:
+            tmp_bin = Path(_tmp_bin)
+            artifact = Path(tmp_bin) / "cat"
+            shutil.copy("/bin/cat", artifact)
+
+            # post url must be set
+            assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
+
+            config = CONFIG_DIR / "post_https_local.conf"
+            proc = chalk.run(
+                chalk_cmd="insert",
+                target=artifact,
+                params=[
+                    "--no-embedded-config",
+                    "--config-file=",
+                    str(config.absolute()),
+                ],
+            )
+
+            stderr_output = proc.stderr.decode()
+            for line in stderr_output.split("\n"):
+                line = line.strip()
+                if line.startswith('"CHALK_ID":'):
+                    chalk_id = line.split('CHALK_ID":')[1].split(",")[0].strip()[1:-1]
+            assert chalk_id, "metadata id for created chalk not found in stderr"
+            cur = conn.cursor()
+            res = cur.execute(f"SELECT id FROM chalks WHERE id='{chalk_id}'")
+            assert res.fetchone() is not None
+            res = cur.execute("SELECT count(id) FROM stats")
+            assert res.fetchone()[0] > chalks_cnt
     finally:
         if conn:
             conn.close()

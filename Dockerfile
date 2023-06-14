@@ -37,4 +37,4 @@ WORKDIR /
 
 COPY --from=build /chalk/chalk /chalk
 
-CMD /chalk
+ENTRYPOINT ["/chalk"]

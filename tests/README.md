@@ -1,18 +1,27 @@
-# Readme
+# About
 
-Runs basic tests for chalk
+Basic sanity tests for chalk
 
-# Setup
+### Requirements
 
-Assumes that chalk has already been compiled.
-To do so run `docker compose run --rm chalk-compile` and subsequently run tests
-via `docker compose run --rm tests` from
-the root level repo (for non docker tests) or directly invoking pytest locally
-for docker tests. Alternatively type `make test`, however this step will
-compile chalk twice - one to be used within docker, and one to be used locally
-in your platform.
+The following requirements are assuming to be there
 
-# Running tests
+- An alpine binary to be used in tests (`make testdeps`)
+- Spin up the local chalk server `docker compose up -d server` (note: you need
+  to spin up the server via `up -d` and not via
+  `docker compose run --rm --service-ports server` for networking to be picked
+  up)
+
+### Running tests
+
+From the root of the repo:
 
 - Run all tests via `make test`
-- Run a single test passing by invoking pytest directly `docker compose run --rm tests sh -c "pytest tests/test_elf.py::test_virtual"`
+- Run a single test file `docker compose run --rm tests test_elf.py`
+- Run a single test inside the test file by `docker compose run --rm tests test_elf.py::test_virtual`
+- See [pytest docs](https://docs.pytest.org/en/7.1.x/how-to/usage.html) for more invocation options
+
+##### Debugging a failed test
+
+Add a `breakpoint()` before the failing assertion and manually invoke the single
+test

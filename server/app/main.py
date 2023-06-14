@@ -1,49 +1,28 @@
-import os
+import argparse
 import json
 import logging.config
+import os
+import sys
+from pathlib import Path
 
 import sqlalchemy
+import uvicorn
+from certs.selfsigned import generate_selfsigned_cert
+from conf.info import CHALK_VER, CONFIG_TOOL_VER, SERVER_VER
 from db import crud, models, schemas
 from db.database import SessionLocal, engine
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.encoders import jsonable_encoder
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi_healthcheck import HealthCheckFactory, healthCheckRoute
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
-
-import selfsigned
-
-__version__  = "0.1"
-SELF_SIGNED_DOMAIN = "tests.crashoverride.run"
-IP_ADDRESS         = None
-TLS_PRIV_KEY       = None
-TLS_CERT           = None
-
-##Gather the various component versions
-SERVER_VER      = __version__
-MODULE_LOCATION = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(MODULE_LOCATION, "..", "..", "chalk_internal.nimble" ),"r") as f:
-    line = f.readline()
-    if "version" in line:
-        CHALK_VER = line.split("=")[-1].replace('"', '').strip()
-with open(os.path.join(MODULE_LOCATION, "..", "..", "config-tool", "chalk-config", "chalkconf.py"),"r") as f:     
-    for line in f.readlines():
-        if "__version__" in line:
-            CONFIG_TOOL_VER = line.split("=")[-1].replace('"', '').strip()
-            break
-
-
-##Paths use to save/load auto-generated self-signed keys and certs 
-## also usedin docker-compose.yml
-SELF_SIGNED_CERT_PATH        = os.path.join(MODULE_LOCATION, "data", "chalk-selfsigned-certificate.crt")
-SELF_SIGNED_PRIVATE_KEY_PATH = os.path.join(MODULE_LOCATION, "data", "chalk-selfsigned-private.key")
 
 models.Base.metadata.create_all(bind=engine)
 
-logging.config.fileConfig("logging.conf", disable_existing_loggers=True)
+logging.config.fileConfig(
+    Path(__file__).parent / "conf" / "logging.conf", disable_existing_loggers=True
+)
 logger = logging.getLogger(__name__)
 
 title = "Local Chalk Ingestion Server"
@@ -64,12 +43,9 @@ def custom_openapi():
 
 app = FastAPI(
     title=title,
-    description="",
-    version="0.1",
-    ssl_keyfile=TLS_PRIV_KEY,
-    ssl_certfile=TLS_CERT
+    version=SERVER_VER,
 )
-# Add Health Checks
+
 _healthChecks = HealthCheckFactory()
 
 app.add_api_route("/health", endpoint=healthCheckRoute(factory=_healthChecks))
@@ -84,55 +60,27 @@ def get_db():
         db.close()
 
 
-def generate_self_signed_tls_certificate(domain=None):
-    if not domain:
-        domain = SELF_SIGNED_DOMAIN
-    print("[+] Generating self-signed certificate for %s"%(domain))
-    ##Check if cert/key files already present?
-    try:
-        os.stat(SELF_SIGNED_CERT_PATH)
-        os.stat(SELF_SIGNED_PRIVATE_KEY_PATH)
-        ##They exist, read n return them
-        with open(SELF_SIGNED_CERT_PATH, "r") as f:
-            SELF_SIGNED_CERT_DATA = f.read()
-        with open(SELF_SIGNED_PRIVATE_KEY_PATH, "r") as f:
-            SELF_SIGNED_PRIVATE_KEY_DATA = f.read()
-        print("[+] Self-signed certificate present, reading from disk....")   
-        return SELF_SIGNED_CERT_DATA, SELF_SIGNED_PRIVATE_KEY_DATA
-    except OSError as err:
-        ##Files not present, generate them
-        print("[+] Generating self-signed certificate for %s......"%(domain))
-        SELF_SIGNED_CERT_DATA, SELF_SIGNED_PRIVATE_KEY_DATA = selfsigned.generate_selfsigned_cert(domain, IP_ADDRESS, TLS_PRIV_KEY )
-        with open(SELF_SIGNED_CERT_PATH, "wb") as f:
-            print("[+] Writing certficate to %s"%(SELF_SIGNED_CERT_PATH))
-            f.write(SELF_SIGNED_CERT_DATA)
-        with open(SELF_SIGNED_PRIVATE_KEY_PATH, "wb") as f:
-            print("[+] Writing private key to %s"%(SELF_SIGNED_PRIVATE_KEY_PATH))
-            f.write(SELF_SIGNED_PRIVATE_KEY_DATA)
-        return SELF_SIGNED_CERT_DATA, SELF_SIGNED_PRIVATE_KEY_DATA
-
-
 @app.get("/", response_class=RedirectResponse)
 async def redirect_to_docs():
     return RedirectResponse("/about")
 
 
-@app.get("/versions")
-async def redirect_to_docs():
-    versions = {"chalk_version":CHALK_VER,
-                "chalk_api_server_version":SERVER_VER,
-                "chalk_config_tool_versions":CONFIG_TOOL_VER}
+@app.get("/version")
+async def versions():
+    versions = {
+        "chalk_version": CHALK_VER,
+        "chalk_api_server_version": SERVER_VER,
+        "chalk_config_tool_version": CONFIG_TOOL_VER,
+    }
     return versions
 
 
-@app.post("/beacon")
-async def beacon(request: Request, db: Session = Depends(get_db)):
+@app.post("/ping")
+async def ping(request: Request, db: Session = Depends(get_db)):
     try:
         raw = await request.body()
-        for line in raw.decode().split("\n"):
-            if not line:
-                continue
-            entry = json.loads(line, strict=False)
+        stats = json.loads(raw)
+        for entry in stats:
             stat = schemas.Stats(
                 operation=entry["_OPERATION"],
                 timestamp=entry["_TIMESTAMP"],
@@ -143,10 +91,9 @@ async def beacon(request: Request, db: Session = Depends(get_db)):
             )
             crud.add_stat(db, stat=stat)
     except Exception as e:
-        print(e)
-        logger.exception("beacon", exc_info=True)
+        logger.exception(f"beacon {e}", exc_info=True)
     finally:
-        return {"OK"}
+        return {"pong"}
 
 
 @app.post("/report")
@@ -154,10 +101,8 @@ async def add_chalk(request: Request, db: Session = Depends(get_db)):
     try:
         all_unique = True
         raw = await request.body()
-        for line in raw.decode().split("\n"):
-            if not line:
-                continue
-            entry = json.loads(line, strict=False)
+        chalks = json.loads(raw)
+        for entry in chalks:
             if "_CHALKS" not in entry:
                 continue
             for c in entry["_CHALKS"]:
@@ -165,7 +110,7 @@ async def add_chalk(request: Request, db: Session = Depends(get_db)):
                     id=c["CHALK_ID"],
                     metadata_hash=c["METADATA_HASH"],
                     metadata_id=c["METADATA_ID"],
-                    raw=line,
+                    raw=json.dumps(entry),
                 )
                 try:
                     crud.add_chalk(db, chalk=chalk)
@@ -181,15 +126,109 @@ async def add_chalk(request: Request, db: Session = Depends(get_db)):
     finally:
         if not all_unique:
             raise HTTPException(status_code=409, detail="Duplicate chalk")
-        
+
+
 if __name__ == "__main__":
-    ##Used by docker to generate self-signed certs before launching the server
-    import sys
-    if len(sys.argv) >1 and sys.argv[1] == "generate_certificate":
-        if len(sys.argv) >2:
-            ##Specify the domain to generate the self-signed cert for
-            cert,priv_key = generate_self_signed_tls_certificate(sys.argv[2])
+    parser = argparse.ArgumentParser("Local chalk API server")
+
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        default=False,
+        help="show server version and exit",
+    )
+    subparsers = parser.add_subparsers()
+    parser.add_argument(
+        "--port", help="port the server is running at", default=8585, type=int
+    )
+    parser.add_argument(
+        "--certfile", help="path to TLS cert", type=lambda p: Path(p).absolute()
+    )
+    parser.add_argument(
+        "--keyfile",
+        help="path to private key for TLS cert",
+        type=lambda p: Path(p).absolute(),
+    )
+    parser.add_argument(
+        "--workers",
+        help="number of workers for the server",
+        type=int,
+        default=4,
+    )
+    parser.add_argument(
+        "--reload",
+        help="reload server on changes",
+        action="store_true",
+        default=False,
+    )
+
+    # FIXME add groups (possibly via click?)
+    parser.add_argument(
+        "--domain",
+        help="domain to generate a certificate for",
+        type=str,
+    )
+    parser.add_argument(
+        "--ips",
+        help="allow addressing by IP, for when you don't have real DNS",
+        default=[],
+        nargs="+",
+    )
+    parser.add_argument(
+        "--cert-output",
+        help="output directory for generated certificates",
+        type=lambda p: Path(p).absolute(),
+        default=Path(__file__).parent / "keys",
+    )
+
+    args = parser.parse_args()
+
+    if args.version:
+        print(SERVER_VER)
+        sys.exit(0)
+
+    if args.domain or args.ips:
+        assert args.domain, "we need a domain, even if dummy alias"
+        os.makedirs(args.cert_output, exist_ok=True)
+        key_file = args.cert_output / "self-signed.key"
+        cert_file = args.cert_output / "self-signed.cert"
+        if key_file.is_file() or cert_file.is_file():
+            raise RuntimeError(
+                (
+                    f"Refusing to overwrite existing certificates in {args.cert_output}. "
+                    "Please remove them or pass them via --keyfile and --certfile"
+                )
+            )
+        cert_pem, key_pem = generate_selfsigned_cert(args.domain, args.ips)
+        with open(key_file, "wb") as outf:
+            outf.write(key_pem)
+        with open(cert_file, "wb") as outf:
+            outf.write(cert_pem)
+
+        if args.keyfile or args.certfile:
+            logger.warning(
+                "Generated certificates in {args.cert_output} but proceeding to use the passed certificates"
+            )
         else:
-            ##Generate cert for deault domain of tests.crashoverride.run
-            cert,priv_key = generate_self_signed_tls_certificate()
-        print(cert)
+            args.keyfile = key_file
+            args.certfile = cert_file
+
+    if args.keyfile or args.certfile:
+        assert args.keyfile and args.certfile, "both a key and cert are required"
+
+    if args.keyfile and args.certfile:
+        assert args.keyfile.is_file(), "Key file not found"
+        assert args.certfile.is_file(), "Cert file not found"
+        app.ssl_keyfile = args.keyfile
+        app.cert_file = args.certfile
+        uvicorn.run(
+            "main:app",
+            port=args.port,
+            host="0.0.0.0",
+            workers=args.workers,
+            reload=args.reload,
+            ssl_keyfile=args.keyfile,
+            ssl_certfile=args.certfile,
+        )
+    else:
+        uvicorn.run(app, host="0.0.0.0", port=args.port)
