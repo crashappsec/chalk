@@ -34,8 +34,8 @@ RUN apk del \
         cmake \
         libffi-dev
 
-ENV CHALK_API_PARAMS
-ENV CHALK_API_PORT
-ENV CHALK_CERT_PARAMS
+ENV CHALK_API_PARAMS="--workers=4 --error-logfile=- --access-logfile=- --timeout 30"
+ENV CHALK_API_PORT="8585"
+ENV CHALK_CERT_PARAMS=""
 
 CMD ["sh", "-c", "/tests.env/bin/gunicorn -workers 4 -k uvicorn.workers.UvicornH11Worker main:app --reload -b :${CHALK_API_PORT} ${CHALK_API_PARAMS} ${CHALK_CERT_PARAMS}"]
