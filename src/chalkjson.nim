@@ -46,7 +46,7 @@ type
 
 proc chalkParseJson(s: Stream): ChalkJSonNode
 
-proc findJsonStart*(stream: FileStream): bool =
+proc findJsonStart*(stream: Stream): bool =
   ## Seeks the stream to the start of the JSON blob, when the stream
   ## is positioned over the start of the actual magic value.
   var

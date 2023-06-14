@@ -13,7 +13,8 @@ type
   ## The chalk info for a single artifact.
   ChalkObj* = ref object
     fullpath*:      string      ## The path to the artifact.
-    cachedHash*:    string      ## Cached hash.
+    cachedHash*:    string      ## Cached 'ending' hash
+    cachedPreHash*: string      ## Cached 'unchalked' hash
     collectedData*: ChalkDict   ## What we're adding during insertion.
     extract*:       ChalkDict   ## What we extracted, or nil if no extract.
     opFailed*:      bool

@@ -40,6 +40,7 @@ method scan*(self:   CodecPythonPyc,
 method handleWrite*(self:    CodecPythonPyc,
                     chalk:   ChalkObj,
                     encoded: Option[string]) =
+  discard chalk.acquireFileStream()
   #Reset to start of file
   chalk.stream.setPosition(0)
   #Read up to previously set offset indicating where magic began
@@ -58,7 +59,10 @@ method handleWrite*(self:    CodecPythonPyc,
     toWrite &= encoded.get() & post.strip(chars = {' ', '\n'}, trailing = false)
   else:
     #TODO clean up like above
-    toWrite = pre[0 ..< pre.find('\n')] & post
+    var endPos = pre.find('\n')
+    if endPos == -1:
+      endPos = len(pre)
+    toWrite = pre[0 ..< endPos] & post
   chalk.closeFileStream()
 
   #If NOT a dry-run replace file contents
@@ -66,6 +70,7 @@ method handleWrite*(self:    CodecPythonPyc,
 
 method getUnchalkedHash*(self:  CodecPythonPyc,
                          chalk: ChalkObj): Option[string] =
+  discard chalk.acquireFileStream()
   chalk.stream.setPosition(0)
   let toHash = $(chalk.stream.readStr(chalk.startOffset))
   return some(hashFmt($(toHash.computeSHA256())))

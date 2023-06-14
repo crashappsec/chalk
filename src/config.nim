@@ -28,6 +28,7 @@ proc commentC4mCode(s: string): string =
   # Some string constants used in multiple places.
 const
   magicUTF8*          = "dadfedabbadabbed"
+  emptyMark*          = "{ \"MAGIC\" : \"" & magicUTF8 & "\" }"
   tmpFilePrefix*      = "chalk-"
   tmpFileSuffix*      = "-file.tmp"
   chalkSpecName*      = "configs/chalk.c42spec"
