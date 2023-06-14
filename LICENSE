@@ -1,4 +1,21 @@
-                    GNU GENERAL PUBLIC LICENSE
+#% INTERNAL
+
+The below license is the license for the open source repository, ONLY.
+Copyright to all source code in this repo is held by Crash Override,
+Inc. (2022-2023), unless otherwise noted at the top of the source
+file, and all rights are reserved.  The code in this repo include
+things not in the open source repo, and for such code, it is only
+available under a commercial license, and is not copyleft.
+
+Chalk itself does not link against any external GPL'd code; we retain
+the copyright for the code that is here, and along with it, the right
+to dual license it.
+
+It is our policy as company not to link to GPLd code in the software
+we write in all cases where we do not own the copyright!
+
+#% END
+GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
  Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
