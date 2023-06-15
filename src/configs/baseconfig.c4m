@@ -1259,7 +1259,7 @@ keyspec _INSTANCE_MOUNTS {
     standard:         true
     doc: """
 Mounts associated with the running container.  Items in the dictionary
-objects come from the container runtime, and the type may vary. 
+objects come from the container runtime, and the type may vary.
 """
 }
 
@@ -1375,7 +1375,7 @@ keyspec _INSTANCE_EXPOSED_PORTS {
     kind: NonChalk
     type: dict[string, dict[string, `x]]
     standard: true
-    doc: """ 
+    doc: """
 Explicitly configured ports that the instance may bind to on external interfaces. The keys will be of the form 'port/family', e.g., 446/tcp'.  The values are info about specific interfaces where those ports are bound, if provided.  Otherwise, it's expected to be across all interfaces.
 """
 }
@@ -1410,7 +1410,7 @@ The primary IPv6 address for the instance, if any.
 keyspec _INSTANCE_GATEWAY {
     kind: NonChalk
     type: string
-    standard: true    
+    standard: true
     doc: """
 The network gateway used by the instance.
  """
@@ -1420,7 +1420,7 @@ keyspec _INSTANCE_GATEWAYV6 {
     kind: NonChalk
     type: string
     standard: true
-    doc: """ 
+    doc: """
 The network gateway used by the instance for IPv6 traffic, if any.
 """
 }
@@ -1429,7 +1429,7 @@ keyspec _INSTANCE_MAC {
     kind: NonChalk
     type: string
     standard: true
-    doc: """ 
+    doc: """
 The MAC address associated with the instance's primary network instance.
 """
 }
@@ -1446,8 +1446,8 @@ Any comment explicitly set for the instance.
 keyspec _INSTANCE_ARCH {
     kind: NonChalk
     type: string
-    standard: true    
-    doc: """ 
+    standard: true
+    doc: """
 The reported architecture that the instance targets.
 """
 }
@@ -2217,7 +2217,7 @@ This profile is for chalkable keys that are automatically added as labels to a c
 custom_report chalk_usage_stats {
   sink_configs:  []
   host_profile:  "usage_report"
-  use_when:      ["insert", "build", "delete"]
+  use_when:      ["insert", "build", "push", "delete"]
 }
 
 custom_report audit {
