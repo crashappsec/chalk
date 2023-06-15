@@ -200,64 +200,94 @@ docker {
     command wait {
       args: (0, high())
     }
+
     command build {
       aliases: ["b"]  # Only in buildx, but no reason not to handle it here.
       args: (0, high())
 
-      flag_multi_arg add_host {
-        optional_arg: true
-      }
+      flag_multi_arg add_host { }
+      flag_multi_arg allow { }
+      flag_multi_arg attest { }
       flag_multi_arg build_arg { }
+      flag_multi_arg build_context { }
+      flag_multi_arg builder { }
       flag_multi_arg cache_from { }
+      flag_multi_arg cache_to { }
       flag_multi_arg cgroup_parent { }
-      flag_multi_arg compress {
-        optional_arg: true
-      }
-      flag_multi_arg cpu_period { }
-      flag_multi_arg cpu_quota { }
-      flag_multi_arg cpu_shares { }
-      flag_multi_arg cpuset_mems { }
-      flag_multi_arg disable_content_trust {
-        optional_arg: true
-      }
       flag_multi_arg file {
         aliases: ["f"]
       }
-      flag_multi_arg force_rm {
-	optional_arg: true
-      }
       flag_multi_arg iidfile { }
-      flag_multi_arg isolation { }
       flag_multi_arg label { }
-      flag_multi_arg memory {
-        aliases: ["m"]
+      flag_yn        load {
+        yes_aliases: []
+        no_aliases:  []
       }
-      flag_multi_arg memory_swap { }
+      flag_multi_arg metadata_file { }
       flag_multi_arg network { }
-      flag_multi_arg no_cache {
-        optional_arg: true
+      flag_yn        no_cache {
+        yes_aliases: []
+        no_aliases:  []
+      }
+      flag_multi_arg no_cache_filter { }
+      flag_multi_arg output {
+        aliases: ["o"]
       }
       flag_multi_arg platform { }
-      flag_multi_arg pull {
-        optional_arg: true
+      flag_multi_arg progress { }
+      flag_multi_arg provenance { }
+      flag_yn        pull {
+        yes_aliases: []
+        no_aliases:  []
       }
-      flag_multi_arg quiet {
-        aliases: ["q"]
-	optional_arg: true
+      flag_yn        quiet {
+        yes_aliases: ["q"]
       }
-      flag_multi_arg rm {
-        optional_arg: true
-      }
-      flag_multi_arg security_opt { }
+      flag_multi_arg sbom { }
+      flag_multi_arg secret { }
       flag_multi_arg shm_size { }
-      flag_multi_arg squash {
-        optional_arg: true
-      }
+      flag_multi_arg ssh { }
       flag_multi_arg tag {
         aliases: ["t"]
       }
       flag_multi_arg target { }
       flag_multi_arg ulimit { }
+
+      # Below here is stuff from 'docker build' that buildx should
+      # support, even though it isn't in `docker buildx build
+      # --help`.
+      flag_yn compress {
+        yes_aliases: []
+        no_aliases:  []
+      }
+      flag_multi_arg cpu_period { }
+      flag_multi_arg cpu_quota { }
+      flag_multi_arg cpu_shares {
+        aliases: ["c"]
+      }
+      flag_multi_arg cpuset_cpus { }
+      flag_multi_arg cpuset_mems { }
+      # This one doesn't seem to exist but is in the docs?
+      flag_multi_arg disable_content_trust { }
+      flag_yn        force_rm {
+        yes_aliases: []
+        no_aliases: []
+      }
+      flag_multi_arg isolation { }
+      flag_multi_arg memory {
+        aliases: ["m"]
+      }
+      flag_multi_arg memory_swap { }
+      flag_yn rm {
+        yes_aliases: []
+        no_aliases:  []
+      }
+      flag_multi_arg security_opt { }
+      flag_multi_arg shm_size { }
+      flag_yn squash {
+        yes_aliases: []
+        no_aliases:  []
+      }
     }
     command push {
       args: (0, high())
@@ -268,9 +298,8 @@ docker {
       flag_multi_arg disable_content_trust {
         optional_arg: true
       }
-      flag_multi_arg quiet {
-        aliases: ["q"]
-        optional_arg: true
+      flag_yn        quiet {
+        yes_aliases: ["q"]
       }
     }
    command run {
@@ -390,21 +419,22 @@ docker {
      flag_multi_arg publish {
        aliases: ["p"]
      }
-     flag_multi_arg plublish_all {
+     flag_multi_arg publish_all {
        aliases: ["P"]
      }
-     flag_multi_arg pull { }
-     flag_multi_arg quiet {
-       optional_arg: true
-     }
+     flag_yn pull { }
+      flag_yn quiet {
+        yes_aliases: ["q"]
+      }
      flag_multi_arg read_only {
        optional_arg: true
      }
      flag_multi_arg restart {
        optional_arg: true
      }
-     flag_multi_arg rm {
-       optional_arg: true
+     flag_yn rm {
+       yes_aliases: []
+       no_aliases:  []
      }
      flag_multi_arg runtime { }
      flag_multi_arg security_opt { }

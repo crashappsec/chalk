@@ -357,15 +357,13 @@ proc scriptLoadMark*(stream: FileStream,
 
   stream.setPosition(0)
 
-  if toHash == "":
-    chalk.cachedPreHash = hashFmt($(contents.computeSHA256()))
-  else:
-    if len(dict) != 1:
-      # When len(dict) == 1, that's the 'placeholder chalk mark', which
-      # we consider to be not a chalk mark for script files.
-      chalk.marked  = true
-      chalk.extract = dict
-    chalk.cachedPreHash = hashFmt($(toHash.computeSHA256()))
+  chalk.cachedPreHash = hashFmt($(toHash.computeSHA256()))
+  if dict != nil and len(dict) != 1:
+    # When len(dict) == 1, that's the 'placeholder chalk mark', which
+    # we consider to be not a chalk mark for script files.
+    chalk.marked  = true
+    chalk.extract = dict
+
 
 proc scriptHandleWrite*(chalk:   ChalkObj,
                         encoded: Option[string],
