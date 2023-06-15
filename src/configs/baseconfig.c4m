@@ -1748,11 +1748,12 @@ sink s3 {
 }
 
 sink post {
-  ~uri:           true
-  ~headers:       false
-  ~content_type:  false
-  ~disallow_http: false
-  ~timeout:       false
+  ~uri:              true
+  ~headers:          false
+  ~content_type:     false
+  ~disallow_http:    false
+  ~timeout:          false
+  ~pinned_cert_file: false
   doc:       "Generic HTTP/HTTPS post to a URL. Headers must be one per-line."
 }
 
