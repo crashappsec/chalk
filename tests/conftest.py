@@ -10,7 +10,7 @@ from .utils.log import get_logger
 logger = get_logger()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def tmp_data_dir():
     with TemporaryDirectory() as tmp_dir:
         with chdir(tmp_dir):

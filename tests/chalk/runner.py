@@ -1,7 +1,8 @@
+import json
 import os
 from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess, check_output, run
-from typing import List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from ..utils.log import get_logger
 
@@ -122,4 +123,40 @@ class Chalk:
                     cur_dir=check_output(["pwd"]).decode().strip(),
                     contents=check_output(["ls"]).decode().strip(),
                 )
+            raise
+
+    # returns chalk report
+    def insert(self, artifact: Path, virtual: bool = False) -> Dict[str, Any]:
+        # suppress output since all we want is the chalk report
+        params = ["--log-level=none"]
+        if virtual:
+            params.append("--virtual")
+
+        inserted = self.run(chalk_cmd="insert", target=artifact, params=params)
+        if inserted.returncode != 0:
+            logger.error(
+                "chalk insertion failed with return code", ret=inserted.returncode
+            )
+            raise AssertionError
+        try:
+            return json.loads(inserted.stderr, strict=False)
+        except json.decoder.JSONDecodeError:
+            logger.error("Could not decode json", raw=inserted.stderr)
+            raise
+
+    def extract(self, artifact: Path) -> Dict[str, Any]:
+        extracted = self.run(
+            chalk_cmd="extract",
+            target=artifact,
+            params=["--log-level=none"],
+        )
+        if extracted.returncode != 0:
+            logger.error(
+                "chalk extraction failed with return code", ret=extracted.returncode
+            )
+            raise AssertionError
+        try:
+            return json.loads(extracted.stderr, strict=False)
+        except json.decoder.JSONDecodeError:
+            logger.error("Could not decode json", raw=extracted.stderr)
             raise

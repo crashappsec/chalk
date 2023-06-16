@@ -17,8 +17,8 @@ The following requirements are assuming to be there
 From the root of the repo:
 
 - Run all tests via `make test`
-- Run a single test file `docker compose run --rm tests test_elf.py`
-- Run a single test inside the test file by `docker compose run --rm tests test_elf.py::test_virtual`
+- Run a single test file `docker compose run --rm tests pytest test_elf.py`
+- Run a single test inside the test file by `docker compose run --rm tests pytest test_elf.py::test_virtual`
 - See [pytest docs](https://docs.pytest.org/en/7.1.x/how-to/usage.html) for more invocation options
 
 ##### Debugging a failed test

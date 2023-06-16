@@ -15,6 +15,7 @@ from .utils.docker import (
     docker_inspect_image_hashes,
 )
 from .utils.log import get_logger
+from .utils.validate import ArtifactInfo, validate_virtual_chalk
 
 logger = get_logger()
 
@@ -56,61 +57,25 @@ def _build_and_chalk_dockerfile(chalk: Chalk, tmp_data_dir: Path, valid: bool):
             docker_image_cleanup(images=images)
 
 
-def _validate_virtual_chalk(tmp_data_dir: Path):
-    try:
-        vjsonf = tmp_data_dir / "virtual-chalk.json"
-        assert vjsonf.is_file(), "virtual-chalk.json not found"
-        vjson = json.loads(vjsonf.read_bytes())
-        assert "CHALK_ID" in vjson
-        assert (
-            vjson["MAGIC"] == "dadfedabbadabbed"
-        ), "virtual chalk magic value incorrect"
-    except json.JSONDecodeError as e:
-        logger.error("unable to decode json", error=e)
-        raise
-    except AssertionError as e:
-        logger.error("virtual-chalk validation failed", error=e)
-        raise
-
-
-def test_virtual_valid_sample_1(tmp_data_dir: Path, chalk: Chalk):
-    files = os.listdir(DOCKERFILES / "valid" / "sample_1")
+@pytest.mark.parametrize(
+    "test_file", ["valid/sample_1", "valid/sample_2", "valid/sample_3"]
+)
+def test_virtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
+    files = os.listdir(DOCKERFILES / test_file)
     for file in files:
-        shutil.copy(DOCKERFILES / "valid" / "sample_1" / file, tmp_data_dir)
+        shutil.copy(DOCKERFILES / test_file / file, tmp_data_dir)
 
+    artifact_info = {tmp_data_dir: ArtifactInfo(type="docker", hash="")}
     _build_and_chalk_dockerfile(chalk, tmp_data_dir, True)
-    _validate_virtual_chalk(tmp_data_dir)
+    validate_virtual_chalk(tmp_data_dir, artifact_map=artifact_info, virtual=True)
 
 
-def test_virtual_valid_sample_2(tmp_data_dir: Path, chalk: Chalk):
-    files = os.listdir(DOCKERFILES / "valid" / "sample_2")
+@pytest.mark.parametrize("test_file", ["invalid/sample_1", "invalid/sample_2"])
+def test_virtual_invalid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
+    files = os.listdir(DOCKERFILES / test_file)
     for file in files:
-        shutil.copy(DOCKERFILES / "valid" / "sample_2" / file, tmp_data_dir)
+        shutil.copy(DOCKERFILES / test_file / file, tmp_data_dir)
 
-    _build_and_chalk_dockerfile(chalk, tmp_data_dir, True)
-    _validate_virtual_chalk(tmp_data_dir)
-
-
-def test_virtual_valid_sample_3(tmp_data_dir: Path, chalk: Chalk):
-    files = os.listdir(DOCKERFILES / "valid" / "sample_3")
-    for file in files:
-        shutil.copy(DOCKERFILES / "valid" / "sample_3" / file, tmp_data_dir)
-
-    _build_and_chalk_dockerfile(chalk, tmp_data_dir, True)
-    _validate_virtual_chalk(tmp_data_dir)
-
-
-def test_virtual_invalid_sample_1(tmp_data_dir: Path, chalk: Chalk):
-    files = os.listdir(DOCKERFILES / "invalid" / "sample_1")
-    for file in files:
-        shutil.copy(DOCKERFILES / "invalid" / "sample_1" / file, tmp_data_dir)
-
+    artifact_info = {tmp_data_dir: ArtifactInfo(type="docker", hash="")}
     _build_and_chalk_dockerfile(chalk, tmp_data_dir, False)
-
-
-def test_virtual_invalid_sample_2(tmp_data_dir: Path, chalk: Chalk):
-    files = os.listdir(DOCKERFILES / "invalid" / "sample_2")
-    for file in files:
-        shutil.copy(DOCKERFILES / "invalid" / "sample_2" / file, tmp_data_dir)
-
-    _build_and_chalk_dockerfile(chalk, tmp_data_dir, False)
+    validate_virtual_chalk(tmp_data_dir, artifact_map=artifact_info, virtual=False)
