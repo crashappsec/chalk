@@ -74,10 +74,8 @@ def validate_chalk_report(
             artifact = artifact_map[path]
 
             # artifact specific fields
-            assert (
-                artifact.type == chalk["ARTIFACT_TYPE"]
-            ), "artifact type doesn't match"
-            assert artifact.hash == chalk["HASH"], "artifact hash doesn't match"
+            assert artifact.type == chalk["ARTIFACT_TYPE"]
+            assert artifact.hash == chalk["HASH"]
             assert virtual == chalk["_VIRTUAL"]
     except AssertionError as e:
         logger.error("chalk report validation failed", error=e)

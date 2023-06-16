@@ -1,6 +1,5 @@
 import json
 import os
-import pprint
 import shutil
 import sqlite3
 import unittest
@@ -181,9 +180,8 @@ def test_s3(tmp_data_dir: Path, chalk: Chalk):
         os.environ["AWS_PROFILE"] = aws_profile
 
 
-# TODO: currently post only accepts docker events
-# fix test when that is added
-@pytest.mark.skip("currently POST only accepts docker events")
+# TODO: enable test when 400 error is fixed
+@pytest.mark.skip("missing headers when sending from chalk")
 @mock.patch.dict(
     os.environ,
     {
@@ -208,10 +206,12 @@ def test_post(tmp_data_dir: Path, chalk: Chalk):
 
         # take the metadata id from stderr where chalk mark is put
         stderr_output = proc.stderr.decode()
+
         metadata_id = ""
         for line in stderr_output.split("\n"):
+            line = line.strip()
             if line.startswith('"METADATA_ID":'):
-                chalk_id = line.split('METADATA_ID":')[1].split(",")[0].strip()[1:-1]
+                metadata_id = line.split('METADATA_ID":')[1].split(",")[0].strip()[1:-1]
 
         assert metadata_id != "", "metadata id for created chalk not found in stderr"
 
@@ -221,11 +221,11 @@ def test_post(tmp_data_dir: Path, chalk: Chalk):
             + metadata_id
         )
 
-        # TODO: checking url doesn't work until miro figures out why the redirects aren't working
-        print(check_url)
-        print("response...")
+        # TODO: checking url won't work until 400 error is fixed in nimutils
+        logger.info(check_url)
+        logger.info("response...")
         res = requests.get(check_url, allow_redirects=True)
-        print(res)
+        logger.info(res)
 
 
 @mock.patch.dict(

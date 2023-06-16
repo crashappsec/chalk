@@ -1,2 +1,0 @@
-
-# { "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "CMSP4C-336G-T34E-9RCSHK", "CHALK_VERSION" : "0.5.0", "DATETIME" : "2023-06-15T16:21:58.139-04:00", "CHALK_PTR" : "https://chalkapi-test.crashoverride.run/v0.1/report", "CHALK_RAND" : "ae6cecc35777c793", "METADATA_HASH" : "2ec87a8581ab63219228cb616e6888cae79d8b0498d03592f4aa84e8ec0f4f9b", "METADATA_ID" : "5V47N1-C1ND-HJ34-H8SDGP" }

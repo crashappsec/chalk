@@ -71,8 +71,7 @@ def test_virtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
         "sample_1",
         "sample_2",
         "sample_3",
-        # FIXME: uncomment when https://github.com/crashappsec/chalk-internal/issues/280 is fixed
-        # "sample_4",
+        "sample_4",
     ],
 )
 def test_nonvirtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
