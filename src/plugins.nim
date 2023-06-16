@@ -357,7 +357,11 @@ proc scriptLoadMark*(stream: FileStream,
 
   stream.setPosition(0)
 
-  chalk.cachedPreHash = hashFmt($(toHash.computeSHA256()))
+  if toHash == "" and dict == nil:
+    chalk.cachedPreHash = hashFmt($(contents.computeSHA256()))
+  else:
+    echo len(toHash)
+    chalk.cachedPreHash = hashFmt($(toHash.computeSHA256()))
   if dict != nil and len(dict) != 1:
     # When len(dict) == 1, that's the 'placeholder chalk mark', which
     # we consider to be not a chalk mark for script files.
