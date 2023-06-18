@@ -13,6 +13,9 @@ static:
                      "--language=nim --output-file=c4autoconf.nim; else " &
                      "echo No change to chalk.c42spec; fi")
 
+when hostOs == "macosx":
+  {.emit: staticRead("macosinit.c") .}
+
 # Note that importing builtins causes topics to register, and
 # importing plugins causes plugins to register.
 {.warning[UnusedImport]: off.}
