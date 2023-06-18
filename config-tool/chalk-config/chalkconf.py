@@ -20,7 +20,6 @@ from wiz_panes import *
 import conf_widgets
 from css import WIZARD_CSS
 
-MODULE_LOCATION = os.path.abspath(os.path.dirname(__file__))
 __version__ = "0.1"
 
 first_run = False
@@ -31,6 +30,7 @@ set_conf_table(conftable)
 # Even if I put this in NewApp's __init__ it goes async and AlphaModal errors??
 intro_md = MDown(CHALK_CONFIG_INTRO_TEXT, id="intro_md")
 
+##Callback that is passed to Wizard() and is invoked when the wizard has finished
 def finish_up():
     config      = config_to_json()
     as_dict     = json_to_dict(config)
@@ -106,7 +106,7 @@ class ConfWiz(Wizard):
 
         super().action_next()
 
-        ##Disable the next_button until user is authenticated
+        ##Disable the next_button on theauthn panel until user is authenticated
         if not get_app().login_widget.is_authenticated() and self.current_panel == self.api_authn_panel:
             self.next_button.disabled = True
 
@@ -164,39 +164,57 @@ class LoginScreen(ModalScreen):
         """
         my_app = get_app()
 
-        ##Pass message up to app so they can be easily graabbed by any screen etc
-        my_app.authenticated  = my_app.login_widget.is_authenticated()
-        my_app.id_token_json  = my_app.login_widget.get_id_token_json()
-        my_app.curr_user_json = my_app.login_widget.get_token_json()
+        ##Authentication attempt outcome
+        if event.result == "success":
+            ##Pass message up to app so they can be easily graabbed by any screen etc
+            my_app.authenticated  = my_app.login_widget.is_authenticated()
+            my_app.id_token_json  = my_app.login_widget.get_id_token_json()
+            my_app.curr_user_json = my_app.login_widget.get_token_json()
 
-        ##Update loginbutton on main page button bar to show logged in user
-        user_str = "Hi %s!"%(event.curr_user_json["given_name"])
-        l_btn = conftable.login_button
-        l_btn.label = user_str
-        l_btn.variant = "success"
-        l_btn.update(user_str)
-        l_btn.refresh()
-        ##If the login button is hit from main screen the wizard DOM hasn't
-        ## been built yet so this fails ....... async DOMs suck
-        try:
-            ## Update inline login button on wizard page to show logged in user
-            wiz_l_btn = wiz.query_one("#wiz_login_button")
-            wiz_l_btn.label = user_str
-            wiz_l_btn.variant = "success"
-            wiz_l_btn.update(user_str)
-            wiz_l_btn.refresh()
+            ##Update loginbutton on main page button bar to show logged in user
+            user_str = "Hi %s!"%(event.curr_user_json["given_name"])
+            l_btn = conftable.login_button
+            l_btn.label = user_str
+            l_btn.variant = "success"
+            l_btn.update(user_str)
+            l_btn.refresh()
+            ##If the login button is hit from main screen the wizard DOM hasn't
+            ## been built yet so this fails ....... async DOMs suck
+            try:
+                ## Update inline login button on wizard page to show logged in user
+                wiz_l_btn = wiz.query_one("#wiz_login_button")
+                wiz_l_btn.label = user_str
+                wiz_l_btn.variant = "success"
+                wiz_l_btn.update(user_str)
+                wiz_l_btn.refresh()
 
-            ##Ensure wizard's next button is enabled
-            wiz.next_button.disabled = False
-        except:
-            pass
+                ##Ensure wizard's next button is enabled
+                wiz.next_button.disabled = False
+            except:
+                pass
 
-        f=open("/tmp/hhh", "w")
-        f.write("%s"%(my_app.login_widget.get_id_token_json()) )
-        f.close()
+            ##Show the user authentication successful in a pop-up
+            pop_user_profile(my_app.login_widget.get_id_token_json(), success_msg=True, pop_off=2)
 
-        ##Show the user authentication successful in a pop-up
-        pop_user_profile(my_app.login_widget.get_id_token_json(), success_msg=True, pop_off=2)
+        elif event.result == "id_token_verification_failure":
+            ##Pop error window
+            err_msg = "## ID Token verification failure"            #Todo localise
+            err_msg+= "\n%s"%(my_app.login_widget.oidc_auth_obj.id_token_error)
+            get_app().push_screen(AckModal(err_msg, pops=2))
+            #Reset login widget
+            my_app.login_widget.oauth_status_checker.stop()
+        elif event.result ==  "authentication_failure":
+            ##Pop error window
+            err_msg = "## Login failure"                           #Todo localise
+            token_json = my_app.login_widget.get_token_json()
+            err_msg+= "\n%s"%(token_json["error"])
+            get_app().push_screen(AckModal(err_msg, pops=2))
+            #Reset login widget
+            my_app.login_widget.reset_login_widget()
+        else:
+            ##Pop error window
+            err_msg = "Unknown login error"                      #Todo localise
+            get_app().push_screen(AckModal(err_msg, pops=2))
            
     def compose(self):
         yield Header(show_clock=True)
@@ -309,7 +327,6 @@ class NewApp(App):
         Binding(key = "c", action = "changelog()", description = "View Changelogs" ), #CHANGELOG_LABEL
         #Binding(key="n", action="newconfig()", show = False),
     ]
-    use_c0_api     = True
     authenticated  = False
     curr_user_json = {}
     id_token_json  = {}
@@ -362,26 +379,27 @@ class NewApp(App):
         """
         Pop up a screen to show the changelogs for both chalk and config-tool
         """
-        changelog_data_chalk       = "changelog empty" #Todo localize these
-        changelog_data_config_tool = "changelog empty"
+        changelog_data_chalk       = "chalk changelog empty" #Todo localize these
+        changelog_data_config_tool = "config-tool changelog empty"
 
         try:
-            with open(os.path.join(MODULE_LOCATION,"CHANGELOG.md"), "r") as fo:
+            with open(os.path.abspath(os.path.join(os.path.dirname(__file__), 'CHANGELOG.md')), "r") as fo:
                 changelog_data_config_tool = fo.read()
         except:
             pass
-        
+
+        ##Pyinstaller location
         try:
-            ##When running wrapped in pyinstaller/ pyinstaller & docker
-            with open("/CHALK-CHANGELOG.md","r") as fo:
-                    changelog_data_chalk = fo.read()
+            with open(os.path.abspath(os.path.join(os.path.dirname(__file__), 'CHALK-CHANGELOG', 'CHANGELOG.md')), "r") as fo:
+                changelog_data_chalk = fo.read()
+        ##Pyinstaller in docker locations
         except:
-            ##When running natively
             try:
-                with open(os.path.join("%s"%(os.path.sep).join(MODULE_LOCATION.split(os.path.sep)),"..","..","CHANGELOG.md"), "r") as fo:
+                with open('/CHALK-CHANGELOG.md', "r") as fo:
                     changelog_data_chalk = fo.read()
             except:
                 raise
+
         self.push_screen(ChangelogModal([changelog_data_chalk, changelog_data_config_tool]))
         
 

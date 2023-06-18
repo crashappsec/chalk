@@ -53,7 +53,7 @@ class ChangelogModal(ModalScreen):
         Binding(key="escape,left,space,enter", action="button_pressed", description = BACK_LABEL),
         Binding(key="c", action="button_pressed", description = MAIN_MENU, show=False),
         Binding(key="l", action="button_pressed", description = MAIN_MENU, show=False),
-        #Binding(key="ctrl+q", action="button_pressed", description = MAIN_MENU, show=False),
+        Binding(key="ctrl+q", action="button_pressed", description = MAIN_MENU, show=False),
     ]
     CSS = """
     Tabs {

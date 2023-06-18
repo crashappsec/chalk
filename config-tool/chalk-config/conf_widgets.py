@@ -242,6 +242,7 @@ class ConfigTable(Container):
             classes="padme",
         )
 
+
 class ChangelogButton(Button):
     async def on_button_pressed(self):
         """
@@ -301,11 +302,43 @@ class EnablingCheckbox(Checkbox):
         get_wizard().query_one(self.refd_id).toggle()
 
 
+class HttpsUrlCheckbox(Checkbox):
+    def __init__(self, title, id):
+        self.original_state = True
+        Checkbox.__init__(self, title, self.original_state, id=id)
+        self.refd_id = "#http_conf"
+
+    def reset(self):
+        if self.value != self.original_state:
+            self.value = self.original_state
+
+    def on_checkbox_changed(self, event: Checkbox.Changed):
+        ##Enable/disable to HTTPS URL config pane in the wizard
+        get_wizard().query_one(self.refd_id).toggle()
+
+        ##Todo abstract the enable/disable next button logic to avoid ever growing custom logic, but until then ....
+        ## Enable / disable the next button based on what has been selected / if HTTPS_URL disabled
+        if self.value:
+            ##Enable API toggle
+            get_wizard().query_one("#c0api_toggle").disabled = False
+            ##If switch set on, enable login button
+            if get_wizard().query_one("#c0api_toggle").value:
+                get_wizard().query_one("#wiz_login_button").disabled = False
+                ##If we aren't authenticated disable next button
+                if not get_app().login_widget.is_authenticated() and get_wizard().current_panel == get_wizard().api_authn_panel:
+                    get_wizard().next_button.disabled = True
+            else:
+                get_wizard().next_button.disabled = False
+        else:
+            get_wizard().query_one("#wiz_login_button").disabled = True
+            get_wizard().query_one("#c0api_toggle").disabled = True
+            get_wizard().next_button.disabled = False
+
+
 class EnvToggle(Switch):
     def on_click(self):
         envpane = get_wizard().query_one("#envconf")
         envpane.disabled = not envpane.disabled
-
 
 class AlphaModal(AckModal):
     def on_mount(self):
@@ -351,18 +384,13 @@ class QrCode(Static):
         return self.qr_string
 
 class C0ApiToggle(Switch):
-
     def on_switch_changed(self):
-        
-        #ToDo WRITE THE CONFIG OPTIONS to file
-        
-        ##Set the app level state of whether to use the API or not
-        get_app().use_c0_api = self.value
-
         ##Based on switch position......
         if self.value:
             ##Enable the inline login button
             get_wizard().query_one("#wiz_login_button").disabled = False
+            ##Set URL value in HTTPS pane
+            get_wizard().query_one("#https_url").value = "chalk.crashoverride.run/report"
         
             ##Disable the Next button if we are not yet authenticated and wanting to use the API 
             if not get_app().authenticated and get_wizard().current_panel == get_wizard().panels[1]:
@@ -370,7 +398,8 @@ class C0ApiToggle(Switch):
         else:
             get_wizard().query_one("#wiz_login_button").disabled = True
             get_wizard().next_button.disabled = False
-
+            get_wizard().query_one("#https_url").value = text_defaults["https_url"]
+            
 def write_from_local(dict, config, d):
     binname  = d["exe_name"]
     

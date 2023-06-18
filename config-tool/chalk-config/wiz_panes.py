@@ -103,16 +103,17 @@ class ApiAuth(WizContainer):
     class OAuthSuccess(Message):
         """
         """
-        def __init__(self,  oidc_json: str, curr_user_json: str) -> None:
+        def __init__(self,  oidc_json: str, curr_user_json: str, result: str) -> None:
             super().__init__()
             self.oidc_json      = oidc_json
             self.curr_user_json = curr_user_json
+            self.result         = result
             
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
         ##Setup Auth0 Env now we have been told to poll
-        self.oidc_auth_obj     = c0_api.CLIAuth(c0_api.AUTH0_DOMAIN, c0_api.AUTH0_CLIENT_ID, c0_api.AUTH0_SECRET)
+        self.oidc_auth_obj     = c0_api.CLIAuth(c0_api.AUTH0_DOMAIN, c0_api.AUTH0_CLIENT_ID)
         self.oidc_widget_1     = OidcLinks()
         self.oidc_widget_1.styles.padding = (0,4)
         self.oidc_widget_1.styles.margin = (0,2)
@@ -126,11 +127,14 @@ class ApiAuth(WizContainer):
         self.token_url         = "https://%s/oauth/token"%(c0_api.AUTH0_DOMAIN)
         self.tokens_path       = ".chalk_tokens.json" #ToDo save tokens to disk
         self.oidc_polling      = False
-
         self.authenticated     = self.is_authenticated()
+        self.authn_failed      = False
 
     def is_authenticated(self):
         return self.oidc_auth_obj.authenticated
+    
+    def has_failed(self):
+        return self.oidc_auth_obj.authn_failed
     
     def get_id_token_json(self):
         return self.oidc_auth_obj.id_token_json
@@ -148,51 +152,67 @@ class ApiAuth(WizContainer):
         A message is then posted to the parent widget to recieve that will trigger it
         to auto-advance to the next page in the wizard
         """
-        ##Todo remove this and stop the interval function from being called after authN'd
-        if self.oidc_auth_obj.authenticated:
+        if self.is_authenticated() or self.has_failed():
             return
-
+        
         ##Poll token endpoint waiting for user to enter the right code
         token_data = {'grant_type'  : 'urn:ietf:params:oauth:grant-type:device_code',
                       'device_code' : self.oidc_auth_obj.device_code_json['device_code'],
                       'client_id'   : self.oidc_auth_obj.auth0_client_id}
 
         resp = requests.post(self.token_url, data=token_data)
-
         self.oidc_auth_obj.token_json = resp.json()
 
         if resp.status_code == 200:
- 
-            #ToDo
-            #Validate id token
-            #self.oidc_auth_obj.oidc_token_validate(self.oidc_auth_obj.token_json["id_token"])
-        
-            #Decode the id_token jwt
-            id_token_json = self.oidc_auth_obj.decode_id_token(self.oidc_auth_obj.token_json["id_token"])
-            
+            #Verify & decode id token
+            verified, id_token_json = self.oidc_auth_obj.oidc_token_validate(self.oidc_auth_obj.token_json["id_token"], decode = True)
+            if not verified:
+                ##Token verification error - this is bad, login failed - post a message 
+                self.post_message(self.OAuthSuccess(self.oidc_auth_obj.token_json, None, "id_token_verification_failure"))
+                self.authn_failed = True
+                self.oauth_status_checker.stop()
+                return None
+                
+            #Save verified ID token
+            self.oidc_auth_obj.id_token_json = id_token_json
+
             ##Setting this value indicates auth'd, causes the watcher to trigger
             self.oidc_auth_obj.authenticated = True
+            self.oauth_status_checker.stop()
 
             ##Post message to be picked up by LoginScreen
-            self.post_message(self.OAuthSuccess(self.oidc_auth_obj.token_json, id_token_json))
-
-        ##ToDo
-        ##ToDo - Proper error handling..... & popups
+            self.post_message(self.OAuthSuccess(self.oidc_auth_obj.token_json, id_token_json, "success"))
+            return None
+            
+        ## Error handling.....
         elif self.oidc_auth_obj.token_json['error'] not in ('authorization_pending', 'slow_down'):
+            self.authn_failed = True
+            self.oauth_status_checker.stop()
+            self.post_message(self.OAuthSuccess(self.oidc_auth_obj.token_json, None, "authentication_failure"))
+            return None
+
+        #ToDo Handle slow downs
+        ##We pendin' ..... sleep a bit
             
-            return -2
-        else:
-            pass
-            
+    def reset_login_widget(self):
+        """
+        Reset the login widgeet using a newly generated device code
+        """
+        self.oauth_status_checker.stop()
+        self.oidc_polling = False
+        self.authn_failed = False
+        ret = self.start_oidc_polling()
+
+
     def start_oidc_polling(self):
         """
-        """
-        ##Avoid starting multiple background polling tasks
-        if self.oidc_polling:
-            return 
-        
+        """        
         ##Call API for device code
         self.device_code_json = self.oidc_auth_obj.get_device_code()
+
+        #ToDo
+        if not self.device_code_json:
+            return -1
 
         ##Build instructions to include the correct URLs and code
         self.oidc_widget_1.update("To enable the Chalk binaries built by the Chalk Configuration Tool to send data to your Crash Override account you must authorize it\n\nClick the button to login to Crash Override\n\n")
@@ -203,8 +223,7 @@ class ApiAuth(WizContainer):
         ##Start background task that polls oauth
         self.oauth_status_checker = self.set_interval(5 , self.oauthstatuscheck)
 
-        ##Set state to avoid starting multiple background tasks
-        self.oidc_polling = True
+        return 0
 
     def compose(self):
 
@@ -503,7 +522,7 @@ class ReportingPane(WizContainer):
                         Checkbox(CO_STDOUT, value=True, id="report_stdout"),
                         Checkbox(CO_STDERR, id="report_stderr"),
                         EnablingCheckbox("log_conf", CO_LOG,  id="report_log"),
-                        EnablingCheckbox("http_conf", CO_POST ,id="report_http"),
+                        HttpsUrlCheckbox(CO_POST ,id="report_http"),
                         EnablingCheckbox("s3_conf", CO_S3,  id="report_s3"))
         yield MDown(API_DOC)
         yield Horizontal(C0ApiToggle(value=True, id="c0api_toggle"),
@@ -572,7 +591,7 @@ sectionBasics.add_step("basics", UsagePane())
 sectionOutputConf.add_step("reporting", ReportingPane())
 sectionOutputConf.add_step("envconf", CustomEnv(disabled=True))
 sectionOutputConf.add_step("log_conf", LogParams(disabled=True))
-sectionOutputConf.add_step("http_conf", HttpParams(disabled=True))
+sectionOutputConf.add_step("http_conf", HttpParams(disabled=False))
 sectionOutputConf.add_step("s3_conf", S3Params(disabled=True))
 sectionChalking.add_step("chalking_base", ChalkOpts())
 sectionReporting.add_step("reporting_base", ReportingOptsChalkTime())

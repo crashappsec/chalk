@@ -189,7 +189,7 @@ all_fields = [
     "note",
 ]
 
-not_in_json = ["conf_name", "overwrite_config"]
+not_in_json = ["conf_name", "overwrite_config","c0api_toggle"]
 
 
 radio_set_dbg = (["release_build", "debug_build"], 0)
@@ -251,7 +251,7 @@ bool_defaults = {
     "report_stdout": True,
     "report_stderr": False,
     "report_log": True,
-    "report_http": False,
+    "report_http": True,
     "report_s3": False,
     "env_adds_report": False,
     "env_custom": False,
@@ -271,7 +271,7 @@ text_defaults = {
     "env_s3_uri": "CHALK_S3_URI",
     "env_s3_secret": "CHALK_S3_SECRET",
     "env_s3_aid": "CHALK_S3_ACCESS_ID",
-    "https_url": "chalk.crashoverride.run/report",
+    "https_url": "chalk.crashoverride.local/report",
     "https_header": "",
     "s3_uri": "",
     "s3_access_id": "",

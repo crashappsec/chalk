@@ -26,6 +26,7 @@ WORKDIR /config-tool
 COPY config-tool/pyproject.toml config-tool/poetry.lock $WORKDIR/
 RUN poetry install --no-plugins --no-root
 
+##Add Chalk changelog file in a way that is retrievable in docker as it mangles __file__ / MEI
 COPY CHANGELOG.md $WORKDIR/CHALK-CHANGELOG.md
 
 RUN apk add --update --no-cache alpine-sdk \
@@ -40,7 +41,7 @@ RUN apk add --update --no-cache alpine-sdk \
 FROM config-tool-compile as build
 
 COPY config-tool /tmp/
-RUN pyinstaller --onefile /tmp/chalk-config/chalkconf.py --collect-all textual --collect-all rich
+RUN pyinstaller --onefile /tmp/chalk-config/chalkconf.py --collect-all textual --collect-all rich --add-data="../CHANGELOG.md:/CHALK-CHANGELOG/" --add-data="chalk-config/CHANGELOG.md:."
 # -------------------------------------------------------------------
 
 # published as ghcr.io/crashappsec/chalkconf:latest
