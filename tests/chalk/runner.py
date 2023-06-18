@@ -64,7 +64,7 @@ class Chalk:
         target: Optional[Path] = None,
         params: Optional[List[str]] = None,
         expected_success: Optional[bool] = True,
-    ) -> CompletedProcess:
+    ) -> Optional[CompletedProcess]:
         logger.info("Running chalk", binary=self.binary)
         assert self.binary.is_file()
 
@@ -81,6 +81,7 @@ class Chalk:
         # FIXME
         my_env["DOCKER_BUILDKIT"] = "0"
         logger.debug("running chalk command: %s", cmd)
+        run_process = None
         try:
             run_process = run(cmd, capture_output=True, check=True, env=my_env)
             if run_process.returncode != 0 or has_errors(run_process.stderr):
@@ -107,6 +108,7 @@ class Chalk:
                     contents=check_output(["ls"]).decode().strip(),
                 )
                 raise
+            return run_process
         except FileNotFoundError as e:
             if self.binary.is_file() and (target is None or target.exists()):
                 logger.error(
@@ -126,13 +128,14 @@ class Chalk:
             raise
 
     # returns chalk report
-    def insert(self, artifact: Path, virtual: bool = False) -> Dict[str, Any]:
+    def insert(self, artifact: Path, virtual: bool = False) -> List[Dict[str, Any]]:
         # suppress output since all we want is the chalk report
         params = ["--log-level=none"]
         if virtual:
             params.append("--virtual")
 
         inserted = self.run(chalk_cmd="insert", target=artifact, params=params)
+        assert inserted is not None
         if inserted.returncode != 0:
             logger.error(
                 "chalk insertion failed with return code", ret=inserted.returncode
@@ -144,12 +147,13 @@ class Chalk:
             logger.error("Could not decode json", raw=inserted.stderr)
             raise
 
-    def extract(self, artifact: Path) -> Dict[str, Any]:
+    def extract(self, artifact: Path) -> List[Dict[str, Any]]:
         extracted = self.run(
             chalk_cmd="extract",
             target=artifact,
             params=["--log-level=none"],
         )
+        assert extracted is not None
         if extracted.returncode != 0:
             logger.error(
                 "chalk extraction failed with return code", ret=extracted.returncode

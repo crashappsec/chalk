@@ -1,0 +1,29 @@
+{
+  "target": {
+    "server": {
+      "cache-from": [
+        "type=registry,ref=ghcr.io/crashappsec/chalk_local_api_server:cache"
+      ],
+      "cache-to": [
+        "type=registry,ref=ghcr.io/crashappsec/chalk_local_api_server:cache"
+      ],
+      "output": ["type=docker"]
+    },
+    "chalk-compile": {
+      "cache-from": [
+        "type=registry,ref=ghcr.io/crashappsec/chalk_compile:cache"
+      ],
+      "cache-to": ["type=registry,ref=ghcr.io/crashappsec/chalk_compile:cache"],
+      "output": ["type=docker"]
+    },
+    "tests": {
+      "cache-from": [
+        "type=registry,ref=ghcr.io/crashappsec/chalk_local_tests:cache"
+      ],
+      "cache-to": [
+        "type=registry,ref=ghcr.io/crashappsec/chalk_local_tests:cache"
+      ],
+      "output": ["type=docker"]
+    }
+  }
+}

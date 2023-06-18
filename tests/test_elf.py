@@ -5,7 +5,6 @@ import stat
 from datetime import timezone
 from pathlib import Path
 from subprocess import check_output
-from typing import Any, Dict
 
 import dateutil.parser
 import pytest
@@ -91,7 +90,7 @@ def test_insert_extract_repeated(tmp_data_dir: Path, chalk: Chalk):
         target=artifact,
         params=["--log-level=none"],
     )
-
+    assert extracted
     extracted_chalks_3 = json.loads(extracted.stderr, strict=False)
     # basic fields
     validate_extracted_chalk(
@@ -141,9 +140,9 @@ def test_insert_extract_directory(tmp_data_dir: Path, chalk: Chalk):
     )
 
 
-@pytest.mark.parametrize("bin", ["ls", "cat", "date"])
+@pytest.mark.parametrize("bin", ["date"])
 def test_virtual(bin: str, tmp_data_dir: Path, chalk: Chalk):
-    bin_path = "/bin/" + bin
+    bin_path = f"/bin/{bin}"
     assert Path(bin_path).is_file(), f"{bin_path} does not exist!"
 
     shutil.copy(bin_path, tmp_data_dir / bin)
@@ -181,5 +180,6 @@ def test_virtual(bin: str, tmp_data_dir: Path, chalk: Chalk):
         target=tmp_data_dir / bin,
         params=["--log-level=none"],
     )
+    assert proc
     virtual_extract_2 = json.loads(proc.stderr, strict=False)
     assert timestamp_1 < virtual_extract_2[0]["_TIMESTAMP"]

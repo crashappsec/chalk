@@ -20,7 +20,7 @@ class ArtifactInfo:
 
 # `virtual-chalk.json` file found after chalking with `--virtual` enabled
 def validate_virtual_chalk(
-    tmp_data_dir: Path, artifact_map: Dict[str, ArtifactInfo], virtual: bool
+    tmp_data_dir: Path, artifact_map: Dict[Path, ArtifactInfo], virtual: bool
 ):
     try:
         vjsonf = tmp_data_dir / "virtual-chalk.json"
@@ -74,9 +74,11 @@ def validate_chalk_report(
             artifact = artifact_map[path]
 
             # artifact specific fields
-            assert artifact.type == chalk["ARTIFACT_TYPE"]
-            assert artifact.hash == chalk["HASH"]
-            assert virtual == chalk["_VIRTUAL"]
+            assert (
+                artifact.type == chalk["ARTIFACT_TYPE"]
+            ), "artifact type doesn't match"
+            assert artifact.hash == chalk["HASH"], "artifact hash doesn't match"
+            assert virtual == chalk["_VIRTUAL"], "_VIRTUAL mismatch"
     except AssertionError as e:
         logger.error("chalk report validation failed", error=e)
         raise

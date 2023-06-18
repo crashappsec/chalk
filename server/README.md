@@ -37,6 +37,9 @@ localhost:8585 in your browser and you should be seeing the chalk docs.
 
   - `/etc/hosts` on OS X should have an entry like:
     `127.0.0.1 chalk.crashoverride.local`
+  - Verify that ping works by `ping chalk.crashoverride.local`. If not, you probably need to refresh your cache:
+
+    - On OS X: `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder`
 
 - from the root of the repo run `docker compose run --rm tests test_sink.py::test_post_http_fastapi`.
   The test should pass.

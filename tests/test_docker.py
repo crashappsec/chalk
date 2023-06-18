@@ -1,10 +1,7 @@
-import json
 import os
 import shutil
 import uuid
-from contextlib import chdir
 from pathlib import Path
-from typing import List
 
 import pytest
 
@@ -43,7 +40,7 @@ def _build_and_chalk_dockerfile(chalk: Chalk, tmp_data_dir: Path, valid: bool):
         )
 
         if valid:
-            assert (
+            assert chalk_run and (
                 docker_run.returncode == chalk_run.returncode
             ), "docker build and chalk docker build results should be the same"
         else:

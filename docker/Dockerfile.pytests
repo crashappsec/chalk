@@ -11,13 +11,7 @@ RUN apk add --no-cache \
         libffi-dev && \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile=minimal && \
     source $HOME/.cargo/env && \
-    pip install --no-cache-dir poetry==${POETRY_VERSION} && \
-    apk del \
-        curl \
-        gcc \
-        libressl-dev \
-        musl-dev \
-        libffi-dev
+    pip install --no-cache-dir poetry==${POETRY_VERSION}
 
 ENV VIRTUAL_ENV=/tests.env
 ENV PATH=/tests.env/bin:$PATH
@@ -31,5 +25,11 @@ RUN poetry install --no-plugins
 
 # install chalk deps
 RUN apk add --no-cache pcre gcompat docker docker-compose
+
+RUN apk del \
+        curl \
+        gcc \
+        musl-dev \
+        libffi-dev
 
 ENTRYPOINT ["/tests.env/bin/pytest"]

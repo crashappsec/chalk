@@ -21,6 +21,61 @@ def remove_img(img: str) -> None:
         logger.warning("[WARN] docker image removal failed: %s", str(e))
 
 
+def stop_container(id: str) -> None:
+    try:
+        run(
+            ["docker", "stop", id],
+            check=True,
+            stdout=DEVNULL,
+            stderr=DEVNULL,
+        )
+    except CalledProcessError as e:
+        logger.error("docker image removal failed: %s", str(e))
+
+
+def compose_run_local_server(*, https: bool = False) -> str:
+    """Spins up the server and returns the container id"""
+    root_dir = Path(__file__).parent.parent.parent
+    try:
+        cmd = [
+            "docker",
+            "run",
+            "--rm",
+            "-d",
+            "--publish",
+            "8585:8585",
+            "-v",
+            f"{root_dir}:{root_dir}",
+            "--network",
+            "chalk-internal-network",
+            "--network-alias",
+            "chalk.crashoverride.local",
+            "--workdir",
+            f"{root_dir}/server/app",
+            "chalk_local_api_server",
+        ]
+        if https:
+            cmd.extend(
+                [
+                    "sh",
+                    "-c",
+                    "python main.py --keyfile keys/self-signed.key --certfile keys/self-signed.cert",
+                ]
+            )
+        out = run(
+            cmd,
+            capture_output=True,
+            cwd=root_dir,
+        )
+        return out.stdout.decode().strip()
+    except CalledProcessError as e:
+        logger.warning(
+            "docker execution of server failed. Is the container built? %s", str(e)
+        )
+        logger.error(e)
+        raise
+
+
 # run docker build with parameters
 def docker_build(
     dir: Path, params: Optional[List[str]] = None, expected_success: bool = True
@@ -31,13 +86,13 @@ def docker_build(
             cmd.extend(params)
 
         _build = run(cmd, capture_output=True)
-        if _build.returncode != 0 and expected_success == True:
+        if _build.returncode != 0 and expected_success:
             # if docker build fails, it might be because docker is down
             # or throttling us, so print error in case we want to check
             logger.error(
                 "Docker build failed unexpectedly", error=_build.stderr.decode()
             )
-        if _build.returncode == 0 and expected_success == False:
+        if _build.returncode == 0 and not expected_success:
             # if docker build fails, it might be because docker is down
             # or throttling us, so print error in case we want to check
             logger.error(
@@ -50,7 +105,7 @@ def docker_build(
 # look up docker image hash from docker tag
 # returns a list of all hashes from the docker inspect
 def docker_inspect_image_hashes(tag: str) -> List[str]:
-    images = []
+    images: List[str] = []
     try:
         docker_inspect = run(
             ["docker", "inspect", tag],

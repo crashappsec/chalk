@@ -27,7 +27,7 @@ files_to_skip = [
     "./chalk",
     "./lto.o",
     "./Makefile",
-    "./docker-compose.yml",
+    "./docker-compose.yml" "./docker-compose-cache.json",
     "./.pre-commit-config.yaml",
     "./src/configs/entrypoint.c4m",
 ]

@@ -181,6 +181,19 @@ if __name__ == "__main__":
         default=Path(__file__).parent / "keys",
     )
 
+    parser.add_argument(
+        "--certs-only",
+        action="store_true",
+        default=False,
+        help="only generate self-signed certs and exit",
+    )
+
+    parser.add_argument(
+        "--cert-name",
+        default="self-signed",
+        help="Prefix to use in cert and key to be generated (xxx.cert & xxx.key)",
+    )
+
     args = parser.parse_args()
 
     if args.version:
@@ -190,8 +203,8 @@ if __name__ == "__main__":
     if args.domain or args.ips:
         assert args.domain, "we need a domain, even if dummy alias"
         os.makedirs(args.cert_output, exist_ok=True)
-        key_file = args.cert_output / "self-signed.key"
-        cert_file = args.cert_output / "self-signed.cert"
+        key_file = args.cert_output / f"{args.cert_name}.key"
+        cert_file = args.cert_output / f"{args.cert_name}.cert"
         if key_file.is_file() or cert_file.is_file():
             raise RuntimeError(
                 (
@@ -204,6 +217,10 @@ if __name__ == "__main__":
             outf.write(key_pem)
         with open(cert_file, "wb") as outf:
             outf.write(cert_pem)
+
+        # FIXME will remove oncew we move into click
+        if args.certs_only:
+            sys.exit(0)
 
         if args.keyfile or args.certfile:
             logger.warning(

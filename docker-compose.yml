@@ -1,6 +1,6 @@
 networks:
   chalk:
-
+    name: chalk-internal-network
 
 services:
   chalk:
@@ -49,25 +49,6 @@ services:
       - $PWD/.config-tool-bin:/config-bin
       - $PWD/config-tool-outdir:/outdir/
 
-  server:
-    build:
-      context: .
-      dockerfile: Dockerfile.server
-    networks:
-      chalk:
-        aliases:
-          - chalk.crashoverride.local
-    ports:
-      - 8585:8585
-      - 8584:8584
-    volumes:
-      - $PWD:$PWD
-    working_dir: $PWD/server/app
-    environment:
-      CHALK_API_PARAMS: "--workers=4 --error-logfile=- --access-logfile=- --timeout 30"
-      CHALK_API_CERT: ""
-      CHALK_API_PORT: "8585"
-
   sqlitebrowser:
     image: lscr.io/linuxserver/sqlitebrowser:latest
     container_name: sqlitebrowser
@@ -84,7 +65,30 @@ services:
       - 3001:3001
     restart: unless-stopped
 
+  server:
+    image: chalk_local_api_server
+    container_name: chalk_local_api_server
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    networks:
+      chalk:
+        aliases:
+          - chalk.crashoverride.local
+    ports:
+      - 8585:8585
+      - 8584:8584
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD/server/app
+    environment:
+      CHALK_CERT_PARAMS: ${CHALK_CERT_PARAMS:-}
+      CHALK_API_PARAMS: ${CHALK_API_PARAMS:-"--workers=4 --error-logfile=- --access-logfile=- --timeout 30"}
+      CHALK_API_PORT: ${CHALK_API_PORT:-8585}
+
   tests:
+    image: chalk_local_tests
+    container_name: chalk_local_tests
     build:
       context: .
       dockerfile: docker/Dockerfile.pytests
@@ -101,3 +105,8 @@ services:
       AWS_PROFILE: ${AWS_PROFILE:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      TEST_CERT_FILE: ${TEST_CERT_FILE:-}
+      CHALK_CERT_PARAMS: ${CHALK_CERT_PARAMS:-}
+      CHALK_API_PARAMS: ${CHALK_API_PARAMS:-}
+      CHALK_API_PORT: ${CHALK_API_PORT:-}
+      GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}

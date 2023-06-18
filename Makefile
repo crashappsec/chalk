@@ -5,7 +5,7 @@ testdeps:
 
 .PHONY: test
 test:
-	docker compose run --rm tests
+	docker compose run --rm --service-ports --use-aliases tests
 
 .PHONY: configdeps
 configdeps:

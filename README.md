@@ -1,8 +1,13 @@
+# Status
+
+[![Actions Status](https://github.com/crashappsec/chalk-internal/workflows/lint/badge.svg)](https://github.com/crash-research/playground/actions)
+[![Actions Status](https://github.com/crashappsec/chalk-internal/workflows/tests/badge.svg)](https://github.com/crash-research/playground/actions)
+
 # Chalk: Your Software is art. Make sure it gets seen.
 
 Chalk is designed to make it incredibly easy to correlate knowledge about code in your dev environment to what's actually running in production.
 
-Chalk can capture metadata at build time, and can, at that point, add a small 'chalk mark' to any artifacts, so they can be identified in production.  Chalk can also extract chalk marks and collect metadata about the operating environment when it does so.
+Chalk can capture metadata at build time, and can, at that point, add a small 'chalk mark' to any artifacts, so they can be identified in production. Chalk can also extract chalk marks and collect metadata about the operating environment when it does so.
 
 It's also very easy to collect custom metadata, and control where metadata goes.
 
@@ -13,7 +18,8 @@ Developers can better understand what builds are actually in production, etc.
 Chalk comes with both a tool and a specification.
 
 ## Background
-Last year, we went out and interviewed many dozens of people about their problems around application security. One thing we noticed is that MANY people suffer because they cannot easily look at software in production and tie it back to the repo it came from.  That is, there's a software provenance problem.
+
+Last year, we went out and interviewed many dozens of people about their problems around application security. One thing we noticed is that MANY people suffer because they cannot easily look at software in production and tie it back to the repo it came from. That is, there's a software provenance problem.
 
 For instance, I watched multiple people work from their cloud security posture management tool, and they all still had plenty of Log4J alerts, more than a year after that bomb dropped. I always heard the same story:
 
@@ -22,6 +28,7 @@ For instance, I watched multiple people work from their cloud security posture m
 3. The deveolpers don't want to spend cycles on something that is probably not an issue at this point anyway.
 
 I also saw the problem from the other direction:
+
 1. "Our code analysis tools are reporting a ton of alerts across our repos".
 2. "For many of the repos, we have no idea where and whether they're deployed, or whether vulnerable versions are deployed".
 3. "We couldn't possibly tackle all this, but we also don't know how to prioritize".
