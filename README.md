@@ -1,7 +1,7 @@
 # Status
 
 [![Actions Status](https://github.com/crashappsec/chalk-internal/workflows/lint/badge.svg)](https://github.com/crash-research/playground/actions)
-[![Actions Status](https://github.com/crashappsec/chalk-internal/workflows/tests/badge.svg)](https://github.com/crash-research/playground/actions)
+[![Actions Status](https://github.com/crashappsec/chalk-internal/workflows/test/badge.svg)](https://github.com/crash-research/playground/actions)
 
 # Chalk: Your Software is art. Make sure it gets seen.
 
