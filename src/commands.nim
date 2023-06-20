@@ -613,6 +613,50 @@ proc runCmdConfLoad*() =
     dumpExOnDebug()
   doReporting()
 
+
+when hostOs == "macosx":
+  proc proc_pidpath(pid: Pid, pathbuf: pointer, len: uint32): cint
+    {.cdecl, header: "<libproc.h>", importc.}
+
+const PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
+
+proc doExecCollection(pid: Pid): Option[ChalkObj] =
+  var n: array[PATH_MAX, char]
+
+  when hostOs == "macosx":
+    if proc_pidpath(pid, addr n[0], PATH_MAX) <= 0:
+      return none(ChalkObj)
+    return none(ChalkObj) # Need a Mach virtual-only codec.
+  elif hostOs == "linux":
+    let procPath = "/proc/" & $(pid) & "/exe"
+    if readlink(cstring(procPath),
+                cast[cstring](addr n[0]), PATH_MAX) == -1:
+      return none(ChalkObj)
+  else:
+    # Unsupported platform
+    return none(ChalkObj)
+
+  var
+    chalk: ChalkObj
+    exe1path = $(cast[cstring](addr n[0]))
+
+  # This will only yield one result, since item is a file not a dir.
+  # But, when the system looks for a second object, the post-chalk
+  # collection code will get run for the object.
+  for item in artifacts(@[exe1path]):
+    chalk = item
+
+  if chalk != nil:
+    result = some(chalk)
+
+  let selfOpt = getSelfExtraction()
+
+  if selfOpt.isSome():
+    let self = selfOpt.get()
+    if self.fullPath == exe1path:
+      selfOpt.get().addToAllChalks()
+      return selfOpt
+
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):
     error("'exec' command not supported on this platform.")
@@ -627,6 +671,8 @@ proc runCmdExec*(args: seq[string]) =
     overrideOk = execConfig.getOverrideOk()
     usePath    = execConfig.getUsePath()
     allOpts    = findAllExePaths(cmdName, cmdPath, usePath)
+    ppid       = getpid()   # Get the current pid before we fork.
+
 
   if cmdName == "":
     error("This chalk instance has no configured process to exec.")
@@ -650,13 +696,34 @@ proc runCmdExec*(args: seq[string]) =
   elif len(args) != 0:
     argsToPass = args
 
-  let pid = fork()
-  if pid != 0:
-    handleExec(allOpts, argsToPass)
-  else:
-    discard setpgid(0, 0); # Detach from the process group.
-    runCmdEnv()
+  let pid  = fork()
 
+  if execConfig.getChalkAsParent():
+    if pid == 0:
+      handleExec(allOpts, argsToPass)
+    else:
+      initCollection()
+      let chalkOpt = doExecCollection(pid)
+      # On some platforms we don't support
+      if chalkOpt.isSome():
+        chalkOpt.get().collectPostChalkInfo()
+
+      doReporting()
+      trace("Waiting for spawned process to exit.")
+      var stat_loc: cint
+      quit(waitpid(pid, stat_loc, 0))
+  else:
+    if pid != 0:
+      handleExec(allOpts, argsToPass)
+    else:
+      initCollection()
+      let chalkOpt = doExecCollection(ppid)
+      discard setpgid(0, 0) # Detach from the process group.
+      # On some platforms we don't support
+      if chalkOpt.isSome():
+        chalkOpt.get().collectPostChalkInfo()
+
+      doReporting()
 
 proc paramFmt(t: StringTable): string =
   var parts: seq[string] = @[]
@@ -1179,7 +1246,6 @@ proc docFilter(s: JsonNode, targetKeys: openarray[string]): Option[JsonNode] =
       return none(JSonNode)
     else:
       return some(outObj)
-
 
 proc getHelpJson(): string =
   let

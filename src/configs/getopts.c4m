@@ -263,7 +263,7 @@ If passed, will be reported as if it is an _ARTIFACT_PATH field.  This field is 
 
   command exec {
     args:     (0, high())
-    ignore_bad_flags: true  # If it's not one of our flags, pass them on to the subprogram as args.
+    ignore_bad_flags: true
     doc: """
 Directly execs a specified process, and in parallel forks off to reports environmental information, without scanning for chalk.  If a chalk ID or metadata ID is passed at the command line, then a chalk can be reported with just that metadata.
 
@@ -277,44 +277,10 @@ When using the 'exec' command, this allows you to explicitly set the command to 
 """
     }
 
-    flag_arg chalk_id {
-      aliases: ["cid"]
-      field_to_set: "env_cache.chalk_id"
-      doc: """
-If passed, will be reported as if it is an extracted CHALK_ID field.  This field is currently not checked, just passed on to the reporting system directly.
-"""
-    }
-
-    flag_arg metadata_id {
-      aliases: ["mid"]
-      field_to_set: "env_cache.metadata_id"
-      doc: """
-If passed, will be reported as if it is an extracted METADATA_ID field.  This field is currently not checked, just passed on to the reporting system directly.
-"""
-    }
-
-    flag_arg artifact_hash {
-      aliases: ["hash"]
-      field_to_set: "env_cache.artifact_hash"
-      doc: """
-If passed, will be reported as if it is an extracted ARTIFACT_HASH field.  This field is currently not checked, just passed on to the reporting system directly.
-"""
-    }
-
-    flag_arg metadata_hash {
-      aliases: ["meta_hash", "mhash"]
-      field_to_set: "env_cache.metadata_hash"
-      doc: """
-If passed, will be reported as if it is an extracted METADATA_HASH field.  This field is currently not checked, just passed on to the reporting system directly.
-"""
-    }
-
-    flag_arg artifact_path {
-      aliases: ["loc"]
-      field_to_set: "env_cache.artifact_path"
-      doc: """
-If passed, will be reported as if it is an _ARTIFACT_PATH field.  This field is currently not checked, just passed on to the reporting system directly.
-"""
+    flag_yn chalk_as_parent {
+      yes_aliases: ["pg13", "pg-13"]
+      no_aliases:  ["no-pg13", "no-pg-13"]
+      field_to_set: "exec.chalk_as_parent"
     }
   }
   command defaults {

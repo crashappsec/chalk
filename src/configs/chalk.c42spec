@@ -1028,13 +1028,26 @@ You must set a value for this variable or pass the --exec-command-name flag to b
   }
 
   field search_path {
-  type:     list[string]
-  default:  []
-  shortdoc: "Exec: extra search directories"
-  doc: """
+    type:     list[string]
+    default:  []
+    shortdoc: "Exec: extra search directories"
+    doc: """
 While the 'exec' command does, by default, search the PATH environment variable looking for what you want to run, this array gets searched first, so if you know where the executable should be, or if you're worried that PATH won't be set, you can put it here.
 
 Also, you can turn off use of PATH via exec.use_path, in which case this becomes the sole search path.
+"""
+  }
+
+  field chalk_as_parent {
+    type:    bool
+    default: false
+    shortdoc: "Chalk as parent process"
+    doc: """
+When running the 'exec' command, this flag sets up Chalk to be the parent process.  The Chalk default is to be the child process.  However, when execing a short-lived process running inside a container, there is no way for Chalk to keep itself alive as the child once the parent dies, unless the parent had previously intervened.
+
+As a result, when this is set to true, during an 'exec' operation, Chalk forks and takes the parent role, and the child process execs.  Chalk does its work, then calls waitpid() on the process, and returns whatever exit value the exec'd process returned.
+
+This can be set at the command-line with --chalk-as-parent (aka --pg-13)
 """
   }
 
