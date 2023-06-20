@@ -24,7 +24,7 @@ RUN mkdir -p /.cache/pypoetry \
 WORKDIR /config-tool
 
 COPY config-tool/pyproject.toml config-tool/poetry.lock $WORKDIR/
-RUN poetry install --no-plugins --no-root
+RUN poetry install --with dev --no-plugins --no-root
 
 ##Add Chalk changelog file in a way that is retrievable in docker as it mangles __file__ / MEI
 COPY CHANGELOG.md $WORKDIR/CHALK-CHANGELOG.md

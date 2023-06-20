@@ -30,12 +30,11 @@ services:
     volumes:
       - $PWD/config-tool:/config-tool
       - $PWD/.config-tool-bin:/config-bin
+      - $PWD/config-tool-outdir:/outdir/
     environment:
       TERM: "xterm-256color"
       COLORTERM: "truecolor"
       CHALK_BINARIES_ARE_LOCAL: 1
-    depends_on:
-      - chalk-compile
 
   chalk-config:
     build:
