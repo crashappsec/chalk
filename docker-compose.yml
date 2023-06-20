@@ -32,18 +32,18 @@ services:
       - $PWD/.config-tool-bin:/config-bin
       - $PWD/config-tool-outdir:/outdir/
     environment:
-      TERM: "xterm-256color"
-      COLORTERM: "truecolor"
-      CHALK_BINARIES_ARE_LOCAL: 1
+      - TERM
+      - COLORTERM
+      - CHALK_BINARIES_ARE_LOCAL=1
 
   chalk-config:
     build:
       context: .
       dockerfile: docker/Dockerfile.chalk-config
     environment:
-      TERM: "xterm-256color"
-      COLORTERM: "truecolor"
-      CHALK_BINARIES_ARE_LOCAL: 1
+      - TERM
+      - COLORTERM
+      - CHALK_BINARIES_ARE_LOCAL=1
     volumes:
       - $PWD/.config-tool-bin:/config-bin
       - $PWD/config-tool-outdir:/outdir/
