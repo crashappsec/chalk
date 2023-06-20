@@ -6,7 +6,7 @@ name = "pypi"
 [packages]
 textualize = "*"
 textual = "*"
-jwt = "*"
+pyjwt = "*"
 requests = "*"
 auth0-python = "*"
 pyqrcode = "*"

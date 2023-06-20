@@ -83,6 +83,55 @@ def finish_up():
                                     key=internal_id)
         conf_widgets.row_ids.append(internal_id)
 
+def locate_read_changelogs():
+    """
+    Depending on which environment the config tool is running in the changelogs end up in different locations
+    Native Python+Poetry vs PyInstaller vs PyInstaller in a Container
+    """
+    config_filepath      = Path(__file__).parent / "CHANGELOG.md"
+    native_filepath      = Path(__file__).parent.parent.parent / "CHANGELOG.md"
+    pyinstaller_filepath = Path(__file__).parent.parent.parent / "CHALK-CHANGELOG" / "CHANGELOG.md"
+    docker_filepath      = Path("/CHALK-CHANGELOG.md")
+
+    chalk_changelog_data  = "Chalk CHANGELOG.md could not be found."
+    config_changelog_data = "Config-Tool CHANGELOG.md could not be found."
+
+    ##Read config-tool changelog
+    try:
+        config_changelog_data = config_filepath.read_text()
+    except:
+         pass
+    ##Find and read the Chalk changelog, only one of these should ever exist ....
+    for cl in [docker_filepath, pyinstaller_filepath, native_filepath]:
+        try:
+            chalk_changelog_data = cl.read_text()
+            break
+        except:
+            pass
+    return (chalk_changelog_data, config_changelog_data)
+
+def pop_user_profile( id_token_json, success_msg = False, pop_off=1):
+    """
+    Pop up a modal showing the logged in user profile
+    """
+    ## Progress to next step now authentication has completed
+    if success_msg:
+        user_profile_data = "%s\n"%LOGIN_SUCCESS
+    else:
+        user_profile_data = "%s\n"%PROFILE_LABEL
+
+    user_profile_data += """Crash ⍉verride has you...
+
+Follow the white rabbit. Knock, Knock, %s .... 🐇🐇🐇"""%(id_token_json["given_name"])
+                                                     
+    user_profile_data+="\n### Logged in user profile:\n\n Name: %s\n\n Email: %s (verified = %s)\n\n Auth Expires: %s UTC"%(id_token_json["name"],id_token_json["email"],id_token_json["email_verified"],str(time.asctime(time.gmtime(id_token_json["exp"]))))
+
+    #ToDo - Breaks rendering in Textual right now, will come back to
+    #pic = ProfilePicture().generate(get_app().id_token_json["picture"])
+    #get_app().push_screen(AckModal(user_profile_data, ascii_art=pic, pops=pop_off))
+
+    get_app().push_screen(AckModal(user_profile_data, pops=pop_off))
+
 class ConfWiz(Wizard):
     def __init__(self,end_callback):
         super().__init__(end_callback)
@@ -264,30 +313,7 @@ class QrCodeScreen(ModalScreen):
         my_app = get_app()
         my_app.pop_screen()
 
-def pop_user_profile( id_token_json, success_msg = False, pop_off=1):
-    """
-    Pop up a modal showing the logged in user profile
-    """
-    ## Progress to next step now authentication has completed
-    if success_msg:
-        user_profile_data = "%s\n"%LOGIN_SUCCESS
-    else:
-        user_profile_data = "%s\n"%PROFILE_LABEL
-
-    user_profile_data += """Crash ⍉verride has you...
-
-Follow the white rabbit. Knock, Knock, %s .... 🐇🐇🐇"""%(id_token_json["given_name"])
-                                                     
-    user_profile_data+="\n### Logged in user profile:\n\n Name: %s\n\n Email: %s (verified = %s)\n\n Auth Expires: %s UTC"%(id_token_json["name"],id_token_json["email"],id_token_json["email_verified"],str(time.asctime(time.gmtime(id_token_json["exp"]))))
-
-    #ToDo - Breaks rendering in Textual right now, will come back to
-    #pic = ProfilePicture().generate(get_app().id_token_json["picture"])
-    #get_app().push_screen(AckModal(user_profile_data, ascii_art=pic, pops=pop_off))
-
-    get_app().push_screen(AckModal(user_profile_data, pops=pop_off))
-
 # Convenience vars.
-
 ##Crash Override API login screen - OIDC
 login_widget              = ApiAuth()
 login_widget.styles.margin = (0,10)
@@ -360,7 +386,8 @@ class NewApp(App):
         """
         if not self.authenticated:
             #Start background task that polls Auth0 API
-            self.login_widget.start_oidc_polling()
+            ret = self.login_widget.start_oidc_polling()
+
             #Display screen in terminal
             conftable.app.push_screen("loginscreen")
         else:
@@ -379,27 +406,7 @@ class NewApp(App):
         """
         Pop up a screen to show the changelogs for both chalk and config-tool
         """
-        changelog_data_chalk       = "chalk changelog empty" #Todo localize these
-        changelog_data_config_tool = "config-tool changelog empty"
-
-        try:
-            with open(os.path.abspath(os.path.join(os.path.dirname(__file__), 'CHANGELOG.md')), "r") as fo:
-                changelog_data_config_tool = fo.read()
-        except:
-            pass
-
-        ##Pyinstaller location
-        try:
-            with open(os.path.abspath(os.path.join(os.path.dirname(__file__), 'CHALK-CHANGELOG', 'CHANGELOG.md')), "r") as fo:
-                changelog_data_chalk = fo.read()
-        ##Pyinstaller in docker locations
-        except:
-            try:
-                with open('/CHALK-CHANGELOG.md', "r") as fo:
-                    changelog_data_chalk = fo.read()
-            except:
-                raise
-
+        changelog_data_chalk, changelog_data_config_tool = locate_read_changelogs()
         self.push_screen(ChangelogModal([changelog_data_chalk, changelog_data_config_tool]))
         
 

@@ -43,8 +43,8 @@ class CLIAuth(object):
         self.authn_failed      = False
         self.token_error       = ""
 
-        self.jwks_url = "https://%s/.well-known/jwks.json"%(self.auth0_domain)
-        self.issuer   = "https://%s/"%(self.auth0_domain)
+        self.jwks_url = f"https://{self.auth0_domain}/.well-known/jwks.json"
+        self.issuer   = f"https://{self.auth0_domain}/" #ensure trailing slash
 
     def oidc_token_validate(self, token, decode=False):
         """
