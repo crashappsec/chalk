@@ -17,15 +17,16 @@ void *run_thread(void *ret) {
     uint64_t        fails = 0;
     uint64_t        local_iters = iters;
     char            token[TOKEN_LEN];
+    uint8_t         uid[JSON_UID_LEN];
     char           *test_key = TEST_KEY;
     char           *test_uid = TEST_UID;
     schedule_t      ctx;
-    
+
     aes128_init((uint8_t *)test_key, &ctx);
 
     for (i = 0; i < local_iters; i++) {
         jwt_mint(&ctx, (uint8_t *)test_uid, i & 0xff, (uint8_t *)token);
-        if (!jwt_validate(&ctx, (uint8_t *)token)) {
+        if (!jwt_validate(&ctx, (uint8_t *)token, uid)) {
             fails++;
         }
     }
@@ -77,7 +78,7 @@ main(int argc, char **argv, char **envp) {
         pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * nthreads);
         uint64_t   fails = 0;
         int        i;
-        
+
         for (i = 0; i < nthreads; i++) {
             pthread_create(&threads[i],
                            NULL,
@@ -89,18 +90,18 @@ main(int argc, char **argv, char **envp) {
             total_fails += fails;
         }
     }
-    
+
     clock_gettime(CLOCK_MONOTONIC, &ts_end);
     diff = time_diff(&ts_end, &ts_start);
 
     // Each run does a mint and an validate, so multiply by 2.
-    
+
     printf("Did %ld mints + validates in %.4f seconds (ops/sec: %.3f)\n",
            total_iters*2, diff, (total_iters*2/diff));
 
     if (total_fails != 0) {
         printf("WARNING:  You had %lu failures (expected 0)!\n", total_fails);
     }
-    
+
     return 0;
 }

@@ -24,7 +24,7 @@
 
 // None of these constants are meant to be configurable. They're just
 // there to make the code easier to understand.
-    
+
 #define TEMPLATE_LEN       178 // the b64, not the json
 // The unencoded signature 16 bytes, and we null-pad to 18 for b64
 // chunking.
@@ -33,8 +33,8 @@
 #define JSON_JTI_LEN       14
 #define B64_PAYLOAD_OFFSET 53
 #define B64_SIG_OFFSET     TEMPLATE_LEN
-#define B64_UID_VAL_OFFSET (B64_PAYLOAD_OFFSET + 16) 
-#define B64_JTI_VAL_OFFSET (B64_PAYLOAD_OFFSET + 80) 
+#define B64_UID_VAL_OFFSET (B64_PAYLOAD_OFFSET + 16)
+#define B64_JTI_VAL_OFFSET (B64_PAYLOAD_OFFSET + 80)
 #define B64_AUD_VAL_OFFSET (B64_PAYLOAD_OFFSET + 116)
 
 // When we extract 64 bits from the UID, what byte do we start
@@ -47,6 +47,6 @@
 
 void init_minting(uint8_t *, schedule_t *);
 void jwt_mint(schedule_t *, uint8_t *, uint8_t, uint8_t *);
-bool jwt_validate(schedule_t *, uint8_t *);
+bool jwt_validate(schedule_t *, uint8_t *, uint8_t[JSON_UID_LEN]);
 
 #endif

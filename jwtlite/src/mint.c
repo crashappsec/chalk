@@ -1,4 +1,4 @@
-/* 
+/*
 ** mint.c -- mint and validate Chalk JWT tokens.
 **
 ** We compress what we need to sign into one AES encryption, which
@@ -20,7 +20,7 @@
 #define unlikely(x)     __builtin_expect(!!(x), 0)
 #endif
 
-/* 
+/*
 ** Note that this code is currently Linux/x86-64 specific.  I may
 ** extend to ARM, and make work on Apple, but not yet.
 **
@@ -34,7 +34,7 @@
 ** "sub" -- The user id, which for us is in UID format.
 ** "aud" -- A byte representing 'entitlements', hex encoded lower case.
 **          This is meant for any future access control, etc.
-** "jti" -- A 56-bit random number that is a essentially a nonce for the 
+** "jti" -- A 56-bit random number that is a essentially a nonce for the
 **          token minting.
 **
 ** Note thatverything is always a fixed size for us, including the
@@ -77,7 +77,7 @@ init_minting(uint8_t *key, schedule_t *ctx) {
 /* Here, we extract 64 bits out of the non-dash characters of the UID
 ** into a single uint64_t. That constitutes half of the non-dash bits,
 ** or 16 of the actual bytes.
-** 
+**
 ** The UIDs we're extracting from are just random bits, but if there
 w** were structure here, we'd want to be more selective. As is, we just
 ** jump to offset 19, where we only have one dash to deal with (The
@@ -125,9 +125,9 @@ mint_uid_to_bits(uint8_t *p, uint8_t *outloc) {
 
 static inline bool
 byte_from_hex(uint8_t *p, uint8_t *outloc) {
-   
+
    uint8_t c, result;
-   
+
    LOAD_NIBBLE(); result  = c << 4;
    LOAD_NIBBLE(); result |= c;
 
@@ -170,7 +170,7 @@ hex_encode_jti(uint8_t *outp, uint8_t *inp) {
 static inline void
 hex_encode_sig(uint8_t *outp, uint8_t *inp) {
     int i;
-  
+
     for (i = 0; i < 16; i++) {
       *outp++ = hex_map[inp[i] >> 4];
       *outp++ = hex_map[inp[i] & 0x0f];
@@ -244,7 +244,7 @@ const int rev_map[256] = {
 static inline void
 template_store_entitlement(uint8_t *outp, uint8_t *inp) {
     uint8_t x, y, z;
-    
+
     outp += B64_AUD_VAL_OFFSET;
     B64_ENC1();
 }
@@ -252,7 +252,7 @@ template_store_entitlement(uint8_t *outp, uint8_t *inp) {
 static inline void
 template_store_jti(uint8_t *outp, uint8_t *inp) {
     uint8_t x, y, z;
-    
+
     outp += B64_JTI_VAL_OFFSET;
     B64_ENC1();
     B64_ENC1();
@@ -268,7 +268,7 @@ template_fill_jti_and_ent(uint8_t *outbuf, uint8_t *blockptr) {
 
     hex_encode_jti(hex_encoded_jti, blockptr);
     template_store_jti(outbuf, hex_encoded_jti);
-    
+
     hex_encode_entitlement(hex_encoded_ent, blockptr[0]);
     template_store_entitlement(outbuf, hex_encoded_ent);
 }
@@ -276,9 +276,9 @@ template_fill_jti_and_ent(uint8_t *outbuf, uint8_t *blockptr) {
 static inline void
 template_fill_uid(uint8_t *outp, uint8_t *inp) {
     uint8_t x, y, z;
-    
+
     outp += B64_UID_VAL_OFFSET;
-    
+
     B64_ENC1();
     B64_ENC1();
     B64_ENC1();
@@ -313,16 +313,16 @@ template_fill_signature(uint8_t *outp, uint8_t *rawsig) {
     B64_ENC1();
     B64_ENC1();
     B64_ENC1();
-    B64_ENC1();    
+    B64_ENC1();
     *outp = 0;
 }
 
 static inline void
 token_to_uid(uint8_t *inp, uint8_t *outp) {
     uint8_t a, b, c, d;
-    
+
     inp += B64_UID_VAL_OFFSET;
-    
+
     B64_DEC1();
     B64_DEC1();
     B64_DEC1();
@@ -387,7 +387,7 @@ token_extract_rand_and_ent(uint8_t *token, uint8_t *blockptr) {
     byte_from_hex(extracted_jti + 13, blockptr++);
 }
 
-/* 
+/*
 ** Note that just because I'm in the habit of trying to maintain
 ** alignment, we go ahead and request 64 bytes from getrandom(), but
 ** then write the entitlement information over the first byte of that.
@@ -406,7 +406,7 @@ const uint8_t *template = (uint8_t *)"ewogICJhbGciOiAiQ0hBTEtBUEkiLAogICJ0eXAiOi
 void
 print_hex64(uint8_t *label, uint8_t *s) {
   int i;
-  
+
   printf("%s:\t", label);
   for(i = 0; i < 8; i++) {
     printf("%02x", (uint8_t)s[i]);
@@ -417,7 +417,7 @@ print_hex64(uint8_t *label, uint8_t *s) {
 
 void
 jwt_mint(schedule_t *ctx, uint8_t *uid, uint8_t ent, uint8_t* outbuf) {
-    
+
     uint8_t block[16];
     uint8_t ct[16];
 
@@ -428,24 +428,28 @@ jwt_mint(schedule_t *ctx, uint8_t *uid, uint8_t ent, uint8_t* outbuf) {
     block[8] = ent;
 
     aes128_encrypt(ctx, block, ct);
-    
+
     template_fill_jti_and_ent(outbuf, (uint8_t *)(block + 8));
-    template_fill_uid(outbuf, uid);          
+    template_fill_uid(outbuf, uid);
     template_fill_signature(outbuf, (uint8_t *)ct);
     outbuf[TOKEN_LEN] = 0;
 }
 
 bool
-jwt_validate(schedule_t *ctx, uint8_t *token) {
-    uint8_t     uid[JSON_UID_LEN];
+jwt_validate(schedule_t *ctx, uint8_t *token, uint8_t uid[JSON_UID_LEN]) {
+    /* The 3rd parameter captures the extracted UID from the token.
+     * Note that it is *not* null terminated.  If you want a
+     * null-terminated string, allocate an extra byte and pre-populate
+     * that last byte to 0.
+     */
     uint8_t  block[16];
-    // base32 decode gives us an extra byte at the end.    
-    uint8_t     hex_extracted_sig[33];
-    uint8_t     real_extracted_sig[16];
+    // base32 decode gives us an extra byte at the end.
+    uint8_t  hex_extracted_sig[33];
+    uint8_t  real_extracted_sig[16];
     uint8_t  calculated_sig[16];
 
     token_to_uid(token, uid);
-    mint_uid_to_bits(uid, block);                 
+    mint_uid_to_bits(uid, block);
     token_extract_rand_and_ent(token, (uint8_t *)&block[8]);
     token_extract_sig(token, hex_extracted_sig);
     hex_decode_sig(hex_extracted_sig, real_extracted_sig);
@@ -456,6 +460,7 @@ jwt_validate(schedule_t *ctx, uint8_t *token) {
 
 // Tests.
 
+#if 0
 void
 test_b64(void) {
     uint8_t *enc =
@@ -473,7 +478,7 @@ test_b64(void) {
     }
 
     *outp = 0;
-    
+
     printf("KAT: %s\nGOT: %s\n", enc, outbuf);
 
     uint8_t a, b, c, d;
@@ -486,5 +491,6 @@ test_b64(void) {
 
     *outp = 0;
 
-    printf("KAT: %s\nGOT: %s\n", dec, outbuf2);    
+    printf("KAT: %s\nGOT: %s\n", dec, outbuf2);
 }
+#endif
