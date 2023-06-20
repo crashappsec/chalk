@@ -313,10 +313,14 @@ proc extractDockerInfo*(chalk:          ChalkObj,
 
   # Pull data from flags we care about.
   if "tag" in flags:
-    cache.tags = unpack[seq[string]](flags["tag"].getValue())
+    cache.tags   = unpack[seq[string]](flags["tag"].getValue())
+    cache.ourTag = cache.tags[0]
+  else:
+    let
+      randint = secureRand[uint]()
+      hexval  = toHex(randint and 0xffffffffffff'u).toLowerAscii()
 
-  let randint: uint = secureRand[uint]()
-  cache.ourTag      = "chalk:" & $(randint)
+    cache.ourTag      = "chalk-" & hexval
 
   if "platform" in flags:
     cache.platform = (unpack[seq[string]](flags["platform"].getValue()))[0]
@@ -754,7 +758,15 @@ proc buildContainer*(chalk:  ChalkObj,
   f.write(fullFile)
   f.close()
   reparse.addFlagWithArg("file", ["f", "file"], true, true, optArg = false)
-  var args = reparse.parse(inargs).args[""] & @["-f", path, "-t", cache.ourTag]
+  var args = reparse.parse(inargs).args[""] & @["-f", path]
+
+  if len(cache.tags) == 0:
+          args &= @["-t", cache.ourTag]
+
+  for k, v in cache.labels:
+    let label = escapeJson(k & "=" & v)
+    trace("Adding docker label: " & label)
+    args &= @["--label", label]
 
   let
     subp = startProcess(cmd, args = args, options = {poParentStreams})
@@ -763,11 +775,6 @@ proc buildContainer*(chalk:  ChalkObj,
   if code != 0: return false
 
   result = runInspectOnImage(cmd, chalk)
-
-  # If the user supplied tags, remove the tag we added.
-  if cache.tags.len() != 0:
-    discard execProcess(cmd, args = @["rmi", cache.ourTag], options = {})
-
 
 proc cleanupTmpFiles*(chalk: ChalkObj) =
   let cache = DockerInfoCache(chalk.cache)

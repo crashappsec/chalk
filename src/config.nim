@@ -212,7 +212,8 @@ proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
     path     = unpack[seq[string]](state.attrLookup("config_path").get())
     filename = unpack[string](state.attrLookup("config_filename").get())
   for dir in path:
-    let fname = dir.joinPath(filename)
+    let fname = resolvePath(dir.joinPath(filename))
+    trace("Looking for config file at: " & fname)
     if fname.fileExists():
       info(fname & ": Found config file")
       try:
@@ -222,7 +223,7 @@ proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
         dumpExOnDebug()
         break
     else:
-        trace("No configuration file found in " & dir)
+        trace(fname & ": No configuration file found.")
 
 var cmdSpec: CommandSpec = nil
 proc getArgCmdSpec*(): CommandSpec = cmdSpec
