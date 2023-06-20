@@ -87,6 +87,37 @@ def validate_chalk_report(
         raise
 
 
+# slightly different from above
+def validate_docker_chalk_report(
+    chalk_report: Dict[str, Any],
+    artifact_map: Dict[str, ArtifactInfo],
+    virtual: bool,
+):
+    try:
+        assert chalk_report["_OPERATION"] == "build"
+
+        assert "_CHALKS" in chalk_report
+        assert (
+            len(chalk_report["_CHALKS"]) == 1
+        ), "should only get one chalk report per docker image"
+
+        for chalk in chalk_report["_CHALKS"]:
+            path = chalk["ARTIFACT_PATH"]
+            assert path in artifact_map, "chalked artifact incorrect"
+            artifact = artifact_map[path]
+
+            assert artifact.type == chalk["ARTIFACT_TYPE"]
+            assert virtual == chalk["_VIRTUAL"]
+            # TODO: docker tags/dockerfile path/etc?
+
+    except AssertionError as e:
+        logger.error("chalk report validation failed", error=e)
+        raise
+    except KeyError as e:
+        logger.error("key not found in chalk report", error=e)
+        raise
+
+
 # extracted chalk is created after `chalk extract` operation
 def validate_extracted_chalk(
     extracted_chalk: Dict[str, Any],

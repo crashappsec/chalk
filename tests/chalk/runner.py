@@ -153,6 +153,7 @@ class Chalk:
             target=artifact,
             params=["--log-level=none"],
         )
+
         assert extracted is not None
         if extracted.returncode != 0:
             logger.error(

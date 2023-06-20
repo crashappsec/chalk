@@ -1,2 +1,2 @@
 FROM ubuntu
-ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT ["/bin/bash", "-c"]
