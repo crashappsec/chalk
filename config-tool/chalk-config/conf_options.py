@@ -466,6 +466,7 @@ def dict_to_con4m(d):
 sink_config env_var_log_file {
   sink: "%s"
   filters: ["fix_new_line"]
+  max: <<10mb>>
   filename: env("%s")
 }
 
@@ -484,6 +485,7 @@ sink_config env_var_s3 {
 
 sink_config pre_config_log {
   sink:    "%s"
+  max: <<10mb>>
   filters: ["fix_new_line"]
   filename: "%s"
 }

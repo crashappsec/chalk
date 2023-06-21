@@ -262,9 +262,10 @@ class EditConfigButton(Button):
         cursor_row = conftable.the_table.cursor_row
         r = cursor.execute(
             "SELECT json, name, note FROM configs WHERE id=?", [row_ids[cursor_row]]
-        )
-        json_txt, name, note = r.fetchone()
-        load_from_json(json_txt, name, note)
+        ).fetchone()
+        if r is not None:
+            json_txt, name, note = r
+            load_from_json(json_txt, name, note)
 
 
 class DelConfigButton(Button):
@@ -284,8 +285,9 @@ class ExConfigButton(Button):
         items = cursor.execute(
             'SELECT name, json FROM configs where id="%s"' % row_ids[cursor_row]
         ).fetchone()
-        menu = ExportMenu(row_ids[cursor_row], items[0], items[1])
-        self.app.push_screen(menu)
+        if items:
+            menu = ExportMenu(row_ids[cursor_row], items[0], items[1])
+            self.app.push_screen(menu)
 
 
 class EnablingCheckbox(Checkbox):
