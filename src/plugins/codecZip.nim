@@ -78,9 +78,9 @@ method scan*(self:   CodecZip,
     cache.onDisk.extractAll(hashD)
 
     # Even if subscans are off, we do this delete for the purposes of hashing.
-    toggleLoggingEnabled()
+    if not chalkConfig.getChalkDebug():  toggleLoggingEnabled()
     discard runChalkSubScan(hashD, "delete")
-    toggleLoggingEnabled()
+    if not chalkConfig.getChalkDebug():  toggleLoggingEnabled()
 
     if zipChalkFile in cache.onDisk.contents:
       removeFile(joinPath(hashD, zipChalkFile))

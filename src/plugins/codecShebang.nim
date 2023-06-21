@@ -11,8 +11,12 @@ type CodecShebang* = ref object of Codec
 method scan*(self:   CodecShebang,
              stream: FileStream,
              path:   string): Option[ChalkObj] =
-  let line1 = stream.readLine()
-  if not line1.startsWith("#!"): return none(ChalkObj)
+  try:
+    let line1 = stream.readLine()
+    if not line1.startsWith("#!"): return none(ChalkObj)
+  except:
+    warn(path & ": Could not find a newline.")
+    return none(ChalkObj)
 
   return stream.scriptLoadMark(path)
 
