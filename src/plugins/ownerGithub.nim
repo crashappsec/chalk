@@ -43,34 +43,6 @@ proc findCOFile(fullpath: string): string =
 
   return "" # nothing here
 
-proc findCodeOwner(contents, artifactPath, copath: string): string =
-  if not artifactPath.startsWith(copath): return
-
-  let
-    lines   = contents.split("\n")
-    gitdir  = copath.splitPath().head
-    relPath = artifactPath[len(copath) .. ^1]
-    path    = if relpath.startsWith("/"): relpath else: "/" & relPath
-
-  for line in lines:
-    let cur = line.strip()
-
-    if cur == "" or cur[0] == '#': continue
-
-    let ix = cur.find(' ')
-    if ix == -1: continue
-
-    var txt = cur[0 ..< ix].strip()
-
-    if not txt.startsWith("/"):  txt = "**/" & txt
-    if txt.endsWith("/"):        txt &= "**"
-    let
-      pattern = glob(txt)
-      owners = line[ix+1 .. ^1].strip()
-
-
-    if path.matches(pattern): result = owners
-    # Keep looping; the last match is the most specific and wins.
 
 type GithubCodeOwner = ref object of Plugin
 
@@ -97,9 +69,7 @@ method getChalkInfo*(self: GithubCodeOwner, obj: ChalkObj): ChalkDict =
     ctx = newFileStream(fname, fmRead)
     if ctx == nil: error(fname & ": Could not open file.")
     else:
-      let
-        s = ctx.readAll()
-        m = s.findCodeOwner(obj.fullPath, fname.splitPath().head)
+      let m = ctx.readAll()
 
       if m != "": result["CODE_OWNERS"] = pack(m)
   except:

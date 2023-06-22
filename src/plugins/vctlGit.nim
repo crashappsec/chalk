@@ -210,7 +210,8 @@ proc loadHead(self: GitPlugin): bool =
 
   try:
     fs = newFileStream(self.vcsDir.joinPath(fNameHead))
-    hf = fs.readAll().strip()
+    if fs != nil: hf = fs.readAll().strip()
+    else: return false
 
     try:    fs.close()
     except: discard

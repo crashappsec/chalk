@@ -32,7 +32,7 @@ PYTHONFILES = Path(__file__).parent / "data" / "python"
 )
 def test_virtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
     files = os.listdir(PYTHONFILES / test_file)
-    artifact_info = {}
+    artifact_info: Dict[str, ArtifactInfo] = {}
     for file in files:
         file_path = PYTHONFILES / test_file / file
         # top level files only, ignoring __pycache__
@@ -76,7 +76,7 @@ def test_virtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
 )
 def test_nonvirtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
     files = os.listdir(PYTHONFILES / test_file)
-    artifact_info = {}
+    artifact_info: Dict[str, ArtifactInfo] = {}
     shebang_check = {}
     shebang = "#!"
     for file in files:
