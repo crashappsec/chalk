@@ -91,7 +91,7 @@ def test_insert_extract_repeated(tmp_data_dir: Path, chalk: Chalk):
         params=["--log-level=none"],
     )
     assert extracted
-    extracted_chalks_3 = json.loads(extracted.stderr, strict=False)
+    extracted_chalks_3 = json.loads(extracted.stdout, strict=False)
     # basic fields
     validate_extracted_chalk(
         extracted_chalk=extracted_chalks_3[0], artifact_map=artifact_info, virtual=False
@@ -181,5 +181,5 @@ def test_virtual(bin: str, tmp_data_dir: Path, chalk: Chalk):
         params=["--log-level=none"],
     )
     assert proc
-    virtual_extract_2 = json.loads(proc.stderr, strict=False)
+    virtual_extract_2 = json.loads(proc.stdout, strict=False)
     assert timestamp_1 < virtual_extract_2[0]["_TIMESTAMP"]

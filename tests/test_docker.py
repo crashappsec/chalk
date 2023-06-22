@@ -84,11 +84,15 @@ def test_virtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
         )
         assert insert_output.returncode == 0, "chalking dockerfile failed"
 
-        # FIXME: hacky json read of report that has to stop before we reach logs
+        # # FIXME: hacky json read of report that has to stop before we reach logs
         json_string = ""
-        for line in insert_output.stderr.decode().splitlines():
-            json_string = json_string + line
-            if line.startswith("]"):
+        in_json = False
+        for line in insert_output.stdout.decode().splitlines():
+            if line == ("["):
+                in_json = True
+            if in_json == True:
+                json_string = json_string + line
+            if line == ("]"):
                 break
         chalk_reports = json.loads(json_string)
         assert len(chalk_reports) == 1
@@ -128,11 +132,15 @@ def test_nonvirtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
             chalk, test_file, tmp_data_dir, valid=True, virtual=False
         )
 
-        # FIXME
+        # # FIXME: hacky json read of report that has to stop before we reach logs
         json_string = ""
-        for line in insert_output.stderr.decode().splitlines():
-            json_string = json_string + line
-            if line.startswith("]"):
+        in_json = False
+        for line in insert_output.stdout.decode().splitlines():
+            if line == ("["):
+                in_json = True
+            if in_json == True:
+                json_string = json_string + line
+            if line == ("]"):
                 break
         chalk_reports = json.loads(json_string)
         assert len(chalk_reports) == 1

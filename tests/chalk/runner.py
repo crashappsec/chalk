@@ -142,9 +142,9 @@ class Chalk:
             )
             raise AssertionError
         try:
-            return json.loads(inserted.stderr, strict=False)
+            return json.loads(inserted.stdout, strict=False)
         except json.decoder.JSONDecodeError:
-            logger.error("Could not decode json", raw=inserted.stderr)
+            logger.error("Could not decode json", raw=inserted.stdout)
             raise
 
     def extract(self, artifact: Path) -> List[Dict[str, Any]]:
@@ -161,7 +161,8 @@ class Chalk:
             )
             raise AssertionError
         try:
-            return json.loads(extracted.stderr, strict=False)
+            extract_out = extracted.stdout.decode()
+            return json.loads(extract_out, strict=False)
         except json.decoder.JSONDecodeError:
-            logger.error("Could not decode json", raw=extracted.stderr)
+            logger.error("Could not decode json", raw=extracted.stdout.decode())
             raise

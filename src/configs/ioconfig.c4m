@@ -15,7 +15,7 @@ elif env_exists("NO_COLOR") {
 
 cmd  := argv0()
 
-subscribe("report",   "json_console_err")
+subscribe("report",   "json_console_out")
 subscribe("audit",    "json_console_out")
 subscribe("version",  "console_out")
 #% INTERNAL
