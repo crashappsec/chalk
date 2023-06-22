@@ -384,6 +384,10 @@ proc extractDockerInfo*(chalk:          ChalkObj,
       error(cache.dockerFilePath & ": docker build failed to read Dockerfile")
       return false
 
+  if cache.context != "":
+    chalk.auxPaths.add(cache.context)
+  chalk.auxPaths.add(cache.dockerFilePath.splitPath().head)
+
   # Part 3: Evaluate the docker file to the extent necessary.
   let stream        = newStringStream(cache.dockerFileContents)
   let (parse, cmds) = stream.parseAndEval(fileArgs, errors)

@@ -31,9 +31,15 @@ type
                                 ## where, they get added to ERR_INFO, if
                                 ## any.  To disable, simply set the chalk
                                 ## log level to 'none'.
-    cache*:         RootRef     ## Generic pointer a plugin can use to
+    cache*:         RootRef     ## Generic pointer a codec can use to
                                 ## store any state it might want to stash.
     myCodec*:       Codec
+    auxPaths*:      seq[string] ## File-system references for this
+                                ## artifact, when the fullpath isn't a
+                                ## file system reference.  For
+                                ## example, in a docker container,
+                                ## this can contain the context
+                                ## directory and the docker file.
 
   Plugin* = ref object of RootObj
     name*:       string

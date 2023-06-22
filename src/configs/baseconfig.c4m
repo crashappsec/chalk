@@ -1599,6 +1599,7 @@ plugin tool {
 plugin vctl_git {
     enabled:         true
     pre_run_keys:    ["COMMIT_ID", "BRANCH", "ORIGIN_URI"]
+    artifact_keys:   ["COMMIT_ID", "BRANCH", "ORIGIN_URI"]
 }
 
 plugin ci_github {

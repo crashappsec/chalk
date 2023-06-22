@@ -1,6 +1,5 @@
 ## The plugin responsible for pulling metadata from the git
-## repository. Leverages the lightweight parsing of the .git directory
-## we do in io/gitConfig.nim.
+## repository.
 ##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
@@ -184,21 +183,20 @@ proc findGitDir(fullpath: string): string =
   return head.findGitDir()
 
 # Using this in the GitRepo plugin too.
-type GitPlugin* = ref object of Plugin
+type GitInfo* = ref object of Plugin
   branchName: string
   commitId:   string
   origin:     string
   vcsDir*:    string
 
-template loadBasics(self: GitPlugin, path: seq[string]) =
-
+template loadBasics(self: GitInfo, path: seq[string]) =
   for item in path:
     self.vcsDir = item.findGitDir()
     if self.vcsDir != "":
       trace("Version control dir: " & self.vcsDir)
       break
 
-proc loadHead(self: GitPlugin): bool =
+proc loadHead(self: GitInfo): bool =
   # Don't want to commit to the order in which things get called,
   # so everything that might get called first someday calls this to
   # be safe.
@@ -245,7 +243,7 @@ proc loadHead(self: GitPlugin): bool =
   trace("commit ID: " & self.commitID)
   return true
 
-proc calcOrigin(self: GitPlugin, conf: seq[SecInfo]): string =
+proc calcOrigin(self: GitInfo, conf: seq[SecInfo]): string =
   # We are generally looking for the remote origin, because we expect
   # this is running from a checked-out copy of a repo.  It's
   # possible there could be multiple remotes, each associated with multiple
@@ -295,7 +293,7 @@ proc calcOrigin(self: GitPlugin, conf: seq[SecInfo]): string =
   self.origin = ghLocal
   return ghLocal
 
-proc getOrigin(self: GitPlugin): (bool, Box) =
+proc getOrigin(self: GitInfo): (bool, Box) =
   if not self.loadHead(): return (false, nil)
 
   let
@@ -314,21 +312,22 @@ proc getOrigin(self: GitPlugin): (bool, Box) =
     dumpExOnDebug()
     return (false, nil)
 
-proc getHead(self: GitPlugin): (bool, Box) =
+proc getHead(self: GitInfo): (bool, Box) =
   if self.commitID == "": return (false, nil)
   return (true, pack(self.commitID))
 
-proc getBranch(self: GitPlugin): (bool, Box) =
+proc getBranch(self: GitInfo): (bool, Box) =
   if self.branchName == "": return (false, nil)
   return (true, pack(self.branchName))
 
-method getHostInfo*(self: GitPlugin,
+method getHostInfo*(self: GitInfo,
                     path: seq[string],
                     ins:  bool): ChalkDict =
   result = ChalkDict()
 
   self.loadBasics(path)
-  if self.vcsDir == "": return # No git directory, so no work to do.
+  if self.vcsDir == "":
+    return # No git directory, so no work to do.
 
   let
     (originThere, origin) = self.getOrigin()
@@ -339,4 +338,39 @@ method getHostInfo*(self: GitPlugin,
   if headThere:   result["COMMIT_ID"]  = head
   if branchThere: result["BRANCH"]     = name
 
-registerPlugin("vctl_git", GitPlugin())
+proc isInRepo(obj: ChalkObj, dir: string): bool =
+  let prefix = dir.resolvePath()
+
+  for item in @[obj.fullpath] & obj.auxPaths:
+       if item.resolvePath().startsWith(prefix):
+         return true
+
+  return false
+
+method getChalkInfo*(self: GitInfo, obj: ChalkObj): ChalkDict =
+  result = ChalkDict()
+
+  if self.vcsDir != "" and obj.isInRepo(self.vcsDir):
+    return
+
+  let options = if len(obj.auxPaths) != 0:
+                  obj.auxPaths
+                else:
+                  @[obj.fullpath]
+
+  var artifactInfo = GitInfo()
+  artifactInfo.loadBasics(options)
+
+  if artifactInfo.vcsDir == "":
+    return
+
+  let
+    (originThere, origin) = artifactInfo.getOrigin()
+    (headThere, head)     = artifactInfo.getHead()
+    (branchThere, name)   = artifactInfo.getBranch()
+
+  if originThere: result["ORIGIN_URI"] = origin
+  if headThere:   result["COMMIT_ID"]  = head
+  if branchThere: result["BRANCH"]     = name
+
+registerPlugin("vctl_git", GitInfo())
