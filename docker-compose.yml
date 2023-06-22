@@ -31,6 +31,7 @@ services:
       - $PWD/config-tool:/config-tool
       - $PWD/.config-tool-bin:/config-bin
       - $PWD/config-tool-outdir:/outdir/
+      - $HOME/.config:/root/.config
     environment:
       - TERM
       - COLORTERM
@@ -47,6 +48,7 @@ services:
     volumes:
       - $PWD/.config-tool-bin:/config-bin
       - $PWD/config-tool-outdir:/outdir/
+      - $HOME/.config:/root/.config
 
   sqlitebrowser:
     image: lscr.io/linuxserver/sqlitebrowser:latest
