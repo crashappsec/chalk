@@ -19,7 +19,8 @@ method scan*(self:   CodecPythonPyc,
         #Does this artefact have a python source file extension?
         # if so chalk it, else skip
         #TODO validate PYC header / magic ?
-        if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.getPycExtensions():
+        if not ext.startsWith(".") or
+           ext[1..^1] notin chalkConfig.getPycExtensions():
             return none(ChalkObj)
 
         let byte_blob = stream.readAll()
@@ -58,11 +59,7 @@ method handleWrite*(self:    CodecPythonPyc,
     toWrite = pre
     toWrite &= encoded.get() & post.strip(chars = {' ', '\n'}, trailing = false)
   else:
-    #TODO clean up like above
-    var endPos = pre.find('\n')
-    if endPos == -1:
-      endPos = len(pre)
-    toWrite = pre[0 ..< endPos] & post
+    toWrite = pre
   chalk.closeFileStream()
 
   #If NOT a dry-run replace file contents

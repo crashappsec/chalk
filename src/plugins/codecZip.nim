@@ -15,7 +15,6 @@ type
     onDisk:        ZipArchive
     embeddedChalk: Box
     tmpDir:        string
-    endingHash:    string
 
 method cleanup*(self: CodecZip, obj: ChalkObj) =
   let cache = ZipCache(obj.cache)
@@ -45,6 +44,33 @@ proc postprocessContext(collectionCtx: CollectionCtx) =
     else:
       newUnmarked.add(item)
   collectionCtx.unmarked = newUnmarked
+
+
+proc hashZip(toHash: ZipArchive): string =
+  var sha = initSHA[SHA256]()
+  var keys: seq[string]
+
+  for k, v in toHash.contents:
+    if v.kind == ekFile:
+      keys.add(k)
+
+  keys.sort()
+
+  for item in keys:
+    sha.update($(len(item)))
+    sha.update(item)
+    let v = toHash.contents[item]
+    sha.update($(len(v.contents)))
+    sha.update(v.contents)
+
+  result = hashFmt($(sha.final))
+
+proc hashExtractedZip(dir: string): string =
+  let toHash = ZipArchive()
+
+  toHash.addDir(dir & "/")
+
+  return toHash.hashZip()
 
 method scan*(self:   CodecZip,
              stream: FileStream,
@@ -85,10 +111,15 @@ method scan*(self:   CodecZip,
     if zipChalkFile in cache.onDisk.contents:
       removeFile(joinPath(hashD, zipChalkFile))
       let contents = cache.onDisk.contents[zipChalkFile].contents
-      if not contents.contains(magicUTF8): return some(chalk)
-      let
-        s           = newStringStream(contents)
-      chalk.extract = s.extractOneChalkJson(chalk.fullpath)
+      if contents.contains(magicUTF8):
+        let
+          s           = newStringStream(contents)
+        chalk.extract = s.extractOneChalkJson(chalk.fullpath)
+        chalk.marked  = true
+      else:
+        chalk.marked  = false
+
+    chalk.cachedPreHash = hashExtractedZip(hashD)
 
     if subscans:
       extractCtx = runChalkSubScan(origD, "extract")
@@ -124,25 +155,6 @@ method scan*(self:   CodecZip,
     dumpExOnDebug()
     return some(chalk)
 
-proc hashZip(toHash: ZipArchive): string =
-  var sha = initSHA[SHA256]()
-  var keys: seq[string]
-
-  for k, v in toHash.contents:
-    if v.kind == ekFile:
-      keys.add(k)
-
-  keys.sort()
-
-  for item in keys:
-    sha.update($(len(item)))
-    sha.update(item)
-    let v = toHash.contents[item]
-    sha.update($(len(v.contents)))
-    sha.update(v.contents)
-
-  result = hashFmt($(sha.final))
-
 proc doWrite(self: CodecZip, chalk: ChalkObj, encoded: Option[string],
              virtual: bool) =
   let
@@ -165,7 +177,7 @@ proc doWrite(self: CodecZip, chalk: ChalkObj, encoded: Option[string],
     newArchive.addDir(dirToUse & "/")
     if not virtual:
       newArchive.writeZipArchive(chalk.fullPath)
-    cache.endingHash = newArchive.hashZip()
+    chalk.cachedHash = newArchive.hashZip()
 
   except:
     error(chalk.fullPath & ": " & getCurrentExceptionMsg())
@@ -174,25 +186,20 @@ proc doWrite(self: CodecZip, chalk: ChalkObj, encoded: Option[string],
 method handleWrite*(self: CodecZip, chalk: ChalkObj, encoded: Option[string]) =
   self.doWrite(chalk, encoded, virtual = false)
 
-method getUnchalkedHash*(self: CodecZip, chalk: ChalkObj): Option[string] =
-  if chalk.cachedHash != "": return some(chalk.cachedHash)
-  let
-    cache  = ZipCache(chalk.cache)
-    toHash = ZipArchive()
-  toHash.addDir(joinPath(cache.tmpDir, "hash") & "/")
-
-  chalk.cachedHash = toHash.hashZip()
-  result           = some(chalk.cachedHash)
-
 method getEndingHash*(self: CodecZip, chalk: ChalkObj): Option[string] =
-  let
-    cache  = ZipCache(chalk.cache)
+  if chalk.cachedHash == "":
+    # When true, --virtual was passed, so we skipped where we calculate
+    # the hash post-write. Theoretically, the hash should be the same as
+    # the unchalked hash, but there could be chalked files in there, so
+    # we calculate by running our hashZip() function on the extracted
+    # directory where we touched nothing.
+    let
+      cache = ZipCache(chalk.cache)
+      path  = cache.tmpDir.joinPath("contents") & "/"
 
-  if cache.endingHash != "":
-    return some(cache.endingHash)
-  else:
-    # --virtual was passed.
-    self.doWrite(chalk, none(string), virtual = true)
+    chalk.cachedHash = hashExtractedZip(path)
+
+  return some(chalk.cachedHash)
 
 method getChalkInfo*(self: CodecZip, obj: ChalkObj): ChalkDict =
   let cache = ZipCache(obj.cache)
