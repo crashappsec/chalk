@@ -44,17 +44,18 @@ class AckModal(ModalScreen):
             self.app.pop_screen()
             self.pops = self.pops - 1
 
-class ChangelogModal(ModalScreen):
+class ReleaseNotesModal(ModalScreen):
     """
-    Pop-up to show changelogs
+    Pop-up to show release notes
     """
     #DEFAULT_CSS=WIZARD_CSS
     BINDINGS = [
         Binding(key="escape,left,space,enter", action="button_pressed", description = BACK_LABEL),
-        Binding(key="c", action="button_pressed", description = MAIN_MENU, show=False),
+        Binding(key="r", action="button_pressed", description = MAIN_MENU, show=False),
         Binding(key="l", action="button_pressed", description = MAIN_MENU, show=False),
         Binding(key="ctrl+q", action="button_pressed", description = MAIN_MENU, show=False),
     ]
+    ##ToDo move this css into css.py
     CSS = """
     Tabs {
         dock: top;
@@ -81,15 +82,15 @@ class ChangelogModal(ModalScreen):
 
     def compose(self):
         """
-        Build tabbed pane with a tab for each changelog
+        Build tabbed pane with a tab for each release note
         """
         yield Tabs(
-                    Tab("Chalk", id="chalk_changelog_md"), 
-                    Tab("Config-Tool", id="configtool_changelog_md")
+                    Tab("Chalk", id="chalk_releasenotes_md"), 
+                    Tab("Config-Tool", id="configtool_releasenotes_md")
                 )
-        with ContentSwitcher(initial="chalk_changelog_md"):  
-            yield MarkdownViewer(self.tab_data_list[0], id="chalk_changelog_md")
-            yield MarkdownViewer(self.tab_data_list[1], id="configtool_changelog_md")
+        with ContentSwitcher(initial="chalk_releasenotes_md"):  
+            yield MarkdownViewer(self.tab_data_list[0], id="chalk_releasenotes_md")
+            yield MarkdownViewer(self.tab_data_list[1], id="configtool_releasenotes_md")
         yield Footer()
 
     def on_tabs_tab_activated(self, event: Tabs.TabActivated) -> None:

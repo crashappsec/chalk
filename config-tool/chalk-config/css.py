@@ -135,7 +135,7 @@ AckModal {
     width: 100%;
 }
 
-ChangelogModal {
+ReleaseNotesModalodal {
     align: center top;
     width: 60;
     overflow-y: scroll;

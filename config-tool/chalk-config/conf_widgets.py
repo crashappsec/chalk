@@ -12,7 +12,7 @@ import urllib.request
 import webbrowser
 from pathlib import *
 
-import ascii_magic
+#import ascii_magic
 from conf_options import *
 from css import WIZARD_CSS
 from localized_text import *
@@ -238,17 +238,17 @@ class ConfigTable(Container):
             EditConfigButton(label=EDIT_LABEL, classes="basicbutton"),
             DelConfigButton(label=DELETE_LABEL, classes="basicbutton"),
             ExConfigButton(label=EXPORT_LABEL, classes="basicbutton"),
-            ChangelogButton(label="Changelog", classes="basicbutton"),
+            ReleaseNotesButton(label="Release Notes", classes="basicbutton"), #ToDo localize
             classes="padme",
         )
 
 
-class ChangelogButton(Button):
+class ReleaseNotesButton(Button):
     async def on_button_pressed(self):
         """
-        Pop open changelog modal
+        Pop open release notes modal
         """
-        get_app().action_changelog()
+        get_app().action_releasenotes()
   
 class RunWizardButton(Button):
     async def on_button_pressed(self):
@@ -358,16 +358,16 @@ class PopBrowserButton(Button):
     async def on_button_pressed(self):
         webbrowser.open(get_app().login_widget.device_code_json['verification_uri_complete'])
 
-class ProfilePicture(Static):
-    ascii_picture = Reactive("")
-    def render(self) -> str:
-        return self.ascii_picture
+# class ProfilePicture(Static):
+#     ascii_picture = Reactive("")
+#     def render(self) -> str:
+#         return self.ascii_picture
     
-    def generate(self, data):
-        #Todo exceptions
-        a = ascii_magic.AsciiArt.from_url(data)
-        self.ascii_picture = "\n\n%s\n\n\n\n"%(a.to_ascii(columns=30))
-        return self.ascii_picture
+#     def generate(self, data):
+#         #Todo exceptions
+#         a = ascii_magic.AsciiArt.from_url(data)
+#         self.ascii_picture = "\n\n%s\n\n\n\n"%(a.to_ascii(columns=30))
+#         return self.ascii_picture
 
 class OidcLinks(MDown):
     """

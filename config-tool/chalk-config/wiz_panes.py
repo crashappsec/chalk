@@ -113,7 +113,7 @@ class ApiAuth(WizContainer):
         super().__init__(*args, **kwargs)
         
         ##Setup Auth0 Env now we have been told to poll
-        self.oidc_auth_obj     = c0_api.CLIAuth(c0_api.AUTH0_DOMAIN, c0_api.AUTH0_CLIENT_ID)
+        #self.oidc_auth_obj     = c0_api.CLIAuth(c0_api.AUTH0_DOMAIN, c0_api.AUTH0_CLIENT_ID)
         self.oidc_widget_1     = OidcLinks()
         self.oidc_widget_1.styles.padding = (0,4)
         self.oidc_widget_1.styles.margin = (0,2)

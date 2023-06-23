@@ -95,7 +95,6 @@ def locate_read_changelogs():
 
     chalk_changelog_data  = "Chalk CHANGELOG.md could not be found."
     config_changelog_data = "Config-Tool CHANGELOG.md could not be found."
-
     ##Read config-tool changelog
     try:
         config_changelog_data = config_filepath.read_text()
@@ -109,6 +108,19 @@ def locate_read_changelogs():
         except:
             pass
     return (chalk_changelog_data, config_changelog_data)
+
+def build_releasenotes_content():
+    """
+    Build up all the content that is wanted to be displayed as part of the release notes modal
+    There are two panes in the release notes modal, one for chalk and one for the config-tool
+    """
+    release_notes_tabs = ["", ""]
+    ##Gather changelog info
+    changelog_data_chalk, changelog_data_config_tool = locate_read_changelogs()
+    release_notes_tabs[0] += changelog_data_chalk
+    release_notes_tabs[1] += changelog_data_config_tool
+    ##We can add in any other markdown content here ......
+    return release_notes_tabs
 
 def pop_user_profile( id_token_json, success_msg = False, pop_off=1):
     """
@@ -169,8 +181,9 @@ class ConfWizScreen(ModalScreen):
         Binding(key="space", action="next()", show=False),
         Binding(key="up", action="<scroll-up>", show=False),
         Binding(key="down", action="<scroll-down>", show=False),
-        Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')",
-                description = HELP_TOGGLE),
+        Binding(key="l", action=None, show=False),
+        Binding(key="r", action=None, show=False),
+        Binding(key="h", action="show_help", description = HELP_TOGGLE),
     ]
     def compose(self):
         yield Header(show_clock=True)
@@ -186,6 +199,11 @@ class ConfWizScreen(ModalScreen):
     def on_screen_resume(self):
         self.wiz.reset()
 
+    def action_show_help(self):
+        """
+        """
+        self.wiz.action_help()
+
     def action_abort_wizard(self):
         self.wiz.abort_wizard()
 
@@ -200,10 +218,8 @@ class LoginScreen(ModalScreen):
         Binding(key="a", action="open_authn_webpage", description = LOGIN_LABEL),
         Binding(key="q", action="display_qr", description = QR_LABEL),
         Binding(key="ctrl+q", action=None, description = MAIN_MENU, show=False),
-        Binding(key="c", action=None, description = MAIN_MENU, show=False),
+        Binding(key="r", action=None, description = MAIN_MENU, show=False),
         Binding(key="l", action=None, description = MAIN_MENU, show=False),
-        Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')",
-                description = HELP_TOGGLE)
     ]
     AUTO_FOCUS   = None
     login_widget = None
@@ -350,7 +366,7 @@ class NewApp(App):
         Binding(key = "l", action = "login()", description = LOGIN_LABEL),
         Binding(key = "up", action = "<scroll-up>", show = False),
         Binding(key = "down", action = "<scroll-down>", show = False),
-        Binding(key = "c", action = "changelog()", description = "View Changelogs" ), #CHANGELOG_LABEL
+        Binding(key = "r", action = "releasenotes()", description = "View Release Notes" ), #RELEASENOTES_LABEL
         #Binding(key="n", action="newconfig()", show = False),
     ]
     authenticated  = False
@@ -402,13 +418,12 @@ class NewApp(App):
         conftable.app.push_screen("qrcodescreen")
         qr_code_screen.set_focus(None)
 
-    def action_changelog(self):
+    def action_releasenotes(self):
         """
-        Pop up a screen to show the changelogs for both chalk and config-tool
+        Pop up a screen to show the release notes for both chalk and config-tool
         """
-        changelog_data_chalk, changelog_data_config_tool = locate_read_changelogs()
-        self.push_screen(ChangelogModal([changelog_data_chalk, changelog_data_config_tool]))
-        
+        release_notes_tab_content = build_releasenotes_content()
+        self.push_screen(ReleaseNotesModal(release_notes_tab_content))
 
 if __name__ == "__main__":
     cached_stdout_fd = sys.stdout
