@@ -162,14 +162,14 @@ class ConfWiz(Wizard):
         
         ##Hack - this effectively disables the keybinds to the next_button stopping
         ## the user from being able to bypass the disabled button via a keybind if not authenticated
-        #if not get_app().login_widget.is_authenticated() and self.current_panel == self.api_authn_panel and self.next_button.disabled == True:
-        #    return
+        if not get_app().login_widget.is_authenticated() and self.current_panel == self.api_authn_panel and self.next_button.disabled == True:
+            return
 
         super().action_next()
 
         ##Disable the next_button on theauthn panel until user is authenticated
-        #if not get_app().login_widget.is_authenticated() and self.current_panel == self.api_authn_panel:
-        #    self.next_button.disabled = True
+        if not get_app().login_widget.is_authenticated() and self.current_panel == self.api_authn_panel:
+            self.next_button.disabled = True
 
 class ConfWizScreen(ModalScreen):
     DEFAULT_CSS=WIZARD_CSS
