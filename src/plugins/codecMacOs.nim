@@ -33,8 +33,11 @@ type
     b64:      Option[string]
 
 template hasMachMagic(s: string): bool =
-  s[0 ..< 4] in ["\xca\xfe\xba\xbe", "\xfe\xed\xfa\xce", "\xce\xfa\xed\xfe",
-                 "\xfe\xed\xfa\xcf", "\xcf\xfa\xed\xfe"]
+  if s.len() < 4:
+    false
+  else:
+    s[0 ..< 4] in ["\xca\xfe\xba\xbe", "\xfe\xed\xfa\xce", "\xce\xfa\xed\xfe",
+                   "\xfe\xed\xfa\xcf", "\xcf\xfa\xed\xfe"]
 
 method scan*(self:   CodecMacOs,
              stream: FileStream,
