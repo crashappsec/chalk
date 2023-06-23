@@ -125,15 +125,76 @@ proc logTrace(args: seq[Box], s: ConfigState): Option[Box] =
   return logBase("trace", args, s)
 
 let chalkCon4mBuiltins* = [
-    ("version() -> string",                 BuiltinFn(getExeVersion)),
-    ("subscribe(string, string) -> bool",   BuiltInFn(topicSubscribe)),
-    ("unsubscribe(string, string) -> bool", BuiltInFn(topicUnSubscribe)),
-    ("error(string)",                       BuiltInFn(logError)),
-    ("warn(string)",                        BuiltInFn(logWarn)),
-    ("info(string)",                        BuiltInFn(logInfo)),
-    ("trace(string)",                       BuiltInFn(logTrace)),
-    ("argv() -> list[string]",              BuiltInFn(getArgv)),
-    ("argv0() -> string",                   BuiltInFn(getChalkCommand)) ]
+    ("version() -> string",
+     BuiltinFn(getExeVersion),
+     "The current version of the chalk program.",
+     @["chalk"]
+    ),
+    ("subscribe(string, string) -> bool",
+     BuiltInFn(topicSubscribe),
+     """
+For the topic name given in the first parameter, subscribes the sink
+configuration named in the second parameter.  The sink configuration
+object must already be defined at the time of the call to subscribe()
+""",
+     @["chalk"]
+    ),
+    ("unsubscribe(string, string) -> bool",
+     BuiltInFn(topicUnSubscribe),
+     """
+For the topic name given in the first parameter, unsubscribes the sink
+configuration named in the second parameter, if subscribed.
+""",
+     @["chalk"]
+    ),
+    ("error(string)",
+     BuiltInFn(logError),
+     """
+Immediately publishes a diagnostic message at log-level 'error'.  Whether this
+gets delivered or not depends on the configuration.  Generally, errors will go
+both to stderr, and be put in any published report.
+""",
+     @["chalk"]
+    ),
+    ("warn(string)",
+     BuiltInFn(logWarn),
+     """
+Immediately publishes a diagnostic message at log-level 'warn'.  Whether this
+gets delivered or not depends on the configuration.  Generally, warnings go to
+stderr, unless wrapping the docker command, but do not get published to reports.
+""",
+     @["chalk"]
+    ),
+    ("info(string)",
+     BuiltInFn(logInfo),
+     """
+Immediately publishes a diagnostic message at log-level 'info'.  Whether this
+gets delivered or not depends on the configuration, but may be off by default.
+""",
+     @["chalk"]),
+    ("trace(string)",
+     BuiltInFn(logTrace),
+     """
+Immediately publishes a diagnostic message at log-level 'trace' (aka verbose).
+Generally, these can get very noisy, and are intended more for testing,
+ debugging, etc.
+""",
+     @["chalk"]),
+    ("argv() -> list[string]",
+     BuiltInFn(getArgv),
+     """
+Returns the arguments being passed to the command, such as the path
+parameters.  This is not the same as the underlying process's argv; it
+represents the arguments getting passed to the underlying chalk command.
+""",
+     @["chalk"]),
+    ("argv0() -> string",
+     BuiltInFn(getChalkCommand),
+     """
+Returns the name of the chalk command being run (not the underlying
+executable name).
+""",
+     @["chalk"]) ]
 
 let errSinkObj = SinkImplementation(outputFunction: chalkErrSink)
 registerSink("chalk-err-log", errSinkObj)

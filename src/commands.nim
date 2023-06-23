@@ -480,6 +480,60 @@ proc runChalkHelp*(cmdName: string) {.noreturn.} =
                                       cols = @[fcName, fcValue])
         if tool.doc.isSome():
           output &= tool.doc.get()
+  of "help.builtins":
+    var
+      rawBiDocs = unpack[string](c4mFuncDocDump(@[], getChalkRuntime()).get())
+      allDocs   = rawBiDocs.parseJson()
+
+    var toShow: JSonNode
+
+    if len(args) == 0:
+      toShow = allDocs
+    else:
+      toShow = newJObject()
+
+      for k, obj in allDocs.mpairs():
+        var added = false
+
+        if "doc" notin obj:
+          continue
+        if "tags" in obj:
+          let tags = to(obj["tags"], seq[string])
+          for tag in tags:
+            if tag in args:
+              toShow[k] = obj
+              added     = true
+              break
+          if added:
+            continue
+          # parts[0] will be the name of the function.
+          let parts = k.split("(")
+          if parts[0] in args:
+            toShow[k] = obj
+            continue
+          let docstr = to(obj["doc"], string)
+          for item in args:
+            if item in docstr:
+              toShow[k] = obj
+              break
+    if len(toShow) == 0:
+      output = "No builtin functions matched your search terms.\n" &
+               "Run 'chalk help builtins' to see all functions with no args.\n"
+    else:
+      var rows = @[@["Function", "Categories", "Documentation"]]
+
+      for k, obj in toShow.mpairs():
+        if "doc" notin obj: continue
+        let
+          doc  = to(obj["doc"], string)
+          tags = if "tags" in obj: to(obj["tags"], seq[string]) else: @[]
+        rows.add(@[k, tags.join(", "), doc])
+
+      var table = tableC4mStyle(3, rows=rows)
+      output = table.render() & "\n"
+
+    if len(args) == 0:
+      output &= "\nTip: you can add search terms to filter the above list."
   else:
     output = "Unknown command: " & cmdName
 
@@ -1256,6 +1310,8 @@ proc getHelpJson(): string =
     cmdlineJson   = cmdlineInfo.scopeToJson().parseJson().docFilter(cmdlineKeys)
     keyspecJson   = keyspecInfo.scopeToJson().parseJson().docFilter(keyspecKeys)
     schemaJson    = schemaInfo.scopeToJson().parseJson().docFilter(schemaKeys)
+    builtinFns    = unpack[string](c4mFuncDocDump(@[], chalkRunTime).get())
+    biFnJson      = builtinFns.parseJson()
 
   var
     preRes = newJObject()
@@ -1263,6 +1319,7 @@ proc getHelpJson(): string =
   preRes["command_line"]        = cmdlineJson.get()
   preRes["key_specs"]           = keyspecJson.get()
   preRes["config_file_schema"]  = schemaJson.get()
+  preRes["builtin_funs"]        = biFnJson
 
   result = $(preRes)
 

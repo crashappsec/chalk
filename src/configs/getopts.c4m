@@ -389,6 +389,12 @@ All arguments appearing after the word 'docker' are passed to docker.  No flags 
 You're living it!
 """
 
+    command builtins {
+      aliases: ["bi", "funcs"]
+      arg_sub_mutex: false
+      args: (0, high())
+    }
+
     command key {
       aliases:            ["keys", "k"]
       arg_sub_mutex: false # should be the default?
@@ -532,21 +538,6 @@ chalk help keyspec        :: Gives detailed info about keyspecs & metadata keys
 chalk help keyspec props  :: Gives info about each important keyspec field.
 }%
 """
-  builtins: """
-%{H Builtin functions in config files}%
-The following functions are in addition to those documented at: {red}https://github.com/crashappsec/con4m{reset}
-%{T <30:
-Function::Description
-version() -> string::Returns the release version of the chalk binary.
-argv0() -> string::Returns the command being run, per the command line. If you've set up a default action in the embedded configuration, that configuration will receive {brown}default{black} for this value when it runs.  Possible options are: {brown}"insert", {brown}"extract", {brown}"delete", {brown}"defaults", {brown}"dump", {brown}"load", {brown}"version", {brown}"help"
-argv() -> [string]::Returns the arguments being used for the command. This may not be what was passed at the command line; it will pick up default values from previous configuration files.  You may not change argv() with immediate effect, but for the {brown}"extract", {brown}"insert" and {brown}"delete" commands, setting the {bold}{magenta}artifact_path{black} variable will lead to argv updating after the script ends.
-error(string)::This prints an error message. Or, more precisely, publishes a message to the {magenta}log{black} topic. This is output subject to the i/o configuration. In the default configuration, it would go both to the console, and into any appropriate reports.
-sink_config(string, string, dict[string, string], list[string])::Set up a configuration for an output sink.  The first parameter is the name of the configuration, the second the name of the sink, the third, configuration parameters specific to that sink, and the fourth, any desired filters. Sinks may have multiple configurations. Sink configurations are immediately available from the configuration file, via {magenta}subscribe() {black}or {magenta}unsubscribe(){black}. See {red}{appName} help output{black} for more details.
-sink_config(string, string, dict[string, string]::Same as previous, with no filters.
-subscribe(string, string)::Subscribes the sink configuration named in the first parameter, to the topic specified in the second parameter.  See {red}{appName} {red}help {red}output{black} for more information on topics.
-unsubscribe(string, string)::Unsubscribes the sink configuration named in the first parameter from the topic specified in the second parameter.  This allows you to override inherited subscriptions, such as the default logging subscription. See {red}{appName} {red}help {red}output{black} for more information on topics.
-}%
-"""
   commands: """
 %{T
 Command  ::Description
@@ -678,7 +669,7 @@ The result of the configuration file executing is a set of key / value pairs. Fo
 
 Con4m's features are documented at {red}https://github.com/crashappsec/con4m{reset}. It comes with a number of built-in functions that can be called from the configuration file. chalk exports all of those, and adds other builtins.
 
-See {bold}{appName} help builtins{reset} for a list of builtin functions that can be called from the configuration file that are specific to Chalk (we also make available all of Con4m's builtins).
+See {red}{appName} help builtins{reset} for a list of builtin functions that can be called from the configuration file that are specific to Chalk (we also make available all of Con4m's builtins).
 """
   output: """
 %{H Output basics}%
