@@ -121,7 +121,7 @@ all_fields = [
     "env_adds_report",
     "env_custom",
     # Crash Override API config
-    "c0api_toggle",
+    #"c0api_toggle",
     # Env var customization
     "env_log",
     "env_post_url",
@@ -189,7 +189,8 @@ all_fields = [
     "note",
 ]
 
-not_in_json = ["conf_name", "overwrite_config","c0api_toggle"]
+#not_in_json = ["conf_name", "overwrite_config","c0api_toggle"]
+not_in_json = ["conf_name", "overwrite_config"]
 
 
 radio_set_dbg = (["release_build", "debug_build"], 0)
@@ -257,7 +258,7 @@ bool_defaults = {
     "env_custom": False,
     "overwrite_config": False,
     "log_truncate": True,
-    "c0api_toggle"     : True,
+    #"c0api_toggle"     : True,
 }
 
 text_defaults = {

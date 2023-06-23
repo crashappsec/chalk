@@ -555,7 +555,7 @@ delete   ::Delete locally stored metadata from software objects.
 defaults ::Loads configuration and shows keys defaults. See 'help defaults'.
 dump     ::Export the self-contained configuration file.
 load     ::Load a new configuration file.
-docker   ::Adds a chalk mark to docker containers, and weaps the entry point.
+docker   ::Adds a chalk mark to docker containers, and wraps the entry point.
 version  ::Shows program version information
 help     ::You're doing it now!
 }%

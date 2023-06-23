@@ -77,7 +77,10 @@ def validate_chalk_report(
             assert (
                 artifact.type == chalk["ARTIFACT_TYPE"]
             ), "artifact type doesn't match"
-            assert artifact.hash == chalk["HASH"], "artifact hash doesn't match"
+            if artifact.hash != "":
+                # in some cases, we don't check the artifact hash
+                # ex: zip files, which are not computed as hash of file
+                assert artifact.hash == chalk["HASH"], "artifact hash doesn't match"
             assert virtual == chalk["_VIRTUAL"], "_VIRTUAL mismatch"
     except AssertionError as e:
         logger.error("chalk report validation failed", error=e)
@@ -159,7 +162,8 @@ def validate_extracted_chalk(
             assert path in artifact_map, "path not found"
             artifact_info = artifact_map[path]
 
-            assert artifact_info.hash == chalk["HASH"]
+            if artifact_info.hash != "":
+                assert artifact_info.hash == chalk["HASH"]
             assert artifact_info.type == chalk["ARTIFACT_TYPE"]
 
             # top level vs chalk-level sanity check
