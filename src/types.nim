@@ -67,6 +67,7 @@ var
   selfID*             = Option[string](none(string))
   canSelfInject*      = true
 
+# All of these things have to be here for stupid dependency reasons.
 proc pushCollectionCtx*(callback: (CollectionCtx) -> void): CollectionCtx =
   ctxStack.add(collectionCtx)
   collectionCtx = CollectionCtx(postprocessor: callback)
@@ -104,3 +105,12 @@ proc idFormat*(rawHash: string): string =
 
 template hashFmt*(s: string): string =
   s.toHex().toLowerAscii()
+
+template getMyAppPath*(): string =
+  when hostOs == "macosx":
+    if chalkConfig == nil:
+      getAppFileName()
+    else:
+      chalkConfig.getSelfLocation().getOrElse(getAppFileName())
+  else:
+    getAppFileName()

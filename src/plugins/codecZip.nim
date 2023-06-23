@@ -45,7 +45,6 @@ proc postprocessContext(collectionCtx: CollectionCtx) =
       newUnmarked.add(item)
   collectionCtx.unmarked = newUnmarked
 
-
 proc hashZip(toHash: ZipArchive): string =
   var sha = initSHA[SHA256]()
   var keys: seq[string]

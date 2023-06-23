@@ -1533,6 +1533,13 @@ plugin shebang {
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 }
 
+plugin macos {
+    codec:           true
+    artifact_keys:   ["HASH_FILES", "ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    priority:        2  # Should come before shebang for sure.
+}
+
 plugin docker {
     codec:    true
     priority: 1

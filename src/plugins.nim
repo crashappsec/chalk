@@ -114,6 +114,7 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string) =
   var
     (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
     ctx       = newFileStream(f)
+    info: Stat
 
   try:
     ctx.write(contents)
@@ -121,7 +122,12 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string) =
     if ctx != nil:
       try:
         ctx.close()
+        # If we can successfully stat the file, we will try to
+        # re-apply the same mode bits via chmod after the move.
+        let statResult = stat(cstring(chalk.fullpath), info)
         moveFile(path, chalk.fullpath)
+        if statResult == 0:
+          discard chmod(cstring(chalk.fullpath), info.st_mode)
       except:
         removeFile(path)
         error(chalk.fullPath & ": Could not write (no permission)")
@@ -641,6 +647,7 @@ import plugins/codecDocker
 import plugins/codecZip
 import plugins/codecPythonPy
 import plugins/codecPythonPyc
+import plugins/codecMacOs
 import plugins/ciGithub
 import plugins/ciJenkins
 import plugins/ciGitlab

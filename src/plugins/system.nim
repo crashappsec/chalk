@@ -151,9 +151,9 @@ method getPostRunInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
   result["_OP_CHALKER_COMMIT_ID"] = pack(getChalkCommitId())
   result["_OP_CHALK_COUNT"]       = pack(len(getAllChalks()) -
                                          len(getUnmarked()))
-  result["_OP_EXE_NAME"]          = pack(getAppFilename())
+  result["_OP_EXE_NAME"]          = pack(getMyAppPath())
   result["_OP_EXE_PATH"]          = pack(getAppDir())
-  result["_OP_ARGV"]              = pack(@[getAppFileName()] &
+  result["_OP_ARGV"]              = pack(@[getMyAppPath()] &
                                           commandLineParams())
   result["_OP_HOSTNAME"]          = pack(getHostName())
   result["_OP_UNMARKED_COUNT"]    = pack(len(getUnmarked()))

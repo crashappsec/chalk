@@ -185,7 +185,7 @@ iterator artifacts*(artifactPath: seq[string]): ChalkObj =
     skips:        seq[Glob]     = @[]
     chalks:       seq[ChalkObj]
     exclude:      seq[string]   = if cmd == "load": @[]
-                                  else: @[resolvePath(getAppFileName())]
+                                  else: @[resolvePath(getMyAppPath())]
 
   if isChalkingOp():
     for item in chalkConfig.getIgnorePatterns(): skips.add(glob("**/" & item))
@@ -246,7 +246,7 @@ proc getSelfExtraction*(): Option[ChalkObj] =
   # have a codec for this type of executable, avoid dupe errors.
   once:
     var
-      myPath = @[resolvePath(getAppFileName())]
+      myPath = @[resolvePath(getMyAppPath())]
       exclusions: seq[string] = @[]
       chalks:     seq[ChalkObj]
       ignore:     bool

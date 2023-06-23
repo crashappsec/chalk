@@ -77,6 +77,14 @@ The reporting cache keeps a local copy of any reports made, to provide redundanc
 """
   }
 
+  flag_arg macosx_metadata_location_info {
+    field_to_set: "self_location"
+    doc: """
+    This is only meant to be used internally in re-execs, currently on MacOS
+    only.  If used in any other context, it will be ignored.
+    """
+  }
+
   flag_yn embedded_config {
     field_to_set: "load_embedded_config"
     doc: "Turn off running the embedded configuration."

@@ -1323,6 +1323,35 @@ proc getHelpJson(): string =
 
   result = $(preRes)
 
+import os, json, strutils
+
 proc runCmdHelpDump*() =
-  publish("help", getHelpJson())
+  if not chalkConfig.getChalkDebug():
+    publish("help", getHelpJson())
+    return
+
+  let
+    outdir             = getEnv("CHALK_DOC_DIR")
+  var
+    jsonStr = getHelpJson().parseJson()
+    funcs   = jsonStr["builtin_funs"]
+    output  = """
+# Chalk Config File: Available Functions
+| Function | Categories | Description |
+| -------- | ---------- | ----------- |
+"""
+
+  for k, v in funcs.mpairs():
+    if not to(v["builtin"], bool):
+      continue
+    var
+      sig  = k.replace("`", "\\`").replace("->", "→")
+      doc  = to(v["doc"], string).replace("\n", "<br />").
+                replace("`", "\\`")
+      tags = to(v["tags"], seq[string])
+
+    output &= "| " & sig & " | " & tags.join(", ") & " | " & doc & " |\n"
+
+  echo output
+
 #% END

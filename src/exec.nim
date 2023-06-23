@@ -80,7 +80,7 @@ proc findAllExePaths*(cmdName:    string,
   ##
   ## The point is, the caller should eanticipate failure.
   let
-    (mydir, me) = getAppFileName().splitPath()
+    (mydir, me) = getMyAppPath().splitPath()
   var
     targetName  = cmdName
     allPaths    = extraPaths

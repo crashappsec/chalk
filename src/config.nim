@@ -70,6 +70,7 @@ let
   artTypeDockerContainer* = pack("Docker Container")
   artTypePy*              = pack("Python")
   artTypePyc*             = pack("Python Bytecode")
+  artTypeMachO*           = pack("Mach-O executable")
 var
   con4mRuntime:       ConfigStack
   chalkConfig*:       ChalkConfig
@@ -539,7 +540,7 @@ proc handleCon4mErrors(err, tb: string): bool =
   return true
 
 proc handleOtherErrors(err, tb: string): bool =
-  error(getAppFilename().splitPath().tail & ": " & err)
+  error(getMyAppPath().splitPath().tail & ": " & err)
   quit(1)
 
 template cmdlineStashTry() =
@@ -577,9 +578,13 @@ proc loadAllConfigs*() =
     toStream = newStringStream
     stack    = newConfigStack()
 
-  case getAppFileName().splitPath().tail
+  case getMyAppPath().splitPath().tail
   of "docker":
-    if "docker" notin params: params = @["docker"] & params
+    if "docker" notin params:
+      if len(params) != 0 and params[0] == "chalk":
+        params = params[1 .. ^1]
+      else:
+        params = @["docker"] & params
   else: discard
 
   con4mRuntime = stack
