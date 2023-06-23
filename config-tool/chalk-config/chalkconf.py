@@ -207,143 +207,143 @@ class ConfWizScreen(ModalScreen):
     def action_abort_wizard(self):
         self.wiz.abort_wizard()
 
-# class LoginScreen(ModalScreen):
-#     """
-#     Screen to login to Crash ⍉verride API via OIDC
-#     """
-#     DEFAULT_CSS=WIZARD_CSS
-#     TITLE    = LOGIN_TITLE
-#     BINDINGS = [
-#         Binding(key="escape", action="abort_wizard", description = MAIN_MENU),
-#         Binding(key="a", action="open_authn_webpage", description = LOGIN_LABEL),
-#         Binding(key="q", action="display_qr", description = QR_LABEL),
-#         Binding(key="ctrl+q", action=None, description = MAIN_MENU, show=False),
-#         Binding(key="c", action=None, description = MAIN_MENU, show=False),
-#         Binding(key="l", action=None, description = MAIN_MENU, show=False),
-#         Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')",
-#                 description = HELP_TOGGLE)
-#     ]
-#     AUTO_FOCUS   = None
-#     login_widget = None
+class LoginScreen(ModalScreen):
+    """
+    Screen to login to Crash ⍉verride API via OIDC
+    """
+    DEFAULT_CSS=WIZARD_CSS
+    TITLE    = LOGIN_TITLE
+    BINDINGS = [
+        Binding(key="escape", action="abort_wizard", description = MAIN_MENU),
+        Binding(key="a", action="open_authn_webpage", description = LOGIN_LABEL),
+        Binding(key="q", action="display_qr", description = QR_LABEL),
+        Binding(key="ctrl+q", action=None, description = MAIN_MENU, show=False),
+        Binding(key="c", action=None, description = MAIN_MENU, show=False),
+        Binding(key="l", action=None, description = MAIN_MENU, show=False),
+        Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')",
+                description = HELP_TOGGLE)
+    ]
+    AUTO_FOCUS   = None
+    login_widget = None
 
-#     def on_api_auth_oauth_success(self, event: ApiAuth.OAuthSuccess) -> None:
-#         """
-#         """
-#         my_app = get_app()
+    def on_api_auth_oauth_success(self, event: ApiAuth.OAuthSuccess) -> None:
+        """
+        """
+        my_app = get_app()
 
-#         ##Authentication attempt outcome
-#         if event.result == "success":
-#             ##Pass message up to app so they can be easily graabbed by any screen etc
-#             my_app.authenticated  = my_app.login_widget.is_authenticated()
-#             my_app.id_token_json  = my_app.login_widget.get_id_token_json()
-#             my_app.curr_user_json = my_app.login_widget.get_token_json()
+        ##Authentication attempt outcome
+        if event.result == "success":
+            ##Pass message up to app so they can be easily graabbed by any screen etc
+            my_app.authenticated  = my_app.login_widget.is_authenticated()
+            my_app.id_token_json  = my_app.login_widget.get_id_token_json()
+            my_app.curr_user_json = my_app.login_widget.get_token_json()
 
-#             ##Update loginbutton on main page button bar to show logged in user
-#             user_str = "Hi %s!"%(event.curr_user_json["given_name"])
-#             l_btn = conftable.login_button
-#             l_btn.label = user_str
-#             l_btn.variant = "success"
-#             l_btn.update(user_str)
-#             l_btn.refresh()
-#             ##If the login button is hit from main screen the wizard DOM hasn't
-#             ## been built yet so this fails ....... async DOMs suck
-#             try:
-#                 ## Update inline login button on wizard page to show logged in user
-#                 wiz_l_btn = wiz.query_one("#wiz_login_button")
-#                 wiz_l_btn.label = user_str
-#                 wiz_l_btn.variant = "success"
-#                 wiz_l_btn.update(user_str)
-#                 wiz_l_btn.refresh()
+            ##Update loginbutton on main page button bar to show logged in user
+            user_str = "Hi %s!"%(event.curr_user_json["given_name"])
+            l_btn = conftable.login_button
+            l_btn.label = user_str
+            l_btn.variant = "success"
+            l_btn.update(user_str)
+            l_btn.refresh()
+            ##If the login button is hit from main screen the wizard DOM hasn't
+            ## been built yet so this fails ....... async DOMs suck
+            try:
+                ## Update inline login button on wizard page to show logged in user
+                wiz_l_btn = wiz.query_one("#wiz_login_button")
+                wiz_l_btn.label = user_str
+                wiz_l_btn.variant = "success"
+                wiz_l_btn.update(user_str)
+                wiz_l_btn.refresh()
 
-#                 ##Ensure wizard's next button is enabled
-#                 wiz.next_button.disabled = False
-#             except:
-#                 pass
+                ##Ensure wizard's next button is enabled
+                wiz.next_button.disabled = False
+            except:
+                pass
 
-#             ##Show the user authentication successful in a pop-up
-#             pop_user_profile(my_app.login_widget.get_id_token_json(), success_msg=True, pop_off=2)
+            ##Show the user authentication successful in a pop-up
+            pop_user_profile(my_app.login_widget.get_id_token_json(), success_msg=True, pop_off=2)
 
-#         elif event.result == "id_token_verification_failure":
-#             ##Pop error window
-#             err_msg = "## ID Token verification failure"            #Todo localise
-#             err_msg+= "\n%s"%(my_app.login_widget.oidc_auth_obj.id_token_error)
-#             get_app().push_screen(AckModal(err_msg, pops=2))
-#             #Reset login widget
-#             my_app.login_widget.oauth_status_checker.stop()
-#         elif event.result ==  "authentication_failure":
-#             ##Pop error window
-#             err_msg = "## Login failure"                           #Todo localise
-#             token_json = my_app.login_widget.get_token_json()
-#             err_msg+= "\n%s"%(token_json["error"])
-#             get_app().push_screen(AckModal(err_msg, pops=2))
-#             #Reset login widget
-#             my_app.login_widget.reset_login_widget()
-#         else:
-#             ##Pop error window
-#             err_msg = "Unknown login error"                      #Todo localise
-#             get_app().push_screen(AckModal(err_msg, pops=2))
+        elif event.result == "id_token_verification_failure":
+            ##Pop error window
+            err_msg = "## ID Token verification failure"            #Todo localise
+            err_msg+= "\n%s"%(my_app.login_widget.oidc_auth_obj.id_token_error)
+            get_app().push_screen(AckModal(err_msg, pops=2))
+            #Reset login widget
+            my_app.login_widget.oauth_status_checker.stop()
+        elif event.result ==  "authentication_failure":
+            ##Pop error window
+            err_msg = "## Login failure"                           #Todo localise
+            token_json = my_app.login_widget.get_token_json()
+            err_msg+= "\n%s"%(token_json["error"])
+            get_app().push_screen(AckModal(err_msg, pops=2))
+            #Reset login widget
+            my_app.login_widget.reset_login_widget()
+        else:
+            ##Pop error window
+            err_msg = "Unknown login error"                      #Todo localise
+            get_app().push_screen(AckModal(err_msg, pops=2))
            
-#     def compose(self):
-#         yield Header(show_clock=True)
-#         yield self.login_widget
-#         yield Footer()
+    def compose(self):
+        yield Header(show_clock=True)
+        yield self.login_widget
+        yield Footer()
 
-#     def action_next(self):
-#         self.wiz.action_next()
+    def action_next(self):
+        self.wiz.action_next()
 
-#     def action_open_authn_webpage(self):
-#         """
-#         Pop open a new browser window at the login page with code filled out
-#         """
-#         webbrowser.open(self.login_widget.device_code_json['verification_uri_complete'])
+    def action_open_authn_webpage(self):
+        """
+        Pop open a new browser window at the login page with code filled out
+        """
+        webbrowser.open(self.login_widget.device_code_json['verification_uri_complete'])
 
-#     def action_display_qr(self):
-#         """
-#         """
-#         get_app().action_display_qr()
+    def action_display_qr(self):
+        """
+        """
+        get_app().action_display_qr()
 
-#     def action_abort_wizard(self):
-#         my_app = get_app()
-#         my_app.pop_screen()
+    def action_abort_wizard(self):
+        my_app = get_app()
+        my_app.pop_screen()
 
-# class QrCodeScreen(ModalScreen):
-#     """
-#     Screen to display QR Code of OAuth URL
-#     """
-#     DEFAULT_CSS=WIZARD_CSS
-#     BINDINGS = [
-#         Binding(key="escape", action="complete", description = BACK_LABEL),
-#         Binding(key="space", action="complete", description = BACK_LABEL, show=False),
-#         Binding(key="left", action="complete", description = BACK_LABEL, show=False),
-#         Binding(key="enter", action="complete", description = BACK_LABEL, show=False),
-#     ]
+class QrCodeScreen(ModalScreen):
+    """
+    Screen to display QR Code of OAuth URL
+    """
+    DEFAULT_CSS=WIZARD_CSS
+    BINDINGS = [
+        Binding(key="escape", action="complete", description = BACK_LABEL),
+        Binding(key="space", action="complete", description = BACK_LABEL, show=False),
+        Binding(key="left", action="complete", description = BACK_LABEL, show=False),
+        Binding(key="enter", action="complete", description = BACK_LABEL, show=False),
+    ]
 
-#     qr_code_widget = None
-#     hdr_widget     = MDown(QR_CODE_TITLE)
-#     hdr_widget.styles.margin = (0,10)
-#     hdr_widget.styles.padding = (1,4)
-#     def compose(self):
-#         yield self.hdr_widget
-#         yield self.qr_code_widget
-#         yield Footer()
+    qr_code_widget = None
+    hdr_widget     = MDown(QR_CODE_TITLE)
+    hdr_widget.styles.margin = (0,10)
+    hdr_widget.styles.padding = (1,4)
+    def compose(self):
+        yield self.hdr_widget
+        yield self.qr_code_widget
+        yield Footer()
 
-#     def action_complete(self):
-#         my_app = get_app()
-#         my_app.pop_screen()
+    def action_complete(self):
+        my_app = get_app()
+        my_app.pop_screen()
 
 # Convenience vars.
-##Crash Override API login screen - OIDC
-# login_widget              = ApiAuth()
-# login_widget.styles.margin = (0,10)
-# login_screen              = LoginScreen()
-# login_screen.login_widget = login_widget
+#Crash Override API login screen - OIDC
+login_widget              = ApiAuth()
+login_widget.styles.margin = (0,10)
+login_screen              = LoginScreen()
+login_screen.login_widget = login_widget
 
-# ##QR code screen
-# qr_code_widget                 = DisplayQrCode()
-# qr_code_widget.styles.margin   = (0,10)
-# qr_code_widget.styles.padding  = (0,25)
-# qr_code_screen                 = QrCodeScreen()
-# qr_code_screen.qr_code_widget  = qr_code_widget
+##QR code screen
+qr_code_widget                 = DisplayQrCode()
+qr_code_widget.styles.margin   = (0,10)
+qr_code_widget.styles.padding  = (0,25)
+qr_code_screen                 = QrCodeScreen()
+qr_code_screen.qr_code_widget  = qr_code_widget
 
 ##Main Wizard screen - multiple steps
 wiz            = ConfWiz(finish_up)
@@ -351,7 +351,7 @@ wiz_screen     = ConfWizScreen()
 wiz_screen.wiz = wiz
 
 ##Back reference to wizard object in other screens
-#login_screen.wiz        = wiz
+login_screen.wiz        = wiz
 
 set_wiz_screen(wiz_screen)
 set_wizard(wiz)
@@ -361,23 +361,23 @@ class NewApp(App):
     DEFAULT_CSS=WIZARD_CSS
     TITLE    = CHALK_TITLE
     SCREENS  = {'confwiz'          : wiz_screen,
-                #'loginscreen'      : login_screen,
-                #'qrcodescreen'     : qr_code_screen, 
+                'loginscreen'      : login_screen,
+                'qrcodescreen'     : qr_code_screen, 
                 }
     BINDINGS = [
         Binding(key = "ctrl+q", action = "quit", description = QUIT_LABEL, priority=True),
-        #Binding(key = "l", action = "login()", description = LOGIN_LABEL),
+        Binding(key = "l", action = "login()", description = LOGIN_LABEL),
         Binding(key = "up", action = "<scroll-up>", show = False),
         Binding(key = "down", action = "<scroll-down>", show = False),
         Binding(key = "r", action = "releasenotes()", description = "View Release Notes" ), #RELEASENOTES_LABEL
         #Binding(key="n", action="newconfig()", show = False),
     ]
     authenticated  = False
-    #curr_user_json = {}
-    #id_token_json  = {}
+    curr_user_json = {}
+    id_token_json  = {}
     config_widget  = wiz
-    #login_widget   = login_widget
-    #qr_code_widget = qr_code_widget
+    login_widget   = login_widget
+    qr_code_widget = qr_code_widget
 
     def compose(self):
         yield Header(show_clock = True, id="chalk_header")

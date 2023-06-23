@@ -204,7 +204,7 @@ class ConfigTable(Container):
         self.the_table.styles.margin = (0,3)
 
         #ToDo update proper localized strings
-        #self.login_button = LoginButton(label="L⍉gin", classes="basicbutton", id="login_button")
+        self.login_button = LoginButton(label="L⍉gin", classes="basicbutton", id="login_button")
              
     async def on_mount(self):
         await self.the_table.mount()
@@ -233,7 +233,7 @@ class ConfigTable(Container):
     def compose(self):
         yield self.the_table
         yield Horizontal(
-            #self.login_button,
+            self.login_button,
             RunWizardButton(label=NEW_LABEL),
             EditConfigButton(label=EDIT_LABEL, classes="basicbutton"),
             DelConfigButton(label=DELETE_LABEL, classes="basicbutton"),
@@ -320,21 +320,21 @@ class HttpsUrlCheckbox(Checkbox):
 
         ##Todo abstract the enable/disable next button logic to avoid ever growing custom logic, but until then ....
         ## Enable / disable the next button based on what has been selected / if HTTPS_URL disabled
-        # if self.value:
-        #     ##Enable API toggle
-        #     get_wizard().query_one("#c0api_toggle").disabled = False
-        #     ##If switch set on, enable login button
-        #     if get_wizard().query_one("#c0api_toggle").value:
-        #         get_wizard().query_one("#wiz_login_button").disabled = False
-        #         ##If we aren't authenticated disable next button
-        #         if not get_app().login_widget.is_authenticated() and get_wizard().current_panel == get_wizard().api_authn_panel:
-        #             get_wizard().next_button.disabled = True
-        #     else:
-        #         get_wizard().next_button.disabled = False
-        # else:
-        #     get_wizard().query_one("#wiz_login_button").disabled = True
-        #     get_wizard().query_one("#c0api_toggle").disabled = True
-        #     get_wizard().next_button.disabled = False
+        if self.value:
+            ##Enable API toggle
+            get_wizard().query_one("#c0api_toggle").disabled = False
+            ##If switch set on, enable login button
+            if get_wizard().query_one("#c0api_toggle").value:
+                get_wizard().query_one("#wiz_login_button").disabled = False
+                ##If we aren't authenticated disable next button
+                if not get_app().login_widget.is_authenticated() and get_wizard().current_panel == get_wizard().api_authn_panel:
+                    get_wizard().next_button.disabled = True
+            else:
+                get_wizard().next_button.disabled = False
+        else:
+            get_wizard().query_one("#wiz_login_button").disabled = True
+            get_wizard().query_one("#c0api_toggle").disabled = True
+            get_wizard().next_button.disabled = False
 
 
 class EnvToggle(Switch):
