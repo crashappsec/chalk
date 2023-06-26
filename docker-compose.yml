@@ -33,18 +33,18 @@ services:
       - $PWD/config-tool-outdir:/outdir/
       - $HOME/.config:/root/.config
     environment:
-      - TERM
-      - COLORTERM
-      - CHALK_BINARIES_ARE_LOCAL=1
+      TERM: ${TERM:-}
+      COLORTERM: ${COLORTERM:-}
+      CHALK_BINARIES_ARE_LOCAL: 1
 
   chalk-config:
     build:
       context: .
       dockerfile: docker/Dockerfile.chalk-config
     environment:
-      - TERM
-      - COLORTERM
-      - CHALK_BINARIES_ARE_LOCAL=1
+      TERM: ${TERM:-}
+      COLORTERM: ${COLORTERM:-}
+      CHALK_BINARIES_ARE_LOCAL: 1
     volumes:
       - $PWD/.config-tool-bin:/config-bin
       - $PWD/config-tool-outdir:/outdir/

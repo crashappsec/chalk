@@ -18,3 +18,4 @@ src/c4autoconf.nim
 *.pyc
 */__pycache__/*
 .envrc.private
+config-tool/dist

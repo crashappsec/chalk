@@ -7,6 +7,20 @@ testdeps:
 test:
 	docker compose run --rm --service-ports --use-aliases tests
 
+.PHONY: chalkosx
+chalkosx:
+	rm -f chalk
+	DYLD_LIBRARY_PATH=/opt/homebrew/opt/openssl@3/lib con4m gen ./src/configs/chalk.c42spec --language=nim --output-file=./src/c4autoconf.nim
+	nimble build
+	mv chalk chalk-macos-arm64
+
+.PHONY: chalkosxrelease
+chalkosxrelease:
+	rm -f chalk
+	DYLD_LIBRARY_PATH=/opt/homebrew/opt/openssl@3/lib con4m gen ./src/configs/chalk.c42spec --language=nim --output-file=./src/c4autoconf.nim
+	nimble build -d:release
+	mv chalk chalk-macos-arm64-release
+
 .PHONY: configdeps
 configdeps:
 	mkdir -p .config-tool-bin
