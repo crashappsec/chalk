@@ -8,7 +8,7 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 1.6.8"
-requires "https://github.com/crashappsec/con4m == 0.7.21"
+requires "https://github.com/crashappsec/con4m == 0.8.1"
 requires "https://github.com/crashappsec/nimutils == 0.4.4"
 requires "nimSHA2 == 0.1.1"
 requires "glob == 0.11.2"
