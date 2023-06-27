@@ -126,7 +126,7 @@ class ModalDelete(ModalScreen):
         self.iid = iid
 
     def compose(self):
-        yield Header(show_clock=True)
+        yield Header(show_clock=False)
         yield Grid(
             Label(CONFIRM_DELETE % self.profilename, classes="model_q"),
             Button(YES_LABEL, id="delete_confirm", classes="modal_button"),
@@ -158,7 +158,7 @@ class ExportMenu(Screen):
         self.jconf = jconf
 
     def compose(self):
-        yield Header(show_clock=True)
+        yield Header(show_clock=False)
         yield MDown(EXPORT_MENU_INTRO)
         yield RadioSet(
             RadioButton(JSON_LABEL, True, id="export_json"),
@@ -204,7 +204,7 @@ class ConfigTable(Container):
         self.the_table.styles.margin = (0,3)
 
         #ToDo update proper localized strings
-        self.login_button = LoginButton(label="L⍉gin", classes="basicbutton", id="login_button")
+        #self.login_button = LoginButton(label="L⍉gin", classes="basicbutton", id="login_button")
              
     async def on_mount(self):
         await self.the_table.mount()
@@ -233,7 +233,7 @@ class ConfigTable(Container):
     def compose(self):
         yield self.the_table
         yield Horizontal(
-            self.login_button,
+            # self.login_button,
             RunWizardButton(label=NEW_LABEL),
             EditConfigButton(label=EDIT_LABEL, classes="basicbutton"),
             DelConfigButton(label=DELETE_LABEL, classes="basicbutton"),
@@ -320,22 +320,21 @@ class HttpsUrlCheckbox(Checkbox):
 
         ##Todo abstract the enable/disable next button logic to avoid ever growing custom logic, but until then ....
         ## Enable / disable the next button based on what has been selected / if HTTPS_URL disabled
-        if self.value:
-            ##Enable API toggle
-            get_wizard().query_one("#c0api_toggle").disabled = False
-            ##If switch set on, enable login button
-            if get_wizard().query_one("#c0api_toggle").value:
-                get_wizard().query_one("#wiz_login_button").disabled = False
-                ##If we aren't authenticated disable next button
-                if not get_app().login_widget.is_authenticated() and get_wizard().current_panel == get_wizard().api_authn_panel:
-                    get_wizard().next_button.disabled = True
-            else:
-                get_wizard().next_button.disabled = False
-        else:
-            get_wizard().query_one("#wiz_login_button").disabled = True
-            get_wizard().query_one("#c0api_toggle").disabled = True
-            get_wizard().next_button.disabled = False
-
+        # if self.value:
+        #     ##Enable API toggle
+        #     get_wizard().query_one("#c0api_toggle").disabled = False
+        #     ##If switch set on, enable login button
+        #     if get_wizard().query_one("#c0api_toggle").value:
+        #         get_wizard().query_one("#wiz_login_button").disabled = False
+        #         ##If we aren't authenticated disable next button
+        #         if not get_app().login_widget.is_authenticated() and get_wizard().current_panel == get_wizard().api_authn_panel:
+        #             get_wizard().next_button.disabled = True
+        #     else:
+        #         get_wizard().next_button.disabled = False
+        # else:
+        #     get_wizard().query_one("#wiz_login_button").disabled = True
+        #     get_wizard().query_one("#c0api_toggle").disabled = True
+        #     get_wizard().next_button.disabled = False
 
 class EnvToggle(Switch):
     def on_click(self):
@@ -346,17 +345,17 @@ class AlphaModal(AckModal):
     def on_mount(self):
         intro_md.update(INTRO_TEXT)
 
-class LoginButton(Button):
-    async def on_button_pressed(self):
-        get_app().action_login()
+# class LoginButton(Button):
+#     async def on_button_pressed(self):
+#         get_app().action_login()
 
-class QRButton(Button):
-    async def on_button_pressed(self):
-        get_app().action_display_qr()
+# class QRButton(Button):
+#     async def on_button_pressed(self):
+#         get_app().action_display_qr()
 
-class PopBrowserButton(Button):
-    async def on_button_pressed(self):
-        webbrowser.open(get_app().login_widget.device_code_json['verification_uri_complete'])
+# class PopBrowserButton(Button):
+#     async def on_button_pressed(self):
+#         webbrowser.open(get_app().login_widget.device_code_json['verification_uri_complete'])
 
 # class ProfilePicture(Static):
 #     ascii_picture = Reactive("")
@@ -369,38 +368,38 @@ class PopBrowserButton(Button):
 #         self.ascii_picture = "\n\n%s\n\n\n\n"%(a.to_ascii(columns=30))
 #         return self.ascii_picture
 
-class OidcLinks(MDown):
-    """
-    Markdown object that will contain the genrated OIDC links
-    """
-    markdown = Reactive("")
-    def render(self) -> str:
-        return self.markdown
+# class OidcLinks(MDown):
+#     """
+#     Markdown object that will contain the genrated OIDC links
+#     """
+#     markdown = Reactive("")
+#     def render(self) -> str:
+#         return self.markdown
 
-class QrCode(Static):
-    """
-    Object that will hold an ASCII art QRcode
-    """
-    qr_string = Reactive("")
-    def render(self) -> str:
-        return self.qr_string
+# class QrCode(Static):
+#     """
+#     Object that will hold an ASCII art QRcode
+#     """
+#     qr_string = Reactive("")
+#     def render(self) -> str:
+#         return self.qr_string
 
-class C0ApiToggle(Switch):
-    def on_switch_changed(self):
-        ##Based on switch position......
-        if self.value:
-            ##Enable the inline login button
-            get_wizard().query_one("#wiz_login_button").disabled = False
-            ##Set URL value in HTTPS pane
-            get_wizard().query_one("#https_url").value = "chalk.crashoverride.run/report"
+# class C0ApiToggle(Switch):
+#     def on_switch_changed(self):
+#         ##Based on switch position......
+#         if self.value:
+#             ##Enable the inline login button
+#             get_wizard().query_one("#wiz_login_button").disabled = False
+#             ##Set URL value in HTTPS pane
+#             get_wizard().query_one("#https_url").value = "chalk.crashoverride.run/report"
         
-            ##Disable the Next button if we are not yet authenticated and wanting to use the API 
-            if not get_app().authenticated and get_wizard().current_panel == get_wizard().panels[1]:
-                get_wizard().next_button.disabled = True
-        else:
-            get_wizard().query_one("#wiz_login_button").disabled = True
-            get_wizard().next_button.disabled = False
-            get_wizard().query_one("#https_url").value = text_defaults["https_url"]
+#             ##Disable the Next button if we are not yet authenticated and wanting to use the API 
+#             if not get_app().authenticated and get_wizard().current_panel == get_wizard().panels[1]:
+#                 get_wizard().next_button.disabled = True
+#         else:
+#             get_wizard().query_one("#wiz_login_button").disabled = True
+#             get_wizard().next_button.disabled = False
+#             get_wizard().query_one("#https_url").value = text_defaults["https_url"]
             
 def write_from_local(dict, config, d):
     binname  = d["exe_name"]
@@ -463,7 +462,6 @@ def write_from_url(dict, config, d):
             get_app().push_screen(AckModal(GENERATION_OK % binname, pops=2))
             return True
     except Exception as e:
-        raise
         get_app().push_screen(
             AckModal(loc.as_posix() + ": " + GENERATION_EXCEPTION % repr(e))
         )

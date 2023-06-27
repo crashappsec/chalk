@@ -434,7 +434,7 @@ CHALK_CONFIG_INTRO_TEXT    = """
 # Chalk Configuration Tool (alpha 1)
 ## Welcome to the **Chalk** configuration tool!
 
-Chalk is like GPS for your code. It makes it esy to find where your code, containers and binaries are deployed.
+Chalk is like GPS for your code. It makes it easy to find where your code, containers and binaries are deployed.
 
 In CI/CD, Chalk captures data about software, marking executables and containers. Then, wherever you see an artifact, you can extract the mark, so that you can easily look up the info you have, add new info, etc.
 

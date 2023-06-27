@@ -24,17 +24,17 @@ class AckModal(ModalScreen):
         self.msg = msg
         self.pops = pops
         self.button_text = button_text
-        self.ascii_art = ascii_art
+        # self.ascii_art = ascii_art
 
-        self.ascii_art_widget = MDown()
+        #self.ascii_art_widget = MDown()
 
     def compose(self):
-        self.ascii_art_widget.markdown = self.ascii_art
+        #self.ascii_art_widget.markdown = self.ascii_art
         #self.ascii_art_widget.styles.overflow_x = "scroll"
-        yield Header(show_clock=True)
+        yield Header(show_clock=False)
         yield Vertical (
             MDown(self.msg, id="modalmsg", classes="ack_md"),
-            self.ascii_art_widget,
+            #self.ascii_art_widget,
             Button(self.button_text, id="acked"),
             )
         yield Footer()
