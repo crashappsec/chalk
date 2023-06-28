@@ -79,7 +79,7 @@ jobs:
           echo "COPY --from=ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-${{ env.CHALK_VERSION }}-${{ matrix.platform }} /chalk /chalk" >> /tmp/chalkbuild/Dockerfile
           cat /tmp/chalkbuild/Dockerfile
           cd /tmp/chalkbuild
-          docker build -t releasechalk . --load
+          docker build -t releasechalk .
           docker run --rm -it -v `pwd`:/chalkbuild releasechalk /bin/sh -c "cp /chalk /chalkbuild"
           AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} aws s3 cp chalk s3://${S3_BUCKET}/${S3_VERSIONED_KEY} --region ${AWS_REGION} --acl public-read
           AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} aws s3 cp chalk s3://${S3_BUCKET}/${S3_LATEST_KEY} --region ${AWS_REGION} --acl public-read
