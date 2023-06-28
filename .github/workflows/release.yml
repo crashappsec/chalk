@@ -80,7 +80,7 @@ jobs:
           cat /tmp/chalkbuild/Dockerfile
           cd /tmp/chalkbuild
           docker build -t releasechalk .
-          docker run --rm -it -v `pwd`:/chalkbuild releasechalk /bin/sh -c "cp /chalk /chalkbuild"
+          docker run -v `pwd`:/chalkbuild releasechalk /bin/sh -c "cp /chalk /chalkbuild"
           AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} aws s3 cp chalk s3://${S3_BUCKET}/${S3_VERSIONED_KEY} --region ${AWS_REGION} --acl public-read
           AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} aws s3 cp chalk s3://${S3_BUCKET}/${S3_LATEST_KEY} --region ${AWS_REGION} --acl public-read
         env:
