@@ -45,7 +45,7 @@ app = FastAPI(
 _healthChecks = HealthCheckFactory()
 
 app.add_api_route("/health", endpoint=healthCheckRoute(factory=_healthChecks))
-# app.mount("/about", StaticFiles(directory="site", html=True), name="site")
+app.mount("/about", StaticFiles(directory="site"), name="site")
 
 
 def get_db():
@@ -58,7 +58,7 @@ def get_db():
 
 @app.get("/", response_class=RedirectResponse)
 async def redirect_to_docs():
-    return RedirectResponse("/health")
+    return RedirectResponse("/about")
 
 
 @app.get("/version")
