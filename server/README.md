@@ -5,7 +5,7 @@ localhost:8585 in your browser and you should be seeing the chalk docs.
 
 #### Invoking this as a python program (HTTP)
 
-- `docker compose run --rm --service-ports server sh -c "python $PWD/server/app/main.py --help"`
+- `docker compose run --rm --service-ports server sh -c "python $PWD/server/app/main.py"`
 - go to `http://0.0.0.0:8585` in your browser
 
 ## Running the server without keys (HTTPS)

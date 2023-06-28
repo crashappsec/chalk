@@ -1,3 +1,0 @@
-CHALK_VER = "0.1"
-SERVER_VER = "0.1"
-CONFIG_TOOL_VER = "0.1"

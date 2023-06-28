@@ -1,16 +1,16 @@
-name: Publish Config Binaries
+name: Publish Server Binaries
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build chalk-config binaries
+    name: Build chalk server binaries
     runs-on: ${{ matrix.builder }}
 
     outputs:
       chalkversion: ${{ steps.chalkversion.outputs.version }}
-      chalkconfigversion: ${{ steps.chalkversion.outputs.chalk_config_version }}
+      chalkserverigversion: ${{ steps.chalkversion.outputs.chalk_config_version }}
 
     strategy:
       matrix:
@@ -19,25 +19,16 @@ jobs:
           # - builder: buildjet-2vcpu-ubuntu-2204-arm
           #   platform: arm64
           #   flavor: linux
-          #   name: chalkconf
-          # FIXME https://github.com/crashappsec/chalk-internal/issues/357
-          # - builder: windows-latest
-          #   platform: amd64
-          #   flavor: windows
-          # name: chalkconf.exe
           - builder: ubuntu-latest
             platform: amd64
             flavor: linux
-            name: chalkconf
           # only amd64
           # - builder: macos-latest
           #   platform: amd64
           #   flavor: darwin
-          #   name: chalkconf
           - builder: macos-latest
             platform: arm64
             flavor: darwin
-            name: chalkconf
 
     steps:
       - name: Checkout Code
@@ -57,28 +48,27 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r config-tool/requirements.txt
-          pip install --quiet --no-cache-dir awscli
+          pip install -r server/requirements.txt
 
       - name: Create binary
         run: |
-          cd config-tool
-          pyinstaller --onefile chalk-config/chalkconf.py --collect-all textual --collect-all rich
+          cd server/app
+          pyinstaller --onefile main.py --paths=./ --add-data 'conf/*:conf/' --add-data 'site/*:site/' --add-data 'db/*:db/'
 
       - uses: actions/upload-artifact@v3
         with:
-          name: chalk-config-${{ matrix.flavor}}-${{ matrix.platform }}
-          path: config-tool/dist/${{ matrix.name }}
+          name: chalk-server-${{ matrix.flavor}}-${{ matrix.platform }}
+          path: server/app/dist/${{ matrix.name }}
 
       - name: Upload to S3
         run: |
-          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} aws s3 cp config-tool/dist/${LOCAL_KEY} s3://${S3_BUCKET}/${S3_VERSIONED_KEY} --region ${AWS_REGION} --acl public-read
-          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} aws s3 cp config-tool/dist/${LOCAL_KEY} s3://${S3_BUCKET}/${S3_LATEST_KEY} --region ${AWS_REGION} --acl public-read
+          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} aws s3 cp server/app/dist/${LOCAL_KEY} s3://${S3_BUCKET}/${S3_VERSIONED_KEY} --region ${AWS_REGION} --acl public-read
+          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} aws s3 cp server/app/dist/${LOCAL_KEY} s3://${S3_BUCKET}/${S3_LATEST_KEY} --region ${AWS_REGION} --acl public-read
         env:
           AWS_REGION: "us-east-1"
           S3_BUCKET: crashoverride-public-binaries
-          S3_VERSIONED_KEY: ${{ matrix.name }}-${{ env.CHALK_VERSION }}-${{matrix.flavor}}-${{matrix.platform}}
-          S3_LATEST_KEY: ${{ matrix.name }}-${{matrix.flavor}}-${{matrix.platform}}
-          LOCAL_KEY: ${{ matrix.name }}
+          S3_VERSIONED_KEY: chalkserver-${{ env.CHALK_VERSION }}-${{matrix.flavor}}-${{matrix.platform}}
+          S3_LATEST_KEY: chalkserver-${{matrix.flavor}}-${{matrix.platform}}
+          LOCAL_KEY: main
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

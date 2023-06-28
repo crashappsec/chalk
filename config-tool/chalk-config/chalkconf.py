@@ -28,11 +28,9 @@ from textual.widgets import *
 from wiz_panes import *
 from wizard import *
 
-__version__ = "0.1"
-
 first_run = False
 
-conftable = ConfigTable()
+conftable = conf_widgets.ConfigTable()
 set_conf_table(conftable)
 
 # Even if I put this in NewApp's __init__ it goes async and AlphaModal errors??
@@ -90,7 +88,7 @@ def finish_up():
             conftable.the_table.remove_row(conf_widgets.row_ids[to_delete])
             conf_widgets.row_ids = (
                 conf_widgets.row_ids[0:to_delete]
-                + conf_widgets.row_ids[to_delete + 1 :]
+                + conf_widgets.row_ids[to_delete + 1:]
             )
 
         conftable.the_table.add_row(
@@ -148,11 +146,11 @@ def locate_read_changelogs():
 #         )
 #     )
 
-    # ToDo - Breaks rendering in Textual right now, will come back to
-    # pic = ProfilePicture().generate(get_app().id_token_json["picture"])
-    # get_app().push_screen(AckModal(user_profile_data, ascii_art=pic, pops=pop_off))
+# ToDo - Breaks rendering in Textual right now, will come back to
+# pic = ProfilePicture().generate(get_app().id_token_json["picture"])
+# get_app().push_screen(AckModal(user_profile_data, ascii_art=pic, pops=pop_off))
 
-    # get_app().push_screen(AckModal(user_profile_data, pops=pop_off))
+# get_app().push_screen(AckModal(user_profile_data, pops=pop_off))
 
 
 class ConfWiz(Wizard):
@@ -199,9 +197,15 @@ class ConfWizScreen(ModalScreen):
         Binding(key="space", action="next()", show=False),
         Binding(key="up", action="<scroll-up>", show=False),
         Binding(key="down", action="<scroll-down>", show=False),
-        #Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')", description=HELP_TOGGLE,),
-        Binding(key="h", action="show_help", description=HELP_TOGGLE,),
-        Binding(key="r", action=None), # Disable release note keybind in the wizard bottom bar
+        # Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')", description=HELP_TOGGLE,),
+        Binding(
+            key="h",
+            action="show_help",
+            description=HELP_TOGGLE,
+        ),
+        Binding(
+            key="r", action=None
+        ),  # Disable release note keybind in the wizard bottom bar
     ]
 
     def compose(self):
@@ -378,7 +382,7 @@ wiz_screen = ConfWizScreen()
 wiz_screen.wiz = wiz
 
 # Back reference to wizard object in other screens
-#login_screen.wiz = wiz
+# login_screen.wiz = wiz
 
 set_wiz_screen(wiz_screen)
 set_wizard(wiz)
@@ -389,12 +393,12 @@ class NewApp(App):
     TITLE = CHALK_TITLE
     SCREENS = {
         "confwiz": wiz_screen,
-        #"loginscreen": login_screen,
-        #"qrcodescreen": qr_code_screen,
+        # "loginscreen": login_screen,
+        # "qrcodescreen": qr_code_screen,
     }
     BINDINGS = [
         Binding(key="ctrl+q", action="quit", description=QUIT_LABEL, priority=True),
-        #Binding(key="l", action="login()", description=LOGIN_LABEL),
+        # Binding(key="l", action="login()", description=LOGIN_LABEL),
         Binding(key="up", action="<scroll-up>", show=False),
         Binding(key="down", action="<scroll-down>", show=False),
         Binding(key="r", action="releasenotes()", description="Release Notes"),

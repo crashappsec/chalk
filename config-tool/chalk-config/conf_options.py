@@ -2,20 +2,23 @@ import datetime
 import hashlib
 import json
 import os
+import platform
 import sqlite3
+import ssl
 import stat
 import subprocess
 import tempfile
 import urllib
-from pathlib import *
+import urllib.request
+from pathlib import Path
+from typing import Optional
 
 from localized_text import *
+from version import __version__
 
 DB_PATH_LOCAL = Path(os.path.expanduser("~/.config/chalk"))
 DB_PATH_SYSTEM = Path("/var/chalk-config/")
 DB_FILE = Path("chalk-config.db")
-BINARY_DEBUG_URL = "file://" + os.getcwd() + "/bin/chalk"
-BINARY_RELEASE_URL = "file://" + os.getcwd() + "/bin/chalk-release"
 CONTAINER_DEBUG_PATH = "/config-bin/chalk"
 CONTAINER_RELEASE_PATH = "/config-bin/chalk-release"
 
@@ -52,6 +55,59 @@ def set_wizard(w):
 
 def get_wizard():
     return wizard
+
+
+def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
+    BINARY_DEBUG_URL = "file://" + os.getcwd() + "/bin/chalk"
+    BINARY_RELEASE_URL = "file://" + os.getcwd() + "/bin/chalk-release"
+    debug = "-debug" if not release_build else ""
+
+    system = platform.system().lower()
+    assert system in ["linux", "windows", "darwin"], f"Unsupported system {system}"
+
+    exc = None
+    if system == "darwin":
+        # we could be running emulated so just fetch it.
+        # /usr/bin/arch yields i386
+        # uname -a yields x86_64 on emulated binary
+        try:
+            raw = subprocess.check_output(
+                ["sysctl", "sysctl.proc_translated"], shell=True
+            )
+            if raw is not None:
+                translated = raw.strip().decode()
+                if "unknown oid" in translated or "proc_translated: 0" in translated:
+                    machine = platform.machine()
+                else:
+                    machine = "arm64"
+            else:
+                # this should normally be available in non emulated therefore
+                # if raw is None this probably (?) means we are in emulated mode
+                machine = "arm64"
+        except Exception as e:
+            machine = "arm64"
+    else:
+        machine = platform.machine()
+    assert machine in [
+        "arm64",
+        "amd64",
+        "x86_64",
+    ], f"Unsupported architecture {machine}"
+    # pull chalk version matching this release only
+    version = f"{__version__}"
+    url = f"https://crashoverride-public-binaries.s3.amazonaws.com/chalk-{version}-{system}-{machine}{debug}"
+
+    try:
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        return urllib.request.urlopen(url, context=context).read()
+    except Exception:
+        furl = BINARY_RELEASE_URL if release_build else BINARY_DEBUG_URL
+        try:
+            return urllib.request.urlopen(furl).read()
+        except Exception:
+            return None
 
 
 def load_from_json(json_blob, confname=None, note=None):
@@ -414,7 +470,7 @@ def json_to_dict(s):
     return d
 
 
-##### Start con4m generation here.
+# Start con4m generation here.
 
 
 def is_true(d, k):
