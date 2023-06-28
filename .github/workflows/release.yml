@@ -74,6 +74,8 @@ jobs:
 
       - name: Push to S3
         run: |
+          python -m pip install --upgrade pip
+          pip install --quiet --no-cache-dir awscli
           mkdir -p /tmp/chalkbuild
           echo "FROM alpine" >> /tmp/chalkbuild/Dockerfile
           echo "COPY --from=ghcr.io/${{ github.repository_owner }}/chalk:${{ inputs.BASE }}-${{ env.CHALK_VERSION }}-${{ matrix.platform }} /chalk /chalk" >> /tmp/chalkbuild/Dockerfile
@@ -81,8 +83,8 @@ jobs:
           cd /tmp/chalkbuild
           docker build -t releasechalk .
           docker run -v `pwd`:/chalkbuild releasechalk /bin/sh -c "cp /chalk /chalkbuild"
-          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} aws s3 cp chalk s3://${S3_BUCKET}/${S3_VERSIONED_KEY} --region ${AWS_REGION} --acl public-read
-          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} aws s3 cp chalk s3://${S3_BUCKET}/${S3_LATEST_KEY} --region ${AWS_REGION} --acl public-read
+          aws s3 cp chalk s3://${S3_BUCKET}/${S3_VERSIONED_KEY} --acl public-read
+          aws s3 cp chalk s3://${S3_BUCKET}/${S3_LATEST_KEY} --acl public-read
         env:
           AWS_REGION: "us-east-1"
           S3_BUCKET: crashoverride-public-binaries
