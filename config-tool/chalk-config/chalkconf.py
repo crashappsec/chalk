@@ -8,6 +8,7 @@ import sqlite3
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import urllib
 import webbrowser
@@ -25,6 +26,7 @@ from textual.coordinate import *
 from textual.screen import *
 from textual.widgets import Markdown as MDown
 from textual.widgets import *
+from version import __version__
 from wiz_panes import *
 from wizard import *
 from log import get_logger
@@ -42,6 +44,16 @@ intro_md = MDown(CHALK_CONFIG_INTRO_TEXT, id="intro_md")
 
 # Callback that is passed to Wizard() and is invoked when the wizard has finished
 def finish_up():
+
+    #User feedback that the bin gen of chalk is happening (last action)
+    n_str    = "Building ...."
+    n_button = wiz.query_one("#Next")
+    n_button.update(n_str)
+    n_button.label = n_str
+    n_button.variant = "warning"
+    n_button.refresh()
+    #wiz.require_ack("hgdsjkhg")
+
     config = config_to_json()
     as_dict = json_to_dict(config)
     internal_id = dict_to_id(as_dict)
@@ -99,6 +111,15 @@ def finish_up():
         )
         conf_widgets.row_ids.append(internal_id)
 
+    # User feedback that the bin gen of chalk is happening (last action)
+    n_str    = "Next"
+    n_button = wiz.next_button
+    n_button.update(n_str)
+    n_button.label = n_str
+    n_button.variant = "default"
+    n_button.refresh()
+
+    wiz.reset()
 
 def locate_read_changelogs():
     """
@@ -122,36 +143,60 @@ def locate_read_changelogs():
     """
     return chalk_changelog_data, config_changelog_data
 
-
-# ToDo ask user where to download to
-async def do_test_server_download(testserverurl):
+async def do_test_server_download(testserverurl,staticsitefilesurl):
     """
     Perform the actual download
     """
     try:
-        # Download the test server (via a 302 redirect)
-        test_server_binary = requests.get(
-            testserverurl, stream=True, allow_redirects=True
-        )
-        # loc = tempfile.mkdtemp() / Path(urllib.parse.urlparse(testserverurl).path[1:])
+        #Download the test server (via a 302 redirect)
+        test_server_binary = requests.get(testserverurl, stream=True, allow_redirects=True)
         loc = Path.cwd() / Path(urllib.parse.urlparse(testserverurl).path[1:])
-
-        # Write the file to the disk
-        f = loc.open("wb")
-        f.write(test_server_binary.content)
-        f.close()
-
-        # chmod +x the binary
-        st = os.stat(loc)
-        os.chmod(loc, st.st_mode | stat.S_IEXEC)
-        return loc
-
-    except Exception as e:
-        logger.error(f"Could not download {test_server_binary}: {e}")
+        
+        #Write the file to the disk
+        try:
+            f = loc.open("wb")
+            f.write(test_server_binary.content)
+            f.close()
+        except: #Todo cleanup
+            return ""
+    except:
         # Returning empty string causes a error modal to pop
         return ""
 
+    #chmod +x the binary
+    st = os.stat(loc)
+    os.chmod(loc, st.st_mode | stat.S_IEXEC)
 
+    loc_site = Path.cwd() / "site"
+    if os.path.exists(loc_site):
+        logger.info("site directory already exits, not redownloading")
+        return loc
+
+    try:
+        #Download static files
+        static_site_files = requests.get(staticsitefilesurl, stream=True, allow_redirects=True)
+        loc_static = Path.cwd() / Path(urllib.parse.urlparse(staticsitefilesurl).path[1:])
+        #write files
+        try:
+            f = loc_static.open("wb")
+            f.write(static_site_files.content)
+            f.close()
+        except: #Todo cleanup
+            return ""
+    except:
+        # Returning empty string causes a error modal to pop
+        return ""
+    try:
+        #unzip
+        tar = tarfile.open(loc_static)
+        tar.extractall()
+        tar.close()
+        os.remove(loc_static)
+    except:
+        return ""
+
+    return loc
+        
 # def pop_user_profile(id_token_json, success_msg=False, pop_off=1):
 #     """
 #     Pop up a modal showing the logged in user profile
@@ -229,18 +274,11 @@ class ConfWizScreen(ModalScreen):
         Binding(key="space", action="next()", show=False),
         Binding(key="up", action="<scroll-up>", show=False),
         Binding(key="down", action="<scroll-down>", show=False),
-        # Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')", description=HELP_TOGGLE,),
-        Binding(
-            key="h",
-            action="show_help",
-            description=HELP_TOGGLE,
-        ),
-        Binding(
-            key="r", action=None
-        ),  # Disable release note keybind in the wizard bottom bar,
-        Binding(
-            key="d", action=None
-        ),  # Disable download keybind in the wizard bottom bar
+        #Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')", description=HELP_TOGGLE,),
+        Binding(key="h", action="show_help", description=HELP_TOGGLE,),
+        Binding(key="r", action=None), # Disable release note keybind in the wizard bottom bar,
+        Binding(key="d", action=None), # Disable download keybind in the wizard bottom bar
+        Binding(key="b", action=None), # Disable bin gen keybind in the wizard bottom bar
     ]
 
     def compose(self):
@@ -466,10 +504,9 @@ class NewApp(App):
     }
     BINDINGS = [
         Binding(key="ctrl+q", action="quit", description=QUIT_LABEL, priority=True),
-        # Binding(key="l", action="login()", description=LOGIN_LABEL),
-        Binding(
-            key="d", action="downloadtestserver()", description="Download Test Server"
-        ),  ##ToDo localize
+        #Binding(key="l", action="login()", description=LOGIN_LABEL),
+        Binding(key="d", action="downloadtestserver()", description="Download Test Server"), # ToDo localize 
+        Binding(key="b", action="generate_chalk_binary()", description="Generate Chalk Binary"), # ToDo localize 
         Binding(key="r", action="releasenotes()", description="Release Notes"),
         Binding(key="up", action="<scroll-up>", show=False),
         Binding(key="down", action="<scroll-down>", show=False),
@@ -483,6 +520,7 @@ class NewApp(App):
     # qr_code_widget = qr_code_widget
     test_server_download_successful = False
     server_bin_filepath = ""
+    config_table = conftable
 
     def compose(self):
         yield Header(show_clock=False, id="chalk_header")
@@ -537,6 +575,12 @@ class NewApp(App):
             ReleaseNotesModal([changelog_data_chalk, changelog_data_config_tool])
         )
 
+    async def action_generate_chalk_binary(self):
+        """
+        Action to build currently selected binary
+        """
+        await conftable.binary_genration_button.on_button_pressed()
+
     async def action_downloadtestserver(self):
         """
         Download the test chalk server
@@ -545,13 +589,12 @@ class NewApp(App):
             # pop download complete screen
             # ToDo add in specific erorr
             completion_msg = (
-                "# Download Already Complete\n\nChalk Test Server located at: %s"
-                % (self.server_bin_filepath)
+                f"# Test Server Already Downloaded\n\nChalk Test Server downloaded to: {self.server_bin_filepath}"
             )
             self.push_screen(AckModal(msg=completion_msg, wiz=self))
             return None
 
-        ##Update download on main page button bar to show in progress
+        # Update download on main page button bar to show in progress
         dl_button = conftable.download_button
         dl_str = "Downloading ..."
         dl_button = conftable.download_button
@@ -559,38 +602,40 @@ class NewApp(App):
         dl_button.variant = "warning"
         dl_button.refresh()
 
-        ##Dumb but this is needed for the button to actually change ....
+        # Dumb but this is needed for the button to actually change ....
         await asyncio.sleep(1.0)
+    
+        # determine correct arch
+        system, machine = determine_sys_arch()
+        version = f"{__version__}"
+        server_bin_name = f"chalkserver-{version}-{system}-{machine}"
 
-        # determine os of native system or docker host   - ToDo Theo's branch has this in, will integrate after merge
-        if 1:
-            test_server_url = "https://dl.crashoverride.run/chalkserver-darwin-arm64"  # THIS NEEDS TO CHANGE TO BE THE SERVER NOT THE CONFIG TOOL
-            # test_server_url = "https://crashoverride-public-binaries.s3.amazonaws.com/chalkserver-darwin-arm64"
-            # test_server_url = "https://failuretestl"
-
-        ##Start the download
-        self.server_bin_filepath = await do_test_server_download(test_server_url)
-
+        # construct urls
+        test_server_url = "https://dl.crashoverride.run/%s"%(server_bin_name) 
+        #test_server_url = "https://failuretestl"  
+        static_files_url = "https://dl.crashoverride.run/chalksite.tar.gz"
+        #static_files_url = "https://failure"
+        
+        # Download server
+        self.server_bin_filepath = await do_test_server_download(test_server_url, static_files_url)
+        
         # pop download complete screen
         if self.server_bin_filepath:
             self.test_server_download_successful = True
             dl_button = conftable.download_button
-            dl_str = "D/L Completed"
+            dl_str    = "Done"
             dl_button = conftable.download_button
             dl_button.label = dl_str
             dl_button.variant = "success"
             dl_button.refresh()
-            completion_msg = (
-                "# Download Complete\n\nChalk Test Server located at: %s"
-                % (self.server_bin_filepath)
-            )
-
-            self.push_screen(AckModal(msg=completion_msg, wiz=self))
-
+            completion_msg = f"# Download Complete !\n\nChalk Test Server downloaded to: {self.server_bin_filepath}"
+            
+            self.push_screen(AckModal(msg = completion_msg, wiz = self))
+        
         # pop download failed download screen
         else:
             dl_button = conftable.download_button
-            dl_str = "D/L Test Server"
+            dl_str    = "Get Test Server"
             dl_button = conftable.download_button
             dl_button.label = dl_str
             dl_button.variant = "default"
@@ -606,10 +651,10 @@ if __name__ == "__main__":
         )
 
     env_vars = os.environ
-    term = env_vars.get("TERM")
-    color = env_vars.get("COLORTERM")
+    term = env_vars.get("TERM", "")
+    color = env_vars.get("COLORTERM", "")
     # FIXME just adjust the CSS
-    if not ((term is not None and "256" in term) or ("true" in color)):
+    if not (("256" in term) or ("true" in color)):
         raise SystemExit(
             f"Please set $TERM and $COLORTERM to allow 256 colors and truecolor respectively. Found: TERM={term} COLORTERM={color}"
         )

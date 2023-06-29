@@ -59,24 +59,19 @@ def set_wizard(w):
 def get_wizard():
     return wizard
 
-
-def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
-    bin_dir = os.getcwd() + "/bin"
-    os.makedirs(bin_dir, exist_ok=True)
-
-    debug = "-debug" if not release_build else ""
-
+def determine_sys_arch():
+    """
+    """
     system = platform.system().lower()
-    assert system in ["linux", "windows", "darwin"], f"Unsupported system {system}"
+    assert system in ["linux", "windows", "darwin", "aarch64"], f"Unsupported system {system}"
 
-    exc = None
     if system == "darwin":
         # we could be running emulated so just fetch it.
         # /usr/bin/arch yields i386
         # uname -a yields x86_64 on emulated binary
         try:
             raw = subprocess.check_output(
-                ["sysctl", "sysctl.proc_translated"], shell=True
+                ["sysctl", "sysctl.proc_translated"], shell=False
             )
             if raw is not None:
                 translated = raw.strip().decode()
@@ -99,7 +94,21 @@ def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
         "arm64",
         "amd64",
         "x86_64",
+        "aarch64",
     ], f"Unsupported architecture {machine}"
+    logger.info(f"Detected system info: {system}, {machine}")
+    return system, machine
+
+def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
+    bin_dir = os.getcwd() + "/bin"
+    os.makedirs(bin_dir, exist_ok=True)
+
+    debug = "-debug" if not release_build else ""
+
+    exc = None
+    
+    # determine correct arch
+    system, machine = determine_sys_arch()
 
     # pull chalk version matching this release only
     version = f"{__version__}"
@@ -109,7 +118,8 @@ def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
 
     if chalk_bin.is_file():
         return chalk_bin.read_bytes()
-    url = f"https://crashoverride-public-binaries.s3.amazonaws.com/{chalk_name}"
+    url = f"https://dl.crashoverride.run/{chalk_name}"
+    logger.error(f"Downloading chalk from {url}")
 
     try:
         context = ssl.create_default_context()

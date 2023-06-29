@@ -44,7 +44,12 @@ def set_conf_table(t):
 def try_system_init():
     global db
     try:
-        db = sqlite3.connect(os.path.join(DB_PATH_SYSTEM, DB_FILE))
+        db_file = DB_PATH_SYSTEM / DB_FILE
+        if not db_file.is_file():
+            # if not on the system path just create locally
+            db_file = DB_FILE
+        logger.info("Connecting to db: %s", db_file)
+        db = sqlite3.connect(db_file)
         return True
     except Exception as e:
         logger.error(e)   
@@ -54,7 +59,14 @@ def try_system_init():
 def local_init():
     global db
     os.makedirs(DB_PATH_LOCAL, exist_ok=True)
-    db = sqlite3.connect(os.path.join(DB_PATH_LOCAL, DB_FILE))
+    db_file = DB_PATH_LOCAL / DB_FILE
+    logger.info("Connecting to db: %s", db_file)
+
+    try:
+        db = sqlite3.connect(db_file)
+    except Exception as e:
+        logger.error(e)
+        raise
 
 
 def sqlite_init():
@@ -219,7 +231,7 @@ class ConfigTable(Container):
 
         #ToDo update all to proper localized strings
         #self.login_button = LoginButton(label="L⍉gin", classes="basicbutton", id="login_button")
-        self.download_button = DownloadTestServerButton(label="D/L Test Server", classes="basicbutton")
+        self.download_button = DownloadTestServerButton(label="Get Test Server", classes="basicbutton")
         self.binary_genration_button = BinaryGenerationButton(label="Build Chalk", classes="basicbutton")
              
     async def on_mount(self):
@@ -259,12 +271,22 @@ class ConfigTable(Container):
             classes="padme",
         )
 
-
 class BinaryGenerationButton(Button):
     """
     Easy button for user to generate a chalk bin from the selected profile
     """
     async def on_button_pressed(self):
+        #await get_app().action_generate_chalk_binary()
+        # Provide some user feedback in the button
+        bg_button = conftable.binary_genration_button
+        bg_str    = "Building ...."
+        bg_button = conftable.binary_genration_button
+        bg_button.label = bg_str
+        bg_button.variant = "warning"
+        bg_button.refresh()
+
+        ##Dumb but this is needed for the button to actually change ....
+        await asyncio.sleep(1.0)
 
         # Get currently selected profile
         cursor_row = conftable.the_table.cursor_row
@@ -275,6 +297,14 @@ class BinaryGenerationButton(Button):
             config, name, note = r
             as_dict = json_to_dict(config)
             write_binary(name, config, as_dict, pops=1)
+
+        #Reset button
+        bg_button = conftable.binary_genration_button
+        bg_str    = "Build Chalk"
+        bg_button = conftable.binary_genration_button
+        bg_button.label = bg_str
+        bg_button.variant = "default"
+        bg_button.refresh()
 
 class DownloadTestServerButton(Button):
     """
@@ -287,7 +317,6 @@ class RunWizardButton(Button):
     async def on_button_pressed(self):
         await self.app.push_screen("confwiz")
         load_from_json(default_config_json)
-
 
 class EditConfigButton(Button):
     async def on_button_pressed(self):
@@ -510,6 +539,8 @@ def write_from_url(dict, config, d, pops=2):
 
 def write_binary(dict, config, d, pops= 2):
     if "CHALK_BINARIES_ARE_LOCAL" in os.environ:
+        logger.info("Building chalk from local")
         return write_from_local(dict, config, d, pops)
     else:
+        logger.info("Building chalk from url")
         return write_from_url(dict, config, d, pops)

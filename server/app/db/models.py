@@ -6,9 +6,9 @@ from .database import Base
 class Chalk(Base):
     __tablename__ = "chalks"
 
-    id = Column(String, primary_key=True, index=True)
+    metadata_id = Column(String, primary_key=True, index=True)
     metadata_hash = Column(String)
-    metadata_id = Column(String)
+    chalk_id = Column(String)
     raw = Column(JSON)
     # TODO fill out rest
 

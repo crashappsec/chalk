@@ -10,9 +10,18 @@ version=$(cat chalk_internal.nimble | grep version | grep "=" | cut -d'"' -f2)
 
 cd config-tool
 
+function libpath {
+    name=$1
+    ldconfig -p | grep $name | awk '{print $4}'
+}
+
 set -x
 poetry run pip install staticx
-poetry run pyinstaller --onefile chalk-config/chalkconf.py --collect-all textual --collect-all rich
+poetry run pyinstaller \
+    --onefile chalk-config/chalkconf.py \
+    --collect-all textual \
+    --collect-all rich \
+    --add-binary="$(libpath libm.so.6):."
 staticx dist/chalkconf dist/chalkconf-static
 
 function publish {

@@ -438,7 +438,7 @@ Chalk is like GPS for your code. It makes it easy to find where your code, conta
 
 In CI/CD, Chalk captures data about software, marking executables and containers. Then, wherever you see an artifact, you can extract the mark, so that you can easily look up the info you have, add new info, etc.
 
-This wizard currently allows you to setup and manage chalk configurations via Wizard.  The wizard covers the most common functionality, but if you want more customization, you can manually create a configuration.  See the documentation.
+This wizard currently allows you to setup and manage chalk configurations.  The wizard covers the most common functionality, but if you want more customization, you can manually create a configuration.  See the documentation.
 
 Note that the wizard will build a configuration, and generate a
 binary.  'Export' will give you either a JSON blob used within this
