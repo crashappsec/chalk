@@ -58,8 +58,9 @@ def get_wizard():
 
 
 def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
-    BINARY_DEBUG_URL = "file://" + os.getcwd() + "/bin/chalk"
-    BINARY_RELEASE_URL = "file://" + os.getcwd() + "/bin/chalk-release"
+    bin_dir = os.getcwd() + "/bin"
+    os.makedirs(bin_dir, exist_ok=True)
+
     debug = "-debug" if not release_build else ""
 
     system = platform.system().lower()
@@ -93,21 +94,28 @@ def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
         "amd64",
         "x86_64",
     ], f"Unsupported architecture {machine}"
+
     # pull chalk version matching this release only
     version = f"{__version__}"
-    url = f"https://crashoverride-public-binaries.s3.amazonaws.com/chalk-{version}-{system}-{machine}{debug}"
+    chalk_name = f"chalk-{version}-{system}-{machine}{debug}"
+
+    chalk_bin = Path(bin_dir) / chalk_name
+
+    if chalk_bin.is_file():
+        return chalk_bin.read_bytes()
+    url = f"https://crashoverride-public-binaries.s3.amazonaws.com/{chalk_name}"
 
     try:
         context = ssl.create_default_context()
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
-        return urllib.request.urlopen(url, context=context).read()
+        raw = urllib.request.urlopen(url, context=context).read()
+        with open(chalk_bin, "wb") as outf:
+            outf.write(raw)
+
     except Exception:
-        furl = BINARY_RELEASE_URL if release_build else BINARY_DEBUG_URL
-        try:
-            return urllib.request.urlopen(furl).read()
-        except Exception:
-            return None
+        # FIXME
+        return None
 
 
 def load_from_json(json_blob, confname=None, note=None):
@@ -313,7 +321,7 @@ bool_defaults = {
     "env_custom": False,
     "overwrite_config": False,
     "log_truncate": True,
-    #"c0api_toggle"     : True,
+    # "c0api_toggle"     : True,
 }
 
 text_defaults = {
