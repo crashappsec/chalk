@@ -1051,6 +1051,17 @@ This can be set at the command-line with --chalk-as-parent (aka --pg-13)
 """
   }
 
+  field reporting_probability {
+    type: int
+    default: 100
+    validator: func validate_probability
+    shortdoc: "Exec reporting probability"
+    doc: """
+When doing a 'chalk exec', this controls the probability associated with whether we actually send a report, instead of exec-only.  This is intended for high-volume, short-lifetime workloads that only want to sample.  It must be an integer percentage.
+"""
+
+  }
+
   field default_args {
   type:     list[string]
   default:  []
@@ -1472,6 +1483,16 @@ the := operator (it is *not* an attribute).
 """
   }
 
+  field inform_if_cant_sign {
+    type: bool
+    default: false
+    shortdoc: "Inform if we can't sign"
+    doc: """
+If true, when signing is on, but Chalk cannot find a GPG passphrase in
+its environment, this will cause an info-level message to be logged.
+"""
+  }
+
   field run_sbom_tools {
     type:     bool
     default:  false
@@ -1706,6 +1727,13 @@ command line parsing won't happen.
 func keyspec_exists(name) {
   if sections("keyspec").contains(name) { return true; }
   return false
+}
+
+func validate_probability(name, value) {
+  if value <= 0 or value > 100 {
+    return "Probability must be an int greater than 0, but less than or equal to 100"
+  }
+  return ""
 }
 
 func key_callback_check(keyname, callback: func (string) -> `x) {

@@ -235,6 +235,7 @@ proc runCmdInsert*(path: seq[string]) =
   initCollection()
   let virtual = chalkConfig.getVirtualChalk()
 
+
   for item in artifacts(path):
     trace(item.fullPath & ": begin chalking")
     item.collectChalkInfo()
@@ -605,8 +606,8 @@ proc runCmdConfLoad*() =
       newCon4m = f.readAll()
       f.close()
     except:
-      cantLoad(filename & ": could not read configuration file")
       dumpExOnDebug()
+      cantLoad(filename & ": could not read configuration file")
 
     if chalkConfig.getValidateConfigsOnLoad():
       info(filename & ": Validating configuration.")
@@ -663,8 +664,8 @@ proc runCmdConfLoad*() =
 
     info("Configuration written to new binary: " & selfChalk.fullPath)
   except:
-    cantLoad("Configuration loading failed: " & getCurrentExceptionMsg())
     dumpExOnDebug()
+    cantLoad("Configuration loading failed: " & getCurrentExceptionMsg())
   doReporting()
 
 
@@ -680,7 +681,6 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
   when hostOs == "macosx":
     if proc_pidpath(pid, addr n[0], PATH_MAX) <= 0:
       return none(ChalkObj)
-    return none(ChalkObj) # Need a Mach virtual-only codec.
   elif hostOs == "linux":
     let procPath = "/proc/" & $(pid) & "/exe"
     if readlink(cstring(procPath),
@@ -716,6 +716,7 @@ proc runCmdExec*(args: seq[string]) =
     error("'exec' command not supported on this platform.")
     quit(1)
 
+
   let
     execConfig = chalkConfig.execConfig
     cmdName    = execConfig.getCommandName()
@@ -724,6 +725,7 @@ proc runCmdExec*(args: seq[string]) =
     appendArgs = execConfig.getAppendCommandLineArgs()
     overrideOk = execConfig.getOverrideOk()
     usePath    = execConfig.getUsePath()
+    pct        = execConfig.getReportingProbability()
     allOpts    = findAllExePaths(cmdName, cmdPath, usePath)
     ppid       = getpid()   # Get the current pid before we fork.
 
@@ -749,6 +751,16 @@ proc runCmdExec*(args: seq[string]) =
     quit(1)
   elif len(args) != 0:
     argsToPass = args
+
+  echo "Pct = ", pct
+
+  if pct != 100:
+    let
+      inRange = pct/100
+      randVal = randInt() / high(int)
+
+    if randVal > inRange:
+      handleExec(allOpts, argsToPass)
 
   let pid  = fork()
 
