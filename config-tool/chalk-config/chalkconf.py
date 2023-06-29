@@ -41,19 +41,21 @@ set_conf_table(conftable)
 # Even if I put this in NewApp's __init__ it goes async and AlphaModal errors??
 intro_md = MDown(CHALK_CONFIG_INTRO_TEXT, id="intro_md")
 
+def update_next_button(label, variant="default"):
+    """
+    """
+    n_str    = label
+    n_button = wiz.query_one("#Next")
+    n_button.update(n_str)
+    n_button.label = n_str
+    n_button.variant = variant
+    n_button.refresh()
 
 # Callback that is passed to Wizard() and is invoked when the wizard has finished
 def finish_up():
 
-    #User feedback that the bin gen of chalk is happening (last action)
-    n_str    = "Building ...."
-    n_button = wiz.query_one("#Next")
-    n_button.update(n_str)
-    n_button.label = n_str
-    n_button.variant = "warning"
-    n_button.refresh()
-    #wiz.require_ack("hgdsjkhg")
-
+    #User feedback that the bin gen of chalk is happening (last action in the wizard)
+    #update_next_button("Building ....")
     config = config_to_json()
     as_dict = json_to_dict(config)
     internal_id = dict_to_id(as_dict)
@@ -84,6 +86,7 @@ def finish_up():
         ).fetchone()
         if idtest != None:
             name = idtest[0]
+            #update_next_button("Next")
             return ERR_DUPE % idtest[0]
         row = [confname, timestamp, CHALK_VERSION, internal_id, config, note]
         query = "INSERT INTO configs VALUES(?, ?, ?, ?, ?, ?)"
@@ -112,14 +115,7 @@ def finish_up():
         conf_widgets.row_ids.append(internal_id)
 
     # User feedback that the bin gen of chalk is happening (last action)
-    n_str    = "Next"
-    n_button = wiz.next_button
-    n_button.update(n_str)
-    n_button.label = n_str
-    n_button.variant = "default"
-    n_button.refresh()
-
-    wiz.reset()
+    #update_next_button("Next")
 
 def locate_read_changelogs():
     """

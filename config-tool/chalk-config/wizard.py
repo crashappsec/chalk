@@ -350,11 +350,14 @@ class Wizard(Container):
         cb_results = self.end_callback()
 
         if not cb_results:
+            logger.info("Final callback returned None")
             self.section_index = 0
             self.set_panel(self.first_panel)
             self.reset(force = True)
         else:
+            logger.info(f"Final callback returned {cb_results}")
             self.section_index -= 1
+            self.require_ack(cb_results)
             self.sections[self.section_index].unadvance()
 
     def action_next(self):
