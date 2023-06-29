@@ -298,8 +298,6 @@ class BinaryGenerationButton(Button):
             as_dict = json_to_dict(config)
             write_binary(name, config, as_dict, pops=1)
 
-        #Todo fix error conditions
-
         #Reset button
         bg_button = conftable.binary_genration_button
         bg_str    = "Build Chalk"

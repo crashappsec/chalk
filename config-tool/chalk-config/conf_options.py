@@ -118,7 +118,8 @@ def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
 
     if chalk_bin.is_file():
         return chalk_bin.read_bytes()
-    url = f"https://crashoverride-public-binaries.s3.amazonaws.com/{chalk_name}"
+    url = f"https://dl.crashoverride.run/{chalk_name}"
+    logger.error(f"Downloading chalk from {url}")
 
     try:
         context = ssl.create_default_context()
