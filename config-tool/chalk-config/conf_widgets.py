@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import json
 import os
+import requests
 import shutil
 import sqlite3
 import stat
@@ -211,6 +212,11 @@ class ConfigTable(Container):
         # ToDo update proper localized strings
         # self.login_button = LoginButton(label="L⍉gin", classes="basicbutton", id="login_button")
 
+        #ToDo update all to proper localized strings
+        #self.login_button = LoginButton(label="L⍉gin", classes="basicbutton", id="login_button")
+        self.download_button = DownloadTestServerButton(label="D/L Test Server", classes="basicbutton")
+        self.binary_genration_button = BinaryGenerationButton(label="Build Chalk", classes="basicbutton")
+             
     async def on_mount(self):
         await self.the_table.mount()
         global row_ids
@@ -243,20 +249,34 @@ class ConfigTable(Container):
             EditConfigButton(label=EDIT_LABEL, classes="basicbutton"),
             DelConfigButton(label=DELETE_LABEL, classes="basicbutton"),
             ExConfigButton(label=EXPORT_LABEL, classes="basicbutton"),
-            ReleaseNotesButton(
-                label="Release Notes", classes="basicbutton"
-            ),  # ToDo localize
+            self.download_button,
+            self.binary_genration_button,
             classes="padme",
         )
 
 
-class ReleaseNotesButton(Button):
+class BinaryGenerationButton(Button):
+    """
+    Easy button for user to generate a chalk bin from the selected profile
+    """
     async def on_button_pressed(self):
-        """
-        Pop open release notes modal
-        """
-        get_app().action_releasenotes()
 
+        # Get currently selected profile
+        cursor_row = conftable.the_table.cursor_row
+        r = cursor.execute(
+            "SELECT json, name, note FROM configs WHERE id=?", [row_ids[cursor_row]]
+        ).fetchone()
+        if r is not None:
+            config, name, note = r
+            as_dict = json_to_dict(config)
+            write_binary(name, config, as_dict, pops=1)
+
+class DownloadTestServerButton(Button):
+    """
+    Easy button for user to d/l the test chalk server locally
+    """
+    async def on_button_pressed(self):
+        await get_app().action_downloadtestserver()
 
 class RunWizardButton(Button):
     async def on_button_pressed(self):
@@ -411,11 +431,10 @@ class AlphaModal(AckModal):
 #             get_wizard().query_one("#wiz_login_button").disabled = True
 #             get_wizard().next_button.disabled = False
 #             get_wizard().query_one("#https_url").value = text_defaults["https_url"]
-
-
-def write_from_local(dict, config, d):
-    binname = d["exe_name"]
-
+            
+def write_from_local(dict, config, d, pops=2):
+    binname  = d["exe_name"]
+    
     if d["release_build"]:
         chalk_bin = CONTAINER_RELEASE_PATH
     else:
@@ -429,20 +448,20 @@ def write_from_local(dict, config, d):
     try:
         subproc = subprocess.run([chalk_bin, "--error", "load", c4mfilename])
         if subproc.returncode:
-            get_app().push_screen(AckModal(GENERATION_FAILED, pops=2))
+            get_app().push_screen(AckModal(GENERATION_FAILED, pops))
             return True
         else:
             newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
             shutil.move(chalk_bin + ".new", newloc)
             newloc.chmod(0o774)
-            get_app().push_screen(AckModal(GENERATION_OK % newloc, pops=2))
+            get_app().push_screen(AckModal(GENERATION_OK % newloc, pops))
             return True
     except Exception as e:
         err = chalk_bin + " load " + c4mfilename + ": "
         get_app().push_screen(AckModal(GENERATION_EXCEPTION % (err + repr(e))))
 
 
-def write_from_url(dict, config, d):
+def write_from_url(dict, config, d, pops=2):
     binname = d["exe_name"]
 
     base_binary = get_chalk_binary_release_bytes(d["release_build"])
@@ -466,13 +485,13 @@ def write_from_url(dict, config, d):
     try:
         subproc = subprocess.run([loc, "--error", "load", c4mfilename])
         if subproc.returncode:
-            get_app().push_screen(AckModal(GENERATION_FAILED, pops=2))
+            get_app().push_screen(AckModal(GENERATION_FAILED, pops))
             return True
         else:
             newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
             shutil.move(loc.as_posix() + ".new", newloc)
             newloc.chmod(0o774)
-            get_app().push_screen(AckModal(GENERATION_OK % binname, pops=2))
+            get_app().push_screen(AckModal(GENERATION_OK % binname, pops))
             return True
     except Exception as e:
         get_app().push_screen(
@@ -481,8 +500,8 @@ def write_from_url(dict, config, d):
         return False
 
 
-def write_binary(dict, config, d):
+def write_binary(dict, config, d, pops= 2):
     if "CHALK_BINARIES_ARE_LOCAL" in os.environ:
-        return write_from_local(dict, config, d)
+        return write_from_local(dict, config, d, pops)
     else:
-        return write_from_url(dict, config, d)
+        return write_from_url(dict, config, d, pops)

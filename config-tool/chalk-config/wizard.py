@@ -25,7 +25,6 @@ class AckModal(ModalScreen):
         self.pops = pops
         self.button_text = button_text
         # self.ascii_art = ascii_art
-
         #self.ascii_art_widget = MDown()
 
     def compose(self):
@@ -44,11 +43,36 @@ class AckModal(ModalScreen):
             self.app.pop_screen()
             self.pops = self.pops - 1
 
+class DownloadTestServerModal(ModalScreen):
+    """
+    Pop-up to download the test server
+    """
+    DEFAULT_CSS=WIZARD_CSS
+    BINDINGS = [
+        Binding(key="escape,left,space,enter", action="button_pressed", description = BACK_LABEL),
+        Binding(key="r", action="button_pressed", description = MAIN_MENU, show=False),
+        Binding(key="l", action="button_pressed", description = MAIN_MENU, show=False),
+        Binding(key="d", action="button_pressed", description = MAIN_MENU, show=False),
+        Binding(key="ctrl+q", action="button_pressed", description = MAIN_MENU, show=False),
+    ]
+
+
+    def compose(self):
+        #self.ascii_art_widget.markdown = self.ascii_art
+        #self.ascii_art_widget.styles.overflow_x = "scroll"
+        yield Header(show_clock=False)
+        yield Vertical (
+            MDown(self.msg, id="downloadcompletemsg"),
+            #self.ascii_art_widget,
+            Button(self.button_text, id="acked"),
+            )
+        yield Footer()
+
+
 class ReleaseNotesModal(ModalScreen):
     """
     Pop-up to show release notes
     """
-    #DEFAULT_CSS=WIZARD_CSS
     BINDINGS = [
         Binding(key="escape,left,space,enter", action="button_pressed", description = BACK_LABEL),
         Binding(key="r", action="button_pressed", description = MAIN_MENU, show=False),
@@ -98,15 +122,12 @@ class ReleaseNotesModal(ModalScreen):
         self.query_one(ContentSwitcher).current = event.tab.id
 
     def on_button_pressed(self):
-        while self.pops:
-            self.app.pop_screen()
-            self.pops = self.pops - 1
+        self.action_button_pressed()
 
     def action_button_pressed(self):
         while self.pops:
             self.app.pop_screen()
             self.pops = self.pops - 1
- 
         
 class HelpWindow(Container):
     def action_help(self):
