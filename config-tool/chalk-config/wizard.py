@@ -355,7 +355,6 @@ class Wizard(Container):
             self.reset(force = True)
         else:
             self.section_index -= 1
-            self.require_ack(cb_results)
             self.sections[self.section_index].unadvance()
 
     def action_next(self):

@@ -259,12 +259,22 @@ class ConfigTable(Container):
             classes="padme",
         )
 
-
 class BinaryGenerationButton(Button):
     """
     Easy button for user to generate a chalk bin from the selected profile
     """
     async def on_button_pressed(self):
+        #await get_app().action_generate_chalk_binary()
+        # Provide some user feedback in the button
+        bg_button = conftable.binary_genration_button
+        bg_str    = "Building ...."
+        bg_button = conftable.binary_genration_button
+        bg_button.label = bg_str
+        bg_button.variant = "warning"
+        bg_button.refresh()
+
+        ##Dumb but this is needed for the button to actually change ....
+        await asyncio.sleep(1.0)
 
         # Get currently selected profile
         cursor_row = conftable.the_table.cursor_row
@@ -275,6 +285,16 @@ class BinaryGenerationButton(Button):
             config, name, note = r
             as_dict = json_to_dict(config)
             write_binary(name, config, as_dict, pops=1)
+
+        #Todo fix error conditions
+
+        #Reset button
+        bg_button = conftable.binary_genration_button
+        bg_str    = "Build Chalk"
+        bg_button = conftable.binary_genration_button
+        bg_button.label = bg_str
+        bg_button.variant = "default"
+        bg_button.refresh()
 
 class DownloadTestServerButton(Button):
     """
@@ -287,7 +307,6 @@ class RunWizardButton(Button):
     async def on_button_pressed(self):
         await self.app.push_screen("confwiz")
         load_from_json(default_config_json)
-
 
 class EditConfigButton(Button):
     async def on_button_pressed(self):
