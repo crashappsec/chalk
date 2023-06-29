@@ -166,11 +166,17 @@ async def do_test_server_download(testserverurl,staticsitefilesurl):
     #chmod +x the binary
     st = os.stat(loc)
     os.chmod(loc, st.st_mode | stat.S_IEXEC)
+
+    loc_site = Path.cwd() / "site"
+    if os.path.exists(loc_site):
+        logger.info("site directory already exits, not redownloading")
+        return loc
+
     try:
         #Download static files
         static_site_files = requests.get(staticsitefilesurl, stream=True, allow_redirects=True)
-        #write files
         loc_static = Path.cwd() / Path(urllib.parse.urlparse(staticsitefilesurl).path[1:])
+        #write files
         try:
             f = loc_static.open("wb")
             f.write(static_site_files.content)
