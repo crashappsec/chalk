@@ -606,10 +606,10 @@ if __name__ == "__main__":
         )
 
     env_vars = os.environ
-    term = env_vars.get("TERM")
-    color = env_vars.get("COLORTERM")
+    term = env_vars.get("TERM", "")
+    color = env_vars.get("COLORTERM", "")
     # FIXME just adjust the CSS
-    if not ((term is not None and "256" in term) or ("true" in color)):
+    if not (("256" in term) or ("true" in color)):
         raise SystemExit(
             f"Please set $TERM and $COLORTERM to allow 256 colors and truecolor respectively. Found: TERM={term} COLORTERM={color}"
         )

@@ -10,6 +10,11 @@ version=$(cat chalk_internal.nimble | grep version | grep "=" | cut -d'"' -f2)
 
 cd server
 
+function libpath {
+    name=$1
+    ldconfig -p | grep $name | awk '{print $4}'
+}
+
 set -x
 poetry run pip install -r requirements.txt
 poetry run pip install staticx
@@ -18,7 +23,8 @@ cd app
 poetry run pyinstaller \
     --onefile main.py \
     --paths=./ \
-    --add-data 'conf/*:conf/'
+    --add-data 'conf/*:conf/' \
+    --add-binary="$(libpath libm.so.6):."
 cp dist/main server
 staticx server server-static
 
