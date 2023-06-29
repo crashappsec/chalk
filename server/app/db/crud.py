@@ -3,6 +3,10 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 
 
+def get_chalks(db: Session) -> list[models.Chalk]:
+    return db.query(models.Chalk).all()
+
+
 def add_chalk(db: Session, chalk: schemas.Chalk) -> models.Chalk:
     db_chalk = models.Chalk(
         id=chalk.id,
@@ -12,7 +16,6 @@ def add_chalk(db: Session, chalk: schemas.Chalk) -> models.Chalk:
     )
     db.add(db_chalk)
     db.commit()
-    db.refresh(db_chalk)
     return db_chalk
 
 
@@ -27,5 +30,4 @@ def add_stat(db: Session, stat: schemas.Stats) -> models.Chalk:
     )
     db.add(db_stat)
     db.commit()
-    db.refresh(db_stat)
     return db_stat

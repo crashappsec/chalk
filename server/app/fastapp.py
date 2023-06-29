@@ -64,7 +64,7 @@ async def redirect_to_docs():
 
 @app.get("/version")
 async def version():
-    return {__version__}
+    return {"version": __version__}
 
 
 @app.post("/ping")
@@ -102,7 +102,12 @@ async def add_chalk(request: Request, db: Session = Depends(get_db)):
                     id=c["CHALK_ID"],
                     metadata_hash=c["METADATA_HASH"],
                     metadata_id=c["METADATA_ID"],
-                    raw=json.dumps(entry),
+                    raw=json.dumps(
+                        {
+                            **c,
+                            **{k: v for k, v in entry.items() if k != "_CHALKS"},
+                        }
+                    ),
                 )
                 try:
                     crud.add_chalk(db, chalk=chalk)
@@ -118,3 +123,9 @@ async def add_chalk(request: Request, db: Session = Depends(get_db)):
     finally:
         if not all_unique:
             raise HTTPException(status_code=409, detail="Duplicate chalk")
+
+
+@app.get("/chalks")
+async def get_chalks(request: Request, db: Session = Depends(get_db)):
+    chalks = crud.get_chalks(db)
+    return [c.raw for c in chalks]
