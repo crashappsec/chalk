@@ -589,8 +589,7 @@ class NewApp(App):
             # pop download complete screen
             # ToDo add in specific erorr
             completion_msg = (
-                "# Download Already Complete\n\nChalk Test Server located at: %s"
-                % (self.server_bin_filepath)
+                f"# Test Server Already Downloaded\n\nChalk Test Server downloaded to: {self.server_bin_filepath}"
             )
             self.push_screen(AckModal(msg=completion_msg, wiz=self))
             return None
@@ -629,7 +628,7 @@ class NewApp(App):
             dl_button.label = dl_str
             dl_button.variant = "success"
             dl_button.refresh()
-            completion_msg = "# Download Complete !"
+            completion_msg = f"# Download Complete !\n\nChalk Test Server downloaded to: {self.server_bin_filepath}"
             
             self.push_screen(AckModal(msg = completion_msg, wiz = self))
         
