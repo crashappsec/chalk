@@ -3,13 +3,17 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 
 
+def get_chalk(db: Session, metadata_id: str) -> models.Chalk:
+    return db.query(models.Chalk).get(metadata_id)
+
+
 def get_chalks(db: Session) -> list[models.Chalk]:
     return db.query(models.Chalk).all()
 
 
 def add_chalk(db: Session, chalk: schemas.Chalk) -> models.Chalk:
     db_chalk = models.Chalk(
-        id=chalk.id,
+        chalk_id=chalk.id,
         metadata_hash=chalk.metadata_hash,
         metadata_id=chalk.metadata_id,
         raw=chalk.raw,
@@ -17,6 +21,21 @@ def add_chalk(db: Session, chalk: schemas.Chalk) -> models.Chalk:
     db.add(db_chalk)
     db.commit()
     return db_chalk
+
+
+def add_chalks(db: Session, chalks: list[schemas.Chalk]) -> list[models.Chalk]:
+    db_chalks = [
+        models.Chalk(
+            chalk_id=chalk.id,
+            metadata_hash=chalk.metadata_hash,
+            metadata_id=chalk.metadata_id,
+            raw=chalk.raw,
+        )
+        for chalk in chalks
+    ]
+    db.add_all(db_chalks)
+    db.commit()
+    return db_chalks
 
 
 def add_stat(db: Session, stat: schemas.Stats) -> models.Chalk:

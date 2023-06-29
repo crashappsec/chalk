@@ -91,41 +91,50 @@ async def ping(request: Request, db: Session = Depends(get_db)):
 @app.post("/report")
 async def add_chalk(request: Request, db: Session = Depends(get_db)):
     try:
-        all_unique = True
         raw = await request.body()
         chalks = json.loads(raw)
+        model_chalks: list[schemas.Chalk] = []
         for entry in chalks:
             if "_CHALKS" not in entry:
                 continue
             for c in entry["_CHALKS"]:
-                chalk = schemas.Chalk(
-                    id=c["CHALK_ID"],
-                    metadata_hash=c["METADATA_HASH"],
-                    metadata_id=c["METADATA_ID"],
-                    raw=json.dumps(
-                        {
-                            **c,
-                            **{k: v for k, v in entry.items() if k != "_CHALKS"},
-                        }
-                    ),
+                model_chalks.append(
+                    schemas.Chalk(
+                        id=c["CHALK_ID"],
+                        metadata_hash=c["METADATA_HASH"],
+                        metadata_id=c["METADATA_ID"],
+                        raw=json.dumps(
+                            {
+                                **c,
+                                **{k: v for k, v in entry.items() if k != "_CHALKS"},
+                            }
+                        ),
+                    )
                 )
-                try:
-                    crud.add_chalk(db, chalk=chalk)
-                except (
-                    sqlalchemy.exc.IntegrityError,
-                    sqlalchemy.exc.PendingRollbackError,
-                ):
-                    logger.warning("Duplicate chalk id %s", c["CHALK_ID"])
-                    all_unique = False
+        try:
+            crud.add_chalks(db, chalks=model_chalks)
+        except (
+            sqlalchemy.exc.IntegrityError,
+            sqlalchemy.exc.PendingRollbackError,
+        ) as e:
+            logger.warning("Duplicate chalks %s", e)
+            raise HTTPException(status_code=409, detail="Duplicate chalk")
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("report", exc_info=True)
         raise HTTPException(status_code=500, detail="Unhandled data")
-    finally:
-        if not all_unique:
-            raise HTTPException(status_code=409, detail="Duplicate chalk")
 
 
 @app.get("/chalks")
 async def get_chalks(request: Request, db: Session = Depends(get_db)):
     chalks = crud.get_chalks(db)
     return [c.raw for c in chalks]
+
+
+@app.get("/chalks/{metadata_id}")
+async def get_chalk(request: Request, metadata_id: str, db: Session = Depends(get_db)):
+    chalk = crud.get_chalk(db, metadata_id)
+    if chalk is None:
+        raise HTTPException(status_code=404)
+    return chalk.raw
