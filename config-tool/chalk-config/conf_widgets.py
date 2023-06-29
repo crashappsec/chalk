@@ -231,7 +231,7 @@ class ConfigTable(Container):
 
         #ToDo update all to proper localized strings
         #self.login_button = LoginButton(label="L⍉gin", classes="basicbutton", id="login_button")
-        self.download_button = DownloadTestServerButton(label="D/L Test Server", classes="basicbutton")
+        self.download_button = DownloadTestServerButton(label="Get Test Server", classes="basicbutton")
         self.binary_genration_button = BinaryGenerationButton(label="Build Chalk", classes="basicbutton")
              
     async def on_mount(self):
