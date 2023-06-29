@@ -539,6 +539,8 @@ def write_from_url(dict, config, d, pops=2):
 
 def write_binary(dict, config, d, pops= 2):
     if "CHALK_BINARIES_ARE_LOCAL" in os.environ:
+        logger.info("Building chalk from local")
         return write_from_local(dict, config, d, pops)
     else:
+        logger.info("Building chalk from url")
         return write_from_url(dict, config, d, pops)
