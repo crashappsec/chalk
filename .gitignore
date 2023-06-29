@@ -2,7 +2,6 @@
 .config-tool-bin/
 config-tool-outdir
 */chalk
-*/chalkconf.spec
 /bin/chalk
 /chalk
 # universal tags
@@ -18,4 +17,9 @@ src/c4autoconf.nim
 *.pyc
 */__pycache__/*
 .envrc.private
-config-tool/dist
+dist
+build
+*.spec
+server/app/server
+server/app/server-static
+*.tar.gz

@@ -53,6 +53,7 @@ FROM config-tool-compile as build
 
 COPY config-tool /tmp/
 RUN cd /tmp && pyinstaller --onefile /tmp/chalk-config/chalkconf.py --collect-all textual --collect-all rich
+# RUN staticx /tmp/dist/chalkconf /tmp/dist/chalkconf-static
 
 # -------------------------------------------------------------------
 
@@ -64,6 +65,6 @@ WORKDIR /
 
 RUN mkdir /outdir/
 
-COPY --from=build /tmp/dist/chalkconf /
+COPY --from=build /tmp/dist/chalkconf* /
 
 ENTRYPOINT ["/chalkconf"]

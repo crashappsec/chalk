@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi_healthcheck import HealthCheckFactory, healthCheckRoute
 from sqlalchemy.orm import Session
 
+
 models.Base.metadata.create_all(bind=engine)
 
 logging.config.fileConfig(
@@ -45,7 +46,7 @@ app = FastAPI(
 _healthChecks = HealthCheckFactory()
 
 app.add_api_route("/health", endpoint=healthCheckRoute(factory=_healthChecks))
-app.mount("/about", StaticFiles(directory="site"), name="site")
+app.mount("/about", StaticFiles(directory="site", html=True), name="site")
 
 
 def get_db():
