@@ -1995,7 +1995,7 @@ Host keys are in the host_report_other_base (i.e., non-insert) profile.
   key._OP_ARTIFACT_PATH.report           = true
   key._OP_ARTIFACT_TYPE.report           = true
   key._CURRENT_HASH.report               = true
-  key._VALIDATED.report                  = true
+  key._VALIDATED.report                  = false
   key._OP_CHALKED_KEYS.report            = false
   key._OP_ARTIFACT_REPORT_KEYS.report    = false
   key._REPO_TAGS.report                  = true
@@ -2053,7 +2053,7 @@ info.
   key._OP_ARTIFACT_PATH.report           = true
   key._OP_ARTIFACT_TYPE.report           = true
   key._CURRENT_HASH.report               = true
-  key._VALIDATED.report                  = true
+  key._VALIDATED.report                  = false
   key._CURRENT_HASH.report               = true
   key._OP_ARTIFACT_PATH.report           = true
   key._REPO_TAGS.report                  = true
@@ -2112,7 +2112,7 @@ Note that _CURRENT_HASH will be empty when deleting, since that key represents t
   key.METADATA_ID.report              = true
   key._OP_ARTIFACT_PATH.report        = true
   key._OP_ARTIFACT_TYPE.report        = true
-  key._VALIDATED.report               = true
+  key._VALIDATED.report               = false
   key.SBOM.report                     = true
   key.SAST.report                     = true
   key.ERR_INFO.report                 = true
@@ -2338,5 +2338,6 @@ sink_config dump_out {
 }
 
 default_command = "help"
+
 
 exec { }
