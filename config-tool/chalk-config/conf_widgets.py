@@ -44,7 +44,12 @@ def set_conf_table(t):
 def try_system_init():
     global db
     try:
-        db = sqlite3.connect(os.path.join(DB_PATH_SYSTEM, DB_FILE))
+        db_file = DB_PATH_SYSTEM / DB_FILE
+        if not db_file.is_file():
+            # if not on the system path just create locally
+            db_file = DB_FILE
+        logger.info("Connecting to db: %s", db_file)
+        db = sqlite3.connect(db_file)
         return True
     except Exception as e:
         logger.error(e)   
@@ -54,7 +59,14 @@ def try_system_init():
 def local_init():
     global db
     os.makedirs(DB_PATH_LOCAL, exist_ok=True)
-    db = sqlite3.connect(os.path.join(DB_PATH_LOCAL, DB_FILE))
+    db_file = DB_PATH_LOCAL / DB_FILE
+    logger.info("Connecting to db: %s", db_file)
+
+    try:
+        db = sqlite3.connect(db_file)
+    except Exception as e:
+        logger.error(e)
+        raise
 
 
 def sqlite_init():
