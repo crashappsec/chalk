@@ -106,11 +106,53 @@ proc idFormat*(rawHash: string): string =
 template hashFmt*(s: string): string =
   s.toHex().toLowerAscii()
 
+when hostOs == "macosx":
+  {.emit: """
+#include <unistd.h>
+#include <libproc.h>
+
+   char *c_get_app_fname(char *buf) {
+     proc_pidpath(getpid(), buf, PROC_PIDPATHINFO_MAXSIZE); // 4096
+     return buf;
+   }
+   """.}
+
+  proc cGetAppFilename(x: cstring): cstring {.importc: "c_get_app_fname".}
+
+  proc betterGetAppFileName(): string =
+    var x: array[4096, byte]
+
+    return $(cGetAppFilename(cast[cstring](addr x[0])))
+
+elif hostOs == "linux":
+  {.emit: """
+#include <unistd.h>
+
+   char *c_get_app_fname(char *buf) {
+   char proc_path[128];
+   snprintf(proc_path, 128, "/proc/%d/exe", getpid());
+   readlink(proc_path, buf, 4096);
+   return buf;
+   }
+   """.}
+
+  proc cGetAppFilename(x: cstring): cstring {.importc: "c_get_app_fname".}
+
+  proc betterGetAppFileName(): string =
+    var x: array[4096, byte]
+
+    return $(cGetAppFilename(cast[cstring](addr x[0])))
+else:
+  template betterGetAppFileName(): string = getAppFileName()
+
+
 template getMyAppPath*(): string =
+
+
   when hostOs == "macosx":
     if chalkConfig == nil:
-      getAppFileName()
+      betterGetAppFileName()
     else:
-      chalkConfig.getSelfLocation().getOrElse(getAppFileName())
+      chalkConfig.getSelfLocation().getOrElse(betterGetAppFileName())
   else:
-    getAppFileName()
+    betterGetAppFileName()
