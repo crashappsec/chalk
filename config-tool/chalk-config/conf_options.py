@@ -14,7 +14,10 @@ from pathlib import Path
 from typing import Optional
 
 from localized_text import *
+from log import get_logger
 from version import __version__
+
+logger = get_logger(__name__)
 
 DB_PATH_LOCAL = Path(os.path.expanduser("~/.config/chalk"))
 DB_PATH_SYSTEM = Path("/var/chalk-config/")
@@ -86,6 +89,9 @@ def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
                 # if raw is None this probably (?) means we are in emulated mode
                 machine = "arm64"
         except Exception as e:
+            logger.error(
+                f"Could not determine if darwing binary is emulated. Setting arch to arm64. {e}"
+            )
             machine = "arm64"
     else:
         machine = platform.machine()
@@ -113,8 +119,8 @@ def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
         with open(chalk_bin, "wb") as outf:
             outf.write(raw)
 
-    except Exception:
-        # FIXME
+    except Exception as e:
+        logger.error(f"Could not download chalk binary: {e}")
         return None
 
 

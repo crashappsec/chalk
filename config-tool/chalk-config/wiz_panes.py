@@ -20,7 +20,9 @@ from localized_text import *
 
 # import pyqrcode
 # import requests
+from log import get_logger 
 
+logger = get_logger(__name__)
 
 def deal_with_overwrite_widget():
     wiz               = get_wizard()
@@ -569,7 +571,8 @@ class UsagePane(WizContainer):
     def complete(self):
         try:
             return self.has_entered
-        except:
+        except Exception as e:
+            logger.error(e)
             self.has_entered = False
             return False
     def doc(self):

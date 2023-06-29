@@ -27,6 +27,9 @@ from textual.widgets import Markdown as MDown
 from textual.widgets import *
 from wiz_panes import *
 from wizard import *
+from log import get_logger
+
+logger = get_logger(__name__)
 
 first_run = False
 
@@ -88,7 +91,7 @@ def finish_up():
             conftable.the_table.remove_row(conf_widgets.row_ids[to_delete])
             conf_widgets.row_ids = (
                 conf_widgets.row_ids[0:to_delete]
-                + conf_widgets.row_ids[to_delete + 1:]
+                + conf_widgets.row_ids[to_delete + 1 :]
             )
 
         conftable.the_table.add_row(
@@ -119,31 +122,35 @@ def locate_read_changelogs():
     """
     return chalk_changelog_data, config_changelog_data
 
-#ToDo ask user where to download to
+
+# ToDo ask user where to download to
 async def do_test_server_download(testserverurl):
     """
     Perform the actual download
     """
     try:
-        #Download the test server (via a 302 redirect)
-        test_server_binary = requests.get(testserverurl, stream=True, allow_redirects=True)
-        #loc = tempfile.mkdtemp() / Path(urllib.parse.urlparse(testserverurl).path[1:])
+        # Download the test server (via a 302 redirect)
+        test_server_binary = requests.get(
+            testserverurl, stream=True, allow_redirects=True
+        )
+        # loc = tempfile.mkdtemp() / Path(urllib.parse.urlparse(testserverurl).path[1:])
         loc = Path.cwd() / Path(urllib.parse.urlparse(testserverurl).path[1:])
-        
-        #Write the file to the disk
+
+        # Write the file to the disk
         f = loc.open("wb")
         f.write(test_server_binary.content)
         f.close()
-        
-        #chmod +x the binary
+
+        # chmod +x the binary
         st = os.stat(loc)
         os.chmod(loc, st.st_mode | stat.S_IEXEC)
         return loc
 
-    except:
+    except Exception as e:
+        logger.error(f"Could not download {test_server_binary}: {e}")
         # Returning empty string causes a error modal to pop
         return ""
-        
+
 
 # def pop_user_profile(id_token_json, success_msg=False, pop_off=1):
 #     """
@@ -222,10 +229,18 @@ class ConfWizScreen(ModalScreen):
         Binding(key="space", action="next()", show=False),
         Binding(key="up", action="<scroll-up>", show=False),
         Binding(key="down", action="<scroll-down>", show=False),
-        #Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')", description=HELP_TOGGLE,),
-        Binding(key="h", action="show_help", description=HELP_TOGGLE,),
-        Binding(key="r", action=None), # Disable release note keybind in the wizard bottom bar,
-        Binding(key="d", action=None), # Disable download keybind in the wizard bottom bar
+        # Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')", description=HELP_TOGGLE,),
+        Binding(
+            key="h",
+            action="show_help",
+            description=HELP_TOGGLE,
+        ),
+        Binding(
+            key="r", action=None
+        ),  # Disable release note keybind in the wizard bottom bar,
+        Binding(
+            key="d", action=None
+        ),  # Disable download keybind in the wizard bottom bar
     ]
 
     def compose(self):
@@ -429,7 +444,7 @@ set_wizard(wiz)
 
 #     # ##Start the download
 #     await do_test_server_download(test_server_url)
-    
+
 #     dl_button = conftable.download_button
 #     dl_str = "Completed!"
 #     dl_button = conftable.download_button
@@ -451,12 +466,13 @@ class NewApp(App):
     }
     BINDINGS = [
         Binding(key="ctrl+q", action="quit", description=QUIT_LABEL, priority=True),
-        #Binding(key="l", action="login()", description=LOGIN_LABEL),
-        Binding(key="d", action="downloadtestserver()", description="Download Test Server"), ##ToDo localize 
+        # Binding(key="l", action="login()", description=LOGIN_LABEL),
+        Binding(
+            key="d", action="downloadtestserver()", description="Download Test Server"
+        ),  ##ToDo localize
         Binding(key="r", action="releasenotes()", description="Release Notes"),
         Binding(key="up", action="<scroll-up>", show=False),
         Binding(key="down", action="<scroll-down>", show=False),
-        
         # Binding(key="n", action="newconfig()", show = False),
     ]
     authenticated = False
@@ -527,14 +543,17 @@ class NewApp(App):
         """
         if self.test_server_download_successful:
             # pop download complete screen
-            #ToDo add in specific erorr
-            completion_msg = "# Download Already Complete\n\nChalk Test Server located at: %s"%(self.server_bin_filepath)
-            self.push_screen(AckModal(msg = completion_msg, wiz = self))
+            # ToDo add in specific erorr
+            completion_msg = (
+                "# Download Already Complete\n\nChalk Test Server located at: %s"
+                % (self.server_bin_filepath)
+            )
+            self.push_screen(AckModal(msg=completion_msg, wiz=self))
             return None
 
         ##Update download on main page button bar to show in progress
         dl_button = conftable.download_button
-        dl_str    = "Downloading ..."
+        dl_str = "Downloading ..."
         dl_button = conftable.download_button
         dl_button.label = dl_str
         dl_button.variant = "warning"
@@ -545,30 +564,33 @@ class NewApp(App):
 
         # determine os of native system or docker host   - ToDo Theo's branch has this in, will integrate after merge
         if 1:
-            test_server_url = "https://dl.crashoverride.run/chalkserver-darwin-arm64"  #THIS NEEDS TO CHANGE TO BE THE SERVER NOT THE CONFIG TOOL
-            #test_server_url = "https://crashoverride-public-binaries.s3.amazonaws.com/chalkserver-darwin-arm64"
-            #test_server_url = "https://failuretestl"  
-            
+            test_server_url = "https://dl.crashoverride.run/chalkserver-darwin-arm64"  # THIS NEEDS TO CHANGE TO BE THE SERVER NOT THE CONFIG TOOL
+            # test_server_url = "https://crashoverride-public-binaries.s3.amazonaws.com/chalkserver-darwin-arm64"
+            # test_server_url = "https://failuretestl"
+
         ##Start the download
         self.server_bin_filepath = await do_test_server_download(test_server_url)
-        
+
         # pop download complete screen
         if self.server_bin_filepath:
             self.test_server_download_successful = True
             dl_button = conftable.download_button
-            dl_str    = "D/L Completed"
+            dl_str = "D/L Completed"
             dl_button = conftable.download_button
             dl_button.label = dl_str
             dl_button.variant = "success"
             dl_button.refresh()
-            completion_msg = "# Download Complete\n\nChalk Test Server located at: %s"%(self.server_bin_filepath)
-            
-            self.push_screen(AckModal(msg = completion_msg, wiz = self))
-        
+            completion_msg = (
+                "# Download Complete\n\nChalk Test Server located at: %s"
+                % (self.server_bin_filepath)
+            )
+
+            self.push_screen(AckModal(msg=completion_msg, wiz=self))
+
         # pop download failed download screen
         else:
             dl_button = conftable.download_button
-            dl_str    = "D/L Test Server"
+            dl_str = "D/L Test Server"
             dl_button = conftable.download_button
             dl_button.label = dl_str
             dl_button.variant = "default"
@@ -577,6 +599,7 @@ class NewApp(App):
 
 
 if __name__ == "__main__":
+    logger.info("Running chalk-config")
     if not sys.stdout.isatty():
         raise SystemExit(
             "Can only run in a TTY. Please run via -it if running in docker"

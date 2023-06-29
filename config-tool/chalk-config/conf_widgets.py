@@ -27,6 +27,10 @@ from textual.widgets import Markdown as MDown
 from textual.widgets import *
 from wizard import *
 
+from log import get_logger
+
+logger = get_logger(__name__)
+
 global cursor, conftable
 cursor = None
 conftable = None
@@ -42,7 +46,8 @@ def try_system_init():
     try:
         db = sqlite3.connect(os.path.join(DB_PATH_SYSTEM, DB_FILE))
         return True
-    except:
+    except Exception as e:
+        logger.error(e)   
         return False
 
 
@@ -74,8 +79,8 @@ def sqlite_init():
             cursor.execute("INSERT INTO configs VALUES(?, ?, ?, ?, ?, ?)", row)
         db.commit()
         first_run = True
-    except:
-        pass  # Already created.
+    except Exception as e:
+        logger.error(e)
 
 
 sqlite_init()
@@ -230,7 +235,7 @@ class ConfigTable(Container):
             row_ids.append(row[3])
             try:
                 self.the_table.add_row(*r, key=row[3])
-            except:
+            except Exception as e:
                 # The above should only fail if the same key appears
                 # twice, which shouldn't happen when we're managing it,
                 # but just be defensive for when people have munged the DB
@@ -239,7 +244,7 @@ class ConfigTable(Container):
                 # This basically causes us to skip displaying anything that's
                 # inserted into the DB that's the same config, different name,
                 # past the first one seen.
-                pass
+                logger.error(e)
 
     def compose(self):
         yield self.the_table
@@ -458,6 +463,7 @@ def write_from_local(dict, config, d, pops=2):
             return True
     except Exception as e:
         err = chalk_bin + " load " + c4mfilename + ": "
+        logger.error(err)
         get_app().push_screen(AckModal(GENERATION_EXCEPTION % (err + repr(e))))
 
 
@@ -468,6 +474,7 @@ def write_from_url(dict, config, d, pops=2):
     try:
         assert base_binary is not None
     except AssertionError as e:
+        logger.error(e)
         get_app().push_screen(AckModal("could not fetch chalk binary"))
         return False
 
@@ -494,6 +501,7 @@ def write_from_url(dict, config, d, pops=2):
             get_app().push_screen(AckModal(GENERATION_OK % binname, pops))
             return True
     except Exception as e:
+        logger.error(e)
         get_app().push_screen(
             AckModal(loc.as_posix() + ": " + GENERATION_EXCEPTION % repr(e))
         )
