@@ -38,7 +38,7 @@ def add_chalks(db: Session, chalks: list[schemas.Chalk]) -> list[models.Chalk]:
     return db_chalks
 
 
-def add_stat(db: Session, stat: schemas.Stats) -> models.Chalk:
+def add_stat(db: Session, stat: schemas.Stat) -> models.Chalk:
     db_stat = models.Stats(
         operation=stat.operation,
         timestamp=stat.timestamp,
@@ -50,3 +50,20 @@ def add_stat(db: Session, stat: schemas.Stats) -> models.Chalk:
     db.add(db_stat)
     db.commit()
     return db_stat
+
+
+def add_stats(db: Session, stats: list[schemas.Stat]) -> list[models.Chalk]:
+    db_stats = [
+        models.Stats(
+            operation=stat.operation,
+            timestamp=stat.timestamp,
+            op_chalk_count=stat.op_chalk_count,
+            op_chalker_commit_id=stat.op_chalker_commit_id,
+            op_chalker_version=stat.op_chalker_version,
+            op_platform=stat.op_platform,
+        )
+        for stat in stats
+    ]
+    db.add_all(db_stats)
+    db.commit()
+    return db_stats

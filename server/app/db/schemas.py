@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Json
+from pydantic import BaseModel, Field, Json
 
 
 class Chalk(BaseModel):
@@ -13,14 +13,14 @@ class Chalk(BaseModel):
         orm_mode = True
 
 
-class Stats(BaseModel):
-    id: int | None
-    operation: str
-    timestamp: int
-    op_chalk_count: int
-    op_chalker_commit_id: str
-    op_chalker_version: str
-    op_platform: str
+class Stat(BaseModel):
+    operation: str = Field(alias="_OPERATION")
+    timestamp: int = Field(alias="_TIMESTAMP")
+    op_chalk_count: int = Field(alias="_OP_CHALK_COUNT")
+    op_chalker_commit_id: str = Field(alias="_OP_CHALKER_COMMIT_ID")
+    op_chalker_version: str = Field(alias="_OP_CHALKER_VERSION")
+    op_platform: str = Field(alias="_OP_PLATFORM")
 
     class Config:
         orm_mode = True
+        allow_population_by_field_name = True

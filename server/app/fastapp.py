@@ -68,36 +68,27 @@ async def version():
 
 
 @app.post("/ping")
-async def ping(request: Request, db: Session = Depends(get_db)):
+async def ping(
+    request: Request, stats: list[schemas.Stat], db: Session = Depends(get_db)
+):
     try:
-        raw = await request.body()
-        stats = json.loads(raw)
-        for entry in stats:
-            stat = schemas.Stats(
-                operation=entry["_OPERATION"],
-                timestamp=entry["_TIMESTAMP"],
-                op_chalk_count=entry["_OP_CHALK_COUNT"],
-                op_chalker_commit_id=entry["_OP_CHALKER_COMMIT_ID"],
-                op_chalker_version=entry["_OP_CHALKER_VERSION"],
-                op_platform=entry["_OP_PLATFORM"],
-            )
-            crud.add_stat(db, stat=stat)
+        crud.add_stats(db, stats=stats)
     except Exception as e:
         logger.exception(f"beacon {e}", exc_info=True)
     finally:
-        return {"pong"}
+        return {"ping": "pong"}
 
 
 @app.post("/report")
-async def add_chalk(request: Request, db: Session = Depends(get_db)):
+async def add_chalks(
+    request: Request, reports: list[dict], db: Session = Depends(get_db)
+):
     try:
-        raw = await request.body()
-        chalks = json.loads(raw)
         model_chalks: list[schemas.Chalk] = []
-        for entry in chalks:
-            if "_CHALKS" not in entry:
+        for report in reports:
+            if "_CHALKS" not in report:
                 continue
-            for c in entry["_CHALKS"]:
+            for c in report["_CHALKS"]:
                 model_chalks.append(
                     schemas.Chalk(
                         id=c["CHALK_ID"],
@@ -106,7 +97,7 @@ async def add_chalk(request: Request, db: Session = Depends(get_db)):
                         raw=json.dumps(
                             {
                                 **c,
-                                **{k: v for k, v in entry.items() if k != "_CHALKS"},
+                                **{k: v for k, v in report.items() if k != "_CHALKS"},
                             }
                         ),
                     )
@@ -119,6 +110,8 @@ async def add_chalk(request: Request, db: Session = Depends(get_db)):
         ) as e:
             logger.warning("Duplicate chalks %s", e)
             raise HTTPException(status_code=409, detail="Duplicate chalk")
+    except KeyError:
+        raise HTTPException(status_code=400)
     except HTTPException:
         raise
     except Exception:
