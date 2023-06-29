@@ -1059,7 +1059,6 @@ This can be set at the command-line with --chalk-as-parent (aka --pg-13)
     doc: """
 When doing a 'chalk exec', this controls the probability associated with whether we actually send a report, instead of exec-only.  This is intended for high-volume, short-lifetime workloads that only want to sample.  It must be an integer percentage.
 """
-
   }
 
   field default_args {

@@ -5,7 +5,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import config, plugins, options, tables, glob, os
+import config, plugins, options, tables, glob
 
 # We collect things in four different places
 

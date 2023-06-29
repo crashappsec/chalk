@@ -676,6 +676,25 @@ when hostOs == "macosx":
 const PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
 
 proc doExecCollection(pid: Pid): Option[ChalkObj] =
+  # First, check the chalk file location, and if there's one there, then create
+  # a chalk object.
+
+  # If there's no such chalk mark, then we just report based on the
+  # exe.
+
+  var
+    info: Stat
+    chalkPath = chalkConfig.dockerConfig.getChalkFileLocation()
+  if stat(cstring(chalkPath), info) == 0:
+    var
+      stream      = newFileStream(chalkPath)
+      chalk       = newChalk(stream, "<<in-container>>")
+    chalk.extract = stream.extractOneChalkJson("<<in-container>>")
+    chalk.myCodec = Codec(getPluginByName("docker"))
+
+    return some(chalk)
+
+
   var n: array[PATH_MAX, char]
 
   when hostOs == "macosx":

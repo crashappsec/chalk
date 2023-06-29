@@ -9,6 +9,9 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
+when (NimMinor, NimPatch) >= (6, 14):
+  {.warning[CastSizes]: off.}
+
 import tables, streams, unicode, parseutils, std/json, config
 
 const
