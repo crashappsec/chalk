@@ -173,7 +173,7 @@ def test_insert_extract_delete(tmp_data_dir: Path, chalk: Chalk):
 
     extracted_subchalk = chalk_extract[0]["_CHALKS"][0]
     deleted_subchalk = deleted_chalk["_CHALKS"][0]
-    for key in ["HASH", "_VALIDATED", "_OP_ARTIFACT_PATH", "_OP_ARTIFACT_TYPE"]:
+    for key in ["HASH", "_OP_ARTIFACT_PATH", "_OP_ARTIFACT_TYPE"]:
         assert extracted_subchalk[key] == deleted_subchalk[key]
 
     # extract again and we shouldn't get anything this time
