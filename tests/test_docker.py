@@ -4,7 +4,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import List
+from typing import Any, Dict, List
 from unittest import mock
 
 import pytest
@@ -72,6 +72,23 @@ def _build_and_chalk_dockerfile(
         raise
 
 
+def _get_chalk_report_from_docker_output(proc: CompletedProcess) -> Dict[str, Any]:
+    # # FIXME: hacky json read of report that has to stop before we reach logs
+    json_string = ""
+    in_json = False
+    for line in proc.stdout.decode().splitlines():
+        if line == ("["):
+            in_json = True
+        if in_json == True:
+            json_string = json_string + line
+        if line == ("]"):
+            break
+    chalk_reports = json.loads(json_string)
+    assert len(chalk_reports) == 1
+    chalk_report = chalk_reports[0]
+    return chalk_report
+
+
 @mock.patch.dict(os.environ, {"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"})
 @pytest.mark.parametrize(
     "test_file", ["valid/sample_1", "valid/sample_2", "valid/sample_3"]
@@ -84,19 +101,7 @@ def test_virtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
         )
         assert insert_output.returncode == 0, "chalking dockerfile failed"
 
-        # # FIXME: hacky json read of report that has to stop before we reach logs
-        json_string = ""
-        in_json = False
-        for line in insert_output.stdout.decode().splitlines():
-            if line == ("["):
-                in_json = True
-            if in_json == True:
-                json_string = json_string + line
-            if line == ("]"):
-                break
-        chalk_reports = json.loads(json_string)
-        assert len(chalk_reports) == 1
-        chalk_report = chalk_reports[0]
+        chalk_report = _get_chalk_report_from_docker_output(insert_output)
 
         validate_docker_chalk_report(
             chalk_report=chalk_report, artifact_map=artifact_info, virtual=True
@@ -132,19 +137,7 @@ def test_nonvirtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
             chalk, test_file, tmp_data_dir, valid=True, virtual=False
         )
 
-        # # FIXME: hacky json read of report that has to stop before we reach logs
-        json_string = ""
-        in_json = False
-        for line in insert_output.stdout.decode().splitlines():
-            if line == ("["):
-                in_json = True
-            if in_json == True:
-                json_string = json_string + line
-            if line == ("]"):
-                break
-        chalk_reports = json.loads(json_string)
-        assert len(chalk_reports) == 1
-        chalk_report = chalk_reports[0]
+        chalk_report = _get_chalk_report_from_docker_output(insert_output)
 
         validate_docker_chalk_report(
             chalk_report=chalk_report, artifact_map=artifact_info, virtual=False
@@ -194,3 +187,66 @@ def test_nonvirtual_invalid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
     assert not (
         tmp_data_dir / "virtual-chalk.json"
     ).is_file(), "virtual-chalk.json should not have been created!"
+
+
+@pytest.mark.parametrize(
+    "test_file",
+    [
+        "valid/sample_1",
+        "valid/sample_2",
+        "valid/sample_3",
+    ],
+)
+def test_build_and_push(tmp_data_dir: Path, chalk: Chalk, test_file: str):
+    try:
+        files = os.listdir(DOCKERFILES / test_file)
+        for file in files:
+            shutil.copy(DOCKERFILES / test_file / file, tmp_data_dir)
+
+        tag = "localhost:5000/" + test_file + ":latest"
+
+        # build docker wrapped
+        chalk_docker_build_proc = chalk.run(
+            params=[
+                "--log-level=none",
+                "docker",
+                "build",
+                "-t",
+                tag,
+                ".",
+            ],
+        )
+        assert chalk_docker_build_proc.returncode == 0, "chalk docker build failed"
+        # grab current_hash for comparison later
+        chalk_docker_build_report = _get_chalk_report_from_docker_output(
+            chalk_docker_build_proc
+        )
+        current_hash_build = chalk_docker_build_report["_CHALKS"][0]["_CURRENT_HASH"]
+
+        # push docker wrapped
+        chalk_docker_push_proc = chalk.run(
+            params=[
+                "--log-level=none",
+                "docker",
+                "push",
+                tag,
+            ],
+        )
+        assert chalk_docker_push_proc.returncode == 0, "chalk docker push failed"
+        chalk_docker_push_report = _get_chalk_report_from_docker_output(
+            chalk_docker_push_proc
+        )
+        current_hash_push = chalk_docker_push_report["_CHALKS"][0]["_CURRENT_HASH"]
+        repo_digest_push = chalk_docker_push_report["_CHALKS"][0]["_REPO_DIGESTS"][0]
+
+        assert current_hash_build == current_hash_push
+
+        # docker pull and check hash
+        docker_pull_proc = chalk.run(params=["docker", "pull", tag])
+        assert docker_pull_proc.returncode == 0
+        for line in docker_pull_proc.stdout.decode().splitlines():
+            if "Digest" in line:
+                assert repo_digest_push in line
+    finally:
+        images = docker_inspect_image_hashes(tag=tag)
+        docker_image_cleanup(images)
