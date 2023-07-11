@@ -24,6 +24,12 @@ task release, "Package the release build":
   exec "nimble build --define:release --opt:size"
   exec "strip " & bin[0]
 
+task static, "Build static x64 Linux ELF":
+  var flags = "--passL:-static"
+  # exec "nimble build " & flags
+  exec "nimble build --define:release --opt:size " & flags
+  exec "strip " & bin[0]
+
 let bucket = "crashoverride-chalk-binaries"
 
 task s3, "Publish release build to S3 bucket. Requires AWS cli + creds":
