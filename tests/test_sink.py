@@ -25,7 +25,7 @@ TLS_CERT_PATH = (
     Path(__file__).parent.parent / "server" / "app" / "keys" / "self-signed.cert"
 ).resolve()
 
-IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") is not None
+IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") or False
 
 
 def aws_secrets_configured() -> bool:

@@ -6,13 +6,12 @@ import sqlalchemy
 from conf.version import __version__
 from db import crud, models, schemas
 from db.database import SessionLocal, engine
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi_healthcheck import HealthCheckFactory, healthCheckRoute
 from sqlalchemy.orm import Session
-
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -79,16 +78,35 @@ async def ping(
         return {"ping": "pong"}
 
 
-@app.post("/report")
+@app.post("/report", status_code=200)
 async def add_chalks(
-    request: Request, reports: list[dict], db: Session = Depends(get_db)
+    request: Request,
+    reports: list[dict],
+    response: Response,
+    db: Session = Depends(get_db),
 ):
     try:
         model_chalks: list[schemas.Chalk] = []
+        model_execs: list[schemas.Exec] = []
         for report in reports:
+            if report.get("_OPERATION") == "exec":
+                model_execs.append(
+                    schemas.Exec(
+                        raw=json.dumps(
+                            {
+                                **report,
+                            }
+                        ),
+                    )
+                )
+                continue
             if "_CHALKS" not in report:
                 continue
             for c in report["_CHALKS"]:
+                if "CHALK_ID" not in c:
+                    logger.error("Skipping chalk %s", str(c))
+                    continue
+
                 model_chalks.append(
                     schemas.Chalk(
                         id=c["CHALK_ID"],
@@ -104,12 +122,14 @@ async def add_chalks(
                 )
         try:
             crud.add_chalks(db, chalks=model_chalks)
+            crud.add_execs(db, execs=model_execs)
         except (
             sqlalchemy.exc.IntegrityError,
             sqlalchemy.exc.PendingRollbackError,
         ) as e:
             logger.warning("Duplicate chalks %s", e)
-            raise HTTPException(status_code=409, detail="Duplicate chalk")
+            response.status_code = status.HTTP_202_ACCEPTED
+            return
     except KeyError:
         raise HTTPException(status_code=400)
     except HTTPException:
@@ -123,6 +143,28 @@ async def add_chalks(
 async def get_chalks(request: Request, db: Session = Depends(get_db)):
     chalks = crud.get_chalks(db)
     return [c.raw for c in chalks]
+
+
+@app.get("/execs")
+async def get_execs(request: Request, db: Session = Depends(get_db)):
+    execs = crud.get_execs(db)
+    return [c.raw for c in execs]
+
+
+@app.get("/stats")
+async def get_stats(request: Request, db: Session = Depends(get_db)):
+    chalk_stats = crud.get_stats(db)
+    return [
+        {
+            "operation": c.operation,
+            "timestamp": c.timestamp,
+            "chalk_count": c.op_chalk_count,
+            "chalker_commit_id": c.op_chalker_commit_id,
+            "chalker_version": c.op_chalker_version,
+            "platform": c.op_platform,
+        }
+        for c in chalk_stats
+    ]
 
 
 @app.get("/chalks/{metadata_id}")

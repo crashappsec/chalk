@@ -3,6 +3,13 @@ from datetime import datetime
 from pydantic import BaseModel, Field, Json
 
 
+class Exec(BaseModel):
+    raw: Json
+
+    class Config:
+        orm_mode = True
+
+
 class Chalk(BaseModel):
     id: str
     metadata_hash: str

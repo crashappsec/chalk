@@ -5,10 +5,16 @@ from .database import Base
 
 class Chalk(Base):
     __tablename__ = "chalks"
-
     metadata_id = Column(String, primary_key=True, index=True)
     metadata_hash = Column(String)
-    chalk_id = Column(String)
+    id = Column(String)
+    raw = Column(JSON)
+    # TODO fill out rest
+
+
+class Exec(Base):
+    __tablename__ = "execs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
     raw = Column(JSON)
     # TODO fill out rest
 
