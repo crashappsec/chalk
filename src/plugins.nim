@@ -501,6 +501,8 @@ method scanArtifactLocations*(self:       Codec,
       if opt.isSome():
         result.add(opt.get())
         opt.get().yieldFileStream()
+    elif info.kind == pcLinkToFile:
+      discard # We ignore symbolic links for now.
     elif recurse:
       dirWalk(true):
         if item in exclusions:               continue

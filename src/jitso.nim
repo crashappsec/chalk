@@ -7,13 +7,13 @@
 ## :Copyright: 2023 Crash Override, Inc.
 ##
 
-import tables
-
 when hostOs == "linux" and hostCPU == "amd64":
+  import tables
+
   {. passL:"-rdynamic -Wl,-wrap,__open64_nocancel".}
   static:
     discard staticExec("nim c --passL:-static getlibpath")
-  const 
+  const
     libc          = "libc.so.6"
     libssl        = "libssl.so.3"
     libpcre       = "libpcre.so.3"

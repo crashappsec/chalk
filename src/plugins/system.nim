@@ -224,6 +224,9 @@ method getHostInfo*(self: SystemPlugin, p: seq[string], ins: bool): ChalkDict =
 method getChalkInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
   result = ChalkDict()
 
+  if obj.extract != nil and "$CHALK_CONFIG" in obj.extract:
+    result["$CHALK_CONFIG"] = obj.extract["$CHALK_CONFIG"]
+
   # We add this one in directly so that it gets added to the MD hash.
   if len(obj.err) != 0:
     obj.collectedData["ERR_INFO"] = pack(obj.err)

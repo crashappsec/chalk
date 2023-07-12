@@ -265,8 +265,13 @@ proc runCmdDelete*(path: seq[string]) =
       info(item.fullPath & ": no chalk mark to delete.")
       continue
     try:
-      item.myCodec.handleWrite(item, none(string))
-      info(item.fullPath & ": chalk mark successfully deleted")
+      if "$CHALK_CONFIG" in item.extract:
+        warn(item.fullPath & ": Is a configured chalk exe; run it using " &
+          "'chalk load default' to remove.")
+        item.opFailed = true
+      else:
+        item.myCodec.handleWrite(item, none(string))
+        info(item.fullPath & ": chalk mark successfully deleted")
     except:
       error(item.fullPath & ": deletion failed: " & getCurrentExceptionMsg())
       dumpExOnDebug()

@@ -1678,7 +1678,7 @@ plugin system {
 
 plugin metsys {
     artifact_keys: ["METADATA_HASH", "SIGNATURE", "SIGN_PARAMS", "ERR_INFO",
-                    "METADATA_ID"]
+                    "METADATA_ID", "$CHALK_CONFIG"]
     ~priority:     high()
 }
 
@@ -1825,7 +1825,7 @@ By default, CHALK_RAND is on for unique builds. If you want reproducable builds,
   key.SIGNATURE.report                = true
   # This would embed info on any config changes used when chalking.
   # Generally, we assume that's not a good use of space in artifacts.
-  key.$CHALK_CONFIG.report            = false
+  key.$CHALK_CONFIG.report            = true
 }
 
 profile chalking_ptr {
@@ -1844,7 +1844,7 @@ By default, CHALK_RAND is on for unique builds. If you want reproducable builds,
   key.SIGNING.report                  = true
   key.METADATA_HASH.report            = true
   key.METADATA_ID.report              = true
-  key.$CHALK_CONFIG.report            = true  # Only used for self-chalks.
+  key.$CHALK_CONFIG.report            = true
 }
 
 profile artifact_report_insert_base {
