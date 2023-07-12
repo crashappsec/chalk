@@ -85,6 +85,7 @@ jobs:
           docker run -v `pwd`:/chalkbuild releasechalk /bin/sh -c "cp /chalk /chalkbuild"
           aws s3 cp chalk s3://${S3_BUCKET}/${S3_VERSIONED_KEY} --acl public-read
           aws s3 cp chalk s3://${S3_BUCKET}/${S3_LATEST_KEY} --acl public-read
+          if [ "${{ matrix.platform }}" == "amd64" ]; then  aws s3 cp chalk s3://${S3_BUCKET}/chalk-${{ env.CHALK_VERSION }}-${{matrix.flavor}}-x86_64 --acl public-read;fi
         env:
           AWS_REGION: "us-east-1"
           S3_BUCKET: crashoverride-public-binaries
