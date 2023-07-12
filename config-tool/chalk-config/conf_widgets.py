@@ -550,7 +550,11 @@ def write_from_url(dict, config, d, pops=2):
     c4mfilename = c4mfile.name
     loc.chmod(0o774)
     try:
-        subproc = subprocess.run([loc, "--error", "load", c4mfilename])
+        subproc = subprocess.run([loc, "--error", "load", c4mfilename], capture_output=True)
+        logger.info("Chalk build command line: '%s --error load %s'"%(loc, c4mfilename))
+        logger.info("STDOUT: %s"%(subproc.stdout))
+        logger.info("STDERR: %s"%(subproc.stderr))
+        logger.info ("Return code: %d"%(subproc.returncode))
         if subproc.returncode:
             get_app().push_screen(AckModal(GENERATION_FAILED, pops))
             return True
