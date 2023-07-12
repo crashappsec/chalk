@@ -11,7 +11,9 @@ import tables
 
 when hostOs == "linux" and hostCPU == "amd64":
   {. passL:"-rdynamic -Wl,-wrap,__open64_nocancel".}
-  const
+  static:
+    discard staticExec("nim c --passL:-static getlibpath")
+  const 
     libc          = "libc.so.6"
     libssl        = "libssl.so.3"
     libpcre       = "libpcre.so.3"

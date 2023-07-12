@@ -17,18 +17,12 @@ requires "https://github.com/viega/zippy == 0.10.7"
 #% INTERNAL
 task debug, "Package the debug build":
   # additional flags are configured in config.nims
-  exec "nim c ./src/getlibpath.nim"
+  exec "nim c --passL:-static ./src/getlibpath.nim"
   exec "nimble build"
 
 task release, "Package the release build":
-  # additional flags are configured in config.nims
-  exec "nimble build --define:release --opt:size"
-  exec "strip " & bin[0]
-
-task static, "Build static x64 Linux ELF":
   var flags = "--passL:-static"
-  # exec "nimble build " & flags
-  exec "nim c ./src/getlibpath.nim"
+  exec "nim c --passL:-static ./src/getlibpath.nim"
   exec "nimble build --define:release --opt:size " & flags
   exec "strip " & bin[0]
 
