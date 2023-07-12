@@ -59,11 +59,16 @@ def set_wizard(w):
 def get_wizard():
     return wizard
 
+
 def determine_sys_arch():
-    """
-    """
+    """ """
     system = platform.system().lower()
-    assert system in ["linux", "windows", "darwin", "aarch64"], f"Unsupported system {system}"
+    assert system in [
+        "linux",
+        "windows",
+        "darwin",
+        "aarch64",
+    ], f"Unsupported system {system}"
 
     if system == "darwin":
         # we could be running emulated so just fetch it.
@@ -99,6 +104,7 @@ def determine_sys_arch():
     logger.info(f"Detected system info: {system}, {machine}")
     return system, machine
 
+
 def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
     bin_dir = os.getcwd() + "/bin"
     os.makedirs(bin_dir, exist_ok=True)
@@ -106,7 +112,7 @@ def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
     debug = "-debug" if not release_build else ""
 
     exc = None
-    
+
     # determine correct arch
     system, machine = determine_sys_arch()
 
@@ -119,7 +125,7 @@ def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
     if chalk_bin.is_file():
         return chalk_bin.read_bytes()
     url = f"https://dl.crashoverride.run/{chalk_name}"
-    logger.error(f"Downloading chalk from {url}")
+    logger.info(f"Downloading chalk from {url}")
 
     try:
         context = ssl.create_default_context()
@@ -128,7 +134,7 @@ def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
         raw = urllib.request.urlopen(url, context=context).read()
         with open(chalk_bin, "wb") as outf:
             outf.write(raw)
-
+        return raw
     except Exception as e:
         logger.error(f"Could not download chalk binary: {e}")
         return None
@@ -287,7 +293,7 @@ pane_switch_map = {
     "report_http": "#http_conf",
     "report_s3": "#s3_conf",
     "env_custom": "#envconf",
-    "auth_success_message" : "#c0authsuccess"
+    "auth_success_message": "#c0authsuccess",
 }
 
 bool_defaults = {
@@ -419,11 +425,14 @@ def config_to_json():
         widget = wizard.query_one("#" + item)
         result[item] = widget.value
 
-    
     # Special case for authN token - set value with "_" at start of key
     if app.login_widget.crashoverride_auth_obj.token:
-        result["_chalk_api_bearer_token"] = app.login_widget.crashoverride_auth_obj.token
-        result["_chalk_api_tenant_id"]    = app.login_widget.crashoverride_auth_obj.revision_id
+        result[
+            "_chalk_api_bearer_token"
+        ] = app.login_widget.crashoverride_auth_obj.token
+        result[
+            "_chalk_api_tenant_id"
+        ] = app.login_widget.crashoverride_auth_obj.revision_id
 
     return json.dumps(result)
 
@@ -961,14 +970,26 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         lines.append("run_sbom_tools = true")
 
     # Whether to add in a bearer token to use with the Crash Override API
-    if is_true(d, "report_co") and ("_chalk_api_bearer_token" in d) and ("_chalk_api_tenant_id" in d):    
+    if (
+        is_true(d, "report_co")
+        and ("_chalk_api_bearer_token" in d)
+        and ("_chalk_api_tenant_id" in d)
+    ):
         # Are we testing or in prod?
         if os.environ.get("CRASH_OVERRIDE_TESTING", default=False):
-            crash_override_api_url = "https://chalkapi-test.crashoverride.run/v0.1/report"
-            logger.info("Using TESTING reporting URL %s (CRASH_OVERRIDE_TESTING env var detected)"%(crash_override_api_url))
+            crash_override_api_url = (
+                "https://chalkapi-test.crashoverride.run/v0.1/report"
+            )
+            logger.info(
+                "Using TESTING reporting URL %s (CRASH_OVERRIDE_TESTING env var detected)"
+                % (crash_override_api_url)
+            )
         else:
             crash_override_api_url = "https://chalk.crashoverride.run/v0.1/report"
-            logger.info("Using PRODUCTION reporting URL %s (no CRASH_OVERRIDE_TESTING env var detected)"%(crash_override_api_url))
+            logger.info(
+                "Using PRODUCTION reporting URL %s (no CRASH_OVERRIDE_TESTING env var detected)"
+                % (crash_override_api_url)
+            )
 
         crash_override_sink_and_subscribe = """
 sink_config crashoverride_api_sink {
@@ -977,13 +998,20 @@ sink_config crashoverride_api_sink {
     headers: mime_to_dict("Authorization: Bearer %s")
 }
 subscribe("report", "crashoverride_api_sink")
-"""%(crash_override_api_url ,d["_chalk_api_bearer_token"])
-        
+""" % (
+            crash_override_api_url,
+            d["_chalk_api_bearer_token"],
+        )
+
         logger.info("Writing Crash Override API values to Conf4m")
-        lines.append('\n# Crash Override API settings - please see https://crashoverride.run for dashboards and data')
-        lines.append('keyspec._TENANT_ID.value = "%s"'%(d["_chalk_api_tenant_id"]))
+        lines.append(
+            "\n# Crash Override API settings - please see https://crashoverride.run for dashboards and data"
+        )
+        lines.append('keyspec._TENANT_ID.value = "%s"' % (d["_chalk_api_tenant_id"]))
         lines.append(crash_override_sink_and_subscribe)
     else:
-        logger.info("Unable to write Crash Override API config, bearer token not ound found in dictionary")
+        logger.info(
+            "Unable to write Crash Override API config, bearer token not ound found in dictionary"
+        )
 
     return "\n".join(lines)
