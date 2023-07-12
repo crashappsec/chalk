@@ -1,7 +1,7 @@
 ## Just-in-time-shared-objects
-## 
+##
 ## This is the minimal set for a hacky answer to dlopen using memfd_create,
-## requiring Linux kernel version 3.17 or greater (2014). 
+## requiring Linux kernel version 3.17 or greater (2014).
 ##
 ## :Author: Brandon Edwards (brandon@crashoverride.com)
 ## :Copyright: 2023 Crash Override, Inc.
@@ -9,9 +9,9 @@
 
 import tables
 
-when hostOs == "linux":
+when hostOs == "linux" and hostCPU == "amd64":
   {. passL:"-rdynamic -Wl,-wrap,__open64_nocancel".}
-  const 
+  const
     libc          = "libc.so.6"
     libssl        = "libssl.so.3"
     libpcre       = "libpcre.so.3"
@@ -124,7 +124,7 @@ int set_library_info(long unsigned int index,
 
   memcpy(data_copy, data, length);
   memcpy(name_copy, name, name_length);
-  library         = &library_info[index];  
+  library         = &library_info[index];
   library->name   = name_copy;
   library->data   = data_copy;
   library->length = length;
@@ -161,7 +161,7 @@ __attribute__((constructor)) int pre_main(int c, char *const a[]) {
     } else {
       new_env = chalk_lib;
     }
-    setenv(ld_env_key, new_env, 1);                                 
+    setenv(ld_env_key, new_env, 1);
     setenv(chalk_already_set_env, "yup", 1);
     execv("/proc/self/exe", a);
   }
@@ -188,7 +188,7 @@ int __wrap___open64_nocancel(const char *file, int flags, ...) {
         }
         library_data   = library_info[index].data;
         remaining      = (ssize_t )library_info[index].length;
-        amount_written = 0; 
+        amount_written = 0;
         while (remaining > 0) {
           amount_written = write(fd, library_data, remaining);
           if (amount_written < 0) {
@@ -204,7 +204,7 @@ int __wrap___open64_nocancel(const char *file, int flags, ...) {
         }
         lseek(fd, 0, SEEK_SET);
         return fd;
-      } 
+      }
     }
   }
   if ((mode & O_CREAT != 0) || (mode & O_TMPFILE == O_TMPFILE)) {
