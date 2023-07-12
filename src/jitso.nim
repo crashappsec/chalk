@@ -12,22 +12,37 @@ import tables
 when hostOs == "linux":
   {. passL:"-rdynamic -Wl,-wrap,__open64_nocancel".}
   const 
-    libc      = "libc.so.6"
-    libssl    = "libssl.so.3"
-    libpcre   = "libpcre.so.3"
-    libcrypto = "libcrypto.so.3"
-    libld     = "ld-linux-x86-64.so.2"
-    libpath   = "/usr/lib/x86_64-linux-gnu/"
-    jitsoLibraries = {
-                      libc:      staticRead(libpath & libc),
-                      libssl:    staticRead(libpath & libssl),
-                      libpcre:   staticRead(libpath & libpcre),
-                      libcrypto: staticRead(libpath & libcrypto),
-                      libld:     staticRead(libpath & libld)
+    libc          = "libc.so.6"
+    libssl        = "libssl.so.3"
+    libpcre       = "libpcre.so.3"
+    libcrypto     = "libcrypto.so.3"
+    libld         = "ld-linux-x86-64.so.2"
+    getlibpath    = "./getlibpath "
+    libcpath      = staticExec(getlibpath & libc)
+    libsslpath    = staticExec(getlibpath & libssl)
+    libpcrepath   = staticExec(getlibpath & libpcre)
+    libcryptopath = staticExec(getlibpath & libcrypto)
+    libldpath     = staticExec(getlibpath & libld)
+
+  static:
+    echo libc      & " -> " & libcpath
+    echo libssl    & " -> " & libsslpath
+    echo libpcre   & " -> " & libpcrepath
+    echo libcrypto & " -> " & libcryptopath
+    echo libld     & " -> " & libldpath
+
+  const jitsoLibraries = {
+                      libc:      staticRead(libcpath),
+                      libssl:    staticRead(libsslpath),
+                      libpcre:   staticRead(libpcrepath),
+                      libcrypto: staticRead(libcryptopath),
+                      libld:     staticRead(libldpath)
                       }.toTable()
+
   proc setupLibraryArrayC(
                          count: uint64
                          ): cint {.importc: "allocate_library_info_array".}
+
   proc setLibraryInfoC(
                       index: uint64,
                       name: ptr cchar,

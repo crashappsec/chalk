@@ -76,14 +76,22 @@ proc parseMapLine*(data: string): procMapping =
                      inode:       parseInt(elements[INODE_INDEX]), # decimal
                      pathname:    pathname)
 
-proc parseMaps*(self: procReader, path: string="/proc/self/maps"): bool =
+proc parseMapsData*(self: procReader, data: string): bool =
   try:
     self.maps = collect:
-      for line in open(path).readAll().splitLines():
+      for line in data.splitLines():
         if len(line) > 0: parseMapLine(line)
   except:
     return false
   return true
+
+proc parseMaps*(self: procReader, path: string="/proc/self/maps"): bool =
+  var data: string
+  try:
+    data = open(path).readAll()
+  except:
+    return false
+  return self.parseMapsData(data)
 
 proc showMaps*(self: procReader) =
   for mapping in self.maps:
