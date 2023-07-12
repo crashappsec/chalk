@@ -11,15 +11,16 @@ from localized_text import *
 from rich.markdown import *
 from textual.widgets import Markdown as MDown
 from pathlib import *
-import sqlite3, os, urllib, tempfile, datetime, hashlib, subprocess, json, stat
+import sqlite3, os, urllib, tempfile, hashlib, subprocess, json, stat
 from wizard import *
 from conf_options import *
 from conf_widgets import *
 from localized_text import *
-# import c0_api
+import crash_override_authn
 
-# import pyqrcode
-# import requests
+import jwt
+import pyqrcode
+import requests
 from log import get_logger 
 
 logger = get_logger(__name__)
@@ -56,217 +57,233 @@ def deal_with_overwrite_widget():
         wiz.query_one("#overwrite_config").value = False
         switch_row.visible                       = False
 
-# def qr_textualize_render(code, quiet_zone=0):
-#     """
-#     Quick n dirty renderer for showing QR in a pretty way that works with textualize - defaults don't
-#     """
-#     buf = io.StringIO()
+def qr_textualize_render(code, quiet_zone=0):
+    """
+    Quick n dirty renderer for showing QR in a pretty way that works with textualize - defaults don't
+    """
+    buf = io.StringIO()
 
-#     border_row = '██' * (len(code[0]) + (quiet_zone*2))
+    border_row = '██' * (len(code[0]) + (quiet_zone*2))
     
-#     #Every QR code start with a quiet zone at the top
-#     for b in range(quiet_zone):
-#         buf.write(border_row)
-#         buf.write('\n')
+    # Every QR code start with a quiet zone at the top
+    for b in range(quiet_zone):
+        buf.write(border_row)
+        buf.write('\n')
 
-#     for row in code:
+    for row in code:
 
-#         #Draw the starting quiet zone
-#         for b in range(quiet_zone):
-#             buf.write('██')
+        # Draw the starting quiet zone
+        for b in range(quiet_zone):
+            buf.write('██')
 
-#         #Actually draw the QR code
-#         for bit in row:
-#             if bit == 1:
-#                 buf.write('  ')
-#             elif bit == 0:
-#                 buf.write('██')
-#             #This is for debugging unfinished QR codes,
-#             #unset pixels will be spaces.
-#             else:
-#                 buf.write(' ')
+        # Actually draw the QR code
+        for bit in row:
+            if bit == 1:
+                buf.write('  ')
+            elif bit == 0:
+                buf.write('██')
+            # This is for debugging unfinished QR codes,
+            #  unset pixels will be spaces.
+            else:
+                buf.write(' ')
 
         
-#         #Draw the ending quiet zone
-#         for b in range(quiet_zone):
-#             buf.write('██')
-#         buf.write('\n')
+        # Draw the ending quiet zone
+        for b in range(quiet_zone):
+            buf.write('██')
+        buf.write('\n')
 
-#     #Every QR code ends with a quiet zone at the bottom
-#     for b in range(quiet_zone):
-#         buf.write(border_row)
-#         buf.write('\n')
+    # Every QR code ends with a quiet zone at the bottom
+    for b in range(quiet_zone):
+        buf.write(border_row)
+        buf.write('\n')
 
-#     return buf.getvalue()
+    return buf.getvalue()
 
-# class ApiAuth(WizContainer):
-#     """
-#     """
-#     class OAuthSuccess(Message):
-#         """
-#         """
-#         def __init__(self,  oidc_json: str, curr_user_json: str, result: str) -> None:
-#             super().__init__()
-#             self.oidc_json      = oidc_json
-#             self.curr_user_json = curr_user_json
-#             self.result         = result
+class ApiAuth(WizContainer):
+    """
+    """ 
+    class AuthSuccess(Message):
+        """
+        """
+        def __init__(self,  token, result):
+            super().__init__()
+            self.token      = token
+            self.result     = result
             
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         ##Setup Auth0 Env now we have been told to poll
-#         self.oidc_auth_obj     = c0_api.CLIAuth(c0_api.AUTH0_DOMAIN, c0_api.AUTH0_CLIENT_ID)
-#         self.oidc_widget_1     = OidcLinks()
-#         self.oidc_widget_1.styles.padding = (0,4)
-#         self.oidc_widget_1.styles.margin = (0,2)
-#         self.oidc_widget_2     = OidcLinks()
-#         self.oidc_widget_2.styles.padding = (1,4)
-#         self.oidc_widget_2.styles.margin = (0,2)
-#         self.authn_button      = PopBrowserButton(AUTHN_LABEL, variant="warning")
-#         self.authn_button.styles.margin = (1,16)
-#         self.qr_code_button    = QRButton(QR_LABEL, variant="warning")
-#         self.qr_code_button.styles.margin = (0,16)
-#         self.token_url         = "https://%s/oauth/token"%(c0_api.AUTH0_DOMAIN)
-#         self.tokens_path       = ".chalk_tokens.json" #ToDo save tokens to disk
-#         self.oidc_polling      = False
-#         self.authenticated     = self.is_authenticated()
-#         self.authn_failed      = False
-
-#     def is_authenticated(self):
-#         return self.oidc_auth_obj.authenticated
-    
-#     def has_failed(self):
-#         return self.oidc_auth_obj.authn_failed
-    
-#     def get_id_token_json(self):
-#         return self.oidc_auth_obj.id_token_json
-    
-#     def get_token_json(self):
-#         return self.oidc_auth_obj.token_json
-
-#     def oauthstatuscheck(self):
-#         """
-#         Called once every 5 seconds (via set_interval())
-#         Checks if an oauth token check endpoint has generated, if not just returns.
-#         If it has it polls the endpoint looking for a HTTP 200 indicating successful 
-#         auth along with the json payload of tokens
-
-#         A message is then posted to the parent widget to recieve that will trigger it
-#         to auto-advance to the next page in the wizard
-#         """
-#         if self.is_authenticated() or self.has_failed():
-#             return
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # ToDo parameterise/localize
+        #self.bearer_token_lbl = Label("foobar", id="c0api_bearer_token", disabled=True)
+        self.crashoverride_auth_obj = crash_override_authn.CrashOverrideAuth("https://chalkapi-test.crashoverride.run/v0.1/auth/code")
         
-#         ##Poll token endpoint waiting for user to enter the right code
-#         token_data = {'grant_type'  : 'urn:ietf:params:oauth:grant-type:device_code',
-#                       'device_code' : self.oidc_auth_obj.device_code_json['device_code'],
-#                       'client_id'   : self.oidc_auth_obj.auth0_client_id}
+        self.auth_widget_1     = AuthhLinks()
+        self.auth_widget_1.styles.padding = (0,4)
+        self.auth_widget_1.styles.margin = (0,2)
+        self.auth_widget_2     = AuthhLinks()
+        self.auth_widget_2.styles.padding = (1,4)
+        self.auth_widget_2.styles.margin = (0,2)
+        self.authn_button      = PopBrowserButton(AUTHN_LABEL, variant="warning")
+        self.authn_button.styles.margin = (1,16)
+        self.qr_code_button    = QRButton(QR_LABEL, variant="warning")
+        self.qr_code_button.styles.margin = (0,16)
+        self.authenticated     = self.is_authenticated()
+        self.failed            = self.has_failed()
 
-#         resp = requests.post(self.token_url, data=token_data)
-#         self.oidc_auth_obj.token_json = resp.json()
+    def is_authenticated(self):
+        return self.crashoverride_auth_obj.authenticated
+    
+    def has_failed(self):
+        return self.crashoverride_auth_obj.failed
 
-#         if resp.status_code == 200:
-#             #Verify & decode id token
-#             verified, id_token_json = self.oidc_auth_obj.oidc_token_validate(self.oidc_auth_obj.token_json["id_token"], decode = True)
-#             if not verified:
-#                 ##Token verification error - this is bad, login failed - post a message 
-#                 self.post_message(self.OAuthSuccess(self.oidc_auth_obj.token_json, None, "id_token_verification_failure"))
-#                 self.authn_failed = True
-#                 self.oauth_status_checker.stop()
-#                 return None
+    def authstatuscheck(self):
+        """
+        Called once every 5 seconds (via set_interval())
+        Checks if an oauth token check endpoint has generated, if not just returns.
+        If it has it polls the endpoint looking for a HTTP 200 indicating successful 
+        auth along with the json payload of tokens
+
+        A message is then posted to the parent widget to recieve that will trigger it
+        to auto-advance to the next page in the wizard
+        """
+        if self.is_authenticated() or self.has_failed():
+            logger.info("Bounced from authentication status check, already authenticated or already")
+            return None
+
+        logger.debug("Entered authentication status check")
+
+        # Below pretty much re-implements the _poll() method in authn api but does it in a way that is
+        # compatible with textualize / asyncio
+        try:
+            logger.debug("Checking authentication status at %s"%(self.crashoverride_auth_obj.poll_url))
+            resp = requests.get(self.crashoverride_auth_obj.poll_url)
+
+        except Exception as err:
+            logger.error("[-] Error calling the config-tool code endpoint at %s: %s"%(self.crashoverride_auth_obj.poll_url, err))
+
+            # Token verification error - this is bad, login failed - post a message 
+            self.post_message(self.AuthSuccess(self.crashoverride_auth_obj, "id_token_verification_failure"))
+            self.crashoverride_auth_obj.failed = True
+            self.auth_status_checker.stop()
+            return None
+        
+        try:
+            # Successful authn - exit loop HTTP 428 vs 200
+            if resp.status_code == 200:
+                logger.info("AUTHENTICATION SUCCEEDED - HTTP 200 received")
+                # Retrieve token from the 200
+                resp_json = resp.json()
+                logger.info("JSON received: %s"%(resp_json))
                 
-#             #Save verified ID token
-#             self.oidc_auth_obj.id_token_json = id_token_json
+                # Setting this value indicates auth'd, causes the watcher to trigger
+                self.crashoverride_auth_obj.token = resp_json["token"]
+                self.crashoverride_auth_obj.decoded_jwt = self.crashoverride_auth_obj._decode_and_validate_jwt(resp_json["token"])
+                self.crashoverride_auth_obj.revision_id = self.crashoverride_auth_obj.decoded_jwt["revisionId"]
+                self.crashoverride_auth_obj.token_issued_at = self.crashoverride_auth_obj.decoded_jwt["iat"]
+                logger.info("Decoded JWT: %s"%(self.crashoverride_auth_obj.decoded_jwt))
 
-#             ##Setting this value indicates auth'd, causes the watcher to trigger
-#             self.oidc_auth_obj.authenticated = True
-#             self.oauth_status_checker.stop()
+                # Populate authenticated user data (keep outside of token/jwt that is passed down to generated chalks)
+                self.crashoverride_auth_obj._user_json = resp_json["user"]
+                self.crashoverride_auth_obj.user_id = self.crashoverride_auth_obj._user_json["id"]
+                self.crashoverride_auth_obj.user_name = self.crashoverride_auth_obj._user_json["name"]
+                self.crashoverride_auth_obj.user_email = self.crashoverride_auth_obj._user_json["email"]
+                self.crashoverride_auth_obj.user_picture = self.crashoverride_auth_obj._user_json["picture"]
+                logger.info("User %s (%s) logged in"%(self.crashoverride_auth_obj.user_name, self.crashoverride_auth_obj.user_email))
 
-#             ##Post message to be picked up by LoginScreen
-#             self.post_message(self.OAuthSuccess(self.oidc_auth_obj.token_json, id_token_json, "success"))
-#             return None
+                self.crashoverride_auth_obj.authenticated = True
+
+                ##Add to config to get picked up by the con4m writer
+                self.bearer_token_lbl = self.crashoverride_auth_obj.token
+                
+                # Post message to be picked up by LoginScreen
+                self.post_message(self.AuthSuccess(self.crashoverride_auth_obj, "success"))
+
+                self.auth_status_checker.stop()
+                return None
             
-#         ## Error handling.....
-#         elif self.oidc_auth_obj.token_json['error'] not in ('authorization_pending', 'slow_down'):
-#             self.authn_failed = True
-#             self.oauth_status_checker.stop()
-#             self.post_message(self.OAuthSuccess(self.oidc_auth_obj.token_json, None, "authentication_failure"))
-#             return None
+            elif resp.status_code == 428:
+                # HTTP 428 We pendin' ..... sleep a bit
+                logger.debug("HTTP 428 received, authentication not succeeded yet. Sleeping until next interval.......")
+                return None
 
-#         #ToDo Handle slow downs
-#         ##We pendin' ..... sleep a bit
+            else:
+                # Unexpect HTTP code returned
+                logger.error("Unknown HTTP code returned. Expecting on 428's and 200's ? %d"%(resp.status_code))
+                return None
             
-#     def reset_login_widget(self):
-#         """
-#         Reset the login widgeet using a newly generated device code
-#         """
-#         self.oauth_status_checker.stop()
-#         self.oidc_polling = False
-#         self.authn_failed = False
-#         ret = self.start_oidc_polling()
+        except Exception as err:
+            logger.error("Error parsing returned data: %s"%(err))
+            return None
+    
+    def reset_login_widget(self):
+        """
+        Reset the login widgeet using a newly generated device code
+        """
+        self.auth_status_checker.stop()
+        self.authn_failed = False
+        ret = self.start_auth_polling()
 
+    def start_auth_polling(self):
+        """
+        """
+        logger.info("API authN polling loop initializing.....")        
+        # Call API for chalk code
+        self.chalk_code_json = self.crashoverride_auth_obj._get_code()
+        
+        if not self.chalk_code_json:
+            logger.error("Error getting Chalk device code, no JSON returned by _get_code()")
+            return -1
 
-#     def start_oidc_polling(self):
-#         """
-#         """        
-#         ##Call API for device code
-#         self.device_code_json = self.oidc_auth_obj.get_device_code()
+        # Build instructions to include the correct URLs and code
+        self.auth_widget_1.update("To enable the Chalk binaries built by the Chalk Configuration Tool to send data to your Crash Override account you must authorize it\n\nClick the button to login to Crash Override\n\n")
+        self.auth_widget_1.refresh()
+        self.auth_widget_2.update("Or, browse to\n\n1. %s\n\nAlternatively \n\n1. Navigate to: %s\n2. Enter the following code: %s\n\nIf you would like to login from another device, click the button to display a QR code"%(self.chalk_code_json['authUrl'], self.chalk_code_json['authUrl'].split("?")[0], self.chalk_code_json['id']))
+        self.auth_widget_2.refresh()
 
-#         #ToDo
-#         if not self.device_code_json:
-#             return -1
+        # Start background task that polls oauth
+        self.auth_status_checker = self.set_interval(self.crashoverride_auth_obj.poll_int, self.authstatuscheck)
+        logger.info("Background authN checker begun with interval of %d seconds"%(self.crashoverride_auth_obj.poll_int))
+        return 0
 
-#         ##Build instructions to include the correct URLs and code
-#         self.oidc_widget_1.update("To enable the Chalk binaries built by the Chalk Configuration Tool to send data to your Crash Override account you must authorize it\n\nClick the button to login to Crash Override\n\n")
-#         self.oidc_widget_1.refresh()
-#         self.oidc_widget_2.update("Or, browse to\n\n1. %s\n\nAlternatively \n\n1. Navigate to: %s\n2. Enter the following code: %s\n\nIf you would like to login from another device, click the button to display a QR code"%(self.device_code_json['verification_uri_complete'], self.device_code_json['verification_uri'], self.device_code_json['user_code']))
-#         self.oidc_widget_2.refresh()
+    def compose(self):
+        self.has_entered = False
+        yield Center(
+            MDown(LOGIN_LABEL),
+            self.auth_widget_1,
+            self.authn_button,
+            self.auth_widget_2,
+            self.qr_code_button,
+        )
 
-#         ##Start background task that polls oauth
-#         self.oauth_status_checker = self.set_interval(5 , self.oauthstatuscheck)
+    def doc(self):
+        return "LOGIN HELP HERE TBD"
 
-#         return 0
+class DisplayQrCode(WizContainer):
 
-#     def compose(self):
-
-#         self.has_entered = False
- 
-#         yield Center(
-#             MDown(LOGIN_LABEL),
-#             self.oidc_widget_1,
-#             self.authn_button,
-#             self.oidc_widget_2,
-#             self.qr_code_button,
-#         )
-
-#     def doc(self):
-#         return "LOGIN HELP HERE TBD"
-
-# class DisplayQrCode(WizContainer):
-
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         self.data_to_encode = ""
-#         self.qr_widget      = QrCode(id="qrcode")
-#         self.url_widget     = Static()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.data_to_encode = ""
+        self.qr_widget      = QrCode(id="qrcode")
+        self.url_widget     = Static()
         
         
-#     def generate_qr(self, data_to_encode):
-#         """
-#         """
-#         self.data_to_encode = data_to_encode
-#         qr = pyqrcode.create(data_to_encode)
-#         qr.textualize = qr_textualize_render
-#         self.qr_widget.qr_string = qr.textualize(qr.code, quiet_zone=1)
-#         self.qr_widget.refresh()
+    def generate_qr(self, data_to_encode):
+        """
+        """
+        self.data_to_encode = data_to_encode
+        qr = pyqrcode.create(data_to_encode)
+        qr.textualize = qr_textualize_render
+        self.qr_widget.qr_string = qr.textualize(qr.code, quiet_zone=1)
+        self.qr_widget.refresh()
 
-#         self.url_widget = Static( "( %s )"%(self.data_to_encode))
-#         self.url_widget.styles.margin = (0,20)
+        self.url_widget = Static( "( %s )"%(self.data_to_encode))
+        self.url_widget.styles.margin = (0,20)
 
-#     def compose(self):
-#         yield Container(
-#             self.qr_widget,
-#             self.url_widget,   ## Add in URL that it represents
-#         )
+    def compose(self):
+        yield Container(
+            self.qr_widget,
+            self.url_widget,   ## Add in URL that it represents
+        )
 
 class BuildBinary(WizContainer):
     def compose(self):
@@ -513,22 +530,25 @@ class S3Params(WizContainer):
 
 class ReportingPane(WizContainer):
     
-    #inline_login_btn = LoginButton(label="Login", classes="basicbutton", id="wiz_login_button")
+    inline_login_btn = LoginButton(label="Login", classes="basicbutton", id="wiz_login_button")
     def compose(self):
         self.has_entered = False
 
         yield MDown(REPORTING_PANE_INTRO)
-        yield ReportingContainer(
-                        Checkbox(CO_CRASH, value=True, id="report_co"),
-                        Checkbox(CO_STDOUT, value=True, id="report_stdout"),
-                        Checkbox(CO_STDERR, id="report_stderr"),
-                        EnablingCheckbox("log_conf", CO_LOG,  id="report_log"),
-                        HttpsUrlCheckbox(CO_POST ,id="report_http"),
-                        EnablingCheckbox("s3_conf", CO_S3,  id="report_s3"))
-        # yield MDown(API_DOC)
-        #yield Horizontal(C0ApiToggle(value=True, id="c0api_toggle"),
-        #                           Label(L_C0API_USE, classes="label"), 
-        #                           self.inline_login_btn)
+        
+        yield Horizontal(C0ApiToggle(value=True, id="report_co"),
+            Label(CO_CRASH, classes="label"), 
+            self.inline_login_btn)
+        yield Horizontal(Switch(value=True, id="report_stdout"),
+            Label(CO_STDOUT, classes="label"))
+        yield Horizontal(Switch(value=True, id="report_stderr"),
+            Label(CO_STDERR, classes="label"))
+        yield Horizontal(EnablingSwitch("log_conf", CO_LOG,  id="report_log"),
+            Label(CO_LOG, classes="label"))  
+        yield Horizontal(EnablingSwitch("http_conf", CO_POST ,id="report_http"),
+            Label(CO_POST, classes="label"))
+        yield Horizontal(EnablingSwitch("s3_conf", CO_S3,  id="report_s3"),
+            Label(CO_S3, classes="label"))        
         yield MDown()
         yield MDown("### Environment Variable Configuration")
         yield MDown(REPORTING_ENV_INTRO)
@@ -538,14 +558,12 @@ class ReportingPane(WizContainer):
                          Label(L_CUSTOM_ENV, classes="label"))
         
         ##Update login button if user is already logged in
-        # if  get_app().authenticated == True:
-        #         #user_str = "Hi %s!"%(get_app().current_user_name)
-        #         user_str = "Hi %s!"%(get_app().login_widget.oidc_auth_obj.current_user_name)
-                
-        #         self.inline_login_btn.label = user_str
-        #         self.inline_login_btn.variant = "success"
-        #         self.inline_login_btn.update(user_str)
-        #         self.inline_login_btn.refresh()
+        if  get_app().authenticated == True:
+                user_str = "Logged In"
+                self.inline_login_btn.label = user_str
+                self.inline_login_btn.variant = "success"
+                self.inline_login_btn.update(user_str)
+                self.inline_login_btn.refresh()
 
     def complete(self):
         return self.has_entered

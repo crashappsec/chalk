@@ -69,7 +69,6 @@ L_NEW_CONF    = "New configuration (not yet saved)"
 L_MODIFIED    = "Existing config modified (needs saving)"
 L_UNMODIFIED  = "Configuration unchanged"
 L_NO_NAME     = "Unsaved (config name required)"
-L_C0API_USE   = "Make use of Crash Override API and services"
 
 # Placeholder text in Input widgets.
 PLACEHOLD_FILE    = "Enter file name"
@@ -98,7 +97,7 @@ R_UCICD    = "In CI/CD, after building stand-alone artifacts"
 R_UEXTRACT = "In production, as a chalk mark scanner"
 
 # Checkbox text
-CO_CRASH   = "Send it to Crash Override (coming soon)"
+CO_CRASH   = "Send it to Crash Override    "
 CO_STDOUT  = "Output to stdout"
 CO_STDERR  = "Output to stderr"
 CO_LOG     = "Output to a log file"

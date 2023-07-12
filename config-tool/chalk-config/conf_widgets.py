@@ -222,15 +222,9 @@ class ConfigTable(Container):
         self.the_table.styles.margin = (0, 3)
 
         # ToDo update proper localized strings
-        # self.login_button = LoginButton(
-        #     label="L⍉gin", classes="basicbutton", id="login_button"
-        # )
-
-        # ToDo update proper localized strings
-        # self.login_button = LoginButton(label="L⍉gin", classes="basicbutton", id="login_button")
-
-        #ToDo update all to proper localized strings
-        #self.login_button = LoginButton(label="L⍉gin", classes="basicbutton", id="login_button")
+        self.login_button = LoginButton(
+            label="L⍉gin", classes="basicbutton", id="login_button"
+        )
         self.download_button = DownloadTestServerButton(label="Get Test Server", classes="basicbutton")
         self.binary_genration_button = BinaryGenerationButton(label="Build Chalk", classes="basicbutton")
              
@@ -261,7 +255,7 @@ class ConfigTable(Container):
     def compose(self):
         yield self.the_table
         yield Horizontal(
-            # self.login_button,
+            self.login_button,
             RunWizardButton(label=NEW_LABEL),
             EditConfigButton(label=EDIT_LABEL, classes="basicbutton"),
             DelConfigButton(label=DELETE_LABEL, classes="basicbutton"),
@@ -270,6 +264,7 @@ class ConfigTable(Container):
             self.binary_genration_button,
             classes="padme",
         )
+
 
 class BinaryGenerationButton(Button):
     """
@@ -306,6 +301,7 @@ class BinaryGenerationButton(Button):
         bg_button.variant = "default"
         bg_button.refresh()
 
+
 class DownloadTestServerButton(Button):
     """
     Easy button for user to d/l the test chalk server locally
@@ -313,10 +309,12 @@ class DownloadTestServerButton(Button):
     async def on_button_pressed(self):
         await get_app().action_downloadtestserver()
 
+
 class RunWizardButton(Button):
     async def on_button_pressed(self):
         await self.app.push_screen("confwiz")
         load_from_json(default_config_json)
+
 
 class EditConfigButton(Button):
     async def on_button_pressed(self):
@@ -365,38 +363,51 @@ class EnablingCheckbox(Checkbox):
     def on_checkbox_changed(self, event: Checkbox.Changed):
         get_wizard().query_one(self.refd_id).toggle()
 
-
-class HttpsUrlCheckbox(Checkbox):
-    def __init__(self, title, id):
-        self.original_state = True
-        Checkbox.__init__(self, title, self.original_state, id=id)
-        self.refd_id = "#http_conf"
+class EnablingSwitch(Switch):
+    def __init__(self, target, title, value=False, disabled=False, id=None):
+        Switch.__init__(self, value, disabled=disabled, id=id)
+        self.refd_id = "#" + target
+        self.original_state = value
 
     def reset(self):
         if self.value != self.original_state:
             self.value = self.original_state
 
-    def on_checkbox_changed(self, event: Checkbox.Changed):
-        # Enable/disable to HTTPS URL config pane in the wizard
+    def on_switch_changed(self, event: Switch.Changed):
         get_wizard().query_one(self.refd_id).toggle()
 
-        ##Todo abstract the enable/disable next button logic to avoid ever growing custom logic, but until then ....
-        ## Enable / disable the next button based on what has been selected / if HTTPS_URL disabled
-        # if self.value:
-        #     ##Enable API toggle
-        #     get_wizard().query_one("#c0api_toggle").disabled = False
-        #     ##If switch set on, enable login button
-        #     if get_wizard().query_one("#c0api_toggle").value:
-        #         get_wizard().query_one("#wiz_login_button").disabled = False
-        #         ##If we aren't authenticated disable next button
-        #         if not get_app().login_widget.is_authenticated() and get_wizard().current_panel == get_wizard().api_authn_panel:
-        #             get_wizard().next_button.disabled = True
-        #     else:
-        #         get_wizard().next_button.disabled = False
-        # else:
-        #     get_wizard().query_one("#wiz_login_button").disabled = True
-        #     get_wizard().query_one("#c0api_toggle").disabled = True
-        #     get_wizard().next_button.disabled = False
+
+# class HttpsUrlCheckbox(Checkbox):
+#     def __init__(self, title, id):
+#         self.original_state = True
+#         Checkbox.__init__(self, title, self.original_state, id=id)
+#         self.refd_id = "#http_conf"
+
+#     def reset(self):
+#         if self.value != self.original_state:
+#             self.value = self.original_state
+
+#     def on_checkbox_changed(self, event: Checkbox.Changed):
+#         # Enable/disable to HTTPS URL config pane in the wizard
+#         get_wizard().query_one(self.refd_id).toggle()
+
+#         # Todo abstract the enable/disable next button logic to avoid ever growing custom logic, but until then ....
+#         #  Enable / disable the next button based on what has been selected / if HTTPS_URL disabled
+#         # if self.value:
+#         #     # Enable API toggle
+#         #     get_wizard().query_one("#report_co").disabled = False
+#         #     # If switch set on, enable login button
+#         #     if get_wizard().query_one("#report_co").value:
+#         #         get_wizard().query_one("#wiz_login_button").disabled = False
+#         #         # If we aren't authenticated disable next button
+#         #         if not get_app().login_widget.is_authenticated() and get_wizard().current_panel == get_wizard().api_authn_panel:
+#         #             get_wizard().next_button.disabled = True
+#         #     else:
+#         #         get_wizard().next_button.disabled = False
+#         # else:
+#         #     get_wizard().query_one("#wiz_login_button").disabled = True
+#         #     get_wizard().query_one("#report_co").disabled = True
+#         #     get_wizard().next_button.disabled = False
 
 
 class EnvToggle(Switch):
@@ -410,17 +421,20 @@ class AlphaModal(AckModal):
         intro_md.update(INTRO_TEXT)
 
 
-# class LoginButton(Button):
-#     async def on_button_pressed(self):
-#         get_app().action_login()
+class LoginButton(Button):
+    async def on_button_pressed(self):
+        get_app().action_login()
 
-# class QRButton(Button):
-#     async def on_button_pressed(self):
-#         get_app().action_display_qr()
 
-# class PopBrowserButton(Button):
-#     async def on_button_pressed(self):
-#         webbrowser.open(get_app().login_widget.device_code_json['verification_uri_complete'])
+class QRButton(Button):
+    async def on_button_pressed(self):
+        get_app().action_display_qr()
+
+
+class PopBrowserButton(Button):
+    async def on_button_pressed(self):
+        webbrowser.open(get_app().login_widget.crashoverride_auth_obj.auth_url)
+
 
 # class ProfilePicture(Static):
 #     ascii_picture = Reactive("")
@@ -433,39 +447,56 @@ class AlphaModal(AckModal):
 #         self.ascii_picture = "\n\n%s\n\n\n\n"%(a.to_ascii(columns=30))
 #         return self.ascii_picture
 
-# class OidcLinks(MDown):
-#     """
-#     Markdown object that will contain the genrated OIDC links
-#     """
-#     markdown = Reactive("")
-#     def render(self) -> str:
-#         return self.markdown
 
-# class QrCode(Static):
-#     """
-#     Object that will hold an ASCII art QRcode
-#     """
-#     qr_string = Reactive("")
-#     def render(self) -> str:
-#         return self.qr_string
+class AuthhLinks(MDown):
+    """
+    Markdown object that will contain the genrated Auth links
+    """
+    markdown = Reactive("")
+    def render(self) -> str:
+        return self.markdown
 
-# class C0ApiToggle(Switch):
-#     def on_switch_changed(self):
-#         ##Based on switch position......
-#         if self.value:
-#             ##Enable the inline login button
-#             get_wizard().query_one("#wiz_login_button").disabled = False
-#             ##Set URL value in HTTPS pane
-#             get_wizard().query_one("#https_url").value = "chalk.crashoverride.run/report"
 
-#             ##Disable the Next button if we are not yet authenticated and wanting to use the API
-#             if not get_app().authenticated and get_wizard().current_panel == get_wizard().panels[1]:
-#                 get_wizard().next_button.disabled = True
-#         else:
-#             get_wizard().query_one("#wiz_login_button").disabled = True
-#             get_wizard().next_button.disabled = False
-#             get_wizard().query_one("#https_url").value = text_defaults["https_url"]
-            
+class QrCode(Static):
+    """
+    Object that will hold an ASCII art QRcode
+    """
+    qr_string = Reactive("")
+    def render(self) -> str:
+        return self.qr_string
+
+
+class C0ApiToggle(Switch):
+    def on_switch_changed(self):
+        ##Based on switch position......
+        if self.value:
+            ##Enable the inline login button
+            get_wizard().query_one("#wiz_login_button").disabled = False
+            ##Set URL value in HTTPS pane
+            get_wizard().query_one("#https_url").value = "chalk.crashoverride.run/report" #ToDo localize
+
+            ##Disable the Next button if we are not yet authenticated and wanting to use the API
+            if not get_app().authenticated and get_wizard().current_panel == get_wizard().panels[1]:
+                update_next_button("Please Login")
+                get_wizard().next_button.disabled = True
+                
+        else:
+            get_wizard().query_one("#wiz_login_button").disabled = True
+            update_next_button("Next")
+            get_wizard().next_button.disabled = False
+            get_wizard().query_one("#https_url").value = text_defaults["https_url"]
+
+
+def update_next_button(label, variant="default"):
+    """
+    """
+    n_str    = label
+    n_button = get_wizard().query_one("#Next")
+    n_button.update(n_str)
+    n_button.label = n_str
+    n_button.variant = variant
+    n_button.refresh()
+
 def write_from_local(dict, config, d, pops=2):
     binname  = d["exe_name"]
     

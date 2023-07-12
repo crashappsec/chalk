@@ -19,8 +19,7 @@
 # SOFTWARE.
 
 import ipaddress
-from datetime import datetime, timedelta
-
+import datetime
 
 def generate_selfsigned_cert(hostname, ip_addresses=None, key=None):
     """Generates self signed certificate for a hostname, and optional IP addresses."""
@@ -56,7 +55,7 @@ def generate_selfsigned_cert(hostname, ip_addresses=None, key=None):
 
     # path_len=0 means this cert can only sign itself, not other certs.
     basic_contraints = x509.BasicConstraints(ca=True, path_length=0)
-    now = datetime.utcnow()
+    now = datetime.datetime.utcnow()
     cert = (
         x509.CertificateBuilder()
         .subject_name(name)
@@ -64,7 +63,7 @@ def generate_selfsigned_cert(hostname, ip_addresses=None, key=None):
         .public_key(key.public_key())
         .serial_number(1000)
         .not_valid_before(now)
-        .not_valid_after(now + timedelta(days=10 * 365))
+        .not_valid_after(now + datetime.timedelta(days=10 * 365))
         .add_extension(basic_contraints, False)
         .add_extension(san, False)
         .sign(key, hashes.SHA256(), default_backend())

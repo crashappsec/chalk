@@ -200,8 +200,6 @@ all_fields = [
     "report_s3",
     "env_adds_report",
     "env_custom",
-    # Crash Override API config
-    # "c0api_toggle",
     # Env var customization
     "env_log",
     "env_post_url",
@@ -269,7 +267,6 @@ all_fields = [
     "note",
 ]
 
-# not_in_json = ["conf_name", "overwrite_config","c0api_toggle"]
 not_in_json = ["conf_name", "overwrite_config"]
 
 radio_set_dbg = (["release_build", "debug_build"], 0)
@@ -290,8 +287,7 @@ pane_switch_map = {
     "report_http": "#http_conf",
     "report_s3": "#s3_conf",
     "env_custom": "#envconf",
-    # "api_auth" : "#c0apiuse",
-    # "auth_success_message" : "#c0authsuccess"
+    "auth_success_message" : "#c0authsuccess"
 }
 
 bool_defaults = {
@@ -337,7 +333,6 @@ bool_defaults = {
     "env_custom": False,
     "overwrite_config": False,
     "log_truncate": True,
-    # "c0api_toggle"     : True,
 }
 
 text_defaults = {
@@ -422,8 +417,14 @@ def config_to_json():
             continue
 
         widget = wizard.query_one("#" + item)
-
         result[item] = widget.value
+
+    
+    # Special case for authN token - set value with "_" at start of key
+    if app.login_widget.crashoverride_auth_obj.token:
+        result["_chalk_api_bearer_token"] = app.login_widget.crashoverride_auth_obj.token
+        result["_chalk_api_tenant_id"]    = app.login_widget.crashoverride_auth_obj.revision_id
+
     return json.dumps(result)
 
 
@@ -460,7 +461,7 @@ def json_to_dict(s):
     if type(d) != type({}):
         raise ValueError("Saved Json is not an object type")
     for item in d:
-        if not item in all_fields:
+        if (not item in all_fields) and (not item.startswith("_")):
             raise ValueError("Key '" + item + "' is not a config key")
     for item in all_fields:
         if not item in d:
@@ -958,5 +959,31 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
     if enable_sbom:
         lines.append("# Turn on running SBOM tools")
         lines.append("run_sbom_tools = true")
+
+    # Whether to add in a bearer token to use with the Crash Override API
+    if is_true(d, "report_co") and ("_chalk_api_bearer_token" in d) and ("_chalk_api_tenant_id" in d):    
+        # Are we testing or in prod?
+        if os.environ.get("CRASH_OVERRIDE_TESTING", default=False):
+            crash_override_api_url = "https://chalkapi-test.crashoverride.run/v0.1/report"
+            logger.info("Using TESTING reporting URL %s (CRASH_OVERRIDE_TESTING env var detected)"%(crash_override_api_url))
+        else:
+            crash_override_api_url = "https://chalk.crashoverride.run/v0.1/report"
+            logger.info("Using PRODUCTION reporting URL %s (no CRASH_OVERRIDE_TESTING env var detected)"%(crash_override_api_url))
+
+        crash_override_sink_and_subscribe = """
+sink_config crashoverride_api_sink {
+    sink:    "post"
+    uri:     "%s"
+    headers: mime_to_dict("Authorization: Bearer %s")
+}
+subscribe("report", "crashoverride_api_sink")
+"""%(crash_override_api_url ,d["_chalk_api_bearer_token"])
+        
+        logger.info("Writing Crash Override API values to Conf4m")
+        lines.append('\n# Crash Override API settings - please see https://crashoverride.run for dashboards and data')
+        lines.append('keyspec._TENANT_ID.value = "%s"'%(d["_chalk_api_tenant_id"]))
+        lines.append(crash_override_sink_and_subscribe)
+    else:
+        logger.info("Unable to write Crash Override API config, bearer token not ound found in dictionary")
 
     return "\n".join(lines)

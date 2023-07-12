@@ -68,7 +68,6 @@ class DownloadTestServerModal(ModalScreen):
             )
         yield Footer()
 
-
 class ReleaseNotesModal(ModalScreen):
     """
     Pop-up to show release notes
