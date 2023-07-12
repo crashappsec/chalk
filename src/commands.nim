@@ -776,8 +776,6 @@ proc runCmdExec*(args: seq[string]) =
   elif len(args) != 0:
     argsToPass = args
 
-  echo "Pct = ", pct
-
   if pct != 100:
     let
       inRange = pct/100
