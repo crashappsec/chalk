@@ -25,7 +25,7 @@ chalkosxrelease:
 configdeps:
 	mkdir -p .config-tool-bin
 	rm -f chalk
-	docker compose run --rm chalk-compile sh -c 'nimble --verbose build -d:release'
+	docker compose run --rm chalk-compile sh -c 'nimble release'
 	mv chalk .config-tool-bin/chalk-release
 	docker compose run --rm chalk-compile sh -c 'nimble debug'
 	mv chalk .config-tool-bin
