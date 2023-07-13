@@ -227,7 +227,8 @@ iterator artifacts*(artifactPath: seq[string]): ChalkObj =
       # post-chalk, so need to go to the system errors list.
       clearErrorObject()
       if not inSubScan() and obj.fullpath notin getUnmarked():
-        obj.collectPostChalkInfo()
+        if not obj.forceIgnore:
+          obj.collectPostChalkInfo()
       obj.myCodec.cleanup(obj)
       obj.closeFileStream()
     if len(chalks) > 0 and not goOn: break

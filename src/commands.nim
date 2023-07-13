@@ -235,7 +235,6 @@ proc runCmdInsert*(path: seq[string]) =
   initCollection()
   let virtual = chalkConfig.getVirtualChalk()
 
-
   for item in artifacts(path):
     trace(item.fullPath & ": begin chalking")
     item.collectChalkInfo()
@@ -243,6 +242,7 @@ proc runCmdInsert*(path: seq[string]) =
     if item.isMarked() and "$CHALK_CONFIG" in item.extract:
       info(item.fullPath & ": Is a configured chalk exe; skipping insertion.")
       item.removeFromAllChalks()
+      item.forceIgnore = true
       continue
     if item.opFailed:
       continue
@@ -265,6 +265,9 @@ proc runCmdInsert*(path: seq[string]) =
 proc runCmdDelete*(path: seq[string]) =
   initCollection()
 
+  # See runCmdInsert for info on this.
+  var toRm: seq[ChalkObj] = @[]
+
   for item in artifacts(path):
     if not item.isMarked():
       info(item.fullPath & ": no chalk mark to delete.")
@@ -274,6 +277,8 @@ proc runCmdDelete*(path: seq[string]) =
         warn(item.fullPath & ": Is a configured chalk exe; run it using " &
           "'chalk load default' to remove.")
         item.opFailed = true
+        toRm.add(item)
+        continue
       else:
         item.myCodec.handleWrite(item, none(string))
         info(item.fullPath & ": chalk mark successfully deleted")

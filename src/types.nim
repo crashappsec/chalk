@@ -40,6 +40,9 @@ type
                                 ## example, in a docker container,
                                 ## this can contain the context
                                 ## directory and the docker file.
+    forceIgnore*:   bool        ## If the system decides the codec shouldn't
+                                ## process this, set this bool.
+
 
   Plugin* = ref object of RootObj
     name*:       string
