@@ -9,7 +9,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.5.0"
+chalk_version :=   "0.1.0"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
