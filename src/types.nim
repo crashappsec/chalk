@@ -87,6 +87,9 @@ proc addToAllChalks*(o: ChalkObj) =
   collectionCtx.allChalks.add(o)
 proc setAllChalks*(s: seq[ChalkObj]) =
   collectionCtx.allChalks = s
+proc removeFromAllChalks*(o: ChalkObj) =
+  if o in collectionCtx.allChalks:
+    collectionCtx.allChalks.del(collectionCtx.allChalks.find(o))
 proc getUnmarked*(): seq[string] = collectionCtx.unmarked
 proc addUnmarked*(s: string) =
   collectionCtx.unmarked.add(s)

@@ -240,9 +240,12 @@ proc runCmdInsert*(path: seq[string]) =
     trace(item.fullPath & ": begin chalking")
     item.collectChalkInfo()
     trace(item.fullPath & ": chalk data collection finished.")
+    if item.isMarked() and "$CHALK_CONFIG" in item.extract:
+      info(item.fullPath & ": Is a configured chalk exe; skipping insertion.")
+      item.removeFromAllChalks()
+      continue
     if item.opFailed:
       continue
-
     try:
       let toWrite = item.getChalkMarkAsStr()
       if virtual:
