@@ -50,6 +50,8 @@ type
 
   Codec* = ref object of Plugin
     searchPath*: seq[string]
+    runtime*:    bool   # Set to true when we run via exec since codecs
+                        # might have different visibility.
 
   KeyType* = enum KtChalkableHost, KtChalk, KtNonChalk, KtHostOnly
 

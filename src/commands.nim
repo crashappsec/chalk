@@ -711,8 +711,8 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
     chalk.extract = stream.extractOneChalkJson("<<in-container>>")
     chalk.myCodec = Codec(getPluginByName("docker"))
 
-    # Denote to the docker plugin that we're running.
-    chalk.myCodec.searchPath = @["runtime"]
+    # Denote to the codec that we're running.
+    chalk.myCodec.runtime = true
 
     return some(chalk)
   else:

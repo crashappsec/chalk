@@ -42,10 +42,7 @@ type
     tmpEntryPoint:          string
     #% END
 
-proc isRuntime(self: CodecDocker): bool =
-  if self.searchPath.len() == 0: return false
-  if self.searchPath[0] == "runtime": return true
-  return false
+template isRuntime(self: CodecDocker): bool = self.runtime
 
 proc extractArgv(json: string): seq[string] {.inline.} =
   for item in parseJson(json).getElems():
