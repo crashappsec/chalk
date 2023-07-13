@@ -95,6 +95,8 @@ def determine_sys_arch():
             machine = "arm64"
     else:
         machine = platform.machine()
+        if machine == "x86_64":
+            machine == "arm64"
     assert machine in [
         "arm64",
         "amd64",
@@ -976,18 +978,19 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         and ("_chalk_api_tenant_id" in d)
     ):
         # Are we testing or in prod?
-        if os.environ.get("CRASH_OVERRIDE_TESTING", default=False):
+        chalk_post_url = os.environ.get("CHALK_POST_URL", default="")
+        if "test" in chalk_post_url:
             crash_override_api_url = (
                 "https://chalkapi-test.crashoverride.run/v0.1/report"
             )
             logger.info(
-                "Using TESTING reporting URL %s (CRASH_OVERRIDE_TESTING env var detected)"
+                "Using TESTING reporting URL %s (CHALK_POST_URL detected test in env var detected)"
                 % (crash_override_api_url)
             )
         else:
             crash_override_api_url = "https://chalk.crashoverride.run/v0.1/report"
             logger.info(
-                "Using PRODUCTION reporting URL %s (no CRASH_OVERRIDE_TESTING env var detected)"
+                "Using PRODUCTION reporting URL %s (no test CHALK_POST_URL env var detected)"
                 % (crash_override_api_url)
             )
 

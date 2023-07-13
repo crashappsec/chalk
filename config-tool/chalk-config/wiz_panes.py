@@ -114,8 +114,21 @@ class ApiAuth(WizContainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # ToDo parameterise/localize
-        #self.bearer_token_lbl = Label("foobar", id="c0api_bearer_token", disabled=True)
-        self.crashoverride_auth_obj = crash_override_authn.CrashOverrideAuth("https://chalkapi-test.crashoverride.run/v0.1/auth/code")
+        chalk_post_url = os.environ.get("CHALK_POST_URL", default="")
+        if "test" in chalk_post_url:
+            co_auth_url = "https://chalkapi-test.crashoverride.run/v0.1/auth/code"
+            logger.info(
+                "Using TESTING authN URL %s (CHALK_POST_URL detected test in env var detected)"
+                % (co_auth_url)
+            )
+        else:
+            co_auth_url = "https://chalk.crashoverride.run/v0.1/auth/code"
+            logger.info(
+                "Using PROD authN URL %s (no test in CHALK_POST_URL detected)"
+                % (co_auth_url)
+            )
+
+        self.crashoverride_auth_obj = crash_override_authn.CrashOverrideAuth(co_auth_url )
         
         self.auth_widget_1     = AuthhLinks()
         self.auth_widget_1.styles.padding = (0,4)
