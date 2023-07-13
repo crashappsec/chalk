@@ -558,10 +558,16 @@ method autoArtifactPath*(self: Codec): bool {.base.}  = true
 
 method getChalkId*(self: Codec, chalk: ChalkObj): string {.base.} =
   let hashOpt = self.getUnchalkedHash(chalk)
-  if hashOpt.isNone():
-    raise newException(Exception, "In plugin: " & self.name &
-      ": no hash for chalk ID")
-  return hashOpt.get().idFormat()
+  if not hashOpt.isNone():
+    return hashOpt.get().idFormat()
+  else:
+    warn(chalk.fullPath & ": In plugin '" & self.name &
+      "', no hash for chalk ID; using a random value.")
+    var
+      b      = secureRand[array[32, char]]()
+      preRes = newStringOfCap(32)
+    for ch in b: preRes.add(ch)
+    return preRes.idFormat()
 
 method getChalkInfo*(self: Codec, chalk: ChalkObj): ChalkDict =
   result               = ChalkDict()

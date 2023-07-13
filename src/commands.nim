@@ -240,9 +240,11 @@ proc runCmdInsert*(path: seq[string]) =
     trace(item.fullPath & ": begin chalking")
     item.collectChalkInfo()
     trace(item.fullPath & ": chalk data collection finished.")
+    if item.opFailed:
+      continue
+
     try:
       let toWrite = item.getChalkMarkAsStr()
-
       if virtual:
         publish("virtual", toWrite)
         info(item.fullPath & ": virtual chalk created.")
