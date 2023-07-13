@@ -59,6 +59,9 @@ method getUnchalkedHash*(self: CodecDocker, chalk: ChalkObj): Option[string] =
   return none(string)
 
 method getChalkId*(self: CodecDocker, chalk: ChalkObj): string =
+
+  if self.isRuntime() and chalk.extract != nil and "CHALK_ID" in chalk.extract:
+    return unpack[string](chalk.extract["CHALK_ID"])
   var
     b      = secureRand[array[32, char]]()
     preRes = newStringOfCap(32)
