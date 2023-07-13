@@ -700,7 +700,11 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
   var
     info: Stat
     chalkPath = chalkConfig.dockerConfig.getChalkFileLocation()
+
+  trace("Looking for a chalk file at: " & chalkPath)
+
   if stat(cstring(chalkPath), info) == 0:
+    info("Found chalk mark in " & chalkPath)
     var
       stream      = newFileStream(chalkPath)
       chalk       = newChalk(stream, "<<in-container>>")
@@ -711,6 +715,9 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
     chalk.myCodec.searchPath = @["runtime"]
 
     return some(chalk)
+  else:
+    info("Could not find a container chalk mark at " & chalkPath)
+    return none(ChalkObj)
 
 
   var n: array[PATH_MAX, char]
@@ -805,7 +812,6 @@ proc runCmdExec*(args: seq[string]) =
     else:
       initCollection()
       let chalkOpt = doExecCollection(pid)
-      # On some platforms we don't support
       if chalkOpt.isSome():
         chalkOpt.get().collectPostChalkInfo()
 
