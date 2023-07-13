@@ -713,12 +713,11 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
 
     # Denote to the codec that we're running.
     chalk.myCodec.runtime = true
+    chalk.addToAllChalks()
 
     return some(chalk)
-  else:
-    info("Could not find a container chalk mark at " & chalkPath)
-    return none(ChalkObj)
 
+  info("Could not find a container chalk mark at " & chalkPath)
 
   var n: array[PATH_MAX, char]
 

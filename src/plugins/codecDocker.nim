@@ -50,7 +50,7 @@ proc extractArgv(json: string): seq[string] {.inline.} =
 
 method usesFStream*(self: CodecDocker): bool = false
 
-method autoArtifactPath*(self: Codec): bool        = false
+method autoArtifactPath*(self: Codec): bool  = false
 
 method getUnchalkedHash*(self: CodecDocker, chalk: ChalkObj): Option[string] =
   return none(string)
