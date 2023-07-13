@@ -5,6 +5,7 @@ import tables, strutils, json, options, os, osproc, streams, parseutils,
        posix_utils, std/tempfiles, nimutils, con4m, ../config, ../plugins,
        ../dockerfile, ../chalkjson, ../exec
 
+
 type
   CodecDocker* = ref object of Codec
   DockerFileSection = ref object
@@ -40,6 +41,11 @@ type
     #% INTERNAL
     tmpEntryPoint:          string
     #% END
+
+proc isRuntime(self: CodecDocker): bool =
+  if self.searchPath.len() == 0: return false
+  if self.searchPath[0] == "runtime": return true
+  return false
 
 proc extractArgv(json: string): seq[string] {.inline.} =
   for item in parseJson(json).getElems():
@@ -276,10 +282,13 @@ method getPostChalkInfo*(self:  CodecDocker,
                          chalk: ChalkObj,
                          ins:   bool): ChalkDict =
   result    = ChalkDict()
+
+  if self.isRuntime():
+    return
+
   let
     cache      = DockerInfoCache(chalk.cache)
     inspectOut = cache.inspectOut
-
 
   if not cache.container:
     chalk.cachedHash = inspectOut["Id"].getStr().extractDockerHash()
