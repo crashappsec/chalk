@@ -147,6 +147,20 @@ Additionally, if temporary files might be useful to inspect, this causes them to
 """
   }
 
+  flag_yn skip_command_report {
+    field_to_set: "skip_command_report"
+    yes_aliases: []
+    no_aliases:  []
+
+    doc: """
+Skip publishing the command report (i.e., the PRIMARY report). NO output sinks will get it.
+
+For most commands, this defeats the purpose of Chalk, so use it sparingly.
+
+Note that this doesn't turn off any custom reports; you have to disable those seprately.    
+"""
+}
+
   command insert {
     aliases:  ["inject", "ins", "in", "i"]
     args:     (0, high())

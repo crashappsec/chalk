@@ -89,18 +89,23 @@ proc setPerChalkReports(successProfileName: string,
   if len(reports) != 0:       hostInfo["_CHALKS"] = pack(reports)
   elif "_CHALKS" in hostInfo: hostInfo.del("_CHALKS")
 
-template doCommandReport(): string =
+proc doCommandReport(): string {.inline.} =
   let
     conf        = getOutputConfig()
     hostProfile = chalkConfig.profiles[conf.hostReport]
     unmarked    = getUnmarked()
 
-  if not hostProfile.enabled: ""
+  if (not hostProfile.enabled):
+    warn("No host reporting profile enabled.")
+    result = ""
+  elif chalkConfig.getSkipCommandReport():
+    info("Skipping the command report, because you said so.")
+    result = ""
   else:
     setPerChalkReports(conf.artifactReport, conf.invalidChalkReport,
                        conf.hostReport)
     if len(unmarked) != 0: hostInfo["_UNMARKED"] = pack(unmarked)
-    hostInfo.prepareContents(hostProfile)
+    result = hostInfo.prepareContents(hostProfile)
 
 template doEmbeddedReport(): Box =
   let

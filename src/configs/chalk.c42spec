@@ -1691,8 +1691,22 @@ Suppress validation of configuration files on loading.  Please don't do this!
   field validation_warning {
     type:        bool
     default:     true
+    shortdoc: "Show 'chalk load' validation warning"
     doc:         """
 Show the (admittedly verbose) warning you get when running 'chalk load'.
+"""
+  }
+
+  field skip_command_report {
+    type:        bool
+    default:     false
+    shortdoc: "Skip the command report"
+    doc: """
+Skip publishing the command report (i.e., the PRIMARY report). NO output sinks will get it.
+
+For most commands, this defeats the purpose of Chalk, so use it sparingly.
+
+Note that this doesn't turn off any custom reports; you have to disable those seprately.
 """
   }
 
