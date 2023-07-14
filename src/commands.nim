@@ -721,6 +721,9 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
     # Don't let system try to call resolvePath when setting the artifact path.
     chalk.noResolvePath   = true
 
+    result = some(chalk)
+
+    chalk.addToAllChalks()
 
   else:
     info("Could not find a container chalk mark at " & chalkPath)
@@ -748,6 +751,10 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
     # doesn't use the iterator).
     #
     # Thus, we break.
+    #
+    # artifacts() does add to allChalks, which is why we don't do that
+    # in this path.
+
 
     for item in artifacts(@[exe1path]):
       chalk = item
@@ -767,7 +774,8 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
   if chalk == nil:
     return none(ChalkObj)
 
-  chalk.addToAllChalks()
+
+
 
 
 proc runCmdExec*(args: seq[string]) =
