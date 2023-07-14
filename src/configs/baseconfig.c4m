@@ -2338,4 +2338,6 @@ sink_config dump_out {
 default_command = "help"
 
 
-exec { }
+exec {
+  search_path: array_add(split(env("PATH"), ":"), ["."])
+}
