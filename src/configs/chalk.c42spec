@@ -1710,6 +1710,21 @@ Note that this doesn't turn off any custom reports; you have to disable those se
 """
   }
 
+  field recursive_exec_limit {
+    type:    int
+    default: 3
+    shortdoc: "Impersonation exec recursion safeguard"
+    doc: """
+When impersonating other commands, there's some possibility chalk
+could call itself recursively, skipping any self-exe check-- the
+impersonating app could inadvertently invoke chalk after it's exec'd,
+etc.
+
+There might be some acceptable recursion, so the default here is low,
+but not 1.
+"""
+  }
+
   #% INTERNAL
   field entrypoint {
     type:    string

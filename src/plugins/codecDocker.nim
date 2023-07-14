@@ -780,7 +780,7 @@ proc buildContainer*(chalk:  ChalkObj,
   let
     cache     = DockerInfoCache(chalk.cache)
     fullFile  = cache.dockerFileContents & "\n" & cache.additionalInstructions
-    (f, path) = createTempFile(tmpFilePrefix, tmpFilesuffix, cache.context)
+    (f, path) = createTempFile(tmpFilePrefix, tmpFilesuffix)
     # This line should be semantically the same as the one after it.
     # However, for some reason, even if I pass every arg by position,
     # noSpace ends up 'true' immediately after???  Oddest thing I've seen

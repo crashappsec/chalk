@@ -16,10 +16,11 @@ static:
 # Note that importing builtins causes topics to register, and
 # importing plugins causes plugins to register.
 {.warning[UnusedImport]: off.}
-import config, builtins, commands, plugins, strutils, jitso
+import config, builtins, commands, plugins, strutils, jitso, norecurse
 
 when isMainModule:
   loadAllConfigs()
+  recursionCheck()
   # Wait for this warning until after configs load.
   if not canSelfInject:
     warn("We have no codec for this platform's native executable type")
