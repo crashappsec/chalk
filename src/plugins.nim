@@ -78,10 +78,13 @@ proc acquireFileStream*(chalk: ChalkObj): Option[FileStream] =
   ## test for it being nil.
 
   if chalk.stream == nil:
-    let handle = newFileStream(chalk.fullpath, fmReadWriteExisting)
+    var handle = newFileStream(chalk.fullpath, fmReadWriteExisting)
     if handle == nil:
-      error(chalk.fullpath & ": could not open file.")
-      return none(FileStream)
+      trace(chalk.fullpath & ": Cannot open for writing.")
+      handle = newFileStream(chalk.fullPath, fmRead)
+      if handle == nil:
+        error(chalk.fullpath & ": could not open file for reading.")
+        return none(FileStream)
 
     trace(chalk.fullpath & ": File stream opened")
     chalk.stream  = handle
