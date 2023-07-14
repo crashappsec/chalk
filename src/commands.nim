@@ -667,22 +667,28 @@ proc runCmdConfLoad*() =
   selfChalk.collectChalkInfo()
 
   trace(filename & ": installing configuration.")
-  let oldLocation = selfChalk.fullPath
-  selfChalk.fullPath = oldLocation & ".new"
-  try:
-    copyFile(oldLocation, selfChalk.fullPath)
-    let
-      toWrite = some(selfChalk.getChalkMarkAsStr())
-    selfChalk.myCodec.handleWrite(selfChalk, toWrite)
-    when defined(posix):
-      let f = open(selfChalk.fullPath)
-      f.makeExecutable()
-      f.close()
 
-    info("Configuration written to new binary: " & selfChalk.fullPath)
-  except:
-    dumpExOnDebug()
-    cantLoad("Configuration loading failed: " & getCurrentExceptionMsg())
+  let toWrite = some(selfChalk.getChalkMarkAsStr())
+  selfChalk.myCodec.handleWrite(selfChalk, toWrite)
+
+  if selfChalk.opFailed:
+    warn(selfChalk.fullPath & ": unable to modify file.")
+    warn("Attempting to write to: " & selfChalk.fullPath & ".new")
+    selfChalk.opFailed = false
+    selfChalk.fullPath = selfChalk.fullPath & ".new"
+    selfChalk.closeFileStream()
+    discard selfChalk.acquireFileStream()
+    selfChalk.myCodec.handleWrite(selfChalk, toWrite)
+    if selfChalk.opFailed:
+      error("Failed to write. Operation aborted.")
+      return
+    else:
+      when defined(posix):
+        let f = open(selfChalk.fullPath)
+        f.makeExecutable()
+        f.close()
+
+  info("Configuration written to new binary: " & selfChalk.fullPath)
   doReporting()
 
 
