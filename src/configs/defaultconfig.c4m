@@ -77,11 +77,12 @@ args    := argv()
 # You can configure where these messages go; they get published to the
 # "logs" topic, which automatically is hooked to stderr by default.
 
-if cmd == "docker" {
-  # For docker, only show error output on console if it's bad.  If you
-  # want every message to be recorded in the chalk report (but not
-  # sent to the console), you can change the value of
-  # `chalk_log_level`, to "info" or "warn" (default is "error" only)
+if cmd == "docker" or cmd == "exec" {
+  # For docker and for entry point wrapping (i.e., exec), only show
+  # error output on console if it's bad.  If you want every message to
+  # be recorded in the chalk report (but not sent to the console), you
+  # can change the value of `chalk_log_level`, to "info" or "warn"
+  # (default is "error" only)
   log_level: "error"
 }
 else {
@@ -110,7 +111,7 @@ ptr_url := ""
 
 # This makes sure the built-in functionality for keeping a backup log
 # of reporting output is enabled. This is meant to be useful if
-# there's a network connectivity issue.  We turn it back off if a
+# there's a network connectivity issue.  We won't use the sink if a
 # file-based sink is configured.
 
 use_report_cache: true
@@ -208,9 +209,9 @@ if env_exists("CHALK_ROTATING_LOG") {
 }
 
 if configured_sink {
-  # 'json_console_err' is the default sink configuration for reporting if
+  # 'json_console_out' is the default sink configuration for reporting if
   # the user doesn't do anything different. Here, we're undoing it.
-  unsubscribe("report", "json_console_err")
+  unsubscribe("report", "json_console_out")
 }
 
 # This switches which default report we use for actual chalking, to
