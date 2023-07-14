@@ -107,9 +107,13 @@ method getPostChalkInfo*(self: SystemPlugin,
   result = ChalkDict()
 
   if not ins:
-    obj.opFailed                       = obj.validateMetadata()
-    result["_VALIDATED"]               = pack(obj.opFailed)
-    result["_OP_ARTIFACT_PATH"]        = pack(resolvePath(obj.fullPath))
+    obj.opFailed         = obj.validateMetadata()
+    result["_VALIDATED"] = pack(obj.opFailed)
+
+    if obj.noResolvePath:
+      result["_OP_ARTIFACT_PATH"] = pack(obj.fullPath)
+    else:
+      result["_OP_ARTIFACT_PATH"] = pack(resolvePath(obj.fullPath))
   else:
     obj.applySubstitutions()
     if obj.isMarked(): discard obj.validateMetadata()

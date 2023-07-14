@@ -280,7 +280,7 @@ proc jsonAutoKey(map:  OrderedTable[string, string],
 
 const mountInfoPreface = "/docker/containers/"
 
-proc getContainerName(): Option[string] {.inline.} =
+proc getContainerName*(): Option[string] {.inline.} =
   var f = newFileStream("/proc/self/mountinfo")
 
   if f == nil: return none(string)
@@ -295,7 +295,7 @@ proc getContainerName(): Option[string] {.inline.} =
       startIx = prefixIx + mountInfoPreface.len()
       endIx   = line.find("/", startIx)
 
-    return some(line[startIx .. endIx])
+    return some(line[startIx ..< endIx])
 
   return none(string)
 
@@ -308,10 +308,10 @@ method getPostChalkInfo*(self:  CodecDocker,
   if self.isRuntime():
     let containerOpt = getContainerName()
 
-    if containerOpt.isSome():
-      let cid = containerOpt.get()
-      result["_INSTANCE_ID"] = pack(cid)
-      chalk.fullPath = "container:cid"
+    # If it's '<<in-container>>' we couldn't read from /proc/self/mountinfo
+    if chalk.fullPath[0] != '<':
+      let cid                     = pack(chalk.fullPath)
+      result["_INSTANCE_ID"]      = cid
     return
 
   let

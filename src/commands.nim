@@ -698,61 +698,77 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
   # exe.
 
   var
-    info: Stat
+    info:  Stat
+    chalk: ChalkObj
     chalkPath = chalkConfig.dockerConfig.getChalkFileLocation()
 
   trace("Looking for a chalk file at: " & chalkPath)
 
   if stat(cstring(chalkPath), info) == 0:
     info("Found chalk mark in " & chalkPath)
-    var
-      stream      = newFileStream(chalkPath)
-      chalk       = newChalk(stream, "<<in-container>>")
-    chalk.extract = stream.extractOneChalkJson("<<in-container>>")
+
+    let
+      cidOpt = getContainerName()
+      cid    = cidOpt.getOrElse("<<in-container>")
+
+    var  stream   = newFileStream(chalkPath)
+    chalk         = newChalk(stream, cid)
+    chalk.extract = stream.extractOneChalkJson(cid)
     chalk.myCodec = Codec(getPluginByName("docker"))
 
     # Denote to the codec that we're running.
     chalk.myCodec.runtime = true
-    chalk.addToAllChalks()
+    # Don't let system try to call resolvePath when setting the artifact path.
+    chalk.noResolvePath   = true
 
-    return some(chalk)
 
-  info("Could not find a container chalk mark at " & chalkPath)
-
-  var n: array[PATH_MAX, char]
-
-  when hostOs == "macosx":
-    if proc_pidpath(pid, addr n[0], PATH_MAX) <= 0:
-      return none(ChalkObj)
-  elif hostOs == "linux":
-    let procPath = "/proc/" & $(pid) & "/exe"
-    if readlink(cstring(procPath),
-                cast[cstring](addr n[0]), PATH_MAX) == -1:
-      return none(ChalkObj)
   else:
-    # Unsupported platform
+    info("Could not find a container chalk mark at " & chalkPath)
+
+    var n: array[PATH_MAX, char]
+
+    when hostOs == "macosx":
+      if proc_pidpath(pid, addr n[0], PATH_MAX) <= 0:
+        return none(ChalkObj)
+    elif hostOs == "linux":
+        let procPath = "/proc/" & $(pid) & "/exe"
+        if readlink(cstring(procPath),
+                    cast[cstring](addr n[0]), PATH_MAX) == -1:
+          return none(ChalkObj)
+    else:
+      # Unsupported platform
+      return none(ChalkObj)
+
+    var
+      exe1path = $(cast[cstring](addr n[0]))
+
+    # This will only yield one result, since item is a file not a dir.
+    # But, we don't want to trigger the post-chalk collection, as it
+    # happens when we return from this function (since the docker path
+    # doesn't use the iterator).
+    #
+    # Thus, we break.
+
+    for item in artifacts(@[exe1path]):
+      chalk = item
+      break
+
+    if chalk != nil:
+      result = some(chalk)
+
+    let selfOpt = getSelfExtraction()
+
+    if selfOpt.isSome():
+      let self = selfOpt.get()
+      if self.fullPath == exe1path:
+        chalk = self
+        result = selfOpt
+
+  if chalk == nil:
     return none(ChalkObj)
 
-  var
-    chalk: ChalkObj
-    exe1path = $(cast[cstring](addr n[0]))
+  chalk.addToAllChalks()
 
-  # This will only yield one result, since item is a file not a dir.
-  # But, when the system looks for a second object, the post-chalk
-  # collection code will get run for the object.
-  for item in artifacts(@[exe1path]):
-    chalk = item
-
-  if chalk != nil:
-    result = some(chalk)
-
-  let selfOpt = getSelfExtraction()
-
-  if selfOpt.isSome():
-    let self = selfOpt.get()
-    if self.fullPath == exe1path:
-      selfOpt.get().addToAllChalks()
-      return selfOpt
 
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):

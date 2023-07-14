@@ -42,6 +42,9 @@ type
                                 ## directory and the docker file.
     forceIgnore*:   bool        ## If the system decides the codec shouldn't
                                 ## process this, set this bool.
+    noResolvePath*: bool        ## True when the system plugin should not
+                                ## call resolvePath when setting the
+                                ## artifact path.
 
 
   Plugin* = ref object of RootObj
