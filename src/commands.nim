@@ -253,7 +253,8 @@ proc runCmdInsert*(path: seq[string]) =
         info(item.fullPath & ": virtual chalk created.")
       else:
         item.myCodec.handleWrite(item, some(toWrite))
-        info(item.fullPath & ": chalk mark successfully added")
+        if not item.opFailed:
+          info(item.fullPath & ": chalk mark successfully added")
 
     except:
       error(item.fullPath & ": insertion failed: " & getCurrentExceptionMsg())
@@ -281,7 +282,8 @@ proc runCmdDelete*(path: seq[string]) =
         continue
       else:
         item.myCodec.handleWrite(item, none(string))
-        info(item.fullPath & ": chalk mark successfully deleted")
+        if not item.opFailed:
+          info(item.fullPath & ": chalk mark successfully deleted")
     except:
       error(item.fullPath & ": deletion failed: " & getCurrentExceptionMsg())
       dumpExOnDebug()

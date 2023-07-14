@@ -113,7 +113,7 @@ proc closeFileStream*(chalk: ChalkObj) =
 proc yieldFileStream*(chalk: ChalkObj) =
   if numCachedFds == chalkConfig.getCacheFdLimit(): chalk.closeFileStream()
 
-proc replaceFileContents*(chalk: ChalkObj, contents: string) =
+proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
   var
     (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
     ctx       = newFileStream(f)
@@ -128,13 +128,24 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string) =
         # If we can successfully stat the file, we will try to
         # re-apply the same mode bits via chmod after the move.
         let statResult = stat(cstring(chalk.fullpath), info)
+        moveFile(chalk.fullPath, path & ".old")
         moveFile(path, chalk.fullpath)
         if statResult == 0:
           discard chmod(cstring(chalk.fullpath), info.st_mode)
       except:
         removeFile(path)
-        error(chalk.fullPath & ": Could not write (no permission)")
+        if not fileExists(chalk.fullPath):
+          # We might have managed to move it but not copy the new guy in.
+          try:
+            moveFile(path & ".old", chalk.fullPath)
+          except:
+            error(chalk.fullPath & " was moved before copying in the new " &
+              "file, but the op failed, and the file could not be replaced. " &
+              " It currently is in: " & path & ".old")
+        else:
+            error(chalk.fullPath & ": Could not write (no permission)")
         dumpExOnDebug()
+        return false
 
 proc findFirstValidChalkMark*(s:            string,
                               artifactPath: string,
@@ -392,12 +403,17 @@ proc scriptHandleWrite*(chalk:   ChalkObj,
       return
     let (toWrite, ignore) = contents.getUnmarkedScriptContent(chalk, true,
                                                               comment)
-    chalk.replaceFileContents(toWrite)
+    if not chalk.replaceFileContents(toWrite):
+      chalk.opFailed = true
+      return
+
     chalk.cachedHash = chalk.cachedPreHash
   else:
     let toWrite = contents.getNewScriptContents(chalk, encoded.get(), comment)
-    chalk.replaceFileContents(toWrite)
-    chalk.cachedHash = hashFmt($(toWrite.computeSHA256()))
+    if not chalk.replaceFileContents(toWrite):
+      chalk.opFailed = true
+    else:
+      chalk.cachedHash = hashFmt($(toWrite.computeSHA256()))
 
 proc loadChalkFromFStream*(stream: FileStream, loc: string): ChalkObj =
   ## A helper function for codecs that use file streams to load
@@ -600,7 +616,8 @@ method handleWrite*(s:       Codec,
     post = chalk.stream.readAll()
   chalk.closeFileStream()
   let contents = pre & enc.getOrElse("") & post
-  chalk.replaceFileContents(contents)
+  if not chalk.replaceFileContents(contents):
+    chalk.opFailed = true
 
 # This is docker specific stuff that shouldn't be here, but am dealing
 # with some cyclic dependencies.

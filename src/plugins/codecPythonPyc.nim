@@ -63,7 +63,9 @@ method handleWrite*(self:    CodecPythonPyc,
   chalk.closeFileStream()
 
   #If NOT a dry-run replace file contents
-  chalk.replaceFileContents(toWrite)
+  if not chalk.replaceFilecontents(toWrite):
+    chalk.opFailed = true
+
 
 method getUnchalkedHash*(self:  CodecPythonPyc,
                          chalk: ChalkObj): Option[string] =

@@ -133,7 +133,8 @@ method handleWrite*(self: CodecMacOs, chalk: ChalkObj, enc: Option[string]) =
     toWrite &= chalk.cachedPreHash & "\n"
     toWrite &= enc.get() & "\n"
 
-  chalk.replaceFileContents(toWrite)
+  if not chalk.replaceFilecontents(toWrite):
+    chalk.opFailed = true
 
 method getChalkInfo*(self: CodecMacOs, chalk: ChalkObj): ChalkDict =
   result                  = ChalkDict()
