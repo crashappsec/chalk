@@ -661,8 +661,8 @@ proc runCmdConfLoad*() =
     else:
       trace("Skipping configuration validation.")
 
-  selfChalk.collectChalkInfo()
   selfChalk.collectedData["$CHALK_CONFIG"] = pack(newCon4m)
+  selfChalk.collectChalkInfo()
 
   trace(filename & ": installing configuration.")
   let oldLocation = selfChalk.fullPath
