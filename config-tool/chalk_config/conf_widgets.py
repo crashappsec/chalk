@@ -472,8 +472,6 @@ class C0ApiToggle(Switch):
         if self.value:
             ##Enable the inline login button
             get_wizard().query_one("#wiz_login_button").disabled = False
-            ##Set URL value in HTTPS pane
-            get_wizard().query_one("#https_url").value = "chalk.crashoverride.run/report" #ToDo localize
 
             ##Disable the Next button if we are not yet authenticated and wanting to use the API
             if not get_app().authenticated and get_wizard().current_panel == get_wizard().panels[1]:
@@ -517,7 +515,7 @@ def write_from_local(dict, config, d, pops=2):
             return True
         else:
             newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
-            shutil.move(chalk_bin + ".new", newloc)
+            shutil.move(chalk_bin, newloc)
             newloc.chmod(0o774)
             get_app().push_screen(AckModal(GENERATION_OK % newloc, pops))
             return True
@@ -560,7 +558,7 @@ def write_from_url(dict, config, d, pops=2):
             return True
         else:
             newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
-            shutil.move(loc.as_posix() + ".new", newloc)
+            shutil.move(loc.as_posix(), newloc)
             newloc.chmod(0o774)
             get_app().push_screen(AckModal(GENERATION_OK % binname, pops))
             return True

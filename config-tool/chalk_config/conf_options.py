@@ -1,11 +1,9 @@
 import datetime
 import hashlib
 import json
-import os
 import platform
 import sqlite3
 import ssl
-import stat
 import subprocess
 import tempfile
 import urllib
@@ -13,9 +11,13 @@ import urllib.request
 from pathlib import Path
 from typing import Optional
 
+import os
+import stat
+
 from .localized_text import *
 from .log import get_logger
 from .version import __version__
+
 
 logger = get_logger(__name__)
 
@@ -331,11 +333,11 @@ bool_defaults = {
     "xrpt_env": True,
     "xrpt_containers": True,
     "xrpt_fullmark": False,
-    "report_co": True,
+    "report_co": False,
     "report_stdout": True,
     "report_stderr": False,
     "report_log": True,
-    "report_http": True,
+    "report_http": False,
     "report_s3": False,
     "env_adds_report": False,
     "env_custom": False,
@@ -354,7 +356,7 @@ text_defaults = {
     "env_s3_uri": "CHALK_S3_URI",
     "env_s3_secret": "CHALK_S3_SECRET",
     "env_s3_aid": "CHALK_S3_ACCESS_ID",
-    "https_url": "chalk.crashoverride.local/report",
+    "https_url": "example/report",
     "https_header": "",
     "s3_uri": "",
     "s3_access_id": "",
@@ -622,7 +624,7 @@ ptr_value := ""
             d["env_s3_aid"],
             filesink,
             d["log_loc"],
-            d["https_url"],
+            "https://" + d["https_url"],
             d["https_header"],
             s3_uri,
             d["s3_secret"],
@@ -994,18 +996,14 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
                 % (crash_override_api_url)
             )
 
-        crash_override_sink_and_subscribe = """
-sink_config crashoverride_api_sink {
+        crash_override_sink_and_subscribe = f"""
+sink_config crashoverride_api_sink {{
     sink:    "post"
-    uri:     "%s"
-    headers: mime_to_dict("Authorization: Bearer %s")
-}
+    uri:     "{crash_override_api_url}"
+    headers: mime_to_dict("Authorization: Bearer {d["_chalk_api_bearer_token"]}")
+}}
 subscribe("report", "crashoverride_api_sink")
-""" % (
-            crash_override_api_url,
-            d["_chalk_api_bearer_token"],
-        )
-
+""".strip()
         logger.info("Writing Crash Override API values to Conf4m")
         lines.append(
             "\n# Crash Override API settings - please see https://crashoverride.run for dashboards and data"

@@ -492,6 +492,7 @@ class HttpParams(WizContainer):
                                id = "https_header")
             )
     def validate_inputs(self):
+        return
         field = get_wizard().query_one("#https_url")
         url = field.value
         http_start = "http://"

@@ -264,6 +264,7 @@ class ConfWiz(Wizard):
         if (
             not get_app().login_widget.is_authenticated()
             and self.current_panel == self.api_authn_panel
+            and get_wizard().query_one("#report_co") == True
         ):
             update_next_button("Please Login")
             self.next_button.disabled = True
