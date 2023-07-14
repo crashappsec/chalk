@@ -114,6 +114,8 @@ proc yieldFileStream*(chalk: ChalkObj) =
   if numCachedFds == chalkConfig.getCacheFdLimit(): chalk.closeFileStream()
 
 proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
+  result = true
+
   var
     (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
     ctx       = newFileStream(f)
@@ -146,6 +148,7 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
             error(chalk.fullPath & ": Could not write (no permission)")
         dumpExOnDebug()
         return false
+
 
 proc findFirstValidChalkMark*(s:            string,
                               artifactPath: string,
