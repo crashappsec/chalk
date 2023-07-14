@@ -509,14 +509,14 @@ def write_from_local(dict, config, d, pops=2):
     c4mfile.close()
 
     try:
-        subproc = subprocess.run([chalk_bin, "--error", "load", c4mfilename])
+        newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
+        shutil.copyfile(chalk_bin, newloc)
+        newloc.chmod(0o774)
+        subproc = subprocess.run([new_loc, "--error", "load", c4mfilename])
         if subproc.returncode:
             get_app().push_screen(AckModal(GENERATION_FAILED, pops))
             return True
         else:
-            newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
-            shutil.move(chalk_bin, newloc)
-            newloc.chmod(0o774)
             get_app().push_screen(AckModal(GENERATION_OK % newloc, pops))
             return True
     except Exception as e:
@@ -548,7 +548,10 @@ def write_from_url(dict, config, d, pops=2):
     c4mfilename = c4mfile.name
     loc.chmod(0o774)
     try:
-        subproc = subprocess.run([loc, "--error", "load", c4mfilename], capture_output=True)
+        newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
+        shutil.move(loc.as_posix(), newloc)
+        newloc.chmod(0o774)
+        subproc = subprocess.run([newloc, "--error", "load", c4mfilename], capture_output=True)
         logger.info("Chalk build command line: '%s --error load %s'"%(loc, c4mfilename))
         logger.info("STDOUT: %s"%(subproc.stdout))
         logger.info("STDERR: %s"%(subproc.stderr))
@@ -557,9 +560,6 @@ def write_from_url(dict, config, d, pops=2):
             get_app().push_screen(AckModal(GENERATION_FAILED, pops))
             return True
         else:
-            newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
-            shutil.move(loc.as_posix(), newloc)
-            newloc.chmod(0o774)
             get_app().push_screen(AckModal(GENERATION_OK % binname, pops))
             return True
     except Exception as e:
