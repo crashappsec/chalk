@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import platform
 import sqlite3
 import stat
 import subprocess
@@ -38,6 +39,12 @@ from .wiz_panes import (
 )
 from .wizard import AckModal, Wizard
 from .log import get_logger
+
+# Temporary until we have the upstream chalk static bins working X-platform
+if platform.machine() != "x86_64" or platform.system() != "Linux":
+    print(f"Error: System {platform.system()} {platform.machine()} detected, but currently only Linux x86_64 supported.")
+    print("Exiting....")
+    sys.exit(-2)
 
 logger = get_logger(__name__)
 
