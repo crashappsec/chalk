@@ -58,7 +58,7 @@
 # Uncomment the next line for chalk to assume 'docker' when no command is
 # provided.
 
-# default_command = "docker"
+# default_command: "docker"
 
 # Note that the := assignment operator keeps variables local to your
 # configuration. If you use just : or =, the configuration checker
@@ -76,23 +76,31 @@ args    := argv()
 #
 # You can configure where these messages go; they get published to the
 # "logs" topic, which automatically is hooked to stderr by default.
-
-if cmd == "docker" or cmd == "exec" {
-  # For docker and for entry point wrapping (i.e., exec), only show
-  # error output on console if it's bad.  If you want every message to
-  # be recorded in the chalk report (but not sent to the console), you
-  # can change the value of `chalk_log_level`, to "info" or "warn"
-  # (default is "error" only)
-  log_level: "error"
-}
-else {
-  log_level: "info"
-  # Uncomment to output log messages from within the config.
-  # info("Using the default config. Use 'chalk load' to load a new one.")
-}
+#
+# Note that, if the user didn't supply a command on the command line,
+# then con4m will not yet have figured out what command *will* run;
+# this file can change the value of `default_command`.
+#
+# In such a case, the value of cmd will be "not_supplied".
 
 if env_exists("CHALK_LOG_LEVEL") {
   log_level: env("CHALK_LOG_LEVEL")
+} else {
+  quieter_cmds := ["docker", "exec"]
+
+  if cmd == "not_supplied" and quieter_cmds.contains(default_command) {
+    log_level: "error"
+  } elif quieter_cmds.contains(cmd) {
+    log_level: "error"
+  } else {
+    # Uncomment this to print the message when the config runs.
+    # Though, then you won't be using the default config, even though
+    # it claims to be!
+    #
+    # info("Using the default config. Use 'chalk load' to load a new one.")
+
+    log_level: "info"
+  }
 }
 
 # By default, all collected metadata gets added to the chalk inserted
