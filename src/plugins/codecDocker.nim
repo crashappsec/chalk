@@ -278,12 +278,40 @@ proc jsonAutoKey(map:  OrderedTable[string, string],
 
     jsonOneAutoKey(subJsonOpt.get(), chalkKey, dict, reportEmpty)
 
+const mountInfoPreface = "/docker/containers/"
+
+proc getContainerName(): Option[string] {.inline.} =
+  var f = newFileStream("/proc/self/mountinfo")
+
+  if f == nil: return none(string)
+
+  let lines = f.readAll().split("\n")
+
+  for line in lines:
+    let prefixIx = line.find(mountInfoPreface)
+    if prefixIx == -1: continue
+
+    let
+      startIx = prefixIx + mountInfoPreface.len()
+      endIx   = line.find("/", startIx)
+
+    return some(line[startIx .. endIx])
+
+  return none(string)
+
+
 method getPostChalkInfo*(self:  CodecDocker,
                          chalk: ChalkObj,
                          ins:   bool): ChalkDict =
   result    = ChalkDict()
 
   if self.isRuntime():
+    let containerOpt = getContainerName()
+
+    if containerOpt.isSome():
+      let cid = containerOpt.get()
+      result["_INSTANCE_ID"] = pack(cid)
+      chalk.fullPath = "container:cid"
     return
 
   let
