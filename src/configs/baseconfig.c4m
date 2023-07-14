@@ -1823,8 +1823,6 @@ By default, CHALK_RAND is on for unique builds. If you want reproducable builds,
   key.METADATA_ID.report              = true
   key.SIGN_PARAMS.report              = true
   key.SIGNATURE.report                = true
-  # This would embed info on any config changes used when chalking.
-  # Generally, we assume that's not a good use of space in artifacts.
   key.$CHALK_CONFIG.report            = true
 }
 

@@ -112,9 +112,9 @@ proc collectPostChalkInfo*(artifact: ChalkObj) =
     artifact.collectedData["_CURRENT_HASH"] = pack(hashOpt.get())
 
 proc collectChalkInfo*(obj: ChalkObj) =
-  # Called from the appropriate commands.
+  # Note that callers must have set obj.collectedData to something
+  # non-null.
   obj.opFailed      = false
-  obj.collectedData = ChalkDict()
   let data          = obj.collectedData
 
   for plugin in getPlugins():
