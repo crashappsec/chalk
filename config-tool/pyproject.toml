@@ -1,15 +1,17 @@
 [tool.poetry]
 name = "chalk-config"
-version = "0.1.0"
-description = ""
-authors = ["Your Name <you@example.com>"]
+version = "0.1"
+description = "Chalk TUI configuration utility"
+authors = []
 readme = "README.md"
 packages = [{include = "chalk_config"}]
 
+[tool.poetry.scripts]
+chalkconf = "chalk_config.chalkconf:main"
+
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+aiohttp = "^3.8.4"
 ascii-magic = "2.3.0"
-auth0-python = "4.2.0"
 certifi = "2023.5.7"
 cffi = "1.15.1"
 charset-normalizer = "3.1.0"
@@ -26,23 +28,22 @@ pycparser = "2.21"
 pygments = "2.15.1"
 pyjwt = "2.7.0"
 pyqrcode = "1.2.1"
+python = ">=3.9,<3.12"
 requests = "2.31.0"
 rich = "13.4.1"
 textual = "0.27.0"
-typing-extensions = "4.6.3"
 uc-micro-py = "1.0.2"
 urllib3 = "2.0.2"
 zipp = "3.15.0"
-pyinstaller = "^5.11.0"
-aiohttp = "^3.8.4"
-
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.3.0"
-isort = "^5.12.0"
 autoflake = "^2.1.1"
+black = "^23.3.0"
 flake8 = "^6.0.0"
+isort = "^5.12.0"
 mypy = "^1.3.0"
+pyinstaller = "^5.11.0"
+typing-extensions = "4.6.3"
 
 [build-system]
 requires = ["poetry-core"]

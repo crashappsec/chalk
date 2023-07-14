@@ -178,24 +178,6 @@ tests = ["attrs[tests-no-zope]", "zope-interface"]
 tests-no-zope = ["cloudpickle", "hypothesis", "mypy (>=1.1.1)", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "pytest-xdist[psutil]"]
 
 [[package]]
-name = "auth0-python"
-version = "4.2.0"
-description = "Auth0 Python SDK"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "auth0-python-4.2.0.tar.gz", hash = "sha256:0f21510901a3cafef961504f37ed715a3290b4f52fdbdc5b958bb64de864915a"},
-    {file = "auth0_python-4.2.0-py2.py3-none-any.whl", hash = "sha256:128b068c2b78541ba945d1f73e6ea18d685910059f5bab5cd5b20ca2f5d0dcfd"},
-]
-
-[package.dependencies]
-pyjwt = {version = ">=2.6.0", extras = ["crypto"]}
-requests = ">=2.14.0"
-
-[package.extras]
-test = ["coverage", "pre-commit"]
-
-[[package]]
 name = "autoflake"
 version = "2.1.1"
 description = "Removes unused imports and unused variables"
@@ -208,6 +190,7 @@ files = [
 
 [package.dependencies]
 pyflakes = ">=3.0.0"
+tomli = {version = ">=2.0.1", markers = "python_version < \"3.11\""}
 
 [[package]]
 name = "black"
@@ -249,6 +232,8 @@ mypy-extensions = ">=0.4.3"
 packaging = ">=22.0"
 pathspec = ">=0.9.0"
 platformdirs = ">=2"
+tomli = {version = ">=1.1.0", markers = "python_version < \"3.11\""}
+typing-extensions = {version = ">=3.10.0.0", markers = "python_version < \"3.10\""}
 
 [package.extras]
 colorama = ["colorama (>=0.4.3)"]
@@ -860,6 +845,7 @@ files = [
 
 [package.dependencies]
 mypy-extensions = ">=1.0.0"
+tomli = {version = ">=1.1.0", markers = "python_version < \"3.11\""}
 typing-extensions = ">=3.10"
 
 [package.extras]
@@ -1108,9 +1094,6 @@ files = [
     {file = "PyJWT-2.7.0.tar.gz", hash = "sha256:bd6ca4a3c4285c1a2d4349e5a035fdf8fb94e04ccd0fcbe6ba289dae9cc3e074"},
 ]
 
-[package.dependencies]
-cryptography = {version = ">=3.4.0", optional = true, markers = "extra == \"crypto\""}
-
 [package.extras]
 crypto = ["cryptography (>=3.4.0)"]
 dev = ["coverage[toml] (==5.0.4)", "cryptography (>=3.4.0)", "pre-commit", "pytest (>=6.0.0,<7.0.0)", "sphinx (>=4.5.0,<5.0.0)", "sphinx-rtd-theme", "zope.interface"]
@@ -1216,6 +1199,17 @@ typing-extensions = ">=4.4.0,<5.0.0"
 
 [package.extras]
 dev = ["aiohttp (>=3.8.1)", "click (>=8.1.2)", "msgpack (>=1.0.3)"]
+
+[[package]]
+name = "tomli"
+version = "2.0.1"
+description = "A lil' TOML parser"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "tomli-2.0.1-py3-none-any.whl", hash = "sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc"},
+    {file = "tomli-2.0.1.tar.gz", hash = "sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f"},
+]
 
 [[package]]
 name = "typing-extensions"
@@ -1363,5 +1357,5 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 
 [metadata]
 lock-version = "2.0"
-python-versions = ">=3.11,<3.12"
-content-hash = "d4438d5ff90f1ed42b2ccaa41f018a3cbeb01ebef1b6f5886f91e388e8b9319e"
+python-versions = ">=3.9,<3.12"
+content-hash = "e6c30e9483ed5b7a4ad76cdddd60ca56b9e7bc4e7072bb02b7a78b50cf6721e9"

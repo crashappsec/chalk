@@ -1,6 +1,6 @@
 # About
 
-Chalk TUI configuration uitility
+Chalk TUI configuration utility
 
 # Building
 

@@ -34,21 +34,21 @@ configdeps:
 .PHONY: chalkconf
 chalkconf:
 	docker compose run --rm chalk-config-compile \
-		sh -c "pyinstaller --onefile chalk-config/chalkconf.py --collect-all textual --collect-all rich && mv dist/chalkconf /config-bin/"
+		sh -c "pyinstaller --onefile chalk_config/chalkconf.py --collect-all textual --collect-all rich && mv dist/chalkconf /config-bin/"
 
 .PHONY: config
 config:
-	docker compose run --rm chalk-config-compile sh -c "python chalk-config/chalkconf.py"
+	docker compose run --rm chalk-config-compile sh -c "python chalk_config/chalkconf.py"
 
 .PHONY: configfmt
 configfmt:
-	docker compose run --rm chalk-config-compile sh -c "autoflake --remove-all-unused-imports -r chalk-config -i"
-	docker compose run --rm chalk-config-compile sh -c "isort --profile \"black\" chalk-config"
-	docker compose run --rm chalk-config-compile sh -c "black chalk-config"
+	docker compose run --rm chalk-config-compile sh -c "autoflake --remove-all-unused-imports -r chalk_config -i"
+	docker compose run --rm chalk-config-compile sh -c "isort --profile \"black\" chalk_config"
+	docker compose run --rm chalk-config-compile sh -c "black chalk_config"
 
 .PHONY: configlint
 configlint:
-	docker compose run --rm chalk-config-compile sh -c "flake8 --extend-ignore=D chalk-config"
-	docker compose run --rm chalk-config-compile sh -c "isort --profile \"black\" --check chalk-config"
-	docker compose run --rm chalk-config-compile sh -c "black --check chalk-config"
-	docker compose run --rm chalk-config-compile sh -c "mypy chalk-config"
+	docker compose run --rm chalk-config-compile sh -c "flake8 --extend-ignore=D chalk_config"
+	docker compose run --rm chalk-config-compile sh -c "isort --profile \"black\" --check chalk_config"
+	docker compose run --rm chalk-config-compile sh -c "black --check chalk_config"
+	docker compose run --rm chalk-config-compile sh -c "mypy chalk_config"

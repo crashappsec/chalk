@@ -3,13 +3,12 @@ from textual.containers import *
 from textual.coordinate import *
 from textual.widgets import *
 from textual.screen import *
-from localized_text import *
+from .localized_text import *
 from rich.markdown import *
 from textual.widgets import Markdown as MDown
 import time
-from conf_options import *
-from localized_text import *
-from css import WIZARD_CSS
+from .conf_options import *
+from .css import WIZARD_CSS
 
 class Nav(Horizontal):           pass
 class WizardSidebar(Container):  pass
@@ -17,7 +16,7 @@ class Body(ScrollableContainer): pass
 
 class AckModal(ModalScreen):
     DEFAULT_CSS=WIZARD_CSS
-    
+
     def __init__(self, msg, pops=1, wiz=None, button_text="Okay", ascii_art=""):
         super().__init__()
         self.wiz = wiz
@@ -88,7 +87,7 @@ class ReleaseNotesModal(ModalScreen):
         dock: top;
         width: 60;
         height: auto;
-        
+
     }
     MarkdownViewer {
         dock: top
@@ -108,10 +107,10 @@ class ReleaseNotesModal(ModalScreen):
         Build tabbed pane with a tab for each release note
         """
         yield Tabs(
-                    Tab("Chalk", id="chalk_releasenotes_md"), 
+                    Tab("Chalk", id="chalk_releasenotes_md"),
                     Tab("Config-Tool", id="configtool_releasenotes_md")
                 )
-        with ContentSwitcher(initial="chalk_releasenotes_md"):  
+        with ContentSwitcher(initial="chalk_releasenotes_md"):
             yield MarkdownViewer(self.tab_data_list[0], id="chalk_releasenotes_md")
             yield MarkdownViewer(self.tab_data_list[1], id="configtool_releasenotes_md")
         yield Footer()
@@ -127,7 +126,7 @@ class ReleaseNotesModal(ModalScreen):
         while self.pops:
             self.app.pop_screen()
             self.pops = self.pops - 1
-        
+
 class HelpWindow(Container):
     def action_help(self):
         self.wiz.action_help()

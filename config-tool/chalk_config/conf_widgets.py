@@ -14,9 +14,9 @@ import webbrowser
 from pathlib import *
 
 # import ascii_magic
-from conf_options import *
-from css import WIZARD_CSS
-from localized_text import *
+from .conf_options import *
+from .css import WIZARD_CSS
+from .localized_text import *
 from rich.markdown import *
 from textual.app import *
 from textual.containers import *
@@ -25,9 +25,9 @@ from textual.reactive import Reactive
 from textual.screen import *
 from textual.widgets import Markdown as MDown
 from textual.widgets import *
-from wizard import *
+from .wizard import *
 
-from log import get_logger
+from .log import get_logger
 
 logger = get_logger(__name__)
 
@@ -52,7 +52,7 @@ def try_system_init():
         db = sqlite3.connect(db_file)
         return True
     except Exception as e:
-        logger.error(e)   
+        logger.error(e)
         return False
 
 
@@ -227,7 +227,7 @@ class ConfigTable(Container):
         )
         self.download_button = DownloadTestServerButton(label="Get Test Server", classes="basicbutton")
         self.binary_genration_button = BinaryGenerationButton(label="Build Chalk", classes="basicbutton")
-             
+
     async def on_mount(self):
         await self.the_table.mount()
         global row_ids
@@ -479,7 +479,7 @@ class C0ApiToggle(Switch):
             if not get_app().authenticated and get_wizard().current_panel == get_wizard().panels[1]:
                 update_next_button("Please Login")
                 get_wizard().next_button.disabled = True
-                
+
         else:
             get_wizard().query_one("#wiz_login_button").disabled = True
             update_next_button("Next")
@@ -499,7 +499,7 @@ def update_next_button(label, variant="default"):
 
 def write_from_local(dict, config, d, pops=2):
     binname  = d["exe_name"]
-    
+
     if d["release_build"]:
         chalk_bin = CONTAINER_RELEASE_PATH
     else:

@@ -7,21 +7,20 @@ from textual.coordinate import *
 from textual.widgets import *
 from textual.screen import *
 from textual.messages import Message
-from localized_text import *
+from .localized_text import *
 from rich.markdown import *
 from textual.widgets import Markdown as MDown
 from pathlib import *
 import sqlite3, os, urllib, tempfile, hashlib, subprocess, json, stat
-from wizard import *
-from conf_options import *
-from conf_widgets import *
-from localized_text import *
-import crash_override_authn
+from .wizard import *
+from .conf_options import *
+from .conf_widgets import *
+from . import crash_override_authn
 
 import jwt
 import pyqrcode
 import requests
-from log import get_logger 
+from .log import get_logger
 
 logger = get_logger(__name__)
 
@@ -64,7 +63,7 @@ def qr_textualize_render(code, quiet_zone=0):
     buf = io.StringIO()
 
     border_row = '██' * (len(code[0]) + (quiet_zone*2))
-    
+
     # Every QR code start with a quiet zone at the top
     for b in range(quiet_zone):
         buf.write(border_row)
@@ -87,7 +86,7 @@ def qr_textualize_render(code, quiet_zone=0):
             else:
                 buf.write(' ')
 
-        
+
         # Draw the ending quiet zone
         for b in range(quiet_zone):
             buf.write('██')
@@ -102,7 +101,7 @@ def qr_textualize_render(code, quiet_zone=0):
 
 class ApiAuth(WizContainer):
     """
-    """ 
+    """
     class AuthSuccess(Message):
         """
         """
@@ -110,7 +109,7 @@ class ApiAuth(WizContainer):
             super().__init__()
             self.token      = token
             self.result     = result
-            
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # ToDo parameterise/localize
@@ -129,7 +128,7 @@ class ApiAuth(WizContainer):
             )
 
         self.crashoverride_auth_obj = crash_override_authn.CrashOverrideAuth(co_auth_url )
-        
+
         self.auth_widget_1     = AuthhLinks()
         self.auth_widget_1.styles.padding = (0,4)
         self.auth_widget_1.styles.margin = (0,2)
@@ -145,7 +144,7 @@ class ApiAuth(WizContainer):
 
     def is_authenticated(self):
         return self.crashoverride_auth_obj.authenticated
-    
+
     def has_failed(self):
         return self.crashoverride_auth_obj.failed
 
@@ -153,7 +152,7 @@ class ApiAuth(WizContainer):
         """
         Called once every 5 seconds (via set_interval())
         Checks if an oauth token check endpoint has generated, if not just returns.
-        If it has it polls the endpoint looking for a HTTP 200 indicating successful 
+        If it has it polls the endpoint looking for a HTTP 200 indicating successful
         auth along with the json payload of tokens
 
         A message is then posted to the parent widget to recieve that will trigger it
@@ -174,12 +173,12 @@ class ApiAuth(WizContainer):
         except Exception as err:
             logger.error("[-] Error calling the config-tool code endpoint at %s: %s"%(self.crashoverride_auth_obj.poll_url, err))
 
-            # Token verification error - this is bad, login failed - post a message 
+            # Token verification error - this is bad, login failed - post a message
             self.post_message(self.AuthSuccess(self.crashoverride_auth_obj, "id_token_verification_failure"))
             self.crashoverride_auth_obj.failed = True
             self.auth_status_checker.stop()
             return None
-        
+
         try:
             # Successful authn - exit loop HTTP 428 vs 200
             if resp.status_code == 200:
@@ -187,7 +186,7 @@ class ApiAuth(WizContainer):
                 # Retrieve token from the 200
                 resp_json = resp.json()
                 logger.info("JSON received: %s"%(resp_json))
-                
+
                 # Setting this value indicates auth'd, causes the watcher to trigger
                 self.crashoverride_auth_obj.token = resp_json["token"]
                 self.crashoverride_auth_obj.decoded_jwt = self.crashoverride_auth_obj._decode_and_validate_jwt(resp_json["token"])
@@ -207,13 +206,13 @@ class ApiAuth(WizContainer):
 
                 ##Add to config to get picked up by the con4m writer
                 self.bearer_token_lbl = self.crashoverride_auth_obj.token
-                
+
                 # Post message to be picked up by LoginScreen
                 self.post_message(self.AuthSuccess(self.crashoverride_auth_obj, "success"))
 
                 self.auth_status_checker.stop()
                 return None
-            
+
             elif resp.status_code == 428:
                 # HTTP 428 We pendin' ..... sleep a bit
                 logger.debug("HTTP 428 received, authentication not succeeded yet. Sleeping until next interval.......")
@@ -223,11 +222,11 @@ class ApiAuth(WizContainer):
                 # Unexpect HTTP code returned
                 logger.error("Unknown HTTP code returned. Expecting on 428's and 200's ? %d"%(resp.status_code))
                 return None
-            
+
         except Exception as err:
             logger.error("Error parsing returned data: %s"%(err))
             return None
-    
+
     def reset_login_widget(self):
         """
         Reset the login widgeet using a newly generated device code
@@ -239,10 +238,10 @@ class ApiAuth(WizContainer):
     def start_auth_polling(self):
         """
         """
-        logger.info("API authN polling loop initializing.....")        
+        logger.info("API authN polling loop initializing.....")
         # Call API for chalk code
         self.chalk_code_json = self.crashoverride_auth_obj._get_code()
-        
+
         if not self.chalk_code_json:
             logger.error("Error getting Chalk device code, no JSON returned by _get_code()")
             return -1
@@ -278,8 +277,8 @@ class DisplayQrCode(WizContainer):
         self.data_to_encode = ""
         self.qr_widget      = QrCode(id="qrcode")
         self.url_widget     = Static()
-        
-        
+
+
     def generate_qr(self, data_to_encode):
         """
         """
@@ -476,7 +475,7 @@ class CustomEnv(WizContainer):
                 Input(placeholder = PLACEHOLD_ENV, id = "env_s3_aid"),
                 Label(L_ENV_S3_ID, classes="label"))
                 )
-        
+
     def doc(self):
         return ENV_DOC
 
@@ -542,26 +541,26 @@ class S3Params(WizContainer):
         return S3_PARAMS_DOC
 
 class ReportingPane(WizContainer):
-    
+
     inline_login_btn = LoginButton(label="Login", classes="basicbutton", id="wiz_login_button")
     def compose(self):
         self.has_entered = False
 
         yield MDown(REPORTING_PANE_INTRO)
-        
+
         yield Horizontal(C0ApiToggle(value=True, id="report_co"),
-            Label(CO_CRASH, classes="label"), 
+            Label(CO_CRASH, classes="label"),
             self.inline_login_btn)
         yield Horizontal(Switch(value=True, id="report_stdout"),
             Label(CO_STDOUT, classes="label"))
         yield Horizontal(Switch(value=True, id="report_stderr"),
             Label(CO_STDERR, classes="label"))
         yield Horizontal(EnablingSwitch("log_conf", CO_LOG,  id="report_log"),
-            Label(CO_LOG, classes="label"))  
+            Label(CO_LOG, classes="label"))
         yield Horizontal(EnablingSwitch("http_conf", CO_POST ,id="report_http"),
             Label(CO_POST, classes="label"))
         yield Horizontal(EnablingSwitch("s3_conf", CO_S3,  id="report_s3"),
-            Label(CO_S3, classes="label"))        
+            Label(CO_S3, classes="label"))
         yield MDown()
         yield MDown("### Environment Variable Configuration")
         yield MDown(REPORTING_ENV_INTRO)
@@ -569,7 +568,7 @@ class ReportingPane(WizContainer):
                          Label(L_ADD_REPORT, classes="label"))
         yield Horizontal(EnvToggle(value=False, id="env_custom"),
                          Label(L_CUSTOM_ENV, classes="label"))
-        
+
         ##Update login button if user is already logged in
         if  get_app().authenticated == True:
                 user_str = "Logged In"

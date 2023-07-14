@@ -14,16 +14,16 @@ import urllib
 import webbrowser
 from pathlib import Path
 import requests
-from conf_options import (
-    config_to_json, determine_sys_arch, json_to_dict, dict_to_id, get_app, 
+from .conf_options import (
+    config_to_json, determine_sys_arch, json_to_dict, dict_to_id, get_app,
     get_wiz_screen, get_wizard, set_app, set_wiz_screen, set_wizard
 )
-import conf_widgets ##row_ids is why this is needed - ToDo cleanup
-from conf_widgets import (
+from . import conf_widgets ##row_ids is why this is needed - ToDo cleanup
+from .conf_widgets import (
     AlphaModal, ConfigTable, cursor, db, set_conf_table, write_binary
 )
-from css import WIZARD_CSS
-from localized_text import *
+from .css import WIZARD_CSS
+from .localized_text import *
 from rich.markdown import *
 from textual.app import *
 from textual.containers import *
@@ -31,13 +31,13 @@ from textual.coordinate import *
 from textual.screen import *
 from textual.widgets import Markdown as MDown
 from textual.widgets import *
-from version import __version__
-from wiz_panes import (
-    ApiAuth, DisplayQrCode, sectionBasics, sectionBinGen, sectionChalking, 
+from .version import __version__
+from .wiz_panes import (
+    ApiAuth, DisplayQrCode, sectionBasics, sectionBinGen, sectionChalking,
     sectionOutputConf,sectionReporting
 )
-from wizard import AckModal, Wizard
-from log import get_logger
+from .wizard import AckModal, Wizard
+from .log import get_logger
 
 logger = get_logger(__name__)
 
@@ -156,7 +156,7 @@ async def do_test_server_download(testserverurl,staticsitefilesurl):
         #Download the test server (via a 302 redirect)
         test_server_binary = requests.get(testserverurl, stream=True, allow_redirects=True)
         loc = Path.cwd() / Path(urllib.parse.urlparse(testserverurl).path[1:])
-        
+
         #Write the file to the disk
         try:
             f = loc.open("wb")
@@ -204,7 +204,7 @@ async def do_test_server_download(testserverurl,staticsitefilesurl):
         return ""
 
     return loc
-        
+
 #def pop_user_profile(token_json, success_msg=False, pop_off=1):
 def pop_user_profile(authn_obj, success_msg=False, pop_off=1):
     """
@@ -267,7 +267,7 @@ class ConfWiz(Wizard):
         ):
             update_next_button("Please Login")
             self.next_button.disabled = True
-            
+
 
 
 class ConfWizScreen(ModalScreen):
@@ -471,8 +471,8 @@ class NewApp(App):
     BINDINGS = [
         Binding(key="ctrl+q", action="quit", description=QUIT_LABEL, priority=True),
         Binding(key="l", action="login()", description=LOGIN_LABEL),
-        Binding(key="d", action="downloadtestserver()", description="Download Test Server"), # ToDo localize 
-        Binding(key="b", action="generate_chalk_binary()", description="Generate Chalk Binary"), # ToDo localize 
+        Binding(key="d", action="downloadtestserver()", description="Download Test Server"), # ToDo localize
+        Binding(key="b", action="generate_chalk_binary()", description="Generate Chalk Binary"), # ToDo localize
         Binding(key="r", action="releasenotes()", description="Release Notes"),
         Binding(key="up", action="<scroll-up>", show=False),
         Binding(key="down", action="<scroll-down>", show=False),
@@ -511,7 +511,7 @@ class NewApp(App):
         Initiate the user registration/login process for Crash Override API
         """
         if not self.authenticated:
-            # Start background task that polls Auth0 API
+            # Start background task that polls chalk API
             ret = self.login_widget.start_auth_polling()
 
             # Display screen in terminal
@@ -569,21 +569,21 @@ class NewApp(App):
 
         # Dumb but this is needed for the button to actually change ....
         await asyncio.sleep(1.0)
-    
+
         # determine correct arch
         system, machine = determine_sys_arch()
         version = f"{__version__}"
         server_bin_name = f"chalkserver-{version}-{system}-{machine}"
 
         # construct urls
-        test_server_url = "https://dl.crashoverride.run/%s"%(server_bin_name) 
-        #test_server_url = "https://failuretestl"  
+        test_server_url = "https://dl.crashoverride.run/%s"%(server_bin_name)
+        #test_server_url = "https://failuretestl"
         static_files_url = "https://dl.crashoverride.run/chalksite.tar.gz"
         #static_files_url = "https://failure"
-        
+
         # Download server
         self.server_bin_filepath = await do_test_server_download(test_server_url, static_files_url)
-        
+
         # pop download complete screen
         if self.server_bin_filepath:
             self.test_server_download_successful = True
@@ -594,9 +594,9 @@ class NewApp(App):
             dl_button.variant = "success"
             dl_button.refresh()
             completion_msg = f"# Download Complete !\n\nChalk Test Server downloaded to: {self.server_bin_filepath}"
-            
+
             self.push_screen(AckModal(msg = completion_msg, wiz = self))
-        
+
         # pop download failed download screen
         else:
             dl_button = conftable.download_button
@@ -608,7 +608,7 @@ class NewApp(App):
             wiz.require_ack("Download Failed 👎")  # add in erorr description
 
 
-if __name__ == "__main__":
+def main():
     logger.info("Running chalk-config")
     if not sys.stdout.isatty():
         raise SystemExit(
@@ -627,3 +627,7 @@ if __name__ == "__main__":
     app = NewApp()
     set_app(app)
     app.run()
+
+
+if __name__ == "__main__":
+    main()

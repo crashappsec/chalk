@@ -64,7 +64,7 @@ jobs:
       - name: Create binary
         run: |
           cd config-tool
-          pyinstaller --onefile chalk-config/chalkconf.py --collect-all textual --collect-all rich
+          pyinstaller --onefile chalk_config/chalkconf.py --collect-all textual --collect-all rich
           mv dist/chalkconf dist/dynamic
           staticx dist/dynamic dist/chalkconf
 

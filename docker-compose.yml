@@ -26,7 +26,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.chalk-config
       target: config-tool-compile
-    command: sh -c "python chalk-config/chalkconf.py"
+    command: sh -c "python chalk_config/chalkconf.py"
     volumes:
       - $PWD/config-tool:/config-tool
       - $PWD/.config-tool-bin:/config-bin

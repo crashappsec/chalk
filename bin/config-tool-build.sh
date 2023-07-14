@@ -18,7 +18,7 @@ function libpath {
 set -x
 poetry run pip install staticx
 poetry run pyinstaller \
-    --onefile chalk-config/chalkconf.py \
+    --onefile chalk_config/chalkconf.py \
     --collect-all textual \
     --collect-all rich \
     --add-binary="$(libpath libm.so.6):."

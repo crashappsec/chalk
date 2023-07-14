@@ -45,14 +45,14 @@ RUN apk add --update --no-cache alpine-sdk \
 
 # COPY config-tool /
 
-# ENTRYPOINT ["python", "chalk-config/chalkconf.py"]
+# ENTRYPOINT ["python", "chalk_config/chalkconf.py"]
 
 # -------------------------------------------------------------------
 
 FROM config-tool-compile as build
 
 COPY config-tool /tmp/
-RUN cd /tmp && pyinstaller --onefile /tmp/chalk-config/chalkconf.py --collect-all textual --collect-all rich
+RUN cd /tmp && pyinstaller --onefile /tmp/chalk_config/chalkconf.py --collect-all textual --collect-all rich
 # RUN staticx /tmp/dist/chalkconf /tmp/dist/chalkconf-static
 
 # -------------------------------------------------------------------
