@@ -96,6 +96,12 @@ method scan*(self:   CodecZip,
 
   try:
     stream.setPosition(0)
+    # Make sure the file seems to be a valid ZIP file.
+    var buf: array[4, char]
+    discard stream.peekData(addr(buf), 4)
+    if buf[0] != 'P' or buf[1] != 'K':
+      return none(ChalkObj)
+
     cache.onDisk.open(stream)
     info(chalk.fullPath & ": temporarily extracting into " & tmpDir)
     zipDir = tmpDir
