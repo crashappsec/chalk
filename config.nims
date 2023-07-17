@@ -2,6 +2,7 @@ switch("d", "nimPreviewHashRef")
 switch("d", "ssl")
 switch("d", "useOpenSSL3")
 switch("debugger", "native")
+switch("passl", "-static")
 
 when (NimMajor, NimMinor) < (1, 7):
   # Locklevels never worked and are gone but older versions will complain.
