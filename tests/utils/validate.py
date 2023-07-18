@@ -20,7 +20,7 @@ class ArtifactInfo:
 
 # `virtual-chalk.json` file found after chalking with `--virtual` enabled
 def validate_virtual_chalk(
-    tmp_data_dir: Path, artifact_map: Dict[Path, ArtifactInfo], virtual: bool
+    tmp_data_dir: Path, artifact_map: Dict[str, ArtifactInfo], virtual: bool
 ):
     try:
         vjsonf = tmp_data_dir / "virtual-chalk.json"

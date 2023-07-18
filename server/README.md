@@ -54,7 +54,7 @@ make a temp directory in the `chalk-internal` root if not already present:
 
 and assuming /etc/hosts contains `127.0.0.1 tests.crashoverride.run` you can run
 
-`CHALK_POST_URL="http://tests.crashoverride.run:8585/report" chalk insert --config-file=./usage_stats.conf tmp --no-embedded-config`
+`CHALK_POST_URL="http://tests.crashoverride.run:8585/report" chalk insert --config-file=./usage_stats.conf tmp --no-use-embedded-config`
 
 ## Browse data
 

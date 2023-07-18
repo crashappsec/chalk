@@ -1,12 +1,7 @@
 import json
-import os
 import shutil
-import stat
-from datetime import timezone
 from pathlib import Path
-from subprocess import check_output
 
-import dateutil.parser
 import pytest
 
 from .chalk.runner import Chalk
@@ -22,7 +17,10 @@ from .utils.validate import (
 logger = get_logger()
 
 
-@pytest.mark.parametrize("bin", ["date", "ls", "cat", "uname"])
+# XXX parameterizing this in case we need ELF files with different properties
+# but we don't want to simply run different binaries like date/ls/cat/uname
+# if we don't expect the behavior to vary
+@pytest.mark.parametrize("bin", ["ls"])
 def test_virtual_valid(bin: str, tmp_data_dir: Path, chalk: Chalk):
     bin_path = f"/bin/{bin}"
     assert Path(bin_path).is_file(), f"{bin_path} does not exist!"
@@ -67,7 +65,7 @@ def test_virtual_valid(bin: str, tmp_data_dir: Path, chalk: Chalk):
     assert timestamp_1 < virtual_extract_2[0]["_TIMESTAMP"]
 
 
-@pytest.mark.parametrize("bin", ["date", "ls", "cat", "uname"])
+@pytest.mark.parametrize("bin", ["ls"])
 def test_nonvirtual_valid(bin: str, tmp_data_dir: Path, chalk: Chalk):
     bin_path = f"/bin/{bin}"
     assert Path(bin_path).is_file(), f"{bin_path} does not exist!"

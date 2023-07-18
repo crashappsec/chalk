@@ -84,14 +84,14 @@ services:
     working_dir: $PWD/server/app
     environment:
       CHALK_CERT_PARAMS: ${CHALK_CERT_PARAMS:-}
-      CHALK_API_PARAMS: ${CHALK_API_PARAMS:-"--workers=4 --error-logfile=- --access-logfile=- --timeout 30"}
+      CHALK_API_PARAMS: ${CHALK_API_PARAMS:- --access-logfile=-  --workers=4 --error-logfile=- --timeout=30}
       CHALK_API_PORT: ${CHALK_API_PORT:-8585}
 
-  registry:
-    image: registry:2
-    container_name: registry
-    ports:
-      - "5000:5000"
+  # registry:
+  #   image: registry:2
+  #   container_name: registry
+  #   ports:
+  #     - "5044:5044"
 
   tests:
     image: chalk_local_tests
@@ -108,6 +108,8 @@ services:
       chalk:
         aliases:
           - chalk.crashoverride.local
+    # depends_on:
+    #   - registry
     environment:
       AWS_PROFILE: ${AWS_PROFILE:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}

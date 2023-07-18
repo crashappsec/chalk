@@ -36,7 +36,7 @@
 ## The value is locked to prevent you from accidentally changing it to
 ## "file" yet having the other parameters be for http POST.
 ## Therefore, when testing a configuration using an external
-## configuration file, you need to pass the --no-embedded-config flag
+## configuration file, you need to pass the --no-use-embedded-config flag
 ## at the command line.
 ##
 ## :Author: John Viega (john@crashoverride.com)

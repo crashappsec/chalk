@@ -640,7 +640,7 @@ proc runCmdConfLoad*() =
              "ignore any calls, but if your config always shells out, it will" &
              " happen here.  To skip error checking, you can add "             &
              "--no-validation.  But, if there's a basic error, chalk may not " &
-             "run without passing --no-embedded-config.  Suppress this "       &
+             "run without passing --no-use-embedded-config.  Suppress this "       &
              "message in the future by setting `no_validation_warning` in the" &
              " config, or passing --no-validation-warning on the command line.")
 

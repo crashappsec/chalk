@@ -44,7 +44,7 @@ def _run_chalk_with_custom_config(
         chalk_cmd="insert",
         target=target_path,
         params=[
-            "--no-embedded-config",
+            "--no-use-embedded-config",
             "--virtual",
             "--config-file=",
             str(config_path.absolute()),
@@ -208,10 +208,10 @@ def test_post(tmp_data_dir: Path, chalk: Chalk):
         )
         assert proc is not None
         # take the metadata id from stderr where chalk mark is put
-        stderr_output = proc.stderr.decode()
+        _output = proc.stdout.decode()
 
         metadata_id = ""
-        for line in stderr_output.split("\n"):
+        for line in _output.split("\n"):
             line = line.strip()
             if line.startswith('"METADATA_ID":'):
                 metadata_id = line.split('METADATA_ID":')[1].split(",")[0].strip()[1:-1]
@@ -232,7 +232,7 @@ def test_post(tmp_data_dir: Path, chalk: Chalk):
 
 
 @pytest.mark.skipif(
-    IN_GITHUB_ACTIONS,
+    bool(IN_GITHUB_ACTIONS),
     reason="Test doesn't work in Github Actions. Need to debug networking",
 )
 @mock.patch.dict(
@@ -289,14 +289,14 @@ def test_post_http_fastapi(tmp_data_dir: Path, chalk: Chalk):
                 chalk_cmd="insert",
                 target=artifact,
                 params=[
-                    "--no-embedded-config",
+                    "--no-use-embedded-config",
                     "--config-file=",
                     str(config.absolute()),
                 ],
             )
             assert proc is not None
-            stderr_output = proc.stderr.decode()
-            for line in stderr_output.split("\n"):
+            _output = proc.stdout.decode()
+            for line in _output.split("\n"):
                 line = line.strip()
                 if line.startswith('"CHALK_ID":'):
                     chalk_id = line.split('CHALK_ID":')[1].split(",")[0].strip()[1:-1]
@@ -309,14 +309,14 @@ def test_post_http_fastapi(tmp_data_dir: Path, chalk: Chalk):
                 res.fetchone()[0] > chalks_cnt
             ), "Could not get ping entry from sqlite"
     finally:
-        if server_id:
-            stop_container(server_id)
+        # if server_id:
+        #     stop_container(server_id)
         if conn:
             conn.close()
 
 
 @pytest.mark.skipif(
-    IN_GITHUB_ACTIONS,
+    bool(IN_GITHUB_ACTIONS),
     reason="Test doesn't work in Github Actions. Need to debug networking",
 )
 @mock.patch.dict(
@@ -328,13 +328,13 @@ def test_post_http_fastapi(tmp_data_dir: Path, chalk: Chalk):
 )
 def test_post_https_fastapi(tmp_data_dir: Path, chalk: Chalk):
     try:
-        conn = None
         server_id = None
+        conn = None
         try:
             assert TLS_CERT_PATH.is_file()
             server_id = compose_run_local_server(https=True)
             assert server_id
-            logger.debug("Spin up local http server with id", server_id=server_id)
+            logger.debug("Spin up local https server with id", server_id=server_id)
             sleep(2)
             r = requests.get(
                 "https://chalk.crashoverride.local:8585/health",
@@ -378,14 +378,14 @@ def test_post_https_fastapi(tmp_data_dir: Path, chalk: Chalk):
                 target=artifact,
                 params=[
                     "--trace",
-                    "--no-embedded-config",
+                    "--no-use-embedded-config",
                     "--config-file=",
                     str(config.absolute()),
                 ],
             )
             assert proc is not None
-            stderr_output = proc.stderr.decode()
-            for line in stderr_output.split("\n"):
+            _output = proc.stdout.decode()
+            for line in _output.split("\n"):
                 line = line.strip()
                 if line.startswith('"CHALK_ID":'):
                     chalk_id = line.split('CHALK_ID":')[1].split(",")[0].strip()[1:-1]

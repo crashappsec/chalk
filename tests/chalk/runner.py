@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from ..utils.log import get_logger
 
-ChalkCmd = Literal["insert", "extract"]
+ChalkCmd = Literal["insert", "extract", "dump", "version", "delete", "load"]
 
 logger = get_logger()
 

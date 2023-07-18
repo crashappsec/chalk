@@ -207,14 +207,14 @@ def test_dump_load(tmp_data_dir: Path, chalk: Chalk):
         file_text = f'error("{validation_string}")' + file_text
         file.write(file_text)
 
-    # load updated config and check that chalk.new binary was created
+    # load updated config and check that chalk binary was created
     load_output = chalk.run(chalk_cmd="load", params=[str(tmp_conf)])
     assert load_output.returncode == 0
     dir_obj = os.listdir(tmp_data_dir)
-    assert "chalk.new" in dir_obj
+    assert "chalk" in dir_obj
 
     # run new chalk and check for error in log output
-    chalk = Chalk(binary=(tmp_data_dir / "chalk.new").resolve())
+    chalk = Chalk(binary=(tmp_data_dir / "chalk").resolve())
     extract_output = chalk.run(chalk_cmd="extract", params=["."])
     assert extract_output.returncode == 0
     error_output = extract_output.stderr.decode()

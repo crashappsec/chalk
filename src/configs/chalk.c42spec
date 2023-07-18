@@ -1458,7 +1458,7 @@ Turn this off to prevent accidentally picking up an external configuration file.
     default:  true
     shortdoc: "Run the embedded configuration file"
     doc: """
-This variable controls whether the embedded configuration file runs. Obviously, setting this from within the embedded configuration file is pointless, as it's used before then. But, you can set this with --no-embedded-config at the command line.
+This variable controls whether the embedded configuration file runs. Obviously, setting this from within the embedded configuration file is pointless, as it's used before then. But, you can set this with --no-use-embedded-config at the command line.
 
 This is primarily meant to make it easier to test new configurations by disabling the embedded config and only running the external (candidate) config.
 """
