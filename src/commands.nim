@@ -703,12 +703,15 @@ when hostOs == "macosx":
 
 const PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
 
-proc doExecCollection(pid: Pid): Option[ChalkObj] =
+proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
   # First, check the chalk file location, and if there's one there, then create
   # a chalk object.
-
+  #
   # If there's no such chalk mark, then we just report based on the
   # exe.
+  #
+  # Note that if we can't find the process path by PID, we assume it's
+  # allOpts[0] for the moment.
 
   var
     info:  Stat
@@ -728,6 +731,7 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
     chalk         = newChalk(stream, cid)
     chalk.extract = stream.extractOneChalkJson(cid)
     chalk.myCodec = Codec(getPluginByName("docker"))
+    chalk.pid     = some(pid)
 
     # Denote to the codec that we're running.
     chalk.myCodec.runtime = true
@@ -739,29 +743,28 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
     chalk.addToAllChalks()
 
   else:
-    info("Could not find a container chalk mark at " & chalkPath)
+    trace("Could not find a container chalk mark at " & chalkPath)
 
-    var n: array[PATH_MAX, char]
+    var
+      n:        array[PATH_MAX, char]
+      exe1path: string = ""
 
     when hostOs == "macosx":
-      if proc_pidpath(pid, addr n[0], PATH_MAX) <= 0:
-        return none(ChalkObj)
+      if proc_pidpath(pid, addr n[0], PATH_MAX) > 0:
+        exe1path =  $(cast[cstring](addr n[0]))
     elif hostOs == "linux":
         let procPath = "/proc/" & $(pid) & "/exe"
         if readlink(cstring(procPath),
-                    cast[cstring](addr n[0]), PATH_MAX) == -1:
-          return none(ChalkObj)
-    else:
-      # Unsupported platform
-      return none(ChalkObj)
+                    cast[cstring](addr n[0]), PATH_MAX) != -1:
+          exe1path = $(cast[cstring](addr n[0]))
 
-    var
-      exe1path = $(cast[cstring](addr n[0]))
+    if exe1path == "":
+      exe1path = allOpts[0]
 
-    # This will only yield one result, since item is a file not a dir.
-    # But, we don't want to trigger the post-chalk collection, as it
-    # happens when we return from this function (since the docker path
-    # doesn't use the iterator).
+    # This will only yield at most one result, since item is a file
+    # not a dir.  But, we don't want to trigger the post-chalk
+    # collection, as it happens when we return from this function
+    # (since the docker path doesn't use the iterator).
     #
     # Thus, we break.
     #
@@ -773,23 +776,26 @@ proc doExecCollection(pid: Pid): Option[ChalkObj] =
       chalk = item
       break
 
-    if chalk != nil:
-      result = some(chalk)
+    if chalk == nil:
+      # If we got here, the executable is unmarked.  It won't
+      # have a CHALK_ID.
+      #
+      # Unfortunately, we haven't found a codec either.  On a Linux
+      # box this might be because we're in a container, but there
+      # was no mark found.
+      #
+      # On an apple box, we might not be able to see the parent exe.
+      #
+      # For now, we assume we're running in a container just because
+      # we won't try file system IO.
 
-    let selfOpt = getSelfExtraction()
+      chalk = newChalk(newFileStream(exe1path), exe1path)
+      chalk.addToAllChalks()
+      chalk.myCodec = Codec(getPluginByName("docker"))
 
-    if selfOpt.isSome():
-      let self = selfOpt.get()
-      if self.fullPath == exe1path:
-        chalk = self
-        result = selfOpt
+    result = some(chalk)
 
-  if chalk == nil:
-    return none(ChalkObj)
-
-
-
-
+    chalk.pid = some(pid)
 
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):
@@ -846,11 +852,11 @@ proc runCmdExec*(args: seq[string]) =
     if pid == 0:
       handleExec(allOpts, argsToPass)
     else:
+      trace("Chalk is parent process.")
       initCollection()
-      let chalkOpt = doExecCollection(pid)
+      let chalkOpt = doExecCollection(allOpts, pid)
       if chalkOpt.isSome():
         chalkOpt.get().collectPostChalkInfo()
-
       doReporting()
       trace("Waiting for spawned process to exit.")
       var stat_loc: cint
@@ -859,8 +865,10 @@ proc runCmdExec*(args: seq[string]) =
     if pid != 0:
       handleExec(allOpts, argsToPass)
     else:
+      trace("Chalk is child process.")
       initCollection()
-      let chalkOpt = doExecCollection(ppid)
+      trace("Host collection finished.")
+      let chalkOpt = doExecCollection(allOpts, ppid)
       discard setpgid(0, 0) # Detach from the process group.
       # On some platforms we don't support
       if chalkOpt.isSome():

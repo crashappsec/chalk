@@ -115,6 +115,7 @@ proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
 
 
     for path in prioritizedExes:
+      trace("execve: " & path & " " & args.join(" "))
       discard execv(cstring(path), cargs)
       # Either execv doesn't return, or something went wrong. No need to check the
       # error code.

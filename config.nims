@@ -2,7 +2,6 @@ switch("d", "nimPreviewHashRef")
 switch("d", "ssl")
 switch("d", "useOpenSSL3")
 switch("debugger", "native")
-switch("passl", "-static")
 
 when (NimMajor, NimMinor) < (1, 7):
   # Locklevels never worked and are gone but older versions will complain.
@@ -17,4 +16,7 @@ if defined(macosx):
   switch("cpu", "arm64")
   switch("passc", "-flto -target arm64-apple-macos11 ")
   switch("passl", "-flto -target arm64-apple-macos11 -Wl,-object_path_lto,lto.o")
+else:
+  switch("passl", "-static")
+
 #switch("d", "release")

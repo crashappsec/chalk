@@ -314,9 +314,11 @@ method getPostChalkInfo*(self:  CodecDocker,
       result["_INSTANCE_ID"]      = cid
     return
 
-  let
-    cache      = DockerInfoCache(chalk.cache)
-    inspectOut = cache.inspectOut
+  let cache      = DockerInfoCache(chalk.cache)
+
+  if cache == nil: return
+
+  let inspectOut = cache.inspectOut
 
   if not cache.container:
     chalk.cachedHash = inspectOut["Id"].getStr().extractDockerHash()

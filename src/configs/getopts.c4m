@@ -303,6 +303,11 @@ When using the 'exec' command, this allows you to explicitly set the command to 
       yes_aliases: ["pg13", "pg-13"]
       no_aliases:  ["no-pg13", "no-pg-13"]
       field_to_set: "exec.chalk_as_parent"
+      doc: """
+When set to true, 'chalk exec' will leave chalk as the parent process (By default, the process to exec stays the parent, and chalk is forked off).
+
+This is most useful for short-lived processes, as it ensures chalk will complete any reporting.
+"""      
     }
   }
   command defaults {

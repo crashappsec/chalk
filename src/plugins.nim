@@ -689,3 +689,5 @@ import plugins/vctlGit
 import plugins/ecs
 import plugins/externalTool
 import plugins/system
+when hostOs == "linux":
+  import plugins/procfs

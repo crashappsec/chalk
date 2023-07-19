@@ -155,7 +155,6 @@ keyspec CHALK_PTR {
     type:                  string
     standard:              true
     since:                 "0.1.0"
-    normalized_order:       400
     apply_substitutions:   true
     doc:                   """
 When enabled, injects minimal metadata; this field then gets a URL you supply
@@ -171,7 +170,6 @@ keyspec EARLIEST_VERSION {
     conf_as_system:   true
     ~value:           chalk_version
     since:            "0.1.0"
-    normalized_order: 500
     doc:              "Reserved for future use"
 }
 
@@ -180,7 +178,6 @@ keyspec INSERTION_HOSTINFO {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: 600
     doc:              "Host information at injection"
 }
 
@@ -189,7 +186,6 @@ keyspec INSERTION_NODENAME {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: 650
     doc:              """
 The node name at the time of insertion. On posix systems, this should be equivolent to the uname 'nodename' field.
 """
@@ -202,7 +198,6 @@ keyspec ARTIFACT_PATH {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    normalized_order: 700
     doc:              "Path of artifact on host where injection occured"
 }
 
@@ -213,7 +208,6 @@ keyspec ARTIFACT_TYPE {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    normalized_order: 750
 }
 
 keyspec _OP_ARTIFACT_TYPE {
@@ -222,7 +216,6 @@ keyspec _OP_ARTIFACT_TYPE {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    normalized_order: 750
 }
 
 keyspec HASH {
@@ -232,7 +225,6 @@ keyspec HASH {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    normalized_order: 800
     doc:              "Hash file of artifact w/o chalk in it, to ensure " +
                       "extracted chalk is intact"
 }
@@ -244,7 +236,6 @@ keyspec HASH_FILES {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    normalized_order: 900
     doc:              "Files that constitute the artifact, and used in the " +
                       " hash, if not just the ARTIFACT_PATH"
 }
@@ -256,7 +247,6 @@ keyspec COMPONENT_HASHES {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    normalized_order: 1000
     doc:              """
 When there are multiple files hashed for a single artifact, this contains
 SHA256 hashes of the individual component hashes. The ordering will match
@@ -271,7 +261,6 @@ keyspec ORIGIN_URI {
     type:                string
     standard:            true
     since:               "0.1.0"
-    normalized_order:    1100
     apply_substitutions: true
     doc:                 "URI of origin for repo from which artifact was built"
 }
@@ -281,7 +270,6 @@ keyspec BRANCH {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: 1200
     doc:              "Version control branch the artifact was built from"
 }
 
@@ -290,7 +278,6 @@ keyspec COMMIT_ID {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: 1300
     doc:              "The commit hash or id for the repository the artifact " +
                       "was built from"
 }
@@ -300,7 +287,6 @@ keyspec ARTIFACT_VERSION {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: 1400
     doc:              "Reserved for future use; can be custom."
 }
 
@@ -309,7 +295,6 @@ keyspec STORE_URI {
     type:                string
     standard:            true
     since:               "0.1.0"
-    normalized_order:    1500
     apply_substitutions: true
     doc:                 "URI for the intended artifact storage location," +
                          " at the time of chalking."
@@ -320,7 +305,6 @@ keyspec PACKAGE_URI {
     type:               string
     standard:           true
     since:              "0.1.0"
-    normalized_order:    1600
     apply_substitutions: true
     doc:                 "Public distribution point."
 }
@@ -330,7 +314,6 @@ keyspec CODE_OWNERS {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: 1700
     doc:              "Code owners associated with the artifact."
 }
 
@@ -339,7 +322,6 @@ keyspec INJECTOR_ID {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: 1800
     doc:              "chalk ID of the chalk binary"
 }
 
@@ -349,7 +331,6 @@ keyspec INJECTOR_VERSION {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 1900
     doc:              "Version of the chalk binary used for injection"
 }
 
@@ -359,7 +340,6 @@ keyspec INJECTOR_PLATFORM {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 2000
     doc:              "OS / system info at time of insertion"
 }
 
@@ -369,7 +349,6 @@ keyspec INJECTOR_COMMIT_ID {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 2100
     doc:              "The commit hash or id from which the injector was built."
 }
 
@@ -378,7 +357,6 @@ keyspec BUILD_ID {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: 2200
     doc:              "The ID of the CI/CD job"
 }
 
@@ -387,7 +365,6 @@ keyspec BUILD_URI {
     type:                string
     standard:            true
     since:               "0.1.0"
-    normalized_order:    2300
     apply_substitutions: true
     doc:                 "URI to the CI/CD job"
 }
@@ -397,7 +374,6 @@ keyspec BUILD_API_URI {
     type:                string
     standard:            true
     since:               "0.1.0"
-    normalized_order:    2400
     apply_substitutions: true
     doc:                 "URI to the CI/CD api if more information needs to  " +
                          "be queried"
@@ -408,7 +384,6 @@ keyspec BUILD_TRIGGER {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: 2500
     doc:              "What event triggered CI/CD job"
 }
 
@@ -417,7 +392,6 @@ keyspec BUILD_CONTACT {
     type:             list[string]
     standard:         true
     since:            "0.1.0"
-    normalized_order: 2600
     doc:              "List of contacts which triggered CI/CD job"
 }
 
@@ -430,7 +404,6 @@ keyspec CHALK_RAND {
     conf_as_system:   true
     ~callback:        func call_rand
     since:            "0.1.0"
-    normalized_order: 2700
     doc:              "64-bit random value generally selected per chalk " +
                       "(if enabled), intended to help ensure unique metadata " +
 		      " IDs in all circumstances.  Presented as hex digits."
@@ -444,7 +417,6 @@ keyspec _ACTION_ID {
     conf_as_system:   true
     ~callback:        func call_rand
     since:            "0.1.0"
-    normalized_order: 100
     doc:              "Unique identifier per-action (i.e., per run of chalk), " +
                       "Which is a 64-bit random value presented as hex digits."
 }
@@ -458,7 +430,6 @@ keyspec ARGV {
     system:           true
     ~value:           cmdline_args
     since:            "0.1.0"
-    normalized_order: 2800
     doc:              "The full contents of argv used on invocation"
 }
 
@@ -468,7 +439,6 @@ keyspec ENV {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 2900
     doc:              """
 Environment variables set when the process is run. Because chalk may be used to proxy container entry points that could contain sensitive data, it's possible to redact variables, or skip them outright.  The behavior is configured with the following configuration attributes:
 
@@ -488,7 +458,6 @@ keyspec _ARGV {
     system:           true
     ~value:           cmdline_args
     since:            "0.1.0"
-    normalized_order: 200
     doc:              "The full contents of argv used on invocation"
 }
 
@@ -499,7 +468,6 @@ keyspec _ENV {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 300
     doc:              """
 Same as ENV, but for a non-chalking context (e.g., extraction time). It respects the same environment variables.
 """
@@ -509,7 +477,6 @@ keyspec TENANT_ID {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 1000
     doc:              """
 A user-defined unique identifier intended to capture any meaningful user data.
 """
@@ -520,7 +487,6 @@ keyspec _TENANT_ID {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 1000
     doc:              """
 A user-defined unique identifier intended to capture any meaningful user data.
 """
@@ -533,7 +499,6 @@ keyspec OLD_CHALK_METADATA_HASH {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 900
     doc:              "Metadata hash of old chalk info associated with an " +
                       "artifact, when a new mark is inserted"
 }
@@ -545,7 +510,6 @@ keyspec OLD_CHALK_METADATA_ID {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 800
     doc:              "Metadata ID of old chalk info associated with an " +
                       "artifact, when a new mark is inserted"
 }
@@ -557,7 +521,6 @@ keyspec EMBEDDED_CHALK {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    normalized_order: high() - 700
     doc:              "Other artifacts contained in this artifact"
 }
 
@@ -568,7 +531,6 @@ keyspec EMBEDDED_TMPDIR {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    normalized_order: high() - 675
     doc:              """
 Temporary directory for embedded contents that was used when chalking. Any directories in the sub-chalk should be under this path.
 """
@@ -579,7 +541,6 @@ keyspec CLOUD_METADATA {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 650
     doc:              """
 Metadata reported by the local cloud provider.  The contents are specific to the provider, but should generally be a string that can itself be interpreted as JSON.
 """
@@ -590,7 +551,6 @@ keyspec SBOM {
     type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 600
     doc:              "SBOMs associated with this artifact"
 }
 
@@ -599,7 +559,6 @@ keyspec SAST {
     type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 550
     doc:              "Static analysis scan results"
 }
 
@@ -759,7 +718,7 @@ keyspec _OP_CHALK_COUNT {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 1000000
+    normalized_order: high() - 100
     doc:              "The number of chalks the operation worked on, meant " +
                       "primarily for contexts where the chalks themselves " +
 		      "are not being reported."
@@ -771,7 +730,7 @@ keyspec _OP_UNMARKED_COUNT {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 1000100
+    normalized_order: high() - 90
     doc:              """
 The number of unmarked artifacts that codecs saw. For inserts, this will be items seen but ignored. For other ops, it will be artifacts w/o chalk marks.
 """
@@ -783,7 +742,6 @@ keyspec _OP_ARTIFACT_PATH {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 1000200
     doc:              "Artifact location as found for the current op only"
 }
 
@@ -793,7 +751,6 @@ keyspec _CURRENT_HASH {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    normalized_order: 1000300
     doc:              "Hash of the artifact at the end of the current op. " +
                       "In a chalk operation, it will be the hash after " +
                       "the chalk is fully inserted. Otherwise, it will be " +
@@ -806,7 +763,6 @@ keyspec _OP_CMD_FLAGS {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 1000400
     doc:              "Fully resolved command-line flags and values used in " +
                       "the current command invocation."
 }
@@ -876,7 +832,6 @@ keyspec _VALIDATED {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 3300
     doc:              "Hash of artifact after a chalk operation. This is not " +
                       "written into the artifact, but is meant to be provided " +
 		      "to wherever the chalk operation is logged."
@@ -888,7 +843,6 @@ keyspec _UNMARKED {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 3200
     doc:              "Artifacts seen in the artifact search path that were " +
                       "not marked."
 }
@@ -899,7 +853,6 @@ keyspec _VIRTUAL {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 3150
     doc:              "Set on chalking ops only, indicating if the chalk was virtual."
 }
 
@@ -909,7 +862,6 @@ keyspec _OP_CHALKER_COMMIT_ID {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 3100
     doc:              "The commit hash or id for this chalk command."
 }
 
@@ -919,7 +871,6 @@ keyspec _OP_CHALKER_VERSION {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 3000
     doc:              "Version info for this chalk command."
 }
 
@@ -928,7 +879,6 @@ keyspec _OP_PLATFORM {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 2900
     doc:              "The platform information for this chalk command."
 }
 
@@ -937,7 +887,6 @@ keyspec _OP_HOSTNAME {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 2800
     doc:              "Hostname information for this chalk command."
 }
 
@@ -946,7 +895,6 @@ keyspec _OP_HOSTINFO {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 2700
     doc:              "Detailed host info reported at the time of the " +
                       "operation.  System provides a default."
 }
@@ -956,7 +904,6 @@ keyspec _OP_NODENAME {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 2650
     doc:              """
 The node name at the time of the current operation. On posix systems, this should be equivolent to the uname 'nodename' field.
 """
@@ -968,7 +915,6 @@ keyspec $CHALK_CONFIG {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order:  high() - 2600
     doc:              "Embedded configuration file; this is special-purpose" +
                       "and will be ignored outsde of dump / load cmds"
 }
@@ -979,7 +925,6 @@ keyspec $ELF_VALUES {
     type:             list[tuple[int, int, int]]
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 750
 }
 
 keyspec $ELF_INSERTIONS {
@@ -987,7 +932,6 @@ keyspec $ELF_INSERTIONS {
     type:             list[tuple[int, int]]
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 700
 }
 #% END
 
@@ -996,7 +940,6 @@ keyspec _OP_CLOUD_METADATA {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 650
     doc:              """
 Metadata reported by the local cloud provider.  The contents are specific to the provider, but should generally be a string that can itself be interpreted as JSON.
 """
@@ -1008,7 +951,6 @@ keyspec _OP_ERRORS {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 2500
     doc:              "Errors on the current operation."
 }
 
@@ -1018,7 +960,6 @@ keyspec _OP_CHALKED_KEYS {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 2400
     doc:              "For insert operations only, a list of all keys that " +
                       "were added to the chalk"
 }
@@ -1029,7 +970,6 @@ keyspec _OP_ARTIFACT_REPORT_KEYS {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 2300
     doc:              "For insert operations only, a list of all keys that " +
                       "were added to the chalk"
 }
@@ -1040,10 +980,497 @@ keyspec _OP_HOST_REPORT_KEYS {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 2200
     doc:              "For insert operations only, a list of all keys that " +
                       "were added to the chalk"
 }
+
+keyspec _OP_TCP_SOCKET_INFO {
+    kind:             HostOnly
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return information about existing TCP sockets, to the degree that the chalk process has permissions to access this information. 
+
+One socket is returned per row. The columns returned are:
+1. The local IP address in use
+2. The local port number in use
+3. The remote IP address in use
+4. The remote port number in use
+5. The status of the connection (e.g., LISTEN, CONNECT, ...)
+6. The UID of the process that owns the socket
+7. The inode associated with the socket
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_UDP_SOCKET_INFO {
+    kind:             HostOnly
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return UDP state information, to the degree that the chalk process has permissions to access this information. 
+
+One socket is returned per row. The columns returned are:
+1. The local IP address in use
+2. The local port number in use
+3. The remote IP address in use
+4. The remote port number in use
+5. The status of the connection (always UNCONN)
+6. The UID of the process that owns the socket
+7. The inode associated with the socket
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_IPV4_ROUTES {
+    kind:             HostOnly
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return IPV4 routing table information, to the degree that the chalk process has permissions to access this information.
+
+One route is returned per row. The columns returned are:
+1. The destination network
+2. The next hop (gateway address)
+3. The netmask for the route
+4. The interface (device) associated with the route
+5. The kernel's 'Flags' field
+6. The kernel's 'RefCnt' field
+7. The kernel's 'Use' field
+8. The kernel's 'Metric' field
+9. The kernel's 'MTU' field
+10. The kernel's 'Window' field
+11. The kernel's 'IRTT' field
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_IPV6_ROUTES {
+    kind:             HostOnly
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return IPV6 routing table information, to the degree that the chalk process has permissions to access this information.
+
+One route is returned per row.  The columns returned are:
+1. The destination network
+2. The destination prefix length in hex
+3. The source network
+4. The source prefix length in hex
+5. The next hop (gateway address)
+6. The interface (device) associated with the route
+7. The kernel's 'Flags' field
+8. The kernel's 'RefCnt' field
+9. The kernel's 'Use' field
+10. The kernel's 'Metric' field
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_IPV4_INTERFACES {
+    kind:             HostOnly
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return information on IPV4 interface status.
+
+One interface is listed per row.  The first column is the interface
+name.  
+
+The next 8 columns are receive statistics:
+bytes, packets, errors, drops, fifo, frame, compressed, multicast
+
+The remaining columns are transmission statistics:
+bytes, packets, errors, drops, fifo, colls, carrier, compressed
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_IPV6_INTERFACES {
+    kind:             HostOnly
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return information on IPV6 interface status.
+
+One interface is listed per row.  The first column is the interface name.
+
+The remaining columns are:
+
+- The netlink device number in hex
+- The prefix length in hex
+- The kernel's 'Scope value' (see include/net/ipv6.h)
+- The kernel's 'Interface flags' (see include/linux/rtnetlink.h') 
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+
+keyspec _OP_ARP_TABLE {
+    kind:             HostOnly
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return the ARP table. 
+
+One row is returned for each ARP entry.  The columns are:
+1. The IP address
+2. The kernel's recorded hardware type
+3. Any flags set in the kernel for the ARP entry
+4. The associated hardware address.
+5. The kernel's record 'Mask' field
+6. The network device from which the entry broadcasts.
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_CPU_INFO {
+    kind:             HostOnly
+    type:             dict[string, string]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+Currently, this just returns CPU basic load average info, including number
+of processes.
+
+The values are all presented as strings.  The current available item info is:
+
+- load: load averages over the last 1, 5 and 15 mins
+- lastpid: the last PID handed out by the system
+- runnable_procs: the number of current running processes
+- total_procs: the total number of running processes.
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""    
+}
+
+keyspec _OP_ALL_PS_INFO {
+    kind:             HostOnly
+    type:             dict[string, dict[string, string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+For every process visible to Chalk, reports key process info.  The keys are the PID as a string, even when they are clearly numeric values.
+
+The values are dictionaries of information associated with that process:
+
+- state: The state of the process (e.g, Running, Sleeping, Zombie, ...)
+- ppid: The parent process ID
+- pgrp: The process group
+- sid:  The session ID of the process.
+- tty_nr: The encoded TTY number for the controlling terminal of the process.
+- tpgid: The ID of the terminal's process group.
+- user_time: The amount of time the process has spent in user mode since starting, in seconds.
+- system_time: The amount of time the process has spent in kernel mode since starting, in seconds.
+- child_utime: User mode time of the proc's waited-for children.
+- child_stime: Kernel mode time of the proc's waited-for children.
+- priority: The real-time scheduler's priority field reported by Linux.
+- nice: The nice value for the process (higher numbers are lower priority)
+- num_threads: The number of threads in the process.
+- runtime: The time since the process started, in seconds.
+- uid: A list containing the real, effective, saved and fs UID
+- gid: A list containing the real, effective, saved and fs GID
+- fd_size: The number of allocated file descriptors
+- groups: A list of the supplementary groups to which the process belongs.
+- seccomp: The process' Seccomp status ('disabled', 'strict' or 'filter')
+- umask: The umask associated with the process.
+- argv: The command line used when exec'ing the process.
+- path: The path to the executable.
+- cwd: The cwd of the process.
+- name: The short name of the process, as determined by /proc/pid/stat
+- command: The short name of the command, as determined by proc/pid/comm
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _PROCESS_PID {
+    kind:             NonChalk
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The process ID of the running process associated with the artifact. 
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_DETAIL {
+    kind:             NonChalk
+    type:             dict[string, string]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+Collects key process info; the same info as in _OP_ALL_PS_INFO, but only for the given process.
+
+Note that this overlaps with many of the other keys beginning with _PROCESS.
+If you use this key, then the only such keys that do not overlap are:
+
+_PROCESS_FD_INFO
+_PROCESS_MOUNT_INFO
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""    
+}
+
+keyspec _PROCESS_PARENT_PID {
+    kind:             NonChalk
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The process ID of the parent process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_START_TIME {
+    kind:             NonChalk
+    type:             float
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+Process start time, in seconds since boot.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_UTIME {
+    kind:             NonChalk
+    type:             float
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The amount of time the process has spent in user mode since starting, in seconds.
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_STIME {
+    kind:             NonChalk
+    type:             float
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The amount of time the process has spent in kernel mode since starting, in seconds.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_CHILDREN_UTIME {
+    kind:             NonChalk
+    type:             float
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+User mode time of the proc's waited-for children.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_CHILDREN_STIME {
+    kind:             NonChalk
+    type:             float
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+Kernel mode time of the proc's waited-for children.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_STATE {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The state of the process (e.g, Running, Sleeping, Zombie, ...)
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_PGID {
+    kind:             NonChalk
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The process group associated with the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_UMASK {
+    kind:             NonChalk
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The umask associated with the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_UID {
+    kind:             NonChalk
+    type:             list[int]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+A list containing the real, effective, saved and fs UID of the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_GID {
+    kind:             NonChalk
+    type:             list[int]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+A list containing the real, effective, saved and fs GID of the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+
+keyspec _PROCESS_NUM_FD_SIZE {
+    kind:             NonChalk
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The number of allocated file descriptors.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_GROUPS {
+    kind:             NonChalk
+    type:             list[int]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+A list of the supplementary groups to which the process belongs.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_SECCOMP_STATUS {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The process' Seccomp status ('disabled', 'strict' or 'filter').
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_ARGV {
+    kind:             NonChalk
+    type:             list[string]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The arv as reported via proc for the exec'd process we are reporting on.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_CWD {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The current working directory of the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_EXE_PATH {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The path to the executable of the process being reported on.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_COMMAND_NAME {
+    kind:             NonChalk
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The current name of the process image being reported on.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_FD_INFO {
+    kind:             NonChalk
+    type:             dict[string, dict[string, string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+Returns information for all file descriptors in the process.
+Keys are file descriptor numbers, but encoded as a string.
+
+Values are dictionaries of info that vary based on the file type. 
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_MOUNT_INFO {
+    kind:             NonChalk
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+A list of mounts available to the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
 
 keyspec DOCKER_FILE {
     kind:             Chalk
@@ -1051,7 +1478,6 @@ keyspec DOCKER_FILE {
     standard:         true
     system:           false
     since:            "0.1.0"
-    normalized_order: high() - 20000
     doc: """
 When chalking docker containers, this gets the contents of the topmost docker file passed to the docker command line, prior to any entry point wrapping.
 """
@@ -1063,7 +1489,6 @@ keyspec DOCKERFILE_PATH {
     standard:         true
     system:           false
     since:            "0.1.0"
-    normalized_order: high() - 19990
     doc: """
 Path to the docker file on the system on which it was built.
 """
@@ -1075,7 +1500,6 @@ keyspec DOCKER_PLATFORM {
     standard:         true
     system:           false
     since:            "0.1.0"
-    normalized_order: high() - 19980
     doc: """
 Platform passed when performing 'docker build', if any.
 """
@@ -1087,7 +1511,6 @@ keyspec DOCKER_LABELS {
     standard:          true
     system:            false
     since:             "0.1.0"
-    normalized_order:  high() - 19970
     doc: """
 Labels added to a docker image.
 """
@@ -1099,7 +1522,6 @@ keyspec DOCKER_TAGS {
     standard:          true
     system:            false
     since:             "0.1.0"
-    normalized_order:  high() - 19960
     doc: """
 Tags added to a docker image.  Will be in the form: REPOSITORY:TAG
 """
@@ -1111,7 +1533,6 @@ keyspec DOCKER_CONTEXT {
     standard:          true
     system:            false
     since:             "0.1.0"
-    normalized_order:  high() - 19950
     doc: """
 Context used when building a container.
 """
@@ -1475,7 +1896,6 @@ keyspec _REPO_HOST {
     type:             string
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 10000
     doc: """
 When reporting on operations involving a repository (e.g., a push or pull), the
  host name of the associated repository.
@@ -1487,7 +1907,6 @@ keyspec _REPO_PORT {
     type:             int
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 9900
     doc: """
 When reporting on operations involving a repository (e.g., a push or pull), the
 port number of the associated repository.
@@ -1499,7 +1918,6 @@ keyspec _REPO_TAGS {
     type:             list[string]
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 9800
     doc: """
 When reporting on operations involving a repository (e.g., a push or pull), any
 tags associated with the artifact in the operation.
@@ -1511,7 +1929,6 @@ keyspec _REPO_DIGESTS {
     type:             list[string]
     standard:         true
     since:            "0.1.0"
-    normalized_order: high() - 9700
     doc: """
 When reporting on operations involving a repository (e.g., a push or pull), any
 SHA256 digests associated with the artifact in the operation.
@@ -1644,8 +2061,30 @@ plugin aws_ecs {
     post_run_keys:   ["_OP_CLOUD_METADATA"]
 }
 
+plugin procfs {
+    enabled:         true
+    post_chalk_keys: ["_PROCESS_PID", "_PROCESS_DETAIL",
+                      "_PROCESS_PARENT_PID", "_PROCESS_START_TIME",
+                      "_PROCESS_STATE", "_PROCESS_PGID", "_PROCESS_UTIME",
+                      "_PROCESS_STIME", "_PROCESS_CHILDREN_UTIME",
+                      "_PROCESS_CHILDREN_STIME", "_PROCESS_UMASK",
+                      "_PROCESS_UID", "_PROCESS_GID",
+                      "_PROCESS_NUM_FD_SIZE", "_PROCESS_GROUPS",
+                      "_PROCESS_SECCOMP_STATUS", "_PROCESS_ARGV",
+                      "_PROCESS_CWD", "_PROCESS_EXE_PATH",
+                      "_PROCESS_COMMAND_NAME", "_PROCESS_FD_INFO",
+                      "_PROCESS_MOUNT_INFO"]
+                      
+    post_run_keys:   ["_OP_TCP_SOCKET_INFO", "_OP_UDP_SOCKET_INFO",
+                      "_OP_IPV4_ROUTES", "_OP_IPV6_ROUTES",
+                      "_OP_IPV4_INTERFACES", "_OP_IPV6_INTERFACES",
+                      "_OP_ARP_TABLE", "_OP_CPU_INFO", "_OP_ALL_PS_INFO"]
+    
+}
+
 # This plugin is the only thing allowed to set these keys.
 plugin system {
+  enabled:          true
   pre_run_keys:    ["INJECTOR_ID", "INJECTOR_VERSION", "INJECTOR_PLATFORM",
                      "INJECTOR_COMMIT_ID", "DATE", "TIME", "TZ_OFFSET",
 		     "DATETIME", "ENV", "INSERTION_HOSTINFO",
@@ -2038,6 +2477,30 @@ Host keys are in the host_report_other_base (i.e., non-insert) profile.
   key._INSTANCE_ARCH.report              = true
   key._INSTANCE_OS.report                = true
   key._INSTANCE_SIZE.report              = true
+
+  # These keys only get used on 'exec' currently.
+  key._PROCESS_PID.report                = true
+  key._PROCESS_DETAIL.report             = false
+  key._PROCESS_PARENT_PID.report         = true
+  key._PROCESS_START_TIME.report         = true
+  key._PROCESS_UTIME.report              = true
+  key._PROCESS_STIME.report              = true
+  key._PROCESS_CHILDREN_UTIME.report     = true
+  key._PROCESS_CHILDREN_STIME.report     = true
+  key._PROCESS_STATE.report              = false
+  key._PROCESS_PGID.report               = true
+  key._PROCESS_UMASK.report              = true
+  key._PROCESS_UID.report                = true
+  key._PROCESS_GID.report                = true
+  key._PROCESS_NUM_FD_SIZE.report        = true
+  key._PROCESS_GROUPS.report             = true
+  key._PROCESS_SECCOMP_STATUS.report     = false
+  key._PROCESS_ARGV.report               = true
+  key._PROCESS_CWD.report                = true
+  key._PROCESS_EXE_PATH.report           = true
+  key._PROCESS_COMMAND_NAME.report       = false
+  key._PROCESS_FD_INFO.report            = false
+  key._PROCESS_MOUNT_INFO.report         = false
 }
 
 profile artifact_report_minimal {
@@ -2146,6 +2609,15 @@ And some keys starting with _ are per-artifact, so appear in artifact reports.
   key._OP_NODENAME.report             = true
   key._OP_ERRORS.report               = true
   key._OP_HOST_REPORT_KEYS.report     = false
+  key._OP_TCP_SOCKET_INFO.report      = false
+  key._OP_UDP_SOCKET_INFO.report      = false
+  key._OP_IPV4_ROUTES.report          = false
+  key._OP_IPV6_ROUTES.report          = false
+  key._OP_IPV4_INTERFACES.report      = false
+  key._OP_IPV6_INTERFACES.report      = false
+  key._OP_ARP_TABLE.report            = false
+  key._OP_CPU_INFO.report             = false
+  key._OP_ALL_PS_INFO.report          = false
   key.SBOM.report                     = true
   key.SAST.report                     = true
   key.ERR_INFO.report                 = true

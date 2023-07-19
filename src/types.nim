@@ -6,7 +6,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import c4autoconf, streams, tables, options, nimutils, sugar
+import c4autoconf, streams, tables, options, nimutils, sugar, posix
 
 type
   ChalkDict* = OrderedTableRef[string, Box]
@@ -45,6 +45,8 @@ type
     noResolvePath*: bool        ## True when the system plugin should not
                                 ## call resolvePath when setting the
                                 ## artifact path.
+    pid*:           Option[Pid] ## If an exec() or eval() and we know
+                                ## the pid, this will be set.
 
 
   Plugin* = ref object of RootObj
@@ -82,6 +84,13 @@ proc pushCollectionCtx*(callback: (CollectionCtx) -> void): CollectionCtx =
   result        = collectionCtx
 proc popCollectionCtx*() =
   if len(ctxStack) != 0: collectionCtx = ctxStack.pop()
+
+template isSubscribedKey*(key: string): bool =
+  if key in subscribedKeys:
+    subscribedKeys[key]
+  else:
+    false
+
 proc inSubscan*(): bool =
   return len(ctxStack) != 0
 proc getCurrentCollectionCtx*(): CollectionCtx = collectionCtx
@@ -109,6 +118,14 @@ proc newChalk*(stream: FileStream, loc: string): ChalkObj =
                     stream:        stream,
                     extract:       nil)
   setErrorObject(result)
+
+template setIfNotEmpty*(dict: ChalkDict, key: string, val: string) =
+  if val != "":
+    dict[key] = pack(val)
+
+template setIfNotEmpty*[T](dict: ChalkDict, key: string, val: seq[T]) =
+  if len(val) > 0:
+    dict[key] = pack[seq[T]](val)
 
 proc idFormat*(rawHash: string): string =
   let s = base32vEncode(rawHash)
@@ -158,8 +175,6 @@ else:
 
 
 template getMyAppPath*(): string =
-
-
   when hostOs == "macosx":
     if chalkConfig == nil:
       betterGetAppFileName()
