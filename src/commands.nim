@@ -860,7 +860,9 @@ proc runCmdExec*(args: seq[string]) =
       doReporting()
       trace("Waiting for spawned process to exit.")
       var stat_loc: cint
-      quit(waitpid(pid, stat_loc, 0))
+      discard waitpid(pid, stat_loc, 0)
+      let pid_exit = WEXITSTATUS(stat_loc)
+      quit(pid_exit)
   else:
     if pid != 0:
       handleExec(allOpts, argsToPass)
