@@ -141,9 +141,9 @@ template doCustomReporting() =
       if not unpack[bool](res):
         warn("Report '" & topic & "' sink config is invalid. Skipping.")
 
-    setPerChalkReports(spec.artifactProfile, spec.invalidChalkProfile,
-                       spec.hostProfile)
-    let profile = chalkConfig.profiles[spec.hostProfile]
+    setPerChalkReports(spec.artifactReport, spec.invalidChalkReport,
+                       spec.hostReport)
+    let profile = chalkConfig.profiles[spec.hostReport]
     if profile.enabled:
       safePublish(topic, hostInfo.prepareContents(profile))
 
@@ -693,7 +693,7 @@ proc runCmdConfLoad*() =
         f.makeExecutable()
         f.close()
 
-  info("Configuration written to new binary: " & selfChalk.fullPath)
+  info("Configuration replaced in binary: " & selfChalk.fullPath)
   doReporting()
 
 
@@ -1282,8 +1282,8 @@ proc showConfig*(force: bool = false) =
       outconfs = if "outconf" in chalkRuntime.attrs.contents:
                    chalkRuntime.attrs.contents["outconf"].get(AttrScope)
                  else: nil
-      crCol    = @["enabled", "artifact_profile", "host_profile",
-                   "invalid_chalk_profile", "use_when"]
+      crCol    = @["enabled", "artifact_report", "host_report",
+                   "invalid_chalk_report", "use_when"]
       reports  = if "custom_report" in chalkRuntime.attrs.contents:
                    chalkRuntime.attrs.contents["custom_report"].get(AttrScope)
                  else: nil

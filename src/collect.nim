@@ -292,7 +292,7 @@ proc initCollection*() =
       if (getBaseCommandName() notin report.use_when and
           "*" notin report.use_when):
         continue
-      registerProfileKeys([report.artifactProfile,
-                           report.hostProfile,
-                           report.invalidChalkProfile])
+      registerProfileKeys([report.artifactReport,
+                           report.hostReport,
+                           report.invalidChalkReport])
     collectHostInfo()

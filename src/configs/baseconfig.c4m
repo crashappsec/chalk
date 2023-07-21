@@ -2695,13 +2695,13 @@ This profile is for chalkable keys that are automatically added as labels to a c
 
 custom_report chalk_usage_stats {
   sink_configs:  []
-  host_profile:  "usage_report"
+  host_report:   "usage_report"
   use_when:      ["insert", "build", "push", "delete"]
 }
 
 custom_report audit {
   sink_configs: [] # "audit_file" is auto-subscribed.
-  host_profile: "audit_report"
+  host_report:  "audit_report"
 }
 
 outconf insert {

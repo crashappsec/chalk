@@ -819,13 +819,13 @@ Basically, this controls where your report will output.
 """
   }
 
-  field artifact_profile {
+  field artifact_report {
     type:       string
     default:    ""
     validator:  func custom_report_artifact_check
     doc:        """
 The named profile is used for when reporting on per-artifact any
-information. If both this field and the 'invalid_chalk_profile' field
+information. If both this field and the 'invalid_chalk_report' field
 are defined, then this profile gets used when the extracted chalk mark
 fully validates.  That DOES generally require you to be using
 signatures, though at some point we may optionally allow validation to
@@ -834,18 +834,18 @@ this makes marks forgable.
 """
   }
 
-  field invalid_chalk_profile {
+  field invalid_chalk_report {
     type:       string
     default:    ""
     validator:  func custom_report_artifact_check
     doc:        """
 If provided, this is the profile used for non-validating chalks, instead of
-the profile given in artifact_profile.  See the 'outconf' field
+the profile given in artifact_report.  See the 'outconf' field
 'invalid_chalk_report' for considerations.
 """
   }
 
-  field host_profile {
+  field host_report {
     type:      string
     default:   ""
     validator: func custom_report_host_check
@@ -2146,11 +2146,12 @@ func custom_report_host_check(name, profile_name) {
   }
 }
 
-func sink_check(name, sink: string) {
-  if not attr_get("private_installed_sinks", list[string]).contains(sink) {
+func sink_check(name, scfg: string) {
+  result := ""
+  if not sections("sink_config").contains(scfg) {
     report := name.split(".")[1]
 
-    return ("The report '" + report + "' applies sink configuration '" + sink +
+    return ("The report '" + report + "' applies sink configuration '" + scfg +
            "', but that configuration has not been set.")
   }
 }
@@ -2222,8 +2223,8 @@ func custom_report_extra_validation() {
   report_sects := sections("custom_report")
   for i from 0 to len(report_sects) {
     base := "custom_report." + report_sects[i] + "."
-    s1   := attr_get(base + "artifact_profile", string)
-    s2   := attr_get(base + "host_profile", string)
+    s1   := attr_get(base + "artifact_report", string)
+    s2   := attr_get(base + "host_report", string)
     if s1 == "" and s2 == "" {
       return "Custom Report '" + report_sects[i] + "' must set a valid profile"
     }
