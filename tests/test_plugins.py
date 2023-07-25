@@ -1,9 +1,7 @@
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict
-
-import pytest
+from typing import Dict
 
 from .chalk.runner import Chalk
 from .utils.bin import sha256

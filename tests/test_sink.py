@@ -4,10 +4,9 @@ import shutil
 import sqlite3
 import unittest
 from pathlib import Path
-from subprocess import CompletedProcess
 from tempfile import TemporaryDirectory
 from time import sleep
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 from unittest import mock
 
 import boto3
@@ -35,22 +34,6 @@ def aws_secrets_configured() -> bool:
             bool(os.environ.get("AWS_SECRET_ACCESS_KEY", "")),
         ]
     )
-
-
-def _run_chalk_with_custom_config(
-    chalk: Chalk, config_path: Path, target_path: Path
-) -> Optional[CompletedProcess]:
-    proc = chalk.run(
-        chalk_cmd="insert",
-        target=target_path,
-        params=[
-            "--no-use-embedded-config",
-            "--virtual",
-            "--config-file=",
-            str(config_path.absolute()),
-        ],
-    )
-    return proc
 
 
 # validates some basic fields on the chalk output, which should be all the same
@@ -82,7 +65,7 @@ def test_file_present(tmp_data_dir: Path, chalk: Chalk):
     assert file_output_path.is_file(), "file sink path must be a valid path"
 
     config = CONFIG_DIR / "file.conf"
-    _run_chalk_with_custom_config(chalk=chalk, config_path=config, target_path=artifact)
+    chalk.run_with_custom_config(config_path=config, target_path=artifact)
 
     # check that file output is correct
     if not file_output_path or not file_output_path.is_file():
@@ -116,7 +99,7 @@ def test_rotating_log(tmp_data_dir: Path, chalk: Chalk):
         pass
 
     config = CONFIG_DIR / "rotating_log.conf"
-    _run_chalk_with_custom_config(chalk=chalk, config_path=config, target_path=artifact)
+    chalk.run_with_custom_config(config_path=config, target_path=artifact)
 
     # check that file output is correct
     if not rotating_log_output_path or not rotating_log_output_path.is_file():
@@ -152,9 +135,7 @@ def test_s3(tmp_data_dir: Path, chalk: Chalk):
         assert os.environ["AWS_S3_BUCKET_URI"], "s3 bucket uri must not be empty"
 
         config = CONFIG_DIR / "s3.conf"
-        proc = _run_chalk_with_custom_config(
-            chalk=chalk, config_path=config, target_path=artifact
-        )
+        proc = chalk.run_with_custom_config(config_path=config, target_path=artifact)
         assert proc is not None
         # get object name out of response code
         logs = proc.stderr.decode().split("\n")
@@ -203,7 +184,7 @@ def test_post(tmp_data_dir: Path, chalk: Chalk):
         assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
 
         config = CONFIG_DIR / "post.conf"
-        proc = _run_chalk_with_custom_config(
+        proc = chalk._run_with_custom_config(
             chalk=chalk, config_path=config, target_path=artifact
         )
         assert proc is not None

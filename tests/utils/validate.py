@@ -59,9 +59,10 @@ def validate_chalk_report(
     chalk_report: Dict[str, Any],
     artifact_map: Dict[str, ArtifactInfo],
     virtual: bool,
+    chalk_action: str = "insert",
 ):
     try:
-        assert chalk_report["_OPERATION"] == "insert"
+        assert chalk_report["_OPERATION"] == chalk_action
 
         assert "_CHALKS" in chalk_report
         assert len(chalk_report["_CHALKS"]) == len(

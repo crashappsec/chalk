@@ -4,10 +4,9 @@ import shutil
 import stat
 from datetime import timezone
 from pathlib import Path
-from subprocess import check_output
+from subprocess import check_output, run
 
 import dateutil.parser
-import pytest
 
 from .chalk.runner import Chalk
 from .utils.bin import sha256
@@ -226,6 +225,9 @@ def test_dump_load(tmp_data_dir: Path, chalk: Chalk):
 # docker commands are not tested here but as part of the docker codec tests
 
 
+# exec commands are tested in test_exec as they are more involved
+
+
 # version
 def test_version(chalk: Chalk):
     version_proc = chalk.run(chalk_cmd="version")
@@ -251,3 +253,27 @@ def test_version(chalk: Chalk):
             break
     assert printed_version != ""
     assert printed_version == internal_version
+
+
+# env
+def test_env(chalk: Chalk):
+    env_proc = chalk.run(chalk_cmd="env")
+    # this should never error
+    assert env_proc.returncode == 0
+    assert env_proc.stderr.decode() == ""
+
+    # env output should match system
+    _stdout = env_proc.stdout.decode()
+    env_output = json.loads(_stdout)[0]
+    logger.info("!!!!")
+    logger.info(env_output)
+
+    # fields to check: platform, hostinfo, nodename
+    _proc = run(args=["uname", "-s"], capture_output=True)
+    assert _proc.stdout.decode().strip() in env_output["_OP_PLATFORM"]
+
+    _proc = run(args=["uname", "-v"], capture_output=True)
+    assert _proc.stdout.decode().strip() in env_output["_OP_HOSTINFO"]
+
+    _proc = run(args=["uname", "-n"], capture_output=True)
+    assert _proc.stdout.decode().strip() in env_output["_OP_NODENAME"]

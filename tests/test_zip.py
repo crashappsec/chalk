@@ -1,15 +1,12 @@
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict
 
 import pytest
 
 from .chalk.runner import Chalk
-from .utils.bin import sha256
 from .utils.log import get_logger
 from .utils.validate import (
-    MAGIC,
     ArtifactInfo,
     validate_chalk_report,
     validate_extracted_chalk,

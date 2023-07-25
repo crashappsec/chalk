@@ -6,7 +6,9 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from ..utils.log import get_logger
 
-ChalkCmd = Literal["insert", "extract", "dump", "version", "delete", "load"]
+ChalkCmd = Literal[
+    "insert", "extract", "dump", "version", "delete", "load", "exec", "env"
+]
 
 logger = get_logger()
 
@@ -126,6 +128,24 @@ class Chalk:
                     contents=check_output(["ls"]).decode().strip(),
                 )
             raise
+
+    def run_with_custom_config(
+        self,
+        config_path: Path,
+        target_path: Path,
+        command: str = "insert",
+    ) -> Optional[CompletedProcess]:
+        proc = self.run(
+            chalk_cmd=command,
+            target=target_path,
+            params=[
+                "--no-use-embedded-config",
+                "--virtual",
+                "--config-file=",
+                str(config_path.absolute()),
+            ],
+        )
+        return proc
 
     # returns chalk report
     def insert(self, artifact: Path, virtual: bool = False) -> List[Dict[str, Any]]:
