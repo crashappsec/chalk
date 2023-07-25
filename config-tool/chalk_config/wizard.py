@@ -5,6 +5,7 @@ from textual.widgets import *
 from textual.screen import *
 from .localized_text import *
 from rich.markdown import *
+import subprocess
 from textual.widgets import Markdown as MDown
 import time
 from .conf_options import *
@@ -17,22 +18,17 @@ class Body(ScrollableContainer): pass
 class AckModal(ModalScreen):
     DEFAULT_CSS=WIZARD_CSS
 
-    def __init__(self, msg, pops=1, wiz=None, button_text="Okay", ascii_art=""):
+    def __init__(self, msg, pops=1, wiz=None, button_text="Okay"):
         super().__init__()
         self.wiz = wiz
         self.msg = msg
         self.pops = pops
         self.button_text = button_text
-        # self.ascii_art = ascii_art
-        #self.ascii_art_widget = MDown()
 
     def compose(self):
-        #self.ascii_art_widget.markdown = self.ascii_art
-        #self.ascii_art_widget.styles.overflow_x = "scroll"
         yield Header(show_clock=False)
         yield Vertical (
             MDown(self.msg, id="modalmsg", classes="ack_md"),
-            #self.ascii_art_widget,
             Button(self.button_text, id="acked"),
             )
         yield Footer()
@@ -41,6 +37,54 @@ class AckModal(ModalScreen):
         while self.pops:
             self.app.pop_screen()
             self.pops = self.pops - 1
+
+class UpdateModal(ModalScreen):
+    DEFAULT_CSS=WIZARD_CSS
+
+    def __init__(self, msg, pops=1, wiz=None, button_text="Okay", cancel_text="Cancel"):
+        super().__init__()
+        self.wiz = wiz
+        self.msg = msg
+        self.pops = pops
+        self.button_text = button_text
+        self.cancel_text = cancel_text
+        self.go_button = Button(self.button_text, id="update_go")
+        
+    def compose(self):
+        yield Header(show_clock=False)
+        yield Vertical (
+            MDown(self.msg, id="update_msg", classes="ack_md"),
+            Horizontal (
+                self.go_button,
+                Button(self.cancel_text, id="update_cancel")
+                )
+            )
+        yield Footer()
+
+    def on_button_pressed(self, event):
+        bg_str     = "Updating...."
+        bg_button = self.go_button
+        bg_button.label = bg_str
+        bg_button.variant = "warning"
+        bg_button.refresh()
+        if event.button.id == "update_go":
+            # do update
+            logger.info("Updating config-tool, running pipx upgrade....")
+            subproc = subprocess.run(["pipx" ,"upgrade", "chalk_config"], capture_output=True)
+            logger.debug(f"STDOUT: {subproc.stdout}")
+            logger.debug(f"STDERR: {subproc.stderr}")
+            logger.debug(f"Return code: {subproc.returncode}")
+            if subproc.returncode:
+                get_app().push_screen(AckModal("Update failed",pops=2))
+                return False
+            else:
+                get_app().push_screen(AckModal("Update successful", pops=2))
+                return True
+        else:
+            while self.pops:
+                self.app.pop_screen()
+                self.pops = self.pops - 1
+
 
 class DownloadTestServerModal(ModalScreen):
     """
@@ -55,14 +99,10 @@ class DownloadTestServerModal(ModalScreen):
         Binding(key="ctrl+q", action="button_pressed", description = MAIN_MENU, show=False),
     ]
 
-
     def compose(self):
-        #self.ascii_art_widget.markdown = self.ascii_art
-        #self.ascii_art_widget.styles.overflow_x = "scroll"
         yield Header(show_clock=False)
         yield Vertical (
             MDown(self.msg, id="downloadcompletemsg"),
-            #self.ascii_art_widget,
             Button(self.button_text, id="acked"),
             )
         yield Footer()

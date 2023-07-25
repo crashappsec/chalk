@@ -3,6 +3,9 @@ import jwt
 import time
 import requests
 
+from .log import get_logger
+logger = get_logger(__name__)
+
 class CrashOverrideAuth:
 
     def __init__(self, auth_url):
@@ -50,7 +53,7 @@ class CrashOverrideAuth:
             return resp_json
 
         except Exception as err:
-            print("[-] Error calling the config-tool code endpoint at %s: %s"%(self.auth_url, err))
+            logger.error("[-] Error calling the config-tool code endpoint at %s: %s"%(self.auth_url, err))
             return None
 
     def _decode_and_validate_jwt(self, jwt_to_decode, validate = False, key = None):

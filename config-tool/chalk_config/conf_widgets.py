@@ -34,6 +34,7 @@ logger = get_logger(__name__)
 global cursor, conftable
 cursor = None
 conftable = None
+MODULE_LOCATION = os.path.dirname(__file__)
 
 
 def set_conf_table(t):
@@ -214,13 +215,76 @@ class ExportMenu(Screen):
             self.app.pop_screen()
 
 
+class BuildChalkMenu(Screen):
+    DEFAULT_CSS = WIZARD_CSS
+    BINDINGS = [
+                Binding(key = "escape", action = "pop_screen()", description=CANCEL_LABEL),
+                Binding("b", None, None),
+                #Binding("d", None, None),
+                Binding("l", None, None),
+                Binding("r", None, None),]
+
+    def __init__(self, profile_name, config, as_dict):
+        super().__init__()
+        self.profile_name = profile_name
+        self.config = config
+        self.as_dict = as_dict
+        self.bin_pth = ""
+        self.chalk_outfile_input = Input(placeholder=f"./chalk-{self.profile_name}", value = self.bin_pth)
+        self.build_button = Button("Build", classes="basicbutton", variant="success", id="build_chalk_go")
+        self.build_mdown = f"""
+# Build Chalk with Embedded '{self.profile_name}' Profile
+
+   Build a new Chalk binary with the selected profile embedded into it. 
+   
+   The new binary will be written to the supplied path, overwriting of existing files is not permitted.
+
+"""
+
+    def compose(self):
+        yield Header(show_clock=False)
+        yield MDown(self.build_mdown)
+        yield OutfileRow(
+            self.chalk_outfile_input,
+            Label("Generated binary file path", classes="label"),
+        )
+        yield Horizontal(
+            self.build_button,
+            Button(CANCEL_LABEL, classes="basicbutton", id="build_chalk_cancel"),
+        )
+        yield Footer()
+
+    async def on_button_pressed(self, event = None):
+        if event == None or event.button.id == "build_chalk_go":
+            logger.info(f"Building chalk {self.profile_name}")
+
+            # Provide some user feedback in the button
+            bg_str    = "Building ...."
+            bg_button = self.build_button
+            bg_button.label = bg_str
+            bg_button.variant = "warning"
+            bg_button.refresh()
+            # Dumb but this is needed for the button to actually change ....
+            await asyncio.sleep(1.0)
+
+            if not write_binary(self.chalk_outfile_input.value, self.profile_name, self.config, self.as_dict, pops=2):
+                bg_str    = "Build"
+                bg_button = self.build_button
+                bg_button.label = bg_str
+                bg_button.variant = "success"
+                bg_button.refresh()
+
+        else:
+            logger.info(f"Cancelling chalk build {self.profile_name}")
+            self.app.pop_screen()
+
+
 class ConfigTable(Container):
     def __init__(self):
         super().__init__(id="conftbl")
         self.the_table = DataTable(id="the_table")
         self.the_table.cursor_type = "row"
         self.the_table.styles.margin = (0, 3)
-
         # ToDo update proper localized strings
         self.login_button = LoginButton(
             label="L⍉gin", classes="basicbutton", id="login_button"
@@ -271,35 +335,15 @@ class BinaryGenerationButton(Button):
     Easy button for user to generate a chalk bin from the selected profile
     """
     async def on_button_pressed(self):
-        #await get_app().action_generate_chalk_binary()
-        # Provide some user feedback in the button
-        bg_button = conftable.binary_genration_button
-        bg_str    = "Building ...."
-        bg_button = conftable.binary_genration_button
-        bg_button.label = bg_str
-        bg_button.variant = "warning"
-        bg_button.refresh()
-
-        ##Dumb but this is needed for the button to actually change ....
-        await asyncio.sleep(1.0)
-
         # Get currently selected profile
         cursor_row = conftable.the_table.cursor_row
         r = cursor.execute(
             "SELECT json, name, note FROM configs WHERE id=?", [row_ids[cursor_row]]
         ).fetchone()
         if r is not None:
-            config, name, note = r
+            config, profile_name, note = r
             as_dict = json_to_dict(config)
-            write_binary(name, config, as_dict, pops=1)
-
-        #Reset button
-        bg_button = conftable.binary_genration_button
-        bg_str    = "Build Chalk"
-        bg_button = conftable.binary_genration_button
-        bg_button.label = bg_str
-        bg_button.variant = "default"
-        bg_button.refresh()
+            await self.app.push_screen( BuildChalkMenu(profile_name, config, as_dict) )
 
 
 class DownloadTestServerButton(Button):
@@ -362,6 +406,7 @@ class EnablingCheckbox(Checkbox):
 
     def on_checkbox_changed(self, event: Checkbox.Changed):
         get_wizard().query_one(self.refd_id).toggle()
+
 
 class EnablingSwitch(Switch):
     def __init__(self, target, title, value=False, disabled=False, id=None):
@@ -495,6 +540,7 @@ def update_next_button(label, variant="default"):
     n_button.variant = variant
     n_button.refresh()
 
+
 def write_from_local(dict, config, d, pops=2):
     binname  = d["exe_name"]
 
@@ -525,55 +571,62 @@ def write_from_local(dict, config, d, pops=2):
         get_app().push_screen(AckModal(GENERATION_EXCEPTION % (err + repr(e))))
 
 
-def write_from_url(dict, config, d, pops=2):
+def write_from_url(out_path, conf_name, config, d, pops=2):
     binname = d["exe_name"]
 
-    base_binary = get_chalk_binary_release_bytes(d["release_build"])
+    loc, base_binary = get_chalk_binary_release_bytes(d["release_build"])
     try:
         assert base_binary is not None
     except AssertionError as e:
         logger.error(e)
         get_app().push_screen(AckModal("could not fetch chalk binary"))
         return False
-
-    dir = Path(tempfile.mkdtemp())
-    loc = dir / Path(binname)
-    f = loc.open("wb")
-    f.write(base_binary)
-    f.close()
-
-    c4mfile = tempfile.NamedTemporaryFile()
+    loc.chmod(0o774)
+    
+    # Write out the con4m file
+    c4mfile = tempfile.NamedTemporaryFile(delete=False)
+    c4mfilename = c4mfile.name
+    logger.info(f"Saving {conf_name} to {c4mfilename}")
     c4mfile.write(dict_to_con4m(d).encode("utf-8"))
     c4mfile.flush()
-    c4mfilename = c4mfile.name
-    loc.chmod(0o774)
+    
+    # Copy base chalk to new location from where it will self-inject the new config
     try:
-        newloc = Path(OUTPUT_DIRECTORY) / Path(binname)
-        shutil.move(loc.as_posix(), newloc)
+        newloc = Path(out_path)
+        logger.info(f"Copying base chalk to {newloc.as_posix()}")
+        shutil.copy(loc.as_posix(), newloc.as_posix())
         newloc.chmod(0o774)
+        # Hydrate with generated config
+        logger.info("Loading profile into chalk binary......")
         subproc = subprocess.run([newloc, "--error", "load", c4mfilename], capture_output=True)
-        logger.info("Chalk build command line: '%s --error load %s'"%(loc, c4mfilename))
-        logger.info("STDOUT: %s"%(subproc.stdout))
-        logger.info("STDERR: %s"%(subproc.stderr))
-        logger.info ("Return code: %d"%(subproc.returncode))
+        logger.debug("Chalk build command line: '%s --error load %s'"%(newloc, c4mfilename))
+        logger.debug("STDOUT: %s"%(subproc.stdout))
+        logger.debug("STDERR: %s"%(subproc.stderr))
+        logger.debug ("Return code: %d"%(subproc.returncode))
         if subproc.returncode:
             get_app().push_screen(AckModal(GENERATION_FAILED, pops))
-            return True
+            c4mfile.close()
+            os.remove(c4mfilename)
+            return False
         else:
-            get_app().push_screen(AckModal(GENERATION_OK % binname, pops))
+            get_app().push_screen(AckModal(GENERATION_OK % newloc.as_posix(), pops))
+            c4mfile.close()
+            os.remove(c4mfilename)
             return True
     except Exception as e:
         logger.error(e)
         get_app().push_screen(
-            AckModal(loc.as_posix() + ": " + GENERATION_EXCEPTION % repr(e))
+            AckModal(loc + ": " + GENERATION_EXCEPTION % repr(e))
         )
+        c4mfile.close()
+        os.remove(c4mfilename)
         return False
 
 
-def write_binary(dict, config, d, pops= 2):
+def write_binary(out_path, conf_name, config, d, pops= 2):
     if "CHALK_BINARIES_ARE_LOCAL" in os.environ:
-        logger.info("Building chalk from local")
-        return write_from_local(dict, config, d, pops)
+        logger.info("Building chalk from local (for testing)")
+        return write_from_local(conf_name, config, d, pops)
     else:
         logger.info("Building chalk from url")
-        return write_from_url(dict, config, d, pops)
+        return write_from_url(out_path, conf_name, config, d, pops)

@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import json
 import platform
+import semver
 import sqlite3
 import ssl
 import subprocess
@@ -30,7 +31,7 @@ CONTAINER_RELEASE_PATH = "/config-bin/chalk-release"
 if os.path.isdir("/outdir/"):
     OUTPUT_DIRECTORY = "/outdir/"
 else:
-    OUTPUT_DIRECTORY = os.getcwd()
+    OUTPUT_DIRECTORY = os.path.dirname(__file__)
 
 app = None
 
@@ -109,39 +110,90 @@ def determine_sys_arch():
     return system, machine
 
 
-def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
-    bin_dir = os.getcwd() + "/bin"
-    os.makedirs(bin_dir, exist_ok=True)
+def check_for_updates():
+    """
+    Return True if updates available
+    """
+    # Get running version
+    curr_version = __version__
+    # Get latest version from server
+    latest_version = get_latest_version()
 
-    debug = "-debug" if not release_build else ""
+    # Compare and return
+    if semver.compare(curr_version, latest_version) == -1:
+        return True, latest_version
+    else:
+        return False, latest_version
 
-    exc = None
 
+#Temporarary solution - waiting on larger packaging decisions
+def get_latest_version():
+    version_url = f"https://dl.crashoverride.run/current-version.txt"
+    try:
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        remote_ver = urllib.request.urlopen(version_url, context=context).read()
+        remote_ver = remote_ver.replace(b'"',b'').replace(b"\n",b"").replace(b"\r",b"").strip()
+        logger.info(f"remote version detected as {remote_ver}")
+        return remote_ver
+        
+    except Exception as e:
+        logger.error(f"Unable to get remote version from {version_url} - {e}")
+        return None
+
+
+def get_chalk_name(release=True):
     # determine correct arch
     system, machine = determine_sys_arch()
 
     # pull chalk version matching this release only
     version = f"{__version__}"
-    chalk_name = f"chalk-{version}-{system}-{machine}{debug}"
+    chalk_name = f"chalk-{version}-{system}-{machine}"
 
-    chalk_bin = Path(bin_dir) / chalk_name
+    # Is this a debug build or not
+    if not release:
+        chalk_name+="-debug"
+
+    return chalk_name
+
+
+def get_chalk_url(release=True):
+    chalk_name = get_chalk_name(release)
+    url = f"https://dl.crashoverride.run/{chalk_name}"
+    return url
+
+
+def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
+    bin_dir = Path(OUTPUT_DIRECTORY) / "bin"
+    os.makedirs(bin_dir, exist_ok=True)
+
+    chalk_bin = Path(bin_dir) / get_chalk_name(release_build)
+
+    # check for updates
+    updates_available, remote_ver = check_for_updates()
+
+    # ToDo prompt user if they want to update
 
     if chalk_bin.is_file():
-        return chalk_bin.read_bytes()
-    url = f"https://dl.crashoverride.run/{chalk_name}"
+        logger.info(f"Existing chalk binary located at {chalk_bin}")
+        logger.info(f"NOT re-downloading")
+        return chalk_bin, chalk_bin.read_bytes()
+    
+    url = get_chalk_url(release_build)
     logger.info(f"Downloading chalk from {url}")
-
     try:
         context = ssl.create_default_context()
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
         raw = urllib.request.urlopen(url, context=context).read()
+        logger.info(f"Writing local base chalk file to {chalk_bin}")
         with open(chalk_bin, "wb") as outf:
             outf.write(raw)
-        return raw
+        return chalk_bin, raw
     except Exception as e:
         logger.error(f"Could not download chalk binary: {e}")
-        return None
+        return None, None
 
 
 def load_from_json(json_blob, confname=None, note=None):
@@ -1012,7 +1064,6 @@ subscribe("report", "crashoverride_api_sink")
         lines.append(crash_override_sink_and_subscribe)
     else:
         logger.info(
-            "Unable to write Crash Override API config, bearer token not ound found in dictionary"
+            "Skipping writing CrashOverride API tokens, bearer token not found in config" 
         )
-
     return "\n".join(lines)

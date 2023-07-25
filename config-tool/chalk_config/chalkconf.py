@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # John Viega. john@crashoverride.com
+import asyncio
 import hashlib
 import json
 import os
 import platform
+import signal
 import sqlite3
 import stat
 import subprocess
@@ -16,8 +18,9 @@ import webbrowser
 from pathlib import Path
 import requests
 from .conf_options import (
-    config_to_json, determine_sys_arch, json_to_dict, dict_to_id, get_app,
-    get_wiz_screen, get_wizard, set_app, set_wiz_screen, set_wizard
+    check_for_updates, config_to_json, determine_sys_arch, json_to_dict, 
+    dict_to_id, get_app, get_chalk_url,  get_wiz_screen, get_wizard, 
+    set_app, set_wiz_screen, set_wizard
 )
 from . import conf_widgets ##row_ids is why this is needed - ToDo cleanup
 from .conf_widgets import (
@@ -37,8 +40,10 @@ from .wiz_panes import (
     ApiAuth, DisplayQrCode, sectionBasics, sectionBinGen, sectionChalking,
     sectionOutputConf,sectionReporting
 )
-from .wizard import AckModal, Wizard
+from .wizard import AckModal, UpdateModal, Wizard
 from .log import get_logger
+
+MODULE_LOCATION = os.path.dirname(__file__)
 
 # Temporary until we have the upstream chalk static bins working X-platform
 if platform.machine() != "x86_64" or platform.system() != "Linux":
@@ -56,6 +61,7 @@ set_conf_table(conftable)
 # Even if I put this in NewApp's __init__ it goes async and AlphaModal errors??
 intro_md = MDown(CHALK_CONFIG_INTRO_TEXT, id="intro_md")
 
+
 def update_next_button(label, variant="default"):
     """
     """
@@ -65,6 +71,7 @@ def update_next_button(label, variant="default"):
     n_button.label = n_str
     n_button.variant = variant
     n_button.refresh()
+
 
 # Callback that is passed to Wizard() and is invoked when the wizard has finished
 def finish_up():
@@ -107,7 +114,7 @@ def finish_up():
         row = [confname, timestamp, CHALK_VERSION, internal_id, config, note]
         query = "INSERT INTO configs VALUES(?, ?, ?, ?, ?, ?)"
 
-    if write_binary(confname, config, as_dict):
+    if write_binary(exe, confname, config, as_dict):
         cursor.execute(query, row)
         db.commit()
         if update:
@@ -133,6 +140,7 @@ def finish_up():
     # User feedback that the bin gen of chalk is happening (last action)
     #update_next_button("Next")
 
+
 def locate_read_changelogs():
     """
     Depending on which environment the config tool is running in the changelogs end up in different locations
@@ -155,64 +163,107 @@ def locate_read_changelogs():
     """
     return chalk_changelog_data, config_changelog_data
 
-async def do_test_server_download(testserverurl,staticsitefilesurl):
+
+async def do_test_server_download(testserverurl, loc):
     """
     Perform the actual download
     """
-    try:
-        #Download the test server (via a 302 redirect)
-        test_server_binary = requests.get(testserverurl, stream=True, allow_redirects=True)
-        loc = Path.cwd() / Path(urllib.parse.urlparse(testserverurl).path[1:])
-
-        #Write the file to the disk
+    # Check to see if this has already been downloaded to the pipx install location
+    if os.path.exists(loc):
+        logger.info(f"Chalk test server already downloaded, located at: {loc}. Skipping re-download.")
+        #get_app().test_server_download_successful = True
+        
+    else:
         try:
-            f = loc.open("wb")
-            f.write(test_server_binary.content)
-            f.close()
-        except: #Todo cleanup
-            return ""
-    except:
-        raise
-        # Returning empty string causes a error modal to pop
-        return ""
+            #Ensure bins dir is created
+            os.makedirs(loc.parents[0], exist_ok = True)
 
-    #chmod +x the binary
+            # Download the test server (via a 302 redirect)
+            logger.info(f"Downloading Chalk test server to {loc}")
+            test_server_binary = requests.get(testserverurl, stream=True, allow_redirects=True)
+
+            # Write the file to the disk
+            try:
+                f = loc.open("wb")
+                f.write(test_server_binary.content)
+                f.close()
+            except Exception as err:
+                logger.error(f"Error writing downloaded server to local fielsystem: '{err}'")
+                return ""
+        except Exception as err:
+            logger.error(f"Error downloading Chalk tests server: '{err}'")
+            # Returning empty string causes a error modal to pop
+            return ""
+
+    # Ensure bin has exec bit set
     st = os.stat(loc)
     os.chmod(loc, st.st_mode | stat.S_IEXEC)
 
-    loc_site = Path.cwd() / "site"
-    if os.path.exists(loc_site):
-        logger.info("site directory already exits, not redownloading")
-        return loc
-
-    try:
-        #Download static files
-        static_site_files = requests.get(staticsitefilesurl, stream=True, allow_redirects=True)
-        loc_static = Path.cwd() / Path(urllib.parse.urlparse(staticsitefilesurl).path[1:])
-        #write files
-        try:
-            f = loc_static.open("wb")
-            f.write(static_site_files.content)
-            f.close()
-        except: #Todo cleanup
-            raise
-            return ""
-    except:
-        # Returning empty string causes a error modal to pop
-        return ""
-    try:
-        #unzip
-        tar = tarfile.open(loc_static)
-        tar.extractall()
-        tar.close()
-        os.remove(loc_static)
-    except:
-        raise
-        return ""
+    # Symlink specific version to common path
+    os.symlink(loc, loc.parents[0] / "chalkserver")
 
     return loc
 
-#def pop_user_profile(token_json, success_msg=False, pop_off=1):
+
+async def do_test_staticsite_download(staticsitefilesurl, loc_static):
+
+    # Check to see if this has already been downloaded to the pipx install location
+    if os.path.exists(loc_static):
+        logger.info(f"Chalk static site data already downloaded, located at: {loc_static}. Skipping re-download.")
+        get_app().test_server_download_successful = True
+    else:
+        try:
+            #Ensure site dir is created
+            os.makedirs(loc_static.parents[0], exist_ok = True)
+
+            # Download static files
+            logger.info(f"Downloading static site files to {loc_static}")
+            static_site_files = requests.get(staticsitefilesurl, stream=True, allow_redirects=True)
+            
+            # Write files
+            try:
+                f = loc_static.open("wb")
+                f.write(static_site_files.content)
+                f.close()
+            except Exception as err:
+                logger.error(f"Error writing downloaded static site to local fielsystem: '{err}'")
+                return ""
+        except Exception as err:
+            # Returning empty string causes a error modal to pop
+            logger.error(f"Error downloading Chalk tests static site: '{err}'")
+            return ""
+        
+        try:
+            # unzip
+            tar = tarfile.open(loc_static)
+            tar.extractall(path=loc_static.parents[0])
+            tar.close()
+        except Exception as err:
+            logger.error(f"Error tar-gunzipping static site data: '{err}'")
+            return ""
+        
+    return loc_static
+
+
+async def launch_server():
+    """
+    Run the local server
+    """
+    server_bin_path = get_app().server_bin_filepath
+    logger.info(f"Running test server at path {server_bin_path}")
+    server_proc = await asyncio.create_subprocess_shell(
+                                                str(server_bin_path), 
+                                                cwd = server_bin_path.parents[0],
+                                                stdin = asyncio.subprocess.PIPE,
+                                                stdout = asyncio.subprocess.PIPE,
+                                                stderr = asyncio.subprocess.PIPE,
+                                                #stdout = asyncio.subprocess.DEVNULL,
+                                                #stderr = asyncio.subprocess.DEVNULL
+                                                )
+    logger.info(f"Server process object {server_proc}")
+    return server_proc
+
+
 def pop_user_profile(authn_obj, success_msg=False, pop_off=1):
     """
     Pop up a modal showing the logged in user profile
@@ -240,6 +291,7 @@ Follow the white rabbit. Knock, Knock .... 🐇🐇🐇"""
     #get_app().push_screen(AckModal(user_profile_data, ascii_art=pic, pops=pop_off))
 
     get_app().push_screen(AckModal(user_profile_data, pops=pop_off))
+
 
 class ConfWiz(Wizard):
     def __init__(self, end_callback):
@@ -275,7 +327,6 @@ class ConfWiz(Wizard):
         ):
             update_next_button("Please Login")
             self.next_button.disabled = True
-
 
 
 class ConfWizScreen(ModalScreen):
@@ -478,22 +529,34 @@ class NewApp(App):
     }
     BINDINGS = [
         Binding(key="ctrl+q", action="quit", description=QUIT_LABEL, priority=True),
+        Binding(key="a", action="about", description="About"),
         Binding(key="l", action="login()", description=LOGIN_LABEL),
-        Binding(key="d", action="downloadtestserver()", description="Download Test Server"), # ToDo localize
+        #Binding(key="d", action="downloadtestserver()", description="Download Test Server"), # ToDo localize
         Binding(key="b", action="generate_chalk_binary()", description="Generate Chalk Binary"), # ToDo localize
         Binding(key="r", action="releasenotes()", description="Release Notes"),
+        Binding(key="u", action="check_for_updates", description="Check for Updates"),
         Binding(key="up", action="<scroll-up>", show=False),
         Binding(key="down", action="<scroll-down>", show=False),
         # Binding(key="n", action="newconfig()", show = False),
     ]
     authenticated = False
+    config_table = conftable
     config_widget = wiz
     login_widget = login_widget
     qr_code_widget = qr_code_widget
-    test_server_download_successful = False
-    server_bin_filepath = ""
-    config_table = conftable
 
+    # determine correct arch
+    system, machine = determine_sys_arch()
+    version = f"{__version__}"
+    server_bin_name = f"chalkserver-{version}-{system}-{machine}"
+    static_site_url = "https://dl.crashoverride.run/chalksite.tar.gz"
+    test_server_url = f"https://dl.crashoverride.run/{server_bin_name}"
+    server_proc = None
+    server_bin_filepath = Path(MODULE_LOCATION) / "bin" / Path(urllib.parse.urlparse(test_server_url).path[1:])
+    staticsite_filepath = Path(MODULE_LOCATION) / "bin" / Path(urllib.parse.urlparse(static_site_url).path[1:])
+    test_server_download_successful = False
+    test_server_running = False
+    
     def compose(self):
         yield Header(show_clock=False, id="chalk_header")
         yield intro_md
@@ -505,6 +568,16 @@ class NewApp(App):
             newbie_modal = AlphaModal(FIRST_TIME_INTRO, button_text=CHEEKY_OK)
             self.push_screen(newbie_modal)
 
+        # If chalkserver already downloaded auto-update button to 'run' it
+        if os.path.exists(Path(MODULE_LOCATION) / "bin" / "chalkserver") and os.path.exists(Path(MODULE_LOCATION) / "bin" / "site"):
+            # Update button to 'run server'
+            dl_button = conftable.download_button
+            dl_str    = "Run Server"
+            dl_button.label = dl_str
+            dl_button.variant = "success"
+            dl_button.refresh()
+            self.test_server_download_successful = True
+
     # def action_newconfig(self):
         # wiz_screen = self.SCREENS["confwiz"]
         # wiz_screen.wiz
@@ -513,6 +586,34 @@ class NewApp(App):
         # conftable.action_next()
         # conftable.app.push_screen('confwiz')
         # load_from_json(default_config_json)
+
+    def action_check_for_updates(self):
+        """
+        Temporary way to check for updates
+        """
+        updates_available, remote_ver = check_for_updates()
+        if updates_available:
+            update_msg = f"# Update Available\n\nYou are running {__version__}, the latest version on the server is {remote_ver.decode('utf-8')}"
+            self.push_screen(UpdateModal(msg = update_msg, button_text="Update", cancel_text=" Go back...", wiz = self))
+        else:
+            update_msg = f"# No Update Available\n\nYou are running the latest version which is {__version__}"
+            self.push_screen(AckModal(msg = update_msg, wiz = self))
+    
+    def action_about(self):
+        """
+        Show pop-up window with a variety of environment info
+        """
+        about_msg = f""" # About Chalk Config Tool\n\n
+* **TUI Ver:** {self.version}\n\n
+* **Sys:** {self.system}\n\n
+* **Arch:** {self.machine}\n\n
+* **Path:** {MODULE_LOCATION}\n\n
+* **CWD:** {os.getcwd()}\n\n
+* **BaseChalk URL:** {get_chalk_url()}\n\n
+* **Test Server URL:** {self.test_server_url}\n\n
+* **Static-site URL:** {self.static_site_url}\n\n
+"""
+        self.push_screen(AckModal(msg = about_msg, wiz = self))
 
     def action_login(self):
         """
@@ -558,17 +659,54 @@ class NewApp(App):
         """
         Download the test chalk server
         """
+        #  Set if server downloaded or already present on system
         if self.test_server_download_successful:
-            # pop download complete screen
-            # ToDo add in specific erorr
-            completion_msg = (
-                f"# Test Server Already Downloaded\n\nChalk Test Server downloaded to: {self.server_bin_filepath}"
-            )
-            self.push_screen(AckModal(msg=completion_msg, wiz=self))
+            
+            if not self.test_server_running:
+                # Server already downloaded, try and run it in a background process instead
+                self.server_proc = await launch_server()
+                sub_pid = await self.server_proc.stderr.readline()
+                logger.info(f"Subprocess stderr {sub_pid}")
+                self.sub_pid = int(sub_pid.split(b"[")[-1].split(b"]")[0])
+                logger.info(f"Server process to kill: {self.sub_pid}")
+                
+                # ToDo check return 
+                self.test_server_running = True
+
+                # Update button to 'stop server'
+                dl_button = conftable.download_button
+                dl_str    = "Stop Server"
+                dl_button = conftable.download_button
+                dl_button.label = dl_str
+                dl_button.variant = "error"
+                dl_button.refresh()
+                launch_msg = f"# Chalk Test Server Running!\n\nURL of Server: http://127.0.0.1:8585\n\nChalk Test Server process: {self.server_proc}"
+                
+                await asyncio.sleep(1.0)
+                self.push_screen(AckModal(msg = launch_msg, wiz = self))
+
+            else:
+                ##Stop server
+                logger.info(f"Stopping Chalk Test Server, kill PID {self.sub_pid}")
+                shutdown_msg = f"# Chalk Test Server Shutdown\n\nProcess exited."
+                os.kill(self.sub_pid, signal.SIGTERM)
+                self.test_server_running = False
+                
+                # Update button to 'run server'
+                dl_button = conftable.download_button
+                dl_str    = "Run Server"
+                dl_button = conftable.download_button
+                dl_button.label = dl_str
+                dl_button.variant = "success"
+                dl_button.refresh()
+                
+                await asyncio.sleep(1.0)
+                self.push_screen(AckModal(msg = shutdown_msg, wiz = self))
+                self.sub_pid = None
+
             return None
 
         # Update download on main page button bar to show in progress
-        dl_button = conftable.download_button
         dl_str = "Downloading ..."
         dl_button = conftable.download_button
         dl_button.label = dl_str
@@ -578,25 +716,23 @@ class NewApp(App):
         # Dumb but this is needed for the button to actually change ....
         await asyncio.sleep(1.0)
 
-        # determine correct arch
-        system, machine = determine_sys_arch()
-        version = f"{__version__}"
-        server_bin_name = f"chalkserver-{version}-{system}-{machine}"
+        # # determine correct arch
+        # system, machine = determine_sys_arch()
+        # version = f"{__version__}"
+        # server_bin_name = f"chalkserver-{version}-{system}-{machine}"
 
         # construct urls
-        test_server_url = "https://dl.crashoverride.run/%s"%(server_bin_name)
-        #test_server_url = "https://failuretestl"
-        static_files_url = "https://dl.crashoverride.run/chalksite.tar.gz"
-        #static_files_url = "https://failure"
+        #test_server_url = "https://dl.crashoverride.run/%s"%(server_bin_name)
+        #static_files_url = "https://dl.crashoverride.run/chalksite.tar.gz"
 
         # Download server
-        self.server_bin_filepath = await do_test_server_download(test_server_url, static_files_url)
+        bin_ret  = await do_test_server_download(self.test_server_url, self.server_bin_filepath)
+        static_ret = await do_test_staticsite_download(self.static_site_url, self.staticsite_filepath)
 
         # pop download complete screen
-        if self.server_bin_filepath:
+        if bin_ret and static_ret:
             self.test_server_download_successful = True
-            dl_button = conftable.download_button
-            dl_str    = "Done"
+            dl_str    = "Run Server"
             dl_button = conftable.download_button
             dl_button.label = dl_str
             dl_button.variant = "success"
@@ -607,6 +743,7 @@ class NewApp(App):
 
         # pop download failed download screen
         else:
+            logger.error("Null path returned from do_test_server_download cancelling download")
             dl_button = conftable.download_button
             dl_str    = "Get Test Server"
             dl_button = conftable.download_button
