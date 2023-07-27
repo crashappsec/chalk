@@ -4,7 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, strutils, ../plugins, ../config
+import ../config
 
 type ConfFilePlugin* = ref object of Plugin
 
@@ -21,22 +21,21 @@ proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
       let cbOpt = runCallback(v.callback.get(), args)
       if cbOpt.isSome(): result[k] = cbOpt.get()
 
-method getHostInfo*(self: ConfFilePlugin,
-                    p:    seq[string],
-                    ins:  bool): ChalkDict =
-  if not ins: return ChalkDict(nil)  # No callbacks
+method getChalkTimeHostInfo*(self: ConfFilePlugin,  p: seq[string]): ChalkDict =
   return scanForWork(KtChalkableHost, none(ChalkObj), @[pack(p.join(":"))])
 
-method getChalkInfo*(self: ConfFilePlugin, obj: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: ConfFilePlugin, obj: ChalkObj):
+       ChalkDict =
   return scanForWork(KtChalk, some(obj), @[pack(obj.fullpath)])
 
-method getPostChalkInfo*(self: ConfFilePlugin,
-                         obj:  ChalkObj,
-                         ins:  bool): ChalkDict =
+method getRunTimeArtifactInfo*(self: ConfFilePlugin,
+                               obj:  ChalkObj,
+                               ins:  bool): ChalkDict =
   return scanForWork(KtNonChalk, some(obj), @[pack(obj.fullpath)])
 
 
-method getPostRunInfo*(self: ConfFilePlugin, objs: seq[ChalkObj]): ChalkDict =
+method getRunTimeHostInfo*(self: ConfFilePlugin, objs: seq[ChalkObj]):
+       ChalkDict =
   return scanForWork(KtHostOnly, none(ChalkObj), @[pack("")])
 
 registerPlugin("conffile", ConfFilePlugin())

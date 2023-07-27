@@ -1,3 +1,9 @@
+## Used to (liberally) parse the docker command line.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
+
 docker {
   getopts {
     args: (0, high())

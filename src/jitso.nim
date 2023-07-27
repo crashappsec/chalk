@@ -3,9 +3,10 @@
 ## This is the minimal set for a hacky answer to dlopen using memfd_create,
 ## requiring Linux kernel version 3.17 or greater (2014).
 ##
+## All of this because Nim refuses to use OpenSSL3 without calling dlopen().
+##
 ## :Author: Brandon Edwards (brandon@crashoverride.com)
 ## :Copyright: 2023 Crash Override, Inc.
-##
 
 when hostOs == "linux" and hostCPU == "amd64":
   import tables

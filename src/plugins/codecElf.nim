@@ -10,8 +10,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, streams, strutils, endians, nimSHA2, ../config,
-       ../plugins
+import  endians, nimSHA2, ../config, ../plugin_api, ../util
 
 const
   b64OffsetLoc = 0x28
@@ -89,13 +88,13 @@ method getUnchalkedHash*(self: CodecElf, chalk: ChalkObj): Option[string] =
   let toHash = chalk.stream.readStr(chalk.startOffset)
   return some(hashFmt($(toHash.computeSHA256())))
 
-method getChalkInfo*(self: CodecElf, chalk: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: CodecElf, chalk: ChalkObj): ChalkDict =
   result                      = ChalkDict()
   result["ARTIFACT_TYPE"]     = artTypeElf
 
-method getPostChalkInfo*(self:  CodecElf,
-                         chalk: ChalkObj,
-                         ins:   bool): ChalkDict =
+method getRunTimeArtifactInfo*(self:  CodecElf,
+                               chalk: ChalkObj,
+                               ins:   bool): ChalkDict =
   result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypeElf
 

@@ -23,35 +23,52 @@ other_report_ops     := ["build", "push"]
 
 tool_types           := ["sbom", "sast"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
-key_types            := ["Chalkable Host", "Chalk", "Non-Chalk", "Host Only"]
+key_types            := ["Chalk-time Host", "Chalk-time Artifact",
+                         "Run-time Artifact", "Run-time Host"]
 known_sink_filters   := ["log_level", "log_prefix", "pretty_json",
                          "fix_new_line", "add_topic", "wrap"]
 
 # This is the enum for key types.   See 'key' object documentation below
 # for more details.
 #
-enum ChalkableHost, Chalk, NonChalk, HostOnly
+enum ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
 
-## Collection contexts
-# The four times plugins may choose to collect metadata:
-# 1) Pre-run:       Things we collect before we start processing artifacts.
-#                   Generally host level-info, that we stuff into artifacts.
+# The four types of metadata keys are collected at different points in
+# a chalk run, thus there are different callbacks a plugin much
+# implement for each type of key.
+#
+# The plugins must declare the keys they delcare for
+# each phase, so that the system can decide whether to even to
+# load the plugin and call into it.
+#
+# The four types (from the four constants above) are:
+
+# 1) ChalkTimeHost: Collect before we start chalking artifacts.
+#                   
 #                   This could include things that *might* be different on
 #                   a per-artifact basis, but where our collection isn't yet
 #                   good enough.
 #
-# 2) Artifact:      While we are processing artifacts (insertion or
-#                   extraction).  This *can* include non-chalkable keys.
+# 2) ChalkTimeArtifact: While we are processing artifacts, before adding
+#                       the chalk mark.  
 
-# 3) Post-Artifact: Stuff we collect after the artifact is written,
-#                   including at collection time.  This *cannot* include
-#                   non-chalkable keys.
+# 3)RunTimeArtifact: Always collected after an operation on an artifact,
+#                    but before processing the next artifact.
+#                    These *cannot* include Chalk-time keys.
 
-# 4) Post-Run:      Stuff we collect after we're done processing any
-#                   artifacts. Ususally expect this to be stats, etc.
+# 4) RunTimeHost:   Collected after all artifacts are processed.
 #                   Nothing here can be chalkable.
 # These are just used internally as part of validation routines.
+
+# CC == collection context, meaning where are we in the collection process.
+# pre-run is when chalk-time host keys are collected,
+# artifact collection is chalk-time artifact keys are collected,
+# post-chalk is after an artifact has been processed
+# post-run is after ALL artifacts have been processed
+
 enum CCPreRun, CCArtifact, CCPostChalk, CCPostRun
+
+# PT == Profile Type.
 enum PTChalk, PTArtifact, PTHost, PTChalkTimeArtifact
 
 # Make these available through stacks.  Enums are automatically
@@ -291,30 +308,30 @@ keys.  The spec can even specify the value of the key.
 
 There are four different kinds of keys:
 
-1) Chalkable Host: Things that are not artifact specific, but either
-                   are fixed, or are unique to the host or the run,
-                   that *can* (and in some instances must) be placed in
-                   chalks, or just captured as part of a report.
-                   Plugins must make these available before the
-                   chalk phase.
+1) Chalk-Time Host: Keys collected at chalk time only, that are
+                    per-host data. They're collected before chalking
+                    any software artifacts.
 
-2) Chalk:          Keys that could have per-artifact values, and can be
-                   chalked (i.e., they are determinable at chalk time).
-                   Plugins can provide these early, if the value is
-                   destined to be the same for every artifact, unless
-                   the keyspec field "never_early" is true.
+2) Chalk-Time Artifact: Keys collected while chalking an artifact,
+                        before performing the chalk operation.
+                        Plugins can provide these early, if the value is
+                        destined to be the same for every artifact, unless
+                        the keyspec field "never_early" is true.
 
-3) Non-Chalk:      Per-artifact keys that are *not* available at chalk
-                   time. This can include immediately post-chalk, or
-                   environmental items at the time or extraction or
-                   other operations.
+3) Run-time Artifact:   Per-artifact keys that are *not* available at chalk
+                        time. They can generally be collected for any
+                        operation, and are collected right after any
+                        artifact is processed.
 
-4) Host Only:      Per-run keys that are not available for chalking,
-                   and also are never expected to be artifact-specific.
+4) Run-Time Host:      Per-run keys that are not available for chalking,
+                       and also are never expected to be artifact-specific.
+                       They're collected after any artifacts are processed. 
 
-For clarity as to what is chalkable, all keys that are Post-Chalk or
-Post-Run must start with a leading _.  No keys that are chalkable may
-start with _.
+For clarity as to what is chalkable, all Chalk-time keys can be added
+to chalk marks. Their names will *never* start with a leading
+underscore.
+
+Run-time keys will *always* start with a leading underscore.
 
 The base chalk spec defines many metadata keys, but you may also
 define your own, by adding your own keyspec sections, as long as they
@@ -352,12 +369,12 @@ elsewhere, but must still contain at least required keys.
     type:        int
     require:     true
     write_lock:  true
-    range:       (ChalkableHost, HostOnly)
+    range:       (ChalkTimeHost, RunTimeHost)
     doc: """
 Specifies which of the four chalk key types applies for this key. While this
 is an integer, there's an enumeration defined you can use:
 
-ChalkableHost, Chalk, NonChalk, HostOnly
+ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
 """
   }
 
@@ -367,11 +384,11 @@ ChalkableHost, Chalk, NonChalk, HostOnly
     write_lock:  true
     validator:   func never_early_check
     doc: """
-True for keys of kind "Chalk" where it would never make sense
-for a plugin to assign the same value to all keys.  For
-instance, the repo URI *could* be different per-artifact, but
-it's perfectly reasonable for a plugin to not check the repo
-on each artifact, and assume the one in the CWD.
+True for keys of kind "ChalkTimeArtifact" where it would never make
+sense for a plugin to assign the same value to all keys.  For
+instance, the repo URI *could* be different per-artifact, but it's
+perfectly reasonable for a plugin to not check the repo on each
+artifact, and assume the one in the CWD.
 
 If metadata whose keys have 'never_early' set to 'false' are
 placed in the host report but not the artifact report, then
@@ -957,7 +974,7 @@ When docker labels are used, they are supposed to have a reverse-DNS prefix for 
     validator: func label_profile_check
     shortdoc: "Auto-added label profile"
     doc: """
-This profile guides what labels will be automatically added to docker images when we successfully chalk them. The only allowed keys are Chalk keys and Chalkable Host keys.  And, if the metadata is not available, then no key will be added.
+This profile guides what labels will be automatically added to docker images when we successfully chalk them. The only allowed keys are Chalk-time keys. And, if the metadata is not available, then no key will be added.
 For instance, the HASH key cannot currently appear in docker chalks, because it is not available for docker chalking, so will not appear as a label.  But, you can add METADATA_ID, CHALK_ID, etc. or anything else that is collectable before the build.
 """
   }
@@ -1788,8 +1805,8 @@ func never_early_check(keyname, val) {
     kind_field := "keyspec." + path[1] + ".kind"
     kind       := attr_get(kind_field, int)
 
-    if kind != Chalk {
-      return "'never_early' can only be set for fields of type Chalk"
+    if kind != ChalkTimeArtifact {
+      return "'never_early' only for fields of type ChalkTimeArtifact"
     }
   }
 }
@@ -1799,7 +1816,8 @@ func plugin_keyspec_check(keyname, val: list[string], context) {
 
   # For each key in val...
   # 1) If the key doesn't exist, fail.
-  # 2) If the key exists, it must be either of kind ChalkableHost or Chalk
+  # 2) If the key exists, it must be either of kind ChalkTimeHost or
+  #    ChalkTimeArtifact
   # 3) If it's of type chalk, never_early must be false.
 
   for i from 0 to len(val) {
@@ -1817,8 +1835,8 @@ func plugin_keyspec_check(keyname, val: list[string], context) {
     kind              := attr_get(kind_field, int)
 
     if context == CCPreRun {
-      if kind == ChalkableHost { continue }
-      elif kind == Chalk {
+      if kind == ChalkTimeHost { continue }
+      elif kind == ChalkTimeArtifact {
         never_early_field := base + "never_early"
         if attr_get(never_early_field, bool) == false {
   	  continue
@@ -1828,17 +1846,17 @@ func plugin_keyspec_check(keyname, val: list[string], context) {
              "the 'Pre-Run' collection context")
     }
     elif context == CCArtifact or context == CCPostChalk {
-      if kind == HostOnly or (kind == ChalkableHost and context == CCPostChalk) {
+      if kind == RunTimeHost or (kind == ChalkTimeHost and context == CCPostChalk) {
         return (keyname + ": specified key '" + item + "' is a host-level " +
 	        "key that cannot appear at artifact collection time")
       }
-      if context == CCPostChalk and kind == Chalk {
+      if context == CCPostChalk and kind == ChalkTimeArtifact {
         return (keyname + ": specified key '" + item + "' must be available " +
 	       "during artifact collection")
       }
     }
     else {  # context == CCPostRun
-      if kind == HostOnly { continue }
+      if kind == RunTimeHost { continue }
 
       return (keyname + ": specified key '" + item + "' cannot appear in " +
               " the 'Post-Run' collection context")
@@ -1913,7 +1931,7 @@ func profile_check_base(profile_name, profile_type) {
 
     if not profile_keys.contains(key_name) {
       if profile_type == PTChalk {
-        if key_kind == NonChalk or key_kind == HostOnly { continue }
+        if key_kind == RunTimeArtifact or key_kind == RunTimeHost { continue }
         if attr_get("keyspec." + key_name + ".required", bool) == true {
           return pc_err(profile_name, key_name,
                         "that key is required to be in chalk marks.")
@@ -1925,7 +1943,7 @@ func profile_check_base(profile_name, profile_type) {
     keyconfbase := "profile." + profile_name + ".key." + key_name + "."
     if attr_get(keyconfbase + "report", bool) == false {
       if profile_type == PTChalk {
-        if key_kind == NonChalk or key_kind == HostOnly { continue }
+        if key_kind == RunTimeArtifact or key_kind == RunTimeHost { continue }
         if attr_get("keyspec." + key_name + ".required", bool) == true {
           return pc_err(profile_name, key_name,
                         " that key is required to be in chalk marks.")
@@ -1940,32 +1958,32 @@ func profile_check_base(profile_name, profile_type) {
     # By here, we know this profile wants to set this key explicitly,
     # and that we are not in a chalk profile.
     #
-    # - ChalkableHost keys can appear anywhere.
-    # - Chalk keys can appear in per-artifact reports, and in host-reports
-    #   as long as the keyspec set never_early to 'false'
-    # - NonChalk keys can appear in per-artifact reports only.
-    # - HostOnly keys can appear in host reports only.
+    # - ChalkTimeHost keys can appear anywhere.
+    # - ChalkTimeArtifact keys can appear in per-artifact reports,
+    #   and in host-reports as long as the keyspec set never_early to 'false'
+    # - RunTimeArtifact keys can appear in per-artifact reports only.
+    # - RunTimeHost keys can appear in host reports only.
     #
-    # If the profile type is PTChalkTimeArtifact, we don't allow NonChalk
-    # or HostOnly keys.
+    # If the profile type is PTChalkTimeArtifact, we don't allow RunTimeArtifact
+    # or RunTimeHost keys.
 
     if profile_type == PTArtifact or profile_type == PTChalkTimeArtifact {
-      if key_kind == HostOnly {
+      if key_kind == RunTimeHost {
         return pc_err(profile_name, key_name,
                       "that key cannot appear in artifact report spec")
       }
-      if key_kind == NonChalk and profile_type == PTChalkTimeArtifact {
+      if key_kind == RunTimeArtifact and profile_type == PTChalkTimeArtifact {
         return pc_err(profile_name, key_name, "This report is used at build " +
 	"time, so keys collected post-chalk aren't allowed.")
       }
       continue
     }
     # Else, profile type is PTHost
-    if key_kind == NonChalk {
+    if key_kind == RunTimeArtifact {
        return pc_err(profile_name, key_name,
           "non-chalkable artifact info can't be in a host-level report spec")
     }
-    elif key_kind == Chalk {
+    elif key_kind == ChalkTimeArtifact {
       if attr_get("keyspec." + key_name + ".never_early", bool) == true {
         return pc_err(profile_name, key_name,
         "that key is artifact specific, so can't be in host-level report spec")
@@ -2239,7 +2257,7 @@ func key_name_validation() {
     base     := "keyspec." + key_name + "."
     if attr_get(base + "standard", bool) { continue; }
     kind     := attr_get(base + "kind", int)
-    if kind == ChalkableHost or kind == Chalk {
+    if kind == ChalkTimeHost or kind == ChalkTimeArtifact {
       if key_name.find("X-") == 0 { continue; }
     }
     elif key_name.find("_X-") == 0 { continue; }

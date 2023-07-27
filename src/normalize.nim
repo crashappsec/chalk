@@ -8,7 +8,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, config
+import algorithm, config
 
 proc u32ToStr(i: uint32): string =
   result = newStringOfCap(sizeof(uint32)+1)
@@ -51,6 +51,16 @@ proc binEncodeItem(self: Box): string =
   of MkSeq:   return binEncodeArr(unpack[seq[Box]](self))
   else:       unreachable
 
+
+proc getSortedKeys(d: ChalkDict): seq[string] {.inline.}=
+  var k: seq[string] = @[]
+
+  for item in d.keys():
+    k.add(item)
+
+  k.sort()
+  return k
+
 proc normalizeChalk*(dict: ChalkDict): string =
   # Currently, this is only called for the METADATA_HASH field, which only
   # signs things actually being written out.  We skip MAGIC, SIGNATURE
@@ -65,7 +75,7 @@ proc normalizeChalk*(dict: ChalkDict): string =
 
   result = u32ToStr(uint32(fieldCount))
 
-  for fullKey in dict.orderKeys():
+  for fullKey in dict.getSortedKeys():
     # It's important to write everything out in a canonical order for
     # signing.  The keys are written in the order we spec, and user-defined
     # keys are in lexigraphical order.

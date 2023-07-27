@@ -12,7 +12,7 @@
 when (NimMinor, NimPatch) >= (6, 14):
   {.warning[CastSizes]: off.}
 
-import tables, streams, unicode, parseutils, std/json, config
+import unicode, parseutils, algorithm, config
 
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']
@@ -425,6 +425,21 @@ proc chalkParseJson(s: Stream): ChalkJSonNode =
 
 proc extractOneChalkJson*(stream: Stream, path: string): ChalkDict =
   return unpack[ChalkDict](valueFromJson(stream.chalkParseJson(), path))
+
+# Output ordering for keys.
+proc orderKeys*(dict: ChalkDict, profile: Profile = nil): seq[string] =
+  var tmp: seq[(int, string)] = @[]
+  for k, _ in dict:
+    var order = chalkConfig.keySpecs[k].normalizedOrder
+    if profile != nil and k in profile.keys:
+      let orderOpt = profile.keys[k].order
+      if orderOpt.isSome():
+        order = orderOpt.get()
+    tmp.add((order, k))
+
+  tmp.sort()
+  result = @[]
+  for (_, key) in tmp: result.add(key)
 
 # %* from the json module; this basically does any escaping
 # we need, which gives us a JsonNode object, that we then convert

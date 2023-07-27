@@ -1,3 +1,8 @@
+## Helper used in jtiso
+##
+## :Author: Brandon Edwards (brandon@crashoverride.com)
+## :Copyright: 2023 Crash Override, Inc.
+
 import os, strutils
 
 {. emit: """

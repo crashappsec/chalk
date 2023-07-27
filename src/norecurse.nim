@@ -2,9 +2,9 @@
 ## recursive loop.
 ##
 ## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
+## :Copyright: 2023, Crash Override, Inc.
 
-import os, config, strutils
+import config
 
 const recursionEnvVar = "CHALK_INVOCATIONS"
 

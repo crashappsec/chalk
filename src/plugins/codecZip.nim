@@ -4,8 +4,8 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
 
-import zippy/ziparchives_v1, streams, nimSHA2, tables, strutils, options, os,
-       std/algorithm, std/tempfiles, ../config, ../chalkjson, ../plugins
+import ../commands, zippy/ziparchives_v1, nimSHA2, algorithm, std/tempfiles,
+       ../config, ../chalkjson, ../util
 
 const zipChalkFile = ".chalk.json"
 
@@ -110,7 +110,7 @@ method scan*(self:   CodecZip,
 
     # Even if subscans are off, we do this delete for the purposes of hashing.
     if not chalkConfig.getChalkDebug():  toggleLoggingEnabled()
-    discard runChalkSubScan(hashD, "delete")
+    discard runChalkSubScan(hashD, "delete", nil)
     if not chalkConfig.getChalkDebug():  toggleLoggingEnabled()
 
     if zipChalkFile in cache.onDisk.contents:
@@ -127,7 +127,7 @@ method scan*(self:   CodecZip,
     chalk.cachedPreHash = hashExtractedZip(hashD)
 
     if subscans:
-      extractCtx = runChalkSubScan(origD, "extract")
+      extractCtx = runChalkSubScan(origD, "extract", nil)
       if extractCtx.report.kind == MkSeq:
         if len(unpack[seq[Box]](extractCtx.report)) != 0:
           if chalk.extract == nil:
@@ -206,7 +206,7 @@ method getEndingHash*(self: CodecZip, chalk: ChalkObj): Option[string] =
 
   return some(chalk.cachedHash)
 
-method getChalkInfo*(self: CodecZip, obj: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: CodecZip, obj: ChalkObj): ChalkDict =
   let cache = ZipCache(obj.cache)
   result    = ChalkDict()
 
@@ -222,7 +222,8 @@ method getChalkInfo*(self: CodecZip, obj: ChalkObj): ChalkDict =
                             of ".ear": artTypeEAR
                             else:      artTypeZip
 
-method getPostChalkInfo*(self: CodecZip, obj: ChalkObj, ins: bool): ChalkDict =
+method getRunTimeArtifactInfo*(self: CodecZip, obj: ChalkObj, ins: bool):
+       ChalkDict =
   result        = ChalkDict()
   let extension = obj.fullPath.splitFile().ext.toLowerAscii()
 

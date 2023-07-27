@@ -1,5 +1,9 @@
-import posix, tables, streams, strutils, options, os, re, base64, sugar,
-       json, nimutils, ../types, ../plugins
+## Pull metadata from the proc file system on Linux.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
+import posix, re, base64, ../config, ../plugin_api
 
 type
   ProcDict   = OrderedTableRef[string, string]
@@ -491,7 +495,8 @@ proc getPsAllInfo(): ProcFdSet =
 
     result[pid] = one
 
-method getPostRunInfo*(self: ProcFSPlugin, objs: seq[ChalkObj]): ChalkDict =
+method getRunTimeHostInfo*(self: ProcFSPlugin, objs: seq[ChalkObj]):
+       ChalkDict =
   result = ChalkDict()
 
   if isSubscribedKey("_OP_TCP_SOCKET_INFO"):
@@ -584,9 +589,9 @@ template loadArrKeyFromCacheOrCall(chalkKey, cacheKey: string, call: untyped) =
 
         result[chalkKey] = pack(x)
 
-method getPostChalkInfo(self: ProcFSPlugin,
-                        obj:  ChalkObj,
-                        ins: bool): ChalkDict =
+method getRunTimeArtifactInfo(self: ProcFSPlugin,
+                              obj:  ChalkObj,
+                              ins: bool): ChalkDict =
   result = ChalkDict()
 
   if ins or obj.pid.isNone():

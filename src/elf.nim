@@ -1,6 +1,8 @@
-import os
-import std/math
-import std/strutils
+## :Author: Brandon Edwards (brandon@crashoverride.com)
+## :Copyright: 2023 Crash Override, Inc.
+
+
+import os, math, strutils
 
 const
 # note on the below: ELF64_HEADER_SIZE is a weird one, because there is also
@@ -40,7 +42,7 @@ const
 # or `ELF<bits>` for ALU-size-specific offsets and sizes (i.e. 32bit vs 64bit)
 
 # The universal ELF header fields: same offset and size regardless of arch/ALU
-const 
+const
   ELF_MAGIC_32               = 0x00
   ELF_CLASS_8                = 0x04
   ELF_ENDIAN_8               = 0x05
@@ -81,7 +83,7 @@ const
   ELF64_SECTION_ENTRYSIZE_64 = 0x38
 
 # errors
-const 
+const
   ERR_FAILED_ELF_HEADER_READ = "failed to read enough data for ELF64 header"
   ERR_BAD_ELF_MAGIC          = "incorrect ELF magic bytes"
   ERR_ONLY_VERSION1          = "only ELF version 1 is supported"
@@ -97,7 +99,7 @@ const
 const defaultMinAlignedLen   = 0x1000
 
 type
-  ElfType*                   = enum 
+  ElfType*                   = enum
     ET_NONE                  = 0x00,
     ET_REL                   = 0x01,
     ET_EXEC                  = 0x02,
@@ -108,7 +110,7 @@ type
     ET_LOPROC                = 0xFF00,
     ET_HIPROC                = 0xFFFF
 
-  ProgramHeaderType*         = enum 
+  ProgramHeaderType*         = enum
     PT_NULL                  = 0x00,
     PT_LOAD                  = 0x01,
     PT_DYNAMIC               = 0x02,
@@ -121,8 +123,8 @@ type
     PT_HIOS                  = 0x6FFFFFFF,
     PT_LOPROC                = 0x70000000,
     PT_HIPROC                = 0x7FFFFFFF
-                                      
-  SectionHeaderType*         = enum 
+
+  SectionHeaderType*         = enum
     SHT_NULL                 = 0x00,
     SHT_PROGBITS             = 0x01,
     SHT_SYMTAB               = 0x02,
@@ -256,7 +258,7 @@ method addElfIntValue[T](self:       ElfFile,
   ## and records the modification in the operations table for future reversal
   if elfValue.ignore:
     # something else has already set this value. This is mostly to save the
-    # extra step of reparsing when a modification is happening where it 
+    # extra step of reparsing when a modification is happening where it
     # *looks like* this offset needs updating but has already been manually
     # updated
     return
@@ -295,7 +297,7 @@ method readOffset(self: ElfFile, whence: uint64): ElfIntValue[uint64] {.base.} =
   return result
 
 method parseHeader*(self: ElfFile): bool {.base.} =
-  let 
+  let
     # skipping as many fields as I can for now, but these are necessary
     checks = @[fixedElfBytesCheck(whence: ELF_MAGIC_32,
                                   value:  ELF_MAGIC_BYTES,
@@ -478,7 +480,7 @@ method parse*(self: ElfFile): bool {.base.} =
   return result
 
 method injectEntry*(self: ElfFile, data: string, setEntryPoint: bool): bool =
-  ## injectEntry(): 
+  ## injectEntry():
   ## injects data (code) into the program defined as containing the entrypoint,
   ## and update the appropriate ELF section, and update offsets of all subsequent
   ## sections in the ELF.
@@ -490,7 +492,7 @@ method injectEntry*(self: ElfFile, data: string, setEntryPoint: bool): bool =
   if programHeader == nil:
     return false
 
-  # Here we get the endSectionAddress: the virtual address representing the 
+  # Here we get the endSectionAddress: the virtual address representing the
   # end of data mapped from the file into memory. Note that we use the filesize
   # from the programHeader, not the memorysize, because the memorysize can be
   # synthetically larger than the data available in the file, which is to
@@ -601,7 +603,7 @@ method injectSectionAtEnd*(self: ElfFile, data: string): bool =
   # now we insert the heckin-chonker-size-aligned sectionHeader
   # the insertAlignedData function will handle fixing up other offsets
   self.insertAlignedData(offset, sectionHeader)
-  
+
   # this next bit is just lazy: we could have calculated the offset/delta
   # with consideration for the alignment and so on, but here we just look
   # at the length of the resulting filedata and use that as our offset in
@@ -620,7 +622,7 @@ method printTableOffsets*(self: ElfFile) =
   echo "sectionTable:   0x" & header.sectionTable.value.tohex()
   echo "sectionCount:   0x" & header.sectionCount.value.tohex()
   echo "sectionHdrSize: 0x" & header.sectionHeaderSize.value.tohex()
-  
+
 
 method injectEntryCodeCave*(self: ElfFile, code: string): bool =
   ## Injects entry point code prefixed with `endbr64` instruction, and suffixed
@@ -703,14 +705,14 @@ if not elfFile.parse():
 # ^ that's hello world, and it's long because it doesn't have contain
 # nullbytes and i'm old so i'm bad at shellcode
 
-# if you want a basic ASCII printable/typable NO-OP: 
+# if you want a basic ASCII printable/typable NO-OP:
 # ./elf anyprogram ./whereitwillbeouttput PX
 #                                         | `--pop  rax
 #                                         `----push rax
 
 
 # the string 'beacon home':
-# 
+#
 var beaconHome = "\xeb\x02\xeb\x11\xe8\xf9\xff\xff\xff\x62\x65\x61\x63\x6f\x6e\x20\x68\x6f\x6d\x65\x0a\x5e\x48\x31\xff\x48\xff\xc7\x48\x89\xfa\x48\xc1\xe2\x02\x48\x89\xd0\x48\xd1\xe2\x48\x01\xc2\x48\x89\xf8\x0f\x05"
 
 var chalkData = "" &

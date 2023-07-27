@@ -4,7 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, strutils, options, streams, ../config, ../plugins
+import ../config, ../plugin_api
 
 type CodecShebang* = ref object of Codec
 
@@ -23,13 +23,14 @@ method scan*(self:   CodecShebang,
 method handleWrite*(self: CodecShebang, chalk: ChalkObj, enc: Option[string]) =
   chalk.scriptHandleWrite(enc)
 
-method getChalkInfo*(self: CodecShebang, chalk: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: CodecShebang, chalk: ChalkObj):
+       ChalkDict =
   result                      = ChalkDict()
   result["ARTIFACT_TYPE"]     = artTypeShebang
 
-method getPostChalkInfo*(self:  CodecShebang,
-                         chalk: ChalkObj,
-                         ins:   bool): ChalkDict =
+method getRunTimeArtifactInfo*(self:  CodecShebang,
+                               chalk: ChalkObj,
+                               ins:   bool): ChalkDict =
   result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypeShebang
 

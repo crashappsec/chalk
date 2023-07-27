@@ -4,7 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import os, streams, tables, strutils, ../config, ../plugins
+import ../config
 
 const
   dirGit       = ".git"
@@ -320,9 +320,7 @@ proc getBranch(self: GitInfo): (bool, Box) =
   if self.branchName == "": return (false, nil)
   return (true, pack(self.branchName))
 
-method getHostInfo*(self: GitInfo,
-                    path: seq[string],
-                    ins:  bool): ChalkDict =
+method getChalkTimeHostInfo*(self: GitInfo, path: seq[string]): ChalkDict =
   result = ChalkDict()
 
   self.loadBasics(path)
@@ -347,7 +345,7 @@ proc isInRepo(obj: ChalkObj, dir: string): bool =
 
   return false
 
-method getChalkInfo*(self: GitInfo, obj: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: GitInfo, obj: ChalkObj): ChalkDict =
   result = ChalkDict()
 
   if self.vcsDir != "" and obj.isInRepo(self.vcsDir):

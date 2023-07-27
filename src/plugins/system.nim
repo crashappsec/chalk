@@ -4,8 +4,8 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import os, nativesockets, tables, options, strutils, nimSHA2, sequtils, times,
-       ../config, ../plugins, ../normalize, ../chalkjson
+import nativesockets, nimSHA2, sequtils, times, ../config, ../plugin_api,
+       ../normalize, ../chalkjson
 
 when defined(posix): import posix_utils
 
@@ -66,7 +66,9 @@ proc validateMetadata(obj: ChalkObj): bool =
       else:
         once(warn(obj.fullPath & ": no signature validation routine provided."))
 
-method getChalkInfo*(self: SystemPlugin, obj: ChalkObj): ChalkDict =
+# Even if you don't subscribe to TIMESTAMP we collect it in case
+# you're subscribed to something that uses it in a substitution.
+method getChalkTimeArtifactInfo*(self: SystemPlugin, obj: ChalkObj): ChalkDict =
   result              = ChalkDict()
   result["MAGIC"]     = pack(magicUTF8)
   result["TIMESTAMP"] = pack(unixTimeInMS())
@@ -74,8 +76,10 @@ method getChalkInfo*(self: SystemPlugin, obj: ChalkObj): ChalkDict =
   if obj.isMarked() and "METADATA_HASH" in obj.extract:
     let h = unpack[string](obj.extract["METADATA_HASH"]).strip().parseHexStr()
 
-    result["OLD_CHALK_METADATA_HASH"] = obj.extract["METADATA_HASH"]
-    result["OLD_CHALK_METADATA_ID"]   = pack(idFormat(h))
+    result.setIfSubscribed("OLD_CHALK_METADATA_HASH",
+                           obj.extract["METADATA_HASH"])
+
+    result.setIfSubscribed("OLD_CHALK_METADATA_ID", idFormat(h))
 
 proc applySubstitutions(obj: ChalkObj) {.inline.} =
   # Apply {}-style substitutions to artifact chalking keys where appropriate.
@@ -101,24 +105,25 @@ proc applySubstitutions(obj: ChalkObj) {.inline.} =
     if not s.contains("{"): continue
     obj.collectedData[k] = pack(s.multiReplace(subs))
 
-method getPostChalkInfo*(self: SystemPlugin,
-                         obj:  ChalkObj,
-                         ins:  bool): ChalkDict =
+method getRunTimeArtifactInfo*(self: SystemPlugin,
+                               obj:  ChalkObj,
+                               ins:  bool): ChalkDict =
   result = ChalkDict()
 
   if not ins:
     obj.opFailed         = obj.validateMetadata()
     result["_VALIDATED"] = pack(obj.opFailed)
 
-    if obj.noResolvePath:
-      result["_OP_ARTIFACT_PATH"] = pack(obj.fullPath)
-    else:
-      result["_OP_ARTIFACT_PATH"] = pack(resolvePath(obj.fullPath))
+    if isSubscribedKey("_OP_ARTIFACT_PATH"):
+      if obj.noResolvePath:
+        result["_OP_ARTIFACT_PATH"] = pack(obj.fullPath)
+      else:
+        result["_OP_ARTIFACT_PATH"] = pack(resolvePath(obj.fullPath))
   else:
     obj.applySubstitutions()
     if obj.isMarked(): discard obj.validateMetadata()
-    result["_OP_CHALKED_KEYS"] = pack(toSeq(obj.getChalkMark().keys))
-    result["_VIRTUAL"]         = pack(chalkConfig.getVirtualChalk())
+    result.setIfSubscribed("_OP_CHALKED_KEYS", toSeq(obj.getChalkMark().keys))
+    result.setIfSubscribed("_VIRTUAL",         chalkConfig.getVirtualChalk())
 
   var
     config     = getOutputConfig()
@@ -136,38 +141,77 @@ method getPostChalkInfo*(self: SystemPlugin,
     result["_OP_ARTIFACT_REPORT_KEYS"] = pack(reportKeys)
 
 
-let
+var
   instant   = epochTime()
   timestamp = instant.fromUnixFloat()
-  date      = timestamp.format("yyyy-MM-dd")
-  time      = timestamp.format("HH:mm:ss") & "." & timestamp.format("fff")
-  offset    = timestamp.format("zzz")
+  envdict:          Con4mDict[string, string]
+  cachedSearchPath: seq[string] = @[]
 
-method getPostRunInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
+when defined(posix):
+  let uinfo = uname()
+
+template getDate(): string     = timestamp.format("yyyy-MM-dd")
+template getTime(): string     = timestamp.format("HH:mm:ss") & "." &
+                                   timestamp.format("fff")
+template getOffset(): string   = timestamp.format("zzz")
+template getDateTime(): string = getDate() & "T" & getTime() & getOffset()
+
+proc getEnvDict(): Box =
+  once:
+    envdict = Con4mDict[string, string]()
+    let
+      always = chalkConfig.getEnvAlwaysShow()
+      never  = chalkConfig.getEnvNeverShow()
+      redact = chalkConfig.getEnvRedact()
+      def    = chalkConfig.getEnvDefaultAction()[0]
+
+    for (k, v) in envPairs():
+      # TODO: could add some con4m to warn on overlap across these 3. For now,
+      # we treat it conservatively.
+      if k in never:    continue
+      elif k in redact: envdict[k] = "<<redact>>"
+      elif k in always: envdict[k] = v
+      elif def == 'n':  continue
+      elif def == 'r':  envdict[k] = "<<redact>>"
+      else: envdict[k] = v
+
+  return pack(envdict)
+
+method getRunTimeHostInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
   result = ChalkDict()
 
-  if len(systemErrors)  != 0: result["_OP_ERRORS"] = pack(systemErrors)
-  if len(getUnmarked()) != 0: result["_UNMARKED"]  = pack(getUnmarked())
+  if len(systemErrors)  != 0:
+    result.setIfSubscribed("_OP_ERRORS", systemErrors)
 
-  result["_OPERATION"]            = pack(getBaseCommandName())
-  result["_OP_CHALKER_VERSION"]   = pack(getChalkExeVersion())
-  result["_OP_PLATFORM"]          = pack(getChalkPlatform())
-  result["_OP_CHALKER_COMMIT_ID"] = pack(getChalkCommitId())
-  result["_OP_CHALK_COUNT"]       = pack(len(getAllChalks()) -
+  if len(getUnmarked()) != 0:
+    result.setIfSubscribed("_UNMARKED", getUnmarked())
+
+  if len(cachedSearchPath) != 0:
+    result.setIfSubscribed("_OP_SEARCH_PATH", cachedSearchPath)
+
+  result.setIfSubscribed("_OPERATION", getBaseCommandName())
+  result.setIfSubscribed("_OP_CHALKER_VERSION", getChalkExeVersion())
+  result.setIfSubscribed("_OP_PLATFORM", getChalkPlatform())
+  result.setIfSubscribed("_OP_CHALKER_COMMIT_ID", getChalkCommitId())
+  result.setIfSubscribed("_OP_CHALK_COUNT", len(getAllChalks()) -
                                          len(getUnmarked()))
-  result["_OP_EXE_NAME"]          = pack(getMyAppPath())
-  result["_OP_EXE_PATH"]          = pack(getAppDir())
-  result["_OP_ARGV"]              = pack(@[getMyAppPath()] &
+  result.setIfSubscribed("_OP_EXE_NAME", getMyAppPath())
+  result.setIfSubscribed("_OP_EXE_PATH", getAppDir())
+  result.setIfSubscribed("_OP_ARGV", @[getMyAppPath()] &
                                           commandLineParams())
-  result["_OP_HOSTNAME"]          = pack(getHostName())
-  result["_OP_UNMARKED_COUNT"]    = pack(len(getUnmarked()))
-  result["_TIMESTAMP"]            = pack(uint64(instant * 1000.0))
-  result["_DATE"]                 = pack(date)
-  result["_TIME"]                 = pack(time)
-  result["_TZ_OFFSET"]            = pack(offset)
-  result["_DATETIME"]             = pack(date & "T" & time & offset)
+  result.setIfSubscribed("_OP_HOSTNAME", getHostName())
+  result.setIfSubscribed("_OP_UNMARKED_COUNT", len(getUnmarked()))
+  result.setIfSubscribed("_TIMESTAMP", pack(uint64(instant * 1000.0)))
+  result.setIfSubscribed("_DATE", pack(getDate()))
+  result.setIfSubscribed("_TIME", pack(getTime()))
+  result.setIfSubscribed("_TZ_OFFSET", pack(getOffset()))
+  result.setIfSubscribed("_DATETIME", pack(getDateTime()))
 
-  if getOutputConfig().hostReport != "":
+  if isSubscribedKey("_ENV"):
+    result["_ENV"] = getEnvDict()
+
+  if isSubscribedKey("_OP_HOST_REPORT_KEYS") and
+     getOutputConfig().hostReport != "":
     let
       profile    = chalkConfig.profiles[getOutputConfig().hostReport]
       reportKeys = toSeq(hostInfo.filterByProfile(profile).keys)
@@ -175,92 +219,76 @@ method getPostRunInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
     result["_OP_HOST_REPORT_KEYS"] = pack(reportKeys)
 
   when defined(posix):
-    let uinfo = uname()
-    result["_OP_HOSTINFO"] = pack(uinfo.version)
-    result["_OP_NODENAME"] = pack(uinfo.nodename)
+    result.setIfSubscribed("_OP_HOSTINFO", uinfo.version)
+    result.setIfSubscribed("_OP_NODENAME", uinfo.nodename)
 
-proc buildEnvDict(): Con4mDict[string, string] =
-  result = Con4mDict[string, string]()
-  let
-    always = chalkConfig.getEnvAlwaysShow()
-    never  = chalkConfig.getEnvNeverShow()
-    redact = chalkConfig.getEnvRedact()
-    def    = chalkConfig.getEnvDefaultAction()[0]
+method getChalkTimeHostInfo*(self: SystemPlugin, p: seq[string]): ChalkDict =
+  result           = ChalkDict()
+  cachedSearchPath = p
 
-  for (k, v) in envPairs():
-    # TODO: could add some con4m to warn on overlap across these 3. For now,
-    # we treat it conservatively.
-    if k in never:    continue
-    elif k in redact: result[k] = "<<redact>>"
-    elif k in always: result[k] = v
-    elif def == 'n':  continue
-    elif def == 'r':  result[k] = "<<redact>>"
-    else: result[k] = v
+  result.setIfSubscribed("INJECTOR_VERSION", getChalkExeVersion())
+  result.setIfSubscribed("INJECTOR_PLATFORM", getChalkPlatform())
+  result.setIfSubscribed("INJECTOR_COMMIT_ID", getChalkCommitId())
+  result.setIfSubscribed("DATE", pack(getDate()))
+  result.setIfSubscribed("TIME", pack(getTime()))
+  result.setIfSubscribed("TZ_OFFSET", pack(getOffset()))
+  result.setIfSubscribed("DATETIME", pack(getDateTime()))
+  result.setIfSubscribed("ENV", getEnvDict())
 
-method getHostInfo*(self: SystemPlugin, p: seq[string], ins: bool): ChalkDict =
-  result  = ChalkDict()
-  var env = buildEnvDict()
+  when defined(posix):
+    result.setIfSubscribed("INSERTION_HOSTINFO", uinfo.version)
+    result.setIfSubscribed("INSERTION_NODENAME", uinfo.nodename)
 
-  # We have thse info now, and it is harder to get later, so cheat a bit
-  # by injecting it directly into hostInfo.  We're the only one who should
-  # ever touch these keys anyway.
-  hostInfo["_OP_SEARCH_PATH"] = pack(p)
-  hostInfo["_ENV"]            = pack(env)
-
-  if ins:
-    result["INJECTOR_VERSION"]   = pack(getChalkExeVersion())
-    result["INJECTOR_PLATFORM"]  = pack(getChalkPlatform())
-    result["INJECTOR_COMMIT_ID"] = pack(getChalkCommitId())
-    result["DATE"]               = pack(date)
-    result["TIME"]               = pack(time)
-    result["TZ_OFFSET"]          = pack(offset)
-    result["DATETIME"]           = pack(date & "T" & time & offset)
-    result["ENV"]                = pack(env)
-
-    when defined(posix):
-      let uinfo = uname()
-      result["INSERTION_HOSTINFO"] = pack(uinfo.version)
-      result["INSERTION_NODENAME"] = pack(uinfo.nodename)
-
+  if isSubscribedKey("INJECTOR_ID"):
     let selfIdOpt = selfID
     if selfIdOpt.isSome(): result["INJECTOR_ID"] = pack(selfIdOpt.get())
 
-method getChalkInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
+proc signingNotInMark(): bool =
+  let outConf = getOutputConfig()
+
+  if outConf.chalk == "":
+    return true
+  let prof = chalkConfig.profiles[outConf.chalk]
+
+  if "SIGNING" notin prof.keys:
+    return true
+
+  return not prof.keys["SIGNING"].report
+
+method getChalkTimeArtifactInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
   result = ChalkDict()
 
   if obj.extract != nil and "$CHALK_CONFIG" in obj.extract and
      "$CHALK_CONFIG" notin obj.collectedData:
     result["$CHALK_CONFIG"] = obj.extract["$CHALK_CONFIG"]
 
-  # We add this one in directly so that it gets added to the MD hash.
+  let shouldSign = isSubscribedKey("SIGNATURE")
+
+  # We add these directly into collectedData so that it can get
+  # added to the MD hash when we call normalizeChalk()
   if len(obj.err) != 0:
     obj.collectedData["ERR_INFO"] = pack(obj.err)
 
-  var shouldSign = false
+  if shouldSign:
+    obj.collectedData["SIGNING"] = pack(true)
+    if signingNotInMark():
+      once:
+        info("`SIGNING` must be configured for the chalk mark report " &
+             "whenever SIGNATURE is configured. Forcing it on.")
 
   let
     toHash   = obj.getChalkMark().normalizeChalk()
     mdHash   = $(toHash.computeSHA256())
     encHash  = hashFmt(mdHash)
     outconf  = getOutputConfig()
-    ckeys    = chalkConfig.profiles[outconf.chalk].getKeys()
-    rkeys    = chalkConfig.profiles[outconf.artifactReport].getKeys()
+
 
   result["METADATA_HASH"] = pack(encHash)
   result["METADATA_ID"]   = pack(idFormat(mdHash))
 
-  # Signing is expensive enough that we check to make sure signing is on.
-  if "SIGNATURE" in ckeys and ckeys["SIGNATURE"].report:
-    shouldSign = true
-  else:
-    trace("SIGNATURE not configured in chalking profile.")
-
-  if "SIGNATURE" in rkeys and rkeys["SIGNATURE"].report:
-    shouldSign = true
-  else:
-    trace("SIGNATURE is not configured in reporting profile.")
-
-  if not shouldSign: return
+  if not shouldSign:
+    trace("SIGNATURE not configured.")
+    return
 
   let
     hashOpt = obj.myCodec.getUnchalkedHash(obj)

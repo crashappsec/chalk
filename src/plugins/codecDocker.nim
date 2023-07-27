@@ -1,10 +1,8 @@
 ## :Author: John Viega, Brandon Edwards
 ## :Copyright: 2023, Crash Override, Inc.
 
-import tables, strutils, json, options, os, osproc, streams, parseutils,
-       posix_utils, std/tempfiles, nimutils, con4m, ../config, ../plugins,
-       ../dockerfile, ../chalkjson, ../exec
-
+import osproc, parseutils, posix_utils, std/tempfiles, ../config,
+       ../plugin_api,  ../dockerfile, ../chalkjson, ../util
 
 type
   CodecDocker* = ref object of Codec
@@ -132,7 +130,8 @@ proc dockerStringToArgv(cmd:   string,
   for value in shell: result.add(value)
   result.add(cmd)
 
-method getChalkInfo*(self: CodecDocker, chalk: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: CodecDocker, chalk: ChalkObj):
+       ChalkDict =
   result = ChalkDict()
   let cache = DockerInfoCache(chalk.cache)
 
@@ -300,9 +299,9 @@ proc getContainerName*(): Option[string] {.inline.} =
   return none(string)
 
 
-method getPostChalkInfo*(self:  CodecDocker,
-                         chalk: ChalkObj,
-                         ins:   bool): ChalkDict =
+method getRunTimeArtifactInfo*(self:  CodecDocker,
+                               chalk: ChalkObj,
+                               ins:   bool): ChalkDict =
   result    = ChalkDict()
 
   if self.isRuntime():

@@ -1,10 +1,10 @@
-# This is a simple codec for dealing with python bytecode files;
-#  i.e., currently ones that have the extensions .pyc, .pyo, .pyd
-#
-# :Author: Rich Smith (rich@crashoverride.com)
-# :Copyright: 2022, 2023, Crash Override, Inc.
+## This is a simple codec for dealing with python bytecode files;
+##  i.e., currently ones that have the extensions .pyc, .pyo, .pyd
+##
+## :Author: Rich Smith (rich@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, strutils, options, streams, nimSHA2, ../config, ../plugins, os
+import nimSHA2, ../config, ../plugin_api, ../util
 
 type CodecPythonPyc* = ref object of Codec
 
@@ -74,13 +74,14 @@ method getUnchalkedHash*(self:  CodecPythonPyc,
   let toHash = $(chalk.stream.readStr(chalk.startOffset))
   return some(hashFmt($(toHash.computeSHA256())))
 
-method getChalkInfo*(self: CodecPythonPyc, chalk: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: CodecPythonPyc, chalk: ChalkObj):
+       ChalkDict =
   result                  = ChalkDict()
   result["ARTIFACT_TYPE"] = artTypePyc
 
-method getPostChalkInfo*(self:  CodecPythonPyc,
-                         chalk: ChalkObj,
-                         ins:   bool): ChalkDict =
+method getRunTimeArtifactInfo*(self:  CodecPythonPyc,
+                               chalk: ChalkObj,
+                               ins:   bool): ChalkDict =
   result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypePyc
 

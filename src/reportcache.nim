@@ -18,7 +18,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
 
-import os, tables, nimutils, strutils, json, streams, std/tempfiles, config
+import std/tempfiles, config, sinks
 
 # These string constants are only used if there's a catastrophic
 # problem w/ the reporting cache; see `panicPublish` below.

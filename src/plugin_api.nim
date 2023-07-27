@@ -8,147 +8,9 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import os, tables, strutils, algorithm, options, glob, streams,
-       posix, std/tempfiles, nimSHA2, config, chalkjson, json
+import glob, posix, nimSHA2, config, chalkjson, util
 
 const  ePureVirtual = "Method is not defined; it must be overridden"
-
-var
-  installedPlugins: Table[string, Plugin]
-  plugins:          seq[Plugin]           = @[]
-  codecs:           seq[Codec]            = @[]
-
-proc registerPlugin*(name: string, plugin: Plugin) =
-  if name in installedPlugins:
-    error("Double install of plugin named: " & name)
-  plugin.name            = name
-  installedPlugins[name] = plugin
-
-proc validatePlugins() =
-  for name, plugin in installedPlugins:
-    let maybe = getPluginConfig(name)
-    if maybe.isNone():
-      error("No config provided for plugin " & name & ". Plugin ignored.")
-      installedPlugins.del(name)
-    elif not maybe.get().getEnabled():
-      trace("Plugin " & name & " is disabled via config gile.")
-      installedPlugins.del(name)
-    else:
-      plugin.configInfo = maybe.get()
-      trace("Installed plugin: " & name)
-
-proc getPlugins*(): seq[Plugin] =
-  once:
-    validatePlugins()
-    var preResult: seq[(int, Plugin)] = @[]
-    for name, plugin in installedPlugins:
-      preResult.add((plugin.configInfo.getPriority(), plugin))
-
-    preResult.sort()
-    for (_, plugin) in preResult: plugins.add(plugin)
-
-  return plugins
-
-proc getPluginByName*(s: string): Plugin =
-  return installedPlugins[s]
-
-proc getCodecs*(): seq[Codec] =
-  once:
-    for item in getPlugins():
-      if item.configInfo.codec: codecs.add(Codec(item))
-
-  return codecs
-
-var numCachedFds = 0
-
-proc acquireFileStream*(chalk: ChalkObj): Option[FileStream] =
-  ## Get a file stream to open the artifact pointed to by the chalk
-  ## object. If it's in our cache, you'll get the cached copy. If
-  ## it's expired, or the first time opening it, it'll be opened
-  ## and added to the cache.
-  ##
-  ## Generally the codec doesn't worry about this... we use this API
-  ## to acquire streams before passing the chalk object to any codec
-  ## where the result of a call to usesFStream() is true (which is the
-  ## default).
-  ##
-  ## If you're writing a plugin, not a codec, you should not rely on
-  ## the presence of a file stream. Some codecs will not use them.
-  ## However, if you want to use it anyway, you can, but you must
-  ## test for it being nil.
-
-  if chalk.stream == nil:
-    var handle = newFileStream(chalk.fullpath, fmReadWriteExisting)
-    if handle == nil:
-      trace(chalk.fullpath & ": Cannot open for writing.")
-      handle = newFileStream(chalk.fullPath, fmRead)
-      if handle == nil:
-        error(chalk.fullpath & ": could not open file for reading.")
-        return none(FileStream)
-
-    trace(chalk.fullpath & ": File stream opened")
-    chalk.stream  = handle
-    numCachedFds += 1
-    return some(handle)
-  else:
-    trace(chalk.fullpath & ": existing stream acquired")
-    result = some(chalk.stream)
-
-proc closeFileStream*(chalk: ChalkObj) =
-  ## This generally only gets called after we're totally done w/ the
-  ## artifact.  Prior to that, when an operation finishes, we call
-  ## yieldFileStream, which decides whether to cache or close.
-  try:
-    if chalk.stream != nil:
-      chalk.stream.close()
-      chalk.stream = nil
-      trace(chalk.fullpath & ": File stream closed")
-  except:
-    warn(chalk.fullpath & ": Error when attempting to close file.")
-    dumpExOnDebug()
-  finally:
-    chalk.stream = nil
-    numCachedFds -= 1
-
-proc yieldFileStream*(chalk: ChalkObj) =
-  if numCachedFds == chalkConfig.getCacheFdLimit(): chalk.closeFileStream()
-
-proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
-  result = true
-
-  var
-    (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
-    ctx       = newFileStream(f)
-    info: Stat
-
-  try:
-    ctx.write(contents)
-  finally:
-    if ctx != nil:
-      try:
-        ctx.close()
-        # If we can successfully stat the file, we will try to
-        # re-apply the same mode bits via chmod after the move.
-        let statResult = stat(cstring(chalk.fullpath), info)
-        moveFile(chalk.fullPath, path & ".old")
-        moveFile(path, chalk.fullpath)
-        if statResult == 0:
-          discard chmod(cstring(chalk.fullpath), info.st_mode)
-      except:
-        removeFile(path)
-        if not fileExists(chalk.fullPath):
-          # We might have managed to move it but not copy the new guy in.
-          try:
-            moveFile(path & ".old", chalk.fullPath)
-          except:
-            error(chalk.fullPath & " was moved before copying in the new " &
-              "file, but the op failed, and the file could not be replaced. " &
-              " It currently is in: " & path & ".old")
-        else:
-            error(chalk.fullPath & ": Could not write (no permission)")
-        dumpExOnDebug()
-        return false
-
 
 proc findFirstValidChalkMark*(s:            string,
                               artifactPath: string,
@@ -442,15 +304,17 @@ proc loadChalkFromFStream*(stream: FileStream, loc: string): ChalkObj =
 # implement them; we only try to call these methods if the config for
 # the plugin specifies that it returns keys from one of these
 # particular calls.
-method getChalkInfo*(self: Plugin, chalk: ChalkObj): ChalkDict {.base.} =
-  raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
-method getPostChalkInfo*(self: Plugin, chalk: ChalkObj, ins: bool):
+method getChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):
        ChalkDict {.base.} =
   raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
-method getHostInfo*(self: Plugin, objs: seq[string], ins: bool):
+method getRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj, ins: bool):
        ChalkDict {.base.} =
   raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
-method getPostRunInfo*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.base.} =
+method getChalkTimeHostInfo*(self: Plugin, objs: seq[string]):
+       ChalkDict {.base.} =
+  raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
+method getRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
+       ChalkDict {.base.} =
   raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
 
 # Base methods for codecs, including default implementations for things
@@ -482,8 +346,7 @@ proc scanLocation(self:       Codec,
   exclusions.add(loc)
   var chalk = result.get()
 
-  if numCachedFds < chalkConfig.getCacheFdLimit():
-    numCachedFds = numCachedFds + 1
+  if bumpFdCount():
     chalk.stream = stream
   else:
     stream.close()
@@ -591,11 +454,12 @@ method getChalkId*(self: Codec, chalk: ChalkObj): string {.base.} =
     for ch in b: preRes.add(ch)
     return preRes.idFormat()
 
-method getChalkInfo*(self: Codec, chalk: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: Codec, chalk: ChalkObj): ChalkDict =
   result               = ChalkDict()
   result["HASH_FILES"] = pack(@[chalk.fullpath])
 
-method getPostChalkInfo*(self: Codec, chalk: ChalkObj, ins: bool): ChalkDict =
+method getRunTimeArtifactInfo*(self: Codec, chalk: ChalkObj, ins: bool):
+       ChalkDict =
   result = ChalkDict()
 
   let postHashOpt = self.getEndingHash(chalk)
@@ -666,28 +530,3 @@ proc sinkConfToString(name: string): string =
     result &= "  " & k & ": \"" & val & "\"\n"
 
   result &= "}\n\n"
-
-# We need to turn off UnusedImport here, because the nim static
-# analyzer thinks the below imports are unused. When we first import,
-# they call registerPlugin(), which absolutely will get called.
-{.warning[UnusedImport]: off.}
-
-import plugins/codecShebang
-import plugins/codecElf
-import plugins/codecDocker
-import plugins/codecZip
-import plugins/codecPythonPy
-import plugins/codecPythonPyc
-import plugins/codecMacOs
-import plugins/ciGithub
-import plugins/ciJenkins
-import plugins/ciGitlab
-import plugins/conffile
-import plugins/ownerAuthors
-import plugins/ownerGithub
-import plugins/vctlGit
-import plugins/ecs
-import plugins/externalTool
-import plugins/system
-when hostOs == "linux":
-  import plugins/procfs

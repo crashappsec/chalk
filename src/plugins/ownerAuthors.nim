@@ -3,7 +3,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, os, streams, ../config, ../plugins
+import ../config
 
 const
   fNameAuthor  = "AUTHOR"
@@ -45,9 +45,7 @@ proc findAuthorsFile(fullpath: string): string =
 type AuthorsFileCodeOwner* = ref object of Plugin
 
 
-method getHostInfo*(self: AuthorsFileCodeOwner,
-                    path: seq[string],
-                    ins:  bool): ChalkDict =
+method getChalkTimeHostInfo*(self: AuthorsFileCodeOwner, path: seq[string]): ChalkDict =
   result = ChalkDict()
 
   var fname: string

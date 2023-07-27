@@ -6,23 +6,22 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 
-import tables, os
-import nimutils, ../types, ../plugins
+import ../config
 
 type GitlabCI = ref object of Plugin
 
-method getHostInfo*(self: GitlabCI, path: seq[string], ins: bool): ChalkDict =
+method getChalkTimeHostInfo*(self: GitlabCI, path: seq[string]): ChalkDict =
   result = ChalkDict()
 
   # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
   let
-    CI                = os.getEnv("CI")
-    GITLAB_CI         = os.getEnv("GITLAB_CI")
-    GITLAB_JOB_URL    = os.getEnv("CI_JOB_URL")
-    GITLAB_JOB_ID     = os.getEnv("CI_JOB_ID")
-    GITLAB_API_URL    = os.getEnv("CI_API_V4_URL")
-    GITLAB_USER       = os.getEnv("GITLAB_USER_LOGIN")
-    GITLAB_EVENT_NAME = os.getEnv("CI_PIPELINE_SOURCE")
+    CI                = getEnv("CI")
+    GITLAB_CI         = getEnv("GITLAB_CI")
+    GITLAB_JOB_URL    = getEnv("CI_JOB_URL")
+    GITLAB_JOB_ID     = getEnv("CI_JOB_ID")
+    GITLAB_API_URL    = getEnv("CI_API_V4_URL")
+    GITLAB_USER       = getEnv("GITLAB_USER_LOGIN")
+    GITLAB_EVENT_NAME = getEnv("CI_PIPELINE_SOURCE")
 
   # probably not running in gitlab CI
   if CI == "" and GITLAB_CI == "": return

@@ -1,3 +1,6 @@
+## :Author: Brandon Edwards (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import strutils
 import sugar
 
@@ -20,7 +23,7 @@ const
 let
   permStrings       = ["-", "r", "w", "", "x"]
   flagStrings       = ["s", "p"]
-type 
+type
   procMapping*     = ref object of RootRef
     addressLow*:   uint64
     addressHigh*:  uint64

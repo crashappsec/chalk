@@ -1,4 +1,9 @@
-import tables, streams, strutils, options, unicode, json, nimutils, os
+## Dockerfile parsing
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023 Crash Override, Inc.
+
+import config, unicode
 
 # RUN and COPY accept << and <<-
 # This one is particularly a HFS:

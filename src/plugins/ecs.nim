@@ -2,7 +2,7 @@
 ##
 ## :Author: Liming Luo (liming@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
-import os, tables, httpclient, json, options, nimutils, ../config, ../plugins
+import httpclient, ../config
 
 
 type AwsEcs = ref object of Plugin
@@ -37,10 +37,10 @@ template reportECSData(key: string) =
   if readECSMetadata().isSome():
     result[key] = pack($(ecsMetadata.get()))
 
-method getHostInfo*(self: AwsEcs, path: seq[string], ins: bool): ChalkDict =
+method getChalkTimeHostInfo*(self: AwsEcs, path: seq[string]): ChalkDict =
   reportECSData("CLOUD_METADATA")
 
-method getPostRunInfo*(self: AwsEcs, objs: seq[ChalkObj]): ChalkDict =
+method getRunTimeHostInfo*(self: AwsEcs, objs: seq[ChalkObj]): ChalkDict =
   reportECSData("_OP_CLOUD_METADATA")
 
 registerPlugin("aws_ecs", AwsEcs())

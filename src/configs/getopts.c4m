@@ -1,3 +1,8 @@
+## Spec for command line.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 default_recursive_doc := """
 "Determines whether a file scan will recursively walk paths to find artifacts.
 """

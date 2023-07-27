@@ -4,8 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, options, algorithm, strutils, json,
-       ../plugins, ../config, ../chalkjson
+import algorithm, ../config, ../chalkjson
 
 type
   ToolPlugin* = ref object of Plugin
@@ -120,11 +119,10 @@ template toolBase(s: untyped, hostScope: static[bool]) {.dirty.} =
 
   return dict
 
-method getHostInfo*(self: ToolPlugin, path: seq[string], ins: bool): ChalkDict =
-  if not ins: return
+method getChalkTimeHostInfo*(self: ToolPlugin, path: seq[string]): ChalkDict =
   toolBase(path[0], true)
 
-method getChalkInfo*(self: ToolPlugin, obj: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: ToolPlugin, obj: ChalkObj): ChalkDict =
  toolbase(obj.fullpath, false)
 
 registerPlugin("tool", ToolPlugin())

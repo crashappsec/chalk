@@ -13,12 +13,12 @@ static:
                      "--language=nim --output-file=c4autoconf.nim; else " &
                      "echo No change to chalk.c42spec; fi")
 
-# Note that importing builtins causes topics to register, and
-# importing plugins causes plugins to register.
+# Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
-import config, builtins, commands, plugins, strutils, jitso, norecurse
+import config, confload, commands, jitso, norecurse, sinks, plugin_load
 
 when isMainModule:
+  addDefaultSinks()
   loadAllConfigs()
   recursionCheck()
   # Wait for this warning until after configs load.

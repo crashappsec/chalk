@@ -1,31 +1,14 @@
 ## Load information based on profiles.
 ##
-## TODO: don't call into plugins if it's not needed.
-##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import config, plugins, options, tables, glob
+import glob, config, util, plugin_api
 
 # We collect things in four different places
 
 type CKind = enum CkChalkInfo, CkPostRunInfo, CkHostInfo
 
-proc registerProfileKeys(profiles: openarray[string]): int {.discardable.} =
-  result = 0
-
-  # We always subscribe to _VALIDATED, even if they don't want to
-  # report it; they might subscribe to the error logs it generates.
-  #
-  # This basically ends up forcing getPostChalkInfo() to run in
-  # the system plugin.
-  subscribedKeys["_VALIDATED"] = true
-
-  for item in profiles:
-    if item == "" or chalkConfig.profiles[item].enabled == false: continue
-    result = result + 1
-    for name, content in chalkConfig.profiles[item].keys:
-      if content.report: subscribedKeys[name] = true
 
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we
@@ -70,27 +53,69 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   error("Plugin '" & plugin.name & "' can't write system key: '" & key & "'")
   return false
 
-proc collectHostInfo() =
-  let
-    path        = chalkConfig.getArtifactSearchPath()
-    isInserting = getCommandName() in chalkConfig.getValidChalkCommandNames()
+proc registerProfileKeys(profiles: openarray[string]): int {.discardable.} =
+  result = 0
+
+  # We always subscribe to _VALIDATED, even if they don't want to
+  # report it; they might subscribe to the error logs it generates.
+  #
+  # This basically ends up forcing getRunTimeArtifactInfo() to run in
+  # the system plugin.
+  subscribedKeys["_VALIDATED"] = true
+
+  for item in profiles:
+    if item == "" or chalkConfig.profiles[item].enabled == false: continue
+    result = result + 1
+    for name, content in chalkConfig.profiles[item].keys:
+      if content.report: subscribedKeys[name] = true
+
+proc collectChalkTimeHostInfo() =
+  ## This collects host information at the start of a run, if we're chalking.
+  let path = chalkConfig.getArtifactSearchPath()
 
   for plugin in getPlugins():
     let subscribed = plugin.configInfo.preRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
-    let dict = plugin.getHostInfo(path, isInserting)
+    let dict = plugin.getChalkTimeHostInfo(path)
     if dict == nil or len(dict) == 0: continue
 
     for k, v in dict:
-      if not isInserting and k[0] != '_':                      continue
       if not plugin.canWrite(k, plugin.configInfo.preRunKeys): continue
       if k notin hostInfo or k in plugin.configInfo.overrides:
         hostInfo[k] = v
 
-proc collectPostChalkInfo*(artifact: ChalkObj) =
-  let
-    isInserting = getCommandName() in chalkConfig.getValidChalkCommandNames()
+proc initCollection*() =
+  ## Chalk commands that report call this to initialize the collection
+  ## system.  It looks at any reports that are currently configured,
+  ## and 'registers' the keys, so that we don't waste time trying to
+  ## collect data that isn't going to be reported upon.
+  ##
+  ## then, if we are chalking, it collects ChalkTimeHostInfo data
 
+  once:
+    let config       = getOutputConfig()
+    let cmdprofnames = [config.chalk, config.hostreport, config.artifactReport,
+                        config.invalidChalkReport]
+
+    # First, deal with the default output configuration.
+    if registerProfileKeys(cmdprofnames) == 0:
+      error("FATAL: no output reporting configured (all specs in the " &
+            "command's 'outconf' object are disabled")
+      quit(1)
+
+    # Next, register for any custom reports.
+    for name, report in chalkConfig.reportSpecs:
+      if (getBaseCommandName() notin report.use_when and
+          "*" notin report.use_when):
+        continue
+      registerProfileKeys([report.artifactReport,
+                           report.hostReport,
+                           report.invalidChalkReport])
+
+    if isChalkingOp():
+      collectChalkTimeHostInfo()
+
+proc collectRunTimeChalkInfo*(artifact: ChalkObj) =
   for plugin in getPlugins():
     let
       data       = artifact.collectedData
@@ -99,7 +124,7 @@ proc collectPostChalkInfo*(artifact: ChalkObj) =
     if plugin.configInfo.codec and plugin != artifact.myCodec: continue
 
 
-    let dict = plugin.getPostChalkInfo(artifact, isInserting)
+    let dict = plugin.getRunTimeArtifactInfo(artifact, isChalkingOp())
     if dict == nil or len(dict) == 0: continue
 
     for k, v in dict:
@@ -131,7 +156,7 @@ proc collectChalkInfo*(obj: ChalkObj) =
     let subscribed = plugin.configInfo.artifactKeys
     if not plugin.hasSubscribedKey(subscribed, data): continue
 
-    let dict = plugin.getChalkInfo(obj)
+    let dict = plugin.getChalkTimeArtifactInfo(obj)
     if dict == nil or len(dict) == 0: continue
 
     for k, v in dict:
@@ -139,14 +164,14 @@ proc collectChalkInfo*(obj: ChalkObj) =
       if k notin obj.collectedData or k in plugin.configInfo.overrides:
         obj.collectedData[k] = v
 
-proc collectPostRunInfo*() =
+proc collectRunTimeHostInfo*() =
   ## Called from report generation in commands.nim, not the main
   ## artifact loop below.
   for plugin in getPlugins():
     let subscribed = plugin.configInfo.postRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
 
-    let dict = plugin.getPostRunInfo(getAllChalks())
+    let dict = plugin.getRunTimeHostInfo(getAllChalks())
     if dict == nil or len(dict) == 0: continue
 
     for k, v in dict:
@@ -161,11 +186,11 @@ proc ignoreArtifact(path: string, globs: seq[glob.Glob]): bool {.inline.} =
     if path.matches(item): return true
   return false
 
-proc findChalk(codec:      Codec,
-               searchPath: seq[string],
-               exclusions: var seq[string],
-               ignoreList: seq[glob.Glob],
-               recurse:    bool): (bool, seq[ChalkObj]) {.inline.} =
+proc findChalk*(codec:      Codec,
+                searchPath: seq[string],
+                exclusions: var seq[string],
+                ignoreList: seq[glob.Glob],
+                recurse:    bool): (bool, seq[ChalkObj]) {.inline.} =
   var goOn = true # Keep trying other codecs if nothing is found
 
   if len(searchPath) != 0: codec.searchPath = searchPath
@@ -228,71 +253,7 @@ iterator artifacts*(artifactPath: seq[string]): ChalkObj =
       clearErrorObject()
       if not inSubScan() and obj.fullpath notin getUnmarked():
         if not obj.forceIgnore:
-          obj.collectPostChalkInfo()
+          obj.collectRunTimeChalkInfo()
       obj.myCodec.cleanup(obj)
       obj.closeFileStream()
     if len(chalks) > 0 and not goOn: break
-
-proc handleSelfChalkWarnings*() =
-  if not canSelfInject:
-    warn("We have no codec for this platform's native executable type")
-  else:
-    if not selfChalk.isMarked():
-        warn("No existing self-chalk mark found.")
-    elif "CHALK_ID" notin selfChalk.extract:
-        error("Self-chalk mark found, but is invalid.")
-
-proc getSelfExtraction*(): Option[ChalkObj] =
-  # If we call twice and we're on a platform where we don't
-  # have a codec for this type of executable, avoid dupe errors.
-  once:
-    var
-      myPath = @[resolvePath(getMyAppPath())]
-      exclusions: seq[string] = @[]
-      chalks:     seq[ChalkObj]
-      ignore:     bool
-
-    # This can stay here, but won't show if the log level is set in the
-    # config file, since this function runs before the config files load.
-    # It will only be seen if running via --trace.
-    #
-    # Also, note that this function extracts any chalk, but our first
-    # caller, getEmbededConfig() in config.nim, checks the results to
-    # see if the mark is there, and reports whether it's found or not.
-    # This trace happens here mainly because we easily have the
-    # resolved path here.
-    trace("Checking chalk binary '" & myPath[0] & "' for embedded config")
-
-    for codec in getCodecs():
-      if hostOS notin codec.getNativeObjPlatforms(): continue
-      (ignore, chalks)  = codec.findChalk(myPath, exclusions, @[], false)
-      selfChalk         = chalks[0]
-      if selfChalk.extract == nil:
-        selfChalk.marked = false
-        selfChalk.extract = ChalkDict()
-      selfId            = some(codec.getChalkId(selfChalk))
-      selfChalk.myCodec = codec
-      return some(selfChalk)
-
-    canSelfInject = false
-
-  if selfChalk != nil: return some(selfChalk)
-  else:                return none(ChalkObj)
-
-proc initCollection*() =
-  once:
-    let config       = getOutputConfig()
-    let cmdprofnames = [config.chalk, config.hostreport, config.artifactReport,
-                        config.invalidChalkReport]
-    if registerProfileKeys(cmdprofnames) == 0:
-      error("FATAL: no output reporting configured (all specs in the " &
-            "command's 'outconf' object are disabled")
-      quit(1)
-    for name, report in chalkConfig.reportSpecs:
-      if (getBaseCommandName() notin report.use_when and
-          "*" notin report.use_when):
-        continue
-      registerProfileKeys([report.artifactReport,
-                           report.hostReport,
-                           report.invalidChalkReport])
-    collectHostInfo()

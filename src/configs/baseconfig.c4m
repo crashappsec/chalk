@@ -39,12 +39,12 @@ ascii_magic   :=   "dadfedabbadabbed"
 # new metadata keys to the space.
 #
 # User-defined MUST begin with the X- prefix.
-enum   ChalkableHost, Chalk, NonChalk, HostOnly
-export ChalkableHost, Chalk, NonChalk, HostOnly
+enum   ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
+export ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
 
 keyspec MAGIC {
     required:         true
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     system:           true
@@ -57,7 +57,7 @@ keyspec MAGIC {
 
 keyspec CHALK_ID {
     required:         true
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             string
     standard:         true
@@ -70,7 +70,7 @@ keyspec CHALK_ID {
 
 keyspec CHALK_VERSION {
     required:         true
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     system:           true
@@ -82,7 +82,7 @@ keyspec CHALK_VERSION {
 }
 
 keyspec TIMESTAMP {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             int
     standard:         true
     system:           true
@@ -97,7 +97,7 @@ formatting, which only happens once at the beginning of each chalk run.
 }
 
 keyspec DATE {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     system:           true
@@ -112,7 +112,7 @@ values, but all other fields only time to the run.
 }
 
 keyspec TIME {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     system:           true
@@ -127,7 +127,7 @@ time values, but all other fields only time to the run.
 }
 
 keyspec TZ_OFFSET {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     system:           true
@@ -139,7 +139,7 @@ keyspec TZ_OFFSET {
 }
 
 keyspec DATETIME {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     system:           true
@@ -151,7 +151,7 @@ keyspec DATETIME {
 }
 
 keyspec CHALK_PTR {
-    kind:                  Chalk
+    kind:                  ChalkTimeArtifact
     type:                  string
     standard:              true
     since:                 "0.1.0"
@@ -163,7 +163,7 @@ to point to the rest of the data.
 }
 
 keyspec EARLIEST_VERSION {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     system:           true
@@ -174,7 +174,7 @@ keyspec EARLIEST_VERSION {
 }
 
 keyspec INSERTION_HOSTINFO {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -182,7 +182,7 @@ keyspec INSERTION_HOSTINFO {
 }
 
 keyspec INSERTION_NODENAME {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -192,7 +192,7 @@ The node name at the time of insertion. On posix systems, this should be equivol
 }
 
 keyspec ARTIFACT_PATH {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             string
     standard:         true
@@ -202,7 +202,7 @@ keyspec ARTIFACT_PATH {
 }
 
 keyspec ARTIFACT_TYPE {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             string
     standard:         true
@@ -211,7 +211,7 @@ keyspec ARTIFACT_TYPE {
 }
 
 keyspec _OP_ARTIFACT_TYPE {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     codec:            true
@@ -219,7 +219,7 @@ keyspec _OP_ARTIFACT_TYPE {
 }
 
 keyspec HASH {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             string
     standard:         true
@@ -230,7 +230,7 @@ keyspec HASH {
 }
 
 keyspec HASH_FILES {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             list[string]
     never_early:      true
     standard:         true
@@ -241,7 +241,7 @@ keyspec HASH_FILES {
 }
 
 keyspec COMPONENT_HASHES {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             list[string]
     never_early:      true
     standard:         true
@@ -257,7 +257,7 @@ the order of the HASH_FILES field
 # This is one that could be different per-artifact, but our current
 # collectors only collect at a host level.
 keyspec ORIGIN_URI {
-    kind:                Chalk
+    kind:                ChalkTimeArtifact
     type:                string
     standard:            true
     since:               "0.1.0"
@@ -266,7 +266,7 @@ keyspec ORIGIN_URI {
 }
 
 keyspec BRANCH {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -274,7 +274,7 @@ keyspec BRANCH {
 }
 
 keyspec COMMIT_ID {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -283,7 +283,7 @@ keyspec COMMIT_ID {
 }
 
 keyspec ARTIFACT_VERSION {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -291,7 +291,7 @@ keyspec ARTIFACT_VERSION {
 }
 
 keyspec STORE_URI {
-    kind:                Chalk
+    kind:                ChalkTimeArtifact
     type:                string
     standard:            true
     since:               "0.1.0"
@@ -301,7 +301,7 @@ keyspec STORE_URI {
 }
 
 keyspec PACKAGE_URI {
-    kind:               Chalk
+    kind:               ChalkTimeArtifact
     type:               string
     standard:           true
     since:              "0.1.0"
@@ -310,7 +310,7 @@ keyspec PACKAGE_URI {
 }
 
 keyspec CODE_OWNERS {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -318,7 +318,7 @@ keyspec CODE_OWNERS {
 }
 
 keyspec INJECTOR_ID {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -326,7 +326,7 @@ keyspec INJECTOR_ID {
 }
 
 keyspec INJECTOR_VERSION {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     system:           true
@@ -335,7 +335,7 @@ keyspec INJECTOR_VERSION {
 }
 
 keyspec INJECTOR_PLATFORM {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     system:           true
@@ -344,7 +344,7 @@ keyspec INJECTOR_PLATFORM {
 }
 
 keyspec INJECTOR_COMMIT_ID {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     system:           true
@@ -353,7 +353,7 @@ keyspec INJECTOR_COMMIT_ID {
 }
 
 keyspec BUILD_ID {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -361,7 +361,7 @@ keyspec BUILD_ID {
 }
 
 keyspec BUILD_URI {
-    kind:                Chalk
+    kind:                ChalkTimeArtifact
     type:                string
     standard:            true
     since:               "0.1.0"
@@ -370,7 +370,7 @@ keyspec BUILD_URI {
 }
 
 keyspec BUILD_API_URI {
-    kind:                Chalk
+    kind:                ChalkTimeArtifact
     type:                string
     standard:            true
     since:               "0.1.0"
@@ -380,7 +380,7 @@ keyspec BUILD_API_URI {
 }
 
 keyspec BUILD_TRIGGER {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -388,7 +388,7 @@ keyspec BUILD_TRIGGER {
 }
 
 keyspec BUILD_CONTACT {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             list[string]
     standard:         true
     since:            "0.1.0"
@@ -397,7 +397,7 @@ keyspec BUILD_CONTACT {
 
 
 keyspec CHALK_RAND {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     system:           true
@@ -410,7 +410,7 @@ keyspec CHALK_RAND {
 }
 
 keyspec _ACTION_ID {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -424,7 +424,7 @@ keyspec _ACTION_ID {
 cmdline_args := argv()
 
 keyspec ARGV {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             list[string]
     standard:         true
     system:           true
@@ -434,7 +434,7 @@ keyspec ARGV {
 }
 
 keyspec ENV {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             dict[string, string]
     standard:         true
     system:           true
@@ -452,7 +452,7 @@ Currently, this filtering is not handled per-report.
 }
 
 keyspec _ARGV {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[string]
     standard:         true
     system:           true
@@ -463,7 +463,7 @@ keyspec _ARGV {
 
 
 keyspec _ENV {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             dict[string, string]
     standard:         true
     system:           true
@@ -473,7 +473,7 @@ Same as ENV, but for a non-chalking context (e.g., extraction time). It respects
 """
 }
 keyspec TENANT_ID {
-    kind:             ChalkableHost
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -483,7 +483,7 @@ A user-defined unique identifier intended to capture any meaningful user data.
 }
 
 keyspec _TENANT_ID {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -493,7 +493,7 @@ A user-defined unique identifier intended to capture any meaningful user data.
 }
 
 keyspec OLD_CHALK_METADATA_HASH {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             string
     standard:         true
@@ -504,7 +504,7 @@ keyspec OLD_CHALK_METADATA_HASH {
 }
 
 keyspec OLD_CHALK_METADATA_ID {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             string
     standard:         true
@@ -515,7 +515,7 @@ keyspec OLD_CHALK_METADATA_ID {
 }
 
 keyspec EMBEDDED_CHALK {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             `x
     standard:         true
@@ -525,7 +525,7 @@ keyspec EMBEDDED_CHALK {
 }
 
 keyspec EMBEDDED_TMPDIR {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             string
     standard:         true
@@ -537,7 +537,7 @@ Temporary directory for embedded contents that was used when chalking. Any direc
 }
 
 keyspec CLOUD_METADATA {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -547,7 +547,7 @@ Metadata reported by the local cloud provider.  The contents are specific to the
 }
 
 keyspec SBOM {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
@@ -555,7 +555,7 @@ keyspec SBOM {
 }
 
 keyspec SAST {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
@@ -563,7 +563,7 @@ keyspec SAST {
 }
 
 keyspec ERR_INFO {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             list[string]
     standard:         true
     system:           true
@@ -573,7 +573,7 @@ keyspec ERR_INFO {
 }
 
 keyspec SIGNING {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             bool
     standard:         true
@@ -588,7 +588,7 @@ keyspec SIGNING {
 
 keyspec METADATA_HASH {
     required:         true
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             string
     standard:         true
@@ -601,7 +601,7 @@ keyspec METADATA_HASH {
 
 keyspec METADATA_ID {
     required:         true
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             string
     standard:         true
@@ -612,7 +612,7 @@ keyspec METADATA_ID {
 }
 
 keyspec SIGN_PARAMS {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             dict[string, string]
     standard:         true
     system:           true
@@ -622,7 +622,7 @@ keyspec SIGN_PARAMS {
 }
 
 keyspec SIGNATURE {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     never_early:      true
     type:             string
     standard:         true
@@ -633,7 +633,7 @@ keyspec SIGNATURE {
 }
 
 keyspec _OPERATION {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -644,7 +644,7 @@ keyspec _OPERATION {
 }
 
 keyspec _TIMESTAMP {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             int
     standard:         true
     system:           true
@@ -655,7 +655,7 @@ keyspec _TIMESTAMP {
 }
 
 keyspec _DATE {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -666,7 +666,7 @@ keyspec _DATE {
 }
 
 keyspec _TIME {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -677,7 +677,7 @@ keyspec _TIME {
 }
 
 keyspec _TZ_OFFSET {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -688,7 +688,7 @@ keyspec _TZ_OFFSET {
 }
 
 keyspec _DATETIME {
-    kind:              HostOnly
+    kind:              RunTimeHost
     type:              string
     standard:          true
     system:            true
@@ -701,7 +701,7 @@ keyspec _DATETIME {
 
 
 keyspec _CHALKS {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -713,7 +713,7 @@ keyspec _CHALKS {
 }
 
 keyspec _OP_CHALK_COUNT {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             int
     standard:         true
     system:           true
@@ -725,7 +725,7 @@ keyspec _OP_CHALK_COUNT {
 }
 
 keyspec _OP_UNMARKED_COUNT {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -737,7 +737,7 @@ The number of unmarked artifacts that codecs saw. For inserts, this will be item
 }
 
 keyspec _OP_ARTIFACT_PATH {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     system:           true
@@ -746,7 +746,7 @@ keyspec _OP_ARTIFACT_PATH {
 }
 
 keyspec _CURRENT_HASH {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     codec:            true
@@ -758,7 +758,7 @@ keyspec _CURRENT_HASH {
 }
 
 keyspec _OP_CMD_FLAGS {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[string]
     standard:         true
     system:           true
@@ -768,7 +768,7 @@ keyspec _OP_CMD_FLAGS {
 }
 
 keyspec _OP_SEARCH_PATH {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[string]
     standard:         true
     system:           true
@@ -778,7 +778,7 @@ keyspec _OP_SEARCH_PATH {
 }
 
 keyspec _OP_EXE_NAME {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -788,7 +788,7 @@ keyspec _OP_EXE_NAME {
 }
 
 keyspec _OP_EXE_PATH {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -799,7 +799,7 @@ keyspec _OP_EXE_PATH {
 }
 
 keyspec _OP_ARGV {
-    kind:           HostOnly
+    kind:           RunTimeHost
     type:           list[string]
     standard:       true
     system:         true
@@ -812,7 +812,7 @@ raw data used to determine _OP_EXE_NAME, _OP_SEARCH_PATH and _OP_CMD_FLAGS
 }
 
 keyspec _OP_CONFIG {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -827,7 +827,7 @@ The contents of any user-definable configuration file, if an external
 
 # This must be skipped under any insertion context.
 keyspec _VALIDATED {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             bool
     standard:         true
     system:           true
@@ -838,7 +838,7 @@ keyspec _VALIDATED {
 }
 
 keyspec _UNMARKED {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[string]
     standard:         true
     system:           true
@@ -848,7 +848,7 @@ keyspec _UNMARKED {
 }
 
 keyspec _VIRTUAL {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             bool
     standard:         true
     system:           true
@@ -857,7 +857,7 @@ keyspec _VIRTUAL {
 }
 
 keyspec _OP_CHALKER_COMMIT_ID {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -866,7 +866,7 @@ keyspec _OP_CHALKER_COMMIT_ID {
 }
 
 keyspec _OP_CHALKER_VERSION {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     system:           true
@@ -875,7 +875,7 @@ keyspec _OP_CHALKER_VERSION {
 }
 
 keyspec _OP_PLATFORM {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -883,7 +883,7 @@ keyspec _OP_PLATFORM {
 }
 
 keyspec _OP_HOSTNAME {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -891,7 +891,7 @@ keyspec _OP_HOSTNAME {
 }
 
 keyspec _OP_HOSTINFO {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -900,7 +900,7 @@ keyspec _OP_HOSTINFO {
 }
 
 keyspec _OP_NODENAME {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -910,7 +910,7 @@ The node name at the time of the current operation. On posix systems, this shoul
 }
 
 keyspec $CHALK_CONFIG {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     system:           true
@@ -921,14 +921,14 @@ keyspec $CHALK_CONFIG {
 
 #% INTERNAL
 keyspec $ELF_VALUES {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             list[tuple[int, int, int]]
     standard:         true
     since:            "0.1.0"
 }
 
 keyspec $ELF_INSERTIONS {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             list[tuple[int, int]]
     standard:         true
     since:            "0.1.0"
@@ -936,7 +936,7 @@ keyspec $ELF_INSERTIONS {
 #% END
 
 keyspec _OP_CLOUD_METADATA {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -946,7 +946,7 @@ Metadata reported by the local cloud provider.  The contents are specific to the
 }
 
 keyspec _OP_ERRORS {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[string]
     standard:         true
     system:           true
@@ -955,7 +955,7 @@ keyspec _OP_ERRORS {
 }
 
 keyspec _OP_CHALKED_KEYS {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[string]
     standard:         true
     system:           true
@@ -965,7 +965,7 @@ keyspec _OP_CHALKED_KEYS {
 }
 
 keyspec _OP_ARTIFACT_REPORT_KEYS {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[string]
     standard:         true
     system:           true
@@ -975,7 +975,7 @@ keyspec _OP_ARTIFACT_REPORT_KEYS {
 }
 
 keyspec _OP_HOST_REPORT_KEYS {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[string]
     standard:         true
     system:           true
@@ -985,7 +985,7 @@ keyspec _OP_HOST_REPORT_KEYS {
 }
 
 keyspec _OP_TCP_SOCKET_INFO {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
@@ -1006,7 +1006,7 @@ When running Chalk inside a container, this information will be the virtualized 
 }
 
 keyspec _OP_UDP_SOCKET_INFO {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
@@ -1027,7 +1027,7 @@ When running Chalk inside a container, this information will be the virtualized 
 }
 
 keyspec _OP_IPV4_ROUTES {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
@@ -1052,7 +1052,7 @@ When running Chalk inside a container, this information will be the virtualized 
 }
 
 keyspec _OP_IPV6_ROUTES {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
@@ -1076,7 +1076,7 @@ When running Chalk inside a container, this information will be the virtualized 
 }
 
 keyspec _OP_IPV4_INTERFACES {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
@@ -1097,7 +1097,7 @@ When running Chalk inside a container, this information will be the virtualized 
 }
 
 keyspec _OP_IPV6_INTERFACES {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
@@ -1119,7 +1119,7 @@ When running Chalk inside a container, this information will be the virtualized 
 
 
 keyspec _OP_ARP_TABLE {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
@@ -1139,7 +1139,7 @@ When running Chalk inside a container, this information will be the virtualized 
 }
 
 keyspec _OP_CPU_INFO {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             dict[string, string]
     standard:         true
     since:            "0.1.0"
@@ -1159,7 +1159,7 @@ When running Chalk inside a container, this information will be the virtualized 
 }
 
 keyspec _OP_ALL_PS_INFO {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             dict[string, dict[string, string]]
     standard:         true
     since:            "0.1.0"
@@ -1199,7 +1199,7 @@ When running Chalk inside a container, this information will be the virtualized 
 }
 
 keyspec _PROCESS_PID {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             int
     standard:         true
     since:            "0.1.0"
@@ -1211,7 +1211,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_DETAIL {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             dict[string, string]
     standard:         true
     since:            "0.1.0"
@@ -1229,7 +1229,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_PARENT_PID {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             int
     standard:         true
     since:            "0.1.0"
@@ -1241,7 +1241,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_START_TIME {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             float
     standard:         true
     since:            "0.1.0"
@@ -1253,7 +1253,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_UTIME {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             float
     standard:         true
     since:            "0.1.0"
@@ -1264,7 +1264,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_STIME {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             float
     standard:         true
     since:            "0.1.0"
@@ -1276,7 +1276,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_CHILDREN_UTIME {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             float
     standard:         true
     since:            "0.1.0"
@@ -1288,7 +1288,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_CHILDREN_STIME {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             float
     standard:         true
     since:            "0.1.0"
@@ -1300,7 +1300,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_STATE {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -1312,7 +1312,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_PGID {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             int
     standard:         true
     since:            "0.1.0"
@@ -1324,7 +1324,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_UMASK {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             int
     standard:         true
     since:            "0.1.0"
@@ -1336,7 +1336,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_UID {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[int]
     standard:         true
     since:            "0.1.0"
@@ -1348,7 +1348,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_GID {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[int]
     standard:         true
     since:            "0.1.0"
@@ -1361,7 +1361,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 
 
 keyspec _PROCESS_NUM_FD_SIZE {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             int
     standard:         true
     since:            "0.1.0"
@@ -1373,7 +1373,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_GROUPS {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[int]
     standard:         true
     since:            "0.1.0"
@@ -1385,7 +1385,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_SECCOMP_STATUS {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -1397,7 +1397,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_ARGV {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[string]
     standard:         true
     since:            "0.1.0"
@@ -1409,7 +1409,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_CWD {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -1421,7 +1421,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_EXE_PATH {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -1433,7 +1433,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_COMMAND_NAME {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -1445,7 +1445,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_FD_INFO {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             dict[string, dict[string, string]]
     standard:         true
     since:            "0.1.0"
@@ -1460,7 +1460,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 }
 
 keyspec _PROCESS_MOUNT_INFO {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
@@ -1473,7 +1473,7 @@ Currently, this is only available during a 'chalk exec' operation, where Chalk h
 
 
 keyspec DOCKER_FILE {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     system:           false
@@ -1484,7 +1484,7 @@ When chalking docker containers, this gets the contents of the topmost docker fi
 }
 
 keyspec DOCKERFILE_PATH {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     system:           false
@@ -1495,7 +1495,7 @@ Path to the docker file on the system on which it was built.
 }
 
 keyspec DOCKER_PLATFORM {
-    kind:             Chalk
+    kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     system:           false
@@ -1506,7 +1506,7 @@ Platform passed when performing 'docker build', if any.
 }
 
 keyspec DOCKER_LABELS {
-    kind:              Chalk
+    kind:              ChalkTimeArtifact
     type:              dict[string, string]
     standard:          true
     system:            false
@@ -1517,7 +1517,7 @@ Labels added to a docker image.
 }
 
 keyspec DOCKER_TAGS {
-    kind:              Chalk
+    kind:              ChalkTimeArtifact
     type:              list[string]
     standard:          true
     system:            false
@@ -1528,7 +1528,7 @@ Tags added to a docker image.  Will be in the form: REPOSITORY:TAG
 }
 
 keyspec DOCKER_CONTEXT {
-    kind:              Chalk
+    kind:              ChalkTimeArtifact
     type:              string
     standard:          true
     system:            false
@@ -1539,7 +1539,7 @@ Context used when building a container.
 }
 
 keyspec _OP_ALL_IMAGE_METADATA {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             `x
     standard:         true
     doc: """
@@ -1548,7 +1548,7 @@ All reported metadata for am image as examined, in JSON format.  With docker, th
 }
 
 keyspec _OP_ALL_CONTAINER_METADATA {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             `x
     standard:         true
     doc: """
@@ -1557,7 +1557,7 @@ All reported metadata for the running container, as reported by the container ru
 }
 
 keyspec _INSTANCE_ID {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     doc: """
@@ -1566,7 +1566,7 @@ Any reported instance ID, such as the container ID for a running container.
 }
 
 keyspec _INSTANCE_CREATION_DATETIME {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     doc: """
@@ -1575,7 +1575,7 @@ The DATETIME formatted string for the reported container creation time.
 }
 
 keyspec _INSTANCE_ENTRYPOINT {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     doc: """
@@ -1584,7 +1584,7 @@ The path to the command, if running in a containerized / virtual environment.  T
 }
 
 keyspec _INSTANCE_ARGV {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[string]
     standard:         true
     doc: """
@@ -1593,7 +1593,7 @@ The arguments used when starting the instance.
 }
 
 keyspec _INSTANCE_ENV {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[string]
     standard:         true
     doc: """
@@ -1602,7 +1602,7 @@ Environment variables made available to the instance, in VAR=value format.
 }
 
 keyspec _INSTANCE_IMAGE_ID {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     doc: """
@@ -1612,7 +1612,7 @@ be lower-case ASCII prefixed with 'sha256:'
 }
 
 keyspec _INSTANCE_IMAGE_NAME {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     doc: """
@@ -1621,7 +1621,7 @@ The image name associated with a container, as reported by the runtime.
 }
 
 keyspec _INSTANCE_STATUS {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     doc: """
@@ -1630,7 +1630,7 @@ The status of a container or virtual instance (running, paused, stopped, etc) as
 }
 
 keyspec _INSTANCE_EXIT_CODE {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             int
     standard:         true
     doc: """
@@ -1639,7 +1639,7 @@ The exit code of a instance, as reported by the runtime.  Note that currently, t
 }
 
 keyspec _INSTANCE_PID {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             int
     standard:         true
     doc: """
@@ -1648,7 +1648,7 @@ The process ID of the instance as reported by the container runtime.  This will 
 }
 
 keyspec _INSTANCE_NAME {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     doc: """
@@ -1657,7 +1657,7 @@ The name this instance has been given by the container runtime.
 }
 
 keyspec _INSTANCE_RESTART_COUNT {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             int
     standard:         true
     doc: """
@@ -1666,7 +1666,7 @@ The number of restarts the runtime reports associated with the container.
 }
 
 keyspec _INSTANCE_PLATFORM {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             string
     standard:         true
     doc: """
@@ -1675,7 +1675,7 @@ Platform of an instance, as reported by the runtime.
 }
 
 keyspec _INSTANCE_MOUNTS {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[dict[string, `x]]
     standard:         true
     doc: """
@@ -1685,7 +1685,7 @@ objects come from the container runtime, and the type may vary.
 }
 
 keyspec _INSTANCE_CGROUP {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1694,7 +1694,7 @@ CGroup associated with the instance, as reported by the container runtime
 }
 
 keyspec _INSTANCE_ISOLATION {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1703,7 +1703,7 @@ Isolation technology in use for the instance, if reported by the container runti
 }
 
 keyspec _INSTANCE_IS_PRIVILEGED {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: bool
     standard: true
     doc: """
@@ -1712,7 +1712,7 @@ Whether or not the workload is running with admin privileges on the underlying n
 }
 
 keyspec _INSTANCE_ADDED_CAPS {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: list[string]
     standard: true
     doc: """
@@ -1721,7 +1721,7 @@ Capabilities explicitly added to an instance.
 }
 
 keyspec _INSTANCE_DROPPED_CAPS {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: list[string]
     standard: true
     doc: """
@@ -1730,7 +1730,7 @@ Capabilities explicitly dropped from an instance.
 }
 
 keyspec _INSTANCE_IMMUTABLE {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: bool
     standard: true
     doc: """
@@ -1739,7 +1739,7 @@ Whether the root file system is immutable.  Note that this does not preclude fil
 }
 
 keyspec _INSTANCE_RUNTIME {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1748,7 +1748,7 @@ The container runtime associated with the instance.
 }
 
 keyspec _INSTANCE_HOSTNAME {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1757,7 +1757,7 @@ The hostname of the instance, if reported by the container runtime.
 }
 
 keyspec _INSTANCE_DOMAINNAME {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1766,7 +1766,7 @@ The domain name of the instance, if any.
 }
 
 keyspec _INSTANCE_USER {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1775,7 +1775,7 @@ The user reported by the runtime, if any.
 }
 
 keyspec _INSTANCE_HAS_TTY {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: bool
     standard: true
     doc: """
@@ -1784,7 +1784,7 @@ Whether the instance is using a TTY.
 }
 
 keyspec _INSTANCE_LABELS {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: dict[string, string]
     standard: true
     doc: """
@@ -1793,7 +1793,7 @@ Labels attached to the instance.
 }
 
 keyspec _INSTANCE_EXPOSED_PORTS {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: dict[string, dict[string, `x]]
     standard: true
     doc: """
@@ -1802,7 +1802,7 @@ Explicitly configured ports that the instance may bind to on external interfaces
 }
 
 keyspec _INSTANCE_BOUND_PORTS {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             dict[string, dict[string, `x]]
     standard:         true
     doc: """
@@ -1811,7 +1811,7 @@ Information on bound ports from the runtime.  The keys will be of the form 'port
 }
 
 keyspec _INSTANCE_IP {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1820,7 +1820,7 @@ The primary IP address for the instance.
 }
 
 keyspec _INSTANCE_IPV6 {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1829,7 +1829,7 @@ The primary IPv6 address for the instance, if any.
 }
 
 keyspec _INSTANCE_GATEWAY {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1838,7 +1838,7 @@ The network gateway used by the instance.
 }
 
 keyspec _INSTANCE_GATEWAYV6 {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1847,7 +1847,7 @@ The network gateway used by the instance for IPv6 traffic, if any.
 }
 
 keyspec _INSTANCE_MAC {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1856,7 +1856,7 @@ The MAC address associated with the instance's primary network instance.
 }
 
 keyspec _INSTANCE_COMMENT {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1865,7 +1865,7 @@ Any comment explicitly set for the instance.
 }
 
 keyspec _INSTANCE_ARCH {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1874,7 +1874,7 @@ The reported architecture that the instance targets.
 }
 
 keyspec _INSTANCE_OS {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: string
     standard: true
     doc: """
@@ -1883,7 +1883,7 @@ The underlying OS reported by the runtime.
 }
 
 keyspec _INSTANCE_SIZE {
-    kind: NonChalk
+    kind: RunTimeArtifact
     type: int
     standard: true
     doc: """
@@ -1892,7 +1892,7 @@ The reported size of the image.
 }
 
 keyspec _REPO_HOST {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -1903,7 +1903,7 @@ When reporting on operations involving a repository (e.g., a push or pull), the
 }
 
 keyspec _REPO_PORT {
-    kind:             HostOnly
+    kind:             RunTimeHost
     type:             int
     standard:         true
     since:            "0.1.0"
@@ -1914,7 +1914,7 @@ port number of the associated repository.
 }
 
 keyspec _REPO_TAGS {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[string]
     standard:         true
     since:            "0.1.0"
@@ -1925,7 +1925,7 @@ tags associated with the artifact in the operation.
 }
 
 keyspec _REPO_DIGESTS {
-    kind:             NonChalk
+    kind:             RunTimeArtifact
     type:             list[string]
     standard:         true
     since:            "0.1.0"
@@ -2257,11 +2257,11 @@ By default, CHALK_RAND is on for unique builds. If you want reproducable builds,
   key.SBOM.report                     = true
   key.SAST.report                     = true
   key.ERR_INFO.report                 = true
-  key.SIGNING.report                  = true
+  key.SIGNING.report                  = false
   key.METADATA_HASH.report            = true
   key.METADATA_ID.report              = true
   key.SIGN_PARAMS.report              = true
-  key.SIGNATURE.report                = true
+  key.SIGNATURE.report                = false
   key.$CHALK_CONFIG.report            = true
 }
 
@@ -2278,7 +2278,7 @@ By default, CHALK_RAND is on for unique builds. If you want reproducable builds,
   key.CHALK_VERSION.report            = true
   key.CHALK_PTR.report                = true
   key.CHALK_RAND.report               = true
-  key.SIGNING.report                  = true
+  key.SIGNING.report                  = false
   key.METADATA_HASH.report            = true
   key.METADATA_ID.report              = true
   key.$CHALK_CONFIG.report            = true
@@ -2424,7 +2424,7 @@ Host keys are in the host_report_other_base (i.e., non-insert) profile.
   key.SBOM.report                        = true
   key.SAST.report                        = true
   key.ERR_INFO.report                    = true
-  key.SIGNING.report                     = false
+  key.SIGNING.report                     = true
   key.METADATA_HASH.report               = true
   key.METADATA_ID.report                 = true
   key.SIGN_PARAMS.report                 = true

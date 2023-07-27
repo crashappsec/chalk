@@ -1,7 +1,11 @@
+## Super cheezy plugin for OS X. I can't believe this even worked.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
 # We use slightly different magic for our heredoc. It's uppercase and longer.
 
-import streams, options, base64, strutils, nimSHA2, tables,
-       ../config, ../chalkjson, ../plugins
+import base64, nimSHA2, ../config, ../chalkjson, ../util
 
 var prefix = """
 #!/bin/bash
@@ -136,13 +140,13 @@ method handleWrite*(self: CodecMacOs, chalk: ChalkObj, enc: Option[string]) =
   if not chalk.replaceFilecontents(toWrite):
     chalk.opFailed = true
 
-method getChalkInfo*(self: CodecMacOs, chalk: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: CodecMacOs, chalk: ChalkObj): ChalkDict =
   result                  = ChalkDict()
   result["ARTIFACT_TYPE"] = artTypeMachO
 
-method getPostChalkInfo*(self:  CodecMacOs,
-                         chalk: ChalkObj,
-                         ins:   bool): ChalkDict =
+method getRunTimeArtifactInfo*(self:  CodecMacOs,
+                               chalk: ChalkObj,
+                               ins:   bool): ChalkDict =
   result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypeMachO
 

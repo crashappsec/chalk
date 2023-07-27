@@ -5,25 +5,25 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 
-import tables, strutils, os, ../config, ../plugins
+import ../config
 
 type GithubCI = ref object of Plugin
 
-method getHostInfo*(self: GithubCI, path: seq[string], ins: bool): ChalkDict =
+method getChalkTimeHostInfo*(self: GithubCI, path: seq[string]): ChalkDict =
   result = ChalkDict()
 
   # https://docs.github.com/en/actions/
   #              learn-github-actions/variables#default-environment-variables
   let
-    CI                = os.getEnv("CI")
-    GITHUB_SHA        = os.getEnv("GITHUB_SHA")
-    GITHUB_SERVER_URL = os.getEnv("GITHUB_SERVER_URL")
-    GITHUB_REPOSITORY = os.getEnv("GITHUB_REPOSITORY")
-    GITHUB_RUN_ID     = os.getEnv("GITHUB_RUN_ID")
-    GITHUB_API_URL    = os.getEnv("GITHUB_API_URL")
-    GITHUB_ACTOR      = os.getEnv("GITHUB_ACTOR")
-    GITHUB_EVENT_NAME = os.getEnv("GITHUB_EVENT_NAME")
-    GITHUB_REF_TYPE   = os.getEnv("GITHUB_REF_TYPE")
+    CI                = getEnv("CI")
+    GITHUB_SHA        = getEnv("GITHUB_SHA")
+    GITHUB_SERVER_URL = getEnv("GITHUB_SERVER_URL")
+    GITHUB_REPOSITORY = getEnv("GITHUB_REPOSITORY")
+    GITHUB_RUN_ID     = getEnv("GITHUB_RUN_ID")
+    GITHUB_API_URL    = getEnv("GITHUB_API_URL")
+    GITHUB_ACTOR      = getEnv("GITHUB_ACTOR")
+    GITHUB_EVENT_NAME = getEnv("GITHUB_EVENT_NAME")
+    GITHUB_REF_TYPE   = getEnv("GITHUB_REF_TYPE")
 
   # probably not running in github CI
   if CI == "" and GITHUB_SHA == "": return

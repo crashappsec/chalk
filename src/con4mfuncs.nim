@@ -1,91 +1,13 @@
-## This is where we keep our customizations of platform stuff that is
-## specific to chalk, including output setup and builtin con4m calls.
-## That is, the output code and con4m calls here do not belong in
-## con4m etc.
-##
-## Similarly, info about sinks and topics and other bits inherited
-## from nimtuils are here.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
-
-import config, options, tables
-
-var doingTestRun = false
-
-proc startTestRun*() =
-  doingTestRun = true
-
-proc endTestRun*() =
-  doingTestRun = false
-
-var args: seq[string]
-
-proc setArgs*(a: seq[string]) =
-  args = a
-
-proc getArgs*(): seq[string] = args
-
-proc getArgv(args: seq[Box], unused: ConfigState): Option[Box] =
-  return some(pack(getArgs()))
+import config, reporting, sinks
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
 
+proc getArgv(args: seq[Box], unused: ConfigState): Option[Box] =
+  return some(pack(getArgs()))
+
 proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getChalkExeVersion()))
-
-proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
-
-  if doingTestRun:
-    return some(pack(true))
-
-  let
-    topic  = unpack[string](args[0])
-    config = unpack[string](args[1])
-    `rec?` = getSinkConfigByName(config)
-
-  if `rec?`.isNone():
-    error(config & ": unknown sink configuration")
-    return some(pack(false))
-
-  let
-    record   = `rec?`.get()
-    `topic?` = subscribe(topic, record)
-
-  if `topic?`.isNone():
-    error(topic & ": unknown topic")
-    return some(pack(false))
-
-  return some(pack(true))
-
-proc topicUnsubscribe(args: seq[Box], unused: ConfigState): Option[Box] =
-  if doingTestRun:
-    return some(pack(true))
-
-  let
-    topic  = unpack[string](args[0])
-    config = unpack[string](args[1])
-    `rec?` = getSinkConfigByName(config)
-
-  if `rec?`.isNone(): return some(pack(false))
-
-  return some(pack(unsubscribe(topic, `rec?`.get())))
-
-proc chalkErrSink(msg: string, cfg: SinkConfig, t: Topic, arg: StringTable) =
-  let errObject = getErrorObject()
-  if not isChalkingOp() or errObject.isNone(): systemErrors.add(msg)
-  else: errObject.get().err.add(msg)
-
-proc chalkErrFilter(msg: string, info: StringTable): (string, bool) =
-  if not getSuspendLogging() and keyLogLevel in info:
-    let llStr = info[keyLogLevel]
-
-    if (llStr in toLogLevelMap) and chalkConfig != nil and
-     (toLogLevelMap[llStr] <= toLogLevelMap[chalkConfig.getChalkLogLevel()]):
-      return (msg, true)
-
-  return ("", false)
 
 proc logBase(ll: string, args: seq[Box], s: ConfigState): Option[Box] =
   let

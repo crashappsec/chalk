@@ -3,7 +3,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, streams, os, ../config, ../plugins
+import os, streams, ../config
 
 
 const
@@ -46,7 +46,8 @@ proc findCOFile(fullpath: string): string =
 
 type GithubCodeOwner = ref object of Plugin
 
-method getChalkInfo*(self: GithubCodeOwner, obj: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: GithubCodeOwner, obj: ChalkObj):
+       ChalkDict =
   # CODEOWNERS can live in the root of a repo, the docs subdir, or
   # the .github directory of a repository.  The challenge is that we
   # don't actually know where the root directory is, relative to the

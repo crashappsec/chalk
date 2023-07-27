@@ -1,14 +1,14 @@
-# This is a simple codec for dealing with python source code files;
-#  i.e., currently ones that have the extensions .py, .ipy, .pyw
-#
-# The presence of shebangs on line1 is accounted for and dealt with
-# identically to the shebang codec (i.e chalk goes on line2),
-# for non-Shebang files chalk goes on line1
-#
-# :Author: Rich Smith (rich@crashoverride.com)
-# :Copyright: 2022, 2023, Crash Override, Inc.
+## This is a simple codec for dealing with python source code files;
+##  i.e., currently ones that have the extensions .py, .ipy, .pyw
+##
+## The presence of shebangs on line1 is accounted for and dealt with
+## identically to the shebang codec (i.e chalk goes on line2),
+## for non-Shebang files chalk goes on line1
+##
+## :Author: Rich Smith (rich@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import tables, strutils, options, streams, ../config, ../plugins, os
+import ../config, ../plugin_api
 
 type CodecPythonPy* = ref object of Codec
 
@@ -29,13 +29,14 @@ method handleWrite*(self:    CodecPythonPy,
 
   chalk.scriptHandleWrite(encoded)
 
-method getChalkInfo*(self: CodecPythonPy, chalk: ChalkObj): ChalkDict =
+method getChalkTimeArtifactInfo*(self: CodecPythonPy, chalk: ChalkObj):
+       ChalkDict =
   result                  = ChalkDict()
   result["ARTIFACT_TYPE"] = artTypePy
 
-method getPostChalkInfo*(self:  CodecPythonPy,
-                         chalk: ChalkObj,
-                         ins:   bool): ChalkDict =
+method getRunTimeArtifactInfo*(self:  CodecPythonPy,
+                               chalk: ChalkObj,
+                               ins:   bool): ChalkDict =
   result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypePy
 
