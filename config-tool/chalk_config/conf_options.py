@@ -28,6 +28,8 @@ DB_FILE = Path("chalk-config.db")
 CONTAINER_DEBUG_PATH = "/config-bin/chalk"
 CONTAINER_RELEASE_PATH = "/config-bin/chalk-release"
 
+MIN_TTY_WIDTH = 120
+
 if os.path.isdir("/outdir/"):
     OUTPUT_DIRECTORY = "/outdir/"
 else:

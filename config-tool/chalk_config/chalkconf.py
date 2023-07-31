@@ -20,7 +20,7 @@ import requests
 from .conf_options import (
     check_for_updates, config_to_json, determine_sys_arch, json_to_dict, 
     dict_to_id, get_app, get_chalk_url,  get_wiz_screen, get_wizard, 
-    set_app, set_wiz_screen, set_wizard
+    MIN_TTY_WIDTH, set_app, set_wiz_screen, set_wizard
 )
 from . import conf_widgets ##row_ids is why this is needed - ToDo cleanup
 from .conf_widgets import (
@@ -52,6 +52,13 @@ MODULE_LOCATION = os.path.dirname(__file__)
 #     sys.exit(-2)
 
 logger = get_logger(__name__)
+
+# Check terminal width, a width different to 80 normally causes problems
+rows, cols = os.popen('stty size', 'r').read().split()
+if int(cols) < MIN_TTY_WIDTH:
+    input(f"\n[!] The width of the terminal is {cols} but needs to be a minimum of {MIN_TTY_WIDTH}. Please adjust your terminal width and relaunch. Exiting....\n")
+    sys.exit(-2)
+logger.info(f"TTY detected as having {int(cols)} columns")
 
 first_run = False
 
