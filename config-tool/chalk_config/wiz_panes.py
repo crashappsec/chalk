@@ -206,8 +206,15 @@ class ApiAuth(WizContainer):
             return -1
 
         # Build instructions to include the correct URLs and code
-        self.auth_widget_1.update("To enable the Chalk binaries built by the Chalk Configuration Tool to send data to your Crash Override account you must authorize it\n\nClick the button to login to Crash Override\n\n")
-        self.auth_widget_1.refresh()
+        
+        if get_app().is_in_ssh_session:
+            self.auth_widget_1.update("To enable the Chalk binaries built by the Chalk Configuration Tool to send data to your Crash Override account you must authorize it\n\n We detected you are running in an SSH session, please login manually.\n\n")
+            self.auth_widget_1.refresh()
+        else:
+            # If we are SSH'd in change instructions
+            self.auth_widget_1.update("To enable the Chalk binaries built by the Chalk Configuration Tool to send data to your Crash Override account you must authorize it\n\nClick the button to login to Crash Override\n\n")
+            self.auth_widget_1.refresh()
+
         self.auth_widget_2.update("Or, browse to\n\n1. %s\n\nAlternatively \n\n1. Navigate to: %s\n2. Enter the following code: %s\n\nIf you would like to login from another device, click the button to display a QR code"%(self.chalk_code_json['authUrl'], self.chalk_code_json['authUrl'].split("?")[0], self.chalk_code_json['id']))
         self.auth_widget_2.refresh()
 
@@ -217,6 +224,15 @@ class ApiAuth(WizContainer):
         return 0
 
     def compose(self):
+        # If we are SSH'd in the 'AUthenticate' button won't work
+        if get_app().is_in_ssh_session:
+            logger.info("SSH session detected, disabling AuthN button")
+            self.authn_button.disabled = True
+            n_str    = "Deactivated"
+            self.authn_button.update(n_str)
+            self.authn_button.label = n_str
+            self.authn_button.refresh()
+
         self.has_entered = False
         yield Center(
             MDown(LOGIN_LABEL),

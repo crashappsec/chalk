@@ -300,6 +300,13 @@ Follow the white rabbit. Knock, Knock .... 🐇🐇🐇"""
     get_app().push_screen(AckModal(user_profile_data, pops=pop_off))
 
 
+def detect_ssh_session():
+    if "SSH_CLIENT" in os.environ or "SSH_TTY" in os.environ:
+        # Yes we are running in an SSH terminal
+        return True
+    # No we are running locally
+    return False
+
 class ConfWiz(Wizard):
     def __init__(self, end_callback):
         super().__init__(end_callback)
@@ -563,6 +570,8 @@ class NewApp(App):
     staticsite_filepath = Path(MODULE_LOCATION) / "bin" / Path(urllib.parse.urlparse(static_site_url).path[1:])
     test_server_download_successful = False
     test_server_running = False
+
+    is_in_ssh_session = detect_ssh_session()
     
     def compose(self):
         yield Header(show_clock=False, id="chalk_header")
