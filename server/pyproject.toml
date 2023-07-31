@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = ">=0.68.0,<0.69.0"
+fastapi = "^0.100.1"
 pydantic = ">=1.8.0,<2.0.0"
 uvicorn = ">=0.15.0,<0.16.0"
 unicorn = {extras = ["all"], version = "^2.0.1.post1"}
@@ -16,7 +16,7 @@ fastapi-healthcheck = "^0.2.12"
 sqlalchemy = "^2.0.15"
 python-multipart = "^0.0.6"
 aiofiles = "^23.1.0"
-cryptography = "^41.0.1"
+cryptography = "^41.0.2"
 
 
 [build-system]
