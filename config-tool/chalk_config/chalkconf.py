@@ -46,10 +46,10 @@ from .log import get_logger
 MODULE_LOCATION = os.path.dirname(__file__)
 
 # Temporary until we have the upstream chalk static bins working X-platform
-if platform.machine() != "x86_64" or platform.system() != "Linux":
-    print(f"Error: System {platform.system()} {platform.machine()} detected, but currently only Linux x86_64 supported.")
-    print("Exiting....")
-    sys.exit(-2)
+# if platform.machine() != "x86_64" or platform.system() != "Linux":
+#     print(f"Error: System {platform.system()} {platform.machine()} detected, but currently only Linux x86_64 supported.")
+#     print("Exiting....")
+#     sys.exit(-2)
 
 logger = get_logger(__name__)
 

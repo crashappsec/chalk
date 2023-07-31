@@ -17,8 +17,9 @@ from .conf_options import *
 from .conf_widgets import *
 from . import crash_override_authn
 
+import io
 import jwt
-import pyqrcode
+import qrcode
 import requests
 from .log import get_logger
 
@@ -56,48 +57,6 @@ def deal_with_overwrite_widget():
         wiz.query_one("#overwrite_config").value = False
         switch_row.visible                       = False
 
-def qr_textualize_render(code, quiet_zone=0):
-    """
-    Quick n dirty renderer for showing QR in a pretty way that works with textualize - defaults don't
-    """
-    buf = io.StringIO()
-
-    border_row = '██' * (len(code[0]) + (quiet_zone*2))
-
-    # Every QR code start with a quiet zone at the top
-    for b in range(quiet_zone):
-        buf.write(border_row)
-        buf.write('\n')
-
-    for row in code:
-
-        # Draw the starting quiet zone
-        for b in range(quiet_zone):
-            buf.write('██')
-
-        # Actually draw the QR code
-        for bit in row:
-            if bit == 1:
-                buf.write('  ')
-            elif bit == 0:
-                buf.write('██')
-            # This is for debugging unfinished QR codes,
-            #  unset pixels will be spaces.
-            else:
-                buf.write(' ')
-
-
-        # Draw the ending quiet zone
-        for b in range(quiet_zone):
-            buf.write('██')
-        buf.write('\n')
-
-    # Every QR code ends with a quiet zone at the bottom
-    for b in range(quiet_zone):
-        buf.write(border_row)
-        buf.write('\n')
-
-    return buf.getvalue()
 
 class ApiAuth(WizContainer):
     """
@@ -277,19 +236,21 @@ class DisplayQrCode(WizContainer):
         self.data_to_encode = ""
         self.qr_widget      = QrCode(id="qrcode")
         self.url_widget     = Static()
+        self.qr_obj         = qrcode.QRCode()
 
 
     def generate_qr(self, data_to_encode):
         """
         """
         self.data_to_encode = data_to_encode
-        qr = pyqrcode.create(data_to_encode)
-        qr.textualize = qr_textualize_render
-        self.qr_widget.qr_string = qr.textualize(qr.code, quiet_zone=1)
+        
+        self.qr_obj.add_data(data_to_encode)
+        f = io.StringIO()
+        self.qr_obj.print_ascii(out=f)
+        f.seek(0)
+        self.qr_widget.qr_string = str(f.read())
         self.qr_widget.refresh()
-
         self.url_widget = Static( "( %s )"%(self.data_to_encode))
-        self.url_widget.styles.margin = (0,20)
 
     def compose(self):
         yield Container(

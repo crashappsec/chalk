@@ -1101,20 +1101,6 @@ docs = ["sphinx (>=4.5.0,<5.0.0)", "sphinx-rtd-theme", "zope.interface"]
 tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
 
 [[package]]
-name = "pyqrcode"
-version = "1.2.1"
-description = "A QR code generator written purely in Python with SVG, EPS, PNG and terminal output."
-optional = false
-python-versions = "*"
-files = [
-    {file = "PyQRCode-1.2.1.tar.gz", hash = "sha256:fdbf7634733e56b72e27f9bce46e4550b75a3a2c420414035cae9d9d26b234d5"},
-    {file = "PyQRCode-1.2.1.zip", hash = "sha256:1b2812775fa6ff5c527977c4cd2ccb07051ca7d0bc0aecf937a43864abe5eff6"},
-]
-
-[package.extras]
-png = ["pypng (>=0.0.13)"]
-
-[[package]]
 name = "pywin32-ctypes"
 version = "0.2.1"
 description = "A (partial) reimplementation of pywin32 using ctypes/cffi"
@@ -1163,6 +1149,17 @@ pygments = ">=2.13.0,<3.0.0"
 
 [package.extras]
 jupyter = ["ipywidgets (>=7.5.1,<9)"]
+
+[[package]]
+name = "semver"
+version = "3.0.1"
+description = "Python helper for Semantic Versioning (https://semver.org)"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "semver-3.0.1-py3-none-any.whl", hash = "sha256:2a23844ba1647362c7490fe3995a86e097bb590d16f0f32dfc383008f19e4cdf"},
+    {file = "semver-3.0.1.tar.gz", hash = "sha256:9ec78c5447883c67b97f98c3b6212796708191d22e4ad30f4570f840171cbce1"},
+]
 
 [[package]]
 name = "setuptools"
@@ -1358,4 +1355,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "e6c30e9483ed5b7a4ad76cdddd60ca56b9e7bc4e7072bb02b7a78b50cf6721e9"
+content-hash = "f10fefae2e65918652a1b028fca166e0c75f4e41080a968ee2a4bb788f50535c"
