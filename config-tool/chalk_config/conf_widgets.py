@@ -13,7 +13,7 @@ import urllib.request
 import webbrowser
 from pathlib import *
 
-# import ascii_magic
+import ascii_magic
 from .conf_options import *
 from .css import WIZARD_CSS
 from .localized_text import *
@@ -481,16 +481,16 @@ class PopBrowserButton(Button):
         webbrowser.open(get_app().login_widget.crashoverride_auth_obj.auth_url)
 
 
-# class ProfilePicture(Static):
-#     ascii_picture = Reactive("")
-#     def render(self) -> str:
-#         return self.ascii_picture
+class ProfilePicture(Static):
+    ascii_picture = Reactive("")
+    def render(self) -> str:
+        return self.ascii_picture
 
-#     def generate(self, data):
-#         #Todo exceptions
-#         a = ascii_magic.AsciiArt.from_url(data)
-#         self.ascii_picture = "\n\n%s\n\n\n\n"%(a.to_ascii(columns=30))
-#         return self.ascii_picture
+    def generate(self, data):
+        #Todo exceptions
+        a = ascii_magic.AsciiArt.from_url(data)
+        self.ascii_picture = "\n\n%s\n\n\n\n"%(a.to_ascii(columns=30))
+        return self.ascii_picture
 
 
 class AuthhLinks(MDown):
@@ -616,7 +616,7 @@ def write_from_url(out_path, conf_name, config, d, pops=2):
     except Exception as e:
         logger.error(e)
         get_app().push_screen(
-            AckModal(loc + ": " + GENERATION_EXCEPTION % repr(e))
+            AckModal(loc.as_posix() + ": " + GENERATION_EXCEPTION % repr(e))
         )
         c4mfile.close()
         os.remove(c4mfilename)

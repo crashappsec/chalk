@@ -24,7 +24,7 @@ from .conf_options import (
 )
 from . import conf_widgets ##row_ids is why this is needed - ToDo cleanup
 from .conf_widgets import (
-    AlphaModal, ConfigTable, cursor, db, set_conf_table, write_binary
+    AlphaModal, ConfigTable, ProfilePicture, cursor, db, set_conf_table, write_binary
 )
 from .css import WIZARD_CSS
 from .localized_text import *
@@ -40,7 +40,7 @@ from .wiz_panes import (
     ApiAuth, DisplayQrCode, sectionBasics, sectionBinGen, sectionChalking,
     sectionOutputConf,sectionReporting
 )
-from .wizard import AckModal, UpdateModal, Wizard
+from .wizard import AckModal, ProfileModal, UpdateModal, Wizard
 from .log import get_logger
 
 MODULE_LOCATION = os.path.dirname(__file__)
@@ -271,7 +271,7 @@ async def launch_server():
     return server_proc
 
 
-def pop_user_profile(authn_obj, success_msg=False, pop_off=1):
+def pop_user_profile(user_name, user_email, user_id, user_picture, success_msg=False, pop_off=1):
     """
     Pop up a modal showing the logged in user profile
     """
@@ -284,20 +284,11 @@ def pop_user_profile(authn_obj, success_msg=False, pop_off=1):
 
 Follow the white rabbit. Knock, Knock .... 🐇🐇🐇"""
     user_profile_data += (
-        "\n### Authenticated profile:\n\n User: %s (%s)\n\n User ID: %s\n\n User Pic: %s\n\n Issued At: %s UTC"
-        % (
-           authn_obj.user_name,
-           authn_obj.user_email,
-           authn_obj.user_id,
-           authn_obj.user_picture,
-           str(time.asctime(time.gmtime(authn_obj.token_issued_at)))
+        f"\n### Authenticated profile:\n\n User: {user_name} ({user_email})\n\n User ID: {user_id}\n\n User Pic:\n\n"
            )
-    )
     # ToDo - Breaks rendering in Textual right now, will come back to
-    #pic = ProfilePicture().generate(get_app().id_token_json["picture"])
-    #get_app().push_screen(AckModal(user_profile_data, ascii_art=pic, pops=pop_off))
-
-    get_app().push_screen(AckModal(user_profile_data, pops=pop_off))
+    pic = ProfilePicture().generate(user_picture)
+    get_app().push_screen(ProfileModal(user_profile_data, pic=pic, pops=pop_off))
 
 
 def detect_ssh_session():
@@ -412,50 +403,136 @@ class LoginScreen(ModalScreen):
 
         ##Authentication attempt outcome
         if event.result == "success":
-            ##Pass message up to app so they can be easily graabbed by any screen etc
+            # Write token to db tokens table
+            self.save_token_to_db(event)
+
+            # Set user / authenticated values at the app level
+            my_app.user_name = event.auth_obj.user_name
+            my_app.user_email = event.auth_obj.user_email
+            my_app.user_id = event.auth_obj.user_id
+            my_app.user_picture = event.auth_obj.user_picture
             my_app.authenticated = my_app.login_widget.is_authenticated()
 
-            ##Update loginbutton on main page button bar to show logged in user
+            # Update loginbutton on main page button bar to show logged in user
             user_str = "Logged In!"
             l_btn = conftable.login_button
             l_btn.label = user_str
             l_btn.variant = "success"
             l_btn.update(user_str)
             l_btn.refresh()
-            ##If the login button is hit from main screen the wizard DOM hasn't
-            ## been built yet so this fails ....... async DOMs suck
+            # If the login button is hit from main screen the wizard DOM hasn't
+            # been built yet so this fails ....... async DOMs suck
             try:
-                ## Update inline login button on wizard page to show logged in user
+                # Update inline login button on wizard page to show logged in user
                 wiz_l_btn = wiz.query_one("#wiz_login_button")
                 wiz_l_btn.label = user_str
                 wiz_l_btn.variant = "success"
                 wiz_l_btn.update(user_str)
                 wiz_l_btn.refresh()
 
-                ##Ensure wizard's next button is enabled
+                # Ensure wizard's next button is enabled
                 update_next_button("Next")
                 wiz.next_button.disabled = False
             except:
                 pass
-            ##Show the user authentication successful in a pop-up
-            pop_user_profile(event.token, success_msg=True, pop_off=2)
+            # Show the user authentication successful in a pop-up
+            pop_user_profile(my_app.user_name, my_app.user_email, my_app.user_id, my_app.user_picture, success_msg=True, pop_off=2)
 
         elif event.result == "id_token_verification_failure":
-            ##Pop error window
+            # Pop error window
             err_msg = "## ID Token verification failure"  # Todo localise
             get_app().push_screen(AckModal(err_msg, pops=2))
             # Reset login widget
             my_app.login_widget.auth_status_checker.stop()
         elif event.result == "authentication_failure":
-            ##Pop error window
+            # Pop error window
             err_msg = "## Login failure"  # Todo localise
             get_app().push_screen(AckModal(err_msg, pops=2))
             # Reset login widget
             my_app.login_widget.reset_login_widget()
         else:
-            ##Pop error window
+            # Pop error window
             err_msg = "Unknown login error"  # Todo localise
             get_app().push_screen(AckModal(err_msg, pops=2))
+
+    def _create_db_authn_table(self):
+        """
+        Create a table in the local DB to store issued bearer tokens
+        Bearer tokens are issued to a user but may be shared across multiple chalk profiles
+        they also need to be accessible across multiple invocations of the config-tool
+        """
+        try:
+            # Create table
+            cursor.execute('''CREATE TABLE IF NOT EXISTS tokens (co_api_token, tenat_id, post_url, timestamp, name, email, uid, image)''')
+            #commit the changes to db
+            db.commit()
+        except:
+            raise
+
+    def save_token_to_db(self, event):
+        try:
+            # Check DB table exists, if not create it
+            self._create_db_authn_table()
+            params = (
+                      event.auth_obj.token, 
+                      event.auth_obj.revision_id, 
+                      event.auth_obj.crash_override_api_url, 
+                      str(time.time()),
+                      event.auth_obj.user_name, 
+                      event.auth_obj.user_email, 
+                      event.auth_obj.user_id, 
+                      event.auth_obj.user_picture
+                     )
+            sql_str = "INSERT INTO tokens (co_api_token, tenat_id, post_url, timestamp, name, email, uid, image) values(?,?,?,?,?,?,?,?)"
+            cursor.execute(sql_str, params)
+            db.commit()
+        except:
+            raise
+
+    def get_bearer_token_from_db(self):
+        """
+        Grab bearer token from DB
+        """
+        try:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tokens';")
+            rows = cursor.fetchall()
+            if not rows:
+                logger.info("tokens table not found in db, proceeding in logged out state")
+                return None, None, None, None, None, None, None, None
+        except:
+            return None, None, None, None, None, None, None, None
+
+        logger.info("Getting C0 API token from DB.....")
+        try:
+            cursor.execute("SELECT co_api_token, tenat_id, post_url, timestamp, name, email, uid, image from tokens")
+            rows = cursor.fetchall()
+            logger.info(rows)
+            api_token, tenant_id, api_url, timestamp, name, email, uid, image = rows[0]
+        except:
+            raise
+            return None, None, None, None, None, None, None, None
+
+        return api_token, tenant_id, api_url, timestamp, name, email, uid, image
+
+    def clear_token_from_db(self):
+        """
+        Remove API token from DB
+        NOTE: Currently this just hoses all rows in the table
+        """
+        try:
+            cursor.execute("DELETE FROM tokens;")
+            db.commit()
+            get_app().authenticated = False
+            user_str = "L⍉gin"
+            l_btn = conftable.login_button
+            l_btn.label = user_str
+            l_btn.variant = "default"
+            l_btn.update(user_str)
+            l_btn.refresh()
+            return True
+        except:
+            return False
+
 
     def compose(self):
         yield Header(show_clock=True)
@@ -533,6 +610,7 @@ login_screen.wiz = wiz
 set_wiz_screen(wiz_screen)
 set_wizard(wiz)
 
+
 class NewApp(App):
     DEFAULT_CSS = WIZARD_CSS
     TITLE = CHALK_TITLE
@@ -570,7 +648,10 @@ class NewApp(App):
     staticsite_filepath = Path(MODULE_LOCATION) / "bin" / Path(urllib.parse.urlparse(static_site_url).path[1:])
     test_server_download_successful = False
     test_server_running = False
-
+    user_name = ""
+    user_email = ""
+    user_id = ""
+    user_picture = ""
     is_in_ssh_session = detect_ssh_session()
     
     def compose(self):
@@ -593,6 +674,25 @@ class NewApp(App):
             dl_button.variant = "success"
             dl_button.refresh()
             self.test_server_download_successful = True
+
+        # If user logged in on a previous session, grab API token from db
+        api_token, tenant_id, api_url, timestamp, name, email, uid, image = self.SCREENS["loginscreen"].get_bearer_token_from_db()
+        if api_token:
+            # Update app state
+            self.user_name = name
+            self.user_email = email
+            self.user_id = uid
+            self.user_picture = image
+            self.authenticated = True
+
+            # Update loginbutton on main page button bar to show logged in user
+            user_str = "Logged In!"
+            l_btn = conftable.login_button
+            l_btn.label = user_str
+            l_btn.variant = "success"
+            l_btn.update(user_str)
+            l_btn.refresh()
+
 
     # def action_newconfig(self):
         # wiz_screen = self.SCREENS["confwiz"]
@@ -643,14 +743,14 @@ class NewApp(App):
             conftable.app.push_screen("loginscreen")
         else:
             ##If we are already authentcated just show the user profile of logged in user
-            pop_user_profile(self.login_widget.crashoverride_auth_obj)
+            #pop_user_profile(self.login_widget.crashoverride_auth_obj)
+            pop_user_profile(self.user_name, self.user_email, self.user_id, self.user_picture)
 
     def action_display_qr(self):
         """
         Pop up a screen showing the QR code of the login URL
         """
         self.qr_code_widget.generate_qr(
-            #self.login_widget.device_code_json["verification_uri_complete"]
             self.login_widget.crashoverride_auth_obj.auth_url
         )
         conftable.app.push_screen("qrcodescreen")

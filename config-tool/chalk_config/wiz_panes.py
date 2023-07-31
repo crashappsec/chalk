@@ -64,9 +64,9 @@ class ApiAuth(WizContainer):
     class AuthSuccess(Message):
         """
         """
-        def __init__(self,  token, result):
+        def __init__(self,  auth_obj, result):
             super().__init__()
-            self.token      = token
+            self.auth_obj   = auth_obj
             self.result     = result
 
     def __init__(self, *args, **kwargs):

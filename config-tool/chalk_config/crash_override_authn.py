@@ -1,5 +1,6 @@
 import json
 import jwt
+import os
 import time
 import requests
 
@@ -33,6 +34,8 @@ class CrashOverrideAuth:
         self.user_name  = ""
         self.user_email = ""
         self.user_picture = "" 
+        self.crash_override_api_url = ""
+        self.set_crashoverride_post_url()
 
     def _get_code(self):
         """
@@ -97,7 +100,6 @@ class CrashOverrideAuth:
                     self.user_name = self._user_json["name"]
                     self.user_email = self._user_json["email"]
                     self.user_picture = self._user_json["picture"]
-                    
                     self.authenticated = True
                     break
 
@@ -120,6 +122,26 @@ class CrashOverrideAuth:
 
         # Poll for success
         self._poll()
+
+    def set_crashoverride_post_url(self):
+        """
+        Are we testing or in prod?
+        """
+        chalk_post_url = os.environ.get("CHALK_POST_URL", default="")
+        if "test" in chalk_post_url:
+            self.crash_override_api_url = (
+                "https://chalkapi-test.crashoverride.run/v0.1/report"
+            )
+            logger.info(
+                "Using TESTING reporting URL %s (CHALK_POST_URL detected test in env var detected)"
+                % (self.crash_override_api_url)
+            )
+        else:
+            self.crash_override_api_url = "https://chalk.crashoverride.run/v0.1/report"
+            logger.info(
+                "Using PRODUCTION reporting URL %s (no test CHALK_POST_URL env var detected)"
+                % (self.crash_override_api_url)
+            )
 
 
 if __name__ == "__main__":

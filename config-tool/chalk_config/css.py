@@ -135,6 +135,10 @@ AckModal {
     width: 100%;
 }
 
+ProfileModal {
+    align: center middle;
+}
+
 UpdateModal {
     align: center middle;
 }
@@ -199,6 +203,28 @@ AckModal > Vertical > Label {
 }
 
 AckModal > Vertical > Button {
+    width: 1fr;
+    background: $primary;
+    content-align: center middle;
+    margin: 0 4;
+}
+
+ProfileModal > Vertical {
+    padding: 0 1;
+    width: 1fr;
+    height: auto;
+    border: thick $primary 80%;
+    background: $surface;
+    align: center middle;
+    content-align: center middle;
+}
+
+ProfileModal > Vertical > Label {
+    width: 1fr;
+    content-align: center middle;
+}
+
+ProfileModal > Vertical > Button {
     width: 1fr;
     background: $primary;
     content-align: center middle;

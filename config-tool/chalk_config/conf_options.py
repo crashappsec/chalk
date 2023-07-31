@@ -483,15 +483,6 @@ def config_to_json():
         widget = wizard.query_one("#" + item)
         result[item] = widget.value
 
-    # Special case for authN token - set value with "_" at start of key
-    if app.login_widget.crashoverride_auth_obj.token:
-        result[
-            "_chalk_api_bearer_token"
-        ] = app.login_widget.crashoverride_auth_obj.token
-        result[
-            "_chalk_api_tenant_id"
-        ] = app.login_widget.crashoverride_auth_obj.revision_id
-
     return json.dumps(result)
 
 
@@ -1028,42 +1019,27 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         lines.append("run_sbom_tools = true")
 
     # Whether to add in a bearer token to use with the Crash Override API
-    if (
-        is_true(d, "report_co")
-        and ("_chalk_api_bearer_token" in d)
-        and ("_chalk_api_tenant_id" in d)
-    ):
-        # Are we testing or in prod?
-        chalk_post_url = os.environ.get("CHALK_POST_URL", default="")
-        if "test" in chalk_post_url:
-            crash_override_api_url = (
-                "https://chalkapi-test.crashoverride.run/v0.1/report"
-            )
-            logger.info(
-                "Using TESTING reporting URL %s (CHALK_POST_URL detected test in env var detected)"
-                % (crash_override_api_url)
-            )
-        else:
-            crash_override_api_url = "https://chalk.crashoverride.run/v0.1/report"
-            logger.info(
-                "Using PRODUCTION reporting URL %s (no test CHALK_POST_URL env var detected)"
-                % (crash_override_api_url)
-            )
+    if is_true(d, "report_co"):
+        # Lookup authn values in DB, if not present / expired then prompt the user to login
+        api_token, tenant_id, crash_override_api_url, timestamp, name, email, uid, image = get_app().SCREENS["loginscreen"].get_bearer_token_from_db()
+
+        logger.info("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s"%(api_token, tenant_id, crash_override_api_url, timestamp, name, email, uid, image))
 
         crash_override_sink_and_subscribe = f"""
 sink_config crashoverride_api_sink {{
     sink:    "post"
     uri:     "{crash_override_api_url}"
-    headers: mime_to_dict("Authorization: Bearer {d["_chalk_api_bearer_token"]}")
+    headers: mime_to_dict("Authorization: Bearer {api_token}")
 }}
 subscribe("report", "crashoverride_api_sink")
 """.strip()
-        logger.info("Writing Crash Override API values to Conf4m")
+        logger.info(crash_override_sink_and_subscribe)
         lines.append(
             "\n# Crash Override API settings - please see https://crashoverride.run for dashboards and data"
         )
-        lines.append('keyspec._TENANT_ID.value = "%s"' % (d["_chalk_api_tenant_id"]))
+        lines.append('keyspec._TENANT_ID.value = "%s"' % (tenant_id))
         lines.append(crash_override_sink_and_subscribe)
+        logger.info("Written Crash Override API values to Conf4m")
     else:
         logger.info(
             "Skipping writing CrashOverride API tokens, bearer token not found in config" 

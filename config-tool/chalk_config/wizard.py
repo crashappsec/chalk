@@ -85,6 +85,44 @@ class UpdateModal(ModalScreen):
                 self.app.pop_screen()
                 self.pops = self.pops - 1
 
+class ProfileModal(ModalScreen):
+    DEFAULT_CSS=WIZARD_CSS
+
+    def __init__(self, msg, pops=1, pic=None, button_text="Done", cancel_text="Logout"):
+        super().__init__()
+        self.pic = Static(pic)
+        self.pic.styles.text_align = "center"
+        self.msg = msg
+        self.pops = pops
+        self.button_text = button_text
+        self.cancel_text = cancel_text
+        self.logout_button = Button(self.cancel_text, id="profile_logout", variant="error")
+        
+    def compose(self):
+        yield Header(show_clock=False)
+        yield Vertical (
+            MDown(self.msg, id="profile_msg", classes="ack_md"),
+            self.pic,
+            Horizontal (
+                Button(self.button_text, id="profile_cancel"),
+                self.logout_button
+                )
+            )
+        yield Footer()
+
+    def on_button_pressed(self, event):
+
+        if event.button.id == "profile_logout":
+            # do update
+            logger.info("Logging out, deleting saved bearer token....")
+            ret = get_app().SCREENS["loginscreen"].clear_token_from_db()
+            logger.info(ret)
+
+        ##Either button triggers this
+        while self.pops:
+            self.app.pop_screen()
+            self.pops = self.pops - 1
+
 
 class DownloadTestServerModal(ModalScreen):
     """
