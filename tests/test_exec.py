@@ -16,7 +16,7 @@ logger = get_logger()
     "flag",
     [
         "--chalk-as-parent",
-        # "--no-chalk-as-parent",
+        "--no-chalk-as-parent",
     ],
 )
 def test_exec_unchalked(
@@ -115,27 +115,3 @@ def test_exec_chalked(
     assert sub_chalk["_PROCESS_PID"] > 0
     assert sub_chalk["_PROCESS_PARENT_PID"] > 0
     assert sub_chalk["_PROCESS_UID"] is not None
-
-
-# FIXME: remove once https://github.com/crashappsec/chalk-internal/issues/458 is fixed
-@pytest.mark.slow()
-def test_unmarked(
-    tmp_data_dir: Path,
-    chalk: Chalk,
-):
-    shutil.copy("/bin/uname", tmp_data_dir / "uname")
-    bin_path = tmp_data_dir / "uname"
-
-    i = 0
-    for i in range(100):
-        exec_proc = chalk.run(
-            chalk_cmd="exec",
-            params=[f"--exec-command-name={bin_path}", "--log-level=none"],
-        )
-        _stdout = exec_proc.stdout.decode()
-        _stdout = _stdout.removeprefix("Linux")
-        chalk_report = json.loads(_stdout, strict=False)[0]
-        if "_UNMARKED" not in chalk_report:
-            logger.error("!! missing unmarked !!")
-            logger.error(chalk_report)
-            assert False

@@ -156,6 +156,10 @@ proc runCmdExec*(args: seq[string]) =
       handleExec(allOpts, argsToPass)
     else:
       trace("Chalk is parent process.")
+      # add 1ms sleep so that the child process has a chance to exec before we try to collect data from it
+      # otherwise the process data collected might be about the chalk binary instead of the target binary, which is incorrect
+      # yes this is also racy but a proper fix will be more complicated
+      sleep(1)
       initCollection()
       let chalkOpt = doExecCollection(allOpts, pid)
       if chalkOpt.isSome():
