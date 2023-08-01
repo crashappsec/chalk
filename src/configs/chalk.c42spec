@@ -1900,8 +1900,13 @@ func override_key_check(keyname: string, val: list[string]) {
   }
 }
 
-func pc_err(profile, key, err) {
-  return ("Profile '" + profile + "' specifies reporting key '" + key +
+func pc_err(profile, key, specified, err) {
+  if specified {
+      return ("Profile '" + profile + "' specifies reporting key '" + key +
+           "', but " + err)
+  }
+
+  return ("Profile '" + profile + "' does not specify reporting key '" + key +
            "', but " + err)
 }
 
@@ -1933,7 +1938,7 @@ func profile_check_base(profile_name, profile_type) {
       if profile_type == PTChalk {
         if key_kind == RunTimeArtifact or key_kind == RunTimeHost { continue }
         if attr_get("keyspec." + key_name + ".required", bool) == true {
-          return pc_err(profile_name, key_name,
+          return pc_err(profile_name, key_name, false,
                         "that key is required to be in chalk marks.")
         }
       }
@@ -1945,8 +1950,8 @@ func profile_check_base(profile_name, profile_type) {
       if profile_type == PTChalk {
         if key_kind == RunTimeArtifact or key_kind == RunTimeHost { continue }
         if attr_get("keyspec." + key_name + ".required", bool) == true {
-          return pc_err(profile_name, key_name,
-                        " that key is required to be in chalk marks.")
+          return pc_err(profile_name, key_name, false,
+                        "that key is required to be in chalk marks.")
         }
       }
       continue
@@ -1969,23 +1974,23 @@ func profile_check_base(profile_name, profile_type) {
 
     if profile_type == PTArtifact or profile_type == PTChalkTimeArtifact {
       if key_kind == RunTimeHost {
-        return pc_err(profile_name, key_name,
+        return pc_err(profile_name, key_name, true,
                       "that key cannot appear in artifact report spec")
       }
       if key_kind == RunTimeArtifact and profile_type == PTChalkTimeArtifact {
-        return pc_err(profile_name, key_name, "This report is used at build " +
+        return pc_err(profile_name, key_name, true, "This report is used at build " +
 	"time, so keys collected post-chalk aren't allowed.")
       }
       continue
     }
     # Else, profile type is PTHost
     if key_kind == RunTimeArtifact {
-       return pc_err(profile_name, key_name,
+       return pc_err(profile_name, key_name, true,
           "non-chalkable artifact info can't be in a host-level report spec")
     }
     elif key_kind == ChalkTimeArtifact {
       if attr_get("keyspec." + key_name + ".never_early", bool) == true {
-        return pc_err(profile_name, key_name,
+        return pc_err(profile_name, key_name, true,
         "that key is artifact specific, so can't be in host-level report spec")
       }
     }
