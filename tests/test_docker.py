@@ -27,6 +27,10 @@ from .utils.validate import (
 logger = get_logger()
 
 DOCKERFILES = Path(__file__).parent / "data" / "dockerfiles"
+# pushing to a registry is orchestrated over the docker socket which means that the push comes from the host
+# therefore this is sufficient for the docker push command
+# FIXME: once we have buildx support we'll need to enable insecure registry https://docs.docker.com/registry/insecure/
+REGISTRY = "localhost:5044"
 
 
 def _build_and_chalk_dockerfile(
@@ -193,19 +197,17 @@ def test_nonvirtual_invalid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
         "valid/sample_1",
     ],
 )
-# @pytest.mark.skipif(
-#     platform.system() == "Darwin",
-#     reason="Skipping local docker push on mac due to issues https://github.com/docker/for-mac/issues/6704",
-# )
-# TODO: this isn't working right now due to registry issues
-@pytest.mark.skip()
+@pytest.mark.skipif(
+    platform.system() == "Darwin",
+    reason="Skipping local docker push on mac due to issues https://github.com/docker/for-mac/issues/6704",
+)
 def test_build_and_push(tmp_data_dir: Path, chalk: Chalk, test_file: str):
     try:
         files = os.listdir(DOCKERFILES / test_file)
         for file in files:
             shutil.copy(DOCKERFILES / test_file / file, tmp_data_dir)
 
-        tag = "127.0.0.1:5044/" + test_file + ":latest"
+        tag = f"{REGISTRY}/{test_file}:latest"
 
         # build docker wrapped
         chalk_docker_build_proc = chalk.run(
@@ -249,9 +251,12 @@ def test_build_and_push(tmp_data_dir: Path, chalk: Chalk, test_file: str):
         docker_pull_proc = chalk.run(params=["docker", "pull", tag])
         assert docker_pull_proc is not None
         assert docker_pull_proc.returncode == 0
+        found = False
         for line in docker_pull_proc.stdout.decode().splitlines():
             if "Digest" in line:
+                found = True
                 assert repo_digest_push in line
+        assert found
     finally:
         images = docker_inspect_image_hashes(tag=tag)
         docker_image_cleanup(images)

@@ -24,12 +24,8 @@ COPY tests/pyproject.toml tests/poetry.lock $WORKDIR/
 RUN poetry install --no-plugins
 
 # install chalk deps
-RUN apk add --no-cache pcre gcompat docker docker-compose
+RUN apk add --no-cache pcre gcompat
 
-RUN apk del \
-        curl \
-        gcc \
-        musl-dev \
-        libffi-dev
+COPY --from=docker:24 /usr/local/bin/docker /usr/local/bin/docker
 
 ENTRYPOINT ["/tests.env/bin/pytest"]

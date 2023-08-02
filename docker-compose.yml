@@ -87,11 +87,15 @@ services:
       CHALK_API_PARAMS: ${CHALK_API_PARAMS:- --access-logfile=-  --workers=4 --error-logfile=- --timeout=30}
       CHALK_API_PORT: ${CHALK_API_PORT:-8585}
 
-  # registry:
-  #   image: registry:2
-  #   container_name: registry
-  #   ports:
-  #     - "5044:5044"
+  registry:
+    image: registry:2
+    container_name: registry
+    ports:
+      - "5044:5044"
+    environment:
+      - REGISTRY_HTTP_ADDR=0.0.0.0:5044
+    networks:
+      - chalk
 
   tests:
     image: chalk_local_tests
@@ -105,11 +109,9 @@ services:
       - ${HOME}/.aws:/root/.aws
     working_dir: $PWD/tests
     networks:
-      chalk:
-        aliases:
-          - chalk.crashoverride.local
-    # depends_on:
-    #   - registry
+      - chalk
+    depends_on:
+      - registry
     environment:
       AWS_PROFILE: ${AWS_PROFILE:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
