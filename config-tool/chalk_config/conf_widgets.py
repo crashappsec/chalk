@@ -572,7 +572,6 @@ def write_from_local(dict, config, d, pops=2):
 
 
 def write_from_url(out_path, conf_name, config, d, pops=2):
-    binname = d["exe_name"]
 
     loc, base_binary = get_chalk_binary_release_bytes(d["release_build"])
     try:

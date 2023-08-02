@@ -400,7 +400,7 @@ bool_defaults = {
 }
 
 text_defaults = {
-    "exe_name": "chalk",
+    "exe_name": os.path.join(tempfile.gettempdir(),"chalk"),
     "conf_name": "",
     "label_prefix": "run.crashoverride.",
     "log_loc": "./chalk-log.jsonl",
