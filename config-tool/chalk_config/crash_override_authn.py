@@ -5,46 +5,45 @@ import time
 import requests
 
 from .log import get_logger
+
 logger = get_logger(__name__)
 
-class CrashOverrideAuth:
 
+class CrashOverrideAuth:
     def __init__(self, auth_url):
-        """
-        """
-        self.id       = ""
+        """ """
+        self.id = ""
         self.device_id = self.id
         self.auth_url = auth_url
-        self._nonce   = ""
+        self._nonce = ""
         self.poll_url = ""
         self.poll_int = 5
         self._poll_issued_at = 0
         self._poll_expiration = 0
         self.auth_jwt = ""
-        self.token    = ""
+        self.token = ""
         self.token_issued_at = 0
-        #self.token_expiration = 0
+        # self.token_expiration = 0
         self.authenticated = False
-        self.failed   = False
+        self.failed = False
         self.decoded_jwt = ""
         self._poll_decoded_jwt = ""
         self.revision_id = ""
         # User data available post-authN
-        self.user_id    = ""
-        self.user_name  = ""
+        self.user_id = ""
+        self.user_name = ""
         self.user_email = ""
-        self.user_picture = "" 
+        self.user_picture = ""
         self.crash_override_api_url = ""
         self.set_crashoverride_post_url()
 
     def _get_code(self):
-        """
-        """
+        """ """
         try:
             resp = requests.post(self.auth_url)
-            resp_json = resp.json()  
+            resp_json = resp.json()
 
-            self.id       = resp_json["id"]
+            self.id = resp_json["id"]
             self.auth_url = resp_json["authUrl"]
             self.poll_url = resp_json["pollUrl"]
             self.poll_int = resp_json["pollIntervalSeconds"]
@@ -56,29 +55,32 @@ class CrashOverrideAuth:
             return resp_json
 
         except Exception as err:
-            logger.error("[-] Error calling the config-tool code endpoint at %s: %s"%(self.auth_url, err))
+            logger.error(
+                "[-] Error calling the config-tool code endpoint at %s: %s"
+                % (self.auth_url, err)
+            )
             return None
 
-    def _decode_and_validate_jwt(self, jwt_to_decode, validate = False, key = None):
-        """
-
-        """
+    def _decode_and_validate_jwt(self, jwt_to_decode, validate=False, key=None):
+        """ """
         # Todo - validation
         if not validate:
-            decoded_jwt = jwt.decode(jwt_to_decode, algorithms=["HS256"],  options={"verify_signature": False})
+            decoded_jwt = jwt.decode(
+                jwt_to_decode, algorithms=["HS256"], options={"verify_signature": False}
+            )
         else:
-            logger.error("JWT validation not implemented yet, only symmetric supported atm")
+            logger.error(
+                "JWT validation not implemented yet, only symmetric supported atm"
+            )
 
         return decoded_jwt
 
     def _show_token(self):
-        """
-        """
-        print("\nVisit %s to authenticate\n"%(self.auth_url))
+        """ """
+        print("\nVisit %s to authenticate\n" % (self.auth_url))
 
     def _poll(self):
-        """
-        """
+        """ """
         while self.poll_int != 0:
             try:
                 resp = requests.get(self.poll_url)
@@ -87,7 +89,7 @@ class CrashOverrideAuth:
                 if resp.status_code == 200:
                     # Retrieve token from the 200
                     resp_json = resp.json()
-                    
+
                     # Decode JWT
                     self.token = resp_json["token"]
                     self.decoded_jwt = self._decode_and_validate_jwt(self.token)
@@ -104,7 +106,10 @@ class CrashOverrideAuth:
                     break
 
             except Exception as err:
-                print("[-] Error calling the config-tool code endpoint at %s: %s"%(self.poll_url, err))
+                print(
+                    "[-] Error calling the config-tool code endpoint at %s: %s"
+                    % (self.poll_url, err)
+                )
                 return None
 
             # Authn pending - wait....
@@ -145,11 +150,9 @@ class CrashOverrideAuth:
 
 
 if __name__ == "__main__":
-
     COA = CrashOverrideAuth()
     COA.authenticate()
     if COA.authenticated:
         print("Authentication successful")
     else:
         print("Authentication failed")
-

@@ -218,11 +218,12 @@ class ExportMenu(Screen):
 class BuildChalkMenu(Screen):
     DEFAULT_CSS = WIZARD_CSS
     BINDINGS = [
-                Binding(key = "escape", action = "pop_screen()", description=CANCEL_LABEL),
-                Binding("b", None, None),
-                #Binding("d", None, None),
-                Binding("l", None, None),
-                Binding("r", None, None),]
+        Binding(key="escape", action="pop_screen()", description=CANCEL_LABEL),
+        Binding("b", None, None),
+        # Binding("d", None, None),
+        Binding("l", None, None),
+        Binding("r", None, None),
+    ]
 
     def __init__(self, profile_name, config, as_dict):
         super().__init__()
@@ -230,8 +231,12 @@ class BuildChalkMenu(Screen):
         self.config = config
         self.as_dict = as_dict
         self.bin_pth = ""
-        self.chalk_outfile_input = Input(placeholder=f"./chalk-{self.profile_name}", value = self.bin_pth)
-        self.build_button = Button("Build", classes="basicbutton", variant="success", id="build_chalk_go")
+        self.chalk_outfile_input = Input(
+            placeholder=f"./chalk-{self.profile_name}", value=self.bin_pth
+        )
+        self.build_button = Button(
+            "Build", classes="basicbutton", variant="success", id="build_chalk_go"
+        )
         self.build_mdown = f"""
 # Build Chalk with Embedded '{self.profile_name}' Profile
 
@@ -254,12 +259,12 @@ class BuildChalkMenu(Screen):
         )
         yield Footer()
 
-    async def on_button_pressed(self, event = None):
+    async def on_button_pressed(self, event=None):
         if event == None or event.button.id == "build_chalk_go":
             logger.info(f"Building chalk {self.profile_name}")
 
             # Provide some user feedback in the button
-            bg_str    = "Building ...."
+            bg_str = "Building ...."
             bg_button = self.build_button
             bg_button.label = bg_str
             bg_button.variant = "warning"
@@ -267,8 +272,14 @@ class BuildChalkMenu(Screen):
             # Dumb but this is needed for the button to actually change ....
             await asyncio.sleep(1.0)
 
-            if not write_binary(self.chalk_outfile_input.value, self.profile_name, self.config, self.as_dict, pops=2):
-                bg_str    = "Build"
+            if not write_binary(
+                self.chalk_outfile_input.value,
+                self.profile_name,
+                self.config,
+                self.as_dict,
+                pops=2,
+            ):
+                bg_str = "Build"
                 bg_button = self.build_button
                 bg_button.label = bg_str
                 bg_button.variant = "success"
@@ -289,8 +300,12 @@ class ConfigTable(Container):
         self.login_button = LoginButton(
             label="L⍉gin", classes="basicbutton", id="login_button"
         )
-        self.download_button = DownloadTestServerButton(label="Get Test Server", classes="basicbutton")
-        self.binary_genration_button = BinaryGenerationButton(label="Build Chalk", classes="basicbutton")
+        self.download_button = DownloadTestServerButton(
+            label="Get Test Server", classes="basicbutton"
+        )
+        self.binary_genration_button = BinaryGenerationButton(
+            label="Build Chalk", classes="basicbutton"
+        )
 
     async def on_mount(self):
         await self.the_table.mount()
@@ -334,6 +349,7 @@ class BinaryGenerationButton(Button):
     """
     Easy button for user to generate a chalk bin from the selected profile
     """
+
     async def on_button_pressed(self):
         # Get currently selected profile
         cursor_row = conftable.the_table.cursor_row
@@ -343,13 +359,14 @@ class BinaryGenerationButton(Button):
         if r is not None:
             config, profile_name, note = r
             as_dict = json_to_dict(config)
-            await self.app.push_screen( BuildChalkMenu(profile_name, config, as_dict) )
+            await self.app.push_screen(BuildChalkMenu(profile_name, config, as_dict))
 
 
 class DownloadTestServerButton(Button):
     """
     Easy button for user to d/l the test chalk server locally
     """
+
     async def on_button_pressed(self):
         await get_app().action_downloadtestserver()
 
@@ -483,13 +500,14 @@ class PopBrowserButton(Button):
 
 class ProfilePicture(Static):
     ascii_picture = Reactive("")
+
     def render(self) -> str:
         return self.ascii_picture
 
     def generate(self, data):
-        #Todo exceptions
+        # Todo exceptions
         a = ascii_magic.AsciiArt.from_url(data)
-        self.ascii_picture = "\n\n%s\n\n\n\n"%(a.to_ascii(columns=30))
+        self.ascii_picture = "\n\n%s\n\n\n\n" % (a.to_ascii(columns=30))
         return self.ascii_picture
 
 
@@ -497,7 +515,9 @@ class AuthhLinks(MDown):
     """
     Markdown object that will contain the genrated Auth links
     """
+
     markdown = Reactive("")
+
     def render(self) -> str:
         return self.markdown
 
@@ -506,7 +526,9 @@ class QrCode(Static):
     """
     Object that will hold an ASCII art QRcode
     """
+
     qr_string = Reactive("")
+
     def render(self) -> str:
         return self.qr_string
 
@@ -519,7 +541,10 @@ class C0ApiToggle(Switch):
             get_wizard().query_one("#wiz_login_button").disabled = False
 
             ##Disable the Next button if we are not yet authenticated and wanting to use the API
-            if not get_app().authenticated and get_wizard().current_panel == get_wizard().panels[1]:
+            if (
+                not get_app().authenticated
+                and get_wizard().current_panel == get_wizard().panels[1]
+            ):
                 update_next_button("Please Login")
                 get_wizard().next_button.disabled = True
 
@@ -531,9 +556,8 @@ class C0ApiToggle(Switch):
 
 
 def update_next_button(label, variant="default"):
-    """
-    """
-    n_str    = label
+    """ """
+    n_str = label
     n_button = get_wizard().query_one("#Next")
     n_button.update(n_str)
     n_button.label = n_str
@@ -542,7 +566,7 @@ def update_next_button(label, variant="default"):
 
 
 def write_from_local(dict, config, d, pops=2):
-    binname  = d["exe_name"]
+    binname = d["exe_name"]
 
     if d["release_build"]:
         chalk_bin = CONTAINER_RELEASE_PATH
@@ -572,7 +596,6 @@ def write_from_local(dict, config, d, pops=2):
 
 
 def write_from_url(out_path, conf_name, config, d, pops=2):
-
     loc, base_binary = get_chalk_binary_release_bytes(d["release_build"])
     try:
         assert base_binary is not None
@@ -581,14 +604,14 @@ def write_from_url(out_path, conf_name, config, d, pops=2):
         get_app().push_screen(AckModal("could not fetch chalk binary"))
         return False
     loc.chmod(0o774)
-    
+
     # Write out the con4m file
     c4mfile = tempfile.NamedTemporaryFile(delete=False)
     c4mfilename = c4mfile.name
     logger.info(f"Saving {conf_name} to {c4mfilename}")
     c4mfile.write(dict_to_con4m(d).encode("utf-8"))
     c4mfile.flush()
-    
+
     # Copy base chalk to new location from where it will self-inject the new config
     try:
         newloc = Path(out_path)
@@ -597,11 +620,15 @@ def write_from_url(out_path, conf_name, config, d, pops=2):
         newloc.chmod(0o774)
         # Hydrate with generated config
         logger.info("Loading profile into chalk binary......")
-        subproc = subprocess.run([newloc, "--error", "load", c4mfilename], capture_output=True)
-        logger.debug("Chalk build command line: '%s --error load %s'"%(newloc, c4mfilename))
-        logger.debug("STDOUT: %s"%(subproc.stdout))
-        logger.debug("STDERR: %s"%(subproc.stderr))
-        logger.debug ("Return code: %d"%(subproc.returncode))
+        subproc = subprocess.run(
+            [newloc, "--error", "load", c4mfilename], capture_output=True
+        )
+        logger.debug(
+            "Chalk build command line: '%s --error load %s'" % (newloc, c4mfilename)
+        )
+        logger.debug("STDOUT: %s" % (subproc.stdout))
+        logger.debug("STDERR: %s" % (subproc.stderr))
+        logger.debug("Return code: %d" % (subproc.returncode))
         if subproc.returncode:
             get_app().push_screen(AckModal(GENERATION_FAILED, pops))
             c4mfile.close()
@@ -622,7 +649,7 @@ def write_from_url(out_path, conf_name, config, d, pops=2):
         return False
 
 
-def write_binary(out_path, conf_name, config, d, pops= 2):
+def write_binary(out_path, conf_name, config, d, pops=2):
     if "CHALK_BINARIES_ARE_LOCAL" in os.environ:
         logger.info("Building chalk from local (for testing)")
         return write_from_local(conf_name, config, d, pops)

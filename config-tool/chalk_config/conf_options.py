@@ -128,7 +128,7 @@ def check_for_updates():
         return False, latest_version
 
 
-#Temporarary solution - waiting on larger packaging decisions
+# Temporarary solution - waiting on larger packaging decisions
 def get_latest_version():
     version_url = f"https://dl.crashoverride.run/current-version.txt"
     try:
@@ -136,10 +136,15 @@ def get_latest_version():
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
         remote_ver = urllib.request.urlopen(version_url, context=context).read()
-        remote_ver = remote_ver.replace(b'"',b'').replace(b"\n",b"").replace(b"\r",b"").strip()
+        remote_ver = (
+            remote_ver.replace(b'"', b"")
+            .replace(b"\n", b"")
+            .replace(b"\r", b"")
+            .strip()
+        )
         logger.info(f"remote version detected as {remote_ver}")
         return remote_ver
-        
+
     except Exception as e:
         logger.error(f"Unable to get remote version from {version_url} - {e}")
         return None
@@ -155,7 +160,7 @@ def get_chalk_name(release=True):
 
     # Is this a debug build or not
     if not release:
-        chalk_name+="-debug"
+        chalk_name += "-debug"
 
     return chalk_name
 
@@ -181,7 +186,7 @@ def get_chalk_binary_release_bytes(release_build: bool) -> Optional[bytes]:
         logger.info(f"Existing chalk binary located at {chalk_bin}")
         logger.info(f"NOT re-downloading")
         return chalk_bin, chalk_bin.read_bytes()
-    
+
     url = get_chalk_url(release_build)
     logger.info(f"Downloading chalk from {url}")
     try:
@@ -400,7 +405,7 @@ bool_defaults = {
 }
 
 text_defaults = {
-    "exe_name": os.path.join(tempfile.gettempdir(),"chalk"),
+    "exe_name": os.path.join(tempfile.gettempdir(), "chalk"),
     "conf_name": "",
     "label_prefix": "run.crashoverride.",
     "log_loc": "./chalk-log.jsonl",
@@ -1021,9 +1026,32 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
     # Whether to add in a bearer token to use with the Crash Override API
     if is_true(d, "report_co"):
         # Lookup authn values in DB, if not present / expired then prompt the user to login
-        api_token, tenant_id, crash_override_api_url, timestamp, name, email, uid, image = get_app().SCREENS["loginscreen"].get_bearer_token_from_db()
+        (
+            api_token,
+            tenant_id,
+            crash_override_api_url,
+            timestamp,
+            name,
+            email,
+            uid,
+            image,
+        ) = (
+            get_app().SCREENS["loginscreen"].get_bearer_token_from_db()
+        )
 
-        logger.info("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s"%(api_token, tenant_id, crash_override_api_url, timestamp, name, email, uid, image))
+        logger.info(
+            "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s"
+            % (
+                api_token,
+                tenant_id,
+                crash_override_api_url,
+                timestamp,
+                name,
+                email,
+                uid,
+                image,
+            )
+        )
 
         crash_override_sink_and_subscribe = f"""
 sink_config crashoverride_api_sink {{
@@ -1042,6 +1070,6 @@ subscribe("report", "crashoverride_api_sink")
         logger.info("Written Crash Override API values to Conf4m")
     else:
         logger.info(
-            "Skipping writing CrashOverride API tokens, bearer token not found in config" 
+            "Skipping writing CrashOverride API tokens, bearer token not found in config"
         )
     return "\n".join(lines)
