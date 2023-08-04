@@ -10,7 +10,7 @@ import ../config
 
 type JenkinsCI = ref object of Plugin
 
-method getChalkTimeHostInfo*(self: JenkinsCI, path: seq[string]): ChalkDict =
+method getChalkTimeHostInfo*(self: JenkinsCI): ChalkDict =
   result = ChalkDict()
 
   # https://www.jenkins.io/doc/book/pipeline/

@@ -472,14 +472,22 @@ template profileEnabledCheck(profile: Profile) =
           " did you mean to use the virtual chalk feature?")
     quit(1)
 
+template enforceMagic() =
+  if "MAGIC" notin profile.keys:
+    profile.keys["MAGIC"] = KeyConfig(report: true)
+  else:
+    profile.keys["MAGIC"].report = true
+
 proc getChalkMark*(obj: ChalkObj): ChalkDict =
   let profile = chalkConfig.profiles[getOutputConfig().chalk]
   profile.profileEnabledCheck()
 
+  enforceMagic()
   return hostInfo.filterByProfile(obj.collectedData, profile)
 
 proc getChalkMarkAsStr*(obj: ChalkObj): string =
   let profile = chalkConfig.profiles[getOutputConfig().chalk]
   profile.profileEnabledCheck()
 
+  enforceMagic()
   return hostInfo.prepareContents(obj.collectedData, profile)

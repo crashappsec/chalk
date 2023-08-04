@@ -45,12 +45,12 @@ proc findAuthorsFile(fullpath: string): string =
 type AuthorsFileCodeOwner* = ref object of Plugin
 
 
-method getChalkTimeHostInfo*(self: AuthorsFileCodeOwner, path: seq[string]): ChalkDict =
+method getChalkTimeHostInfo*(self: AuthorsFileCodeOwner): ChalkDict =
   result = ChalkDict()
 
   var fname: string
 
-  for item in path:
+  for item in getContextDirectories():
     fname = item.findAuthorsFile()
     if fname != "": break
 

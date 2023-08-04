@@ -1,0 +1,75 @@
+# Part of the base configuration.  See the comment at the top of
+# `base_keyspecs.c4m`
+
+outconf insert {
+  chalk:                  "chalk_default"
+  artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf extract {
+  artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf env {
+  artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf exec {
+  artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf delete {
+  artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf load {
+  # Always do the more minimal chalk.
+  chalk:                  "chalk_default"
+  artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf dump {
+  artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
+# This is only used when the 'docker' command errors.
+outconf docker {
+  artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf build {
+  chalk:                  "chalk_minimal"
+  artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf push {
+  artifact_report:        "push_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf help {
+}
+
+outconf fail {
+}
+
+
+custom_report chalk_usage_stats {
+  sink_configs:  []
+  ~host_report:  "usage_report"
+  use_when:      ["insert", "build", "push", "delete"]
+}
+
+custom_report audit {
+  sink_configs: [] # "audit_file" is auto-subscribed.
+  host_report: "audit_report"
+}

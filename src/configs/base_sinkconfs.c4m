@@ -1,0 +1,33 @@
+sink_config console_err {
+  sink: "stderr"
+}
+
+sink_config console_out {
+  sink: "stdout"
+}
+
+# For commands that output JSON, default user output should get
+# JSON formatting and always get a newline per-publish.
+sink_config json_console_out {
+  sink: "stdout"
+  filters: ["pretty_json", "fix_new_line"]
+}
+
+sink_config json_console_err {
+  sink: "stderr"
+  filters: ["pretty_json", "fix_new_line"]
+}
+
+# This is the default sink for virtual chalking.
+sink_config virtual_chalk_log {
+  enabled:  true
+  sink:     "file"
+  filters:  ["fix_new_line"]
+  filename: "./virtual-chalk.json"
+}
+
+sink_config dump_out {
+  enabled:  false
+  sink:     "file"
+  filename: ""  # Set via command line in ioconfig.
+}

@@ -46,6 +46,7 @@ proc logTrace(args: seq[Box], s: ConfigState): Option[Box] =
 
   return logBase("trace", args, s)
 
+
 let chalkCon4mBuiltins* = [
     ("version() -> string",
      BuiltinFn(getExeVersion),

@@ -1,0 +1,2959 @@
+## This is the first configuration file loaded, and basically provides
+## data and defaults. The bulk of it specifies the default metadata
+## schema (key blocks).
+##
+## There's also metadata about the plugin modules and sinks we have
+## available.
+##
+## Actually, everything starting with base_* gets concatenated into one
+## big file (kinda like an include):
+##
+## - base_keyspecs.c4m
+## - base_plugins.c4m
+## - base_sinks.c4m
+## - base_profiles.c4m
+## - base_outconf.c4m
+## - base_sinkconfs.c4m
+##
+## Conventions in the naming:
+##
+## 1. All runtime (i.e., per-operation) keys start with _, their names
+##    are otherwise as descriptive as possible.
+## 2. INJECTOR_ indicates info about the chalk process that did the chalking.
+## 3. For information about the artifact or host that really is just
+##    metadata expected only to have  applied at chalk time, the keys will
+##    have _CHALKED, or _WHEN_CHALKED at the end, whichever reads more
+##    naturally (as determined by me)
+## 4. BUILD_ keys relate to the CI/CD process during chalk.
+## 5. DOCKER_ keys relate to docker-specific information at the time a
+##    `docker build` command was run.
+## 6. Things that should be non-varying properties of an artifact itself
+##    (including its chalk mark), and not metadata about the artifact's
+##    lifecycle, are just named descriptively, including CHALK_ID, SBOM, etc.
+##    I also include repo information in here, since such things seldom
+##    change.
+## 7. _PROCESS keys relate to info gleaned about a running process.
+## 8. _IMAGE_ keys relate to info gleaned about a container image locally
+##    available via docker.
+## 9. _INSTANCE_ keys relate to info gleaned about a running container instance
+## 10. _REPO_ keys relate to info gleaned about an image repo for containers
+## 11. $ keys are *private* to the chalk implementation.
+## 12. If I had any doubt that the runtime key's name might be confused with
+##     something that one might expect be collected chalk-time, I added _OP.
+##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+
+## CHALK SCHEMA
+chalk_version :=   "0.1.0"
+ascii_magic   :=   "dadfedabbadabbed"
+
+# Field starting with an underscore (_) are "system" metadata fields, that
+# are not conceptually part of the chalked metadata.
+
+# Some of these fields may still get added to the chalk mark.
+#
+# Specifically: MAGIC must always be added, as in many contexts it
+# might be necessary for finding the start of the mark.  But it generally
+# must not be reported.
+#
+# _OPERATION, _ACTION_ID, _VALIDATED, _CURRENT_HASH, and _OP_ERRORS are
+# metadata on the current chalk operation, and will not be embedded into
+# chalk marks.
+#
+#
+# Any other keys starting with $'s are meant to be reserved for the
+# tool's internal use.  This reference implementation adds two:
+# - $CHALK_CONFIG, which is used for self-injection of default config
+#    data. Like MAGIC, it *does* get added to the mark.
+#
+# - $CHALK_IMPLEMENTATION_NAME which is used to indicate which version
+#      of Chalk this is. It is added as part of the compilation process
+#      to indicate this is a Chalk reference implementation binary,
+#      which is used to facilitate command wrapping.
+#
+#      For instance, when wrapping 'docker', Chalk searches the path looking
+#      for an _actual_ docker command. The presence of this field will
+#      prevent a different chalk from trying to invoke this as 'docker'
+#      (it might cause a recursive loop).
+
+# Conforming tools MUST NOT output items consisting of underscores as part
+# of a chalk mark (i.e., any extract operations).
+#
+# Similarly, system metadata fields unknown to the implementation SHOULD
+# NOT be output under any circumstances, to discourage users from adding
+# new metadata keys to the space.
+#
+# User-defined MUST begin with the X- prefix.
+enum   ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
+export ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
+
+keyspec MAGIC {
+    required_in_chalk_mark: true
+    kind:                   ChalkTimeHost
+    type:                   string
+    standard:               true
+    system:                 true
+    conf_as_system:         true
+    ~value:                 ascii_magic
+    since:                  "0.1.0"
+    normalized_order:       0
+    doc:  "Used to identify the start of JSON encoded output only"
+}
+
+keyspec CHALK_VERSION {
+    required_in_chalk_mark: true
+    kind:                   ChalkTimeHost
+    type:                   string
+    standard:               true
+    system:                 true
+    conf_as_system:         true
+    ~value:                 chalk_version
+    since:                  "0.1.0"
+    normalized_order:       2
+    doc:                    "Spec version used for inserted objects"
+}
+
+keyspec DATE_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    normalized_order:  4
+    doc:              """
+_TIMESTAMP, converted to a date string, in the local time zone.  Note that this
+only has one value per run-- when chalking, TIMESTAMP_WHEN_CHALKED gives per-chalk time
+values, but all other fields only time to the run.
+"""
+}
+
+keyspec TIME_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    normalized_order:  5
+    doc:              """
+_TIMESTAMP, converted to the current time, in the local time zone. Note that
+this only has one value per run-- when chalking, TIMESTAMP_WHEN_CHALKED gives per-chalk
+time values, but all other fields only time to the run.
+"""
+}
+
+keyspec TZ_OFFSET_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    normalized_order: 6
+    doc:              "Time Zone offset from UTC for any non-numeric " +
+                      "date-time objects."
+}
+
+keyspec DATETIME_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    normalized_order: 7
+    doc:              "Full ISO-8601 Date-time w/ timezone, base on the " +
+                      "value of _TIMESTAMP."
+}
+
+keyspec EARLIEST_VERSION {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    ~value:           chalk_version
+    since:            "0.1.0"
+    doc:              "Reserved for future use"
+}
+
+keyspec HOSTINFO_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "Host information at injection"
+}
+
+keyspec NODENAME_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              """
+The node name at the time of insertion. On posix systems, this should be
+equivolent to the uname 'nodename' field.
+"""
+}
+
+keyspec INJECTOR_CHALK_ID {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "chalk ID of the chalk binary"
+}
+
+keyspec INJECTOR_VERSION {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "Version of the chalk binary used for injection"
+}
+
+keyspec PLATFORM_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "OS / system info at time of insertion"
+}
+
+keyspec INJECTOR_COMMIT_ID {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "The commit hash or id from which the injector was built."
+}
+
+cmdline_args := argv()
+
+keyspec INJECTOR_ARGV {
+    kind:             ChalkTimeHost
+    type:             list[string]
+    standard:         true
+    system:           true
+    conf_as_system:   true    
+    ~value:           cmdline_args
+    since:            "0.1.0"
+    doc:              "The full contents of argv used on invocation"
+}
+
+keyspec INJECTOR_ENV {
+    kind:             ChalkTimeHost
+    type:             dict[string, string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              """
+Environment variables set when the process is run. Because chalk may be used to proxy container entry points that could contain sensitive data, it's possible to redact variables, or skip them outright.  The behavior is configured with the following configuration attributes:
+
+- {bold}env_always_show{reset}, a list of environment variables to show unredacted.
+- {bold}env_never_show{reset}, a list of environment variables NOT to show in this report.
+- {bold}env_redact{reset}, a list of environment variables to redact.
+- {bold}env_default_action{reset}, a value ("show", "redact", "ignore") that indicates what to do for unnamed environment variables.  This defaults to "redact"
+
+Currently, this filtering is not handled per-report.
+"""
+}
+
+keyspec TENANT_ID_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              """
+A user-defined unique identifier intended to capture any meaningful user data.
+"""
+}
+
+keyspec CHALK_ID {
+    required_in_chalk_mark: true
+    kind:                   ChalkTimeArtifact
+    never_early:            true
+    type:                   string
+    standard:               true
+    system:                 true
+    since:                  "0.1.0"
+    normalized_order:       1
+    doc:                    """
+A unique ID for the artifact, taken from the artifact hash provided by
+the codec
+"""                      
+}
+
+keyspec TIMESTAMP_WHEN_CHALKED {
+    kind:             ChalkTimeArtifact
+    type:             int
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    normalized_order: 3
+    doc:              """
+Milliseconds since the Unix epoch for each chalk. Should generally show the
+time between chalks, and will not be the same as _TIMESTAMP, or other time
+formatting, which only happens once at the beginning of each chalk run.
+"""
+}
+
+keyspec CHALK_PTR {
+    kind:                  ChalkTimeArtifact
+    type:                  string
+    standard:              true
+    since:                 "0.1.0"
+    apply_substitutions:   true
+    doc:                   """
+When enabled, injects minimal metadata; this field then gets a URL you supply
+to point to the rest of the data.
+"""
+}
+
+keyspec PATH_WHEN_CHALKED {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    doc:              "Path of artifact on host where injection occured"
+}
+
+keyspec PATH_WITHIN_ZIP {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    doc:              """
+For items chalked when they were in a ZIP file, this field gets their path
+within that ZIP file.
+"""
+}
+
+keyspec CONTAINING_ARTIFACT_WHEN_CHALKED {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    doc:              """
+    
+For items chalked when they were in a embedded into a ZIP file, this is the
+`CHALK_ID` of the containing artifact.
+"""
+}
+
+keyspec ARTIFACT_TYPE {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+}
+
+keyspec HASH {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    doc:              "Hash file of artifact w/o chalk in it, to ensure " +
+                      "extracted chalk is intact"
+}
+
+# This is one that could be different per-artifact, but our current
+# collectors only collect at a host level.
+keyspec ORIGIN_URI {
+    kind:                ChalkTimeArtifact
+    type:                string
+    standard:            true
+    since:               "0.1.0"
+    apply_substitutions: true
+    doc:                 "URI of origin for repo from which artifact was built"
+}
+
+keyspec BRANCH {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "Version control branch the artifact was built from"
+}
+
+keyspec COMMIT_ID {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "The commit hash or id for the repository the artifact " +
+                      "was built from"
+}
+
+keyspec ARTIFACT_VERSION {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "Reserved for future use; can be custom."
+}
+
+keyspec STORE_URI {
+    kind:                ChalkTimeArtifact
+    type:                string
+    standard:            true
+    since:               "0.1.0"
+    apply_substitutions: true
+    doc:                 "URI for the intended artifact storage location," +
+                         " at the time of chalking."
+}
+
+keyspec PACKAGE_URI {
+    kind:               ChalkTimeArtifact
+    type:               string
+    standard:           true
+    since:              "0.1.0"
+    apply_substitutions: true
+    doc:                 "Public distribution point."
+}
+
+keyspec CODE_OWNERS {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "Code owners associated with the artifact."
+}
+
+keyspec VCS_DIR_WHEN_CHALKED {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "Directory at Chalk time under VCS"
+}
+
+keyspec BUILD_ID {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "The ID of the CI/CD job"
+}
+
+keyspec BUILD_URI {
+    kind:                ChalkTimeArtifact
+    type:                string
+    standard:            true
+    since:               "0.1.0"
+    apply_substitutions: true
+    doc:                 "URI to the CI/CD job"
+}
+
+keyspec BUILD_API_URI {
+    kind:                ChalkTimeArtifact
+    type:                string
+    standard:            true
+    since:               "0.1.0"
+    apply_substitutions: true
+    doc:                 "URI to the CI/CD api if more information needs to  " +
+                         "be queried"
+}
+
+keyspec BUILD_TRIGGER {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "What event triggered CI/CD job"
+}
+
+keyspec BUILD_CONTACT {
+    kind:             ChalkTimeArtifact
+    type:             list[string]
+    standard:         true
+    since:            "0.1.0"
+    doc:              "List of contacts which triggered CI/CD job"
+}
+
+
+keyspec CHALK_RAND {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    ~callback:        func call_rand
+    since:            "0.1.0"
+    doc:              "64-bit random value generally selected per chalk " +
+                      "(if enabled), intended to help ensure unique metadata " +
+		      " IDs in all circumstances.  Presented as hex digits."
+}
+
+keyspec OLD_CHALK_METADATA_HASH {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "Metadata hash of old chalk info associated with an " +
+                      "artifact, when a new mark is inserted"
+}
+
+keyspec OLD_CHALK_METADATA_ID {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "Metadata ID of old chalk info associated with an " +
+                      "artifact, when a new mark is inserted"
+}
+
+keyspec EMBEDDED_CHALK {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             `x
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    doc:              "Other artifacts contained in this artifact"
+}
+
+keyspec EMBEDDED_TMPDIR {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    doc:              """
+Temporary directory for embedded contents that was used when chalking. Any directories in the sub-chalk should be under this path.
+"""
+}
+
+keyspec CLOUD_METADATA_WHEN_CHALKED {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              """
+Metadata reported by the local cloud provider.  The contents are specific to the provider, but should generally be a string that can itself be interpreted as JSON.
+"""
+}
+
+keyspec SBOM {
+    kind:             ChalkTimeArtifact
+    type:             dict[string, `x]
+    standard:         true
+    since:            "0.1.0"
+    doc:              "SBOMs associated with this artifact"
+}
+
+keyspec SAST {
+    kind:             ChalkTimeArtifact
+    type:             dict[string, `x]
+    standard:         true
+    since:            "0.1.0"
+    doc:              "Static analysis scan results"
+}
+
+keyspec ERR_INFO {
+    kind:             ChalkTimeArtifact
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 500
+    doc:              "Errors when inserting metadata"
+}
+
+keyspec SIGNING {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             bool
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 400
+    doc:              "Must be added per-chalk when signing to ensure that " +
+                      "deleted signatures can be detected (which is why this " +
+		      "may not be lifted to the host-reporting level; " +
+		      "generally, there is no good reason to ever report it)"
+}
+
+keyspec METADATA_HASH {
+    required_in_chalk_mark: true
+    kind:                   ChalkTimeArtifact
+    never_early:            true
+    type:                   string
+    standard:               true
+    system:                 true
+    since:                  "0.1.0"
+    normalized_order:       high() - 300
+    doc:                    """
+A hash of all the preceding metadata, in a canonicalized format. This includes
+user-defined keys.
+"""
+}
+
+keyspec METADATA_ID {
+    required_in_chalk_mark: true
+    kind:                   ChalkTimeArtifact
+    never_early:            true
+    type:                   string
+    standard:               true
+    system:                 true
+    since:                  "0.1.0"
+    normalized_order:       high() - 200
+    doc:                    """
+A more readable unique identifier for all metadata.
+"""    
+}
+
+keyspec SIGN_PARAMS {
+    kind:             ChalkTimeArtifact
+    type:             dict[string, string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 100
+    doc:              "Signing parameters for digital signatures."
+}
+
+keyspec SIGNATURE {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high()
+    doc:              "Embedded digital signature for artifact"
+}
+
+keyspec DOCKER_FILE {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.1.0"
+    doc: """
+When chalking docker containers, this gets the contents of the topmost docker file passed to the docker command line, prior to any entry point wrapping.
+"""
+}
+
+keyspec DOCKERFILE_PATH {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.1.0"
+    doc: """
+Path to the docker file on the system on which it was built.
+"""
+}
+
+keyspec DOCKER_PLATFORM {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.1.0"
+    doc: """
+Platform passed when performing 'docker build', if any.
+"""
+}
+
+keyspec DOCKER_LABELS {
+    kind:              ChalkTimeArtifact
+    type:              dict[string, string]
+    standard:          true
+    system:            false
+    since:             "0.1.0"
+    doc: """
+Labels added to a docker image.
+"""
+}
+
+keyspec DOCKER_TAGS {
+    kind:              ChalkTimeArtifact
+    type:              list[string]
+    standard:          true
+    system:            false
+    since:             "0.1.0"
+    doc: """
+Tags added to a docker image.  Will be in the form: REPOSITORY:TAG
+"""
+}
+
+keyspec DOCKER_CONTEXT {
+    kind:              ChalkTimeArtifact
+    type:              string
+    standard:          true
+    system:            false
+    since:             "0.1.0"
+    doc: """
+Primary context used when building a container.
+"""
+}
+
+keyspec DOCKER_ADDITIONAL_CONTEXTS {
+    kind:              ChalkTimeArtifact
+    type:              dict[string, string]
+    standard:          true
+    system:            false
+    since:             "0.1.0"
+    doc: """
+Additional contexts specified when building a container.
+"""
+}
+
+keyspec DOCKER_CHALK_ADDED_LABELS {
+    kind:              ChalkTimeArtifact
+    type:              dict[string, string]
+    standard:          true
+    system:            false
+    since:             "0.1.0"
+    doc: """
+List of labels programatically added by Chalk.
+"""
+}
+
+keyspec DOCKER_CHALK_ADDED_TO_DOCKERFILE {
+    kind:              ChalkTimeArtifact
+    type:              string
+    standard:          true
+    system:            false
+    since:             "0.1.0"
+    doc: """
+Additional instructions added to the passed dockerfile.
+"""
+}
+
+keyspec DOCKER_CHALK_TEMPORARY_TAG {
+    kind:              ChalkTimeArtifact
+    type:              string
+    standard:          true
+    system:            false
+    since:             "0.1.0"
+    doc: """
+If there was no tag when the build command is run, we use a temporary
+tag so we can reliably inspect it after the build.
+"""
+}
+
+keyspec _OP_ARTIFACT_TYPE {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+}
+
+keyspec _OP_ARTIFACT_PATH {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "Artifact location as found for the current op only"
+}
+
+keyspec _CURRENT_HASH {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.1.0"
+    doc:              "Hash of the artifact at the end of the current op. " +
+                      "In a chalk operation, it will be the hash after " +
+                      "the chalk is fully inserted. Otherwise, it will be " +
+                      "the hash calculated on the object in its current state."
+}
+
+
+# This must be skipped under any insertion context.
+keyspec _VALIDATED {
+    kind:             RunTimeArtifact
+    type:             bool
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "Hash of artifact after a chalk operation. This is not " +
+                      "written into the artifact, but is meant to be provided " +
+		      "to wherever the chalk operation is logged."
+}
+
+keyspec _VIRTUAL {
+    kind:             RunTimeArtifact
+    type:             bool
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "Set on chalking ops only, indicating if the chalk was virtual."
+}
+
+keyspec _OP_CHALKED_KEYS {
+    kind:             RunTimeArtifact
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "For insert operations only, a list of all keys that " +
+                      "were added to the chalk"
+}
+
+keyspec _OP_ARTIFACT_REPORT_KEYS {
+    kind:             RunTimeArtifact
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "For insert operations only, a list of all keys that " +
+                      "were added to the chalk"
+}
+
+keyspec _PROCESS_PID {
+    kind:             RunTimeArtifact
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The process ID of the running process associated with the artifact. 
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_DETAIL {
+    kind:             RunTimeArtifact
+    type:             dict[string, string]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+Collects key process info; the same info as in _OP_ALL_PS_INFO, but only for the given process.
+
+Note that this overlaps with many of the other keys beginning with _PROCESS.
+If you use this key, then the only such keys that do not overlap are:
+
+_PROCESS_FD_INFO
+_PROCESS_MOUNT_INFO
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""    
+}
+
+keyspec _PROCESS_PARENT_PID {
+    kind:             RunTimeArtifact
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The process ID of the parent process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_START_TIME {
+    kind:             RunTimeArtifact
+    type:             float
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+Process start time, in seconds since boot.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_UTIME {
+    kind:             RunTimeArtifact
+    type:             float
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The amount of time the process has spent in user mode since starting, in seconds.
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_STIME {
+    kind:             RunTimeArtifact
+    type:             float
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The amount of time the process has spent in kernel mode since starting, in seconds.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_CHILDREN_UTIME {
+    kind:             RunTimeArtifact
+    type:             float
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+User mode time of the proc's waited-for children.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_CHILDREN_STIME {
+    kind:             RunTimeArtifact
+    type:             float
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+Kernel mode time of the proc's waited-for children.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_STATE {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The state of the process (e.g, Running, Sleeping, Zombie, ...)
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_PGID {
+    kind:             RunTimeArtifact
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The process group associated with the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_UMASK {
+    kind:             RunTimeArtifact
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The umask associated with the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_UID {
+    kind:             RunTimeArtifact
+    type:             list[int]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+A list containing the real, effective, saved and fs UID of the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_GID {
+    kind:             RunTimeArtifact
+    type:             list[int]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+A list containing the real, effective, saved and fs GID of the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+
+keyspec _PROCESS_NUM_FD_SIZE {
+    kind:             RunTimeArtifact
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The number of allocated file descriptors.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_GROUPS {
+    kind:             RunTimeArtifact
+    type:             list[int]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+A list of the supplementary groups to which the process belongs.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_SECCOMP_STATUS {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The process' Seccomp status ('disabled', 'strict' or 'filter').
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_ARGV {
+    kind:             RunTimeArtifact
+    type:             list[string]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The arv as reported via proc for the exec'd process we are reporting on.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_CWD {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The current working directory of the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_EXE_PATH {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The path to the executable of the process being reported on.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_COMMAND_NAME {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+The current name of the process image being reported on.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_FD_INFO {
+    kind:             RunTimeArtifact
+    type:             dict[string, dict[string, string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+Returns information for all file descriptors in the process.
+Keys are file descriptor numbers, but encoded as a string.
+
+Values are dictionaries of info that vary based on the file type. 
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _PROCESS_MOUNT_INFO {
+    kind:             RunTimeArtifact
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+A list of mounts available to the process.
+
+Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+"""
+}
+
+keyspec _OP_ALL_IMAGE_METADATA {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: """
+All reported metadata for am image as examined, in JSON format.  With docker, this is equivolent to running 'docker inspect' on the image.
+"""
+}
+
+keyspec _OP_ALL_CONTAINER_METADATA {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: """
+All reported metadata for the running container, as reported by the container runtime, in JSON format.  With docker, this is equivolent to running 'docker inspect' on a running container.
+"""
+}
+
+keyspec _IMAGE_ID {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+The image ID associated with a container image.
+"""
+}
+
+keyspec _IMAGE_COMMENT {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""    
+}
+
+keyspec _IMAGE_CREATION_DATETIME {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_DOCKER_VERSION {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_AUTHOR {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_ARCHITECTURE {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_VARIANT {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_OS {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_OS_VERSION {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_SIZE {
+    kind: RunTimeArtifact
+    type: int
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_ROOT_FS_TYPE {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_ROOT_FS_LAYERS {
+    kind: RunTimeArtifact
+    type: list[string]
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_HOSTNAME {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_DOMAINNAME {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_USER {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_EXPOSED_PORTS {
+    kind: RunTimeArtifact
+    type: dict[string, dict[string, `x]]
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_ENV {
+    kind: RunTimeArtifact
+    type: list[string]
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_CMD {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_NAME {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_HEALTHCHECK_TEST {
+    kind: RunTimeArtifact
+    type: list[string]
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_HEALTHCHECK_INTERVAL {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_HEALTHCHECK_TIMEOUT {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_HEALTHCHECK_START_PERIOD {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_HEALTHCHECK_START_INTERVAL {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_HEALTHCHECK_RETRIES {
+    kind: RunTimeArtifact
+    type: int
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_MOUNTS {
+    kind: RunTimeArtifact
+    type: list[dict[string, `x]]
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_WORKINGDIR {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_ENTRYPOINT {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_NETWORK_DISABLED {
+    kind: RunTimeArtifact
+    type: bool
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_MAC_ADDR {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_ONBUILD {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_LABELS {
+    kind: RunTimeArtifact
+    type: dict[string, string]
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_STOP_SIGNAL {
+    kind: RunTimeArtifact
+    type: int
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_STOP_TIMEOUT {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_SHELL {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""
+}
+
+keyspec _IMAGE_VIRTUAL_SIZE {
+    kind: RunTimeArtifact
+    type: int
+    standard: true
+    doc: """
+"""    
+}
+
+keyspec _IMAGE_LAST_TAG_TIME {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+"""    
+}
+
+keyspec _IMAGE_STORAGE_METADATA {
+    kind: RunTimeArtifact
+    type: dict[string, string]
+    standard: true
+    doc: """
+"""    
+}
+
+keyspec _INSTANCE_CONTAINER_ID {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+Any reported instance ID, such as the container ID for a running container.
+"""
+}
+
+keyspec _INSTANCE_CREATION_DATETIME {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+The DATETIME formatted string for the reported container creation time.
+"""
+}
+
+keyspec _INSTANCE_ENTRYPOINT_PATH {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+The path to the command, if running in a containerized / virtual environment.  The path is relative to the root of the environment.
+"""
+}
+
+keyspec _INSTANCE_ENTRYPOINT_ARGS {
+    kind:             RunTimeArtifact
+    type:             list[string]
+    standard:         true
+    doc: """
+The arguments used when starting the instance.
+"""
+}
+
+keyspec _INSTANCE_ENV {
+    kind:             RunTimeArtifact
+    type:             list[string]
+    standard:         true
+    doc: """
+Environment variables made available to the instance, in VAR=value format.
+"""
+}
+
+keyspec _INSTANCE_RESOLVE_CONF_PATH {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: ""
+}
+
+keyspec _INSTANCE_HOSTNAME_PATH {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: ""
+}
+
+keyspec _INSTANCE_HOSTS_PATH {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: ""
+}
+
+keyspec _INSTANCE_LOG_PATH {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: ""
+}
+
+keyspec _INSTANCE_IMAGE_ID {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+The image ID associated with the instance, as a hash.  Will generally
+be lower-case ASCII prefixed with 'sha256:'
+"""
+}
+
+keyspec _INSTANCE_STATUS {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+The status of a container or virtual instance (running, paused, stopped, etc) as reported by the container runtime.
+"""
+}
+
+keyspec _INSTANCE_PID {
+    kind:             RunTimeArtifact
+    type:             int
+    standard:         true
+    doc: """
+The process ID of the instance as reported by the container runtime.  This will generally be the actual PID, not a virtualized PID.
+"""
+}
+
+keyspec _INSTANCE_NAME {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+The name this instance has been given by the container runtime.
+"""
+}
+
+keyspec _INSTANCE_RESTART_COUNT {
+    kind:             RunTimeArtifact
+    type:             int
+    standard:         true
+    doc: """
+The number of restarts the runtime reports associated with the container.
+"""
+}
+
+keyspec _INSTANCE_DRIVER {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_PLATFORM {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+Platform of an instance, as reported by the runtime.
+"""
+}
+
+keyspec _INSTANCE_MOUNT_LABEL {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+"""
+}
+
+keyspec _INSTANCE_PROCESS_LABEL {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+"""
+}
+
+keyspec _INSTANCE_APP_ARMOR_PROFILE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: """
+"""
+}
+
+keyspec _INSTANCE_EXEC_IDS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: """
+"""
+}
+
+keyspec _INSTANCE_BINDS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: """
+"""
+}
+
+keyspec _INSTANCE_CONTAINER_ID_FILE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: """
+"""
+}
+
+keyspec _INSTANCE_LOG_CONFIG {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: """
+"""
+}
+
+keyspec _INSTANCE_NETWORK_MODE {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+"""
+}
+
+keyspec _INSTANCE_RESTART_POLICY_NAME {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_RESTART_RETRY_COUNT {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_AUTOREMOVE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_VOLUME_DRIVER {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_VOLUMES_FROM {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CONSOLE_SIZE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+
+keyspec _INSTANCE_ADDED_CAPS {
+    kind: RunTimeArtifact
+    type: list[string]
+    standard: true
+    doc: """
+Capabilities explicitly added to an instance.
+"""
+}
+
+keyspec _INSTANCE_DROPPED_CAPS {
+    kind: RunTimeArtifact
+    type: list[string]
+    standard: true
+    doc: """
+Capabilities explicitly dropped from an instance.
+ """
+}
+
+keyspec _INSTANCE_CGROUP_NS_MODE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_DNS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_DNS_OPTIONS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_DNS_SEARCH {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_EXTRA_HOSTS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_GROUP_ADD {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_IPC_MODE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CGROUP {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+CGroup associated with the instance, as reported by the container runtime
+"""
+}
+
+keyspec _INSTANCE_LINKS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_OOM_SCORE_ADJ {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_PID_MODE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_IS_PRIVILEGED {
+    kind: RunTimeArtifact
+    type: bool
+    standard: true
+    doc: """
+Whether or not the workload is running with admin privileges on the underlying node.
+"""
+}
+
+keyspec _INSTANCE_PUBLISH_ALL_PORTS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_READONLY_ROOT_FS {
+    kind:             RunTimeArtifact
+    type:             bool
+    standard:         true
+        doc: """
+Whether the root file system is immutable.  Note that this does not preclude filesystem mounts that allow writing.
+"""
+}
+
+keyspec _INSTANCE_SECURITY_OPT {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_UTS_MODE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_USER_NS_MODE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_SHM_SIZE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_RUNTIME {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+The container runtime associated with the instance.
+ """
+
+}
+
+keyspec _INSTANCE_ISOLATION {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: """
+Isolation technology in use for the instance, if reported by the container runtime.    
+"""    
+}
+
+keyspec _INSTANCE_CPU_SHARES {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_MEMORY {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_NANO_CPUS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CGROUP_PARENT {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_BLOCKIO_WEIGHT {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_BLOCKIO_WEIGHT_DEVICE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_BLOCKIO_DEVICE_READ_BPS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_BLOCKIO_DEVICE_WRITE_BPS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_BLOCKIO_DEVICE_READ_IOPS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_BLOCKIO_DEVICE_WRITE_IOPS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CPU_PERIOD {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CPU_QUOTA {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CPU_REALTIME_PERIOD {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CPU_REALTIME_RUNTIME {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CPUSET_CPUS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CPUSET_MEMS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_DEVICES {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CGROUP_RULES {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_DEVICE_REQUESTS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_MEMORY_RESERVATION {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_MEMORY_SWAP {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_MEMORY_SWAPPINESS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_OOM_KILL_DISABLE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_PIDS_LIMIT {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_ULIMITS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CPU_COUNT {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CPU_PERCENT {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_IO_MAX_IOPS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_IO_MAX_BPS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_MASKED_PATHS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_READONLY_PATHS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_STORAGE_METADATA {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_MOUNTS {
+    kind:             RunTimeArtifact
+    type:             list[dict[string, `x]]
+    standard:         true
+    doc: """
+Mounts associated with the running container.
+"""    
+}
+
+
+keyspec _INSTANCE_HOSTNAMES {
+    kind: RunTimeArtifact
+    type: list[string]
+    standard: true
+    doc: """
+The hostnames of the instance, if reported by the container runtime.
+ """
+}
+
+keyspec _INSTANCE_DOMAINNAME {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+The domain name of the instance, if any.
+ """
+}
+
+keyspec _INSTANCE_USER {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+The user reported by the runtime, if any.
+ """
+}
+
+
+keyspec _INSTANCE_ATTACH_STDIN {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_ATTACH_STDOUT {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_ATTACH_STDERR {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_EXPOSED_PORTS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_HAS_TTY {
+    kind:             RunTimeArtifact
+    type:             bool
+    standard:         true
+    doc: "Whether the instance is using a TTY."
+}
+
+keyspec _INSTANCE_OPEN_STDIN {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_STDIN_ONCE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_ENV {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CMD {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_CONFIG_IMAGE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_VOLUMES {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_WORKING_DIR {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_ENTRYPOINT {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_ONBUILD {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_LABELS {
+    kind:             RunTimeArtifact
+    type:             dict[string, string]
+    standard:         true
+    doc: "Labels attached to the instance."
+}
+
+keyspec _INSTANCE_BRIDGE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_SANDBOXID {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_HAIRPINMODE {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_LOCAL_IPV6 {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_LOCAL_IPV6_PREFIX_LEN {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_BOUND_PORTS {
+    kind:             RunTimeArtifact
+    type:             dict[string, dict[string, `x]]
+    standard:         true
+    doc: """
+Information on bound ports from the runtime.  The keys will be of the form 'port/family', e.g., 446/tcp'.  The values are info about specific interfaces where those ports are bound, if provided.  Otherwise, it's expected to be across all interfaces.
+"""
+}
+
+keyspec _INSTANCE_SANDBOX_KEY {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_SECONDARY_IPS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_SECONDARY_IPV6_ADDRS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_ENDPOINTID {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_GATEWAY {
+    kind: RunTimeArtifact
+    type: string
+    standard: true
+    doc: """
+The network gateway used by the instance.
+ """
+}
+
+keyspec _INSTANCE_GLOBAL_IPV6_ADDRESS {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_GLOBAL_IPV6_PREFIX_LEN {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_IP {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: "The primary IPv4 address for the instance."
+}
+
+keyspec _INSTANCE_IP_PREFIX_LEN {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _INSTANCE_IPV6_GATEWAY {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+The network gateway used by the instance for IPv6 traffic, if any.
+"""
+}
+
+keyspec _INSTANCE_MAC {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    doc: """
+The MAC address associated with the instance's primary network instance.
+"""
+}
+
+keyspec _INSTANCE_NETWORKS {
+    kind:             RunTimeArtifact
+    type:             `x
+    standard:         true
+    doc: ""
+}
+
+keyspec _REPO_TAGS {
+    kind:             RunTimeArtifact
+    type:             list[string]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+When reporting on operations involving a repository (e.g., a push or pull), any
+tags associated with the artifact in the operation.
+"""
+}
+
+keyspec _REPO_DIGESTS {
+    kind:             RunTimeArtifact
+    type:             dict[string, string]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+When reporting on operations involving a repository (e.g., a push or pull), any
+SHA256 digests associated with the artifact in the operation, mapped to the associated tag.
+"""
+}
+
+keyspec _FOUND_BASE_MARK {
+    kind:             RunTimeArtifact
+    type:             tuple[string, string]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+When extracting from a docker image that is unmarked at the top layer, if lower layers are searched, this will be set to the found values of CHALK_ID and METADATA_ID, in the highest layer where a mark was found.
+
+These values will not have been validated.
+"""    
+}
+
+keyspec _ACTION_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    ~callback:        func call_rand
+    since:            "0.1.0"
+    doc:              "Unique identifier per-action (i.e., per run of chalk), " +
+                      "Which is a 64-bit random value presented as hex digits."
+}
+
+keyspec _ARGV {
+    kind:             RunTimeHost
+    type:             list[string]
+    standard:         true
+    system:           true
+    conf_as_system:   true        
+    ~value:           cmdline_args
+    since:            "0.1.0"
+    doc:              "The full contents of argv used on invocation"
+}
+
+
+keyspec _ENV {
+    kind:             RunTimeHost
+    type:             dict[string, string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              """
+Same as INJECTOR_ENV, but for a non-chalking context (e.g., extraction time). It respects the same environment variables.
+"""
+}
+
+keyspec _TENANT_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              """
+A user-defined unique identifier intended to capture any meaningful user data.
+"""
+}
+
+
+keyspec _OPERATION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 0
+    doc:              "Added to reporting data to distinguish operations. " +
+                      "Not intended for artifact embedding."
+}
+
+keyspec _TIMESTAMP {
+    kind:             RunTimeHost
+    type:             int
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    normalized_order: 1
+    doc:              "Milliseconds since the Unix epoch for the current op."
+}
+
+keyspec _DATE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    normalized_order: 2
+    doc:              "_TIMESTAMP, converted to a date string, in the local time zone."
+}
+
+keyspec _TIME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    normalized_order: 3
+    doc:              "_TIMESTAMP, converted to the current time, in the local time zone."
+}
+
+keyspec _TZ_OFFSET {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.1.0"
+    normalized_order: 4
+    doc:              "Time Zone offset from UTC for the current operation."
+}
+
+keyspec _DATETIME {
+    kind:              RunTimeHost
+    type:              string
+    standard:          true
+    system:            true
+    conf_as_system:    true
+    since:             "0.1.0"
+    normalized_order:  5
+    doc:               "Full ISO-8601 Date-time w/ Timezone offset for the " +
+                       "current operation."
+}
+
+
+keyspec _CHALKS {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 6
+    doc:              "Used to report chalks the operation worked on. " +
+                      "A host report without this key set will not output " +
+		      "chalks"
+}
+
+keyspec _OP_CHALK_COUNT {
+    kind:             RunTimeHost
+    type:             int
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 100
+    doc:              "The number of chalks the operation worked on, meant " +
+                      "primarily for contexts where the chalks themselves " +
+		      "are not being reported."
+}
+
+keyspec _OP_UNMARKED_COUNT {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: high() - 90
+    doc:              """
+The number of unmarked artifacts that codecs saw. For inserts, this will be items seen but ignored. For other ops, it will be artifacts w/o chalk marks.
+"""
+}
+
+keyspec _OP_CMD_FLAGS {
+    kind:             RunTimeHost
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "Fully resolved command-line flags and values used in " +
+                      "the current command invocation."
+}
+
+keyspec _OP_SEARCH_PATH {
+    kind:             RunTimeHost
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000500
+    doc:              "Artifact search path used for the current command"
+}
+
+keyspec _OP_EXE_NAME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000600
+    doc:              "The executable name, approximately argv[0]"
+}
+
+keyspec _OP_EXE_PATH {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000700
+    doc:              "The local path to this chalk executable (does not " +
+                      "include the actual exe name"
+}
+
+keyspec _OP_ARGV {
+    kind:           RunTimeHost
+    type:           list[string]
+    standard:       true
+    system:         true
+    since:          "0.1.0"
+    normalized_order : 1000800
+    doc:              """
+Full value of the command-line as passed to the process; should contain the
+raw data used to determine _OP_EXE_NAME, _OP_SEARCH_PATH and _OP_CMD_FLAGS
+"""
+}
+
+keyspec _OP_CONFIG {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    normalized_order: 1000900
+    doc:              """
+The contents of any user-definable configuration file, if an external
+ configuration file is used (otherwise, even if requested, no value will be
+ returned)
+"""
+}
+
+keyspec _UNMARKED {
+    kind:             RunTimeHost
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "Artifacts seen in the artifact search path that were " +
+                      "not marked."
+}
+
+keyspec _OP_CHALKER_COMMIT_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "The commit hash or id for this chalk command."
+}
+
+keyspec _OP_CHALKER_VERSION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "Version info for this chalk command."
+}
+
+keyspec _OP_PLATFORM {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "The platform information for this chalk command."
+}
+
+keyspec _OP_HOSTNAME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "Hostname information for this chalk command."
+}
+
+keyspec _OP_HOSTINFO {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              "Detailed host info reported at the time of the " +
+                      "operation.  System provides a default."
+}
+
+keyspec _OP_NODENAME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              """
+The node name at the time of the current operation. On posix systems, this should be equivolent to the uname 'nodename' field.
+"""
+}
+
+keyspec _OP_CLOUD_METADATA {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              """
+Metadata reported by the local cloud provider.  The contents are specific to the provider, but should generally be a string that can itself be interpreted as JSON.
+"""
+}
+
+keyspec _OP_ERRORS {
+    kind:             RunTimeHost
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "Errors on the current operation."
+}
+
+keyspec _OP_HOST_REPORT_KEYS {
+    kind:             RunTimeHost
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              "For insert operations only, a list of all keys that " +
+                      "were added to the chalk"
+}
+
+keyspec _OP_TCP_SOCKET_INFO {
+    kind:             RunTimeHost
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return information about existing TCP sockets, to the degree that the chalk process has permissions to access this information. 
+
+One socket is returned per row. The columns returned are:
+1. The local IP address in use
+2. The local port number in use
+3. The remote IP address in use
+4. The remote port number in use
+5. The status of the connection (e.g., LISTEN, CONNECT, ...)
+6. The UID of the process that owns the socket
+7. The inode associated with the socket
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_UDP_SOCKET_INFO {
+    kind:             RunTimeHost
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return UDP state information, to the degree that the chalk process has permissions to access this information. 
+
+One socket is returned per row. The columns returned are:
+1. The local IP address in use
+2. The local port number in use
+3. The remote IP address in use
+4. The remote port number in use
+5. The status of the connection (always UNCONN)
+6. The UID of the process that owns the socket
+7. The inode associated with the socket
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_IPV4_ROUTES {
+    kind:             RunTimeHost
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return IPV4 routing table information, to the degree that the chalk process has permissions to access this information.
+
+One route is returned per row. The columns returned are:
+1. The destination network
+2. The next hop (gateway address)
+3. The netmask for the route
+4. The interface (device) associated with the route
+5. The kernel's 'Flags' field
+6. The kernel's 'RefCnt' field
+7. The kernel's 'Use' field
+8. The kernel's 'Metric' field
+9. The kernel's 'MTU' field
+10. The kernel's 'Window' field
+11. The kernel's 'IRTT' field
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_IPV6_ROUTES {
+    kind:             RunTimeHost
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return IPV6 routing table information, to the degree that the chalk process has permissions to access this information.
+
+One route is returned per row.  The columns returned are:
+1. The destination network
+2. The destination prefix length in hex
+3. The source network
+4. The source prefix length in hex
+5. The next hop (gateway address)
+6. The interface (device) associated with the route
+7. The kernel's 'Flags' field
+8. The kernel's 'RefCnt' field
+9. The kernel's 'Use' field
+10. The kernel's 'Metric' field
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_IPV4_INTERFACES {
+    kind:             RunTimeHost
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return information on IPV4 interface status.
+
+One interface is listed per row.  The first column is the interface
+name.  
+
+The next 8 columns are receive statistics:
+bytes, packets, errors, drops, fifo, frame, compressed, multicast
+
+The remaining columns are transmission statistics:
+bytes, packets, errors, drops, fifo, colls, carrier, compressed
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_IPV6_INTERFACES {
+    kind:             RunTimeHost
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return information on IPV6 interface status.
+
+One interface is listed per row.  The first column is the interface name.
+
+The remaining columns are:
+
+- The netlink device number in hex
+- The prefix length in hex
+- The kernel's 'Scope value' (see include/net/ipv6.h)
+- The kernel's 'Interface flags' (see include/linux/rtnetlink.h') 
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+
+keyspec _OP_ARP_TABLE {
+    kind:             RunTimeHost
+    type:             list[list[string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+On Linux machines, will return the ARP table. 
+
+One row is returned for each ARP entry.  The columns are:
+1. The IP address
+2. The kernel's recorded hardware type
+3. Any flags set in the kernel for the ARP entry
+4. The associated hardware address.
+5. The kernel's record 'Mask' field
+6. The network device from which the entry broadcasts.
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _OP_CPU_INFO {
+    kind:             RunTimeHost
+    type:             dict[string, string]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+Currently, this just returns CPU basic load average info, including number
+of processes.
+
+The values are all presented as strings.  The current available item info is:
+
+- load: load averages over the last 1, 5 and 15 mins
+- lastpid: the last PID handed out by the system
+- runnable_procs: the number of current running processes
+- total_procs: the total number of running processes.
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""    
+}
+
+keyspec _OP_ALL_PS_INFO {
+    kind:             RunTimeHost
+    type:             dict[string, dict[string, string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+For every process visible to Chalk, reports key process info.  The keys are the PID as a string, even when they are clearly numeric values.
+
+The values are dictionaries of information associated with that process:
+
+- state: The state of the process (e.g, Running, Sleeping, Zombie, ...)
+- ppid: The parent process ID
+- pgrp: The process group
+- sid:  The session ID of the process.
+- tty_nr: The encoded TTY number for the controlling terminal of the process.
+- tpgid: The ID of the terminal's process group.
+- user_time: The amount of time the process has spent in user mode since starting, in seconds.
+- system_time: The amount of time the process has spent in kernel mode since starting, in seconds.
+- child_utime: User mode time of the proc's waited-for children.
+- child_stime: Kernel mode time of the proc's waited-for children.
+- priority: The real-time scheduler's priority field reported by Linux.
+- nice: The nice value for the process (higher numbers are lower priority)
+- num_threads: The number of threads in the process.
+- runtime: The time since the process started, in seconds.
+- uid: A list containing the real, effective, saved and fs UID
+- gid: A list containing the real, effective, saved and fs GID
+- fd_size: The number of allocated file descriptors
+- groups: A list of the supplementary groups to which the process belongs.
+- seccomp: The process' Seccomp status ('disabled', 'strict' or 'filter')
+- umask: The umask associated with the process.
+- argv: The command line used when exec'ing the process.
+- path: The path to the executable.
+- cwd: The cwd of the process.
+- name: The short name of the process, as determined by /proc/pid/stat
+- command: The short name of the command, as determined by proc/pid/comm
+
+When running Chalk inside a container, this information will be the virtualized view available insider the container.
+"""
+}
+
+keyspec _REPO_HOST {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+When reporting on operations involving a repository (e.g., a push or pull), the
+ host name of the associated repository.
+"""
+}
+
+keyspec _REPO_PORT {
+    kind:             RunTimeHost
+    type:             int
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+When reporting on operations involving a repository (e.g., a push or pull), the
+port number of the associated repository.
+"""
+}
+
+keyspec $CHALK_CONFIG {
+    required_in_self_mark: true
+    kind:                  ChalkTimeArtifact
+    type:                  string
+    standard:              true
+    system:                true
+    since:                 "0.1.0"
+    doc:                   """
+Embedded configuration file; this is special-purpose and will be ignored
+outsde of dump / load cmds.
+"""
+}
+
+keyspec $CHALK_IMPLEMENTATION_NAME {
+    required_in_self_mark: true
+    kind:                  ChalkTimeArtifact
+    type:                  string
+    standard:              true
+    system:                true
+    since:                 "0.1.0"
+    doc:                   """
+Added to chalk binaries to indicate the implementation of Chalk in use.
+"""
+}
+
+# Used in a keyspec above.
+func call_rand(key) { return $(lower(hex(rand())));  }
+
+default_command = "help"
+
+# Currently, this needs to be here for singleton defaults to take hold.
+extract {
+}
+
+exec {
+  search_path: array_add(split(env("PATH"), ":"), ["."])
+}
+
+docker {
+  wrap_entrypoint: false # TODO, this should need to be here either.
+}  

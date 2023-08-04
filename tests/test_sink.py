@@ -45,7 +45,7 @@ def _validate_chalk(
     assert single_chalk["_OPERATION"] == "insert", "operation expected to be insert"
     assert len(single_chalk["_CHALKS"]) == 1, "wrong number of chalks"
     chalk = single_chalk["_CHALKS"][0]
-    assert chalk["ARTIFACT_PATH"] == str(path / "cat")
+    assert chalk["PATH_WHEN_CHALKED"] == str(path / "cat")
     assert chalk["ARTIFACT_TYPE"] == "ELF"
 
 

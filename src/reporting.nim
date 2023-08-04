@@ -222,13 +222,13 @@ proc liftUniformKeys() =
 proc doReporting*(topic="report") =
   if inSubscan():
     let ctx = getCurrentCollectionCtx()
-    if ctx.postprocessor != nil:
-      ctx.postprocessor(ctx)
     liftUniformKeys()
     ctx.report = doEmbeddedReport()
   else:
+    trace("Collecting runtime host info.")
     collectRunTimeHostInfo()
     liftUniformKeys()
+    trace("Generating command report.")
     let report = doCommandReport()
     if report != "":
       safePublish(topic, report)

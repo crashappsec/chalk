@@ -29,6 +29,7 @@ proc makeExecutable(f: File) =
       discard fchmod(fd, Mode(mode))
 
 proc runCmdConfLoad*() =
+  setContextDirectories(@["."])
   initCollection()
 
   var newCon4m: string
@@ -74,7 +75,7 @@ proc runCmdConfLoad*() =
              "ignore any calls, but if your config always shells out, it will" &
              " happen here.  To skip error checking, you can add "             &
              "--no-validation.  But, if there's a basic error, chalk may not " &
-             "run without passing --no-use-embedded-config.  Suppress this "       &
+             "run without passing --no-use-embedded-config.  Suppress this "   &
              "message in the future by setting `no_validation_warning` in the" &
              " config, or passing --no-validation-warning on the command line.")
 
@@ -95,15 +96,19 @@ proc runCmdConfLoad*() =
       if not stack.errored:
         trace(filename & ": Configuration successfully validated.")
       else:
-        addUnmarked(selfChalk.fullPath)
+        addUnmarked(selfChalk.fsRef)
         selfChalk.opFailed = true
         doReporting()
         return
     else:
       trace("Skipping configuration validation.")
 
-  selfChalk.collectedData["$CHALK_CONFIG"] = pack(newCon4m)
-  selfChalk.collectChalkInfo()
+  selfChalk.collectedData["$CHALK_IMPLEMENTATION_NAME"] = pack(implName)
+  if filename != "default":
+    selfChalk.collectedData["$CHALK_CONFIG"]            = pack(newCon4m)
+
+  collectChalkTimeHostInfo()
+  selfChalk.collectChalkTimeArtifactInfo()
 
   trace(filename & ": installing configuration.")
 
@@ -111,10 +116,10 @@ proc runCmdConfLoad*() =
   selfChalk.myCodec.handleWrite(selfChalk, toWrite)
 
   if selfChalk.opFailed:
-    warn(selfChalk.fullPath & ": unable to modify file.")
-    warn("Attempting to write to: " & selfChalk.fullPath & ".new")
+    warn(selfChalk.fsRef & ": unable to modify file.")
+    warn("Attempting to write to: " & selfChalk.fsRef & ".new")
     selfChalk.opFailed = false
-    selfChalk.fullPath = selfChalk.fullPath & ".new"
+    selfChalk.fsRef = selfChalk.fsRef & ".new"
     selfChalk.closeFileStream()
     discard selfChalk.acquireFileStream()
     selfChalk.myCodec.handleWrite(selfChalk, toWrite)
@@ -123,9 +128,9 @@ proc runCmdConfLoad*() =
       return
     else:
       when defined(posix):
-        let f = open(selfChalk.fullPath)
+        let f = open(selfChalk.fsRef)
         f.makeExecutable()
         f.close()
 
-  info("Configuration replaced in binary: " & selfChalk.fullPath)
+  info("Configuration replaced in binary: " & selfChalk.fsRef)
   doReporting()

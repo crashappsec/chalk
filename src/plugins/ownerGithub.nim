@@ -62,7 +62,10 @@ method getChalkTimeArtifactInfo*(self: GithubCodeOwner, obj: ChalkObj):
   # We let this go all the way up to the root of the fs \_("/)_/
   result = ChalkDict()
 
-  var fname = obj.fullPath.findCOFile()
+  if obj.fsRef == "":
+    return
+
+  var fname = obj.fsRef.findCOFile()
   if fname == "": return
   var ctx: FileStream
 

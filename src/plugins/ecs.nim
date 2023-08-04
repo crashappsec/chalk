@@ -31,14 +31,13 @@ proc readECSMetadata*(): Option[JsonNode] =
 
   return ecsMetadata
 
-
 template reportECSData(key: string) =
   result      = ChalkDict()
   if readECSMetadata().isSome():
     result[key] = pack($(ecsMetadata.get()))
 
-method getChalkTimeHostInfo*(self: AwsEcs, path: seq[string]): ChalkDict =
-  reportECSData("CLOUD_METADATA")
+method getChalkTimeHostInfo*(self: AwsEcs): ChalkDict =
+  reportECSData("CLOUD_METADATA_WHEN_CHALKED")
 
 method getRunTimeHostInfo*(self: AwsEcs, objs: seq[ChalkObj]): ChalkDict =
   reportECSData("_OP_CLOUD_METADATA")

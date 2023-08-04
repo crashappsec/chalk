@@ -126,7 +126,7 @@ proc getUnmarkedScriptContent*(current: string,
   ## Seems like a decent enough trade-off, and we have already made a
   ## similar one in ZIP files.
 
-  var (cs, r, extract) = current.findFirstValidChalkMark(chalk.fullPath, quiet)
+  var (cs, r, extract) = current.findFirstValidChalkMark(chalk.fsRef, quiet)
 
   if cs == -1:
     # There was no mark to find, so the input is the output, which we
@@ -194,7 +194,7 @@ proc getNewScriptContents*(fileContents: string,
   ##
   ## If there's no mark found, we shove it at the end of the output,
   ## with our comment prelude added beforehand.
-  var (cs, r, ignore) = fileContents.findFirstValidChalkMark(chalk.fullPath,
+  var (cs, r, ignore) = fileContents.findFirstValidChalkMark(chalk.fsRef,
                                                              true)
 
   if cs == -1:
@@ -223,7 +223,8 @@ proc getNewScriptContents*(fileContents: string,
   else:
     return fileContents[0 ..< cs] & markContents & fileContents[r .. ^1]
 
-proc scriptLoadMark*(stream: FileStream,
+proc scriptLoadMark*(codec:  Codec,
+                     stream: FileStream,
                      path:   string,
                      comment = "#"): Option[ChalkObj] =
   ## Instead of having a big, fragile inheritance hierarchy, we
@@ -235,7 +236,11 @@ proc scriptLoadMark*(stream: FileStream,
   stream.setPosition(0)
   let
     contents       = stream.readAll()
-    chalk          = newChalk(stream, path)
+    chalk          = newChalk(name         = path,
+                              fsRef        = path,
+                              codec        = codec,
+                              stream       = stream,
+                              resourceType = {ResourceFile})
     (toHash, dict) = contents.getUnmarkedScriptContent(chalk, false, comment)
 
   result = some(chalk)
@@ -280,13 +285,20 @@ proc scriptHandleWrite*(chalk:   ChalkObj,
     else:
       chalk.cachedHash = hashFmt($(toWrite.computeSHA256()))
 
-proc loadChalkFromFStream*(stream: FileStream, loc: string): ChalkObj =
+proc loadChalkFromFStream*(codec:  Codec,
+                           stream: FileStream,
+                           loc:    string): ChalkObj =
   ## A helper function for codecs that use file streams to load
   ## an existing chalk mark.  The stream must be positioned over
   ## the start of the Chalk magic before you call this function.
 
-  result = newChalk(stream, loc)
-  trace(result.fullpath & ": chalk mark magic @ " & $(stream.getPosition()))
+  result = newChalk(name         = loc,
+                    fsRef        = loc,
+                    codec        = codec,
+                    stream       = stream,
+                    resourceType = {ResourceFile})
+
+  trace(result.name & ": chalk mark magic @ " & $(stream.getPosition()))
 
   if not stream.findJsonStart():
     error(loc & ": Invalid JSON: found magic but no JSON start")
@@ -294,7 +306,7 @@ proc loadChalkFromFStream*(stream: FileStream, loc: string): ChalkObj =
 
   try:
     result.startOffset   = result.stream.getPosition()
-    result.extract       = result.stream.extractOneChalkJson(result.fullpath)
+    result.extract       = result.stream.extractOneChalkJson(result.name)
     result.endOffset     = result.stream.getPosition()
   except:
     error(loc & ": Invalid JSON: " & getCurrentExceptionMsg())
@@ -310,8 +322,7 @@ method getChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):
 method getRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj, ins: bool):
        ChalkDict {.base.} =
   raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
-method getChalkTimeHostInfo*(self: Plugin, objs: seq[string]):
-       ChalkDict {.base.} =
+method getChalkTimeHostInfo*(self: Plugin): ChalkDict {.base.} =
   raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
 method getRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
        ChalkDict {.base.} =
@@ -439,14 +450,12 @@ method getEndingHash*(self: Codec, chalk: ChalkObj): Option[string] {.base.} =
   if chalk.cachedHash != "": return some(chalk.cachedHash)
   return simpleHash(self, chalk)
 
-method autoArtifactPath*(self: Codec): bool {.base.}  = true
-
 method getChalkId*(self: Codec, chalk: ChalkObj): string {.base.} =
   let hashOpt = self.getUnchalkedHash(chalk)
   if not hashOpt.isNone():
     return hashOpt.get().idFormat()
   else:
-    warn(chalk.fullPath & ": In plugin '" & self.name &
+    warn(chalk.name & ": In plugin '" & self.name &
       "', no hash for chalk ID; using a random value.")
     var
       b      = secureRand[array[32, char]]()
@@ -455,8 +464,7 @@ method getChalkId*(self: Codec, chalk: ChalkObj): string {.base.} =
     return preRes.idFormat()
 
 method getChalkTimeArtifactInfo*(self: Codec, chalk: ChalkObj): ChalkDict =
-  result               = ChalkDict()
-  result["HASH_FILES"] = pack(@[chalk.fullpath])
+  discard
 
 method getRunTimeArtifactInfo*(self: Codec, chalk: ChalkObj, ins: bool):
        ChalkDict =

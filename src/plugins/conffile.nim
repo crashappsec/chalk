@@ -21,17 +21,18 @@ proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
       let cbOpt = runCallback(v.callback.get(), args)
       if cbOpt.isSome(): result[k] = cbOpt.get()
 
-method getChalkTimeHostInfo*(self: ConfFilePlugin,  p: seq[string]): ChalkDict =
-  return scanForWork(KtChalkableHost, none(ChalkObj), @[pack(p.join(":"))])
+method getChalkTimeHostInfo*(self: ConfFilePlugin): ChalkDict =
+  return scanForWork(KtChalkableHost, none(ChalkObj),
+                     @[pack(getContextDirectories().join(":"))])
 
 method getChalkTimeArtifactInfo*(self: ConfFilePlugin, obj: ChalkObj):
        ChalkDict =
-  return scanForWork(KtChalk, some(obj), @[pack(obj.fullpath)])
+  return scanForWork(KtChalk, some(obj), @[pack(obj.name)])
 
 method getRunTimeArtifactInfo*(self: ConfFilePlugin,
                                obj:  ChalkObj,
                                ins:  bool): ChalkDict =
-  return scanForWork(KtNonChalk, some(obj), @[pack(obj.fullpath)])
+  return scanForWork(KtNonChalk, some(obj), @[pack(obj.name)])
 
 
 method getRunTimeHostInfo*(self: ConfFilePlugin, objs: seq[ChalkObj]):

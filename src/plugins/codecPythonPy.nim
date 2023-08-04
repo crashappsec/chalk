@@ -21,7 +21,7 @@ method scan*(self:   CodecPythonPy,
         ext[1 .. ^1] notin chalkConfig.getPyExtensions()):
     return none(ChalkObj)
 
-  return stream.scriptLoadMark(path)
+  return self.scriptLoadMark(stream, path)
 
 method handleWrite*(self:    CodecPythonPy,
                     chalk:   ChalkObj,

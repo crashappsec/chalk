@@ -69,14 +69,12 @@ proc registerProfileKeys(profiles: openarray[string]): int {.discardable.} =
     for name, content in chalkConfig.profiles[item].keys:
       if content.report: subscribedKeys[name] = true
 
-proc collectChalkTimeHostInfo() =
-  ## This collects host information at the start of a run, if we're chalking.
-  let path = chalkConfig.getArtifactSearchPath()
-
+proc collectChalkTimeHostInfo*() =
+  if hostCollectionSuspended(): return
   for plugin in getPlugins():
     let subscribed = plugin.configInfo.preRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
-    let dict = plugin.getChalkTimeHostInfo(path)
+    let dict = plugin.getChalkTimeHostInfo()
     if dict == nil or len(dict) == 0: continue
 
     for k, v in dict:
@@ -92,34 +90,35 @@ proc initCollection*() =
   ##
   ## then, if we are chalking, it collects ChalkTimeHostInfo data
 
-  once:
-    let config       = getOutputConfig()
-    let cmdprofnames = [config.chalk, config.hostreport, config.artifactReport,
-                        config.invalidChalkReport]
+  trace("Collecting host-level chalk-time data")
+  let config       = getOutputConfig()
+  let cmdprofnames = [config.chalk, config.hostreport, config.artifactReport,
+                      config.invalidChalkReport]
 
-    # First, deal with the default output configuration.
-    if registerProfileKeys(cmdprofnames) == 0:
-      error("FATAL: no output reporting configured (all specs in the " &
-            "command's 'outconf' object are disabled")
-      quit(1)
+  # First, deal with the default output configuration.
+  if registerProfileKeys(cmdprofnames) == 0:
+    error("FATAL: no output reporting configured (all specs in the " &
+          "command's 'outconf' object are disabled")
+    quit(1)
 
-    # Next, register for any custom reports.
-    for name, report in chalkConfig.reportSpecs:
-      if (getBaseCommandName() notin report.use_when and
-          "*" notin report.use_when):
-        continue
-      registerProfileKeys([report.artifactReport,
-                           report.hostReport,
-                           report.invalidChalkReport])
+  # Next, register for any custom reports.
+  for name, report in chalkConfig.reportSpecs:
+    if (getBaseCommandName() notin report.use_when and
+        "*" notin report.use_when):
+      continue
+    registerProfileKeys([report.artifactReport,
+                         report.hostReport,
+                         report.invalidChalkReport])
 
-    if isChalkingOp():
+  if isChalkingOp():
       collectChalkTimeHostInfo()
 
-proc collectRunTimeChalkInfo*(artifact: ChalkObj) =
+proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
   for plugin in getPlugins():
     let
       data       = artifact.collectedData
       subscribed = plugin.configInfo.postChalkKeys
+
     if not plugin.hasSubscribedKey(subscribed, data):          continue
     if plugin.configInfo.codec and plugin != artifact.myCodec: continue
 
@@ -136,35 +135,44 @@ proc collectRunTimeChalkInfo*(artifact: ChalkObj) =
   if hashOpt.isSome():
     artifact.collectedData["_CURRENT_HASH"] = pack(hashOpt.get())
 
-proc collectChalkInfo*(obj: ChalkObj) =
+proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
   # Note that callers must have set obj.collectedData to something
   # non-null.
   obj.opFailed      = false
   let data          = obj.collectedData
 
+  trace("Collecting chalk-time data.")
   for plugin in getPlugins():
     if plugin == Plugin(obj.myCodec):
+      trace("Filling in codec info")
       data["CHALK_ID"]      = pack(obj.myCodec.getChalkID(obj))
       let preHashOpt = obj.myCodec.getUnchalkedHash(obj)
       if preHashOpt.isSome():
         data["HASH"]          = pack(preHashOpt.get())
-      if obj.myCodec.autoArtifactPath():
-        data["ARTIFACT_PATH"] = pack(resolvePath(obj.fullpath))
+      if obj.fsRef != "":
+        data["PATH_WHEN_CHALKED"] = pack(resolvePath(obj.fsRef))
 
-    elif plugin.configInfo.codec and plugin != obj.myCodec: continue
+    if plugin.configInfo.codec and plugin != obj.myCodec: continue
 
     let subscribed = plugin.configInfo.artifactKeys
-    if not plugin.hasSubscribedKey(subscribed, data): continue
+    if not plugin.hasSubscribedKey(subscribed, data):
+      trace(plugin.name & ": Skipping plugin; its metadata wouldn't be used.")
+      continue
 
     let dict = plugin.getChalkTimeArtifactInfo(obj)
-    if dict == nil or len(dict) == 0: continue
+    if dict == nil or len(dict) == 0:
+      trace(plugin.name & ": Plugin produced no keys to use.")
+      continue
 
     for k, v in dict:
       if not plugin.canWrite(k, plugin.configInfo.artifactKeys): continue
       if k notin obj.collectedData or k in plugin.configInfo.overrides:
         obj.collectedData[k] = v
 
+    trace(plugin.name & ": Plugin called.")
+
 proc collectRunTimeHostInfo*() =
+  if hostCollectionSuspended(): return
   ## Called from report generation in commands.nim, not the main
   ## artifact loop below.
   for plugin in getPlugins():
@@ -193,8 +201,10 @@ proc findChalk*(codec:      Codec,
                 recurse:    bool): (bool, seq[ChalkObj]) {.inline.} =
   var goOn = true # Keep trying other codecs if nothing is found
 
-  if len(searchPath) != 0: codec.searchPath = searchPath
-  else:                    codec.searchPath = @[resolvePath("")]
+  if len(searchPath) != 0:
+    codec.searchPath = searchPath
+  else:
+    codec.searchPath = @[resolvePath("")]
 
   let chalks = codec.scanArtifactLocations(exclusions, ignoreList, recurse)
   if len(chalks) != 0:  goOn = codec.keepScanningOnSuccess()
@@ -216,7 +226,12 @@ iterator artifacts*(artifactPath: seq[string]): ChalkObj =
     for item in chalkConfig.getIgnorePatterns(): skips.add(glob("**/" & item))
   for codec in getCodecs():
     var goOn: bool
-    trace("Asking codec '" &  codec.name & "' to find existing chalk.")
+
+    if getCommandName() == "extract" and len(getArgs()) == 0:
+      if not chalkConfig.extractConfig.getEmptyArgsMeansFsScan() and
+         codec.name != "docker":
+        continue
+    trace("Asking codec '" &  codec.name & "' to scan artifacts.")
     # A codec can return 'false' to short-circuit all other plugins.
     # This is used, for instance, with containers.
     (goOn, chalks) = codec.findChalk(artifactPath, exclude, skips, recursive)
@@ -224,9 +239,15 @@ iterator artifacts*(artifactPath: seq[string]): ChalkObj =
       if obj.extract != nil and "MAGIC" in obj.extract:
         obj.marked = true
 
-      discard obj.acquireFileStream()
-      obj.myCodec = codec
-      let path    = obj.fullPath
+      if ResourceFile in obj.resourceType:
+        discard obj.acquireFileStream()
+        if obj.fsRef == "":
+          obj.fsRef = obj.name
+          warn("Codec did not properly set the fsRef field.")
+
+      # For ignore skipping, we're currently using one list.
+      # We maybe should do it per resource type.
+      let path = obj.name
       if isChalkingOp():
         if path.ignoreArtifact(skips):
           addUnmarked(path)
@@ -251,9 +272,9 @@ iterator artifacts*(artifactPath: seq[string]): ChalkObj =
       # On an insert, any more errors in this object are going to be
       # post-chalk, so need to go to the system errors list.
       clearErrorObject()
-      if not inSubScan() and obj.fullpath notin getUnmarked():
+      if not inSubScan() and obj.name notin getUnmarked():
         if not obj.forceIgnore:
-          obj.collectRunTimeChalkInfo()
+          obj.collectRunTimeArtifactInfo()
       obj.myCodec.cleanup(obj)
       obj.closeFileStream()
     if len(chalks) > 0 and not goOn: break

@@ -105,7 +105,7 @@ def test_exec_chalked(
     assert sub_chalk["_CURRENT_HASH"] == current_hash
 
     # expect bin info to be available
-    assert sub_chalk["ARTIFACT_PATH"] == str(bin_path)
+    assert sub_chalk["_OP_ARTIFACT_PATH"] == str(bin_path)
     assert sub_chalk["ARTIFACT_TYPE"] == "ELF"
     assert sub_chalk["HASH"] == bin_hash
     assert current_hash != bin_hash

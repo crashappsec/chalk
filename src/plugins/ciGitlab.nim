@@ -10,7 +10,7 @@ import ../config
 
 type GitlabCI = ref object of Plugin
 
-method getChalkTimeHostInfo*(self: GitlabCI, path: seq[string]): ChalkDict =
+method getChalkTimeHostInfo*(self: GitlabCI): ChalkDict =
   result = ChalkDict()
 
   # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html

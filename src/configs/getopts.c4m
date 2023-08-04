@@ -82,14 +82,6 @@ The reporting cache keeps a local copy of any reports made, to provide redundanc
 """
   }
 
-  flag_arg macosx_metadata_location_info {
-    field_to_set: "self_location"
-    doc: """
-    This is only meant to be used internally in re-execs, currently on MacOS
-    only.  If used in any other context, it will be ignored.
-    """
-  }
-
   flag_yn use_embedded_config {
     field_to_set: "load_embedded_config"
     doc: "Turn off running the embedded configuration."
@@ -164,7 +156,20 @@ For most commands, this defeats the purpose of Chalk, so use it sparingly.
 
 Note that this doesn't turn off any custom reports; you have to disable those seprately.    
 """
-}
+  }
+
+  flag_yn wrap {
+    field_to_set: "docker.wrap_entrypoint"
+    doc: """
+
+When building a container via `chalk docker`, this will cause Chalk to
+automatically perform entry-point wrapping in such a way that built
+containers will do a chalk report when they launch.  Note that the
+'docker' command passes through ALL flags, so this flag needs to
+technically be part of the 'global' flags, even though nothing else
+uses it.
+"""    
+  }
 
   command insert {
     aliases:  ["inject", "ins", "in", "i"]
@@ -207,22 +212,34 @@ This command looks for existing chalk marks in artifacts, and reports on what it
       field_to_set: "recursive"
     }
 
-    command containers {
-      aliases:  ["c", "cont", "container", "docker", "d"]
-      args:     (0, high())
-      callback: func set_docker_image_list(list[string])
-
-      flag_yn report_unmarked {
-        yes_aliases: ["u"]
-        field_to_set: "report_unmarked"
-        doc: """
-If the 'report_unmarked' config variable is off in the config, --report-unmarked will turn it on.  Conversely, --no-report-unmarked will turn it off.
-
-In this context, it will cause 'chalk extract containers' to report metadata found on *any* running container, not just ones with chalk marks.
+    flag_yn containers {
+    doc: """
+Scan running continers for chalk.
 """
-      }
+    field_to_set: "extract.extract_from_containers"
     }
-  }
+
+    flag_yn images {
+    doc: """
+Scan local images for chalk.
+"""
+    field_to_set: "extract.extract_from_images"
+    }
+
+    flag_yn fs_scan {
+    doc: """
+True if omitting args should still do a file system scan.    
+"""
+    field_to_set: "extract.empty_args_means_fs_scan"
+    }
+
+    flag_yn search_layers {
+      doc: """
+When a mark in an image can't be found, should we try to report on overwitten marks?      
+"""
+      field_to_set: "extract.search_base_layers_for_marks"
+    }
+}
 
   command delete {
     aliases:  ["del"]

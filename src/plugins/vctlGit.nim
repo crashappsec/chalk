@@ -174,54 +174,55 @@ proc parseGitConfig(s: Stream): seq[SecInfo] =
 
 proc findGitDir(fullpath: string): string =
   let
+    gitDir       = fullpath.joinPath(".git")
     (head, tail) = fullpath.splitPath()
-    gitdir = head.joinPath(dirGit)
 
-  if tail == "": return
-  if gitdir.dirExists(): return gitdir
+  if gitdir.dirExists():
+    return gitDir
+
+  if tail == "":
+    return
 
   return head.findGitDir()
 
 # Using this in the GitRepo plugin too.
-type GitInfo* = ref object of Plugin
-  branchName: string
-  commitId:   string
-  origin:     string
-  vcsDir*:    string
+type
+  RepoInfo = ref object
+    vcsDir:   string
+    origin:   string
+    branch:   string
+    commitId: string
 
-template loadBasics(self: GitInfo, path: seq[string]) =
-  for item in path:
-    self.vcsDir = item.findGitDir()
-    if self.vcsDir != "":
-      trace("Version control dir: " & self.vcsDir)
-      break
+  GitInfo* = ref object of Plugin
+    branchName: Option[string]
+    commitId:   Option[string]
+    origin:     Option[string]
+    vcsDirs*:   OrderedTable[string, RepoInfo]
 
-proc loadHead(self: GitInfo): bool =
-  # Don't want to commit to the order in which things get called,
-  # so everything that might get called first someday calls this to
-  # be safe.
-  if self.commitID != "": return true
-
+proc loadHead(info: RepoInfo) =
   var
     fs: FileStream
     hf: string
 
   try:
-    fs = newFileStream(self.vcsDir.joinPath(fNameHead))
-    if fs != nil: hf = fs.readAll().strip()
-    else: return false
+    fs = newFileStream(info.vcsDir.joinPath(fNameHead))
+    if fs != nil:
+      hf = fs.readAll().strip()
+    else:
+      return
 
-    try:    fs.close()
-    except: discard
+    try:
+      fs.close()
+    except:
+      discard
   except:
     error(fNameHead & ": github HEAD file couldn't be read")
     dumpExOnDebug()
-    return false
-
+    return
 
   if not hf.startsWith(ghRef):
-    self.commitID = hf
-    return true
+    info.commitId = hf
+    return
 
   let
     fname = hf[4 .. ^1].strip()
@@ -232,18 +233,17 @@ proc loadHead(self: GitInfo): bool =
 
   if parts.len() < 3:
     error(fNameHead & ": github HEAD file couldn't be loaded")
-    return false
+    return
 
-  self.branchName = parts[2 .. ^1].join($DirSep)
-  var reffile     = newFileStream(self.vcsDir.joinPath(fname))
-  self.commitID   = reffile.readAll().strip()
+  info.branch   = parts[2 .. ^1].join($DirSep)
+  var reffile   = newFileStream(info.vcsDir.joinPath(fname))
+  info.commitId = reffile.readAll().strip()
   reffile.close()
 
-  trace("branch: " & self.branchName)
-  trace("commit ID: " & self.commitID)
-  return true
+  trace("branch: " & info.branch)
+  trace("commit ID: " & info.commitID)
 
-proc calcOrigin(self: GitInfo, conf: seq[SecInfo]): string =
+proc calcOrigin(self: RepoInfo, conf: seq[SecInfo]): string =
   # We are generally looking for the remote origin, because we expect
   # this is running from a checked-out copy of a repo.  It's
   # possible there could be multiple remotes, each associated with multiple
@@ -263,7 +263,7 @@ proc calcOrigin(self: GitInfo, conf: seq[SecInfo]): string =
   #
   # 5. Return the word "local"
   for (sec, subsec, kvpairs) in conf:
-    if sec == ghBranch and subsec == self.branchName:
+    if sec == ghBranch and subsec == self.branch:
       for (k, v) in kvpairs:
         if k == ghRemote:
           for (sec, subsec, kvpairs) in conf:
@@ -293,82 +293,79 @@ proc calcOrigin(self: GitInfo, conf: seq[SecInfo]): string =
   self.origin = ghLocal
   return ghLocal
 
-proc getOrigin(self: GitInfo): (bool, Box) =
-  if not self.loadHead(): return (false, nil)
+
+proc findAndLoad(plugin: GitInfo, path: string) =
+  trace("Looking for .git directory, from: " & path)
+  let vcsDir = path.findGitDir()
+
+  if vcsDir == "" or vcsDir in plugin.vcsDirs:
+    return
 
   let
-    confFileName = self.vcsDir.joinPath(fNameConfig)
+    confFileName = vcsDir.joinPath(fNameConfig)
+    info         = RepoInfo(vcsDir: vcsDir)
+    f            = newFileStream(confFileName)
+  trace("Found version control dir: " & vcsDir)
+  info.loadHead()
 
   try:
-    let
-      f      = newFileStream(confFileName)
-      config = f.parseGitConfig()
-      url    = self.calcOrigin(config)
-
-    trace("origin: " & url)
-    return (true, pack(url))
+    if f != nil:
+      let config = f.parseGitConfig()
+      info.origin = info.calcOrigin(config)
   except:
     error(confFileName & ": Github configuration file not parsed.")
     dumpExOnDebug()
-    return (false, nil)
 
-proc getHead(self: GitInfo): (bool, Box) =
-  if self.commitID == "": return (false, nil)
-  return (true, pack(self.commitID))
+  if info.commitId == "":
+    return
 
-proc getBranch(self: GitInfo): (bool, Box) =
-  if self.branchName == "": return (false, nil)
-  return (true, pack(self.branchName))
+  plugin.vcsDirs[vcsDir] = info
 
-method getChalkTimeHostInfo*(self: GitInfo, path: seq[string]): ChalkDict =
+template setVcsStuff(info: RepoInfo) =
+  result["VCS_DIR_WHEN_CHALKED"] = pack(info.vcsDir.splitPath().head)
+  if info.origin != "":
+    result["ORIGIN_URI"] = pack(info.origin)
+  if info.commitId != "":
+    result["COMMIT_ID"] = pack(info.commitId)
+  if info.branch != "":
+    result["BRANCH"] = pack(info.branch)
+  break
+
+method getChalkTimeHostInfo*(self: GitInfo): ChalkDict =
   result = ChalkDict()
 
-  self.loadBasics(path)
-  if self.vcsDir == "":
+  for path in getContextDirectories():
+    self.findAndLoad(path.resolvePath())
+
+  if len(self.vcsDirs) == 0:
     return # No git directory, so no work to do.
 
-  let
-    (originThere, origin) = self.getOrigin()
-    (headThere, head)     = self.getHead()
-    (branchThere, name)   = self.getBranch()
+  # Don't know an easier way to get the first one in an ordered table
+  for dir, info in self.vcsDirs:
+    info.setVcsStuff()
 
-  if originThere: result["ORIGIN_URI"] = origin
-  if headThere:   result["COMMIT_ID"]  = head
-  if branchThere: result["BRANCH"]     = name
+proc isInRepo(obj: ChalkObj, repo: string): bool =
+  if obj.fsRef == "":
+    return false
 
-proc isInRepo(obj: ChalkObj, dir: string): bool =
-  let prefix = dir.resolvePath()
-
-  for item in @[obj.fullpath] & obj.auxPaths:
-       if item.resolvePath().startsWith(prefix):
-         return true
+  let prefix = repo.splitPath().head
+  if obj.fsref.resolvePath().startsWith(prefix):
+    return true
 
   return false
 
 method getChalkTimeArtifactInfo*(self: GitInfo, obj: ChalkObj): ChalkDict =
   result = ChalkDict()
 
-  if self.vcsDir != "" and obj.isInRepo(self.vcsDir):
+  if len(self.vcsDirs) == 0:
     return
 
-  let options = if len(obj.auxPaths) != 0:
-                  obj.auxPaths
-                else:
-                  @[obj.fullpath]
+  if obj.fsRef == "":
+    for dir, info in self.vcsDirs:
+      info.setVcsStuff()
 
-  var artifactInfo = GitInfo()
-  artifactInfo.loadBasics(options)
-
-  if artifactInfo.vcsDir == "":
-    return
-
-  let
-    (originThere, origin) = artifactInfo.getOrigin()
-    (headThere, head)     = artifactInfo.getHead()
-    (branchThere, name)   = artifactInfo.getBranch()
-
-  if originThere: result["ORIGIN_URI"] = origin
-  if headThere:   result["COMMIT_ID"]  = head
-  if branchThere: result["BRANCH"]     = name
+  for dir, info in self.vcsDirs:
+    if obj.isInRepo(dir):
+      info.setVcsStuff()
 
 registerPlugin("vctl_git", GitInfo())

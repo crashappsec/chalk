@@ -9,15 +9,19 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import os, json, streams, tables, options, strutils, nimutils, sugar, posix,
-       nimutils/logging, con4m, c4autoconf
+       nimutils/logging, con4m, c4autoconf, unicode
 export os, json, options, tables, strutils, streams, sugar, nimutils, logging,
        con4m, c4autoconf
 
 type
-  ChalkDict* = OrderedTableRef[string, Box]
+  ChalkDict*    = OrderedTableRef[string, Box]
+
+  ResourceType* = enum
+    ResourceFile, ResourceImage, ResourceContainer, ResourcePid
+
   ## The chalk info for a single artifact.
   ChalkObj* = ref object
-    fullpath*:      string      ## The path to the artifact.
+    name*:          string      ## The name to use for the artifact.
     cachedHash*:    string      ## Cached 'ending' hash
     cachedPreHash*: string      ## Cached 'unchalked' hash
     collectedData*: ChalkDict   ## What we're adding during insertion.
@@ -25,12 +29,7 @@ type
     opFailed*:      bool
     marked*:        bool
     embeds*:        seq[ChalkObj]
-    stream*:        FileStream  # Plugins by default use file streams; we
-    startOffset*:   int         # keep state fields for that to bridge between
-    endOffset*:     int         # extract and write. If the plugin needs to do
-                                # something else, use the cache field
-                                # below, instead.
-    err*:           seq[string] ## runtime logs for chalking are filtered
+    err*:           seq[string] ## Runtime logs for chalking are filtered
                                 ## based on the "chalk log level". They
                                 ## end up here, until the end of chalking
                                 ## where, they get added to ERR_INFO, if
@@ -39,19 +38,20 @@ type
     cache*:         RootRef     ## Generic pointer a codec can use to
                                 ## store any state it might want to stash.
     myCodec*:       Codec
-    auxPaths*:      seq[string] ## File-system references for this
-                                ## artifact, when the fullpath isn't a
-                                ## file system reference.  For
-                                ## example, in a docker container,
-                                ## this can contain the context
-                                ## directory and the docker file.
     forceIgnore*:   bool        ## If the system decides the codec shouldn't
                                 ## process this, set this bool.
-    noResolvePath*: bool        ## True when the system plugin should not
-                                ## call resolvePath when setting the
-                                ## artifact path.
     pid*:           Option[Pid] ## If an exec() or eval() and we know
                                 ## the pid, this will be set.
+    stream*:        FileStream  ## Plugins by default use file streams; we
+    startOffset*:   int         ## keep state fields for that to bridge between
+    endOffset*:     int         ## extract and write. If the plugin needs to do
+                                ## something else, use the cache field
+                                ## below, instead.
+    fsRef*:         string      ## Reference for this artifact on a fs
+    tagRef*:        string      ## Tag reference if this is a docker image
+    imageId*:       string      ## Image ID if this is a docker image
+    containerId*:   string      ## Container ID if this is a container
+    resourceType*:  set[ResourceType]
 
   Plugin* = ref object of RootObj
     name*:       string
@@ -59,8 +59,6 @@ type
 
   Codec* = ref object of Plugin
     searchPath*: seq[string]
-    runtime*:    bool   # Set to true when we run via exec since codecs
-                        # might have different visibility.
 
   KeyType* = enum KtChalkableHost, KtChalk, KtNonChalk, KtHostOnly
 
@@ -69,7 +67,163 @@ type
     allChalks*:          seq[ChalkObj]
     unmarked*:           seq[string]
     report*:             Box
-    postprocessor*:      (CollectionCtx) -> void
+
+type
+  DockerDirective* = ref object
+    name*:       string
+    rawArg*:     string
+    escapeChar*: Option[Rune]
+
+  DockerCommand* = ref object
+    name*:   string
+    rawArg*: string
+    continuationLines*: seq[int]  # line 's we continue onto.
+    errors*: seq[string]
+
+  VarSub* = ref object
+    brace*:   bool
+    name*:    string
+    startix*: int
+    endix*:   int
+    default*: Option[LineToken]
+    error*:   string
+    plus*:    bool
+    minus*:   bool  #
+  LineTokenType* = enum ltOther, ltWord, ltQuoted, ltSpace
+
+  LineToken* = ref object
+    # Line tokens with variable substitutions can be a nested tree,
+    # because variable substitutions can, when providing default values,
+    # have their own substitutions (which can have their own substitutions...)
+    #
+    # To construct the post-eval string, combine the contents array, with
+    # each 'joiner' being a variable substitution operation.
+    #
+    # The individual pieces in the 'contents' field will be de-quoted
+    # already, with escapes processed.
+    startix*:    int
+    endix*:      int
+    kind*:       LineTokenType
+    contents*:   seq[string]
+    varSubs*:    seq[VarSub]
+    quoteType*:  Option[Rune]
+    usedEscape*: bool
+    error*:      string
+
+  DfFlag* = ref object
+    name*:    string
+    valid*:   bool
+    argtoks*: seq[LineToken]
+
+  TopLevelTokenType* = enum tltComment, tltWhiteSpace, tltCommand, tltDirective
+  TopLevelToken* = ref object
+    startLine*: int # 0-indexed
+    errors*:    seq[string]
+    case kind*: TopLevelTokenType
+    of tltCommand:
+      cmd*: DockerCommand
+    of tltDirective:
+      directive*: DockerDirective
+    else: discard
+  CmdParseType* = enum cpFrom, cpUnknown
+
+  DockerParse* = ref object
+    currentEscape*:      Rune
+    stream*:             Stream
+    expectContinuation*: bool
+    seenRun*:            bool
+    curLine*:            int
+    directives*:         OrderedTable[string, DockerDirective]
+    cachedCommand*:      DockerCommand
+    args*:               Table[string, string]  # Name to default value
+    envs*:               Table[string, string]
+    commands*:           seq[DockerCommand]
+    sourceLines*:        seq[string] # The unparsed input text
+    tokens*:             seq[TopLevelToken]
+    errors*:             seq[string] # Not the only place errors live for now.
+    inArgs*:             Table[string, string]
+
+  InfoBase* = ref object of RootRef
+    error*:    string
+    stopHere*: bool
+
+  FromInfo* = ref object of InfoBase
+    flags*:  seq[DfFlag]
+    image*:  Option[LineToken]
+    tag*:    Option[LineToken]
+    digest*: Option[LineToken]
+    asArg*:  Option[LineToken]
+
+  ShellInfo* = ref object of InfoBase
+    json*:         JsonNode
+
+  CmdInfo* = ref object of InfoBase
+    raw*:          string
+    json*:         JsonNode
+    str*:          string
+
+  EntryPointInfo* = ref object of InfoBase
+    raw*:          string
+    json*:         JsonNode
+    str*:          string
+
+  OnBuildInfo* = ref object of InfoBase
+    rawContents*:  string
+
+  AddInfo* = ref object of InfoBase
+    flags*:  seq[DfFlag]
+    rawSrc*: seq[string]
+    rawDst*: string
+
+  CopyInfo* = ref object of InfoBase
+    flags*:  seq[DfFlag]
+    rawSrc*: seq[string]
+    rawDst*: string
+
+  LabelInfo* = ref object of InfoBase
+    labels*: OrderedTable[string, string]
+
+  DockerFileSection* = ref object
+    image*:       string
+    alias*:       string
+    entryPoint*:  EntryPointInfo
+    cmd*:         CmdInfo
+    shell*:       ShellInfo
+
+  DockerInvocation* = ref object
+    dockerExe*:         string
+    opChalkObj*:        ChalkObj
+    originalArgs*:      seq[string]
+    cmd*:               string
+    processedArgs*:     seq[string]
+    flags*:             OrderedTable[string, FlagSpec]
+    foundLabels*:       OrderedTableRef[string, string]
+    foundTags*:         seq[string]
+    ourTag*:            string
+    prefTag*:           string
+    passedImage*:       string
+    buildArgs*:         Table[string, string]
+    foundFileArg*:      string
+    dockerfileLoc*:     string
+    inDockerFile*:      string
+    foundPlatform*:     string
+    foundContext*:      string
+    otherContexts*:     OrderedTableRef[string, string]
+    errs*:              seq[string]
+    cmdBuild*:          bool
+    cmdPush*:           bool
+    privs*:             seq[string]
+    targetBuildStage*:  string
+    pushAllTags*:       bool
+    embededMarks*:      Box
+    newCmdLine*:        seq[string] # Rewritten command line
+    fileParseCtx*:      DockerParse
+    dfCommands*:        seq[InfoBase]
+    dfSections*:        seq[DockerFileSection]
+    dfSectionAliases*:  OrderedTable[string, DockerFileSection]
+    addedInstructions*: seq[string]
+    tmpFiles*:          seq[string]
+
 
 # Compile-time only helper for generating one of the consts below.
 proc commentC4mCode(s: string): string =
@@ -81,11 +235,12 @@ proc commentC4mCode(s: string): string =
 const
   magicUTF8*          = "dadfedabbadabbed"
   emptyMark*          = "{ \"MAGIC\" : \"" & magicUTF8 & "\" }"
+  implName*           = "chalk-reference"
   tmpFilePrefix*      = "chalk-"
   tmpFileSuffix*      = "-file.tmp"
   chalkSpecName*      = "configs/chalk.c42spec"
   getoptConfName*     = "configs/getopts.c4m"
-  baseConfName*       = "configs/baseconfig.c4m"
+  baseConfName*       = "configs/base_*.c4m"
   signConfName*       = "configs/signconfig.c4m"
   sbomConfName*       = "configs/sbomconfig.c4m"
   sastConfName*       = "configs/sastconfig.c4m"
@@ -94,7 +249,12 @@ const
   defCfgFname*        = "configs/defaultconfig.c4m"  # Default embedded config.
   chalkC42Spec*       = staticRead(chalkSpecName)
   getoptConfig*       = staticRead(getoptConfName)
-  baseConfig*         = staticRead(baseConfName)
+  baseConfig*         = staticRead("configs/base_keyspecs.c4m") &
+                        staticRead("configs/base_plugins.c4m") &
+                        staticRead("configs/base_sinks.c4m") &
+                        staticRead("configs/base_profiles.c4m") &
+                        staticRead("configs/base_outconf.c4m") &
+                        staticRead("configs/base_sinkconfs.c4m")
   signConfig*         = staticRead(signConfName)
   sbomConfig*         = staticRead(sbomConfName)
   sastConfig*         = staticRead(sastConfName)
@@ -178,18 +338,37 @@ else:
   template betterGetAppFileName(): string = getAppFileName()
 
 
-template getMyAppPath*(): string =
-  when hostOs == "macosx":
-    if chalkConfig == nil:
-      betterGetAppFileName()
-    else:
-      chalkConfig.getSelfLocation().getOrElse(betterGetAppFileName())
-  else:
-    betterGetAppFileName()
+when hostOs == "macosx":
+  proc getMyAppPath*(): string =
+    let name = betterGetAppFileName()
+
+    if "_CHALK" notin name:
+      return name
+    let parts = name.split("_CHALK")[0 .. ^1]
+
+    for item in parts:
+      if len(item) < 3:
+        return name
+      case item[0 ..< 3]
+      of "HM_":
+        result &= "#"
+      of "SP_":
+        result &= " "
+      of "SL_":
+        result &= "/"
+      else:
+        return name
+      if len(item) > 3:
+        result &= item[3 .. ^1]
+    echo "getMyAppPath() = ", result
+else:
+  template getMyAppPath*(): string = betterGetAppFileName()
 
 template dumpExOnDebug*() =
   if chalkConfig != nil and chalkConfig.getChalkDebug():
-    publish("debug", getCurrentException().getStackTrace())
+    let msg = "Handling exception (msg = " & getCurrentExceptionMsg() & ")\n" &
+      getCurrentException().getStackTrace()
+    publish("debug", msg)
 
 proc getBaseCommandName*(): string =
   if '.' in commandName:

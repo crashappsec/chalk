@@ -1,16 +1,17 @@
 import ../config, ../collect, ../reporting, ../chalkjson, ../plugin_api
 
 
-proc runCmdInsert*(path: seq[string]) =
+proc runCmdInsert*(path: seq[string]) {.exportc,cdecl.} =
+  setContextDirectories(path)
   initCollection()
   let virtual = chalkConfig.getVirtualChalk()
 
   for item in artifacts(path):
-    trace(item.fullPath & ": begin chalking")
-    item.collectChalkInfo()
-    trace(item.fullPath & ": chalk data collection finished.")
+    trace(item.name & ": begin chalking")
+    item.collectChalkTimeArtifactInfo()
+    trace(item.name & ": chalk data collection finished.")
     if item.isMarked() and "$CHALK_CONFIG" in item.extract:
-      info(item.fullPath & ": Is a configured chalk exe; skipping insertion.")
+      info(item.name & ": Is a configured chalk exe; skipping insertion.")
       item.removeFromAllChalks()
       item.forceIgnore = true
       continue
@@ -20,14 +21,14 @@ proc runCmdInsert*(path: seq[string]) =
       let toWrite = item.getChalkMarkAsStr()
       if virtual:
         publish("virtual", toWrite)
-        info(item.fullPath & ": virtual chalk created.")
+        info(item.name & ": virtual chalk created.")
       else:
         item.myCodec.handleWrite(item, some(toWrite))
         if not item.opFailed:
-          info(item.fullPath & ": chalk mark successfully added")
+          info(item.name & ": chalk mark successfully added")
 
     except:
-      error(item.fullPath & ": insertion failed: " & getCurrentExceptionMsg())
+      error(item.name & ": insertion failed: " & getCurrentExceptionMsg())
       dumpExOnDebug()
       item.opFailed = true
 

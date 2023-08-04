@@ -119,10 +119,10 @@ template toolBase(s: untyped, hostScope: static[bool]) {.dirty.} =
 
   return dict
 
-method getChalkTimeHostInfo*(self: ToolPlugin, path: seq[string]): ChalkDict =
-  toolBase(path[0], true)
+method getChalkTimeHostInfo*(self: ToolPlugin): ChalkDict =
+  toolBase(getContextDirectories()[0], true)
 
 method getChalkTimeArtifactInfo*(self: ToolPlugin, obj: ChalkObj): ChalkDict =
- toolbase(obj.fullpath, false)
+ toolbase(obj.name, false)
 
 registerPlugin("tool", ToolPlugin())

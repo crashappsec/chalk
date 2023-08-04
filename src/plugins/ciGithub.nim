@@ -9,7 +9,7 @@ import ../config
 
 type GithubCI = ref object of Plugin
 
-method getChalkTimeHostInfo*(self: GithubCI, path: seq[string]): ChalkDict =
+method getChalkTimeHostInfo*(self: GithubCI): ChalkDict =
   result = ChalkDict()
 
   # https://docs.github.com/en/actions/

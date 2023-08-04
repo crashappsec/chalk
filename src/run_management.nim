@@ -1,20 +1,20 @@
-import chalk_common
+import chalk_common, posix
 export chalk_common
 
 var
   ctxStack            = seq[CollectionCtx](@[])
   collectionCtx       = CollectionCtx()
-  `isChalkingOp?`:    bool
 
+# This is for when we're doing a `conf load`.  We force silence, turning off
+# all logging of merit.
 proc startTestRun*() =
   doingTestRun = true
-
-proc endTestRun*() =
+proc endTestRun*()   =
   doingTestRun = false
 
-proc pushCollectionCtx*(callback: (CollectionCtx) -> void): CollectionCtx =
+proc pushCollectionCtx*(): CollectionCtx =
   ctxStack.add(collectionCtx)
-  collectionCtx = CollectionCtx(postprocessor: callback)
+  collectionCtx = CollectionCtx()
   result        = collectionCtx
 
 proc popCollectionCtx*() =
@@ -29,6 +29,7 @@ proc setErrorObject*(o: ChalkObj) =
 proc clearErrorObject*() =
   collectionCtx.currentErrorObject = none(ChalkObj)
 proc getAllChalks*(): seq[ChalkObj] = collectionCtx.allChalks
+proc getAllChalks*(cc: CollectionCtx): seq[ChalkObj] = cc.allChalks
 proc addToAllChalks*(o: ChalkObj) =
   collectionCtx.allChalks.add(o)
 proc setAllChalks*(s: seq[ChalkObj]) =
@@ -40,12 +41,32 @@ proc getUnmarked*(): seq[string] = collectionCtx.unmarked
 proc addUnmarked*(s: string) =
   collectionCtx.unmarked.add(s)
 proc isMarked*(chalk: ChalkObj): bool {.inline.} = return chalk.marked
-proc newChalk*(stream: FileStream, loc: string): ChalkObj =
-  result = ChalkObj(fullpath:      loc,
+proc newChalk*(name:         string            = "",
+               pid:          Option[Pid]       = none(Pid),
+               fsRef:        string            = "",
+               tag:          string            = "",
+               imageId:      string            = "",
+               containerId:  string            = "",
+               marked:       bool              = false,
+               stream:       FileStream        = FileStream(nil),
+               resourceType: set[ResourceType] = {ResourceFile},
+               extract:      ChalkDict         = ChalkDict(nil),
+               cache:        RootRef           = RootRef(nil),
+               codec:        Codec             = Codec(nil)): ChalkObj =
+  result = ChalkObj(name:          name,
+                    pid:           pid,
+                    fsRef:         fsRef,
+                    stream:        stream,
+                    tagRef:        tag,
+                    marked:        marked,
+                    imageId:       imageId,
+                    containerId:   containerId,
                     collectedData: ChalkDict(),
                     opFailed:      false,
-                    stream:        stream,
-                    extract:       nil)
+                    resourceType:  resourceType,
+                    extract:       extract,
+                    cache:         cache,
+                    myCodec:       codec)
   setErrorObject(result)
 
 template setIfNotEmpty*(dict: ChalkDict, key: string, val: string) =
@@ -69,15 +90,25 @@ template isSubscribedKey*(key: string): bool =
   else:
     false
 
-template setIfSubscribed*[T](d: ChalkDict, k: string, v: T) =
+template setIfSubscribed[T](d: ChalkDict, k: string, v: T) =
   if isSubscribedKey(k):
     d[k] = pack[T](v)
 
-proc isChalkingOp*(): bool =
-  once:
-    `isChalkingOp?` = commandName in chalkConfig.getValidChalkCommandNames()
-  return `isChalkingOp?`
+template setIfNeeded*[T](o: ChalkDict, k: string, v: T) =
+  when T is string:
+    if v != "":
+      setIfSubscribed(o, k, v)
+  elif T is seq or T is ChalkDict:
+    if len(v) != 0:
+      setIfSubscribed(o, k, v)
+  else:
+    setIfSubscribed(o, k, v)
 
+template setIfNeeded*[T](o: ChalkObj, k: string, v: T) =
+  setIfNeeded(o.collectedData, k, v)
+
+proc isChalkingOp*(): bool =
+  return commandName in chalkConfig.getValidChalkCommandNames()
 
 proc lookupCollectedKey*(obj: ChalkObj, k: string): Option[Box] =
   if k in hostInfo:          return some(hostInfo[k])
@@ -92,3 +123,17 @@ proc getArgs*(): seq[string] = args
 
 var cmdSpec*: CommandSpec = nil
 proc getArgCmdSpec*(): CommandSpec = cmdSpec
+
+var contextDirectories: seq[string]
+
+template setContextDirectories*(l: seq[string]) =
+  # Used for 'where to look for stuff' plugins, particularly version control.
+  contextDirectories = l
+
+template getContextDirectories*(): seq[string] =
+  contextDirectories
+
+var hostCollectionSuspends = 0
+template suspendHostCollection*() =         hostCollectionSuspends += 1
+template restoreHostCollection*() =         hostCollectionSuspends -= 1
+template hostCollectionSuspended*(): bool = hostCollectionSuspends != 0

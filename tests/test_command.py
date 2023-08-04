@@ -10,6 +10,7 @@ import dateutil.parser
 
 from .chalk.runner import Chalk
 from .utils.bin import sha256
+from .utils.chalk_report import get_liftable_key
 from .utils.log import get_logger
 from .utils.validate import (
     ArtifactInfo,
@@ -59,10 +60,11 @@ def test_insert_extract_repeated(tmp_data_dir: Path, chalk: Chalk):
         * 1000
         == single_chalk["_TIMESTAMP"]
     )
-    assert single_chalk["_DATETIME"] > _chalk["DATETIME"]
+    assert single_chalk["_DATETIME"] > _chalk["DATETIME_WHEN_CHALKED"]
 
     # store chalk_rand and timestamp1 to compare against second chalk
-    rand1 = _chalk["CHALK_RAND"]
+    # chalk_rand may or may not have been lifted to host level
+    rand1 = get_liftable_key(single_chalk, "CHALK_RAND")
     timestamp1 = single_chalk["_TIMESTAMP"]
 
     # repeat the above process re-chalking the same binary and assert that the
@@ -79,10 +81,11 @@ def test_insert_extract_repeated(tmp_data_dir: Path, chalk: Chalk):
 
     # but this time timestamps and random values should be different
     _chalk = extracted_chalks_2[0]["_CHALKS"][0]
-    assert rand1 != _chalk["CHALK_RAND"]
+    rand2 = get_liftable_key(extracted_chalks_2[0], "CHALK_RAND")
+    assert rand1 != rand2
     timestamp2 = extracted_chalks_2[0]["_TIMESTAMP"]
     assert timestamp1 < timestamp2
-    last_chalk_datetime = _chalk["DATETIME"]
+    last_chalk_datetime = _chalk["DATETIME_WHEN_CHALKED"]
 
     # do one final extraction
     extracted = chalk.run(
@@ -99,7 +102,7 @@ def test_insert_extract_repeated(tmp_data_dir: Path, chalk: Chalk):
     _chalk = extracted_chalks_3[0]["_CHALKS"][0]
     # _TIMESTAMP is time at extraction time, so these will be different
     assert timestamp2 < extracted_chalks_3[0]["_TIMESTAMP"]
-    assert last_chalk_datetime == _chalk["DATETIME"]
+    assert last_chalk_datetime == _chalk["DATETIME_WHEN_CHALKED"]
 
     # ensure that the binary executes properly although chalked
     st = os.stat(artifact)
@@ -257,7 +260,7 @@ def test_version(chalk: Chalk):
 
 # env
 def test_env(chalk: Chalk):
-    env_proc = chalk.run(chalk_cmd="env")
+    env_proc = chalk.run(chalk_cmd="env", params=["--log-level=error"])
     # this should never error
     assert env_proc.returncode == 0
     assert env_proc.stderr.decode() == ""
@@ -265,8 +268,6 @@ def test_env(chalk: Chalk):
     # env output should match system
     _stdout = env_proc.stdout.decode()
     env_output = json.loads(_stdout)[0]
-    logger.info("!!!!")
-    logger.info(env_output)
 
     # fields to check: platform, hostinfo, nodename
     _proc = run(args=["uname", "-s"], capture_output=True)

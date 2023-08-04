@@ -229,7 +229,7 @@ if configured_sink {
 
 if ptr_url != "" {
     keyspec.CHALK_PTR.value = strip(ptr_url)
-    outconf.insert.chalk = "chalking_ptr"
+    outconf.insert.chalk = "chalk_minimal"
 }
 
 #% INTERNAL

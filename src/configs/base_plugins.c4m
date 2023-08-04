@@ -1,0 +1,291 @@
+# Part of the base configuration.  See the comment at the top of
+# `base_keyspecs.c4m`
+
+# Doesn't do any keys other than the codec defaults, which are:
+# PATH_WHEN_CHALKED and HASH Note that non-codecs should should not s
+# houl d
+
+# not s
+
+# et these
+
+# keys.
+
+plugin elf {
+    codec:           true
+    artifact_keys:   ["ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+}
+
+plugin shebang {
+    codec:           true
+    artifact_keys:   ["ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+}
+
+plugin macos {
+    codec:           true
+    artifact_keys:   ["ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    priority:        2  # Should come before shebang for sure.
+}
+
+plugin docker {
+    codec:    true
+    priority: 1
+    enabled:  true
+    artifact_keys: ["ARTIFACT_TYPE", "DOCKER_FILE", "DOCKERFILE_PATH",
+                    "DOCKER_PLATFORM", "DOCKER_LABELS", "DOCKER_TAGS",
+                    "DOCKER_CONTEXT", "DOCKER_ADDITIONAL_CONTEXTS",
+                    "DOCKER_CHALK_ADDED_LABELS", "DOCKER_CHALK_TEMPORARY_TAG",
+                    "DOCKER_CHALK_ADDED_TO_DOCKERFILE" ]
+    
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE", "_REPO_TAGS",
+        "_REPO_DIGESTS", "_IMAGE_COMMENT", "_IMAGE_CREATION_DATETIME",
+        "_IMAGE_DOCKER_VERSION", "_IMAGE_AUTHOR", "_IMAGE_ARCHITECTURE",
+        "_IMAGE_VARIANT", "_IMAGE_OS", "_IMAGE_OS_VERSION", "_IMAGE_SIZE",
+        "_IMAGE_ROOT_FS_TYPE", "_IMAGE_ROOT_FS_LAYERS", "_IMAGE_HOSTNAME",
+        "_IMAGE_DOMAINNAME", "_IMAGE_USER", "_IMAGE_EXPOSED_PORTS",
+        "_IMAGE_ENV", "_IMAGE_CMD", "_IMAGE_NAME", "_IMAGE_HEALTHCHECK_TEST",
+        "_IMAGE_HEALTHCHECK_INTERVAL", "_IMAGE_HEALTHCHECK_TIMEOUT",
+        "_IMAGE_HEALTHCHECK_START_PERIOD", "_IMAGE_HEALTHCHECK_START_INTERVAL",
+        "_IMAGE_HEALTHCHECK_RETRIES", "_IMAGE_MOUNTS", "_IMAGE_WORKINGDIR",
+        "_IMAGE_ENTRYPOINT", "_IMAGE_NETWORK_DISABLED", "_IMAGE_MAC_ADDR",
+        "_IMAGE_ONBUILD", "_IMAGE_LABELS", "_IMAGE_STOP_SIGNAL",
+        "_IMAGE_STOP_TIMEOUT", "_IMAGE_SHELL", "_IMAGE_VIRTUAL_SIZE",
+        "_IMAGE_LAST_TAG_TIME", "_IMAGE_STORAGE_METADATA",
+        "_INSTANCE_CONTAINER_ID","_INSTANCE_CREATION_DATETIME",        
+        "_INSTANCE_ENTRYPOINT_PATH", "_INSTANCE_ENTRYPOINT_ARGS",
+        "_INSTANCE_ENV", "_INSTANCE_RESOLVE_CONF_PATH",
+        "_INSTANCE_HOSTNAME_PATH", "_INSTANCE_HOSTS_PATH", "_INSTANCE_LOG_PATH",
+        "_INSTANCE_IMAGE_ID", "_INSTANCE_STATUS", "_INSTANCE_PID",
+        "_INSTANCE_NAME", "_INSTANCE_RESTART_COUNT", "_INSTANCE_DRIVER",
+        "_INSTANCE_PLATFORM", "_INSTANCE_MOUNT_LABEL",
+        "_INSTANCE_PROCESS_LABEL", "_INSTANCE_APP_ARMOR_PROFILE",
+        "_INSTANCE_EXEC_IDS", "_INSTANCE_BINDS", "_INSTANCE_CONTAINER_ID_FILE",
+        "_INSTANCE_LOG_CONFIG", "_INSTANCE_NETWORK_MODE",
+        "_INSTANCE_RESTART_POLICY_NAME", "_INSTANCE_RESTART_RETRY_COUNT",
+        "_INSTANCE_AUTOREMOVE", "_INSTANCE_VOLUME_DRIVER",
+        "_INSTANCE_VOLUMES_FROM", "_INSTANCE_CONSOLE_SIZE",
+        "_INSTANCE_ADDED_CAPS", "_INSTANCE_DROPPED_CAPS",
+        "_INSTANCE_CGROUP_NS_MODE", "_INSTANCE_DNS", "_INSTANCE_DNS_OPTIONS",
+        "_INSTANCE_DNS_SEARCH", "_INSTANCE_EXTRA_HOSTS", "_INSTANCE_GROUP_ADD",
+        "_INSTANCE_IPC_MODE", "_INSTANCE_CGROUP", "_INSTANCE_LINKS",
+        "_INSTANCE_OOM_SCORE_ADJ", "_INSTANCE_PID_MODE",
+        "_INSTANCE_IS_PRIVILEGED", "_INSTANCE_PUBLISH_ALL_PORTS",
+        "_INSTANCE_READONLY_ROOT_FS", "_INSTANCE_SECURITY_OPT",
+        "_INSTANCE_UTS_MODE", "_INSTANCE_USER_NS_MODE", "_INSTANCE_SHM_SIZE",
+        "_INSTANCE_RUNTIME", "_INSTANCE_ISOLATION", "_INSTANCE_CPU_SHARES",
+        "_INSTANCE_MEMORY", "_INSTANCE_NANO_CPUS", "_INSTANCE_CGROUP_PARENT",
+        "_INSTANCE_BLOCKIO_WEIGHT", "_INSTANCE_BLOCKIO_WEIGHT_DEVICE",
+        "_INSTANCE_BLOCKIO_DEVICE_READ_BPS",
+        "_INSTANCE_BLOCKIO_DEVICE_WRITE_BPS",
+        "_INSTANCE_BLOCKIO_DEVICE_READ_IOPS",
+        "_INSTANCE_BLOCKIO_DEVICE_WRITE_IOPS",
+        "_INSTANCE_CPU_PERIOD", "_INSTANCE_CPU_QUOTA",
+        "_INSTANCE_CPU_REALTIME_PERIOD", "_INSTANCE_CPU_REALTIME_RUNTIME",
+        "_INSTANCE_CPUSET_CPUS", "_INSTANCE_CPUSET_MEMS", "_INSTANCE_DEVICES",
+        "_INSTANCE_CGROUP_RULES", "_INSTANCE_DEVICE_REQUESTS",
+        "_INSTANCE_MEMORY_RESERVATION", "_INSTANCE_MEMORY_SWAP",
+        "_INSTANCE_MEMORY_SWAPPINESS", "_INSTANCE_OOM_KILL_DISABLE",
+        "_INSTANCE_PIDS_LIMIT", "_INSTANCE_ULIMITS", "_INSTANCE_CPU_COUNT",
+        "_INSTANCE_CPU_PERCENT", "_INSTANCE_IO_MAX_IOPS",
+        "_INSTANCE_IO_MAX_BPS", "_INSTANCE_MASKED_PATHS",
+        "_INSTANCE_READONLY_PATHS", "_INSTANCE_STORAGE_METADATA",
+        "_INSTANCE_MOUNTS", "_INSTANCE_HOSTNAMES", "_INSTANCE_DOMAINNAME",
+        "_INSTANCE_USER", "_INSTANCE_ATTACH_STDIN", "_INSTANCE_ATTACH_STDOUT",
+        "_INSTANCE_ATTACH_STDERR", "_INSTANCE_EXPOSED_PORTS",
+        "_INSTANCE_HAS_TTY", "_INSTANCE_OPEN_STDIN", "_INSTANCE_STDIN_ONCE",
+        "_INSTANCE_ENV", "_INSTANCE_CMD", "_INSTANCE_CONFIG_IMAGE",
+        "_INSTANCE_VOLUMES", "_INSTANCE_WORKING_DIR", "_INSTANCE_ENTRYPOINT",
+        "_INSTANCE_ONBUILD", "_INSTANCE_LABELS", "_INSTANCE_BRIDGE",
+        "_INSTANCE_SANDBOXID", "_INSTANCE_HAIRPINMODE", "_INSTANCE_LOCAL_IPV6",
+        "_INSTANCE_LOCAL_IPV6_PREFIX_LEN", "_INSTANCE_BOUND_PORTS",
+        "_INSTANCE_SANDBOX_KEY", "_INSTANCE_SECONDARY_IPS",
+        "_INSTANCE_SECONDARY_IPV6_ADDRS", "_INSTANCE_ENDPOINTID",
+        "_INSTANCE_GATEWAY", "_INSTANCE_GLOBAL_IPV6_ADDRESS",
+        "_INSTANCE_GLOBAL_IPV6_PREFIX_LEN", "_INSTANCE_IP",
+        "_INSTANCE_IP_PREFIX_LEN", "_INSTANCE_IPV6_GATEWAY",
+        "_INSTANCE_MAC", "_INSTANCE_NETWORKS",  "_OP_ALL_CONTAINER_METADATA",
+        "_OP_ALL_IMAGE_METADATA"
+    ]
+}
+
+plugin zip {
+    codec:           true
+    priority:        1
+    enabled:         true
+    artifact_keys:   ["EMBEDDED_CHALK", "EMBEDDED_TMPDIR", "ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+}
+
+plugin zippeditem {
+    enabled:         true
+    artifact_keys:   ["CONTAINING_ARTIFACT_WHEN_CHALKED", "PATH_WITHIN_ZIP"]
+}
+
+plugin python_py {
+    codec:           true
+    priority:        1
+    enabled:         true
+    artifact_keys:   ["ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+}
+
+plugin python_pyc {
+    codec:           true
+    priority:        1
+    enabled:         true
+    artifact_keys:   ["ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+}
+
+plugin tool {
+    enabled:         true
+    pre_run_keys:    ["*"]
+    artifact_keys:   ["*"]
+}
+
+# Probably should add file time of artifact, date of branch
+# and any tag associated.
+plugin vctl_git {
+    enabled:         true
+    pre_run_keys:    ["COMMIT_ID", "BRANCH", "ORIGIN_URI",
+                      "VCS_DIR_WHEN_CHALKED"]
+    artifact_keys:   ["COMMIT_ID", "BRANCH", "ORIGIN_URI",
+                      "VCS_DIR_WHEN_CHALKED"]
+}
+
+plugin ci_github {
+    enabled:         true
+    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
+                     "BUILD_TRIGGER", "BUILD_CONTACT"]
+}
+
+plugin ci_jenkins {
+    enabled:         true
+    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI"]
+}
+
+plugin ci_gitlab {
+    enabled:         true
+    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
+                      "BUILD_TRIGGER", "BUILD_CONTACT"]
+}
+
+plugin authors {
+    # Since there's only one key it might export, go ahead and
+    # lock it; if you want to disable that key, turn off the whole plugin.
+    enabled:         true
+    pre_run_keys:    ["CODE_OWNERS"]
+}
+
+plugin github_codeowners {
+    enabled:         true
+    artifact_keys:   ["CODE_OWNERS"]
+}
+
+plugin aws_ecs {
+    enabled:         true
+    pre_run_keys:    ["CLOUD_METADATA_WHEN_CHALKED"]
+    post_run_keys:   ["_OP_CLOUD_METADATA"]
+}
+
+plugin procfs {
+    enabled:         true
+    post_chalk_keys: ["_PROCESS_PID", "_PROCESS_DETAIL",
+                      "_PROCESS_PARENT_PID", "_PROCESS_START_TIME",
+                      "_PROCESS_STATE", "_PROCESS_PGID", "_PROCESS_UTIME",
+                      "_PROCESS_STIME", "_PROCESS_CHILDREN_UTIME",
+                      "_PROCESS_CHILDREN_STIME", "_PROCESS_UMASK",
+                      "_PROCESS_UID", "_PROCESS_GID",
+                      "_PROCESS_NUM_FD_SIZE", "_PROCESS_GROUPS",
+                      "_PROCESS_SECCOMP_STATUS", "_PROCESS_ARGV",
+                      "_PROCESS_CWD", "_PROCESS_EXE_PATH",
+                      "_PROCESS_COMMAND_NAME", "_PROCESS_FD_INFO",
+                      "_PROCESS_MOUNT_INFO"]
+                      
+    post_run_keys:   ["_OP_TCP_SOCKET_INFO", "_OP_UDP_SOCKET_INFO",
+                      "_OP_IPV4_ROUTES", "_OP_IPV6_ROUTES",
+                      "_OP_IPV4_INTERFACES", "_OP_IPV6_INTERFACES",
+                      "_OP_ARP_TABLE", "_OP_CPU_INFO", "_OP_ALL_PS_INFO"]
+    
+}
+
+# This plugin is the only thing allowed to set these keys.
+plugin system {
+  enabled:          true
+  pre_run_keys:    ["INJECTOR_CHALK_ID", "INJECTOR_VERSION", "TIME_CHALKED",
+                     "INJECTOR_COMMIT_ID", "DATE_CHALKED",
+                     "TZ_OFFSET_WHEN_CHALKED", "DATETIME_WHEN_CHALKED",
+                     "INJECTOR_ENV", "HOSTINFO_WHEN_CHALKED",
+                      "NODENAME_WHEN_CHALKED", "PLATFORM_WHEN_CHALKED"]
+                     
+  artifact_keys:   ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
+                    "TIMESTAMP_WHEN_CHALKED"]
+                    
+  post_chalk_keys: ["_VALIDATED", "_OP_ARTIFACT_PATH", "_CURRENT_HASH",
+                    "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS", "_VIRTUAL"]
+                    
+  post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
+                    "_OP_HOSTINFO", "_OP_NODENAME", "_OP_PLATFORM",
+		    "_OP_CHALKER_COMMIT_ID", "_OP_CHALKER_VERSION",
+		    "_OP_CHALK_COUNT", "_OP_CMD_FLAGS", "_OP_EXE_NAME",
+		    "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
+		    "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
+		    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV"]
+                    
+  ~priority:       0
+}
+
+# These keys are system keys, but need to go LAST, not first.  The
+# OLD_CHALK field needs to know what fields get written before it can
+# figure out what to write.
+#
+# `metsys` is essentially meant to be "system end" in the sense of the
+# old algol days where an if statement's end delimeter was `fi` and a
+# case statement's end was `esac`. But also, this is where system
+# stuff goes that needs other metadata before it can write its own, so
+# I thought it was particularly appropriate.
+#
+# The priority field is set to high(int64).
+
+plugin metsys {
+    artifact_keys: ["METADATA_HASH", "SIGNATURE", "SIGN_PARAMS", "ERR_INFO",
+                    "METADATA_ID", "$CHALK_CONFIG"]
+    ~priority:     high()
+}
+
+# This plugin takes values from the conf file, whether they're static
+# values, or callbacks. By default, these are of the lowest priority
+# of anything that can conflict.
+#
+# For static values read from the profile, this plugin attempts to
+# apply substitutions to text strings, where appropriate. See the plugin
+# implementation for details on the substitutions.
+#
+# For callbacks, it passes in the artifact path as a first parameter, and
+# expects the callback to return the proper value.
+#
+# This really should go next to last, since it fills in default values
+# when no other plugin does.  For string fields, it will do string
+# substitutions too:
+#
+# {chalkid} -> value of CHALK_ID
+# {now}     -> value of TIMESTAMP
+# {path}    -> value of PATH_WHEN_CHALKED
+# {hash}    -> value of HASH
+# {tenant}  -> value of TENANT_ID_WHEN_CHALKED
+#
+#
+# While we don't enforce that, if you want to ensure callbacks are called,
+# and that provided values clobber plugin values, you can leave the
+# priority as is, and set the overrides field.
+
+plugin conffile {
+    pre_run_keys:     ["*"]  # Host-only keys are evaluated here.
+    artifact_keys:    ["*"]  # Chalk-only keys are evaluated here.
+    post_chalk_keys:  ["*"]  # Non-chalkable artifact keys here.
+    post_run_keys:    ["*"]  # Post-run keys here.
+    priority:         high() - 1
+}

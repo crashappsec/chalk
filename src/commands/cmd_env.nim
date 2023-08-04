@@ -16,8 +16,9 @@ proc runCmdEnv*() =
   oneEnvItem("_ARTIFACT_PATH", artifactPath)
 
   if len(dict) != 0:
-    let c = ChalkObj(extract: dict, collectedData: ChalkDict(),
-                     opFailed: false, marked: true)
+    let c = ChalkObj(extract:       dict,
+                     collectedData: ChalkDict(),
+                     opFailed:      false, marked: true)
     c.addToAllChalks()
 
   doReporting()

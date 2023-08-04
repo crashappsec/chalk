@@ -259,6 +259,19 @@ docker {
       flag_multi_arg target { }
       flag_multi_arg ulimit { }
 
+      flag_yn push {
+        yes_aliases: []
+        no_aliases: []
+      }
+
+      flag_multi_arg output_type {
+      }
+      
+      flag_yn pull {
+        yes_aliases: []
+        no_aliases: []
+      }
+
       # Below here is stuff from 'docker build' that buildx should
       # support, even though it isn't in `docker buildx build
       # --help`.

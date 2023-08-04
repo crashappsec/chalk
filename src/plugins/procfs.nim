@@ -3,7 +3,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
 
-import posix, re, base64, ../config, ../plugin_api
+import posix, re, base64, ../config
 
 type
   ProcDict   = OrderedTableRef[string, string]
@@ -154,28 +154,40 @@ proc clockConvert(input: string): string =
 proc getPidStatInfo(pid: string, res: var ProcDict) =
   let statFieldOpt = readOneFile("/proc/" & pid & "/stat")
 
-  if statFieldOpt.isNone(): return
-
-  let parts = statFieldOpt.get().split(' ')
-
-  if len(parts) < 22:
+  if statFieldOpt.isNone():
     return
 
-  res["name"]        = parts[1]
-  res["state"]       = stateMap[parts[2]]
-  res["ppid"]        = parts[3]
-  res["pgrp"]        = parts[4]
-  res["sid"]         = parts[5]
-  res["tty_nr"]      = parts[6]
-  res["tpgid"]       = parts[7]
-  res["user_time"]   = clockConvert(parts[13])
-  res["system_time"] = clockConvert(parts[14])
-  res["child_utime"] = clockConvert(parts[15])
-  res["child_stime"] = clockConvert(parts[16])
-  res["priority"]    = parts[17]
-  res["nice"]        = parts[18]
-  res["num_threads"] = parts[19]
-  res["runtime"]     = clockConvert(parts[21])
+  let
+    contents = statFieldOpt.get()
+    lparen   = contents.find('(')
+    rparen   = contents.rfind(')')
+
+  if lparen == -1 or rparen == -1:
+    return
+
+  let
+    name  = contents[lparen + 1 ..< rparen]
+    rest  = contents[rparen + 1 .. ^1].strip()
+    parts = rest.split(' ')
+
+  if len(parts) < 20:
+    return
+
+  res["name"]        = name
+  res["state"]       = stateMap[parts[0]]
+  res["ppid"]        = parts[1]
+  res["pgrp"]        = parts[2]
+  res["sid"]         = parts[3]
+  res["tty_nr"]      = parts[4]
+  res["tpgid"]       = parts[5]
+  res["user_time"]   = clockConvert(parts[11])
+  res["system_time"] = clockConvert(parts[12])
+  res["child_utime"] = clockConvert(parts[13])
+  res["child_stime"] = clockConvert(parts[14])
+  res["priority"]    = parts[15]
+  res["nice"]        = parts[16]
+  res["num_threads"] = parts[17]
+  res["runtime"]     = clockConvert(parts[19])
 
 template putIf(outdict: ProcDict, k, n: string, indict: ProcDict) =
   if k in indict: outdict[n] = indict[k]
@@ -594,7 +606,7 @@ method getRunTimeArtifactInfo(self: ProcFSPlugin,
                               ins: bool): ChalkDict =
   result = ChalkDict()
 
-  if ins or obj.pid.isNone():
+  if obj.pid.isNone():
     return
 
   let pid = int(obj.pid.get())

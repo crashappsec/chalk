@@ -158,7 +158,8 @@ def _check_chalk_reports(info: ChalkRunInfo) -> CrossChalkCheck:
     assert (
         top_level_chalk["INSERTION_NODENAME"] == info.insertion_nodename
     ), "insertion node name doesn't match"
-    assert sub_chalk["_VIRTUAL"] == info.virtual, "virtual doesn't match"
+    if info.operation == "insert":
+        assert sub_chalk["_VIRTUAL"] == info.virtual, "virtual doesn't match"
     assert (
         sub_chalk["ARTIFACT_PATH"] == info.artifact_path
     ), "artifact path does not match"

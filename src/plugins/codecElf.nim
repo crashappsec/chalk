@@ -24,7 +24,9 @@ const
 
 type CodecElf* = ref object of Codec
 
-proc extractKeyMetadata(stream: FileStream, loc: string): ChalkObj =
+proc extractKeyMetadata(codec:  CodecElf,
+                        stream: FileStream,
+                        loc:    string): ChalkObj =
   stream.setPosition(wsOffsetLoc)
   var
     is64Bit     = if stream.readChar() == is64BitVal: true else: false
@@ -63,9 +65,13 @@ proc extractKeyMetadata(stream: FileStream, loc: string): ChalkObj =
   if offset1 != -1:
     offset = int(shStart) + offset1
     stream.setPosition(offset)
-    result = stream.loadChalkFromFStream(loc)
+    result = codec.loadChalkFromFStream(stream, loc)
   else:
-    result = newChalk(stream, loc)
+    result = newChalk(name         = loc,
+                      fsRef        = loc,
+                      stream       = stream,
+                      codec        = codec,
+                      resourceType = {ResourceFile})
     result.startOffset = stream.getPosition()
 
 method scan*(self:   CodecElf,
@@ -76,7 +82,7 @@ method scan*(self:   CodecElf,
     let magic = stream.readUint32()
 
     if magic != elfMagic and magic != elfSwapped: return none(ChalkObj)
-    result = some(extractKeyMetadata(stream, loc))
+    result = some(self.extractKeyMetadata(stream, loc))
   except: return none(ChalkObj)
   # This is usally a 0-length file and not worth a stack-trace.
 

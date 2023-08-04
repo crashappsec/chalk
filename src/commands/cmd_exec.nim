@@ -1,10 +1,11 @@
-import posix, ../config, ../collect, ../util, ../reporting, ../chalkjson, ../plugins/codecDocker
+import posix, ../config, ../collect, ../util, ../reporting, ../chalkjson
 
 when hostOs == "macosx":
   proc proc_pidpath(pid: Pid, pathbuf: pointer, len: uint32): cint
     {.cdecl, header: "<libproc.h>", importc.}
 
-const PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
+const
+  PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
 
 proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
   # First, check the chalk file location, and if there's one there, then create
@@ -17,9 +18,23 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
   # allOpts[0] for the moment.
 
   var
-    info:  Stat
-    chalk: ChalkObj
+    n:        array[PATH_MAX, char]
+    exe1path: string = ""
+    info:     Stat
+    chalk:    ChalkObj
     chalkPath = chalkConfig.dockerConfig.getChalkFileLocation()
+
+  when hostOs == "macosx":
+    if proc_pidpath(pid, addr n[0], PATH_MAX) > 0:
+      exe1path =  $(cast[cstring](addr n[0]))
+  elif hostOs == "linux":
+      let procPath = "/proc/" & $(pid) & "/exe"
+      if readlink(cstring(procPath),
+                  cast[cstring](addr n[0]), PATH_MAX) != -1:
+        exe1path = $(cast[cstring](addr n[0]))
+
+  if exe1path == "":
+    exe1path = allOpts[0]
 
   trace("Looking for a chalk file at: " & chalkPath)
 
@@ -31,39 +46,23 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
       cid    = cidOpt.getOrElse("<<in-container>")
 
     var  stream   = newFileStream(chalkPath)
-    chalk         = newChalk(stream, cid)
-    chalk.extract = stream.extractOneChalkJson(cid)
-    chalk.myCodec = Codec(getPluginByName("docker"))
-    chalk.pid     = some(pid)
+    chalk         = newChalk(name         = exe1path,
+                             fsRef        = exe1path,
+                             stream       = newFileStream(exe1path),
+                             containerId  = cidOpt.getOrElse(""),
+                             pid          = some(pid),
+                             resourceType = {ResourcePid, ResourceFile},
+                             extract      = stream.extractOneChalkJson(cid),
+                             codec        = Codec(getPluginByName("docker")))
 
-    # Denote to the codec that we're running.
-    chalk.myCodec.runtime = true
-    # Don't let system try to call resolvePath when setting the artifact path.
-    chalk.noResolvePath   = true
+    if chalk.containerId != "":
+      chalk.resourceType = chalk.resourceType + {ResourceContainer}
 
     result = some(chalk)
-
     chalk.addToAllChalks()
 
   else:
     trace("Could not find a container chalk mark at " & chalkPath)
-
-    var
-      n:        array[PATH_MAX, char]
-      exe1path: string = ""
-
-    when hostOs == "macosx":
-      if proc_pidpath(pid, addr n[0], PATH_MAX) > 0:
-        exe1path =  $(cast[cstring](addr n[0]))
-    elif hostOs == "linux":
-        let procPath = "/proc/" & $(pid) & "/exe"
-        if readlink(cstring(procPath),
-                    cast[cstring](addr n[0]), PATH_MAX) != -1:
-          exe1path = $(cast[cstring](addr n[0]))
-
-    if exe1path == "":
-      exe1path = allOpts[0]
-
     # This will only yield at most one result, since item is a file
     # not a dir.  But, we don't want to trigger the post-chalk
     # collection, as it happens when we return from this function
@@ -74,9 +73,9 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
     # artifacts() does add to allChalks, which is why we don't do that
     # in this path.
 
-
     for item in artifacts(@[exe1path]):
-      chalk = item
+      chalk     = item
+      chalk.pid = some(pid)
       break
 
     if chalk == nil:
@@ -92,9 +91,13 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
       # For now, we assume we're running in a container just because
       # we won't try file system IO.
 
-      chalk = newChalk(newFileStream(exe1path), exe1path)
+      chalk = newChalk(name         = exe1path,
+                       fsRef        = exe1path,
+                       stream       = newFileStream(exe1path),
+                       resourceType = {ResourceFile},
+                       codec        = Codec(getPluginByName("docker")))
+
       chalk.addToAllChalks()
-      chalk.myCodec = Codec(getPluginByName("docker"))
 
     result = some(chalk)
 
@@ -156,14 +159,17 @@ proc runCmdExec*(args: seq[string]) =
       handleExec(allOpts, argsToPass)
     else:
       trace("Chalk is parent process.")
-      # add 1ms sleep so that the child process has a chance to exec before we try to collect data from it
-      # otherwise the process data collected might be about the chalk binary instead of the target binary, which is incorrect
-      # yes this is also racy but a proper fix will be more complicated
+      # add 1ms sleep so that the child process has a chance to exec before
+      # we try to collect data from it otherwise the process data collected
+      # might be about the chalk binary instead of the target binary, which
+      #is incorrect
+      #
+      # Yes this is also racy but a proper fix will be more complicated
       sleep(1)
       initCollection()
       let chalkOpt = doExecCollection(allOpts, pid)
       if chalkOpt.isSome():
-        chalkOpt.get().collectRunTimeChalkInfo()
+        chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting()
       trace("Waiting for spawned process to exit.")
       var stat_loc: cint
@@ -181,6 +187,6 @@ proc runCmdExec*(args: seq[string]) =
       discard setpgid(0, 0) # Detach from the process group.
       # On some platforms we don't support
       if chalkOpt.isSome():
-        chalkOpt.get().collectRunTimeChalkInfo()
+        chalkOpt.get().collectRunTimeArtifactInfo()
 
       doReporting()

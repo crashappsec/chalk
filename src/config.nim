@@ -1,4 +1,8 @@
-# Wrappers for accessing information stored in the configuration.
+## Wrappers for more abstracted accessing of configuration information
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
+#
 
 import algorithm, run_management
 export run_management
@@ -61,8 +65,20 @@ proc sinkConfToString*(name: string): string =
   result &= "}\n\n"
 
 proc getOutputConfig*(): OutputConfig =
-  once: currentOutputCfg = chalkConfig.outputConfigs[getBaseCommandName()]
-  return currentOutputCfg
+  return chalkConfig.outputConfigs[getBaseCommandName()]
+
+template forceHostKeys*(keynames: openarray[string]) =
+  let
+    reportName = getOutputConfig().artifact_report
+    profile    = chalkConfig.profiles[reportName]
+
+  for item in keynames:
+    if item in profile.keys:
+      profile.keys[item].report = true
+    else:
+      profile.keys[item] = KeyConfig(report: true)
+
+
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.sCall(cb, args)
@@ -92,7 +108,7 @@ proc getPluginConfig*(name: string): Option[PluginSpec] =
   if name in chalkConfig.plugins:
     return some(chalkConfig.plugins[name])
 
-var autoHelp*: string = ""
+var autoHelp*:       string = ""
 proc getAutoHelp*(): string = autoHelp
 
 var

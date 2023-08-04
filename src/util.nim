@@ -1,10 +1,17 @@
-## This is for any common code for system stuff, such as executing code.
-## :Author: John Viega
-## :Copyright: 2023, Crash Override, Inc.
+## This is for any common code for system stuff, such as executing
+## code.
+##
+## :Author: John Viega :Copyright: 2023, Crash Override, Inc.
 
-import  std/tempfiles, posix, posix_utils, config
+import  std/tempfiles, posix, posix_utils, config, subscan
 
 proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
+
+  if chalk.fsRef == "":
+    error(chalk.name & ": replaceFileContents() called on an artifact that " &
+          "isn't associated with a file.")
+    return false
+
   result = true
 
   var
@@ -20,23 +27,23 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
         ctx.close()
         # If we can successfully stat the file, we will try to
         # re-apply the same mode bits via chmod after the move.
-        let statResult = stat(cstring(chalk.fullpath), info)
-        moveFile(chalk.fullPath, path & ".old")
-        moveFile(path, chalk.fullpath)
+        let statResult = stat(cstring(chalk.fsRef), info)
+        moveFile(chalk.fsRef, path & ".old")
+        moveFile(path, chalk.fsRef)
         if statResult == 0:
-          discard chmod(cstring(chalk.fullpath), info.st_mode)
+          discard chmod(cstring(chalk.fsRef), info.st_mode)
       except:
         removeFile(path)
-        if not fileExists(chalk.fullPath):
+        if not fileExists(chalk.fsRef):
           # We might have managed to move it but not copy the new guy in.
           try:
-            moveFile(path & ".old", chalk.fullPath)
+            moveFile(path & ".old", chalk.fsRef)
           except:
-            error(chalk.fullPath & " was moved before copying in the new " &
+            error(chalk.fsRef & " was moved before copying in the new " &
               "file, but the op failed, and the file could not be replaced. " &
               " It currently is in: " & path & ".old")
         else:
-            error(chalk.fullPath & ": Could not write (no permission)")
+            error(chalk.fsRef & ": Could not write (no permission)")
         dumpExOnDebug()
         return false
 
@@ -137,12 +144,30 @@ proc findAllExePaths*(cmdName:    string,
 
 proc findExePath*(cmdName:    string,
                   extraPaths: seq[string] = @[],
-                  usePath = true): Option[string] =
-  let foundExes = findAllExePaths(cmdName, extraPaths, usePath)
+                  usePath = true,
+                  ignoreChalkExes = false): Option[string] =
+  var foundExes = findAllExePaths(cmdName, extraPaths, usePath)
+
+  if ignoreChalkExes:
+    var newExes: seq[string]
+
+    for location in foundExes:
+      let
+        subscan   = runChalkSubScan(location, "extract")
+        allchalks = subscan.getAllChalks()
+      if len(allChalks) != 0 and allChalks[0].extract != nil and
+         "$CHALK_IMPLEMENTATION_NAME" in allChalks[0].extract:
+        continue
+      else:
+        newExes.add(location)
+
+    foundExes = newExes
 
   if foundExes.len() == 0:
+    trace("Could not find '" & cmdName & "' in path.")
     return none(string)
 
+  trace("Found '" & cmdName & "' in path: " & foundExes[0])
   return some(foundExes[0])
 
 proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
@@ -185,21 +210,23 @@ proc acquireFileStream*(chalk: ChalkObj): Option[FileStream] =
   ## However, if you want to use it anyway, you can, but you must
   ## test for it being nil.
 
+  if chalk.fsRef == "":
+    return none(FileStream)
   if chalk.stream == nil:
-    var handle = newFileStream(chalk.fullpath, fmReadWriteExisting)
+    var handle = newFileStream(chalk.fsRef, fmReadWriteExisting)
     if handle == nil:
-      trace(chalk.fullpath & ": Cannot open for writing.")
-      handle = newFileStream(chalk.fullPath, fmRead)
+      trace(chalk.fsRef & ": Cannot open for writing.")
+      handle = newFileStream(chalk.fsRef, fmRead)
       if handle == nil:
-        error(chalk.fullpath & ": could not open file for reading.")
+        error(chalk.fsRef & ": could not open file for reading.")
         return none(FileStream)
 
-    trace(chalk.fullpath & ": File stream opened")
+    trace(chalk.fsRef & ": File stream opened")
     chalk.stream  = handle
     numCachedFds += 1
     return some(handle)
   else:
-    trace(chalk.fullpath & ": existing stream acquired")
+    trace(chalk.fsRef & ": existing stream acquired")
     result = some(chalk.stream)
 
 proc closeFileStream*(chalk: ChalkObj) =
@@ -210,9 +237,9 @@ proc closeFileStream*(chalk: ChalkObj) =
     if chalk.stream != nil:
       chalk.stream.close()
       chalk.stream = nil
-      trace(chalk.fullpath & ": File stream closed")
+      trace(chalk.fsRef & ": File stream closed")
   except:
-    warn(chalk.fullpath & ": Error when attempting to close file.")
+    warn(chalk.fsRef & ": Error when attempting to close file.")
     dumpExOnDebug()
   finally:
     chalk.stream = nil

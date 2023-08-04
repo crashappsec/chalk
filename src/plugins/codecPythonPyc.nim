@@ -28,12 +28,15 @@ method scan*(self:   CodecPythonPyc,
         let ix  = byte_blob.find(magicUTF8)
         if ix == -1:
             #No magic == no existing chalk, new chalk created
-            chalk             = newChalk(stream, loc)
+            chalk             = newChalk(name   = loc,
+                                         fsRef  = loc,
+                                         stream = stream,
+                                         codec  =  self)
             chalk.startOffset = len(byte_blob)
 
-        else:#Existing chalk, just reflect whats found
+        else: # Existing chalk, just reflect whats found
             stream.setPosition(ix)
-            chalk             = stream.loadChalkFromFStream(loc)
+            chalk = self.loadChalkFromFStream(stream, loc)
         return some(chalk)
     except:
         return none(ChalkObj)

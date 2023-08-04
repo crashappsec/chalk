@@ -18,7 +18,7 @@ method scan*(self:   CodecShebang,
     warn(path & ": Could not find a newline.")
     return none(ChalkObj)
 
-  return stream.scriptLoadMark(path)
+  return self.scriptLoadMark(stream, path)
 
 method handleWrite*(self: CodecShebang, chalk: ChalkObj, enc: Option[string]) =
   chalk.scriptHandleWrite(enc)

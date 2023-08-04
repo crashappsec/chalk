@@ -1,0 +1,51 @@
+# Part of the base configuration.  See the comment at the top of
+# `base_keyspecs.c4m`
+
+# The default sink implementations are currently in the nimutils
+# library, except for 'custom', which is in output.nim.  That one
+# allows you to define your own sink in con4m by supplying the
+# callback outhook() If you do add more hardcoded sinks, please do
+# make sure they get locked in the lockBuiltinKeys() function in
+# config.nim.
+
+sink stdout {
+  doc:             "A sink that writes to stdout"
+}
+
+sink stderr {
+  doc:             "A sink that writes to stderr"
+}
+
+sink file {
+  ~filename:        true
+  ~log_search_path: false
+  ~use_search_path: false
+  doc:       "A sink that writes a local file"
+}
+
+sink rotating_log {
+  ~filename:          true
+  ~max:               true
+  ~log_search_path:   false
+  ~truncation_amount: false
+  doc:       "A truncating log file."
+}
+
+sink s3 {
+  ~secret:   true
+  ~uid:      true
+  ~uri:      true
+  ~region:   false
+  ~extra:    false
+  doc:       "A sink for S3 buckets"
+}
+
+sink post {
+  ~uri:              true
+  ~headers:          false
+  ~content_type:     false
+  ~disallow_http:    false
+  ~timeout:          false
+  ~pinned_cert_file: false
+  doc:       "Generic HTTP/HTTPS post to a URL. Headers must be one per-line."
+}

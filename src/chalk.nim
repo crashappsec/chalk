@@ -1,21 +1,10 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-# At compile time, this will generate c4autoconf if the file doesn't
-# exist, or if the spec file has a newer timestamp.  We do this before
-# any submodule imports it.
-
-static:
-  echo "Running dependency test on chalk.c42spec"
-  echo staticexec("if test \\! c4autoconf.nim -nt configs/chalk.c42spec; " &
-                     "then echo 'Config file schema changed. Regenerating " &
-                     "c4autoconf.nim.' ; con4m gen configs/chalk.c42spec " &
-                     "--language=nim --output-file=c4autoconf.nim; else " &
-                     "echo No change to chalk.c42spec; fi")
-
 # Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
-import config, confload, commands, jitso, norecurse, sinks, plugin_load
+import config, confload, commands, jitso, norecurse, sinks, plugin_load,
+       docker_base
 
 when isMainModule:
   addDefaultSinks()
@@ -25,6 +14,7 @@ when isMainModule:
   if not canSelfInject:
     warn("We have no codec for this platform's native executable type")
   setupDefaultLogConfigs()
+  setDockerExeLocation()
   case getCommandName()
   of "extract":        runCmdExtract(chalkConfig.getArtifactSearchPath())
   of "insert":         runCmdInsert(chalkConfig.getArtifactSearchPath())
@@ -34,15 +24,12 @@ when isMainModule:
   of "load":           runCmdConfLoad()
   of "defaults":       showConfig(force = true)
   of "version":        runCmdVersion()
-  of "docker":         runCmdDocker()
+  of "docker":         runCmdDocker(getArgs())
   of "profile":        runCmdProfile(getArgs())
   of "exec":           runCmdExec(getArgs())
   #% INTERNAL
   of "helpdump":       runCmdHelpDump()
-  of "entrypoint":     echo "entry point."
   #% END
-  of "extract.containers":
-    runCmdExtractContainers(chalkConfig.getArtifactSearchPath())
   else:
     runChalkHelp(getCommandName()) # noreturn, will not show config.
 

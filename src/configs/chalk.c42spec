@@ -13,13 +13,12 @@ valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
 		         #% REWRITE ,$ ]
                          "profile",
 			 #% INTERNAL
-			 "helpdump", "entrypoint"]
+			 "helpdump"]
 			 #% END
 all_cmds_that_insert := ["insert", "build", "load"]
 
 # Beyond valid chalk commands, these can generate reports.
 other_report_ops     := ["build", "push"]
-
 
 tool_types           := ["sbom", "sast"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
@@ -352,7 +351,7 @@ See "chalk help keys" or "chalk help key KEY_NAME" for specific key type
 info.
 """
 
-  field required {
+  field required_in_chalk_mark {
     # Required fields apply only to what must go into a chalk mark.
     type:        bool
     default:     false
@@ -363,6 +362,15 @@ chalk mark (even if the chalk mark is not inserted directly into the
 artifact; so called 'virtual' chalk marks are expected to be put
 elsewhere, but must still contain at least required keys.
 """
+  }
+
+  field required_in_self_mark {
+    type:        bool
+    default:     false
+    write_lock:  true
+    doc:         """
+This field is true in keys that must be set when self-chalking.
+"""  
   }
 
   field kind {
@@ -400,7 +408,6 @@ If you add to both the host and artifact report, host will
 be preferred, but it will still show up per-artifact if
 appropriate.
 """
-
   }
 
   field type {
@@ -435,7 +442,6 @@ parts of the system implementation not part of the plugin system.  These keys
 can never be redefined directly (though some may be indirectly set in codecs
 by the methods they implement).
 """
-
   }
 
   field conf_as_system {
@@ -505,7 +511,7 @@ Currently supported variable substitutions are:
 
 {chalk_id} -> value of CHALK_ID
 {now}      -> value of TIMESTAMP
-{path}     -> value of ARTIFACT_PATH
+{path}     -> value of PATH_WHEN_CHALKED
 {hash}     -> value of HASH
 {tenant}   -> value of TENANT_ID
 {random}   -> value of CHALK_RAND
@@ -894,61 +900,95 @@ If not specified, reports apply to any command that reports.
   }
 }
 
+singleton extract {
+  gen_fieldname: "extractConfig"
+  gen_typename: "ExtractConfig"
+  gen_setters: false
+  user_def_ok: false
+  doc: """
+Configuration specific to how `chalk exec` behaves.  
+  """
+
+  field extract_from_containers {
+    type:    bool
+    default: false
+    shortdoc: "Extract marks from containers"
+    doc: """
+When `true`, the `chalk extract` command will attempt to extract marks from any running containers. This is done even if file system arguments are passed at the command line.
+
+If the default is `false`, then `chalk extract --containers` will turn it on;.
+if the default is `true`, then `chalk extract --no-containers` will turn it off.
+"""
+  }
+
+  field extract_from_images {
+    type:    bool
+    default: false
+    shortdoc: "Extract marks from containers"
+    doc: """
+When `true`, the `chalk extract` command will attempt to extract marks from any local container images. This is done even if file system arguments are passed at the command line.
+
+If the default is `false`, then `chalk extract --images` will turn it on;.
+if the default is `true`, then `chalk extract --no-images` will turn it off.
+"""    
+  }
+
+  field empty_args_means_fs_scan {
+    type:    bool
+    default: true
+    shortdoc: "Do the fs scan without command-line args"
+    doc: """
+When `true`, this means that, if no arguments are passed on the command line, the system will check `artifact_search_path` (which defaults to ["."] to determine what to extract from the file system.
+
+This is similar to what always happens with `chalk insert` and other commands that use the variable. However, with `extract`, we allow it to be turned off, since one might want to just do container scans without a fs scan.
+
+Still, Chalk ships with this defaulting to the behavior used for other commands; instead, it defaults-to-off container and image scanning.
+
+If this is on, You can still pass `--no-fs-scan` to turn off from the command line.
+"""    
+  }
+
+  field search_base_layers_for_marks {
+    type:    bool
+    default: false
+    shortdoc: "Extract marks from containers"
+    doc: """
+When extracting from images, Chalk will check attestations when available. But if not, it looks in the top layer of the file system.
+
+When no Chalk can be found in either place, if this is set to true, we'll look at the other layers in the image and report the `CHALK_ID` and `METADATA_ID` of the topmost layer with a mark, using the `_FOUND_BASE_MARK` key (the image itself is said to be unchalked; it's more about being able to use knowledge of a chalked base image).
+
+The non-attestation approach requires enough i/o that we have this off by default.
+"""    
+  }
+}
+
 singleton docker {
   gen_fieldname: "dockerConfig"
   gen_typename:  "DockerConfig"
   gen_setters:   false
   user_def_ok:   false
   doc: """
-Internal configuration information for the docker command.
+Configuration specific to the `chalk docker` command.
 """
   allow getopts { }
-  #% INTERNAL
+
   field wrap_entrypoint {
     type:    bool
     default: false
-    shortdoc: "Wrap entrypoints"
+    shortdoc: "Automatically wrap entrypoints"
     doc:     """
-When running the docker command, this option modifies the container
-to, on entry, report as if running the 'chalk extract' command, and
-then exec the actual entry point.
+When running the docker command, this option causes `chalk docker build` to
+modify containers to, on entry, use `chalk exec` to spawn your process.
+
+Note that, by default, Chalk will use its own binary for the wrapping, unless
+it sees an arch flag and determines that this is the wrong binary.
+
+In such a case, you should have a binary available for the architecture you are uilding for to copy in, and then specify it with `chalk_wrap_exe`
+
+Note that *either* we need to be able to copy the chalk binary into the context directory before invoking Docker, or you need to be on a version of Docker that accepts `--build-context`.
 """
   }
 
-  field entrypoint_report_sink {
-     type:      string
-     default:   ""
-     validator: func sink_ref_check
-    shortdoc: "Entrypoint reporting sink"
-     doc:  """
-When wrapping a container to run in entrypoint mode, you need to configure an output sink.  For this, specify the name of a sink configuration.
-"""
-  }
-
-  field entrypoint_host_report_profile {
-    type:      string
-    require:   false
-    validator: func custom_report_artifact_check
-    shortdoc: "Entrypoint host report profile"
-    doc:       """
-The named profile is used to determine which host-level metadata keys
-will be used for reporting when a docker container entry point is run.
-If not provided, a default policy is added.
-"""
-  }
-
-  field entrypoint_artifact_report_profile {
-    type:      string
-    require:   false
-    validator: func custom_report_artifact_check
-    shortdoc: "Entrypoint artifact report profile"
-    doc: """
-The named profile is used for when reporting on per-artifact any
-information, when run from the docker entry point.
-If not provided, a default policy is added.
-"""
-  }
-#% END
   field chalk_file_location {
     type: string
     default: "/chalk.json"
@@ -1204,6 +1244,7 @@ root {
   allow outconf       { }
   allow custom_report { }
   allow tool          { }
+  allow extract       { }
   allow docker        { }
   allow exec          { }
   allow env_cache     { }
@@ -1540,7 +1581,7 @@ Currently, the only available tool out of the box is semgrep, and will only work
     default:  true
     shortdoc: "Recursive"
     doc:      """
-When scanning for artifacts, if this is true, directoris in the
+When scanning for artifacts, if this is true, directories in the
 artifact search path will be traversed recursively.
 """
   }
@@ -1560,12 +1601,14 @@ Note that, when chalk is invoked with 'docker' as its EXE name, the default IO c
 
   field chalk_contained_items {
     type:    bool
-    default: true
+    default: false
     shortdoc: "Add chalk to embedded chalkable objects"
     doc: """
 When chalking an artifact that can itself contain artifacts, this field dictates whether the contents should be chalked, or if just the outer artifact.  This also controls whether, on extraction, chalk will report contents.
 
-Currently, this is only respected for artifacts in ZIP format (e.g., JAR files)
+Currently, this is only fully respected for artifacts in ZIP format (e.g., JAR files)
+
+When this is true, docker builds will chalk items in any local context directories. Remote contexts currently do not get chalked when this is true.
 """
   }
 
@@ -1586,13 +1629,6 @@ This is useful when you have conditional logic in your configuration
 file, and want to see the results of config file evaluation for
 specific sets of command-line arguments.
 """
-  }
-
-  field self_location {
-    type:    string
-    require: false
-    hidden:  true
-    doc: "Internal; used to kludge self-extraction on MacOSX."
   }
 
   field ktype_names {
@@ -1664,7 +1700,7 @@ Note that this is NOT checked if there is a report cache enabled; even if the re
     default:    []
     shortdoc:   "Env Vars to show full data for"
     doc:        """
-For the ENV and _ENV metadata keys, any environment variable listed here will get reported with its actual value at the time the chalk command is invoked.
+For the INJECTOR_ENV and _ENV metadata keys, any environment variable listed here will get reported with its actual value at the time the chalk command is invoked.
 """
   }
 
@@ -1673,7 +1709,7 @@ For the ENV and _ENV metadata keys, any environment variable listed here will ge
     default:    []
     shortdoc:   "Env Vars to ignore"
     doc:        """
-For the ENV and _ENV metadata keys, any environment variable listed here will get ignored.
+For the INJECTOR_ENV and _ENV metadata keys, any environment variable listed here will get ignored.
 """
   }
 
@@ -1682,17 +1718,17 @@ For the ENV and _ENV metadata keys, any environment variable listed here will ge
     default:    []
     shortdoc:   "Env Vars to redact"
     doc:        """
-For the ENV and _ENV metadata keys, any environment variable listed here will get redacted for privacy.  Currently, that means we give the value <<redacted>>; we do not try to detect sensitive data and redact it.
+For the INJECTOR_ENV and _ENV metadata keys, any environment variable listed here will get redacted for privacy.  Currently, that means we give the value <<redacted>>; we do not try to detect sensitive data and redact it.
 """
   }
 
   field env_default_action {
     type:     string
     choice:   ["show", "redact", "ignore"]
-    default:  "redact"
+    default:  "show"
     shortdoc: "Default envvar action"
     doc:        """
-For the ENV and _ENV metadata keys, any environment variable that is not listed explicitly in the above lists will be handled as specified here.
+For the INJECTOR_ENV and _ENV metadata keys, any environment variable that is not listed explicitly in the above lists will be handled as specified here.
 """
   }
 
@@ -1726,33 +1762,6 @@ For most commands, this defeats the purpose of Chalk, so use it sparingly.
 Note that this doesn't turn off any custom reports; you have to disable those seprately.
 """
   }
-
-  field recursive_exec_limit {
-    type:    int
-    default: 3
-    shortdoc: "Impersonation exec recursion safeguard"
-    doc: """
-When impersonating other commands, there's some possibility chalk
-could call itself recursively, skipping any self-exe check-- the
-impersonating app could inadvertently invoke chalk after it's exec'd,
-etc.
-
-There might be some acceptable recursion, so the default here is low,
-but not 1.
-"""
-  }
-
-  #% INTERNAL
-  field entrypoint {
-    type:    string
-    require: false
-    doc:  """
-When running in entrypoint mode, this is the command line to exec on startup.
-Note that this is generally set by the 'docker' command.  If it is set, then
-command line parsing won't happen.
-"""
-  }
-  #% END
 
   field crashoverride_usage_reporting_url {
     type:       string
@@ -1910,19 +1919,24 @@ func pc_err(profile, key, specified, err) {
            "', but " + err)
 }
 
-func profile_check_base(profile_name, profile_type) {
+func profile_check_base(profile_name, profile_type, cmd) {
   result := ""
   sects  := sections("profile")
 
   if profile_name == "" {
+    if profile_type == PTChalk and all_cmds_that_insert.contains(cmd) {
+      return ("outconf configuration for command '" + cmd + "' must provide " +
+      "a valid profile for chalking.")
+    }
     return
   }
   if not sects.contains(profile_name) {
     return "profile '" + profile_name + "' not found"
   }
 
-  specs        := sections("keyspec")
-  profile_keys := sections("profile." + profile_name + ".key")
+  specs         := sections("keyspec")
+  key_attr_path := "profile." + profile_name + ".key"
+  profile_keys  := sections(key_attr_path)
 
   for i from 0 to len(profile_keys) {
     if not specs.contains(profile_keys[i]) {
@@ -1932,34 +1946,34 @@ func profile_check_base(profile_name, profile_type) {
   }
   for i from 0 to len(specs) {
     key_name   := specs[i]
-    key_kind   := attr_get("keyspec." + key_name + ".kind", int)
+    spec_base  := "keyspec." + key_name
+    key_kind   := attr_get(spec_base + ".kind", int)
 
-    if not profile_keys.contains(key_name) {
-      if profile_type == PTChalk {
+    if profile_type == PTChalk {
         if key_kind == RunTimeArtifact or key_kind == RunTimeHost { continue }
-        if attr_get("keyspec." + key_name + ".required", bool) == true {
-          return pc_err(profile_name, key_name, false,
-                        "that key is required to be in chalk marks.")
+        
+        flag := false
+        
+        if attr_get(spec_base + ".required_in_chalk_mark", bool) {
+          flag := true
         }
-      }
+        if cmd == "load" and attr_get(spec_base + ".required_in_self_mark",
+                                       bool) {
+          flag := true
+        }
+        if flag {
+          add_override(key_attr_path + "." + key_name + ".report", true)
+        }
       continue
     }
+
+    if not profile_keys.contains(key_name) { continue }
 
     keyconfbase := "profile." + profile_name + ".key." + key_name + "."
-    if attr_get(keyconfbase + "report", bool) == false {
-      if profile_type == PTChalk {
-        if key_kind == RunTimeArtifact or key_kind == RunTimeHost { continue }
-        if attr_get("keyspec." + key_name + ".required", bool) == true {
-          return pc_err(profile_name, key_name, false,
-                        "that key is required to be in chalk marks.")
-        }
-      }
-      continue
-    }
-    elif profile_type == PTChalk {
-      continue
-    }
 
+    if attr_get(keyconfbase + "report", bool) == false { continue }
+    
+    
     # By here, we know this profile wants to set this key explicitly,
     # and that we are not in a chalk profile.
     #
@@ -1978,8 +1992,9 @@ func profile_check_base(profile_name, profile_type) {
                       "that key cannot appear in artifact report spec")
       }
       if key_kind == RunTimeArtifact and profile_type == PTChalkTimeArtifact {
-        return pc_err(profile_name, key_name, true, "This report is used at build " +
-	"time, so keys collected post-chalk aren't allowed.")
+        return pc_err(profile_name, key_name, true,
+        "This report is used at build time, so keys collected post-chalk " +
+        "aren't allowed.")
       }
       continue
     }
@@ -2019,7 +2034,7 @@ func outconf_chalk_check(name, profile_name) {
             "It's only valid for commands that add chalk marks.")
   }
 
-  result := profile_check_base(profile_name, PTChalk)
+  result := profile_check_base(profile_name, PTChalk, cmd)
   if result != "" {
     result := in_outconf(name) + result
   }
@@ -2029,7 +2044,7 @@ func outconf_artifact_check(name, profile_name) {
   if profile_name == "" {
     return ""
   }
-  result := profile_check_base(profile_name, PTArtifact)
+  result := profile_check_base(profile_name, PTArtifact, "")
   if result != "" {
     result := in_outconf(name) + result
   }
@@ -2039,7 +2054,7 @@ func outconf_host_check(name, profile_name) {
   if profile_name == "" {
     return ""
   }
-  result := profile_check_base(profile_name, PTHost)
+  result := profile_check_base(profile_name, PTHost, "")
   if result != "" {
     result := in_outconf(name) + result
   }
@@ -2059,14 +2074,14 @@ func outconf_invalid_chalk_check(name, profile_name) {
             "It's only valid for commands that do NOT add chalk marks.")
   }
 
-  result := profile_check_base(profile_name, PTArtifact)
+  result := profile_check_base(profile_name, PTArtifact, "")
   if result != "" {
     result := in_outconf(name) + result
   }
 }
 
 func custom_report_artifact_check(name, profile_name) {
-  result := profile_check_base(profile_name, PTArtifact)
+  result := profile_check_base(profile_name, PTArtifact, "")
   if result != "" {
     result := in_report(name) + result
   }
@@ -2076,7 +2091,7 @@ func label_profile_check(name, profile_name) {
   if profile_name == "" {
     return ""
   }
-  result := profile_check_base(profile_name, PTChalkTimeArtifact)
+  result := profile_check_base(profile_name, PTChalkTimeArtifact, "")
   if result != "" {
     result := in_report(name) + result
   }
@@ -2163,7 +2178,7 @@ func use_when_check(name, value: list[string]) {
 }
 
 func custom_report_host_check(name, profile_name) {
-  result := profile_check_base(profile_name, PTHost)
+  result := profile_check_base(profile_name, PTHost, "")
   if result != "" {
     result := in_report(name) + result
   }

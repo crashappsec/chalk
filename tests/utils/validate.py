@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
+from .chalk_report import get_liftable_key
 from .log import get_logger
 
 logger = get_logger()
@@ -70,7 +71,7 @@ def validate_chalk_report(
         ), "chalks missing from report"
 
         for chalk in chalk_report["_CHALKS"]:
-            path = chalk["ARTIFACT_PATH"]
+            path = chalk["PATH_WHEN_CHALKED"]
             assert path in artifact_map, "chalked artifact incorrect"
             artifact = artifact_map[path]
 
@@ -82,7 +83,8 @@ def validate_chalk_report(
                 # in some cases, we don't check the artifact hash
                 # ex: zip files, which are not computed as hash of file
                 assert artifact.hash == chalk["HASH"], "artifact hash doesn't match"
-            assert virtual == chalk["_VIRTUAL"], "_VIRTUAL mismatch"
+            if chalk_action == "insert":
+                assert virtual == chalk["_VIRTUAL"], "_VIRTUAL mismatch"
     except AssertionError as e:
         logger.error("chalk report validation failed", error=e)
         raise
@@ -106,11 +108,12 @@ def validate_docker_chalk_report(
         ), "should only get one chalk report per docker image"
 
         for chalk in chalk_report["_CHALKS"]:
-            path = chalk["ARTIFACT_PATH"]
+            # dockerfile path may have been lifted
+            path = get_liftable_key(chalk_report, "DOCKERFILE_PATH")
             assert path in artifact_map, "chalked artifact incorrect"
             artifact = artifact_map[path]
 
-            assert artifact.type == chalk["ARTIFACT_TYPE"]
+            assert artifact.type == chalk["_OP_ARTIFACT_TYPE"]
             assert virtual == chalk["_VIRTUAL"]
             # TODO: docker tags/dockerfile path/etc?
 
@@ -159,7 +162,7 @@ def validate_extracted_chalk(
             assert path in artifact_map, "path not found"
     else:
         for chalk in extracted_chalk["_CHALKS"]:
-            path = chalk["ARTIFACT_PATH"]
+            path = chalk["_OP_ARTIFACT_PATH"]
             assert path in artifact_map, "path not found"
             artifact_info = artifact_map[path]
 
@@ -168,7 +171,7 @@ def validate_extracted_chalk(
             assert artifact_info.type == chalk["ARTIFACT_TYPE"]
 
             # top level vs chalk-level sanity check
-            assert chalk["INJECTOR_PLATFORM"] == extracted_chalk["_OP_PLATFORM"]
+            assert chalk["PLATFORM_WHEN_CHALKED"] == extracted_chalk["_OP_PLATFORM"]
             assert (
                 chalk["INJECTOR_COMMIT_ID"] == extracted_chalk["_OP_CHALKER_COMMIT_ID"]
             )

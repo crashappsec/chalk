@@ -6,7 +6,8 @@
 
 import config
 
-const recursionEnvVar = "CHALK_INVOCATIONS"
+const recursionEnvVar = "__CHALK_INVOCATIONS__"
+const recursionLimit  = 3
 
 proc recursionCheck*() =
   if not existsEnv(recursionEnvVar):
@@ -18,14 +19,15 @@ proc recursionCheck*() =
   try:
     let
       num   = parseInt(cur)
-      limit = chalkConfig.getRecursiveExecLimit()
+      limit = 3
     if num >= limit:
-      error(
-        "Chalk is calling chalk recursively. This might happen in cases " &
-        "where chalk is impersonating another command, if that command " &
-        "might end up execing chalk or execing itself.  If the recursion " &
-        "is expected, then set 'recursive_exec_limit' to a higher value " &
-        "in your config (current limit is: " & $(limit) & ")")
+      error("""
+Chalk is calling chalk recursively. This should only happen in specific
+circumstances, and should never reach a recursion depth greater than 2.
+
+If the environment variable __CHALK_INVOCATIONS__ wasn't maliciously
+set, then there's probably a bug.
+""")
       quit(-1)
     else:
       putEnv(recursionEnvVar, $(num + 1))

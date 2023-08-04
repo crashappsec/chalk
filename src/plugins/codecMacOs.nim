@@ -13,12 +13,15 @@ var prefix = """
 BASE_NAME=$(basename -- "${BASH_SOURCE[0]}")
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" && pwd )
 SCRIPT_PATH=$(echo ${SCRIPT_DIR}/${BASE_NAME})
-CMDLOC=/tmp/$(echo ${SCRIPT_PATH} | tr -- "-/ " _)
+CMDLOC=$(echo ${SCRIPT_PATH} | sed s/-/_CHALKDA_/g)
+CMDLOC=$(echo ${CMDLOC} | sed s/" "/_CHALKSP_/g)
+CMDLOC=$(echo ${CMDLOC} | sed s#/#_CHALKSL_#g)
+CMDLOC=/tmp/${CMDLOC}
 
 if [[ -x ${CMDLOC} ]] ; then
   HASH=$(/usr/bin/shasum --tag -a 256 ${CMDLOC} | cut -f 4 -d ' ')
   if [[ $(grep ${HASH} ${SCRIPT_PATH}) ]]; then
-    exec ${CMDLOC} --macosx-metadata-location-info=${SCRIPT_PATH} ${@}
+    exec ${CMDLOC} ${@}
   fi
 fi
 (base64 -d)  < /bin/cat << CHALK_DADFEDABBADABBEDBAD_END > ${CMDLOC}
@@ -48,20 +51,54 @@ method scan*(self:   CodecMacOs,
              path:   string): Option[ChalkObj] =
 
   var
-    contents = stream.readAll()
-    fullpath = path.resolvePath()
-    cache    = ExeCache()
-    chalk:     ChalkObj
+    contents   = stream.readAll()
+    fullpath   = path.resolvePath()
+    cache      = ExeCache()
+    goodStream: FileStream
+    chalk:      ChalkObj
 
   if contents.hasMachMagic():
-    # It's an unmarked Mach-O binary of some kind.
-    chalk          = newChalk(stream, fullpath)
-    chalk.cache    = cache
-    chalk.extract  = ChalkDict()
+    trace("Found MACH binary @ " & fullpath)
     cache.contents = contents
-    # Drop down below to cache the unchalked hash.
 
-  elif contents.startswith(prefix):
+    let ix = fullpath.find("_CHALK")
+    if ix != -1:
+      fullpath   = fullpath[ix .. ^1]
+      fullpath   = fullpath.replace("_CHALKDA_", "-")
+      fullpath   = fullpath.replace("_CHALKSL_", "/")
+      fullpath   = fullpath.replace("_CHALKSP_", " ")
+      trace("Looking for chalk mark in wrapper script: " & fullpath)
+      goodStream = newFileStream(fullpath)
+
+      if goodStream == nil:
+        warn("Previously chalked binary is missing its script. " &
+          "Replace the script or rename the executable")
+        return none(ChalkObj)
+
+      contents   = goodStream.readAll()
+
+      stream.close()
+      # Drop down below for the chalk mark.
+    else:
+      # It's an unmarked Mach-O binary of some kind.
+      chalk = newChalk(name         = fullpath,
+                       fsRef        = fullpath,
+                       stream       = stream,
+                       resourceType = {ResourceFile},
+                       cache        = cache,
+                       codec        = self)
+
+      chalk.cachedPreHash = hashFmt($(cache.contents.computeSHA256()))
+      return some(chalk)
+
+  elif not contents.startswith(prefix):
+    return none(ChalkObj)
+  else:
+    goodStream = stream
+
+  # Validation.
+  if contents.startswith(prefix):
+    trace("Testing MacOS Chalk wrapper at: "  & fullpath)
     let lines = contents[len(prefix) .. ^1].strip().split('\n')
     # It's *probably* marked, but it might have been tampered with,
     # in which case we're going to let it get treated like a Unix
@@ -74,10 +111,12 @@ method scan*(self:   CodecMacOs,
     # don't stick these in a comment; there's an 'exec' above it, so
     # bash will never get to it.
     if len(lines) != 3 + len(postfixLines):
+      trace("Wrapper not valid: # lines is wrong.")
       return none(ChalkObj)
 
     for i, line in postfixLines:
       if lines[i+1] != line:
+        trace("Postfix lines don't match")
         return none(ChalkObj)
 
     let
@@ -85,26 +124,37 @@ method scan*(self:   CodecMacOs,
       sstrm = newStringStream(s)
 
     if s.find(magicUTF8) == -1:
+      trace("Wrapper not valid; no chalk magic.")
       return none(ChalkObj)
     let dict = sstrm.extractOneChalkJson(fullpath)
     if sstrm.getPosition() != len(s):
+      trace("Wrapper not valid; extra bits after mark")
       return none(ChalkObj)
 
     # At this point, the marked object is well formed.
-    chalk = newChalk(stream, fullpath)
-    chalk.extract = dict
-    chalk.marked  = true
-    chalk.cache   = cache
-    cache.b64     = some(lines[0])
+    chalk = newChalk(name         = fullpath,
+                     fsRef        = fullpath,
+                     stream       = goodStream,
+                     resourceType = {ResourceFile},
+                     cache        = cache,
+                     codec        = self,
+                     extract      = dict,
+                     marked       = true)
 
-    # Now we need to un-b64, because we need to compute the unchalked
-    # hash below.
-    cache.contents = decode(lines[0])
+    cache.b64 = some(lines[0])
+
+    if cache.contents != "":
+      # Now we need to un-b64, because we need to compute the unchalked
+      # hash below.
+      cache.contents = decode(lines[0])
     # Let's finally make sure that this seems to be a valid binary:
-    if not cache.contents.hasMachMagic():
-      return none(ChalkObj)
+      if not cache.contents.hasMachMagic():
+        trace("Wrapped binary is not a Mach-O binary")
+        return none(ChalkObj)
   else:
     return none(ChalkObj)
+
+  trace("Wrapper is validated.")
 
   chalk.cachedPreHash = hashFmt($(cache.contents.computeSHA256()))
 

@@ -1,61 +1,15 @@
 ## :Author: John Viega, Brandon Edwards
 ## :Copyright: 2023, Crash Override, Inc.
 
-import osproc, parseutils, posix_utils, std/tempfiles, ../config,
-       ../plugin_api,  ../dockerfile, ../chalkjson, ../util
+import osproc,  glob, std/tempfiles, ../config, ../docker_base, ../chalkjson
 
 type
   CodecDocker* = ref object of Codec
-  DockerFileSection = ref object
-    image:        string
-    alias:        string
-    entryPoint:   EntryPointInfo
-    cmd:          CmdInfo
-    shell:        ShellInfo
-  #% INTERNAL
-  InspectedImage = tuple[entryArgv: seq[string],
-                         cmdArgv:   seq[string],
-                         shellArgv: seq[string],
-                         success:   bool]
-  #% END
-  DockerInfoCache* = ref object of RootObj
-    # These fields apply to all artifacts
-    container*:             bool     # Whether it's a container or an image.
-    inspectOut*:            JSonNode
-    # These fields are used on insertion for image artifacts.
-    context:                string
-    dockerFilePath:         string
-    dockerFileContents:     string
-    additionalInstructions: string
-    tags*:                  seq[string]
-    ourTag*:                string
-    platform:               string
-    labels:                 Con4mDict[string, string]
-    execNoArgs:             seq[string]
-    execWithArgs:           seq[string]
-    tmpDockerFile:          string
-    tmpChalkMark:           string
-    relativeEntry:          string
-    #% INTERNAL
-    tmpEntryPoint:          string
-    #% END
 
-template isRuntime(self: CodecDocker): bool = self.runtime
-
-proc extractArgv(json: string): seq[string] {.inline.} =
-  for item in parseJson(json).getElems():
-    result.add(item.getStr())
-
-method usesFStream*(self: CodecDocker): bool = false
-
-method autoArtifactPath*(self: Codec): bool  = false
-
-method getUnchalkedHash*(self: CodecDocker, chalk: ChalkObj): Option[string] =
-  return none(string)
+method keepScanningOnSuccess*(self: CodecDocker): bool = true
 
 method getChalkId*(self: CodecDocker, chalk: ChalkObj): string =
-
-  if self.isRuntime() and chalk.extract != nil and "CHALK_ID" in chalk.extract:
+  if chalk.extract != nil and "CHALK_ID" in chalk.extract:
     return unpack[string](chalk.extract["CHALK_ID"])
   var
     b      = secureRand[array[32, char]]()
@@ -63,93 +17,345 @@ method getChalkId*(self: CodecDocker, chalk: ChalkObj): string =
   for ch in b: preRes.add(ch)
   return preRes.idFormat()
 
-# This codec is hard-wired to the docker command at the moment.
-method scan*(self: CodecDocker, stream: FileStream, loc: string):
-       Option[ChalkObj] = none(ChalkObj)
 
-var dockerPathOpt: Option[string] = none(string)
+template extractFinish() =
+  setCurrentDir(cwd)
+  try:
+    removeDir(dir)
+  except:
+    dumpExOnDebug()
+  return
 
-proc findDockerPath*(): Option[string] =
-  once:
-    var
-      userPath: seq[string]
-      exeOpt   = chalkConfig.getDockerExe()
+proc extractImageMark(imageId: string, loc: string, chalk: ChalkObj) =
+  # Need to integrate Theo's attestation bits here, but here's the
+  # fallback option.  For now, if a manifest is a multi-arch image, we
+  # still just look at the first item, rather than treating each as
+  # a separate image.
+  let
+    cwd  = getCurrentDir()
+    dir  = createTempDir("docker_image_", "_extract")
 
-    if exeOpt.isSome():
-      userPath.add(exeOpt.get())
+  try:
+    setCurrentDir(dir)
 
-    dockerPathOpt = findExePath("docker", userPath)
-  return dockerPathOpt
+    if runDocker(@["save", imageId, "-o", "image.tar"]) != 0:
+      error("Image " & imageId & ": error extracting chalk mark")
+      extractFinish()
+    if execCmd("tar -xf image.tar manifest.json") != 0:
+      error("Image " & imageId & ": could not extract manifest (no tar cmd?)")
+      extractFinish()
 
-#% INTERNAL
-proc dockerInspectEntryAndCmd(imageName: string): InspectedImage =
-  # `docker inspect imageName`
-  #FIXME another thing: this probably needs to be aware of if docker sock
-  # or context or docker config is specified to the original docker command!
-  #FIXME also needs to return `Shell`
+    let
+      file   = newFileStream("manifest.json")
 
-  if imageName == "scratch": return
+    if file == nil:
+      error("Image " & imageId & ": could not extract manifest (permissions?)")
+      extractFinish()
+    let
+      str    = file.readAll()
+      json   = str.parseJson()
+      layers = json.getElems()[0]["Layers"]
+
+    file.close()
+
+    if execCmd("tar -xf image.tar " & layers[^1].getStr()) != 0:
+      error("Image " & imageId & ": error extracting chalk mark")
+      extractFinish()
+
+    if execCmd("tar -xf " & layers[^1].getStr() &
+      " chalk.json 2>/dev/null") == 0:
+      let file = newFileStream("chalk.json")
+
+      if file == nil:
+        error("Image " & imageId & " has a chalk file but we can't read it?")
+        extractFinish()
+      chalk.extract = extractOneChalkJson(file, imageId)
+      chalk.marked  = true
+      file.close()
+      trace("Image " & imageId & ": chalk mark extracted")
+      extractFinish()
+
+    else:
+      warn("Image " & imageId & " has no chalk mark in the top layer.")
+      if not chalkConfig.extractConfig.getSearchBaseLayersForMarks():
+        extractFinish()
+      # We're only going to go deeper if there's no chalk mark found.
+      var
+        n = len(layers) - 1
+
+      while n != 0:
+        n = n - 1
+        if execCmd("tar -xf " & layers[n].getStr() &
+          " chalk.json 2>/dev/null") == 0:
+          let file = newFileStream("chalk.json")
+          if file == nil:
+            continue
+          try:
+            let
+              extract = extractOneChalkJson(file, imageId)
+              cid     = extract["CHALK_ID"]
+              mdid    = extract["METADATA_ID"]
+
+            info("In layer " & $(n) & " (of " & $(len(layers)) & "), found " &
+              "Chalk mark reporting CHALK_ID = " & $(cid) &
+              " and METADATA_ID = " & $(mdid))
+            chalk.collectedData["_FOUND_BASE_MARK"] = pack(@[cid, mdid])
+            extractFinish()
+          except:
+            continue
+      extractFinish()
+  except:
+    dumpExOnDebug()
+    trace(imageId & ": Could not complete mark extraction")
+    extractFinish()
+
+proc extractContainerMark(cid: string, loc: string, chalk: ChalkObj) =
+  try:
+    let rawmark = runDockerGetOutput(@["cp", cid & ":" & loc, "-"])
+
+    if rawmark.contains("No such container"):
+      error("Container " & cid & " shut down before mark extraction")
+    elif rawmark.contains("Cout not find the file"):
+      warn("Container " & cid & " is unmarked.")
+    else:
+      chalk.extract = extractOneChalkJson(newStringStream(rawmark), cid)
+      chalk.marked  = true
+      trace("Container " & cid & ": chalk mark extracted")
+  except:
+    dumpExOnDebug()
+    error("Got error when extracting from container " & cid)
+
+method scanArtifactLocations*(codec:      CodecDocker,
+                              exclusions: var seq[string],
+                              ignoreList: seq[glob.Glob],
+                              recurse:    bool) : seq[ChalkObj] =
+
+  if getCommandName() != "extract":
+    return
 
   let
-    cmd  = findDockerPath().get()
-    json = execProcess(cmd, args = ["inspect", imageName], options = {})
-    arr  = json.parseJson().getElems()
+    do_images      = chalkConfig.extractConfig.getExtractFromImages()
+    do_containers  = chalkConfig.extractConfig.getExtractFromContainers()
+    markLocation   = chalkConfig.dockerConfig.getChalkFileLocation()
+    reportUnmarked = chalkConfig.dockerConfig.getReportUnmarked()
 
-  if len(arr) == 0: return
+  if not do_images and not do_containers:
+    return
 
-  result.success = true
+  if do_images:
+    try:
+      let raw = runDockerGetOutput(@["images", "--format", "json"]).strip()
 
-  if hasKey(arr[0], "ContainerConfig"):
-    let containerConfig = arr[0]["ContainerConfig"]
-    if containerConfig.hasKey("Cmd"):
-      for i, item in containerConfig["Cmd"].getElems():
-        let s = item.getStr()
-        if s.startsWith("#(nop)"):
-          break
-        result.shellArgv.add(s)
-  if hasKey(arr[0], "Config"):
-    let config = arr[0]["Config"]
-    if hasKey(config, "Entrypoint"):
-      let items = config["Entrypoint"].getElems()
-      for item in items:
-        result.entryArgv.add(item.getStr())
-    if hasKey(config, "Cmd"):
-      let items = config["Cmd"]
-      for item in items:
-        result.cmdArgv.add(item.getStr())
+      if raw == "":
+        trace("No local images.")
+      else:
+        for line in raw.split("\n"):
+          let
+            imageId = parseJson(line)["ID"].getStr()
+            chalk   = newChalk(name         = "image:" & imageId,
+                               codec        = codec,
+                               imageId      = imageId,
+                               extract      = ChalkDict(),
+                               resourceType = {ResourceImage})
 
-template inspectionFailed(image: InspectedImage): bool =
-  image.success == false
-#% END
+          if not isChalkingOp():
+            extractImageMark(chalk.imageId, markLocation, chalk)
 
-proc dockerStringToArgv(cmd:   string,
-                        shell: seq[string],
-                        json:  bool): seq[string] =
-  if json: return extractArgv(cmd)
+          result.add(chalk)
+    except:
+      dumpExOnDebug()
+      trace("No docker command found.")
+      return
 
-  for value in shell: result.add(value)
-  result.add(cmd)
+  if do_containers:
+    try:
+      let raw = runDockerGetOutput(@["ps", "--format", "json"]).strip()
 
-method getChalkTimeArtifactInfo*(self: CodecDocker, chalk: ChalkObj):
-       ChalkDict =
-  result = ChalkDict()
-  let cache = DockerInfoCache(chalk.cache)
+      if raw == "":
+        trace("No running containers.")
+        return
+      for line in raw.split("\n"):
+        let
+          containerId = parseJson(line)["Id"].getStr()
+          chalk       = newChalk(name         = "container:" & containerId,
+                                 containerId  = containerId,
+                                 codec        = codec,
+                                 resourceType = {ResourceContainer})
 
-  result["DOCKER_TAGS"]     = pack(cache.tags)
-  result["ARTIFACT_PATH"]   = pack(cache.context)
-  result["DOCKERFILE_PATH"] = pack(cache.dockerFilePath) #TODO
-  result["DOCKER_FILE"]     = pack(cache.dockerFileContents)
-  result["DOCKER_CONTEXT"]  = pack(cache.context)
-  result["ARTIFACT_TYPE"]   = artTypeDockerImage
+        if not isChalkingOp():
+          extractContainerMark(chalk.containerId, markLocation, chalk)
 
-  if cache.platform != "":
-    result["DOCKER_PLATFORM"] = pack(cache.platform)
+        result.add(chalk)
+    except:
+      dumpExOnDebug()
+      trace("Could not run docker.")
 
-  if cache.labels.len() != 0:
-    result["DOCKER_LABELS"]   = pack(cache.labels)
+# These are the keys we can auto-convert without any special-casing.
+# Types of the JSon will be checked against the key's declared type.
+let dockerImageAutoMap = {
+  "RepoTags":                           "_REPO_TAGS",
+  "RepoDigests":                        "_REPO_DIGESTS",
+  "Comment":                            "_IMAGE_COMMENT",
+  "Created":                            "_IMAGE_CREATION_DATETIME",
+  "DockerVersion":                      "_IMAGE_DOCKER_VERSION",
+  "Author":                             "_IMAGE_AUTHOR",
+  "Architecture":                       "_IMAGE_ARCHITECTURE",
+  "Variant":                            "_IMAGE_VARIANT",
+  "OS":                                 "_IMAGE_OS",
+  "OsVersion":                          "_IMAGE_OS_VERSION",
+  "Size":                               "_IMAGE_SIZE",
+  "RootFS.Type":                        "_IMAGE_ROOT_FS_TYPE",
+  "RootFS.Layers",                      "_IMAGE_ROOT_FS_LAYERS",
+  "Config.Hostname":                    "_IMAGE_HOSTNAMES",
+  "Config.Domainname":                  "_IMAGE_DOMAINNAME",
+  "Config.User":                        "_IMAGE_USER",
+  "Config.ExposedPorts":                "_IMAGE_EXPOSEDPORTS",
+  "Config.Env":                         "_IMAGE_ENV",
+  "Config.Cmd":                         "_IMAGE_CMD",
+  "Config.Image":                       "_IMAGE_NAME",
+  "Config.Healthcheck.Test":            "_IMAGE_HEALTHCHECK_TEST",
+  "Config.Healthcheck.Interval":        "_IMAGE_HEALTHCHECK_INTERVAL",
+  "Config.Healthcheck.Timeout":         "_IMAGE_HEALTHCHECK_TIMEOUT",
+  "Config.Healthcheck.StartPeriod":     "_IMAGE_HEALTHCHECK_START_PERIOD",
+  "Config.Healthcheck.StartInterval":   "_IMAGE_HEALTHCHECK_START_INTERVAL",
+  "Config.Healthcheck.Retries":         "_IMAGE_HEALTHCHECK_RETRIES",
+  "Config.Volumes":                     "_IMAGE_MOUNTS",
+  "Config.WorkingDir":                  "_IMAGE_WORKINGDIR",
+  "Config.Entrypoint":                  "_IMAGE_ENTRYPOINT",
+  "Config.NetworkDisabled":             "_IMAGE_NETWORK_DISABLED",
+  "Config.MacAddress":                  "_IMAGE_MAC_ADDR",
+  "Config.OnBuild":                     "_IMAGE_ONBUILD",
+  "Config.Labels":                      "_IMAGE_LABELS",
+  "Config.StopSignal":                  "_IMAGE_STOP_SIGNAL",
+  "Config.StopTimeout":                 "_IMAGE_STOP_TIMEOUT",
+  "Config.Shell":                       "_IMAGE_SHELL",
+  "VirtualSize":                        "_IMAGE_VIRTUAL_SIZE",
+  "Metadata.LastTagTime":               "_IMAGE_LAST_TAG_TIME",
+  "GraphDriver":                        "_IMAGE_STORAGE_METADATA"
+  }.toOrderedTable()
 
-template extractDockerHash(s: string): string =
-  s.split(":")[1].toLowerAscii()
+let dockerContainerAutoMap = {
+  "Id":                                 "_INSTANCE_CONTAINER_ID",
+  "Created":                            "_INSTANCE_CREATION_DATETIME",
+  "Path":                               "_INSTANCE_ENTRYPOINT_PATH",
+  "Args":                               "_INSTANCE_ENTRYPOINT_ARGS",
+  "State.Status":                       "_INSTANCE_STATUS",
+  "State.Pid":                          "_INSTANCE_PID",
+  "ResolvConfPath":                     "_INSTANCE_RESOLVE_CONF_PATH",
+  "HostNamePath":                       "_INSTANCE_HOSTNAME_PATH",
+  "HostsPath":                          "_INSTANCE_HOSTS_PATH",
+  "LogPath":                            "_INSTANCE_LOG_PATH",
+  "Name":                               "_INSTANCE_NAME",
+  "RestartCount":                       "_INSTANCE_RESTART_COUNT",
+  "Driver":                             "_INSTANCE_DRIVER",
+  "Platform":                           "_INSTANCE_PLATFORM",
+  "MountLabel":                         "_INSTANCE_MOUNT_LABEL",
+  "ProcessLabel":                       "_INSTANCE_PROCESS_LABEL",
+  "AppArmorProfile":                    "_INSTANCE_APP_ARMOR_PROFILE",
+  "ExecIDs":                            "_INSTANCE_EXEC_IDS",
+  "HostConfig.Binds":                   "_INSTANCE_BINDS",
+  "HostConfig.ContainerIDFile":         "_INSTANCE_CONTAINER_ID_FILE",
+  "HostConfig.LogConfig.Config":        "_INSTANCE_LOG_CONFIG",
+  "HostConfig.NetworkMode":             "_INSTANCE_NETWORK_MODE",
+  "HostConfig.PortBindings":            "_INSTANCE_BOUND_PORTS",
+  "HostConfig.RestartPolicy.Name":      "_INSTANCE_RESTART_POLICY_NAME",
+  "HostConfig.RestartPolicy.MaximumRetryCount": "_INSTANCE_RESTART_RETRY_COUNT",
+  "HostConfig.AutoRemove":              "_INSTANCE_AUTOREMOVE",
+  "HostConfig.VolumeDriver":            "_INSTANCE_VOLUME_DRIVER",
+  "HostConfig.VolumesFrom":             "_INSTANCE_VOLUMES_FROM",
+  "HostConfig.ConsoleSize":             "_INSTANCE_CONSOLE_SIZE",
+  "HostConfig.CapAdd":                  "_INSTANCE_ADDED_CAPS",
+  "HostConfig.CapDrop":                 "_INSTANCE_DROPPED_CAPS",
+  "HostConfig.CgroupnsMode":            "_INSTANCE_CGROUP_NS_MODE",
+  "HostConfig.Dns":                     "_INSTANCE_DNS",
+  "HostConfig.DnsOptions":              "_INSTANCE_DNS_OPTIONS",
+  "HostConfig.DnsSearch":               "_INSTANCE_DNS_SEARCH",
+  "HostConfig.ExtraHosts":              "_INSTANCE_EXTRA_HOSTS",
+  "HostConfig.GroupAdd":                "_INSTANCE_GROUP_ADD",
+  "HostConfig.IpcMode":                 "_INSTANCE_IPC_MODE",
+  "HostConfig.Cgroup":                  "_INSTANCE_CGROUP",
+  "HostConfig.Links":                   "_INSTANCE_LINKS",
+  "HostConfig.OomScoreAdj":             "_INSTANCE_OOM_SCORE_ADJ",
+  "HostConfig.PidMode":                 "_INSTANCE_PID_MODE",
+  "HostConfig.Privileged":              "_INSTANCE_IS_PRIVILEGED",
+  "HostConfig.PublishAllPorts":         "_INSTANCE_PUBLISH_ALL_PORTS",
+  "HostConfig.ReadonlyRootfs":          "_INSTANCE_READONLY_ROOT_FS",
+  "HostConfig.SecurityOpt":             "_INSTANCE_SECURITY_OPT",
+  "HostConfig.UTSMode":                 "_INSTANCE_UTS_MODE",
+  "HostConfig.UsernsMode":              "_INSTANCE_USER_NS_MODE",
+  "HostConfig.ShmSize":                 "_INSTANCE_SHM_SIZE",
+  "HostConfig.Runtime":                 "_INSTANCE_RUNTIME",
+  "HostConfig.Isolation":               "_INSTANCE_ISOLATION",
+  "HostConfig.CpuShares":               "_INSTANCE_CPU_SHARES",
+  "HostConfig.Memory":                  "_INSTANCE_MEMORY",
+  "HostConfig.NanoCpus":                "_INSTANCE_NANO_CPUS",
+  "HostConfig.CgroupParent":            "_INSTANCE_CGROUP_PARENT",
+  "HostConfig.BlkioWeight":             "_INSTANCE_BLOCKIO_WEIGHT",
+  "HostConfig.BlkioWeightDevice":       "_INSTANCE_BLOCKIO_WEIGHT_DEVICE",
+  "HostConfig.BlkioDeviceReadBps":      "_INSTANCE_BLOCKIO_DEVICE_READ_BPS",
+  "HostConfig.BlkioDeviceWriteBps":     "_INSTANCE_BLOCKIO_DEVICE_WRITE_BPS",
+  "HostConfig.BlkioDeviceReadIOps":     "_INSTANCE_BLOCKIO_DEVICE_READ_IOPS",
+  "HostConfig.BlkioDeviceWriteIops":    "_INSTANCE_BLOCKIO_DEVICE_WRITE_IOPS",
+  "HostConfig.CpuPeriod":               "_INSTANCE_CPU_PERIOD",
+  "HostConfig.CpuQuota":                "_INSTANCE_CPU_QUOTA",
+  "HostConfig.CpuRealtimePeriod":       "_INSTANCE_CPU_REALTIME_PERIOD",
+  "HostConfig.CpuRealtimeRuntime":      "_INSTANCE_CPU_REALTIME_RUNTIME",
+  "HostConfig.CpusetCpus":              "_INSTANCE_CPUSET_CPUS",
+  "HostConfig.CpusetMems":              "_INSTANCE_CPUSET_MEMS",
+  "HostConfig.Devices":                 "_INSTANCE_DEVICES",
+  "HostConfig.DeviceCgroupRules":       "_INSTANCE_CGROUP_RULES",
+  "HostConfig.DeviceRequests":          "_INSTANCE_DEVICE_REQUESTS",
+  "HostConfig.MemoryReservation":       "_INSTANCE_MEMORY_RESERVATION",
+  "HostConfig.MemorySwap":              "_INSTANCE_MEMORY_SWAP",
+  "HostConfig.MemorySwappiness":        "_INSTANCE_MEMORY_SWAPPINESS",
+  "HostConfig.OomKillDisable":          "_INSTANCE_OOM_KILL_DISABLE",
+  "HostConfig.PidsLimit":               "_INSTANCE_PIDS_LIMIT",
+  "HostConfig.Ulimits":                 "_INSTANCE_ULIMITS",
+  "HostConfig.CpuCount":                "_INSTANCE_CPU_COUNT",
+  "HostConfig.CpuPercent":              "_INSTANCE_CPU_PERCENT",
+  "HostConfig.IOMaximumIOps":           "_INSTANCE_IO_MAX_IOPS",
+  "HostConfig.IOMaximumBandwidth":      "_INSTANCE_IO_MAX_BPS",
+  "HostConfig.MaskedPaths":             "_INSTANCE_MASKED_PATHS",
+  "HostConfig.ReadonlyPaths":           "_INSTANCE_READONLY_PATHS",
+  "GraphDriver":                        "_INSTANCE_STORAGE_METADATA",
+  "Mounts":                             "_INSTANCE_MOUNTS",
+  "Config.Hostname":                    "_INSTANCE_HOSTNAMES",
+  "Config.Domainname":                  "_INSTANCE_DOMAINNAME",
+  "Config.User":                        "_INSTANCE_USER",
+  "Config.AttachStdin":                 "_INSTANCE_ATTACH_STDIN",
+  "Config.AttachStdout":                "_INSTANCE_ATTACH_STDOUT",
+  "Config.AttachStderr":                "_INSTANCE_ATTACH_STDERR",
+  "Config.ExposedPorts":                "_INSTANCE_EXPOSED_PORTS",
+  "Config.Tty":                         "_INSTANCE_HAS_TTY",
+  "Config.OpenStdin":                   "_INSTANCE_OPEN_STDIN",
+  "Config.StdinOnce":                   "_INSTANCE_STDIN_ONCE",
+  "Config.Env":                         "_INSTANCE_ENV",
+  "Config.Cmd":                         "_INSTANCE_CMD",
+  "Config.Image":                       "_INSTANCE_CONFIG_IMAGE",
+  "Config.Volumes":                     "_INSTANCE_VOLUMES",
+  "Config.WorkingDir":                  "_INSTANCE_WORKING_DIR",
+  "Config.Entrypoint":                  "_INSTANCE_ENTRYPOINT",
+  "Config.OnBuild":                     "_INSTANCE_ONBUILD",
+  "Config.Labels":                      "_INSTANCE_LABELS",
+  "NetworkSettings.Bridge":             "_INSTANCE_BRIDGE",
+  "NetworkSettings.SandboxId":          "_INSTANCE_SANDBOXID",
+  "NetworkSettings.HairpinMode":        "_INSTANCE_HAIRPINMODE",
+  "NetworkSettings.LinkLocalIPv6Address":   "_INSTANCE_LOCAL_IPV6",
+  "NetworkSettings.LinkLocalIPv6PrefixLen": "_INSTANCE_LOCAL_IPV6_PREFIX_LEN",
+  "NetworkSettings.Ports":                  "_INSTANCE_BOUND_PORTS",
+  "NetworkSettings.SanboxKey":              "_INSTANCE_SANDBOX_KEY",
+  "NetworkSettings.SecondaryIPAddresses":   "_INSTANCE_SECONDARY_IPS",
+  "NetworkSettings.SecondaryIPv6Addresses": "_INSTANCE_SECONDARY_IPV6_ADDRS",
+  "NetworkSettings.EndpointID":             "_INSTANCE_ENDPOINTID",
+  "NetworkSettings.Gateway":                "_INSTANCE_GATEWAY",
+  "NetworkSettings.GlobalIPv6Address":      "_INSTANCE_GLOBAL_IPV6_ADDRESS",
+  "NetworkSettings.GlobalIPv6PrefixLen":    "_INSTANCE_GLOBAL_IPV6_PREFIX_LEN",
+  "NetworkSettings.IPAddress":              "_INSTANCE_IPADDRESS",
+  "NetworkSettings.IPPrefixLen":            "_INSTANCE_IP_PREFIX_LEN",
+  "NetworkSettings.IPv6Gateway":            "_INSTANCE_IPV6_GATEWAY",
+  "NetworkSettings.MacAddress":             "_INSTANCE_MAC",
+  "NetworkSettings.Networks":               "_INSTANCE_NETWORKS"
+}.toOrderedTable()
 
 proc getBoxType(b: Box): Con4mType =
   case b.kind
@@ -180,14 +386,67 @@ proc getBoxType(b: Box): Con4mType =
 proc checkAutoType(b: Box, t: Con4mType): bool =
   return not b.getBoxType().unify(t).isBottom()
 
+const hashHeader = "sha256:"
+
+template extractShaHashMap(value: Box): Box =
+  let list     = unpack[seq[string]](value)
+  var outTable = OrderedTableRef[string, string]()
+
+  for item in list:
+    let ix = item.find(hashHeader)
+    if ix == -1:
+      warn("Unrecognized item in _REPO_DIGEST array: " & item)
+      continue
+    let
+      k = item[0 ..< ix - 1] # Also chop off the @
+      v = item[ix + len(hashHeader) .. ^1]
+
+    outTable[k] = v
+
+  pack(outTable)
+
+template extractShaHash(value: Box): Box =
+  let asStr = unpack[string](value)
+
+  if not asStr.startsWith(hashHeader):
+    value
+  else:
+    pack[string](asStr[len(hashHeader) .. ^1])
+
+template extractShaHashList(value: Box): Box =
+  let list    = unpack[seq[string]](value)
+  var outList = seq[string](@[])
+
+  for item in list:
+    if not item.startsWith(hashHeader):
+      outList.add(item)
+    else:
+      outList.add(item[len(hashHeader) .. ^1])
+
+  pack[seq[string]](outList)
+
 proc jsonOneAutoKey(node:        JsonNode,
                     chalkKey:    string,
                     dict:        ChalkDict,
                     reportEmpty: bool) =
-  let value = node.nimJsonToBox()
+
+  if not chalkKey.isSubscribedKey():
+    return
+  var value = node.nimJsonToBox()
 
   if value.kind == MkObj: # Using this to represent 'null' / not provided
     return
+
+  # Handle any transformations we know we need.
+  case chalkKey
+  of "_REPO_DIGESTS":
+    value = extractShaHashMap(value)
+  of "_IMAGE_HOSTNAMES":
+    value = extractShaHashList(value)
+  of "_IMAGE_NAME":
+    value = extractShaHash(value)
+  else:
+    discard
 
   if not reportEmpty:
     case value.kind
@@ -217,53 +476,6 @@ proc getPartialJsonObject(top: JSonNode, key: string): Option[JSonNode] =
 
   return some(cur)
 
-# These are the keys we can auto-convert without any special-casing.
-# Types of the JSon will be checked against the key's declared type.
-let dockerContainerAutoMap = {
-  "RepoTags":                           "_REPO_TAGS",
-  "RepoDigests":                        "_REPO_DIGESTS",
-  "Args" :                              "_INSTANCE_ARGV",
-  "Config.Env" :                        "_INSTANCE_ENV",
-  "Id" :                                "_INSTANCE_ID",
-  "Created" :                           "_INSTANCE_CREATION_DATETIME",
-  "Path" :                              "_INSTANCE_ENTRYPOINT",
-  "EntryPoint":                         "_INSTANCE_ENTRYPOINT",
-  "Cmd":                                "_INSTANCE_ENTRYPOINT",
-  "Config.Image" :                      "_INSTANCE_IMAGE_NAME",
-  "Image":                              "_INSTANCE_IMAGE_ID",
-  "State.Status" :                      "_INSTANCE_STATUS",
-  "State.ExitCode" :                    "_INSTANCE_EXIT_CODE",
-  "State.Pid" :                         "_INSTANCE_PID",
-  "Name" :                              "_INSTANCE_NAME",
-  "RestartCount" :                      "_INSTANCE_RESTART_COUNT",
-  "Platform" :                          "_INSTANCE_PLATFORM",
-  "HostConfig.Mounts" :                 "_INSTANCE_MOUNTS",
-  "HostConfig.PortBindings" :           "_INSTANCE_BOUND_PORTS",
-  "HostConfig.Cgroup" :                 "_INSTANCE_CGROUP",
-  "HostConfig.Isolation":               "_INSTANCE_ISOLATION",
-  "HostConfig.Privileged" :             "_INSTANCE_IS_PRIVILEGED",
-  "HostConfig.CapAdd" :                 "_INSTANCE_ADDED_CAPS",
-  "HostConfig.CapDrop" :                "_INSTANCE_DROPPED_CAPS",
-  "HostConfig.ReadonlyRootfs" :         "_INSTANCE_IMMUTABLE",
-  "HostConfig.Runtime" :                "_INSTANCE_RUNTIME",
-  "Config.Hostname" :                   "_INSTANCE_HOSTNAME",
-  "Config.Domainname" :                 "_INSTANCE_DOMAINNAME",
-  "Config.User" :                       "_INSTANCE_USER",
-  "Config.Tty" :                        "_INSTANCE_HAS_TTY",
-  "Config.Labels" :                     "_INSTANCE_LABELS",
-  "Config.ExposedPorts":                "_INSTANCE_EXPOSED_PORTS",
-  "NetworkSettings.Ports" :             "_INSTANCE_BOUND_PORTS",
-  "NetworkSettings.IPAddress" :         "_INSTANCE_IP",
-  "NetworkSettings.GlobalIPv6Address" : "_INSTANCE_IPV6",
-  "NetworkSettings.Gateway" :           "_INSTANCE_GATEWAY",
-  "NetworkSettings.IPv6Gateway" :       "_INSTANCE_GATEWAYV6",
-  "NetworkSettings.MacAddress" :        "_INSTANCE_MAC",
-  "Comment":                            "_INSTANCE_COMMENT",
-  "Architecture":                       "_INSTANCE_ARCH",
-  "Os":                                 "_INSTANCE_OS",
-  "Size":                               "_INSTANCE_SIZE"
-}.toOrderedTable()
-
 proc jsonAutoKey(map:  OrderedTable[string, string],
                  top:  JsonNode,
                  dict: ChalkDict) =
@@ -277,629 +489,47 @@ proc jsonAutoKey(map:  OrderedTable[string, string],
 
     jsonOneAutoKey(subJsonOpt.get(), chalkKey, dict, reportEmpty)
 
-const mountInfoPreface = "/docker/containers/"
+proc inspectImage(dict: ChalkDict, id: string, chalk: ChalkObj) =
+  let
+    output   = runDockerGetOutput(@["inspect", id, "--format", "json"])
+    contents = output.parseJson().getElems()[0]
 
-proc getContainerName*(): Option[string] {.inline.} =
-  var f = newFileStream("/proc/self/mountinfo")
+  chalk.cachedHash = contents["Id"].getStr().extractDockerHash()
+  chalk.setIfNeeded("_IMAGE_ID", chalk.cachedHash)
+  chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents.nimJsonToBox())
+  chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerImage)
 
-  if f == nil: return none(string)
+  jsonAutoKey(dockerImageAutoMap, contents, dict)
 
-  let lines = f.readAll().split("\n")
+proc inspectContainer(dict: ChalkDict, id: string, chalk: ChalkObj) =
+  let
+    output   = runDockerGetOutput(@["container", "inspect", id, "--format",
+                                    "json"])
+    contents = output.parseJson().getElems()[0]
 
-  for line in lines:
-    let prefixIx = line.find(mountInfoPreface)
-    if prefixIx == -1: continue
+  chalk.cachedHash = contents["Image"].getStr().extractDockerHash()
+  chalk.setIfNeeded("_IMAGE_ID", chalk.cachedHash)
+  chalk.setIfNeeded("_OP_ALL_CONTAINER_METADATA", contents.nimJsonToBox())
+  chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerContainer)
 
-    let
-      startIx = prefixIx + mountInfoPreface.len()
-      endIx   = line.find("/", startIx)
-
-    return some(line[startIx ..< endIx])
-
-  return none(string)
+  jsonAutoKey(dockerContainerAutoMap, contents, dict)
 
 
 method getRunTimeArtifactInfo*(self:  CodecDocker,
                                chalk: ChalkObj,
                                ins:   bool): ChalkDict =
-  result    = ChalkDict()
 
-  if self.isRuntime():
-    let containerOpt = getContainerName()
+  result = ChalkDict()
 
-    # If it's '<<in-container>>' we couldn't read from /proc/self/mountinfo
-    if chalk.fullPath[0] != '<':
-      let cid                     = pack(chalk.fullPath)
-      result["_INSTANCE_ID"]      = cid
-    return
+  if chalk.containerId != "":
+    result.inspectContainer(chalk.containerId, chalk)
+    if chalk.cachedHash != "":
+      chalk.imageId = chalk.cachedHash
+  if chalk.imageId != "":
+    result.inspectImage(chalk.imageId, chalk)
+  elif chalk.tagRef != "":
+    result.inspectImage(chalk.tagRef, chalk)
 
-  let cache      = DockerInfoCache(chalk.cache)
 
-  if cache == nil: return
 
-  let inspectOut = cache.inspectOut
-
-  if not cache.container:
-    chalk.cachedHash = inspectOut["Id"].getStr().extractDockerHash()
-    result["_OP_ALL_IMAGE_METADATA"] = inspectOut.nimJsonToBox()
-    result["_OP_ARTIFACT_TYPE"]      = artTypeDockerImage
-    return
-  chalk.cachedHash = inspectOut["Image"].getStr().extractDockerHash()
-  result["_OP_ALL_CONTAINER_METADATA"] = inspectOut.nimJsonToBox()
-  result["_OP_ARTIFACT_TYPE"]          = artTypeDockerContainer
-
-  jsonAutoKey(dockerContainerAutoMap, inspectOut, result)
-
-proc extractDockerInfo*(chalk:          ChalkObj,
-                        flags:          OrderedTable[string, FlagSpec],
-                        cmdlineContext: string): bool =
-  ## This function evaluates the docker state, including environment
-  ## variables, command-line flags and docker file.
-
-  let
-    env   = unpack[Con4mDict[string, string]](c4mEnvAll(@[]).get())
-    cache = DockerInfoCache()
-
-  var
-    errors:         seq[string] = @[]
-    rawArgs:        seq[string] = @[]
-    fileArgs:       Table[string, string]
-    labels        = Con4mDict[string, string]()
-
-  chalk.cache = cache
-  cache.labels = Con4mDict[string, string]()
-
-  # Pull data from flags we care about.
-  if "tag" in flags:
-    cache.tags   = unpack[seq[string]](flags["tag"].getValue())
-    cache.ourTag = cache.tags[0]
-  else:
-    let
-      randint = secureRand[uint]()
-      hexval  = toHex(randint and 0xffffffffffff'u).toLowerAscii()
-
-    cache.ourTag      = "chalk-" & hexval
-
-  if "platform" in flags:
-    cache.platform = (unpack[seq[string]](flags["platform"].getValue()))[0]
-    if cache.platform != "linux/amd64":
-      error("chalk: skipping unsupported platform: " & cache.platform)
-      return false
-
-  if "label" in flags:
-    let rawLabels = unpack[seq[string]](flags["label"].getValue())
-    for item in rawLabels:
-      let arr = item.split("=")
-      cache.labels[arr[0]] = arr[^1]
-
-  if "build-arg" in flags:
-    rawArgs = unpack[seq[string]](flags["build-arg"].getValue())
-
-  for item in rawArgs:
-    let n = item.find("=")
-    if n == -1: continue
-    fileArgs[item[0 ..< n]] = item[n+1 .. ^1]
-
-  if cmdlineContext == "-":
-    cache.context        = "/tmp/"
-    cache.dockerFilePath = "-"
-  else:
-    let possibility = cmdLineContext.resolvePath()
-    try:
-      discard possibility.stat()
-    except:
-      error("Chalk: When trying to find: " & possibility &
-        ": couldn't find local context: " & getCurrentExceptionMsg())
-      error("Remote contexts are not currently supported.")
-      return false
-    cache.context = possibility
-
-    if "file" in flags:
-      cache.dockerFilePath = unpack[seq[string]](flags["file"].getValue())[0]
-      if cache.dockerFilePath == "-":
-        #NOTE: this is distinct from `docker build -`,
-        # this for cases like `docker build -f - .`
-        cache.dockerFileContents = stdin.readAll()
-        cache.dockerFilePath     = "-"
-      else:
-        if not cache.dockerFilePath.startsWith("/"):
-          let unresolved       = cache.context.joinPath(cache.dockerFilePath)
-          cache.dockerFilePath = unresolved.resolvePath()
-    else:
-      cache.dockerFilePath = cache.context.joinPath("Dockerfile")
-
-  if cache.dockerFilePath == "-":
-    cache.dockerFileContents = stdin.readAll()
-  else:
-    try:
-      let s                    = newFileStream(cache.dockerFilePath, fmRead)
-      if s != nil:
-        cache.dockerFileContents = s.readAll()
-        s.close()
-      else:
-        error(cache.dockerFilePath & ": Dockerfile not found")
-    except:
-      error(cache.dockerFilePath & ": docker build failed to read Dockerfile")
-      return false
-
-  if cache.context != "":
-    chalk.auxPaths.add(cache.context)
-  chalk.auxPaths.add(cache.dockerFilePath.splitPath().head)
-
-  # Part 3: Evaluate the docker file to the extent necessary.
-  let stream        = newStringStream(cache.dockerFileContents)
-  let (parse, cmds) = stream.parseAndEval(fileArgs, errors)
-  for err in errors:
-    error(chalk.fullPath & ": " & err)
-
-  var
-    section:    DockerFileSection
-    curSection: DockerFileSection
-    itemFrom:   FromInfo
-    foundEntry: EntryPointInfo
-    foundCmd:   CmdInfo
-    foundShell: ShellInfo
-    sectionTable = Table[string, DockerFileSection]()
-
-  for item in cmds:
-    if item of FromInfo:
-      if section != nil:
-        if len(section.alias) > 0:
-          sectionTable[section.alias] = section
-        else:
-          # This is a leaf node section, it doesn't resolve to any tag name
-          #TODO insert/chalk this layer in resulting Dockerfile prime
-          error("skipping unreferenced discrete section in Dockerfile")
-          discard
-      section = DockerFileSection()
-      itemFrom = FromInfo(item)
-      section.image = parse.evalOrReturnEmptyString(itemFrom.image, errors)
-      if itemFrom.tag.isSome():
-        section.image &= ":" &
-                 parse.evalSubstitutions(itemFrom.tag.get(), errors)
-      section.alias = parse.evalOrReturnEmptyString(itemFrom.asArg, errors)
-    elif item of EntryPointInfo:
-      section.entryPoint = EntryPointInfo(item)
-    elif item of CmdInfo:
-      section.cmd = CmdInfo(item)
-    elif item of ShellInfo:
-      section.shell = ShellInfo(item)
-    elif item of LabelInfo:
-      for k, v in LabelInfo(item).labels:
-        labels[k] = v
-    # TODO: when we support CopyInfo, we need to add a case for it here
-    # to save the source location as a hint for where to look for git info
-
-  # might have had errors walking the Dockerfile commands
-  for err in errors:
-    error(chalk.fullPath & ": " & err)
-
-  # Command line flags replace what's in the docker file if there's a key
-  # collision.
-  for k, v in labels:
-    if k notin cache.labels:
-      cache.labels[k] = v
-
-  if section == nil:
-    warn("No content found in the docker file")
-    return false
-
-  #% INTERNAL
-  if not chalkConfig.dockerConfig.getWrapEntryPoint():
-    stream.close()
-    return true
-
-  # walk the sections from the most-recently-defined section.
-  curSection = section
-  while true:
-    if foundCmd == nil:
-      foundCmd = curSection.cmd
-    if foundEntry == nil:
-      foundEntry = curSection.entryPoint
-    if foundShell == nil:
-      foundShell = curSection.shell
-    if curSection.image notin sectionTable:
-      break
-    curSection = sectionTable[curSection.image]
-
-  var
-    entryArgv:             seq[string]
-    cmdArgv:               seq[string]
-    shellArgv:             seq[string]
-    inspected:             InspectedImage
-    containerExecNoArgs:   seq[string]
-    containerExecWithArgs: seq[string]
-
-  if foundShell != nil:
-    # shell is required to be specified in JSON, note that
-    # here with ShellInfo the .json is a string not a bool :)
-    shellArgv = extractArgv(foundShell.json)
-
-  if foundEntry == nil or (foundEntry.json == false and foundShell == nil):
-    # we need to inspect the ancestor image if:
-    #   - we didn't find an entrypoint, as we need to know if there is one
-    #     and if there's not, then we need to default to cmd, which we also
-    #     might not have
-    #   - we found the entrypoint but in shell-form and we didn't find a shell
-    # if we don't have cmd, we should also populate that from inspect results
-    inspected       = dockerInspectEntryAndCmd(curSection.image)
-    if inspected.inspectionFailed():
-      warn("Docker inspect failed.")
-      return false
-    if foundEntry == nil:
-      # we don't have entrypoint, so use the one from inspect, which might also
-      # be nil but that's ok
-      entryArgv = inspected.entryArgv
-      if foundShell == nil:
-        shellArgv = inspected.shellArgv
-      # This dockerfile hasn't defined its own entrypoint, so we need
-      # to honor the cmd if it is defined in the ancestor.
-      if foundCmd == nil:
-        cmdArgv = inspected.cmdArgv
-      else:
-        cmdArgv = dockerStringToArgv(foundCmd.contents,shellArgv,foundCmd.json)
-    else:
-      # we have an entry point, but it's not json and we didn't find shell
-      shellArgv = inspected.shellArgv
-      entryArgv = dockerStringToArgv(foundEntry.contents, shellArgv, false)
-  else:
-    # we had found entrypoint, and if it's not json we also have shell
-    entryArgv = dockerStringToArgv(foundEntry.contents,
-                                   shellArgv,
-                                   foundEntry.json)
-    if foundCmd != nil:
-      # fun fact: from the docs you would think this should also
-      # check that foundEntry.json == true, because entrypoints defined
-      # in shellform supposedly discard cmd.. except that behavior is a
-      # byproduct of `/bin/sh -c`, which treats the next argv entry as
-      # the only command to execute.
-      if foundShell == nil and not foundCmd.json:
-        inspected = dockerInspectEntryAndCmd(curSection.image)
-        if inspected.inspectionFailed():
-          warn("Docker inspect failed.")
-          return false
-        shellArgv = inspected.shellArgv
-      cmdArgv = dockerStringToArgv(foundCmd.contents, shellArgv, foundCmd.json)
-
-  if len(entryArgv) == 0:
-    if len(cmdArgv) == 0:
-      # TODO this should be configurable: if we don't have an entrypoint
-      # and we don't have a cmd, if the user still wants us to embed an
-      # entrypoint we can. Once we have a config option and thought about
-      # what default should be then resume here to implement
-      error("skipping currently unsupported case of !entrypoint && !cmd")
-      return false
-
-    # If cmd is specified in exec form, and the first item doesn't
-    # have an explicitly defined /path/to/file, then we should be sure
-    # that, if we wrap the entry point, we can find the command at
-    # build time.  Sure, they might come in and slam the path, but if
-    # they do something crazy like that, we'll just fail and re-build
-    # the container without chalking.
-    if cmdArgv[0][0] != '/':
-      cache.relativeEntry = cmdArgv[0].split(" ")[0]
-
-    cache.execNoArgs   = cmdArgv
-    cache.execWithArgs = @[]
-  else:
-    cache.execNoArgs   = entryArgv & cmdArgv
-    cache.execWithArgs = entryArgv
-  #% END
-  stream.close()
-  return true
-
-proc processLabel(s: string): string =
-  let
-    prefix = chalkConfig.dockerConfig.getLabelPrefix()
-    joined = if prefix.endsWith('.'): prefix & s else: prefix & "." & s
-    lower  = joined.toLowerAscii()
-
-  result = lower.replace("_", "-")
-  if result.contains("$"):
-    result = result.replace("$", "_")
-
-proc writeChalkMark*(chalk: ChalkObj, mark: string) =
-  var
-    cache     = DockerInfoCache(chalk.cache)
-    (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix, cache.context)
-    ctx       = newFileStream(f)
-    labelOps  = chalkConfig.dockerConfig.getCustomLabels()
-
-  try:
-    ctx.writeLine(mark)
-    ctx.close()
-    cache.tmpChalkMark = path
-    info("Creating temporary chalk file: " & path)
-    cache.additionalInstructions = "COPY " & path.splitPath().tail & " " &
-      chalkConfig.dockerConfig.getChalkFileLocation() & "\n"
-    if labelOps.isSome():
-      for k, v in labelOps.get():
-        let jtxt = if v.startsWith('"'): v else: escapeJson(v)
-        cache.additionalInstructions &= "LABEL " & processLabel(k) &
-          "=" & jtxt & "\n"
-    let labelProfileName = chalkConfig.dockerConfig.getLabelProfile()
-    if labelProfileName != "":
-      let lprof = chalkConfig.profiles[labelProfileName]
-      if lprof.enabled:
-        let toLabel = filterByProfile(hostInfo, chalk.collectedData, lprof)
-        for k, v in toLabel:
-          let
-            jraw = boxToJson(v)
-            jtxt = if jraw.startswith('"'): jraw else: jraw.escapeJson()
-          cache.additionalInstructions &= "LABEL " & processLabel(k) &
-            "=" & jtxt & "\n"
-  finally:
-    if ctx != nil:
-      try:
-        ctx.close()
-      except:
-        removeFile(path)
-        error("Could not write chalk mark (no permission)")
-        raise
-
-#% INTERNAL
-const
-  hostDefault = "host_report_other_base"
-  artDefault  = "artifact_report_extract_base"
-
-proc profileToString(name: string): string =
-  if name in ["", hostDefault, artDefault]: return ""
-
-  result      = "profile " & name & " {\n"
-  let profile = chalkConfig.profiles[name]
-
-  for k, obj in profile.keys:
-    let
-      scope  = obj.getAttrScope()
-      report = get[bool](scope, "report")
-      order  = getOpt[int](scope, "order")
-
-    result &= "  key." & k & ".report = " & $(report) & "\n"
-    if order.isSome():
-      result &= "  key." & k & ".order = " & $(order.get()) & "\n"
-
-  result &= "}\n\n"
-
-proc sinkConfToString(name: string): string =
-  result     = "sink_config " & name & " {\n  filters: ["
-  var frepr  = seq[string](@[])
-  let
-    config   = chalkConfig.sinkConfs[name]
-    scope    = config.getAttrScope()
-
-  for item in config.filters: frepr.add("\"" & item & "\"")
-
-  result &= frepr.join(", ") & "]\n"
-  result &= "  sink: \"" & config.sink & "\"\n"
-
-  # copy out the config-specific variables.
-  for k, v in scope.contents:
-    if k in ["enabled", "filters", "loaded", "sink"]: continue
-    if v.isA(AttrScope): continue
-    let val = getOpt[string](scope, k).getOrElse("")
-    result &= "  " & k & ": \"" & val & "\"\n"
-
-  result &= "}\n\n"
-
-proc prepEntryPointBinary*(chalk, selfChalk: ChalkObj) =
-  # TODO: this and the template need to be massaged to work, and
-  # we need to write the code to actually handle the 'entrypoint' command.
-  # Similarly, need to have a flag to skip arg parsing altogether.
-
-  var newCfg     = entryPtTemplate
-  let
-    cache        = DockerInfoCache(chalk.cache)
-    noArgs       = $(%* cache.execNoArgs)
-    withArgs     = $(%* cache.execWithArgs)
-    dockerCfg    = chalkConfig.dockerConfig
-    hostProfName = dockerCfg.getEntrypointHostReportProfile().get(hostDefault)
-    artProfName  = dockerCfg.getEntrypointHostReportProfile().get(artDefault)
-    sinkName     = dockerCfg.getEntrypointReportSink()
-    hostProfile  = hostProfName.profileToString()
-    artProfile   = artProfName.profileToString()
-    sinkSpec     = sinkName.sinkConfToString()
-
-  newCfg = newCfg.replace("$$$CHALKFILE$$$", dockerCfg.getChalkFileLocation())
-  newCfg = newCfg.replace("$$$ENTRYPOINT$$$", "???")
-  newCfg = newCfg.replace("$$$SINKNAME$$$", sinkName)
-  newCfg = newCfg.replace("$$$HOSTPROFILE$$$", hostProfile)
-  newCfg = newCfg.replace("$$$ARTIFACTPROFILE$$$", artProfile)
-  newCfg = newCfg.replace("$$$ARTPROFILEREF$$$", hostProfName)
-  newCfg = newCfg.replace("$$$HOSTPROFILEREF$$$", artProfName)
-  newCfg = newCfg.replace("$$$CONTAINEREXECNOARGS$$$", noArgs)
-  newCfg = newCfg.replace("$$$CONTAINEREXECWITHARGS$$$", withArgs)
-  newCfg = newCfg.replace("$$$SINKCONFIG$$$", sinkSpec)
-
-  selfChalk.collectedData["$CHALK_CONFIG"] = pack(newCfg)
-
-proc writeEntryPointBinary*(chalk, selfChalk: ChalkObj, toWrite: string) =
-  let
-    cache     = DockerInfoCache(chalk.cache)
-    (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix, cache.context)
-    codec     = selfChalk.myCodec
-
-  f.close() # Just needed the name...
-  trace("Writing new entrypoint binary to: " & path)
-
-  # If we cannot write to the file system, we should write the chalk
-  # mark to a label (TODO)
-  try:
-    codec.handleWrite(selfChalk, some(toWrite))
-    info("New entrypoint binary written to: " & path)
-
-    # If we saw a relative path for the entry point binary, we should make sure
-    # that we're going to find it in the container, so that we don't silently
-    # fail when running as an entry point.  If the 'which' command fails, the
-    # build should fail, and the container should re-build without us.
-    if cache.relativeEntry != "":
-      cache.additionalInstructions &= "RUN which " & cache.relativeEntry & "\n"
-
-    # Here's the rationale around the random string:
-    # 1. Unlikely, but two builds could use the same context dir concurrently
-    # 2. Docker caches layers from RUN commands, and possibly from COPY,
-    #    so to ensure the binary is treated uniquely we use a random name
-    #    (we could pass --no-cache to Docker, but this could have other
-    #     side-effects we don't want, and also doesn't address #1)
-    # 3. We don't copy directly to /chalk in container because there might
-    #    already be a /chalk binary there, and we need to consume its contents
-    #    if it's there
-    if chalkConfig.getRecursive():
-      cache.additionalInstructions &= "RUN /" & path & " insert\n"
-      cache.additionalInstructions &= "COPY " & path & " /" & path & "\n"
-    else:
-      cache.additionalInstructions &= "COPY " & path & " /chalk\n"
-    cache.additionalInstructions &= "ENTRYPOINT [\"/chalk\"]\n"
-  except:
-    error("Writing entrypoint binary failed: " & getCurrentExceptionMsg())
-    dumpExOnDebug()
-    raise
-
-  try:
-    discard cache.context.joinPath(".dockerignore").stat()
-    # really not sure the best approach here, they all feel racy
-    # do we just write an exclusion (which begins with '!') in
-    # the form of !{tmpFilePrefix} ? or !{generated-tmp-path}
-    # but if we have concurrent accesses ... well it could get ugly
-  except:
-    discard
-#% END
-proc runInspectOnImage*(cmd: string, chalk: ChalkObj): bool =
-  let
-    cache  = DockerInfoCache(chalk.cache)
-    output = execProcess(cmd, args = @["inspect", cache.ourTag], options = {})
-    items  = output.parseJson().getElems()
-
-  if len(items) != 0:
-    cache.inspectOut = items[0]
-    return true
-
-proc buildContainer*(chalk:  ChalkObj,
-                     flags:  OrderedTable[string, FlagSpec],
-                     inargs: seq[string]): bool =
-  # Going to reparse the original argument to lift out any -f/--file
-  # but otherwise will pass through all arguments.
-  let
-    cache     = DockerInfoCache(chalk.cache)
-    fullFile  = cache.dockerFileContents & "\n" & cache.additionalInstructions
-    (f, path) = createTempFile(tmpFilePrefix, tmpFilesuffix)
-    # This line should be semantically the same as the one after it.
-    # However, for some reason, even if I pass every arg by position,
-    # noSpace ends up 'true' immediately after???  Oddest thing I've seen
-    # in a while. TODO: WTF is going on??
-    #
-    # reparse   = newSpecObj(maxArgs = high(int), unknownFlagsOk = true,
-    #                        noSpace = false)
-    reparse = CommandSpec(maxArgs: high(int), dockerSingleArg: true,
-                                  unknownFlagsOk: true, noSpace: false)
-
-  let
-    cmd       = findDockerPath().get()
-
-  info("Created temporary docker file: " & path)
-  cache.tmpDockerFile = path
-  f.write(fullFile)
-  f.close()
-  reparse.addFlagWithArg("file", ["f", "file"], true, true, optArg = false)
-  var args = reparse.parse(inargs).args[""] & @["-f", path]
-
-  if len(cache.tags) == 0:
-          args &= @["-t", cache.ourTag]
-
-  for k, v in cache.labels:
-    let label = escapeJson(k & "=" & v)
-    trace("Adding docker label: " & label)
-    args &= @["--label", label]
-
-  let
-    subp = startProcess(cmd, args = args, options = {poParentStreams})
-    code = subp.waitForExit()
-
-  if code != 0: return false
-
-  result = runInspectOnImage(cmd, chalk)
-
-proc cleanupTmpFiles*(chalk: ChalkObj) =
-  let cache = DockerInfoCache(chalk.cache)
-
-  if not chalkConfig.getChalkDebug():
-    if cache == nil:              return
-    if cache.tmpDockerFile != "": removeFile(cache.tmpDockerFile)
-    if cache.tmpChalkMark  != "": removeFile(cache.tmpChalkMark)
-    #% INTERNAL
-    if cache.tmpEntryPoint != "": removeFile(cache.tmpEntryPoint)
-    #% END
-  else:
-    # This generally won't print since --log-level defaults to 'error' for chalk
-    info("Skipping deletion of temporary files due to chalk_debug = true")
-
-proc processPushInfo*(arr: seq[JSonNode], arg: string) =
-  let
-    slashIx  = arg.find('/')
-    endIx    = if slashIx == -1: len(arg) else: slashIx
-    fullRepo = arg[0 ..< endIx]
-    parts    = fullRepo.split(':')
-  if len(parts) > 0:
-    hostInfo["_REPO_HOST"] = pack(parts[0])
-  if len(parts) > 1:
-    var port: int
-    try:
-      discard parseInt(parts[1], port)
-      hostInfo["_REPO_PORT"] = pack(port)
-    except:
-      hostInfo["_REPO_HOST"] = pack(fullRepo)
-
-  # Really should only have one, but just in case...
-  for item in arr:
-    if "Id" notin item:
-      continue
-    let
-      id    = item["Id"].getStr()
-      chalk = newChalk(FileStream(nil), id)
-
-    # We're assuming it's marked; we don't want to bother looking for the mark
-    chalk.marked = true
-    chalk.addToAllChalks()
-    chalk.collectedData["_CURRENT_HASH"] = pack(id.split(":")[^1])
-    if "RepoTags" in item:
-      var
-        tags: seq[string] = @[]
-        jsonArr           = item["RepoTags"].getElems()
-      for item in jsonArr:
-        tags.add(item.getStr())
-      if len(tags) != 0:
-        chalk.collectedData["_REPO_TAGS"] = pack(tags)
-    if "RepoDigests" in item:
-      var
-        digests: seq[string] = @[]
-        jsonArr              = item["RepoDigests"].getElems()
-      for item in jsonArr:
-        digests.add(item.getStr().split(":")[^1])
-      if len(digests) != 0:
-        chalk.collectedData["_REPO_DIGESTS"] = pack(digests)
-
-#% INTERNAL
-# This stuff needs to get done somewhere...
-#
-# when we execute docker build (using user's original commandline):
-#   - change/set -f/--file to /tmp/chalkdockerfileRandomString
-#
-# when chalk is executing from the RUN statement above, it will be in-container
-# during build-time, it needs to :
-#   - check for existing chalk at /chalk: consume that chalk metadata
-#   - write to /chalk itself + any metadata consumed
-#   - remove /chalkBinaryRandomString
-#
-# When we exec in container fo real!
-#   - fork() --> child reports home (not parent!), with some timeout (< 1sec)
-#   - in parent (pid 1 in theory):
-#       - if len(argv) > 1:
-#         exec(containerExecWithArgs + argv[1:^1])
-#       - else
-#         exec(containerExecNoArgs)
-# TODO: not handling virtual chalking.
-# TODO: report not being able to chalk.
-# TODO: add chalk.postHash
-# TODO: remove chalk and chalk.json from the context if they exist.
-# TODO: report the image ID as the post-hash (needs appropriate formatting)
-#% END
 registerPlugin("docker", CodecDocker())
