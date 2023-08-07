@@ -16,7 +16,7 @@ fastapi-healthcheck = "^0.2.12"
 sqlalchemy = "^2.0.15"
 python-multipart = "^0.0.6"
 aiofiles = "^23.1.0"
-cryptography = "^41.0.2"
+cryptography = "^41.0.3"
 
 
 [build-system]
