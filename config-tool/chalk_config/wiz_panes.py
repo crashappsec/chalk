@@ -663,7 +663,7 @@ class ReportingPane(WizContainer):
         )
 
         ##Update login button if user is already logged in
-        if get_app().authenticated == True:
+        if get_app().login_widget.authenticated == True:
             user_str = "Logged In"
             self.inline_login_btn.label = user_str
             self.inline_login_btn.variant = "success"

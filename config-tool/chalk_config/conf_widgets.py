@@ -137,7 +137,17 @@ class ReportingContainer(Container):
 
 class ModalDelete(ModalScreen):
     DEFAULT_CSS = WIZARD_CSS
-    BINDINGS = [("q", "pop_screen()", CANCEL_LABEL), ("d", "delete", DELETE_LABEL)]
+    BINDINGS = [
+        Binding("q", "pop_screen()", CANCEL_LABEL),
+        Binding("d", "delete", DELETE_LABEL),
+        Binding(key="ctrl+q", action=None, description=MAIN_MENU, show=False),
+        Binding(key="a", action=None, description=LOGIN_LABEL, show=False),
+        Binding(key="b", action=None, description=MAIN_MENU, show=False),
+        Binding(key="c", action=None, description=MAIN_MENU, show=False),
+        Binding(key="l", action=None, description=MAIN_MENU, show=False),
+        Binding(key="r", action=None, description=MAIN_MENU, show=False),
+        Binding(key="u", action=None, description=MAIN_MENU, show=False),
+    ]
 
     def __init__(self, name, iid):
         super().__init__()
@@ -168,7 +178,16 @@ class ModalDelete(ModalScreen):
 
 class ExportMenu(Screen):
     DEFAULT_CSS = WIZARD_CSS
-    BINDINGS = [("escape", "pop_screen()", CANCEL_LABEL)]
+    # The 'None' entries below are to supress the display of keybinds defined at
+    # higher level screens that filter down
+    BINDINGS = [
+        Binding(key="escape", action="pop_screen()", description=CANCEL_LABEL),
+        Binding("a", None, None),
+        Binding("b", None, None),
+        Binding("l", None, None),
+        Binding("r", None, None),
+        Binding("u", None, None),
+    ]
 
     def __init__(self, iid, name, jconf):
         super().__init__()
@@ -217,12 +236,16 @@ class ExportMenu(Screen):
 
 class BuildChalkMenu(Screen):
     DEFAULT_CSS = WIZARD_CSS
+
+    # The 'None' entries below are to supress the display of keybinds defined at
+    # higher level screens that filter down
     BINDINGS = [
         Binding(key="escape", action="pop_screen()", description=CANCEL_LABEL),
+        Binding("a", None, None),
         Binding("b", None, None),
-        # Binding("d", None, None),
         Binding("l", None, None),
         Binding("r", None, None),
+        Binding("u", None, None),
     ]
 
     def __init__(self, profile_name, config, as_dict):
@@ -532,7 +555,7 @@ class C0ApiToggle(Switch):
 
             ##Disable the Next button if we are not yet authenticated and wanting to use the API
             if (
-                not get_app().authenticated
+                not get_app().login_widget.authenticated == True
                 and get_wizard().current_panel == get_wizard().panels[1]
             ):
                 update_next_button("Please Login")

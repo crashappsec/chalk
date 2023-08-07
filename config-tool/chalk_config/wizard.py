@@ -174,8 +174,11 @@ class ReleaseNotesModal(ModalScreen):
             action="button_pressed",
             description=BACK_LABEL,
         ),
-        Binding(key="r", action="button_pressed", description=MAIN_MENU, show=False),
+        Binding(key="a", action=None, show=False),
+        Binding(key="b", action=None, show=False),
         Binding(key="l", action="button_pressed", description=MAIN_MENU, show=False),
+        Binding(key="r", action="button_pressed", description=MAIN_MENU, show=False),
+        Binding(key="u", action=None, show=False),
         Binding(
             key="ctrl+q", action="button_pressed", description=MAIN_MENU, show=False
         ),

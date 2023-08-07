@@ -62,7 +62,7 @@ from .wiz_panes import (
     sectionOutputConf,
     sectionReporting,
 )
-from .wizard import AckModal, ProfileModal, UpdateModal, Wizard
+from .wizard import AckModal, ProfileModal, ReleaseNotesModal, UpdateModal, Wizard
 from .log import get_logger
 
 MODULE_LOCATION = os.path.dirname(__file__)
@@ -375,24 +375,13 @@ class ConfWizScreen(ModalScreen):
         Binding(key="space", action="next()", show=False),
         Binding(key="up", action="<scroll-up>", show=False),
         Binding(key="down", action="<scroll-down>", show=False),
-        # Binding(key="h", action="wizard.toggle_class('HelpWindow', '-hidden')", description=HELP_TOGGLE,),
-        Binding(
-            key="h",
-            action="show_help",
-            description=HELP_TOGGLE,
-        ),
-        Binding(
-            key="r", action=None
-        ),  # Disable release note keybind in the wizard bottom bar,
-        Binding(
-            key="d", action=None
-        ),  # Disable download keybind in the wizard bottom bar
-        Binding(
-            key="b", action=None
-        ),  # Disable bin gen keybind in the wizard bottom bar
-        Binding(
-            key="l", action=None
-        ),  # Disable bin gen keybind in the wizard bottom bar
+        Binding(key="a", action=None, show=False),
+        Binding(key="b", action=None),
+        Binding(key="d", action=None),
+        Binding(key="h", action="show_help", description=HELP_TOGGLE),
+        Binding(key="l", action=None),
+        Binding(key="r", action=None),
+        Binding(key="u", action=None, show=False),
     ]
 
     def compose(self):
@@ -426,16 +415,14 @@ class LoginScreen(ModalScreen):
     TITLE = LOGIN_TITLE
     BINDINGS = [
         Binding(key="escape", action="abort_wizard", description=MAIN_MENU),
-        Binding(key="a", action="open_authn_webpage", description=LOGIN_LABEL),
-        Binding(key="q", action="display_qr", description=QR_LABEL),
-        Binding(key="ctrl+q", action=None, description=MAIN_MENU, show=False),
+        Binding(key="a", action=None, description=LOGIN_LABEL, show=False),
+        Binding(key="b", action=None, description=MAIN_MENU, show=False),
         Binding(key="c", action=None, description=MAIN_MENU, show=False),
         Binding(key="l", action=None, description=MAIN_MENU, show=False),
-        Binding(
-            key="h",
-            action="wizard.toggle_class('HelpWindow', '-hidden')",
-            description=HELP_TOGGLE,
-        ),
+        Binding(key="q", action="display_qr", description=QR_LABEL),
+        Binding(key="ctrl+q", action=None, description=MAIN_MENU, show=False),
+        Binding(key="r", action=None, description=MAIN_MENU, show=False),
+        Binding(key="u", action=None, description=MAIN_MENU, show=False),
     ]
     AUTO_FOCUS = None
     login_widget = None
@@ -623,6 +610,13 @@ class QrCodeScreen(ModalScreen):
         Binding(key="space", action="complete", description=BACK_LABEL, show=False),
         Binding(key="left", action="complete", description=BACK_LABEL, show=False),
         Binding(key="enter", action="complete", description=BACK_LABEL, show=False),
+        Binding(key="a", action=None, description=LOGIN_LABEL, show=False),
+        Binding(key="b", action=None, description=MAIN_MENU, show=False),
+        Binding(key="c", action=None, description=MAIN_MENU, show=False),
+        Binding(key="l", action=None, description=MAIN_MENU, show=False),
+        Binding(key="ctrl+q", action=None, description=MAIN_MENU, show=False),
+        Binding(key="r", action=None, description=MAIN_MENU, show=False),
+        Binding(key="u", action=None, description=MAIN_MENU, show=False),
     ]
 
     qr_code_widget = None
@@ -678,7 +672,6 @@ class NewApp(App):
         Binding(key="ctrl+q", action="quit", description=QUIT_LABEL, priority=True),
         Binding(key="a", action="about", description="About"),
         Binding(key="l", action="login()", description=LOGIN_LABEL),
-        # Binding(key="d", action="downloadtestserver()", description="Download Test Server"), # ToDo localize
         Binding(
             key="b",
             action="generate_chalk_binary()",
