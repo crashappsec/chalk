@@ -252,7 +252,6 @@ class ApiAuth(WizContainer):
             return -1
 
         # Build instructions to include the correct URLs and code
-
         if get_app().is_in_ssh_session:
             self.auth_widget_1.update(
                 "To enable the Chalk binaries built by the Chalk Configuration Tool to send data to your Crash Override account you must authorize it\n\n We detected you are running in an SSH session, please login manually.\n\n"
@@ -324,7 +323,7 @@ class DisplayQrCode(WizContainer):
         f = io.StringIO()
         self.qr_obj.print_ascii(out=f)
         f.seek(0)
-        self.qr_widget.qr_string = str(f.read())
+        self.qr_widget.update(str(f.read()))
         self.qr_widget.refresh()
         self.url_widget = Static("( %s )" % (self.data_to_encode))
 

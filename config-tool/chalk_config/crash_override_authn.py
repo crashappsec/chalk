@@ -10,11 +10,11 @@ logger = get_logger(__name__)
 
 
 class CrashOverrideAuth:
-    def __init__(self, auth_url):
+    def __init__(self, code_url):
         """ """
         self.id = ""
         self.device_id = self.id
-        self.auth_url = auth_url
+        self.code_url = code_url
         self._nonce = ""
         self.poll_url = ""
         self.poll_int = 5
@@ -40,7 +40,7 @@ class CrashOverrideAuth:
     def _get_code(self):
         """ """
         try:
-            resp = requests.post(self.auth_url)
+            resp = requests.post(self.code_url)
             resp_json = resp.json()
 
             self.id = resp_json["id"]
@@ -57,7 +57,7 @@ class CrashOverrideAuth:
         except Exception as err:
             logger.error(
                 "[-] Error calling the config-tool code endpoint at %s: %s"
-                % (self.auth_url, err)
+                % (self.code_url, err)
             )
             return None
 
@@ -77,7 +77,7 @@ class CrashOverrideAuth:
 
     def _show_token(self):
         """ """
-        print("\nVisit %s to authenticate\n" % (self.auth_url))
+        print("\nVisit %s to authenticate\n" % (self.code_url))
 
     def _poll(self):
         """ """

@@ -39,6 +39,7 @@ from .conf_widgets import (
     ProfilePicture,
     cursor,
     db,
+    ReleaseNotesModal,
     set_conf_table,
     write_binary,
 )
@@ -295,8 +296,6 @@ async def launch_server():
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        # stdout = asyncio.subprocess.DEVNULL,
-        # stderr = asyncio.subprocess.DEVNULL
     )
     logger.info(f"Server process object {server_proc}")
     return server_proc
@@ -455,7 +454,6 @@ class LoginScreen(ModalScreen):
             my_app.user_email = event.auth_obj.user_email
             my_app.user_id = event.auth_obj.user_id
             my_app.user_picture = event.auth_obj.user_picture
-            my_app.authenticated = my_app.login_widget.is_authenticated()
 
             # Update loginbutton on main page button bar to show logged in user
             user_str = "Logged In!"
@@ -568,7 +566,6 @@ class LoginScreen(ModalScreen):
             logger.info(rows)
             api_token, tenant_id, api_url, timestamp, name, email, uid, image = rows[0]
         except:
-            raise
             return None, None, None, None, None, None, None, None
 
         return api_token, tenant_id, api_url, timestamp, name, email, uid, image
@@ -581,7 +578,7 @@ class LoginScreen(ModalScreen):
         try:
             cursor.execute("DELETE FROM tokens;")
             db.commit()
-            get_app().authenticated = False
+            self.login_widget.crashoverride_auth_obj.authenticated = False
             user_str = "L⍉gin"
             l_btn = conftable.login_button
             l_btn.label = user_str
@@ -693,7 +690,6 @@ class NewApp(App):
         Binding(key="down", action="<scroll-down>", show=False),
         # Binding(key="n", action="newconfig()", show = False),
     ]
-    authenticated = False
     config_table = conftable
     config_widget = wiz
     login_widget = login_widget
@@ -764,7 +760,7 @@ class NewApp(App):
             self.user_email = email
             self.user_id = uid
             self.user_picture = image
-            self.authenticated = True
+            self.login_widget.crashoverride_auth_obj.authenticated = True
 
             # Update loginbutton on main page button bar to show logged in user
             user_str = "Logged In!"
@@ -822,7 +818,7 @@ class NewApp(App):
         """
         Initiate the user registration/login process for Crash Override API
         """
-        if not self.authenticated:
+        if not self.login_widget.is_authenticated():
             # Start background task that polls chalk API
             ret = self.login_widget.start_auth_polling()
 

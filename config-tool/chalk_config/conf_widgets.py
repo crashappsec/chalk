@@ -516,21 +516,11 @@ class AuthhLinks(MDown):
     Markdown object that will contain the genrated Auth links
     """
 
-    markdown = Reactive("")
-
-    def render(self) -> str:
-        return self.markdown
-
 
 class QrCode(Static):
     """
     Object that will hold an ASCII art QRcode
     """
-
-    qr_string = Reactive("")
-
-    def render(self) -> str:
-        return self.qr_string
 
 
 class C0ApiToggle(Switch):
