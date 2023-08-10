@@ -17,12 +17,15 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
   # Note that if we can't find the process path by PID, we assume it's
   # allOpts[0] for the moment.
 
+  const
+    chalkPath = "/chalk.json"
+
   var
     n:        array[PATH_MAX, char]
     exe1path: string = ""
     info:     Stat
     chalk:    ChalkObj
-    chalkPath = chalkConfig.dockerConfig.getChalkFileLocation()
+
 
   when hostOs == "macosx":
     if proc_pidpath(pid, addr n[0], PATH_MAX) > 0:
@@ -106,7 +109,8 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):
     error("'exec' command not supported on this platform.")
-    quit(1)
+    setExitCode(1)
+    return
 
 
   let
@@ -128,11 +132,14 @@ proc runCmdExec*(args: seq[string]) =
       "set the program name (PATH is searched).")
     error("Add extra directories to search with --exec-search-path.")
     error("In a config file, set exec.command_name and/or exec.search_path")
-    quit(1)
+    setExitCode(1)
+    return
+
 
   if len(allOpts) == 0:
     error("No executable named '" & cmdName & "' found in your path.")
-    quit(1)
+    setExitCode(1)
+    return
 
   var argsToPass = defaults
 
@@ -140,7 +147,8 @@ proc runCmdExec*(args: seq[string]) =
     argsToPass &= args
   elif len(args) != 0 and not overrideOk:
     error("Cannot override default arguments on the command line.")
-    quit(1)
+    setExitCode(1)
+    return
   elif len(args) != 0:
     argsToPass = args
 
@@ -174,8 +182,7 @@ proc runCmdExec*(args: seq[string]) =
       trace("Waiting for spawned process to exit.")
       var stat_loc: cint
       discard waitpid(pid, stat_loc, 0)
-      let pid_exit = WEXITSTATUS(stat_loc)
-      quit(pid_exit)
+      setExitCode(WEXITSTATUS(stat_loc))
   else:
     if pid != 0:
       handleExec(allOpts, argsToPass)

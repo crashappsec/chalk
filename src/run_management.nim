@@ -57,7 +57,7 @@ proc newChalk*(name:         string            = "",
                     pid:           pid,
                     fsRef:         fsRef,
                     stream:        stream,
-                    tagRef:        tag,
+                    userRef:       tag,
                     marked:        marked,
                     imageId:       imageId,
                     containerId:   containerId,
@@ -115,11 +115,9 @@ proc lookupCollectedKey*(obj: ChalkObj, k: string): Option[Box] =
   if k in obj.collectedData: return some(obj.collectedData[k])
   return none(Box)
 
-var args: seq[string]
-
 proc setArgs*(a: seq[string]) =
-  args = a
-proc getArgs*(): seq[string] = args
+  collectionCtx.args = a
+proc getArgs*(): seq[string] = collectionCtx.args
 
 var cmdSpec*: CommandSpec = nil
 proc getArgCmdSpec*(): CommandSpec = cmdSpec

@@ -36,6 +36,7 @@ reproducable builds, turn it off, along w/ items that cary the time.
   key.INJECTOR_COMMIT_ID.report                  = true
   key.INJECTOR_ARGV.report                       = true
   key.INJECTOR_ENV.report                        = true
+  key.INJECTOR_PUBLIC_KEY.report                 = true
   key.TENANT_ID_WHEN_CHALKED.report              = true
   key.TIMESTAMP_WHEN_CHALKED.report              = true
   key.CHALK_PTR.report                           = true
@@ -67,11 +68,8 @@ reproducable builds, turn it off, along w/ items that cary the time.
   key.SBOM.report                                = false
   key.SAST.report                                = false
   key.ERR_INFO.report                            = true
-  # Turning this and SIGNATURE off by default until this is no
-  # longer experimental.
-  key.SIGNING.report                             = false
-  key.SIGN_PARAMS.report                         = false
-  key.SIGNATURE.report                           = false
+  key.SIGNING.report                             = true
+  key.SIGNATURE.report                           = true
   key.DOCKER_FILE.report                         = true
   key.DOCKERFILE_PATH.report                     = true
   key.DOCKER_PLATFORM.report                     = true
@@ -94,12 +92,16 @@ not collect most available information about the build environment.
 This is not a config suitable for a reproducable build. To make it one,
 use `chalk_reproducable`.
 """
+  key.DATE_CHALKED.report                        = false
+  key.TIME_CHALKED.report                        = false
+  key.TZ_OFFSET_WHEN_CHALKED.report              = false
   key.DATETIME_WHEN_CHALKED.report               = true
   key.TIMESTAMP_WHEN_CHALKED.report              = true
   key.CHALK_RAND.report                          = true
   key.CHALK_PTR.report                           = true
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
+  key.INJECTOR_PUBLIC_KEY.report                 = true  
   key.TENANT_ID_WHEN_CHALKED.report              = true
   key.ARTIFACT_TYPE.report                       = true
   key.HASH.report                                = true
@@ -134,6 +136,7 @@ nonce removed.
   key.CHALK_PTR.report                           = true
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
+  key.INJECTOR_PUBLIC_KEY.report                 = true  
   key.TENANT_ID_WHEN_CHALKED.report              = true
   key.ARTIFACT_TYPE.report                       = true
   key.HASH.report                                = true
@@ -169,6 +172,7 @@ you wanted.
 """
   key.DATETIME_WHEN_CHALKED.report               = true
   key.CHALK_PTR.report                           = true
+  key.INJECTOR_PUBLIC_KEY.report                 = true  
 }
 
 profile artifact_report_large {
@@ -185,6 +189,7 @@ more expensive to capture (like full ps when available).
   key.HOSTINFO_WHEN_CHALKED.report               = true
   key.NODENAME_WHEN_CHALKED.report               = true
   key.INJECTOR_CHALK_ID.report                   = true
+  key.INJECTOR_PUBLIC_KEY.report                 = true  
   key.INJECTOR_VERSION.report                    = true
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
@@ -224,8 +229,7 @@ more expensive to capture (like full ps when available).
   key.SIGNING.report                             = false
   key.METADATA_HASH.report                       = true
   key.METADATA_ID.report                         = true
-  key.SIGN_PARAMS.report                         = true
-  key.SIGNATURE.report                           = false
+  key.SIGNATURE.report                           = true
   key.DOCKER_FILE.report                         = true
   key.DOCKERFILE_PATH.report                     = true
   key.DOCKER_PLATFORM.report                     = true
@@ -239,7 +243,6 @@ more expensive to capture (like full ps when available).
   key._OP_ARTIFACT_TYPE.report                   = true
   key._OP_ARTIFACT_PATH.report                   = true
   key._CURRENT_HASH.report                       = true
-  key._VALIDATED.report                          = true
   key._VIRTUAL.report                            = true
   key._OP_ARTIFACT_REPORT_KEYS.report            = false
   key._PROCESS_PID.report                        = true
@@ -389,7 +392,7 @@ more expensive to capture (like full ps when available).
   key._INSTANCE_READONLY_PATHS.report            = true
   key._INSTANCE_STORAGE_METADATA.report          = true
   key._INSTANCE_MOUNTS.report                    = true
-  key._INSTANCE_HOSTNAMES.report                 = true
+  key._INSTANCE_HOSTNAME.report                  = true
   key._INSTANCE_DOMAINNAME.report                = true
   key._INSTANCE_USER.report                      = true
   key._INSTANCE_ATTACH_STDIN.report              = true
@@ -425,14 +428,20 @@ more expensive to capture (like full ps when available).
   key._INSTANCE_IPV6_GATEWAY.report              = true
   key._INSTANCE_MAC.report                       = true
   key._INSTANCE_NETWORKS.report                  = true
+  key._STORE_URI.report                          = true  
   key._REPO_TAGS.report                          = true
   key._REPO_DIGESTS.report                       = true
   key._FOUND_BASE_MARK.report                    = true
+  key._SIGNATURE.report                          = true
+  key._INVALID_SIGNATURE.report                  = true
+  key._VALIDATED_SIGNATURE.report                = true
   key.$CHALK_CONFIG.report                       = true
   key.$CHALK_IMPLEMENTATION_NAME.report          = true
+  key.$CHALK_LOAD_COUNT.report                   = true
+  key.$CHALK_PUBLIC_KEY.report                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
+  key.$CHALK_ATTESTATION_TOKEN.report            = true   
 }
-
-
 
 profile artifact_report_default {
   doc: """
@@ -450,6 +459,7 @@ things that are spammy.
   key.HOSTINFO_WHEN_CHALKED.report               = true
   key.NODENAME_WHEN_CHALKED.report               = true
   key.INJECTOR_CHALK_ID.report                   = true
+  key.INJECTOR_PUBLIC_KEY.report                 = true  
   key.INJECTOR_VERSION.report                    = true
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
@@ -489,8 +499,7 @@ things that are spammy.
   key.SIGNING.report                             = false
   key.METADATA_HASH.report                       = true
   key.METADATA_ID.report                         = true
-  key.SIGN_PARAMS.report                         = true
-  key.SIGNATURE.report                           = false
+  key.SIGNATURE.report                           = true
   key.DOCKER_FILE.report                         = true
   key.DOCKERFILE_PATH.report                     = true
   key.DOCKER_PLATFORM.report                     = true
@@ -504,7 +513,6 @@ things that are spammy.
   key._OP_ARTIFACT_TYPE.report                   = true
   key._OP_ARTIFACT_PATH.report                   = true
   key._CURRENT_HASH.report                       = true
-  key._VALIDATED.report                          = true
   key._VIRTUAL.report                            = true
   key._OP_ARTIFACT_REPORT_KEYS.report            = false
   key._PROCESS_PID.report                        = true
@@ -653,7 +661,7 @@ things that are spammy.
   key._INSTANCE_READONLY_PATHS.report            = true
   key._INSTANCE_STORAGE_METADATA.report          = true
   key._INSTANCE_MOUNTS.report                    = true
-  key._INSTANCE_HOSTNAMES.report                 = true
+  key._INSTANCE_HOSTNAME.report                  = true
   key._INSTANCE_DOMAINNAME.report                = true
   key._INSTANCE_USER.report                      = true
   key._INSTANCE_ATTACH_STDIN.report              = true
@@ -687,11 +695,19 @@ things that are spammy.
   key._INSTANCE_IPV6_GATEWAY.report              = true
   key._INSTANCE_MAC.report                       = true
   key._INSTANCE_NETWORKS.report                  = true
+  key._STORE_URI.report                          = true
   key._REPO_TAGS.report                          = true
   key._REPO_DIGESTS.report                       = true
   key._FOUND_BASE_MARK.report                    = true
+  key._SIGNATURE.report                          = true
+  key._INVALID_SIGNATURE.report                  = true
+  key._VALIDATED_SIGNATURE.report                = true
   key.$CHALK_CONFIG.report                       = true
   key.$CHALK_IMPLEMENTATION_NAME.report          = true
+  key.$CHALK_LOAD_COUNT.report                   = true
+  key.$CHALK_PUBLIC_KEY.report                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
+  key.$CHALK_ATTESTATION_TOKEN.report            = true   
 }
 
 profile host_report_large {
@@ -705,6 +721,7 @@ profile host_report_large {
   key.NODENAME_WHEN_CHALKED.report               = true
   key.INJECTOR_CHALK_ID.report                   = true
   key.INJECTOR_VERSION.report                    = true
+  key.INJECTOR_PUBLIC_KEY.report                 = true  
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
   key.INJECTOR_ARGV.report                       = true
@@ -780,8 +797,6 @@ profile host_report_large {
   key._OP_ARP_TABLE.report                       = true
   key._OP_CPU_INFO.report                        = true
   key._OP_ALL_PS_INFO.report                     = true
-  key._REPO_HOST.report                          = true
-  key._REPO_PORT.report                          = true
 }
 
 profile host_report_default {
@@ -812,6 +827,7 @@ It reports all PS info, but only if definitely running in a container.
   key.NODENAME_WHEN_CHALKED.report               = true
   key.INJECTOR_CHALK_ID.report                   = true
   key.INJECTOR_VERSION.report                    = true
+  key.INJECTOR_PUBLIC_KEY.report                 = true  
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
   key.INJECTOR_ARGV.report                       = true
@@ -877,8 +893,6 @@ It reports all PS info, but only if definitely running in a container.
   key._OP_NODENAME.report                        = true
   key._OP_CLOUD_METADATA.report                  = true
   key._OP_ERRORS.report                          = true
-  key._REPO_HOST.report                          = true
-  key._REPO_PORT.report                          = true
 }
 
 profile host_report_minimal {
@@ -896,8 +910,21 @@ profile host_report_minimal {
   key._OP_HOSTINFO.report                        = true
   key._OP_NODENAME.report                        = true
   key._OP_ERRORS.report                          = true
-  key._REPO_HOST.report                          = true
-  key._REPO_PORT.report                          = true
+}
+
+profile unknown_docker_report {
+  doc: """
+  This is for reporting only basic identifying and operational info.
+"""
+  key._OPERATION.report                          = true
+  key._ACTION_ID.report                          = true
+  key._DATETIME.report                           = true
+  key._ARGV.report                               = true
+  key._OP_CHALKER_COMMIT_ID.report               = true
+  key._OP_CHALKER_VERSION.report                 = true
+  key._OP_PLATFORM.report                        = true
+  key._OP_HOSTINFO.report                        = true
+  key._OP_NODENAME.report                        = true
 }
 
 profile push_report_default {
@@ -911,8 +938,11 @@ You can certainly collect a lot more data here, but we expect it
 should usually be redundant w/ the info you collected during a build.
 """
   ~key._CURRENT_HASH.report                      = true
+  key._STORE_URI.report                          = true    
   key._REPO_TAGS.report                          = true
   ~key._REPO_DIGESTS.report                      = true
+  key.INJECTOR_PUBLIC_KEY.report                 = true
+  key.CHALK_ID.report                            = true
 }
 
 profile audit_report {

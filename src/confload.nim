@@ -148,16 +148,16 @@ proc loadAllConfigs*() =
   doRun()
 
   stack.addConfLoad(ioConfName, toStream(ioConfig), notEvenDefaults).
-      addConfLoad(dockerConfName, toStream(dockerConfig), checkNone)
-
+        addConfLoad(attestConfName, toStream(attestConfig), checkNone)
   if chalkConfig.getLoadDefaultSigning():
     stack.addConfLoad(signConfName, toStream(signConfig), checkNone)
 
   let chalkOps = chalkConfig.getValidChalkCommandNames()
   if commandName in chalkOps or (commandName == "not_supplied" and
     chalkConfig.defaultCommand.getOrElse("") in chalkOps):
-    stack.addConfLoad(sbomConfName, toStream(sbomConfig), checkNone)
-    stack.addConfLoad(sastConfName, toStream(sastConfig), checkNone)
+    stack.addConfLoad(sbomConfName,   toStream(sbomConfig),   checkNone)
+    stack.addConfLoad(sastConfName,   toStream(sastConfig),   checkNone)
+
 
   stack.addCallback(loadLocalStructs)
   doRun()

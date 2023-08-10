@@ -80,7 +80,9 @@ def _build_and_chalk_dockerfile(
             assert (
                 docker_run.returncode == 1
             ), "docker build should not have succeeded on invalid dockerfile"
-            assert chalk_run is None
+            assert (
+                chalk_run.returncode == 1
+            ), "chalk docker build should not have succeeded on invalid dockerfile"
         return chalk_run
     except Exception as e:
         logger.error("docker build / chalk build failed unexpectedly", error=e)

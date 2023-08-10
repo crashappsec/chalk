@@ -18,7 +18,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
 
-import std/tempfiles, config, sinks
+import std/tempfiles, config, sinks, util
 
 # These string constants are only used if there's a catastrophic
 # problem w/ the reporting cache; see `panicPublish` below.
@@ -71,7 +71,7 @@ template doPanicWrite(s: string) =
       try:
         echo(s)
       except:
-        quit(100)
+        quitChalk(100)
       # If this doesn't work, we just have to give up :(
 
 const quietTopics = ["chalk_usage_stats"]

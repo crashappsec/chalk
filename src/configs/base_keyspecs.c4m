@@ -207,6 +207,19 @@ keyspec INJECTOR_CHALK_ID {
     doc:              "chalk ID of the chalk binary"
 }
 
+keyspec INJECTOR_PUBLIC_KEY {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.0"
+    doc:              """
+The public key stored within the injecting Chalk binary, as generated
+by `chalk setup`. This key is configured to go into a Chalk mark
+whenever you intend to sign software.  It can be added even if you're
+not signing, however.
+"""
+}
+
 keyspec INJECTOR_VERSION {
     kind:             ChalkTimeHost
     type:             string
@@ -234,15 +247,13 @@ keyspec INJECTOR_COMMIT_ID {
     doc:              "The commit hash or id from which the injector was built."
 }
 
-cmdline_args := argv()
-
 keyspec INJECTOR_ARGV {
     kind:             ChalkTimeHost
     type:             list[string]
     standard:         true
     system:           true
     conf_as_system:   true    
-    ~value:           cmdline_args
+    ~callback:        func get_args
     since:            "0.1.0"
     doc:              "The full contents of argv used on invocation"
 }
@@ -625,25 +636,19 @@ A more readable unique identifier for all metadata.
 """    
 }
 
-keyspec SIGN_PARAMS {
+keyspec SIGNATURE {
     kind:             ChalkTimeArtifact
+    never_early:      true
     type:             dict[string, string]
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: high() - 100
-    doc:              "Signing parameters for digital signatures."
-}
-
-keyspec SIGNATURE {
-    kind:             ChalkTimeArtifact
-    never_early:      true
-    type:             string
-    standard:         true
-    system:           true
-    since:            "0.1.0"
     normalized_order: high()
-    doc:              "Embedded digital signature for artifact"
+    doc:              """
+Embedded digital signature for artifact. Note that this is only
+supported for file system artifacts; containers and images use
+detached signatures only.
+"""
 }
 
 keyspec DOCKER_FILE {
@@ -786,17 +791,39 @@ keyspec _CURRENT_HASH {
                       "the hash calculated on the object in its current state."
 }
 
-
-# This must be skipped under any insertion context.
-keyspec _VALIDATED {
+keyspec _INVALID_SIGNATURE {
     kind:             RunTimeArtifact
     type:             bool
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "Hash of artifact after a chalk operation. This is not " +
-                      "written into the artifact, but is meant to be provided " +
-		      "to wherever the chalk operation is logged."
+    doc:              """
+True if a signature was found in an artifact, but it did not properly
+validate. If no signature is found, or if there is a technical reason
+validation failed, this key is not set.
+
+That is, it will never have the value of `false`.
+"""
+}
+
+keyspec _VALIDATED_SIGNATURE {
+    kind:             RunTimeArtifact
+    type:             bool
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              """
+This is set to true if a signature is both present and validated in
+an artifact.
+
+If, for some reason, there is a signature but we could not validate
+(e.g., the public key is not available), then this will be set to
+`false`.
+
+However, this doesn't indicate tampering; in the case of a failed
+validation, this key is omitted, and `_INVALID_SIGNATURE` will be
+`true`.
+"""
 }
 
 keyspec _VIRTUAL {
@@ -1258,7 +1285,7 @@ keyspec _IMAGE_ENV {
 
 keyspec _IMAGE_CMD {
     kind: RunTimeArtifact
-    type: string
+    type: list[string]
     standard: true
     doc: """
 """
@@ -1322,7 +1349,7 @@ keyspec _IMAGE_HEALTHCHECK_RETRIES {
 
 keyspec _IMAGE_MOUNTS {
     kind: RunTimeArtifact
-    type: list[dict[string, `x]]
+    type: dict[string, `x]
     standard: true
     doc: """
 """
@@ -1338,7 +1365,7 @@ keyspec _IMAGE_WORKINGDIR {
 
 keyspec _IMAGE_ENTRYPOINT {
     kind: RunTimeArtifact
-    type: string
+    type: list[string]
     standard: true
     doc: """
 """
@@ -1423,6 +1450,20 @@ keyspec _IMAGE_STORAGE_METADATA {
     doc: """
 """    
 }
+
+
+keyspec _STORE_URI {
+    kind:                RunTimeArtifact
+    type:                string
+    standard:            true
+    since:               "0.1.0"
+    apply_substitutions: true
+    doc:                 """
+URI where an artifact is none to have been stored, generally as a part of the
+current operation.
+"""
+}
+
 
 keyspec _INSTANCE_CONTAINER_ID {
     kind:             RunTimeArtifact
@@ -2069,12 +2110,12 @@ Mounts associated with the running container.
 }
 
 
-keyspec _INSTANCE_HOSTNAMES {
+keyspec _INSTANCE_HOSTNAME {
     kind: RunTimeArtifact
-    type: list[string]
+    type: string
     standard: true
     doc: """
-The hostnames of the instance, if reported by the container runtime.
+The hostname of the instance, if reported by the container runtime.
  """
 }
 
@@ -2370,6 +2411,32 @@ These values will not have been validated.
 """    
 }
 
+keyspec _SIGNATURE {
+    kind:             RunTimeArtifact
+    type:             dict[string, string]
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              """
+Digital signature for artifact.  For build/push operations, this will
+generally represent the digital signature added as part of the
+operation. For extraction operations, it represents a *validated*
+extracted signature.
+"""
+}
+
+keyspec _INVALID_SIGNATURE {
+    kind:             RunTimeArtifact
+    type:             bool
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              """
+Set to true (and is only set) if there was an attestation that
+explicitly did not validate.
+"""
+}
+
 keyspec _ACTION_ID {
     kind:             RunTimeHost
     type:             string
@@ -2388,7 +2455,7 @@ keyspec _ARGV {
     standard:         true
     system:           true
     conf_as_system:   true        
-    ~value:           cmdline_args
+    ~callback:        func get_args
     since:            "0.1.0"
     doc:              "The full contents of argv used on invocation"
 }
@@ -2894,28 +2961,6 @@ When running Chalk inside a container, this information will be the virtualized 
 """
 }
 
-keyspec _REPO_HOST {
-    kind:             RunTimeHost
-    type:             string
-    standard:         true
-    since:            "0.1.0"
-    doc: """
-When reporting on operations involving a repository (e.g., a push or pull), the
- host name of the associated repository.
-"""
-}
-
-keyspec _REPO_PORT {
-    kind:             RunTimeHost
-    type:             int
-    standard:         true
-    since:            "0.1.0"
-    doc: """
-When reporting on operations involving a repository (e.g., a push or pull), the
-port number of the associated repository.
-"""
-}
-
 keyspec $CHALK_CONFIG {
     required_in_self_mark: true
     kind:                  ChalkTimeArtifact
@@ -2941,8 +2986,69 @@ Added to chalk binaries to indicate the implementation of Chalk in use.
 """
 }
 
+keyspec $CHALK_LOAD_COUNT {
+   required_in_self_mark:  true
+   kind:                   ChalkTimeArtifact
+   type:                   string
+   standard:               true
+   system:                 true
+   since:                  "0.1.0"
+   doc:                    """
+Count how many times the self-mark has been rewritten.   
+"""
+}
+
+keyspec $CHALK_PUBLIC_KEY {
+   required_in_self_mark:  true
+   kind:                   ChalkTimeArtifact
+   type:                   string
+   standard:               true
+   system:                 true
+   since:                  "0.1.0"
+   doc:                    """
+Used for attestations.   
+"""
+}
+
+keyspec $CHALK_ENCRYPTED_PRIVATE_KEY {
+   required_in_self_mark:  true
+   kind:                   ChalkTimeArtifact
+   type:                   string
+   standard:               true
+   system:                 true
+   since:                  "0.1.0"
+   doc:                    """
+Also necessary for attestations.
+"""
+}
+
+keyspec $CHALK_ATTESTATION_TOKEN {
+   required_in_self_mark:  true
+   kind:                   ChalkTimeArtifact
+   type:                   string
+   standard:               true
+   system:                 true
+   since:                  "0.1.0"
+   doc:                    """
+...   
+"""
+}
+
+keyspec $CHALK_SECRET_ENDPOINT_URI {
+   required_in_self_mark:  true
+   kind:                   ChalkTimeArtifact
+   type:                   string
+   standard:               true
+   system:                 true
+   since:                  "0.1.0"
+   doc:                    """
+...
+"""
+}
+
 # Used in a keyspec above.
 func call_rand(key) { return $(lower(hex(rand())));  }
+func get_args(key) { return argv(); }
 
 default_command = "help"
 

@@ -92,7 +92,7 @@ plugin docker {
         "_INSTANCE_CPU_PERCENT", "_INSTANCE_IO_MAX_IOPS",
         "_INSTANCE_IO_MAX_BPS", "_INSTANCE_MASKED_PATHS",
         "_INSTANCE_READONLY_PATHS", "_INSTANCE_STORAGE_METADATA",
-        "_INSTANCE_MOUNTS", "_INSTANCE_HOSTNAMES", "_INSTANCE_DOMAINNAME",
+        "_INSTANCE_MOUNTS", "_INSTANCE_HOSTNAME", "_INSTANCE_DOMAINNAME",
         "_INSTANCE_USER", "_INSTANCE_ATTACH_STDIN", "_INSTANCE_ATTACH_STDOUT",
         "_INSTANCE_ATTACH_STDERR", "_INSTANCE_EXPOSED_PORTS",
         "_INSTANCE_HAS_TTY", "_INSTANCE_OPEN_STDIN", "_INSTANCE_STDIN_ONCE",
@@ -107,7 +107,7 @@ plugin docker {
         "_INSTANCE_GLOBAL_IPV6_PREFIX_LEN", "_INSTANCE_IP",
         "_INSTANCE_IP_PREFIX_LEN", "_INSTANCE_IPV6_GATEWAY",
         "_INSTANCE_MAC", "_INSTANCE_NETWORKS",  "_OP_ALL_CONTAINER_METADATA",
-        "_OP_ALL_IMAGE_METADATA"
+        "_OP_ALL_IMAGE_METADATA", "_STORE_URI"
     ]
 }
 
@@ -219,12 +219,13 @@ plugin system {
                      "INJECTOR_COMMIT_ID", "DATE_CHALKED",
                      "TZ_OFFSET_WHEN_CHALKED", "DATETIME_WHEN_CHALKED",
                      "INJECTOR_ENV", "HOSTINFO_WHEN_CHALKED",
-                      "NODENAME_WHEN_CHALKED", "PLATFORM_WHEN_CHALKED"]
+                      "NODENAME_WHEN_CHALKED", "PLATFORM_WHEN_CHALKED",
+                      "INJECTOR_PUBLIC_KEY"]
                      
   artifact_keys:   ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
                     "TIMESTAMP_WHEN_CHALKED"]
                     
-  post_chalk_keys: ["_VALIDATED", "_OP_ARTIFACT_PATH", "_CURRENT_HASH",
+  post_chalk_keys: ["_OP_ARTIFACT_PATH", "_CURRENT_HASH",
                     "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS", "_VIRTUAL"]
                     
   post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
@@ -251,8 +252,7 @@ plugin system {
 # The priority field is set to high(int64).
 
 plugin metsys {
-    artifact_keys: ["METADATA_HASH", "SIGNATURE", "SIGN_PARAMS", "ERR_INFO",
-                    "METADATA_ID", "$CHALK_CONFIG"]
+    artifact_keys: ["METADATA_HASH", "SIGNATURE", "ERR_INFO", "METADATA_ID"]
     ~priority:     high()
 }
 

@@ -32,8 +32,11 @@ proc getSelfExtraction*(): Option[ChalkObj] =
 
     for codec in getCodecs():
       if hostOS notin codec.getNativeObjPlatforms(): continue
-      (ignore, chalks)  = codec.findChalk(myPath, exclusions, @[], false)
-      selfChalk         = chalks[0]
+      for item in artifacts(myPath, false):
+        selfChalk = item
+        break
+      if selfChalk == nil:
+        return none(ChalkObj)
       if selfChalk.extract == nil:
         selfChalk.marked = false
         selfChalk.extract = ChalkDict()
@@ -45,3 +48,10 @@ proc getSelfExtraction*(): Option[ChalkObj] =
 
   if selfChalk != nil: return some(selfChalk)
   else:                return none(ChalkObj)
+
+template selfChalkGetKey*(keyName: string): Option[Box] =
+  if selfChalk == nil or selfChalk.extract == nil or
+     keyName notin selfChalk.extract:
+    none(Box)
+  else:
+    some(selfChalk.extract[keyName])

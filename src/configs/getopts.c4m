@@ -212,32 +212,25 @@ This command looks for existing chalk marks in artifacts, and reports on what it
       field_to_set: "recursive"
     }
 
-    flag_yn containers {
-    doc: """
-Scan running continers for chalk.
-"""
-    field_to_set: "extract.extract_from_containers"
-    }
-
-    flag_yn images {
-    doc: """
-Scan local images for chalk.
-"""
-    field_to_set: "extract.extract_from_images"
-    }
-
-    flag_yn fs_scan {
-    doc: """
-True if omitting args should still do a file system scan.    
-"""
-    field_to_set: "extract.empty_args_means_fs_scan"
-    }
-
     flag_yn search_layers {
       doc: """
 When a mark in an image can't be found, should we try to report on overwitten marks?      
 """
       field_to_set: "extract.search_base_layers_for_marks"
+    }
+
+    command images {
+      aliases: ["image", "img", "i"]
+    }
+
+    command containers {
+      aliases: ["container", "con", "c"]
+    }
+
+    command all {
+      aliases:  ["a"]
+      args:     (0, high())
+      callback: func set_artifact_search_path(list[string])
     }
 }
 
@@ -427,6 +420,12 @@ Chalk a container operation.  This always transparently calls docker, as long as
 Currently, Chalk only collects metadata for 'docker' and 'push' commands.
 
 All arguments appearing after the word 'docker' are passed to docker.  No flags to chalk can appear after the command.
+"""
+  }
+
+  command setup {
+    doc: """
+Set up code signing / attestation.
 """
   }
 
@@ -861,16 +860,6 @@ func set_artifact_search_path(args: list[string]) {
     return
   }
 
-  path := []
-  for i from 0 to len(args) {
-    resolved := resolve_path(args[i])
-    path := array_add(path, [resolved])
-  }
-
-  add_override("artifact_search_path", path)
-}
-
-func set_docker_image_list(args: list[string]) {
   add_override("artifact_search_path", args)
 }
 

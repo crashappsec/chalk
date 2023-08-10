@@ -219,7 +219,7 @@ proc liftUniformKeys() =
     liftableKeys.add(key)
     hostInfo[key] = box.get()
 
-proc doReporting*(topic="report") =
+proc doReporting*(topic="report") {.exportc,cdecl.} =
   if inSubscan():
     let ctx = getCurrentCollectionCtx()
     liftUniformKeys()

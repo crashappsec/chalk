@@ -4,8 +4,8 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
 
-import zippy/ziparchives_v1, nimSHA2, algorithm, std/tempfiles,
-       ../config, ../chalkjson, ../util, ../subscan
+import zippy/ziparchives_v1, nimSHA2, algorithm, ../config, ../chalkjson,
+       ../util, ../subscan
 
 const zipChalkFile = "chalk.json"
 
@@ -23,13 +23,6 @@ type
 let
   zipCodec      = CodecZip()
   zipItemPlugin = PluginZippedItem()
-
-method cleanup*(self: CodecZip, obj: ChalkObj) =
-  let cache = ZipCache(obj.cache)
-
-  if cache.tmpDir != "":
-    removeDir(cache.tmpDir)
-
 
 
 template pushZipDir(s: string)   = zipItemPlugin.zipDirs.add(s)
@@ -78,7 +71,7 @@ method scan*(self:   CodecZip,
     return none(ChalkObj)
 
   let
-    tmpDir   = createTempDir(tmpFilePrefix, tmpFileSuffix)
+    tmpDir   = getNewTempDir()
     cache    = ZipCache()
     origD    = tmpDir.joinPath("contents")
     hashD    = tmpDir.joinPath("hash")

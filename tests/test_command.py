@@ -187,43 +187,7 @@ def test_insert_extract_delete(tmp_data_dir: Path, chalk: Chalk):
 
 
 # test basic config commands:
-# dump, load
-def test_dump_load(tmp_data_dir: Path, chalk: Chalk):
-    validation_string = "TEST ERROR HERE XXXXXX"
-    # output for updated config
-    tmp_conf = tmp_data_dir / "testconf.conf"
-    # copy chalk binary over to temp file since we are overwriting
-    chalk_path = Path(__file__).parent.parent / "chalk"
-    shutil.copy(chalk_path, tmp_data_dir)
-    chalk = Chalk(binary=(tmp_data_dir / "chalk").resolve())
-
-    # dump config to file
-    dump_output = chalk.run(chalk_cmd="dump", params=[str(tmp_conf)])
-    assert dump_output.returncode == 0
-
-    # edit file (add an error output)
-    assert tmp_conf.exists(), "testconf.conf not created"
-    assert tmp_conf.is_file(), "testconf.conf must be a file and is not"
-    with open(tmp_conf, "w+") as file:
-        file_text = file.read()
-        file_text = f'error("{validation_string}")' + file_text
-        file.write(file_text)
-
-    # load updated config and check that chalk binary was created
-    load_output = chalk.run(chalk_cmd="load", params=[str(tmp_conf)])
-    assert load_output.returncode == 0
-    dir_obj = os.listdir(tmp_data_dir)
-    assert "chalk" in dir_obj
-
-    # run new chalk and check for error in log output
-    chalk = Chalk(binary=(tmp_data_dir / "chalk").resolve())
-    extract_output = chalk.run(chalk_cmd="extract", params=["."])
-    assert extract_output.returncode == 0
-    error_output = extract_output.stderr.decode()
-    assert validation_string in error_output
-
-    return
-
+# dump + load tested in test_config.py
 
 # docker commands are not tested here but as part of the docker codec tests
 

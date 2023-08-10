@@ -340,10 +340,9 @@ method scan*(self:   Codec,
 
 method keepScanningOnSuccess*(self: Codec): bool {.base.} = true
 
-proc scanLocation(self:       Codec,
-                  loc:        string,
-                  exclusions: var seq[string]): Option[ChalkObj] =
-  # Helper function for the default method scanArtifactLocations below.
+proc scanLocation(self: Codec, loc: string, state: ArtifactIterationInfo):
+                 Option[ChalkObj] =
+  # Helper function for scanArtifactLocations below.
   var stream = newFileStream(loc, fmRead)
   if stream == nil:
     error(loc & ": could not open file.")
@@ -354,7 +353,7 @@ proc scanLocation(self:       Codec,
   if result.isNone():
     stream.close()
     return
-  exclusions.add(loc)
+  state.fileExclusions.add(loc)
   var chalk = result.get()
 
   if bumpFdCount():
@@ -368,54 +367,47 @@ proc mustIgnore(path: string, globs: seq[glob.Glob]): bool {.inline.} =
     if path.matches(item): return true
   return false
 
-method scanArtifactLocations*(self:       Codec,
-                              exclusions: var seq[string],
-                              ignoreList: seq[glob.Glob],
-                              recurse:    bool): seq[ChalkObj] {.base.} =
-  # If you want a simpler interface, this will call scan()
-  # with a file stream, and you pass back a Chalk object if chalk is
-  # there.  Otherwise, you can overload this if you want to skip
-  # the file system walk.
+proc scanArtifactLocations*(self: Codec, state: ArtifactIterationInfo):
+                        seq[ChalkObj] =
+  # This will call scan() with a file stream, and you pass back a
+  # Chalk object if chalk is there.
   result = @[]
 
-  for path in self.searchPath:
+  for path in state.filePaths:
     trace("Codec " & self.name & ": beginning scan of " & path)
     var info: FileInfo
     try:
       info = getFileInfo(path)
     except:
-      error("In codec '" & self.name & "': " & path &
-            ": No such file or directory")
-      dumpExOnDebug()
       continue
 
     if info.kind == pcFile:
-      if path in exclusions:          continue
-      if path.mustIgnore(ignoreList): continue
+      if path in state.fileExclusions: continue
+      if path.mustIgnore(state.skips): continue
       trace(path & ": scanning file")
-      let opt = self.scanLocation(path, exclusions)
+      let opt = self.scanLocation(path, state)
       if opt.isSome():
         result.add(opt.get())
         opt.get().yieldFileStream()
     elif info.kind == pcLinkToFile:
       discard # We ignore symbolic links for now.
-    elif recurse:
+    elif state.recurse:
       dirWalk(true):
-        if item in exclusions:               continue
-        if item.mustIgnore(ignoreList):      continue
+        if item in state.fileExclusions:     continue
+        if item.mustIgnore(state.skips):     continue
         if getFileInfo(item).kind != pcFile: continue
         trace(item & ": scanning file")
-        let opt = self.scanLocation(item, exclusions)
+        let opt = self.scanLocation(item, state)
         if opt.isSome():
           result.add(opt.get())
           opt.get().yieldFileStream()
     else:
       dirWalk(false):
-        if item in exclusions:               continue
-        if item.mustIgnore(ignoreList):      continue
+        if item in state.fileExclusions:     continue
+        if item.mustIgnore(state.skips):     continue
         if getFileInfo(item).kind != pcFile: continue
         trace("Non-recursive dir walk examining: " & item)
-        let opt = self.scanLocation(item, exclusions)
+        let opt = self.scanLocation(item, state)
         if opt.isSome():
           result.add(opt.get())
           opt.get().yieldFileStream()
@@ -474,8 +466,6 @@ method getRunTimeArtifactInfo*(self: Codec, chalk: ChalkObj, ins: bool):
 
   if postHashOpt.isSome():
     result["_CURRENT_HASH"] = pack(postHashOpt.get())
-
-method cleanup*(self: Codec, chalk: ChalkObj) {.base.} = discard
 
 ## Codecs override this if they're for a binary format and can self-inject.
 method getNativeObjPlatforms*(s: Codec): seq[string] {.base.} = @[]

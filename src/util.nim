@@ -3,7 +3,62 @@
 ##
 ## :Author: John Viega :Copyright: 2023, Crash Override, Inc.
 
-import  std/tempfiles, posix, posix_utils, config, subscan
+import  std/tempfiles, osproc, posix, posix_utils, config, subscan
+
+var
+  tmpDirs:  seq[string] = @[]
+  tmpFiles: seq[string] = @[]
+  exitCode              = 0
+
+template cleanTempFiles() =
+  for dir in tmpDirs:
+    try:
+      trace("Removing tmp directory: " & dir)
+      removeDir(dir)
+    except:
+      dumpExOnDebug()
+      warn("Could not remove directory: " & dir)
+  for file in tmpFiles:
+    try:
+      trace("Removing tmp file: " & file)
+      removeFile(file)
+    except:
+      dumpExOnDebug()
+      warn("Could not remove tmp file: " & file)
+
+proc quitChalk*(errCode = exitCode) {.noreturn.} =
+  if chalkConfig.getChalkDebug():
+    if len(tmpDirs) != 0 or len(tmpFiles) != 0:
+      error("Skipping cleanup; moving the following to ./chalk-tmp:")
+      createDir("chalk-tmp")
+      for item in tmpDirs & tmpFiles:
+        let baseName = splitPath(item).tail
+        error(item)
+        if fileExists(item):
+          moveFile(item, "chalk-tmp/" & baseName)
+        else:
+          moveDir(item, "chalk-tmp/" & baseName)
+  else:
+    cleanTempFiles()
+  quit(errcode)
+
+proc setExitCode*(code: int) =
+  exitCode = code
+
+proc getNewTempDir*(): string =
+  result = createTempDir(tmpFilePrefix, tmpFileSuffix)
+  tmpDirs.add(result)
+
+proc getNewTempFile*(prefix = tmpFilePrefix, suffix = tmpFileSuffix,
+                     autoDelete = true): (FileStream, string) =
+  var (f, path) = createTempFile(prefix, suffix)
+  if autoDelete:
+    tmpFiles.add(path)
+
+  result = (newFileStream(f), path)
+
+proc registerTempFile*(path: string) =
+  tmpFiles.add(path)
 
 proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
 
@@ -104,7 +159,7 @@ proc isExecutable*(path: string): bool =
 
 proc findAllExePaths*(cmdName:    string,
                       extraPaths: seq[string] = @[],
-                       usePath                = true): seq[string] =
+                      usePath                 = true): seq[string] =
   ##
   ## The priority here is to the passed command name, but if and only
   ## if it is a path; we're assuming that they want to try to run
@@ -136,15 +191,16 @@ proc findAllExePaths*(cmdName:    string,
     targetName = tup.tail
     allPaths   = @[tup.head] & allPaths
 
-  for path in allPaths:
+  for item in allPaths:
+    let path = resolvePath(item)
     if me == targetName and path == mydir: continue # Don't ever find ourself.
-    let potential = joinpath(path, targetName)
+    let potential = joinPath(path, targetName)
     if potential.isExecutable():
       result.add(potential)
 
 proc findExePath*(cmdName:    string,
                   extraPaths: seq[string] = @[],
-                  usePath = true,
+                  usePath         = true,
                   ignoreChalkExes = false): Option[string] =
   var foundExes = findAllExePaths(cmdName, extraPaths, usePath)
 
@@ -183,7 +239,7 @@ proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
       error("Chalk: when execing '" & path & "': " & $(strerror(errno)))
 
   error("Chalk: exec could not find a working executable to run.")
-  quit(1)
+  quitChalk(1)
 
 var numCachedFds = 0
 
@@ -247,3 +303,144 @@ proc closeFileStream*(chalk: ChalkObj) =
 
 proc yieldFileStream*(chalk: ChalkObj) =
   if numCachedFds == chalkConfig.getCacheFdLimit(): chalk.closeFileStream()
+
+{.emit: """
+#include <unistd.h>
+
+int c_replace_stdin_with_pipe() {
+  int filedes[2];
+
+  pipe(filedes);
+  dup2(filedes, 0);
+  return filedes[1];
+}
+
+int c_write_to_pipe(int fd, char *s, int len) {
+  return write(fd, s, len);
+}
+""".}
+
+proc cReplaceStdinWithPipe*(): cint {.importc: "c_replace_stdin_with_pipe".}
+proc cWriteToPipe*(fd: cint, s: cstring, l: cint):
+                 cint {.importc: "c_write_to_pipe".}
+
+proc runWithNewStdin*(exe:      string,
+                      args:     seq[string],
+                      contents: string): int {.discardable.} =
+  let
+    fd   = cReplaceStdinWithPipe()
+    subp = startProcess(exe,
+                        args = args,
+                        options = {poParentStreams})
+
+  discard cWriteToPipe(fd, cstring(contents), cint(len(contents) + 1))
+  let code = subp.waitForExit()
+  subp.close()
+
+  result = int(code)
+
+
+template runCmdGetOutput*(exe: string, args: seq[string]): string =
+  execProcess(exe, args = args, options = {})
+
+type ExecOutput* = object
+    stdout*:   string
+    stderr*:   string
+    exitCode*: int
+
+proc readAllFromFd(fd: cint): string =
+  var
+    buf: array[0 .. 1024, char]
+
+  while true:
+    let n = read(fd, addr buf, 1024)
+    if n <= 0: break
+    var i: int = 0
+    while i < n:
+      let c = char(buf[i])
+      result.add(c)
+      i += 1
+
+proc runCmdGetEverything*(exe: string, args: seq[string]): ExecOutput =
+  var
+    stdOutPipe: array[0 .. 1, cint]
+    stdErrPipe: array[0 .. 1, cint]
+
+  trace("Running: " & exe & " " & args.join(" "))
+
+  discard pipe(stdOutPipe)
+  discard pipe(stdErrPipe)
+
+  let pid = fork()
+  if pid != 0:
+    discard close(stdOutPipe[1])
+    discard close(stdErrPipe[1])
+    var stat_ptr: cint
+    discard waitpid(pid, stat_ptr, 0)
+    result.exitCode = int(WEXITSTATUS(stat_ptr))
+    result.stdout   = readAllFromFd(stdOutPipe[0])
+    result.stderr   = readAllFromFd(stdErrPipe[0])
+    discard close(stdOutPipe[0])
+    discard close(stdErrPipe[0])
+
+  else:
+    let cargs = allocCStringArray(@[exe] & args)
+    discard close(stdOutPipe[0])
+    discard close(stdErrPipe[0])
+    discard dup2(stdOutPipe[1], 1)
+    discard dup2(stdErrPipe[1], 2)
+    discard execv(cstring(exe), cargs)
+
+  if chalkConfig.getChalkDebug():
+    trace("command returned error code: " & $result.exitCode)
+    trace("stderr = " & result.stderr)
+    trace("stdout = " & result.stdout)
+
+
+template getStdout*(o: ExecOutput): string = o.stdout
+template getStderr*(o: ExecOutput): string = o.stderr
+template getExit*(o: ExecOutput): int      = o.exitCode
+
+
+# I'd rather these live in docker_base.nim, but it'd be more work than
+# it's worth to make that happen.
+proc runWrappedDocker*(args: seq[string], df: string): int {.discardable.} =
+  trace("Running docker w/ stdin dockerfile by calling: " & dockerExeLocation &
+    " " & args.join(" "))
+
+  let code = runWithNewStdin(dockerExeLocation, args, df)
+
+  if code != 0:
+    trace("Docker exited with code: " & $(code))
+
+proc runDocker*(args: seq[string]): int {.discardable.} =
+  trace("Running: " & dockerExeLocation & " " & args.join(" "))
+  let
+    subp = startProcess(dockerExeLocation,
+                        args = args,
+                        options = {poParentStreams})
+
+  result = subp.waitForExit()
+
+  subp.close()
+
+  if result != 0:
+    trace("Docker exited with code: " & $(result))
+
+template runWrappedDocker*(info: DockerInvocation): int =
+  let res = runDocker(info.newCmdLine)
+  if res != 0:
+    error("Wrapped docker call failed; reverting to original docker cmd")
+    raise newException(ValueError, "doh")
+  res
+
+proc doReporting*(topic: string){.importc.}
+
+proc dockerFailsafe*(info: DockerInvocation) {.noreturn.} =
+  var exitCode: int
+  if info.dockerFileLoc == ":stdin:":
+    exitCode = runWrappedDocker(info.originalArgs, info.inDockerFile)
+  else:
+    exitCode = runDocker(info.originalArgs)
+  doReporting("fail")
+  quitChalk(exitCode)

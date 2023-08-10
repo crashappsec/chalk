@@ -1,10 +1,14 @@
 ## :Author: John Viega, Brandon Edwards
 ## :Copyright: 2023, Crash Override, Inc.
 
-import osproc,  glob, std/tempfiles, ../config, ../docker_base, ../chalkjson
+import osproc, glob, ../config, ../docker_base, ../chalkjson, ../util,
+       ../attestation
 
-type
-  CodecDocker* = ref object of Codec
+type CodecDocker* = ref object of Codec
+
+const
+  markFile     = "chalk.json"
+  markLocation = "/chalk.json"
 
 method keepScanningOnSuccess*(self: CodecDocker): bool = true
 
@@ -17,23 +21,17 @@ method getChalkId*(self: CodecDocker, chalk: ChalkObj): string =
   for ch in b: preRes.add(ch)
   return preRes.idFormat()
 
-
-template extractFinish() =
+template extractFinish(res: bool = false) =
   setCurrentDir(cwd)
-  try:
-    removeDir(dir)
-  except:
-    dumpExOnDebug()
   return
 
-proc extractImageMark(imageId: string, loc: string, chalk: ChalkObj) =
-  # Need to integrate Theo's attestation bits here, but here's the
-  # fallback option.  For now, if a manifest is a multi-arch image, we
-  # still just look at the first item, rather than treating each as
-  # a separate image.
+proc extractImageMark(chalk: ChalkObj): ChalkDict =
+  result = ChalkDict(nil)
+
   let
-    cwd  = getCurrentDir()
-    dir  = createTempDir("docker_image_", "_extract")
+    imageId = chalk.imageId
+    cwd     = getCurrentDir()
+    dir     = getNewTempDir()
 
   try:
     setCurrentDir(dir)
@@ -46,7 +44,7 @@ proc extractImageMark(imageId: string, loc: string, chalk: ChalkObj) =
       extractFinish()
 
     let
-      file   = newFileStream("manifest.json")
+      file = newFileStream("manifest.json")
 
     if file == nil:
       error("Image " & imageId & ": could not extract manifest (permissions?)")
@@ -64,17 +62,20 @@ proc extractImageMark(imageId: string, loc: string, chalk: ChalkObj) =
 
     if execCmd("tar -xf " & layers[^1].getStr() &
       " chalk.json 2>/dev/null") == 0:
-      let file = newFileStream("chalk.json")
+      let file = newFileStream(markFile)
 
       if file == nil:
         error("Image " & imageId & " has a chalk file but we can't read it?")
         extractFinish()
-      chalk.extract = extractOneChalkJson(file, imageId)
-      chalk.marked  = true
-      file.close()
-      trace("Image " & imageId & ": chalk mark extracted")
-      extractFinish()
 
+      chalk.cachedMark = file.readAll()
+      file.close()
+
+      let mark = newStringStream(chalk.cachedMark)
+      result   = extractOneChalkJson(mark, imageId)
+
+      mark.close()
+      extractFinish(true)
     else:
       warn("Image " & imageId & " has no chalk mark in the top layer.")
       if not chalkConfig.extractConfig.getSearchBaseLayersForMarks():
@@ -109,86 +110,101 @@ proc extractImageMark(imageId: string, loc: string, chalk: ChalkObj) =
     trace(imageId & ": Could not complete mark extraction")
     extractFinish()
 
-proc extractContainerMark(cid: string, loc: string, chalk: ChalkObj) =
-  try:
-    let rawmark = runDockerGetOutput(@["cp", cid & ":" & loc, "-"])
+proc extractMarkFromStdin(s: string): string =
+  var raw = s
 
-    if rawmark.contains("No such container"):
-      error("Container " & cid & " shut down before mark extraction")
-    elif rawmark.contains("Cout not find the file"):
-      warn("Container " & cid & " is unmarked.")
-    else:
-      chalk.extract = extractOneChalkJson(newStringStream(rawmark), cid)
-      chalk.marked  = true
-      trace("Container " & cid & ": chalk mark extracted")
+  while true:
+    let ix = raw.find('{')
+    if ix == -1:
+      return ""
+    raw = raw[ix .. ^1]
+    if raw[1 .. ^1].strip().startswith("\"MAGIC\""):
+      return raw
+
+proc extractContainerMark(chalk: ChalkObj): ChalkDict =
+  result = ChalkDict(nil)
+  let
+    cid = chalk.containerId
+
+  try:
+    let
+      procInfo = runDockerGetEverything(@["cp", cid & ":" & markLocation, "-"])
+      mark     = procInfo.getStdOut().extractMarkFromStdin()
+
+    if procInfo.getExit() != 0:
+      let err = procInfo.getStdErr()
+      if err.contains("No such container"):
+        error(chalk.name & ": container shut down before mark extraction")
+      elif err.contains("Could not find the file"):
+        warn(chalk.name & ": container is unmarked.")
+      else:
+        warn(chalk.name & ": container mark not retrieved: " & err)
+      return
+    result = extractOneChalkJson(newStringStream(mark), cid)
   except:
     dumpExOnDebug()
-    error("Got error when extracting from container " & cid)
+    error(chalk.name & ": got error when extracting from container.")
 
-method scanArtifactLocations*(codec:      CodecDocker,
-                              exclusions: var seq[string],
-                              ignoreList: seq[glob.Glob],
-                              recurse:    bool) : seq[ChalkObj] =
+proc getImageChalks*(codec: Codec): seq[ChalkObj] {.exportc,cdecl.} =
+  try:
+    let
+      raw    = runDockerGetEverything(@["images", "--format", "json"])
+      stdout = raw.getStdout().strip()
 
-  if getCommandName() != "extract":
-    return
-
-  let
-    do_images      = chalkConfig.extractConfig.getExtractFromImages()
-    do_containers  = chalkConfig.extractConfig.getExtractFromContainers()
-    markLocation   = chalkConfig.dockerConfig.getChalkFileLocation()
-    reportUnmarked = chalkConfig.dockerConfig.getReportUnmarked()
-
-  if not do_images and not do_containers:
-    return
-
-  if do_images:
-    try:
-      let raw = runDockerGetOutput(@["images", "--format", "json"]).strip()
-
-      if raw == "":
-        trace("No local images.")
-      else:
-        for line in raw.split("\n"):
-          let
-            imageId = parseJson(line)["ID"].getStr()
-            chalk   = newChalk(name         = "image:" & imageId,
-                               codec        = codec,
-                               imageId      = imageId,
-                               extract      = ChalkDict(),
-                               resourceType = {ResourceImage})
-
-          if not isChalkingOp():
-            extractImageMark(chalk.imageId, markLocation, chalk)
-
-          result.add(chalk)
-    except:
-      dumpExOnDebug()
-      trace("No docker command found.")
-      return
-
-  if do_containers:
-    try:
-      let raw = runDockerGetOutput(@["ps", "--format", "json"]).strip()
-
-      if raw == "":
-        trace("No running containers.")
-        return
-      for line in raw.split("\n"):
+    if raw.getExit() != 0 or stdout == "":
+      trace("No local images.")
+    else:
+      for line in stdout.split("\n"):
         let
-          containerId = parseJson(line)["Id"].getStr()
-          chalk       = newChalk(name         = "container:" & containerId,
-                                 containerId  = containerId,
-                                 codec        = codec,
-                                 resourceType = {ResourceContainer})
-
-        if not isChalkingOp():
-          extractContainerMark(chalk.containerId, markLocation, chalk)
-
+          json    = parseJson(line)
+          imageId = json["ID"].getStr()
+          repo    = json["Repository"].getStr()
+          tag     = json["Tag"].getStr().replace("\u003cnone\u003e","").strip()
+          chalk   = newChalk(name         = imageId,
+                             codec        = codec,
+                             tag          = imageId,
+                             imageId      = imageId,
+                             extract      = ChalkDict(),
+                             resourceType = {ResourceImage})
+        chalk.tag = tag
+        trace("Got image with ID = " & imageId)
         result.add(chalk)
-    except:
-      dumpExOnDebug()
-      trace("Could not run docker.")
+  except:
+    dumpExOnDebug()
+    trace("No docker command found.")
+    return
+
+proc inspectContainer(chalk: ChalkObj) # Defined below.
+
+proc getContainerChalks*(codec: Codec): seq[ChalkObj] {.exportc,cdecl.} =
+  try:
+    let
+      raw    = runDockerGetEverything(@["ps", "--format", "json"])
+      stdout = raw.getStdout().strip()
+
+    if raw.getExit() != 0 or stdout == "":
+      trace("No running containers.")
+      return
+    for line in stdout.split("\n"):
+      let
+        containerId = parseJson(line)["ID"].getStr()
+        name        = parseJson(line)["Names"].getStr()
+        image       = parseJson(line)["Image"].getStr()
+        chalk       = newChalk(name         = name,
+                               tag          = name,
+                               containerId  = containerId,
+                               codec        = codec,
+                               resourceType = {ResourceContainer})
+
+      if chalk.name == "":
+        chalk.name = containerId
+
+      chalk.inspectContainer()
+
+      result.add(chalk)
+  except:
+    dumpExOnDebug()
+    trace("Could not run docker.")
 
 # These are the keys we can auto-convert without any special-casing.
 # Types of the JSon will be checked against the key's declared type.
@@ -319,7 +335,7 @@ let dockerContainerAutoMap = {
   "HostConfig.ReadonlyPaths":           "_INSTANCE_READONLY_PATHS",
   "GraphDriver":                        "_INSTANCE_STORAGE_METADATA",
   "Mounts":                             "_INSTANCE_MOUNTS",
-  "Config.Hostname":                    "_INSTANCE_HOSTNAMES",
+  "Config.Hostname":                    "_INSTANCE_HOSTNAME",
   "Config.Domainname":                  "_INSTANCE_DOMAINNAME",
   "Config.User":                        "_INSTANCE_USER",
   "Config.AttachStdin":                 "_INSTANCE_ATTACH_STDIN",
@@ -386,14 +402,12 @@ proc getBoxType(b: Box): Con4mType =
 proc checkAutoType(b: Box, t: Con4mType): bool =
   return not b.getBoxType().unify(t).isBottom()
 
-const hashHeader = "sha256:"
-
-template extractShaHashMap(value: Box): Box =
+template extractDockerHashMap(value: Box): Box =
   let list     = unpack[seq[string]](value)
   var outTable = OrderedTableRef[string, string]()
 
   for item in list:
-    let ix = item.find(hashHeader)
+    let ix = item.find(hashHeader) # defined in docker_base.nim
     if ix == -1:
       warn("Unrecognized item in _REPO_DIGEST array: " & item)
       continue
@@ -405,23 +419,12 @@ template extractShaHashMap(value: Box): Box =
 
   pack(outTable)
 
-template extractShaHash(value: Box): Box =
-  let asStr = unpack[string](value)
-
-  if not asStr.startsWith(hashHeader):
-    value
-  else:
-    pack[string](asStr[len(hashHeader) .. ^1])
-
-template extractShaHashList(value: Box): Box =
+template extractDockerHashList(value: Box): Box =
   let list    = unpack[seq[string]](value)
   var outList = seq[string](@[])
 
   for item in list:
-    if not item.startsWith(hashHeader):
-      outList.add(item)
-    else:
-      outList.add(item[len(hashHeader) .. ^1])
+    outList.add(item.extractDockerHash())
 
   pack[seq[string]](outList)
 
@@ -430,7 +433,8 @@ proc jsonOneAutoKey(node:        JsonNode,
                     dict:        ChalkDict,
                     reportEmpty: bool) =
 
-  if not chalkKey.isSubscribedKey():
+  # We need _REPO_DIGESTS for attestation even if it's not subscribed to.
+  if not chalkKey.isSubscribedKey() and chalkKey != "_REPO_DIGESTS":
     return
   var value = node.nimJsonToBox()
 
@@ -440,11 +444,11 @@ proc jsonOneAutoKey(node:        JsonNode,
   # Handle any transformations we know we need.
   case chalkKey
   of "_REPO_DIGESTS":
-    value = extractShaHashMap(value)
+    value = extractDockerHashMap(value)
   of "_IMAGE_HOSTNAMES":
-    value = extractShaHashList(value)
+    value = extractDockerHashList(value)
   of "_IMAGE_NAME":
-    value = extractShaHash(value)
+    value = extractBoxedDockerHash(value)
   else:
     discard
 
@@ -489,47 +493,124 @@ proc jsonAutoKey(map:  OrderedTable[string, string],
 
     jsonOneAutoKey(subJsonOpt.get(), chalkKey, dict, reportEmpty)
 
-proc inspectImage(dict: ChalkDict, id: string, chalk: ChalkObj) =
-  let
-    output   = runDockerGetOutput(@["inspect", id, "--format", "json"])
-    contents = output.parseJson().getElems()[0]
-
-  chalk.cachedHash = contents["Id"].getStr().extractDockerHash()
+template inspectCommon() =
+  chalk.imageId    = chalk.cachedHash
   chalk.setIfNeeded("_IMAGE_ID", chalk.cachedHash)
   chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents.nimJsonToBox())
-  chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerImage)
 
-  jsonAutoKey(dockerImageAutoMap, contents, dict)
+  jsonAutoKey(dockerImageAutoMap, contents, chalk.collectedData)
 
-proc inspectContainer(dict: ChalkDict, id: string, chalk: ChalkObj) =
+  if "_REPO_DIGESTS" in chalk.collectedData:
+    let
+      box  = chalk.collectedData["_REPO_DIGESTS"]
+      info = unpack[OrderedTableRef[string, string]](box)
+    for k, v in info:
+      trace("Image ID is: " & chalk.imageId)
+      trace("Repo Digest: " & v)
+      if chalk.repo != "" and chalk.repo != k:
+        warn("Changing repo from " & chalk.repo & " to: " & k)
+      chalk.repo     = k
+      chalk.repoHash = v
+      if chalk.containerId == "":
+        if chalk.tag == "":
+          chalk.userRef = chalk.repo
+        else:
+          chalk.userRef = chalk.repo & ":" & chalk.tag
+        chalk.name = chalk.userRef
+      break
+
+proc inspectImage(chalk: ChalkObj) =
+  var id: string
+
   let
-    output   = runDockerGetOutput(@["container", "inspect", id, "--format",
-                                    "json"])
-    contents = output.parseJson().getElems()[0]
+    cmdOut = runDockerGetEverything(@["inspect", chalk.name])
 
-  chalk.cachedHash = contents["Image"].getStr().extractDockerHash()
-  chalk.setIfNeeded("_IMAGE_ID", chalk.cachedHash)
-  chalk.setIfNeeded("_OP_ALL_CONTAINER_METADATA", contents.nimJsonToBox())
+  if cmdOut.getExit() != 0:
+    error(chalk.name & ": Docker inspect failed: " & cmdOut.getStdErr())
+    return
+
+  let contents = cmdOut.getStdOut().parseJson().getElems()[0]
+
+  chalk.cachedHash = contents["Id"].getStr().extractDockerHash()
+  chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerImage)
+  inspectCommon()
+
+proc inspectContainer(chalk: ChalkObj) =
+  let
+    id     = chalk.userRef
+    cmdOut = runDockerGetEverything(@["container", "inspect", id])
+
+  if cmdout.getExit() != 0:
+    warn(chalk.userRef & ": Container inspection failed (no longer running?)")
+    return
+
+  let
+    contents = cmdOut.getStdout().parseJson().getElems()[0]
+
+  chalk.cachedHash  = contents["Image"].getStr().extractDockerHash()
+  chalk.containerId = contents["Id"].getStr()
+  chalk.name        = contents["Name"].getStr()
+
+  if chalk.name.startsWith("/"):
+    chalk.name = chalk.name[1 .. ^1]
+
   chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerContainer)
+  chalk.resourceType = {ResourceContainer}
+  inspectCommon()
 
-  jsonAutoKey(dockerContainerAutoMap, contents, dict)
+proc inspectArtifact(chalk: ChalkObj) {.inline.} =
+  if chalk.containerId != "":
+    chalk.inspectContainer()
+    if chalk.cachedHash != "":
+      chalk.imageId = chalk.cachedHash
+  if chalk.containerId == "":
+    chalk.resourceType = {ResourceImage}
+  chalk.inspectImage()
 
+proc scanOne*(codec: Codec, item: string): Option[ChalkObj]
+    {.exportc,cdecl.} =
+
+  let chalk = newChalk(name = item, tag = item, codec = codec)
+
+  # Call docker images first, and if there's no shortId we found 0.
+  info("Extracting basic image info.")
+  if not chalk.extractBasicImageInfo():
+    chalk.inspectContainer()
+    if chalk.containerId == "":
+      return none(ChalkObj)
+
+  return some(chalk)
 
 method getRunTimeArtifactInfo*(self:  CodecDocker,
                                chalk: ChalkObj,
                                ins:   bool): ChalkDict =
-
   result = ChalkDict()
+  # If a container name / id was passed, it got inspected during scan,
+  # but images did not.
+  if ResourceContainer notin chalk.resourceType:
+    chalk.inspectArtifact()
 
+proc dockerExtractChalkMark*(chalk: ChalkObj): ChalkDict {.exportc, cdecl.} =
+  if chalk.repo != "":
+    result = chalk.extractAttestationMark()
+
+  if result != nil:
+    info(chalk.name & ": Chalk mark successfully extracted from attestation.")
+    chalk.signed = true
+    return
+
+  result = chalk.extractImageMark()
+  if result != nil:
+    info(chalk.name & ": Chalk mark extracted from base image.")
+    return
   if chalk.containerId != "":
-    result.inspectContainer(chalk.containerId, chalk)
-    if chalk.cachedHash != "":
-      chalk.imageId = chalk.cachedHash
-  if chalk.imageId != "":
-    result.inspectImage(chalk.imageId, chalk)
-  elif chalk.tagRef != "":
-    result.inspectImage(chalk.tagRef, chalk)
+    result = chalk.extractContainerMark()
+    if result != nil:
+      info(chalk.name & ": Chalk mark extracted from running container")
+      return
 
+  warn(chalk.name & ": No chalk mark extracted.")
+  addUnmarked(chalk.name)
 
 
 registerPlugin("docker", CodecDocker())

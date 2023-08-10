@@ -11,11 +11,13 @@ when (NimMajor, NimMinor, NimPatch) >= (1, 6, 12):
   switch("warning", "BareExcept:off")
 
 if defined(macosx):
-  let openssldir = "/opt/homebrew/opt/openssl@3.0/lib"
+  let openssldir = "/opt/homebrew/opt/openssl@3/"
   #switch("dynlibOverride","ssl")
   switch("cpu", "arm64")
-  switch("passc", "-flto -target arm64-apple-macos11 ")
-  switch("passl", "-flto -target arm64-apple-macos11 -Wl,-object_path_lto,lto.o")
+  switch("passc", "-flto -target arm64-apple-macos11 " & "-I" & openssldir &
+         "/include/")
+  switch("passl", "-flto -target arm64-apple-macos11 -lcrypto.3 " &
+          "-Wl,-object_path_lto,lto.o -L " & openssldir & "/lib/")
 else:
   switch("passl", "-static")
 

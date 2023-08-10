@@ -29,6 +29,8 @@ proc addBackOtherOutputFlags*(state: DockerInvocation) =
   # we add a --load for good measure.
   if "output" in state.flags or "load" in state.flags or "push" in state.flags:
     state.newCmdLine.add("--load")
+  if "output" notin state.flags:
+    return
   for item in unpack[seq[string]](state.flags["output"].getValue()):
     if "registry" notin item:
       state.newCmdLine.add("--output=" & item)
@@ -45,6 +47,8 @@ proc extractTarget(state: DockerInvocation) =
 proc extractTags(state: DockerInvocation) =
   if "tag" in state.flags:
     state.foundTags = unpack[seq[string]](state.flags["tag"].getValue())
+    if len(state.foundTags) > 0:
+      state.prefTag = state.foundTags[0]
 
 proc extractPlatform(state: DockerInvocation) =
   if "platform" in state.flags:
@@ -216,11 +220,12 @@ proc stripFlagsWeRewrite*(ctx: DockerInvocation) =
   let reparse = CommandSpec(maxArgs: high(int), dockerSingleArg: true,
                             unknownFlagsOk: true, noSpace: false)
 
+  reparse.addYesNoFlag("push", ["push"], [])
+  reparse.addYesNoFlag("load", ["load"], [])
   reparse.addFlagWithArg("file", ["f", "file"], true, true, optArg = false)
   reparse.addFlagWithArg("target", [], true, true, optArg = false)
   reparse.addFlagWithArg("output", [], true, true, optArg = false)
-  reparse.addYesNoFlag("push", [], [])
-  reparse.addYesNoFlag("load", [], [])
+
 
   ctx.newCmdLine = reparse.parse(ctx.originalArgs).args[""]
 

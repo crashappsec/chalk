@@ -1,12 +1,23 @@
 import osproc, config, util
 
 var
-  dockerExeLocation: string = ""
   buildXVersion:     float  = 0   # Major and minor only
+
+const
+  hashHeader* = "sha256:"
 
 
 var dockerPathOpt: Option[string] = none(string)
 
+
+template extractDockerHash*(value: string): string =
+  if not value.startsWith(hashHeader):
+    value
+  else:
+    value[len(hashHeader) .. ^1]
+
+template extractBoxedDockerHash*(value: Box): Box =
+  pack(extractDockerHash(unpack[string](value)))
 
 proc setDockerExeLocation*() =
   once:
@@ -46,71 +57,12 @@ proc getBuildXVersion*(): float =
 template haveBuildContextFlag*(): bool =
   buildXVersion >= 0.8
 
-proc runDocker*(args: seq[string]): int {.discardable.} =
-  trace("Running: " & dockerExeLocation & " " & args.join(" "))
-  let
-    subp = startProcess(dockerExeLocation,
-                        args = args,
-                        options = {poParentStreams})
-
-  result = subp.waitForExit()
-
-  subp.close()
-
-  if result != 0:
-    trace("Docker exited with code: " & $(result))
-
-{.emit: """
-#include <unistd.h>
-
-int c_replace_stdin_with_pipe() {
-  int filedes[2];
-
-  pipe(filedes);
-  dup2(filedes, 0);
-  return filedes[1];
-}
-
-int c_write_to_pipe(int fd, char *s, int len) {
-  return write(fd, s, len);
-}
-""".}
-
-proc cReplaceStdinWithPipe(): cint {.importc: "c_replace_stdin_with_pipe".}
-proc cWriteToPipe(fd: cint, s: cstring, l: cint):
-                 cint {.importc: "c_write_to_pipe".}
-
-proc runWrappedDocker*(args: seq[string], df: string): int {.discardable.} =
-  trace("Running docker w/ stdin dockerfile by calling: " & dockerExeLocation &
-    " " & args.join(" "))
-
-  let
-    fd   = cReplaceStdinWithPipe()
-    subp = startProcess(dockerExeLocation,
-                        args = args,
-                        options = {poParentStreams})
-
-  discard cWriteToPipe(fd, cstring(df), cint(len(df) + 1))
-  let code = subp.waitForExit()
-  subp.close()
-  if code != 0:
-    trace("Docker exited with code: " & $(code))
-
-  result = int(code)
-
-template runWrappedDocker*(info: DockerInvocation): int =
-  let r = runDocker(info.newCmdLine)
-  if r != 0:
-    error("Wrapped docker call failed; reverting to original docker cmd")
-    raise newException(ValueError, "doh")
-  r
-
 proc runDockerGetOutput*(args: seq[string]): string =
   trace("Running: " & dockerExeLocation & " " & args.join(" "))
-  return execProcess(dockerExeLocation, args = args, options = {})
+  return runCmdGetOutput(dockerExeLocation, args = args)
 
-template extractDockerHash*(s: string): string =
-  s.split(":")[1].toLowerAscii()
+template runDockerGetEverything*(args: seq[string]): ExecOutput =
+  runCmdGetEverything(dockerExeLocation, args)
 
 var contextCounter = 0
 
@@ -130,7 +82,7 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
       " " & file & " /" & newname)
     contextCounter += 1
     if move:
-      ctx.tmpFiles.add(loc)
+      registerTempFile(loc)
   elif ctx.foundContext == "-":
     warn("Cannot chalk when context is passed to stdin w/o BUILDKIT support")
     raise newException(ValueError, "stdinctx")
@@ -157,7 +109,7 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
           copyFile(loc, dstLoc)
 
         ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
-        ctx.tmpFiles.add(dstLoc)
+        registerTempFile(dstLoc)
       except:
         dumpExOnDebug()
         warn("Could not write to context directory.")
@@ -176,3 +128,40 @@ proc getAllDockerContexts*(info: DockerInvocation): seq[string] =
 
   for k, v in info.otherContexts:
     result.add(resolvePath(v))
+
+proc populateBasicImageInfo*(chalk: ChalkObj, info: JSonNode) =
+  let
+    repo  = info["Repository"].getStr()
+    tag   = info["Tag"].getStr.replace("\u003cnone\u003e", "").strip()
+    short = info["ID"].getStr()
+
+  chalk.repo    = repo
+  chalk.tag     = tag
+  chalk.shortId = short
+
+proc getBasicImageInfo*(refName: string): Option[JSonNode] =
+  let
+    allInfo = runDockerGetEverything(@["images", refName, "--format", "json"])
+    stdout  = allInfo.getStdout().strip()
+
+  if allInfo.getExit() != 0 or stdout == "":
+    return none(JsonNode)
+
+  let lines = stdout.split("\n")
+
+  if len(lines) < 1:
+    return none(JsonNode)
+
+  return some(parseJson(lines[0]))
+
+proc extractBasicImageInfo*(chalk: ChalkObj): bool =
+  # usreRef should always be what was passed on the command line, and
+  # if nothing was passed on the command line, it will be our
+  # temporary tag.
+  let info = getBasicImageInfo(chalk.userRef)
+
+  if info.isNone():
+    return false
+
+  chalk.populateBasicImageInfo(info.get())
+  return true

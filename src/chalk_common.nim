@@ -9,7 +9,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import os, json, streams, tables, options, strutils, nimutils, sugar, posix,
-       nimutils/logging, con4m, c4autoconf, unicode
+       nimutils/logging, con4m, c4autoconf, unicode, glob
 export os, json, options, tables, strutils, streams, sugar, nimutils, logging,
        con4m, c4autoconf
 
@@ -21,11 +21,12 @@ type
 
   ## The chalk info for a single artifact.
   ChalkObj* = ref object
-    name*:          string      ## The name to use for the artifact.
+    name*:          string      ## The name to use for the artifact in errors.
     cachedHash*:    string      ## Cached 'ending' hash
     cachedPreHash*: string      ## Cached 'unchalked' hash
     collectedData*: ChalkDict   ## What we're adding during insertion.
     extract*:       ChalkDict   ## What we extracted, or nil if no extract.
+    cachedMark*:    string      ## Cached chalk mark.
     opFailed*:      bool
     marked*:        bool
     embeds*:        seq[ChalkObj]
@@ -48,9 +49,17 @@ type
                                 ## something else, use the cache field
                                 ## below, instead.
     fsRef*:         string      ## Reference for this artifact on a fs
-    tagRef*:        string      ## Tag reference if this is a docker image
+    userRef*:       string      ## Reference the user gave for the artifact.
+    repo*:          string      ## The docker repo.
+    tag*:           string      ## The image tag, if any.
+    shortId*:       string      ## The short hash ID of an image.
     imageId*:       string      ## Image ID if this is a docker image
+    repoHash*:      string      ## Image ID in the repo.
     containerId*:   string      ## Container ID if this is a container
+    signed*:        bool        ## True on the insert path once signed,
+                                ## and once we've seen an attestation otherwise
+    inspected*:     bool        ## True for images once inspected; we don't
+                                ## need to inspect twice when we build + push.
     resourceType*:  set[ResourceType]
 
   Plugin* = ref object of RootObj
@@ -67,8 +76,16 @@ type
     allChalks*:          seq[ChalkObj]
     unmarked*:           seq[string]
     report*:             Box
+    args*:               seq[string]
 
-type
+  ArtifactIterationInfo* = ref object
+    filePaths*:       seq[string]
+    otherPaths*:      seq[string]
+    fileExclusions*:  seq[string]
+    skips*:           seq[glob.Glob]
+    chalks*:          seq[ChalkObj]
+    recurse*:         bool
+
   DockerDirective* = ref object
     name*:       string
     rawArg*:     string
@@ -199,8 +216,8 @@ type
     flags*:             OrderedTable[string, FlagSpec]
     foundLabels*:       OrderedTableRef[string, string]
     foundTags*:         seq[string]
-    ourTag*:            string
-    prefTag*:           string
+    ourTag*:            string # This is what chalk added.
+    prefTag*:           string # This is what the user gave via -t or similar.
     passedImage*:       string
     buildArgs*:         Table[string, string]
     foundFileArg*:      string
@@ -222,8 +239,6 @@ type
     dfSections*:        seq[DockerFileSection]
     dfSectionAliases*:  OrderedTable[string, DockerFileSection]
     addedInstructions*: seq[string]
-    tmpFiles*:          seq[string]
-
 
 # Compile-time only helper for generating one of the consts below.
 proc commentC4mCode(s: string): string =
@@ -245,7 +260,7 @@ const
   sbomConfName*       = "configs/sbomconfig.c4m"
   sastConfName*       = "configs/sastconfig.c4m"
   ioConfName*         = "configs/ioconfig.c4m"
-  dockerConfName*     = "configs/dockercmd.c4m"
+  attestConfName*     = "configs/attestation.c4m"
   defCfgFname*        = "configs/defaultconfig.c4m"  # Default embedded config.
   chalkC42Spec*       = staticRead(chalkSpecName)
   getoptConfig*       = staticRead(getoptConfName)
@@ -254,13 +269,14 @@ const
                         staticRead("configs/base_sinks.c4m") &
                         staticRead("configs/base_profiles.c4m") &
                         staticRead("configs/base_outconf.c4m") &
-                        staticRead("configs/base_sinkconfs.c4m")
+                        staticRead("configs/base_sinkconfs.c4m") &
+                        staticRead("configs/dockercmd.c4m")
   signConfig*         = staticRead(signConfName)
   sbomConfig*         = staticRead(sbomConfName)
   sastConfig*         = staticRead(sastConfName)
   ioConfig*           = staticRead(ioConfName)
-  dockerConfig*       = staticRead(dockerConfName)
   defaultConfig*      = staticRead(defCfgFname) & commentC4mCode(ioConfig)
+  attestConfig*       = staticRead(attestConfName)
   versionStr*         = staticexec("cat ../*.nimble | grep ^version")
   commitID*           = staticexec("git rev-parse HEAD")
   archStr*            = staticexec("uname -m")
@@ -296,6 +312,8 @@ var
   con4mRuntime*:      ConfigStack
   commandName*:       string
   currentOutputCfg*:  OutputConfig
+  dockerExeLocation*: string = ""
+
 
 
 when hostOs == "macosx":

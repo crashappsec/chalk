@@ -1,10 +1,13 @@
-import std/tempfiles, posix, unicode, ../config, ../collect, ../reporting,
+## :Author: John Viega, Theofilos Petsios
+## :Copyright: 2023, Crash Override, Inc.
+
+import posix, unicode, ../config, ../collect, ../reporting,
        ../chalkjson, ../docker_cmdline, ../docker_base, ../subscan,
-       ../dockerfile
+       ../dockerfile, ../commands/cmd_defaults, ../util, ../attestation
 
 {.warning[CStringConv]: off.}
 
-proc launchDockerSubscan(info:     DockerInvocation,
+proc launchDockerSubscan(ctx:     DockerInvocation,
                          contexts: seq[string]): Box =
 
   var usableContexts: seq[string]
@@ -30,19 +33,16 @@ proc launchDockerSubscan(info:     DockerInvocation,
   result = runChalkSubScan(usableContexts, "insert").report
   trace("Docker subscan complete.")
 
-proc writeChalkMark(info: DockerInvocation, mark: string) =
+proc writeChalkMark(ctx: DockerInvocation, mark: string) =
+  # We are going to move this file, so don't autodelete.
   var
-    (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
-    ctx       = newFileStream(f)
+    (f, path) = getNewTempFile(autoDelete = false)
 
-  if f == nil:
-    error("Unable to create a tmp file for Docker chalk mark")
-    raise newException(ValueError, "fs open")
   try:
     info("Creating temporary chalk file: " & path)
-    ctx.writeLine(mark)
-    ctx.close()
-    info.makeFileAvailableToDocker(path, true, "chalk.json")
+    f.writeLine(mark)
+    f.close()
+    ctx.makeFileAvailableToDocker(path, true, "chalk.json")
   except:
     error("Unable to write to open tmp file (disk space?)")
     raise newException(ValueError, "fs write")
@@ -73,13 +73,13 @@ proc formatLabel(name: string, value: string, addLabel: bool): string =
     result = "LABEL "
   result &= processLabelKey(name) & "=" & processLabelValue(value)
 
-proc addNewLabelsToDockerFile(info: DockerInvocation) =
+proc addNewLabelsToDockerFile(ctx: DockerInvocation) =
   # First, add totally custom labels.
   let labelOps = chalkConfig.dockerConfig.getCustomLabels()
 
   if labelOps.isSome():
     for k, v in labelOps.get():
-      info.addedInstructions.add(formatLabel(k, v, true))
+      ctx.addedInstructions.add(formatLabel(k, v, true))
 
   let labelProfileName = chalkConfig.dockerConfig.getLabelProfile()
   if labelProfileName == "":
@@ -91,59 +91,46 @@ proc addNewLabelsToDockerFile(info: DockerInvocation) =
     return
 
   let
-    chalkObj    = info.opChalkObj.collectedData
+    chalkObj    = ctx.opChalkObj.collectedData
     labelsToAdd = filterByProfile(hostInfo, chalkObj, labelProfile)
 
   for k, v in labelsToAdd:
-    info.addedInstructions.add(formatLabel(k, boxToJson(v), true))
+    ctx.addedInstructions.add(formatLabel(k, boxToJson(v), true))
 
-proc setPreferredTag(info: DockerInvocation) =
+proc setPreferredTag(ctx: DockerInvocation) =
   # For now, we only add a tag if there are no found tags, and that is it.
   # Eventually we may let people define their own.
 
-  if len(info.foundTags) == 0:
-    info.ourTag      = chooseNewTag()
-    info.prefTag     = info.ourTag
-    info.newCmdLine &= @["-t", info.ourTag]
+  if len(ctx.foundTags) == 0:
+    ctx.ourTag      = chooseNewTag()
+    ctx.prefTag     = ctx.ourTag
+    ctx.newCmdLine &= @["-t", ctx.ourTag]
 
   else:
-    info.prefTag = info.foundTags[0]
+    ctx.prefTag = ctx.foundTags[0]
 
-  info.opChalkObj.tagRef = info.prefTag
+  ctx.opChalkObj.userRef = ctx.prefTag
 
-  trace("Docker tag we'll use is " & info.prefTag)
-
-proc writeNewDockerFile(info: DockerInvocation) =
+proc writeNewDockerFile(ctx: DockerInvocation) =
   # TODO: can just plan to always send the Dockerfile on stdin, unless the
   # context was provided on stdin.
 
-  if len(info.addedInstructions) == 0 and info.dockerFileLoc != ":stdin:":
-    info.newCmdLine.add("-f")
-    info.newCmdLine.add(info.dockerFileLoc)
+  if len(ctx.addedInstructions) == 0 and ctx.dockerFileLoc != ":stdin:":
+    ctx.newCmdLine.add("-f")
+    ctx.newCmdLine.add(ctx.dockerFileLoc)
     return
 
-  let (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
+  let (f, path) = getNewTempFile()
 
-  info.tmpFiles.add(path)
+  info("Created temporary Dockerfile at: " & path)
 
-  if f == nil:
-    warn("Chalk cannot process; cannot create temporary files")
-    raise newException(ValueError, "tmpfile")
-
-  info("Created temporary Dockerfile: " & path)
-
-  f.write(info.inDockerFile)
-  for line in info.addedInstructions:
+  f.write(ctx.inDockerFile)
+  for line in ctx.addedInstructions:
     f.writeLine(line)
   f.close()
 
-  info.newCmdLine.add("-f")
-  info.newCmdLine.add(path)
-
-proc removeDockerTemporaryFiles(info: DockerInvocation) =
-  for item in info.tmpFiles:
-    trace("Removing tmp file: " & item)
-    removeFile(item)
+  ctx.newCmdLine.add("-f")
+  ctx.newCmdLine.add(path)
 
 template noBadJson(item: InfoBase) =
   if item.error != "":
@@ -215,12 +202,12 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
 
   ctx.addedInstructions.add(newInstruction)
 
-proc handleTrueInsertion(info: DockerInvocation, mark: string) =
+proc handleTrueInsertion(ctx: DockerInvocation, mark: string) =
   if chalkConfig.dockerConfig.getWrapEntryPoint():
-    info.rewriteEntryPoint()
-  info.writeChalkMark(mark)
+    ctx.rewriteEntryPoint()
+  ctx.writeChalkMark(mark)
 
-proc prepVirtualInsertion(info: DockerInvocation) =
+proc prepVirtualInsertion(ctx: DockerInvocation) =
   # Virtual insertion for Docker does not rewrite the entry point
   # either.
 
@@ -231,8 +218,8 @@ proc prepVirtualInsertion(info: DockerInvocation) =
 
   if labelOps.isSome():
     for k, v in labelOps.get():
-      info.newCmdLine.add("--label")
-      info.newCmdline.add(k & "=" & escapeJson(v))
+      ctx.newCmdLine.add("--label")
+      ctx.newCmdline.add(k & "=" & escapeJson(v))
 
   let labelProfileName = chalkConfig.dockerConfig.getLabelProfile()
   if labelProfileName == "":
@@ -244,26 +231,26 @@ proc prepVirtualInsertion(info: DockerInvocation) =
     return
 
   let
-    chalkObj    = info.opChalkObj.collectedData
+    chalkObj    = ctx.opChalkObj.collectedData
     labelsToAdd = filterByProfile(hostInfo, chalkObj, labelProfile)
 
   for k, v in labelsToAdd:
-    info.newCmdLine.add("--label")
-    info.addedInstructions.add(formatLabel(k, boxToJson(v), false))
+    ctx.newCmdLine.add("--label")
+    ctx.addedInstructions.add(formatLabel(k, boxToJson(v), false))
 
-proc addBuildCmdMetadataToMark(info: DockerInvocation) =
-  let dict = info.opChalkObj.collectedData
+proc addBuildCmdMetadataToMark(ctx: DockerInvocation) =
+  let dict = ctx.opChalkObj.collectedData
 
-  dict.setIfNeeded("DOCKERFILE_PATH", info.dockerFileLoc)
-  dict.setIfNeeded("DOCKER_FILE", info.inDockerFile)
-  dict.setIfNeeded("DOCKER_PLATFORM", info.foundPlatform)
-  dict.setIfNeeded("DOCKER_LABELS", info.foundLabels)
-  dict.setIfNeeded("DOCKER_TAGS", info.foundTags)
-  dict.setIfNeeded("DOCKER_CONTEXT", info.foundContext)
-  dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS", info.otherContexts)
-  dict.setIfNeeded("DOCKER_CHALK_TEMPORARY_TAG", info.ourTag)
+  dict.setIfNeeded("DOCKERFILE_PATH", ctx.dockerFileLoc)
+  dict.setIfNeeded("DOCKER_FILE", ctx.inDockerFile)
+  dict.setIfNeeded("DOCKER_PLATFORM", ctx.foundPlatform)
+  dict.setIfNeeded("DOCKER_LABELS", ctx.foundLabels)
+  dict.setIfNeeded("DOCKER_TAGS", ctx.foundTags)
+  dict.setIfNeeded("DOCKER_CONTEXT", ctx.foundContext)
+  dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS", ctx.otherContexts)
+  dict.setIfNeeded("DOCKER_CHALK_TEMPORARY_TAG", ctx.ourTag)
   dict.setIfNeeded("DOCKER_CHALK_ADDED_TO_DOCKERFILE",
-                   info.addedInstructions.join("\n"))
+                   ctx.addedInstructions.join("\n"))
 
 proc prepareToBuild*(state: DockerInvocation) =
   info("Running docker build.")
@@ -275,128 +262,188 @@ proc prepareToBuild*(state: DockerInvocation) =
   state.stripFlagsWeRewrite()
   setContextDirectories(state.getAllDockerContexts())
 
-
-proc runBuild(info: DockerInvocation): int =
-  info.prepareToBuild()
+proc runBuild(ctx: DockerInvocation): int =
+  ctx.prepareToBuild()
   initCollection()
 
-  let chalk       = newChalk(name         = info.getDockerFileLoc(),
+  let chalk       = newChalk(name         = ctx.prefTag,
                              resourceType = {ResourceImage},
                              codec        = Codec(getPluginByName("docker")))
-  info.opChalkObj = chalk
-  chalk.addToAllChalks()
+  ctx.opChalkObj = chalk
 
-  if not info.cmdPush:
-    info.addBackAllOutputFlags()
+  if not ctx.cmdPush:
+    ctx.addBackAllOutputFlags()
   else:
-    info.addBackOtherOutputFlags()
+    ctx.addBackOtherOutputFlags()
   if chalkConfig.getChalkContainedItems():
     info("Docker is starting a recursive chalk of context directories.")
-    var contexts: seq[string] = @[info.foundContext]
+    var contexts: seq[string] = @[ctx.foundContext]
 
     # It's alias=path
-    for k, v in info.otherContexts:
+    for k, v in ctx.otherContexts:
       contexts.add(v)
     let
-      subscanBox = info.launchDockerSubscan(contexts)
+      subscanBox = ctx.launchDockerSubscan(contexts)
       unpacked   = unpack[seq[Box]](subscanBox)
 
     if len(unpacked) != 0:
       chalk.collectedData["EMBEDDED_CHALK"] = subscanBox
     info("Docker subscan finished.")
 
-  info.evalAndExtractDockerfile()
-  info.setPreferredTag()
+  ctx.evalAndExtractDockerfile()
+  ctx.setPreferredTag()
 
   trace("Collecting chalkable artifact data")
-  info.addBuildCmdMetadataToMark()
+  ctx.addBuildCmdMetadataToMark()
   chalk.collectChalkTimeArtifactInfo()
 
   trace("Creating chalk mark.")
   let chalkMark = chalk.getChalkMarkAsStr()
 
   if chalkConfig.getVirtualChalk():
-    info.prepVirtualInsertion()
+    ctx.prepVirtualInsertion()
   else:
-    info.handleTrueInsertion(chalkMark)
-    info.addNewLabelsToDockerFile()
-    info.writeNewDockerFile()
+    ctx.handleTrueInsertion(chalkMark)
+    ctx.addNewLabelsToDockerFile()
+    ctx.writeNewDockerFile()
 
-  # TODO: info.addEnvVarsToDockerfile()
-  result = info.runWrappedDocker()
+  # TODO: ctx.addEnvVarsToDockerfile()
+  result = ctx.runWrappedDocker()
 
   if chalkConfig.getVirtualChalk() and result == 0:
     publish("virtual", chalkMark)
 
-  trace("Collecting post-build runtime data and reporting")
-  chalk.collectRunTimeArtifactInfo()
-  doReporting("report")
+  chalk.marked = true
 
-proc runPush(info: DockerInvocation): int =
-  setCommandName("push")
-
-  if info.cmdBuild:
-    info.newCmdLine = @["push", info.prefTag]
+proc runPush(ctx: DockerInvocation): int =
+  if ctx.cmdBuild:
+    ctx.newCmdLine = @["push", ctx.prefTag]
     # Need to get imageID from the docker inspect.
     #handleExec(@[getMyAppPath()], @["docker", "push"]) # TODO from here
     # We're going to re-exec ourselves with an appropriate docker push command.
   else:
-    let chalk       = newChalk(name         = info.getDockerFileLoc(),
-                               resourceType = {ResourceImage},
-                               codec        = Codec(getPluginByName("docker")))
     initCollection()
-    info.newCmdLine = info.originalArgs
-    info.opChalkObj = chalk
-    chalk.tagRef    = info.prefTag
 
-    chalk.addToAllChalks()
-  try:
-    # Here, if we fail, there's no re-run. Either (in the second branch), we
-    # ran their original command line, or we've got nothing to fall back on,
-    # because the build already succeeded.
-    result = runDocker(info.newCmdLine)
-    if result != 0:
-      error("Push operation failed.")
-      doReporting("fail")
-      return result
+    let chalk = ctx.getPushChalkObj()
+    ctx.newCmdLine = ctx.originalArgs
+    ctx.opChalkObj = chalk
+    chalk.userRef  = ctx.prefTag
 
-  except:
-    error("Push operation failed.")
-    doReporting("fail")
-    return -1
-
-  trace("Collecting post-push runtime data and reporting")
-  forceHostKeys(["_REPO_PORT", "_REPO_HOST"])
-  info.opChalkObj.collectRunTimeArtifactInfo()
-  doReporting("report")
+  # Here, if we fail, there's no re-run. Either (in the second branch), we
+  # ran their original command line, or we've got nothing to fall back on,
+  # because the build already succeeded.
+  result = runDocker(ctx.newCmdLine)
+  return result
 
 # TODO: Any other noteworthy commands to wrap (run, etc)
 
-proc runCmdDocker*(args: seq[string]) =
+template passThroughLogic() =
+  try:
+    # Silently pass through other docker commands right now.
+    exitCode = runDocker(args)
+    if chalkConfig.dockerConfig.getReportUnwrappedCommands():
+      reporting.doReporting("report")
+  except:
+    dumpExOnDebug()
+    reporting.doReporting("fail")
 
+template gotBuildCommand() =
+  try:
+    exitCode = ctx.runBuild()
+    if exitCode != 0:
+      error("Docker failed with exit code: " & $(exitCode) &
+            ". Retrying w/o chalk.")
+      ctx.dockerFailsafe()
+    else:
+      if not ctx.opChalkObj.extractBasicImageInfo():
+        error("Could not inspect image after successful build." &
+          "Chalk reporting will be limited.")
+  except:
+    dumpExOnDebug()
+    error("Chalk could not process Docker correctly. Retrying w/o chalk.")
+    ctx.dockerFailSafe()
+
+  trace("Collecting post-build runtime data")
+  ctx.opChalkObj.collectRunTimeArtifactInfo()
+
+template gotPushCommand() =
+  try:
+    exitCode = ctx.runPush()
+    if exitCode != 0:
+      error("Docker push operation failed with exit code: " & $(exitCode))
+    else:
+      info(ctx.opChalkObj.name & ": Successfully pushed")
+      trace("Collecting post-push runtime data")
+      ctx.opChalkObj.collectRunTimeArtifactInfo()
+      if not ctx.cmdBuild:
+        let
+          mark = ctx.opChalkObj.dockerExtractChalkMark()
+
+        if mark == nil:
+          info(ctx.opChalkObj.name & ": Artifact is unchalked.")
+        else:
+          for k, v in mark:
+            ctx.opChalkObj.collectedData[k] = v
+            ctx.opChalkObj.extract          = mark
+            ctx.opChalkObj.marked           = true
+  except:
+    error("Docker push operation failed.")
+  exitCode = 0
+
+template postDockerActivity() =
+  if exitCode == 0:
+    if canAttest():
+      if not ctx.cmdBuild and ctx.opChalkObj.cachedMark == "":
+        error(ctx.opChalkObj.name & ": Pushing an unchalked container.")
+      else:
+        info("Pushing attestation.")
+        try:
+          ctx.pushAttestation()
+          info("Collecting post-push runtime data")
+          ctx.opChalkObj.collectRunTimeArtifactInfo()
+          trace("About to call into validate.")
+          attestation.extractAndValidateSignature(ctx.opChalkObj)
+        except:
+          dumpExOnDebug()
+          error("Docker attestation failed.")
+    else:
+        info("Attestation not configured.")
+        # Build succeeded, so we want to report and exit 0, even if
+        # the push failed.
+        exitCode = 0
+
+proc runCmdDocker*(args: seq[string]) =
   setDockerExeLocation()
 
   var
-    exitCode: int   = 0
-    info            = args.processDockerCmdLine()
-  info.originalArgs = args
+    exitCode = 0
+    ctx      = args.processDockerCmdLine()
 
-  try:
-    if info.cmdBuild:
-      exitCode = info.runBuild()
-    if exitCode == 0 and info.cmdPush:
-      exitCode = info.runPush()
-    elif not info.cmdBuild:
-      # Silently pass through other docker commands right now.
-      exitCode = runDocker(args)
-  except:
-    dumpExOnDebug()
-    if info.dockerFileLoc == ":stdin:":
-      exitCode = runWrappedDocker(args, info.inDockerFile)
-    else:
-      exitCode = runDocker(args)
-    doReporting("fail")
-  finally:
-    info.removeDockerTemporaryFiles()
+  ctx.originalArgs = args
 
-  quit(exitCode)
+  if ctx.cmdBuild:
+    # Build with --push is still a build operation.
+    setCommandName("build")
+  elif ctx.cmdPush:
+    setCommandName("push")
+
+  if not ctx.cmdBuild and not ctx.cmdPush:
+    passThroughLogic()
+  else:
+      forceArtifactKeys(["_REPO_TAGS", "_REPO_DIGESTS"])
+      if ctx.cmdBuild:
+        gotBuildCommand()
+
+      if ctx.cmdPush:
+        gotPushCommand()
+
+      ctx.opChalkObj.addToAllChalks()
+
+      postDockerActivity()
+
+      if exitCode == 0:
+        reporting.doReporting("report")
+
+  # For paths that didn't call doReporting, which generally cleans these up.
+  showConfig()
+  quitChalk(exitCode)

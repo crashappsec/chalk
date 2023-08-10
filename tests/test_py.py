@@ -117,6 +117,8 @@ def test_nonvirtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
 
     # check that first line shebangs are not clobbered in non-virtual chalk
     for file in os.listdir(tmp_data_dir):
+        if "crash-override-attestation.key" in file or "crash-override-attestation.pub":
+            continue
         text = (tmp_data_dir / file).read_text().splitlines()
 
         shebang_expected = shebang_check[str(tmp_data_dir / file)]

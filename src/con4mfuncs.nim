@@ -1,4 +1,4 @@
-import config, reporting, sinks
+import config, reporting, sinks, util
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
@@ -46,6 +46,12 @@ proc logTrace(args: seq[Box], s: ConfigState): Option[Box] =
 
   return logBase("trace", args, s)
 
+proc findExeC4m(args: seq[Box], s: ConfigState): Option[Box] =
+  let
+    cmdName    = unpack[string](args[0])
+    extraPaths = unpack[seq[string]](args[1])
+
+  return some(pack(findExePath(cmdName, extraPaths).getOrElse("")))
 
 let chalkCon4mBuiltins* = [
     ("version() -> string",
@@ -117,7 +123,15 @@ represents the arguments getting passed to the underlying chalk command.
 Returns the name of the chalk command being run (not the underlying
 executable name).
 """,
-     @["chalk"]) ]
+     @["chalk"]),
+     ("find_exe(string, list[string]) -> string",
+     BuiltinFn(findExeC4m),
+     """
+Locate an executable with the given name in the PATH, adding any extra
+directories passed in the second argument.
+""",
+     @["chalk"])
+]
 
 let errSinkObj = SinkImplementation(outputFunction: chalkErrSink)
 registerSink("chalk-err-log", errSinkObj)

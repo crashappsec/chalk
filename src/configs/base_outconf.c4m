@@ -39,10 +39,11 @@ outconf dump {
   host_report:            "host_report_default"
 }
 
-# This is only used when the 'docker' command errors.
+# This is only used when the 'docker' command is run for an unknown
+# command, and when `report_unwrapped_commands` is also true.
+
 outconf docker {
-  artifact_report:        "artifact_report_default"
-  host_report:            "host_report_default"
+  host_report:            "unknown_docker_report"
 }
 
 outconf build {
@@ -53,6 +54,12 @@ outconf build {
 
 outconf push {
   artifact_report:        "push_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf setup {
+  chalk:                  "chalk_default"
+  artifact_report:        "artifact_report_default"
   host_report:            "host_report_default"
 }
 

@@ -3,7 +3,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import glob, config, util, plugin_api
+import glob, config, util, plugin_api, util
 
 # We collect things in four different places
 
@@ -99,7 +99,7 @@ proc initCollection*() =
   if registerProfileKeys(cmdprofnames) == 0:
     error("FATAL: no output reporting configured (all specs in the " &
           "command's 'outconf' object are disabled")
-    quit(1)
+    quitChalk(1)
 
   # Next, register for any custom reports.
   for name, report in chalkConfig.reportSpecs:
@@ -194,87 +194,167 @@ proc ignoreArtifact(path: string, globs: seq[glob.Glob]): bool {.inline.} =
     if path.matches(item): return true
   return false
 
-proc findChalk*(codec:      Codec,
-                searchPath: seq[string],
-                exclusions: var seq[string],
-                ignoreList: seq[glob.Glob],
-                recurse:    bool): (bool, seq[ChalkObj]) {.inline.} =
-  var goOn = true # Keep trying other codecs if nothing is found
+proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
+  new result
 
-  if len(searchPath) != 0:
-    codec.searchPath = searchPath
+  result.fileExclusions = @[resolvePath(getMyAppPath())]
+  result.recurse        = chalkConfig.getRecursive()
+
+  for item in argv:
+    let maybe = resolvePath(item)
+    if dirExists(maybe) or fileExists(maybe):
+      result.filePaths.add(maybe)
+    else:
+      result.otherPaths.add(item)
+
+proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
+  new result
+
+  result.fileExclusions = @[resolvePath(getMyAppPath())]
+  result.recurse        = chalkConfig.getRecursive()
+
+  for item in chalkConfig.getIgnorePatterns():
+    result.skips.add(glob("**/" & item))
+
+  if len(argv) == 0:
+    result.filePaths.add(getCurrentDir())
   else:
-    codec.searchPath = @[resolvePath("")]
-
-  let chalks = codec.scanArtifactLocations(exclusions, ignoreList, recurse)
-  if len(chalks) != 0:  goOn = codec.keepScanningOnSuccess()
-
-  return (goOn, chalks)
-
-iterator artifacts*(artifactPath: seq[string]): ChalkObj =
-  let
-    cmd          = getCommandName()
-    recursive    = chalkConfig.getRecursive()
-
-  var
-    skips:        seq[Glob]     = @[]
-    chalks:       seq[ChalkObj]
-    exclude:      seq[string]   = if cmd == "load": @[]
-                                  else: @[resolvePath(getMyAppPath())]
-
-  if isChalkingOp():
-    for item in chalkConfig.getIgnorePatterns(): skips.add(glob("**/" & item))
-  for codec in getCodecs():
-    var goOn: bool
-
-    if getCommandName() == "extract" and len(getArgs()) == 0:
-      if not chalkConfig.extractConfig.getEmptyArgsMeansFsScan() and
-         codec.name != "docker":
-        continue
-    trace("Asking codec '" &  codec.name & "' to scan artifacts.")
-    # A codec can return 'false' to short-circuit all other plugins.
-    # This is used, for instance, with containers.
-    (goOn, chalks) = codec.findChalk(artifactPath, exclude, skips, recursive)
-    for obj in chalks:
-      if obj.extract != nil and "MAGIC" in obj.extract:
-        obj.marked = true
-
-      if ResourceFile in obj.resourceType:
-        discard obj.acquireFileStream()
-        if obj.fsRef == "":
-          obj.fsRef = obj.name
-          warn("Codec did not properly set the fsRef field.")
-
-      # For ignore skipping, we're currently using one list.
-      # We maybe should do it per resource type.
-      let path = obj.name
-      if isChalkingOp():
-        if path.ignoreArtifact(skips):
-          addUnmarked(path)
-          if obj.isMarked(): info(path & ": Ignoring, but previously chalked")
-          else:              trace(path & ": ignoring artifact")
-        else:
-          obj.addToAllChalks()
-          if obj.isMarked(): info(path & ": Existing chalk mark extracted")
-          else:              trace(path & ": Currently unchalked")
+    for item in argv:
+      let maybe = resolvePath(item)
+      if dirExists(maybe) or fileExists(maybe):
+        result.filePaths.add(maybe)
       else:
-        obj.addToAllChalks()
-        if not obj.isMarked():
-          addUnmarked(path)
-          warn(path & ": Artifact is unchalked")
+        error(maybe & ": No such file or directory")
+
+proc artSetupForExecAndEnv(argv: seq[string]): ArtifactIterationInfo =
+  # For the moment.
+  new result
+
+  result.filePaths = argv
+
+proc dockerExtractChalkMark*(chalk: ChalkObj): ChalkDict {.importc.}
+proc extractAndValidateSignature*(chalk: ChalkObj) {.importc.}
+
+proc getImageChalks(codec: Codec): seq[ChalkObj] {.importc.}
+proc getContainerChalks(codec: Codec): seq[ChalkObj] {.importc.}
+proc scanOne(codec: Codec, item: string): Option[ChalkObj] {.importc.}
+
+proc resolveAll(argv: seq[string]): seq[string] =
+  for item in argv:
+    result.add(resolvePath(item))
+
+iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
+  var iterInfo: ArtifactIterationInfo
+
+  if notTmp:
+    case getBaseCommandName()
+    of "insert", "delete":
+      iterInfo = artSetupForInsertAndDelete(argv)
+    of "extract":
+      iterInfo = artSetupForExtract(argv)
+    of "exec", "env":
+      iterInfo = artSetupForExecAndEnv(argv)
+  else:
+      iterInfo = ArtifactIterationInfo(filePaths: resolveAll(argv))
+
+  trace("Called artifacts() -- filepaths = " & $(iterInfo.filePaths) &
+    "; otherPaths = " & $(iterInfo.otherPaths))
+
+  # First, iterate over all our file system entries.
+  if iterInfo.filePaths.len() != 0:
+    for codec in getCodecs():
+      if codec.name == "docker":
+        continue
+      trace("Asking codec '" &  codec.name & "' to scan artifacts.")
+      let chalks = codec.scanArtifactLocations(iterInfo)
+
+      for obj in chalks:
+        if obj.extract != nil and "MAGIC" in obj.extract:
+          obj.marked = true
+
+        if ResourceFile in obj.resourceType:
+          discard obj.acquireFileStream()
+          if obj.fsRef == "":
+            obj.fsRef = obj.name
+            warn("Codec did not properly set the fsRef field.")
+
+        let path = obj.fsRef
+        if isChalkingOp():
+          if path.ignoreArtifact(iterInfo.skips):
+            if notTmp: addUnmarked(path)
+            if obj.isMarked():
+              info(path & ": Ignoring, but previously chalked")
+            else:
+              trace(path & ": ignoring artifact")
+          else:
+            if notTmp: obj.addToAllChalks()
+            if obj.isMarked():
+              info(path & ": Existing chalk mark extracted")
+            else:
+              trace(path & ": Currently unchalked")
         else:
-          for k, v in obj.extract:
-            obj.collectedData[k] = v
+          if notTmp: obj.addToAllChalks()
+          if not obj.isMarked():
+            if notTmp: addUnmarked(path)
+            warn(path & ": Artifact is unchalked")
+          else:
+            for k, v in obj.extract:
+              obj.collectedData[k] = v
 
-          info(path & ": Chalk mark extracted")
+            info(path & ": Chalk mark extracted")
 
-      yield obj
-      # On an insert, any more errors in this object are going to be
-      # post-chalk, so need to go to the system errors list.
-      clearErrorObject()
-      if not inSubScan() and obj.name notin getUnmarked():
-        if not obj.forceIgnore:
-          obj.collectRunTimeArtifactInfo()
-      obj.myCodec.cleanup(obj)
-      obj.closeFileStream()
-    if len(chalks) > 0 and not goOn: break
+        yield obj
+
+        clearErrorObject()
+        if not inSubscan() and not obj.forceIgnore and
+           obj.name notin getUnmarked():
+          obj.collectRuntimeArtifactInfo()
+          obj.closeFileStream()
+
+  if not inSubscan():
+    if getCommandName() != "extract":
+      for item in iterInfo.otherPaths:
+        error(item & ": No such file or directory.")
+    else:
+      trace("Processing docker artifacts.")
+      let docker = Codec(getPluginByName("docker"))
+      var chalks: seq[ChalkObj]
+      for item in iterInfo.otherPaths:
+        let objOpt = docker.scanOne(item)
+        if objOpt.isNone():
+          if len(iterInfo.filePaths) > 0:
+            error(item & ": No file, image or container found with this name")
+          else:
+            error(item & ": No image or container found")
+        else:
+          chalks.add(objOpt.get())
+
+      for item in chalks:
+        trace("Processing artifact: " & item.name)
+        item.addToAllChalks()
+        trace("Collecting artifact runtime info")
+        item.collectRuntimeArtifactInfo()
+        let mark = item.dockerExtractChalkMark()
+        if mark == nil:
+          info(item.name & ": Artifact is unchalked.")
+        else:
+          for k, v in mark:
+            item.collectedData[k] = v
+          item.extract = mark
+          item.marked = true
+          item.extractAndValidateSignature()
+        yield item
+        clearErrorObject()
+
+proc getPushChalkObj*(info: DockerInvocation): ChalkObj =
+    let chalkOpt = scanOne(Codec(getPluginByName("docker")), info.prefTag)
+
+    if chalkOpt.isNone():
+      warn("Cannot find image; running docker normally.")
+      info.dockerFailSafe()
+
+    if chalkOpt.get().containerId != "":
+      warn("Push references a container; giving up & running docker normally.")
+      info.dockerFailSafe()
+
+    return chalkOpt.get()

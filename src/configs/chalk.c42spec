@@ -11,11 +11,11 @@ default_key_priority := 4611686018427387904  # 2^62.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
                          "load", "dump", "docker", "version", "env", "exec",
 		         #% REWRITE ,$ ]
-                         "profile",
+                         "profile", "setup",
 			 #% INTERNAL
 			 "helpdump"]
 			 #% END
-all_cmds_that_insert := ["insert", "build", "load"]
+all_cmds_that_insert := ["insert", "build", "load", "setup"]
 
 # Beyond valid chalk commands, these can generate reports.
 other_report_ops     := ["build", "push"]
@@ -909,42 +909,14 @@ singleton extract {
 Configuration specific to how `chalk exec` behaves.  
   """
 
-  field extract_from_containers {
+  field ignore_unsigned_images {
     type:    bool
     default: false
-    shortdoc: "Extract marks from containers"
+    shortdoc: "Ignore unsigned images"
     doc: """
-When `true`, the `chalk extract` command will attempt to extract marks from any running containers. This is done even if file system arguments are passed at the command line.
+When running a scan of all images, if this is `true`, Chalk only will try to extract Chalk marks from locally stored images if the image has a Chalk signature added via cosign attestations.
 
-If the default is `false`, then `chalk extract --containers` will turn it on;.
-if the default is `true`, then `chalk extract --no-containers` will turn it off.
-"""
-  }
-
-  field extract_from_images {
-    type:    bool
-    default: false
-    shortdoc: "Extract marks from containers"
-    doc: """
-When `true`, the `chalk extract` command will attempt to extract marks from any local container images. This is done even if file system arguments are passed at the command line.
-
-If the default is `false`, then `chalk extract --images` will turn it on;.
-if the default is `true`, then `chalk extract --no-images` will turn it off.
-"""    
-  }
-
-  field empty_args_means_fs_scan {
-    type:    bool
-    default: true
-    shortdoc: "Do the fs scan without command-line args"
-    doc: """
-When `true`, this means that, if no arguments are passed on the command line, the system will check `artifact_search_path` (which defaults to ["."] to determine what to extract from the file system.
-
-This is similar to what always happens with `chalk insert` and other commands that use the variable. However, with `extract`, we allow it to be turned off, since one might want to just do container scans without a fs scan.
-
-Still, Chalk ships with this defaulting to the behavior used for other commands; instead, it defaults-to-off container and image scanning.
-
-If this is on, You can still pass `--no-fs-scan` to turn off from the command line.
+By default we skip unsigned images, because the process (necessarily) involves downloading the container image.
 """    
   }
 
@@ -953,11 +925,13 @@ If this is on, You can still pass `--no-fs-scan` to turn off from the command li
     default: false
     shortdoc: "Extract marks from containers"
     doc: """
-When extracting from images, Chalk will check attestations when available. But if not, it looks in the top layer of the file system.
+When extracting from images when `ignore_unsigned_images = false`, Chalk will start by checking for a digital signature containing the Chalk mark in the repo, when available.
 
-When no Chalk can be found in either place, if this is set to true, we'll look at the other layers in the image and report the `CHALK_ID` and `METADATA_ID` of the topmost layer with a mark, using the `_FOUND_BASE_MARK` key (the image itself is said to be unchalked; it's more about being able to use knowledge of a chalked base image).
+But if there's no signature, assuming `ignore_unsigned_images` is true, Chalk looks in the top layer of the file system.
 
-The non-attestation approach requires enough i/o that we have this off by default.
+When no Chalk can be found in either place, if this attribute is set to true, we'll look at the other layers in the image and report the `CHALK_ID` and `METADATA_ID` of the topmost layer with a mark, using the `_FOUND_BASE_MARK` key (the image itself is said to be unchalked; it's more about being able to use knowledge of a chalked base image).
+
+Note that this does nothing unless `ignore_unsigned_images` is false.
 """    
   }
 }
@@ -983,18 +957,13 @@ modify containers to, on entry, use `chalk exec` to spawn your process.
 Note that, by default, Chalk will use its own binary for the wrapping, unless
 it sees an arch flag and determines that this is the wrong binary.
 
-In such a case, you should have a binary available for the architecture you are uilding for to copy in, and then specify it with `chalk_wrap_exe`
+In such a case, you should have a binary available for the
+architecture you are uilding for to copy in, and then specify it with
+`chalk_wrap_exe`
 
-Note that *either* we need to be able to copy the chalk binary into the context directory before invoking Docker, or you need to be on a version of Docker that accepts `--build-context`.
-"""
-  }
-
-  field chalk_file_location {
-    type: string
-    default: "/chalk.json"
-    shortdoc: "Chalk file location"
-    doc: """
-This controls where the chalk file gets written, when chalking a docker image.  Should generally be in the root, just in case the path doesn't exist in a container.
+Note that *either* we need to be able to copy the chalk binary into
+the context directory before invoking Docker, or you need to be on a
+version of Docker that accepts `--build-context`.
 """
   }
 
@@ -1004,7 +973,9 @@ This controls where the chalk file gets written, when chalking a docker image.  
     shortdoc: "Prefix for added labels"
     validator: func label_prefix_check
     doc: """
-When docker labels are used, they are supposed to have a reverse-DNS prefix for the organization that added them. You generally should add your own organization here.
+When docker labels are used, they are supposed to have a reverse-DNS
+prefix for the organization that added them. You generally should add
+your own organization here.
 """
   }
 
@@ -1014,8 +985,15 @@ When docker labels are used, they are supposed to have a reverse-DNS prefix for 
     validator: func label_profile_check
     shortdoc: "Auto-added label profile"
     doc: """
-This profile guides what labels will be automatically added to docker images when we successfully chalk them. The only allowed keys are Chalk-time keys. And, if the metadata is not available, then no key will be added.
-For instance, the HASH key cannot currently appear in docker chalks, because it is not available for docker chalking, so will not appear as a label.  But, you can add METADATA_ID, CHALK_ID, etc. or anything else that is collectable before the build.
+This profile guides what labels will be automatically added to docker
+images when we successfully chalk them. The only allowed keys are
+Chalk-time keys. And, if the metadata is not available, then no key
+will be added.
+
+For instance, the `HASH` key cannot currently appear in docker chalks,
+because it is not available for chalk-time, so will not appear as
+a label.  But, you can add `METADATA_ID`, `CHALK_ID`, etc. or anything
+else that is collectable before the build.
 """
   }
 
@@ -1025,7 +1003,9 @@ For instance, the HASH key cannot currently appear in docker chalks, because it 
     validator: func custom_labels_check
     shortdoc: "Custom labels"
     doc: """
-Any labels added here will be added as a LABEL line to the chalked container.  This will add label_prefix before the keys, and will not add if the key is not an alphanumeric value.
+Any labels added here will be added as a `LABEL` line to the chalked
+container.  This will add `label_prefix` before the keys, and will not
+add if the key is not an alphanumeric value.
 """
   }
 
@@ -1036,19 +1016,10 @@ Any labels added here will be added as a LABEL line to the chalked container.  T
     doc: """
 If true, host reports will be generated for docker commands we do not wrap.
 By default, we do not report.  If you set this to 'true', it's helpful to
-have _ARGV in your report, to get more telemetry.
+have `_ARGV` in your report, to get more telemetry.
 
 Note that failed chalk attempts get published to the 'fail' topic, and there
 are no default output sinks subscribed to this topic.
-"""
-  }
-
-  field report_unmarked {
-    type:    bool
-    default: true
-    shortdoc: "Report non-marked containers and images"
-    doc: """
-When running 'chalk extract containers', if this is true, then you will get back
 """
   }
 
@@ -1059,6 +1030,17 @@ When running 'chalk extract containers', if this is true, then you will get back
     doc: """
 Docker's internal reporting often gives results that are empty when not set.  If this is on, such fields are elided on reporting.
 """
+  }
+
+  field use_transparency_log {
+    type:     bool
+    default:  false
+    shortdoc: "Use transparency logging"
+    doc: """
+
+When this is true, digital signings will get published to a transparency log, and extracts from container images will attempt to validate in the transparency log.
+
+"""    
   }
 }
 
@@ -1484,8 +1466,7 @@ Note that if nothing in this path works, Chalk tries to create a temporary direc
     default:  ["."]
     shortdoc: "Search Path"
     doc:      """
-Set the default path to search for artifacts, unless overriden by
- command-line arguments.
+Set the default path to search for artifacts, unless overriden by command-line arguments.
 """
   }
 

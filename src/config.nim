@@ -67,7 +67,7 @@ proc sinkConfToString*(name: string): string =
 proc getOutputConfig*(): OutputConfig =
   return chalkConfig.outputConfigs[getBaseCommandName()]
 
-template forceHostKeys*(keynames: openarray[string]) =
+template forceArtifactKeys*(keynames: openarray[string]) =
   let
     reportName = getOutputConfig().artifact_report
     profile    = chalkConfig.profiles[reportName]
@@ -77,8 +77,6 @@ template forceHostKeys*(keynames: openarray[string]) =
       profile.keys[item].report = true
     else:
       profile.keys[item] = KeyConfig(report: true)
-
-
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.sCall(cb, args)

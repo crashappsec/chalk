@@ -5,7 +5,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import nativesockets, nimSHA2, sequtils, times, ../config, ../plugin_api,
-       ../normalize, ../chalkjson
+       ../normalize, ../chalkjson, ../selfextract
 
 when defined(posix): import posix_utils
 
@@ -23,8 +23,6 @@ proc validateMetadata(obj: ChalkObj): bool =
 
   # Re-compute the chalk ID.
   if fields == nil or len(fields) == 0:
-    if getCommandName() == "extract":
-      warn(obj.name & ": can't validate; no extract.")
     return
   elif "CHALK_ID" notin fields:
     error(obj.name & ": extracted chalk mark missing CHALK_ID field")
@@ -53,7 +51,7 @@ proc validateMetadata(obj: ChalkObj): bool =
     if artHash.isSome():
       let
         toVerify = pack(artHash.get() & "\n" & computed & "\n")
-        args     = @[toVerify, fields["SIGNATURE"], fields["SIGN_PARAMS"]]
+        args     = @[toVerify, fields["SIGNATURE"]]
         optValid = runCallback(verifySig, args)
 
       if optValid.isSome():
@@ -114,7 +112,6 @@ method getRunTimeArtifactInfo*(self: SystemPlugin,
   result = ChalkDict()
 
   if isChalkingOp():
-    assert getCommandName() != "push"
     obj.applySubstitutions()
     if obj.isMarked():
       discard obj.validateMetadata()
@@ -122,8 +119,9 @@ method getRunTimeArtifactInfo*(self: SystemPlugin,
     result.setIfNeeded("_VIRTUAL", chalkConfig.getVirtualChalk())
   else:
     obj.opFailed = obj.validateMetadata()
-    result.setIfNeeded("_VALIDATED",  obj.opFailed)
-    result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
+    #result.setIfNeeded("_VALIDATED",  obj.opFailed)
+    if obj.fsRef != "":
+      result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
 
   var
     config     = getOutputConfig()
@@ -225,6 +223,9 @@ method getChalkTimeHostInfo*(self: SystemPlugin): ChalkDict =
   result           = ChalkDict()
   cachedSearchPath = getContextDirectories()
 
+  let pubKeyOpt = selfChalkGetKey("$CHALK_PUBLIC_KEY")
+  if pubKeyOpt.isSome():
+    result["INJECTOR_PUBLIC_KEY"] = pubKeyOpt.get()
   result.setIfNeeded("INJECTOR_VERSION", getChalkExeVersion())
   result.setIfNeeded("INJECTOR_COMMIT_ID", getChalkCommitId())
   result.setIfNeeded("INJECTOR_ENV", getEnvDict())
@@ -257,11 +258,9 @@ proc signingNotInMark(): bool =
 method getChalkTimeArtifactInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
   result = ChalkDict()
 
-  if obj.extract != nil and "$CHALK_CONFIG" in obj.extract and
-     "$CHALK_CONFIG" notin obj.collectedData:
-    result["$CHALK_CONFIG"] = obj.extract["$CHALK_CONFIG"]
-
-  let shouldSign = isSubscribedKey("SIGNATURE")
+  # Container signing happens in the attestation layer;
+  # this will likely move there too.
+  let shouldSign = isSubscribedKey("SIGNATURE") and getCommandName() == "insert"
 
   # We add these directly into collectedData so that it can get
   # added to the MD hash when we call normalizeChalk()
@@ -305,7 +304,6 @@ method getChalkTimeArtifactInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
 
       if hash != "":
         result["SIGNATURE"]   = tup[0]
-        result["SIGN_PARAMS"] = tup[1]
     else:
       trace("No implementation of sign() provided; cannot sign.")
   else:

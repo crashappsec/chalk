@@ -12,7 +12,7 @@
 when (NimMinor, NimPatch) >= (6, 14):
   {.warning[CastSizes]: off.}
 
-import unicode, parseutils, algorithm, config
+import unicode, parseutils, algorithm, config, util
 
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']
@@ -470,7 +470,7 @@ template profileEnabledCheck(profile: Profile) =
   if profile.enabled == false:
     error("FATAL: invalid to disable the chalk profile when inserting." &
           " did you mean to use the virtual chalk feature?")
-    quit(1)
+    quitChalk(1)
 
 template enforceMagic() =
   if "MAGIC" notin profile.keys:
@@ -479,6 +479,7 @@ template enforceMagic() =
     profile.keys["MAGIC"].report = true
 
 proc getChalkMark*(obj: ChalkObj): ChalkDict =
+  trace("Creating mark using profile: " & getOutputConfig().chalk)
   let profile = chalkConfig.profiles[getOutputConfig().chalk]
   profile.profileEnabledCheck()
 
@@ -486,8 +487,23 @@ proc getChalkMark*(obj: ChalkObj): ChalkDict =
   return hostInfo.filterByProfile(obj.collectedData, profile)
 
 proc getChalkMarkAsStr*(obj: ChalkObj): string =
-  let profile = chalkConfig.profiles[getOutputConfig().chalk]
+  if obj.cachedMark != "":
+    return obj.cachedMark
+
+  trace("Converting Mark to JSON. Profile name is: " & getOutputConfig().chalk)
+  if obj.cachedMark != "":
+    return obj.cachedMark
+
+
+  let profileName = getOutputConfig().chalk
+
+  if profileName == "":
+    error("Configuration error: `chalk` profile cannot be empty")
+    quit(1)
+
+  let  profile = chalkConfig.profiles[profileName]
   profile.profileEnabledCheck()
 
   enforceMagic()
-  return hostInfo.prepareContents(obj.collectedData, profile)
+  result         = hostInfo.prepareContents(obj.collectedData, profile)
+  obj.cachedMark = result

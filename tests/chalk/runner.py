@@ -85,32 +85,35 @@ class Chalk:
         logger.debug("running chalk command: %s", cmd)
         run_process = None
         try:
-            run_process = run(cmd, capture_output=True, check=True, env=my_env)
-            if run_process.returncode != 0 or has_errors(run_process.stderr):
+            run_process = run(cmd, capture_output=True, env=my_env)
+            if (
+                run_process.returncode != 0 or has_errors(run_process.stderr)
+            ) and expected_success:
                 logger.error(
-                    "Chalk invocation had errors",
+                    "Chalk invocation had unexpected errors",
                     cmd=cmd,
                     output=run_process.stdout,
                     stderr=run_process.stderr,
                     returncode=run_process.returncode,
                 )
+            # process is returned whether chalk was fail or success
             return run_process
         except CalledProcessError as e:
-            if expected_success:
-                logger.error(
-                    "Chalk invocation failed",
-                    error=e,
-                    output=e.output,
-                    stderr=e.stderr,
-                    returncode=e.returncode,
-                    target=target,
-                    params=params,
-                    chalk_cmd=chalk_cmd,
-                    cur_dir=check_output(["pwd"]).decode().strip(),
-                    contents=check_output(["ls"]).decode().strip(),
-                )
-                raise
-            return run_process
+            # something else went wrong
+            logger.error(
+                "Chalk invocation failed unexpectedly",
+                error=e,
+                cmd=e.cmd,
+                stdout=e.output,
+                stderr=e.stderr,
+                returncode=e.returncode,
+                target=target,
+                params=params,
+                chalk_cmd=chalk_cmd,
+                cur_dir=check_output(["pwd"]).decode().strip(),
+                contents=check_output(["ls"]).decode().strip(),
+            )
+            raise
         except FileNotFoundError as e:
             if self.binary.is_file() and (target is None or target.exists()):
                 logger.error(
@@ -129,6 +132,7 @@ class Chalk:
                 )
             raise
 
+    # run with custom config that is external
     def run_with_custom_config(
         self,
         config_path: Path,
@@ -185,4 +189,66 @@ class Chalk:
             return json.loads(extract_out, strict=False)
         except json.decoder.JSONDecodeError:
             logger.error("Could not decode json", raw=extracted.stdout.decode())
+            raise
+
+    def exec(
+        self, artifact: Path, chalk_as_parent: bool = False
+    ) -> List[Dict[str, Any]]:
+        exec_flag = "--exec-command-name=" + str(artifact)
+        params = [exec_flag, "--log-level=none"]
+        if chalk_as_parent:
+            params.append("--chalk-as-parent")
+        proc = self.run(
+            chalk_cmd="exec",
+            params=params,
+        )
+
+        assert proc is not None
+        if proc.returncode != 0:
+            logger.error("chalk exec failed with return code", ret=proc.returncode)
+            raise AssertionError
+        try:
+            _report = proc.stdout.decode()
+            # there will be exec proc output that is not chalk so ignore it
+            chalk_start = _report.find("[")
+            return json.loads(_report[chalk_start:], strict=False)
+        except json.decoder.JSONDecodeError:
+            logger.error("Could not decode json", raw=proc.stdout.decode())
+            raise
+
+    def delete(self, artifact: Path) -> List[Dict[str, Any]]:
+        proc = self.run(
+            chalk_cmd="delete",
+            params=[str(artifact), "--log-level=none"],
+        )
+
+        assert proc is not None
+        if proc.returncode != 0:
+            logger.error("chalk delete failed with return code", ret=proc.returncode)
+            raise AssertionError
+        try:
+            _report = proc.stdout.decode()
+            return json.loads(_report, strict=False)
+        except json.decoder.JSONDecodeError:
+            logger.error("Could not decode json", raw=proc.stdout.decode())
+            raise
+
+    # FIXME: returns a process -- should it be returning the chalk report?
+    # loading a config into the binary
+    def load(self, config: str, use_embedded: bool) -> Optional[CompletedProcess]:
+        logger.info("running chalk load")
+        try:
+            params = [config, "--log-level=error"]
+            if use_embedded:
+                params.append("--use-embedded-config")
+            else:
+                params.append("--no-use-embedded-config")
+            load_proc = self.run(
+                chalk_cmd="load",
+                params=params,
+            )
+
+            return load_proc
+        except CalledProcessError as e:
+            logger.error("Called process error for chalk load", error=e)
             raise
