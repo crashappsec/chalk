@@ -192,7 +192,7 @@ method getRunTimeHostInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
   result.setIfNeeded("_OP_CHALKER_COMMIT_ID", getChalkCommitId())
   result.setIfNeeded("_OP_CHALK_COUNT", len(getAllChalks()) -
                                          len(getUnmarked()))
-  result.setIfNeeded("_OP_EXE_NAME", getMyAppPath())
+  result.setIfNeeded("_OP_EXE_NAME", getMyAppPath().splitPath().tail)
   result.setIfNeeded("_OP_EXE_PATH", getAppDir())
   result.setIfNeeded("_OP_ARGV", @[getMyAppPath()] &
                                           commandLineParams())
