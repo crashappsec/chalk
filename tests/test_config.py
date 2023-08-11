@@ -30,9 +30,7 @@ def _chalk_copy(tmp_data_dir: Path, chalk: Chalk) -> Chalk:
 
 
 # test dump + reload with error log + extract to check error
-# FIXME(theo) - add False as a param here once
-# https://github.com/crashappsec/chalk-internal/issues/514 is addressed
-@pytest.mark.parametrize("use_embedded", [True])
+@pytest.mark.parametrize("use_embedded", [True, False])
 def test_dump_load(tmp_data_dir: Path, chalk: Chalk, use_embedded: bool):
     # output for updated config
     tmp_conf = tmp_data_dir / "testconf.conf"
@@ -119,10 +117,8 @@ def test_invalid_load(
         assert "_OP_ERRORS" not in report
 
 
-# FIXME(theo) - add False as a param here once
-# https://github.com/crashappsec/chalk-internal/issues/514 is addressed
 @pytest.mark.parametrize("test_config_file", ["validation/valid_1.conf"])
-@pytest.mark.parametrize("use_embedded", [True])
+@pytest.mark.parametrize("use_embedded", [True, False])
 def test_valid_load(
     tmp_data_dir: Path, chalk: Chalk, test_config_file: str, use_embedded: bool
 ):

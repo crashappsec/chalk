@@ -30,4 +30,5 @@ sink_config dump_out {
   enabled:  false
   sink:     "file"
   filename: ""  # Set via command line in ioconfig.
+  log_search_path: ["."]
 }

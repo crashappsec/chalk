@@ -1265,7 +1265,7 @@ root {
 
   field ignore_when_normalizing {
     type:       list[string]
-    default:    ["MAGIC", "METADATA_HASH", "METADATA_ID", "SIGN_PARAMS",
+    default:    ["MAGIC", "METADATA_HASH", "METADATA_ID", 
                  "SIGNING", "SIGNATURE", "EMBEDDED_CHALK"]
     write_lock: true
     hidden:     true
@@ -2310,16 +2310,28 @@ func sink_config_check(path) {
 	      "' does not use that field.")
     }
 
-    if (conffield == "max") {
+    if contains(["timeout", "truncation_amount", "max"], conffield) {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, Size) and not typecmp(t, int) {
-          return "This field must be a con4m Size, or an int (in bytes)"
+          return "max: This field must be a con4m Size, or an int (in bytes)"
       }
     }
-    elif (conffield == "headers") {
+    elif conffield == "headers" {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, dict[string, string]) {
-          return "This field must be a dict[string, string]"
+          return conffield + ": Field must be a dict[string, string]"
+      }
+    }
+    elif contains(["enabled", "use_search_path", "disallow_http"], conffield) {
+      t := attr_type(path + "." + conffield)
+      if not typecmp(t, bool) {
+          return conffield + ": Field must be `true` or `false`"
+      }
+    }
+    elif contains(["log_search_path", "filters"], conffield) {
+      t := attr_type(path + "." + conffield)
+      if not typecmp(t, list[string]) {
+          return conffield + ": Field must be a list[string]"
       }
     }
     elif not typecmp(attr_type(path + "." + conffield), string) {

@@ -473,18 +473,17 @@ template profileEnabledCheck(profile: Profile) =
     quitChalk(1)
 
 template enforceMagic() =
-  if "MAGIC" notin profile.keys:
-    profile.keys["MAGIC"] = KeyConfig(report: true)
-  else:
-    profile.keys["MAGIC"].report = true
+  forceChalkKeys(["MAGIC", "CHALK_ID", "METADATA_ID"])
 
 proc getChalkMark*(obj: ChalkObj): ChalkDict =
   trace("Creating mark using profile: " & getOutputConfig().chalk)
+
   let profile = chalkConfig.profiles[getOutputConfig().chalk]
   profile.profileEnabledCheck()
 
   enforceMagic()
-  return hostInfo.filterByProfile(obj.collectedData, profile)
+
+  result = hostInfo.filterByProfile(obj.collectedData, profile)
 
 proc getChalkMarkAsStr*(obj: ChalkObj): string =
   if obj.cachedMark != "":
@@ -493,7 +492,6 @@ proc getChalkMarkAsStr*(obj: ChalkObj): string =
   trace("Converting Mark to JSON. Profile name is: " & getOutputConfig().chalk)
   if obj.cachedMark != "":
     return obj.cachedMark
-
 
   let profileName = getOutputConfig().chalk
 
@@ -507,3 +505,6 @@ proc getChalkMarkAsStr*(obj: ChalkObj): string =
   enforceMagic()
   result         = hostInfo.prepareContents(obj.collectedData, profile)
   obj.cachedMark = result
+
+  if not result.startswith("""{ "MAGIC" :"""):
+    error("MAGIC not provided; mark is invalid.")

@@ -199,7 +199,7 @@ proc checkAnnotationSetupStatus*() =
       trace("Signing is already set up.")
       return
 
-    if getBaseCommandName() in [ "setup", "exec", "defaults", "version",
+    if getBaseCommandName() in [ "setup", "exec", "defaults", "version", "load",
                                  "help", "env", "profile", "dump" ]:
       trace("Not taking setup action.")
       return

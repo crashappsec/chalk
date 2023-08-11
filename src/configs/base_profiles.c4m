@@ -80,6 +80,12 @@ reproducable builds, turn it off, along w/ items that cary the time.
   key.DOCKER_CHALK_ADDED_LABELS.report           = true
   key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.report    = true
   key.DOCKER_CHALK_TEMPORARY_TAG.report          = true
+  key.$CHALK_CONFIG.report                       = true
+  key.$CHALK_IMPLEMENTATION_NAME.report          = true
+  key.$CHALK_LOAD_COUNT.report                   = true
+  key.$CHALK_PUBLIC_KEY.report                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
+  key.$CHALK_ATTESTATION_TOKEN.report            = true   
 }
 
 profile chalk_default {
@@ -121,6 +127,12 @@ use `chalk_reproducable`.
   key.OLD_CHALK_METADATA_ID.report               = true
   key.EMBEDDED_CHALK.report                      = true
   key.EMBEDDED_TMPDIR.report                     = true
+  key.$CHALK_CONFIG.report                       = true
+  key.$CHALK_IMPLEMENTATION_NAME.report          = true
+  key.$CHALK_LOAD_COUNT.report                   = true
+  key.$CHALK_PUBLIC_KEY.report                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
+  key.$CHALK_ATTESTATION_TOKEN.report            = true   
 }
 
 # This is the same as the `chalk_default` profile, except the first three
@@ -156,6 +168,12 @@ nonce removed.
   key.OLD_CHALK_METADATA_ID.report               = true
   key.EMBEDDED_CHALK.report                      = true
   key.EMBEDDED_TMPDIR.report                     = true
+  key.$CHALK_CONFIG.report                       = true
+  key.$CHALK_IMPLEMENTATION_NAME.report          = true
+  key.$CHALK_LOAD_COUNT.report                   = true
+  key.$CHALK_PUBLIC_KEY.report                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
+  key.$CHALK_ATTESTATION_TOKEN.report            = true   
 }
 
 profile chalk_minimal {
@@ -172,7 +190,13 @@ you wanted.
 """
   key.DATETIME_WHEN_CHALKED.report               = true
   key.CHALK_PTR.report                           = true
-  key.INJECTOR_PUBLIC_KEY.report                 = true  
+  key.INJECTOR_PUBLIC_KEY.report                 = true
+  key.$CHALK_CONFIG.report                       = true
+  key.$CHALK_IMPLEMENTATION_NAME.report          = true
+  key.$CHALK_LOAD_COUNT.report                   = true
+  key.$CHALK_PUBLIC_KEY.report                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
+  key.$CHALK_ATTESTATION_TOKEN.report            = true   
 }
 
 profile artifact_report_large {

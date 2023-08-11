@@ -155,7 +155,8 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
     if plugin.configInfo.codec and plugin != obj.myCodec: continue
 
     let subscribed = plugin.configInfo.artifactKeys
-    if not plugin.hasSubscribedKey(subscribed, data):
+    if not plugin.hasSubscribedKey(subscribed, data) and
+       plugin.name notin ["system", "metsys"]:
       trace(plugin.name & ": Skipping plugin; its metadata wouldn't be used.")
       continue
 

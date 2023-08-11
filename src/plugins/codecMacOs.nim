@@ -138,14 +138,16 @@ method scan*(self:   CodecMacOs,
     s     = lines[^1]
     sstrm = newStringStream(s)
 
-  if s.find(magicUTF8) == -1:
-    trace("Wrapper not valid; no chalk magic.")
-    return none(ChalkObj)
-  let dict = sstrm.extractOneChalkJson(fullpath)
+  var dict: ChalkDict
 
-  if sstrm.getPosition() != len(s):
-    trace("Wrapper not valid; extra bits after mark")
-    return none(ChalkObj)
+  if s.find(magicUTF8) == -1:
+    warn("Wrapper not valid; no chalk magic.")
+    dict = ChalkDict(nil)
+  else:
+    dict = sstrm.extractOneChalkJson(fullpath)
+    if sstrm.getPosition() != len(s):
+      trace("Wrapper not valid; extra bits after mark")
+      return none(ChalkObj)
 
   # At this point, the marked object is well formed.
   chalk = newChalk(name         = fullpath,

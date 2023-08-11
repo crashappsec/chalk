@@ -61,10 +61,19 @@ proc writeSelfConfig*(selfChalk: ChalkObj) =
   selfChalk.myCodec.handleWrite(selfChalk, toWrite)
 
   if selfChalk.opFailed:
+    let
+      (path, fname) = selfChalk.fsRef.splitPath()
+      maybe         = getCurrentDir().joinPath(fname)
+      actual        = if maybe == selfChalk.fsRef:
+                        selfChalk.fsRef & ".new"
+                      else:
+                        maybe
+
     warn(selfChalk.fsRef & ": unable to modify file.")
-    warn("Attempting to write a copy to: " & selfChalk.fsRef & ".new")
+    warn("Attempting to write a copy of the binary with the new config to: " &
+         actual)
     selfChalk.opFailed = false
-    selfChalk.fsRef = selfChalk.fsRef & ".new"
+    selfChalk.fsRef    = actual
     selfChalk.closeFileStream()
     discard selfChalk.acquireFileStream()
     selfChalk.myCodec.handleWrite(selfChalk, toWrite)
@@ -153,17 +162,20 @@ proc runCmdConfLoad*() =
     cantLoad("Platform does not support self-injection.")
 
   if filename == "default":
-    if selfChalk.isMarked() and "$CHALK_CONFIG" notin selfChalk.collectedData:
-        cantLoad("Already using the default configuration.")
-    newCon4m = defaultConfig
-    info("Installing the default configuration file.")
+    if selfChalk.isMarked() and "$CHALK_CONFIG" notin selfChalk.extract:
+      cantLoad("Already using the default configuration.")
+    else:
+      selfChalk.extract.del("$CHALK_CONFIG")
+      selfChalk.collectedData.del("$CHALK_CONFIG")
+      info("Installing the default configuration file.")
   else:
     loadConfigFile(filename)
-    trace(filename & ": Configuration successfully validated.")
     if chalkConfig.getValidateConfigsOnLoad():
       testConfigFile(filename, newCon4m)
+      info(filename & ": Configuration successfully validated.")
     else:
       warn("Skipping configuration validation. This could break chalk.")
 
   selfChalk.writeSelfConfig()
+  info("Updated configuration for " & selfChalk.name)
   doReporting()
