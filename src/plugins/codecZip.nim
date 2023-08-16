@@ -5,32 +5,26 @@
 ## :Copyright: 2023, Crash Override, Inc.
 
 import zippy/ziparchives_v1, nimSHA2, algorithm, ../config, ../chalkjson,
-       ../util, ../subscan
+       ../util, ../subscan, ../plugin_api
 
 const zipChalkFile = "chalk.json"
 
 type
-  CodecZip         = ref object of Codec
-  PluginZippedItem = ref object of Plugin
-    zipDirs:  seq[string]
-    chalkIds: seq[Box]
-
-  ZipCache = ref object of RootObj
+  ZipCache = ref object of RootRef
     onDisk:        ZipArchive
     embeddedChalk: Box
     tmpDir:        string
 
-let
-  zipCodec      = CodecZip()
-  zipItemPlugin = PluginZippedItem()
+var
+    zipDirs:  seq[string]
+    chalkIds: seq[Box]
 
-
-template pushZipDir(s: string)   = zipItemPlugin.zipDirs.add(s)
-template popZipDir()             = discard zipItemPlugin.zipDirs.pop()
-template pushChalkId(s: string)  = zipItemPlugin.chalkIds.add(pack(s))
-template popChalkId()            = discard zipItemPlugin.chalkIds.pop()
-template getZipDir(): string     = zipItemPlugin.zipDirs[^1]
-template getZipChalkId(): Box    = zipItemPlugin.chalkIds[^1]
+template pushZipDir(s: string)   = zipDirs.add(s)
+template popZipDir()             = discard zipDirs.pop()
+template pushChalkId(s: string)  = chalkIds.add(pack(s))
+template popChalkId()            = discard chalkIds.pop()
+template getZipDir(): string     = zipDirs[^1]
+template getZipChalkId(): Box    = chalkIds[^1]
 
 proc hashZip(toHash: ZipArchive): string =
   var sha = initSHA[SHA256]()
@@ -59,16 +53,39 @@ proc hashExtractedZip(dir: string): string =
 
   return toHash.hashZip()
 
-method scan*(self:   CodecZip,
-             stream: FileStream,
-             loc:    string): Option[ChalkObj] =
+template giveUp() =
+  if stream != nil:
+    stream.close()
+  error(loc & ": " & getCurrentExceptionMsg())
+  dumpExOnDebug()
+  return none(ChalkObj)
 
+template tryOrBail(code: untyped) =
+  try:
+    code
+  except:
+    giveUp()
+
+proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
   var
     ext = loc.splitFile().ext.strip()
     extractCtx: CollectionCtx
 
   if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.getZipExtensions():
     return none(ChalkObj)
+
+  let
+    stream = newFileStream(loc)
+
+  if stream == nil:
+    return none(ChalkObj)
+
+  tryOrBail:
+    # Make sure the file seems to be a valid ZIP file.
+    var buf: array[4, char]
+    discard stream.peekData(addr(buf), 4)
+    if buf[0] != 'P' or buf[1] != 'K':
+      return none(ChalkObj)
 
   let
     tmpDir   = getNewTempDir()
@@ -85,83 +102,80 @@ method scan*(self:   CodecZip,
   cache.onDisk  = ZipArchive()
   cache.tmpDir  = tmpDir
 
-  try:
-    stream.setPosition(0)
-    # Make sure the file seems to be a valid ZIP file.
-    var buf: array[4, char]
-    discard stream.peekData(addr(buf), 4)
-    if buf[0] != 'P' or buf[1] != 'K':
-      return none(ChalkObj)
+  cache.onDisk.open(stream)
+  info(chalk.fsRef & ": temporarily extracting into " & tmpDir)
+  tryOrBail:
+      cache.onDisk.extractAll(origD)
+      cache.onDisk.extractAll(hashD)
 
-    cache.onDisk.open(stream)
-    info(chalk.fsRef & ": temporarily extracting into " & tmpDir)
-    cache.onDisk.extractAll(origD)
-    cache.onDisk.extractAll(hashD)
+  # Even if subscans are off, we do this delete for the purposes of hashing.
+  if not chalkConfig.getChalkDebug():
+    toggleLoggingEnabled()
+  discard runChalkSubScan(hashD, "delete")
+  if not chalkConfig.getChalkDebug():
+    toggleLoggingEnabled()
 
-    # Even if subscans are off, we do this delete for the purposes of hashing.
-    if not chalkConfig.getChalkDebug():  toggleLoggingEnabled()
-    discard runChalkSubScan(hashD, "delete")
-    if not chalkConfig.getChalkDebug():  toggleLoggingEnabled()
-
-    if zipChalkFile in cache.onDisk.contents:
+  if zipChalkFile in cache.onDisk.contents:
+    tryOrBail:
       removeFile(joinPath(hashD, zipChalkFile))
-      let contents = cache.onDisk.contents[zipChalkFile].contents
-      if contents.contains(magicUTF8):
-        let
-          s           = newStringStream(contents)
+
+    let contents = cache.onDisk.contents[zipChalkFile].contents
+    if contents.contains(magicUTF8):
+      let
+        s           = newStringStream(contents)
+
+      try:
         chalk.extract = s.extractOneChalkJson(chalk.fsRef)
         chalk.marked  = true
-      else:
-        chalk.marked  = false
+        s.close()
+      except:
+        discard
+    else:
+      chalk.marked  = false
 
-    chalk.cachedPreHash = hashExtractedZip(hashD)
+  chalk.cachedPreHash = hashExtractedZip(hashD)
 
-    if subscans:
-      extractCtx = runChalkSubScan(origD, "extract")
-      if extractCtx.report.kind == MkSeq:
-        if len(unpack[seq[Box]](extractCtx.report)) != 0:
-          if chalk.extract == nil:
-            warn(chalk.fsRef & ": contains chalked contents, but is not " &
-                 "itself chalked.")
-            chalk.extract = ChalkDict()
-          chalk.extract["EMBEDDED_CHALK"] = extractCtx.report
-      if getCommandName() != "extract":
-        pushZipDir(tmpDir)
-        pushChalkId(chalk.cachedPreHash.idFormat())
-        let collectionCtx = runChalkSubScan(origD, getCommandName())
-        popChalkId()
-        popZipDir()
+  if subscans:
+    extractCtx = runChalkSubScan(origD, "extract")
+    if extractCtx.report.kind == MkSeq:
+      if len(unpack[seq[Box]](extractCtx.report)) != 0:
+        if chalk.extract == nil:
+          warn(chalk.fsRef & ": contains chalked contents, but is not " &
+               "itself chalked.")
+          chalk.extract = ChalkDict()
+        chalk.extract["EMBEDDED_CHALK"] = extractCtx.report
+    if getCommandName() != "extract":
+      pushZipDir(tmpDir)
+      pushChalkId(chalk.cachedPreHash.idFormat())
+      let collectionCtx = runChalkSubScan(origD, getCommandName())
+      popChalkId()
+      popZipDir()
 
-        # Update the internal accounting for the sake of the post-op hash
-        for k, v in cache.onDisk.contents:
-          let tmpPath = os.joinPath(origD, k)
-          if not tmpPath.fileExists():
-            continue
+      # Update the internal accounting for the sake of the post-op hash
+      for k, v in cache.onDisk.contents:
+        let tmpPath = os.joinPath(origD, k)
+        if not tmpPath.fileExists():
+          continue
 
-          var newv = v
-          let
-            f = open(tmpPath, fmRead)
-            c = f.readAll()
-          f.close()
-          newv.contents             = c
-          cache.onDisk.contents[k]  = newV
-        cache.embeddedChalk = collectionCtx.report
+        var newv = v
+        let
+          f = open(tmpPath, fmRead)
+          c = f.readAll()
+        f.close()
+        newv.contents             = c
+        cache.onDisk.contents[k]  = newV
+      cache.embeddedChalk = collectionCtx.report
 
-    return some(chalk)
-  except:
-    error(loc & ": " & getCurrentExceptionMsg())
-    dumpExOnDebug()
-    return some(chalk)
+  return some(chalk)
 
-proc doWrite(self: CodecZip, chalk: ChalkObj, encoded: Option[string],
-             virtual: bool) =
+proc doZipWrite(chalk: ChalkObj, encoded: Option[string], virtual: bool) =
   let
     cache     = ZipCache(chalk.cache)
     chalkFile = joinPath(cache.tmpDir, "contents", zipChalkFile)
 
   var dirToUse: string
 
-  chalk.closeFileStream()
+  chalkCloseStream(chalk)
   try:
     if encoded.isSome():
       let f = open(chalkfile, fmWrite)
@@ -176,15 +190,15 @@ proc doWrite(self: CodecZip, chalk: ChalkObj, encoded: Option[string],
     if not virtual:
       newArchive.writeZipArchive(chalk.fsRef)
     chalk.cachedHash = newArchive.hashZip()
-
   except:
-    error(chalk.fsRef & ": " & getCurrentExceptionMsg())
+    error(chalkFile & ": " & getCurrentExceptionMsg())
     dumpExOnDebug()
 
-method handleWrite*(self: CodecZip, chalk: ChalkObj, encoded: Option[string]) =
-  self.doWrite(chalk, encoded, virtual = false)
+proc zipHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
+                   {.cdecl.} =
+  chalk.doZipWrite(encoded, virtual = false)
 
-method getEndingHash*(self: CodecZip, chalk: ChalkObj): Option[string] =
+proc zipGetEndingHash*(self: Plugin, chalk: ChalkObj): Option[string] {.cdecl.} =
   if chalk.cachedHash == "":
     # When true, --virtual was passed, so we skipped where we calculate
     # the hash post-write. Theoretically, the hash should be the same as
@@ -199,7 +213,8 @@ method getEndingHash*(self: CodecZip, chalk: ChalkObj): Option[string] =
 
   return some(chalk.cachedHash)
 
-method getChalkTimeArtifactInfo*(self: CodecZip, obj: ChalkObj): ChalkDict =
+proc zipGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
+                                ChalkDict {.cdecl.} =
   let cache = ZipCache(obj.cache)
   result    = ChalkDict()
 
@@ -215,8 +230,8 @@ method getChalkTimeArtifactInfo*(self: CodecZip, obj: ChalkObj): ChalkDict =
                                 of ".ear": artTypeEAR
                                 else:      artTypeZip
 
-method getRunTimeArtifactInfo*(self: CodecZip, obj: ChalkObj, ins: bool):
-       ChalkDict =
+proc zipGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, ins: bool):
+       ChalkDict {.cdecl.} =
   result        = ChalkDict()
   let extension = obj.fsRef.splitFile().ext.toLowerAscii()
 
@@ -226,11 +241,11 @@ method getRunTimeArtifactInfo*(self: CodecZip, obj: ChalkObj, ins: bool):
                             of ".ear": artTypeEAR
                             else:      artTypeZip
 
-method getChalkTimeArtifactInfo*(self: PluginZippedItem, obj: ChalkObj):
-       ChalkDict =
+proc zitemGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
+       ChalkDict {.cdecl.} =
   result = ChalkDict()
 
-  if len(zipItemPlugin.chalkIds) == 0:
+  if len(chalkIds) == 0:
     return
 
   if "PATH_WHEN_CHALKED" in obj.collectedData:
@@ -251,5 +266,13 @@ method getChalkTimeArtifactInfo*(self: PluginZippedItem, obj: ChalkObj):
 
   result["CONTAINING_ARTIFACT_WHEN_CHALKED"] = getZipChalkId()
 
-registerPlugin("zip",        zipCodec)
-registerPlugin("zippeditem", zipItemPlugin)
+proc loadCodecZip*() =
+  newCodec("zip",
+           scan          = ScanCb(zipScan),
+           handleWrite   = HandleWriteCb(zipHandleWrite),
+           getEndingHash = EndingHashCb(zipGetEndingHash),
+           ctArtCallback = ChalkTimeArtifactCb(zipGetChalkTimeArtifactInfo),
+           rtArtCallback = RunTimeArtifactCb(zipGetRuntimeArtifactInfo))
+
+  newPlugin("zippeditem",
+            ctArtCallback = ChalkTimeArtifactCb(zitemGetChalkTimeArtifactInfo))

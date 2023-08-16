@@ -2,28 +2,34 @@
 ##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
+# We only need to load plugins that aren't loaded by anything else.
 
-# We need to turn off UnusedImport here, because the nim static
-# analyzer thinks the below imports are unused. When we first import,
-# they call registerPlugin(), which absolutely will get called.
-{.warning[UnusedImport]: off.}
+import macros
 
-import plugins/codecShebang
-import plugins/codecElf
-import plugins/codecDocker
-import plugins/codecZip
-import plugins/codecPythonPy
-import plugins/codecPythonPyc
-import plugins/codecMacOs
-import plugins/ciGithub
-import plugins/ciJenkins
-import plugins/ciGitlab
-import plugins/conffile
-import plugins/ownerAuthors
-import plugins/ownerGithub
-import plugins/vctlGit
-import plugins/ecs
-import plugins/externalTool
-import plugins/system
-when hostOs == "linux":
-  import plugins/procfs
+macro loadPlugins(list: static[openarray[string]]): untyped =
+  var
+    imports = newNimNode(nnkStmtList)
+    loads   = newNimNode(nnkStmtList)
+
+  for item in list:
+    loads.add(nnkCall.newTree(newIdentNode("load" & item)))
+
+    let importTree = quote do:
+      import plugins/`item`
+
+    imports.add(importTree)
+
+  let loadDecl = quote do:
+    proc loadAllPlugins*() =
+      `loads`
+
+  result = imports
+  result.add(loadDecl)
+
+# Putting `pluginName` in here will cause `loadPluginName()`
+# to get called.
+
+loadPlugins(["codecDocker", "codecElf", "codecMacOs", "codecPythonPy",
+             "codecPythonPyc", "codecShebang", "codecZip", "ciGithub", "ciGitlab",
+             "ciJenkins", "conffile", "ecs", "externalTool", "ownerAuthors",
+             "ownerGithub", "procfs", "system", "vctlGit"])

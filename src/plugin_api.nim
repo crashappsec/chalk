@@ -8,9 +8,68 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import glob, posix, nimSHA2, config, chalkjson, util
+import glob, nimSHA2, config, chalkjson, util, algorithm
 
-const  ePureVirtual = "Method is not defined; it must be overridden"
+# These things don't check for null pointers, because they should only
+# get called when plugins declare stuff in the config file, so this
+# should all be pre-checked.
+
+template callGetChalkTimeHostInfo*(plugin: Plugin): ChalkDict =
+  let cb = plugin.getChalkTimeHostInfo
+
+  cb(plugin)
+
+template callGetChalkTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj):
+         ChalkDict =
+  let cb = plugin.getChalkTimeArtifactInfo
+
+  cb(plugin, obj)
+
+template callGetRunTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj, b: bool):
+         ChalkDict =
+  let cb = plugin.getRunTimeArtifactInfo
+
+  cb(plugin, obj, b)
+
+template callGetRunTimeHostInfo*(plugin: Plugin, objs: seq[ChalkObj]):
+         ChalkDict =
+  let cb = plugin.getRunTimeHostInfo
+
+  cb(plugin, objs)
+
+template callScan*(plugin: Plugin, s: string):
+         Option[ChalkObj] =
+  let cb = plugin.scan
+
+  cb(plugin, s)
+
+template callGetUnchalkedHash*(obj: ChalkObj): Option[string] =
+  let
+    plugin = obj.myCodec
+    cb     = plugin.getUnchalkedHash
+
+  cb(plugin, obj)
+
+template callGetEndingHash*(obj: ChalkObj): Option[string] =
+  let
+    plugin = obj.myCodec
+    cb     = plugin.getEndingHash
+
+  cb(plugin, obj)
+
+template callGetChalkId*(obj: ChalkObj): string =
+  let
+    plugin = obj.myCodec
+    cb     = plugin.getChalkId
+
+  cb(plugin, obj)
+
+template callHandleWrite*(obj: ChalkObj, toWrite: Option[string]) =
+  let
+    plugin = obj.myCodec
+    cb     = plugin.handleWrite
+
+  cb(plugin, obj, toWrite)
 
 proc findFirstValidChalkMark*(s:            string,
                               artifactPath: string,
@@ -223,17 +282,16 @@ proc getNewScriptContents*(fileContents: string,
   else:
     return fileContents[0 ..< cs] & markContents & fileContents[r .. ^1]
 
-proc scriptLoadMark*(codec:  Codec,
-                     stream: FileStream,
-                     path:   string,
-                     comment = "#"): Option[ChalkObj] =
-  ## Instead of having a big, fragile inheritance hierarchy, we
-  ## provide this helper function that we expect will work for MOST
+proc scriptLoadMark*(codec:  Plugin, stream: FileStream,
+                     path: string, comment = "#"):
+                   Option[ChalkObj] =
+  ## We expect this helper function will work for MOST
   ## codecs for scripting languages and similar, after checking
   ## conditions to figure out if you want to handle the thing.  But
   ## you don't have to use it, if it's not appropriate!
 
   stream.setPosition(0)
+
   let
     contents       = stream.readAll()
     chalk          = newChalk(name         = path,
@@ -245,8 +303,6 @@ proc scriptLoadMark*(codec:  Codec,
 
   result = some(chalk)
 
-  stream.setPosition(0)
-
   if toHash == "" and dict == nil:
     chalk.cachedPreHash = hashFmt($(contents.computeSHA256()))
   else:
@@ -257,16 +313,18 @@ proc scriptLoadMark*(codec:  Codec,
     chalk.marked  = true
     chalk.extract = dict
 
-
-proc scriptHandleWrite*(chalk:   ChalkObj,
-                        encoded: Option[string],
-                        comment = "#") =
+proc scriptHandleWrite*(plugin:  Plugin,
+                        chalk:   ChalkObj,
+                        encoded: Option[string]) {.cdecl.} =
   ## Same as above, default option for a handleWrite implementation
   ## that should work for most scripting languages.
-  discard chalk.acquireFileStream()
-  chalk.stream.setPosition(0)
-  let contents = chalk.stream.readAll()
-  chalk.closeFileStream()
+  let comment = plugin.commentStart
+
+  var contents: string
+
+  chalkUseStream(chalk):
+    contents = chalk.stream.readAll()
+  chalkCloseStream(chalk)
 
   if encoded.isNone():
     if not chalk.marked:  # Unmarked, so nothing to do.
@@ -285,7 +343,7 @@ proc scriptHandleWrite*(chalk:   ChalkObj,
     else:
       chalk.cachedHash = hashFmt($(toWrite.computeSHA256()))
 
-proc loadChalkFromFStream*(codec:  Codec,
+proc loadChalkFromFStream*(codec:  Plugin,
                            stream: FileStream,
                            loc:    string): ChalkObj =
   ## A helper function for codecs that use file streams to load
@@ -312,62 +370,18 @@ proc loadChalkFromFStream*(codec:  Codec,
     error(loc & ": Invalid JSON: " & getCurrentExceptionMsg())
     dumpExOnDebug()
 
-# These are the base methods for all plugins.  They don't have to
-# implement them; we only try to call these methods if the config for
-# the plugin specifies that it returns keys from one of these
-# particular calls.
-method getChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):
-       ChalkDict {.base.} =
-  raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
-method getRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj, ins: bool):
-       ChalkDict {.base.} =
-  raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
-method getChalkTimeHostInfo*(self: Plugin): ChalkDict {.base.} =
-  raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
-method getRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
-       ChalkDict {.base.} =
-  raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
-
-# Base methods for codecs, including default implementations for things
-# using file streams.
-
-method usesFStream*(self: Codec): bool {.base.} = true
-
-method scan*(self:   Codec,
-             stream: FileStream,
-             loc:    string): Option[ChalkObj] {.base.} =
-  raise newException(Exception, "In plugin: " & self.name & ": " & ePureVirtual)
-
-method keepScanningOnSuccess*(self: Codec): bool {.base.} = true
-
-proc scanLocation(self: Codec, loc: string, state: ArtifactIterationInfo):
+proc scanLocation(self: Plugin, loc: string):
                  Option[ChalkObj] =
-  # Helper function for scanArtifactLocations below.
-  var stream = newFileStream(loc, fmRead)
-  if stream == nil:
-    error(loc & ": could not open file.")
-    return
-  else:
-    trace(loc & ": File stream opened")
-  result = self.scan(stream, loc)
-  if result.isNone():
-    stream.close()
-    return
-  state.fileExclusions.add(loc)
-  var chalk = result.get()
-
-  if bumpFdCount():
-    chalk.stream = stream
-  else:
-    stream.close()
-    trace(loc & ": File stream closed")
+  result = callScan(self, loc)
 
 proc mustIgnore(path: string, globs: seq[glob.Glob]): bool {.inline.} =
-  for item in globs:
-    if path.matches(item): return true
-  return false
+  result = false
 
-proc scanArtifactLocations*(self: Codec, state: ArtifactIterationInfo):
+  for item in globs:
+    if path.matches(item):
+      return true
+
+proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
                         seq[ChalkObj] =
   # This will call scan() with a file stream, and you pass back a
   # Chalk object if chalk is there.
@@ -385,10 +399,9 @@ proc scanArtifactLocations*(self: Codec, state: ArtifactIterationInfo):
       if path in state.fileExclusions: continue
       if path.mustIgnore(state.skips): continue
       trace(path & ": scanning file")
-      let opt = self.scanLocation(path, state)
+      let opt = self.scanLocation(path)
       if opt.isSome():
         result.add(opt.get())
-        opt.get().yieldFileStream()
     elif info.kind == pcLinkToFile:
       discard # We ignore symbolic links for now.
     elif state.recurse:
@@ -397,37 +410,28 @@ proc scanArtifactLocations*(self: Codec, state: ArtifactIterationInfo):
         if item.mustIgnore(state.skips):     continue
         if getFileInfo(item).kind != pcFile: continue
         trace(item & ": scanning file")
-        let opt = self.scanLocation(item, state)
+        let opt = self.scanLocation(item)
         if opt.isSome():
           result.add(opt.get())
-          opt.get().yieldFileStream()
     else:
       dirWalk(false):
         if item in state.fileExclusions:     continue
         if item.mustIgnore(state.skips):     continue
         if getFileInfo(item).kind != pcFile: continue
         trace("Non-recursive dir walk examining: " & item)
-        let opt = self.scanLocation(item, state)
+        let opt = self.scanLocation(item)
         if opt.isSome():
           result.add(opt.get())
-          opt.get().yieldFileStream()
 
-proc simpleHash(self: Codec, chalk: ChalkObj): Option[string] =
-  var s: Stream
+proc simpleHash(self: Plugin, chalk: ChalkObj): Option[string] =
+  # The default if the stream can't be acquired.
+  result = none(string)
 
-  if self.usesFStream():
-    s = chalk.acquireFileStream().getOrElse(nil)
+  chalkUseStream(chalk):
+    let txt = $(stream.readAll().computeSHA256())
+    result = some(hashFmt(txt))
 
-  if s == nil:
-    return none(string)
-
-  s.setPosition(0)
-  let txt = $(s.readAll().computeSHA256())
-  chalk.yieldFileStream()
-
-  result = some(hashFmt(txt))
-
-method getUnchalkedHash*(self: Codec, obj: ChalkObj): Option[string] {.base.} =
+proc defUnchalkedHash*(self: Plugin, obj: ChalkObj): Option[string] {.cdecl.} =
   ## This is called in computing the CHALK_ID. If the artifact already
   ## hash chalk marks they need to be removed.
   ##
@@ -437,94 +441,159 @@ method getUnchalkedHash*(self: Codec, obj: ChalkObj): Option[string] {.base.} =
   if obj.cachedPreHash != "": return some(obj.cachedPreHash)
   return none(string)
 
-method getEndingHash*(self: Codec, chalk: ChalkObj): Option[string] {.base.} =
+proc defEndingHash*(self: Plugin, chalk: ChalkObj): Option[string] {.cdecl.} =
   ## This is called after chalking is done.  We check the cache first.
   if chalk.cachedHash != "": return some(chalk.cachedHash)
   return simpleHash(self, chalk)
 
-method getChalkId*(self: Codec, chalk: ChalkObj): string {.base.} =
-  let hashOpt = self.getUnchalkedHash(chalk)
+proc randChalkId*(self: Plugin, chalk: ChalkObj): string {.cdecl.} =
+  var
+    b      = secureRand[array[32, char]]()
+    preRes = newStringOfCap(32)
+
+  for ch in b:
+    preRes.add(ch)
+
+  return preRes.idFormat()
+
+proc defaultChalkId*(self: Plugin, chalk: ChalkObj): string {.cdecl.} =
+  let hashOpt = chalk.callGetUnchalkedHash()
+
   if not hashOpt.isNone():
     return hashOpt.get().idFormat()
-  else:
-    warn(chalk.name & ": In plugin '" & self.name &
-      "', no hash for chalk ID; using a random value.")
-    var
-      b      = secureRand[array[32, char]]()
-      preRes = newStringOfCap(32)
-    for ch in b: preRes.add(ch)
-    return preRes.idFormat()
 
-method getChalkTimeArtifactInfo*(self: Codec, chalk: ChalkObj): ChalkDict =
-  discard
+  info(chalk.name & ": In plugin '" & self.name &
+       "', no hash for chalk ID; using a random value.")
 
-method getRunTimeArtifactInfo*(self: Codec, chalk: ChalkObj, ins: bool):
-       ChalkDict =
+  return self.randChalkId(chalk)
+
+proc defaultRtArtInfo*(self: Plugin, chalk: ChalkObj, ins: bool):
+                     ChalkDict {.cdecl.} =
   result = ChalkDict()
 
-  let postHashOpt = self.getEndingHash(chalk)
+  let postHashOpt = chalk.callGetEndingHash()
 
   if postHashOpt.isSome():
     result["_CURRENT_HASH"] = pack(postHashOpt.get())
 
-## Codecs override this if they're for a binary format and can self-inject.
-method getNativeObjPlatforms*(s: Codec): seq[string] {.base.} = @[]
+proc defaultCodecWrite*(s:     Plugin,
+                        chalk: ChalkObj,
+                        enc:   Option[string]) {.cdecl.} =
+  var
+    pre:  string
+    post: string
 
-method handleWrite*(s:       Codec,
-                    chalk:   ChalkObj,
-                    enc:     Option[string]) {.base.} =
-  var pre, post: string
-  chalk.stream.setPosition(0)
-  pre = chalk.stream.readStr(chalk.startOffset)
-  if chalk.endOffset > chalk.startOffset:
-    chalk.stream.setPosition(chalk.endOffset)
-    post = chalk.stream.readAll()
-  chalk.closeFileStream()
+  chalkUseStream(chalk):
+    pre = stream.readStr(chalk.startOffset)
+
+    if chalk.endOffset > chalk.startOffset:
+      stream.setPosition(chalk.endOffset)
+      post = chalk.stream.readAll()
+
+  # Need to close in order to successfully replace.
+  chalkCloseStream(chalk)
+
   let contents = pre & enc.getOrElse("") & post
   if not chalk.replaceFileContents(contents):
     chalk.opFailed = true
 
-# This is docker specific stuff that shouldn't be here, but am dealing
-# with some cyclic dependencies.
-const
-  hostDefault = "host_report_other_base"
-  artDefault  = "artifact_report_extract_base"
+var
+  installedPlugins: Table[string, Plugin]
+  plugins:          seq[Plugin]           = @[]
+  codecs:           seq[Plugin]           = @[]
 
-proc profileToString(name: string): string =
-  if name in ["", hostDefault, artDefault]: return ""
+template isCodec*(plugin: Plugin): bool = plugin.configInfo.codec
 
-  result      = "profile " & name & " {\n"
-  let profile = chalkConfig.profiles[name]
-
-  for k, obj in profile.keys:
-    let
-      scope  = obj.getAttrScope()
-      report = get[bool](scope, "report")
-      order  = getOpt[int](scope, "order")
-
-    result &= "  key." & k & ".report = " & $(report) & "\n"
-    if order.isSome():
-      result &= "  key." & k & ".order = " & $(order.get()) & "\n"
-
-  result &= "}\n\n"
-
-proc sinkConfToString(name: string): string =
-  result     = "sink_config " & name & " {\n  filters: ["
-  var frepr  = seq[string](@[])
+proc checkPlugin(plugin: Plugin, codec: bool): bool {.inline.} =
   let
-    config   = chalkConfig.sinkConfs[name]
-    scope    = config.getAttrScope()
+    name  = plugin.name
+    maybe = getPluginConfig(name)
+    spec  = maybe.getOrElse(PluginSpec(nil))
 
-  for item in config.filters: frepr.add("\"" & item & "\"")
+  if maybe.isNone():
+    error("No config provided for plugin " & name & ". Plugin ignored.")
+  elif not maybe.get().getEnabled():
+      trace("Plugin " & name & " is disabled via config file.")
+  elif name in installedPlugins:
+    error("Double install of plugin named: " & name)
+  elif spec.codec != codec:
+    if codec:
+      error("Codec expected, but the config file does not declare that it " &
+        "is a codec.")
+    else:
+      error("Plugin expected, but the config file declares that it's a codec.")
+  else:
+    trace("Installed plugin: " & name)
+    plugin.configInfo      = spec
+    installedPlugins[name] = plugin
+    return true
 
-  result &= frepr.join(", ") & "]\n"
-  result &= "  sink: \"" & config.sink & "\"\n"
+proc getAllPlugins*(): seq[Plugin] =
+  var preResult: seq[(int, Plugin)] = @[]
+  for name, plugin in installedPlugins:
+    preResult.add((plugin.configInfo.getPriority(), plugin))
 
-  # copy out the config-specific variables.
-  for k, v in scope.contents:
-    if k in ["enabled", "filters", "loaded", "sink"]: continue
-    if v.isA(AttrScope): continue
-    let val = getOpt[string](scope, k).getOrElse("")
-    result &= "  " & k & ": \"" & val & "\"\n"
+  preResult.sort()
+  for (_, plugin) in preResult:
+    result.add(plugin)
 
-  result &= "}\n\n"
+template getPluginByName*(s: string): Plugin = installedPlugins[s]
+
+proc getAllCodecs*(): seq[Plugin] =
+  once:
+    for item in getAllPlugins():
+      if item.isCodec():
+        codecs.add(item)
+
+  return codecs
+
+proc newPlugin*(
+  name:           string,
+  ctHostCallback: ChalkTimeHostCb     = ChalkTimeHostCb(nil),
+  ctArtCallback:  ChalkTimeArtifactCb = ChalkTimeArtifactCb(nil),
+  rtArtCallback:  RunTimeArtifactCb   = RunTimeArtifactCb(nil),
+  rtHostCallback: RunTimeHostCb       = RunTimeHostCb(nil),
+  cache:          RootRef             = RootRef(nil)):
+    Plugin {.discardable, cdecl.} =
+  result = Plugin(name:                     name,
+                  getChalkTimeHostInfo:     ctHostCallback,
+                  getChalkTimeArtifactInfo: ctArtCallback,
+                  getRunTimeArtifactInfo:   rtArtCallback,
+                  getRunTimeHostInfo:       rtHostCallback,
+                  internalState:            cache)
+
+  if not result.checkPlugin(codec = false):
+    result = Plugin(nil)
+
+proc newCodec*(
+  name:               string,
+  scan:               ScanCb              = ScanCb(nil),
+  ctHostCallback:     ChalkTimeHostCb     = ChalkTimeHostCb(nil),
+  ctArtCallback:      ChalkTimeArtifactCb = ChalkTimeArtifactCb(nil),
+  rtArtCallback:      RunTimeArtifactCb   = RuntimeArtifactCb(defaultRtArtInfo),
+  rtHostCallback:     RunTimeHostCb       = RunTimeHostcb(nil),
+  getUnchalkedHash:   UnchalkedHashCb     = UnchalkedHashCb(defUnchalkedHash),
+  getEndingHash:      EndingHashCb        = EndingHashCb(defEndingHash),
+  getChalkId:         ChalkIdCb           = ChalkIdCb(defaultChalkId),
+  handleWrite:        HandleWriteCb       = HandleWritecb(defaultCodecWrite),
+  nativeObjPlatforms: seq[string]         =  @[],
+  cache:              RootRef             = RootRef(nil),
+  commentStart:       string              = "#"):
+    Plugin {.discardable, cdecl.} =
+
+  result = Plugin(name:                     name,
+                  scan:                     scan,
+                  getChalkTimeHostInfo:     ctHostCallback,
+                  getChalkTimeArtifactInfo: ctArtCallback,
+                  getRunTimeArtifactInfo:   rtArtCallback,
+                  getRunTimeHostInfo:       rtHostCallback,
+                  getUnchalkedHash:         getUnchalkedHash,
+                  getEndingHash:            getEndingHash,
+                  getChalkId:               getChalkId,
+                  handleWrite:              handleWrite,
+                  nativeObjPlatforms:       nativeObjPlatforms,
+                  internalState:            cache,
+                  commentStart:             commentStart)
+
+  if not result.checkPlugin(codec = true):
+    result = Plugin(nil)

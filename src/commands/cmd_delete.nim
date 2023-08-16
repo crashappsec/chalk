@@ -20,7 +20,7 @@ proc runCmdDelete*(path: seq[string]) {.exportc,cdecl.} =
         toRm.add(item)
         continue
       else:
-        item.myCodec.handleWrite(item, none(string))
+        item.callHandleWrite(none(string))
         if not item.opFailed:
           info(item.fsRef & ": chalk mark successfully deleted")
     except:

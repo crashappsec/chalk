@@ -1,4 +1,4 @@
-import posix, ../config, ../selfextract, ../collect, ../reporting,
+import posix, ../config, ../selfextract, ../reporting, ../collect,
        ../con4mfuncs, ../chalkjson, ../util, ../plugin_api
 
 template cantLoad(s: string) =
@@ -42,7 +42,8 @@ proc makeNewValuesAvailable(chalk: ChalkObj) =
     if item.startsWith("$"):
       chalk.extract[item] = value
 
-proc writeSelfConfig*(selfChalk: ChalkObj) =
+proc writeSelfConfig*(selfChalk: ChalkObj): bool
+    {.cdecl, exportc, discardable.} =
   selfChalk.persistInternalValues()
   collectChalkTimeHostInfo()
   selfChalk.collectChalkTimeArtifactInfo()
@@ -58,7 +59,7 @@ proc writeSelfConfig*(selfChalk: ChalkObj) =
   trace(selfChalk.name & ": installing configuration.")
 
   let toWrite = some(selfChalk.getChalkMarkAsStr())
-  selfChalk.myCodec.handleWrite(selfChalk, toWrite)
+  selfChalk.callHandleWrite(toWrite)
 
   if selfChalk.opFailed:
     let
@@ -74,12 +75,12 @@ proc writeSelfConfig*(selfChalk: ChalkObj) =
          actual)
     selfChalk.opFailed = false
     selfChalk.fsRef    = actual
-    selfChalk.closeFileStream()
-    discard selfChalk.acquireFileStream()
-    selfChalk.myCodec.handleWrite(selfChalk, toWrite)
+    selfChalk.chalkCloseStream()
+
+    selfChalk.callHandleWrite(toWrite)
     if selfChalk.opFailed:
       error("Failed to write. Operation aborted.")
-      return
+      return false
     else:
       when defined(posix):
         let f = open(selfChalk.fsRef)
@@ -88,6 +89,7 @@ proc writeSelfConfig*(selfChalk: ChalkObj) =
 
   info("Configuration replaced in binary: " & selfChalk.fsRef)
   selfChalk.makeNewValuesAvailable()
+  return true
 
 template loadConfigFile(filename: string) =
     let f = newFileStream(resolvePath(filename))

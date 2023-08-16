@@ -1,5 +1,5 @@
-import ../config, ../collect, ../reporting, ../plugins/codecDocker
-
+import ../config, ../collect, ../reporting, ../plugins/codecDocker,
+       ../plugin_api
 
 template processDockerChalkList(chalkList: seq[ChalkObj]) =
   for item in chalkList:
@@ -28,7 +28,7 @@ template coreExtractFiles(path: seq[string]) =
 
 template coreExtractImages() =
   let
-    docker = Codec(getPluginByName("docker"))
+    docker = getPluginByName("docker")
     images = docker.getImageChalks()
 
   if len(images) == 0:
@@ -38,7 +38,7 @@ template coreExtractImages() =
 
 template coreExtractContainers() =
   let
-    docker     = Codec(getPluginByName("docker"))
+    docker     = getPluginByName("docker")
     containers = docker.getContainerChalks()
 
   if len(containers) == 0:

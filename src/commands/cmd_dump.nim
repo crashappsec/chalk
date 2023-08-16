@@ -3,7 +3,6 @@ import ../config, ../selfextract
 proc runCmdConfDump*() =
   var
     toDump  = defaultConfig
-    argList = getArgs()
     chalk   = getSelfExtraction().getOrElse(nil)
     extract = if chalk != nil: chalk.extract else: nil
 

@@ -158,6 +158,7 @@ outconf = [
     "setup",
     "help",
     "fail",
+    "heartbeat"
 ]
 
 

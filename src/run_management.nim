@@ -11,6 +11,19 @@ proc startTestRun*() =
   doingTestRun = true
 proc endTestRun*()   =
   doingTestRun = false
+proc startNativeCodecsOnly*() =
+  nativeCodecsOnly = true
+proc endNativeCodecsOnly*() =
+  nativeCodecsOnly = false
+
+template getNativeCodecsOnly*(): bool = nativeCodecsOnly
+
+proc clearReportingState*() =
+  ctxStack       = @[]
+  collectionCtx  = CollectionCtx()
+  hostInfo       = ChalkDict()
+  subscribedKeys = Table[string, bool]()
+  systemErrors   = @[]
 
 proc pushCollectionCtx*(): CollectionCtx =
   ctxStack.add(collectionCtx)
@@ -45,6 +58,7 @@ proc newChalk*(name:         string            = "",
                pid:          Option[Pid]       = none(Pid),
                fsRef:        string            = "",
                tag:          string            = "",
+               repo:         string            = "",
                imageId:      string            = "",
                containerId:  string            = "",
                marked:       bool              = false,
@@ -52,12 +66,13 @@ proc newChalk*(name:         string            = "",
                resourceType: set[ResourceType] = {ResourceFile},
                extract:      ChalkDict         = ChalkDict(nil),
                cache:        RootRef           = RootRef(nil),
-               codec:        Codec             = Codec(nil)): ChalkObj =
+               codec:        Plugin            = Plugin(nil)): ChalkObj =
   result = ChalkObj(name:          name,
                     pid:           pid,
                     fsRef:         fsRef,
                     stream:        stream,
                     userRef:       tag,
+                    repo:          repo,
                     marked:        marked,
                     imageId:       imageId,
                     containerId:   containerId,
@@ -67,6 +82,10 @@ proc newChalk*(name:         string            = "",
                     extract:       extract,
                     cache:         cache,
                     myCodec:       codec)
+
+  if stream != FileStream(nil):
+    cachedChalkStreams.add(result)
+
   setErrorObject(result)
 
 template setIfNotEmpty*(dict: ChalkDict, key: string, val: string) =

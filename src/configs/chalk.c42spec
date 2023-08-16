@@ -18,7 +18,7 @@ valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
 all_cmds_that_insert := ["insert", "build", "load", "setup"]
 
 # Beyond valid chalk commands, these can generate reports.
-other_report_ops     := ["build", "push"]
+other_report_ops     := ["build", "push", "heartbeat"]
 
 tool_types           := ["sbom", "sast"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
@@ -967,6 +967,36 @@ version of Docker that accepts `--build-context`.
 """
   }
 
+  field arch_binary_locations {
+    type:     dict[string, string]
+    require:  false
+    shortdoc: "Locations for entrypoint binaries"
+    doc: """
+Whenever Chalk does automatic entry-point wrapping, it uses its own
+binary and its own `exec` config to move into the entry
+point. However, if the container being built is of a different
+architecture, it cannot do that.
+
+If this field is set, it maps docker architecture strings to locations
+where the configured Chalk binary lives for the platform. Currently,
+this only accepts local file system paths, so the binary must be
+local.
+
+If there isn't an architecture match, and no binary can be found per
+this field,
+
+Keys are expected in "Os/Architecture/Variant" form, eg:
+"linux/arm64", "linux/amd64", "linux/arm/v7" etc.
+
+Note that Chalk itself is only targeted for a subset of the platforms
+that officially support Docker, specifically Linux on arm64 and amd64
+(no Windows yet). If an entrypoint wrapping is performed on any
+architecture not in this set (bravo for getting Chalk to build!), it
+will still refuse to copy itself in, except via this configuration
+field.
+"""    
+  }
+
   field label_prefix {
     type:    string
     default: "run.crashoverride."
@@ -1028,18 +1058,35 @@ are no default output sinks subscribed to this topic.
     default:  false
     shortdoc: "Report on empty docker metadata"
     doc: """
-Docker's internal reporting often gives results that are empty when not set.  If this is on, such fields are elided on reporting.
+Docker's internal reporting often gives results that are empty when
+not set.  If this is on, such fields are elided on reporting.
+
 """
   }
 
-  field use_transparency_log {
-    type:     bool
-    default:  false
-    shortdoc: "Use transparency logging"
+  field additional_env_vars {
+    type: dict[string, string]
+    default: { }
+    shortdoc: "Additional container environment variables"
     doc: """
+When doing non-virtual chalking of a container, this will
+automatically add an `ENV` statement to the *end* of the Dockerfile
+passed to the final build. Keys may only have letters, numbers and
+underscores (and cannot start with a number); the values are always
+quoted per JSON rules.
 
-When this is true, digital signings will get published to a transparency log, and extracts from container images will attempt to validate in the transparency log.
+If you want to add chalk-time metadata, have the value be the chalk
+key, prefixed with an @.  For instance:
 
+```
+{ "ARTIFACT_IDENTIFIER" : "@CHALK_ID" }
+```
+
+will add something to the dockerfile like:
+
+```
+ENV ARTIFACT_IDENTIFIER="X6VRPZ-C828-KDNS-QDXRT0"
+```
 """    
   }
 }
@@ -1146,62 +1193,63 @@ When this is true, the PATH environment variable will be searched for your execu
 If it is NOT true, set exec.searchpath to provide any locations Chalk should check for the executable to exec.
 """
   }
+
+  field heartbeat {
+    type:    bool
+    default: false
+    shortdoc: "Report heartbeats"
+    doc: """
+When this is true, Chalk will, after initial reporting, connect
+periodically to post "heartbeat" reports. The beacon report frequency is
+controlled by the `heartbeat_rate` field.
+"""    
+  }
+
+  field heartbeat_rate {
+    type:    Duration
+    default: <<20 seconds>>
+    shortdoc: "Heartbeat rate"
+    doc: """
+When `heartbeat` is true, after any report, chalk will sleep the specified
+amount of time before providing another heartbeat report.
+
+Note that, when Chalk is running in a container, the container may
+exit before any particular report completes, and can even kill one in
+the middle of it posting.
+
+When running outside a container, or if inside a container, but
+running as a parent process, the heartbeat process will exit after a
+final report, if the monitored process has exited.
+"""    
+  }
 }
 
-singleton env_cache {
+singleton env_config {
   gen_fieldname: "envConfig"
   gen_typename:  "EnvConfig"
   gen_setters:   false
   user_def_ok:   false
   doc: """
-Internal configuration information gathering runtime environment information when running runtime environmental information.  Note that this is generally done either the 'env' command or the 'exec' command.
+Internal configuration information gathering runtime environment
+information when running with the 'env' command, which is similar to
+the exec command, but where the exec command executes a subprocess
+that is the focus of reporting, env just reports on the host
+environment, and optionally any processes that you're interested.
 
-The difference is that 'exec' explicitly spawns a workload (the chalk reporting happens in a separate thread), whereas 'env' is usable as an environmental report at any point (processes can run a chalk instance).
+If there is a /chalk.json file, this will assume it is in a container,
+and report on pid 1.
 """
 
 
-  field chalk_id {
-    type:    string
-    require: false
-    shortdoc: "CHALK_ID to report"
+  field process_report_patterns {
+    type:    list[string]
+    default: []
+    shortdoc: "Processes to report on"
     doc: """
-If passed, will be reported as if it is an extracted CHALK_ID field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
-"""
-  }
-
-  field metadata_id {
-    type:    string
-    require: false
-    shortdoc: "METADATA_ID to report"
-    doc: """
-If passed, will be reported as if it is an extracted METADATA_ID field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
-"""
-  }
-
-  field artifact_hash {
-    type:    string
-    require: false
-    shortdoc: "ARTIFACT_HASH to report"
-    doc: """
-If passed, will be reported as if it is an extracted ARTIFACT_HASH field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
-"""
-  }
-
-  field metadata_hash {
-    type:    string
-    require: false
-    shortdoc: "METADATA_HASH to report"
-    doc: """
-If passed, will be reported as if it is an extracted METADATA_HASH field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
-"""
-  }
-
-  field artifact_path {
-    type:    string
-    require: false
-    shortdoc: "_ARTIFACT_PATH to report"
-    doc: """
-If passed, will be reported as if it is an _ARTIFACT_PATH field, when the 'env' command is run.  This field is currently not checked, just passed on to the reporting system directly.
+If passed, Chalk will match processes by name to report on, accepting
+regular expression matches. It looks up processes via the system
+facilities for process listing, and does try to look up the binary
+from that, if it has access.
 """
   }
 }
@@ -1229,7 +1277,7 @@ root {
   allow extract       { }
   allow docker        { }
   allow exec          { }
-  allow env_cache     { }
+  allow env_config    { }
 
   field config_path {
     type:       list[string]
@@ -1265,8 +1313,8 @@ root {
 
   field ignore_when_normalizing {
     type:       list[string]
-    default:    ["MAGIC", "METADATA_HASH", "METADATA_ID", 
-                 "SIGNING", "SIGNATURE", "EMBEDDED_CHALK"]
+    default:    ["MAGIC", "METADATA_HASH", "METADATA_ID", "SIGNING", "SIGNATURE",
+                 "EMBEDDED_CHALK"]
     write_lock: true
     hidden:     true
     doc:        """
@@ -1470,6 +1518,77 @@ Set the default path to search for artifacts, unless overriden by command-line a
 """
   }
 
+  field always_try_to_sign {
+    type:     bool
+    default:  true
+    shortdoc: "Always sign"
+    doc:      """
+When true, Chalk will attempt to use Cosign to sign *all* artifacts
+when chalking. If it's false, Chalk will still try to sign when
+chalking containers, as otherwise it's not practical to determine when
+containers have been modified since chalking.
+
+Even if this is false, Chalk will try to sign if either the chalk
+profile or the artifact reporting profile have SIGNATURE set.
+"""    
+  }
+
+  field use_transparency_log {
+    type:     bool
+    default:  false
+    shortdoc: "Use transparency logging"
+    doc: """
+When this is true, digital signings will get published to a transparency log, and extracts from container images will attempt to validate in the transparency log.
+
+"""    
+  }
+
+  field use_internal_password {
+    type:     bool
+    default:  false
+    shortdoc: "Embed signing password"
+    doc: """
+When this is true, then Chalk will look inside the chalk mark for the
+signing password when needed (and decrypt it from an embedded
+key). When this is false, Chalk instead uses the `CHALK_PASSWORD`
+environment variable to read the password.
+
+Generally, our recommendation is for this value to be `false` and to
+use a secret manager to load the environment variable right before
+calling chalk (make sure it gets unloaded immediately after).
+
+However, this option is provided for those who wish to hardcode
+secrets; this manages the hardcoding, and even encrypts it with a key
+specific to the binary. If you compile the binary yourself, and care
+about operational security of the binary (making sure, for instance,
+it's only ever readable by the current user when running it), then
+this is a plausable approach.
+
+For the `chalk setup` command, this will cause the embedding to
+happen. For any other command, when the password is needed, it will
+cause Chalk to look for the internal password first, and then try the
+environment variable if that fails.
+
+Otherwise, if this is false, Chalk will not save the password on
+`setup`, and for other commands will ONLY check the environment
+variable.
+"""    
+  }
+
+  field signing_key_location {
+  type:     string
+  default:  "./chalk.key"
+  shortdoc: "Signing key location"
+  doc: """
+
+This is only used for the `chalk setup` command; it dictates where to
+either find a key pair to load, or where to write a keypair being
+generated.
+
+Chalk will also embed the keypairs internally, for future operations.
+"""
+}
+
   field ignore_patterns {
     type:     list[string]
     default:  [".*/**", "*.txt", "*.json"]
@@ -1500,24 +1619,6 @@ Turn this off to prevent accidentally picking up an external configuration file.
 This variable controls whether the embedded configuration file runs. Obviously, setting this from within the embedded configuration file is pointless, as it's used before then. But, you can set this with --no-use-embedded-config at the command line.
 
 This is primarily meant to make it easier to test new configurations by disabling the embedded config and only running the external (candidate) config.
-"""
-  }
-
-  field load_default_signing {
-    type:     bool
-    default:  true
-    shortdoc: "Load GPG module"
-    hidden:   true # This happens before the user config runs.
-    doc: """
-When true, this will cause chalk to load the default signing
-implementation, which provides an implementation of sign() an verify
-that will use gpg, when available.  It makes no attempt to install GPG
-if it is not available.
-
-This implementation expects that the passphrase for signing will be
-found in the GPG_PASSPHRASE environment variable.  The variable name
-can be changed by setting the global variable PASSPHRASE_ENV_VAR with
-the := operator (it is *not* an attribute).
 """
   }
 

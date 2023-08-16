@@ -3,9 +3,8 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
 
-import config, chalkjson, reportcache, collect, sinks
+import config, chalkjson, reportcache, sinks, collect
 
-let emptyReport               = toJson(ChalkDict())
 var liftableKeys: seq[string] = @[]
 
 proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
@@ -210,7 +209,8 @@ proc liftUniformKeys() =
         if dictToUse[key] != box.get():
           lift = false
           break
-    if not lift:  continue
+    if not lift:
+      continue
 
     for chalk in allChalks:
       if key in chalk.collectedData:
@@ -219,7 +219,7 @@ proc liftUniformKeys() =
     liftableKeys.add(key)
     hostInfo[key] = box.get()
 
-proc doReporting*(topic="report") {.exportc,cdecl.} =
+proc doReporting*(topic="report") {.exportc, cdecl.} =
   if inSubscan():
     let ctx = getCurrentCollectionCtx()
     liftUniformKeys()

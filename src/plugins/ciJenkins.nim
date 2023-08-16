@@ -6,11 +6,9 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 
-import ../config
+import ../config, ../plugin_api
 
-type JenkinsCI = ref object of Plugin
-
-method getChalkTimeHostInfo*(self: JenkinsCI): ChalkDict =
+proc jenkinsGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result = ChalkDict()
 
   # https://www.jenkins.io/doc/book/pipeline/
@@ -42,4 +40,6 @@ method getChalkTimeHostInfo*(self: JenkinsCI): ChalkDict =
   if JENKINS_URL != "":
     result["BUILD_API_URI"] = pack(JENKINS_URL)
 
-registerPlugin("ci_jenkins", JenkinsCI())
+proc loadCiJenkins*() =
+  newPlugin("ci_jenkins",
+            ctHostCallback = ChalkTimeHostCb(jenkinsGetChalkTimeHostInfo))

@@ -3,7 +3,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import os, streams, ../config
+import os, streams, ../config, ../plugin_api
 
 
 const
@@ -44,10 +44,8 @@ proc findCOFile(fullpath: string): string =
   return "" # nothing here
 
 
-type GithubCodeOwner = ref object of Plugin
-
-method getChalkTimeArtifactInfo*(self: GithubCodeOwner, obj: ChalkObj):
-       ChalkDict =
+proc ghOwnerChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
+       ChalkDict {.cdecl.} =
   # CODEOWNERS can live in the root of a repo, the docs subdir, or
   # the .github directory of a repository.  The challenge is that we
   # don't actually know where the root directory is, relative to the
@@ -83,4 +81,6 @@ method getChalkTimeArtifactInfo*(self: GithubCodeOwner, obj: ChalkObj):
   finally:
     if ctx != nil: ctx.close()
 
-registerPlugin("github_codeowners", GithubCodeOwner())
+proc loadOwnerGithub*() =
+  newPlugin("github_codeowners",
+            ctArtCallback = ChalkTimeArtifactCb(ghOwnerChalkTimeArtifactInfo))

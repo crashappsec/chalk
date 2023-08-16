@@ -459,6 +459,7 @@ more expensive to capture (like full ps when available).
   key._SIGNATURE.report                          = true
   key._INVALID_SIGNATURE.report                  = true
   key._VALIDATED_SIGNATURE.report                = true
+  key._VALIDATED_METADATA.report                 = true  
   key.$CHALK_CONFIG.report                       = true
   key.$CHALK_IMPLEMENTATION_NAME.report          = true
   key.$CHALK_LOAD_COUNT.report                   = true
@@ -726,6 +727,7 @@ things that are spammy.
   key._SIGNATURE.report                          = true
   key._INVALID_SIGNATURE.report                  = true
   key._VALIDATED_SIGNATURE.report                = true
+  key._VALIDATED_METADATA.report                 = true    
   key.$CHALK_CONFIG.report                       = true
   key.$CHALK_IMPLEMENTATION_NAME.report          = true
   key.$CHALK_LOAD_COUNT.report                   = true

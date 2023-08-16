@@ -839,7 +839,7 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation) =
           discard # No alias.
       section = DockerFileSection()
       ctx.dfSections.add(section)
-      itemFrom = FromInfo(item)
+      itemFrom = item
       section.image = parse.evalOrReturnEmptyString(itemFrom.image, errors)
       if itemFrom.tag.isSome():
         section.image &= ":" &

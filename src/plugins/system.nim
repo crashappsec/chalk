@@ -5,20 +5,12 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import nativesockets, nimSHA2, sequtils, times, ../config, ../plugin_api,
-       ../normalize, ../chalkjson, ../selfextract
+       ../normalize, ../chalkjson, ../selfextract, ../attestation
 
 when defined(posix): import posix_utils
 
-type
-  SystemPlugin* = ref object of Plugin
-  MetsysPlugin* = ref object of Plugin
 
-let
-  signSig   = "sign(string) -> tuple[string, dict[string, string]]"
-  verifySig = "verify(string, string, dict[string, string]) -> bool"
-
-proc validateMetadata(obj: ChalkObj): bool =
-  result     = false
+proc validateMetadata(obj: ChalkObj): ValidateResult =
   let fields = obj.extract
 
   # Re-compute the chalk ID.
@@ -26,47 +18,60 @@ proc validateMetadata(obj: ChalkObj): bool =
     return
   elif "CHALK_ID" notin fields:
     error(obj.name & ": extracted chalk mark missing CHALK_ID field")
-    return
-  elif obj.myCodec.getChalkID(obj) != unpack[string](fields["CHALK_ID"]):
+    return vBadMd
+  elif obj.callGetChalkID() != unpack[string](fields["CHALK_ID"]):
     error(obj.name & ": extracted CHALK_ID doesn't match computed CHALK_ID")
-    error(obj.myCodec.getChalkID(obj) & " vs: " &
+    error(obj.callGetChalkID() & " vs: " &
       unpack[string](fields["CHALK_ID"]))
-    return
+    return vBadMd
   elif "METADATA_HASH" notin fields:
     error(obj.name & ": extracted chalk mark missing METADATA_HASH field")
-    return
+    return vBadMd
   var
     toHash   = fields.normalizeChalk()
     computed = hashFmt($(toHash.computeSHA256()))
 
   if computed != unpack[string](fields["METADATA_HASH"]):
     error(obj.name & ": extracted METADATA_HASH doesn't validate")
+    return vBadMd
 
-  elif "SIGNATURE" notin fields:
+  trace("computed = " & computed)
+  trace("mdh = " & unpack[string](fields["METADATA_HASH"]))
+
+  if obj.fsRef == "":
+    # For containers, validation currently happens via cmd_docker.nim;
+    # They could definitely come together.
+    return vOk
+
+  if "SIGNATURE" notin fields:
     if "SIGNING" in fields and unpack[bool](fields["SIGNING"]):
       error(obj.name & ": SIGNING was set, but SIGNATURE was not found")
-  else:
-    let artHash = obj.myCodec.getUnchalkedHash(obj)
+      return vBadMd
+    else:
+      return vOk
 
-    if artHash.isSome():
-      let
-        toVerify = pack(artHash.get() & "\n" & computed & "\n")
-        args     = @[toVerify, fields["SIGNATURE"]]
-        optValid = runCallback(verifySig, args)
+  if "INJECTOR_PUBLIC_KEY" notin fields:
+    error(obj.name & ": Bad chalk mark; signed, but missing INJECTOR_PUBLIC_KEY")
+    return vNoPk
 
-      if optValid.isSome():
-        result = unpack[bool](optValid.get())
-        if not result:
-          error(obj.name & ": signature verification failed.")
-        else:
-          info(obj.name & ": signature successfully verified.")
-          return true
-      else:
-        once(warn(obj.name & ": no signature validation routine provided."))
+  if getCosignLocation() == "":
+    warn(obj.name & ": Signed but cannot validate; run `chalk setup` to fix")
+    return vNoCosign
+
+  let artHash = obj.callGetUnchalkedHash()
+  if artHash.isNone():
+    return vNoHash
+
+  let
+    sig    = unpack[string](fields["SIGNATURE"])
+    pubkey = unpack[string](fields["INJECTOR_PUBLIC_KEY"])
+
+  return obj.cosignNonContainerVerify(artHash.get(), computed, sig, pubkey)
 
 # Even if you don't subscribe to TIMESTAMP_WHEN_CHALKED we collect it in case
 # you're subscribed to something that uses it in a substitution.
-method getChalkTimeArtifactInfo*(self: SystemPlugin, obj: ChalkObj): ChalkDict =
+proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
+                                                        ChalkDict {.cdecl.} =
   result                           = ChalkDict()
   result["MAGIC"]                  = pack(magicUTF8)
   result["TIMESTAMP_WHEN_CHALKED"] = pack(unixTimeInMS())
@@ -106,20 +111,31 @@ proc applySubstitutions(obj: ChalkObj) {.inline.} =
     if not s.contains("{"): continue
     obj.collectedData[k] = pack(s.multiReplace(subs))
 
-method getRunTimeArtifactInfo*(self: SystemPlugin,
-                               obj:  ChalkObj,
-                               ins:  bool): ChalkDict =
+proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, ins: bool):
+                              ChalkDict {.cdecl.} =
   result = ChalkDict()
 
   if isChalkingOp():
     obj.applySubstitutions()
-    if obj.isMarked():
-      discard obj.validateMetadata()
     result.setIfNeeded("_OP_CHALKED_KEYS", toSeq(obj.getChalkMark().keys))
     result.setIfNeeded("_VIRTUAL", chalkConfig.getVirtualChalk())
   else:
-    obj.opFailed = obj.validateMetadata()
-    #result.setIfNeeded("_VALIDATED",  obj.opFailed)
+    case obj.validateMetaData()
+    of vOk:
+      result.setIfNeeded("_VALIDATED_METADATA", true)
+    of vSignedOk:
+      result.setIfNeeded("_VALIDATED_METADATA", true)
+      result.setIfNeeded("_VALIDATED_SIGNATURE", true)
+    of vBadMd:
+      result.setIfNeeded("_VALIDATED_METADATA", false)
+      obj.opFailed = true
+    of vNoPk, vNoCosign, vNoHash:
+      result.setIfNeeded("_VALIDATED_METADATA", true)
+      result.setIfNeeded("_VALIDATED_SIGNATURE", false)
+    of vBadSig:
+      result.setIfNeeded("_VALIDATED_METADATA", true)
+      result.setIfNeeded("_INVALID_SIGNATURE", true)
+
     if obj.fsRef != "":
       result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
 
@@ -174,7 +190,8 @@ proc getEnvDict(): Box =
 
   return pack(envdict)
 
-method getRunTimeHostInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
+proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
+                          ChalkDict {.cdecl.} =
   result = ChalkDict()
 
   if len(systemErrors)  != 0:
@@ -219,7 +236,7 @@ method getRunTimeHostInfo*(self: SystemPlugin, objs: seq[ChalkObj]): ChalkDict =
     result.setIfNeeded("_OP_HOSTINFO", uinfo.version)
     result.setIfNeeded("_OP_NODENAME", uinfo.nodename)
 
-method getChalkTimeHostInfo*(self: SystemPlugin): ChalkDict =
+proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result           = ChalkDict()
   cachedSearchPath = getContextDirectories()
 
@@ -243,71 +260,54 @@ method getChalkTimeHostInfo*(self: SystemPlugin): ChalkDict =
     let selfIdOpt = selfID
     if selfIdOpt.isSome(): result["INJECTOR_CHALK_ID"] = pack(selfIdOpt.get())
 
-proc signingNotInMark(): bool =
-  let outConf = getOutputConfig()
-
-  if outConf.chalk == "":
-    return true
-  let prof = chalkConfig.profiles[outConf.chalk]
-
-  if "SIGNING" notin prof.keys:
-    return true
-
-  return not prof.keys["SIGNING"].report
-
-method getChalkTimeArtifactInfo*(self: MetsysPlugin, obj: ChalkObj): ChalkDict =
+proc metsysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
+                                   ChalkDict {.cdecl.} =
   result = ChalkDict()
-
-  # Container signing happens in the attestation layer;
-  # this will likely move there too.
-  let shouldSign = isSubscribedKey("SIGNATURE") and getCommandName() == "insert"
 
   # We add these directly into collectedData so that it can get
   # added to the MD hash when we call normalizeChalk()
   if len(obj.err) != 0:
     obj.collectedData["ERR_INFO"] = pack(obj.err)
 
-  if shouldSign:
-    obj.collectedData["SIGNING"] = pack(true)
-    if signingNotInMark():
-      once:
-        info("`SIGNING` must be configured for the chalk mark report " &
-             "whenever SIGNATURE is configured. Forcing it on.")
+  let pubKey = obj.willSignNonContainer()
+  if pubKey != "":
+    obj.collectedData["SIGNING"]             = pack(true)
+    obj.collectedData["INJECTOR_PUBLIC_KEY"] = pack(pubKey)
+    forceChalkKeys(["SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"])
 
   let
     toHash   = obj.getChalkMark().normalizeChalk()
     mdHash   = $(toHash.computeSHA256())
     encHash  = hashFmt(mdHash)
-    outconf  = getOutputConfig()
-
 
   result["METADATA_HASH"] = pack(encHash)
   result["METADATA_ID"]   = pack(idFormat(mdHash))
 
-  if not shouldSign:
-    trace("SIGNATURE not configured.")
+  if pubKey == "":
     return
 
   let
-    hashOpt = obj.myCodec.getUnchalkedHash(obj)
+    hashOpt = obj.callGetUnchalkedHash()
 
-  if hashOpt.isSome():
-    let
-      toSign  = @[pack(hashFmt(hashOpt.get()) & "\n" & encHash & "\n")]
-      sigOpt  = runCallback(signSig, toSign)
+  if not hashOpt.isSome():
+    warn(obj.name &
+      ": Cannot sign; No hash available for this artifact at time of signing.")
+    return
 
-    if sigOpt.isSome():
-      let
-        res  = sigOpt.get()
-        tup  = unpack[seq[Box]](res)
-        hash = unpack[string](tup[0])
+  let sig = obj.signNonContainer(hashOpt.get(), encHash)
 
-      if hash != "":
-        result["SIGNATURE"]   = tup[0]
-    else:
-      trace("No implementation of sign() provided; cannot sign.")
-  else:
-    trace("No hash available for this artifact at time of signing.")
+  if sig == "":
+    warn(obj.name & ": Cannot sign; cosign command failed.")
+    return
 
-registerPlugin("system", SystemPlugin())
-registerPlugin("metsys", MetsysPlugin())
+  result["SIGNATURE"] = pack(sig)
+
+proc loadSystem*() =
+  newPlugin("system",
+            ctHostCallback = ChalkTimeHostCb(sysGetChalkTimeHostInfo),
+            ctArtCallback  = ChalkTimeArtifactCb(sysGetChalkTimeArtifactInfo),
+            rtArtCallback  = RunTimeArtifactCb(sysGetRunTimeArtifactInfo),
+            rtHostCallback = RunTimeHostCb(sysGetRunTimeHostInfo))
+
+  newPlugin("metsys",
+            ctArtCallback = ChalkTimeArtifactCb(metsysGetChalkTimeArtifactInfo))

@@ -226,7 +226,9 @@ plugin system {
                     "TIMESTAMP_WHEN_CHALKED"]
                     
   post_chalk_keys: ["_OP_ARTIFACT_PATH", "_CURRENT_HASH",
-                    "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS", "_VIRTUAL"]
+                    "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS", "_VIRTUAL",
+                    "_VALIDATED_SIGNATURE", "_VALIDATED_METADATA",
+                    "_INVALID_SIGNATURE"]
                     
   post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
                     "_OP_HOSTINFO", "_OP_NODENAME", "_OP_PLATFORM",

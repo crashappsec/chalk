@@ -19,8 +19,7 @@ proc recursionCheck*() =
   try:
     let
       num   = parseInt(cur)
-      limit = 3
-    if num >= limit:
+    if num >= recursionLimit:
       error("""
 Chalk is calling chalk recursively. This should only happen in specific
 circumstances, and should never reach a recursion depth greater than 2.

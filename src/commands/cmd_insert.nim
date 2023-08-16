@@ -23,7 +23,7 @@ proc runCmdInsert*(path: seq[string]) {.exportc,cdecl.} =
         publish("virtual", toWrite)
         info(item.name & ": virtual chalk created.")
       else:
-        item.myCodec.handleWrite(item, some(toWrite))
+        item.callHandleWrite(some(toWrite))
         if not item.opFailed:
           info(item.name & ": chalk mark successfully added")
 

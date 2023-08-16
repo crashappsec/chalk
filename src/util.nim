@@ -5,6 +5,10 @@
 
 import  std/tempfiles, osproc, posix, posix_utils, config, subscan
 
+proc getpass*(prompt: cstring) : cstring {.header: "<unistd.h>",
+                                           header: "<pwd.h>",
+                                          importc: "getpass".}
+
 var
   tmpDirs:  seq[string] = @[]
   tmpFiles: seq[string] = @[]
@@ -26,6 +30,9 @@ template cleanTempFiles() =
       dumpExOnDebug()
       warn("Could not remove tmp file: " & file)
 
+template moveError() =
+  error("Could not move: " & item)
+
 proc quitChalk*(errCode = exitCode) {.noreturn.} =
   if chalkConfig.getChalkDebug():
     if len(tmpDirs) != 0 or len(tmpFiles) != 0:
@@ -35,9 +42,15 @@ proc quitChalk*(errCode = exitCode) {.noreturn.} =
         let baseName = splitPath(item).tail
         error(item)
         if fileExists(item):
-          moveFile(item, "chalk-tmp/" & baseName)
+          try:
+            moveFile(item, "chalk-tmp/" & baseName)
+          except:
+            moveError()
         else:
-          moveDir(item, "chalk-tmp/" & baseName)
+          try:
+            moveDir(item, "chalk-tmp/" & baseName)
+          except:
+            moveError()
   else:
     cleanTempFiles()
   quit(errcode)
@@ -101,9 +114,6 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
             error(chalk.fsRef & ": Could not write (no permission)")
         dumpExOnDebug()
         return false
-
-
-
 
 const
   S_IFMT  = 0xf000
@@ -207,6 +217,8 @@ proc findExePath*(cmdName:    string,
   if ignoreChalkExes:
     var newExes: seq[string]
 
+    startNativeCodecsOnly()
+
     for location in foundExes:
       let
         subscan   = runChalkSubScan(location, "extract")
@@ -216,6 +228,8 @@ proc findExePath*(cmdName:    string,
         continue
       else:
         newExes.add(location)
+
+    endNativeCodecsOnly()
 
     foundExes = newExes
 
@@ -241,69 +255,6 @@ proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
   error("Chalk: exec could not find a working executable to run.")
   quitChalk(1)
 
-var numCachedFds = 0
-
-template bumpFdCount*(): bool =
-  if numCachedFds < chalkConfig.getCacheFdLimit():
-    numCachedFds = numCachedFds + 1
-    true
-  else:
-    false
-
-proc acquireFileStream*(chalk: ChalkObj): Option[FileStream] =
-  ## Get a file stream to open the artifact pointed to by the chalk
-  ## object. If it's in our cache, you'll get the cached copy. If
-  ## it's expired, or the first time opening it, it'll be opened
-  ## and added to the cache.
-  ##
-  ## Generally the codec doesn't worry about this... we use this API
-  ## to acquire streams before passing the chalk object to any codec
-  ## where the result of a call to usesFStream() is true (which is the
-  ## default).
-  ##
-  ## If you're writing a plugin, not a codec, you should not rely on
-  ## the presence of a file stream. Some codecs will not use them.
-  ## However, if you want to use it anyway, you can, but you must
-  ## test for it being nil.
-
-  if chalk.fsRef == "":
-    return none(FileStream)
-  if chalk.stream == nil:
-    var handle = newFileStream(chalk.fsRef, fmReadWriteExisting)
-    if handle == nil:
-      trace(chalk.fsRef & ": Cannot open for writing.")
-      handle = newFileStream(chalk.fsRef, fmRead)
-      if handle == nil:
-        error(chalk.fsRef & ": could not open file for reading.")
-        return none(FileStream)
-
-    trace(chalk.fsRef & ": File stream opened")
-    chalk.stream  = handle
-    numCachedFds += 1
-    return some(handle)
-  else:
-    trace(chalk.fsRef & ": existing stream acquired")
-    result = some(chalk.stream)
-
-proc closeFileStream*(chalk: ChalkObj) =
-  ## This generally only gets called after we're totally done w/ the
-  ## artifact.  Prior to that, when an operation finishes, we call
-  ## yieldFileStream, which decides whether to cache or close.
-  try:
-    if chalk.stream != nil:
-      chalk.stream.close()
-      chalk.stream = nil
-      trace(chalk.fsRef & ": File stream closed")
-  except:
-    warn(chalk.fsRef & ": Error when attempting to close file.")
-    dumpExOnDebug()
-  finally:
-    chalk.stream = nil
-    numCachedFds -= 1
-
-proc yieldFileStream*(chalk: ChalkObj) =
-  if numCachedFds == chalkConfig.getCacheFdLimit(): chalk.closeFileStream()
-
 {.emit: """
 #include <unistd.h>
 
@@ -316,7 +267,17 @@ int c_replace_stdin_with_pipe() {
 }
 
 int c_write_to_pipe(int fd, char *s, int len) {
-  return write(fd, s, len);
+  ssize_t res;
+
+  while(len > 0) {
+   res = write(fd, s, len);
+   if (res == -1) {
+     return errno;
+   }
+   len -= res;
+  }
+
+  return 0;
 }
 """.}
 
@@ -332,8 +293,11 @@ proc runWithNewStdin*(exe:      string,
     subp = startProcess(exe,
                         args = args,
                         options = {poParentStreams})
+    res  = cWriteToPipe(fd, cstring(contents), cint(len(contents) + 1))
+  if res != 0:
+    error("Write to pipe failed: " & $(strerror(res)))
 
-  discard cWriteToPipe(fd, cstring(contents), cint(len(contents) + 1))
+  discard close(fd)
   let code = subp.waitForExit()
   subp.close()
 
@@ -360,36 +324,67 @@ proc readAllFromFd(fd: cint): string =
       let c = char(buf[i])
       result.add(c)
       i += 1
+    if n == -1:
+      error($(strerror(errno)))
+      quit(1)
 
-proc runCmdGetEverything*(exe: string, args: seq[string]): ExecOutput =
+template ccall(code: untyped, success = 0) =
+  let ret = code
+
+  if ret != success:
+    error($(strerror(ret)))
+    quit(1)
+
+
+proc runCmdGetEverything*(exe:      string,
+                          args:     seq[string],
+                          newStdIn: string       = ""): ExecOutput =
   var
     stdOutPipe: array[0 .. 1, cint]
     stdErrPipe: array[0 .. 1, cint]
+    stdInPipe:  array[0 .. 1, cint]
 
   trace("Running: " & exe & " " & args.join(" "))
+  ccall pipe(stdOutPipe)
+  ccall pipe(stdErrPipe)
 
-  discard pipe(stdOutPipe)
-  discard pipe(stdErrPipe)
+  if newStdIn != "":
+    ccall pipe(stdInPipe)
 
   let pid = fork()
   if pid != 0:
-    discard close(stdOutPipe[1])
-    discard close(stdErrPipe[1])
+    ccall close(stdOutPipe[1])
+    ccall close(stdErrPipe[1])
+    if newStdIn != "":
+      ccall close(stdInPipe[0])
+      let res = cWriteToPipe(stdInPipe[1], cstring(newStdIn),
+                             cint(len(newStdIn)))
+      if res != 0:
+        error("Write to pipe failed: " & $(strerror(res)))
+      ccall close(stdInPipe[1])
     var stat_ptr: cint
+    trace("Waiting for pid = " & $(pid))
     discard waitpid(pid, stat_ptr, 0)
     result.exitCode = int(WEXITSTATUS(stat_ptr))
     result.stdout   = readAllFromFd(stdOutPipe[0])
     result.stderr   = readAllFromFd(stdErrPipe[0])
-    discard close(stdOutPipe[0])
-    discard close(stdErrPipe[0])
-
+    ccall close(stdOutPipe[0])
+    ccall close(stdErrPipe[0])
   else:
     let cargs = allocCStringArray(@[exe] & args)
-    discard close(stdOutPipe[0])
-    discard close(stdErrPipe[0])
+    if newStdIn != "":
+      ccall close(stdInPipe[1])
+      discard dup2(stdInPipe[0], 0)
+      ccall close(stdInPipe[0])
+    ccall close(stdOutPipe[0])
+    ccall close(stdErrPipe[0])
     discard dup2(stdOutPipe[1], 1)
     discard dup2(stdErrPipe[1], 2)
-    discard execv(cstring(exe), cargs)
+    ccall close(stdOutPipe[1])
+    ccall close(stdErrPipe[1])
+    ccall(execv(cstring(exe), cargs), -1)
+    error(exe & ": command not found")
+    quit(-1)
 
   if chalkConfig.getChalkDebug():
     trace("command returned error code: " & $result.exitCode)
@@ -415,17 +410,17 @@ proc runWrappedDocker*(args: seq[string], df: string): int {.discardable.} =
 
 proc runDocker*(args: seq[string]): int {.discardable.} =
   trace("Running: " & dockerExeLocation & " " & args.join(" "))
-  let
-    subp = startProcess(dockerExeLocation,
-                        args = args,
-                        options = {poParentStreams})
 
-  result = subp.waitForExit()
-
-  subp.close()
-
-  if result != 0:
-    trace("Docker exited with code: " & $(result))
+  let pid = fork()
+  if pid != 0:
+    var stat_ptr: cint
+    discard waitpid(pid, stat_ptr, 0)
+    result = int(WEXITSTATUS(stat_ptr))
+    if result != 0:
+      trace("Docker exited with code: " & $(result))
+  else:
+    let cArgs = allocCStringArray(@[dockerExeLocation] & args)
+    discard execv(cstring(dockerExeLocation), cargs)
 
 template runWrappedDocker*(info: DockerInvocation): int =
   let res = runDocker(info.newCmdLine)
@@ -444,3 +439,158 @@ proc dockerFailsafe*(info: DockerInvocation) {.noreturn.} =
     exitCode = runDocker(info.originalArgs)
   doReporting("fail")
   quitChalk(exitCode)
+
+template withWorkingDir*(dir: string, code: untyped) =
+  let
+    toRestore = getCurrentDir()
+
+  try:
+    setCurrentDir(dir)
+    trace("Set current working directory to: " & dir)
+    code
+  finally:
+    setCurrentDir(toRestore)
+    trace("Restored current working directory to: " & toRestore)
+
+proc tryToLoadFile*(fname: string): string =
+  try:
+    return readFile(fname)
+  except:
+    return ""
+
+proc tryToWriteFile*(fname: string, contents: string): bool =
+  try:
+    writeFile(fname, contents)
+    return true
+  except:
+    return false
+
+proc tryToCopyFile*(fname: string, dst: string): bool =
+  try:
+    copyFile(fname, dst)
+    return true
+  except:
+    return false
+
+proc getPasswordViaTty*(): string {.discardable.} =
+  if isatty(0) == 0:
+    error("Cannot read password securely when not run from a tty.")
+    return ""
+
+  var pw = getpass(cstring("Enter password for decrypting the private key: "))
+
+  result = $(pw)
+
+  for i in 0 ..< len(pw):
+    pw[i] = char(0)
+
+proc delByValue*[T](s: var seq[T], x: T): bool {.discardable.} =
+  let ix = s.find(x)
+  if ix == -1:
+    return false
+
+  s.delete(ix)
+  return true
+
+proc increfStream*(chalk: ChalkObj) =
+  if chalk.streamRefCt != 0:
+    chalk.streamRefCt += 1
+    return
+
+  chalk.streamRefCt = 1
+
+  if len(cachedChalkStreams) + 1 == chalkConfig.getCacheFdLimit():
+    let removing = cachedChalkStreams[0]
+
+    trace("Too many cached file descriptors. Closing fd for: " & chalk.name)
+    try:
+      removing.stream.close()
+    except:
+      discard
+
+    removing.stream      = FileStream(nil)
+    removing.streamRefCt = 0
+
+  cachedChalkStreams.add(chalk)
+
+proc decrefStream*(chalk: ChalkObj) =
+  chalk.streamRefCt -= 1
+
+
+template chalkUseStream*(chalk: ChalkObj, code: untyped) {.dirty.} =
+  var
+    stream:  FileStream
+    noRead:  bool
+    noWrite: bool
+
+  if chalk.fsRef == "":
+    noRead  = true
+    noWrite = true
+  else:
+    if chalk.stream == nil:
+      chalk.stream = newFileStream(chalk.fsRef, fmReadWriteExisting)
+
+      if chalk.stream == nil:
+        trace(chalk.fsRef & ": Cannot open for writing.")
+        noWrite = true
+        chalk.stream = newFileStream(chalk.fsRef, fmRead)
+
+        if chalk.stream == nil:
+          error(chalk.fsRef & ": Cannot open for reading either.")
+          noRead = true
+        else:
+          chalk.increfStream()
+          trace(chalk.fsRef & ": File stream opened for reading.")
+      else:
+        chalk.increfStream()
+        trace(chalk.fsRef & ": File stream opened for writing.")
+    else:
+      chalk.increfStream()
+      trace(chalk.fsRef & ": File stream is cached.")
+
+    if chalk.stream != nil:
+      try:
+        stream = chalk.stream
+        stream.setPosition(0)
+        code
+      finally:
+        chalk.decrefStream()
+
+template chalkCloseStream*(chalk: ChalkObj) =
+  if chalk.stream != nil:
+    chalk.stream.close()
+
+  chalk.stream      = nil
+  chalk.streamRefCt = 0
+
+  delByValue(cachedChalkStreams, chalk)
+
+
+proc getBoxType*(b: Box): Con4mType =
+  case b.kind
+  of MkStr:   return stringType
+  of MkInt:   return intType
+  of MkFloat: return floatType
+  of MkBool:  return boolType
+  of MkSeq:
+    var itemTypes: seq[Con4mType]
+    let l = unpack[seq[Box]](b)
+
+    if l.len() == 0:
+      return newListType(newTypeVar())
+
+    for item in l:
+      itemTypes.add(item.getBoxType())
+    for item in itemTypes[1..^1]:
+      if item.unify(itemTypes[0]).isBottom():
+        return Con4mType(kind: TypeTuple, itemTypes: itemTypes)
+    return newListType(itemTypes[0])
+  of MkTable:
+    # This is a lie, but con4m doesn't have real objects, or a "Json" / Mixed
+    # type, so we'll just continue to special case dicts.
+    return newDictType(stringType, newTypeVar())
+  else:
+    return newTypeVar() # The JSON "Null" can stand in for any type.
+
+proc checkAutoType*(b: Box, t: Con4mType): bool =
+  return not b.getBoxType().unify(t).isBottom()

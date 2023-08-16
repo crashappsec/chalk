@@ -1,9 +1,10 @@
 ## :Author: John Viega, Theofilos Petsios
 ## :Copyright: 2023, Crash Override, Inc.
 
-import posix, unicode, ../config, ../collect, ../reporting,
+import posix, unicode, base64, ../config, ../collect, ../reporting,
        ../chalkjson, ../docker_cmdline, ../docker_base, ../subscan,
-       ../dockerfile, ../commands/cmd_defaults, ../util, ../attestation
+       ../dockerfile, ../commands/cmd_defaults, ../util, ../attestation,
+       ../plugin_api
 
 {.warning[CStringConv]: off.}
 
@@ -137,6 +138,102 @@ template noBadJson(item: InfoBase) =
     warn("Cannot wrap due to dockerfile JSON parse error.")
     return
 
+proc getDefaultPlatformInfo(): string =
+  let
+    probeFile    = """
+FROM alpine
+ARG TARGETPLATFORM
+RUN echo "CHALK_TARGET_PLATFORM=$TARGETPLATFORM"
+"""
+    randomBinary = secureRand[array[16, char]]()
+  var
+    binStr       = newStringOfCap(16)
+
+  for ch in randomBinary:
+    binStr.add(ch)
+
+  # Base64 gives a mix of upper and lower, but docker only accepts
+  # lower in tags. So we lose some entropy, which is why we use a
+  # pretty long tag to make sure we're way above an accidental
+  # collision boundary.
+
+  let
+    preTag = binStr.encode(safe=true).replace("-", ".").replace("=","")
+    tmpTag = preTag.toLowerAscii()
+    allOut = runDockerGetEverything(@["build", "-t", tmpTag, "-f",
+                                          "-", "."], probeFile)
+    stdErr = allOut.getStderr()
+    parts  = stdErr.split("CHALK_TARGET_PLATFORM=")
+
+  discard runDockerGetEverything(@["rmi", tmpTag])
+
+  # This could fail if docker is borked or somesuch.
+  if len(parts) < 2:
+    warn("Could not find `CHALK_TARGET_PLATFORM=` in the output.")
+    return ""
+
+  # From here, we'll assume docker is reliable, so we can just look
+  #  for the quote.
+  let
+    base = parts[1]
+    ix   = base.find('"')
+
+  if base[0] == '$':
+    # ARG didn't get substituted, so this build arg isn't supported.
+    return ""
+
+  return base[0 ..< ix]
+
+template noBinaryForPlatform(): string =
+    warn("Cannot wrap; no chalk binary found for target platform: " &
+      targetPlatform & "(build platform = " & buildPlatform & ")")
+    ""
+
+proc findProperBinaryToCopyIntoContainer(ctx: DockerInvocation): string =
+  # Mapping nim platform names to docker ones is a PITA. We need to
+  # know the default target platform whenever --platform isn't
+  # explicitly provided anyway, so we just ask Docker to tell us both
+  # the native build platform, and the default target platform.
+
+  # Note that docker does have some name normalization rules. For
+  # instance, I think linux/arm/v7 and linux/arm64 are supposed to be
+  # the same. We currently only ever self-identify with the later, but
+  # you can match both options to point to the same binary with the
+  # `arch_binary_locations` field.
+
+  var
+   targetPlatform = getDefaultPlatformInfo()
+   buildPlatform  = hostOs & "/" & hostCPU
+
+  if targetPlatform == "":
+    warn("Cannot wrap; container platform doesn't support the TARGETPLATFORM " &
+      "build arg.")
+    return ""
+
+  if ctx.foundPlatform != "":
+    targetPlatform = ctx.foundPlatform
+
+  if targetPlatform == buildPlatform:
+    return getMyAppPath()
+
+  let locOpt = chalkConfig.dockerConfig.getArchBinaryLocations()
+
+  if locOpt.isNone():
+    return noBinaryForPlatform()
+
+  let locInfo = locOpt.get()
+
+  if targetPlatform notin locInfo:
+    return noBinaryForPlatform()
+
+  result = locInfo[targetPlatform].resolvePath()
+
+  if not result.isExecutable():
+    warn("Cannot wrap: specified Chalk binary for target architecture is " &
+         "not executable. (binary: " & result & ", arch: " & targetPlatform &
+         ")")
+    return ""
+
 proc rewriteEntryPoint*(ctx: DockerInvocation) =
   var
     lastEntryPoint = EntryPointInfo(nil)
@@ -152,6 +249,8 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
       section.cmd.noBadJson()
       lastCmd = section.cmd
 
+  info("Attempting to wrap container entry point.")
+
   if lastCmd == nil and lastEntryPoint == nil:
     # TODO: probably could wrap a /bin/sh -c invocation, but
     # we would need to worry about how to get access to any
@@ -159,8 +258,16 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
     warn("Cannot wrap; no entry information found in Dockerfile")
     return
 
+  let
+    binaryToCopy = ctx.findProperBinaryToCopyIntoContainer()
+
+  if binaryToCopy == "":
+    # Already got a warning.
+    return
+
+  info("Entry point wrapped with this chalk binary: " & binaryToCopy)
   try:
-    ctx.makeFileAvailableToDocker(getMyAppPath(), false, "chalk")
+    ctx.makeFileAvailableToDocker(binaryToCopy, false, "chalk")
   except:
     warn("Wrapping canceled; no available method to wrap entry point.")
     return
@@ -201,10 +308,69 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
       newInstruction = "CMD " & $(arr)
 
   ctx.addedInstructions.add(newInstruction)
+  info("Entry point wrapped.")
+  trace("Added instructions: \n" & newInstruction)
+
+proc isValidEnvVarName(s: string): bool =
+  if len(s) == 0 or (s[0] >= '0' and s[0] <= '9'):
+    return false
+
+  for ch in s:
+    if ch.isAlphaNumeric() or ch == '_':
+      continue
+    return false
+
+  return true
+
+proc pullValueFromKey(ctx: DockerInvocation, k: string): string =
+  if len(k) == 1:
+    warn(k & ": Invalid; key to pull into ENV var must not be empty.")
+    return ""
+  let key = k[1 .. ^1]
+
+  if key.startsWith("_"):
+    warn(k & ": Invalid; cannot use run-time keys, only chalk-time keys.")
+
+  if key notin chalkConfig.keyspecs:
+    warn(key & ": Invalid for env var; Chalk key doesn't exist.")
+
+  if key in hostInfo:
+    return $(hostInfo[key])
+
+  if key in ctx.opChalkObj.collectedData:
+    return $(ctx.opChalkObj.collectedData[key])
+
+  warn(key & ": key could not be collected. Skipping environment variable.")
+
+proc addAnyExtraEnvVars(ctx: DockerInvocation) =
+  var
+    toAdd: seq[string] = @[]
+    map                = chalkConfig.dockerConfig.getAdditionalEnvVars()
+    value: string
+
+  for k, v in map:
+    if not k.isValidEnvVarName():
+      warn("ENV var " & k & " NOT added. Environment vars may only have " &
+        "Letters (which will be upper-cased), numbers, and underscores.")
+      continue
+    if v.startsWith("@"):
+      value = ctx.pullValueFromKey(v)
+      if value == "":
+        continue
+    else:
+      value = v
+    toAdd.add(k.toUpperAscii() & "=" & escapeJson(value))
+
+  if len(toAdd) != 0:
+    let newEnvLine = "ENV " & toAdd.join(" ")
+    ctx.addedInstructions.add(newEnvLine)
+    info("Added to Dockerfile: " & newEnvLine)
+
 
 proc handleTrueInsertion(ctx: DockerInvocation, mark: string) =
   if chalkConfig.dockerConfig.getWrapEntryPoint():
     ctx.rewriteEntryPoint()
+  ctx.addAnyExtraEnvVars()
   ctx.writeChalkMark(mark)
 
 proc prepVirtualInsertion(ctx: DockerInvocation) =
@@ -268,7 +434,7 @@ proc runBuild(ctx: DockerInvocation): int =
 
   let chalk       = newChalk(name         = ctx.prefTag,
                              resourceType = {ResourceImage},
-                             codec        = Codec(getPluginByName("docker")))
+                             codec        = getPluginByName("docker"))
   ctx.opChalkObj = chalk
 
   if not ctx.cmdPush:

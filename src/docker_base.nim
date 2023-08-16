@@ -61,8 +61,8 @@ proc runDockerGetOutput*(args: seq[string]): string =
   trace("Running: " & dockerExeLocation & " " & args.join(" "))
   return runCmdGetOutput(dockerExeLocation, args = args)
 
-template runDockerGetEverything*(args: seq[string]): ExecOutput =
-  runCmdGetEverything(dockerExeLocation, args)
+template runDockerGetEverything*(args: seq[string], stdin = ""): ExecOutput =
+  runCmdGetEverything(dockerExeLocation, args, stdin)
 
 var contextCounter = 0
 
@@ -141,18 +141,31 @@ proc populateBasicImageInfo*(chalk: ChalkObj, info: JSonNode) =
 
 proc getBasicImageInfo*(refName: string): Option[JSonNode] =
   let
-    allInfo = runDockerGetEverything(@["images", refName, "--format", "json"])
+    allInfo = runDockerGetEverything(@["images", "--format", "json"])
     stdout  = allInfo.getStdout().strip()
 
   if allInfo.getExit() != 0 or stdout == "":
     return none(JsonNode)
 
-  let lines = stdout.split("\n")
+  let
+    lines = stdout.split("\n")
+    name  = refName.toLowerAscii()
 
-  if len(lines) < 1:
-    return none(JsonNode)
+  for line in lines:
+    let
+      json = parseJson(line)
+      repo = json["Repository"].getStr()
+      tag  = json["Tag"].getStr().replace("\u003cnone\u003e", "")
+      id   = json["ID"].getStr()
 
-  return some(parseJson(lines[0]))
+    if name.toLowerAscii() == id:
+      return some(json)
+    if name == repo:
+      return some(json)
+    if name == repo & ":" & tag:
+      return some(json)
+
+  return none(JsonNode)
 
 proc extractBasicImageInfo*(chalk: ChalkObj): bool =
   # usreRef should always be what was passed on the command line, and

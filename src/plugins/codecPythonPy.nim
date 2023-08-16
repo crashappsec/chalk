@@ -10,34 +10,33 @@
 
 import ../config, ../plugin_api
 
-type CodecPythonPy* = ref object of Codec
 
-method scan*(self:   CodecPythonPy,
-             stream: FileStream,
-             path:   string): Option[ChalkObj] =
+proc pyScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   var ext = path.splitFile().ext.strip()
 
   if (not ext.startsWith(".") or
         ext[1 .. ^1] notin chalkConfig.getPyExtensions()):
     return none(ChalkObj)
 
-  return self.scriptLoadMark(stream, path)
+  let stream = newFileStream(path)
+  result     = self.scriptLoadMark(stream, path)
 
-method handleWrite*(self:    CodecPythonPy,
-                    chalk:   ChalkObj,
-                    encoded: Option[string]) =
+  if result == none(ChalkObj) and stream != nil:
+      stream.close()
 
-  chalk.scriptHandleWrite(encoded)
-
-method getChalkTimeArtifactInfo*(self: CodecPythonPy, chalk: ChalkObj):
-       ChalkDict =
+proc pyGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):
+                               ChalkDict {.cdecl.} =
   result                  = ChalkDict()
   result["ARTIFACT_TYPE"] = artTypePy
 
-method getRunTimeArtifactInfo*(self:  CodecPythonPy,
-                               chalk: ChalkObj,
-                               ins:   bool): ChalkDict =
+proc pyGetRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj, ins: bool):
+                             ChalkDict {.cdecl.} =
   result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypePy
 
-registerPlugin("python_py", CodecPythonPy())
+proc loadCodecPythonPy*() =
+  newCodec("python_py",
+         scan          = ScanCb(pyScan),
+         ctArtCallback = ChalkTimeArtifactCb(pyGetChalkTimeArtifactInfo),
+         rtArtCallback = RunTimeArtifactCb(pyGetRunTimeArtifactInfo),
+         handleWrite   = HandleWriteCb(scriptHandleWrite))

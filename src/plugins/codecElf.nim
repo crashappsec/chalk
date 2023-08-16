@@ -10,7 +10,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import  endians, nimSHA2, ../config, ../plugin_api, ../util
+import  endians, nimSHA2, ../config, ../util, ../plugin_api
 
 const
   b64OffsetLoc = 0x28
@@ -22,18 +22,15 @@ const
   elfSwapped   = 0x464c457f'u32
 
 
-type CodecElf* = ref object of Codec
-
-proc extractKeyMetadata(codec:  CodecElf,
-                        stream: FileStream,
-                        loc:    string): ChalkObj =
+proc extractKeyMetadata(codec: Plugin, stream: FileStream, loc: string):
+                       ChalkObj =
   stream.setPosition(wsOffsetLoc)
   var
     is64Bit     = if stream.readChar() == is64BitVal: true else: false
     isBigEndian = if stream.readChar() == bigEndianVal: true else: false
     swap        = if is64Bit: swapEndian64 else: swapEndian32
-    raw64:     uint64
-    raw32:     uint32
+    raw64:             uint64
+    raw32:             uint32
     rawBytes, shStLoc: pointer
     shStart, offset:   int
 
@@ -74,36 +71,50 @@ proc extractKeyMetadata(codec:  CodecElf,
                       resourceType = {ResourceFile})
     result.startOffset = stream.getPosition()
 
-method scan*(self:   CodecElf,
-             stream: FileStream,
-             loc:    string): Option[ChalkObj] =
+proc elfScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
+  var
+    stream: FileStream
 
   try:
+    stream    = newFileStream(loc)
+
+    if stream == nil:
+      return none(ChalkObj)
+
     let magic = stream.readUint32()
 
-    if magic != elfMagic and magic != elfSwapped: return none(ChalkObj)
+    if magic != elfMagic and magic != elfSwapped:
+      stream.close()
+      return none(ChalkObj)
+
     result = some(self.extractKeyMetadata(stream, loc))
-  except: return none(ChalkObj)
+  except:
+    if stream != nil:
+      stream.close()
+
+    return none(ChalkObj)
   # This is usally a 0-length file and not worth a stack-trace.
 
-method getUnchalkedHash*(self: CodecElf, chalk: ChalkObj): Option[string] =
-  let s = chalk.acquireFileStream()
-  if s.isNone(): return none(string)
+proc elfGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
+                        Option[string] {.cdecl.} =
+  chalk.chalkUseStream():
+    let toHash = stream.readStr(chalk.startOffset)
+    return some(hashFmt($(toHash.computeSHA256())))
 
-  chalk.stream.setPosition(0)
-  let toHash = chalk.stream.readStr(chalk.startOffset)
-  return some(hashFmt($(toHash.computeSHA256())))
-
-method getChalkTimeArtifactInfo*(self: CodecElf, chalk: ChalkObj): ChalkDict =
+proc elfGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):
+                                ChalkDict {.cdecl.} =
   result                      = ChalkDict()
   result["ARTIFACT_TYPE"]     = artTypeElf
 
-method getRunTimeArtifactInfo*(self:  CodecElf,
-                               chalk: ChalkObj,
-                               ins:   bool): ChalkDict =
+proc elfGetRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj, ins: bool):
+                              ChalkDict {.cdecl.} =
   result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypeElf
 
-method getNativeObjPlatforms*(s: CodecElf): seq[string] = @["linux"]
-
-registerPlugin("elf", CodecElf())
+proc loadCodecElf*() =
+  newCodec("elf",
+         nativeObjPlatforms = @["linux"],
+         scan               = ScanCb(elfScan),
+         getUnchalkedHash   = UnchalkedHashCb(elfGetUnchalkedHash),
+         ctArtCallback      = ChalkTimeArtifactCb(elfGetChalkTimeArtifactInfo),
+         rtArtCallback      = RunTimeArtifactCb(elfgetRunTimeArtifactInfo))

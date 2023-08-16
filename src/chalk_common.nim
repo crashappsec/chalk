@@ -38,7 +38,7 @@ type
                                 ## log level to 'none'.
     cache*:         RootRef     ## Generic pointer a codec can use to
                                 ## store any state it might want to stash.
-    myCodec*:       Codec
+    myCodec*:       Plugin
     forceIgnore*:   bool        ## If the system decides the codec shouldn't
                                 ## process this, set this bool.
     pid*:           Option[Pid] ## If an exec() or eval() and we know
@@ -48,6 +48,7 @@ type
     endOffset*:     int         ## extract and write. If the plugin needs to do
                                 ## something else, use the cache field
                                 ## below, instead.
+    streamRefCt*:   int         ## Ref count for recursive acquires.
     fsRef*:         string      ## Reference for this artifact on a fs
     userRef*:       string      ## Reference the user gave for the artifact.
     repo*:          string      ## The docker repo.
@@ -62,21 +63,45 @@ type
                                 ## need to inspect twice when we build + push.
     resourceType*:  set[ResourceType]
 
-  Plugin* = ref object of RootObj
-    name*:       string
-    configInfo*: PluginSpec
+  ChalkTimeHostCb*     = proc (a: Plugin): ChalkDict {.cdecl.}
+  ChalkTimeArtifactCb* = proc (a: Plugin, b: ChalkObj): ChalkDict {.cdecl.}
+  RunTimeArtifactCb*   = proc (a: Plugin, b: ChalkObj, c: bool):
+                             ChalkDict {.cdecl.}
+  RunTimeHostCb*       = proc (a: Plugin, b: seq[ChalkObj]): ChalkDict {.cdecl.}
+  ScanCb*              = proc (a: Plugin, b: string): Option[ChalkObj] {.cdecl.}
+  UnchalkedHashCb*     = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
+  EndingHashCb*        = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
+  ChalkIdCb*           = proc (a: Plugin, b: ChalkObj): string {.cdecl.}
+  HandleWriteCb*       = proc (a: Plugin, b: ChalkObj,
+                               c: Option[string]) {.cdecl.}
+  Plugin* = ref object
+    name*:                     string
+    configInfo*:               PluginSpec
+    getChalkTimeHostInfo*:     ChalkTimeHostCb
+    getChalkTimeArtifactInfo*: ChalkTimeArtifactCb
+    getRunTimeArtifactInfo*:   RunTimeArtifactCb
+    getRunTimeHostInfo*:       RunTimeHostCb
 
-  Codec* = ref object of Plugin
-    searchPath*: seq[string]
+    # Codec-only bits
+    nativeObjPlatforms*:       seq[string]
+    scan*:                     ScanCb
+    getUnchalkedHash*:         UnchalkedHashCb
+    getEndingHash*:            EndingHashCb
+    getChalkId*:               ChalkIdCb
+    handleWrite*:              HandleWriteCb
+    # Currently, this is used by procfs on Linux.
+    internalState*:            RootRef
+    # This is only used when using the default script chalking.
+    commentStart*:             string
 
   KeyType* = enum KtChalkableHost, KtChalk, KtNonChalk, KtHostOnly
 
   CollectionCtx* = ref object
-    currentErrorObject*: Option[ChalkObj]
-    allChalks*:          seq[ChalkObj]
-    unmarked*:           seq[string]
-    report*:             Box
-    args*:               seq[string]
+    currentErrorObject*:       Option[ChalkObj]
+    allChalks*:                seq[ChalkObj]
+    unmarked*:                 seq[string]
+    report*:                   Box
+    args*:                     seq[string]
 
   ArtifactIterationInfo* = ref object
     filePaths*:       seq[string]
@@ -256,7 +281,6 @@ const
   chalkSpecName*      = "configs/chalk.c42spec"
   getoptConfName*     = "configs/getopts.c4m"
   baseConfName*       = "configs/base_*.c4m"
-  signConfName*       = "configs/signconfig.c4m"
   sbomConfName*       = "configs/sbomconfig.c4m"
   sastConfName*       = "configs/sastconfig.c4m"
   ioConfName*         = "configs/ioconfig.c4m"
@@ -271,7 +295,6 @@ const
                         staticRead("configs/base_outconf.c4m") &
                         staticRead("configs/base_sinkconfs.c4m") &
                         staticRead("configs/dockercmd.c4m")
-  signConfig*         = staticRead(signConfName)
   sbomConfig*         = staticRead(sbomConfName)
   sastConfig*         = staticRead(sastConfName)
   ioConfig*           = staticRead(ioConfName)
@@ -301,18 +324,20 @@ let
   artTypeMachO*           = pack("Mach-O executable")
 
 var
-  hostInfo*           = ChalkDict()
-  subscribedKeys*     = Table[string, bool]()
-  systemErrors*       = seq[string](@[])
-  selfChalk*          = ChalkObj(nil)
-  selfID*             = Option[string](none(string))
-  canSelfInject*      = true
-  doingTestRun*       = false
-  chalkConfig*:       ChalkConfig
-  con4mRuntime*:      ConfigStack
-  commandName*:       string
-  currentOutputCfg*:  OutputConfig
-  dockerExeLocation*: string = ""
+  hostInfo*            = ChalkDict()
+  subscribedKeys*      = Table[string, bool]()
+  systemErrors*        = seq[string](@[])
+  selfChalk*           = ChalkObj(nil)
+  selfID*              = none(string)
+  canSelfInject*       = true
+  doingTestRun*        = false
+  nativeCodecsOnly*    = false
+  chalkConfig*:        ChalkConfig
+  con4mRuntime*:       ConfigStack
+  commandName*:        string
+  dockerExeLocation*:  string = ""
+  cachedChalkStreams*: seq[ChalkObj]
+
 
 
 

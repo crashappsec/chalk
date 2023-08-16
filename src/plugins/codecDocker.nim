@@ -2,17 +2,13 @@
 ## :Copyright: 2023, Crash Override, Inc.
 
 import osproc, glob, ../config, ../docker_base, ../chalkjson, ../util,
-       ../attestation
-
-type CodecDocker* = ref object of Codec
+       ../attestation, ../plugin_api
 
 const
   markFile     = "chalk.json"
   markLocation = "/chalk.json"
 
-method keepScanningOnSuccess*(self: CodecDocker): bool = true
-
-method getChalkId*(self: CodecDocker, chalk: ChalkObj): string =
+proc dockerGetChalkId*(self: Plugin, chalk: ChalkObj): string {.cdecl.} =
   if chalk.extract != nil and "CHALK_ID" in chalk.extract:
     return unpack[string](chalk.extract["CHALK_ID"])
   var
@@ -145,7 +141,7 @@ proc extractContainerMark(chalk: ChalkObj): ChalkDict =
     dumpExOnDebug()
     error(chalk.name & ": got error when extracting from container.")
 
-proc getImageChalks*(codec: Codec): seq[ChalkObj] {.exportc,cdecl.} =
+proc getImageChalks*(codec: Plugin): seq[ChalkObj] {.exportc,cdecl.} =
   try:
     let
       raw    = runDockerGetEverything(@["images", "--format", "json"])
@@ -162,6 +158,7 @@ proc getImageChalks*(codec: Codec): seq[ChalkObj] {.exportc,cdecl.} =
           tag     = json["Tag"].getStr().replace("\u003cnone\u003e","").strip()
           chalk   = newChalk(name         = imageId,
                              codec        = codec,
+                             repo         = repo,
                              tag          = imageId,
                              imageId      = imageId,
                              extract      = ChalkDict(),
@@ -176,7 +173,7 @@ proc getImageChalks*(codec: Codec): seq[ChalkObj] {.exportc,cdecl.} =
 
 proc inspectContainer(chalk: ChalkObj) # Defined below.
 
-proc getContainerChalks*(codec: Codec): seq[ChalkObj] {.exportc,cdecl.} =
+proc getContainerChalks*(codec: Plugin): seq[ChalkObj] {.exportc,cdecl.} =
   try:
     let
       raw    = runDockerGetEverything(@["ps", "--format", "json"])
@@ -189,7 +186,6 @@ proc getContainerChalks*(codec: Codec): seq[ChalkObj] {.exportc,cdecl.} =
       let
         containerId = parseJson(line)["ID"].getStr()
         name        = parseJson(line)["Names"].getStr()
-        image       = parseJson(line)["Image"].getStr()
         chalk       = newChalk(name         = name,
                                tag          = name,
                                containerId  = containerId,
@@ -373,35 +369,6 @@ let dockerContainerAutoMap = {
   "NetworkSettings.Networks":               "_INSTANCE_NETWORKS"
 }.toOrderedTable()
 
-proc getBoxType(b: Box): Con4mType =
-  case b.kind
-  of MkStr:   return stringType
-  of MkInt:   return intType
-  of MkFloat: return floatType
-  of MkBool:  return boolType
-  of MkSeq:
-    var itemTypes: seq[Con4mType]
-    let l = unpack[seq[Box]](b)
-
-    if l.len() == 0:
-      return newListType(newTypeVar())
-
-    for item in l:
-      itemTypes.add(item.getBoxType())
-    for item in itemTypes[1..^1]:
-      if item.unify(itemTypes[0]).isBottom():
-        return Con4mType(kind: TypeTuple, itemTypes: itemTypes)
-    return newListType(itemTypes[0])
-  of MkTable:
-    # This is a lie, but con4m doesn't have real objects, or a "Json" / Mixed
-    # type, so we'll just continue to special case dicts.
-    return newDictType(stringType, newTypeVar())
-  else:
-    return newTypeVar() # The JSON "Null" can stand in for any type.
-
-proc checkAutoType(b: Box, t: Con4mType): bool =
-  return not b.getBoxType().unify(t).isBottom()
-
 template extractDockerHashMap(value: Box): Box =
   let list     = unpack[seq[string]](value)
   var outTable = OrderedTableRef[string, string]()
@@ -493,12 +460,12 @@ proc jsonAutoKey(map:  OrderedTable[string, string],
 
     jsonOneAutoKey(subJsonOpt.get(), chalkKey, dict, reportEmpty)
 
-template inspectCommon() =
+template inspectCommon(map=dockerImageAutoMap) =
   chalk.imageId    = chalk.cachedHash
   chalk.setIfNeeded("_IMAGE_ID", chalk.cachedHash)
   chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents.nimJsonToBox())
 
-  jsonAutoKey(dockerImageAutoMap, contents, chalk.collectedData)
+  jsonAutoKey(map, contents, chalk.collectedData)
 
   if "_REPO_DIGESTS" in chalk.collectedData:
     let
@@ -509,6 +476,7 @@ template inspectCommon() =
       trace("Repo Digest: " & v)
       if chalk.repo != "" and chalk.repo != k:
         warn("Changing repo from " & chalk.repo & " to: " & k)
+      chalk.setIfNeeded("_STORE_URI", "https://" & k & "@sha256:" & v)
       chalk.repo     = k
       chalk.repoHash = v
       if chalk.containerId == "":
@@ -520,8 +488,6 @@ template inspectCommon() =
       break
 
 proc inspectImage(chalk: ChalkObj) =
-  var id: string
-
   let
     cmdOut = runDockerGetEverything(@["inspect", chalk.name])
 
@@ -556,7 +522,7 @@ proc inspectContainer(chalk: ChalkObj) =
 
   chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerContainer)
   chalk.resourceType = {ResourceContainer}
-  inspectCommon()
+  inspectCommon(dockerContainerAutoMap)
 
 proc inspectArtifact(chalk: ChalkObj) {.inline.} =
   if chalk.containerId != "":
@@ -567,8 +533,8 @@ proc inspectArtifact(chalk: ChalkObj) {.inline.} =
     chalk.resourceType = {ResourceImage}
   chalk.inspectImage()
 
-proc scanOne*(codec: Codec, item: string): Option[ChalkObj]
-    {.exportc,cdecl.} =
+proc scanOne*(codec: Plugin, item: string): Option[ChalkObj]
+    {.exportc, cdecl.} =
 
   let chalk = newChalk(name = item, tag = item, codec = codec)
 
@@ -581,9 +547,8 @@ proc scanOne*(codec: Codec, item: string): Option[ChalkObj]
 
   return some(chalk)
 
-method getRunTimeArtifactInfo*(self:  CodecDocker,
-                               chalk: ChalkObj,
-                               ins:   bool): ChalkDict =
+proc dockerGetRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj, ins: bool):
+                                 ChalkDict {.exportc, cdecl.} =
   result = ChalkDict()
   # If a container name / id was passed, it got inspected during scan,
   # but images did not.
@@ -612,5 +577,7 @@ proc dockerExtractChalkMark*(chalk: ChalkObj): ChalkDict {.exportc, cdecl.} =
   warn(chalk.name & ": No chalk mark extracted.")
   addUnmarked(chalk.name)
 
-
-registerPlugin("docker", CodecDocker())
+proc loadCodecDocker*() =
+  newCodec("docker",
+           rtArtCallback = RunTimeArtifactCb(dockerGetRunTimeArtifactInfo),
+           getChalkId    = ChalkIdCb(dockerGetChalkId))

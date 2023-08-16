@@ -1,4 +1,5 @@
-import posix, ../config, ../collect, ../util, ../reporting, ../chalkjson
+import posix, ../config, ../collect, ../util, ../reporting, ../chalkjson,
+       ../plugin_api
 
 when hostOs == "macosx":
   proc proc_pidpath(pid: Pid, pathbuf: pointer, len: uint32): cint
@@ -56,7 +57,7 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
                              pid          = some(pid),
                              resourceType = {ResourcePid, ResourceFile},
                              extract      = stream.extractOneChalkJson(cid),
-                             codec        = Codec(getPluginByName("docker")))
+                             codec        = getPluginByName("docker"))
 
     if chalk.containerId != "":
       chalk.resourceType = chalk.resourceType + {ResourceContainer}
@@ -98,13 +99,63 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
                        fsRef        = exe1path,
                        stream       = newFileStream(exe1path),
                        resourceType = {ResourceFile},
-                       codec        = Codec(getPluginByName("docker")))
+                       codec        = getPluginByName("docker"))
 
       chalk.addToAllChalks()
 
     result = some(chalk)
 
     chalk.pid = some(pid)
+
+proc getChildExitStatus(pid: Pid): bool =
+  var stat_loc: cint
+
+  let res = waitpid(pid, stat_loc, WNOHANG)
+
+  if res == 0:
+    return false
+
+  assert WIFEXITED(stat_loc)
+  setExitCode(WEXITSTATUS(stat_loc))
+  return true
+
+proc getParentExitStatus(trueParentPid: Pid): bool =
+  if getppid() != trueParentPid:
+    return true
+  return false
+
+proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
+  clearReportingState()
+  initCollection()
+  if chalkOpt.isSome():
+    let chalk = chalkOpt.get()
+
+    if not chalk.isMarked():
+      addUnmarked(chalk.name)
+
+    chalk.addToAllChalks()
+    chalk.collectedData = ChalkDict()
+    chalk.collectRunTimeArtifactInfo()
+  doReporting()
+
+template doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: untyped) =
+  let
+    inMicroSec    = int(chalkConfig.execConfig.getHeartbeatRate())
+    sleepInterval = int(inMicroSec / 1000)
+
+  setCommandName("heartbeat")
+
+  while true:
+    sleep(sleepInterval)
+    chalkOpt.doHeartbeatReport()
+    if fn(pid):
+      break
+
+template doHeartbeatAsChild(chalkOpt: Option[ChalkObj], pid: Pid) =
+  chalkOpt.doHeartbeat(pid, getParentExitStatus)
+
+template doHeartbeatAsParent(chalkOpt: Option[ChalkObj], pid: Pid) =
+  chalkOpt.doHeartbeat(pid, getChildExitStatus)
 
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):
@@ -179,15 +230,20 @@ proc runCmdExec*(args: seq[string]) =
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting()
-      trace("Waiting for spawned process to exit.")
-      var stat_loc: cint
-      discard waitpid(pid, stat_loc, 0)
-      setExitCode(WEXITSTATUS(stat_loc))
+
+      if execConfig.getHeartbeat():
+        chalkOpt.doHeartbeatAsParent(pid)
+      else:
+        trace("Waiting for spawned process to exit.")
+        var stat_loc: cint
+        discard waitpid(pid, stat_loc, 0)
+        setExitCode(WEXITSTATUS(stat_loc))
   else:
     if pid != 0:
       handleExec(allOpts, argsToPass)
     else:
       trace("Chalk is child process.")
+      sleep(1)
       initCollection()
       trace("Host collection finished.")
       let chalkOpt = doExecCollection(allOpts, ppid)
@@ -195,5 +251,7 @@ proc runCmdExec*(args: seq[string]) =
       # On some platforms we don't support
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
-
       doReporting()
+
+      if execConfig.getHeartbeat():
+        chalkOpt.doHeartbeatAsChild(ppid)

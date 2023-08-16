@@ -3,8 +3,8 @@
 
 # Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
-import config, confload, commands, jitso, norecurse, sinks, plugin_load,
-       docker_base, attestation, util
+import config, confload, commands, jitso, norecurse, sinks, docker_base,
+       attestation, util
 
 when isMainModule:
   addDefaultSinks()
@@ -14,7 +14,7 @@ when isMainModule:
   if not canSelfInject:
     warn("We have no codec for this platform's native executable type")
   setupDefaultLogConfigs()
-  checkAnnotationSetupStatus()
+  checkSetupStatus()
   setDockerExeLocation()
   case getCommandName()
   of "extract":            runCmdExtract(chalkConfig.getArtifactSearchPath())
@@ -31,7 +31,9 @@ when isMainModule:
   of "docker":             runCmdDocker(getArgs())
   of "profile":            runCmdProfile(getArgs())
   of "exec":               runCmdExec(getArgs())
-  of "setup":              runCmdSetup()
+  of "setup":              runCmdSetup(gen=true, load=true)
+  of "setup.gen":          runCmdSetup(gen=true, load=false)
+  of "setup.load":         runCmdSetup(gen=false, load=true)
   #% INTERNAL
   of "helpdump":           runCmdHelpDump()
   #% END

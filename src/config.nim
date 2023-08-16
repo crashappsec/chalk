@@ -4,13 +4,9 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 #
 
-import algorithm, run_management
+import run_management
 export run_management
 from macros import parseStmt
-
-const
-  hostDefault = "host_report_other_base"
-  artDefault  = "artifact_report_extract_base"
 
 proc filterByProfile*(dict: ChalkDict, p: Profile): ChalkDict =
   result = ChalkDict()
@@ -24,45 +20,6 @@ proc filterByProfile*(host, obj: ChalkDict, p: Profile): ChalkDict =
     if k in p.keys and p.keys[k].report: result[k] = v
   for k, v in obj:
     if k in p.keys and p.keys[k].report: result[k] = v
-
-proc profileToString*(name: string): string =
-  if name in ["", hostDefault, artDefault]: return ""
-
-  result      = "profile " & name & " {\n"
-  let profile = chalkConfig.profiles[name]
-
-  for k, obj in profile.keys:
-    let
-      scope  = obj.getAttrScope()
-      report = get[bool](scope, "report")
-      order  = getOpt[int](scope, "order")
-
-    result &= "  key." & k & ".report = " & $(report) & "\n"
-    if order.isSome():
-      result &= "  key." & k & ".order = " & $(order.get()) & "\n"
-
-  result &= "}\n\n"
-
-proc sinkConfToString*(name: string): string =
-  result     = "sink_config " & name & " {\n  filters: ["
-  var frepr  = seq[string](@[])
-  let
-    config   = chalkConfig.sinkConfs[name]
-    scope    = config.getAttrScope()
-
-  for item in config.filters: frepr.add("\"" & item & "\"")
-
-  result &= frepr.join(", ") & "]\n"
-  result &= "  sink: \"" & config.sink & "\"\n"
-
-  # copy out the config-specific variables.
-  for k, v in scope.contents:
-    if k in ["enabled", "filters", "loaded", "sink"]: continue
-    if v.isA(AttrScope): continue
-    let val = getOpt[string](scope, k).getOrElse("")
-    result &= "  " & k & ": \"" & val & "\"\n"
-
-  result &= "}\n\n"
 
 proc getOutputConfig*(): OutputConfig =
   return chalkConfig.outputConfigs[getBaseCommandName()]
@@ -117,49 +74,3 @@ proc getPluginConfig*(name: string): Option[PluginSpec] =
 
 var autoHelp*:       string = ""
 proc getAutoHelp*(): string = autoHelp
-
-var
-  installedPlugins: Table[string, Plugin]
-  plugins:          seq[Plugin]           = @[]
-  codecs:           seq[Codec]            = @[]
-
-proc registerPlugin*(name: string, plugin: Plugin) =
-  if name in installedPlugins:
-    error("Double install of plugin named: " & name)
-  plugin.name            = name
-  installedPlugins[name] = plugin
-
-proc validatePlugins() =
-  for name, plugin in installedPlugins:
-    let maybe = getPluginConfig(name)
-    if maybe.isNone():
-      error("No config provided for plugin " & name & ". Plugin ignored.")
-      installedPlugins.del(name)
-    elif not maybe.get().getEnabled():
-      trace("Plugin " & name & " is disabled via config gile.")
-      installedPlugins.del(name)
-    else:
-      plugin.configInfo = maybe.get()
-      trace("Installed plugin: " & name)
-
-proc getPlugins*(): seq[Plugin] =
-  once:
-    validatePlugins()
-    var preResult: seq[(int, Plugin)] = @[]
-    for name, plugin in installedPlugins:
-      preResult.add((plugin.configInfo.getPriority(), plugin))
-
-    preResult.sort()
-    for (_, plugin) in preResult: plugins.add(plugin)
-
-  return plugins
-
-proc getPluginByName*(s: string): Plugin =
-  return installedPlugins[s]
-
-proc getCodecs*(): seq[Codec] =
-  once:
-    for item in getPlugins():
-      if item.configInfo.codec: codecs.add(Codec(item))
-
-  return codecs

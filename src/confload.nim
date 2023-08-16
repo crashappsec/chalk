@@ -12,7 +12,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import config, selfextract, con4mfuncs
+import config, selfextract, con4mfuncs, plugin_load
 import macros except error
 
 # Since these are system keys, we are the only one able to write them,
@@ -149,8 +149,6 @@ proc loadAllConfigs*() =
 
   stack.addConfLoad(ioConfName, toStream(ioConfig), notEvenDefaults).
         addConfLoad(attestConfName, toStream(attestConfig), checkNone)
-  if chalkConfig.getLoadDefaultSigning():
-    stack.addConfLoad(signConfName, toStream(signConfig), checkNone)
 
   let chalkOps = chalkConfig.getValidChalkCommandNames()
   if commandName in chalkOps or (commandName == "not_supplied" and
@@ -161,6 +159,9 @@ proc loadAllConfigs*() =
 
   stack.addCallback(loadLocalStructs)
   doRun()
+
+  # We need Codecs to load before we can get a self-extraction.
+  loadAllPlugins()
 
   # Next, do self extraction, and get the embedded config.
   # The embedded config has already been validated.

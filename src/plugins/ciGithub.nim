@@ -5,11 +5,9 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 
-import ../config
+import ../config, ../plugin_api
 
-type GithubCI = ref object of Plugin
-
-method getChalkTimeHostInfo*(self: GithubCI): ChalkDict =
+proc githubGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result = ChalkDict()
 
   # https://docs.github.com/en/actions/
@@ -58,4 +56,6 @@ method getChalkTimeHostInfo*(self: GithubCI): ChalkDict =
 
   if GITHUB_ACTOR != "": result["BUILD_CONTACT"] = pack(@[GITHUB_ACTOR])
 
-registerPlugin("ci_github", GithubCI())
+proc loadCiGitHub*() =
+  newPlugin("ci_github",
+            ctHostCallback = ChalkTimeHostCb(githubGetChalkTimeHostInfo))

@@ -58,7 +58,7 @@ ascii_magic   :=   "dadfedabbadabbed"
 # might be necessary for finding the start of the mark.  But it generally
 # must not be reported.
 #
-# _OPERATION, _ACTION_ID, _VALIDATED, _CURRENT_HASH, and _OP_ERRORS are
+# _OPERATION, _ACTION_ID, _CURRENT_HASH, and _OP_ERRORS are
 # metadata on the current chalk operation, and will not be embedded into
 # chalk marks.
 #
@@ -804,6 +804,20 @@ validation failed, this key is not set.
 
 That is, it will never have the value of `false`.
 """
+}
+
+keyspec _VALIDATED_METADATA {
+    kind:             RunTimeArtifact
+    type:             bool
+    standard:         true
+    system:           true
+    since:            "0.1.0"
+    doc:              """
+This is set to `true` if an object's metadata is okay, and the chalk mark was
+well-formed. If an object is unsigned, this being `true` does NOT mean that
+the metadata is authentic, just that the data is all consistent.  If there is
+also a validated signature as well, _VALIDATED_SIGNATURE will also be true.
+"""    
 }
 
 keyspec _VALIDATED_SIGNATURE {
@@ -3061,5 +3075,5 @@ exec {
 }
 
 docker {
-  wrap_entrypoint: false # TODO, this should need to be here either.
+  wrap_entrypoint: false # TODO, this shouldn't need to be here either.
 }  

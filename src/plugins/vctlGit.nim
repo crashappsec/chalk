@@ -4,10 +4,9 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import ../config
+import ../config, ../plugin_api
 
 const
-  dirGit       = ".git"
   fNameHead    = "HEAD"
   fNameConfig  = "config"
   ghRef        = "ref:"
@@ -193,11 +192,11 @@ type
     branch:   string
     commitId: string
 
-  GitInfo* = ref object of Plugin
+  GitInfo = ref object of RootRef
     branchName: Option[string]
     commitId:   Option[string]
     origin:     Option[string]
-    vcsDirs*:   OrderedTable[string, RepoInfo]
+    vcsDirs:    OrderedTable[string, RepoInfo]
 
 proc loadHead(info: RepoInfo) =
   var
@@ -331,17 +330,18 @@ template setVcsStuff(info: RepoInfo) =
     result["BRANCH"] = pack(info.branch)
   break
 
-method getChalkTimeHostInfo*(self: GitInfo): ChalkDict =
-  result = ChalkDict()
+proc gitGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
+  result    = ChalkDict()
+  let cache = GitInfo(self.internalState)
 
   for path in getContextDirectories():
-    self.findAndLoad(path.resolvePath())
+    cache.findAndLoad(path.resolvePath())
 
-  if len(self.vcsDirs) == 0:
+  if len(cache.vcsDirs) == 0:
     return # No git directory, so no work to do.
 
   # Don't know an easier way to get the first one in an ordered table
-  for dir, info in self.vcsDirs:
+  for dir, info in cache.vcsDirs:
     info.setVcsStuff()
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
@@ -354,18 +354,24 @@ proc isInRepo(obj: ChalkObj, repo: string): bool =
 
   return false
 
-method getChalkTimeArtifactInfo*(self: GitInfo, obj: ChalkObj): ChalkDict =
-  result = ChalkDict()
+proc gitGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
+                                ChalkDict {.cdecl.} =
+  result    = ChalkDict()
+  let cache = GitInfo(self.internalState)
 
-  if len(self.vcsDirs) == 0:
+  if len(cache.vcsDirs) == 0:
     return
 
   if obj.fsRef == "":
-    for dir, info in self.vcsDirs:
+    for dir, info in cache.vcsDirs:
       info.setVcsStuff()
 
-  for dir, info in self.vcsDirs:
+  for dir, info in cache.vcsDirs:
     if obj.isInRepo(dir):
       info.setVcsStuff()
 
-registerPlugin("vctl_git", GitInfo())
+proc loadVctlGit*() =
+  newPlugin("vctl_git",
+            ctHostCallback = ChalkTimeHostCb(gitGetChalkTimeHostInfo),
+            ctArtCallback  = ChalkTimeArtifactCb(gitGetChalkTimeArtifactInfo),
+            cache          =  RootRef(GitInfo()))

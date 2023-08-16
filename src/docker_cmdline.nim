@@ -53,7 +53,12 @@ proc extractTags(state: DockerInvocation) =
 proc extractPlatform(state: DockerInvocation) =
   if "platform" in state.flags:
     let platforms = unpack[seq[string]](state.flags["platform"].getValue())
-    state.foundPlatform = platforms[0]
+    if len(platforms) > 1:
+      # We don't want to try to wrap this right now.
+      state.foundPlatform = "multi-arch"
+    else:
+      state.foundPlatform = platforms[0]
+
 
 proc extractBuildArgs(state: DockerInvocation) =
   if "build-arg" in state.flags:

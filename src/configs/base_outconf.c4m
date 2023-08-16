@@ -22,6 +22,11 @@ outconf exec {
   host_report:            "host_report_default"
 }
 
+outconf heartbeat {
+  artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
 outconf delete {
   artifact_report:        "artifact_report_default"
   host_report:            "host_report_default"

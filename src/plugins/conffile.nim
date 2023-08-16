@@ -4,9 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import ../config
-
-type ConfFilePlugin* = ref object of Plugin
+import ../config, ../plugin_api
 
 proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
   result = ChalkDict()
@@ -21,22 +19,26 @@ proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
       let cbOpt = runCallback(v.callback.get(), args)
       if cbOpt.isSome(): result[k] = cbOpt.get()
 
-method getChalkTimeHostInfo*(self: ConfFilePlugin): ChalkDict =
+proc confGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   return scanForWork(KtChalkableHost, none(ChalkObj),
                      @[pack(getContextDirectories().join(":"))])
 
-method getChalkTimeArtifactInfo*(self: ConfFilePlugin, obj: ChalkObj):
-       ChalkDict =
+proc confGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
+    ChalkDict {.cdecl.} =
   return scanForWork(KtChalk, some(obj), @[pack(obj.name)])
 
-method getRunTimeArtifactInfo*(self: ConfFilePlugin,
-                               obj:  ChalkObj,
-                               ins:  bool): ChalkDict =
+proc confGetRunTimeArtifactInfo*(self: Plugin,
+                                 obj:  ChalkObj,
+                                 ins:  bool): ChalkDict {.cdecl.} =
   return scanForWork(KtNonChalk, some(obj), @[pack(obj.name)])
 
-
-method getRunTimeHostInfo*(self: ConfFilePlugin, objs: seq[ChalkObj]):
-       ChalkDict =
+proc confGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
+       ChalkDict {.cdecl.} =
   return scanForWork(KtHostOnly, none(ChalkObj), @[pack("")])
 
-registerPlugin("conffile", ConfFilePlugin())
+proc loadConfFile*() =
+  newPlugin("conffile",
+            ctHostCallback = ChalkTimeHostCb(confGetChalkTimeHostInfo),
+            ctArtCallback  = ChalkTimeArtifactCb(confGetChalkTimeArtifactInfo),
+            rtArtCallback  = RunTimeArtifactCb(confGetRunTimeArtifactInfo),
+            rtHostCallback = RunTimeHostCb(confGetRunTimeHostInfo))

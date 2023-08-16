@@ -6,32 +6,37 @@
 
 import ../config, ../plugin_api
 
-type CodecShebang* = ref object of Codec
+proc sheScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
+  let stream = newFileStream(path)
 
-method scan*(self:   CodecShebang,
-             stream: FileStream,
-             path:   string): Option[ChalkObj] =
+  if stream == nil:
+    return none(ChalkObj)
+
   try:
     let line1 = stream.readLine()
-    if not line1.startsWith("#!"): return none(ChalkObj)
+    if not line1.startsWith("#!"):
+      stream.close()
+      return none(ChalkObj)
   except:
     warn(path & ": Could not find a newline.")
+    stream.close()
     return none(ChalkObj)
 
   return self.scriptLoadMark(stream, path)
 
-method handleWrite*(self: CodecShebang, chalk: ChalkObj, enc: Option[string]) =
-  chalk.scriptHandleWrite(enc)
-
-method getChalkTimeArtifactInfo*(self: CodecShebang, chalk: ChalkObj):
-       ChalkDict =
+proc sheGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):
+                                ChalkDict {.cdecl.} =
   result                      = ChalkDict()
   result["ARTIFACT_TYPE"]     = artTypeShebang
 
-method getRunTimeArtifactInfo*(self:  CodecShebang,
-                               chalk: ChalkObj,
-                               ins:   bool): ChalkDict =
+proc sheGetRunTimeArtifactInfo*(self:  Plugin, chalk: ChalkObj, ins: bool):
+                              ChalkDict {.cdecl.} =
   result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypeShebang
 
-registerPlugin("shebang", CodecShebang())
+proc loadCodecShebang*() =
+  newCodec("shebang",
+         scan          = ScanCb(sheScan),
+         ctArtCallback = ChalkTimeArtifactCb(sheGetChalkTimeArtifactInfo),
+         rtArtCallback = RunTimeArtifactCb(sheGetRunTimeArtifactInfo),
+         handleWrite   = HandleWriteCb(scriptHandleWrite))

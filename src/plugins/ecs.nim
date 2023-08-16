@@ -2,10 +2,9 @@
 ##
 ## :Author: Liming Luo (liming@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
-import httpclient, ../config
 
+import httpclient, ../config, ../plugin_api
 
-type AwsEcs = ref object of Plugin
 
 var cloudMetadataUrl = os.getEnv("ECS_CONTAINER_METADATA_URI")
 
@@ -18,7 +17,7 @@ proc readECSMetadata*(): Option[JsonNode] =
   # For now, we just return the whole blob.
   once:
     if cloudMetadataUrl == "":
-        info("ecs: metadata env var is not defined: no AWS info available")
+        trace("ecs: metadata env var is not defined: no AWS info available")
     else:
       var
         client = newHttpClient()
@@ -36,10 +35,14 @@ template reportECSData(key: string) =
   if readECSMetadata().isSome():
     result[key] = pack($(ecsMetadata.get()))
 
-method getChalkTimeHostInfo*(self: AwsEcs): ChalkDict =
+proc ecsGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   reportECSData("CLOUD_METADATA_WHEN_CHALKED")
 
-method getRunTimeHostInfo*(self: AwsEcs, objs: seq[ChalkObj]): ChalkDict =
+proc ecsGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
+                          ChalkDict {.cdecl.} =
   reportECSData("_OP_CLOUD_METADATA")
 
-registerPlugin("aws_ecs", AwsEcs())
+proc loadEcs*() =
+  newPlugin("aws_ecs",
+            ctHostCallback = ChalkTimeHostCb(ecsGetChalkTimeHostInfo),
+            rtHostCallback = RunTimeHostCb(ecsGetRunTimeHostInfo))

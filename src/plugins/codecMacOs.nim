@@ -1,11 +1,11 @@
-## Super cheezy plugin for OS X. I can't believe this even worked.
+## Super cheezy plugin for MacOS. I can't believe this even worked.
 ##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 # We use slightly different magic for our heredoc. It's uppercase and longer.
 
-import base64, nimSHA2, ../config, ../chalkjson, ../util
+import base64, nimSHA2, ../config, ../chalkjson, ../util, ../plugin_api
 
 var prefix = """
 #!/bin/bash
@@ -40,7 +40,6 @@ var postfixLines = [
 ]
 
 type
-  CodecMacOs* = ref object of Codec
   ExeCache    = ref object of RootRef
     binStream: FileStream
     binFName:  string
@@ -51,20 +50,32 @@ template hasMachMagic(s: string): bool =
   s in ["\xca\xfe\xba\xbe", "\xfe\xed\xfa\xce", "\xce\xfa\xed\xfe",
         "\xfe\xed\xfa\xcf", "\xcf\xfa\xed\xfe"]
 
-method scan*(self:   CodecMacOs,
-             stream: FileStream,
-             path:   string): Option[ChalkObj] =
+template scanFail() =
+  if wrapStream != nil:
+    wrapStream.close()
+  if cache.binStream != nil:
+    cache.binStream.close()
+  return none(ChalkObj)
+
+proc macScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   var
+    stream     = newFileStream(path)
     header:      string
     fullpath   = path.resolvePath()
     cache      = ExeCache()
     wrapStream: FileStream
     chalk:      ChalkObj
 
+  if stream == FileStream(nil):
+    warn(path & ": could not open.")
+    return none(ChalkObj)
+
   try:
     header = stream.peekStr(4)
   except:
-    return none(ChalkObj)
+    warn(path & ": could not read.")
+    dumpExOnDebug()
+    scanFail()
 
   if header.hasMachMagic():
     trace("Found MACH binary @ " & fullpath)
@@ -84,7 +95,7 @@ method scan*(self:   CodecMacOs,
       if wrapStream == nil:
         warn("Previously chalked binary is missing its script. " &
           "Replace the script or rename the executable")
-        return none(ChalkObj)
+        scanFail()
       # Drop down below for the chalk mark.
     else:
       # It's an unmarked Mach-O binary of some kind.
@@ -103,9 +114,10 @@ method scan*(self:   CodecMacOs,
     wrapStream.setPosition(0)
     let start = wrapStream.readStr(len(prefix))
     if start != prefix:
-      return none(ChalkObj)
+      scanFail()
   except:
-    return none(ChalkObj)
+    dumpExOnDebug()
+    scanFail()
 
   # Validation.
   trace("Testing MacOS Chalk wrapper at: "  & fullpath)
@@ -127,12 +139,12 @@ method scan*(self:   CodecMacOs,
   let lines = wrapStream.readAll().strip().split("\n")
   if len(lines) != 3 + len(postfixLines):
     trace("Wrapper not valid: # lines is wrong.")
-    return none(ChalkObj)
+    scanFail()
 
   for i, line in postfixLines:
     if lines[i+1] != line:
       trace("Postfix lines don't match")
-      return none(ChalkObj)
+      scanFail()
 
   let
     s     = lines[^1]
@@ -147,7 +159,7 @@ method scan*(self:   CodecMacOs,
     dict = sstrm.extractOneChalkJson(fullpath)
     if sstrm.getPosition() != len(s):
       trace("Wrapper not valid; extra bits after mark")
-      return none(ChalkObj)
+      scanFail()
 
   # At this point, the marked object is well formed.
   chalk = newChalk(name         = fullpath,
@@ -163,7 +175,8 @@ method scan*(self:   CodecMacOs,
 
   return some(chalk)
 
-method getUnchalkedHash*(self: CodecMacOS, chalk: ChalkObj): Option[string] =
+proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
+                        Option[string] {.cdecl.} =
   var contents: string
 
   if chalk.cachedPreHash == "":
@@ -176,7 +189,8 @@ method getUnchalkedHash*(self: CodecMacOS, chalk: ChalkObj): Option[string] =
         cache.binStream.setPosition(0)
         contents       = cache.binStream.readAll()
         cache.contents = contents
-        cache.binStream.close()
+        if cache.binStream != chalk.stream:
+          cache.binStream.close()
       except:
         discard
 
@@ -197,11 +211,8 @@ method getUnchalkedHash*(self: CodecMacOS, chalk: ChalkObj): Option[string] =
     chalk.cachedPreHash = hashFmt($(contents.computeSHA256()))
     if not isChalkingOp():
       # the ending hash will be the hash of the script file as on disk.
-      let sOpt = chalk.acquireFileStream()
-      if sOpt.isSome():
-        let s = sOpt.get()
-        s.setPosition(0)
-        let contents     = s.readAll()
+      chalkUseStream(chalk):
+        let contents     = stream.readAll()
         chalk.cachedHash = hashFmt($(contents.computeSHA256()))
 
   if chalk.cachedPreHash == "":
@@ -209,7 +220,8 @@ method getUnchalkedHash*(self: CodecMacOS, chalk: ChalkObj): Option[string] =
   else:
     return some(chalk.cachedPreHash)
 
-method handleWrite*(self: CodecMacOs, chalk: ChalkObj, enc: Option[string]) =
+proc macHandleWrite*(self: Plugin, chalk: ChalkObj, enc: Option[string])
+  {.cdecl.} =
   var toWrite = ""
   let cache   = ExeCache(chalk.cache)
 
@@ -232,19 +244,26 @@ method handleWrite*(self: CodecMacOs, chalk: ChalkObj, enc: Option[string]) =
     toWrite &= chalk.cachedPreHash & "\n"
     toWrite &= enc.get() & "\n"
 
+  chalk.chalkCloseStream()
+
   if not chalk.replaceFilecontents(toWrite):
     chalk.opFailed = true
 
-method getChalkTimeArtifactInfo*(self: CodecMacOs, chalk: ChalkObj): ChalkDict =
+proc macGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):
+                                ChalkDict {.cdecl.} =
   result                  = ChalkDict()
   result["ARTIFACT_TYPE"] = artTypeMachO
 
-method getRunTimeArtifactInfo*(self:  CodecMacOs,
-                               chalk: ChalkObj,
-                               ins:   bool): ChalkDict =
+proc macGetRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj, ins: bool):
+                              ChalkDict {.cdecl.} =
   result                      = ChalkDict()
   result["_OP_ARTIFACT_TYPE"] = artTypeMachO
 
-method getNativeObjPlatforms*(s: CodecMacOs): seq[string] =  @["macosx"]
-
-registerPlugin("macos", CodecMacOs())
+proc loadCodecMacOs*() =
+  newCodec("macos",
+         nativeObjPlatforms = @["macosx"],
+         scan               = ScanCb(macScan),
+         getUnchalkedHash   = UnchalkedHashCb(macGetUnchalkedHash),
+         ctArtCallback      = ChalkTimeArtifactCb(macGetChalkTimeArtifactInfo),
+         rtArtCallback      = RunTimeArtifactCb(macGetRunTimeArtifactInfo),
+         handleWrite        = HandleWriteCb(macHandleWrite))

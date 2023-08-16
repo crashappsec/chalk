@@ -6,11 +6,9 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 
-import ../config
+import ../config, ../plugin_api
 
-type GitlabCI = ref object of Plugin
-
-method getChalkTimeHostInfo*(self: GitlabCI): ChalkDict =
+proc gitlabGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.}  =
   result = ChalkDict()
 
   # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
@@ -42,4 +40,6 @@ method getChalkTimeHostInfo*(self: GitlabCI): ChalkDict =
   #  meaning to different user value depending on their pipeline
   if GITLAB_USER != "": result["BUILD_CONTACT"] = pack(@[GITLAB_USER])
 
-registerPlugin("ci_gitlab", GitlabCI())
+proc loadCiGitlab*() =
+  newPlugin("ci_gitlab",
+            ctHostCallback = ChalkTimeHostCb(gitlabGetChalkTimeHostInfo))

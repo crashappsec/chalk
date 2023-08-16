@@ -3,13 +3,17 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
 
-import posix, re, base64, ../config
+when hostOs != "linux":
+  {.warning[UnusedImport]: off.}
+
+import posix, re, base64, ../config, ../plugin_api
 
 type
   ProcDict   = OrderedTableRef[string, string]
   ProcFdSet  = TableRef[string, ProcDict]
   ProcTable  = seq[seq[string]]
-  ProcFSPlugin* = ref object of Plugin
+
+  ProcFSCache* = ref object of RootRef
     tcpSockInfoCache: Option[ProcTable]
     udpSockInfoCache: Option[ProcTable]
     psInfoCache:      Option[ProcFdSet]
@@ -244,7 +248,6 @@ proc getFullProcessInfo(pid: string): ProcDict =
   setIfNotEmptyString(result["cwd"], pid.getPidCwd())
   setIfNotEmptyString(result["path"], pid.getPidExePath())
 
-
 proc getMountInfo(pid: string): seq[ProcDict] =
   let mountinfo = readOneFile("/proc/" & pid & "/mountinfo").get("")
 
@@ -429,7 +432,6 @@ proc sockStatusMap(s: string): string =
     return "UNKNOWN"
 
 proc udpStatusMap(s: string): string = "UNCONN"
-proc identityMap(s: string): string = s
 
 proc getSockInfo(raw: string, mapStatus: (string) -> string): ProcTable =
   let lines = raw.strip().split("\n")
@@ -484,6 +486,7 @@ template getUDPSockInfo(): ProcTable =
     getSockInfo(getRawUDPSockInfo().get(""), udpStatusMap)
 
 # Can be used for UDP or TCP
+# but currently isn't being used yet.
 proc getProcSockInfo(allSockInfo: ProcTable, myFdInfo: ProcFdSet): ProcTable =
   var allInodes: seq[string]
 
@@ -507,18 +510,19 @@ proc getPsAllInfo(): ProcFdSet =
 
     result[pid] = one
 
-method getRunTimeHostInfo*(self: ProcFSPlugin, objs: seq[ChalkObj]):
-       ChalkDict =
-  result = ChalkDict()
+proc procfsGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
+       ChalkDict {.cdecl.} =
+  result    = ChalkDict()
+  let cache = ProcFsCache(self.internalState)
 
   if isSubscribedKey("_OP_TCP_SOCKET_INFO"):
     let info = getTCPSockInfo()
-    self.tcpSockInfoCache = some(info)
+    cache.tcpSockInfoCache = some(info)
     setIfNotEmpty(result, "_OP_TCP_SOCKET_INFO", info)
 
   if isSubscribedKey("_OP_UDP_SOCKET_INFO"):
     let info = getUDPSockInfo()
-    self.udpSockInfoCache = some(info)
+    cache.udpSockInfoCache = some(info)
     setIfNotEmpty(result, "_OP_UDP_SOCKET_INFO", info)
 
   if isSubscribedKey("_OP_IPV4_ROUTES"):
@@ -543,7 +547,7 @@ method getRunTimeHostInfo*(self: ProcFSPlugin, objs: seq[ChalkObj]):
 
   if isSubscribedKey("_OP_ALL_PS_INFO"):
     let info = getPsAllInfo()
-    self.psInfoCache = some(info)
+    cache.psInfoCache = some(info)
     if info != nil and len(info) != 0:
       result["_OP_ALL_PS_INFO"] = pack(info)
 
@@ -601,25 +605,25 @@ template loadArrKeyFromCacheOrCall(chalkKey, cacheKey: string, call: untyped) =
 
         result[chalkKey] = pack(x)
 
-method getRunTimeArtifactInfo(self: ProcFSPlugin,
-                              obj:  ChalkObj,
-                              ins: bool): ChalkDict =
-  result = ChalkDict()
+proc procfsGetRunTimeArtifactInfo(self: Plugin, obj: ChalkObj, ins: bool):
+                                 ChalkDict {.cdecl.} =
+  result    = ChalkDict()
+  let cache = ProcFsCache(self.internalState)
 
   if obj.pid.isNone():
     return
 
-  let pid = int(obj.pid.get())
-
-  let pidAsString = $(pid)
+  let
+    pid         = int(obj.pid.get())
+    pidAsString = $(pid)
 
   var psInfo: ProcDict
 
   if isSubscribedKey("_PROCESS_PID"):
     result["_PROCESS_PID"] = pack(pid)
 
-  if self.psInfoCache.isSome():
-    let cache = self.psInfoCache.get()
+  if cache.psInfoCache.isSome():
+    let cache = cache.psInfoCache.get()
     if pidAsString notin cache:
       return
     psInfo = cache[pidAsString]
@@ -682,4 +686,10 @@ method getRunTimeArtifactInfo(self: ProcFSPlugin,
   if isSubscribedKey("_PROCESS_DETAIL"):
     result["_PROCESS_DETAIL"] = pack(psInfo)
 
-registerPlugin("procfs", ProcFSPlugin())
+
+proc loadProcFs*() =
+  when hostOs == "linux":
+    newPlugin("procfs",
+              rtHostCallback = RunTimeHostCb(procfsGetRunTimeHostInfo),
+              rtArtCallback  = RunTimeArtifactCb(procfsGetRunTimeArtifactInfo),
+              cache          = RootRef(ProcFsCache()))

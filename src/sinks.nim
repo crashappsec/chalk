@@ -1,12 +1,16 @@
 import uri, config
 
+proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
+  return (msg.perLineWrap(startingMaxLineWidth = -7,
+                          firstHangingIndent = 7), true)
+
 const
   availableFilters = { "log_level"     : MsgFilter(logLevelFilter),
                        "log_prefix"    : MsgFilter(logPrefixFilter),
                        "pretty_json"   : MsgFilter(prettyJson),
                        "fix_new_line"  : MsgFilter(fixNewline),
                        "add_topic"     : MsgFilter(addTopic),
-                       "wrap"          : MsgFilter(wrapToWidth)
+                       "wrap"          : MsgFilter(chalkLogWrap)
                      }.toTable()
 
 proc chalkErrSink*(msg: string, cfg: SinkConfig, t: Topic, arg: StringTable) =
@@ -28,6 +32,9 @@ proc getFilterName*(filter: MsgFilter): Option[string] =
   for name, f in availableFilters:
     if f == filter: return some(name)
 
+defaultLogHook.filters = @[MsgFilter(logLevelFilter),
+                           MsgFilter(logPrefixFilter),
+                           MsgFilter(chalkLogWrap)]
 
 var availableSinkConfigs = { "log_hook"     : defaultLogHook,
                              "con4m_hook"   : defaultCon4mHook,
@@ -118,7 +125,6 @@ proc ioErrorHandler(cfg: SinkConfig, t: Topic, msg, err, tb: string) =
     sinkErrors.add(cfg)
 
   let
-    name  = cfg.name
     toOut = formatIo(cfg, t, err, msg)
 
   if not quiet or chalkConfig.getChalkDebug():
@@ -275,7 +281,6 @@ proc getSinkConfigs*(): Table[string, SinkConfig] = return availableSinkConfigs
 
 proc setupDefaultLogConfigs*() =
   let
-    cacheFile = chalkConfig.getReportCacheLocation()
     auditFile = chalkConfig.getAuditLocation()
     doAudit   = chalkConfig.getPublishAudit()
 

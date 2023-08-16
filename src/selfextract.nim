@@ -1,4 +1,4 @@
-import config, collect, plugin_api
+import config, plugin_api
 
 proc handleSelfChalkWarnings*() =
   if not canSelfInject:
@@ -15,9 +15,9 @@ proc getSelfExtraction*(): Option[ChalkObj] =
   once:
     var
       myPath = @[resolvePath(getMyAppPath())]
-      exclusions: seq[string] = @[]
-      chalks:     seq[ChalkObj]
-      ignore:     bool
+      cmd    = getCommandName()
+
+    setCommandName("extract")
 
     # This can stay here, but won't show if the log level is set in the
     # config file, since this function runs before the config files load.
@@ -30,24 +30,38 @@ proc getSelfExtraction*(): Option[ChalkObj] =
     # resolved path here.
     trace("Checking chalk binary '" & myPath[0] & "' for embedded config")
 
-    for codec in getCodecs():
-      if hostOS notin codec.getNativeObjPlatforms(): continue
-      for item in artifacts(myPath, false):
-        selfChalk = item
-        break
-      if selfChalk == nil:
-        return none(ChalkObj)
-      if selfChalk.extract == nil:
-        selfChalk.marked = false
-        selfChalk.extract = ChalkDict()
-      selfId            = some(codec.getChalkId(selfChalk))
-      selfChalk.myCodec = codec
-      return some(selfChalk)
+    for codec in getAllCodecs():
+      if hostOS notin codec.nativeObjPlatforms:
+        continue
+      let
+        ai     = ArtifactIterationInfo(filePaths: myPath)
+        chalks = codec.scanArtifactLocations(ai)
 
-    canSelfInject = false
+      if len(chalks) == 0:
+        continue
 
-  if selfChalk != nil: return some(selfChalk)
-  else:                return none(ChalkObj)
+      selfChalk = chalks[0]
+      break
+
+    if selfChalk == nil:
+      canSelfInject = false
+      setCommandName(cmd)
+      return none(ChalkObj)
+
+    if selfChalk.extract == nil:
+      selfChalk.marked = false
+      selfChalk.extract = ChalkDict()
+
+      selfId = some(selfChalk.callGetChalkId())
+
+    setCommandName(cmd)
+
+  if selfChalk != nil:
+    result = some(selfChalk)
+  else:
+    result = none(ChalkObj)
+
+
 
 template selfChalkGetKey*(keyName: string): Option[Box] =
   if selfChalk == nil or selfChalk.extract == nil or

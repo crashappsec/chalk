@@ -3,12 +3,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import glob, config, util, plugin_api, util
-
-# We collect things in four different places
-
-type CKind = enum CkChalkInfo, CkPostRunInfo, CkHostInfo
-
+import glob, config, util, plugin_api
 
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we
@@ -61,6 +56,8 @@ proc registerProfileKeys(profiles: openarray[string]): int {.discardable.} =
   #
   # This basically ends up forcing getRunTimeArtifactInfo() to run in
   # the system plugin.
+  #
+  # TODO: The config should hand us a list of keys to force.
   subscribedKeys["_VALIDATED"] = true
 
   for item in profiles:
@@ -70,15 +67,20 @@ proc registerProfileKeys(profiles: openarray[string]): int {.discardable.} =
       if content.report: subscribedKeys[name] = true
 
 proc collectChalkTimeHostInfo*() =
-  if hostCollectionSuspended(): return
-  for plugin in getPlugins():
+  if hostCollectionSuspended():
+    return
+
+  for plugin in getAllPlugins():
     let subscribed = plugin.configInfo.preRunKeys
-    if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
-    let dict = plugin.getChalkTimeHostInfo()
-    if dict == nil or len(dict) == 0: continue
+    if not plugin.hasSubscribedKey(subscribed, hostInfo):
+      continue
+    let dict = plugin.callGetChalkTimeHostInfo()
+    if dict == nil or len(dict) == 0:
+      continue
 
     for k, v in dict:
-      if not plugin.canWrite(k, plugin.configInfo.preRunKeys): continue
+      if not plugin.canWrite(k, plugin.configInfo.preRunKeys):
+        continue
       if k notin hostInfo or k in plugin.configInfo.overrides:
         hostInfo[k] = v
 
@@ -114,7 +116,7 @@ proc initCollection*() =
       collectChalkTimeHostInfo()
 
 proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
-  for plugin in getPlugins():
+  for plugin in getAllPlugins():
     let
       data       = artifact.collectedData
       subscribed = plugin.configInfo.postChalkKeys
@@ -123,7 +125,7 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
     if plugin.configInfo.codec and plugin != artifact.myCodec: continue
 
 
-    let dict = plugin.getRunTimeArtifactInfo(artifact, isChalkingOp())
+    let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
     if dict == nil or len(dict) == 0: continue
 
     for k, v in dict:
@@ -131,7 +133,7 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
       if k notin artifact.collectedData or k in plugin.configInfo.overrides:
         artifact.collectedData[k] = v
 
-  let hashOpt = artifact.myCodec.getEndingHash(artifact)
+  let hashOpt = artifact.callGetEndingHash()
   if hashOpt.isSome():
     artifact.collectedData["_CURRENT_HASH"] = pack(hashOpt.get())
 
@@ -142,11 +144,11 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
   let data          = obj.collectedData
 
   trace("Collecting chalk-time data.")
-  for plugin in getPlugins():
-    if plugin == Plugin(obj.myCodec):
+  for plugin in getAllPlugins():
+    if plugin == obj.myCodec:
       trace("Filling in codec info")
-      data["CHALK_ID"]      = pack(obj.myCodec.getChalkID(obj))
-      let preHashOpt = obj.myCodec.getUnchalkedHash(obj)
+      data["CHALK_ID"]      = pack(obj.callGetChalkID())
+      let preHashOpt = obj.callGetUnchalkedHash()
       if preHashOpt.isSome():
         data["HASH"]          = pack(preHashOpt.get())
       if obj.fsRef != "":
@@ -160,7 +162,10 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
       trace(plugin.name & ": Skipping plugin; its metadata wouldn't be used.")
       continue
 
-    let dict = plugin.getChalkTimeArtifactInfo(obj)
+    if plugin.getChalkTimeArtifactInfo == nil:
+      continue
+
+    let dict = plugin.callGetChalkTimeArtifactInfo(obj)
     if dict == nil or len(dict) == 0:
       trace(plugin.name & ": Plugin produced no keys to use.")
       continue
@@ -176,11 +181,11 @@ proc collectRunTimeHostInfo*() =
   if hostCollectionSuspended(): return
   ## Called from report generation in commands.nim, not the main
   ## artifact loop below.
-  for plugin in getPlugins():
+  for plugin in getAllPlugins():
     let subscribed = plugin.configInfo.postRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
 
-    let dict = plugin.getRunTimeHostInfo(getAllChalks())
+    let dict = plugin.callGetRunTimeHostInfo(getAllChalks())
     if dict == nil or len(dict) == 0: continue
 
     for k, v in dict:
@@ -236,9 +241,7 @@ proc artSetupForExecAndEnv(argv: seq[string]): ArtifactIterationInfo =
 proc dockerExtractChalkMark*(chalk: ChalkObj): ChalkDict {.importc.}
 proc extractAndValidateSignature*(chalk: ChalkObj) {.importc.}
 
-proc getImageChalks(codec: Codec): seq[ChalkObj] {.importc.}
-proc getContainerChalks(codec: Codec): seq[ChalkObj] {.importc.}
-proc scanOne(codec: Codec, item: string): Option[ChalkObj] {.importc.}
+proc scanOne(codec: Plugin, item: string): Option[ChalkObj] {.importc.}
 
 proc resolveAll(argv: seq[string]): seq[string] =
   for item in argv:
@@ -263,18 +266,21 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
   # First, iterate over all our file system entries.
   if iterInfo.filePaths.len() != 0:
-    for codec in getCodecs():
+    for codec in getAllCodecs():
+      if getNativeCodecsOnly() and hostOs notin codec.nativeObjPlatforms:
+        continue
       if codec.name == "docker":
         continue
       trace("Asking codec '" &  codec.name & "' to scan artifacts.")
       let chalks = codec.scanArtifactLocations(iterInfo)
 
       for obj in chalks:
+        iterInfo.fileExclusions.add(obj.fsRef)
+
         if obj.extract != nil and "MAGIC" in obj.extract:
           obj.marked = true
 
         if ResourceFile in obj.resourceType:
-          discard obj.acquireFileStream()
           if obj.fsRef == "":
             obj.fsRef = obj.name
             warn("Codec did not properly set the fsRef field.")
@@ -310,7 +316,7 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
         if not inSubscan() and not obj.forceIgnore and
            obj.name notin getUnmarked():
           obj.collectRuntimeArtifactInfo()
-          obj.closeFileStream()
+          chalkCloseStream(obj)
 
   if not inSubscan():
     if getCommandName() != "extract":
@@ -318,7 +324,7 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
         error(item & ": No such file or directory.")
     else:
       trace("Processing docker artifacts.")
-      let docker = Codec(getPluginByName("docker"))
+      let docker = getPluginByName("docker")
       var chalks: seq[ChalkObj]
       for item in iterInfo.otherPaths:
         let objOpt = docker.scanOne(item)
@@ -348,7 +354,7 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
         clearErrorObject()
 
 proc getPushChalkObj*(info: DockerInvocation): ChalkObj =
-    let chalkOpt = scanOne(Codec(getPluginByName("docker")), info.prefTag)
+    let chalkOpt = scanOne(getPluginByName("docker"), info.prefTag)
 
     if chalkOpt.isNone():
       warn("Cannot find image; running docker normally.")

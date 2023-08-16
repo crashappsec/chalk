@@ -4,10 +4,9 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import algorithm, ../config, ../chalkjson
+import algorithm, ../config, ../chalkjson, ../plugin_api
 
 type
-  ToolPlugin* = ref object of Plugin
   PIInfo      = ref object
     name: string
     obj: ToolInfo
@@ -119,10 +118,14 @@ template toolBase(s: untyped, hostScope: static[bool]) {.dirty.} =
 
   return dict
 
-method getChalkTimeHostInfo*(self: ToolPlugin): ChalkDict =
+proc toolGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   toolBase(getContextDirectories()[0], true)
 
-method getChalkTimeArtifactInfo*(self: ToolPlugin, obj: ChalkObj): ChalkDict =
+proc toolGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
+                                 ChalkDict {.cdecl.} =
  toolbase(obj.name, false)
 
-registerPlugin("tool", ToolPlugin())
+proc loadExternalTool*() =
+  newPlugin("tool",
+            ctHostCallback = ChalkTimeHostCb(toolGetChalkTimeHostInfo),
+            ctArtCallback  = ChalkTimeArtifactCb(toolGetChalkTimeArtifactInfo))
