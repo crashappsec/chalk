@@ -20,7 +20,7 @@ RUN python -m venv /tests.env
 RUN mkdir -p /.cache/pypoetry \
     && chmod 0777 /.cache/pypoetry
 
-COPY tests/pyproject.toml tests/poetry.lock $WORKDIR/
+COPY pyproject.toml poetry.lock $WORKDIR/
 RUN poetry install --no-plugins
 
 # install chalk deps

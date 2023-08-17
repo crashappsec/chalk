@@ -22,20 +22,11 @@ RUN python -m venv /tests.env
 RUN mkdir -p /.cache/pypoetry \
     && chmod 0777 /.cache/pypoetry
 
-COPY server/pyproject.toml server/poetry.lock $WORKDIR/
+COPY pyproject.toml poetry.lock $WORKDIR/
 RUN poetry install --no-plugins
-
-RUN apk del \
-        curl \
-        gcc \
-        libressl-dev \
-        musl-dev \
-        make \
-        cmake \
-        libffi-dev
 
 ENV CHALK_API_PARAMS="--workers=4 --error-logfile=- --access-logfile=- --timeout 30"
 ENV CHALK_API_PORT="8585"
 ENV CHALK_CERT_PARAMS=""
 
-CMD ["sh", "-c", "/tests.env/bin/gunicorn -k uvicorn.workers.UvicornH11Worker main:app --reload -b :${CHALK_API_PORT} ${CHALK_API_PARAMS} ${CHALK_CERT_PARAMS}"]
+CMD /tests.env/bin/gunicorn -k uvicorn.workers.UvicornH11Worker main:app --reload -b :${CHALK_API_PORT} ${CHALK_API_PARAMS} ${CHALK_CERT_PARAMS}

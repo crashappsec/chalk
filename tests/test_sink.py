@@ -116,7 +116,9 @@ def test_rotating_log(tmp_data_dir: Path, chalk: Chalk):
 
 @pytest.mark.skipif(not aws_secrets_configured(), reason="AWS secrets not configured")
 # FIXME add some tests for the different options of `/` in S3 URIs
-@mock.patch.dict(os.environ, {"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/"})
+@mock.patch.dict(
+    os.environ, {"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/sink-test.json"}
+)
 def test_s3(tmp_data_dir: Path, chalk: Chalk):
     logger.debug("testing s3 sink...")
     artifact = Path(tmp_data_dir) / "cat"
@@ -143,8 +145,11 @@ def test_s3(tmp_data_dir: Path, chalk: Chalk):
         for line in logs:
             # expecting log line from chalk of form `info: Post to: 1686605005558-CSP9AXH5CMXKAE3D9BN8G25K0G-sink-test; response = 200 OK (sink conf='my_s3_config')`
             if "Post to" in line:
-                object_name = line.split(" ")[3].strip(";")
+                object_name = line.split()[3].strip(";")
+                break
+
         assert object_name != "", "object name could not be found"
+        assert object_name.endswith(".json")
         logger.debug("object name fetched from s3 %s", object_name)
 
         # fetch s3 bucket object and then validate

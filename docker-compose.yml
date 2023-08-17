@@ -16,17 +16,15 @@ services:
     build:
       context: .
       target: compile
-    command: sh -c "nimble debug"
+    command: nimble debug
     working_dir: $PWD
     volumes:
       - $PWD:$PWD
 
-  chalk-config-compile:
+  chalk-config:
     build:
-      context: .
-      dockerfile: docker/Dockerfile.chalk-config
-      target: config-tool-compile
-    command: sh -c "python chalk_config/chalkconf.py"
+      context: config-tool
+    command: python -m chalk_config
     volumes:
       - $PWD/config-tool:/config-tool
       - $PWD/.config-tool-bin:/config-bin
@@ -36,19 +34,6 @@ services:
       TERM: ${TERM:-}
       COLORTERM: ${COLORTERM:-}
       CHALK_BINARIES_ARE_LOCAL: 1
-
-  chalk-config:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.chalk-config
-    environment:
-      TERM: ${TERM:-}
-      COLORTERM: ${COLORTERM:-}
-      CHALK_BINARIES_ARE_LOCAL: 1
-    volumes:
-      - $PWD/.config-tool-bin:/config-bin
-      - $PWD/config-tool-outdir:/outdir/
-      - $HOME/.config:/root/.config
 
   sqlitebrowser:
     image: lscr.io/linuxserver/sqlitebrowser:latest
@@ -70,8 +55,7 @@ services:
     image: chalk_local_api_server
     container_name: chalk_local_api_server
     build:
-      context: .
-      dockerfile: Dockerfile.server
+      context: server
     networks:
       chalk:
         aliases:
@@ -84,7 +68,7 @@ services:
     working_dir: $PWD/server/app
     environment:
       CHALK_CERT_PARAMS: ${CHALK_CERT_PARAMS:-}
-      CHALK_API_PARAMS: ${CHALK_API_PARAMS:- --access-logfile=-  --workers=4 --error-logfile=- --timeout=30}
+      CHALK_API_PARAMS: ${CHALK_API_PARAMS:- --access-logfile=- --workers=4 --error-logfile=- --timeout=30}
       CHALK_API_PORT: ${CHALK_API_PORT:-8585}
 
   registry:
@@ -101,8 +85,7 @@ services:
     image: chalk_local_tests
     container_name: chalk_local_tests
     build:
-      context: .
-      dockerfile: docker/Dockerfile.pytests
+      context: tests
     volumes:
       - $PWD:$PWD
       - /var/run/docker.sock:/var/run/docker.sock

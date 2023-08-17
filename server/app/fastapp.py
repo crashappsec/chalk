@@ -13,13 +13,20 @@ from fastapi.staticfiles import StaticFiles
 from fastapi_healthcheck import HealthCheckFactory, healthCheckRoute
 from sqlalchemy.orm import Session
 
-models.Base.metadata.create_all(bind=engine)
 
 logging.config.fileConfig(
     Path(__file__).parent / "conf" / "logging.conf",
     disable_existing_loggers=True,
 )
 logger = logging.getLogger(__name__)
+
+try:
+    # sqlite does not have DDL locks therefore when multiple workers
+    # start at the same time, some of them can fail creating tables
+    models.Base.metadata.create_all(bind=engine)
+except Exception as error:
+    logger.error(error)
+
 
 title = "Local Chalk Ingestion Server"
 
