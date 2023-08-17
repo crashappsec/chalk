@@ -8,13 +8,17 @@ env:
   TEST_API_SERVER_CERT: ${{ secrets.TEST_API_SERVER_CERT }}
   TEST_API_SERVER_CERT_KEY: ${{ secrets.TEST_API_SERVER_CERT_KEY }}
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   tests:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      packages: write
+    if: |
+      !github.event.pull_request.draft &&
+      !contains(github.event.pull_request.body, format('skip:{0}:{1}', github.workflow, github.job))
 
     steps:
       - name: Checkout
@@ -37,7 +41,7 @@ jobs:
       - name: Compile chalk
         run: |
           docker buildx bake --file docker-compose.yml --file docker-compose-cache.json chalk-compile
-          docker-compose run chalk-compile
+          docker compose run chalk-compile
 
       # - name: Update hosts
       #   run: |
@@ -55,4 +59,4 @@ jobs:
       - name: Run tests
         run: |
           docker buildx bake --file docker-compose.yml --file docker-compose-cache.json tests
-          docker-compose run --rm tests
+          docker compose run --rm tests

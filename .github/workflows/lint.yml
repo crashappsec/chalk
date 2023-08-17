@@ -6,6 +6,10 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
 
+    if: |
+      !github.event.pull_request.draft &&
+      !contains(github.event.pull_request.body, format('skip:{0}:{1}', github.workflow, github.job))
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
