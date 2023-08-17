@@ -398,14 +398,6 @@ Outputs basic version information for the chalk binary.
 """
   }
 #% INTERNAL
-  command entrypoint {
-    args:    (0, high())
-    ignore_all_flags: true
-    doc: """
-coming soon.
-"""
-  }
-
    command helpdump {
      doc: """
 Dumps documentation into a single JSON structure.  Currently, this only captures static structure, not configuration.

@@ -31,7 +31,7 @@ def test_codeowners(tmp_data_dir: Path, chalk: Chalk):
     chalk_reports = chalk.insert(artifact=tmp_data_dir / "helloworld.py", virtual=True)
     assert len(chalk_reports) == 1
     chalk_report = chalk_reports[0]
-    assert chalk_report.get("CODE_OWNERS") == "@test\n\nfoo @test2 @test3\n"
+    assert chalk_report["_CHALKS"][0]["CODE_OWNERS"] == "@test\n\nfoo @test2 @test3\n"
     # check chalk report
     validate_chalk_report(
         chalk_report=chalk_report, artifact_map=artifact_info, virtual=True
