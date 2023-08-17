@@ -2115,6 +2115,36 @@ Show the (admittedly verbose) warning you get when running 'chalk load'.
 """
   }
 
+  field keys_that_can_lift {
+    type:    list[string]
+    default: ["SBOM", "SAST"]
+    validator: func liftable_key_check
+    shortdoc: "Specify which chalk keys *can* be lifted."
+    doc: """
+Normally, at chalk time, chalkable artifact keys can only appear in
+the artifact report, even if it's the same info across all artifacts
+being chalked at once. You will get an error if trying to add them to
+the host report.
+
+However, some items like SBOMs and SAST scan results can be huge, and
+the duplication not awesome.
+
+Such keys must be itemized here, but you get 3 choices:
+
+1. Leave the key in the artifact report and accept the spam.
+
+2. Put the key in the host report but NOT the artifact report; if all
+artifacts have the same value, it'll be reported at the host level a
+single time. However, if it's not the same across all chalked
+artifacts, it gets DROPPED.
+
+3. Put the key in BOTH places. If you do that, it'll report at the
+host level if all values are the same, and at the artifact level if
+not.
+"""
+
+  }
+
   field skip_command_report {
     type:        bool
     default:     false
@@ -2274,6 +2304,29 @@ func override_key_check(keyname: string, val: list[string]) {
   }
 }
 
+func liftable_key_check(keyname, val: list[string]) {
+  result := ""
+  
+  for i from 0 to len(val) {
+    item := val[i]
+    
+    if not keyspec_exists(item) {
+      return (keyname + ": key '" + item + " is specified to be liftable, " +
+      "but no such key has been defined.")
+    }
+
+    base       := "keyspec." + item + "."
+    kind_field := base + "kind"
+    kind       := attr_get(kind_field, int)
+
+    if kind != ChalkTimeArtifact {
+      return (keyname + ": specified key '" + item + "' is not liftable " +
+      "because it is not a chalkable artifact key.")
+    }
+  }
+}
+
+
 func pc_err(profile, key, specified, err) {
   if specified {
       return ("Profile '" + profile + "' specifies reporting key '" + key +
@@ -2345,11 +2398,16 @@ func profile_check_base(profile_name, profile_type, cmd) {
     # - ChalkTimeHost keys can appear anywhere.
     # - ChalkTimeArtifact keys can appear in per-artifact reports,
     #   and in host-reports as long as the keyspec set never_early to 'false'
+    #   *and* the key is in the `keys_that_can_lift` field. Otherwise,
+    #   it can only appear in an artifact report.
+    
     # - RunTimeArtifact keys can appear in per-artifact reports only.
     # - RunTimeHost keys can appear in host reports only.
     #
     # If the profile type is PTChalkTimeArtifact, we don't allow RunTimeArtifact
     # or RunTimeHost keys.
+
+    valid_lifts := attr_get("keys_that_can_lift", list[string])
 
     if profile_type == PTArtifact or profile_type == PTChalkTimeArtifact {
       if key_kind == RunTimeHost {
@@ -2373,6 +2431,11 @@ func profile_check_base(profile_name, profile_type, cmd) {
         return pc_err(profile_name, key_name, true,
         "that key is artifact specific, so can't be in host-level report spec")
       }
+      if valid_lifts.contains(key_name) {
+        continue
+      }
+      return pc_err(profile_name, key_name, true,
+      "That key is not configured to be liftable.")
     }
     # Otherwise, all is good in the cosmos.
   }

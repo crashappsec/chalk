@@ -754,35 +754,9 @@ profile host_report_large {
   key.INJECTOR_ENV.report                        = true
   key.TENANT_ID_WHEN_CHALKED.report              = true
 
-  # Keys that are practical to lift.
-  key.CHALK_PTR.report                           = true
-  key.ORIGIN_URI.report                          = true
-  key.BRANCH.report                              = true
-  key.COMMIT_ID.report                           = true
-  key.ARTIFACT_VERSION.report                    = true
-  key.STORE_URI.report                           = true
-  key.PACKAGE_URI.report                         = true
-  key.CODE_OWNERS.report                         = true
-  key.VCS_DIR_WHEN_CHALKED.report                = true
-  key.BUILD_ID.report                            = true
-  key.BUILD_URI.report                           = true
-  key.BUILD_API_URI.report                       = true
-  key.BUILD_TRIGGER.report                       = true
-  key.BUILD_CONTACT.report                       = true
-  key.CHALK_RAND.report                          = true
-  key.CLOUD_METADATA_WHEN_CHALKED.report         = true
+  # Keys that we try to lift.
   key.SBOM.report                                = true
   key.SAST.report                                = true
-  key.DOCKER_FILE.report                         = true
-  key.DOCKERFILE_PATH.report                     = true
-  key.DOCKER_PLATFORM.report                     = true
-  key.DOCKER_LABELS.report                       = true
-  key.DOCKER_TAGS.report                         = true
-  key.DOCKER_CONTEXT.report                      = true
-  key.DOCKER_ADDITIONAL_CONTEXTS.report          = true
-  key.DOCKER_CHALK_ADDED_LABELS.report           = true
-  key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.report    = true
-  key.DOCKER_CHALK_TEMPORARY_TAG.report          = true
 
   # Runtime host keys.
   key._ACTION_ID.report                          = true
@@ -860,35 +834,9 @@ It reports all PS info, but only if definitely running in a container.
   key.INJECTOR_ENV.report                        = true
   key.TENANT_ID_WHEN_CHALKED.report              = true
 
-  # Keys that are practical to lift.
-  key.CHALK_PTR.report                           = true
-  key.ORIGIN_URI.report                          = true
-  key.BRANCH.report                              = true
-  key.COMMIT_ID.report                           = true
-  key.ARTIFACT_VERSION.report                    = true
-  key.STORE_URI.report                           = true
-  key.PACKAGE_URI.report                         = true
-  key.CODE_OWNERS.report                         = true
-  key.VCS_DIR_WHEN_CHALKED.report                = true
-  key.BUILD_ID.report                            = true
-  key.BUILD_URI.report                           = true
-  key.BUILD_API_URI.report                       = true
-  key.BUILD_TRIGGER.report                       = true
-  key.BUILD_CONTACT.report                       = true
-  key.CHALK_RAND.report                          = true
-  key.CLOUD_METADATA_WHEN_CHALKED.report         = true
+  # Keys that we try to lift.
   key.SBOM.report                                = true
   key.SAST.report                                = true
-  key.DOCKER_FILE.report                         = true
-  key.DOCKERFILE_PATH.report                     = true
-  key.DOCKER_PLATFORM.report                     = true
-  key.DOCKER_LABELS.report                       = true
-  key.DOCKER_TAGS.report                         = true
-  key.DOCKER_CONTEXT.report                      = true
-  key.DOCKER_ADDITIONAL_CONTEXTS.report          = true
-  key.DOCKER_CHALK_ADDED_LABELS.report           = true
-  key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.report    = true
-  key.DOCKER_CHALK_TEMPORARY_TAG.report          = true
 
   # Runtime host keys.
   key._ACTION_ID.report                          = true
