@@ -3066,8 +3066,11 @@ func get_args(key) { return argv(); }
 
 default_command = "help"
 
-# Currently, this needs to be here for singleton defaults to take hold.
+# Currently, these need to be here for singleton defaults to take hold.
 extract {
+}
+
+source_marks {
 }
 
 exec {

@@ -134,8 +134,8 @@ const basePrefixLen = 2 # size of the prefix w/o the comment char(s)
 
 proc getUnmarkedScriptContent*(current: string,
                                chalk:   ChalkObj,
-                               quiet            = false,
-                               commentIndicator = "#"): (string, ChalkDict) =
+                               comment: string,
+                               quiet            = false): (string, ChalkDict) =
   ## This function is intended to be used from plugins for artifacts
   ## where we have text files that are marked by adding one-line
   ## comments.
@@ -218,7 +218,7 @@ proc getUnmarkedScriptContent*(current: string,
     # Below, we call the string that is either emptyMark or ""
     # 'remnant' because I can't come up with a better name.
   let
-    ourEnding    = "\n" & commentIndicator & " "
+    ourEnding    = "\n" & comment & " "
     preMark      = current[0 ..< cs]
     addEmptyMark = if not preMark.endsWith(ourEnding):            true
                    elif r != len(current) and current[r] != '\n': true
@@ -228,7 +228,7 @@ proc getUnmarkedScriptContent*(current: string,
   # If we're not adding empty mark, we need to excise the prefix,
   # which includes the newline, the comment marker and a space.
   if not addEmptyMark:
-    cs -= (basePrefixLen + len(commentIndicator))
+    cs -= (basePrefixLen + len(comment))
 
   # If r is positioned at the end of the string we don't want to get
   # an array indexing error.
@@ -239,8 +239,7 @@ proc getUnmarkedScriptContent*(current: string,
 
 proc getNewScriptContents*(fileContents: string,
                            chalk:        ChalkObj,
-                           markContents: string,
-                           commentIndicator       = "#"): string =
+                           markContents: string): string =
   ## This helper function can be used for script plugins to calculate
   ## their new output.  It assumes you've either cached the input
   ## (which isn't a great idea if chalking large zip files or other
@@ -267,9 +266,9 @@ proc getNewScriptContents*(fileContents: string,
     # that there wasn't one there before.
 
     if len(fileContents) != 0 and fileContents[^1] == '\n':
-      return fileContents & commentIndicator & " " & markContents & "\n"
+      return fileContents & chalk.commentPrefix & " " & markContents & "\n"
     else:
-      return fileContents & "\n" & commentIndicator & " " & markContents
+      return fileContents & "\n" & chalk.commentPrefix & " " & markContents
 
   # At this point, we don't care about the newline situation; we are
   # just going to replace an *existing* chalk mark (which may be the
@@ -283,7 +282,7 @@ proc getNewScriptContents*(fileContents: string,
     return fileContents[0 ..< cs] & markContents & fileContents[r .. ^1]
 
 proc scriptLoadMark*(codec:  Plugin, stream: FileStream,
-                     path: string, comment = "#"):
+                     path: string, comment: string):
                    Option[ChalkObj] =
   ## We expect this helper function will work for MOST
   ## codecs for scripting languages and similar, after checking
@@ -299,7 +298,7 @@ proc scriptLoadMark*(codec:  Plugin, stream: FileStream,
                               codec        = codec,
                               stream       = stream,
                               resourceType = {ResourceFile})
-    (toHash, dict) = contents.getUnmarkedScriptContent(chalk, false, comment)
+    (toHash, dict) = contents.getUnmarkedScriptContent(chalk, comment)
 
   result = some(chalk)
 
@@ -318,8 +317,6 @@ proc scriptHandleWrite*(plugin:  Plugin,
                         encoded: Option[string]) {.cdecl.} =
   ## Same as above, default option for a handleWrite implementation
   ## that should work for most scripting languages.
-  let comment = plugin.commentStart
-
   var contents: string
 
   chalkUseStream(chalk):
@@ -329,15 +326,15 @@ proc scriptHandleWrite*(plugin:  Plugin,
   if encoded.isNone():
     if not chalk.marked:  # Unmarked, so nothing to do.
       return
-    let (toWrite, ignore) = contents.getUnmarkedScriptContent(chalk, true,
-                                                              comment)
+    let (toWrite, ignore) = contents.getUnmarkedScriptContent(chalk,
+                                                chalk.commentPrefix, true)
     if not chalk.replaceFileContents(toWrite):
       chalk.opFailed = true
       return
 
     chalk.cachedHash = chalk.cachedPreHash
   else:
-    let toWrite = contents.getNewScriptContents(chalk, encoded.get(), comment)
+    let toWrite = contents.getNewScriptContents(chalk, encoded.get())
     if not chalk.replaceFileContents(toWrite):
       chalk.opFailed = true
     else:

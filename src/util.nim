@@ -335,7 +335,6 @@ template ccall(code: untyped, success = 0) =
     error($(strerror(ret)))
     quit(1)
 
-
 proc runCmdGetEverything*(exe:      string,
                           args:     seq[string],
                           newStdIn: string       = ""): ExecOutput =

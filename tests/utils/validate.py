@@ -25,7 +25,7 @@ def validate_virtual_chalk(
 ):
     try:
         vjsonf = tmp_data_dir / "virtual-chalk.json"
-        if not virtual:
+        if not virtual or len(artifact_map) == 0:
             assert (
                 not vjsonf.is_file()
             ), "virtual-chalk.json should not have been created!"
@@ -65,26 +65,29 @@ def validate_chalk_report(
     try:
         assert chalk_report["_OPERATION"] == chalk_action
 
-        assert "_CHALKS" in chalk_report
-        assert len(chalk_report["_CHALKS"]) == len(
-            artifact_map
-        ), "chalks missing from report"
+        if len(artifact_map) > 0:
+            assert "_CHALKS" in chalk_report
+            assert len(chalk_report["_CHALKS"]) == len(
+                artifact_map
+            ), "chalks missing from report"
 
-        for chalk in chalk_report["_CHALKS"]:
-            path = chalk["PATH_WHEN_CHALKED"]
-            assert path in artifact_map, "chalked artifact incorrect"
-            artifact = artifact_map[path]
+            for chalk in chalk_report["_CHALKS"]:
+                path = chalk["PATH_WHEN_CHALKED"]
+                assert path in artifact_map, "chalked artifact incorrect"
+                artifact = artifact_map[path]
 
-            # artifact specific fields
-            assert (
-                artifact.type == chalk["ARTIFACT_TYPE"]
-            ), "artifact type doesn't match"
-            if artifact.hash != "":
-                # in some cases, we don't check the artifact hash
-                # ex: zip files, which are not computed as hash of file
-                assert artifact.hash == chalk["HASH"], "artifact hash doesn't match"
-            if chalk_action == "insert":
-                assert virtual == chalk["_VIRTUAL"], "_VIRTUAL mismatch"
+                # artifact specific fields
+                assert (
+                    artifact.type == chalk["ARTIFACT_TYPE"]
+                ), "artifact type doesn't match"
+                if artifact.hash != "":
+                    # in some cases, we don't check the artifact hash
+                    # ex: zip files, which are not computed as hash of file
+                    assert artifact.hash == chalk["HASH"], "artifact hash doesn't match"
+                if chalk_action == "insert":
+                    assert virtual == chalk["_VIRTUAL"], "_VIRTUAL mismatch"
+        else:
+            assert "_CHALKS" not in chalk_report
     except AssertionError as e:
         logger.error("chalk report validation failed", error=e)
         raise
@@ -135,20 +138,52 @@ def validate_extracted_chalk(
         extracted_chalk["_OPERATION"] == "extract"
     ), "operation expected to be extract"
 
+    if len(artifact_map) == 0:
+        assert "_CHALKS" not in extracted_chalk
+        return
+
     if virtual:
         assert (
             "_UNMARKED" in extracted_chalk and "_CHALKS" not in extracted_chalk
         ), "Expected that artifact to not have chalks embedded"
-        assert len(extracted_chalk["_UNMARKED"]) == len(
+
+        # everything should be unmarked, but not everything is an artifact
+        assert len(extracted_chalk["_UNMARKED"]) >= len(
             artifact_map
         ), "wrong number of unmarked chalks"
+
+        # we should find artifact in _UNMARKED
+        for key in artifact_map:
+            assert key in extracted_chalk["_UNMARKED"]
+
     else:
-        assert (
-            "_UNMARKED" not in extracted_chalk and "_CHALKS" in extracted_chalk
-        ), "Expected that artifact to have chalks embedded"
-        assert len(extracted_chalk["_CHALKS"]) == len(
-            artifact_map
-        ), "wrong number of chalks"
+        if len(artifact_map) > 0:
+            # okay to have _UNMARKED as long as the chalk mark is still there
+            assert (
+                "_CHALKS" in extracted_chalk
+            ), "Expected that artifact to have chalks embedded"
+
+            assert len(extracted_chalk["_CHALKS"]) == len(
+                artifact_map
+            ), "wrong number of chalks"
+
+            for chalk in extracted_chalk["_CHALKS"]:
+                path = chalk["_OP_ARTIFACT_PATH"]
+                assert path in artifact_map, "path not found"
+                artifact_info = artifact_map[path]
+
+                if artifact_info.hash != "":
+                    assert artifact_info.hash == chalk["HASH"]
+                assert artifact_info.type == chalk["ARTIFACT_TYPE"]
+
+                # top level vs chalk-level sanity check
+                assert chalk["PLATFORM_WHEN_CHALKED"] == extracted_chalk["_OP_PLATFORM"]
+                assert (
+                    chalk["INJECTOR_COMMIT_ID"]
+                    == extracted_chalk["_OP_CHALKER_COMMIT_ID"]
+                )
+        else:
+            assert "_CHALKS" not in extracted_chalk
 
     # there should not be operation errors
     try:
@@ -156,22 +191,3 @@ def validate_extracted_chalk(
     except KeyError:
         # fine if this key doesn't exist
         pass
-
-    if virtual:
-        for path in extracted_chalk["_UNMARKED"]:
-            assert path in artifact_map, "path not found"
-    else:
-        for chalk in extracted_chalk["_CHALKS"]:
-            path = chalk["_OP_ARTIFACT_PATH"]
-            assert path in artifact_map, "path not found"
-            artifact_info = artifact_map[path]
-
-            if artifact_info.hash != "":
-                assert artifact_info.hash == chalk["HASH"]
-            assert artifact_info.type == chalk["ARTIFACT_TYPE"]
-
-            # top level vs chalk-level sanity check
-            assert chalk["PLATFORM_WHEN_CHALKED"] == extracted_chalk["_OP_PLATFORM"]
-            assert (
-                chalk["INJECTOR_COMMIT_ID"] == extracted_chalk["_OP_CHALKER_COMMIT_ID"]
-            )

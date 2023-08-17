@@ -29,7 +29,7 @@ macro loadPlugins(list: static[openarray[string]]): untyped =
 # Putting `pluginName` in here will cause `loadPluginName()`
 # to get called.
 
-loadPlugins(["codecDocker", "codecElf", "codecMacOs", "codecPythonPy",
-             "codecPythonPyc", "codecShebang", "codecZip", "ciGithub", "ciGitlab",
-             "ciJenkins", "conffile", "ecs", "externalTool", "ownerAuthors",
-             "ownerGithub", "procfs", "system", "vctlGit"])
+loadPlugins(["codecDocker", "codecElf", "codecMacOs", "codecPythonPyc",
+             "codecSource", "codecZip", "ciGithub", "ciGitlab", "ciJenkins",
+             "conffile", "ecs", "externalTool", "ownerAuthors", "ownerGithub",
+             "procfs", "system", "vctlGit"])

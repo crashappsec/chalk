@@ -1254,6 +1254,288 @@ from that, if it has access.
   }
 }
 
+singleton source_marks {
+  gen_fieldname: "srcConfig"
+  gen_typename:  "SrcConfig"
+  gen_setters:   false
+  user_def_ok:   false
+  
+  doc: """
+This controls whether and how source-based artifacts are marked.
+
+Generally, the marking occurs by sticking the mark in a comment.
+
+Currently, the intent for source marking is to mark content that will
+be shipped and run in source code form. While you *can* mark every
+source file, we don't really encourage it. For that reason, by
+default, our database only contains reasonably well used scripting
+languages, and is configured to only mark things with unix Shebangs
+(extraction doesn't consider the shebang).
+
+We also definitely do **not** recommend marking code while it is in a
+repository. Git does that job well, and no tooling exists to help
+recalculate every time you make an edit.
+
+Ideally, you might wish to mark both a file and any
+dependencies. Currently, with the exception of container images /
+containers, Chalk doesn't handle that, as it's significantly difficult
+to be particularly precise about what is part of the artifact and what
+isn't.
+"""
+
+  field only_mark_shebangs {
+    type:    bool
+    default: true
+    doc: """
+If this is true, we will only mark files that have a shebang line
+(i.e., the first line starts with `#!`).
+
+This is useful in many scripting languages, as the main entry point is
+often made executable and given a shebang, whereas supporting files
+are not.
+
+Currently, Chalk has no native support to try to determine which files
+the language is likely to deem an entry point. We do not attempt to
+understand any package/module system, etc.
+
+If you'd like to do that, you can add a custom callback.
+
+Extraction does not check this.  It will attempt to extract from any
+file that appears to be valid utf when looking at the first 256 bytes,
+unless you provide a custom callback.
+"""
+}
+
+  field only_mark_when_execute_set {
+    type:    bool
+    default: false
+    doc: """
+    
+When this is true, Chalk will not attempt to mark source code *unless*
+the executable bit is set. However, the execute bit can get added later;
+it's a trade-off!
+
+Extraction does not check this.  It will attempt to extract from any
+file that appears to be valid utf when looking at the first 256 bytes,
+unless you provide a custom callback.
+"""    
+  }
+
+  field text_only_extensions {
+    type: list[string]
+    default: ["json", "jsonl", "txt", "text", "md", "docx"]
+    doc: """
+Chalk extraction generally assumes that if it finds a chalk mark in a
+text file, then it should report it. But, that isn't true for
+documentation!
+
+So for all operations, we assume the extensions in this list can *never*
+be source code.
+"""    
+ }
+  
+  field custom_logic {
+    type:    func (string, string, string, bool, bool) -> bool
+    require: false
+    doc: """
+If you'd like to have fine-grained control over what source gets
+marked, you can do so by setting a callback.
+
+Your callback will *not* supercede `shebangs_when_no_extension_match`
+and `only_mark_when_execute_is_set`. Your callback will only get run
+if those checks would lead to the file otherwise being marked.
+
+The callback receives the following parameters:
+
+1. The (resolved) file name for the file being considered.
+2. The detected language (see below).
+3. The file extension (so you don't have to carve it out of the file name).
+4. A boolean indicating whether there was a shebang line (if
+   `only_mark_shebangs` is on, this will always be true).
+5. A boolean indicating whether the execute bit is set on the file system.
+   This will always be true if `only_mark_when_execute_set` is true.
+
+Language detection prefers the shebang line, if it's captured. The
+language name will be matched with the following rules:
+
+- We look at the first item after the #!, which will either be a full path or
+  an exe name (where the path is searched).
+- Any directory component is stripped.
+- If the value is the word `env` then we instead look at the first non-flag
+  item (again, stripping any directory component, even though generally
+  we wouldn't expect to see any).
+- Any trailing sequence of numbers and dots are removed.
+
+Therefore, all of these will normalize the same way:
+
+#! python
+#! python3
+#! /bin/env python
+#! /bin/env python3.3.1
+
+If chalk does not recognize the language, and your logic says to mark,
+it will proceed to mark it, assuming that '#' is the comment character.
+Alternatively, you can add the language to our database.
+
+If there was no shebang line, or we did not look at the shebang line,
+then we consult `source_marks.extensions_to_languages_map`.
+
+If that turns up nothing, or if there is no extension, then we look at
+the executable bit. If it's set, then we check to see if the file
+seems to be valid utf-8, by looking at the first 256 bytes. If it is,
+then we assume `sh` as the language.
+
+Otherwise, we will assume the file is *not* an executable.
+
+This also means that we might use odd language names, like 'node',
+since it's the thing we're likely to see in a shebang line.
+"""    
+  }
+
+  field language_to_comment_map {
+    type: dict[string, string]
+    default: {
+      "sh"              : "#",
+      "csh"             : "#",
+      "tcsh"            : "#",
+      "ksh"             : "#",
+      "zsh"             : "#",
+      "terraform"       : "//",
+      "node"            : "//",
+      "php"             : "//",
+      "perl"            : "#",
+      "python"          : "#",
+      "ruby"            : "#",
+      "expect"          : "#",
+      "tcl"             : "#",
+      "ack"             : "#",
+      "awk"             : "#"
+    }
+  }
+  
+  field extensions_to_languages_map {
+    type: dict[string, string]
+    default: {
+      "sh"              : "sh",
+      "csh"             : "csh",
+      "tcsh"            : "tcsh",
+      "ksh"             : "ksh",
+      "zsh"             : "zsh",
+      "hcl"             : "terraform",
+      "nomad"           : "terraform",
+      "tf"              : "terraform",
+      "_js"             : "node",
+      "bones"           : "node",
+      "cjs"             : "node",
+      "es6"             : "node",
+      "jake"            : "node",
+      "jakefile"        : "node",
+      "js"              : "node",
+      "jsb"             : "node",
+      "jscad"           : "node",
+      "jsfl"            : "node",
+      "jsm"             : "node",
+      "jss"             : "node",
+      "mjs"             : "node",
+      "njs"             : "node",
+      "pac"             : "node",
+      "sjs"             : "node",
+      "ssjs"            : "node",
+      "xsjs"            : "node",
+      "xsjslib"         : "node",
+      "aw"              : "php",
+      "ctp"             : "php",
+      "phakefile"       : "php",
+      "php"             : "php",
+      "php3"            : "php",
+      "php4"            : "php",
+      "php5"            : "php",
+      "php_cs"          : "php",
+      "dist"            : "php",
+      "phps"            : "php",
+      "phpt"            : "php",
+      "phtml"           : "php",
+      "ack"             : "perl",
+      "al"              : "perl",
+      "cpanfile"        : "perl",
+      "pl"              : "perl",
+      "perl"            : "perl",
+      "ph"              : "perl",
+      "plh"             : "perl",
+      "plx"             : "perl",
+      "pm"              : "perl",
+      "psgi"            : "perl",
+      "rexfile"         : "perl",
+      "buck"            : "python",
+      "bazel"           : "python",
+      "gclient"         : "python",
+      "gyp"             : "python",
+      "gypi"            : "python",
+      "lmi"             : "python",
+      "py"              : "python",
+      "py3"             : "python",
+      "pyde"            : "python",
+      "pyi"             : "python",
+      "pyp"             : "python",
+      "pyt"             : "python",
+      "pyw"             : "python",
+      "sconscript"      : "python",
+      "sconstruct"      : "python",
+      "snakefile"       : "python",
+      "tac"             : "python",
+      "workspace"       : "python",
+      "wscript"         : "python",
+      "wsgi"            : "python",
+      "xpy"             : "python",
+      "appraisals"      : "ruby",
+      "berksfile"       : "ruby",
+      "brewfile"        : "ruby",
+      "builder"         : "ruby",
+      "buildfile"       : "ruby",
+      "capfile"         : "ruby",
+      "dangerfile"      : "ruby",
+      "deliverfile"     : "ruby",
+      "eye"             : "ruby",
+      "fastfile"        : "ruby",
+      "gemfile"         : "ruby",
+      "gemfile.lock"    : "ruby",
+      "gemspec"         : "ruby",
+      "god"             : "ruby",
+      "guardfile"       : "ruby",
+      "irbrc"           : "ruby",
+      "jarfile"         : "ruby",
+      "jbuilder"        : "ruby",
+      "mavenfile"       : "ruby",
+      "mspec"           : "ruby",
+      "podfile"         : "ruby",
+      "podspec"         : "ruby",
+      "pryrc"           : "ruby",
+      "puppetfile"      : "ruby",
+      "rabl"            : "ruby",
+      "rake"            : "ruby",
+      "rb"              : "ruby",
+      "rbuild"          : "ruby",
+      "rbw"             : "ruby",
+      "rbx"             : "ruby",
+      "ru"              : "ruby",
+      "snapfile"        : "ruby",
+      "thor"            : "ruby",
+      "thorfile"        : "ruby",
+      "vagrantfile"     : "ruby",
+      "watchr"          : "ruby",
+      "tcl"             : "tcl",
+      "itk"             : "tcl",
+      "tk"              : "tcl",
+      "awk"             : "awk",
+      "gawk"            : "gawk",
+      "mawk"            : "mawk",
+      "nawk"            : "nawk"
+    }
+    doc: """
+"""    
+  }
+}
+
 root {
   prologue: """
 # This file is auto-generated as part of the chalk build.
@@ -1278,6 +1560,7 @@ root {
   allow docker        { }
   allow exec          { }
   allow env_config    { }
+  allow source_marks  { }
 
   field config_path {
     type:       list[string]

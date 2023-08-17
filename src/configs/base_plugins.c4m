@@ -17,10 +17,11 @@ plugin elf {
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 }
 
-plugin shebang {
+plugin source {
     codec:           true
     artifact_keys:   ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    priority: 1000
 }
 
 plugin macos {
@@ -122,14 +123,6 @@ plugin zip {
 plugin zippeditem {
     enabled:         true
     artifact_keys:   ["CONTAINING_ARTIFACT_WHEN_CHALKED", "PATH_WITHIN_ZIP"]
-}
-
-plugin python_py {
-    codec:           true
-    priority:        1
-    enabled:         true
-    artifact_keys:   ["ARTIFACT_TYPE"]
-    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
 }
 
 plugin python_pyc {

@@ -27,6 +27,9 @@ type
     collectedData*: ChalkDict   ## What we're adding during insertion.
     extract*:       ChalkDict   ## What we extracted, or nil if no extract.
     cachedMark*:    string      ## Cached chalk mark.
+    commentPrefix*: string      ## For scripting languages only, the comment
+                                ## prefix we use when adding / rming marks
+    detectedLang*:  string      ## Currently only used in codecSource.
     opFailed*:      bool
     marked*:        bool
     embeds*:        seq[ChalkObj]
