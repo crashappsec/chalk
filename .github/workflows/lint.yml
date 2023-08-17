@@ -8,7 +8,7 @@ jobs:
 
     if: |
       !github.event.pull_request.draft &&
-      !contains(github.event.pull_request.body, format('skip:{0}:{1}', github.workflow, github.job))
+      !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
 
     steps:
       - name: Checkout Code

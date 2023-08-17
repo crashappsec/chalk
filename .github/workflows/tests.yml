@@ -1,6 +1,9 @@
 name: test
 
-on: pull_request
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
 
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -17,8 +20,10 @@ jobs:
     runs-on: ubuntu-latest
 
     if: |
-      !github.event.pull_request.draft &&
-      !contains(github.event.pull_request.body, format('skip:{0}:{1}', github.workflow, github.job))
+      github.event_name != 'pull_request' || (
+        !github.event.pull_request.draft &&
+        !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
+      )
 
     steps:
       - name: Checkout
