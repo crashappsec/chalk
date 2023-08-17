@@ -1,21 +1,31 @@
-Sign the CLA
+Contributions
 =============
 
-This is a step-by-step guide to signing the Crash Override
-Contributors License Agreement via Pull Request. 
+| Type                      | Where to contribute                                                                                                                            |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| File an issue             | Submit an issue in [the relevant GitHub repository](https://github.com/crashappsec)                                                            |
+| Update this documentation | Create a PR or submit an issue in the [Documentation repository](https://github.com/crashappsec/docs)                                          |
+| Contribute code changes   | Follow the process [below](#contributing-to-the-project), then raise a PR in [the relevant GitHub repository](https://github.com/crashappsec/) |
 
-1. Please read the current versions of the
-   [individual CLA here](cla-individual-1.0.md) or [entity CLA here](cla-entity-1.0.md)
-   and ensure you understand and agree to them. If you have any questions please reach
-   out to us at [opensource@crashoverride.com](mailto:opensource@crashoverride.com).
 
-3. If you don't already have one make an account on [GitHub](https://github.com/).
+Contributing Code to the Project
+================================
+
+Thank you for your interest in contributing to the project, below are the steps 
+that we ask all contributors to take to ensure that the project stays compliant 
+with its GPLv3 license and its codebase can remain fully open.
+
+1. If you don't already have one make an account on [GitHub](https://github.com/).
+2. Read and agree to the project's code of conduct [here](https://github.com/crashappsec/.github/blob/main/code-of-conduct.md)
+3. Read the current version of the Contributor License Agreement (CLA), the
+   [individual CLA is here](https://github.com/crashappsec/chalk-internal/blob/main/cla-individual-1.0.md), 
+   the [entity CLA is here.](https://github.com/crashappsec/chalk-internal/blob/main/cla-entity-1.0.md)
+   (Please ensure you understand and agree to them, if you have any questions please reach
+   out to us at [opensource@crashoverride.com](mailto:opensource@crashoverride.com))
 
 4. File a pull request on the Chalk project, as [shown here](#filing-the-pull-request).
 
-5. Email the Crash Override team, as [shown here](#sending-the-email).
-
-6. Wait for someone from the team to merge your pull request. You may start
+5. Wait for someone from the team to merge your pull request. You may start
    opening pull requests for the project but we will only be able to merge
    your contributions after your signed CLA is merged.
 
@@ -40,11 +50,15 @@ look as follows:
 [date in YYYY-MM-DD format]
 
 I hereby agree to the terms of the Individual Contributors License
-Agreement, version 1.0, with MD5 checksum
+Agreement version 1.0 (https://github.com/crashappsec/chalk-internal/blob/main/cla-individual-1.0.md), with MD5 checksum
 2acaee37d7cd4ca34c537bcc0d5ef6d9.
 
 I furthermore declare that I am authorized and able to make this
 agreement and sign this declaration.
+
+Finally, I agree to abide by the project's code of conduct version 1.0
+(https://github.com/crashappsec/.github/blob/main/code-of-conduct.md), 
+with MD5 checksum f5587cc97110aa2fa21bc7c8d6861c44.
 
 Signed,
 
@@ -59,11 +73,15 @@ look as follows:
 [date YYYY-MM-DD]
 
 I hereby agree to the terms of the Entity Contributors License
-Agreement, version 1.0, with MD5 checksum
+Agreement version 1.0 (https://github.com/crashappsec/chalk-internal/blob/main/cla-entity-1.0.md), with MD5 checksum
 59ea9b11340d11f9d730d7e85c61ac96.
 
 I furthermore declare that I am authorized and able to make this
 agreement and sign this declaration.
+
+Finally, I agree to abide by the project's code of conduct version 1.0 
+(https://github.com/crashappsec/.github/blob/main/code-of-conduct.md), 
+with MD5 checksum f5587cc97110aa2fa21bc7c8d6861c44.
 
 Signed,
 
@@ -77,9 +95,16 @@ Replace the bracketed text as follows:
 * `[your name]` with your name.
 * `[your github userid]` with your GitHub userid.
 
-You can confirm the MD5 checksums of the CLAs by running the md5 program over them:
+
+Checking File Versions and MD5 Checksums
+----------------------------------------
+
+You can confirm the MD5 checksums of the code of conduct and CLAs by running the md5 program over them:
 
 ```
+md5sum code-of-conduct.md
+f5587cc97110aa2fa21bc7c8d6861c44  code-of-conduct.md
+
 md5sum cla-{individual,entity}-1.0.md
 2acaee37d7cd4ca34c537bcc0d5ef6d9  cla-individual-1.0.md
 59ea9b11340d11f9d730d7e85c61ac96  cla-entity-1.0.md
@@ -90,25 +115,3 @@ If the output is different from above, do not sign the CLA and let us know.
 That's it!
 
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-
-Sending the Email
------------------
-
-Send an email to the Crash Override team at
-[opensource@crashoverride.com](mailto:opensource@crashoverride.com),
-with the subject "CLA" and the following body:
-
-```
-I submitted a pull request to indicate agreement to the terms
-of the Contributors License Agreement.
-
-Signed,
-
-[your name]
-https://github.com/[your github userid]
-```
-
-Replace the bracketed text as follows:
-
-* `[your name]` with your name.
-* `[your github userid]` with your GitHub userid.
