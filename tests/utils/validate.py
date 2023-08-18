@@ -13,16 +13,20 @@ MAGIC = "dadfedabbadabbed"
 class ArtifactInfo:
     type: str
     hash: str
+    chalk_info: Dict[str, Any]
+    host_info: Dict[str, Any]
 
     def __init__(self, type: str, hash: str) -> None:
         self.type = type
         self.hash = hash
+        self.chalk_info = {}
+        self.host_info = {}
 
 
 # `virtual-chalk.json` file found after chalking with `--virtual` enabled
 def validate_virtual_chalk(
     tmp_data_dir: Path, artifact_map: Dict[str, ArtifactInfo], virtual: bool
-):
+) -> Dict[str, Any]:
     try:
         vjsonf = tmp_data_dir / "virtual-chalk.json"
         if not virtual or len(artifact_map) == 0:
@@ -35,7 +39,7 @@ def validate_virtual_chalk(
         virtual_chalks_jsonl = vjsonf.read_text()
 
         # jsonl is one json object per line, NOT array of json
-        # number of json object is number of artifacts chalked
+        # number of json objects is number of artifacts chalked
         all_vchalks = virtual_chalks_jsonl.splitlines()
         assert len(all_vchalks) == len(artifact_map)
 
@@ -44,6 +48,9 @@ def validate_virtual_chalk(
 
             assert "CHALK_ID" in vjson
             assert vjson["MAGIC"] == MAGIC, "virtual chalk magic value incorrect"
+
+        # return first one
+        return json.loads(all_vchalks[0])
     except json.JSONDecodeError as e:
         logger.error("unable to decode json", error=e)
         raise
@@ -76,16 +83,21 @@ def validate_chalk_report(
                 assert path in artifact_map, "chalked artifact incorrect"
                 artifact = artifact_map[path]
 
-                # artifact specific fields
-                assert (
-                    artifact.type == chalk["ARTIFACT_TYPE"]
-                ), "artifact type doesn't match"
-                if artifact.hash != "":
-                    # in some cases, we don't check the artifact hash
-                    # ex: zip files, which are not computed as hash of file
-                    assert artifact.hash == chalk["HASH"], "artifact hash doesn't match"
-                if chalk_action == "insert":
-                    assert virtual == chalk["_VIRTUAL"], "_VIRTUAL mismatch"
+            # artifact specific fields
+            assert (
+                artifact.type == chalk["ARTIFACT_TYPE"]
+            ), "artifact type doesn't match"
+            if artifact.hash != "":
+                # in some cases, we don't check the artifact hash
+                # ex: zip files, which are not computed as hash of file
+                assert artifact.hash == chalk["HASH"], "artifact hash doesn't match"
+            # check arbitrary artifact values
+            for key, value in artifact.chalk_info:
+                assert key in chalk
+                assert value == chalk[key]
+
+            if chalk_action == "insert":
+                assert virtual == chalk["_VIRTUAL"], "_VIRTUAL mismatch"
         else:
             assert "_CHALKS" not in chalk_report
     except AssertionError as e:
@@ -99,26 +111,30 @@ def validate_chalk_report(
 # slightly different from above
 def validate_docker_chalk_report(
     chalk_report: Dict[str, Any],
-    artifact_map: Dict[str, ArtifactInfo],
+    artifact: ArtifactInfo,
     virtual: bool,
+    chalk_action: str = "build",
 ):
     try:
-        assert chalk_report["_OPERATION"] == "build"
+        assert chalk_report["_OPERATION"] == chalk_action
 
         assert "_CHALKS" in chalk_report
         assert (
             len(chalk_report["_CHALKS"]) == 1
         ), "should only get one chalk report per docker image"
 
+        for key in artifact.host_info:
+            assert artifact.host_info[key] == chalk_report[key]
+
         for chalk in chalk_report["_CHALKS"]:
-            # dockerfile path may have been lifted
-            path = get_liftable_key(chalk_report, "DOCKERFILE_PATH")
-            assert path in artifact_map, "chalked artifact incorrect"
-            artifact = artifact_map[path]
+            for key in artifact.chalk_info:
+                assert artifact.chalk_info[key] == chalk[key]
+            # chalk id should always exist
+            assert "CHALK_ID" in chalk
 
             assert artifact.type == chalk["_OP_ARTIFACT_TYPE"]
-            assert virtual == chalk["_VIRTUAL"]
-            # TODO: docker tags/dockerfile path/etc?
+            if chalk_action == "build":
+                assert virtual == chalk["_VIRTUAL"]
 
     except AssertionError as e:
         logger.error("chalk report validation failed", error=e)

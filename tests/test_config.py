@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from .chalk.runner import Chalk
+from .chalk.runner import Chalk, chalk_copy
 from .utils.log import get_logger
 from .utils.validate import MAGIC
 
@@ -15,18 +15,11 @@ logger = get_logger()
 
 
 validation_string = "TEST ERROR HERE XXXXXX"
+parse_error = ["Parse", "error"]
 CONFIGFILES = Path(__file__).parent / "data" / "configs"
 # base profiles and outconf
 BASE_PROFILES = Path(__file__).parent.parent / "src" / "configs" / "base_profiles.c4m"
 BASE_OUTCONF = Path(__file__).parent.parent / "src" / "configs" / "base_outconf.c4m"
-
-
-# make a copy of chalk binary to the tmp directory since we don't want to overwrite the binary that all the other tests are using
-def _chalk_copy(tmp_data_dir: Path, chalk: Chalk) -> Chalk:
-    logger.info("making a copy of chalk")
-    chalk_path = chalk.binary
-    shutil.copy(chalk_path, tmp_data_dir / "chalk")
-    return Chalk(binary=(tmp_data_dir / "chalk").resolve())
 
 
 # test dump + reload with error log + extract to check error
@@ -34,7 +27,7 @@ def _chalk_copy(tmp_data_dir: Path, chalk: Chalk) -> Chalk:
 def test_dump_load(tmp_data_dir: Path, chalk: Chalk, use_embedded: bool):
     # output for updated config
     tmp_conf = tmp_data_dir / "testconf.conf"
-    chalk = _chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
+    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
 
     # dump config to file
     dump_proc = chalk.run(chalk_cmd="dump", params=[str(tmp_conf)])
@@ -68,7 +61,7 @@ def test_dump_load(tmp_data_dir: Path, chalk: Chalk, use_embedded: bool):
 @pytest.mark.parametrize("test_config_file", ["validation/default.conf"])
 def test_default_config(tmp_data_dir: Path, chalk: Chalk, test_config_file: str):
     tmp_conf = tmp_data_dir / "testconf.conf"
-    chalk = _chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
+    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
 
     # dump config to file
     dump_proc = chalk.run(chalk_cmd="dump", params=[str(tmp_conf)])
@@ -99,13 +92,13 @@ def test_default_config(tmp_data_dir: Path, chalk: Chalk, test_config_file: str)
 def test_invalid_load(
     tmp_data_dir: Path, chalk: Chalk, test_config_file: str, use_embedded: bool
 ):
-    chalk = _chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
+    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
     # call chalk load on invalid config
     load_proc = chalk.load(CONFIGFILES / test_config_file, use_embedded)
 
     #  we expect the load to fail with associated errors
     assert load_proc.returncode != 0, "load invalid config should have failed"
-    assert "Parse error" in load_proc.stderr.decode()
+    assert all(x in load_proc.stderr.decode() for x in parse_error)
 
     # chalk should still have default config embedded
     # and further calls should not fail and not have any errors
@@ -122,14 +115,14 @@ def test_invalid_load(
 def test_valid_load(
     tmp_data_dir: Path, chalk: Chalk, test_config_file: str, use_embedded: bool
 ):
-    chalk = _chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
+    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
 
     # call chalk load on valid config
     load_proc = chalk.load(CONFIGFILES / test_config_file, use_embedded)
 
     #  we expect the load to succeed
     assert load_proc.returncode == 0, "load valid config should have succeeded"
-    assert "Parse error" not in load_proc.stderr.decode()
+    assert not any(x in load_proc.stderr.decode() for x in parse_error)
 
     # extract should succeed, but the error we put in should show up
     extract_output = chalk.extract(chalk.binary)
@@ -158,7 +151,7 @@ outconf = [
     "setup",
     "help",
     "fail",
-    "heartbeat"
+    "heartbeat",
 ]
 
 
@@ -342,20 +335,20 @@ def _validate_profile_keys(report: Dict[str, Any], expected_keys: List[str]):
     "use_embedded",
     [
         True,
-        # False,
+        False,
     ],
 )
 def test_profiles(
     tmp_data_dir: Path, chalk: Chalk, test_config_file: str, use_embedded: bool
 ):
     # chalk setup
-    chalk = _chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
+    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
 
     # call chalk load on test config
     load_proc = chalk.load(CONFIGFILES / test_config_file, use_embedded)
     #  we expect the load to succeed
     assert load_proc.returncode == 0, "load valid config should have succeeded"
-    assert "Parse error" not in load_proc.stderr.decode()
+    assert not any(x in load_proc.stderr.decode() for x in parse_error)
 
     # using "ls" for test binary
     shutil.copy("/bin/ls", tmp_data_dir)

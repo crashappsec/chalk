@@ -8,9 +8,9 @@ from subprocess import check_output, run
 
 import dateutil.parser
 
-from .chalk.runner import Chalk
+from .chalk.runner import Chalk, chalk_copy
 from .utils.bin import sha256
-from .utils.chalk_report import get_liftable_key
+from .utils.chalk_report import get_chalk_report_from_output, get_liftable_key
 from .utils.log import get_logger
 from .utils.validate import (
     ArtifactInfo,
@@ -189,10 +189,10 @@ def test_insert_extract_delete(tmp_data_dir: Path, chalk: Chalk):
 # test basic config commands:
 # dump + load tested in test_config.py
 
-# docker commands are not tested here but as part of the docker codec tests
+# docker commands are not tested here but as part of the docker codec tests in test_docker.py
 
 
-# exec commands are tested in test_exec as they are more involved
+# exec commands are tested in test_exec.py as they are more involved
 
 
 # version
@@ -242,3 +242,34 @@ def test_env(chalk: Chalk):
 
     _proc = run(args=["uname", "-n"], capture_output=True)
     assert _proc.stdout.decode().strip() in env_output["_OP_NODENAME"]
+
+
+# setup: needs to display password, and public and private key info in chalk
+def test_setup(tmp_data_dir: Path, chalk: Chalk):
+    # setup changes the config and reloads, so make a copy
+    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
+
+    setup_proc = chalk.run(chalk_cmd="setup", params=["--log-level=error"])
+    # this should never error
+    assert setup_proc.returncode == 0
+    assert setup_proc.stderr.decode() == ""
+
+    _stdout = setup_proc.stdout.decode()
+    # password should be stored
+    password = ""
+    for line in _stdout.splitlines():
+        # if this string changes, the test will fail
+        if "Your password is: " in line:
+            password = line.split(":")[1]
+            break
+    assert password != ""
+
+    _report = get_chalk_report_from_output(setup_proc)
+    assert _report["_OPERATION"] == "setup"
+    _chalk = _report["_CHALKS"][0]
+
+    # check key info
+    assert "PUBLIC KEY" in _chalk["$CHALK_PUBLIC_KEY"]
+    assert "PRIVATE KEY" in _chalk["$CHALK_ENCRYPTED_PRIVATE_KEY"]
+
+    assert _report["INJECTOR_PUBLIC_KEY"] == _chalk["$CHALK_PUBLIC_KEY"]

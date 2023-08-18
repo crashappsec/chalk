@@ -3,6 +3,7 @@ import os
 import platform
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from subprocess import CompletedProcess
 from typing import Any, Dict, Optional
@@ -11,7 +12,7 @@ from unittest import mock
 import pytest
 
 from .chalk.runner import Chalk
-from .utils.chalk_report import get_liftable_key
+from .utils.chalk_report import get_chalk_report_from_output
 from .utils.docker import (
     docker_build,
     docker_image_cleanup,
@@ -89,47 +90,78 @@ def _build_and_chalk_dockerfile(
         raise
 
 
-def _get_chalk_report_from_docker_output(proc: CompletedProcess) -> Dict[str, Any]:
-    # # FIXME: hacky json read of report that has to stop before we reach logs and ignore beginning docker output
-
-    _output = proc.stdout.decode()
-    json_start = _output.find("[\n")
-    json_end = _output.rfind("]")
-
-    json_string = _output[json_start : json_end + 1]
-    if json_string != "":
-        chalk_reports = json.loads(json_string)
-        assert len(chalk_reports) == 1
-        chalk_report = chalk_reports[0]
-        return chalk_report
-    else:
-        logger.error("json chalk report is empty!")
-        raise Exception("json chalk report is empty!")
-
-
 @mock.patch.dict(os.environ, {"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"})
-@pytest.mark.parametrize("test_file", ["valid/sample_1", "valid/sample_2"])
+@pytest.mark.parametrize(
+    "test_file",
+    [
+        "valid/sample_1",
+        "valid/sample_2",
+    ],
+)
 def test_virtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
     try:
-        artifact_info = {
-            str(tmp_data_dir / "Dockerfile"): ArtifactInfo(type="Docker Image", hash="")
-        }
         insert_output = _build_and_chalk_dockerfile(
             chalk, test_file, tmp_data_dir, valid=True, virtual=True
         )
         assert insert_output is not None
         assert insert_output.returncode == 0, "chalking dockerfile failed"
 
-        chalk_report = _get_chalk_report_from_docker_output(insert_output)
+        chalk_report = get_chalk_report_from_output(insert_output)
 
+        _chalk = chalk_report["_CHALKS"][0]
+        # current hash is the image hash
+        assert "_CURRENT_HASH" in _chalk
+        image_hash = _chalk["_CURRENT_HASH"]
+
+        # artifact is the docker image
+        artifact_info = ArtifactInfo(type="Docker Image", hash=image_hash)
+        # keys to check
+        artifact_info.chalk_info = {
+            "_CURRENT_HASH": image_hash,
+            "_IMAGE_ID": image_hash,
+            "_REPO_TAGS": [test_file + ":latest"],
+            "DOCKERFILE_PATH": str(tmp_data_dir / "Dockerfile"),
+            # docker tags should be set to tag above
+            "DOCKER_TAGS": [test_file],
+        }
+        artifact_info.host_info = {}
+        logger.info(chalk_report)
         validate_docker_chalk_report(
-            chalk_report=chalk_report, artifact_map=artifact_info, virtual=True
+            chalk_report=chalk_report, artifact=artifact_info, virtual=True
         )
 
-        validate_virtual_chalk(tmp_data_dir, artifact_map=artifact_info, virtual=True)
+        metadata_hash = _chalk["METADATA_HASH"]
+        metadata_id = _chalk["METADATA_ID"]
 
-        # chalk extraction is not checked as extract will only say
-        # No chalk marks extracted
+        vchalk = validate_virtual_chalk(
+            tmp_data_dir, artifact_map={artifact_info}, virtual=True
+        )
+        assert "CHALK_ID" in vchalk
+        assert vchalk["MAGIC"] == MAGIC, "chalk magic value incorrect"
+        assert vchalk["METADATA_HASH"] == metadata_hash
+        assert vchalk["METADATA_ID"] == metadata_id
+
+        container_proc = subprocess.run(
+            args=[
+                "docker",
+                "run",
+                "--rm",
+                "--name",
+                "test_container",
+                "--entrypoint",
+                "cat",
+                image_hash,
+                "chalk.json",
+            ],
+            # check=True,
+            capture_output=True,
+        )
+
+        # expecting error since chalk.json doesn't exist
+        chalk_err = container_proc.stderr.decode()
+        assert "No such file or directory" in chalk_err
+    except subprocess.CalledProcessError as e:
+        logger.info(e.stderr)
     finally:
         images = docker_inspect_image_hashes(tag=test_file)
         docker_image_cleanup(images=images)
@@ -149,29 +181,43 @@ def test_virtual_invalid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
 @pytest.mark.parametrize("test_file", ["valid/sample_1", "valid/sample_2"])
 def test_nonvirtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
     try:
-        artifact_info = {
-            str(tmp_data_dir / "Dockerfile"): ArtifactInfo(type="Docker Image", hash="")
-        }
         insert_output = _build_and_chalk_dockerfile(
             chalk, test_file, tmp_data_dir, valid=True, virtual=False
         )
         assert insert_output is not None
-        chalk_report = _get_chalk_report_from_docker_output(insert_output)
+        assert insert_output.returncode == 0, "chalking dockerfile failed"
 
-        validate_docker_chalk_report(
-            chalk_report=chalk_report, artifact_map=artifact_info, virtual=False
-        )
-        # docker tags should be set to tag above
-        docker_tags = get_liftable_key(chalk_report, "DOCKER_TAGS")
-        assert docker_tags == [test_file]
+        chalk_report = get_chalk_report_from_output(insert_output)
+
+        _chalk = chalk_report["_CHALKS"][0]
         # current hash is the image hash
-        assert "_CURRENT_HASH" in chalk_report["_CHALKS"][0]
-        image_hash = chalk_report["_CHALKS"][0]["_CURRENT_HASH"]
+        assert "_CURRENT_HASH" in _chalk
+        image_hash = _chalk["_CURRENT_HASH"]
+
+        # artifact is the docker image
+        artifact_info = ArtifactInfo(type="Docker Image", hash=image_hash)
+        # keys to check
+        artifact_info.chalk_info = {
+            "_CURRENT_HASH": image_hash,
+            "_IMAGE_ID": image_hash,
+            "_REPO_TAGS": [test_file + ":latest"],
+            "DOCKERFILE_PATH": str(tmp_data_dir / "Dockerfile"),
+            # docker tags should be set to tag above
+            "DOCKER_TAGS": [test_file],
+        }
+        artifact_info.host_info = {}
+        validate_docker_chalk_report(
+            chalk_report=chalk_report, artifact=artifact_info, virtual=False
+        )
+
+        metadata_hash = _chalk["METADATA_HASH"]
+        metadata_id = _chalk["METADATA_ID"]
 
         container_proc = subprocess.run(
             args=[
                 "docker",
                 "run",
+                "--rm",
                 "--name",
                 "test_container",
                 "--entrypoint",
@@ -187,6 +233,8 @@ def test_nonvirtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
         chalk_json = json.loads(container_chalk)
         assert "CHALK_ID" in chalk_json
         assert chalk_json["MAGIC"] == MAGIC, "chalk magic value incorrect"
+        assert chalk_json["METADATA_HASH"] == metadata_hash
+        assert chalk_json["METADATA_ID"] == metadata_id
     except subprocess.CalledProcessError as e:
         logger.info(e.stderr)
     finally:
@@ -242,7 +290,7 @@ def test_build_and_push(tmp_data_dir: Path, chalk: Chalk, test_file: str):
         assert chalk_docker_build_proc is not None
         assert chalk_docker_build_proc.returncode == 0, "chalk docker build failed"
         # grab current_hash for comparison later
-        chalk_docker_build_report = _get_chalk_report_from_docker_output(
+        chalk_docker_build_report = get_chalk_report_from_output(
             chalk_docker_build_proc
         )
         current_hash_build = chalk_docker_build_report["_CHALKS"][0]["_CURRENT_HASH"]
@@ -258,9 +306,7 @@ def test_build_and_push(tmp_data_dir: Path, chalk: Chalk, test_file: str):
         )
         assert chalk_docker_push_proc is not None
         assert chalk_docker_push_proc.returncode == 0, "chalk docker push failed"
-        chalk_docker_push_report = _get_chalk_report_from_docker_output(
-            chalk_docker_push_proc
-        )
+        chalk_docker_push_report = get_chalk_report_from_output(chalk_docker_push_proc)
         current_hash_push = chalk_docker_push_report["_CHALKS"][0]["_CURRENT_HASH"]
         repo_digest_push = chalk_docker_push_report["_CHALKS"][0]["_REPO_DIGESTS"][
             tag_base
@@ -281,3 +327,158 @@ def test_build_and_push(tmp_data_dir: Path, chalk: Chalk, test_file: str):
     finally:
         images = docker_inspect_image_hashes(tag=tag)
         docker_image_cleanup(images)
+
+
+# extract on image id, and image name, running container id + container name, exited container id + container name
+def test_extract(tmp_data_dir: Path, chalk: Chalk):
+    try:
+        dockerfile = "valid/sample_1"
+        files = os.listdir(DOCKERFILES / dockerfile)
+        for file in files:
+            shutil.copy(DOCKERFILES / dockerfile / file, tmp_data_dir)
+
+        # build test image
+        image_name = "test_image"
+        chalk_params = ["--log-level=none", "docker", "build", "-t", image_name, "."]
+        chalk_run = chalk.run(
+            params=chalk_params,
+            expected_success=True,
+        )
+
+        chalk_report = get_chalk_report_from_output(chalk_run)
+        assert "_CURRENT_HASH" in chalk_report["_CHALKS"][0]
+        image_id = chalk_report["_CHALKS"][0]["_CURRENT_HASH"]
+
+        # artifact info should be consistent
+        artifact = ArtifactInfo(type="Docker Image", hash=image_id)
+        artifact.host_info = {
+            "_OPERATION": "extract",
+            "_OP_EXE_NAME": "chalk",
+            "_OP_UNMARKED_COUNT": 0,
+            "_OP_CHALK_COUNT": 1,
+        }
+        artifact.chalk_info = {
+            "_OP_ARTIFACT_TYPE": "Docker Image",
+            "_IMAGE_ID": image_id,
+            "_CURRENT_HASH": image_id,
+            "_REPO_TAGS": [image_name + ":latest"],
+        }
+
+        # extract chalk from image id and image name
+        _extract_image_name = chalk.extract(image_name)[0]
+
+        validate_docker_chalk_report(
+            chalk_report=_extract_image_name,
+            artifact=artifact,
+            virtual=False,
+            chalk_action="extract",
+        )
+
+        _extract_image_id = chalk.extract(image_id[:12])[0]
+        validate_docker_chalk_report(
+            chalk_report=_extract_image_id,
+            artifact=artifact,
+            virtual=False,
+            chalk_action="extract",
+        )
+
+        # run container and keep alive via shell
+        container_name = "test_container"
+        subprocess.Popen(
+            args=[
+                "docker",
+                "run",
+                "--name",
+                container_name,
+                "-t",
+                "--entrypoint",
+                "sh",
+                image_id,
+            ],
+            shell=False,
+            stdin=None,
+            stdout=None,
+            stderr=None,
+            close_fds=True,
+        )
+
+        # let container start
+        time.sleep(2)
+        # get running container id
+        _proc = subprocess.run(
+            args=["docker", "ps", "-qf", f"name={container_name}", "--no-trunc"],
+            capture_output=True,
+        )
+        container_id = _proc.stdout.decode().strip()
+        assert container_id != ""
+
+        # new artifact for running container
+        artifact_container = ArtifactInfo(type="Docker Container", hash=image_id)
+        artifact_container.host_info = {
+            "_OPERATION": "extract",
+            "_OP_EXE_NAME": "chalk",
+            "_OP_UNMARKED_COUNT": 0,
+            "_OP_CHALK_COUNT": 1,
+        }
+        artifact_container.chalk_info = {
+            "_OP_ARTIFACT_TYPE": "Docker Container",
+            "_IMAGE_ID": image_id,
+            "_CURRENT_HASH": image_id,
+            "_INSTANCE_CONTAINER_ID": container_id,
+            "_INSTANCE_NAME": container_name,
+            "_INSTANCE_STATUS": "running",
+        }
+
+        # extract on container name and validate
+        _extract_container_name_running = chalk.extract(container_name)[0]
+        validate_docker_chalk_report(
+            chalk_report=_extract_container_name_running,
+            artifact=artifact_container,
+            virtual=False,
+            chalk_action="extract",
+        )
+
+        # extract on container id and validate
+        _extract_container_id_running = chalk.extract(container_id)[0]
+        validate_docker_chalk_report(
+            chalk_report=_extract_container_id_running,
+            artifact=artifact_container,
+            virtual=False,
+            chalk_action="extract",
+        )
+
+        # shut down container
+        _proc = subprocess.run(
+            args=["docker", "stop", container_name], capture_output=True
+        )
+        assert container_name in _proc.stdout.decode(), "container not stopped properly"
+
+        # update artifact info
+        artifact_container.chalk_info["_INSTANCE_STATUS"] = "exited"
+
+        # extract on container name and container id now that container is stopped
+        _extract_container_name_dead = chalk.extract(container_name)[0]
+        validate_docker_chalk_report(
+            chalk_report=_extract_container_name_dead,
+            artifact=artifact_container,
+            virtual=False,
+            chalk_action="extract",
+        )
+
+        _extract_container_id_dead = chalk.extract(container_id)[0]
+        validate_docker_chalk_report(
+            chalk_report=_extract_container_id_dead,
+            artifact=artifact_container,
+            virtual=False,
+            chalk_action="extract",
+        )
+    except Exception as e:
+        logger.error(e)
+        raise
+    finally:
+        images = docker_inspect_image_hashes(tag="test_image")
+        docker_image_cleanup(images)
+        try:
+            subprocess.run(args=["docker", "rm", "-f", "test_container"])
+        except Exception as e:
+            logger.warning("Could not remove test_container %s", e)

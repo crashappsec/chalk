@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess, check_output, run
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -63,7 +64,7 @@ class Chalk:
         self,
         *,
         chalk_cmd: Optional[ChalkCmd] = None,
-        target: Optional[Path] = None,
+        target: Optional[Path] | Optional[str] = None,
         params: Optional[List[str]] = None,
         expected_success: Optional[bool] = True,
     ) -> Optional[CompletedProcess]:
@@ -75,8 +76,13 @@ class Chalk:
             cmd.append(chalk_cmd)
         if params:
             cmd.extend(params)
-        if target:
+
+        if target is Path:
             assert target.exists(), f"Target {target} does not exist"
+            cmd.append(target)
+        elif target is not None:
+            # might be a docker image or container
+            # TODO: add validation for docker image and container inspection
             cmd.append(target)
 
         my_env = os.environ.copy()
@@ -171,7 +177,7 @@ class Chalk:
             logger.error("Could not decode json", raw=inserted.stdout)
             raise
 
-    def extract(self, artifact: Path) -> List[Dict[str, Any]]:
+    def extract(self, artifact: Path | str) -> List[Dict[str, Any]]:
         extracted = self.run(
             chalk_cmd="extract",
             target=artifact,
@@ -252,3 +258,11 @@ class Chalk:
         except CalledProcessError as e:
             logger.error("Called process error for chalk load", error=e)
             raise
+
+
+# make a copy of chalk binary to the tmp directory since we don't want to overwrite the binary that all the other tests are using
+def chalk_copy(tmp_data_dir: Path, chalk: Chalk) -> Chalk:
+    logger.info("making a copy of chalk")
+    chalk_path = chalk.binary
+    shutil.copy(chalk_path, tmp_data_dir / "chalk")
+    return Chalk(binary=(tmp_data_dir / "chalk").resolve())
