@@ -4,6 +4,7 @@ services:
       context: .
       args:
         CHALK_BUILD: ${CHALK_BUILD:-debug}
+      target: ${BASE:-ubuntu}
     working_dir: $PWD
     volumes:
       - $PWD:$PWD

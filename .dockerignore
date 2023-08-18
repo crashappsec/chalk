@@ -1,4 +1,6 @@
-chalk
 .dockerignore
-Dockerfile
+.github
+Dockerfile*
+chalk
+docker
 docker-compose.yml

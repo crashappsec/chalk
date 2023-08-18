@@ -43,16 +43,34 @@ RUN --mount=type=cache,target=/root/.nimble,sharing=locked \
     yes | nimble $CHALK_BUILD
 
 # -------------------------------------------------------------------
-# published as ghcr.io/crashappsec/chalk:ubuntu-latest
+# published as ghcr.io/crashappsec/chalk:alpine
 
-FROM ubuntu:jammy-20230126 as release
+FROM alpine:latest as alpine
 
-RUN apt-get update -y \
-    && apt-get install -y libpcre3 libpcre3-dev \
-    && apt-get clean -y
+RUN apk add --no-cache \
+    gcompat \
+    pcre
 
 WORKDIR /
 
 COPY --from=build /chalk/chalk /chalk
 
-CMD /chalk
+ENTRYPOINT ["/chalk"]
+
+# -------------------------------------------------------------------
+# published as ghcr.io/crashappsec/chalk:ubuntu
+
+FROM ubuntu:jammy-20230126 as ubuntu
+
+RUN apt-get update -y && \
+    apt-get install -y \
+        libpcre3 \
+        libpcre3-dev \
+        && \
+    apt-get clean -y
+
+WORKDIR /
+
+COPY --from=build /chalk/chalk /chalk
+
+ENTRYPOINT ["/chalk"]
