@@ -414,8 +414,12 @@ proc jsonOneAutoKey(node:        JsonNode,
     value = extractDockerHashMap(value)
   of "_IMAGE_HOSTNAMES":
     value = extractDockerHashList(value)
-  of "_IMAGE_NAME":
-    value = extractBoxedDockerHash(value)
+  of "_INSTANCE_NAME":
+    value    = extractBoxedDockerHash(value)
+    let name = unpack[string](value)
+
+    if name.startswith("/"):
+      value = pack(name[1 .. ^1])
   else:
     discard
 
@@ -487,19 +491,22 @@ template inspectCommon(map=dockerImageAutoMap) =
         chalk.name = chalk.userRef
       break
 
-proc inspectImage(chalk: ChalkObj) =
+proc inspectImage(chalk: ChalkObj): bool {.discardable.} =
   let
     cmdOut = runDockerGetEverything(@["inspect", chalk.name])
 
   if cmdOut.getExit() != 0:
-    error(chalk.name & ": Docker inspect failed: " & cmdOut.getStdErr())
-    return
+    info(chalk.name & ": Docker inspect image failed: " & cmdOut.getStdErr())
+    return false
 
   let contents = cmdOut.getStdOut().parseJson().getElems()[0]
 
   chalk.cachedHash = contents["Id"].getStr().extractDockerHash()
-  chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerImage)
+  if "_OP_ARTIFACT_TYPE" notin chalk.collectedData:
+    chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerImage)
   inspectCommon()
+
+  return true
 
 proc inspectContainer(chalk: ChalkObj) =
   let
@@ -542,7 +549,7 @@ proc scanOne*(codec: Plugin, item: string): Option[ChalkObj]
   info("Extracting basic image info.")
   if not chalk.extractBasicImageInfo():
     chalk.inspectContainer()
-    if chalk.containerId == "":
+    if chalk.containerId == "" and not chalk.inspectImage():
       return none(ChalkObj)
 
   return some(chalk)
