@@ -10,6 +10,13 @@ jobs:
       !github.event.pull_request.draft &&
       !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
 
+    concurrency:
+      # only allow one job per PR running
+      # older pending jobs will be cancelled not to waste CI minutes
+      # cannot use github.job here https://github.com/community/community/discussions/13496
+      group: ${{ github.workflow }}-pre-commit-${{ github.ref }}
+      cancel-in-progress: true
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3

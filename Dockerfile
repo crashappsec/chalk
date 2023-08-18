@@ -4,20 +4,33 @@ FROM ghcr.io/crashappsec/nim:ubuntu-1.6.12 as compile
 # https://github.com/actions/runner/issues/2033
 RUN if which git; then git config --global --add safe.directory "*"; fi
 
-# FIXME get these dynamically
-RUN nimble install -y https://github.com/crashappsec/con4m \
-        https://github.com/crashappsec/nimutils \
-        nimSHA2@0.1.1 \
-        glob@0.11.2 \
-        https://github.com/viega/zippy
+WORKDIR /chalk
 
-ENV PATH="/root/.nimble/bin:${PATH}"
+COPY chalk_internal.nimble /chalk/
 
-# we are doing this to only compile chalk once when we build this image
-# ("compile"), and then, if we want to re-compile, we will do so via the cmd in
-# docker-compose and rely on volume mounts to actually have an updated binary
-# _without_ rebuilding the whole image. This step only ships you the
-# dependencies you need to
+# con4m - for verifying config files
+#         and nimble sync fails to sync it as it has bin configured
+# bump  - for cutting releases
+RUN nimble install -y \
+    https://github.com/crashappsec/con4m \
+    https://github.com/disruptek/bump
+
+# generate lock file in order to use nimble sync
+# as repo does not use lock files as they cause trouble outside of docker
+# nimble sync requires git repo
+# so we create dummy git repo with empty commit
+# and then immediately clean-up
+RUN git init -b main . && \
+    git config user.name "chalk" && \
+    git config user.email "chalk@crashoverride.com" && \
+    git commit --allow-empty -m "for nimble sync" && \
+    nimble lock && \
+    nimble sync && \
+    rm -rf .git
+
+# -------------------------------------------------------------------
+# build chalk binary to be copied into final release stage
+
 FROM compile as build
 
 ARG CHALK_BUILD="release"
@@ -30,7 +43,6 @@ RUN --mount=type=cache,target=/root/.nimble,sharing=locked \
     yes | nimble $CHALK_BUILD
 
 # -------------------------------------------------------------------
-
 # published as ghcr.io/crashappsec/chalk:ubuntu-latest
 
 FROM ubuntu:jammy-20230126 as release

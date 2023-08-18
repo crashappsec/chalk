@@ -1,4 +1,4 @@
-name: test
+name: tests
 
 on:
   pull_request:
@@ -16,7 +16,7 @@ permissions:
   packages: write
 
 jobs:
-  tests:
+  pytest:
     runs-on: ubuntu-latest
 
     if: |
@@ -24,6 +24,13 @@ jobs:
         !github.event.pull_request.draft &&
         !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
       )
+
+    concurrency:
+      # only allow one job per PR running
+      # older pending jobs will be cancelled not to waste CI minutes
+      # cannot use github.job here https://github.com/community/community/discussions/13496
+      group: ${{ github.workflow }}-pytest-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout
