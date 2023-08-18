@@ -135,14 +135,6 @@ AckModal {
     width: 100%;
 }
 
-ProfileModal {
-    align: center middle;
-}
-
-UpdateModal {
-    align: center middle;
-}
-
 ReleaseNotesModalodal {
     align: center top;
     width: 60;
@@ -203,50 +195,6 @@ AckModal > Vertical > Label {
 }
 
 AckModal > Vertical > Button {
-    width: 1fr;
-    background: $primary;
-    content-align: center middle;
-    margin: 0 4;
-}
-
-ProfileModal > Vertical {
-    padding: 0 1;
-    width: 1fr;
-    height: auto;
-    border: thick $primary 80%;
-    background: $surface;
-    align: center middle;
-    content-align: center middle;
-}
-
-ProfileModal > Vertical > Label {
-    width: 1fr;
-    content-align: center middle;
-}
-
-ProfileModal > Vertical > Button {
-    width: 1fr;
-    background: $primary;
-    content-align: center middle;
-    margin: 0 4;
-}
-
-UpdateModal > Vertical {
-    padding: 0 1;
-    width: 60;
-    height: auto;
-    border: thick $primary 80%;
-    background: $surface;
-    align: center middle;
-    content-align: center middle;
-}
-
-UpdateModal > Vertical > Label {
-    width: 1fr;
-    content-align: center middle;
-}
-
-UpdateModal > Vertical > Button {
     width: 1fr;
     background: $primary;
     content-align: center middle;
@@ -410,8 +358,18 @@ ConfigRow {
 ConfigTable {
     align: center top;
     overflow-y: scroll;
-    height: auto;
+    height: 15;
     width: 100%;
+}
+
+.box {
+    align: center top;
+    overflow-y: scroll;
+    height: 10;
+    width: 100%;
+    margin: 0 4;
+    padding: 0 1;
+    border: solid magenta;
 }
 
 Footer {
@@ -419,8 +377,8 @@ Footer {
 }
 
 Horizontal.padme {
-    margin: 2 0;
-    padding: 1 0;
+    margin: 0 0;
+    padding: 0 0;
     align: center middle;
     content-align: center middle;
 }

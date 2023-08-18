@@ -53,15 +53,7 @@ from textual.screen import *
 from textual.widgets import Markdown as MDown
 from textual.widgets import *
 from .version import __version__
-from .wiz_panes import (
-    ApiAuth,
-    DisplayQrCode,
-    sectionBasics,
-    sectionBinGen,
-    sectionChalking,
-    sectionOutputConf,
-    sectionReporting,
-)
+from .wiz_panes import ApiAuth, DisplayQrCode, init_sections
 from .wizard import AckModal, ProfileModal, ReleaseNotesModal, UpdateModal, Wizard
 from .log import get_logger
 
@@ -330,7 +322,20 @@ def detect_ssh_session():
 
 
 class ConfWiz(Wizard):
-    def __init__(self, end_callback):
+    def __init__(
+        self,
+        end_callback,
+        sectionBasics,
+        sectionOutputConf,
+        sectionChalking,
+        sectionReporting,
+        sectionBinGen,
+    ):
+        self.sectionBasics = sectionBasics
+        self.sectionOutputConf = sectionOutputConf
+        self.sectionChalking = sectionChalking
+        self.sectionReporting = sectionReporting
+        self.sectionBinGen = sectionBinGen
         super().__init__(end_callback)
 
         # Define which panel contains the API authn switch
@@ -648,16 +653,8 @@ qr_code_widget.styles.padding = (0, 25)
 qr_code_screen = QrCodeScreen()
 qr_code_screen.qr_code_widget = qr_code_widget
 
-# Main Wizard screen - multiple steps
-wiz = ConfWiz(finish_up)
+# Wizard screen
 wiz_screen = ConfWizScreen()
-wiz_screen.wiz = wiz
-
-# Back reference to wizard object in other screens
-login_screen.wiz = wiz
-
-set_wiz_screen(wiz_screen)
-set_wizard(wiz)
 
 
 class NewApp(App):
@@ -684,7 +681,6 @@ class NewApp(App):
         # Binding(key="n", action="newconfig()", show = False),
     ]
     config_table = conftable
-    config_widget = wiz
     login_widget = login_widget
     qr_code_widget = qr_code_widget
 
@@ -953,6 +949,8 @@ class NewApp(App):
 
 
 def main():
+    global sectionBasics, sectionOutputConf, sectionChalking, sectionReporting, sectionBinGen, wiz, wiz_screen, login_screen
+
     logger.info("Running chalk-config")
     if not sys.stdout.isatty():
         raise SystemExit(
@@ -970,6 +968,31 @@ def main():
     cached_stdout_fd = sys.stdout
     app = NewApp()
     set_app(app)
+    (
+        sectionBasics,
+        sectionOutputConf,
+        sectionChalking,
+        sectionReporting,
+        sectionBinGen,
+    ) = init_sections()
+
+    # Main Wizard screen - multiple steps
+    wiz = ConfWiz(
+        finish_up,
+        sectionBasics,
+        sectionOutputConf,
+        sectionChalking,
+        sectionReporting,
+        sectionBinGen,
+    )
+    wiz_screen.wiz = wiz
+
+    # Back reference to wizard object in other screens
+    login_screen.wiz = wiz
+
+    set_wiz_screen(wiz_screen)
+    set_wizard(wiz)
+
     app.run()
 
 

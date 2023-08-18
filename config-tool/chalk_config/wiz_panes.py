@@ -712,21 +712,29 @@ For instance, if running as a docker wrapper, this allows you to alias docker to
 """
 
 
-sectionBasics = WizardSection(SB_BASICS)
-sectionOutputConf = WizardSection(SB_OUTPUT)
-sectionChalking = WizardSection(SB_CHALK)
-sectionReporting = WizardSection(SB_REPORT)
-sectionBinGen = WizardSection(SB_FINISH)
+def init_sections():
+    sectionBasics = WizardSection(SB_BASICS)
+    sectionOutputConf = WizardSection(SB_OUTPUT)
+    sectionChalking = WizardSection(SB_CHALK)
+    sectionReporting = WizardSection(SB_REPORT)
+    sectionBinGen = WizardSection(SB_FINISH)
+    sectionBasics.add_step("basics", UsagePane())
+    sectionOutputConf.add_step("reporting", ReportingPane())
+    sectionOutputConf.add_step("envconf", CustomEnv(disabled=True))
+    sectionOutputConf.add_step("log_conf", LogParams(disabled=True))
+    sectionOutputConf.add_step("http_conf", HttpParams(disabled=False))
+    sectionOutputConf.add_step("s3_conf", S3Params(disabled=True))
+    sectionChalking.add_step("chalking_base", ChalkOpts())
+    sectionReporting.add_step("reporting_base", ReportingOptsChalkTime())
+    sectionReporting.add_step("reporting_docker", ReportingOptsDocker())
+    sectionChalking.add_step("chalking_docker", DockerChalking())
+    sectionReporting.add_step("reporting_extract", ReportingExtraction())
+    sectionBinGen.add_step("final", BuildBinary())
 
-sectionBasics.add_step("basics", UsagePane())
-sectionOutputConf.add_step("reporting", ReportingPane())
-sectionOutputConf.add_step("envconf", CustomEnv(disabled=True))
-sectionOutputConf.add_step("log_conf", LogParams(disabled=True))
-sectionOutputConf.add_step("http_conf", HttpParams(disabled=False))
-sectionOutputConf.add_step("s3_conf", S3Params(disabled=True))
-sectionChalking.add_step("chalking_base", ChalkOpts())
-sectionReporting.add_step("reporting_base", ReportingOptsChalkTime())
-sectionReporting.add_step("reporting_docker", ReportingOptsDocker())
-sectionChalking.add_step("chalking_docker", DockerChalking())
-sectionReporting.add_step("reporting_extract", ReportingExtraction())
-sectionBinGen.add_step("final", BuildBinary())
+    return (
+        sectionBasics,
+        sectionOutputConf,
+        sectionChalking,
+        sectionReporting,
+        sectionBinGen,
+    )
