@@ -134,6 +134,58 @@ def test_valid_load(
         assert validation_string in report["_OP_ERRORS"][0]
 
 
+# tests for configs that are found in the chalk search path
+# these configs are NOT loaded directly into the binary
+def test_external_configs(
+    chalk: Chalk,
+):
+    valid_config = "validation/valid_1.conf"
+    invalid_config = "validation/invalid_1.conf"
+    config_location = "/etc/chalk"
+    try:
+        # test load via flag
+        _flag_proc = chalk.run(
+            chalk_cmd="env",
+            params=["--log-level=none", f"--config-file={CONFIGFILES / valid_config}"],
+        )
+        _flag_report = _flag_proc.stdout.decode()
+        assert validation_string in _flag_report
+
+        # invalid config should not load
+        _flag_proc = chalk.run(
+            chalk_cmd="env",
+            params=[
+                "--log-level=none",
+                f"--config-file={CONFIGFILES / invalid_config}",
+            ],
+        )
+        assert _flag_proc.returncode != 0
+
+        # test load by putting it in chalk default search locations
+        # instead of copying to tmp data dir, we have to copy to someplace chalk looks for it
+        os.mkdir(config_location)
+
+        # valid
+        shutil.copy(CONFIGFILES / valid_config, config_location + "/chalk.conf")
+        # if config was properly loaded
+        _path_proc = chalk.run(chalk_cmd="env", params=["--log-level=none"])
+        _path_report = _path_proc.stdout.decode()
+        assert validation_string in _path_report
+
+        # invalid
+        shutil.copy(CONFIGFILES / invalid_config, config_location + "/chalk.conf")
+        # if config was properly loaded
+        _path_proc = chalk.run(chalk_cmd="env", params=["--log-level=none"])
+        assert _path_proc.returncode != 0
+    except Exception as e:
+        logger.info(e)
+        raise
+    finally:
+        # we need to do cleanup here for /etc/chalk
+        for file in os.listdir(config_location):
+            os.remove(os.path.join(config_location, file))
+
+
 # outconf tests
 
 # output configurations defined in "src/configs/base_outconf.c4m"
