@@ -13,6 +13,15 @@ services:
     volumes:
       - $PWD:$PWD
 
+  chalk-compile-release:
+    build:
+      context: .
+      target: compile
+    command: nimble build -d:release
+    working_dir: $PWD
+    volumes:
+      - $PWD:$PWD
+
   chalk-compile:
     build:
       context: .
