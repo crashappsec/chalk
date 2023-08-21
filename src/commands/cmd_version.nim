@@ -1,3 +1,8 @@
+## The `chalk insert` command.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import ../config
 
 proc runCmdVersion*() =

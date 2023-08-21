@@ -1,3 +1,8 @@
+## The `chalk delete` command.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import ../config, ../collect, ../reporting, ../plugin_api
 
 proc runCmdDelete*(path: seq[string]) {.exportc,cdecl.} =

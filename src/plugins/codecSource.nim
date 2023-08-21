@@ -5,7 +5,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import ../config, ../plugin_api, ../util
+import ../config, ../plugin_api
 
 from unicode import validateUtf8
 

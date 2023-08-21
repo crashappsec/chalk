@@ -1,5 +1,8 @@
-# Part of the base configuration.  See the comment at the top of
-# `base_keyspecs.c4m`
+## Part of the base configuration.  See the comment at the top of
+## `base_keyspecs.c4m`
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
 
 outconf insert {
   chalk:                  "chalk_default"

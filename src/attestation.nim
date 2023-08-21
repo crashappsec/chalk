@@ -1,7 +1,7 @@
 ## :Author: Theofilos Petsios
 ## :Copyright: 2023, Crash Override, Inc.
 
-import base64, config, util, selfextract, chalkjson
+import base64, config, selfextract, chalkjson
 
 type ValidateResult* = enum
   vOk, vSignedOk, vBadMd, vNoCosign, vBadSig, vNoHash, vNoPk

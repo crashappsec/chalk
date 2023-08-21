@@ -133,28 +133,30 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
 proc loadReportCache(fname: string) =
   once:
     try:
-      let f = newFileStream(fname, fmReadWriteExisting)
-      if f != nil:
-        let lines = f.readAll().strip().split("\n")
-        for line in lines:
-          let
-            parse = parseJson(line.strip())
-            sinks = parse["$sinks"].getElems()
-            topic = parse["$topic"].getStr()
-            msg = parse["$message"].getStr()
-          for item in sinks:
-            let sinkName = item.getStr()
+      let
+        retries = chalkConfig.getReportCacheLockTimeoutSec()
+        lines   = readViaLockFile(fname, false, retries).strip().split("\n")
+      for line in lines:
+        let
+          parse = parseJson(line.strip())
+          sinks = parse["$sinks"].getElems()
+          topic = parse["$topic"].getStr()
+          msg   = parse["$message"].getStr()
 
-            if sinkName notin reportCache:
-              let starter = {topic: @[msg]}.newTable()
-              reportCache[sinkName] = ReportCacheInfo(starter)
+        for item in sinks:
+          let sinkName = item.getStr()
+
+          if sinkName notin reportCache:
+            let starter = {topic: @[msg]}.newTable()
+            reportCache[sinkName] = ReportCacheInfo(starter)
+          else:
+            let cacheObj = reportCache[sinkName]
+            if topic in cacheObj:
+              cacheObj[topic].add(msg)
             else:
-              let cacheObj = reportCache[sinkName]
-              if topic in cacheObj:
-                cacheObj[topic].add(msg)
-              else:
-                cacheObj[topic] = @[msg]
-        f.close()
+              cacheObj[topic] = @[msg]
+    except ValueError:
+      trace(fname & ": file lock obtained, but no report cache to read.")
     except:
       error("When opening chalk report cache for read: " &
             getCurrentExceptionMsg())
@@ -164,7 +166,7 @@ proc loadReportCache(fname: string) =
 proc serializeReportCache(numEntries: var int): string =
   # When we write the cache out, we don't want to duplicate messages,
   # and we don't want to implement refereneces... people should be
-  # able to injext the cache as a jsonl file directly.  So instead of
+  # able to injest the cache as a jsonl file directly.  So instead of
   # storing indexed on sink configs, we store one row per message / topic
   # combo (different topics generally should be getting different
   # messages).
@@ -399,3 +401,8 @@ proc writeReportCache*() =
         getCurrentExceptionMsg())
       error("Please remove it manually to avoid unnecessary double reporting")
       dumpExOnDebug()
+  try:
+    releaseLockFile(fname)
+    trace(fname & ": file lock for report cache released")
+  except:
+    discard

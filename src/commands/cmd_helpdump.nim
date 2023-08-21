@@ -1,4 +1,9 @@
 #% INTERNAL
+## The `chalk helpdump` command.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import ../config
 
 const cmdlineKeys  = ["doc", "shortdoc", "args", "aliases", "field_to_set",

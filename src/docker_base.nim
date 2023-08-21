@@ -1,14 +1,18 @@
+## Common docker-specific utility bits used in various parts of the
+## implementation.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import osproc, config, util
 
 var
-  buildXVersion:     float  = 0   # Major and minor only
+  buildXVersion: float  = 0   # Major and minor only
 
 const
   hashHeader* = "sha256:"
 
-
 var dockerPathOpt: Option[string] = none(string)
-
 
 template extractDockerHash*(value: string): string =
   if not value.startsWith(hashHeader):
@@ -152,6 +156,10 @@ proc getBasicImageInfo*(refName: string): Option[JSonNode] =
     name  = refName.toLowerAscii()
 
   for line in lines:
+    # Comparing line.strip() to "" or checking the length didn't work??
+    # There might be some unprintable character before EOF in stdin.
+    if not line.strip().startswith("{"):
+      break
     let
       json = parseJson(line)
       repo = json["Repository"].getStr()

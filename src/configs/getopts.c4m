@@ -177,7 +177,6 @@ For instance, if you create a new profile named 'my_chalk_mark', you can activat
 outconf.insert.chalk = "myconf"
 outconf.docker.chalk = "myconf"
 
-
 For information on profiles, see: 'help profile'
 """
     callback: func set_artifact_search_path(list[string])
@@ -188,7 +187,33 @@ For information on profiles, see: 'help profile'
       doc: default_recursive_doc
       field_to_set: "recursive"
     }
-  }
+
+    flag_arg artifact_profile {
+      field_to_set: "outconf.insert.artifact_report"
+      doc: """
+This change the artifact profile to use. for the default report. This can
+be useful if you are running on the command line and want a more minimal
+report.
+"""
+    }
+
+    flag_arg host_profile {
+      field_to_set: "outconf.insert.host_report"
+      doc: """
+This change the host profile to use for the default report. This can be
+useful if you are running on the command line and want a more minimal
+report.
+"""
+    }
+
+    flag_arg chalk_profile {
+      field_to_set: "outconf.insert.chalk"
+      doc: """
+This change the profile to use for generating chalk marks to the named
+profile (which obviously must exist).
+"""
+    }
+}
 
   command extract {
     aliases:       ["ex", "e"]
@@ -205,6 +230,24 @@ This command looks for existing chalk marks in artifacts, and reports on what it
       no_aliases: ["R"]
       doc: default_recursive_doc
       field_to_set: "recursive"
+    }
+
+    flag_arg artifact_profile {
+      field_to_set: "outconf.extract.artifact_report"
+      doc: """
+This change the artifact profile to use. for the default report. This can
+be useful if you are running on the command line and want a more minimal
+report.
+"""
+    }
+
+    flag_arg host_profile {
+      field_to_set: "outconf.extract.host_report"
+      doc: """
+This change the host profile to use for the default report. This can be
+useful if you are running on the command line and want a more minimal
+report.
+"""
     }
 
     flag_yn search_layers {
@@ -244,6 +287,23 @@ Deletes metadata from all artifacts specified in the search path.
       field_to_set: "recursive"
     }
 
+    flag_arg artifact_profile {
+      field_to_set: "outconf.delete.artifact_report"
+      doc: """
+This change the artifact profile to use. for the default report. This can
+be useful if you are running on the command line and want a more minimal
+report.
+"""
+    }
+
+    flag_arg host_profile {
+      field_to_set: "outconf.delete.host_report"
+      doc: """
+This change the host profile to use for the default report. This can be
+useful if you are running on the command line and want a more minimal
+report.
+"""
+    }
   }
 
   command env {
@@ -285,6 +345,24 @@ This is most useful for short-lived processes, as it ensures chalk will complete
     doc: """
 When set to true, causes periodic reports to be run, past the initial one.    
 """    
+    }
+
+    flag_arg artifact_profile {
+      field_to_set: "outconf.exec.artifact_report"
+      doc: """
+This change the artifact profile to use. for the default report. This can
+be useful if you are running on the command line and want a more minimal
+report.
+"""
+    }
+
+    flag_arg host_profile {
+      field_to_set: "outconf.exec.host_report"
+      doc: """
+This change the host profile to use for the default report. This can be
+useful if you are running on the command line and want a more minimal
+report.
+"""
     }
   }
   command defaults {

@@ -7,16 +7,18 @@ import config, confload, commands, jitso, norecurse, sinks, docker_base,
        attestation, util
 
 when isMainModule:
-  addDefaultSinks()
-  loadAllConfigs()
-  recursionCheck()
+  setupSignalHandlers() # util.nim
+  addDefaultSinks()     # nimutils/sinks.nim
+  loadAllConfigs()      # config.nim
+  recursionCheck()      # norecurse.nim
+  setupManagedTemp()    # util.nim
   # Wait for this warning until after configs load.
   if not canSelfInject:
     warn("We have no codec for this platform's native executable type")
-  setupDefaultLogConfigs()
-  checkSetupStatus()
-  setDockerExeLocation()
-  case getCommandName()
+  setupDefaultLogConfigs() # src/sinks.nim
+  checkSetupStatus()       # attestation.nim
+  setDockerExeLocation()   # docker_base.nim
+  case getCommandName()    # config.nim
   of "extract":            runCmdExtract(chalkConfig.getArtifactSearchPath())
   of "extract.containers": runCmdExtractContainers()
   of "extract.images":     runCmdExtractImages()

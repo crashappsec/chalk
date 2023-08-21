@@ -1,15 +1,8 @@
-# Part of the base configuration.  See the comment at the top of
-# `base_keyspecs.c4m`
-
-# Doesn't do any keys other than the codec defaults, which are:
-# PATH_WHEN_CHALKED and HASH Note that non-codecs should should not s
-# houl d
-
-# not s
-
-# et these
-
-# keys.
+## Part of the base configuration.  See the comment at the top of
+## `base_keyspecs.c4m`
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
 
 plugin elf {
     codec:           true

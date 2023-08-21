@@ -19,7 +19,6 @@ all_cmds_that_insert := ["insert", "build", "load", "setup"]
 
 # Beyond valid chalk commands, these can generate reports.
 other_report_ops     := ["build", "push", "heartbeat"]
-
 tool_types           := ["sbom", "sast"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
 key_types            := ["Chalk-time Host", "Chalk-time Artifact",
@@ -745,6 +744,7 @@ integrity check passes, even if this makes marks forgable.
     type:      string
     default:   ""
     validator: func outconf_invalid_chalk_check
+    hidden:    true
     doc:       """
 The named profile is used for reporting per-artifact, any time the
 digital signature is fully validated. The general idea here is that,
@@ -2049,6 +2049,32 @@ Where to write the report cache, if in use.  Note that Chalk does not try to wri
 """
   }
 
+  field report_cache_lock_timeout_sec {
+    type:    int
+    default: 15
+    shortdoc: "Report cache lock acquisition timeout"
+    doc: """
+When using the report cache, it's possible multiple parallel instances
+of chalk on the same machine will be attempting to use the same cache
+file.
+
+For cases when this happens, Chalk uses a file locking system. If
+another running process holds the lock, chalk will keep retrying once
+per second for the number of specified seconds, before giving up
+(stale lock files are ignored).
+
+This variable then controls how many retries will be made, and thus
+the approximate maximum delay to the start of work.
+
+If you're running tools via chalk that can take a while to run, then
+you probably want to bump this number up, or use multiple report
+caches, or somesuch.
+
+If you have more typical build runs that complete quickly, then this
+number can stay pretty low.
+"""
+  }
+
   field force_output_on_reporting_fails {
     type:       bool
     default:    true
@@ -2326,7 +2352,6 @@ func liftable_key_check(keyname, val: list[string]) {
   }
 }
 
-
 func pc_err(profile, key, specified, err) {
   if specified {
       return ("Profile '" + profile + "' specifies reporting key '" + key +
@@ -2349,7 +2374,7 @@ func profile_check_base(profile_name, profile_type, cmd) {
     return
   }
   if not sects.contains(profile_name) {
-    return "profile '" + profile_name + "' not found"
+    return "there is no defined profile named '" + profile_name + "'"
   }
 
   specs         := sections("keyspec")
@@ -2443,7 +2468,7 @@ func profile_check_base(profile_name, profile_type, cmd) {
 
 func in_outconf(name) {
   secname := name.split(".")[1]
-  return "In outconf section '" + secname + "': "
+  return "For output configuration of command '" + secname + "': "
 }
 
 func in_report(name) {
@@ -2784,6 +2809,13 @@ func sink_config_check(path) {
     elif not typecmp(attr_type(path + "." + conffield), string) {
       return "This field must be a string."
     }
+    elif conffield == "pinned_cert_file" {
+      if attr_exists(path + ".pinned_cert") {
+        return ("Cannot have `pinned_cert_file` and `pinned_cert` in the same" +
+        "sink configuration.")
+      }
+    }
+    
   }
 
   for i from 0 to len(sinkfields) {

@@ -1,3 +1,8 @@
+## The `chalk help` command.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import ../config
 
 template row(x, y, z: string) = ot.addRow(@[x, y, z])

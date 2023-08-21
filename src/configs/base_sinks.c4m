@@ -1,12 +1,15 @@
-# Part of the base configuration.  See the comment at the top of
-# `base_keyspecs.c4m`
+## Part of the base configuration.  See the comment at the top of
+## `base_keyspecs.c4m`
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2022, 2023, Crash Override, Inc.
 
-# The default sink implementations are currently in the nimutils
-# library, except for 'custom', which is in output.nim.  That one
-# allows you to define your own sink in con4m by supplying the
-# callback outhook() If you do add more hardcoded sinks, please do
-# make sure they get locked in the lockBuiltinKeys() function in
-# config.nim.
+## The default sink implementations are currently in the nimutils
+## library, except for 'custom', which is in output.nim.  That one
+## allows you to define your own sink in con4m by supplying the
+## callback outhook() If you do add more hardcoded sinks, please do
+## make sure they get locked in the lockBuiltinKeys() function in
+## config.nim.
 
 sink stdout {
   doc:             "A sink that writes to stdout"

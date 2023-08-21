@@ -1,3 +1,8 @@
+## The `chalk setup` command.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import ../config, ../attestation, ../reporting, ../selfextract, ../util
 
 proc runCmdSetup*(gen, load: bool) =

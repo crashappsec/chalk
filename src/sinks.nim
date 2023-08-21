@@ -1,3 +1,8 @@
+## Chalk-specific setup and APIs around nimtuils' IO sinks.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import uri, config
 
 proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
@@ -42,7 +47,6 @@ var availableSinkConfigs = { "log_hook"     : defaultLogHook,
 
 when not defined(release):
   availableSinkConfigs["debug_hook"] = defaultDebugHook
-
 
 # These are used by reportcache.nim
 var   sinkErrors*: seq[SinkConfig] = @[]
@@ -168,6 +172,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     filterNames: seq[string]
     filters:     seq[MsgFilter] = @[]
     opts                        = OrderedTableRef[string, string]()
+    deleteList:  seq[string]
 
   for k, _ in attrs.contents:
     case k
@@ -186,6 +191,17 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
           error(k & " (sink config key) must be 'true' or 'false'")
         else:
           opts[k] = $(unpack[bool](boxOpt.get()))
+    of "pinned_cert":
+      let
+        (stream, path) = getNewTempFile("pinned", ".pem")
+        certContents   = getOpt[string](attrs, k).getOrElse("")
+
+      stream.write(certContents)
+      stream.close()
+      discard attrs.setOverride("pinned_cert_file", some(pack(path)))
+      # Can't delete from a dict while we're iterating over it.
+      deleteList.add(k)
+
     of "log_search_path":
       let boxOpt = getOpt[Box](attrs, k)
       if boxOpt.isSome():
@@ -226,6 +242,9 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
         continue
     else:
       opts[k] = getOpt[string](attrs, k).getOrElse("")
+
+  for item in deleteList:
+    attrs.contents.del(item)
 
   case sinkName
   of "":

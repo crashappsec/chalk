@@ -1,3 +1,20 @@
+## The `chalk docker` command logic.
+##
+## Whereas other commands use the `collect` module for their overall
+## collection logic, docker is completely different, with two
+## different paths where we do collection... chalk extraction, and
+## when running docker.
+##
+## The bits in common to those two things are mainly handled in the
+## docker Codec, or in chalk_base when more appropriate.
+##
+## The extract path still starts in `cmd_extract.nim`, which can even
+## make its way into `collect.nim` if specific containers or images
+## are requested on the command line.
+##
+## But when wrapping docker, this module does the bulk of the work and
+## is responsible for all of the collection logic.
+##
 ## :Author: John Viega, Theofilos Petsios
 ## :Copyright: 2023, Crash Override, Inc.
 
@@ -35,9 +52,9 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   trace("Docker subscan complete.")
 
 proc writeChalkMark(ctx: DockerInvocation, mark: string) =
-  # We are going to move this file, so don't autodelete.
+  # We are going to move this file, so don't autoclean.
   var
-    (f, path) = getNewTempFile(autoDelete = false)
+    (f, path) = getNewTempFile(autoClean = false)
 
   try:
     info("Creating temporary chalk file: " & path)
@@ -188,7 +205,6 @@ template noBinaryForPlatform(): string =
     warn("Cannot wrap; no chalk binary found for target platform: " &
       targetPlatform & "(build platform = " & buildPlatform & ")")
     ""
-
 proc findProperBinaryToCopyIntoContainer(ctx: DockerInvocation): string =
   # Mapping nim platform names to docker ones is a PITA. We need to
   # know the default target platform whenever --platform isn't

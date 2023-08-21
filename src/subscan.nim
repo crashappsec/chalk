@@ -1,3 +1,9 @@
+## Implements recursive scanning, for instance, used to process
+## contents of zip files.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import config
 
 # For the moment, this seems to be breaking our external dependency?!!!

@@ -1,3 +1,8 @@
+## The `chalk extract` command.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import ../config, ../collect, ../reporting, ../plugins/codecDocker,
        ../plugin_api
 

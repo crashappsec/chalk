@@ -1,3 +1,12 @@
+## This module deals with extracting information we need from the
+## docker command line. The command line is automatically parsed by
+## con4m when we call processDockerCmdLine (the spec it uses to parse
+## is in configs/dockercmd.c4m), so we really just need to look at
+## the command and flag info returned.
+
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import config
 
 proc extractOpInfo(state: DockerInvocation) =
@@ -58,7 +67,6 @@ proc extractPlatform(state: DockerInvocation) =
       state.foundPlatform = "multi-arch"
     else:
       state.foundPlatform = platforms[0]
-
 
 proc extractBuildArgs(state: DockerInvocation) =
   if "build-arg" in state.flags:
@@ -196,7 +204,6 @@ proc extractCmdlineBuildContext*(state: DockerInvocation) =
       prevArgWasntFlag = true
 
   state.foundContext = lastGoodArg
-
 
 proc stripFlagsWeRewrite*(ctx: DockerInvocation) =
   ## The main docker parse tries to pull out as many flags as it can

@@ -1,3 +1,10 @@
+## Common items related to managing the chalk run, including key
+## setting, status stuff, and the core scan state ("collection
+## contexts"), that the subscan module pushes and pops.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import chalk_common, posix
 export chalk_common
 

@@ -1,3 +1,8 @@
+## The `chalk defaults` command.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import ../config, ../sinks, macros
 
 proc paramFmt(t: StringTable): string =

@@ -9,9 +9,9 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import os, json, streams, tables, options, strutils, nimutils, sugar, posix,
-       nimutils/logging, con4m, c4autoconf, unicode, glob
+       nimutils/logging, nimutils/managedtmp, con4m, c4autoconf, unicode, glob
 export os, json, options, tables, strutils, streams, sugar, nimutils, logging,
-       con4m, c4autoconf
+       managedtmp, con4m, c4autoconf
 
 type
   ChalkDict*    = OrderedTableRef[string, Box]
@@ -340,75 +340,6 @@ var
   commandName*:        string
   dockerExeLocation*:  string = ""
   cachedChalkStreams*: seq[ChalkObj]
-
-
-
-
-when hostOs == "macosx":
-  {.emit: """
-#include <unistd.h>
-#include <libproc.h>
-
-   char *c_get_app_fname(char *buf) {
-     proc_pidpath(getpid(), buf, PROC_PIDPATHINFO_MAXSIZE); // 4096
-     return buf;
-   }
-   """.}
-
-  proc cGetAppFilename(x: cstring): cstring {.importc: "c_get_app_fname".}
-
-  proc betterGetAppFileName(): string =
-    var x: array[4096, byte]
-
-    return $(cGetAppFilename(cast[cstring](addr x[0])))
-
-elif hostOs == "linux":
-  {.emit: """
-#include <unistd.h>
-
-   char *c_get_app_fname(char *buf) {
-   char proc_path[128];
-   snprintf(proc_path, 128, "/proc/%d/exe", getpid());
-   readlink(proc_path, buf, 4096);
-   return buf;
-   }
-   """.}
-
-  proc cGetAppFilename(x: cstring): cstring {.importc: "c_get_app_fname".}
-
-  proc betterGetAppFileName(): string =
-    var x: array[4096, byte]
-
-    return $(cGetAppFilename(cast[cstring](addr x[0])))
-else:
-  template betterGetAppFileName(): string = getAppFileName()
-
-
-when hostOs == "macosx":
-  proc getMyAppPath*(): string =
-    let name = betterGetAppFileName()
-
-    if "_CHALK" notin name:
-      return name
-    let parts = name.split("_CHALK")[0 .. ^1]
-
-    for item in parts:
-      if len(item) < 3:
-        return name
-      case item[0 ..< 3]
-      of "HM_":
-        result &= "#"
-      of "SP_":
-        result &= " "
-      of "SL_":
-        result &= "/"
-      else:
-        return name
-      if len(item) > 3:
-        result &= item[3 .. ^1]
-    echo "getMyAppPath() = ", result
-else:
-  template getMyAppPath*(): string = betterGetAppFileName()
 
 template dumpExOnDebug*() =
   if chalkConfig != nil and chalkConfig.getChalkDebug():

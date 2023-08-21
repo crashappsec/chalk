@@ -1,3 +1,8 @@
+## The `chalk exec` command.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import posix, ../config, ../collect, ../util, ../reporting, ../chalkjson,
        ../plugin_api
 

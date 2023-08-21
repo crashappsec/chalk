@@ -1,3 +1,8 @@
+## The `chalk dump` command.
+##
+## :Author: John Viega (john@crashoverride.com)
+## :Copyright: 2023, Crash Override, Inc.
+
 import ../config, ../selfextract
 
 proc runCmdConfDump*() =
