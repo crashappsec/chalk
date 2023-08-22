@@ -65,6 +65,17 @@ macro buildProfile(title: untyped, varName: untyped): untyped =
         keyArr  = oneProf.contents["key"].get(AttrScope)
       toPublish &= keyArr.arrayToTable(@["report"], @["Key Name", "Report?"])
 
+template addSectionDefaults(configField: untyped, objtypestr: untyped) =
+    if chalkConfig.configField != nil:
+      let
+        info  = chalkConfig.configField.`@@attrscope@@`
+        toAdd = info.oneObjToTable(genCols, genHdrs, objType = objtypestr)
+
+      if toAdd != "":
+        toPublish &= formatTitle("'" & objtypestr & "' configuration")
+        toPublish &= toAdd
+
+
 proc showConfig*(force: bool = false) =
   once:
     const nope = "none\n\n"
@@ -139,16 +150,13 @@ proc showConfig*(force: bool = false) =
     toPublish &= formatTitle("General configuration")
     toPublish &= chalkRuntime.attrs.oneObjToTable(genCols, genHdrs)
 
-    let dockerInfo = chalkConfig.dockerConfig.`@@attrscope@@`
-    toPublish &= formatTitle("Docker configuration")
-    toPublish &= dockerInfo.oneObjToTable(genCols, genHdrs, objType = "docker")
+    addSectionDefaults(dockerConfig, "docker")
+    addSectionDefaults(extractConfig, "extract")
+    addSectionDefaults(execConfig, "exec")
+    addSectionDefaults(envConfig, "env_config")
+    addSectionDefaults(srcConfig, "source_marks")
 
-    let
-      envInfo = chalkConfig.envConfig.`@@attrscope@@`
-      toAdd   = envInfo.oneObjToTable(genCols, genHdrs, objType = "env_cache")
 
-    if toAdd != "":
-      toPublish &= formatTitle("Cached fields for env command") & toAdd
 
     publish("defaults", toPublish)
     if force: showDisclaimer(80)

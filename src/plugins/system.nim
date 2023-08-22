@@ -184,7 +184,7 @@ proc getEnvDict(): Box =
       if k in never:    continue
       elif k in redact: envdict[k] = "<<redact>>"
       elif k in always: envdict[k] = v
-      elif def == 'n':  continue
+      elif def == 'i':  continue
       elif def == 'r':  envdict[k] = "<<redact>>"
       else: envdict[k] = v
 

@@ -163,6 +163,11 @@ containers will do a chalk report when they launch.  Note that the
 'docker' command passes through ALL flags, so this flag needs to
 technically be part of the 'global' flags, even though nothing else
 uses it.
+
+If, when wrapping, your chalk binary is using an external
+configuration file, that file will NOT get used inside the
+container. The wrapped binary currently only uses the embedded
+configuration present in the binary at the time of the wrapping.
 """    
   }
 

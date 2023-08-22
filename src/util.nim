@@ -13,9 +13,13 @@ proc regularTerminationSignal(signal: cint) {.noconv.} =
   try:
     error("Aborting due to signal: " & sigNameMap[signal] & "(" & $(signal) &
       ")")
+    if chalkConfig.getChalkDebug():
+      publish("debug", "Stack trace: \n" & getStackTrace())
+
   except:
     echo "Aborting due to signal: " & sigNameMap[signal]  & "(" & $(signal) &
       ")"
+    dumpExOnDebug()
   var sigset:  SigSet
 
   discard sigemptyset(sigset)

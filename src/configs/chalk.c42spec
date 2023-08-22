@@ -964,6 +964,14 @@ architecture you are uilding for to copy in, and then specify it with
 Note that *either* we need to be able to copy the chalk binary into
 the context directory before invoking Docker, or you need to be on a
 version of Docker that accepts `--build-context`.
+
+The configuration of the chalk process inside the container will be
+inherited from the binary doing the chalking.
+
+If, when wrapping, your chalk binary is using an external
+configuration file, that file will NOT get used inside the
+container. The wrapped binary currently only uses the embedded
+configuration present in the binary in the time of the wrapping.
 """
   }
 
@@ -1286,6 +1294,7 @@ isn't.
   field only_mark_shebangs {
     type:    bool
     default: true
+    shortdoc: "Marking requires #! in script"
     doc: """
 If this is true, we will only mark files that have a shebang line
 (i.e., the first line starts with `#!`).
@@ -1309,6 +1318,7 @@ unless you provide a custom callback.
   field only_mark_when_execute_set {
     type:    bool
     default: false
+    shortdoc: "Marking requires +x"
     doc: """
     
 When this is true, Chalk will not attempt to mark source code *unless*
@@ -1324,6 +1334,7 @@ unless you provide a custom callback.
   field text_only_extensions {
     type: list[string]
     default: ["json", "jsonl", "txt", "text", "md", "docx"]
+    shortdoc: "Extensions that should be ignored, even if they have something that looks like a chalk mark"
     doc: """
 Chalk extraction generally assumes that if it finds a chalk mark in a
 text file, then it should report it. But, that isn't true for
@@ -1337,6 +1348,7 @@ be source code.
   field custom_logic {
     type:    func (string, string, string, bool, bool) -> bool
     require: false
+    shortdoc: "A callback for custom logic."
     doc: """
 If you'd like to have fine-grained control over what source gets
 marked, you can do so by setting a callback.
@@ -1389,11 +1401,13 @@ Otherwise, we will assume the file is *not* an executable.
 
 This also means that we might use odd language names, like 'node',
 since it's the thing we're likely to see in a shebang line.
-"""    
+"""
   }
 
   field language_to_comment_map {
     type: dict[string, string]
+    shortdoc: "Lang runtimes to comment sequence"
+    doc: "Maps binary names for lang runtimes to their comment type"    
     default: {
       "sh"              : "#",
       "csh"             : "#",
@@ -1415,6 +1429,8 @@ since it's the thing we're likely to see in a shebang line.
   
   field extensions_to_languages_map {
     type: dict[string, string]
+    shortdoc: "File extensions to runtime binary"
+    doc: "Maps file extensions to the binary names for lang runtimes"
     default: {
       "sh"              : "sh",
       "csh"             : "csh",
@@ -2088,7 +2104,7 @@ Note that this is NOT checked if there is a report cache enabled; even if the re
 
   field env_always_show {
     type:       list[string]
-    default:    []
+    default:    ["PATH", "PWD", "XDG_SESSION_TYPE", "USER", "SSH_TTY"]
     shortdoc:   "Env Vars to show full data for"
     doc:        """
 For the INJECTOR_ENV and _ENV metadata keys, any environment variable listed here will get reported with its actual value at the time the chalk command is invoked.
@@ -2106,7 +2122,7 @@ For the INJECTOR_ENV and _ENV metadata keys, any environment variable listed her
 
   field env_redact {
     type:       list[string]
-    default:    []
+    default:    ["AWS_SECRET_ACCESS_KEY"]
     shortdoc:   "Env Vars to redact"
     doc:        """
 For the INJECTOR_ENV and _ENV metadata keys, any environment variable listed here will get redacted for privacy.  Currently, that means we give the value <<redacted>>; we do not try to detect sensitive data and redact it.
@@ -2116,7 +2132,7 @@ For the INJECTOR_ENV and _ENV metadata keys, any environment variable listed her
   field env_default_action {
     type:     string
     choice:   ["show", "redact", "ignore"]
-    default:  "show"
+    default:  "ignore"
     shortdoc: "Default envvar action"
     doc:        """
 For the INJECTOR_ENV and _ENV metadata keys, any environment variable that is not listed explicitly in the above lists will be handled as specified here.
