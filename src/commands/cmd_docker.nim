@@ -60,7 +60,7 @@ proc writeChalkMark(ctx: DockerInvocation, mark: string) =
     info("Creating temporary chalk file: " & path)
     f.writeLine(mark)
     f.close()
-    ctx.makeFileAvailableToDocker(path, true, "chalk.json")
+    ctx.makeFileAvailableToDocker(path, move=true, newName="chalk.json")
   except:
     error("Unable to write to open tmp file (disk space?)")
     raise newException(ValueError, "fs write")
@@ -283,7 +283,7 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
 
   info("Entry point wrapped with this chalk binary: " & binaryToCopy)
   try:
-    ctx.makeFileAvailableToDocker(binaryToCopy, false, "chalk")
+    ctx.makeFileAvailableToDocker(binaryToCopy, move=false, chmod=true, newname="chalk")
   except:
     warn("Wrapping canceled; no available method to wrap entry point.")
     return

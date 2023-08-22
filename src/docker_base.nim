@@ -73,6 +73,7 @@ var contextCounter = 0
 proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
                                 loc:      string,
                                 move:     bool,
+                                chmod:    bool = false,
                                 newName = "") =
   let (dir, file) = loc.splitPath()
 
@@ -84,6 +85,8 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
     ctx.newCmdLine.add("chalktmpdir" & $(contextCounter) & "=\"" & dir & "\"")
     ctx.addedInstructions.add("COPY --from=chalkexedir" & $(contextCounter) &
       " " & file & " /" & newname)
+    if chmod:
+      ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
     contextCounter += 1
     if move:
       registerTempFile(loc)
@@ -113,6 +116,8 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
           copyFile(loc, dstLoc)
 
         ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
+        if chmod:
+          ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
         registerTempFile(dstLoc)
       except:
         dumpExOnDebug()
