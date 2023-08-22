@@ -268,11 +268,11 @@ type
     dfSectionAliases*:  OrderedTable[string, DockerFileSection]
     addedInstructions*: seq[string]
 
-# Compile-time only helper for generating one of the consts below.
-proc commentC4mCode(s: string): string =
-  let lines = s.split("\n")
-  result    = ""
-  for line in lines: result &= "# " & line & "\n"
+# # Compile-time only helper for generating one of the consts below.
+# proc commentC4mCode(s: string): string =
+#   let lines = s.split("\n")
+#   result    = ""
+#   for line in lines: result &= "# " & line & "\n"
 
   # Some string constants, mostly used in multiple places.
 const
@@ -301,7 +301,7 @@ const
   sbomConfig*         = staticRead(sbomConfName)
   sastConfig*         = staticRead(sastConfName)
   ioConfig*           = staticRead(ioConfName)
-  defaultConfig*      = staticRead(defCfgFname) & commentC4mCode(ioConfig)
+  defaultConfig*      = staticRead(defCfgFname) #& commentC4mCode(ioConfig)
   attestConfig*       = staticRead(attestConfName)
   versionStr*         = staticexec("cat ../*.nimble | grep ^version")
   commitID*           = staticexec("git rev-parse HEAD")

@@ -13,11 +13,12 @@ elif env_exists("NO_COLOR") {
   color: true
 }
 
-cmd  := argv0()
+cmd  := command_name()
 
 subscribe("report",   "json_console_out")
 subscribe("audit",    "json_console_out")
 subscribe("version",  "console_out")
+subscribe("virtual",  "virtual_chalk_log")
 #% INTERNAL
 if cmd == "helpdump" {
     subscribe("help", "json_console_out")
@@ -29,7 +30,7 @@ subscribe("help",     "console_out")
 #% END
 
 if cmd == "dump" {
-  args := argv()
+  args := command_argv()
   if len(args) == 0 {
     subscribe("confdump", "console_out")
   } else {
@@ -43,6 +44,22 @@ elif cmd == "defaults" {
 } else {
     subscribe("defaults", "console_err")
 }
+
+# Set up the log level based on the command.
+quieter_cmds := ["docker", "exec"]
+cmd := command_name()
+
+if cmd == "not_supplied" and quieter_cmds.contains(default_command) {
+  log_level: "error"
+}
+elif quieter_cmds.contains(cmd) {
+    log_level: "error"
+}
+else {
+    log_level: "info"
+}
+  
+
 # Note that there are already two pre-built output configurations.
 # They are both subscribed to the 'stderr' sink.  You can remove those
 # subscriptions.

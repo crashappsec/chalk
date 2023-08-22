@@ -112,8 +112,10 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
       try:
         if move:
           moveFile(loc, dstLoc)
+          trace("Moved " & loc & " to " & dstLoc)
         else:
           copyFile(loc, dstLoc)
+          trace("Copied " & loc & " to " & dstLoc)
 
         ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
         if chmod:

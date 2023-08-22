@@ -109,17 +109,24 @@ proc getFdInfo(n: string): ProcFdSet =
 
   for item in pids:
     # item will be the full path to the file.
-    let retOpt = kvFileToProcDict(item)
-    if retOpt.isSome():
-      var procDict      = retOpt.get()
-      let fd            = item.splitPath().tail
-      procDict["path"]  = item
-      let inodeOpt      = procReadLink(item)
+    let
+      fullFdPath = procFdInfoDir & item
+    try:
+      let
+        retOpt     = kvFileToProcDict(fullFdPath)
+      if retOpt.isSome():
+        var procDict      = retOpt.get()
+        let fd            = fullFdPath.splitPath().tail
+        procDict["path"]  = fullFdPath
+        let inodeOpt      = procReadLink(fullFdPath)
 
-      if inodeOpt.isSome():
-        procDict["ino"] = inodeOpt.get()
+        if inodeOpt.isSome():
+          procDict["ino"] = inodeOpt.get()
 
-      result[fd]        = procDict
+        result[fd]        = procDict
+    except:
+      warn("Unexpected failure in getFdInfo for " & fullFdPath)
+      dumpExOnDebug()
 
 proc getPidArgv(pid: string): string =
   let contentOpt = readOneFile("/proc/" & pid & "/cmdline")

@@ -142,9 +142,13 @@ proc writeNewDockerFile(ctx: DockerInvocation) =
 
   info("Created temporary Dockerfile at: " & path)
 
-  f.write(ctx.inDockerFile)
-  for line in ctx.addedInstructions:
-    f.writeLine(line)
+  if ctx.inDockerFile.len() != 0 and ctx.inDockerFile[^1] != '\n':
+    ctx.inDockerFile &= "\n"
+
+  let newcontents = ctx.inDockerFile & ctx.addedInstructions.join("\n")
+
+  trace("New docker file: \n" & newcontents)
+  f.write(newcontents)
   f.close()
 
   ctx.newCmdLine.add("-f")
@@ -155,7 +159,10 @@ template noBadJson(item: InfoBase) =
     warn("Cannot wrap due to dockerfile JSON parse error.")
     return
 
-proc getDefaultPlatformInfo(): string =
+proc getDefaultPlatformInfo(ctx: DockerInvocation): string =
+  if ctx.foundPlatform != "":
+    return ctx.foundPlatform
+
   let
     probeFile    = """
 FROM alpine
@@ -218,16 +225,14 @@ proc findProperBinaryToCopyIntoContainer(ctx: DockerInvocation): string =
   # `arch_binary_locations` field.
 
   var
-   targetPlatform = getDefaultPlatformInfo()
+   targetPlatform = ctx.getDefaultPlatformInfo()
    buildPlatform  = hostOs & "/" & hostCPU
 
   if targetPlatform == "":
+
     warn("Cannot wrap; container platform doesn't support the TARGETPLATFORM " &
       "build arg.")
     return ""
-
-  if ctx.foundPlatform != "":
-    targetPlatform = ctx.foundPlatform
 
   if targetPlatform == buildPlatform:
     return getMyAppPath()
@@ -281,7 +286,7 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
     # Already got a warning.
     return
 
-  info("Entry point wrapped with this chalk binary: " & binaryToCopy)
+  info("Wrapping entry point with this chalk binary: " & binaryToCopy)
   try:
     ctx.makeFileAvailableToDocker(binaryToCopy, move=false, chmod=true, newname="chalk")
   except:
@@ -325,7 +330,7 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
 
   ctx.addedInstructions.add(newInstruction)
   info("Entry point wrapped.")
-  trace("Added instructions: \n" & newInstruction)
+  trace("Added instructions: \n" & ctx.addedInstructions.join("\n"))
 
 proc isValidEnvVarName(s: string): bool =
   if len(s) == 0 or (s[0] >= '0' and s[0] <= '9'):

@@ -112,7 +112,7 @@ Generally, these can get very noisy, and are intended more for testing,
  debugging, etc.
 """,
      @["chalk"]),
-    ("argv() -> list[string]",
+    ("command_argv() -> list[string]",
      BuiltInFn(getArgv),
      """
 Returns the arguments being passed to the command, such as the path
@@ -120,7 +120,7 @@ parameters.  This is not the same as the underlying process's argv; it
 represents the arguments getting passed to the underlying chalk command.
 """,
      @["chalk"]),
-    ("argv0() -> string",
+    ("command_name() -> string",
      BuiltInFn(getChalkCommand),
      """
 Returns the name of the chalk command being run (not the underlying

@@ -791,21 +791,6 @@ keyspec _CURRENT_HASH {
                       "the hash calculated on the object in its current state."
 }
 
-keyspec _INVALID_SIGNATURE {
-    kind:             RunTimeArtifact
-    type:             bool
-    standard:         true
-    system:           true
-    since:            "0.1.0"
-    doc:              """
-True if a signature was found in an artifact, but it did not properly
-validate. If no signature is found, or if there is a technical reason
-validation failed, this key is not set.
-
-That is, it will never have the value of `false`.
-"""
-}
-
 keyspec _VALIDATED_METADATA {
     kind:             RunTimeArtifact
     type:             bool
@@ -2201,13 +2186,6 @@ keyspec _INSTANCE_STDIN_ONCE {
     doc: ""
 }
 
-keyspec _INSTANCE_ENV {
-    kind:             RunTimeArtifact
-    type:             `x
-    standard:         true
-    doc: ""
-}
-
 keyspec _INSTANCE_CMD {
     kind:             RunTimeArtifact
     type:             `x
@@ -3062,7 +3040,7 @@ keyspec $CHALK_SECRET_ENDPOINT_URI {
 
 # Used in a keyspec above.
 func call_rand(key) { return $(lower(hex(rand())));  }
-func get_args(key) { return argv(); }
+func get_args(key) { return command_argv(); }
 
 default_command = "help"
 

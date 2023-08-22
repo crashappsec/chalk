@@ -871,7 +871,7 @@ This first example connects the output of the {bold}defaults{reset} command to s
 sink_config({green}"redirectableOut"{cyan}, {green}"stdout"{cyan}, {{}})
 sink_config({green}"defaultOut"{cyan},      {green}"stderr"{cyan}, {{}})
 {brown} #argv() gets the command name.
-if argv0() != {green}"defaults"{cyan} {{
+if command_name() != {green}"defaults"{cyan} {{
     subscribe({green}"defaults"{cyan}, {green}"defaultOut"{cyan})
 }} else {{
     subscribe({green}"defaults"{cyan}, {green}"redirectableOut"{cyan})

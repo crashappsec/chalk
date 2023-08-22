@@ -74,15 +74,20 @@ proc collectChalkTimeHostInfo*() =
     let subscribed = plugin.configInfo.preRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo):
       continue
-    let dict = plugin.callGetChalkTimeHostInfo()
-    if dict == nil or len(dict) == 0:
-      continue
-
-    for k, v in dict:
-      if not plugin.canWrite(k, plugin.configInfo.preRunKeys):
+    try:
+      let dict = plugin.callGetChalkTimeHostInfo()
+      if dict == nil or len(dict) == 0:
         continue
-      if k notin hostInfo or k in plugin.configInfo.overrides:
-        hostInfo[k] = v
+
+      for k, v in dict:
+        if not plugin.canWrite(k, plugin.configInfo.preRunKeys):
+          continue
+        if k notin hostInfo or k in plugin.configInfo.overrides:
+          hostInfo[k] = v
+    except:
+      warn("When collecting chalk-time host info, plugin implementation " &
+        plugin.name & " threw an exception it didn't handle.")
+      dumpExOnDebug()
 
 proc initCollection*() =
   ## Chalk commands that report call this to initialize the collection
@@ -125,13 +130,19 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
     if plugin.configInfo.codec and plugin != artifact.myCodec: continue
 
 
-    let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
-    if dict == nil or len(dict) == 0: continue
-
-    for k, v in dict:
-      if not plugin.canWrite(k, plugin.configInfo.postChalkKeys): continue
-      if k notin artifact.collectedData or k in plugin.configInfo.overrides:
-        artifact.collectedData[k] = v
+    try:
+      let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
+      if dict == nil or len(dict) == 0: continue
+      for k, v in dict:
+        if not plugin.canWrite(k, plugin.configInfo.postChalkKeys): continue
+        if k notin artifact.collectedData or k in plugin.configInfo.overrides:
+          artifact.collectedData[k] = v
+      trace(plugin.name & ": Plugin called.")
+    except:
+      warn("When collecting run-time artifact data, plugin implementation " &
+        plugin.name & " threw an exception it didn't handle (artifact = " &
+        artifact.name & ".")
+      dumpExOnDebug()
 
   let hashOpt = artifact.callGetEndingHash()
   if hashOpt.isSome():
@@ -165,17 +176,22 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
     if plugin.getChalkTimeArtifactInfo == nil:
       continue
 
-    let dict = plugin.callGetChalkTimeArtifactInfo(obj)
-    if dict == nil or len(dict) == 0:
-      trace(plugin.name & ": Plugin produced no keys to use.")
-      continue
+    try:
+      let dict = plugin.callGetChalkTimeArtifactInfo(obj)
+      if dict == nil or len(dict) == 0:
+        trace(plugin.name & ": Plugin produced no keys to use.")
+        continue
 
-    for k, v in dict:
-      if not plugin.canWrite(k, plugin.configInfo.artifactKeys): continue
-      if k notin obj.collectedData or k in plugin.configInfo.overrides:
-        obj.collectedData[k] = v
-
-    trace(plugin.name & ": Plugin called.")
+      for k, v in dict:
+        if not plugin.canWrite(k, plugin.configInfo.artifactKeys): continue
+        if k notin obj.collectedData or k in plugin.configInfo.overrides:
+          obj.collectedData[k] = v
+      trace(plugin.name & ": Plugin called.")
+    except:
+      warn("When collecting chalk-time artifact data, plugin implementation " &
+        plugin.name & " threw an exception it didn't handle (artifact = " &
+        obj.name & ".")
+      dumpExOnDebug()
 
 proc collectRunTimeHostInfo*() =
   if hostCollectionSuspended(): return
@@ -185,13 +201,19 @@ proc collectRunTimeHostInfo*() =
     let subscribed = plugin.configInfo.postRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
 
-    let dict = plugin.callGetRunTimeHostInfo(getAllChalks())
-    if dict == nil or len(dict) == 0: continue
+    try:
+      let dict = plugin.callGetRunTimeHostInfo(getAllChalks())
+      if dict == nil or len(dict) == 0: continue
 
-    for k, v in dict:
-      if not plugin.canWrite(k, plugin.configInfo.postRunKeys): continue
-      if k notin hostInfo or k in plugin.configInfo.overrides:
-        hostInfo[k] = v
+      for k, v in dict:
+        if not plugin.canWrite(k, plugin.configInfo.postRunKeys): continue
+        if k notin hostInfo or k in plugin.configInfo.overrides:
+          hostInfo[k] = v
+    except:
+      warn("When collecting run-time host info, plugin implementation " &
+        plugin.name & " threw an exception it didn't handle.")
+      dumpExOnDebug()
+
 
 # The two below functions are helpers for the artifacts() iterator
 # and the self-extractor (in the case of findChalk anyway).
@@ -219,8 +241,8 @@ proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
   result.fileExclusions = @[resolvePath(getMyAppPath())]
   result.recurse        = chalkConfig.getRecursive()
 
-  for item in chalkConfig.getIgnorePatterns():
-    result.skips.add(glob("**/" & item))
+
+
 
   if len(argv) == 0:
     result.filePaths.add(getCurrentDir())

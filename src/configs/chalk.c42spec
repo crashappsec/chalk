@@ -958,12 +958,13 @@ Note that, by default, Chalk will use its own binary for the wrapping, unless
 it sees an arch flag and determines that this is the wrong binary.
 
 In such a case, you should have a binary available for the
-architecture you are uilding for to copy in, and then specify it with
-`chalk_wrap_exe`
+architecture you are building for to copy in, which can be specified
+via the `arch_binary_locations` field.
 
 Note that *either* we need to be able to copy the chalk binary into
 the context directory before invoking Docker, or you need to be on a
-version of Docker that accepts `--build-context`.
+version of Docker that accepts `--build-context`, otherwise the
+wrapping will fail (though just the wrapping).
 
 The configuration of the chalk process inside the container will be
 inherited from the binary doing the chalking.

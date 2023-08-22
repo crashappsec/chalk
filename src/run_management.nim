@@ -73,7 +73,8 @@ proc newChalk*(name:         string            = "",
                resourceType: set[ResourceType] = {ResourceFile},
                extract:      ChalkDict         = ChalkDict(nil),
                cache:        RootRef           = RootRef(nil),
-               codec:        Plugin            = Plugin(nil)): ChalkObj =
+               codec:        Plugin            = Plugin(nil),
+               addToAllChalks                  = false): ChalkObj =
   result = ChalkObj(name:          name,
                     pid:           pid,
                     fsRef:         fsRef,
@@ -92,6 +93,9 @@ proc newChalk*(name:         string            = "",
 
   if stream != FileStream(nil):
     cachedChalkStreams.add(result)
+
+  if addToAllChalks:
+    result.addToAllChalks()
 
   setErrorObject(result)
 
