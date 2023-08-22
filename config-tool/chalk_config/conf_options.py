@@ -17,7 +17,7 @@ import stat
 
 from .localized_text import *
 from .log import get_logger
-from .version import __version__
+from .__version__ import __version__
 
 
 logger = get_logger(__name__)

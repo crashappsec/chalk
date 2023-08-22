@@ -1,6 +1,10 @@
+*config-tool*
 .dockerignore
 .github
 Dockerfile*
+bin
 chalk
 docker
-docker-compose.yml
+docker-compose*
+server
+tests

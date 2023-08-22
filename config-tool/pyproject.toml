@@ -1,6 +1,8 @@
 [tool.poetry]
 name = "chalk-config"
-version = "0.1.0"
+# placeholder. on release replaced by poetry
+# https://pypi.org/project/poetry-dynamic-versioning/
+version = "0.0.0"
 description = "Chalk TUI configuration utility"
 authors = []
 readme = "README.md"
@@ -28,6 +30,7 @@ pycparser = "2.21"
 pygments = "2.15.1"
 pyjwt = "2.7.0"
 python = ">=3.9,<3.12"
+qrcode = "^7.4.2"
 requests = "2.31.0"
 rich = "13.4.1"
 semver = "^3.0.1"
@@ -35,7 +38,6 @@ textual = "0.27.0"
 uc-micro-py = "1.0.2"
 urllib3 = "2.0.2"
 zipp = "3.15.0"
-qrcode = "^7.4.2"
 
 [tool.poetry.group.dev.dependencies]
 autoflake = "^2.1.1"
@@ -47,5 +49,8 @@ pyinstaller = "^5.11.0"
 typing-extensions = "4.6.3"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+build-backend = "poetry_dynamic_versioning.backend"
+requires = ["poetry-core", "poetry_dynamic_versioning"]
+
+[tool.poetry-dynamic-versioning]
+enable = true

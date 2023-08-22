@@ -31,14 +31,29 @@ services:
     volumes:
       - $PWD:$PWD
 
+  chalk-config-release:
+    build:
+      context: config-tool
+      additional_contexts:
+        git: ./.git
+      target: release
+    volumes:
+      - ./.config-tool-bin:/config-bin
+      - ./config-tool-outdir:/outdir/
+      - $HOME/.config:/root/.config
+    environment:
+      TERM: ${TERM:-}
+      COLORTERM: ${COLORTERM:-}
+      CHALK_BINARIES_ARE_LOCAL: 1
+
   chalk-config:
     build:
       context: config-tool
     command: python -m chalk_config
     volumes:
-      - $PWD/config-tool:/config-tool
-      - $PWD/.config-tool-bin:/config-bin
-      - $PWD/config-tool-outdir:/outdir/
+      - ./config-tool:/config-tool
+      - ./.config-tool-bin:/config-bin
+      - ./config-tool-outdir:/outdir/
       - $HOME/.config:/root/.config
     environment:
       TERM: ${TERM:-}
@@ -55,7 +70,7 @@ services:
       - PGID=1000
       - TZ=Etc/UTC
     volumes:
-      - $PWD/server/app/db/data:/config
+      - ./server/app/db/data:/config
     ports:
       - 3000:3000
       - 3001:3001

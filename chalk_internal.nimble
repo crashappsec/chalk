@@ -14,6 +14,10 @@ requires "nimSHA2 == 0.1.1"
 requires "glob == 0.11.2"
 requires "https://github.com/viega/zippy == 0.10.7"
 
+# this allows to get version externally without grepping for it in the file
+task version, "Show current version":
+  echo version
+
 #% INTERNAL
 task debug, "Package the debug build":
   # additional flags are configured in config.nims

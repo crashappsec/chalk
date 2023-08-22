@@ -52,7 +52,7 @@ from textual.coordinate import *
 from textual.screen import *
 from textual.widgets import Markdown as MDown
 from textual.widgets import *
-from .version import __version__
+from .__version__ import __version__
 from .wiz_panes import ApiAuth, DisplayQrCode, init_sections
 from .wizard import AckModal, ProfileModal, ReleaseNotesModal, UpdateModal, Wizard
 from .log import get_logger
@@ -686,7 +686,7 @@ class NewApp(App):
 
     # determine correct arch
     system, machine = determine_sys_arch()
-    version = f"{__version__}"
+    version = __version__.split('.post')[0]
     server_bin_name = f"chalkserver-{version}-{system}-{machine}"
     static_site_url = "https://dl.crashoverride.run/chalksite.tar.gz"
     test_server_url = f"https://dl.crashoverride.run/{server_bin_name}"

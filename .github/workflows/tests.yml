@@ -2,6 +2,14 @@ name: tests
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - src/**
+      - tests/**
   workflow_dispatch:
     inputs:
 
@@ -53,7 +61,7 @@ jobs:
       - name: Compile chalk
         run: |
           docker buildx bake --file docker-compose.yml --file docker-compose-cache.json chalk-compile
-          docker compose run chalk-compile
+          docker compose run --rm chalk-compile
 
       # - name: Update hosts
       #   run: |
