@@ -1,5 +1,7 @@
 import json
+import os
 import shutil
+import time
 from pathlib import Path
 
 import pytest
@@ -7,8 +9,10 @@ import pytest
 from .chalk.runner import Chalk
 from .utils.bin import sha256
 from .utils.log import get_logger
+from .utils.validate import ArtifactInfo, validate_chalk_report
 
 logger = get_logger()
+CONFIGFILES = Path(__file__).parent / "data" / "configs"
 
 
 # chalk exec forking should not affect behavior
@@ -115,3 +119,63 @@ def test_exec_chalked(
     assert sub_chalk["_PROCESS_PID"] > 0
     assert sub_chalk["_PROCESS_PARENT_PID"] > 0
     assert sub_chalk["_PROCESS_UID"] is not None
+
+
+# exec wrapping with heartbeat
+def test_exec_heartbeat(
+    tmp_data_dir: Path,
+    chalk: Chalk,
+):
+    bin = "sleep"
+    shutil.copy(f"/bin/{bin}", tmp_data_dir / bin)
+    bin_path = tmp_data_dir / bin
+    bin_hash = sha256(tmp_data_dir / bin)
+
+    # add chalk mark
+    chalk.insert(artifact=bin_path, virtual=False)
+
+    # hash of chalked binary
+    current_hash = sha256(tmp_data_dir / bin)
+    assert bin_hash != current_hash
+
+    log_file = "/tmp/heartbeat.log"
+
+    heartbeat_conf = CONFIGFILES / "heartbeat.conf"
+    exec_proc = chalk.run(
+        chalk_cmd="exec",
+        params=[
+            "--heartbeat",
+            f"--config-file={heartbeat_conf}",
+            # sleep 5 seconds -- expecting ~4 heartbeats
+            f"--exec-command-name={bin_path}",
+            "5",
+        ],
+    )
+
+    # should not error but skip stdout checking
+    assert exec_proc.returncode == 0
+    _stderr = exec_proc.stderr.decode()
+    assert _stderr == ""
+
+    # validate contents of log file
+    assert os.path.isfile(log_file)
+    with open(log_file) as file:
+        lines = file.readlines()
+
+        _exec = lines[0]
+        exec_report = json.loads(_exec)[0]
+        assert exec_report["_OPERATION"] == "exec"
+        assert "_CHALKS" in exec_report
+
+        _chalk = exec_report["_CHALKS"][0]
+        assert _chalk["_OP_ARTIFACT_PATH"] == str(bin_path)
+        assert _chalk["_CURRENT_HASH"] == current_hash
+        assert _chalk["ARTIFACT_TYPE"] == "ELF"
+        assert _chalk["_PROCESS_PID"] != ""
+
+        assert len(lines[1:]) > 0, "no heartbeats reported"
+        for line in lines[1:]:
+            heartbeat_report = json.loads(line)[0]
+            assert heartbeat_report["_OPERATION"] == "heartbeat"
+            assert "_CHALKS" in heartbeat_report
+            assert heartbeat_report["_CHALKS"][0] == _chalk

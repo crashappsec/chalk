@@ -11,7 +11,7 @@ from unittest import mock
 
 import pytest
 
-from .chalk.runner import Chalk
+from .chalk.runner import Chalk, chalk_copy
 from .utils.chalk_report import get_chalk_report_from_output
 from .utils.docker import (
     docker_build,
@@ -29,10 +29,13 @@ from .utils.validate import (
 logger = get_logger()
 
 DOCKERFILES = Path(__file__).parent / "data" / "dockerfiles"
+CONFIGFILES = Path(__file__).parent / "data" / "configs"
 # pushing to a registry is orchestrated over the docker socket which means that the push comes from the host
 # therefore this is sufficient for the docker push command
 # FIXME: once we have buildx support we'll need to enable insecure registry https://docs.docker.com/registry/insecure/
 REGISTRY = "localhost:5044"
+
+TEST_LABEL = "CRASH_OVERRIDE_TEST_LABEL"
 
 
 def _build_and_chalk_dockerfile(
@@ -125,7 +128,6 @@ def test_virtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
             "DOCKER_TAGS": [test_file],
         }
         artifact_info.host_info = {}
-        logger.info(chalk_report)
         validate_docker_chalk_report(
             chalk_report=chalk_report, artifact=artifact_info, virtual=True
         )
@@ -255,6 +257,114 @@ def test_nonvirtual_invalid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
     assert not (
         tmp_data_dir / "virtual-chalk.json"
     ).is_file(), "virtual-chalk.json should not have been created!"
+
+
+# exec heartbeat from inside docker
+def test_docker_heartbeat(tmp_data_dir: Path, chalk: Chalk):
+    test_image = "test_image"
+    test_container = "test_container"
+    try:
+        files = os.listdir(DOCKERFILES / "valid" / "sleep")
+        for file in files:
+            shutil.copy(DOCKERFILES / "valid" / "sleep" / file, tmp_data_dir)
+
+        # copy chalk and load the config we want
+        chalk = chalk_copy(tmp_data_dir=Path("/tmp"), chalk=chalk)
+        assert os.path.isfile("/tmp/chalk")
+
+        load_output = chalk.load(str(CONFIGFILES / "docker_heartbeat.conf"), False)
+        assert load_output.returncode == 0
+
+        # build dockerfile with chalk docker entrypoint wrapping
+        chalk_build = subprocess.run(
+            args=[
+                chalk.binary,
+                "docker",
+                "build",
+                "--platform=linux/amd64",
+                "-t",
+                test_image,
+                ".",
+            ],
+            capture_output=True,
+        )
+        assert chalk_build.returncode == 0
+
+        # run with docker and we should get output
+        container_proc = subprocess.run(
+            args=[
+                "docker",
+                "run",
+                "-t",
+                "--name",
+                "test_container",
+                test_image,
+            ],
+            capture_output=True,
+        )
+        assert container_proc.returncode == 0
+
+        _stdout = container_proc.stdout.decode()
+        # FIXME: stdoutput is multiple jsons split over multiple lines, figure out how to parse that into a list of json objects
+        # validate exec
+        assert '"_OPERATION": "exec"' in _stdout
+        # at least two heartbeats in output
+        assert _stdout.count('"_OPERATION": "heartbeat"') > 2
+
+    except Exception:
+        raise
+    finally:
+        docker_image_cleanup([test_image])
+        try:
+            subprocess.run(args=["docker", "rm", "-f", test_container])
+        except Exception as e:
+            logger.warning("Could not remove test_container %s", e)
+
+
+def test_docker_labels(tmp_data_dir: Path, chalk: Chalk):
+    files = os.listdir(DOCKERFILES / "valid" / "sample_1")
+    for file in files:
+        shutil.copy(DOCKERFILES / "valid" / "sample_1" / file, tmp_data_dir)
+
+    container_name = "test_container"
+    try:
+        # build container with env vars
+        chalk_run = chalk.run(
+            params=[
+                f"--config-file={CONFIGFILES / 'docker_heartbeat.conf'}",
+                "--log-level=none",
+                "docker",
+                "build",
+                "-t",
+                container_name,
+                ".",
+            ],
+        )
+        assert chalk_run.returncode == 0
+
+        _docker_inspect_proc = subprocess.run(
+            ["docker", "inspect", container_name],
+            capture_output=True,
+        )
+        assert _docker_inspect_proc.returncode == 0
+        # expecting json array with 1 element
+        _docker_inspect_info = _docker_inspect_proc.stdout.decode()
+        docker_inspect = json.loads(_docker_inspect_info)
+
+        assert len(docker_inspect) == 1
+        docker_configs = docker_inspect[0]["Config"]
+        assert "Labels" in docker_configs
+        labels = docker_configs["Labels"]
+        label_found = False
+        for label in labels:
+            if labels[label] == TEST_LABEL:
+                label_found = True
+                break
+        assert label_found
+    except Exception:
+        raise
+    finally:
+        docker_image_cleanup([container_name])
 
 
 @pytest.mark.parametrize(
