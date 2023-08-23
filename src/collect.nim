@@ -225,12 +225,17 @@ proc ignoreArtifact(path: string, globs: seq[glob.Glob]): bool {.inline.} =
 proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
   new result
 
-  result.fileExclusions = @[resolvePath(getMyAppPath())]
+  let selfPath = resolvePath(getMyAppPath())
+
+  result.fileExclusions = @[selfPath]
   result.recurse        = chalkConfig.getRecursive()
 
   for item in argv:
     let maybe = resolvePath(item)
+
     if dirExists(maybe) or fileExists(maybe):
+      if maybe == selfPath:
+        result.fileExclusions = @[]
       result.filePaths.add(maybe)
     else:
       result.otherPaths.add(item)
@@ -238,11 +243,10 @@ proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
 proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
   new result
 
-  result.fileExclusions = @[resolvePath(getMyAppPath())]
+  let selfPath = resolvePath(getMyAppPath())
+
+  result.fileExclusions = @[selfPath]
   result.recurse        = chalkConfig.getRecursive()
-
-
-
 
   if len(argv) == 0:
     result.filePaths.add(getCurrentDir())
@@ -250,6 +254,9 @@ proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
     for item in argv:
       let maybe = resolvePath(item)
       if dirExists(maybe) or fileExists(maybe):
+        if maybe == selfPath:
+          error("Cannot use this command to modify this chalk executable. " &
+            "Please use 'chalk load' to modify.")
         result.filePaths.add(maybe)
       else:
         error(maybe & ": No such file or directory")
@@ -332,6 +339,8 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
             info(path & ": Chalk mark extracted")
 
+        if getCommandName() in ["insert", "docker"]:
+          obj.persistInternalValues()
         yield obj
 
         clearErrorObject()

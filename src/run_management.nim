@@ -165,3 +165,17 @@ var hostCollectionSuspends = 0
 template suspendHostCollection*() =         hostCollectionSuspends += 1
 template restoreHostCollection*() =         hostCollectionSuspends -= 1
 template hostCollectionSuspended*(): bool = hostCollectionSuspends != 0
+
+proc persistInternalValues*(chalk: ChalkObj) =
+  if chalk.extract == nil:
+    return
+  for item, value in chalk.extract:
+    if item.startsWith("$"):
+      chalk.collectedData[item] = value
+
+proc makeNewValuesAvailable*(chalk: ChalkObj) =
+  if chalk.extract == nil:
+    chalk.extract = ChalkDict()
+  for item, value in chalk.collectedData:
+    if item.startsWith("$"):
+      chalk.extract[item] = value

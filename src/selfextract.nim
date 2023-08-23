@@ -102,25 +102,10 @@ proc makeExecutable(f: File) =
 
       discard fchmod(fd, Mode(mode))
 
-proc persistInternalValues(chalk: ChalkObj) =
-  if chalk.extract == nil:
-    return
-  for item, value in chalk.extract:
-    if item.startsWith("$"):
-      chalk.collectedData[item] = value
-
-proc makeNewValuesAvailable(chalk: ChalkObj) =
-  if chalk.extract == nil:
-    chalk.extract = ChalkDict()
-  for item, value in chalk.collectedData:
-    if item.startsWith("$"):
-      chalk.extract[item] = value
-
 proc writeSelfConfig*(selfChalk: ChalkObj): bool
     {.cdecl, exportc, discardable.} =
   selfChalk.persistInternalValues()
   collectChalkTimeHostInfo()
-  selfChalk.collectChalkTimeArtifactInfo()
 
   let lastCount = if "$CHALK_LOAD_COUNT" notin selfChalk.collectedData:
                     -1
@@ -129,6 +114,7 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
 
   selfChalk.collectedData["$CHALK_LOAD_COUNT"]          = pack(lastCount + 1)
   selfChalk.collectedData["$CHALK_IMPLEMENTATION_NAME"] = pack(implName)
+  selfChalk.collectChalkTimeArtifactInfo()
 
   trace(selfChalk.name & ": installing configuration.")
 
