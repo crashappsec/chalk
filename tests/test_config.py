@@ -143,7 +143,8 @@ def test_external_configs(
     invalid_config = "validation/invalid_1.conf"
     config_location = "/etc/chalk"
     try:
-        # test load via flag
+        # test config passed in via flag via flag
+        # valid config should pass
         _flag_proc = chalk.run(
             chalk_cmd="env",
             params=["--log-level=none", f"--config-file={CONFIGFILES / valid_config}"],
@@ -151,7 +152,7 @@ def test_external_configs(
         _flag_report = _flag_proc.stdout.decode()
         assert validation_string in _flag_report
 
-        # invalid config should not load
+        # invalid config should not error
         _flag_proc = chalk.run(
             chalk_cmd="env",
             params=[
@@ -165,16 +166,14 @@ def test_external_configs(
         # instead of copying to tmp data dir, we have to copy to someplace chalk looks for it
         os.mkdir(config_location)
 
-        # valid
+        # valid should be loaded
         shutil.copy(CONFIGFILES / valid_config, config_location + "/chalk.conf")
-        # if config was properly loaded
         _path_proc = chalk.run(chalk_cmd="env", params=["--log-level=none"])
         _path_report = _path_proc.stdout.decode()
         assert validation_string in _path_report
 
-        # invalid
+        # invalid should not be loaded
         shutil.copy(CONFIGFILES / invalid_config, config_location + "/chalk.conf")
-        # if config was properly loaded
         _path_proc = chalk.run(chalk_cmd="env", params=["--log-level=none"])
         assert _path_proc.returncode != 0
     except Exception as e:
@@ -184,6 +183,51 @@ def test_external_configs(
         # we need to do cleanup here for /etc/chalk
         for file in os.listdir(config_location):
             os.remove(os.path.join(config_location, file))
+
+
+# TODO: fill this out
+@pytest.mark.parametrize(
+    "test_config_file", [CONFIGFILES / "validation/custom_report.conf"]
+)
+def test_custom_report(
+    tmp_data_dir: Path,
+    chalk: Chalk,
+    test_config_file: str,
+):
+    # using "ls" for test binary
+    shutil.copy("/bin/ls", tmp_data_dir)
+    ls_path = tmp_data_dir / "ls"
+    assert ls_path.exists(), "bin copy went wrong"
+
+    # config sets custom report file output here
+    report_path = "/tmp/custom_report.log"
+
+    # expecting a report for insert
+    _proc = chalk.run_with_custom_config(test_config_file, ls_path, "insert", False)
+    assert _proc.returncode == 0
+
+    # expecting a report for extract
+    _proc = chalk.run_with_custom_config(test_config_file, ls_path, "extract", False)
+    assert _proc.returncode == 0
+
+    # not expecting a report for env
+    _proc = chalk.run_with_custom_config(test_config_file, "", "env", False)
+    assert _proc.returncode == 0
+
+    log_lines = []
+    with open(report_path) as log:
+        log_lines = log.readlines()
+
+    # only expecting report for insert and extract
+    assert len(log_lines) == 2
+
+    insert_report = json.loads(log_lines[0])[0]
+    assert insert_report["_OPERATION"] == "insert"
+    assert len(insert_report) == 2
+
+    extract_report = json.loads(log_lines[1])[0]
+    assert extract_report["_OPERATION"] == "extract"
+    assert len(extract_report) == 2
 
 
 # outconf tests

@@ -144,16 +144,24 @@ class Chalk:
         config_path: Path,
         target_path: Path,
         command: str = "insert",
+        virtual: bool = True,
     ) -> Optional[CompletedProcess]:
+        target = None
+        if target_path != "":
+            target = target_path
+
+        params = [
+            "--no-use-embedded-config",
+            "--config-file=",
+            str(config_path.absolute()),
+        ]
+
+        if virtual:
+            params.append("--virtual")
         proc = self.run(
             chalk_cmd=command,
-            target=target_path,
-            params=[
-                "--no-use-embedded-config",
-                "--virtual",
-                "--config-file=",
-                str(config_path.absolute()),
-            ],
+            target=target,
+            params=params,
         )
         return proc
 
