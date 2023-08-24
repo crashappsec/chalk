@@ -2953,6 +2953,19 @@ When running Chalk inside a container, this information will be the virtualized 
 """
 }
 
+keyspec _CHALK_EXTERNAL_ACTION_AUDIT {
+    kind: RunTimeHost
+    type: list[(string, string)]
+    standard: true
+    since: "0.1.1"
+    doc:   """
+An audit trail of any actions taken by the config file that involved
+the world beyond the chalk process. For instance, any file
+modifications and web connections get audited, as do externally run
+commands.
+"""    
+}
+
 keyspec $CHALK_CONFIG {
     required_in_self_mark: true
     kind:                  ChalkTimeArtifact

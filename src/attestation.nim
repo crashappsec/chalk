@@ -246,7 +246,10 @@ proc saveSigningSetup(pubKey, priKey: string): bool =
     if "$CHALK_ATTESTATION_TOKEN" in selfChalk.extract:
       selfChalk.extract.del("$CHALK_ATTESTATION_TOKEN")
 
-  return selfChalk.writeSelfConfig()
+  let savedCommandName = getCommandName()
+  setCommandName("setup")
+  result = selfChalk.writeSelfConfig()
+  setCommandName(savedCommandName)
 
 proc copyGeneratedKeys(pubKey, priKey, baseLoc: string) =
   let

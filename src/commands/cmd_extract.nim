@@ -4,7 +4,7 @@
 ## :Copyright: 2023, Crash Override, Inc.
 
 import ../config, ../collect, ../reporting, ../plugins/codecDocker,
-       ../plugin_api
+       ../plugin_api, ../docker_base
 
 template processDockerChalkList(chalkList: seq[ChalkObj]) =
   for item in chalkList:
@@ -53,22 +53,26 @@ template coreExtractContainers() =
 
 
 proc runCmdExtract*(path: seq[string]) {.exportc,cdecl.} =
+  setDockerExeLocation()
   setContextDirectories(path)
   initCollection()
   coreExtractFiles(path)
   doReporting()
 
 proc runCmdExtractImages*() =
+  setDockerExeLocation()
   initCollection()
   coreExtractImages()
   doReporting()
 
 proc runCmdExtractContainers*() =
+  setDockerExeLocation()
   initCollection()
   coreExtractContainers()
   doReporting()
 
 proc runCmdExtractAll*(path: seq[string]) =
+  setDockerExeLocation()
   setContextDirectories(path)
   initCollection()
   coreExtractFiles(path)

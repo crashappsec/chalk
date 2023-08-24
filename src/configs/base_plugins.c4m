@@ -241,6 +241,7 @@ plugin system {
 
 plugin metsys {
     artifact_keys: ["METADATA_HASH", "SIGNATURE", "ERR_INFO", "METADATA_ID"]
+    post_run_keys: ["_CHALK_EXTERNAL_ACTION_AUDIT"]
     ~priority:     high()
 }
 

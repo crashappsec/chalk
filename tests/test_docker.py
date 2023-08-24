@@ -290,26 +290,31 @@ def test_docker_heartbeat(tmp_data_dir: Path, chalk: Chalk):
         )
         assert chalk_build.returncode == 0
 
-        # run with docker and we should get output
-        container_proc = subprocess.run(
-            args=[
-                "docker",
-                "run",
-                "-t",
-                "--name",
-                "test_container",
-                test_image,
-            ],
-            capture_output=True,
-        )
-        assert container_proc.returncode == 0
+        with open(tmp_data_dir / "log.tmp", "w") as file:
+            # run with docker and we should get output
+            subprocess.Popen(
+                args=[
+                    "docker",
+                    "run",
+                    "--name",
+                    test_container,
+                    "-t",
+                    test_image,
+                ],
+                stdin=None,
+                stdout=file,
+                stderr=file,
+                close_fds=True,
+            )
+        time.sleep(10)
 
-        _stdout = container_proc.stdout.decode()
-        # FIXME: stdoutput is multiple jsons split over multiple lines, figure out how to parse that into a list of json objects
-        # validate exec
-        assert '"_OPERATION": "exec"' in _stdout
-        # at least two heartbeats in output
-        assert _stdout.count('"_OPERATION": "heartbeat"') > 2
+        with open(tmp_data_dir / "log.tmp") as file:
+            _stdout = file.read()
+            # FIXME: stdoutput is multiple jsons split over multiple lines, figure out how to parse that into a list of json objects
+            # validate exec
+            assert '"_OPERATION": "exec"' in _stdout
+            # at least two heartbeats in output
+            assert _stdout.count('"_OPERATION": "heartbeat"') > 2
 
     except Exception:
         raise

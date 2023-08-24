@@ -463,7 +463,7 @@ more expensive to capture (like full ps when available).
   key._SIGNATURE.report                          = true
   key._INVALID_SIGNATURE.report                  = true
   key._VALIDATED_SIGNATURE.report                = true
-  key._VALIDATED_METADATA.report                 = true  
+  key._VALIDATED_METADATA.report                 = true
   key.$CHALK_CONFIG.report                       = true
   key.$CHALK_IMPLEMENTATION_NAME.report          = true
   key.$CHALK_LOAD_COUNT.report                   = true
@@ -731,7 +731,7 @@ things that are spammy.
   key._SIGNATURE.report                          = true
   key._INVALID_SIGNATURE.report                  = true
   key._VALIDATED_SIGNATURE.report                = true
-  key._VALIDATED_METADATA.report                 = true    
+  key._VALIDATED_METADATA.report                 = true
   key.$CHALK_CONFIG.report                       = true
   key.$CHALK_IMPLEMENTATION_NAME.report          = true
   key.$CHALK_LOAD_COUNT.report                   = true
@@ -801,6 +801,7 @@ profile host_report_large {
   key._OP_ARP_TABLE.report                       = true
   key._OP_CPU_INFO.report                        = true
   key._OP_ALL_PS_INFO.report                     = true
+  key._CHALK_EXTERNAL_ACTION_AUDIT.report        = true
 }
 
 profile host_report_default {
@@ -870,6 +871,7 @@ It reports all PS info, but only if definitely running in a container.
   key._OP_HOSTINFO.report                        = true
   key._OP_NODENAME.report                        = true
   key._OP_CLOUD_METADATA.report                  = true
+  key._CHALK_EXTERNAL_ACTION_AUDIT.report        = true  
   key._OP_ERRORS.report                          = true
 }
 
@@ -928,7 +930,9 @@ profile audit_report {
 Here, we only report key bits about the configuration used, for audit
 purposes. This is implemented as the "audit" report below; the
 implementation special-cases it a bit; the "publish_audit" variable
-can be used to control this (right now, just turn it on or off).
+can be used to control this (right now, just turn it on or off, though
+you can certainly change this report, and change the output sink(s)
+subscribed to the 'audit' topic).
 
 Note that in the default configuration, "publish_audit" is OFF.
 """
@@ -939,6 +943,7 @@ Note that in the default configuration, "publish_audit" is OFF.
   key._OP_CHALK_COUNT.report                     = true
   key._OP_CMD_FLAGS.report                       = true
   key._OP_CONFIG.report                          = true
+  key._CHALK_EXTERNAL_ACTION_AUDIT.report        = true
 }
 
 profile usage_report {

@@ -61,7 +61,8 @@ proc registerProfileKeys(profiles: openarray[string]): int {.discardable.} =
   subscribedKeys["_VALIDATED"] = true
 
   for item in profiles:
-    if item == "" or chalkConfig.profiles[item].enabled == false: continue
+    if item == "" or chalkConfig.profiles[item] == nil or
+       chalkConfig.profiles[item].enabled == false: continue
     result = result + 1
     for name, content in chalkConfig.profiles[item].keys:
       if content.report: subscribedKeys[name] = true

@@ -10,6 +10,15 @@ import nativesockets, nimSHA2, sequtils, times, ../config, ../plugin_api,
 when defined(posix): import posix_utils
 
 
+var
+  externalActions: seq[(string, string)] = @[]
+
+proc recordExternalActions(kind: string, details: string) =
+  externalActions.add((kind, details))
+
+setExternalActionCallback(recordExternalActions)
+
+
 proc validateMetadata(obj: ChalkObj): ValidateResult =
   let fields = obj.extract
 
@@ -302,6 +311,13 @@ proc metsysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
 
   result["SIGNATURE"] = pack(sig)
 
+proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
+                             ChalkDict {.cdecl.} =
+  result = ChalkDict()
+
+  if len(externalActions) > 0:
+    result.setIfNeeded("_CHALK_EXTERNAL_ACTION_AUDIT", externalActions)
+
 proc loadSystem*() =
   newPlugin("system",
             ctHostCallback = ChalkTimeHostCb(sysGetChalkTimeHostInfo),
@@ -310,4 +326,5 @@ proc loadSystem*() =
             rtHostCallback = RunTimeHostCb(sysGetRunTimeHostInfo))
 
   newPlugin("metsys",
-            ctArtCallback = ChalkTimeArtifactCb(metsysGetChalkTimeArtifactInfo))
+           ctArtCallback = ChalkTimeArtifactCb(metsysGetChalkTimeArtifactInfo),
+           rtHostCallback = RunTimeHostCb(metsysGetRunTimeHostInfo))

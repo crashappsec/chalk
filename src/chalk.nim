@@ -14,10 +14,13 @@ when isMainModule:
   setupManagedTemp()    # util.nim
   # Wait for this warning until after configs load.
   if not canSelfInject:
-    warn("We have no codec for this platform's native executable type")
+    warn("No working codec is available for the native executable type")
+
+  if passedHelpFlag:
+    showCommandHelp() # no return; in cmd_help.nim
+
   setupDefaultLogConfigs() # src/sinks.nim
   checkSetupStatus()       # attestation.nim
-  setDockerExeLocation()   # docker_base.nim
   case getCommandName()    # config.nim
   of "extract":            runCmdExtract(chalkConfig.getArtifactSearchPath())
   of "extract.containers": runCmdExtractContainers()
@@ -37,6 +40,14 @@ when isMainModule:
   of "setup.gen":          runCmdSetup(gen=true, load=false)
   of "setup.load":         runCmdSetup(gen=false, load=true)
   #% INTERNAL
+  of "rawattrs":
+    let runtime = getChalkRuntime()
+    echo parseJson(runtime.attrs.scopeToJson()).pretty()
+    quit(1)
+  of "rawspec":
+    let runtime = getValidationRuntime()
+    echo parseJson(runtime.attrs.scopeToJson()).pretty()
+    quit(1)
   of "helpdump":           runCmdHelpDump()
   #% END
   else:

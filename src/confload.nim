@@ -21,6 +21,8 @@ proc stashFlags(winner: ArgResult) =
   var flagStrs: seq[string] = @[]
 
   for key, value in winner.stringizeFlags():
+    if key == "help":
+      passedHelpFlag = true
     if value == "": flagStrs.add("--" & key)
     else:           flagStrs.add("--" & key & "=" & value)
 

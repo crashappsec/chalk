@@ -1,4 +1,4 @@
-## Spec for command line.
+# Spec for command line.
 ##
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
@@ -13,7 +13,7 @@ getopts {
   default_yes_prefixes: []
   default_no_prefixes: ["no"]
   show_doc_on_err: true
-  add_help_commands: false
+  add_help_commands: true
   doc: """
 {bold}Insert or extract metadata from software artifacts.{reset}
 
@@ -227,7 +227,9 @@ profile (which obviously must exist).
     arg_sub_mutex: false
 
     doc: """
-This command looks for existing chalk marks in artifacts, and reports on what it finds.  The reporting configuration is specified by the configuration file, but will default to simply reporting to stdout if nothing is configured.
+This command looks for existing chalk marks in artifacts as specified by any command line arguments passed. The arguments can be files, directories, container identifiers, or container image identifiers.
+
+Chalk will attempt to find all matching marks, and willreports on what it finds, based on your reporting configuration.
 """
 
     flag_yn recursive {
@@ -264,16 +266,29 @@ When a mark in an image can't be found, should we try to report on overwitten ma
 
     command images {
       aliases: ["image", "img", "i"]
+      doc: """
+This command will look at any docker images available locally, attempting to find chalk marks in them.
+
+Note that this does not look through running containers; use 'chalk extract containers' or 'chalk extract all'.
+"""      
     }
 
     command containers {
       aliases: ["container", "con", "c"]
+      doc: """
+This command will look at any docker containers available locally, attempting to find chalk marks in them.
+"""      
     }
 
     command all {
       aliases:  ["a"]
       args:     (0, high())
       callback: func set_artifact_search_path(list[string])
+      doc: """
+This command will attempt to extract chalk marks in all containers,
+container images for anything it can find on the local machine, AND will
+search the current working directory for chalk marks.
+"""      
     }
 }
 
@@ -440,7 +455,20 @@ This verbose flag controls whether or not you get the verbose warning.  It's muc
 Outputs basic version information for the chalk binary.
 """
   }
+  
 #% INTERNAL
+   command rawattrs {
+     doc: """
+     Raw dump of the attr state in Json, unlike helpdump.
+     """
+   }
+
+   command rawspec {
+     doc: """
+     Raw dump of the spec state.
+     """
+   }
+   
    command helpdump {
      doc: """
 Dumps documentation into a single JSON structure.  Currently, this only captures static structure, not configuration.
@@ -545,41 +573,63 @@ You're living it!
       aliases: ["bi", "funcs"]
       arg_sub_mutex: false
       args: (0, high())
+      doc: "Show detail about builtin functions you can use from your config."
     }
 
     command key {
       aliases:            ["keys", "k"]
       arg_sub_mutex: false # should be the default?
+      doc: """
+Shows information about all chalk keys."      
+"""      
       args: (0, high())
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
+        doc: """
+Shows con4m property documentation for key specifications.        
+"""        
       }
 
       command chalk {
         aliases: ["c"]
         args: (0, high())
+        doc: """
+Filters keys to those that are chalkable artifact keys.
+"""        
       }
 
       command host {
         aliases: ["h"]
         args: (0, high())
+        doc: """
+Filters keys to those that are chalkable host keys.        
+"""        
       }
 
       command art {
         aliases: ["a", "artifact"]
         args: (0, high())
+        doc: """
+Filters keys to those that are run-time artifact keys.        
+"""        
       }
 
       command report {
         aliases: ["r", "rep"]
         args: (0, high())
+        doc: """
+Filters keys to those that are run-time host keys.        
+"""        
       }
 
       command search {
         aliases: ["s"]
         args: (1, high())
+        doc: """
+Allows you to search for a specific pattern in key documentation, only returning keys that match the pattern.        
+        """
       }
   }
 
@@ -587,11 +637,16 @@ You're living it!
       aliases:            ["ks", "spec", "specs"]
       args: (0, high())
       arg_sub_mutex: false # should be the default?
-
+      doc: """
+Provides overview documentation of the chalk config file's `keyspec` section type, which can be used to add new keys.      
+"""      
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
+        doc: """
+Shows the field properties for the chalk config file's `keyspec` section type.
+"""        
       }
     }
 
@@ -599,10 +654,16 @@ You're living it!
       aliases:             ["profiles", "pro", "pr"]
       arg_sub_mutex: false # should be the default?
       args: (0, high())
+      doc: """
+Provides overview documentation of the chalk config file's `profile` section type, which can be used to create new reporting profiles.      
+"""            
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
+        doc: """
+Shows the field properties for the chalk config file's `profile` section type.
+"""        
       }
     }
 
@@ -610,10 +671,17 @@ You're living it!
       aliases: ["tools", "t"]
       args: (0, high())
       arg_sub_mutex: false # should be the default?
+      doc: """
+Provides overview documentation of the chalk config file's `tool` section type, which can be used to create new external tools.      
+"""            
+      
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
+        doc: """
+Shows the field properties for the chalk config file's `tool` section type.
+"""        
       }
     }
 
@@ -621,10 +689,16 @@ You're living it!
       aliases: ["plugins", "pi"]
       arg_sub_mutex: false # should be the default?
       args: (0, high())
+      doc: """
+Provides overview documentation of the chalk config file's `plugin` section type, which are used to configure data collection modules (called plugins)
+"""            
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
+        doc: """
+Shows the field properties for the chalk config file's `plugin` section type.
+"""                
       }
     }
 
@@ -632,10 +706,16 @@ You're living it!
       aliases: ["sinks"]
       arg_sub_mutex: false # should be the default?
       args: (0, high())
+      doc: """
+Provides overview documentation of the chalk config file's `sink` section type, which is used to configure available output types.
+"""            
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
+        doc: """
+Shows the field properties for the chalk config file's `sink` section type.
+"""        
       }
     }
 
@@ -643,10 +723,16 @@ You're living it!
       aliases: ["outconfs"]
       arg_sub_mutex: false
       args: (0, high())
+      doc: """
+Provides overview documentation of the chalk config file's `outconf` section type, which can be used to map profiles to reports.
+"""            
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
+        doc: """
+Shows the field properties for the chalk config file's `outconf` section type.
+"""        
       }
     }
 
@@ -654,10 +740,15 @@ You're living it!
       aliases: ["report", "reports"]
       arg_sub_mutex: false
       args: (0, high())
-
+      doc: """
+Provides overview documentation of the chalk config file's `custom_report` section type, which can be used to create new reports beyond the default command reporting..      
+"""            
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
+        doc: """
+Shows the field properties for the chalk config file's `custom_report` section type.
+"""        
       }
     }
 
@@ -665,11 +756,17 @@ You're living it!
       aliases: ["sboms"]
       arg_sub_mutex: false
       args: (0, high())
+      doc: """
+Shows information about any SBOM tools configured, if any.      
+"""      
     }
 
     command sast {
       args: (0, high())
       arg_sub_mutex: false
+      doc: """
+Shows information about any SAST tools configured, if any.      
+"""      
     }
   }
 

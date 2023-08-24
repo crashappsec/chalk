@@ -71,10 +71,11 @@ template runDockerGetEverything*(args: seq[string], stdin = ""): ExecOutput =
 var contextCounter = 0
 
 proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
-                                loc:      string,
+                                inLoc:    string,
                                 move:     bool,
                                 chmod:    bool = false,
                                 newName = "") =
+  var loc         = inLoc
   let (dir, file) = loc.splitPath()
 
   if haveBuildContextFlag():
@@ -94,7 +95,7 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
     warn("Cannot chalk when context is passed to stdin w/o BUILDKIT support")
     raise newException(ValueError, "stdinctx")
   else:
-    let
+    var
       contextDir  = resolvePath(ctx.foundContext)
       dstLoc      = contextDir.joinPath(file)
 
@@ -102,14 +103,10 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
       warn("Cannot find context directory (" & contextDir &
         "), so cannot wrap entry point.")
       raise newException(ValueError, "ctxwrite")
-    if fileExists(dstLoc):
-      # This shouldn't happen w/ the chalk mark, as the file name is randomized
-      # but it could happen w/ the chalk exe
-      warn("File name: '" & file & "already exists in the context. Assuming " &
-        "this is the file to copy in.")
-      return
-    else:
-      try:
+
+    while fileExists(dstLoc):
+      dstLoc &= ".tmp"
+    try:
         if move:
           moveFile(loc, dstLoc)
           trace("Moved " & loc & " to " & dstLoc)
@@ -121,7 +118,7 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
         if chmod:
           ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
         registerTempFile(dstLoc)
-      except:
+    except:
         dumpExOnDebug()
         warn("Could not write to context directory.")
         raise newException(ValueError, "ctxcpy")

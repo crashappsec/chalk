@@ -76,6 +76,13 @@ See: 'chalk help keys <KEYNAME>' for details on specific keys.  OR:
 The first letter for each sub-command also works. 'key' and 'keys' both work.
 """
 
+proc showCommandHelp*(cmd = getCommandName()) {.noreturn.} =
+  let spec = getArgCmdSpec()
+
+  publish("help", getCmdHelp(getArgCmdSpec(), getArgs()))
+
+  quit(0)
+
 proc runChalkHelp*(cmdName: string) {.noreturn.} =
   var
     output: string = ""
@@ -86,7 +93,14 @@ proc runChalkHelp*(cmdName: string) {.noreturn.} =
   of "help":
     output = getAutoHelp()
     if output == "":
-      output = getCmdHelp(getArgCmdSpec(), args)
+      var mySpec = getArgCmdSpec()
+
+      # We dont actually want the help docs for "chalk help", we
+      # want the help for "chalk"
+      if mySpec.parent.isSome():
+        mySpec = mySpec.parent.get()
+
+      output = getCmdHelp(myspec , args)
   of "help.key":
       output = getKeyHelp(filter = nil, noSearch = true)
   of "help.key.chalk":
@@ -124,7 +138,9 @@ proc runChalkHelp*(cmdName: string) {.noreturn.} =
     let name       = cmdName.split(".")[^1]
     let toolFilter = if name == "sbom": filterBySbom else: filterBySast
 
-    if len(args) == 0:
+    if chalkConfig.tools == nil or len(chalkConfig.tools) == 0:
+      output = "No tools configured."
+    elif len(args) == 0:
       let
         sec  = getChalkRuntime().attrs.contents["tool"].get(AttrScope)
         hdrs = @["Tool", "Kind", "Enabled", "Priority"]
@@ -205,7 +221,9 @@ proc runChalkHelp*(cmdName: string) {.noreturn.} =
     if len(args) == 0:
       output &= "\nTip: you can add search terms to filter the above list."
   else:
-    output = "Unknown command: " & cmdName
+    if not cmdName.endsWith(".help"):
+      output = "Unknown command: " & cmdName
+    # Otherwise; we got auto-helped.
 
   if len(output) == 0 or output[^1] != '\n': output &= "\n"
 

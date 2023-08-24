@@ -158,7 +158,13 @@ template loadConfigFile*(filename: string) =
     try:
       newCon4m = f.readAll()
       f.close()
-      selfChalk.collectedData["$CHALK_CONFIG"] = pack(newCon4m)
+      if selfChalk.extract != nil:
+        # Overwrite what we extracted, as it'll get "preserved" when
+        # writing out the chalk file.
+        selfChalk.extract["$CHALK_CONFIG"] = pack(newCon4m)
+      else:
+        selfChalk.collectedData["$CHALK_CONFIG"] = pack(newCon4m)
+
     except:
       dumpExOnDebug()
       cantLoad(filename & ": could not read configuration file")

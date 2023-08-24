@@ -13,7 +13,7 @@ valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
 		         #% REWRITE ,$ ]
                          "profile", "setup",
 			 #% INTERNAL
-			 "helpdump"]
+			 "helpdump", "rawattrs", "rawspec"]
 			 #% END
 all_cmds_that_insert := ["insert", "build", "load", "setup"]
 

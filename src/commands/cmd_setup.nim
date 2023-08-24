@@ -3,10 +3,13 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
 
-import ../config, ../attestation, ../reporting, ../selfextract, ../util
+import ../config, ../attestation, ../reporting, ../selfextract, ../util,
+       ../collect
 
 proc runCmdSetup*(gen, load: bool) =
   setCommandName("setup")
+  initCollection()
+
   let selfChalk = getSelfExtraction().getOrElse(nil)
 
   if selfChalk == nil:
