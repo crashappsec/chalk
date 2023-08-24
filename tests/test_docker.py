@@ -260,6 +260,7 @@ def test_nonvirtual_invalid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
 
 
 # exec heartbeat from inside docker
+@pytest.mark.slow()
 def test_docker_heartbeat(tmp_data_dir: Path, chalk: Chalk):
     test_image = "test_image"
     test_container = "test_container"
