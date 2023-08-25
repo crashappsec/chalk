@@ -7,7 +7,7 @@ srcDir        = "src"
 bin           = @["chalk"]
 
 # Dependencies
-requires "nim >= 1.6.12"
+requires "nim >= 1.6.12 & < 2.0"
 requires "https://github.com/crashappsec/con4m == 0.8.8"
 requires "https://github.com/crashappsec/nimutils == 0.4.7"
 requires "nimSHA2 == 0.1.1"
@@ -68,6 +68,7 @@ proc depCheck() =
                   "c4autoconf.nim.' ; con4m gen src/configs/chalk.c42spec " &
                   "--language=nim --output-file=src/c4autoconf.nim; else " &
                   "echo No change to chalk.c42spec; fi")
+
 before build:
   con4mDevMode()
   depCheck()

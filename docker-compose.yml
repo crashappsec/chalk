@@ -1,100 +1,164 @@
 networks:
   chalk:
-    name: chalk-internal-network
 
 services:
+  # --------------------------------------------------------------------------
+  # CHALK
+
   chalk:
     build:
       context: .
+      target: compile
+      x-bake:
+        cache_from:
+          - type=registry,ref=ghcr.io/crashappsec/chalk_compile:cache
+        cache_to:
+          - type=registry,ref=ghcr.io/crashappsec/chalk_compile:cache
+    command: nimble ${CHALK_BUILD:-release}
+    working_dir: /chalk
+    volumes:
+      - .:/chalk
+
+  chalk-release:
+    build:
+      context: .
       args:
-        CHALK_BUILD: ${CHALK_BUILD:-debug}
+        CHALK_BUILD: ${CHALK_BUILD:-release}
       target: ${BASE:-ubuntu}
-    working_dir: $PWD
+    working_dir: /chalk
     volumes:
-      - $PWD:$PWD
+      - .:/chalk
 
-  chalk-compile-release:
+  # --------------------------------------------------------------------------
+  # CHALK CONFIG
+
+  config:
     build:
-      context: .
-      target: compile
-    command: nimble build -d:release
-    working_dir: $PWD
+      context: ./config-tool
+      target: deps
+      x-bake:
+        cache_from:
+          - type=registry,ref=ghcr.io/crashappsec/chalk_config_compile:cache
+        cache_to:
+          - type=registry,ref=ghcr.io/crashappsec/chalk_config_compile:cache
+    command: python -m chalk_config
+    working_dir: /chalk/config-tool
     volumes:
-      - $PWD:$PWD
+      - .:/chalk
+      - ./.config-tool-bin:/config-bin
+      - ./config-tool-outdir:/outdir
+      - $HOME/.config:/root/.config
+    environment:
+      TERM: ${TERM:-}
+      COLORTERM: ${COLORTERM:-}
+      CHALK_BINARIES_ARE_LOCAL: 1
 
-  chalk-compile:
+  config-release:
     build:
-      context: .
-      target: compile
-    command: nimble debug
-    working_dir: $PWD
-    volumes:
-      - $PWD:$PWD
-
-  chalk-config-release:
-    build:
-      context: config-tool
+      context: ./config-tool
       additional_contexts:
         git: ./.git
       target: release
+    working_dir: /chalk/config-tool
     volumes:
       - ./.config-tool-bin:/config-bin
-      - ./config-tool-outdir:/outdir/
+      - ./config-tool-outdir:/outdir
       - $HOME/.config:/root/.config
     environment:
       TERM: ${TERM:-}
       COLORTERM: ${COLORTERM:-}
       CHALK_BINARIES_ARE_LOCAL: 1
 
-  chalk-config:
-    build:
-      context: config-tool
-    command: python -m chalk_config
-    volumes:
-      - ./config-tool:/config-tool
-      - ./.config-tool-bin:/config-bin
-      - ./config-tool-outdir:/outdir/
-      - $HOME/.config:/root/.config
-    environment:
-      TERM: ${TERM:-}
-      COLORTERM: ${COLORTERM:-}
-      CHALK_BINARIES_ARE_LOCAL: 1
+  # --------------------------------------------------------------------------
+  # SERVER
 
-  sqlitebrowser:
-    image: lscr.io/linuxserver/sqlitebrowser:latest
-    container_name: sqlitebrowser
-    security_opt:
-      - seccomp:unconfined #optional
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Etc/UTC
-    volumes:
-      - ./server/app/db/data:/config
-    ports:
-      - 3000:3000
-      - 3001:3001
-    restart: unless-stopped
-
-  server:
-    image: chalk_local_api_server
-    container_name: chalk_local_api_server
+  server: &server
     build:
-      context: server
+      context: ./server
+      x-bake:
+        cache_from:
+          - type=registry,ref=ghcr.io/crashappsec/chalk_local_api_server:cache
+        cache_to:
+          - type=registry,ref=ghcr.io/crashappsec/chalk_local_api_server:cache
+      target: deps
     networks:
       chalk:
         aliases:
-          - chalk.crashoverride.local
+          - chalk.local
     ports:
       - 8585:8585
-      - 8584:8584
+    working_dir: /chalk/server
     volumes:
-      - $PWD:$PWD
-    working_dir: $PWD/server/app
+      - .:/chalk
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - sh -c "curl -f http://localhost:8585/health"
+      start_period: 30s
+      interval: 1s
+
+  server-tls:
+    <<: *server
+    command: run -r -p 5858 --domain=tls.chalk.local --keyfile=cert.key --certfile=cert.pem --use-existing-cert
+    ports:
+      - 5858:5858
+    networks:
+      chalk:
+        aliases:
+          - tls.chalk.local
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - sh -c "curl -f https://localhost:5858/health --insecure"
+      start_period: 30s
+      interval: 1s
+
+  server-release:
+    build:
+      context: ./server
+      additional_contexts:
+        git: ./.git
+      target: static
+    networks:
+      chalk:
+        aliases:
+          - release.chalk.local
+    ports:
+      - 8586:8585
+    working_dir: /chalk/server
+    volumes:
+      - .:/chalk
+
+  # --------------------------------------------------------------------------
+  # TESTS
+
+  tests:
+    image: chalk_local_tests
+    container_name: chalk_local_tests
+    build:
+      context: ./tests
+    volumes:
+      - .:/chalk
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.aws:/root/.aws
+    working_dir: /chalk/tests
+    networks:
+      - chalk
+    depends_on:
+      registry:
+        condition: service_healthy
+      server:
+        condition: service_healthy
+      server-tls:
+        condition: service_healthy
     environment:
-      CHALK_CERT_PARAMS: ${CHALK_CERT_PARAMS:-}
-      CHALK_API_PARAMS: ${CHALK_API_PARAMS:- --access-logfile=- --workers=4 --error-logfile=- --timeout=30}
-      CHALK_API_PORT: ${CHALK_API_PORT:-8585}
+      AWS_PROFILE: ${AWS_PROFILE:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}
+
+  # --------------------------------------------------------------------------
+  # MISC DEPS
 
   registry:
     image: registry:2
@@ -105,27 +169,24 @@ services:
       - REGISTRY_HTTP_ADDR=0.0.0.0:5044
     networks:
       - chalk
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - sh -c "echo 'GET / HTTP/1.1' | nc -v localhost 5044"
+      start_period: 30s
+      interval: 1s
 
-  tests:
-    image: chalk_local_tests
-    container_name: chalk_local_tests
-    build:
-      context: tests
+  sqlite:
+    image: coleifer/sqlite-web
     volumes:
-      - $PWD:$PWD
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${HOME}/.aws:/root/.aws
-    working_dir: $PWD/tests
-    networks:
-      - chalk
-    depends_on:
-      - registry
+      - ./server:/server
     environment:
-      AWS_PROFILE: ${AWS_PROFILE:-}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      TEST_CERT_FILE: ${TEST_CERT_FILE:-}
-      CHALK_CERT_PARAMS: ${CHALK_CERT_PARAMS:-}
-      CHALK_API_PARAMS: ${CHALK_API_PARAMS:-}
-      CHALK_API_PORT: ${CHALK_API_PORT:-}
-      GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}
+      SQLITE_DATABASE: /server/chalkdb.sqlite
+    ports:
+      - 18080:8080
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - sh -c "echo 'GET / HTTP/1.1' | nc -v localhost 8080"
+      start_period: 30s
+      interval: 1s

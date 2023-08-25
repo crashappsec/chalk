@@ -25,5 +25,7 @@ server/app/server
 server/app/server-static
 *.tar.gz
 *.db
+*.sqlite
 *.key
+*.pem
 *.pub

@@ -1,32 +1,73 @@
-FROM python:3.11.3-alpine3.17
+FROM python:3.11.3-slim as base
+
+# -------------------------------------------------------------------
+
+FROM base as deps
 
 ARG POETRY_VERSION=1.5.1
+ENV PATH=/root/.local/bin:$PATH
 
-# install poetry
-RUN apk add --no-cache \
+RUN apt-get update && \
+    apt-get install -y \
+        git \
         curl \
-        gcc \
-        libressl-dev \
-        musl-dev \
-        make \
-        cmake \
-        libffi-dev && \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile=minimal && \
-    source $HOME/.cargo/env && \
-    pip install --no-cache-dir poetry==${POETRY_VERSION}
+        && \
+    apt-get clean -y
 
-ENV VIRTUAL_ENV=/tests.env
-ENV PATH=/tests.env/bin:$PATH
-RUN python -m venv /tests.env
+RUN pip install pipx && \
+    pipx install poetry==$POETRY_VERSION && \
+    poetry self add "poetry-dynamic-versioning[plugin]"
 
-RUN mkdir -p /.cache/pypoetry \
-    && chmod 0777 /.cache/pypoetry
+ENV VIRTUAL_ENV=/server.env
+ENV PATH=$VIRTUAL_ENV/bin:$PATH
+RUN python -m venv $VIRTUAL_ENV
 
-COPY pyproject.toml poetry.lock $WORKDIR/
-RUN poetry install --no-plugins
+WORKDIR /server
 
-ENV CHALK_API_PARAMS="--workers=4 --error-logfile=- --access-logfile=- --timeout 30"
-ENV CHALK_API_PORT="8585"
-ENV CHALK_CERT_PARAMS=""
+COPY pyproject.toml poetry.lock /server/
+RUN poetry install --no-plugins --no-root
 
-CMD /tests.env/bin/gunicorn -k uvicorn.workers.UvicornH11Worker main:app --reload -b :${CHALK_API_PORT} ${CHALK_API_PARAMS} ${CHALK_CERT_PARAMS}
+ENTRYPOINT ["python", "-m", "server"]
+CMD ["run", "--reload"]
+
+# -------------------------------------------------------------------
+
+FROM deps as build
+
+# install staticx system deps
+RUN apt-get update && \
+    apt-get install -y \
+    gcc \
+    patchelf \
+    scons
+
+RUN pipx install staticx && \
+    pipx install pyinstaller
+
+# git to extract correct current version
+COPY --from=git . .git/
+COPY . /server/
+
+# install via pip to get correct version/entrypoint
+RUN pip install .
+# create binary out of it
+RUN pyinstaller \
+    --onefile $VIRTUAL_ENV/bin/chalkserver \
+    --path=/server.env/lib/python3.11/site-packages/ \
+    --add-binary=$(ldconfig -p | grep libm.so.6 | cut -d">" -f2 | awk '{print $1}'):. \
+    --add-binary=$(ldconfig -p | grep librt.so.1 | cut -d">" -f2 | awk '{print $1}'):. \
+    --add-binary=$(ldconfig -p | grep libutil.so.1 | cut -d">" -f2 | awk '{print $1}'):.
+# make that binary static
+RUN staticx dist/chalkserver /chalkserver && \
+    chmod 0755 /chalkserver
+
+# -------------------------------------------------------------------
+
+FROM alpine as static
+
+COPY --from=build /chalkserver /bin/chalkserver
+
+RUN /bin/chalkserver --version
+
+ENTRYPOINT ["/bin/chalkserver"]
+CMD ["run"]

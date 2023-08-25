@@ -1,0 +1,73 @@
+name: release:server
+
+on:
+  push:
+    tags:
+      - "*"
+  workflow_dispatch:
+    inputs:
+
+permissions:
+  contents: read
+  id-token: write # for aws role
+  packages: write
+
+env:
+  SERVER: ./server/dist/chalkserver
+
+jobs:
+  binary:
+    runs-on: ${{ matrix.builder }}
+
+    strategy:
+      matrix:
+        include:
+          - builder: ubuntu-latest
+            platform: amd64
+            os: linux
+          - builder: buildjet-2vcpu-ubuntu-2204-arm
+            platform: arm64
+            os: linux
+
+    steps:
+      - name: Checkout Code
+        uses: crashappsec/action-checkout@main
+        with:
+          fetch-depth: 0
+
+      - name: Setup Release Deps
+        uses: ./.github/actions/release
+        with:
+          secrets: ${{ toJSON(secrets) }}
+          platform: ${{ matrix.platform }}
+
+      - name: Build Server Binary
+        run: |
+          make server/release
+
+      - name: Sanity check
+        working-directory: ./server/dist
+        run: |
+          ./chalkserver --version
+
+      - name: Update Current Version
+        if: matrix.platform == 'amd64'
+        run: |
+          make version > current-version.txt
+          aws s3 cp current-version.txt s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/current-version.txt --acl=public-read
+
+      - name: Push amd64 Binaries
+        if: matrix.platform == 'amd64'
+        working-directory: ./server
+        run: |
+          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-${{ matrix.os }}-amd64  --acl=public-read
+          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-${{ matrix.os }}-x86_64 --acl=public-read
+          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-$(uname -s)-$(uname -m) --acl=public-read
+
+      - name: Push arm64 Binaries
+        if: matrix.platform == 'arm64'
+        working-directory: ./server
+        run: |
+          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-${{ matrix.os }}-arm64   --acl=public-read
+          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-${{ matrix.os }}-aarch64 --acl=public-read
+          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-$(uname -s)-$(uname -m)  --acl=public-read

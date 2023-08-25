@@ -153,7 +153,6 @@ logging.config.dictConfig(
 
 structlog.configure(
     processors=[
-        structlog.contextvars.merge_contextvars,
         structlog.stdlib.filter_by_level,
         *SHARED_PROCESSORS,
         *STRUCTLOG_PROCESSORS,

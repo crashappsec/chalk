@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from .log import get_logger
 
+
 logger = get_logger()
 
 
@@ -31,49 +32,6 @@ def stop_container(id: str) -> None:
         )
     except CalledProcessError as e:
         logger.error("docker image removal failed: %s", str(e))
-
-
-def compose_run_local_server(*, https: bool = False) -> str:
-    """Spins up the server and returns the container id"""
-    root_dir = Path(__file__).parent.parent.parent
-    try:
-        cmd = [
-            "docker",
-            "run",
-            "--rm",
-            "-d",
-            "--publish",
-            "8585:8585",
-            "-v",
-            f"{root_dir}:{root_dir}",
-            "--network",
-            "chalk-internal-network",
-            "--network-alias",
-            "chalk.crashoverride.local",
-            "--workdir",
-            f"{root_dir}/server/app",
-            "chalk_local_api_server",
-        ]
-        if https:
-            cmd.extend(
-                [
-                    "sh",
-                    "-c",
-                    "python main.py --keyfile keys/self-signed.key --certfile keys/self-signed.cert",
-                ]
-            )
-        out = run(
-            cmd,
-            capture_output=True,
-            cwd=root_dir,
-        )
-        return out.stdout.decode().strip()
-    except CalledProcessError as e:
-        logger.warning(
-            "docker execution of server failed. Is the container built? %s", str(e)
-        )
-        logger.error(e)
-        raise
 
 
 # run docker build with parameters

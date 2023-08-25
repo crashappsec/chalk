@@ -17,10 +17,8 @@ COPY chalk_internal.nimble /chalk/
 
 # con4m - for verifying config files
 #         and nimble sync fails to sync it as it has bin configured
-# bump  - for cutting releases
 RUN nimble install -y \
-    https://github.com/crashappsec/con4m \
-    https://github.com/disruptek/bump
+    https://github.com/crashappsec/con4m
 
 # generate lock file in order to use nimble sync
 # as repo does not use lock files as they cause trouble outside of docker

@@ -43,8 +43,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -58,25 +56,10 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
-      - name: Compile chalk
+      - name: Bake Images
         run: |
-          docker buildx bake --file docker-compose.yml --file docker-compose-cache.json chalk-compile
-          docker compose run --rm chalk-compile
-
-      # - name: Update hosts
-      #   run: |
-      #     sudo echo "127.0.0.1 chalk.crashoverride.local" | sudo tee -a /etc/hosts
-      #     ping -c 1 chalk.crashoverride.local || exit 1
-      #     sudo resolvectl flush-caches
-
-      # - name: Build server
-      #   run: |
-      #     mkdir -p server/app/keys
-      #     echo $TEST_API_SERVER_CERT > server/app/keys/self-signed.cert
-      #     echo $TEST_API_SERVER_CERT_KEY > server/app/keys/self-signed.key
-      #     docker buildx bake --file docker-compose.yml --file docker-compose-cache.json server
+          docker buildx bake chalk server tests --load
 
       - name: Run tests
         run: |
-          docker buildx bake --file docker-compose.yml --file docker-compose-cache.json tests
-          docker compose run --rm tests
+          make tests

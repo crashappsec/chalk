@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from .chalk.runner import Chalk, chalk_copy
+from .chalk.runner import Chalk
 from .utils.log import get_logger
 from .utils.validate import MAGIC
 
@@ -24,13 +24,12 @@ BASE_OUTCONF = Path(__file__).parent.parent / "src" / "configs" / "base_outconf.
 
 # test dump + reload with error log + extract to check error
 @pytest.mark.parametrize("use_embedded", [True, False])
-def test_dump_load(tmp_data_dir: Path, chalk: Chalk, use_embedded: bool):
+def test_dump_load(tmp_data_dir: Path, chalk_copy: Chalk, use_embedded: bool):
     # output for updated config
     tmp_conf = tmp_data_dir / "testconf.conf"
-    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
 
     # dump config to file
-    dump_proc = chalk.run(chalk_cmd="dump", params=[str(tmp_conf)])
+    dump_proc = chalk_copy.run(chalk_cmd="dump", params=[str(tmp_conf)])
     assert dump_proc.returncode == 0
 
     # edit file (add an error output)
@@ -42,14 +41,14 @@ def test_dump_load(tmp_data_dir: Path, chalk: Chalk, use_embedded: bool):
         file.write(file_text)
 
     # load updated config (will overwrite chalk binary)
-    load_output = chalk.load(str(tmp_conf), use_embedded)
+    load_output = chalk_copy.load(str(tmp_conf), use_embedded)
     assert load_output.returncode == 0
     dir_obj = os.listdir(tmp_data_dir)
     assert "chalk" in dir_obj
 
     # run new chalk and check for error in log output
-    chalk = Chalk(binary=(tmp_data_dir / "chalk").resolve())
-    extract_output = chalk.run(chalk_cmd="extract", params=["."])
+    chalk_copy = Chalk(binary=(tmp_data_dir / "chalk").resolve())
+    extract_output = chalk_copy.run(chalk_cmd="extract", params=["."])
     assert extract_output.returncode == 0
     error_output = extract_output.stderr.decode()
     assert validation_string in error_output
@@ -59,12 +58,11 @@ def test_dump_load(tmp_data_dir: Path, chalk: Chalk, use_embedded: bool):
 # if it has then the thing to do is usually update "default.conf" with the new default config
 # this test is mainly to catch any default changes that might impact other tests, or if the default config loaded to the binary is wrong
 @pytest.mark.parametrize("test_config_file", ["validation/default.conf"])
-def test_default_config(tmp_data_dir: Path, chalk: Chalk, test_config_file: str):
+def test_default_config(tmp_data_dir: Path, chalk_copy: Chalk, test_config_file: str):
     tmp_conf = tmp_data_dir / "testconf.conf"
-    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
 
     # dump config to file
-    dump_proc = chalk.run(chalk_cmd="dump", params=[str(tmp_conf)])
+    dump_proc = chalk_copy.run(chalk_cmd="dump", params=[str(tmp_conf)])
     assert dump_proc.returncode == 0
     assert tmp_conf.exists(), "testconf.conf not created"
     assert tmp_conf.is_file(), "testconf.conf must be a file and is not"
@@ -90,11 +88,10 @@ def test_default_config(tmp_data_dir: Path, chalk: Chalk, test_config_file: str)
 )
 @pytest.mark.parametrize("use_embedded", [True, False])
 def test_invalid_load(
-    tmp_data_dir: Path, chalk: Chalk, test_config_file: str, use_embedded: bool
+    tmp_data_dir: Path, chalk_copy: Chalk, test_config_file: str, use_embedded: bool
 ):
-    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
     # call chalk load on invalid config
-    load_proc = chalk.load(CONFIGFILES / test_config_file, use_embedded)
+    load_proc = chalk_copy.load(CONFIGFILES / test_config_file, use_embedded)
 
     #  we expect the load to fail with associated errors
     assert load_proc.returncode != 0, "load invalid config should have failed"
@@ -102,7 +99,7 @@ def test_invalid_load(
 
     # chalk should still have default config embedded
     # and further calls should not fail and not have any errors
-    extract_output = chalk.extract(chalk.binary)
+    extract_output = chalk_copy.extract(chalk_copy.binary)
     for report in extract_output:
         assert "_OPERATION" in report
         assert report["_OPERATION"] == "extract"
@@ -113,19 +110,17 @@ def test_invalid_load(
 @pytest.mark.parametrize("test_config_file", ["validation/valid_1.conf"])
 @pytest.mark.parametrize("use_embedded", [True, False])
 def test_valid_load(
-    tmp_data_dir: Path, chalk: Chalk, test_config_file: str, use_embedded: bool
+    tmp_data_dir: Path, chalk_copy: Chalk, test_config_file: str, use_embedded: bool
 ):
-    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
-
     # call chalk load on valid config
-    load_proc = chalk.load(CONFIGFILES / test_config_file, use_embedded)
+    load_proc = chalk_copy.load(CONFIGFILES / test_config_file, use_embedded)
 
     #  we expect the load to succeed
     assert load_proc.returncode == 0, "load valid config should have succeeded"
     assert not any(x in load_proc.stderr.decode() for x in parse_error)
 
     # extract should succeed, but the error we put in should show up
-    extract_output = chalk.extract(chalk.binary)
+    extract_output = chalk_copy.extract(chalk_copy.binary)
     for report in extract_output:
         assert "_OPERATION" in report
         assert report["_OPERATION"] == "extract"
@@ -137,7 +132,7 @@ def test_valid_load(
 # tests for configs that are found in the chalk search path
 # these configs are NOT loaded directly into the binary
 def test_external_configs(
-    chalk: Chalk,
+    chalk_copy: Chalk,
 ):
     valid_config = "validation/valid_1.conf"
     invalid_config = "validation/invalid_1.conf"
@@ -145,7 +140,7 @@ def test_external_configs(
     try:
         # test config passed in via flag via flag
         # valid config should pass
-        _flag_proc = chalk.run(
+        _flag_proc = chalk_copy.run(
             chalk_cmd="env",
             params=["--log-level=none", f"--config-file={CONFIGFILES / valid_config}"],
         )
@@ -153,7 +148,7 @@ def test_external_configs(
         assert validation_string in _flag_report
 
         # invalid config should not error
-        _flag_proc = chalk.run(
+        _flag_proc = chalk_copy.run(
             chalk_cmd="env",
             params=[
                 "--log-level=none",
@@ -168,13 +163,13 @@ def test_external_configs(
 
         # valid should be loaded
         shutil.copy(CONFIGFILES / valid_config, config_location + "/chalk.conf")
-        _path_proc = chalk.run(chalk_cmd="env", params=["--log-level=none"])
+        _path_proc = chalk_copy.run(chalk_cmd="env", params=["--log-level=none"])
         _path_report = _path_proc.stdout.decode()
         assert validation_string in _path_report
 
         # invalid should not be loaded
         shutil.copy(CONFIGFILES / invalid_config, config_location + "/chalk.conf")
-        _path_proc = chalk.run(chalk_cmd="env", params=["--log-level=none"])
+        _path_proc = chalk_copy.run(chalk_cmd="env", params=["--log-level=none"])
         assert _path_proc.returncode != 0
     except Exception as e:
         logger.info(e)
@@ -191,7 +186,7 @@ def test_external_configs(
 )
 def test_custom_report(
     tmp_data_dir: Path,
-    chalk: Chalk,
+    chalk_copy: Chalk,
     test_config_file: str,
 ):
     # using "ls" for test binary
@@ -203,15 +198,19 @@ def test_custom_report(
     report_path = "/tmp/custom_report.log"
 
     # expecting a report for insert
-    _proc = chalk.run_with_custom_config(test_config_file, ls_path, "insert", False)
+    _proc = chalk_copy.run_with_custom_config(
+        test_config_file, ls_path, "insert", False
+    )
     assert _proc.returncode == 0
 
     # expecting a report for extract
-    _proc = chalk.run_with_custom_config(test_config_file, ls_path, "extract", False)
+    _proc = chalk_copy.run_with_custom_config(
+        test_config_file, ls_path, "extract", False
+    )
     assert _proc.returncode == 0
 
     # not expecting a report for env
-    _proc = chalk.run_with_custom_config(test_config_file, "", "env", False)
+    _proc = chalk_copy.run_with_custom_config(test_config_file, "", "env", False)
     assert _proc.returncode == 0
 
     log_lines = []
@@ -435,13 +434,10 @@ def _validate_profile_keys(report: Dict[str, Any], expected_keys: List[str]):
     ],
 )
 def test_profiles(
-    tmp_data_dir: Path, chalk: Chalk, test_config_file: str, use_embedded: bool
+    tmp_data_dir: Path, chalk_copy: Chalk, test_config_file: str, use_embedded: bool
 ):
-    # chalk setup
-    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
-
     # call chalk load on test config
-    load_proc = chalk.load(CONFIGFILES / test_config_file, use_embedded)
+    load_proc = chalk_copy.load(CONFIGFILES / test_config_file, use_embedded)
     #  we expect the load to succeed
     assert load_proc.returncode == 0, "load valid config should have succeeded"
     assert not any(x in load_proc.stderr.decode() for x in parse_error)
@@ -454,7 +450,7 @@ def test_profiles(
     profile_definitions, outconf_definitions = _get_profiles(test_config_file)
 
     # insert report should have keys listed
-    insert_report = chalk.insert(ls_path)[0]
+    insert_report = chalk_copy.insert(ls_path)[0]
     _validate_chalk_report_keys(
         insert_report, "insert", profile_definitions, outconf_definitions
     )
@@ -491,19 +487,19 @@ def test_profiles(
     )
 
     # extract
-    extract_report = chalk.extract(ls_path)[0]
+    extract_report = chalk_copy.extract(ls_path)[0]
     _validate_chalk_report_keys(
         extract_report, "extract", profile_definitions, outconf_definitions
     )
 
     # exec
-    exec_report = chalk.exec(ls_path)[0]
+    exec_report = chalk_copy.exec(ls_path)[0]
     _validate_chalk_report_keys(
         exec_report, "exec", profile_definitions, outconf_definitions
     )
 
     # delete
-    delete_report = chalk.delete(ls_path)[0]
+    delete_report = chalk_copy.delete(ls_path)[0]
     _validate_chalk_report_keys(
         delete_report, "delete", profile_definitions, outconf_definitions
     )

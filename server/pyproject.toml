@@ -1,24 +1,28 @@
 [tool.poetry]
-name = "server"
-version = "0.1.0"
-description = ""
-authors = ["Your Name <you@example.com>"]
+name = "chalk-server"
+# placeholder. on release replaced by poetry
+# https://pypi.org/project/poetry-dynamic-versioning/
+version = "0.0.0"
+description = "Local Chalk Ingestion Server"
+authors = []
 readme = "README.md"
+packages = [{include = "server"}]
+
+[tool.poetry.scripts]
+chalkserver = "server.__main__:main"
 
 [tool.poetry.dependencies]
-python = "^3.11"
-fastapi = "^0.100.1"
-pydantic = ">=1.8.0,<2.0.0"
-uvicorn = ">=0.15.0,<0.16.0"
-unicorn = {extras = ["all"], version = "^2.0.1.post1"}
-gunicorn = "^20.1.0"
-fastapi-healthcheck = "^0.2.12"
-sqlalchemy = "^2.0.15"
-python-multipart = "^0.0.6"
-aiofiles = "^23.1.0"
 cryptography = "^41.0.3"
-
+fastapi = "^0.100.1"
+fastapi-healthcheck = "^0.2.12"
+pydantic = ">=1.8.0,<2.0.0"
+python = "^3.11"
+sqlalchemy = "^2.0.15"
+uvicorn = ">=0.15.0,<0.16.0"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+build-backend = "poetry_dynamic_versioning.backend"
+requires = ["poetry-core", "poetry_dynamic_versioning"]
+
+[tool.poetry-dynamic-versioning]
+enable = true

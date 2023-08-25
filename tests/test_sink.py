@@ -1,30 +1,27 @@
 import json
-import os
 import shutil
-import sqlite3
-import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from time import sleep
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 from unittest import mock
 
 import boto3
+import os
 import pytest
 import requests
 
 from .chalk.runner import Chalk
-from .utils.docker import compose_run_local_server, stop_container
+from .conf import (
+    CONFIG_DIR,
+    IN_GITHUB_ACTIONS,
+    SERVER_CERT,
+    SERVER_HTTP,
+    SERVER_HTTPS,
+)
 from .utils.log import get_logger
 
+
 logger = get_logger()
-
-CONFIG_DIR = (Path(__file__).parent / "data" / "sink_configs").resolve()
-TLS_CERT_PATH = (
-    Path(__file__).parent.parent / "server" / "app" / "keys" / "self-signed.cert"
-).resolve()
-
-IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") or False
 
 
 def aws_secrets_configured() -> bool:
@@ -169,223 +166,103 @@ def test_s3(tmp_data_dir: Path, chalk: Chalk):
             os.environ["AWS_PROFILE"] = aws_profile
 
 
-# TODO: enable test when 400 error is fixed
-@pytest.mark.skip("missing headers when sending from chalk")
 @mock.patch.dict(
     os.environ,
     {
-        "CHALK_POST_URL": "https://chalkapi-test.crashoverride.run/v0.1/report",
-        "CHALK_POST_HEADERS": "X-Crashoverride-Id:a779384b-ed4a-441a-95b6-577caeeec081",
+        "CHALK_POST_URL": f"{SERVER_HTTP}/report",
+        # testing if chalk at least parses headers correctly
+        "CHALK_POST_HEADERS": "x-test-header: test-header",
     },
 )
-def test_post(tmp_data_dir: Path, chalk: Chalk):
-    logger.debug("testing https sink...")
-    with TemporaryDirectory() as _tmp_bin:
-        tmp_bin = Path(_tmp_bin)
-        artifact = Path(tmp_bin) / "cat"
-        shutil.copy("/bin/cat", artifact)
-
-        # post url must be set
-        assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
-
-        config = CONFIG_DIR / "post.conf"
-        proc = chalk._run_with_custom_config(
-            chalk=chalk, config_path=config, target_path=artifact
-        )
-        assert proc is not None
-        # take the metadata id from stderr where chalk mark is put
-        _output = proc.stdout.decode()
-
-        metadata_id = ""
-        for line in _output.split("\n"):
-            line = line.strip()
-            if line.startswith('"METADATA_ID":'):
-                metadata_id = line.split('METADATA_ID":')[1].split(",")[0].strip()[1:-1]
-
-        assert metadata_id != "", "metadata id for created chalk not found in stderr"
-
-        check_url = (
-            os.environ["CHALK_POST_URL"].removesuffix("report")
-            + "chalks/"
-            + metadata_id
-        )
-
-        # TODO: checking url won't work until 400 error is fixed in nimutils
-        logger.info(check_url)
-        logger.info("response...")
-        res = requests.get(check_url, allow_redirects=True)
-        logger.info(res)
+def test_post_http_fastapi(
+    tmp_data_dir: Path,
+    chalk: Chalk,
+    server_sql: Callable[[str], str | None],
+    server_http: str,
+):
+    _test_server(
+        tmp_data_dir=tmp_data_dir,
+        chalk=chalk,
+        conf="post_https_local.conf",
+        url=server_http,
+        server_sql=server_sql,
+        verify=None,
+    )
 
 
-@pytest.mark.skipif(
-    bool(IN_GITHUB_ACTIONS),
-    reason="Test doesn't work in Github Actions. Need to debug networking",
-)
 @mock.patch.dict(
     os.environ,
     {
-        "CHALK_POST_URL": "http://chalk.crashoverride.local:8585/report",
+        "CHALK_POST_URL": f"{SERVER_HTTPS}/report",
+        # testing if chalk at least parses headers correctly
+        "CHALK_POST_HEADERS": "x-test-header: test-header",
+        "TLS_CERT_FILE": str(SERVER_CERT),
     },
 )
-def test_post_http_fastapi(tmp_data_dir: Path, chalk: Chalk):
-    try:
-        server_id = None
-        conn = None
-        try:
-            server_id = compose_run_local_server()
-            assert server_id
-            logger.debug("Spin up local http server with id", server_id=server_id)
-            sleep(2)
-            r = requests.get(
-                "http://chalk.crashoverride.local:8585/health",
-                allow_redirects=True,
-                timeout=10,
-            )
-            if r.status_code != 200:
-                raise unittest.SkipTest("Chalk Ingestion Server Down - Skipping")
-        except requests.exceptions.ConnectionError:
-            logger.error("Chalk ingestion server unreachable")
-            raise unittest.SkipTest("Chalk Ingestion Server Unreachable - Skipping")
-        logger.debug("Server healthcheck passed")
-        dbfile = (
-            Path(__file__).parent.parent
-            / "server"
-            / "app"
-            / "db"
-            / "data"
-            / "chalkdb.sqlite"
-        ).resolve()
-        if not dbfile.is_file():
-            raise unittest.SkipTest("Bad server state - DB file not found - skipping")
-        conn = sqlite3.connect(dbfile)
-        cur = conn.cursor()
-        res = cur.execute("SELECT count(id) FROM stats")
-        chalks_cnt = res.fetchone()[0]
-
-        with TemporaryDirectory() as _tmp_bin:
-            tmp_bin = Path(_tmp_bin)
-            artifact = Path(tmp_bin) / "ls"
-            shutil.copy("/bin/ls", artifact)
-
-            # post url must be set
-            assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
-
-            config = CONFIG_DIR / "post_http_local.conf"
-            proc = chalk.run(
-                chalk_cmd="insert",
-                target=artifact,
-                params=[
-                    "--no-use-embedded-config",
-                    "--config-file=",
-                    str(config.absolute()),
-                ],
-            )
-            assert proc is not None
-            _output = proc.stdout.decode()
-            for line in _output.split("\n"):
-                line = line.strip()
-                if line.startswith('"CHALK_ID":'):
-                    chalk_id = line.split('CHALK_ID":')[1].split(",")[0].strip()[1:-1]
-            assert chalk_id, "metadata id for created chalk not found in stderr"
-            cur = conn.cursor()
-            res = cur.execute(f"SELECT id FROM chalks WHERE id='{chalk_id}'")
-            assert res.fetchone() is not None, "could not get chalk entry from sqlite"
-            res = cur.execute("SELECT count(id) FROM stats")
-            assert (
-                res.fetchone()[0] > chalks_cnt
-            ), "Could not get ping entry from sqlite"
-    finally:
-        # if server_id:
-        #     stop_container(server_id)
-        if conn:
-            conn.close()
+def test_post_https_fastapi(
+    tmp_data_dir: Path,
+    chalk: Chalk,
+    server_sql: Callable[[str], str | None],
+    server_https: str,
+    server_cert: str,
+):
+    _test_server(
+        tmp_data_dir=tmp_data_dir,
+        chalk=chalk,
+        conf="post_https_local.conf",
+        url=server_https,
+        server_sql=server_sql,
+        verify=server_cert,
+    )
 
 
-@pytest.mark.skipif(
-    bool(IN_GITHUB_ACTIONS),
-    reason="Test doesn't work in Github Actions. Need to debug networking",
-)
-@mock.patch.dict(
-    os.environ,
-    {
-        "CHALK_POST_URL": "https://chalk.crashoverride.local:8585/report",
-        "TLS_CERT_FILE": str(TLS_CERT_PATH),
-    },
-)
-def test_post_https_fastapi(tmp_data_dir: Path, chalk: Chalk):
-    try:
-        server_id = None
-        conn = None
-        try:
-            assert TLS_CERT_PATH.is_file()
-            server_id = compose_run_local_server(https=True)
-            assert server_id
-            logger.debug("Spin up local https server with id", server_id=server_id)
-            sleep(2)
-            r = requests.get(
-                "https://chalk.crashoverride.local:8585/health",
-                allow_redirects=True,
-                timeout=10,
-                verify=TLS_CERT_PATH,
-            )
-            if r.status_code != 200:
-                raise unittest.SkipTest("Chalk Ingestion Server Down - Skipping")
-        except requests.exceptions.ConnectionError as e:
-            logger.error(e)
-            logger.error("Chalk ingestion server unreachable")
-            raise unittest.SkipTest("Chalk Ingestion Server Unreachable - Skipping")
-        logger.debug("Server healthcheck passed")
-        dbfile = (
-            Path(__file__).parent.parent
-            / "server"
-            / "app"
-            / "db"
-            / "data"
-            / "chalkdb.sqlite"
-        ).resolve()
-        if not dbfile.is_file():
-            raise unittest.SkipTest("Bad server state - DB file not found - skipping")
-        conn = sqlite3.connect(dbfile)
-        cur = conn.cursor()
-        res = cur.execute("SELECT count(id) FROM stats")
-        chalks_cnt = res.fetchone()[0]
+def _test_server(
+    tmp_data_dir: Path,
+    chalk: Chalk,
+    conf: str,
+    url: str,
+    server_sql: Callable[[str], str | None],
+    verify: str | None,
+):
+    initial_chalks_count = int(server_sql("SELECT count(id) FROM chalks") or 0)
 
-        with TemporaryDirectory() as _tmp_bin:
-            tmp_bin = Path(_tmp_bin)
-            artifact = Path(tmp_bin) / "cat"
-            shutil.copy("/bin/cat", artifact)
+    # post url must be set
+    assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
 
-            # post url must be set
-            assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
+    artifact = tmp_data_dir / "cat"
+    shutil.copy("/bin/cat", artifact)
 
-            config = CONFIG_DIR / "post_https_local.conf"
-            proc = chalk.run(
-                chalk_cmd="insert",
-                target=artifact,
-                params=[
-                    "--trace",
-                    "--no-use-embedded-config",
-                    "--config-file=",
-                    str(config.absolute()),
-                ],
-            )
-            assert proc is not None
-            _output = proc.stdout.decode()
-            for line in _output.split("\n"):
-                line = line.strip()
-                if line.startswith('"CHALK_ID":'):
-                    chalk_id = line.split('CHALK_ID":')[1].split(",")[0].strip()[1:-1]
-            assert chalk_id, "metadata id for created chalk not found in stderr"
-            cur = conn.cursor()
-            res = cur.execute(f"SELECT id FROM chalks WHERE id='{chalk_id}'")
-            assert res.fetchone() is not None, "could not get chalk entry from sqlite"
-            # XXX ping currently does not work with self signed certs
-            # res = cur.execute("SELECT count(id) FROM stats")
-            # assert (
-            #     res.fetchone()[0] > chalks_cnt
-            # ), "Could not get ping entry from sqlite"
-    finally:
-        if server_id:
-            stop_container(server_id)
-        if conn:
-            conn.close()
+    config = CONFIG_DIR / conf
+    proc = chalk.run(
+        chalk_cmd="insert",
+        target=artifact,
+        params=[
+            "--trace",
+            "--no-use-embedded-config",
+            "--config-file=",
+            str(config.absolute()),
+        ],
+    )
+    assert proc is not None
+
+    metadata_id = None
+    _output = proc.stdout.decode()
+    for line in _output.split("\n"):
+        line = line.strip()
+        if line.startswith('"METADATA_ID":'):
+            metadata_id = line.split('METADATA_ID":')[1].split(",")[0].strip()[1:-1]
+    assert metadata_id, "metadata id for created chalk not found in stderr"
+
+    db_id = server_sql(f"SELECT id FROM chalks WHERE metadata_id='{metadata_id}'")
+    assert db_id is not None
+
+    chalks_count = int(server_sql("SELECT count(id) FROM chalks") or 0)
+    assert chalks_count == initial_chalks_count + 1
+
+    # get the chalk from the api
+    response = requests.get(
+        f"{url}/chalks/{metadata_id}", allow_redirects=True, timeout=5, verify=verify
+    )
+    response.raise_for_status()
+    fetched_chalk = response.json()
+    assert fetched_chalk["METADATA_ID"] == metadata_id

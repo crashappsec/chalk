@@ -266,11 +266,3 @@ class Chalk:
         except CalledProcessError as e:
             logger.error("Called process error for chalk load", error=e)
             raise
-
-
-# make a copy of chalk binary to the tmp directory since we don't want to overwrite the binary that all the other tests are using
-def chalk_copy(tmp_data_dir: Path, chalk: Chalk) -> Chalk:
-    logger.info("making a copy of chalk")
-    chalk_path = chalk.binary
-    shutil.copy(chalk_path, tmp_data_dir / "chalk")
-    return Chalk(binary=(tmp_data_dir / "chalk").resolve())

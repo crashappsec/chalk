@@ -1,5 +1,4 @@
 import json
-import os
 import platform
 import shutil
 import subprocess
@@ -9,9 +8,10 @@ from subprocess import CompletedProcess
 from typing import Any, Dict, Optional
 from unittest import mock
 
+import os
 import pytest
 
-from .chalk.runner import Chalk, chalk_copy
+from .chalk.runner import Chalk
 from .utils.chalk_report import get_chalk_report_from_output
 from .utils.docker import (
     docker_build,
@@ -25,6 +25,7 @@ from .utils.validate import (
     validate_docker_chalk_report,
     validate_virtual_chalk,
 )
+
 
 logger = get_logger()
 
@@ -261,7 +262,7 @@ def test_nonvirtual_invalid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
 
 # exec heartbeat from inside docker
 @pytest.mark.slow()
-def test_docker_heartbeat(tmp_data_dir: Path, chalk: Chalk):
+def test_docker_heartbeat(tmp_data_dir: Path, chalk_copy: Chalk):
     test_image = "test_image"
     test_container = "test_container"
     try:
@@ -269,23 +270,26 @@ def test_docker_heartbeat(tmp_data_dir: Path, chalk: Chalk):
         for file in files:
             shutil.copy(DOCKERFILES / "valid" / "sleep" / file, tmp_data_dir)
 
-        # copy chalk and load the config we want
-        chalk = chalk_copy(tmp_data_dir=Path("/tmp"), chalk=chalk)
-        assert os.path.isfile("/tmp/chalk")
-
-        load_output = chalk.load(str(CONFIGFILES / "docker_heartbeat.conf"), False)
+        load_output = chalk_copy.load(str(CONFIGFILES / "docker_heartbeat.conf"), False)
         assert load_output.returncode == 0
 
         # build dockerfile with chalk docker entrypoint wrapping
         chalk_build = subprocess.run(
             args=[
-                chalk.binary,
+                chalk_copy.binary,
                 "docker",
                 "build",
                 "--platform=linux/amd64",
                 "-t",
                 test_image,
-                ".",
+                # TODO switch to . context
+                # If docker build context has "chalk", it is not copied
+                # to the image and therefore the container will fail to run.
+                # For now using /tmp as context and explicitly building
+                # Dockerfile via -f
+                "-f",
+                tmp_data_dir / "Dockerfile",
+                "/tmp",
             ],
             capture_output=True,
         )

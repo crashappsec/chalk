@@ -1,0 +1,7 @@
+services:
+  bump:
+    build:
+      dockerfile: Dockerfile.bump
+    working_dir: /chalk
+    volumes:
+      - ..:/chalk

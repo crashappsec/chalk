@@ -8,7 +8,7 @@ from subprocess import check_output, run
 
 import dateutil.parser
 
-from .chalk.runner import Chalk, chalk_copy
+from .chalk.runner import Chalk
 from .utils.bin import sha256
 from .utils.chalk_report import get_chalk_report_from_output, get_liftable_key
 from .utils.log import get_logger
@@ -18,6 +18,7 @@ from .utils.validate import (
     validate_extracted_chalk,
     validate_virtual_chalk,
 )
+
 
 logger = get_logger()
 
@@ -245,11 +246,8 @@ def test_env(chalk: Chalk):
 
 
 # setup: needs to display password, and public and private key info in chalk
-def test_setup(tmp_data_dir: Path, chalk: Chalk):
-    # setup changes the config and reloads, so make a copy
-    chalk = chalk_copy(tmp_data_dir=tmp_data_dir, chalk=chalk)
-
-    setup_proc = chalk.run(chalk_cmd="setup", params=["--log-level=error"])
+def test_setup(tmp_data_dir: Path, chalk_copy: Chalk):
+    setup_proc = chalk_copy.run(chalk_cmd="setup", params=["--log-level=error"])
     # this should never error
     assert setup_proc.returncode == 0
     assert setup_proc.stderr.decode() == ""

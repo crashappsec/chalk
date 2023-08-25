@@ -28,4 +28,4 @@ RUN apk add --no-cache pcre gcompat
 
 COPY --from=docker:24 /usr/local/bin/docker /usr/local/bin/docker
 
-ENTRYPOINT ["/tests.env/bin/pytest"]
+ENTRYPOINT ["pytest"]
