@@ -11,27 +11,16 @@ when (NimMajor, NimMinor, NimPatch) >= (1, 6, 12):
   switch("warning", "BareExcept:off")
 
 if defined(macosx):
-  var brew = staticexec("brew --prefix")
-  var cpu = ""
-  var target = ""
-  if defined(arm):
-    cpu = "arm64"
-    target = "arm64"
-  elif defined(amd64):
-    cpu = "amd64"
-    target = "x86_64"
-  let openssldir = brew & "/opt/openssl@3/"
-  switch("cpu", $cpu)
-  switch("passc", "-flto " &
-         "-target " & target & "-apple-macos11 " &
-         "-I" & openssldir & "/include/")
-  switch("passl", "-flto " &
-         "-target " & target & "-apple-macos11 " &
-         "-lcrypto.3 " &
-          "-Wl,-object_path_lto,lto.o " &
-          "-L " & openssldir & "/lib/")
+  var host: string
 
+  when defined(doAmd64Build):
+    host = "amd64"
+  else:
+    host = "arm64"
+
+  switch("cpu", host)
+  switch("passc", "-flto -target " & host & "-apple-macos11")
+  switch("passl", "-flto -target " & host & "-apple-macos11 " &
+          "-Wl,-object_path_lto,lto.o")
 else:
   switch("passl", "-static")
-
-#switch("d", "release")
