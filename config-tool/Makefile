@@ -1,27 +1,8 @@
 SHELL=bash
 
-CHALK_RELEASE=../.config-tool-bin/chalk-release
-CHALK_DEBUG=../.config-tool-bin/chalk
-
 .PHONLY: config
 config:
 	docker compose run --rm config
-
-.PHONY: $(CHALK_RELEASE)
-$(CHALK_RELEASE):
-	mkdir -p $(@D)
-	make -C .. release
-	cp ../chalk $@
-
-.PHONY: $(CHALK_DEBUG)
-$(CHALK_DEBUG):
-	mkdir -p $(@D)
-	make -C .. debug
-	cp ../chalk $@
-
-.PHONY: deps
-deps: $(CHALK_RELEASE) $(CHALK_DEBUG)
-	docker compose build config
 
 .PHONY: format
 format:
