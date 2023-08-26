@@ -3,7 +3,8 @@
 ##
 ## :Author: John Viega :Copyright: 2023, Crash Override, Inc.
 
-import  std/tempfiles, osproc, posix, config, subscan, nimutils/managedtmp
+import  std/tempfiles, osproc, posix, config, subscan, nimutils/managedtmp,
+        std/monotimes
 
 let sigNameMap = { 1: "SIGHUP", 2: "SIGINT", 3: "SIGQUIT", 4: "SIGILL",
                    6: "SIGABRT",7: "SIGBUS", 9: "SIGKILL", 11: "SIGSEGV",
@@ -53,6 +54,12 @@ proc reportTmpFileExitState*(files, dirs, errs: seq[string]) =
           "following to ./chalk-tmp:")
     for item in files & dirs:
       error(item)
+
+  if chalkConfig.getReportTotalTime():
+    echo "Total run time: " & $(int(getMonoTime().ticks() - startTime) /
+                                1000000000) &
+      " seconds"
+
 
 proc setupManagedTemp*() =
   if chalkConfig.getChalkDebug():

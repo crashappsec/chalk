@@ -1772,6 +1772,18 @@ specified  by the audit_file_size variable.
 """
   }
 
+  field report_total_time {
+    type:    bool
+    default: false
+    shortdoc: "Show total chalk run time"
+    doc: """
+Chalk can report the time from start until the time a report is produced
+by subscribing to the _CHALK_RUN_TIME host key. However, if you're running
+on the command line, and want the total time to be output to stderr as the
+very last thing, you can use this option (--time on the command line).
+"""    
+  }
+
   field audit_location {
     type:       string
     default:    "chalk-audit.json"

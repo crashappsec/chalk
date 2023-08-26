@@ -82,6 +82,13 @@ The reporting cache keeps a local copy of any reports made, to provide redundanc
 """
   }
 
+  flag_yn time {
+    field_to_set: "report_total_time"
+    doc: """
+Reports the total run time of the chalk executable in seconds.
+"""    
+  }
+
   flag_yn use_embedded_config {
     field_to_set: "load_embedded_config"
     doc: "Turn off running the embedded configuration."

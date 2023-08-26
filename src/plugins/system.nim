@@ -4,11 +4,11 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import nativesockets, nimSHA2, sequtils, times, ../config, ../plugin_api,
-       ../normalize, ../chalkjson, ../selfextract, ../attestation
+import std/monotimes, nativesockets, nimSHA2, sequtils, times, ../config,
+       ../plugin_api, ../normalize, ../chalkjson, ../selfextract,
+       ../attestation
 
 when defined(posix): import posix_utils
-
 
 var
   externalActions: seq[(string, string)] = @[]
@@ -317,6 +317,15 @@ proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
 
   if len(externalActions) > 0:
     result.setIfNeeded("_CHALK_EXTERNAL_ACTION_AUDIT", externalActions)
+
+  if isSubscribedKey("_CHALK_RUN_TIME"):
+    # startTime lives in runManagement.
+    let
+      diff = getMonoTime().ticks() - startTime
+      inMs = diff div 1000 # It's in nanosec, convert to 1/1000000th of a sec
+
+
+    result["_CHALK_RUN_TIME"] = pack(inMs)
 
 proc loadSystem*() =
   newPlugin("system",

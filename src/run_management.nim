@@ -5,12 +5,14 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
 
-import chalk_common, posix
+import chalk_common, posix, std/monotimes
 export chalk_common
 
 var
   ctxStack            = seq[CollectionCtx](@[])
   collectionCtx       = CollectionCtx()
+  startTime*          = getMonoTime().ticks()
+
 
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
@@ -26,6 +28,7 @@ proc endNativeCodecsOnly*() =
 template getNativeCodecsOnly*(): bool = nativeCodecsOnly
 
 proc clearReportingState*() =
+  startTime      = getMonoTime().ticks()
   ctxStack       = @[]
   collectionCtx  = CollectionCtx()
   hostInfo       = ChalkDict()

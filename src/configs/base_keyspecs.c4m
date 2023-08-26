@@ -2966,6 +2966,19 @@ commands.
 """    
 }
 
+keyspec _CHALK_RUN_TIME {
+    kind: RunTimeHost
+    type: int
+    standard: true
+    since: "0.1.1"
+    doc: """
+Calculates the amount of time between the start of a chalk executable
+and when a report is generated. It's an integer with resolution of
+1/1000000th of a second.
+"""    
+    
+}
+
 keyspec $CHALK_CONFIG {
     required_in_self_mark: true
     kind:                  ChalkTimeArtifact

@@ -11,16 +11,19 @@ when (NimMajor, NimMinor, NimPatch) >= (1, 6, 12):
   switch("warning", "BareExcept:off")
 
 if defined(macosx):
-  var host: string
+  var
+    host, target: string
+    pwd = staticExec("pwd")
 
   when defined(doAmd64Build):
-    host = "amd64"
+    host   = "amd64"
+    target = "x86_64-apple-macos11"
   else:
-    host = "arm64"
+    host   = "arm64"
+    target = "arm64-apple-macos11"
 
   switch("cpu", host)
-  switch("passc", "-flto -target " & host & "-apple-macos11")
-  switch("passl", "-flto -target " & host & "-apple-macos11 " &
-          "-Wl,-object_path_lto,lto.o")
+  switch("passc", "-flto -target " & target)
+  switch("passl", "-flto -target " & target & "-Wl,-object_path_lto,lto.o")
 else:
   switch("passl", "-static")
