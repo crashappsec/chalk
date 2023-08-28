@@ -9,7 +9,6 @@ target "server" {
 }
 
 target "tests" {
-  # comment while github sync permissions for new package
-  # cache-from = ["type=registry,ref=ghcr.io/crashappsec/chalk_tests:cache"]
-  # cache-to   = ["type=registry,ref=ghcr.io/crashappsec/chalk_tests:cache"]
+  cache-from = ["type=registry,ref=ghcr.io/crashappsec/chalk_tests:cache"]
+  cache-to   = ["type=registry,ref=ghcr.io/crashappsec/chalk_tests:cache"]
 }

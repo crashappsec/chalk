@@ -58,6 +58,10 @@ jobs:
         run: |
           docker buildx bake chalk server tests --load
 
+      - name: Compile Chalk
+        run: |
+          make
+
       - name: Run tests
         run: |
           make tests
