@@ -6,34 +6,22 @@ is the recommended way to use Chalk, however if you would prefer to
 build Chalk from source please follow the instructions and ensure you
 have the correct dependencies installed.
 
-## Release vs Debug
-
-Chalk can be compile in either `debug` or `release` mode.
-`debug` mode can aid in debugging `chalk` however you will likely notice
-that the `release` binary runs quicker than the `debug` binary.
-Below instructions show commands for building `release` binary
-but the comments in the code snippets will show how to build
-the `debug` binary instead. In most cases the difference
-is either:
-
-- setting `CHALK_BUILD` to either `release` or `debug`
-- calling appropriate `make` target - `release` or `debug`
-
 ## Building Chalk in a Container (Recommended)
 
-If you are running on an **x64 Linux** distribution the easiest way to build
-the project is to use the supplied container to both compile and run Chalk.
-This requires that you have [docker installed](https://docs.docker.com/engine/install/).
+If you are running on a **Linux** distribution the easiest way to
+build the project is to use the supplied container to both compile and
+run Chalk, which will install all dependencies properly.  This
+requires that you have [docker
+installed](https://docs.docker.com/engine/install/).
 
 To build `chalk` run the following command from the root of the repository:
 
 ```sh
-make chalk   # rebuilds only if source files changed
-make release # always builds release binary
-# for debug build equivalent:
-# CHALK_BUILD=debug make chalk
-# make debug
+make  # rebuilds only if source files changed
 ```
+
+You can build a debug build with `make debug`, which will result in a
+considerably slower binary, but will enable stack traces.
 
 Once the compilation has finished the resulting static `chalk` binary will be
 written to the current working directory and can be run directly on any x64
@@ -45,36 +33,31 @@ Linux system:
 
 ## Building Chalk Natively
 
-If you would like to build Chalk natively on your system you will need to have
-the [nimble](https://github.com/nim-lang/nimble) package manager installed.
+If you would like to build Chalk natively on your system (particularly
+on MacOs), you will need to have Nim installed, generally with the
+Nimble package manager.
 
-To build Chalk natively on an **x64 Linux** distribution the commands are
-the same as for docker builds except they will require disabling docker
-by setting `DOCKER` environment variable to an empty string:
-
-```sh
-export DOCKER=
-make chalk   # rebuilds only if source files changed
-make release # always builds release binary
-# for debug build equivalent
-# CHALK_BUILD=debug make chalk
-# make debug
-```
-
-Nimble will do the rest and download additional dependencies at the correct versions
-
-### MacOS Requirements
-
-If you are running on an **macOS** system ensure that you have
-[OpenSSL 3 installed via homebrew](https://formulae.brew.sh/formula/openssl@3)
-(Instructions for installing homebrew can be found [here](https://brew.sh/)).
+The easiest way to do this, is with `choosenim` and then setting it to
+version 1.6.14 (Chalk does not work with Nim 2.0):
 
 ```sh
-brew install openssl@3
+curl https://nim-lang.org/choosenim/init.sh -sSf | sh
+export PATH=$PATH:~/.nimble/bin/
+choosenim 1.6.14
 ```
 
-Once MacOS requirements are satisfied, the same commands can be used as
-above to compile chalk on MacOS.
+All nim tools will live in ~/.nimble/bin, if you want to update in
+your shell's config file. Then, from the root of the repository, you
+can build chalk simply by typing:
+
+```sh
+nimble build
+```
+
+Nimble will do the rest and download a few additional
+dependencies. Nimble keeps all its state in ~/.nimble; choosenim keeps
+the compiler in ~/.choosenim; you can delete the 2.0 toolchain if
+desired.
 
 ## Issues
 

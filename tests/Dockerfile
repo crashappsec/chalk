@@ -23,9 +23,7 @@ RUN mkdir -p /.cache/pypoetry \
 COPY pyproject.toml poetry.lock $WORKDIR/
 RUN poetry install --no-plugins
 
-# install chalk deps
-RUN apk add --no-cache pcre gcompat
-
 COPY --from=docker:24 /usr/local/bin/docker /usr/local/bin/docker
 
 ENTRYPOINT ["pytest"]
+

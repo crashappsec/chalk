@@ -3,7 +3,7 @@ FROM ghcr.io/crashappsec/nim:ubuntu-1.6.12 as compile
 # curl - chalk downloads some things directly with curl for the moment
 RUN apt-get update -y && \
     apt-get install -y \
-        curl \
+        curl make autoconf m4 file \
         && \
     apt-get clean -y
 
@@ -14,7 +14,8 @@ RUN if which git; then git config --global --add safe.directory "*"; fi
 WORKDIR /chalk
 
 COPY chalk_internal.nimble /chalk/
-
+COPY --chmod=755 bin/ensure-static /chalk/bin/
+RUN --mount=type=cache,target=/chalk/deps bin/ensure-static
 # con4m - for verifying config files
 #         and nimble sync fails to sync it as it has bin configured
 RUN nimble install -y \
@@ -33,6 +34,7 @@ RUN git init -b main . && \
     nimble sync && \
     rm -rf .git
 
+    
 # -------------------------------------------------------------------
 # build chalk binary to be copied into final release stage
 
@@ -46,10 +48,12 @@ WORKDIR /chalk
 # vs COPY . /chalk/
 # as repo has other tools and copying only necessary files
 # optimizes docker build cache
+COPY --chmod=755 bin/devmode /chalk/bin/
 COPY config.nims /chalk/
 COPY ./src/ /chalk/src/
 # for chalk commit id
 COPY ./.git/ /chalk/.git/
+
 
 RUN --mount=type=cache,target=/root/.nimble,sharing=locked \
     yes | nimble $CHALK_BUILD

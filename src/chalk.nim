@@ -3,7 +3,7 @@
 
 # Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
-import config, confload, commands, jitso, norecurse, sinks, docker_base,
+import config, confload, commands, norecurse, sinks, docker_base,
        attestation, util
 
 when isMainModule:

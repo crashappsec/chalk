@@ -48,8 +48,8 @@ echo $(color cyan "con4m directory: ") $CON4M_DIR
 echo $(color cyan "nimutils direct: ") $NIMUTILS_DIR
 echo $(color cyan "nimble packages: ") $NIMBLE_PKGS
 
-LATEST_CON4M=`ls ${NIMBLE_PKGS} | egrep "^con4m" | sort | tail -1`
-LATEST_NUTIL=`ls ${NIMBLE_PKGS} | egrep "^nimutils" | sort | tail -1`
+LATEST_CON4M=`ls ${NIMBLE_PKGS} | egrep "^con4m" | sort -V | tail -1`
+LATEST_NUTIL=`ls ${NIMBLE_PKGS} | egrep "^nimutils" | sort -V | tail -1`
 
 echo $(color cyan "con4m version:  ") $LATEST_CON4M
 echo $(color cyan "nimutils vers:  ") $LATEST_NUTIL
@@ -98,7 +98,7 @@ function push_ext_files {
     popd >/dev/null
 }
 
-push_ext_files ${CON4M_DIR}/src/con4m ${CON4M_TARGET}/con4m nim
-push_ext_files ${CON4M_DIR}/src/c ${CON4M_TARGET}/c c
-push_ext_files ${CON4M_DIR}/src/c ${CON4M_TARGET}/c h
+push_ext_files ${CON4M_DIR}/files/ ${CON4M_TARGET}/ nim
+push_ext_files ${CON4M_DIR}/files/c ${CON4M_TARGET}/c c
+push_ext_files ${CON4M_DIR}/files/c ${CON4M_TARGET}/c h
 push_ext_files ${NIMUTILS_DIR}/src/nimutils ${NIMUTILS_TARGET}/nimutils nim
