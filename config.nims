@@ -58,7 +58,7 @@ if defined(macosx):
   let
      libs   = ["ssl", "crypto"]
      libDir = staticRead("/tmp/con4m-build-dir").strip() &
-       "/deps/macos/" & targetArch & "/"
+       "/files/deps/macos/" & targetArch & "/"
 
   for item in libs:
     let libFile = "lib" & item & ".a"

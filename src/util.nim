@@ -69,6 +69,127 @@ proc setupManagedTemp*() =
   setDefaultTmpFilePrefix(tmpFilePrefix)
   setDefaultTmpFileSuffix(tmpFileSuffix)
 
+
+when hostOs == "macosx":
+  const scriptLoc = "autocomplete/mac.bash"
+else:
+  const scriptLoc = "autocomplete/default.bash"
+
+const
+  bashScript      = staticRead(scriptLoc)
+  autoCompleteLoc = "~/.local/share/bash_completion/completions/chalk.bash"
+when hostOs == "linux":
+  template makeCompletionAutoSource() =
+    var
+      acpath  = resolvePath("~/.bash_completion")
+      f       = newFileStream(acpath, fmReadWriteExisting)
+      toWrite = ". " & dst & "\n"
+
+    if f == nil:
+      f = newFileStream(acpath, fmWrite)
+      if f == nil:
+        warn("Cannot write to " & acpath & " to turn on autocomplete.")
+        return
+    else:
+      try:
+        let
+          contents = f.readAll()
+        if toWrite in contents:
+          f.close()
+          return
+        if len(contents) != 0 and contents[^1] != '\n':
+          f.write("\n")
+      except:
+        warn("Cannot write to ~/.bash_completion to turn on autocomplete.")
+        dumpExOnDebug()
+        f.close()
+        return
+    f.write(toWrite)
+    f.close()
+    info("Added sourcing of autocomplete to ~/.bash_completion file")
+elif hostOs == "macosx":
+  template makeCompletionAutoSource() =
+    var
+      acpath = resolvePath("~/.zshrc")
+      f      = newFileStream(acpath, fmReadWriteExisting)
+
+    if f == nil:
+      f = newFileStream(acPath, fmWrite)
+      if f == nil:
+        warn("Cannot write to " & acpath & " to turn on autocomplete.")
+        return
+
+    var
+      contents: string
+      foundbci = false
+      foundci  = false
+      foundsrc = false
+    try:
+      contents = f.readAll()
+    except:
+      discard
+    let
+      lines   = contents.split("\n")
+      srcLine = "source " & dst
+
+    for line in lines:
+      # This is not even a little precise but should be ok
+      let words = line.split(" ")
+      if "bashcompinit" in words:
+        foundbci = true
+      elif "compinit" in words:
+        foundci = true
+      elif line == srcLine and foundci and foundbci:
+        foundsrc = true
+
+    if foundbci and foundci and foundsrc:
+      return
+
+    if len(contents) != 0 and contents[^1] != '\n':
+      f.write("\n")
+
+    if not foundbci:
+      f.writeLine("autoload bashcompinit")
+      f.writeLine("bashcompinit")
+
+    if not foundci:
+      f.writeLine("autoload -Uz compinit")
+      f.writeLine("compinit")
+
+    if not foundsrc:
+      f.writeLine(srcLine)
+
+    f.close()
+    info("Set up sourcing of basic autocomplete in ~/.zshrc")
+
+else:
+    template makeCompletionAutoSource() = discard
+
+
+
+proc autocompleteFileCheck*() =
+  if isatty(0) == 0 or chalkConfig.getInstallCompletionScript() == false:
+    return
+  let dst = resolvePath(autoCompleteLoc)
+  if fileExists(dst):
+    return
+  try:
+    createDir(resolvePath(dst.splitPath().head))
+  except:
+    warn("No permission to create auto-completion directory: " &
+      dst.splitPath().head)
+    return
+  if not tryToWriteFile(dst, bashScript):
+    warn("Could not write to auto-completion file: " & dst)
+    return
+  else:
+    info("Wrote bash auto-completion file to: " & dst)
+  makeCompletionAutoSource()
+
+template otherSetupTasks*() =
+  setupManagedTemp()
+  autocompleteFileCheck()
+
 var exitCode = 0
 
 proc quitChalk*(errCode = exitCode) {.noreturn.} =

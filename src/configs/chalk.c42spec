@@ -2213,6 +2213,20 @@ Note that this doesn't turn off any custom reports; you have to disable those se
 """
   }
 
+  field install_completion_script {
+    type:     bool
+    default:  true
+    shortdoc: "Auto-install completion script"
+    doc: """
+When this is true, on startup chalk will look for a chalk auto-completion
+script in the local user's directory:
+
+~/.local/share/bash_completion/completions/chalk.bash
+
+If it's not present, chalk will attempt to install it.
+"""    
+  }
+
   field crashoverride_usage_reporting_url {
     type:       string
     default:    "https://chalk.crashoverride.run/v0.1/usage"

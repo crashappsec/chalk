@@ -11,7 +11,7 @@ when isMainModule:
   addDefaultSinks()     # nimutils/sinks.nim
   loadAllConfigs()      # config.nim
   recursionCheck()      # norecurse.nim
-  setupManagedTemp()    # util.nim
+  otherSetupTasks()     # util.nim
   # Wait for this warning until after configs load.
   if not canSelfInject:
     warn("No working codec is available for the native executable type")
