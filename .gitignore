@@ -5,6 +5,7 @@ config-tool-outdir
 /bin/chalk
 /chalk
 /src/getlibpath
+/deps
 # universal tags
 tags
 .DS_Store
