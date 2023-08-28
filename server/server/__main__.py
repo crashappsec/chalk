@@ -122,7 +122,7 @@ cert = subparsers.add_parser(
     help="Generate self-signed certificate",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-cert.add_argument(
+cert_domains = cert.add_argument(
     "--domain",
     dest="domains",
     help="domain to generate a certificate for",
@@ -202,7 +202,7 @@ def main():
         return 0
 
     # not running any command
-    if not getattr(args, "port", None) and not getattr(args, "domain", None):
+    if not getattr(args, "port", None) and not getattr(args, "domains", None):
         parser.print_help(sys.stderr)
         return 1
 
@@ -213,15 +213,17 @@ def main():
     if certfile_exists or keyfile_exists:
         certfile.type = existing_file
         keyfile.type = existing_file
-        domains.type = lambda _: (
-            ""
-            if getattr(args, "use_existing_cert", False)
-            else parser.error(
+
+        def dont_overwrite_cert(_):
+            if getattr(args, "use_existing_cert", False):
+                return ""
+            parser.error(
                 f"{args.certfile} or {args.keyfile} already exist. "
-                "Refusing to overwrite them. "
-                f"Either remove them or dont pass {domains.option_strings[0]}",
+                "Refusing to overwrite them."
             )
-        )
+
+        domains.type = dont_overwrite_cert
+        cert_domains.type = dont_overwrite_cert
 
     # if paths are provided but they dont exist, ensure domain is required
     # so that cert can be created

@@ -12,7 +12,7 @@ SOURCES+=$(shell find src/ -name '*.c42spec')
 # when any of the nim sources change
 # (a.k.a what Makefile is good at :D)
 chalk: $(SOURCES)
-	-rm @
+	-rm -f $@
 	$(DOCKER) nimble $(CHALK_BUILD)
 
 .PHONY: debug release

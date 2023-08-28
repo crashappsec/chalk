@@ -9,11 +9,6 @@ services:
     build:
       context: .
       target: compile
-      x-bake:
-        cache_from:
-          - type=registry,ref=ghcr.io/crashappsec/chalk_compile:cache
-        cache_to:
-          - type=registry,ref=ghcr.io/crashappsec/chalk_compile:cache
     command: nimble ${CHALK_BUILD:-release}
     working_dir: /chalk
     volumes:
@@ -36,11 +31,6 @@ services:
     build:
       context: ./config-tool
       target: deps
-      x-bake:
-        cache_from:
-          - type=registry,ref=ghcr.io/crashappsec/chalk_config_compile:cache
-        cache_to:
-          - type=registry,ref=ghcr.io/crashappsec/chalk_config_compile:cache
     command: python -m chalk_config
     working_dir: /chalk/config-tool
     volumes:
@@ -75,11 +65,6 @@ services:
   server: &server
     build:
       context: ./server
-      x-bake:
-        cache_from:
-          - type=registry,ref=ghcr.io/crashappsec/chalk_local_api_server:cache
-        cache_to:
-          - type=registry,ref=ghcr.io/crashappsec/chalk_local_api_server:cache
       target: deps
     networks:
       chalk:

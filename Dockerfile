@@ -1,9 +1,31 @@
+FROM ubuntu:jammy-20230126 as libs
+
+# deps for compiling static deps
+RUN apt-get update -y && \
+    apt-get install -y \
+        autoconf \
+        file \
+        gcc \
+        git \
+        m4 \
+        make \
+        && \
+    apt-get clean -y
+
+ENV DEPS_DIR=/libs
+
+COPY bin/ensure-static /chalk/bin/
+
+RUN /chalk/bin/ensure-static
+
+# -------------------------------------------------------------------
+
 FROM ghcr.io/crashappsec/nim:ubuntu-1.6.12 as compile
 
 # curl - chalk downloads some things directly with curl for the moment
 RUN apt-get update -y && \
     apt-get install -y \
-        curl make autoconf m4 file \
+        curl \
         && \
     apt-get clean -y
 
@@ -12,10 +34,11 @@ RUN apt-get update -y && \
 RUN if which git; then git config --global --add safe.directory "*"; fi
 
 WORKDIR /chalk
+ENV DEPS_DIR=/libs
 
-COPY chalk_internal.nimble /chalk/
-COPY --chmod=755 bin/ensure-static /chalk/bin/
-RUN --mount=type=cache,target=/chalk/deps bin/ensure-static
+COPY --from=libs /libs /libs
+COPY *.nimble /chalk/
+
 # con4m - for verifying config files
 #         and nimble sync fails to sync it as it has bin configured
 RUN nimble install -y \

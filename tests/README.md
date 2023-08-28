@@ -48,25 +48,25 @@ To run all tests:
 
 ```sh
 # root of the repo
-./make tests
+make tests
 ```
 
 To run all tests within a test file:
 
 ```sh
 # root of the repo
-./make tests [TESTFILE]
+make tests args="[TESTFILE]"
 ```
 
 where `TESTFILE` is the path of the test file
-(ex: `test_command.py`, `tests/test_zip.py`).
-Note that path could be relative to either `tests/` or root of the repo.
+(ex: `test_command.py`, `test_zip.py`).
+Note that path **MUST** be relative to `tests/` folder (not repo root).
 
 To run a single test within a test file:
 
 ```sh
 # root of the repo
-./make tests [TESTFILE]::[TESTNAME]
+make tests args="[TESTFILE]::[TESTNAME]"
 ```
 
 where `TESTFILE` is as above, and `TESTNAME` is the name of the test
@@ -79,7 +79,7 @@ To run slower tests which are by default skipped add `--slow`` argument:
 
 ```sh
 # root of the repo
-./make tests --slow
+make tests args="--slow"
 ```
 
 ### Debugging a Failed Test
@@ -89,7 +89,7 @@ To do that run test(s) with `--pdb` flag:
 
 ```sh
 # root of the repo
-./make tests [TESTFILE]::[TESTNAME] --pdb
+make tests args="[TESTFILE]::[TESTNAME] --pdb"
 ```
 
 Alternatively you can add `breakpoint()` before the failing assertion

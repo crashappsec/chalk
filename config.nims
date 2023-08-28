@@ -71,9 +71,11 @@ elif defined(linux):
     ## Specify libs to be statically linked here. They must appear in the order
     ## they should be on the link line.
     libs     = ["pcre", "ssl", "crypto"]
-    depsDir  = getCurrentDir() & "/deps/" & hostCPU & "/"
-    libDir   = depsDir & "lib/"
-    muslPath = depsDir & "usr/musl/bin/musl-gcc"
+    depsDir  = getEnv("DEPS_DIR", getCurrentDir() & "/deps")
+    archDir  = depsDir & "/" & hostCPU
+    libDir   = archDir & "/lib/"
+    muslPath = archDir & "/usr/musl/bin/musl-gcc"
+
   switch("passl", "-static")
   switch("gcc.exe", muslPath)
   switch("gcc.linkerexe", muslPath)

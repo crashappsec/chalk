@@ -8,14 +8,50 @@ else
     NIMARCH=arm64
 fi
 
-DEP_DIR=${ORIGINAL_PWD}/deps/${NIMARCH}
-DEP_LIB=${DEP_DIR}/lib
-DEP_SRC=${DEP_DIR}/src
-DEP_USR=${DEP_DIR}/usr
+DEPS_DIR=${DEPS_DIR:-${ORIGINAL_PWD}/deps/${NIMARCH}}
+ARCH_DIR=${DEPS_DIR}/${NIMARCH}
+DEP_LIB=${ARCH_DIR}/lib
+DEP_SRC=${ARCH_DIR}/src
+DEP_USR=${ARCH_DIR}/usr
 
-export OPENSSL_CONFIG_OPTS='no-egd no-zlib no-idea no-camellia no-seed no-bf no-des no-cast no-rc2 no-rc4 no-rc5 no-md2 no-md4 no-mdc2 no-uplink enable-ec_nistp_64_gcc_128 no-tls1_1 no-tls1_2 no-tls1 no-quic no-engine no-docs no-ssl no-comp no-dtls no-dtls1 no-shared no-err no-psk no-srp no-weak-ssl-ciphers no-tests no-deprecated no-afalgeng no-apps'
+export OPENSSL_CONFIG_OPTS=$(echo "
+enable-ec_nistp_64_gcc_128
+no-afalgeng
+no-apps
+no-bf
+no-camellia
+no-cast
+no-comp
+no-deprecated
+no-des
+no-docs
+no-dtls
+no-dtls1
+no-egd
+no-engine
+no-err
+no-idea
+no-md2
+no-md4
+no-mdc2
+no-psk
+no-quic
+no-rc2
+no-rc4
+no-rc5
+no-seed
+no-shared
+no-srp
+no-ssl
+no-tests
+no-tls1
+no-tls1_1
+no-uplink
+no-weak-ssl-ciphers
+no-zlib
+" | grep -vE "^$" | paste -d" " -s)
 
-MUSL_GCC_INSTALL_LOC=${DEP_DIR}/usr/musl/bin/musl-gcc
+MUSL_GCC_INSTALL_LOC=${DEP_USR}/musl/bin/musl-gcc
 
 mkdir -p ${DEP_LIB}
 
@@ -147,4 +183,4 @@ ensure_openssl
 ensure_pcre
 
 echo $(color green "All dependencies installed.")
-#remove_src
+remove_src

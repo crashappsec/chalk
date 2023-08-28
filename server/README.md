@@ -8,7 +8,7 @@ unless otherwise specified.
 ### HTTP
 
 ```sh
-../make http
+make http
 ```
 
 [http://localhost:8585](http://localhost:8585) should show chalk API docs.
@@ -16,7 +16,7 @@ unless otherwise specified.
 ### HTTPS Server
 
 ```sh
-../make https
+make https
 ```
 
 If you choose to run https server and are using self-signed certificate,
@@ -34,11 +34,10 @@ curl https://localhost:5858 --insecure
 
 Above commands start default http/https servers used for testing.
 The server however has its own CLI.
-See available options via `./make` script which will normalize
-all commands to run in docker:
+See available options with `--help`:
 
 ```sh
-../make server --help
+make server args="--help"
 ```
 
 #### Running the server AND generate certificate
@@ -47,30 +46,30 @@ By providing TLS parameters to `run` command, it will create
 the certificate if one does not already exist.
 
 ```sh
-../make server \
+make server args="\
     run \
         --certfile=cert.pem \
         --keyfile=cert.key \
-        --domain=chalk.crashoverride.local
+        --domain=chalk.crashoverride.local"
 ```
 
 #### Generate certificate only
 
 ```sh
-../make server \
+make server args="\
     certonly \
         --certfile=cert.pem \
         --keyfile=cert.key \
-        --domain=chalk.crashoverride.local
+        --domain=chalk.crashoverride.local"
 ```
 
 #### Running the server with existing certificate
 
 ```sh
-../make server \
+make server args="\
     run \
         --certfile=cert.pem \
-        --keyfile=cert.key
+        --keyfile=cert.key"
 ```
 
 ## Database
@@ -83,7 +82,7 @@ with the URL to the database of your choosing.
 ### Browse SQLite
 
 ```sh
-../make sqlite
+make sqlite
 ```
 
 Browse to [http://localhost:18080](http://localhost:18080)
@@ -129,5 +128,5 @@ http server:
 
 ```sh
 # from root of the repo
-./make tests test_sink.py::test_post_http_fastapi
+make tests args="test_sink.py::test_post_http_fastapi"
 ```

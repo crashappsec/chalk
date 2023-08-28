@@ -2,16 +2,10 @@ FROM python:3.11.3-alpine3.17
 
 ARG POETRY_VERSION=1.5.1
 
-# install poetry
-RUN apk add --no-cache \
-        curl \
-        gcc \
-        libressl-dev \
-        musl-dev \
-        libffi-dev && \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile=minimal && \
-    source $HOME/.cargo/env && \
-    pip install --no-cache-dir poetry==${POETRY_VERSION}
+# install chalk runtime deps
+RUN apk add --no-cache curl
+
+RUN pip install --no-cache-dir poetry==${POETRY_VERSION}
 
 ENV VIRTUAL_ENV=/tests.env
 ENV PATH=/tests.env/bin:$PATH
@@ -26,4 +20,3 @@ RUN poetry install --no-plugins
 COPY --from=docker:24 /usr/local/bin/docker /usr/local/bin/docker
 
 ENTRYPOINT ["pytest"]
-
