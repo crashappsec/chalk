@@ -1,4 +1,4 @@
 {
-	"contributors": ["MyNameIsMeerkat"],
-	"message": "Thank you for your pull request and welcome to our community. We require contributors to sign our Contributor License Agreement, and we don't seem to have the users {{usersWithoutCLA}} on file. In order for us to review and merge your code please follow the steps outlined in [CLA-process.md](https://github.com/crashappsec/chalk/CLA-process.md).If you have any questions please contact us at opensource @crashoverride.com and we 'll be happy to help."
+	"contributors": ["viega", "nettrino", "miki725", "drraid", "indecisivedragon", "MyNameIsMeerkat"],
+	"message": "Thank you for your pull request and welcome to our community. We require contributors to sign our Contributor License Agreement, and we don't seem to have the users {{usersWithoutCLA}} on file. In order for us to review and merge your code please follow the steps outlined in [CLA-process.md](https://github.com/crashappsec/.github/CLA-process.md).If you have any questions please contact us at opensource @crashoverride.com and we 'll be happy to help."
 }

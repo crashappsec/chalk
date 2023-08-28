@@ -32,7 +32,8 @@ files_to_skip = [
     "./src/configs/entrypoint.c4m",
     "./src/procmaps_linux.nim" # Not used yet.
     "./src/elf.nim", # Not used yet.
-    "./src/commands/cmd_helpdump.nim"
+    "./src/commands/cmd_helpdump.nim",
+    "./config-tool/chalk_config/setup.cfg", # Ready for when config-tool is removed from dir skiplist above 
 ]
 files_to_move = {
     "./chalk_internal.nimble": "./chalk.nimble",
