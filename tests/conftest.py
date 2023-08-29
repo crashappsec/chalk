@@ -16,6 +16,19 @@ from .utils.log import get_logger
 logger = get_logger()
 
 
+def pytest_addoption(parser):
+    # https://docs.pytest.org/en/7.4.x/how-to/logging.html#live-logs
+    # log_cli is only an ini option so we add argument for it
+    parser.addoption(
+        "--logs", action="store_true", default=False, help="show live logs"
+    )
+
+
+@pytest.hookimpl
+def pytest_configure(config):
+    config.inicfg["log_cli"] = config.getoption("--logs")
+
+
 @pytest.fixture(scope="function")
 def tmp_data_dir():
     with TemporaryDirectory() as tmp_dir:

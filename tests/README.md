@@ -75,11 +75,22 @@ within the test file (ex: `test_elf.py::test_virtual_valid`).
 See [pytest docs](https://docs.pytest.org/en/7.1.x/how-to/usage.html)
 for more invocation options.
 
-To run slower tests which are by default skipped add `--slow`` argument:
+#### Slow Tests
+
+To run slower tests which are by default skipped add `--slow` argument:
 
 ```sh
 # root of the repo
 make tests args="--slow"
+```
+
+#### Live Logs
+
+By default logs will only show for failed tests.
+To show all logs of running tests as they run, add `--logs` argument:
+
+```sh
+make tests args="--logs"
 ```
 
 ### Debugging a Failed Test
