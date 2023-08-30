@@ -17,6 +17,7 @@ src/c4autoconf.nim
 *.json
 *.jsonl
 *.pyc
+*.lck
 */__pycache__/*
 .envrc.private
 dist

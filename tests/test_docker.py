@@ -5,7 +5,7 @@ import subprocess
 import time
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import Any, Dict, Optional
+from typing import Optional
 from unittest import mock
 
 import os
@@ -149,8 +149,6 @@ def test_virtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
                 "docker",
                 "run",
                 "--rm",
-                "--name",
-                "test_container",
                 "--entrypoint",
                 "cat",
                 image_hash,
@@ -182,7 +180,10 @@ def test_virtual_invalid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
 
 
 @pytest.mark.parametrize("test_file", ["valid/sample_1", "valid/sample_2"])
-def test_nonvirtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
+def test_nonvirtual_valid(
+    tmp_data_dir: Path, chalk: Chalk, test_file: str, worker_id: str
+):
+    container_name = f"test_container_{worker_id}"
     try:
         insert_output = _build_and_chalk_dockerfile(
             chalk, test_file, tmp_data_dir, valid=True, virtual=False
@@ -222,7 +223,7 @@ def test_nonvirtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
                 "run",
                 "--rm",
                 "--name",
-                "test_container",
+                container_name,
                 "--entrypoint",
                 "cat",
                 image_hash,
@@ -244,9 +245,9 @@ def test_nonvirtual_valid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
         images = docker_inspect_image_hashes(tag=test_file)
         docker_image_cleanup(images)
         try:
-            subprocess.run(args=["docker", "rm", "-f", "test_container"])
+            subprocess.run(args=["docker", "rm", "-f", container_name])
         except Exception as e:
-            logger.warning("Could not remove test_container %s", e)
+            logger.warning("Could not remove container", name=container_name, error=e)
 
 
 @pytest.mark.parametrize("test_file", ["invalid/sample_1", "invalid/sample_2"])
@@ -262,9 +263,9 @@ def test_nonvirtual_invalid(tmp_data_dir: Path, chalk: Chalk, test_file: str):
 
 # exec heartbeat from inside docker
 @pytest.mark.slow()
-def test_docker_heartbeat(tmp_data_dir: Path, chalk_copy: Chalk):
+def test_docker_heartbeat(tmp_data_dir: Path, chalk_copy: Chalk, worker_id: str):
     test_image = "test_image"
-    test_container = "test_container"
+    container_name = f"test_container_{worker_id}"
     try:
         files = os.listdir(DOCKERFILES / "valid" / "sleep")
         for file in files:
@@ -302,7 +303,7 @@ def test_docker_heartbeat(tmp_data_dir: Path, chalk_copy: Chalk):
                     "docker",
                     "run",
                     "--name",
-                    test_container,
+                    container_name,
                     "-t",
                     test_image,
                 ],
@@ -326,17 +327,17 @@ def test_docker_heartbeat(tmp_data_dir: Path, chalk_copy: Chalk):
     finally:
         docker_image_cleanup([test_image])
         try:
-            subprocess.run(args=["docker", "rm", "-f", test_container])
+            subprocess.run(args=["docker", "rm", "-f", container_name])
         except Exception as e:
-            logger.warning("Could not remove test_container %s", e)
+            logger.warning("Could not remove container", name=container_name, error=e)
 
 
-def test_docker_labels(tmp_data_dir: Path, chalk: Chalk):
+def test_docker_labels(tmp_data_dir: Path, chalk: Chalk, worker_id: str):
     files = os.listdir(DOCKERFILES / "valid" / "sample_1")
     for file in files:
         shutil.copy(DOCKERFILES / "valid" / "sample_1" / file, tmp_data_dir)
 
-    container_name = "test_container"
+    image_name = f"test_image_{worker_id}"
     try:
         # build container with env vars
         chalk_run = chalk.run(
@@ -346,14 +347,14 @@ def test_docker_labels(tmp_data_dir: Path, chalk: Chalk):
                 "docker",
                 "build",
                 "-t",
-                container_name,
+                image_name,
                 ".",
             ],
         )
         assert chalk_run.returncode == 0
 
         _docker_inspect_proc = subprocess.run(
-            ["docker", "inspect", container_name],
+            ["docker", "inspect", image_name],
             capture_output=True,
         )
         assert _docker_inspect_proc.returncode == 0
@@ -374,7 +375,7 @@ def test_docker_labels(tmp_data_dir: Path, chalk: Chalk):
     except Exception:
         raise
     finally:
-        docker_image_cleanup([container_name])
+        docker_image_cleanup([image_name])
 
 
 @pytest.mark.parametrize(
@@ -450,7 +451,8 @@ def test_build_and_push(tmp_data_dir: Path, chalk: Chalk, test_file: str):
 
 
 # extract on image id, and image name, running container id + container name, exited container id + container name
-def test_extract(tmp_data_dir: Path, chalk: Chalk):
+def test_extract(tmp_data_dir: Path, chalk: Chalk, worker_id: str):
+    container_name = f"test_container_{worker_id}"
     try:
         dockerfile = "valid/sample_1"
         files = os.listdir(DOCKERFILES / dockerfile)
@@ -503,7 +505,6 @@ def test_extract(tmp_data_dir: Path, chalk: Chalk):
         )
 
         # run container and keep alive via shell
-        container_name = "test_container"
         subprocess.Popen(
             args=[
                 "docker",
@@ -599,6 +600,6 @@ def test_extract(tmp_data_dir: Path, chalk: Chalk):
         images = docker_inspect_image_hashes(tag="test_image")
         docker_image_cleanup(images)
         try:
-            subprocess.run(args=["docker", "rm", "-f", "test_container"])
+            subprocess.run(args=["docker", "rm", "-f", container_name])
         except Exception as e:
-            logger.warning("Could not remove test_container %s", e)
+            logger.warning("Could not remove container", name=container_name, error=e)

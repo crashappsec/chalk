@@ -93,6 +93,19 @@ To show all logs of running tests as they run, add `--logs` argument:
 make tests args="--logs"
 ```
 
+#### Parallel Tests
+
+To run tests in parallel, add `-nauto` argument which will run tests
+in number of workers as there are CPU cores on the system:
+
+```sh
+make tests args="-nauto"
+```
+
+If you would like you can also hardcode number of workers like `-n4`.
+Note that parallel tests does not work with various other pytest flags
+such as `--pdb`.
+
 ### Debugging a Failed Test
 
 Simplest approach is for `pytest` to enter a debugger on test failure.

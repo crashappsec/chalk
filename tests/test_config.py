@@ -3,7 +3,7 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, IO
 
 import pytest
 
@@ -14,7 +14,7 @@ from .utils.validate import MAGIC
 logger = get_logger()
 
 
-validation_string = "TEST ERROR HERE XXXXXX"
+VALIDATION_ERROR = "TEST ERROR HERE XXXXXX"
 parse_error = ["Parse", "error"]
 CONFIGFILES = Path(__file__).parent / "data" / "configs"
 # base profiles and outconf
@@ -37,7 +37,7 @@ def test_dump_load(tmp_data_dir: Path, chalk_copy: Chalk, use_embedded: bool):
     assert tmp_conf.is_file(), "testconf.conf must be a file and is not"
     with open(tmp_conf, "w+") as file:
         file_text = file.read()
-        file_text = f'error("{validation_string}")' + file_text
+        file_text = f'error("{VALIDATION_ERROR}")' + file_text
         file.write(file_text)
 
     # load updated config (will overwrite chalk binary)
@@ -51,7 +51,7 @@ def test_dump_load(tmp_data_dir: Path, chalk_copy: Chalk, use_embedded: bool):
     extract_output = chalk_copy.run(chalk_cmd="extract", params=["."])
     assert extract_output.returncode == 0
     error_output = extract_output.stderr.decode()
-    assert validation_string in error_output
+    assert VALIDATION_ERROR in error_output
 
 
 # sanity check that default config has not changed
@@ -126,58 +126,48 @@ def test_valid_load(
         assert report["_OPERATION"] == "extract"
 
         assert "_OP_ERRORS" in report
-        assert validation_string in report["_OP_ERRORS"][0]
+        assert VALIDATION_ERROR in report["_OP_ERRORS"][0]
 
 
 # tests for configs that are found in the chalk search path
 # these configs are NOT loaded directly into the binary
+# as these configs are global across the system,
+# test needs to be exclusive so nothing else executes in parallel
+@pytest.mark.exclusive
+@pytest.mark.parametrize("tmp_file", [{"path": "/etc/chalk.conf"}], indirect=True)
+@pytest.mark.parametrize(
+    "test_config",
+    [
+        ("validation/valid_1.conf", 0, VALIDATION_ERROR),
+        ("validation/invalid_1.conf", 1, ""),
+    ],
+)
 def test_external_configs(
+    tmp_file: IO,
     chalk_copy: Chalk,
+    test_config: tuple[str, int, str],
 ):
-    valid_config = "validation/valid_1.conf"
-    invalid_config = "validation/invalid_1.conf"
-    config_location = "/etc/chalk"
-    try:
-        # test config passed in via flag via flag
-        # valid config should pass
-        _flag_proc = chalk_copy.run(
-            chalk_cmd="env",
-            params=["--log-level=none", f"--config-file={CONFIGFILES / valid_config}"],
-        )
-        _flag_report = _flag_proc.stdout.decode()
-        assert validation_string in _flag_report
+    # dont allow other chalks to run while this test case is running
+    # chalk_copy.lock()
 
-        # invalid config should not error
-        _flag_proc = chalk_copy.run(
-            chalk_cmd="env",
-            params=[
-                "--log-level=none",
-                f"--config-file={CONFIGFILES / invalid_config}",
-            ],
-        )
-        assert _flag_proc.returncode != 0
+    config_path, returncode, expected_error = test_config
 
-        # test load by putting it in chalk default search locations
-        # instead of copying to tmp data dir, we have to copy to someplace chalk looks for it
-        os.mkdir(config_location)
+    reference = chalk_copy.run(
+        chalk_cmd="env",
+        params=["--log-level=error", f"--config-file={CONFIGFILES / config_path}"],
+    )
+    assert reference
+    assert reference.returncode == returncode
+    assert expected_error in reference.stdout.decode()
 
-        # valid should be loaded
-        shutil.copy(CONFIGFILES / valid_config, config_location + "/chalk.conf")
-        _path_proc = chalk_copy.run(chalk_cmd="env", params=["--log-level=none"])
-        _path_report = _path_proc.stdout.decode()
-        assert validation_string in _path_report
+    # test load by putting it in chalk default search locations
+    # instead of copying to tmp data dir, we have to copy to someplace chalk looks for it
+    with tmp_file as fid:
+        fid.write((CONFIGFILES / config_path).read_bytes())
 
-        # invalid should not be loaded
-        shutil.copy(CONFIGFILES / invalid_config, config_location + "/chalk.conf")
-        _path_proc = chalk_copy.run(chalk_cmd="env", params=["--log-level=none"])
-        assert _path_proc.returncode != 0
-    except Exception as e:
-        logger.info(e)
-        raise
-    finally:
-        # we need to do cleanup here for /etc/chalk
-        for file in os.listdir(config_location):
-            os.remove(os.path.join(config_location, file))
+    external = chalk_copy.run(chalk_cmd="env", params=["--log-level=error"])
+    assert external
+    assert external.returncode == returncode
 
 
 # TODO: fill this out

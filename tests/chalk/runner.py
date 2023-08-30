@@ -1,6 +1,5 @@
 import json
 import os
-import shutil
 from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess, check_output, run
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -64,7 +63,7 @@ class Chalk:
         self,
         *,
         chalk_cmd: Optional[ChalkCmd] = None,
-        target: Optional[Path] | Optional[str] = None,
+        target: Optional[Path | str] = None,
         params: Optional[List[str]] = None,
         expected_success: Optional[bool] = True,
     ) -> Optional[CompletedProcess]:
@@ -77,7 +76,7 @@ class Chalk:
         if params:
             cmd.extend(params)
 
-        if target is Path:
+        if isinstance(target, Path):
             assert target.exists(), f"Target {target} does not exist"
             cmd.append(target)
         elif target is not None:
@@ -88,7 +87,7 @@ class Chalk:
         my_env = os.environ.copy()
         # FIXME
         my_env["DOCKER_BUILDKIT"] = "0"
-        logger.debug("running chalk command: %s", cmd)
+        logger.debug("running chalk command", cmd=cmd)
         run_process = None
         try:
             run_process = run(cmd, capture_output=True, env=my_env)
@@ -98,10 +97,21 @@ class Chalk:
                 logger.error(
                     "Chalk invocation had unexpected errors",
                     cmd=cmd,
-                    output=run_process.stdout,
-                    stderr=run_process.stderr,
+                    stdout=run_process.stdout.decode(),
+                    stderr=run_process.stderr.decode(),
                     returncode=run_process.returncode,
+                    cwd=os.getcwd(),
+                    contents=os.listdir(),
                 )
+            logger.debug(
+                "chalk result",
+                cmd=cmd,
+                stdout=run_process.stdout.decode(),
+                stderr=run_process.stderr.decode(),
+                returncode=run_process.returncode,
+                cwd=os.getcwd(),
+                contents=os.listdir(),
+            )
             # process is returned whether chalk was fail or success
             return run_process
         except CalledProcessError as e:
@@ -110,20 +120,21 @@ class Chalk:
                 "Chalk invocation failed unexpectedly",
                 error=e,
                 cmd=e.cmd,
-                stdout=e.output,
-                stderr=e.stderr,
+                stdout=e.output.decode(),
+                stderr=e.stderr.decode(),
                 returncode=e.returncode,
                 target=target,
                 params=params,
                 chalk_cmd=chalk_cmd,
-                cur_dir=check_output(["pwd"]).decode().strip(),
-                contents=check_output(["ls"]).decode().strip(),
+                cwd=os.getcwd(),
+                contents=os.listdir(),
             )
             raise
         except FileNotFoundError as e:
-            if self.binary.is_file() and (target is None or target.exists()):
+            if self.binary.is_file() and (target is None or Path(target).exists()):
                 logger.error(
-                    "Got exception about file not found but chalk binary exists. Perhaps a platform incompatibility of the compiled binary?",
+                    "Got exception about file not found but chalk binary exists. "
+                    "Perhaps a platform incompatibility of the compiled binary?",
                     error=e,
                 )
             else:
@@ -133,8 +144,8 @@ class Chalk:
                     target=target,
                     params=params,
                     chalk_cmd=chalk_cmd,
-                    cur_dir=check_output(["pwd"]).decode().strip(),
-                    contents=check_output(["ls"]).decode().strip(),
+                    cwd=os.getcwd(),
+                    contents=os.listdir(),
                 )
             raise
 
@@ -168,7 +179,7 @@ class Chalk:
     # returns chalk report
     def insert(self, artifact: Path, virtual: bool = False) -> List[Dict[str, Any]]:
         # suppress output since all we want is the chalk report
-        params = ["--log-level=none"]
+        params = ["--log-level=error"]
         if virtual:
             params.append("--virtual")
 
@@ -176,9 +187,12 @@ class Chalk:
         assert inserted is not None
         if inserted.returncode != 0:
             logger.error(
-                "chalk insertion failed with return code", ret=inserted.returncode
+                "chalk insertion failed with return code",
+                ret=inserted.returncode,
+                stdout=inserted.stdout.decode(),
+                stderr=inserted.stderr.decode(),
             )
-            raise AssertionError
+            assert inserted.returncode == 0
         try:
             return json.loads(inserted.stdout, strict=False)
         except json.decoder.JSONDecodeError:
@@ -189,15 +203,18 @@ class Chalk:
         extracted = self.run(
             chalk_cmd="extract",
             target=artifact,
-            params=["--log-level=none"],
+            params=["--log-level=error"],
         )
 
         assert extracted is not None
         if extracted.returncode != 0:
             logger.error(
-                "chalk extraction failed with return code", ret=extracted.returncode
+                "chalk extraction failed with return code",
+                ret=extracted.returncode,
+                stdout=extracted.stdout.decode(),
+                stderr=extracted.stderr.decode(),
             )
-            raise AssertionError
+            assert extracted.returncode == 0
         try:
             extract_out = extracted.stdout.decode()
             return json.loads(extract_out, strict=False)
@@ -209,7 +226,7 @@ class Chalk:
         self, artifact: Path, chalk_as_parent: bool = False
     ) -> List[Dict[str, Any]]:
         exec_flag = "--exec-command-name=" + str(artifact)
-        params = [exec_flag, "--log-level=none"]
+        params = [exec_flag, "--log-level=error"]
         if chalk_as_parent:
             params.append("--chalk-as-parent")
         proc = self.run(
@@ -219,8 +236,13 @@ class Chalk:
 
         assert proc is not None
         if proc.returncode != 0:
-            logger.error("chalk exec failed with return code", ret=proc.returncode)
-            raise AssertionError
+            logger.error(
+                "chalk exec failed with return code",
+                ret=proc.returncode,
+                stdout=proc.stdout.decode(),
+                stderr=proc.stderr.decode(),
+            )
+            assert proc.returncode == 0
         try:
             _report = proc.stdout.decode()
             # there will be exec proc output that is not chalk so ignore it
@@ -233,13 +255,18 @@ class Chalk:
     def delete(self, artifact: Path) -> List[Dict[str, Any]]:
         proc = self.run(
             chalk_cmd="delete",
-            params=[str(artifact), "--log-level=none"],
+            params=[str(artifact), "--log-level=error"],
         )
 
         assert proc is not None
         if proc.returncode != 0:
-            logger.error("chalk delete failed with return code", ret=proc.returncode)
-            raise AssertionError
+            logger.error(
+                "chalk delete failed with return code",
+                ret=proc.returncode,
+                stdout=proc.stdout.decode(),
+                stderr=proc.stderr.decode(),
+            )
+            assert proc.returncode == 0
         try:
             _report = proc.stdout.decode()
             return json.loads(_report, strict=False)

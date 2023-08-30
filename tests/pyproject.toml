@@ -6,17 +6,19 @@ authors = []
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
-structlog = "^23.1.0"
+boto3 = "^1.26.149"
+filelock = "^3.12.3"
+ndg-httpsclient = "^0.5.1"
 pytest = "^7.3.1"
 pytest-dependency = "^0.5.1"
 pytest-profiling = "^1.7.0"
 pytest-skip-slow = "^0.0.3"
 pytest-timeout = "^2.1.0"
+pytest-xdist = "^3.3.1"
+python = "^3.11"
 python-dateutil = "^2.8.2"
-boto3 = "^1.26.149"
 requests = "^2.31.0"
-ndg-httpsclient = "^0.5.1"
+structlog = "^23.1.0"
 
 [tool.poetry.group.neovim.dependencies]
 mypy = {version = "^0.991", optional = true}

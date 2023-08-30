@@ -64,4 +64,4 @@ jobs:
 
       - name: Run tests
         run: |
-          make tests
+          make tests args="-nauto"

@@ -1,12 +1,14 @@
 import shutil
 import sqlite3
-from contextlib import chdir, closing
+from contextlib import ExitStack, chdir, closing
 from functools import lru_cache
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 
+import os
 import pytest
 import requests
+from filelock import FileLock
 
 from .chalk.runner import Chalk
 from .conf import SERVER_CERT, SERVER_DB, SERVER_HTTP, SERVER_HTTPS
@@ -29,11 +31,57 @@ def pytest_configure(config):
     config.inicfg["log_cli"] = config.getoption("--logs")
 
 
+def lock(name: str):
+    return FileLock(Path(__file__).with_name(name).resolve())
+
+
+@pytest.fixture(autouse=True)
+def be_exclusive(request, worker_id):
+    try:
+        workercount = request.config.workerinput["workercount"]
+    except AttributeError:
+        yield
+    else:
+        if request.node.get_closest_marker("exclusive"):
+            with ExitStack() as stack:
+                # as test case is exclusive, lock all worker locks
+                for i in range(workercount):
+                    stack.enter_context(lock(f"worker-gw{i}.lck"))
+                yield
+        else:
+            with lock(f"worker-{worker_id}.lck"):
+                yield
+
+
 @pytest.fixture(scope="function")
 def tmp_data_dir():
     with TemporaryDirectory() as tmp_dir:
         with chdir(tmp_dir):
             yield Path(tmp_dir)
+
+
+@pytest.fixture(scope="function")
+def tmp_file(request):
+    config = {
+        "mode": "w+b",
+        "delete": True,
+    }
+    config.update(getattr(request, "param", {}))
+    path = config.pop("path")
+    # tempfile does not allow to create file with specific path
+    # as it always randomizes the name
+    if path:
+        path = Path(path).resolve()
+        os.makedirs(path.parent, exist_ok=True)
+        try:
+            with path.open(config["mode"]) as f:
+                yield f
+        finally:
+            if config["delete"]:
+                path.unlink(missing_ok=True)
+    else:
+        with NamedTemporaryFile(**config) as f:
+            yield f
 
 
 @pytest.fixture(scope="session")
