@@ -1,7 +1,5 @@
 import json
-import shutil
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Any, Callable, Dict
 from unittest import mock
 
@@ -11,13 +9,7 @@ import pytest
 import requests
 
 from .chalk.runner import Chalk
-from .conf import (
-    CONFIG_DIR,
-    IN_GITHUB_ACTIONS,
-    SERVER_CERT,
-    SERVER_HTTP,
-    SERVER_HTTPS,
-)
+from .conf import CAT_PATH, SERVER_CERT, SERVER_HTTP, SERVER_HTTPS, SINK_CONFIGS
 from .utils.log import get_logger
 
 
@@ -48,10 +40,9 @@ def _validate_chalk(
 
 # TODO add a test for the file not being present
 @mock.patch.dict(os.environ, {"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"})
-def test_file_present(tmp_data_dir: Path, chalk: Chalk):
-    logger.debug("testing file sink with an existing file...")
-    artifact = tmp_data_dir / "cat"
-    shutil.copy("/bin/cat", artifact)
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
+def test_file_present(tmp_data_dir: Path, chalk: Chalk, copy_files: list[Path]):
+    artifact = copy_files[0]
 
     # prep config file
     file_output_path = Path(os.environ["SINK_TEST_OUTPUT_FILE"])
@@ -61,17 +52,14 @@ def test_file_present(tmp_data_dir: Path, chalk: Chalk):
         os.utime(file_output_path, None)
     assert file_output_path.is_file(), "file sink path must be a valid path"
 
-    config = CONFIG_DIR / "file.conf"
-    chalk.run_with_custom_config(config_path=config, target_path=artifact)
+    config = SINK_CONFIGS / "file.conf"
+    chalk.run_with_custom_config(config_path=config, target=artifact)
 
     # check that file output is correct
-    if not file_output_path or not file_output_path.is_file():
-        logger.error("output file %s does not exist", file_output_path)
-        raise AssertionError
+    assert file_output_path.is_file(), "file sink should exist after chalk operation"
 
-    contents = file_output_path.read_bytes()
-    if not contents:
-        raise AssertionError("file output is empty!?")
+    contents = file_output_path.read_text()
+    assert contents
     chalks = json.loads(contents)
     assert len(chalks) == 1
     _validate_chalk(chalks[0], tmp_data_dir)
@@ -80,23 +68,18 @@ def test_file_present(tmp_data_dir: Path, chalk: Chalk):
 @mock.patch.dict(
     os.environ, {"SINK_TEST_OUTPUT_ROTATING_LOG": "/tmp/sink_rotating.json"}
 )
-def test_rotating_log(tmp_data_dir: Path, chalk: Chalk):
-    logger.debug("testing rotating log sink...")
-    artifact = Path(tmp_data_dir) / "cat"
-    shutil.copy("/bin/cat", artifact)
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
+def test_rotating_log(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
+    artifact = copy_files[0]
 
     assert (
         os.environ["SINK_TEST_OUTPUT_ROTATING_LOG"] != ""
     ), "rotating log output not set"
     rotating_log_output_path = Path(os.environ["SINK_TEST_OUTPUT_ROTATING_LOG"])
-    try:
-        os.remove(rotating_log_output_path)
-    except FileNotFoundError:
-        # okay if file doesn't exist
-        pass
+    rotating_log_output_path.unlink(missing_ok=True)
 
-    config = CONFIG_DIR / "rotating_log.conf"
-    chalk.run_with_custom_config(config_path=config, target_path=artifact)
+    config = SINK_CONFIGS / "rotating_log.conf"
+    chalk.run_with_custom_config(config_path=config, target=artifact)
 
     # check that file output is correct
     if not rotating_log_output_path or not rotating_log_output_path.is_file():
@@ -116,54 +99,43 @@ def test_rotating_log(tmp_data_dir: Path, chalk: Chalk):
 @mock.patch.dict(
     os.environ, {"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/sink-test.json"}
 )
-def test_s3(tmp_data_dir: Path, chalk: Chalk):
-    logger.debug("testing s3 sink...")
-    artifact = Path(tmp_data_dir) / "cat"
-    shutil.copy("/bin/cat", artifact)
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
+def test_s3(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
+    artifact = copy_files[0]
 
-    has_access_key = os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get(
-        "AWS_SECRET_ACCESS_KEY"
-    )
+    os.environ.pop("AWS_PROFILE")
 
-    aws_profile = os.environ.get("AWS_PROFILE")
-    if has_access_key:
-        os.environ.pop("AWS_PROFILE")
-    try:
-        s3 = boto3.client("s3")
-        # basic validation of s3 env vars
-        assert os.environ["AWS_S3_BUCKET_URI"], "s3 bucket uri must not be empty"
+    s3 = boto3.client("s3")
+    # basic validation of s3 env vars
+    assert os.environ["AWS_S3_BUCKET_URI"], "s3 bucket uri must not be empty"
 
-        config = CONFIG_DIR / "s3.conf"
-        proc = chalk.run_with_custom_config(config_path=config, target_path=artifact)
-        assert proc is not None
-        # get object name out of response code
-        logs = proc.stderr.decode().split("\n")
-        object_name = ""
-        for line in logs:
-            # expecting log line from chalk of form `info: Post to: 1686605005558-CSP9AXH5CMXKAE3D9BN8G25K0G-sink-test; response = 200 OK (sink conf='my_s3_config')`
-            if "Post to" in line:
-                object_name = line.split()[3].strip(";")
-                break
+    config = SINK_CONFIGS / "s3.conf"
+    proc = chalk.run_with_custom_config(config_path=config, target=artifact)
+    assert proc is not None
+    # get object name out of response code
+    logs = proc.stderr.decode().split("\n")
+    object_name = ""
+    for line in logs:
+        # expecting log line from chalk of form `info: Post to: 1686605005558-CSP9AXH5CMXKAE3D9BN8G25K0G-sink-test; response = 200 OK (sink conf='my_s3_config')`
+        if "Post to" in line:
+            object_name = line.split()[3].strip(";")
+            break
 
-        assert object_name != "", "object name could not be found"
-        assert object_name.endswith(".json")
-        logger.debug("object name fetched from s3 %s", object_name)
+    assert object_name != "", "object name could not be found"
+    assert object_name.endswith(".json")
+    logger.debug("object name fetched from s3 %s", object_name)
 
-        # fetch s3 bucket object and then validate
-        bucket_name = "crashoverride-chalk-tests"
-        response = s3.get_object(Bucket=bucket_name, Key=object_name)["Body"]
-        if not response:
-            raise AssertionError("s3 sent empty response?")
-        chalks = json.loads(response.read())
+    # fetch s3 bucket object and then validate
+    bucket_name = "crashoverride-chalk-tests"
+    response = s3.get_object(Bucket=bucket_name, Key=object_name)["Body"]
+    if not response:
+        raise AssertionError("s3 sent empty response?")
+    chalks = json.loads(response.read())
 
-        if not chalks:
-            raise AssertionError("s3 fetched empty chalk json?!")
+    if not chalks:
+        raise AssertionError("s3 fetched empty chalk json?!")
 
-        _validate_chalk(chalks[0], tmp_data_dir)
-
-    finally:
-        if aws_profile:
-            os.environ["AWS_PROFILE"] = aws_profile
+    _validate_chalk(chalks[0], tmp_data_dir)
 
 
 @mock.patch.dict(
@@ -174,14 +146,16 @@ def test_s3(tmp_data_dir: Path, chalk: Chalk):
         "CHALK_POST_HEADERS": "x-test-header: test-header",
     },
 )
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_post_http_fastapi(
     tmp_data_dir: Path,
+    copy_files: list[Path],
     chalk: Chalk,
     server_sql: Callable[[str], str | None],
     server_http: str,
 ):
     _test_server(
-        tmp_data_dir=tmp_data_dir,
+        artifact=copy_files[0],
         chalk=chalk,
         conf="post_https_local.conf",
         url=server_http,
@@ -199,15 +173,16 @@ def test_post_http_fastapi(
         "TLS_CERT_FILE": str(SERVER_CERT),
     },
 )
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_post_https_fastapi(
-    tmp_data_dir: Path,
+    copy_files: list[Path],
     chalk: Chalk,
     server_sql: Callable[[str], str | None],
     server_https: str,
     server_cert: str,
 ):
     _test_server(
-        tmp_data_dir=tmp_data_dir,
+        artifact=copy_files[0],
         chalk=chalk,
         conf="post_https_local.conf",
         url=server_https,
@@ -217,7 +192,7 @@ def test_post_https_fastapi(
 
 
 def _test_server(
-    tmp_data_dir: Path,
+    artifact: Path,
     chalk: Chalk,
     conf: str,
     url: str,
@@ -229,10 +204,7 @@ def _test_server(
     # post url must be set
     assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
 
-    artifact = tmp_data_dir / "cat"
-    shutil.copy("/bin/cat", artifact)
-
-    config = CONFIG_DIR / conf
+    config = SINK_CONFIGS / conf
     proc = chalk.run(
         chalk_cmd="insert",
         target=artifact,
@@ -243,7 +215,6 @@ def _test_server(
             str(config.absolute()),
         ],
     )
-    assert proc is not None
 
     metadata_id = None
     _output = proc.stdout.decode()

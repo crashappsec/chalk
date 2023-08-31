@@ -3,6 +3,7 @@ import sqlite3
 from contextlib import ExitStack, chdir, closing
 from functools import lru_cache
 from pathlib import Path
+from secrets import token_bytes
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 import os
@@ -53,6 +54,11 @@ def be_exclusive(request, worker_id):
                 yield
 
 
+@pytest.fixture()
+def random_hex():
+    return token_bytes(5).hex()
+
+
 @pytest.fixture(scope="function")
 def tmp_data_dir():
     with TemporaryDirectory() as tmp_dir:
@@ -82,6 +88,16 @@ def tmp_file(request):
     else:
         with NamedTemporaryFile(**config) as f:
             yield f
+
+
+@pytest.fixture(scope="function")
+def copy_files(tmp_data_dir: Path, request):
+    paths: list[Path] = []
+    assert isinstance(request.param, list)
+    for i in request.param:
+        shutil.copy(i, tmp_data_dir)
+        paths.append(tmp_data_dir / Path(i).name)
+    yield paths
 
 
 @pytest.fixture(scope="session")

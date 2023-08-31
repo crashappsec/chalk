@@ -46,7 +46,7 @@ $(addsuffix /%,$(TOOLS)):
 .PHONY: tests
 tests: DOCKER=$(_DOCKER) # force rebuilds to use docker to match tests
 tests: chalk # note this will rebuild chalk if necessary
-	docker compose run --rm tests -v $(args)
+	docker compose run --rm tests $(args)
 
 # ----------------------------------------------------------------------------
 # MISC

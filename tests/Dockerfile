@@ -3,7 +3,7 @@ FROM python:3.11.3-alpine3.17
 ARG POETRY_VERSION=1.5.1
 
 # install chalk runtime deps
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl git
 
 # M1-only deps to compile wheels on ARM
 RUN if uname -m | grep -Ei "arm|aarch"; then \

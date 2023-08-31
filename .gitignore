@@ -1,7 +1,6 @@
 .TODO
 .config-tool-bin/
 config-tool-outdir
-*/chalk
 /bin/chalk
 /chalk
 /src/getlibpath
@@ -12,12 +11,15 @@ tags
 .vscode
 chalk.conf
 chalk.dSYM
+chalk-tmp
+chalk-*.tmp
 src/c4autoconf.nim
 *.o
 *.json
 *.jsonl
 *.pyc
 *.lck
+*.vim
 */__pycache__/*
 .envrc.private
 dist

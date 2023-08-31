@@ -1,18 +1,14 @@
-import json
-import os
-import shutil
-import time
 from pathlib import Path
 
 import pytest
 
-from .chalk.runner import Chalk
+from .chalk.runner import Chalk, ChalkReport
+from .conf import CONFIGS, SLEEP_PATH, UNAME_PATH
 from .utils.bin import sha256
 from .utils.log import get_logger
-from .utils.validate import ArtifactInfo, validate_chalk_report
+
 
 logger = get_logger()
-CONFIGFILES = Path(__file__).parent / "data" / "configs"
 
 
 # chalk exec forking should not affect behavior
@@ -23,44 +19,37 @@ CONFIGFILES = Path(__file__).parent / "data" / "configs"
         "--no-chalk-as-parent",
     ],
 )
+@pytest.mark.parametrize("copy_files", [[UNAME_PATH]], indirect=True)
 def test_exec_unchalked(
     flag: str,
     tmp_data_dir: Path,
+    copy_files: list[Path],
     chalk: Chalk,
 ):
-    shutil.copy("/bin/uname", tmp_data_dir / "uname")
-    bin_path = tmp_data_dir / "uname"
-    bin_hash = sha256(tmp_data_dir / "uname")
+    bin_path = copy_files[0]
+    bin_hash = sha256(bin_path)
 
     exec_proc = chalk.run(
         chalk_cmd="exec",
         params=[flag, f"--exec-command-name={bin_path}", "--log-level=none"],
     )
-    assert exec_proc.returncode == 0
-    _stderr = exec_proc.stderr.decode()
-    assert _stderr == ""
-
-    _stdout = exec_proc.stdout.decode()
     # first line must be linux
-    assert _stdout.startswith("Linux")
-    _stdout = _stdout.removeprefix("Linux")
-    chalk_report = json.loads(_stdout, strict=False)[0]
+    assert exec_proc.text.startswith("Linux")
 
-    assert chalk_report["_OPERATION"] == "exec"
+    assert exec_proc.report["_OPERATION"] == "exec"
     # we expect the binary to be unmarked
-    assert chalk_report["_UNMARKED"] == [str(bin_path)]
+    assert exec_proc.report["_UNMARKED"] == [str(bin_path)]
 
-    sub_chalk = chalk_report["_CHALKS"][0]
-    assert sub_chalk["_OP_ARTIFACT_PATH"] == str(bin_path)
-    assert sub_chalk["_OP_ARTIFACT_TYPE"] == "ELF"
+    assert exec_proc.mark["_OP_ARTIFACT_PATH"] == str(bin_path)
+    assert exec_proc.mark["_OP_ARTIFACT_TYPE"] == "ELF"
     # current hash should be identical to bin hash since we didn't change the binary
-    assert sub_chalk["_CURRENT_HASH"] == bin_hash
+    assert exec_proc.mark["_CURRENT_HASH"] == bin_hash
 
     # expect process info to be included
     # but can't check exact values for most of these
-    assert sub_chalk["_PROCESS_PID"] > 0
-    assert sub_chalk["_PROCESS_PARENT_PID"] > 0
-    assert sub_chalk["_PROCESS_UID"] is not None
+    assert exec_proc.mark["_PROCESS_PID"] > 0
+    assert exec_proc.mark["_PROCESS_PARENT_PID"] > 0
+    assert exec_proc.mark["_PROCESS_UID"] is not None
 
 
 @pytest.mark.parametrize(
@@ -70,78 +59,72 @@ def test_exec_unchalked(
         "--no-chalk-as-parent",
     ],
 )
+@pytest.mark.parametrize("copy_files", [[UNAME_PATH]], indirect=True)
 def test_exec_chalked(
     flag: str,
     tmp_data_dir: Path,
+    copy_files: list[Path],
     chalk: Chalk,
 ):
-    shutil.copy("/bin/uname", tmp_data_dir / "uname")
-    bin_path = tmp_data_dir / "uname"
-    bin_hash = sha256(tmp_data_dir / "uname")
+    bin_path = copy_files[0]
+    bin_hash = sha256(bin_path)
 
     # add chalk mark
     chalk.insert(artifact=bin_path, virtual=False)
 
     # hash of chalked binary
-    current_hash = sha256(tmp_data_dir / "uname")
+    chalk_hash = sha256(bin_path)
+    assert bin_hash != chalk_hash
 
     exec_proc = chalk.run(
         chalk_cmd="exec",
         params=[flag, f"--exec-command-name={bin_path}", "--log-level=none"],
     )
-    assert exec_proc.returncode == 0
-    _stderr = exec_proc.stderr.decode()
-    assert _stderr == ""
-
-    _stdout = exec_proc.stdout.decode()
     # first line must be linux
-    assert _stdout.startswith("Linux")
-    _stdout = _stdout.removeprefix("Linux")
-    chalk_report = json.loads(_stdout, strict=False)[0]
+    assert exec_proc.text.startswith("Linux")
 
-    assert chalk_report["_OPERATION"] == "exec"
+    assert exec_proc.report["_OPERATION"] == "exec"
     # we expect the binary to be marked
-    assert "_UNMARKED" not in chalk_report
+    assert "_UNMARKED" not in exec_proc.report
 
-    sub_chalk = chalk_report["_CHALKS"][0]
-    assert sub_chalk["_OP_ARTIFACT_PATH"] == str(bin_path)
-    assert sub_chalk["_OP_ARTIFACT_TYPE"] == "ELF"
-    assert sub_chalk["_CURRENT_HASH"] == current_hash
+    assert exec_proc.mark["_OP_ARTIFACT_PATH"] == str(bin_path)
+    assert exec_proc.mark["_OP_ARTIFACT_TYPE"] == "ELF"
+    assert exec_proc.mark["_CURRENT_HASH"] == chalk_hash
 
     # expect bin info to be available
-    assert sub_chalk["_OP_ARTIFACT_PATH"] == str(bin_path)
-    assert sub_chalk["ARTIFACT_TYPE"] == "ELF"
-    assert sub_chalk["HASH"] == bin_hash
-    assert current_hash != bin_hash
+    assert exec_proc.mark["_OP_ARTIFACT_PATH"] == str(bin_path)
+    assert exec_proc.mark["ARTIFACT_TYPE"] == "ELF"
+    assert exec_proc.mark["HASH"] == bin_hash
+    assert chalk_hash != bin_hash
 
     # expect process info to be included
     # but can't check exact values for most of these
-    assert sub_chalk["_PROCESS_PID"] > 0
-    assert sub_chalk["_PROCESS_PARENT_PID"] > 0
-    assert sub_chalk["_PROCESS_UID"] is not None
+    assert exec_proc.mark["_PROCESS_PID"] > 0
+    assert exec_proc.mark["_PROCESS_PARENT_PID"] > 0
+    assert exec_proc.mark["_PROCESS_UID"] is not None
 
 
 # exec wrapping with heartbeat
+@pytest.mark.parametrize("copy_files", [[SLEEP_PATH]], indirect=True)
 def test_exec_heartbeat(
     tmp_data_dir: Path,
+    copy_files: list[Path],
     chalk: Chalk,
 ):
-    bin = "sleep"
-    shutil.copy(f"/bin/{bin}", tmp_data_dir / bin)
-    bin_path = tmp_data_dir / bin
-    bin_hash = sha256(tmp_data_dir / bin)
+    bin_path = copy_files[0]
+    bin_hash = sha256(bin_path)
 
     # add chalk mark
     chalk.insert(artifact=bin_path, virtual=False)
 
     # hash of chalked binary
-    current_hash = sha256(tmp_data_dir / bin)
-    assert bin_hash != current_hash
+    chalk_hash = sha256(bin_path)
+    assert bin_hash != chalk_hash
 
-    log_file = "/tmp/heartbeat.log"
-
-    heartbeat_conf = CONFIGFILES / "heartbeat.conf"
-    exec_proc = chalk.run(
+    # custom config sets to use use this log file
+    log_file = Path("/tmp/heartbeat.log")
+    heartbeat_conf = CONFIGS / "heartbeat.conf"
+    chalk.run(
         chalk_cmd="exec",
         params=[
             "--heartbeat",
@@ -152,30 +135,21 @@ def test_exec_heartbeat(
         ],
     )
 
-    # should not error but skip stdout checking
-    assert exec_proc.returncode == 0
-    _stderr = exec_proc.stderr.decode()
-    assert _stderr == ""
-
     # validate contents of log file
-    assert os.path.isfile(log_file)
-    with open(log_file) as file:
-        lines = file.readlines()
+    assert log_file.is_file()
+    first_line, *other_lines = log_file.read_text().splitlines()
 
-        _exec = lines[0]
-        exec_report = json.loads(_exec)[0]
-        assert exec_report["_OPERATION"] == "exec"
-        assert "_CHALKS" in exec_report
+    report = ChalkReport.from_json(first_line)
+    assert report["_OPERATION"] == "exec"
 
-        _chalk = exec_report["_CHALKS"][0]
-        assert _chalk["_OP_ARTIFACT_PATH"] == str(bin_path)
-        assert _chalk["_CURRENT_HASH"] == current_hash
-        assert _chalk["ARTIFACT_TYPE"] == "ELF"
-        assert _chalk["_PROCESS_PID"] != ""
+    assert report.mark["_OP_ARTIFACT_PATH"] == str(bin_path)
+    assert report.mark["_CURRENT_HASH"] == chalk_hash
+    assert report.mark["ARTIFACT_TYPE"] == "ELF"
+    assert report.mark["_PROCESS_PID"] != ""
 
-        assert len(lines[1:]) > 0, "no heartbeats reported"
-        for line in lines[1:]:
-            heartbeat_report = json.loads(line)[0]
-            assert heartbeat_report["_OPERATION"] == "heartbeat"
-            assert "_CHALKS" in heartbeat_report
-            assert heartbeat_report["_CHALKS"][0] == _chalk
+    # as mentioned above, there should be a few heartbeats
+    assert len(other_lines) > 0, "no heartbeats reported"
+    for line in other_lines:
+        other_report = ChalkReport.from_json(line)
+        assert other_report["_OPERATION"] == "heartbeat"
+        assert other_report.mark == report.mark
