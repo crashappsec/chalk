@@ -2,14 +2,11 @@ import datetime
 import hashlib
 import json
 import os
-import requests
 import shutil
 import sqlite3
 import stat
 import subprocess
 import tempfile
-import urllib
-import urllib.request
 import webbrowser
 from pathlib import *
 

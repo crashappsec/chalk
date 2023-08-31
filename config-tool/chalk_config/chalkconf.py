@@ -193,7 +193,6 @@ async def do_test_server_download(testserverurl, loc):
         logger.info(
             f"Chalk test server already downloaded, located at: {loc}. Skipping re-download."
         )
-        # get_app().test_server_download_successful = True
 
     else:
         try:
@@ -223,57 +222,18 @@ async def do_test_server_download(testserverurl, loc):
 
     # Ensure bin has exec bit set
     st = os.stat(loc)
-    os.chmod(loc, st.st_mode | stat.S_IEXEC)
+    try:
+        os.chmod(loc, st.st_mode | stat.S_IEXEC)
+    except Exception as err:
+        logger.error(f"Error setting executable bit on downloaded chalk bin - {err}")
 
     # Symlink specific version to common path
-    os.symlink(loc, loc.parents[0] / "chalkserver")
+    try:
+        os.symlink(loc, loc.parents[0] / "chalkserver")
+    except Exception as err:
+        logger.error(f"Error symlinking to downloaded chalk bin - {err}")
 
     return loc
-
-
-async def do_test_staticsite_download(staticsitefilesurl, loc_static):
-    # Check to see if this has already been downloaded to the pipx install location
-    if os.path.exists(loc_static):
-        logger.info(
-            f"Chalk static site data already downloaded, located at: {loc_static}. Skipping re-download."
-        )
-        get_app().test_server_download_successful = True
-    else:
-        try:
-            # Ensure site dir is created
-            os.makedirs(loc_static.parents[0], exist_ok=True)
-
-            # Download static files
-            logger.info(f"Downloading static site files to {loc_static}")
-            static_site_files = requests.get(
-                staticsitefilesurl, stream=True, allow_redirects=True
-            )
-
-            # Write files
-            try:
-                f = loc_static.open("wb")
-                f.write(static_site_files.content)
-                f.close()
-            except Exception as err:
-                logger.error(
-                    f"Error writing downloaded static site to local fielsystem: '{err}'"
-                )
-                return ""
-        except Exception as err:
-            # Returning empty string causes a error modal to pop
-            logger.error(f"Error downloading Chalk tests static site: '{err}'")
-            return ""
-
-        try:
-            # unzip
-            tar = tarfile.open(loc_static)
-            tar.extractall(path=loc_static.parents[0])
-            tar.close()
-        except Exception as err:
-            logger.error(f"Error tar-gunzipping static site data: '{err}'")
-            return ""
-
-    return loc_static
 
 
 async def launch_server():
@@ -283,7 +243,7 @@ async def launch_server():
     server_bin_path = get_app().server_bin_filepath
     logger.info(f"Running test server at path {server_bin_path}")
     server_proc = await asyncio.create_subprocess_shell(
-        str(server_bin_path),
+        str(server_bin_path) + " run",
         cwd=server_bin_path.parents[0],
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
@@ -686,20 +646,14 @@ class NewApp(App):
 
     # determine correct arch
     system, machine = determine_sys_arch()
-    version = __version__.split('.post')[0]
+    version = __version__.split(".post")[0]
     server_bin_name = f"chalkserver-{version}-{system}-{machine}"
-    static_site_url = "https://dl.crashoverride.run/chalksite.tar.gz"
-    test_server_url = f"https://dl.crashoverride.run/{server_bin_name}"
+    test_server_url = f"https://dl.crashoverride.run/chalkserver/{server_bin_name}"
     server_proc = None
     server_bin_filepath = (
         Path(MODULE_LOCATION)
         / "bin"
         / Path(urllib.parse.urlparse(test_server_url).path[1:])
-    )
-    staticsite_filepath = (
-        Path(MODULE_LOCATION)
-        / "bin"
-        / Path(urllib.parse.urlparse(static_site_url).path[1:])
     )
     test_server_download_successful = False
     test_server_running = False
@@ -721,9 +675,7 @@ class NewApp(App):
             self.push_screen(newbie_modal)
 
         # If chalkserver already downloaded auto-update button to 'run' it
-        if os.path.exists(
-            Path(MODULE_LOCATION) / "bin" / "chalkserver"
-        ) and os.path.exists(Path(MODULE_LOCATION) / "bin" / "site"):
+        if os.path.exists(Path(MODULE_LOCATION) / "bin" / "chalkserver"):
             # Update button to 'run server'
             dl_button = conftable.download_button
             dl_str = "Run Server"
@@ -799,7 +751,6 @@ class NewApp(App):
 * **CWD:** {os.getcwd()}\n\n
 * **BaseChalk URL:** {get_chalk_url()}\n\n
 * **Test Server URL:** {self.test_server_url}\n\n
-* **Static-site URL:** {self.static_site_url}\n\n
 """
         self.push_screen(AckModal(msg=about_msg, wiz=self))
 
@@ -905,25 +856,13 @@ class NewApp(App):
         # Dumb but this is needed for the button to actually change ....
         await asyncio.sleep(1.0)
 
-        # # determine correct arch
-        # system, machine = determine_sys_arch()
-        # version = f"{__version__}"
-        # server_bin_name = f"chalkserver-{version}-{system}-{machine}"
-
-        # construct urls
-        # test_server_url = "https://dl.crashoverride.run/%s"%(server_bin_name)
-        # static_files_url = "https://dl.crashoverride.run/chalksite.tar.gz"
-
         # Download server
         bin_ret = await do_test_server_download(
             self.test_server_url, self.server_bin_filepath
         )
-        static_ret = await do_test_staticsite_download(
-            self.static_site_url, self.staticsite_filepath
-        )
 
         # pop download complete screen
-        if bin_ret and static_ret:
+        if bin_ret:
             self.test_server_download_successful = True
             dl_str = "Run Server"
             dl_button = conftable.download_button

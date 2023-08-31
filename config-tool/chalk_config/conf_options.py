@@ -130,7 +130,7 @@ def check_for_updates():
 
 # Temporarary solution - waiting on larger packaging decisions
 def get_latest_version():
-    version_url = f"https://dl.crashoverride.run/current-version.txt"
+    version_url = f"https://dl.crashoverride.run/chalk/current-version.txt"
     try:
         context = ssl.create_default_context()
         context.check_hostname = False
@@ -167,7 +167,7 @@ def get_chalk_name(release=True):
 
 def get_chalk_url(release=True):
     chalk_name = get_chalk_name(release)
-    url = f"https://dl.crashoverride.run/{chalk_name}"
+    url = f"https://dl.crashoverride.run/chalk/{chalk_name}"
     return url
 
 
