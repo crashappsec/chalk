@@ -5,6 +5,14 @@ ARG POETRY_VERSION=1.5.1
 # install chalk runtime deps
 RUN apk add --no-cache curl
 
+# M1-only deps to compile wheels on ARM
+RUN if uname -m | grep -Ei "arm|aarch"; then \
+    apk add --no-cache \
+        gcc \
+        libffi-dev \
+        musl-dev \
+    ; fi
+
 RUN pip install --no-cache-dir poetry==${POETRY_VERSION}
 
 ENV VIRTUAL_ENV=/tests.env
