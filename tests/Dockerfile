@@ -26,5 +26,6 @@ COPY pyproject.toml poetry.lock $WORKDIR/
 RUN poetry install --no-plugins
 
 COPY --from=docker:24 /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=docker/buildx-bin:0.11.2 /buildx /usr/lib/docker/cli-plugins/docker-buildx
 
 ENTRYPOINT ["pytest"]

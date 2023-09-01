@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import datetime
+import os
 from typing import Any, Literal, Optional, cast
 
 from ..utils.bin import sha256
@@ -110,14 +111,6 @@ class ChalkProgram(Program):
         errors = [i for i in self.logs.splitlines() if i.startswith("error:")]
         return errors
 
-    def find(self, needle) -> str:
-        for line in self.text.splitlines():
-            if needle in line:
-                i = line.find(needle)
-                return line[i:].replace(needle, "", 1).strip()
-        self.logger.error("could not find string in outout", needle=needle)
-        raise ValueError(f"{needle} not found in stdout")
-
     @property
     def reports(self):
         return [ChalkReport(i) for i in self.json(after="[\n")]
@@ -161,6 +154,7 @@ class Chalk:
         expected_success: bool = True,
         ignore_errors: bool = False,
         cwd: Optional[Path] = None,
+        env: Optional[dict[str, str]] = None,
     ) -> ChalkProgram:
         params = params or []
         cmd: list[str] = [str(self.binary)]
@@ -182,8 +176,8 @@ class Chalk:
             run(
                 cmd,
                 expected_exit_code=int(not expected_success),
-                env={"DOCKER_BUILDKIT": "0"},
                 cwd=cwd,
+                env=env,
             )
         )
         if not ignore_errors and expected_success and result.errors:
@@ -300,17 +294,18 @@ class Chalk:
 
     def docker_build(
         self,
-        dockerfile: Path,
         *,
-        tag: str,
+        dockerfile: Optional[Path] = None,
+        tag: Optional[str] = None,
         context: Optional[Path] = None,
         expected_success: bool = True,
         virtual: bool = False,
         cwd: Optional[Path] = None,
         params: Optional[list[str]] = None,
-    ) -> ChalkProgram:
-        cwd = cwd or dockerfile.parent
-        context = context or dockerfile.parent
+        buildkit: bool = True,
+    ) -> tuple[str, ChalkProgram]:
+        cwd = cwd or Path(os.getcwd())
+        context = context or getattr(dockerfile, "parent", cwd)
 
         # run vanilla docker build to ensure it works without chalk
         Docker.build(
@@ -319,6 +314,7 @@ class Chalk:
             dockerfile=dockerfile,
             cwd=cwd,
             expected_success=expected_success,
+            buildkit=buildkit,
         )
 
         # TODO remove log level but there are error bugs due to --debug
@@ -326,16 +322,19 @@ class Chalk:
         chalk_params = ["--debug", "--log-level=none"]
         if virtual:
             chalk_params += ["--virtual"]
-        return self.run(
-            params=chalk_params
-            + (params or [])
-            + Docker.build_cmd(
-                tag=tag,
-                context=context,
-                dockerfile=dockerfile,
-            ),
-            expected_success=expected_success,
-            cwd=cwd,
+        return Docker.with_image_id(
+            self.run(
+                params=chalk_params
+                + (params or [])
+                + Docker.build_cmd(
+                    tag=tag,
+                    context=context,
+                    dockerfile=dockerfile,
+                ),
+                expected_success=expected_success,
+                cwd=cwd,
+                env=Docker.build_env(buildkit=buildkit),
+            )
         )
 
     def docker_push(self, image: str):

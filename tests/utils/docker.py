@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, TypeVar
 
 from .log import get_logger
 from .os import Program, run
@@ -7,15 +7,20 @@ from .os import Program, run
 
 logger = get_logger()
 
+ProgramType = TypeVar("ProgramType", bound=Program)
+
 
 class Docker:
     @staticmethod
     def build_cmd(
-        tag: str,
+        *,
+        tag: Optional[str],
         context: Optional[Path] = None,
         dockerfile: Optional[Path] = None,
     ):
-        cmd = ["docker", "build", "-t", tag]
+        cmd = ["docker", "build"]
+        if tag:
+            cmd += ["-t", tag]
         if dockerfile:
             cmd += ["-f", str(dockerfile)]
         cmd += [str(context or ".")]
@@ -23,20 +28,52 @@ class Docker:
 
     @staticmethod
     def build(
-        tag: str,
+        *,
+        tag: Optional[str] = None,
         context: Optional[Path] = None,
         dockerfile: Optional[Path] = None,
         cwd: Optional[Path] = None,
         expected_success: bool = True,
-    ) -> Program:
+        buildkit: bool = True,
+    ) -> tuple[str, Program]:
         """
         run docker build with parameters
         """
-        return run(
-            Docker.build_cmd(tag=tag, context=context, dockerfile=dockerfile),
-            expected_exit_code=int(not expected_success),
-            cwd=cwd,
+        return Docker.with_image_id(
+            run(
+                Docker.build_cmd(tag=tag, context=context, dockerfile=dockerfile),
+                expected_exit_code=int(not expected_success),
+                env=Docker.build_env(buildkit=buildkit),
+                cwd=cwd,
+            )
         )
+
+    @staticmethod
+    def build_env(
+        *,
+        buildkit: bool = True,
+    ) -> dict[str, str]:
+        return {"DOCKER_BUILDKIT": str(int(buildkit))}
+
+    @staticmethod
+    def with_image_id(build: ProgramType) -> tuple[str, ProgramType]:
+        image_id = ""
+        if build.exit_code == 0:
+            try:
+                # buildx
+                image_id = build.find(
+                    "writing image",
+                    text=build.logs,
+                    words=1,  # there is "done" after hash
+                ).split(":")[1]
+            except ValueError:
+                image_id = build.find("Successfully built", words=1)
+                # legacy builder returns short id so we figure out longer id
+                image_id = run(
+                    ["docker", "inspect", image_id, "--format", "{{ .ID }}"],
+                    log_level="debug",
+                ).text.split(":")[1]
+        return image_id, build
 
     @staticmethod
     def run(

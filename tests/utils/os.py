@@ -98,6 +98,17 @@ class Program:
             self.exit_code, self.cmd, output=self.stdout, stderr=self.stderr
         )
 
+    def find(self, needle: str, text: Optional[str] = None, words: int = 0) -> str:
+        for line in (text or self.text).splitlines():
+            if needle in line:
+                i = line.find(needle)
+                result = line[i:].replace(needle, "", 1).strip()
+                if words:
+                    result = " ".join(result.split()[:words])
+                return result
+        self.logger.error("could not find string in outout", needle=needle)
+        raise ValueError(f"{needle} not found in stdout")
+
     def json(self, *, after: Optional[str] = None):
         text = self.text
         if after:

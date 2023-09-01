@@ -3,6 +3,7 @@ import shutil
 import time
 from contextlib import ExitStack
 from pathlib import Path
+from typing import Iterator, Optional
 from unittest import mock
 
 import os
@@ -26,18 +27,19 @@ TEST_LABEL = "CRASH_OVERRIDE_TEST_LABEL"
 
 
 @pytest.fixture(scope="session", autouse=True)
-def do_docker_cleanup():
+def do_docker_cleanup() -> Iterator[None]:
     # record all tags/containers being created during tests
     # and automatically delete them at the end of the test suite
-    tags: set[str] = set()
+    images: set[str] = set()
     containers: set[str] = set()
 
     _docker_build = Chalk.docker_build
     _run_container = Docker.run
 
     def docker_build(self, *args, **kwargs):
-        tags.add(kwargs["tag"])
-        return _docker_build(self, *args, **kwargs)
+        image_hash, result = _docker_build(self, *args, **kwargs)
+        images.add(image_hash)
+        return image_hash, result
 
     def run_container(*args, **kwargs):
         container_id, result = _run_container(*args, **kwargs)
@@ -52,8 +54,42 @@ def do_docker_cleanup():
         finally:
             if containers:
                 Docker.remove_containers(list(containers))
-            if tags:
-                Docker.remove_images(list(tags))
+            if images:
+                Docker.remove_images(list(images))
+
+
+@pytest.mark.parametrize("buildkit", [True, False])
+@pytest.mark.parametrize(
+    "cwd, dockerfile, tag",
+    [
+        # PWD=foo && docker build .
+        (DOCKERFILES / "valid" / "sample_1", None, False),
+        # PWD=foo && docker build -t test .
+        (DOCKERFILES / "valid" / "sample_1", None, True),
+        # docker build -f foo/Dockerfile foo
+        (None, DOCKERFILES / "valid" / "sample_1" / "Dockerfile", False),
+        # docker build -f foo/Dockerfile -t test foo
+        (None, DOCKERFILES / "valid" / "sample_1" / "Dockerfile", True),
+    ],
+)
+def test_build(
+    chalk: Chalk,
+    dockerfile: Optional[Path],
+    cwd: Optional[Path],
+    tag: Optional[bool],
+    buildkit: bool,
+    random_hex: str,
+):
+    """
+    Test various variants of docker build command
+    """
+    image_id, _ = chalk.docker_build(
+        dockerfile=dockerfile,
+        cwd=cwd,
+        tag=random_hex if tag else None,
+        buildkit=buildkit,
+    )
+    assert image_id
 
 
 @mock.patch.dict(os.environ, {"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"})
@@ -71,13 +107,12 @@ def test_virtual_valid(
     shutil.copytree(DOCKERFILES / test_file, tmp_data_dir, dirs_exist_ok=True)
 
     tag = f"{test_file}_{random_hex}"
-    build = chalk.docker_build(
+    image_hash, build = chalk.docker_build(
         dockerfile=tmp_data_dir / "Dockerfile",
         tag=tag,
         virtual=True,
         cwd=tmp_data_dir,
     )
-    image_hash = build.mark["_CURRENT_HASH"]
 
     # artifact is the docker image
     # keys to check
@@ -143,11 +178,10 @@ def test_virtual_invalid(
 @pytest.mark.parametrize("test_file", ["valid/sample_1", "valid/sample_2"])
 def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
     tag = f"{test_file}_{random_hex}"
-    build = chalk.docker_build(
+    image_hash, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
     )
-    image_hash = build.mark["_CURRENT_HASH"]
 
     # artifact is the docker image
     artifact_info = ArtifactInfo(
@@ -201,7 +235,7 @@ def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
 
     # build dockerfile with chalk docker entrypoint wrapping
     chalk_copy.docker_build(
-        DOCKERFILES / "valid" / "sleep" / "Dockerfile",
+        dockerfile=DOCKERFILES / "valid" / "sleep" / "Dockerfile",
         tag=tag,
         # TODO remove
         # If docker build context has "chalk", it is not copied
@@ -258,12 +292,10 @@ def test_build_and_push(chalk: Chalk, test_file: str):
     tag_base = f"{REGISTRY}/{test_file}"
     tag = f"{tag_base}:latest"
 
-    build = chalk.docker_build(
-        DOCKERFILES / test_file / "Dockerfile",
+    current_hash_build, _ = chalk.docker_build(
+        dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
     )
-    # grab current_hash for comparison later
-    current_hash_build = build.mark["_CURRENT_HASH"]
 
     # push docker wrapped
     push = chalk.docker_push(tag)
@@ -282,11 +314,10 @@ def test_extract(chalk: Chalk, random_hex: str):
     container_name = f"test_container_{random_hex}"
 
     # build test image
-    build = chalk.docker_build(
-        DOCKERFILES / "valid" / "sample_1" / "Dockerfile",
+    image_id, _ = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "sample_1" / "Dockerfile",
         tag=tag,
     )
-    image_id = build.mark["_CURRENT_HASH"]
 
     # artifact info should be consistent
     image_artifact = ArtifactInfo(
