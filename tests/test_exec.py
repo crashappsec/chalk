@@ -22,7 +22,6 @@ logger = get_logger()
 @pytest.mark.parametrize("copy_files", [[UNAME_PATH]], indirect=True)
 def test_exec_unchalked(
     flag: str,
-    tmp_data_dir: Path,
     copy_files: list[Path],
     chalk: Chalk,
 ):
@@ -62,7 +61,6 @@ def test_exec_unchalked(
 @pytest.mark.parametrize("copy_files", [[UNAME_PATH]], indirect=True)
 def test_exec_chalked(
     flag: str,
-    tmp_data_dir: Path,
     copy_files: list[Path],
     chalk: Chalk,
 ):
@@ -107,7 +105,6 @@ def test_exec_chalked(
 # exec wrapping with heartbeat
 @pytest.mark.parametrize("copy_files", [[SLEEP_PATH]], indirect=True)
 def test_exec_heartbeat(
-    tmp_data_dir: Path,
     copy_files: list[Path],
     chalk: Chalk,
 ):

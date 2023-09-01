@@ -10,7 +10,7 @@ LOG_LEVEL
 import logging
 import logging.config
 import pathlib
-from typing import Any, Iterable, List, TypedDict
+from typing import Any, Iterable, TypedDict, cast
 
 import _pytest.logging
 import os
@@ -80,7 +80,7 @@ STRUCTLOG_PROCESSORS: Iterable[structlog.types.Processor] = filter(
 
 class Logger(TypedDict):
     level: str
-    handlers: List[str]
+    handlers: list[str]
     propagate: bool
 
 
@@ -92,7 +92,7 @@ def create_formatter(self, *args, **kwargs):
 
 # pytest does not allow to customize the formatter class externally
 # but we can monkey-patch it for compatibility
-_pytest.logging.LoggingPlugin._create_formatter = create_formatter
+_pytest.logging.LoggingPlugin._create_formatter = cast(Any, create_formatter)
 
 
 logging.config.dictConfig(

@@ -51,9 +51,7 @@ def test_default_config(tmp_data_dir: Path, chalk_copy: Chalk, test_config_file:
     "test_config_file", ["validation/invalid_1.conf", "validation/invalid_2.conf"]
 )
 @pytest.mark.parametrize("use_embedded", [True, False])
-def test_invalid_load(
-    tmp_data_dir: Path, chalk_copy: Chalk, test_config_file: str, use_embedded: bool
-):
+def test_invalid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bool):
     # call chalk load on invalid config
     load = chalk_copy.load(
         CONFIGS / test_config_file,
@@ -72,9 +70,7 @@ def test_invalid_load(
 
 @pytest.mark.parametrize("test_config_file", ["validation/valid_1.conf"])
 @pytest.mark.parametrize("use_embedded", [True, False])
-def test_valid_load(
-    tmp_data_dir: Path, chalk_copy: Chalk, test_config_file: str, use_embedded: bool
-):
+def test_valid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bool):
     # call chalk load on valid config
     chalk_copy.load(CONFIGS / test_config_file, use_embedded)
 
@@ -133,7 +129,6 @@ def test_external_configs(
 )
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_custom_report(
-    tmp_data_dir: Path,
     chalk_copy: Chalk,
     copy_files: list[Path],
     test_config_file: str,
@@ -350,7 +345,6 @@ def validate_profile_keys(report: dict[str, Any], expected_keys: set[str]):
 )
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_profiles(
-    tmp_data_dir: Path,
     copy_files: list[Path],
     chalk_copy: Chalk,
     test_config_file: str,

@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Callable
 from unittest import mock
 
 import boto3
@@ -28,7 +28,7 @@ def aws_secrets_configured() -> bool:
 # validates some basic fields on the chalk output, which should be all the same
 # since we will only be chalking one target
 def _validate_chalk(
-    single_chalk: Dict[str, Any],
+    single_chalk: dict[str, Any],
     path: Path,
 ) -> None:
     assert single_chalk["_OPERATION"] == "insert", "operation expected to be insert"
@@ -148,7 +148,6 @@ def test_s3(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
 )
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_post_http_fastapi(
-    tmp_data_dir: Path,
     copy_files: list[Path],
     chalk: Chalk,
     server_sql: Callable[[str], str | None],

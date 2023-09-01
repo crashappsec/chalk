@@ -113,9 +113,7 @@ def test_insert_extract_directory(
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-def test_insert_extract_delete(
-    tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk
-):
+def test_insert_extract_delete(copy_files: list[Path], chalk: Chalk):
     artifact = copy_files[0]
     artifact_info = ArtifactInfo.one_elf(artifact)
 
@@ -169,7 +167,7 @@ def test_env(chalk: Chalk):
     assert run(["uname", "-n"]).text in report["_OP_NODENAME"]
 
 
-def test_setup(tmp_data_dir: Path, chalk_copy: Chalk):
+def test_setup(chalk_copy: Chalk):
     """
     needs to display password, and public and private key info in chalk
     """

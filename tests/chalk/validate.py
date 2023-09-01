@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from ..conf import MAGIC, SHEBANG
 from ..utils.bin import sha256
@@ -15,8 +15,8 @@ logger = get_logger()
 class ArtifactInfo:
     type: str
     hash: str
-    chalk_info: Dict[str, Any] = field(default_factory=dict)
-    host_info: Dict[str, Any] = field(default_factory=dict)
+    chalk_info: dict[str, Any] = field(default_factory=dict)
+    host_info: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def path_type(cls, path: Path) -> str:
@@ -40,8 +40,8 @@ class ArtifactInfo:
 
 # `virtual-chalk.json` file found after chalking with `--virtual` enabled
 def validate_virtual_chalk(
-    tmp_data_dir: Path, artifact_map: Dict[str, ArtifactInfo], virtual: bool
-) -> Dict[str, Any]:
+    tmp_data_dir: Path, artifact_map: dict[str, ArtifactInfo], virtual: bool
+) -> dict[str, Any]:
     vjsonf = tmp_data_dir / "virtual-chalk.json"
     if not virtual or not artifact_map:
         assert not vjsonf.is_file(), "virtual-chalk.json should not have been created!"
@@ -67,23 +67,26 @@ def validate_virtual_chalk(
 
 # chalk report is created after `chalk insert` operation
 def validate_chalk_report(
-    chalk_report: Dict[str, Any],
-    artifact_map: Dict[str, ArtifactInfo],
+    chalk_report: dict[str, Any],
+    artifact_map: dict[str, ArtifactInfo],
     virtual: bool,
     chalk_action: str = "insert",
 ):
     assert chalk_report["_OPERATION"] == chalk_action
 
-    if len(artifact_map) > 0:
-        assert "_CHALKS" in chalk_report
-        assert len(chalk_report["_CHALKS"]) == len(
-            artifact_map
-        ), "chalks missing from report"
+    if not artifact_map:
+        assert "_CHALKS" not in chalk_report
+        return
 
-        for chalk in chalk_report["_CHALKS"]:
-            path = chalk["PATH_WHEN_CHALKED"]
-            assert path in artifact_map, "chalked artifact incorrect"
-            artifact = artifact_map[path]
+    assert "_CHALKS" in chalk_report
+    assert len(chalk_report["_CHALKS"]) == len(
+        artifact_map
+    ), "chalks missing from report"
+
+    for chalk in chalk_report["_CHALKS"]:
+        path = chalk["PATH_WHEN_CHALKED"]
+        assert path in artifact_map, "chalked artifact incorrect"
+        artifact = artifact_map[path]
 
         # artifact specific fields
         assert artifact.type == chalk["ARTIFACT_TYPE"], "artifact type doesn't match"
@@ -91,20 +94,19 @@ def validate_chalk_report(
             # in some cases, we don't check the artifact hash
             # ex: zip files, which are not computed as hash of file
             assert artifact.hash == chalk["HASH"], "artifact hash doesn't match"
+
         # check arbitrary artifact values
-        for key, value in artifact.chalk_info:
+        for key, value in artifact.chalk_info.items():
             assert key in chalk
             assert value == chalk[key]
 
         if chalk_action == "insert":
             assert virtual == chalk["_VIRTUAL"], "_VIRTUAL mismatch"
-    else:
-        assert "_CHALKS" not in chalk_report
 
 
 # slightly different from above
 def validate_docker_chalk_report(
-    chalk_report: Dict[str, Any],
+    chalk_report: dict[str, Any],
     artifact: ArtifactInfo,
     virtual: bool,
     chalk_action: str = "build",
@@ -135,8 +137,8 @@ def validate_docker_chalk_report(
 
 # extracted chalk is created after `chalk extract` operation
 def validate_extracted_chalk(
-    extracted_chalk: Dict[str, Any],
-    artifact_map: Dict[str, ArtifactInfo],
+    extracted_chalk: dict[str, Any],
+    artifact_map: dict[str, ArtifactInfo],
     virtual: bool,
 ) -> None:
     assert (

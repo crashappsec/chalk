@@ -277,7 +277,7 @@ def test_build_and_push(chalk: Chalk, test_file: str):
 
 
 # extract on image id, and image name, running container id + container name, exited container id + container name
-def test_extract(tmp_data_dir: Path, chalk: Chalk, random_hex: str):
+def test_extract(chalk: Chalk, random_hex: str):
     tag = f"test_image_{random_hex}"
     container_name = f"test_container_{random_hex}"
 

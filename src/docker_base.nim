@@ -83,7 +83,7 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
       trace("Docker injection method: --build-context")
 
     ctx.newCmdLine.add("--build-context")
-    ctx.newCmdLine.add("chalktmpdir" & $(contextCounter) & "=\"" & dir & "\"")
+    ctx.newCmdLine.add("chalkexedir" & $(contextCounter) & "=\"" & dir & "\"")
     ctx.addedInstructions.add("COPY --from=chalkexedir" & $(contextCounter) &
       " " & file & " /" & newname)
     if chmod:

@@ -3,8 +3,6 @@ from pathlib import Path
 
 import os
 
-from .utils.os import run
-
 
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
