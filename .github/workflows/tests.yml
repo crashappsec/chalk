@@ -64,4 +64,4 @@ jobs:
 
       - name: Run tests
         run: |
-          make tests args="-nauto"
+          make tests_parallel

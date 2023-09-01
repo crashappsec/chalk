@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from ..conf import MAGIC, SHEBANG
 from ..utils.bin import sha256
@@ -26,8 +26,14 @@ class ArtifactInfo:
             return "ELF"
 
     @classmethod
-    def one_elf(cls, path: Path):
-        return {str(path): cls(type=cls.path_type(path), hash=sha256(path))}
+    def one_elf(cls, path: Path, chalk_info: Optional[dict[str, Any]] = None):
+        return {
+            str(path): cls(
+                type=cls.path_type(path),
+                hash=sha256(path),
+                chalk_info=chalk_info or {},
+            )
+        }
 
     @classmethod
     def all_shebangs(cls):

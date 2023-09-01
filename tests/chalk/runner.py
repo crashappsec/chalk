@@ -1,7 +1,7 @@
 from pathlib import Path
 import json
 import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, cast
 
 from ..utils.bin import sha256
 
@@ -49,6 +49,9 @@ class ChalkReport(dict):
     @classmethod
     def from_json(cls, data: str):
         return cls(json.loads(data)[0])
+
+    def validate(self, operation: str):
+        assert self["_OPERATION"] == operation
 
 
 class ChalkMark(dict):
@@ -159,6 +162,7 @@ class Chalk:
         ignore_errors: bool = False,
         cwd: Optional[Path] = None,
     ) -> ChalkProgram:
+        params = params or []
         cmd: list[str] = [str(self.binary)]
 
         if chalk_cmd:
@@ -185,7 +189,22 @@ class Chalk:
         if not ignore_errors and expected_success and result.errors:
             raise result.error
 
-        return ChalkProgram.from_program(result)
+        # if chalk outputs report, sanity check its operation matches chalk_cmd
+        try:
+            report = result.report
+        except Exception:
+            pass
+        else:
+            # report could be silenced on the profile level
+            if report:
+                operation = cast(str, chalk_cmd)
+                # when calling docker, the arg after docker is the operation
+                if not operation and "docker" in params:
+                    operation = params[params.index("docker") + 1]
+                if operation:
+                    report.validate(operation)
+
+        return result
 
     # run with custom config that is external
     def run_with_custom_config(

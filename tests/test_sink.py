@@ -227,7 +227,8 @@ def _test_server(
     assert db_id is not None
 
     chalks_count = int(server_sql("SELECT count(id) FROM chalks") or 0)
-    assert chalks_count == initial_chalks_count + 1
+    # tests can run in parallel so we cant know exact number except it has to be higher
+    assert chalks_count > initial_chalks_count
 
     # get the chalk from the api
     response = requests.get(

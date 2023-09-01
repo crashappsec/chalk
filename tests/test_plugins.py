@@ -1,5 +1,9 @@
 import shutil
 from pathlib import Path
+from unittest import mock
+
+import os
+import pytest
 
 from .chalk.runner import Chalk
 from .chalk.validate import (
@@ -8,7 +12,7 @@ from .chalk.validate import (
     validate_extracted_chalk,
     validate_virtual_chalk,
 )
-from .conf import CODEOWNERS
+from .conf import CODEOWNERS, LS_PATH
 from .utils.git import init
 from .utils.log import get_logger
 
@@ -40,4 +44,78 @@ def test_codeowners(tmp_data_dir: Path, chalk: Chalk):
     )
     validate_virtual_chalk(
         tmp_data_dir=tmp_data_dir, artifact_map=artifact_info, virtual=True
+    )
+
+
+# https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
+@mock.patch.dict(
+    os.environ,
+    {
+        "CI": "true",
+        "GITHUB_SHA": "ffac537e6cbbf934b08745a378932722df287a53",
+        "GITHUB_SERVER_URL": "https://github.com",
+        "GITHUB_REPOSITORY": "octocat/Hello-World",
+        "GITHUB_RUN_ID": "1658821493",
+        "GITHUB_API_URL": "https://api.github.com",
+        "GITHUB_ACTOR": "octocat",
+        # there are a bunch of variations of these
+        # but for now at least we test basic flow
+        "GITHUB_EVENT_NAME": "push",
+        "GITHUB_REF_TYPE": "tag",
+    },
+)
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_github(copy_files: list[Path], chalk: Chalk):
+    bin_path = copy_files[0]
+    artifact = ArtifactInfo.one_elf(
+        bin_path,
+        chalk_info={
+            "BUILD_ID": "1658821493",
+            "BUILD_TRIGGER": "tag",
+            "BUILD_CONTACT": ["octocat"],
+            "BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493",
+            "BUILD_API_URI": "https://api.github.com",
+        },
+    )
+    insert = chalk.insert(bin_path)
+    validate_chalk_report(
+        chalk_report=insert.report,
+        artifact_map=artifact,
+        virtual=False,
+        chalk_action="insert",
+    )
+
+
+# https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+@mock.patch.dict(
+    os.environ,
+    {
+        "CI": "true",
+        "GITLAB_CI": "true",
+        "CI_JOB_URL": "https://gitlab.com/gitlab-org/gitlab/-/jobs/4999820578",
+        "CI_JOB_ID": "4999820578",
+        "CI_API_V4_URL": "https://gitlab.com/api/v4",
+        "GITLAB_USER_LOGIN": "user",
+        "CI_PIPELINE_SOURCE": "push",
+    },
+)
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_gitlab(copy_files: list[Path], chalk: Chalk):
+    bin_path = copy_files[0]
+    artifact = ArtifactInfo.one_elf(
+        bin_path,
+        chalk_info={
+            "BUILD_ID": "4999820578",
+            "BUILD_TRIGGER": "push",
+            "BUILD_CONTACT": ["user"],
+            "BUILD_URI": "https://gitlab.com/gitlab-org/gitlab/-/jobs/4999820578",
+            "BUILD_API_URI": "https://gitlab.com/api/v4",
+        },
+    )
+    insert = chalk.insert(bin_path)
+    validate_chalk_report(
+        chalk_report=insert.report,
+        artifact_map=artifact,
+        virtual=False,
+        chalk_action="insert",
     )

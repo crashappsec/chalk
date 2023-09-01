@@ -46,7 +46,11 @@ $(addsuffix /%,$(TOOLS)):
 .PHONY: tests
 tests: DOCKER=$(_DOCKER) # force rebuilds to use docker to match tests
 tests: chalk # note this will rebuild chalk if necessary
-	docker compose run --rm tests $(args)
+	docker compose run --rm tests $(make_args) $(args)
+
+.PHONY: parallel
+tests_parallel: make_args=-nauto
+tests_parallel: tests
 
 # ----------------------------------------------------------------------------
 # MISC
