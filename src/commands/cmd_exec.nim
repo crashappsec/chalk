@@ -228,8 +228,13 @@ proc runCmdExec*(args: seq[string]) =
       # might be about the chalk binary instead of the target binary, which
       # is incorrect
       #
-      # Yes this is also racy but a proper fix will be more complicated
-      sleep(100)
+      # Yes this is also racy but a proper fix will be more complicated.
+      let
+        inMicroSec   = int(execConfig.getInitialSleepTime())
+        initialSleep = int(inMicroSec / 1000)
+
+      sleep(initialSleep)
+
       initCollection()
       let chalkOpt = doExecCollection(allOpts, pid)
       if chalkOpt.isSome():
@@ -248,7 +253,13 @@ proc runCmdExec*(args: seq[string]) =
       handleExec(allOpts, argsToPass)
     else:
       trace("Chalk is child process.")
-      sleep(1)
+
+      let
+        inMicroSec   = int(execConfig.getInitialSleepTime())
+        initialSleep = int(inMicroSec / 1000)
+
+      sleep(initialSleep)
+
       initCollection()
       trace("Host collection finished.")
       let chalkOpt = doExecCollection(allOpts, ppid)

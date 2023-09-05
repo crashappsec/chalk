@@ -1122,6 +1122,28 @@ You must set a value for this variable or pass the --exec-command-name flag to b
 """
   }
 
+  field initial_sleep_time {
+    type: Duration
+    default: <<50 msecs>> # 1/20th of a second
+    shortdoc: "Exec: initial sleep time"
+    doc: """
+Controls how long after exec + fork Chalk waits before collecting data
+on the exec'd process for the first time.
+
+When chalk is configured to be the parent after fork, it's important
+to give ourselves enough time for the exec() to occur, so that the
+child's process info doesn't look like Chalk.
+
+When chalk isn't the parent, it's still not bad to allow some
+initialization time; it improves the data collection. However, in this
+scenario, short-lived containers could die and prevent us from
+reporting, so it may be best to keep this well under a second in general.
+
+See `get_heartbeat_rate` for the subsequent sleep period.
+"""    
+    
+  }
+
   field search_path {
     type:     list[string]
     default:  []
