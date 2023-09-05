@@ -288,7 +288,8 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
 
   info("Wrapping entry point with this chalk binary: " & binaryToCopy)
   try:
-    ctx.makeFileAvailableToDocker(binaryToCopy, move=false, chmod=true, newname="chalk")
+    ctx.makeFileAvailableToDocker(binaryToCopy, move=false, chmod=true,
+                                                     newname="chalk")
   except:
     warn("Wrapping canceled; no available method to wrap entry point.")
     return

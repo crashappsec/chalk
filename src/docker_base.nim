@@ -78,7 +78,9 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
   var loc         = inLoc
   let (dir, file) = loc.splitPath()
 
-  if haveBuildContextFlag():
+  # Something wrong is happening in this case, but it's mostly
+  # unneeded, so disable it for now.
+  when false: # if haveBuildContextFlag():
     once:
       trace("Docker injection method: --build-context")
 
@@ -91,7 +93,8 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
     contextCounter += 1
     if move:
       registerTempFile(loc)
-  elif ctx.foundContext == "-":
+  # When we revisit the above code, this next line becomes an elif.
+  if ctx.foundContext == "-":
     warn("Cannot chalk when context is passed to stdin w/o BUILDKIT support")
     raise newException(ValueError, "stdinctx")
   else:
