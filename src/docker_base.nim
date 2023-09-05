@@ -75,12 +75,15 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
                                 move:     bool,
                                 chmod:    bool = false,
                                 newName = "") =
-  var loc         = inLoc
+  var loc         = inLoc.resolvePath()
   let (dir, file) = loc.splitPath()
 
-  # Something wrong is happening in this case, but it's mostly
-  # unneeded, so disable it for now.
-  when false: # if haveBuildContextFlag():
+  if move:
+    trace("Making file available to docker via move: " & loc)
+  else:
+    trace("Making file available to docker via copy: " & loc)
+
+  if haveBuildContextFlag():
     once:
       trace("Docker injection method: --build-context")
 
@@ -93,34 +96,36 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
     contextCounter += 1
     if move:
       registerTempFile(loc)
-  # When we revisit the above code, this next line becomes an elif.
-  if ctx.foundContext == "-":
+  elif ctx.foundContext == "-":
     warn("Cannot chalk when context is passed to stdin w/o BUILDKIT support")
     raise newException(ValueError, "stdinctx")
   else:
     var
-      contextDir  = resolvePath(ctx.foundContext)
+      contextDir  = ctx.foundContext.resolvePath()
       dstLoc      = contextDir.joinPath(file)
 
+    trace("Context directory is: " & contextDir)
     if not dirExists(contextDir):
       warn("Cannot find context directory (" & contextDir &
         "), so cannot wrap entry point.")
       raise newException(ValueError, "ctxwrite")
 
-    while fileExists(dstLoc):
-      dstLoc &= ".tmp"
     try:
         if move:
           moveFile(loc, dstLoc)
           trace("Moved " & loc & " to " & dstLoc)
         else:
+          while fileExists(dstLoc):
+            dstLoc &= ".tmp"
           copyFile(loc, dstLoc)
           trace("Copied " & loc & " to " & dstLoc)
 
         ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
         if chmod:
           ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
+
         registerTempFile(dstLoc)
+
     except:
         dumpExOnDebug()
         warn("Could not write to context directory.")

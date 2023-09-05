@@ -1,5 +1,4 @@
 import platform
-import shutil
 import time
 from contextlib import ExitStack
 from pathlib import Path
@@ -103,15 +102,12 @@ def test_build(
 def test_virtual_valid(
     tmp_data_dir: Path, chalk: Chalk, test_file: str, random_hex: str
 ):
-    # TODO virtual chalk only works in /tmp
-    shutil.copytree(DOCKERFILES / test_file, tmp_data_dir, dirs_exist_ok=True)
-
     tag = f"{test_file}_{random_hex}"
+    dockerfile = DOCKERFILES / test_file / "Dockerfile"
     image_hash, build = chalk.docker_build(
-        dockerfile=tmp_data_dir / "Dockerfile",
+        dockerfile=dockerfile,
         tag=tag,
         virtual=True,
-        cwd=tmp_data_dir,
     )
 
     # artifact is the docker image
@@ -123,7 +119,7 @@ def test_virtual_valid(
             "_CURRENT_HASH": image_hash,
             "_IMAGE_ID": image_hash,
             "_REPO_TAGS": [tag + ":latest"],
-            "DOCKERFILE_PATH": str(tmp_data_dir / "Dockerfile"),
+            "DOCKERFILE_PATH": str(dockerfile),
             # docker tags should be set to tag above
             "DOCKER_TAGS": [tag],
         },
@@ -157,15 +153,12 @@ def test_virtual_valid(
 def test_virtual_invalid(
     tmp_data_dir: Path, chalk: Chalk, test_file: str, random_hex: str
 ):
-    # TODO virtual chalk only works in /tmp
-    shutil.copytree(DOCKERFILES / test_file, tmp_data_dir, dirs_exist_ok=True)
-
     tag = f"{test_file}_{random_hex}"
+    dockerfile = DOCKERFILES / test_file / "Dockerfile"
     chalk.docker_build(
-        dockerfile=tmp_data_dir / "Dockerfile",
+        dockerfile=dockerfile,
         tag=tag,
         virtual=True,
-        cwd=tmp_data_dir,
         expected_success=False,
     )
 

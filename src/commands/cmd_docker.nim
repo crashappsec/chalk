@@ -90,6 +90,8 @@ proc formatLabel(name: string, value: string, addLabel: bool): string =
   if addLabel:
     result = "LABEL "
   result &= processLabelKey(name) & "=" & processLabelValue(value)
+  trace("Formatting label: " & result)
+
 
 proc addNewLabelsToDockerFile(ctx: DockerInvocation) =
   # First, add totally custom labels.
@@ -406,6 +408,9 @@ proc prepVirtualInsertion(ctx: DockerInvocation) =
 
   if labelOps.isSome():
     for k, v in labelOps.get():
+      if unicode.strip(v).len() == 0:
+        continue
+
       ctx.newCmdLine.add("--label")
       ctx.newCmdline.add(k & "=" & escapeJson(v))
 
@@ -423,8 +428,13 @@ proc prepVirtualInsertion(ctx: DockerInvocation) =
     labelsToAdd = filterByProfile(hostInfo, chalkObj, labelProfile)
 
   for k, v in labelsToAdd:
+    let val = boxToJson(v)
+
+    if val.len() <= 2:
+      continue
+
     ctx.newCmdLine.add("--label")
-    ctx.addedInstructions.add(formatLabel(k, boxToJson(v), false))
+    ctx.newCmdLine.add(formatLabel(k, val, false))
 
 proc addBuildCmdMetadataToMark(ctx: DockerInvocation) =
   let dict = ctx.opChalkObj.collectedData

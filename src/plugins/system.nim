@@ -38,14 +38,21 @@ proc validateMetadata(obj: ChalkObj): ValidateResult =
     return vBadMd
   var
     toHash   = fields.normalizeChalk()
-    computed = toHash.sha256Hex()
+    computed = toHash.sha256()
 
-  if computed != unpack[string](fields["METADATA_HASH"]):
-    error(obj.name & ": extracted METADATA_HASH doesn't validate")
-    return vBadMd
-
-  trace("computed = " & computed)
-  trace("mdh = " & unpack[string](fields["METADATA_HASH"]))
+  if "METADATA_HASH" in fields:
+    trace("computed = " & computed.hex())
+    trace("mdhash   = " & unpack[string](fields["METADATA_HASH"]))
+    if computed.hex() != unpack[string](fields["METADATA_HASH"]):
+      error(obj.name & ": extracted METADATA_HASH doesn't validate")
+      return vBadMd
+  else:
+    let computedMdId = computed.idFormat()
+    trace("computed = " & computedMdId)
+    trace("mdid     = " & unpack[string](fields["METADATA_ID"]))
+    if computedMdId != unpack[string](fields["METADATA_ID"]):
+      error(obj.name & ": extracted METADATA_ID doesn't validate")
+      return vBadMd
 
   if obj.fsRef == "":
     # For containers, validation currently happens via cmd_docker.nim;
@@ -287,7 +294,7 @@ proc metsysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   let
     toHash   = obj.getChalkMark().normalizeChalk()
     mdHash   = toHash.sha256()
-    encHash  = mdHash.toHex().toLowerAscii()
+    encHash  = mdHash.hex()
 
   result["METADATA_HASH"] = pack(encHash)
   result["METADATA_ID"]   = pack(idFormat(mdHash))
