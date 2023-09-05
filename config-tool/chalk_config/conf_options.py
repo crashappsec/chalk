@@ -114,7 +114,8 @@ def check_for_updates():
     Return True if updates available
     """
     # Get running version
-    curr_version = __version__
+    curr_version = __version__.split('.post')[0]
+
     # Get latest version from server
     latest_version = get_latest_version()
 
@@ -152,8 +153,9 @@ def get_chalk_name(release=True):
     system, machine = determine_sys_arch()
 
     # pull chalk version matching this release only
-    version = f"{__version__}"
-    chalk_name = f"chalk-{version}-{system}-{machine}"
+    curr_version = __version__.split('.post')[0]
+
+    chalk_name = f"chalk-{curr_version}-{system}-{machine}"
 
     # Is this a debug build or not
     if not release:
