@@ -1,22 +1,21 @@
 ## :Author: Theofilos Petsios
 ## :Copyright: 2023, Crash Override, Inc.
 
-import base64, config, selfextract, chalkjson
+import base64, config, selfextract, chalkjson, httpclient, net, uri
 
 type ValidateResult* = enum
   vOk, vSignedOk, vBadMd, vNoCosign, vBadSig, vNoHash, vNoPk
 
-# 2 128 bit keys for (future) 4-round Luby-Rackoff
 const
   attestationObfuscator = staticExec(
-    "dd status=none if=/dev/random bs=1 count=32 | base64").decode()
+    "dd status=none if=/dev/random bs=1 count=16 | base64").decode()
   cosignLoader = "load_attestation_binary() -> string"
   #c4mAttest    = "push_attestation(string, string, string) -> bool"
 
 var
   cosignTempDir = ""
   cosignLoc     = ""
-  cosignPw      = ""
+  cosignPw      = ""    # Note this is not encrypted in memory.
   cosignLoaded  = false
 
 template withCosignPassword(code: untyped) =
@@ -98,16 +97,111 @@ generate_keypair(char **s1, char **s2) {
 ## not finished enough to replace what we already have.
 
 
-proc encryptPassword(s: string): string =
-  # For now, let's use XOR then b64.
-  for i, ch in s:
-    result.add(char(uint8(ch) xor uint8(attestationObfuscator[i])))
+template callTheSecretService(base: string, prKey: string, bodytxt: untyped,
+                              mth: untyped): Response =
+  let
+    timeout:  int    = cast[int](chalkConfig.getSecretManagerTimeout())
+    id:       string = sha256Hex(attestationObfuscator & prkey)
+  var
+    url:      string
+    uri:      Uri
+    client:   HttpClient
+    context:  SslContext
+    response: Response
 
-  result = result.encode(safe=true)
+  if mth == HttPGet:
+    trace("Calling secret manager to retrieve key with id: " & id)
+  else:
+    trace("Calling secret manager to store key with id: " & id)
 
-proc decryptPassword(s: string): string =
-  for i, ch in s.decode():
-    result.add(char(uint8(ch) xor uint8(attestationObfuscator[i])))
+  if base[^1] == '/':
+    url = base & id
+  else:
+    url = base & "/" & id
+
+  uri = parseUri(url)
+
+  if uri.scheme == "https":
+    context = newContext(verifyMode = CVerifyPeer)
+    client  = newHttpClient(sslContext = context, timeout = timeout)
+  else:
+    client  = newHttpClient(timeout = timeout)
+
+  response  = client.request(url = uri, httpMethod = mth, body = bodytxt)
+  client.close()
+  response
+
+proc saveToSecretManager*(content: string, prkey: string): bool =
+  var
+    nonce:    string
+    response: Response
+
+  let
+    base  = chalkConfig.getSecretManagerUrl()
+    ct    = prp(attestationObfuscator, cosignPw, nonce)
+
+  if len(base) == 0:
+    error("Cannot save secret; no secret manager URL configured.")
+    return false
+
+  let body = nonce.hex() & ct.hex()
+  response = callTheSecretService(base, prkey, body, HttpPut)
+
+  trace("Sending encrypted secret: " & body)
+  if response.status.startswith("405"):
+    info("This secret is already saved.")
+  elif response.status[0] != '2':
+    error("When attempting to save signing secret: " & response.status)
+    return false
+  else:
+    info("Successfully stored secret.")
+  return true
+
+proc loadFromSecretManager*(prkey: string): bool =
+
+  if cosignPw != "":
+    return true
+
+  let
+    base: string = chalkConfig.getSecretManagerUrl()
+
+  if len(base) == 0 or prkey == "":
+    return false
+
+  let response = callTheSecretService(base, prKey, "", HttpGet)
+
+  if response.status[0] != '2':
+    warn("Could not retrieve signing secret: " & response.status & "\n" &
+      "Will not be able to sign / verify.")
+    return false
+
+  var
+    body:    string
+    hexBits: string
+
+  try:
+    hexBits = response.bodyStream.readAll().strip()
+    body    = hexBits.parseHexStr()
+
+    info("Got body: " & hexBits)
+
+
+    if len(body) != 40:
+      raise newException(ValueError, "Nice hex, but wrong size.")
+  except:
+    error("When loading the signing secret, received an invalid " &
+      "response from server: " & response.status)
+    return false
+
+  trace("Successfully retrieved secret from secret manager.")
+
+  var
+    nonce = body[0 ..< 16]
+    ct    = body[16 .. ^1]
+
+  cosignPw = brb(attestationObfuscator, ct, nonce)
+
+  return true
 
 proc getCosignLocation*(): string =
   once:
@@ -171,23 +265,61 @@ proc generateKeyMaterial*(cosign: string): bool =
   else:
     return true
 
-proc setRandomPassword() =
+proc commitPassword(pri: string, gen: bool) =
   var
-    randomBinary = secureRand[array[15, char]]()
-    binStr       = newStringOfCap(15)
+    storeIt = chalkConfig.getUseSecretManager()
+    printIt = not storeIt
 
-  for ch in randomBinary:
-    binStr.add(ch)
+  if storeIt:
+    # If the manager doesn't work, then we need to fall back.
+    if not cosignPw.saveToSecretManager(pri):
+      error("Could not store password. Either try again later, or " &
+        "use the below password with the CHALK_PASSWORD environment " &
+        "variable. We attempt to store as long as use_secret_manager is " &
+        "true.\nIf you forget the password, delete chalk.key and " &
+        "chalk.pub before rerunning.")
 
-  cosignPw = binStr.encode(safe=true)
+      if gen:
+        printIt = true
 
-  echo "------------------------------------------"
-  echo "Your password is: ", cosignPw
-  echo """------------------------------------------
+
+  if printIt:
+    echo "------------------------------------------"
+    echo "Your password is: ", cosignPw
+    echo """------------------------------------------
 
 Write this down. Even if you embedded it in the Chalk binary, you
 will need it to load the key pair into another chalk binary.
 """
+
+  # Right now we are not using the result.
+proc acquirePassword(optfile = ""): bool {.discardable.} =
+  var
+    prikey = optfile
+
+
+  if existsEnv("CHALK_PASSWORD"):
+    cosignPw = getEnv("CHALK_PASSWORD")
+    delEnv("CHALK_PASSWORD")
+    return true
+
+  if chalkConfig.getUseSecretManager() == false:
+    return false
+
+  if prikey == "":
+    let
+      boxedOpt = selfChalkGetKey("$CHALK_ENCRYPTED_PRIVATE_KEY")
+      boxed    = boxedOpt.getOrElse(pack(""))
+
+    prikey  = unpack[string](boxed)
+
+    if prikey == "":
+      return false
+
+  if loadFromSecretManager(prikey):
+    return true
+
+  return false
 
 proc testSigningSetup(pubKey, priKey: string): bool =
   cosignTempDir = getNewTempDir()
@@ -233,18 +365,23 @@ proc testSigningSetup(pubKey, priKey: string): bool =
 
 proc writeSelfConfig(selfChalk: ChalkObj): bool {.importc, discardable.}
 
-proc saveSigningSetup(pubKey, priKey: string): bool =
+proc saveSigningSetup(pubKey, priKey: string, gen: bool): bool =
   let selfChalk = getSelfExtraction().get()
 
   selfChalk.extract["$CHALK_ENCRYPTED_PRIVATE_KEY"] = pack(priKey)
   selfChalk.extract["$CHALK_PUBLIC_KEY"]            = pack(pubKey)
 
-  if chalkConfig.getUseInternalPassword():
-    let pw = pack(encryptPassword(cosignPw))
-    selfChalk.extract["$CHALK_ATTESTATION_TOKEN"] = pw
-  else:
-    if "$CHALK_ATTESTATION_TOKEN" in selfChalk.extract:
-      selfChalk.extract.del("$CHALK_ATTESTATION_TOKEN")
+  commitPassword(prikey, gen)
+
+  when false:
+    # This is old code, but it might make a comeback at some point,
+    # so I'm not removing it.
+    if chalkConfig.getUseInternalPassword():
+      let pw = pack(encryptPassword(cosignPw))
+      selfChalk.extract["$CHALK_ATTESTATION_TOKEN"] = pw
+    else:
+      if "$CHALK_ATTESTATION_TOKEN" in selfChalk.extract:
+        selfChalk.extract.del("$CHALK_ATTESTATION_TOKEN")
 
   let savedCommandName = getCommandName()
   setCommandName("setup")
@@ -258,15 +395,12 @@ proc copyGeneratedKeys(pubKey, priKey, baseLoc: string) =
 
   if not tryToCopyFile("chalk.pub", pubLoc):
     error("Could not copy public key to " & pubLoc & "; printing to stdout")
-    echo pubKey
   else:
     info("Public key written to: " & pubLoc)
   if not tryToCopyFile("chalk.key", priLoc):
     error("Could not copy private key to " & priLoc & "; printing to stdout")
-    echo priKey
   else:
-    info("Public key (encrypted) written to: " & priLoc &
-      "\n**Make sure to write down your password!**")
+    info("Public key (encrypted) written to: " & priLoc)
 
 proc loadSigningSetup(): bool =
   let
@@ -287,16 +421,6 @@ proc loadSigningSetup(): bool =
 
   if "$CHALK_PUBLIC_KEY" notin extract:
     return false
-
-  # The value of coSign password is set early if CHALK_PASSWORD is
-  # set.  However, if getUseInternalPassword() is set, we are supposed
-  # to ignore the environment variable.
-  if chalkConfig.getUseInternalPassword() and
-     "$CHALK_ATTESTATION_TOKEN" in extract:
-    let
-      encPw    = unpack[string](extract["$CHALK_ATTESTATION_TOKEN"])
-
-    cosignPw = decryptPassword(encPw)
 
   if cosignPw == "":
     error("Cannot attest; no password is available for the private key. " &
@@ -326,7 +450,7 @@ proc attemptToLoadKeys*(silent=false): bool =
   if withoutExtension == "":
       return false
 
-  let
+  var
     pubKey = tryToLoadFile(withoutExtension & ".pub")
     priKey = tryToLoadFile(withoutExtension & ".key")
 
@@ -339,6 +463,7 @@ proc attemptToLoadKeys*(silent=false): bool =
       error("Could not read public key.")
     return false
 
+  acquirePassword(priKey)
   if cosignPw == "":
     cosignPw = getPasswordViaTty()
     if cosignPw == "":
@@ -348,7 +473,7 @@ proc attemptToLoadKeys*(silent=false): bool =
     return false
 
   cosignLoaded = true
-  return saveSigningSetup(pubKey, priKey)
+  return saveSigningSetup(pubKey, priKey, false)
 
 proc attemptToGenKeys*(): bool =
   if getCosignLocation() == "":
@@ -366,7 +491,8 @@ proc attemptToGenKeys*(): bool =
     cosignTempDir = getNewTempDir()
 
   withWorkingDir(cosignTempDir):
-    setRandomPassword()
+    cosignPw = randString(16).encode(safe = true)
+
     withCosignPassword:
       if not generateKeyMaterial(getCosignLocation()):
         return false
@@ -380,7 +506,7 @@ proc attemptToGenKeys*(): bool =
     copyGeneratedKeys(pubKey, priKey, keyOutLoc)
     cosignLoaded = true
 
-    result = saveSigningSetup(pubKey, priKey)
+    result = saveSigningSetup(pubKey, priKey, true)
 
 proc canAttest*(): bool =
   if getCosignLocation() == "":
@@ -392,11 +518,7 @@ proc checkSetupStatus*() =
   # Beyond that, call canAttest()
 
   once:
-    # In all circumstances, we want to scrub this from the environment
-    # before reporting anything.
-    cosignPw = getEnv("CHALK_PASSWORD")
-
-    delEnv("CHALK_PASSWORD")
+    acquirePassword()
 
     let cmd = getBaseCommandName()
     if cmd in ["setup", "help", "load", "dump", "version", "env", "exec"]:
@@ -670,7 +792,7 @@ proc signNonContainer*(chalk: ChalkObj, unchalkedMD, metadataMD : string):
                "chalk.key", "-"]
     blob   = unchalkedMD & metadataMD
 
-  trace("blob = >>" & blob & "<<")
+  trace("signing blob: " & blob )
   withWorkingDir(getCosignTempDir()):
     withCosignPassword:
       let allOutput = getCosignLocation().runCmdGetEverything(args, blob & "\n")

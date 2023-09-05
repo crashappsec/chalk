@@ -173,15 +173,13 @@ def test_setup(chalk_copy: Chalk):
     """
     result = chalk_copy.run(chalk_cmd="setup", params=["--log-level=error"])
 
-    # password should be stored
-    result.find("Your password is: ")
-
     report = result.report
     assert report["_OPERATION"] == "setup"
 
     # check key info
     chalkmark = result.mark
     assert "PUBLIC KEY" in chalkmark["$CHALK_PUBLIC_KEY"]
-    assert "PRIVATE KEY" in chalkmark["$CHALK_ENCRYPTED_PRIVATE_KEY"]
+    assert "SIGSTORE PRIVATE KEY" in chalkmark["$CHALK_ENCRYPTED_PRIVATE_KEY"]
+    assert "SIGNATURE" in chalkmark
 
     assert report["INJECTOR_PUBLIC_KEY"] == chalkmark["$CHALK_PUBLIC_KEY"]

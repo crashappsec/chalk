@@ -3,9 +3,9 @@ import strutils, os
 switch("d", "nimPreviewHashRef")
 switch("d", "ssl")
 switch("d", "useOpenSSL3")
+switch("gc", "refc")
 # This will end up yielding lto warnings. Uncomment if you want to load in gdb
 #switch("debugger", "native")
-
 
 when (NimMajor, NimMinor) < (1, 7):
   # Locklevels never worked and are gone but older versions will complain.
@@ -19,14 +19,15 @@ when not defined(debug):
     switch("d", "release")
     switch("opt", "speed")
 
-if defined(macosx):
+var targetArch = hostCPU
+
+when defined(macosx):
   # -d:arch=amd64 will allow you to specifically cross-compile to intel.
   # The .strdefine. pragma sets the variable from the -d: flag w/ the same
   # name, overriding the value of the const.
   const arch {.strdefine.} = "detect"
 
   var
-    targetArch = arch
     targetStr  = ""
 
   if arch == "detect":
@@ -44,46 +45,45 @@ if defined(macosx):
     echo "Override: arch = " & arch
 
   if targetArch == "arm64":
-    targetStr = "arm64-apple-macos11"
+    targetStr = "arm64-apple-macos13"
   elif targetArch == "amd64":
-    targetStr = "x86_64-apple-macos11"
+    targetStr = "x86_64-apple-macos13"
   else:
     echo "Invalid target architecture for MacOs: " & arch
+    quit(1)
 
   switch("cpu", targetArch)
   switch("passc", "-flto -w -target " & targetStr)
   switch("passl", "-flto -w -target " & targetStr &
         "-Wl,-object_path_lto,lto.o")
 
-  let
-     libs   = ["ssl", "crypto"]
-     libDir = staticRead("/tmp/con4m-build-dir").strip() &
-       "/files/deps/macos/" & targetArch & "/"
-
-  for item in libs:
-    let libFile = "lib" & item & ".a"
-    switch("passL", libDir & libFile)
-    switch("dynlibOverride", item)
-
 elif defined(linux):
-  exec "bin/ensure-static"
-  let
-    ## Specify libs to be statically linked here. They must appear in the order
-    ## they should be on the link line.
-    libs     = ["pcre", "ssl", "crypto"]
-    depsDir  = getEnv("DEPS_DIR", getCurrentDir() & "/deps")
-    archDir  = depsDir & "/" & hostCPU
-    libDir   = archDir & "/lib/"
-    muslPath = archDir & "/usr/musl/bin/musl-gcc"
-
   switch("passl", "-static")
+else:
+  echo "Platform not supported."
+  quit(1)
+
+proc getEnvDir(s: string, default = ""): string =
+  result = getEnv(s, default)
+  if not result.endsWith("/"):
+    result &= "/"
+
+var
+  default  = getEnvDir("HOME") & ".local/c0"
+  localDir = getEnvDir("LOCAL_INSTALL_DIR", default)
+  libDir   = localdir & "libs"
+  libs     = ["pcre", "ssl", "crypto", "cmark-gfm", "cmark-gfm-extensions",
+              "gumbo"]
+
+when defined(linux):
+  var
+    muslPath = localdir & "musl/bin/musl-gcc"
+
   switch("gcc.exe", muslPath)
   switch("gcc.linkerexe", muslPath)
 
-  for item in libs:
-    let libFile = "lib" & item & ".a"
-    switch("passL", libDir & libFile)
-    switch("dynlibOverride", item)
+for item in libs:
+  let libFile = "lib" & item & ".a"
 
-discard staticExec("if [ -f /tmp/con4m-build-dir ] ; " &
-                   "then rm /tmp/con4m-build-dir fi")
+  switch("passL", libDir & "/" & libFile)
+  switch("dynlibOverride", item)

@@ -9,7 +9,7 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import os, json, streams, tables, options, strutils, nimutils, sugar, posix,
-       nimutils/logging, nimutils/managedtmp, con4m, c4autoconf, unicode, glob
+       nimutils/logging, nimutils/managedtmp, con4m, c4autoconf, unicode, re
 export os, json, options, tables, strutils, streams, sugar, nimutils, logging,
        managedtmp, con4m, c4autoconf
 
@@ -110,7 +110,7 @@ type
     filePaths*:       seq[string]
     otherPaths*:      seq[string]
     fileExclusions*:  seq[string]
-    skips*:           seq[glob.Glob]
+    skips*:           seq[Regex]
     chalks*:          seq[ChalkObj]
     recurse*:         bool
 

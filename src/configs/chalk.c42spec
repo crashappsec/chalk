@@ -1855,35 +1855,59 @@ When this is true, digital signings will get published to a transparency log, an
 """    
   }
 
-  field use_internal_password {
-    type:     bool
-    default:  false
-    shortdoc: "Embed signing password"
+  field use_secret_manager {
+    type:    bool
+    default: true
+    shortdoc: "Use secret manager for encryption"
     doc: """
-When this is true, then Chalk will look inside the chalk mark for the
-signing password when needed (and decrypt it from an embedded
-key). When this is false, Chalk instead uses the `CHALK_PASSWORD`
-environment variable to read the password.
+Any signing keys generated or imported are encrypted by a randomly
+generated password (which is derived by encoding 128 bits taken from a
+cryptographically secure source).
 
-Generally, our recommendation is for this value to be `false` and to
-use a secret manager to load the environment variable right before
-calling chalk (make sure it gets unloaded immediately after).
+The password is NOT stored in the binary. You can choose to provide
+the password via the CHALK_PASSWORD environment variable, or you may
+escrow it in our secret manager.
 
-However, this option is provided for those who wish to hardcode
-secrets; this manages the hardcoding, and even encrypts it with a key
-specific to the binary. If you compile the binary yourself, and care
-about operational security of the binary (making sure, for instance,
-it's only ever readable by the current user when running it), then
-this is a plausable approach.
+If this is true, when you set up signing, the password will get
+encrypted by another randomly generated value, stored in your
+binary. The result will posted to our free service over TLS; the
+service will then be queried as it is needed.
 
-For the `chalk setup` command, this will cause the embedding to
-happen. For any other command, when the password is needed, it will
-cause Chalk to look for the internal password first, and then try the
-environment variable if that fails.
+If you do not select this when setting up signing, the password will
+be written to stdout a single time. Or, you can set the password
+manually via the CHALK_PASSWORD environment variable (if using the
+manager, the env variable is ignored during setup).
 
-Otherwise, if this is false, Chalk will not save the password on
-`setup`, and for other commands will ONLY check the environment
-variable.
+Once you have configured signing, Chalk will first try to read the
+password from the CHALK_PASSWORD environment variable. If the
+environment variable doesn't exist, what happens next is dependant on
+this variable.
+
+If it's true, then we attempt to query the secret manager before
+giving up. If it's false, we immediately move on without signing.
+
+Note that if you provide the environment variable, then the secret
+manager currently does not run. We may eventually make it a fallback.
+"""    
+  }
+  
+  field secret_manager_url {
+    type:     string
+    default:  "https://chalkapi-test.crashoverride.run/v0.1/signkeys/"
+    hidden:   true
+    shortdoc: "URL for secret manager"
+    doc: """
+Currently you can just use ours.    
+"""    
+  }
+
+  field secret_manager_timeout {
+    type:    Duration
+    default: << 3 sec >>
+    shortdoc: "HTTPS timeout for secret manager"
+    doc: """
+If the timeout is exceeded and the operation fails, chalk will proceed,
+just without doing any signing / verifying.    
 """    
   }
 

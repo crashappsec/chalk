@@ -8,7 +8,9 @@ services:
   chalk:
     build:
       context: .
-      target: compile
+      target: deps
+      args:
+        CON4M_BRANCH: ${CON4M_BRANCH:-main}
     command: nimble ${CHALK_BUILD:-release}
     working_dir: /chalk
     volumes:
@@ -19,10 +21,11 @@ services:
       context: .
       args:
         CHALK_BUILD: ${CHALK_BUILD:-release}
+        CON4M_BRANCH: ${CON4M_BRANCH:-main}
       target: ${BASE:-ubuntu}
-    working_dir: /chalk
+    working_dir: $PWD
     volumes:
-      - .:/chalk
+      - $PWD:$PWD
 
   # --------------------------------------------------------------------------
   # CHALK CONFIG

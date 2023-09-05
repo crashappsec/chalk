@@ -1,10 +1,18 @@
-FROM ubuntu:jammy-20230126 as libs
+FROM ghcr.io/crashappsec/nim:ubuntu-2.0.0 as nim
+
+# -------------------------------------------------------------------
+# con4m install static deps for build which requires
+# more system deps so we do that in a separate docker step
+
+FROM nim as con4m
 
 # deps for compiling static deps
 RUN apt-get update -y && \
     apt-get install -y \
         autoconf \
+        cmake \
         file \
+        g++ \
         gcc \
         git \
         m4 \
@@ -12,15 +20,16 @@ RUN apt-get update -y && \
         && \
     apt-get clean -y
 
-ENV DEPS_DIR=/libs
+WORKDIR /tmp
+ARG CON4M_BRANCH=main
+RUN git clone https://github.com/crashappsec/con4m -b $CON4M_BRANCH
 
-COPY bin/ensure-static /chalk/bin/
-
-RUN /chalk/bin/ensure-static
+WORKDIR /tmp/con4m
+RUN nimble install
 
 # -------------------------------------------------------------------
 
-FROM ghcr.io/crashappsec/nim:ubuntu-1.6.12 as compile
+FROM nim as deps
 
 # curl - chalk downloads some things directly with curl for the moment
 RUN apt-get update -y && \
@@ -34,34 +43,20 @@ RUN apt-get update -y && \
 RUN if which git; then git config --global --add safe.directory "*"; fi
 
 WORKDIR /chalk
-ENV DEPS_DIR=/libs
 
-COPY --from=libs /libs /libs
+COPY --from=con4m /root/.local/c0 /root/.local/c0
 COPY *.nimble /chalk/
 
-# con4m - for verifying config files
-#         and nimble sync fails to sync it as it has bin configured
-RUN nimble install -y \
-    https://github.com/crashappsec/con4m
+# build chalk so that all deps are installed
+# this requires creating dummy source file
+RUN mkdir src && \
+    touch src/chalk.nim && \
+    nimble build
 
-# generate lock file in order to use nimble sync
-# as repo does not use lock files as they cause trouble outside of docker
-# nimble sync requires git repo
-# so we create dummy git repo with empty commit
-# and then immediately clean-up
-RUN git init -b main . && \
-    git config user.name "chalk" && \
-    git config user.email "chalk@crashoverride.com" && \
-    git commit --allow-empty -m "for nimble sync" && \
-    nimble lock && \
-    nimble sync && \
-    rm -rf .git
-
-    
 # -------------------------------------------------------------------
 # build chalk binary to be copied into final release stage
 
-FROM compile as build
+FROM deps as build
 
 ARG CHALK_BUILD="release"
 
@@ -78,8 +73,7 @@ COPY ./src/ /chalk/src/
 COPY ./.git/ /chalk/.git/
 
 
-RUN --mount=type=cache,target=/root/.nimble,sharing=locked \
-    yes | nimble $CHALK_BUILD
+RUN yes | nimble $CHALK_BUILD
 
 # -------------------------------------------------------------------
 # published as ghcr.io/crashappsec/chalk:alpine

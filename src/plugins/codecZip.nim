@@ -4,7 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2023, Crash Override, Inc.
 
-import zippy/ziparchives_v1, nimSHA2, algorithm, ../config, ../chalkjson,
+import zippy/ziparchives_v1, algorithm, ../config, ../chalkjson,
        ../util, ../subscan, ../plugin_api
 
 const zipChalkFile = "chalk.json"
@@ -27,7 +27,7 @@ template getZipDir(): string     = zipDirs[^1]
 template getZipChalkId(): Box    = chalkIds[^1]
 
 proc hashZip(toHash: ZipArchive): string =
-  var sha = initSHA[SHA256]()
+  var sha = initSHA256()
   var keys: seq[string]
 
   for k, v in toHash.contents:
@@ -44,7 +44,7 @@ proc hashZip(toHash: ZipArchive): string =
     sha.update($(len(v.contents)))
     sha.update(v.contents)
 
-  result = hashFmt($(sha.final))
+  result = sha.finalHex()
 
 proc hashExtractedZip(dir: string): string =
   let toHash = ZipArchive()

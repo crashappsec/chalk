@@ -3,7 +3,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import glob, config, util, plugin_api
+import re, config, util, plugin_api
 
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we
@@ -218,9 +218,9 @@ proc collectRunTimeHostInfo*() =
 
 # The two below functions are helpers for the artifacts() iterator
 # and the self-extractor (in the case of findChalk anyway).
-proc ignoreArtifact(path: string, globs: seq[glob.Glob]): bool {.inline.} =
-  for item in globs:
-    if path.matches(item): return true
+proc ignoreArtifact(path: string, regexps: seq[Regex]): bool {.inline.} =
+  for item in regexps:
+    if path.match(item): return true
   return false
 
 proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =

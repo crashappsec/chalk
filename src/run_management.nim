@@ -114,9 +114,6 @@ proc idFormat*(rawHash: string): string =
   let s = base32vEncode(rawHash)
   s[0 ..< 6] & "-" & s[6 ..< 10] & "-" & s[10 ..< 14] & "-" & s[14 ..< 20]
 
-template hashFmt*(s: string): string =
-  s.toHex().toLowerAscii()
-
 template isSubscribedKey*(key: string): bool =
   if key in subscribedKeys:
     subscribedKeys[key]

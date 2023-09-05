@@ -4,7 +4,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import std/monotimes, nativesockets, nimSHA2, sequtils, times, ../config,
+import std/monotimes, nativesockets, sequtils, times, ../config,
        ../plugin_api, ../normalize, ../chalkjson, ../selfextract,
        ../attestation
 
@@ -38,7 +38,7 @@ proc validateMetadata(obj: ChalkObj): ValidateResult =
     return vBadMd
   var
     toHash   = fields.normalizeChalk()
-    computed = hashFmt($(toHash.computeSHA256()))
+    computed = toHash.sha256Hex()
 
   if computed != unpack[string](fields["METADATA_HASH"]):
     error(obj.name & ": extracted METADATA_HASH doesn't validate")
@@ -286,8 +286,8 @@ proc metsysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
 
   let
     toHash   = obj.getChalkMark().normalizeChalk()
-    mdHash   = $(toHash.computeSHA256())
-    encHash  = hashFmt(mdHash)
+    mdHash   = toHash.sha256()
+    encHash  = mdHash.toHex().toLowerAscii()
 
   result["METADATA_HASH"] = pack(encHash)
   result["METADATA_ID"]   = pack(idFormat(mdHash))

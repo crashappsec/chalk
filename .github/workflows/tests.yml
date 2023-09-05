@@ -10,6 +10,8 @@ on:
     paths:
       - src/**
       - tests/**
+      - config.nims
+      - "*.nimble"
   workflow_dispatch:
     inputs:
 

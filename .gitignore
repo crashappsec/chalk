@@ -33,3 +33,5 @@ server/app/server-static
 *.key
 *.pem
 *.pub
+nimble.develop
+nimble.paths

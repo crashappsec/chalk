@@ -1,7 +1,7 @@
 ## :Author: John Viega, Brandon Edwards
 ## :Copyright: 2023, Crash Override, Inc.
 
-import osproc, glob, ../config, ../docker_base, ../chalkjson, ../util,
+import osproc, ../config, ../docker_base, ../chalkjson, ../util,
        ../attestation, ../plugin_api
 
 const

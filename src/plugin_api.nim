@@ -8,7 +8,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import glob, nimSHA2, config, chalkjson, util, algorithm
+import re, config, chalkjson, util, algorithm
 
 # These things don't check for null pointers, because they should only
 # get called when plugins declare stuff in the config file, so this
@@ -303,9 +303,9 @@ proc scriptLoadMark*(codec:  Plugin, stream: FileStream,
   result = some(chalk)
 
   if toHash == "" and dict == nil:
-    chalk.cachedPreHash = hashFmt($(contents.computeSHA256()))
+    chalk.cachedPreHash = contents.sha256Hex()
   else:
-    chalk.cachedPreHash = hashFmt($(toHash.computeSHA256()))
+    chalk.cachedPreHash = toHash.sha256Hex()
   if dict != nil and len(dict) != 1:
     # When len(dict) == 1, that's the 'placeholder chalk mark', which
     # we consider to be not a chalk mark for script files.
@@ -338,7 +338,7 @@ proc scriptHandleWrite*(plugin:  Plugin,
     if not chalk.replaceFileContents(toWrite):
       chalk.opFailed = true
     else:
-      chalk.cachedHash = hashFmt($(toWrite.computeSHA256()))
+      chalk.cachedHash = toWrite.sha256Hex()
 
 proc loadChalkFromFStream*(codec:  Plugin,
                            stream: FileStream,
@@ -371,11 +371,11 @@ proc scanLocation(self: Plugin, loc: string):
                  Option[ChalkObj] =
   result = callScan(self, loc)
 
-proc mustIgnore(path: string, globs: seq[glob.Glob]): bool {.inline.} =
+proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
   result = false
 
-  for item in globs:
-    if path.matches(item):
+  for item in regexes:
+    if path.match(item):
       return true
 
 proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
@@ -425,8 +425,7 @@ proc simpleHash(self: Plugin, chalk: ChalkObj): Option[string] =
   result = none(string)
 
   chalkUseStream(chalk):
-    let txt = $(stream.readAll().computeSHA256())
-    result = some(hashFmt(txt))
+    result = some(stream.readAll().sha256Hex())
 
 proc defUnchalkedHash*(self: Plugin, obj: ChalkObj): Option[string] {.cdecl.} =
   ## This is called in computing the CHALK_ID. If the artifact already

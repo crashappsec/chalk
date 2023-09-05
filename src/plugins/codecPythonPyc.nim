@@ -4,7 +4,7 @@
 ## :Author: Rich Smith (rich@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import nimSHA2, ../config, ../plugin_api, ../util
+import ../config, ../plugin_api, ../util
 
 proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
   var
@@ -76,7 +76,7 @@ proc pycGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
                         Option[string] {.cdecl.} =
   chalkUseStream(chalk):
     let toHash = $(chalk.stream.readStr(chalk.startOffset))
-    return some(hashFmt($(toHash.computeSHA256())))
+    return some(toHash.sha256Hex())
 
 proc pycGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):
                                 ChalkDict {.cdecl.} =

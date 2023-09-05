@@ -5,7 +5,7 @@
 
 # We use slightly different magic for our heredoc. It's uppercase and longer.
 
-import base64, nimSHA2, ../config, ../chalkjson, ../util, ../plugin_api
+import base64, ../config, ../chalkjson, ../util, ../plugin_api
 
 var prefix = """
 #!/bin/bash
@@ -208,12 +208,12 @@ proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
         error("MacOS binary contents could not be properly read.")
         return none(string)
 
-    chalk.cachedPreHash = hashFmt($(contents.computeSHA256()))
+    chalk.cachedPreHash = contents.sha256Hex()
     if not isChalkingOp():
       # the ending hash will be the hash of the script file as on disk.
       chalkUseStream(chalk):
         let contents     = stream.readAll()
-        chalk.cachedHash = hashFmt($(contents.computeSHA256()))
+        chalk.cachedHash = contents.sha256Hex()
 
   if chalk.cachedPreHash == "":
     return none(string)

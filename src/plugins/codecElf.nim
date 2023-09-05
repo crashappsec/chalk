@@ -10,7 +10,7 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
-import  endians, nimSHA2, ../config, ../util, ../plugin_api
+import  endians, ../config, ../util, ../plugin_api
 
 const
   b64OffsetLoc = 0x28
@@ -99,7 +99,7 @@ proc elfGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
                         Option[string] {.cdecl.} =
   chalk.chalkUseStream():
     let toHash = stream.readStr(chalk.startOffset)
-    return some(hashFmt($(toHash.computeSHA256())))
+    return some(toHash.sha256Hex())
 
 proc elfGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):
                                 ChalkDict {.cdecl.} =
