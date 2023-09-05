@@ -33,9 +33,6 @@ proc validateMetadata(obj: ChalkObj): ValidateResult =
     error(obj.callGetChalkID() & " vs: " &
       unpack[string](fields["CHALK_ID"]))
     return vBadMd
-  elif "METADATA_HASH" notin fields:
-    error(obj.name & ": extracted chalk mark missing METADATA_HASH field")
-    return vBadMd
   var
     toHash   = fields.normalizeChalk()
     computed = toHash.sha256()

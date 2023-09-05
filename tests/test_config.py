@@ -12,7 +12,7 @@ logger = get_logger()
 
 
 VALIDATION_ERROR = "TEST ERROR HERE XXXXXX"
-parse_error = ["Parse", "error"]
+parse_error = "Parse error"
 
 
 # test dump + reload with error log + extract to check error
@@ -68,9 +68,26 @@ def test_invalid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bo
         assert "_OP_ERRORS" not in report
 
 
-@pytest.mark.parametrize("test_config_file", ["validation/valid_1.conf"])
-@pytest.mark.parametrize("use_embedded", [True, False])
-def test_valid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bool):
+@pytest.mark.parametrize(
+    "test_config_file, expected_error",
+    [
+        ("validation/valid_1.conf", VALIDATION_ERROR),
+        ("config-tool/CI_CD_Docker.c4m", ""),
+        ("config-tool/CI_CD_Standalone.c4m", ""),
+        ("config-tool/default-USING-API.c4m", ""),
+        ("config-tool/default.c4m", ""),
+    ],
+)
+@pytest.mark.parametrize(
+    "use_embedded",
+    [
+        True,
+        False,
+    ],
+)
+def test_valid_load(
+    chalk_copy: Chalk, test_config_file: str, expected_error: str, use_embedded: bool
+):
     # call chalk load on valid config
     chalk_copy.load(CONFIGS / test_config_file, use_embedded)
 
@@ -78,7 +95,16 @@ def test_valid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bool
     extract = chalk_copy.extract(chalk_copy.binary, ignore_errors=True)
     for report in extract.reports:
         assert report["_OPERATION"] == "extract"
-        assert VALIDATION_ERROR in report.errors
+
+        if expected_error:
+            assert report.errors
+            assert expected_error in report.errors
+        else:
+            if "_OP_ERRORS" in report:
+                logger.error(
+                    "report has unexpected errors", errors=report["_OP_ERRORS"]
+                )
+            assert "_OP_ERRORS" not in report
 
 
 # tests for configs that are found in the chalk search path
@@ -88,42 +114,47 @@ def test_valid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bool
 @pytest.mark.exclusive
 @pytest.mark.parametrize("tmp_file", [{"path": "/etc/chalk.conf"}], indirect=True)
 @pytest.mark.parametrize(
-    "test_config",
+    "config_path, expected_success, expected_error",
     [
-        ("validation/valid_1.conf", VALIDATION_ERROR),
-        ("validation/invalid_1.conf", ""),
+        ("validation/valid_1.conf", True, VALIDATION_ERROR),
+        ("validation/invalid_1.conf", False, ""),
+        ("config-tool/CI_CD_Docker.c4m", True, ""),
+        ("config-tool/CI_CD_Standalone.c4m", True, ""),
+        ("config-tool/default-USING-API.c4m", True, ""),
+        ("config-tool/default.c4m", True, ""),
     ],
 )
 def test_external_configs(
     tmp_file: IO,
     chalk_copy: Chalk,
-    test_config: tuple[str, str],
+    config_path: str,
+    expected_success: bool,
+    expected_error: str,
 ):
-    config_path, expected_error = test_config
-
-    reference = chalk_copy.run(
+    result_config = chalk_copy.run(
         chalk_cmd="env",
         params=["--log-level=error", f"--config-file={CONFIGS / config_path}"],
-        expected_success=bool(expected_error),
+        expected_success=expected_success,
         ignore_errors=True,
     )
     if expected_error:
-        assert expected_error in reference.logs
+        assert expected_error in result_config.logs
 
     # test load by putting it in chalk default search locations
     # instead of copying to tmp data dir, we have to copy to someplace chalk looks for it
     with tmp_file as fid:
         fid.write((CONFIGS / config_path).read_bytes())
 
-    chalk_copy.run(
+    result_external = chalk_copy.run(
         chalk_cmd="env",
         params=["--log-level=error"],
-        expected_success=bool(expected_error),
+        expected_success=expected_success,
         ignore_errors=True,
     )
+    if expected_error:
+        assert expected_error in result_external.logs
 
 
-# TODO: fill this out
 @pytest.mark.parametrize(
     "test_config_file", [CONFIGS / "validation/custom_report.conf"]
 )

@@ -16,15 +16,15 @@
 # But we list them all here to make it easier to cut, paste and change.
 profile chalk_large {
   doc: """
-This profile is intended to be used for chalking artifacts, when you
-want to put pretty much all available metadata into a chalk mark.
+  This profile is intended to be used for chalking artifacts, when you
+  want to put pretty much all available metadata into a chalk mark.
 
-Except that we don't put quite everything in, especially the
-potentially huge items like SBOM and SAST. But, it's far more than you
-probably want, especially if you're shipping metadata somewhere.
+  Except that we don't put quite everything in, especially the
+  potentially huge items like SBOM and SAST. But, it's far more than you
+  probably want, especially if you're shipping metadata somewhere.
 
-By default, CHALK_RAND is on for unique builds. If you want
-reproducable builds, turn it off, along w/ items that cary the time.
+  By default, CHALK_RAND is on for unique builds. If you want
+  reproducable builds, turn it off, along w/ items that cary the time.
 """
   # We go w/ Datetime
   key.DATE_CHALKED.report                        = false
@@ -94,13 +94,13 @@ reproducable builds, turn it off, along w/ items that cary the time.
 
 profile chalk_default {
   doc: """
-The default values for what goes into chalk marks when using the
-'insert' and 'docker' commands shipped with Chalk.  This only turns on
-things that are able to tie the artifact to its repository; it does
-not collect most available information about the build environment.
+  The default values for what goes into chalk marks when using the
+  'insert' and 'docker' commands shipped with Chalk.  This only turns on
+  things that are able to tie the artifact to its repository; it does
+  not collect most available information about the build environment.
 
-This is not a config suitable for a reproducable build. To make it one,
-use `chalk_reproducable`.
+  This is not a config suitable for a reproducable build. To make it one,
+  use `chalk_reproducable`.
 """
   key.DATE_CHALKED.report                        = false
   key.TIME_CHALKED.report                        = false
@@ -143,8 +143,8 @@ use `chalk_reproducable`.
 # keys are off.
 profile chalk_reproducable {
   doc: """
-This profile is based on `chalk_default` but with the time and the
-nonce removed.
+  This profile is based on `chalk_default` but with the time and the
+  nonce removed.
 """  
   key.DATETIME_WHEN_CHALKED.report               = false
   key.TIMESTAMP_WHEN_CHALKED.report              = false
@@ -182,15 +182,15 @@ nonce removed.
 
 profile chalk_minimal {
   doc: """
-This profile is for what gets inserted into artifacts when we are
-sending metadata somewhere This profile is meant to be
-minimal. Signatures will sign what's in the chalk mark, but don't
-themselves strictly need to be in the mark; they can just be reported
-up.
+  This profile is for what gets inserted into artifacts when we are
+  sending metadata somewhere This profile is meant to be
+  minimal. Signatures will sign what's in the chalk mark, but don't
+  themselves strictly need to be in the mark; they can just be reported
+  up.
 
-This represents the default items that are required, along with
-`CHALK_PTR` and `DATETIME_WHEN_CHALKED`.  You could remove these if
-you wanted.
+  This represents the default items that are required, along with
+  `CHALK_PTR` and `DATETIME_WHEN_CHALKED`.  You could remove these if
+  you wanted.
 """
   key.DATETIME_WHEN_CHALKED.report               = true
   key.CHALK_PTR.report                           = true
@@ -205,9 +205,9 @@ you wanted.
 
 profile artifact_report_large {
 doc: """
-This profile reports most things, except large stuff that's mostly
-redundant, like _OP_ALL_IMAGE_METADATA. This does report stuff that's
-more expensive to capture (like full ps when available).
+  This profile reports most things, except large stuff that's mostly
+  redundant, like _OP_ALL_IMAGE_METADATA. This does report stuff that's
+  more expensive to capture (like full ps when available).
 """
   key.DATE_CHALKED.report                        = true
   key.TIME_CHALKED.report                        = true
@@ -474,8 +474,8 @@ more expensive to capture (like full ps when available).
 
 profile artifact_report_default {
   doc: """
-This profile turns is based on `artifact_report_large`, removing
-things that are spammy.
+  This profile turns is based on `artifact_report_large`, removing
+  things that are spammy.
 """
   key._PROCESS_DETAIL.report                     = false
   key._INSTANCE_LOCAL_IPV6.report                = false
@@ -806,8 +806,8 @@ profile host_report_large {
 
 profile host_report_default {
   doc: """
-This reports lots of info on Linux boxes, but skips stuff that's spammy.
-It reports all PS info, but only if definitely running in a container.
+  This reports lots of info on Linux boxes, but skips stuff that's spammy.
+  It reports all PS info, but only if definitely running in a container.
 """
 
   key._OP_HOST_REPORT_KEYS.report                = false
@@ -909,13 +909,13 @@ profile unknown_docker_report {
 
 profile push_report_default {
   doc: """
-When we report on a 'docker push', these are the important
-per-artifact items we collect. The CURRENT_HASH and REPO_DIGESTS
-fields are both necessary for following the breadcrumbs, so should be
-on in all circumstances (we'll probably force them on eventually).
+  When we report on a 'docker push', these are the important
+  per-artifact items we collect. The CURRENT_HASH and REPO_DIGESTS
+  fields are both necessary for following the breadcrumbs, so should be
+  on in all circumstances (we'll probably force them on eventually).
 
-You can certainly collect a lot more data here, but we expect it
-should usually be redundant w/ the info you collected during a build.
+  You can certainly collect a lot more data here, but we expect it
+  should usually be redundant w/ the info you collected during a build.
 """
   ~key._CURRENT_HASH.report                      = true
   key._STORE_URI.report                          = true    
@@ -927,14 +927,14 @@ should usually be redundant w/ the info you collected during a build.
 
 profile audit_report {
   doc: """
-Here, we only report key bits about the configuration used, for audit
-purposes. This is implemented as the "audit" report below; the
-implementation special-cases it a bit; the "publish_audit" variable
-can be used to control this (right now, just turn it on or off, though
-you can certainly change this report, and change the output sink(s)
-subscribed to the 'audit' topic).
+  Here, we only report key bits about the configuration used, for audit
+  purposes. This is implemented as the "audit" report below; the
+  implementation special-cases it a bit; the "publish_audit" variable
+  can be used to control this (right now, just turn it on or off, though
+  you can certainly change this report, and change the output sink(s)
+  subscribed to the 'audit' topic).
 
-Note that in the default configuration, "publish_audit" is OFF.
+  Note that in the default configuration, "publish_audit" is OFF.
 """
   key._OPERATION.report                          = true
   key._ACTION_ID.report                          = true
@@ -949,16 +949,16 @@ Note that in the default configuration, "publish_audit" is OFF.
 profile usage_report {
   enabled: true
   doc: """
-These fields are, by default, sent back up to Crash Override to keep
-high-level statistics on Chalk usage (via an attempted post to an
-HTTPS endpoint).
+  These fields are, by default, sent back up to Crash Override to keep
+  high-level statistics on Chalk usage (via an attempted post to an
+  HTTPS endpoint).
 
-This is important for supporting our development of Chalk.  However,
-you may disable it by adding to your configuration file:
+  This is important for supporting our development of Chalk.  However,
+  you may disable it by adding to your configuration file:
 
-```
-profile.usage_report.enabled = false
-```
+  ```
+  profile.usage_report.enabled = false
+  ```
 """
   ~key._OPERATION.report                         = true
   ~key._TIMESTAMP.report                         = true
@@ -971,8 +971,8 @@ profile.usage_report.enabled = false
 
 profile chalk_labels {
   doc: """
-This profile is for chalkable keys that are automatically added as
-labels to a container when running `docker build`.
+  This profile is for chalkable keys that are automatically added as
+  labels to a container when running `docker build`.
 """
   key.COMMIT_ID.report                           = true
   key.ORIGIN_URI.report                          = true

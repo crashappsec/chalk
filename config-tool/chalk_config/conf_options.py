@@ -1,9 +1,7 @@
-import datetime
 import hashlib
 import json
 import platform
 import semver
-import sqlite3
 import ssl
 import subprocess
 import tempfile
@@ -13,7 +11,6 @@ from pathlib import Path
 from typing import Optional
 
 import os
-import stat
 
 from .localized_text import *
 from .log import get_logger
@@ -446,15 +443,15 @@ note_kludge = None
 
 
 profile_name_map = {
-    "chalk_min": "chalking_ptr",
-    "chalk_max": "chalking_default",
-    "chalk_art": "artifact_report_insert_base",
-    "chalk_host": "host_report_insert_base",
+    "chalk_min": "chalk_minimal",
+    "chalk_max": "chalk_large",
+    "chalk_art": "artifact_report_default",
+    "chalk_host": "host_report_default",
     "labels": "chalk_labels",
     "x_min_host": "host_report_minimal",
-    "x_max_host": "host_report_other_base",
-    "x_min_art": "artifact_report_minimal",
-    "x_max_art": "artifact_report_extract_base",
+    "x_max_host": "host_report_large",
+    "x_min_art": "artifact_report_default",
+    "x_max_art": "artifact_report_large",
 }
 
 
@@ -574,7 +571,7 @@ def dict_to_con4m(d):
         forLinux = False
     lines = []
 
-    lines.append("cmd := argv0()")
+    lines.append("cmd := command_name()")
 
     if is_true(d, "use_docker"):
         lines.append('default_command = "docker"')
@@ -805,8 +802,8 @@ unsubscribe("report", "json_console_error")
     if is_true(d, "chalk_minimal"):
         lines.append(
             """
-outconf.insert.chalk = "chalking_ptr"
-outconf.build.chalk  = "chalking_ptr"
+outconf.insert.chalk = "chalk_minimal"
+outconf.build.chalk  = "chalk_minimal"
 
 keyspec.CHALK_PTR.value = strip(ptr_value)
 """
@@ -825,11 +822,11 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         if is_true(d, "chalk_rand"):
             lines.append(profile_set("chalk_min", "CHALK_RAND", "true"))
         if is_true(d, "chalk_build_env"):
-            lines.append(profile_set("chalk_min", "INSERTION_HOSTINFO", "true"))
-            lines.append(profile_set("chalk_min", "INSERTION_NODENAME", "true"))
+            lines.append(profile_set("chalk_min", "HOSTINFO_WHEN_CHALKED", "true"))
+            lines.append(profile_set("chalk_min", "NODENAME_WHEN_CHALKED", "true"))
         # if is_true(d, "chalk_sig"):
         #    lines.append(profile_set('chalk_min', 'SIGNATURE', 'true'))
-        #    lines.append(profile_set('chalk_min', 'SIGN_PARAMS', 'true'))
+        #    lines.append(profile_set('chalk_min', 'SIGNING', 'true'))
         if is_true(d, "chalk_sbom"):
             lines.append(profile_set("chalk_min", "SBOM", "true"))
             enable_sbom = True
@@ -852,11 +849,11 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         if is_true(d, "chalk_rand"):
             lines.append(profile_set("chalk_max", "CHALK_RAND", "false"))
         if is_true(d, "chalk_build_env"):
-            lines.append(profile_set("chalk_max", "INSERTION_HOSTINFO", "false"))
-            lines.append(profile_set("chalk_max", "INSERTION_NODENAME", "false"))
+            lines.append(profile_set("chalk_max", "HOSTINFO_WHEN_CHALKED", "false"))
+            lines.append(profile_set("chalk_max", "NODENAME_WHEN_CHALKED", "false"))
         # if is_true(d, "chalk_sig"):
         #    lines.append(profile_set('chalk_max', 'SIGNATURE', 'false'))
-        #    lines.append(profile_set('chalk_max', 'SIGN_PARAMS', 'false'))
+        #    lines.append(profile_set('chalk_max', 'SIGNING', 'false'))
         if is_true(d, "chalk_sbom"):
             lines.append(profile_set("chalk_max", "SBOM", "false"))
         else:
@@ -904,12 +901,12 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         if not is_true(d, "crpt_embed"):
             lines.append(profile_set("chalk_art", "EMBEDDED_CHALK", "false"))
         if not is_true(d, "crpt_host"):
-            lines.append(profile_set("chalk_host", "INSERTION_HOSTINFO", "false"))
-            lines.append(profile_set("chalk_host", "INSERTION_NODENAME", "false"))
+            lines.append(profile_set("chalk_host", "HOSTINFO_WHEN_CHALKED", "false"))
+            lines.append(profile_set("chalk_host", "NODENAME_WHEN_CHALKED", "false"))
         if is_true(d, "crpt_env"):
-            lines.append(profile_set("chalk_host", "ENV", "true"))
+            lines.append(profile_set("chalk_host", "_ENV", "true"))
         if not is_true(d, "crpt_sig"):
-            lines.append(profile_set("chalk_art", "SIGN_PARAMS", "false"))
+            lines.append(profile_set("chalk_art", "SIGNING", "false"))
             lines.append(profile_set("chalk_art", "SIGNATURE", "false"))
         if is_true(d, "crpt_sast"):
             lines.append(profile_set("chalk_host", "SAST", "false"))
@@ -928,12 +925,12 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
         if is_true(d, "crpt_embed"):
             lines.append(profile_set("chalk_art", "EMBEDDED_CHALK", "false"))
         if is_true(d, "crpt_host"):
-            lines.append(profile_set("chalk_host", "INSERTION_HOSTINFO", "false"))
-            lines.append(profile_set("chalk_host", "INSERTION_NODENAME", "false"))
+            lines.append(profile_set("chalk_host", "HOSTINFO_WHEN_CHALKED", "false"))
+            lines.append(profile_set("chalk_host", "NODENAME_WHEN_CHALKED", "false"))
         if not is_true(d, "crpt_env"):
-            lines.append(profile_set("chalk_host", "ENV", "true"))
+            lines.append(profile_set("chalk_host", "_ENV", "true"))
         if not is_true(d, "crpt_sig"):
-            lines.append(profile_set("chalk_art", "SIGN_PARAMS", "false"))
+            lines.append(profile_set("chalk_art", "SIGNING", "false"))
             lines.append(profile_set("chalk_art", "SIGNATURE", "false"))
         if not is_true(d, "crpt_sast"):
             lines.append(profile_set("chalk_host", "SAST", "false"))
@@ -948,38 +945,36 @@ keyspec.CHALK_PTR.value = strip(ptr_value)
 
     if is_true(d, "drpt_labels"):
         lines.append(profile_set("chalk_art", "DOCKER_LABELS", "true"))
-        lines.append(profile_set("chalk_host", "DOCKER_LABELS", "true"))
+        # lines.append(profile_set("chalk_host", "DOCKER_LABELS", "true"))
     else:
         lines.append(profile_set("chalk_art", "DOCKER_LABELS", "false"))
-        lines.append(profile_set("chalk_host", "DOCKER_LABELS", "false"))
+        # lines.append(profile_set("chalk_host", "DOCKER_LABELS", "false"))
     if is_true(d, "drpt_tags"):
         lines.append(profile_set("chalk_art", "DOCKER_TAGS", "true"))
-        lines.append(profile_set("chalk_host", "DOCKER_TAGS", "true"))
+        # lines.append(profile_set("chalk_host", "DOCKER_TAGS", "true"))
     else:
         lines.append(profile_set("chalk_art", "DOCKER_TAGS", "false"))
-        lines.append(profile_set("chalk_host", "DOCKER_TAGS", "false"))
+        # lines.append(profile_set("chalk_host", "DOCKER_TAGS", "false"))
     if is_true(d, "drpt_dfile"):
         lines.append(profile_set("chalk_art", "DOCKER_FILE", "true"))
-        lines.append(profile_set("chalk_host", "DOCKER_FILE", "true"))
     else:
         lines.append(profile_set("chalk_art", "DOCKER_FILE", "false"))
-        lines.append(profile_set("chalk_host", "DOCKER_FILE", "false"))
     if is_true(d, "drpt_dfpath"):
         lines.append(profile_set("chalk_art", "DOCKERFILE_PATH", "true"))
-        lines.append(profile_set("chalk_host", "DOCKERFILE_PATH", "true"))
+        # lines.append(profile_set("chalk_host", "DOCKERFILE_PATH", "true"))
     else:
         lines.append(profile_set("chalk_art", "DOCKERFILE_PATH", "false"))
-        lines.append(profile_set("chalk_host", "DOCKERFILE_PATH", "false"))
+        # lines.append(profile_set("chalk_host", "DOCKERFILE_PATH", "false"))
     if is_true(d, "drpt_platform"):
         lines.append(profile_set("chalk_art", "DOCKER_PLATFORM", "true"))
-        lines.append(profile_set("chalk_host", "DOCKER_PLATFORM", "true"))
+        # lines.append(profile_set("chalk_host", "DOCKER_PLATFORM", "true"))
     else:
         lines.append(profile_set("chalk_art", "DOCKER_PLATFORM", "false"))
-        lines.append(profile_set("chalk_host", "DOCKER_PLATFORM", "false"))
+        # lines.append(profile_set("chalk_host", "DOCKER_PLATFORM", "false"))
     if is_true(d, "drpt_cmd"):
-        lines.append(profile_set("chalk_host", "ARGV", "true"))
+        lines.append(profile_set("chalk_host", "_ARGV", "true"))
     else:
-        lines.append(profile_set("chalk_host", "ARGV", "false"))
+        lines.append(profile_set("chalk_host", "_ARGV", "false"))
     if is_true(d, "drpt_ctx"):
         lines.append(profile_set("chalk_art", "DOCKER_CONTEXT", "true"))
         lines.append(profile_set("chalk_host", "DOCKER_CONTEXT", "true"))
