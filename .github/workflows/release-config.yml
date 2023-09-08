@@ -12,6 +12,9 @@ permissions:
   id-token: write # for aws role
   packages: write
 
+env:
+  CHALK_BINARIES_BUCKET: ${{ secrets.CHALK_BINARIES_BUCKET }}
+
 jobs:
   s3:
     runs-on: ubuntu-latest
@@ -28,11 +31,11 @@ jobs:
           secrets: ${{ toJSON(secrets) }}
 
       - name: Build Config Package
+        working-directory: ./config-tool
         run: |
-          make config-tool/release
+          make release
 
       - name: Push Fake PyPI Release To S3
-        working-directory: ./config-tool/dist
+        working-directory: ./config-tool
         run: |
-          # TODO rename config-tool to chalk-config
-          aws s3 cp --recursive . s3://${{ secrets.CHALK_BINARIES_BUCKET }}/config-tool/ --acl=public-read
+          make upload

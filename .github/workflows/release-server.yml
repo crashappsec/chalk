@@ -13,7 +13,7 @@ permissions:
   packages: write
 
 env:
-  SERVER: ./server/dist/chalkserver
+  CHALK_BINARIES_BUCKET: ${{ secrets.CHALK_BINARIES_BUCKET }}
 
 jobs:
   binary:
@@ -42,32 +42,21 @@ jobs:
           platform: ${{ matrix.platform }}
 
       - name: Build Server Binary
+        working-directory: ./server
         run: |
-          make server/release
+          make release
 
       - name: Sanity check
-        working-directory: ./server/dist
+        working-directory: ./server
         run: |
           ./chalkserver --version
 
-      - name: Update Current Version
-        if: matrix.platform == 'amd64'
-        run: |
-          make version > current-version.txt
-          aws s3 cp current-version.txt s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/current-version.txt --acl=public-read
-
-      - name: Push amd64 Binaries
-        if: matrix.platform == 'amd64'
+      - name: Dist
         working-directory: ./server
         run: |
-          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-${{ matrix.os }}-amd64  --acl=public-read
-          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-${{ matrix.os }}-x86_64 --acl=public-read
-          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-$(uname -s)-$(uname -m) --acl=public-read
+          make dist
 
-      - name: Push arm64 Binaries
-        if: matrix.platform == 'arm64'
+      - name: Upload To S3
         working-directory: ./server
         run: |
-          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-${{ matrix.os }}-arm64   --acl=public-read
-          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-${{ matrix.os }}-aarch64 --acl=public-read
-          aws s3 cp dist/chalkserver s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalkserver/chalkserver-$(make version)-$(uname -s)-$(uname -m)  --acl=public-read
+          make upload

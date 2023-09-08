@@ -1,4 +1,7 @@
 SHELL=bash
+BINARY=chalkserver
+
+VERSION=$(shell $(MAKE) -s -C .. version)
 
 .PHONY: server
 server:
@@ -17,18 +20,23 @@ sqlite:
 	docker compose up -d --wait sqlite
 	docker compose logs sqlite | head
 
-.PHONY: release
-release:
-	mkdir -p dist
+$(BINARY):
 	docker compose build server-release
 	docker compose run \
 		--rm \
 		--user=$$(id -u):$$(id -g) \
 		--entrypoint=cp \
-		server-release /bin/chalkserver dist/chalkserver
-	ls -la dist
-	file dist/chalkserver
+		server-release /bin/chalkserver $@
+	ls -la $@
+	file $@
+
+.PHONY: release
+release:
+	-rm -f $(BINARY)
+	$(MAKE) $(BINARY)
 
 .PHONY: version
 version:
-	@$(MAKE) -s -C .. $@
+	@echo $(VERSION)
+
+include ../.github/Makefile.dist

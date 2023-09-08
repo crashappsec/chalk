@@ -1,5 +1,9 @@
 SHELL=bash
 
+# TODO rename config-tool to chalk-config
+# this must match pyproject.toml name
+NAME=config-tool
+
 .PHONLY: config
 config:
 	docker compose run --rm config
@@ -34,3 +38,8 @@ release: dist  ## add dummy pypi simple/index.html for dist to be "pypi" server
 	mv dist/simple.html dist/index.html
 	ls -la dist
 	cat dist/index.html
+
+ifneq "$(CHALK_BINARIES_BUCKET)" ""
+upload:
+	aws s3 sync dist s3://$(CHALK_BINARIES_BUCKET)/$(NAME)/ --acl=public-read
+endif

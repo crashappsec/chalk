@@ -12,6 +12,9 @@ permissions:
   id-token: write # for aws role
   packages: write
 
+env:
+  CHALK_BINARIES_BUCKET: ${{ secrets.CHALK_BINARIES_BUCKET }}
+
 jobs:
   binary:
     runs-on: ${{ matrix.builder }}
@@ -50,25 +53,13 @@ jobs:
         run: |
           ./chalk version
 
-      - name: Update Current Version
-        if: matrix.platform == 'amd64'
+      - name: Dist
         run: |
-          make version > current-version.txt
-          aws s3 cp current-version.txt s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalk/current-version.txt --acl=public-read
+          make dist
 
-      - name: Push amd64 Binaries
-        if: matrix.platform == 'amd64'
+      - name: Upload To S3
         run: |
-          aws s3 cp chalk s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalk/chalk-$(make version)-${{ matrix.os }}-amd64  --acl=public-read
-          aws s3 cp chalk s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalk/chalk-$(make version)-${{ matrix.os }}-x86_64 --acl=public-read
-          aws s3 cp chalk s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalk/chalk-$(make version)-$(uname -s)-$(uname -m) --acl=public-read
-
-      - name: Push arm64 Binaries
-        if: matrix.platform == 'arm64'
-        run: |
-          aws s3 cp chalk s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalk/chalk-$(make version)-${{ matrix.os }}-arm64   --acl=public-read
-          aws s3 cp chalk s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalk/chalk-$(make version)-${{ matrix.os }}-aarch64 --acl=public-read
-          aws s3 cp chalk s3://${{ secrets.CHALK_BINARIES_BUCKET }}/chalk/chalk-$(make version)-$(uname -s)-$(uname -m)  --acl=public-read
+          make upload
 
   github:
     needs: binary
@@ -93,16 +84,13 @@ jobs:
         run: |
           echo "version=$(make version)" >> $GITHUB_OUTPUT
 
-      - name: Aggregate All Released Binaries From S3
-        run: |
-          aws s3 cp --recursive --exclude="*" --include="chalk/chalk-$(make version)-*" s3://${{ secrets.CHALK_BINARIES_BUCKET }} dist
-
-      - name: Upload Binaries to GitHub Release
+      - name: Create GitHub Release
         # official action is not maintained
         # https://github.com/actions/create-release
         # so using this suggested action instead
         uses: ncipollo/release-action@v1.13.0
         with:
+          # note this only creates release without binaries
+          # as downloads will go via s3 bucket
           allowUpdates: true
-          artifacts: "dist/chalk/*"
           tag: v${{ steps.version.outputs.version }}

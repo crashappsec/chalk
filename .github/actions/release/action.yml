@@ -12,9 +12,15 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ github.token }}
+
     # buildjet has older version of buildx which is incompatible with bake
     - name: Set up Docker Buildx
-      if: inputs.platform == 'arm64'
       uses: docker/setup-buildx-action@v2
       with:
         version: v0.11.2
