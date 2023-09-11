@@ -1,4 +1,5 @@
 FROM ghcr.io/crashappsec/nim:ubuntu-2.0.0 as nim
+FROM gcr.io/projectsigstore/cosign as cosign
 
 # -------------------------------------------------------------------
 # con4m install static deps for build which requires
@@ -44,6 +45,7 @@ RUN if which git; then git config --global --add safe.directory "*"; fi
 
 WORKDIR /chalk
 
+COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
 COPY --from=con4m /root/.local/c0 /root/.local/c0
 COPY *.nimble /chalk/
 

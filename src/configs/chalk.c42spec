@@ -608,7 +608,10 @@ before the next artifact is processed.
   field enabled {
     type:    bool
     default: true
-    doc:     "Setting this field completely disables a plugin."
+    doc:     """
+Setting this field completely disables a plugin. Some plugins cannot be
+disabled, including most built-in codecs and the system / metsys plugins.
+"""
   }
 
   field overrides {
@@ -2198,6 +2201,7 @@ For the INJECTOR_ENV and _ENV metadata keys, any environment variable that is no
 """
   }
 
+
   field validate_configs_on_load {
     type:        bool
     default:     true
@@ -2257,6 +2261,44 @@ For most commands, this defeats the purpose of Chalk, so use it sparingly.
 
 Note that this doesn't turn off any custom reports; you have to disable those seprately.
 """
+  }
+
+  field skip_summary_report {
+    type:        bool
+    default:     false
+    shortdoc: "Skip the command report"
+    doc: """
+Skip publishing the summary report that's typically printed to the terminal.
+
+This is checked before the user config is loaded; it's only settable
+via command line flag.
+
+However, if you want to disable it in your config file, you can just set:
+
+```
+custom_report_terminal_chalk_time.enabled: false
+custom_report.terminal_env_time.enabled: false  
+custom_report.terminal_other_op.enabled: false
+```
+"""
+  }
+
+  field symlink_behavior {
+    type: string
+    default: "skip"
+    choice: ["skip", "clobber", "copy"]
+    shortdoc: "Behavior for symbolic links to files"
+    doc: """
+Chalk never follows directory links. When running non-chalking operations, chalk will read the file on the other end of the link, and report using the file name of the link.
+
+For insertion operations, Chalk will, out of the box, warn on symbolic links, without processing them. 
+
+This variable controls what happens in those cases:
+
+- <em>skip</em>   will not process files that are linked.
+- <em>clobber</em> will read the artifact on the other end of the link, and, if writing, try to replace the file being linked to.
+- <em>copy</em> will read the artifact on the other end of the link, and, if writing, will replace the link with a modified file, leaving the file on the other end of the link intact.
+"""    
   }
 
   field install_completion_script {

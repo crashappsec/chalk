@@ -138,7 +138,6 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   else:
     commentPrefix = "#"
 
-  info("commentPrefix = " & commentPrefix)
   result = self.scriptLoadMark(stream, path, commentPrefix)
 
   if result.isSome():

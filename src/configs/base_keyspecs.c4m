@@ -252,7 +252,7 @@ keyspec INJECTOR_ARGV {
     type:             list[string]
     standard:         true
     system:           true
-    conf_as_system:   true    
+    conf_as_system:   true
     ~callback:        func get_args
     since:            "0.1.0"
     doc:              "The full contents of argv used on invocation"
@@ -298,7 +298,7 @@ keyspec CHALK_ID {
     doc:                    """
 A unique ID for the artifact, taken from the artifact hash provided by
 the codec
-"""                      
+"""
 }
 
 keyspec TIMESTAMP_WHEN_CHALKED {
@@ -359,7 +359,7 @@ keyspec CONTAINING_ARTIFACT_WHEN_CHALKED {
     codec:            true
     since:            "0.1.0"
     doc:              """
-    
+
 For items chalked when they were in a embedded into a ZIP file, this is the
 `CHALK_ID` of the containing artifact.
 """
@@ -381,8 +381,60 @@ keyspec HASH {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    doc:              "Hash file of artifact w/o chalk in it, to ensure " +
-                      "extracted chalk is intact"
+    doc:              """
+Hash file of artifact w/o chalk in it, to ensure extracted chalk is
+intact.  The hash algorithm is specific to the codec, and is generally
+a normalization of the file that is format specific.
+
+It is NOT the file system hash. For Chalk's purposes, even when
+inserting a chalk mark, the file system hash is not a good hash to use
+to decided whether two artifacts are the same non-chalked item. For
+instance, if you chalk an artifact that has already been chalked, the
+chalk HASH algorithm will see they're the same artifact, but the file
+system hashes would definitely differ.
+
+Also, for some codecs, due to file format complexities, if you DELETE
+a chalk mark from an artifact, you may not get the same bits back as
+before any chalk mark was inserted.
+
+That's because there's a normalization process applied, and reversing
+it is not worth the effort, especially for things like ZIP files and
+ELF binaries, where the logic involved would be complex, and it would
+also require storing data.
+
+The codec-specific normalization process ensures the artifact
+semantics are always valid, and that we have a consistent way to
+hash. It just doesn't always enable recovering the original bits.
+
+Nonetheless:
+
+1. The `_CURRENT_HASH` key will always give you the hash of the file
+on the file system, at the end of the current operation.
+
+2. For file system artifacts, The `PRE_CHALK_HASH` field will give the
+file system hash before insertion. __However__, this is calculated
+without considering whether it is already chalked of not.
+
+"""
+}
+
+keyspec PRE_CHALK_HASH {
+    kind:                ChalkTimeArtifact
+    type:                string
+    standard:            true
+    since:               "0.1.1"
+    doc:                 """
+For chalking operations only, this is the hash value of the file, before the
+chalking operation took place.
+
+This key does process chalk marks, only bits on disk. That is, if the
+file was previously chalked before the current insertion, the hash
+will include the old chalk mark being replaced.
+
+The run-time key `_CURRENT_HASH` is available on all operations, and
+for file system objects, gives the hash on disk after the operation
+concludes.
+"""
 }
 
 # This is one that could be different per-artifact, but our current
@@ -633,7 +685,7 @@ keyspec METADATA_ID {
     normalized_order:       high() - 200
     doc:                    """
 A more readable unique identifier for all metadata.
-"""    
+"""
 }
 
 keyspec SIGNATURE {
@@ -802,7 +854,7 @@ This is set to `true` if an object's metadata is okay, and the chalk mark was
 well-formed. If an object is unsigned, this being `true` does NOT mean that
 the metadata is authentic, just that the data is all consistent.  If there is
 also a validated signature as well, _VALIDATED_SIGNATURE will also be true.
-"""    
+"""
 }
 
 keyspec _VALIDATED_SIGNATURE {
@@ -860,7 +912,7 @@ keyspec _PROCESS_PID {
     standard:         true
     since:            "0.1.0"
     doc: """
-The process ID of the running process associated with the artifact. 
+The process ID of the running process associated with the artifact.
 
 Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
 """
@@ -881,7 +933,7 @@ _PROCESS_FD_INFO
 _PROCESS_MOUNT_INFO
 
 Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
-"""    
+"""
 }
 
 keyspec _PROCESS_PARENT_PID {
@@ -1109,7 +1161,7 @@ keyspec _PROCESS_FD_INFO {
 Returns information for all file descriptors in the process.
 Keys are file descriptor numbers, but encoded as a string.
 
-Values are dictionaries of info that vary based on the file type. 
+Values are dictionaries of info that vary based on the file type.
 
 Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
 """
@@ -1159,7 +1211,7 @@ keyspec _IMAGE_COMMENT {
     type: string
     standard: true
     doc: """
-"""    
+"""
 }
 
 keyspec _IMAGE_CREATION_DATETIME {
@@ -1431,7 +1483,7 @@ keyspec _IMAGE_VIRTUAL_SIZE {
     type: int
     standard: true
     doc: """
-"""    
+"""
 }
 
 keyspec _IMAGE_LAST_TAG_TIME {
@@ -1439,7 +1491,7 @@ keyspec _IMAGE_LAST_TAG_TIME {
     type: string
     standard: true
     doc: """
-"""    
+"""
 }
 
 keyspec _IMAGE_STORAGE_METADATA {
@@ -1447,7 +1499,7 @@ keyspec _IMAGE_STORAGE_METADATA {
     type: dict[string, string]
     standard: true
     doc: """
-"""    
+"""
 }
 
 
@@ -1871,8 +1923,8 @@ keyspec _INSTANCE_ISOLATION {
     type:             `x
     standard:         true
     doc: """
-Isolation technology in use for the instance, if reported by the container runtime.    
-"""    
+Isolation technology in use for the instance, if reported by the container runtime.
+"""
 }
 
 keyspec _INSTANCE_CPU_SHARES {
@@ -2105,9 +2157,8 @@ keyspec _INSTANCE_MOUNTS {
     standard:         true
     doc: """
 Mounts associated with the running container.
-"""    
+"""
 }
-
 
 keyspec _INSTANCE_HOSTNAME {
     kind: RunTimeArtifact
@@ -2400,7 +2451,7 @@ keyspec _FOUND_BASE_MARK {
 When extracting from a docker image that is unmarked at the top layer, if lower layers are searched, this will be set to the found values of CHALK_ID and METADATA_ID, in the highest layer where a mark was found.
 
 These values will not have been validated.
-"""    
+"""
 }
 
 keyspec _SIGNATURE {
@@ -2446,7 +2497,7 @@ keyspec _ARGV {
     type:             list[string]
     standard:         true
     system:           true
-    conf_as_system:   true        
+    conf_as_system:   true
     ~callback:        func get_args
     since:            "0.1.0"
     doc:              "The full contents of argv used on invocation"
@@ -2745,7 +2796,7 @@ keyspec _OP_TCP_SOCKET_INFO {
     standard:         true
     since:            "0.1.0"
     doc: """
-On Linux machines, will return information about existing TCP sockets, to the degree that the chalk process has permissions to access this information. 
+On Linux machines, will return information about existing TCP sockets, to the degree that the chalk process has permissions to access this information.
 
 One socket is returned per row. The columns returned are:
 1. The local IP address in use
@@ -2766,7 +2817,7 @@ keyspec _OP_UDP_SOCKET_INFO {
     standard:         true
     since:            "0.1.0"
     doc: """
-On Linux machines, will return UDP state information, to the degree that the chalk process has permissions to access this information. 
+On Linux machines, will return UDP state information, to the degree that the chalk process has permissions to access this information.
 
 One socket is returned per row. The columns returned are:
 1. The local IP address in use
@@ -2839,7 +2890,7 @@ keyspec _OP_IPV4_INTERFACES {
 On Linux machines, will return information on IPV4 interface status.
 
 One interface is listed per row.  The first column is the interface
-name.  
+name.
 
 The next 8 columns are receive statistics:
 bytes, packets, errors, drops, fifo, frame, compressed, multicast
@@ -2866,7 +2917,7 @@ The remaining columns are:
 - The netlink device number in hex
 - The prefix length in hex
 - The kernel's 'Scope value' (see include/net/ipv6.h)
-- The kernel's 'Interface flags' (see include/linux/rtnetlink.h') 
+- The kernel's 'Interface flags' (see include/linux/rtnetlink.h')
 
 When running Chalk inside a container, this information will be the virtualized view available insider the container.
 """
@@ -2879,7 +2930,7 @@ keyspec _OP_ARP_TABLE {
     standard:         true
     since:            "0.1.0"
     doc: """
-On Linux machines, will return the ARP table. 
+On Linux machines, will return the ARP table.
 
 One row is returned for each ARP entry.  The columns are:
 1. The IP address
@@ -2910,7 +2961,7 @@ The values are all presented as strings.  The current available item info is:
 - total_procs: the total number of running processes.
 
 When running Chalk inside a container, this information will be the virtualized view available insider the container.
-"""    
+"""
 }
 
 keyspec _OP_ALL_PS_INFO {
@@ -2953,6 +3004,372 @@ When running Chalk inside a container, this information will be the virtualized 
 """
 }
 
+keyspec _AWS_INSTANCE_IDENTITY_DOCUMENT {
+    kind:             RunTimeHost
+    type:             `x
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+JSON containing instance attributes, such as instance-id, private IP address, etc. See Instance identity documents.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_INSTANCE_IDENTITY_PKCS7 {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+Used to verify the document's authenticity and content against the signature. See Instance identity documents.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_INSTANCE_IDENTITY_SIGNATURE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+Data that can be used by other parties to verify identity document's origin and authenticity.  See Instance identity documents.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_INSTANCE_MONITORING {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+Value showing whether the customer has enabled detailed one-minute monitoring in CloudWatch. Valid values: `enabled`, `disabled`.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_AMI_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The AMI ID used to launch the instance.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_AMI_LAUNCH_INDEX {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+If you started more than one instance at the same time, this value indicates the order in which the instance was launched. The value of the first instance launched is 0.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_AMI_MANIFEST_PATH {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The path to the AMI manifest file in Amazon S3. If you used an Amazon EBS-backed AMI to launch the instance, the returned result is unknown.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_ANCESTOR_AMI_IDS {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The AMI IDs of any instances that were rebundled to create this AMI. This value will only exist if the AMI manifest file contained an ancestor-amis key.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+
+keyspec _AWS_HOSTNAME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+If the EC2 instance is using IP-based naming (IPBN), this is the private IPv4 DNS hostname of the instance. If the EC2 instance is using Resource-based naming (RBN), this is the RBN. In cases where multiple network interfaces are present, this refers to the eth0 device (the device for which the device number is 0). For more information about IPBN and RBN, see Amazon EC2 instance hostname types.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_IAM_INFO {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+If there is an IAM role associated with the instance, contains information about the last time the instance profile was updated, including the instance's LastUpdated date, InstanceProfileArn, and InstanceProfileId. Otherwise, not present.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+
+keyspec _AWS_INSTANCE_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The ID of an AWS instance.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+
+"""
+}
+
+keyspec _AWS_INSTANCE_LIFE_CYCLE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The purchasing option of this instance. For more information see:
+<ul><li>https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-purchasing-options.html</li></ul>
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_INSTANCE_TYPE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The type of instance. For more information, see:
+<ul><li>https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html</li></ul>
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_IPV6_ADDR {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The IPv6 address of the instance, if any. In cases where multiple network interfaces are present, this refers to the eth0 device network interface and the first IPv6 address assigned.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_KERNEL_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The ID of the kernel launched with this instance, if applicable.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_LOCAL_HOSTNAME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+In cases where multiple network interfaces are present, this refers to the eth0 device (the device for which the device number is 0). If the EC2 instance is using IP-based naming (IPBN), this is the private IPv4 DNS hostname of the instance. If the EC2 instance is using Resource-based naming (RBN), this is the RBN. For more information about IPBN, RBN, and EC2 instance naming, see:
+<ul><li>https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-naming.html</li></ul>
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_LOCAL_IPV4_ADDR {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The private IPv4 address of the instance, if any. In cases where multiple network interfaces are present, this refers to the eth0 device (the device for which the device number is 0).
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_AZ {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The Availability Zone in which the instance launched.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_AZ_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The static Availability Zone ID in which the instance is launched. The Availability Zone ID is consistent across accounts. However, it might be different from the Availability Zone, which can vary by account.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_PLACEMENT_GROUP {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The name of the placement group in which the instance is launched.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_DEDICATED_HOST_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The ID of the host on which the instance is launched. Applicable only to Dedicated Hosts.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_PARTITION_NUMBER {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The number of the partition in which the instance is launched.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_REGION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The AWS Region in which the instance is launched.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_PUBLIC_HOSTNAME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The instance's public DNS (IPv4). This category is only returned if the enableDnsHostnames attribute is set to true. For more information, see [DNS attributes for your VPC](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-dns.html) in the Amazon VPC User Guide. If the instance only has a public-IPv6 address and no public-IPv4 address, this item is not set.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_PUBLIC_IPV4_ADDR {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The public IPv4 address. If an Elastic IP address is associated with the instance, the value returned is the Elastic IP address.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_OPENSSH_PUBKEY {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+Public key for SSH access. Only available if supplied at instance launch time.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_SECURITY_GROUPS {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The names of the security groups applied to the instance.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_RESOURCE_DOMAIN {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The domain for AWS resources for the Region.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_PARTITION_NAME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The partition that the resource is in. For standard AWS Regions, the partition is aws. If you have resources in other partitions, the partition is aws-partitionname. For example, the partition for resources in the China (Beijing) Region is aws-cn.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_TAGS {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.1"
+    doc: """
+The instance tags associated with the instance. Only available if you explicitly allow access to tags in instance metadata. For more information, see [Allow access to tags in instance metadata](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html#allow-access-to-tags-in-IMDS).
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
 keyspec _CHALK_EXTERNAL_ACTION_AUDIT {
     kind: RunTimeHost
     type: list[(string, string)]
@@ -2963,7 +3380,7 @@ An audit trail of any actions taken by the config file that involved
 the world beyond the chalk process. For instance, any file
 modifications and web connections get audited, as do externally run
 commands.
-"""    
+"""
 }
 
 keyspec _CHALK_RUN_TIME {
@@ -2975,8 +3392,8 @@ keyspec _CHALK_RUN_TIME {
 Calculates the amount of time between the start of a chalk executable
 and when a report is generated. It's an integer with resolution of
 1/1000000th of a second.
-"""    
-    
+"""
+
 }
 
 keyspec $CHALK_CONFIG {
@@ -3012,7 +3429,7 @@ keyspec $CHALK_LOAD_COUNT {
    system:                 true
    since:                  "0.1.0"
    doc:                    """
-Count how many times the self-mark has been rewritten.   
+Count how many times the self-mark has been rewritten.
 """
 }
 
@@ -3024,7 +3441,7 @@ keyspec $CHALK_PUBLIC_KEY {
    system:                 true
    since:                  "0.1.0"
    doc:                    """
-Used for attestations.   
+Used for attestations.
 """
 }
 
@@ -3048,7 +3465,7 @@ keyspec $CHALK_ATTESTATION_TOKEN {
    system:                 true
    since:                  "0.1.0"
    doc:                    """
-...   
+...
 """
 }
 
@@ -3083,4 +3500,4 @@ exec {
 
 docker {
   wrap_entrypoint: false # TODO, this shouldn't need to be here either.
-}  
+}

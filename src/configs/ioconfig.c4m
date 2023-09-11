@@ -4,19 +4,57 @@
 ## :Author: John Viega (john@crashoverride.com)
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
+
+custom_report terminal_chalk_time {
+  enabled:         true
+  host_report:     "terminal_host_report"
+  artifact_report: "terminal_artifact_report_when_chalking"
+  sink_configs:    ["json_console_out"]
+  use_when:        ["insert", "build"]
+}
+
+custom_report terminal_env_time {
+  enabled:         true
+  host_report:     "terminal_env_host_report"
+  artifact_report: "terminal_artifact_report_all_others"
+  sink_configs:    ["json_console_out"]
+  use_when:        ["env"]
+}
+
+custom_report terminal_other_op {
+  enabled:         true
+  host_report:     "terminal_host_report"
+  artifact_report: "terminal_artifact_report_all_others"
+  sink_configs:    ["json_console_out"]
+  use_when:        ["extract", "delete", "exec"]
+}
+
 if not using_tty() {
   color: false
-}
-elif env_exists("NO_COLOR") {
+  custom_report.terminal_chalk_time.enabled: false
+  custom_report.terminal_env_time.enabled: false
+  custom_report.terminal_other_op.enabled: false
+} elif env_exists("NO_COLOR") {
   color: false
 } else {
   color: true
 }
 
-cmd  := command_name()
+if skip_summary_report {
+  custom_report.terminal_chalk_time.enabled: false
+  custom_report.terminal_env_time.enabled: false  
+  custom_report.terminal_other_op.enabled: false
+}
 
-subscribe("report",   "json_console_out")
-subscribe("audit",    "json_console_out")
+cmd        := command_name()
+exceptions := ["defaults", "dump", "load", "profile", "version"]
+
+if exceptions.contains(cmd) {
+  subscribe("report", "json_console_out")
+}
+
+subscribe("report",   "default_out")
+subscribe("audit",    "default_out")
 subscribe("version",  "console_out")
 subscribe("virtual",  "virtual_chalk_log")
 #% INTERNAL

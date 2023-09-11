@@ -1,3 +1,5 @@
+FROM gcr.io/projectsigstore/cosign as cosign
+
 FROM python:3.11.3-alpine3.17
 
 ARG POETRY_VERSION=1.5.1
@@ -12,6 +14,8 @@ RUN if uname -m | grep -Ei "arm|aarch"; then \
         libffi-dev \
         musl-dev \
     ; fi
+
+COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
 
 RUN pip install --no-cache-dir poetry==${POETRY_VERSION}
 

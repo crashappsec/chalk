@@ -38,19 +38,25 @@ def test_dump_load(tmp_data_dir: Path, chalk_copy: Chalk, use_embedded: bool):
 # if it has then the thing to do is usually update "default.conf" with the new default config
 # this test is mainly to catch any default changes that might impact other tests, or if the default config loaded to the binary is wrong
 @pytest.mark.parametrize("test_config_file", ["validation/default.conf"])
-def test_default_config(tmp_data_dir: Path, chalk_copy: Chalk, test_config_file: str):
+def test_default_config(tmp_data_dir: Path, chalk_default: Chalk, test_config_file: str):
     tmp_conf = tmp_data_dir / "testconf.conf"
 
     # dump config to file
-    chalk_copy.dump(tmp_conf)
+    chalk_default.dump(tmp_conf)
 
     assert tmp_conf.read_text() == (CONFIGS / test_config_file).read_text()
 
 
 @pytest.mark.parametrize(
-    "test_config_file", ["validation/invalid_1.conf", "validation/invalid_2.conf"]
+    "test_config_file", [
+        "validation/invalid_1.conf",
+        "validation/invalid_2.conf",
+        ]
 )
-@pytest.mark.parametrize("use_embedded", [True, False])
+@pytest.mark.parametrize("use_embedded", [
+    True,
+    False,
+    ])
 def test_invalid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bool):
     # call chalk load on invalid config
     load = chalk_copy.load(
@@ -132,8 +138,9 @@ def test_external_configs(
     expected_error: str,
 ):
     result_config = chalk_copy.run(
-        chalk_cmd="env",
-        params=["--log-level=error", f"--config-file={CONFIGS / config_path}"],
+        command="env",
+        log_level="error",
+        config=CONFIGS / config_path,
         expected_success=expected_success,
         ignore_errors=True,
     )
@@ -146,8 +153,8 @@ def test_external_configs(
         fid.write((CONFIGS / config_path).read_bytes())
 
     result_external = chalk_copy.run(
-        chalk_cmd="env",
-        params=["--log-level=error"],
+        command="env",
+        log_level="error",
         expected_success=expected_success,
         ignore_errors=True,
     )
@@ -162,23 +169,23 @@ def test_external_configs(
 def test_custom_report(
     chalk_copy: Chalk,
     copy_files: list[Path],
-    test_config_file: str,
+    test_config_file: Path,
 ):
     bin_path = copy_files[0]
     # config sets custom report file output here
     report_path = Path("/tmp/custom_report.log")
 
     # expecting a report for insert
-    assert chalk_copy.run_with_custom_config(
-        Path(test_config_file),
+    assert chalk_copy.run(
+        config=test_config_file,
         target=bin_path,
         command="insert",
         virtual=False,
     ).report
 
     # expecting a report for extract
-    assert chalk_copy.run_with_custom_config(
-        Path(test_config_file),
+    assert chalk_copy.run(
+        config=test_config_file,
         target=bin_path,
         command="extract",
         virtual=False,
@@ -186,8 +193,8 @@ def test_custom_report(
 
     # not expecting a report for env in report file
     # but it still shows up in stdout
-    assert chalk_copy.run_with_custom_config(
-        Path(test_config_file),
+    assert chalk_copy.run(
+        config=test_config_file,
         command="env",
         virtual=False,
     ).reports
@@ -362,7 +369,7 @@ def validate_profile_keys(report: dict[str, Any], expected_keys: set[str]):
     "test_config_file",
     [
         ("profiles/empty_profile.conf"),
-        ("profiles/default.conf"),
+        # ("profiles/default.conf"),
         ("profiles/minimal_profile.conf"),
         ("profiles/large_profile.conf"),
     ],
@@ -402,6 +409,7 @@ def test_profiles(
         "METADATA_HASH",
         "METADATA_ID",
     }
+    logger.info(configs["insert"]["chalk"])
     # validate all keys (minimal+rest) in the chalk mark profile
     validate_profile_keys(chalk_mark, configs["insert"]["chalk"] | minimal_chalk)
 

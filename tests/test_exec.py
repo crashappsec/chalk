@@ -12,16 +12,10 @@ logger = get_logger()
 
 
 # chalk exec forking should not affect behavior
-@pytest.mark.parametrize(
-    "flag",
-    [
-        "--chalk-as-parent",
-        "--no-chalk-as-parent",
-    ],
-)
+@pytest.mark.parametrize("as_parent", [True, False])
 @pytest.mark.parametrize("copy_files", [[UNAME_PATH]], indirect=True)
 def test_exec_unchalked(
-    flag: str,
+    as_parent: bool,
     copy_files: list[Path],
     chalk: Chalk,
 ):
@@ -29,8 +23,10 @@ def test_exec_unchalked(
     bin_hash = sha256(bin_path)
 
     exec_proc = chalk.run(
-        chalk_cmd="exec",
-        params=[flag, f"--exec-command-name={bin_path}", "--log-level=none"],
+        command="exec",
+        exec_command=bin_path,
+        log_level="none",
+        as_parent=as_parent,
     )
     # first line must be linux
     assert exec_proc.text.startswith("Linux")
@@ -51,16 +47,10 @@ def test_exec_unchalked(
     assert exec_proc.mark["_PROCESS_UID"] is not None
 
 
-@pytest.mark.parametrize(
-    "flag",
-    [
-        "--chalk-as-parent",
-        "--no-chalk-as-parent",
-    ],
-)
+@pytest.mark.parametrize("as_parent", [True, False])
 @pytest.mark.parametrize("copy_files", [[UNAME_PATH]], indirect=True)
 def test_exec_chalked(
-    flag: str,
+    as_parent: bool,
     copy_files: list[Path],
     chalk: Chalk,
 ):
@@ -75,8 +65,10 @@ def test_exec_chalked(
     assert bin_hash != chalk_hash
 
     exec_proc = chalk.run(
-        chalk_cmd="exec",
-        params=[flag, f"--exec-command-name={bin_path}", "--log-level=none"],
+        command="exec",
+        exec_command=bin_path,
+        log_level="none",
+        as_parent=as_parent,
     )
     # first line must be linux
     assert exec_proc.text.startswith("Linux")
@@ -92,7 +84,7 @@ def test_exec_chalked(
     # expect bin info to be available
     assert exec_proc.mark["_OP_ARTIFACT_PATH"] == str(bin_path)
     assert exec_proc.mark["ARTIFACT_TYPE"] == "ELF"
-    assert exec_proc.mark["HASH"] == bin_hash
+    assert exec_proc.mark["HASH"] != bin_hash
     assert chalk_hash != bin_hash
 
     # expect process info to be included
@@ -122,14 +114,11 @@ def test_exec_heartbeat(
     log_file = Path("/tmp/heartbeat.log")
     heartbeat_conf = CONFIGS / "heartbeat.conf"
     chalk.run(
-        chalk_cmd="exec",
-        params=[
-            "--heartbeat",
-            f"--config-file={heartbeat_conf}",
-            # sleep 5 seconds -- expecting ~4 heartbeats
-            f"--exec-command-name={bin_path}",
-            "5",
-        ],
+        command="exec",
+        heartbeat=True,
+        config=heartbeat_conf,
+        exec_command=bin_path,
+        params=["5"],
     )
 
     # validate contents of log file

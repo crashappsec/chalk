@@ -367,8 +367,7 @@ proc loadChalkFromFStream*(codec:  Plugin,
     error(loc & ": Invalid JSON: " & getCurrentExceptionMsg())
     dumpExOnDebug()
 
-proc scanLocation(self: Plugin, loc: string):
-                 Option[ChalkObj] =
+proc scanLocation(self: Plugin, loc: string): Option[ChalkObj] =
   result = callScan(self, loc)
 
 proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
@@ -378,17 +377,74 @@ proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
     if path.match(item):
       return true
 
+{.emit: """
+#include <unistd.h>
+#include <stdio.h>
+
+static int
+get_path_max()
+{
+  return PATH_MAX;
+}
+
+static void
+do_read_link(const char *filename, char *buf) {
+  readlink(filename, buf, PATH_MAX);
+}
+""".}
+
+proc do_read_link(s: cstring, p: pointer): void {.cdecl,importc,nodecl.}
+proc get_path_max(): cint {.cdecl,importc,nodecl.}
+
+proc readLink*(s: string): string =
+  var v = newStringOfCap(int(get_path_max()));
+  do_read_link(cstring(s), addr s[0])
+  result = resolvePath(v)
+
+template symlinkCheck(path: string) =
+  if skipLinks:
+    warn("Skipping symbolic link: " & path & """\n
+Use --clobber to follow and clobber the linked-to file when inserting,
+or --copy to copy the file and replace the symlink.""")
+    continue
+  elif useDstName:
+    var
+      newPath = path
+      i       = 40
+    while i != 0:
+      newPath = readlink(newPath)
+
+      if getFileInfo(newPath, followSymlink = false).kind != pcLinkToFile:
+        break
+      i -= 0
+
+    if i != 0:
+      let opt = self.scanLocation(newPath)
+      if opt.isSome():
+        result.add(opt.get())
+
 proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
                         seq[ChalkObj] =
   # This will call scan() with a file stream, and you pass back a
   # Chalk object if chalk is there.
   result = @[]
 
+  var
+    skipLinks  = false
+    useDstName = false
+
+  if isChalkingOp():
+    let symLinkBehavior = chalkConfig.getSymlinkBehavior()
+    if symLinkBehavior == "skip":
+      skipLinks = true
+    elif symLinkBehavior == "clobber":
+      useDstName = true
+
   for path in state.filePaths:
     trace("Codec " & self.name & ": beginning scan of " & path)
     var info: FileInfo
     try:
-      info = getFileInfo(path)
+      info = getFileInfo(path, followSymlink = false)
     except:
       continue
 
@@ -400,25 +456,37 @@ proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
       if opt.isSome():
         result.add(opt.get())
     elif info.kind == pcLinkToFile:
-      discard # We ignore symbolic links for now.
+      symLinkCheck(path)
+
     elif state.recurse:
       dirWalk(true):
         if item in state.fileExclusions:     continue
         if item.mustIgnore(state.skips):     continue
-        if getFileInfo(item).kind != pcFile: continue
-        trace(item & ": scanning file")
-        let opt = self.scanLocation(item)
-        if opt.isSome():
-          result.add(opt.get())
+        case getFileInfo(item, followSymlink = false).kind
+        of pcFile:
+          trace(item & ": scanning file")
+          let opt = self.scanLocation(item)
+          if opt.isSome():
+            result.add(opt.get())
+        of pcLinkToFile:
+          symlinkCheck(item)
+        else:
+          continue
+
     else:
       dirWalk(false):
         if item in state.fileExclusions:     continue
         if item.mustIgnore(state.skips):     continue
-        if getFileInfo(item).kind != pcFile: continue
-        trace("Non-recursive dir walk examining: " & item)
-        let opt = self.scanLocation(item)
-        if opt.isSome():
-          result.add(opt.get())
+        case getFileInfo(item, followSymlink = false).kind
+        of pcFile:
+          trace("Non-recursive dir walk examining: " & item)
+          let opt = self.scanLocation(item)
+          if opt.isSome():
+            result.add(opt.get())
+        of pcLinkToFile:
+          symLinkCheck(item)
+        else:
+          continue
 
 proc simpleHash(self: Plugin, chalk: ChalkObj): Option[string] =
   # The default if the stream can't be acquired.

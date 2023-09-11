@@ -53,7 +53,7 @@ def test_file_present(tmp_data_dir: Path, chalk: Chalk, copy_files: list[Path]):
     assert file_output_path.is_file(), "file sink path must be a valid path"
 
     config = SINK_CONFIGS / "file.conf"
-    chalk.run_with_custom_config(config_path=config, target=artifact)
+    chalk.insert(config=config, artifact=artifact)
 
     # check that file output is correct
     assert file_output_path.is_file(), "file sink should exist after chalk operation"
@@ -79,7 +79,7 @@ def test_rotating_log(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
     rotating_log_output_path.unlink(missing_ok=True)
 
     config = SINK_CONFIGS / "rotating_log.conf"
-    chalk.run_with_custom_config(config_path=config, target=artifact)
+    chalk.insert(config=config, artifact=artifact)
 
     # check that file output is correct
     if not rotating_log_output_path or not rotating_log_output_path.is_file():
@@ -110,18 +110,11 @@ def test_s3(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
     assert os.environ["AWS_S3_BUCKET_URI"], "s3 bucket uri must not be empty"
 
     config = SINK_CONFIGS / "s3.conf"
-    proc = chalk.run_with_custom_config(config_path=config, target=artifact)
-    assert proc is not None
-    # get object name out of response code
-    logs = proc.stderr.decode().split("\n")
-    object_name = ""
-    for line in logs:
-        # expecting log line from chalk of form `info: Post to: 1686605005558-CSP9AXH5CMXKAE3D9BN8G25K0G-sink-test; response = 200 OK (sink conf='my_s3_config')`
-        if "Post to" in line:
-            object_name = line.split()[3].strip(";")
-            break
+    proc = chalk.insert(config=config, artifact=artifact, log_level="info")
 
-    assert object_name != "", "object name could not be found"
+    # expecting log line from chalk of form
+    # info: Post to: 1686605005558-CSP9AXH5CMXKAE3D9BN8G25K0G-sink-test; response = 200 OK (sink conf='my_s3_config')
+    object_name = proc.find("Post to:", words=1, text=proc.logs).strip(";")
     assert object_name.endswith(".json")
     logger.debug("object name fetched from s3 %s", object_name)
 
@@ -205,22 +198,14 @@ def _test_server(
 
     config = SINK_CONFIGS / conf
     proc = chalk.run(
-        chalk_cmd="insert",
+        command="insert",
         target=artifact,
-        params=[
-            "--trace",
-            "--no-use-embedded-config",
-            "--config-file=",
-            str(config.absolute()),
-        ],
+        config=config,
+        use_embedded=False,
+        log_level="trace",
     )
 
-    metadata_id = None
-    _output = proc.stdout.decode()
-    for line in _output.split("\n"):
-        line = line.strip()
-        if line.startswith('"METADATA_ID":'):
-            metadata_id = line.split('METADATA_ID":')[1].split(",")[0].strip()[1:-1]
+    metadata_id = proc.mark["METADATA_ID"]
     assert metadata_id, "metadata id for created chalk not found in stderr"
 
     db_id = server_sql(f"SELECT id FROM chalks WHERE metadata_id='{metadata_id}'")

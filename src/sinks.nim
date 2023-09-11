@@ -7,7 +7,7 @@ import uri, config
 
 proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
   return (msg.perLineWrap(startingMaxLineWidth = -7,
-                          firstHangingIndent = 7), true)
+                          firstHangingIndent   = 7), true)
 
 const
   availableFilters = { "log_level"     : MsgFilter(logLevelFilter),
@@ -117,10 +117,6 @@ template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
         line &= "\n\tmax               = " & max
         line &= "\n\ttruncation_amount = " & trunc
 
-
-    else:
-      discard
-
   line
 
 proc ioErrorHandler(cfg: SinkConfig, t: Topic, msg, err, tb: string) =
@@ -146,10 +142,22 @@ proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
 
   let toOut = formatIo(cfg, t, errmsg, "")
 
-  if quiet:
-    trace(toOut)
-  else:
-    info(toOut)
+  if chalkconfig.getLogLevel() in ["trace", "info"]:
+    let
+      attrRoot = chalkConfig.`@@attrscope@@`
+      attrOpt  = attrRoot.getObjectOpt("sink_config." & cfg.name)
+      attr     = attrOpt.getOrElse(nil)
+
+    if attr != nil and errmsg == "Write":
+      let msgOpt = getOpt[string](attr, "on_write_msg")
+      if msgOpt.isSome():
+        info(strutils.strip(msgOpt.get()))
+    elif quiet:
+      trace(toOut)
+    else:
+      info(toOut)
+
+
 
 var
   errCbOpt = some(FailCallback(ioErrorHandler))
@@ -201,7 +209,8 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       discard attrs.setOverride("pinned_cert_file", some(pack(path)))
       # Can't delete from a dict while we're iterating over it.
       deleteList.add(k)
-
+    of "on_write_msg":
+      discard
     of "log_search_path":
       let boxOpt = getOpt[Box](attrs, k)
       if boxOpt.isSome():
@@ -291,7 +300,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
 
   if result.isSome():
     availableSinkConfigs[name] = result.get()
-    info("Loaded sink config for '" & name & "'")
+    trace("Loaded sink config for '" & name & "'")
   else:
     error("Output sink configuration '" & name & "' failed to load.")
     return none(SinkConfig)

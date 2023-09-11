@@ -89,7 +89,7 @@ profile chalk_large {
   key.$CHALK_LOAD_COUNT.report                   = true
   key.$CHALK_PUBLIC_KEY.report                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
-  key.$CHALK_ATTESTATION_TOKEN.report            = true   
+  key.$CHALK_ATTESTATION_TOKEN.report            = true
 }
 
 profile chalk_default {
@@ -111,7 +111,7 @@ profile chalk_default {
   key.CHALK_PTR.report                           = true
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
-  key.INJECTOR_PUBLIC_KEY.report                 = true  
+  key.INJECTOR_PUBLIC_KEY.report                 = true
   key.TENANT_ID_WHEN_CHALKED.report              = true
   key.ARTIFACT_TYPE.report                       = true
   key.HASH.report                                = true
@@ -136,7 +136,7 @@ profile chalk_default {
   key.$CHALK_LOAD_COUNT.report                   = true
   key.$CHALK_PUBLIC_KEY.report                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
-  key.$CHALK_ATTESTATION_TOKEN.report            = true   
+  key.$CHALK_ATTESTATION_TOKEN.report            = true
 }
 
 # This is the same as the `chalk_default` profile, except the first three
@@ -145,14 +145,14 @@ profile chalk_reproducable {
   doc: """
   This profile is based on `chalk_default` but with the time and the
   nonce removed.
-"""  
+"""
   key.DATETIME_WHEN_CHALKED.report               = false
   key.TIMESTAMP_WHEN_CHALKED.report              = false
   key.CHALK_RAND.report                          = false
   key.CHALK_PTR.report                           = true
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
-  key.INJECTOR_PUBLIC_KEY.report                 = true  
+  key.INJECTOR_PUBLIC_KEY.report                 = true
   key.TENANT_ID_WHEN_CHALKED.report              = true
   key.ARTIFACT_TYPE.report                       = true
   key.HASH.report                                = true
@@ -177,7 +177,7 @@ profile chalk_reproducable {
   key.$CHALK_LOAD_COUNT.report                   = true
   key.$CHALK_PUBLIC_KEY.report                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
-  key.$CHALK_ATTESTATION_TOKEN.report            = true   
+  key.$CHALK_ATTESTATION_TOKEN.report            = true
 }
 
 profile chalk_minimal {
@@ -200,7 +200,7 @@ profile chalk_minimal {
   key.$CHALK_LOAD_COUNT.report                   = true
   key.$CHALK_PUBLIC_KEY.report                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
-  key.$CHALK_ATTESTATION_TOKEN.report            = true   
+  key.$CHALK_ATTESTATION_TOKEN.report            = true
 }
 
 profile artifact_report_large {
@@ -217,7 +217,7 @@ doc: """
   key.HOSTINFO_WHEN_CHALKED.report               = true
   key.NODENAME_WHEN_CHALKED.report               = true
   key.INJECTOR_CHALK_ID.report                   = true
-  key.INJECTOR_PUBLIC_KEY.report                 = true  
+  key.INJECTOR_PUBLIC_KEY.report                 = true
   key.INJECTOR_VERSION.report                    = true
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
@@ -456,7 +456,7 @@ doc: """
   key._INSTANCE_IPV6_GATEWAY.report              = true
   key._INSTANCE_MAC.report                       = true
   key._INSTANCE_NETWORKS.report                  = true
-  key._STORE_URI.report                          = true  
+  key._STORE_URI.report                          = true
   key._REPO_TAGS.report                          = true
   key._REPO_DIGESTS.report                       = true
   key._FOUND_BASE_MARK.report                    = true
@@ -469,7 +469,7 @@ doc: """
   key.$CHALK_LOAD_COUNT.report                   = true
   key.$CHALK_PUBLIC_KEY.report                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
-  key.$CHALK_ATTESTATION_TOKEN.report            = true   
+  key.$CHALK_ATTESTATION_TOKEN.report            = true
 }
 
 profile artifact_report_default {
@@ -488,7 +488,7 @@ profile artifact_report_default {
   key.HOSTINFO_WHEN_CHALKED.report               = true
   key.NODENAME_WHEN_CHALKED.report               = true
   key.INJECTOR_CHALK_ID.report                   = true
-  key.INJECTOR_PUBLIC_KEY.report                 = true  
+  key.INJECTOR_PUBLIC_KEY.report                 = true
   key.INJECTOR_VERSION.report                    = true
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
@@ -737,7 +737,7 @@ profile artifact_report_default {
   key.$CHALK_LOAD_COUNT.report                   = true
   key.$CHALK_PUBLIC_KEY.report                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.report        = true
-  key.$CHALK_ATTESTATION_TOKEN.report            = true   
+  key.$CHALK_ATTESTATION_TOKEN.report            = true
 }
 
 profile host_report_large {
@@ -751,7 +751,7 @@ profile host_report_large {
   key.NODENAME_WHEN_CHALKED.report               = true
   key.INJECTOR_CHALK_ID.report                   = true
   key.INJECTOR_VERSION.report                    = true
-  key.INJECTOR_PUBLIC_KEY.report                 = true  
+  key.INJECTOR_PUBLIC_KEY.report                 = true
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
   key.INJECTOR_ARGV.report                       = true
@@ -819,7 +819,7 @@ profile host_report_default {
   key._OP_IPV6_INTERFACES.report                 = false
   key._OP_UDP_SOCKET_INFO.report                 = false
   key._OP_TCP_SOCKET_INFO.report                 = false
-  if not in_container() {  
+  if not in_container() {
     key._OP_ALL_PS_INFO.report                   = false
   }
   key.CHALK_VERSION.report                       = true
@@ -832,7 +832,7 @@ profile host_report_default {
   key.NODENAME_WHEN_CHALKED.report               = true
   key.INJECTOR_CHALK_ID.report                   = true
   key.INJECTOR_VERSION.report                    = true
-  key.INJECTOR_PUBLIC_KEY.report                 = true  
+  key.INJECTOR_PUBLIC_KEY.report                 = true
   key.PLATFORM_WHEN_CHALKED.report               = true
   key.INJECTOR_COMMIT_ID.report                  = true
   key.INJECTOR_ARGV.report                       = true
@@ -871,8 +871,43 @@ profile host_report_default {
   key._OP_HOSTINFO.report                        = true
   key._OP_NODENAME.report                        = true
   key._OP_CLOUD_METADATA.report                  = true
-  key._CHALK_EXTERNAL_ACTION_AUDIT.report        = true  
+  key._CHALK_EXTERNAL_ACTION_AUDIT.report        = true
   key._OP_ERRORS.report                          = true
+
+
+  # IMDS keys
+  # dynamic
+  key._AWS_INSTANCE_IDENTITY_DOCUMENT.report    = true
+  key._AWS_INSTANCE_IDENTITY_PKCS7.report    = true
+  key._AWS_INSTANCE_IDENTITY_SIGNATURE.report    = true
+  key._AWS_INSTANCE_MONITORING.report  = true
+
+  key._AWS_AMI_ID.report               = true
+  key._AWS_AMI_LAUNCH_INDEX.report               = true
+  key._AWS_AMI_MANIFEST_PATH.report        = true
+  key._AWS_ANCESTOR_AMI_IDS.report        = true
+  key._AWS_HOSTNAME.report             = true
+  key._AWS_IAM_INFO.report             = true
+  key._AWS_INSTANCE_ID.report          = true
+  key._AWS_INSTANCE_LIFE_CYCLE.report  = true
+  key._AWS_INSTANCE_TYPE.report        = true
+  key._AWS_IPV6_ADDR.report            = true
+  key._AWS_KERNEL_ID.report            = true
+  key._AWS_LOCAL_HOSTNAME.report       = true
+  key._AWS_LOCAL_IPV4_ADDR.report      = true
+  key._AWS_AZ.report                   = true
+  key._AWS_AZ_ID.report                = true
+  key._AWS_PLACEMENT_GROUP.report      = true
+  key._AWS_DEDICATED_HOST_ID.report    = true
+  key._AWS_PARTITION_NUMBER.report     = true
+  key._AWS_REGION.report               = true
+  key._AWS_PUBLIC_HOSTNAME.report      = true
+  key._AWS_PUBLIC_IPV4_ADDR.report     = true
+  key._AWS_OPENSSH_PUBKEY.report       = true
+  key._AWS_SECURITY_GROUPS.report      = true
+  key._AWS_RESOURCE_DOMAIN.report      = true
+  key._AWS_PARTITION_NAME.report       = true
+  key._AWS_TAGS.report                 = true
 }
 
 profile host_report_minimal {
@@ -918,7 +953,7 @@ profile push_report_default {
   should usually be redundant w/ the info you collected during a build.
 """
   ~key._CURRENT_HASH.report                      = true
-  key._STORE_URI.report                          = true    
+  key._STORE_URI.report                          = true
   key._REPO_TAGS.report                          = true
   ~key._REPO_DIGESTS.report                      = true
   key.INJECTOR_PUBLIC_KEY.report                 = true
@@ -978,3 +1013,71 @@ profile chalk_labels {
   key.ORIGIN_URI.report                          = true
   key.BRANCH.report                              = true
 }
+
+profile terminal_host_report {
+  key._OPERATION.report                          = true
+  key._DATETIME.report                           = true
+  key._CHALKS.report                             = true
+  key._OP_ARGV.report                            = true
+  key._OP_CHALKER_VERSION.report                 = true
+  key._OP_CHALK_COUNT.report                     = true
+  key._OP_UNMARKED_COUNT.report                  = true
+  key._OP_ERRORS.report                          = true
+}
+
+profile terminal_artifact_report_when_chalking {
+  key.CHALK_ID.report                            = true
+  key.PRE_CHALK_HASH.report                      = true
+  key.PATH_WHEN_CHALKED.report                   = true
+  key.ARTIFACT_TYPE.report                       = true
+  key.ORIGIN_URI.report                          = true
+  key.BRANCH.report                              = true
+  key.COMMIT_ID.report                           = true
+  key.EMBEDDED_CHALK.report                      = true
+  key.ERR_INFO.report                            = true
+  key.DOCKER_FILE.report                         = true
+  key.DOCKERFILE_PATH.report                     = true
+  key.DOCKER_PLATFORM.report                     = true
+  key.DOCKER_LABELS.report                       = true
+  key.DOCKER_TAGS.report                         = true
+  key.METADATA_ID.report                         = true
+  key._VIRTUAL.report                            = true
+  key._CURRENT_HASH.report                       = true
+  key._IMAGE_ID.report                           = true
+}
+
+profile terminal_env_host_report {
+  key._OPERATION.report                          = true
+  key._DATETIME.report                           = true
+  key._CHALKS.report                             = true
+  key._OP_ARGV.report                            = true
+  key._OP_CHALKER_VERSION.report                 = true
+  key._OP_CHALK_COUNT.report                     = true
+  key._OP_UNMARKED_COUNT.report                  = true
+  key._OP_ERRORS.report                          = true
+  key._ENV.report                                = true
+}
+
+profile terminal_artifact_report_all_others {
+  key.CHALK_ID.report                            = true
+  key.PATH_WHEN_CHALKED.report                   = true
+  key.ARTIFACT_TYPE.report                       = true
+  key.ORIGIN_URI.report                          = true
+  key.BRANCH.report                              = true
+  key.COMMIT_ID.report                           = true
+  key.EMBEDDED_CHALK.report                      = true
+  key.ERR_INFO.report                            = true
+  key.DOCKER_FILE.report                         = true
+  key.DOCKERFILE_PATH.report                     = true
+  key.DOCKER_PLATFORM.report                     = true
+  key.DOCKER_LABELS.report                       = true
+  key.DOCKER_TAGS.report                         = true
+  key.METADATA_ID.report                         = true
+  key._OP_ARTIFACT_TYPE.report                   = true
+  key._OP_ARTIFACT_PATH.report                   = true
+  key._CURRENT_HASH.report                       = true
+  key._IMAGE_ID.report                           = true
+  key._INSTANCE_CONTAINER_ID.report              = true
+  key._INSTANCE_NAME.report                      = true
+  key._REPO_TAGS.report                          = true
+ }

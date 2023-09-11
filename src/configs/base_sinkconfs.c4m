@@ -32,6 +32,15 @@ sink_config virtual_chalk_log {
   filename: "./virtual-chalk.json"
 }
 
+sink_config default_out {
+  enabled:  true
+  sink:     "file"
+  filename: "~/.local/chalk/chalk.log"
+  on_write_msg: """
+Full chalk report appended to: ~/.local/chalk/chalk.log
+"""
+}
+
 sink_config dump_out {
   enabled:  false
   sink:     "file"

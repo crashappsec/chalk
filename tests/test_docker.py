@@ -114,7 +114,6 @@ def test_virtual_valid(
     # keys to check
     artifact_info = ArtifactInfo(
         type="Docker Image",
-        hash=image_hash,
         chalk_info={
             "_CURRENT_HASH": image_hash,
             "_IMAGE_ID": image_hash,
@@ -179,7 +178,6 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
     # artifact is the docker image
     artifact_info = ArtifactInfo(
         type="Docker Image",
-        hash=image_hash,
         # keys to check
         chalk_info={
             "_CURRENT_HASH": image_hash,
@@ -257,9 +255,7 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
     chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "sample_1" / "Dockerfile",
         tag=tag,
-        params=[
-            f"--config-file={CONFIGS / 'docker_heartbeat.conf'}",
-        ],
+        config=CONFIGS / "docker_heartbeat.conf",
     )
 
     inspected = Docker.inspect(tag)
@@ -315,7 +311,6 @@ def test_extract(chalk: Chalk, random_hex: str):
     # artifact info should be consistent
     image_artifact = ArtifactInfo(
         type="Docker Image",
-        hash=image_id,
         host_info={
             "_OPERATION": "extract",
             "_OP_EXE_NAME": "chalk",
@@ -362,7 +357,6 @@ def test_extract(chalk: Chalk, random_hex: str):
     # new artifact for running container
     artifact_container = ArtifactInfo(
         type="Docker Container",
-        hash=image_id,
         host_info={
             "_OPERATION": "extract",
             "_OP_EXE_NAME": "chalk",

@@ -30,6 +30,7 @@ macro loadPlugins(list: static[openarray[string]]): untyped =
 # to get called.
 
 loadPlugins(["codecDocker", "codecElf", "codecMacOs", "codecPythonPyc",
-             "codecSource", "codecZip", "ciGithub", "ciGitlab", "ciJenkins",
-             "conffile", "ecs", "externalTool", "ownerAuthors", "ownerGithub",
+             "codecSource", "codecZip", "codecFallbackElf",
+             "ciGithub", "ciGitlab", "ciJenkins", "conffile", "ecs",
+             "externalTool", "imdsv2", "ownerAuthors", "ownerGithub",
              "procfs", "system", "vctlGit"])

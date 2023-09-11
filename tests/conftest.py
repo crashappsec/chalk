@@ -102,7 +102,26 @@ def copy_files(tmp_data_dir: Path, request):
 
 @pytest.fixture(scope="session")
 def chalk():
-    chalk = Chalk(binary=(Path(__file__).parent.parent / "chalk").resolve())
+    binary = Path(__file__).parent.parent / "chalk"
+
+    # make a copy of chalk that has testing config loaded
+    # for most tests need output from stdout
+    tmp = Path("/tmp/chalk")
+    shutil.copy(binary, tmp)
+    chalk = Chalk(binary=tmp)
+    # sanity check
+    assert chalk.binary and chalk.binary.is_file()
+    chalk.load(Path(__file__).parent / "testing.conf", use_embedded=False)
+    yield chalk
+
+@pytest.fixture(scope="function")
+def chalk_default(chalk: Chalk):
+    """
+    Returns bare chalk binary (for some testing case
+    where we don't need stdout enabled in config)
+    """
+    binary = Path(__file__).parent.parent / "chalk"
+    chalk = Chalk(binary=binary)
     assert chalk.binary and chalk.binary.is_file()
     yield chalk
 
@@ -119,6 +138,7 @@ def chalk_copy(chalk: Chalk, tmp_data_dir: Path):
     logger.info("making a copy of chalk", base=chalk.binary, copy=path)
     shutil.copy(chalk.binary, path)
     chalk = Chalk(binary=path)
+    chalk.load(Path(__file__).parent / "testing.conf", use_embedded=False)
     yield chalk
 
 

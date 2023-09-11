@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ..conf import MAGIC, SHEBANG
-from ..utils.bin import sha256
 from ..utils.log import get_logger
 
 
@@ -14,7 +13,6 @@ logger = get_logger()
 @dataclass
 class ArtifactInfo:
     type: str
-    hash: str
     chalk_info: dict[str, Any] = field(default_factory=dict)
     host_info: dict[str, Any] = field(default_factory=dict)
 
@@ -30,7 +28,6 @@ class ArtifactInfo:
         return {
             str(path): cls(
                 type=cls.path_type(path),
-                hash=sha256(path),
                 chalk_info=chalk_info or {},
             )
         }
@@ -38,7 +35,7 @@ class ArtifactInfo:
     @classmethod
     def all_shebangs(cls):
         return {
-            str(i.resolve()): cls(type=cls.path_type(i), hash=sha256(i))
+            str(i.resolve()): cls(type=cls.path_type(i))
             for i in Path().iterdir()
             if i.is_file() and i.read_text().startswith(SHEBANG)
         }
@@ -96,10 +93,6 @@ def validate_chalk_report(
 
         # artifact specific fields
         assert artifact.type == chalk["ARTIFACT_TYPE"], "artifact type doesn't match"
-        if artifact.hash != "":
-            # in some cases, we don't check the artifact hash
-            # ex: zip files, which are not computed as hash of file
-            assert artifact.hash == chalk["HASH"], "artifact hash doesn't match"
 
         # check arbitrary artifact values
         for key, value in artifact.chalk_info.items():
@@ -185,8 +178,6 @@ def validate_extracted_chalk(
                 assert path in artifact_map, "path not found"
                 artifact_info = artifact_map[path]
 
-                if artifact_info.hash != "":
-                    assert artifact_info.hash == chalk["HASH"]
                 assert artifact_info.type == chalk["ARTIFACT_TYPE"]
 
                 # top level vs chalk-level sanity check

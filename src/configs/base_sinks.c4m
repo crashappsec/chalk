@@ -23,6 +23,7 @@ sink file {
   ~filename:        true
   ~log_search_path: false
   ~use_search_path: false
+  ~on_write_msg:    false
   doc:       "A sink that writes a local file"
 }
 
@@ -31,6 +32,7 @@ sink rotating_log {
   ~max:               true
   ~log_search_path:   false
   ~truncation_amount: false
+  ~on_write_msg:      false  
   doc:       "A truncating log file."
 }
 
@@ -40,6 +42,7 @@ sink s3 {
   ~uri:      true
   ~region:   false
   ~extra:    false
+  ~on_write_msg:    false  
   doc:       "A sink for S3 buckets"
 }
 
@@ -50,5 +53,6 @@ sink post {
   ~disallow_http:    false
   ~timeout:          false
   ~pinned_cert_file: false
+  ~on_write_msg:    false  
   doc:       "Generic HTTP/HTTPS post to a URL. Headers must be one per-line."
 }

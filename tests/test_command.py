@@ -7,6 +7,7 @@ exec commands are tested in test_exec.py as they are more involved
 """
 from pathlib import Path
 
+
 import pytest
 
 from .chalk.runner import Chalk
@@ -122,6 +123,7 @@ def test_insert_extract_delete(copy_files: list[Path], chalk: Chalk):
     validate_chalk_report(
         chalk_report=insert.report, artifact_map=artifact_info, virtual=False
     )
+    insert_1_hash = insert.report["_CHALKS"][0]["HASH"]
 
     # extract
     extract = chalk.extract(artifact=artifact)
@@ -130,7 +132,7 @@ def test_insert_extract_delete(copy_files: list[Path], chalk: Chalk):
     )
 
     # delete
-    delete = chalk.run(chalk_cmd="delete", target=artifact, params=["--log-level=none"])
+    delete = chalk.run(command="delete", target=artifact, log_level="none")
     assert delete.report["_OPERATION"] == "delete"
 
     for key in ["HASH", "_OP_ARTIFACT_PATH", "_OP_ARTIFACT_TYPE"]:
@@ -140,9 +142,14 @@ def test_insert_extract_delete(copy_files: list[Path], chalk: Chalk):
     nop_extract = chalk.extract(artifact=artifact)
     assert "_CHALKS" not in nop_extract.report
 
+    # insert again and check that hash is the same as first insert
+    insert2 = chalk.insert(artifact=artifact, virtual=False)
+    insert_2_hash = insert2.report["_CHALKS"][0]["HASH"]
+    assert insert_1_hash == insert_2_hash
+
 
 def test_version(chalk: Chalk):
-    result = chalk.run(chalk_cmd="version", params=["--no-color"])
+    result = chalk.run(command="version", no_color=True)
     printed_version = result.find("Chalk version")
 
     # version output should match the version in chalk_internal.nimble
@@ -158,7 +165,7 @@ def test_version(chalk: Chalk):
 
 
 def test_env(chalk: Chalk):
-    result = chalk.run(chalk_cmd="env", params=["--log-level=error"])
+    result = chalk.run(command="env", log_level="error")
     report = result.report
 
     # fields to check: platform, hostinfo, nodename
@@ -171,7 +178,7 @@ def test_setup(chalk_copy: Chalk):
     """
     needs to display password, and public and private key info in chalk
     """
-    result = chalk_copy.run(chalk_cmd="setup", params=["--log-level=error"])
+    result = chalk_copy.run(command="setup", log_level="error")
 
     report = result.report
     assert report["_OPERATION"] == "setup"

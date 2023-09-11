@@ -6,7 +6,7 @@
 
 import std/monotimes, nativesockets, sequtils, times, ../config,
        ../plugin_api, ../normalize, ../chalkjson, ../selfextract,
-       ../attestation
+       ../attestation, ../util
 
 when defined(posix): import posix_utils
 
@@ -88,6 +88,10 @@ proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   result                           = ChalkDict()
   result["MAGIC"]                  = pack(magicUTF8)
   result["TIMESTAMP_WHEN_CHALKED"] = pack(unixTimeInMS())
+
+  if isSubscribedKey("PRE_CHALK_HASH") and obj.fsRef != "":
+    chalkUseStream(obj):
+      result["PRE_CHALK_HASH"] = pack(obj.stream.readAll().sha256Hex())
 
   if obj.isMarked() and "METADATA_HASH" in obj.extract:
     let h = unpack[string](obj.extract["METADATA_HASH"]).strip().parseHexStr()

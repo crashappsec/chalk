@@ -160,10 +160,34 @@ Note that this doesn't turn off any custom reports; you have to disable those se
 """
   }
 
+  flag_yn skip_summary_report {
+    field_to_set: "skip_summary_report"
+    doc: """
+Whether to skip the summary report to the terminal.
+"""    
+  }
+
+  flag_choice symlink_behavior {
+    aliases: ["symlink_behaviour"]
+    choices: ["skip", "clobber", "copy"]
+    add_choice_flags: true
+    field_to_set: "symlink_behavior"
+    doc: """
+Chalk never follows directory links. When running non-chalking operations, chalk will read the file on the other end of the link, and report using the file name of the link.
+
+For insertion operations, Chalk will, out of the box, warn on symbolic links, without processing them. 
+
+This variable controls what happens in those cases:
+
+- <em>skip</em>   will not process files that are linked.
+- <em>clobber</em> will read the artifact on the other end of the link, and, if writing, try to replace the file being linked to.
+- <em>copy</em> will read the artifact on the other end of the link, and, if writing, will replace the link with a modified file, leaving the file on the other end of the link intact.
+"""    
+  }
+
   flag_yn wrap {
     field_to_set: "docker.wrap_entrypoint"
     doc: """
-
 When building a container via `chalk docker`, this will cause Chalk to
 automatically perform entry-point wrapping in such a way that built
 containers will do a chalk report when they launch.  Note that the

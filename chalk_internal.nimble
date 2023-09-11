@@ -9,8 +9,8 @@ bin           = @["chalk"]
 # Dependencies
 requires "nim >= 1.6.12"
 # TODO figure out why == does not work here
-requires "https://github.com/crashappsec/con4m.git#v0.1.1"
-requires "https://github.com/crashappsec/nimutils == 0.1.1"
+requires "https://github.com/crashappsec/con4m.git#v0.1.2"
+requires "https://github.com/crashappsec/nimutils.git#v0.1.2"
 requires "https://github.com/viega/zippy == 0.10.7"
 
 import std/strformat
@@ -69,7 +69,9 @@ before install:
 
 # Add --trace if needed.
 after build:
-  exec "./" & bin[0] & " --no-use-external-config --skip-command-report load default"
+  when not defined(debug):
+    exec "set -x && strip " & bin[0]
+  exec "set -x && ./" & bin[0] & " --no-use-external-config --skip-command-report load default"
 
 task debug, "Get a debug build":
   # additional flags are configured in config.nims
@@ -78,7 +80,6 @@ task debug, "Get a debug build":
 #% INTERNAL
 task release, "Package the release build":
   exec "nimble build"
-  exec "strip " & bin[0]
 
 let bucket = "crashoverride-chalk-binaries"
 

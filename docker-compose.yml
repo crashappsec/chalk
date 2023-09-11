@@ -14,7 +14,7 @@ services:
     command: nimble ${CHALK_BUILD:-release}
     working_dir: /chalk
     volumes:
-      - .:/chalk
+      - .:/chalk/
 
   chalk-release:
     build:

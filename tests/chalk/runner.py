@@ -11,7 +11,7 @@ from ..utils.log import get_logger
 from ..utils.os import run, Program, CalledProcessError
 from ..utils.docker import Docker
 
-ChalkCmd = Literal[
+ChalkCommand = Literal[
     "delete",
     "dump",
     "env",
@@ -21,6 +21,12 @@ ChalkCmd = Literal[
     "load",
     "setup",
     "version",
+]
+ChalkLogLevel = Literal[
+    "none",
+    "trace",
+    "info",
+    "error",
 ]
 
 logger = get_logger()
@@ -148,8 +154,17 @@ class Chalk:
     def run(
         self,
         *,
-        chalk_cmd: Optional[ChalkCmd] = None,
+        command: Optional[ChalkCommand] = None,
         target: Optional[Path | str] = None,
+        config: Optional[Path] = None,
+        use_embedded: bool = True,
+        virtual: bool = False,
+        debug: bool = False,
+        heartbeat: bool = False,
+        log_level: Optional[ChalkLogLevel] = None,
+        exec_command: Optional[str | Path] = None,
+        as_parent: Optional[bool] = None,
+        no_color: bool = False,
         params: Optional[list[str]] = None,
         expected_success: bool = True,
         ignore_errors: bool = False,
@@ -159,10 +174,30 @@ class Chalk:
         params = params or []
         cmd: list[str] = [str(self.binary)]
 
-        if chalk_cmd:
-            cmd.append(chalk_cmd)
+        if command:
+            cmd += [command]
+        if virtual:
+            cmd += ["--virtual"]
+        if config:
+            cmd += [f"--config-file={config.absolute()}"]
+            if use_embedded:
+                cmd += ["--use-embedded-config"]
+            else:
+                cmd += ["--no-use-embedded-config"]
+        if log_level:
+            cmd += [f"--log-level={log_level}"]
+        if exec_command:
+            cmd += [f"--exec-command-name={exec_command}"]
+        if as_parent:
+            cmd += ["--chalk-as-parent"]
+        if heartbeat:
+            cmd += ["--heartbeat"]
+        if debug:
+            cmd += ["--debug"]
+        if no_color:
+            cmd += ["--no-color"]
         if params:
-            cmd.extend(params)
+            cmd += params
 
         if isinstance(target, Path):
             assert target.exists()
@@ -191,7 +226,7 @@ class Chalk:
         else:
             # report could be silenced on the profile level
             if report:
-                operation = cast(str, chalk_cmd)
+                operation = cast(str, command)
                 # when calling docker, the arg after docker is the operation
                 if not operation and "docker" in params:
                     operation = params[params.index("docker") + 1]
@@ -200,36 +235,22 @@ class Chalk:
 
         return result
 
-    # run with custom config that is external
-    def run_with_custom_config(
-        self,
-        config_path: Path,
-        target: Optional[Path] = None,
-        command: ChalkCmd = "insert",
-        virtual: bool = True,
-    ) -> ChalkProgram:
-        params = [
-            "--no-use-embedded-config",
-            "--config-file=",
-            str(config_path.absolute()),
-        ]
-        if virtual:
-            params.append("--virtual")
-
-        return self.run(
-            chalk_cmd=command,
-            target=target,
-            params=params,
-        )
-
     # returns chalk report
-    def insert(self, artifact: Path, virtual: bool = False) -> ChalkProgram:
+    def insert(
+        self,
+        artifact: Path,
+        virtual: bool = False,
+        config: Optional[Path] = None,
         # suppress output since all we want is the chalk report
-        params = ["--log-level=error"]
-        if virtual:
-            params.append("--virtual")
-
-        return self.run(chalk_cmd="insert", target=artifact, params=params)
+        log_level: ChalkLogLevel = "none",
+    ) -> ChalkProgram:
+        return self.run(
+            command="insert",
+            target=artifact,
+            config=config,
+            virtual=virtual,
+            log_level=log_level,
+        )
 
     def extract(
         self,
@@ -238,33 +259,31 @@ class Chalk:
         ignore_errors: bool = False,
     ) -> ChalkProgram:
         return self.run(
-            chalk_cmd="extract",
+            command="extract",
             target=artifact,
-            params=["--log-level=error"],
+            log_level="error",
             expected_success=expected_success,
             ignore_errors=ignore_errors,
         )
 
-    def exec(self, artifact: Path, chalk_as_parent: bool = False) -> ChalkProgram:
-        exec_flag = "--exec-command-name=" + str(artifact)
-        params = [exec_flag, "--log-level=error"]
-        if chalk_as_parent:
-            params.append("--chalk-as-parent")
-
+    def exec(self, artifact: Path, as_parent: bool = False) -> ChalkProgram:
         return self.run(
-            chalk_cmd="exec",
-            params=params,
+            command="exec",
+            exec_command=artifact,
+            log_level="error",
+            as_parent=as_parent,
         )
 
     def delete(self, artifact: Path) -> ChalkProgram:
         return self.run(
-            chalk_cmd="delete",
-            params=[str(artifact), "--log-level=error"],
+            command="delete",
+            target=artifact,
+            log_level="error",
         )
 
     def dump(self, path: Path) -> ChalkProgram:
         assert not path.is_file()
-        result = self.run(chalk_cmd="dump", params=[str(path)])
+        result = self.run(command="dump", params=[str(path)])
         assert path.is_file()
         return result
 
@@ -276,14 +295,11 @@ class Chalk:
         ignore_errors: bool = False,
     ) -> ChalkProgram:
         hash = sha256(self.binary)
-        params = [str(config), "--log-level=error"]
-        if use_embedded:
-            params.append("--use-embedded-config")
-        else:
-            params.append("--no-use-embedded-config")
         result = self.run(
-            chalk_cmd="load",
-            params=params,
+            command="load",
+            params=[str(config)],
+            log_level="error",
+            use_embedded=use_embedded,
             expected_success=expected_success,
             ignore_errors=ignore_errors,
         )
@@ -301,7 +317,8 @@ class Chalk:
         expected_success: bool = True,
         virtual: bool = False,
         cwd: Optional[Path] = None,
-        params: Optional[list[str]] = None,
+        config: Optional[Path] = None,
+        # params: Optional[list[str]] = None,
         buildkit: bool = True,
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
@@ -317,16 +334,15 @@ class Chalk:
             buildkit=buildkit,
         )
 
-        # TODO remove log level but there are error bugs due to --debug
-        # which fail the command validation
-        chalk_params = ["--debug", "--log-level=none"]
-        if virtual:
-            chalk_params += ["--virtual"]
         return Docker.with_image_id(
             self.run(
-                params=chalk_params
-                + (params or [])
-                + Docker.build_cmd(
+                # TODO remove log level but there are error bugs due to --debug
+                # which fail the command validation
+                log_level="none",
+                debug=True,
+                virtual=virtual,
+                config=config,
+                params=Docker.build_cmd(
                     tag=tag,
                     context=context,
                     dockerfile=dockerfile,

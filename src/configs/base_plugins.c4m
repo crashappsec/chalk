@@ -5,12 +5,22 @@
 ## :Copyright: 2022, 2023, Crash Override, Inc.
 
 plugin elf {
+    ~enabled:        true
     codec:           true
     artifact_keys:   ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    ~priority:       45
+}
+
+plugin elf_last_resort {
+    codec:           true
+    artifact_keys:   ["ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    ~priority: high() - 1
 }
 
 plugin source {
+    ~enabled:        true
     codec:           true
     artifact_keys:   ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
@@ -18,6 +28,7 @@ plugin source {
 }
 
 plugin macos {
+    ~enabled:        true
     codec:           true
     artifact_keys:   ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
@@ -25,6 +36,7 @@ plugin macos {
 }
 
 plugin docker {
+    ~enabled: true
     codec:    true
     priority: 1
     enabled:  true
@@ -33,7 +45,7 @@ plugin docker {
                     "DOCKER_CONTEXT", "DOCKER_ADDITIONAL_CONTEXTS",
                     "DOCKER_CHALK_ADDED_LABELS", "DOCKER_CHALK_TEMPORARY_TAG",
                     "DOCKER_CHALK_ADDED_TO_DOCKERFILE" ]
-    
+
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE", "_REPO_TAGS",
         "_REPO_DIGESTS", "_IMAGE_COMMENT", "_IMAGE_CREATION_DATETIME",
         "_IMAGE_DOCKER_VERSION", "_IMAGE_AUTHOR", "_IMAGE_ARCHITECTURE",
@@ -48,7 +60,7 @@ plugin docker {
         "_IMAGE_ONBUILD", "_IMAGE_LABELS", "_IMAGE_STOP_SIGNAL",
         "_IMAGE_STOP_TIMEOUT", "_IMAGE_SHELL", "_IMAGE_VIRTUAL_SIZE",
         "_IMAGE_LAST_TAG_TIME", "_IMAGE_STORAGE_METADATA",
-        "_INSTANCE_CONTAINER_ID","_INSTANCE_CREATION_DATETIME",        
+        "_INSTANCE_CONTAINER_ID","_INSTANCE_CREATION_DATETIME",
         "_INSTANCE_ENTRYPOINT_PATH", "_INSTANCE_ENTRYPOINT_ARGS",
         "_INSTANCE_ENV", "_INSTANCE_RESOLVE_CONF_PATH",
         "_INSTANCE_HOSTNAME_PATH", "_INSTANCE_HOSTS_PATH", "_INSTANCE_LOG_PATH",
@@ -177,6 +189,22 @@ plugin aws_ecs {
     post_run_keys:   ["_OP_CLOUD_METADATA"]
 }
 
+plugin imdsv2 {
+    enabled:         true
+    post_run_keys:   ["_AWS_INSTANCE_IDENTITY_DOCUMENT",
+    "_AWS_INSTANCE_IDENTITY_PKCS7", "_AWS_INSTANCE_IDENTITY_SIGNATURE",
+    "_AWS_INSTANCE_MONITORING", "_AWS_AMI_ID", "_AWS_AMI_LAUNCH_INDEX",
+    "_AWS_ANCESTOR_AMI_IDS",
+    "_AWS_AMI_MANIFEST_PATH", "_AWS_HOSTNAME", "_AWS_IAM_INFO",
+    "_AWS_INSTANCE_ID", "_AWS_INSTANCE_LIFE_CYCLE",
+    "_AWS_INSTANCE_TYPE", "_AWS_IPV6_ADDR", "_AWS_KERNEL_ID",
+    "_AWS_LOCAL_HOSTNAME", "_AWS_LOCAL_IPV4_ADDR", "_AWS_AZ", "_AWS_AZ_ID",
+    "_AWS_PLACEMENT_GROUP", "_AWS_DEDICATED_HOST_ID", "_AWS_PARTITION_NUMBER",
+    "_AWS_REGION", "_AWS_PUBLIC_HOSTNAME", "_AWS_PUBLIC_IPV4_ADDR",
+    "_AWS_OPENSSH_PUBKEY", "_AWS_RESOURCE_DOMAIN",
+    "_AWS_PARTITION_NAME", "_AWS_TAGS"]
+}
+
 plugin procfs {
     enabled:         true
     post_chalk_keys: ["_PROCESS_PID", "_PROCESS_DETAIL",
@@ -190,32 +218,32 @@ plugin procfs {
                       "_PROCESS_CWD", "_PROCESS_EXE_PATH",
                       "_PROCESS_COMMAND_NAME", "_PROCESS_FD_INFO",
                       "_PROCESS_MOUNT_INFO"]
-                      
+
     post_run_keys:   ["_OP_TCP_SOCKET_INFO", "_OP_UDP_SOCKET_INFO",
                       "_OP_IPV4_ROUTES", "_OP_IPV6_ROUTES",
                       "_OP_IPV4_INTERFACES", "_OP_IPV6_INTERFACES",
                       "_OP_ARP_TABLE", "_OP_CPU_INFO", "_OP_ALL_PS_INFO"]
-    
+
 }
 
 # This plugin is the only thing allowed to set these keys.
 plugin system {
-  enabled:          true
-  pre_run_keys:    ["INJECTOR_CHALK_ID", "INJECTOR_VERSION", "TIME_CHALKED",
+  ~enabled:         true
+  pre_run_keys:     ["INJECTOR_CHALK_ID", "INJECTOR_VERSION", "TIME_CHALKED",
                      "INJECTOR_COMMIT_ID", "DATE_CHALKED",
                      "TZ_OFFSET_WHEN_CHALKED", "DATETIME_WHEN_CHALKED",
                      "INJECTOR_ENV", "HOSTINFO_WHEN_CHALKED",
                       "NODENAME_WHEN_CHALKED", "PLATFORM_WHEN_CHALKED",
                       "INJECTOR_PUBLIC_KEY"]
-                     
+
   artifact_keys:   ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
-                    "TIMESTAMP_WHEN_CHALKED"]
-                    
+                    "PRE_CHALK_HASH", "TIMESTAMP_WHEN_CHALKED"]
+
   post_chalk_keys: ["_OP_ARTIFACT_PATH", "_CURRENT_HASH",
                     "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS", "_VIRTUAL",
                     "_VALIDATED_SIGNATURE", "_VALIDATED_METADATA",
                     "_INVALID_SIGNATURE"]
-                    
+
   post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
                     "_OP_HOSTINFO", "_OP_NODENAME", "_OP_PLATFORM",
 		    "_OP_CHALKER_COMMIT_ID", "_OP_CHALKER_VERSION",
@@ -223,7 +251,7 @@ plugin system {
 		    "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
 		    "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
 		    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV"]
-                    
+
   ~priority:       0
 }
 
@@ -240,6 +268,7 @@ plugin system {
 # The priority field is set to high(int64).
 
 plugin metsys {
+    ~enabled: true
     artifact_keys: ["METADATA_HASH", "SIGNATURE", "ERR_INFO", "METADATA_ID"]
     post_run_keys: ["_CHALK_EXTERNAL_ACTION_AUDIT"]
     ~priority:     high()
