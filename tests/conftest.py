@@ -114,6 +114,7 @@ def chalk():
     chalk.load(Path(__file__).parent / "testing.conf", use_embedded=False)
     yield chalk
 
+
 @pytest.fixture(scope="function")
 def chalk_default(chalk: Chalk):
     """
@@ -138,7 +139,6 @@ def chalk_copy(chalk: Chalk, tmp_data_dir: Path):
     logger.info("making a copy of chalk", base=chalk.binary, copy=path)
     shutil.copy(chalk.binary, path)
     chalk = Chalk(binary=path)
-    chalk.load(Path(__file__).parent / "testing.conf", use_embedded=False)
     yield chalk
 
 

@@ -129,6 +129,7 @@ proc setPreferredTag(ctx: DockerInvocation) =
   else:
     ctx.prefTag = ctx.foundTags[0]
 
+  ctx.opChalkObj.name = ctx.prefTag
   ctx.opChalkObj.userRef = ctx.prefTag
 
 proc writeNewDockerFile(ctx: DockerInvocation) =

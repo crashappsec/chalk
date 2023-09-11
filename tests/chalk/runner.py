@@ -318,7 +318,6 @@ class Chalk:
         virtual: bool = False,
         cwd: Optional[Path] = None,
         config: Optional[Path] = None,
-        # params: Optional[list[str]] = None,
         buildkit: bool = True,
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
@@ -334,7 +333,7 @@ class Chalk:
             buildkit=buildkit,
         )
 
-        return Docker.with_image_id(
+        image_hash, result = Docker.with_image_id(
             self.run(
                 # TODO remove log level but there are error bugs due to --debug
                 # which fail the command validation
@@ -352,6 +351,15 @@ class Chalk:
                 env=Docker.build_env(buildkit=buildkit),
             )
         )
+        dockerfile = dockerfile or (
+            (cwd or context or Path(os.getcwd())) / "Dockerfile"
+        )
+        if expected_success:
+            # sanity check that chalk mark includes basic chalk keys
+            assert image_hash == result.mark["_CURRENT_HASH"]
+            assert image_hash == result.mark["_IMAGE_ID"]
+            assert str(dockerfile) == result.mark["DOCKERFILE_PATH"]
+        return image_hash, result
 
     def docker_push(self, image: str):
         return self.run(
