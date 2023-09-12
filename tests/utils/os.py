@@ -1,5 +1,6 @@
 import datetime
 import json
+import re
 from contextlib import suppress
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -106,18 +107,31 @@ class Program:
                 if words:
                     result = " ".join(result.split()[:words])
                 return result
-        self.logger.error("could not find string in outout", needle=needle)
+        self.logger.error("could not find string in output", needle=needle)
         raise ValueError(f"{needle} not found in stdout")
 
-    def json(self, *, after: Optional[str] = None):
-        text = self.text
-        if after:
-            i = max(text.find(after), 0)
+    def after(self, *, match: Optional[str] = None, text: Optional[str] = None) -> str:
+        text = text or self.text
+        if match:
+            found = list(re.finditer(match, text))
+            if found:
+                i = found[0].start(0)
+            else:
+                i = 0
             text = text[i:]
+        return text
+
+    def json(
+        self,
+        *,
+        after: Optional[str] = None,
+        text: Optional[str] = None,
+        log_level: Literal["error", "debug"] = "error",
+    ):
         try:
-            return json.loads(text, strict=False)
+            return json.loads(self.after(match=after, text=text), strict=False)
         except Exception as e:
-            self.logger.error("output is invalid json", error=e)
+            getattr(self.logger, log_level)("output is invalid json", error=e)
             raise
 
 

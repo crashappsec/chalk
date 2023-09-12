@@ -8,7 +8,7 @@ from unittest import mock
 import os
 import pytest
 
-from .chalk.runner import Chalk
+from .chalk.runner import Chalk, ChalkProgram
 from .chalk.validate import (
     MAGIC,
     ArtifactInfo,
@@ -228,24 +228,22 @@ def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
     chalk_copy.docker_build(
         dockerfile=DOCKERFILES / "valid" / "sleep" / "Dockerfile",
         tag=tag,
-        # TODO remove
-        # If docker build context has "chalk", it is not copied
-        # to the image and therefore the container will fail to run.
-        # For now using /tmp as context and explicitly building
-        context=Path("/tmp"),
     )
 
     _, result = Docker.run(
         image=tag,
         check=False,
     )
+    chalk_result = ChalkProgram.from_program(result)
 
-    # FIXME: stdoutput is multiple jsons split over multiple lines,
-    # figure out how to parse that into a list of json objects
-    # validate exec
-    assert '"_OPERATION": "exec"' in result.text
-    # at least two heartbeats in output
-    assert result.text.count('"_OPERATION": "heartbeat"') > 2
+    report = chalk_result.reports[0]
+    assert report["_OPERATION"] == "exec"
+
+    # there should be a few heartbeats
+    assert len(chalk_result.reports) > 1
+    for other_report in chalk_result.reports[1:]:
+        assert other_report["_OPERATION"] == "heartbeat"
+        assert other_report.mark == report.mark
 
 
 def test_docker_labels(chalk: Chalk, random_hex: str):

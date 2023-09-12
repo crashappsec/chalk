@@ -110,32 +110,23 @@ def test_exec_heartbeat(
     chalk_hash = sha256(bin_path)
     assert bin_hash != chalk_hash
 
-    # custom config sets to use use this log file
-    log_file = Path("/tmp/heartbeat.log")
-    heartbeat_conf = CONFIGS / "heartbeat.conf"
-    chalk.run(
+    result = chalk.run(
         command="exec",
         heartbeat=True,
-        config=heartbeat_conf,
+        config=CONFIGS / "heartbeat.conf",
         exec_command=bin_path,
         params=["5"],
     )
 
-    # validate contents of log file
-    assert log_file.is_file()
-    first_line, *other_lines = log_file.read_text().splitlines()
-
-    report = ChalkReport.from_json(first_line)
+    report = result.reports[0]
     assert report["_OPERATION"] == "exec"
-
     assert report.mark["_OP_ARTIFACT_PATH"] == str(bin_path)
     assert report.mark["_CURRENT_HASH"] == chalk_hash
     assert report.mark["ARTIFACT_TYPE"] == "ELF"
     assert report.mark["_PROCESS_PID"] != ""
 
-    # as mentioned above, there should be a few heartbeats
-    assert len(other_lines) > 0, "no heartbeats reported"
-    for line in other_lines:
-        other_report = ChalkReport.from_json(line)
+    # there should be a few heartbeats
+    assert len(result.reports) > 1
+    for other_report in result.reports[1:]:
         assert other_report["_OPERATION"] == "heartbeat"
         assert other_report.mark == report.mark

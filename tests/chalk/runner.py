@@ -119,7 +119,27 @@ class ChalkProgram(Program):
 
     @property
     def reports(self):
-        return [ChalkReport(i) for i in self.json(after="[\n")]
+        reports = []
+        text = self.after(match=r"\[\s")
+        while text.strip():
+            try:
+                # assume all of text is valid json
+                reports += json.loads(text)
+            except json.JSONDecodeError as e:
+                # if not we grab valid json until the invalid
+                # character and then keep doing that until we
+                # find all reports in the text
+                e_str = str(e)
+                if not e_str.startswith("Extra data:"):
+                    self.logger.error("output is invalid json", error=e)
+                    raise
+                # Extra data: line 25 column 1 (char 596)
+                char = int(e_str.split()[-1].strip(")"))
+                reports += self.json(text=text[:char])
+                text = text[char:]
+            else:
+                break
+        return [ChalkReport(i) for i in reports]
 
     @property
     def report(self):

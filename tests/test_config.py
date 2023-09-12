@@ -38,7 +38,9 @@ def test_dump_load(tmp_data_dir: Path, chalk_copy: Chalk, use_embedded: bool):
 # if it has then the thing to do is usually update "default.conf" with the new default config
 # this test is mainly to catch any default changes that might impact other tests, or if the default config loaded to the binary is wrong
 @pytest.mark.parametrize("test_config_file", ["validation/default.conf"])
-def test_default_config(tmp_data_dir: Path, chalk_default: Chalk, test_config_file: str):
+def test_default_config(
+    tmp_data_dir: Path, chalk_default: Chalk, test_config_file: str
+):
     tmp_conf = tmp_data_dir / "testconf.conf"
 
     # dump config to file
@@ -48,15 +50,19 @@ def test_default_config(tmp_data_dir: Path, chalk_default: Chalk, test_config_fi
 
 
 @pytest.mark.parametrize(
-    "test_config_file", [
+    "test_config_file",
+    [
         "validation/invalid_1.conf",
         "validation/invalid_2.conf",
-        ]
+    ],
 )
-@pytest.mark.parametrize("use_embedded", [
-    True,
-    False,
-    ])
+@pytest.mark.parametrize(
+    "use_embedded",
+    [
+        True,
+        False,
+    ],
+)
 def test_invalid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bool):
     # call chalk load on invalid config
     load = chalk_copy.load(
@@ -409,7 +415,7 @@ def test_profiles(
         "METADATA_HASH",
         "METADATA_ID",
     }
-    logger.info(configs["insert"]["chalk"])
+    logger.info("chalk insert config", config=configs["insert"]["chalk"])
     # validate all keys (minimal+rest) in the chalk mark profile
     validate_profile_keys(chalk_mark, configs["insert"]["chalk"] | minimal_chalk)
 
