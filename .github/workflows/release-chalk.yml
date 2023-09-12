@@ -23,11 +23,14 @@ jobs:
       matrix:
         include:
           - builder: ubuntu-latest
-            platform: amd64
+            arch: amd64
             os: linux
           - builder: buildjet-2vcpu-ubuntu-2204-arm
-            platform: arm64
+            arch: arm64
             os: linux
+          - builder: macos-latest
+            arch: amd64
+            os: darwin
 
     steps:
       - name: Checkout Code
@@ -39,15 +42,23 @@ jobs:
         uses: ./.github/actions/release
         with:
           secrets: ${{ toJSON(secrets) }}
-          platform: ${{ matrix.platform }}
+          arch: ${{ matrix.arch }}
+          os: ${{ matrix.os }}
 
       - name: Bake Images
+        if: matrix.os == 'linux'
         run: |
           docker buildx bake chalk --load
 
-      - name: Compile chalk
+      - name: Compile chalk (Docker)
+        if: matrix.os == 'linux'
         run: |
           make release
+
+      - name: Compile chalk (Host)
+        if: matrix.os == 'darwin'
+        run: |
+          DOCKER= make release
 
       - name: Sanity check
         run: |
@@ -76,7 +87,6 @@ jobs:
         uses: ./.github/actions/release
         with:
           secrets: ${{ toJSON(secrets) }}
-          platform: ${{ matrix.platform }}
 
       # necessary for manual jobs as there is no tag
       - name: Get Chalk Version

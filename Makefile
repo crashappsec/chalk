@@ -11,17 +11,20 @@ SOURCES+=$(shell find src/ -name '*.c42spec')
 
 VERSION=$(shell cat *.nimble | grep -E "version\s+=" | cut -d'"' -f2)
 
+# in case nimble bin is not in PATH - e.g. vanilla shell
+export PATH:=$(HOME)/.nimble/bin:$(PATH)
+
 # not PHONY jobs on purpose but instead rebuilds chalk
 # when any of the nim sources change
 # (a.k.a what Makefile is good at :D)
 $(BINARY): $(SOURCES)
 	-rm -f $@
-	$(DOCKER) nimble $(CHALK_BUILD)
+	$(DOCKER) nimble -y $(CHALK_BUILD)
 
 .PHONY: debug release
 debug release:
 	-rm -f $(BINARY)
-	$(DOCKER) nimble $@
+	$(DOCKER) nimble -y $@
 
 .PHONY: version
 version:

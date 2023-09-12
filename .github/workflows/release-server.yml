@@ -23,10 +23,10 @@ jobs:
       matrix:
         include:
           - builder: ubuntu-latest
-            platform: amd64
+            arch: amd64
             os: linux
           - builder: buildjet-2vcpu-ubuntu-2204-arm
-            platform: arm64
+            arch: arm64
             os: linux
 
     steps:
@@ -39,7 +39,8 @@ jobs:
         uses: ./.github/actions/release
         with:
           secrets: ${{ toJSON(secrets) }}
-          platform: ${{ matrix.platform }}
+          arch: ${{ matrix.arch }}
+          os: ${{ matrix.os }}
 
       - name: Build Server Binary
         working-directory: ./server
