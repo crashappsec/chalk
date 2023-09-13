@@ -1,0 +1,26 @@
+default_command = "help"
+
+# Used in keyspec
+func call_rand(key) { return $(lower(hex(rand())));  }
+func get_args(key) { return command_argv(); }
+
+exec {
+  search_path: array_add(split(env("PATH"), ":"), ["."])
+}
+
+# TODO Remove all sections below
+# Currently, these need to be here for singleton defaults to take hold.
+
+extract {
+}
+
+source_marks {
+}
+
+docker {
+}
+
+aws {
+  ec2 {
+  }
+}

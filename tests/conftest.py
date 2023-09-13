@@ -12,7 +12,7 @@ import requests
 from filelock import FileLock
 
 from .chalk.runner import Chalk
-from .conf import SERVER_CERT, SERVER_DB, SERVER_HTTP, SERVER_HTTPS
+from .conf import SERVER_CERT, SERVER_DB, SERVER_HTTP, SERVER_HTTPS, SERVER_IMDS
 from .utils.log import get_logger
 
 
@@ -101,22 +101,7 @@ def copy_files(tmp_data_dir: Path, request):
 
 
 @pytest.fixture(scope="session")
-def chalk():
-    binary = Path(__file__).parent.parent / "chalk"
-
-    # make a copy of chalk that has testing config loaded
-    # for most tests need output from stdout
-    tmp = Path("/tmp/chalk")
-    shutil.copy(binary, tmp)
-    chalk = Chalk(binary=tmp)
-    # sanity check
-    assert chalk.binary and chalk.binary.is_file()
-    chalk.load(Path(__file__).parent / "testing.conf", use_embedded=False)
-    yield chalk
-
-
-@pytest.fixture(scope="function")
-def chalk_default(chalk: Chalk):
+def chalk_default():
     """
     Returns bare chalk binary (for some testing case
     where we don't need stdout enabled in config)
@@ -124,6 +109,21 @@ def chalk_default(chalk: Chalk):
     binary = Path(__file__).parent.parent / "chalk"
     chalk = Chalk(binary=binary)
     assert chalk.binary and chalk.binary.is_file()
+    yield chalk
+
+
+@pytest.fixture(scope="session")
+def chalk(
+    chalk_default: Chalk,
+):
+    # make a copy of chalk that has testing config loaded
+    # for most tests need output from stdout
+    tmp = Path("/tmp/chalk").with_suffix(f".{token_bytes(5).hex()}")
+    shutil.copy(chalk_default.binary, tmp)
+    chalk = Chalk(binary=tmp)
+    # sanity check
+    assert chalk.binary and chalk.binary.is_file()
+    chalk.load(Path(__file__).parent / "testing.conf", use_embedded=False)
     yield chalk
 
 
@@ -188,3 +188,10 @@ def server_https(server_cert: str):
     if not is_server_up(f"{SERVER_HTTPS}/health", verify=server_cert):
         pytest.skip(f"{SERVER_HTTPS} is down. skipping test")
     return SERVER_HTTPS
+
+
+@pytest.fixture()
+def server_imds():
+    if not is_server_up(f"{SERVER_IMDS}/health"):
+        pytest.skip(f"{SERVER_IMDS} is down. skipping test")
+    return SERVER_IMDS

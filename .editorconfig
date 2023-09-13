@@ -10,6 +10,6 @@ insert_final_newline = true
 # repo prefers 80 char limit lines
 max_line_length = 80
 
-[*.nim]
+[*.{nim,c4m,c42spec}]
 indent_style = space
 indent_size = 2

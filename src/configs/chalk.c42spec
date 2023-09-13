@@ -42,13 +42,13 @@ enum ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
 # The four types (from the four constants above) are:
 
 # 1) ChalkTimeHost: Collect before we start chalking artifacts.
-#                   
+#
 #                   This could include things that *might* be different on
 #                   a per-artifact basis, but where our collection isn't yet
 #                   good enough.
 #
 # 2) ChalkTimeArtifact: While we are processing artifacts, before adding
-#                       the chalk mark.  
+#                       the chalk mark.
 
 # 3)RunTimeArtifact: Always collected after an operation on an artifact,
 #                    but before processing the next artifact.
@@ -323,7 +323,7 @@ There are four different kinds of keys:
 
 4) Run-Time Host:      Per-run keys that are not available for chalking,
                        and also are never expected to be artifact-specific.
-                       They're collected after any artifacts are processed. 
+                       They're collected after any artifacts are processed.
 
 For clarity as to what is chalkable, all Chalk-time keys can be added
 to chalk marks. Their names will *never* start with a leading
@@ -369,7 +369,7 @@ elsewhere, but must still contain at least required keys.
     write_lock:  true
     doc:         """
 This field is true in keys that must be set when self-chalking.
-"""  
+"""
   }
 
   field kind {
@@ -909,7 +909,7 @@ singleton extract {
   gen_setters: false
   user_def_ok: false
   doc: """
-Configuration specific to how `chalk exec` behaves.  
+Configuration specific to how `chalk exec` behaves.
   """
 
   field ignore_unsigned_images {
@@ -920,7 +920,7 @@ Configuration specific to how `chalk exec` behaves.
 When running a scan of all images, if this is `true`, Chalk only will try to extract Chalk marks from locally stored images if the image has a Chalk signature added via cosign attestations.
 
 By default we skip unsigned images, because the process (necessarily) involves downloading the container image.
-"""    
+"""
   }
 
   field search_base_layers_for_marks {
@@ -935,7 +935,7 @@ But if there's no signature, assuming `ignore_unsigned_images` is true, Chalk lo
 When no Chalk can be found in either place, if this attribute is set to true, we'll look at the other layers in the image and report the `CHALK_ID` and `METADATA_ID` of the topmost layer with a mark, using the `_FOUND_BASE_MARK` key (the image itself is said to be unchalked; it's more about being able to use knowledge of a chalked base image).
 
 Note that this does nothing unless `ignore_unsigned_images` is false.
-"""    
+"""
   }
 }
 
@@ -1006,7 +1006,7 @@ that officially support Docker, specifically Linux on arm64 and amd64
 architecture not in this set (bravo for getting Chalk to build!), it
 will still refuse to copy itself in, except via this configuration
 field.
-"""    
+"""
   }
 
   field label_prefix {
@@ -1099,7 +1099,7 @@ will add something to the dockerfile like:
 ```
 ENV ARTIFACT_IDENTIFIER="X6VRPZ-C828-KDNS-QDXRT0"
 ```
-"""    
+"""
   }
 }
 
@@ -1143,8 +1143,8 @@ scenario, short-lived containers could die and prevent us from
 reporting, so it may be best to keep this well under a second in general.
 
 See `get_heartbeat_rate` for the subsequent sleep period.
-"""    
-    
+"""
+
   }
 
   field search_path {
@@ -1213,7 +1213,7 @@ When true, any command-line arguments will be appeneded to exec.default_args ins
     validator: func exec_arg_semantics_check
     shortdoc: "Exec: override default_args"
     doc: """
-When true, if the 'chalk exec' command has any arguments passed, they will replace any arguments provided in default_args. 
+When true, if the 'chalk exec' command has any arguments passed, they will replace any arguments provided in default_args.
 """
   }
 
@@ -1236,7 +1236,7 @@ If it is NOT true, set exec.searchpath to provide any locations Chalk should che
 When this is true, Chalk will, after initial reporting, connect
 periodically to post "heartbeat" reports. The beacon report frequency is
 controlled by the `heartbeat_rate` field.
-"""    
+"""
   }
 
   field heartbeat_rate {
@@ -1254,7 +1254,7 @@ the middle of it posting.
 When running outside a container, or if inside a container, but
 running as a parent process, the heartbeat process will exit after a
 final report, if the monitored process has exited.
-"""    
+"""
   }
 }
 
@@ -1293,7 +1293,7 @@ singleton source_marks {
   gen_typename:  "SrcConfig"
   gen_setters:   false
   user_def_ok:   false
-  
+
   doc: """
 This controls whether and how source-based artifacts are marked.
 
@@ -1346,7 +1346,7 @@ unless you provide a custom callback.
     default: false
     shortdoc: "Marking requires +x"
     doc: """
-    
+
 When this is true, Chalk will not attempt to mark source code *unless*
 the executable bit is set. However, the execute bit can get added later;
 it's a trade-off!
@@ -1354,7 +1354,7 @@ it's a trade-off!
 Extraction does not check this.  It will attempt to extract from any
 file that appears to be valid utf when looking at the first 256 bytes,
 unless you provide a custom callback.
-"""    
+"""
   }
 
   field text_only_extensions {
@@ -1368,9 +1368,9 @@ documentation!
 
 So for all operations, we assume the extensions in this list can *never*
 be source code.
-"""    
+"""
  }
-  
+
   field custom_logic {
     type:    func (string, string, string, bool, bool) -> bool
     require: false
@@ -1433,7 +1433,7 @@ since it's the thing we're likely to see in a shebang line.
   field language_to_comment_map {
     type: dict[string, string]
     shortdoc: "Lang runtimes to comment sequence"
-    doc: "Maps binary names for lang runtimes to their comment type"    
+    doc: "Maps binary names for lang runtimes to their comment type"
     default: {
       "sh"              : "#",
       "csh"             : "#",
@@ -1452,7 +1452,7 @@ since it's the thing we're likely to see in a shebang line.
       "awk"             : "#"
     }
   }
-  
+
   field extensions_to_languages_map {
     type: dict[string, string]
     shortdoc: "File extensions to runtime binary"
@@ -1574,8 +1574,53 @@ since it's the thing we're likely to see in a shebang line.
       "nawk"            : "nawk"
     }
     doc: """
-"""    
+"""
   }
+}
+
+singleton ec2 {
+  gen_fieldname: "ec2Config"
+  gen_typename:  "EC2Config"
+  gen_setters:   false
+  user_def_ok:   false
+  doc: """
+Configuration information for AWS EC2
+"""
+
+  field sys_hypervisor_path {
+    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
+    type:    string
+    default: "/sys/hypervisor/uuid"
+    hidden:  true
+    doc:     "Path where to check AWS hypervisor if running in AWS EC2"
+  }
+
+  field sys_vendor_path {
+    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
+    type:    string
+    default: "/sys/class/dmi/id/board_vendor"
+    hidden:  true
+    doc:     "Path where to check AWS board vendor if running in AWS EC2"
+  }
+
+  field sys_product_path {
+    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
+    type:    string
+    default: "/sys/devices/virtual/dmi/id/product_uuid"
+    hidden:  true
+    doc:     "Path where to check AWS product if running in AWS EC2"
+  }
+}
+
+singleton aws {
+  gen_fieldname: "awsConfig"
+  gen_typename:  "AwsConfig"
+  gen_setters:   false
+  user_def_ok:   false
+  doc: """
+Configuration information for AWS Cloud Provider
+"""
+  allow ec2 { }
 }
 
 root {
@@ -1603,6 +1648,7 @@ root {
   allow exec          { }
   allow env_config    { }
   allow source_marks  { }
+  allow aws           { }
 
   field config_path {
     type:       list[string]
@@ -1806,7 +1852,7 @@ Chalk can report the time from start until the time a report is produced
 by subscribing to the _CHALK_RUN_TIME host key. However, if you're running
 on the command line, and want the total time to be output to stderr as the
 very last thing, you can use this option (--time on the command line).
-"""    
+"""
   }
 
   field audit_location {
@@ -1867,7 +1913,7 @@ containers have been modified since chalking.
 
 Even if this is false, Chalk will try to sign if either the chalk
 profile or the artifact reporting profile have SIGNATURE set.
-"""    
+"""
   }
 
   field use_transparency_log {
@@ -1877,7 +1923,7 @@ profile or the artifact reporting profile have SIGNATURE set.
     doc: """
 When this is true, digital signings will get published to a transparency log, and extracts from container images will attempt to validate in the transparency log.
 
-"""    
+"""
   }
 
   field use_secret_manager {
@@ -1913,17 +1959,17 @@ giving up. If it's false, we immediately move on without signing.
 
 Note that if you provide the environment variable, then the secret
 manager currently does not run. We may eventually make it a fallback.
-"""    
+"""
   }
-  
+
   field secret_manager_url {
     type:     string
     default:  "https://chalkapi-test.crashoverride.run/v0.1/signkeys/"
     hidden:   true
     shortdoc: "URL for secret manager"
     doc: """
-Currently you can just use ours.    
-"""    
+Currently you can just use ours.
+"""
   }
 
   field secret_manager_timeout {
@@ -1932,8 +1978,8 @@ Currently you can just use ours.
     shortdoc: "HTTPS timeout for secret manager"
     doc: """
 If the timeout is exceeded and the operation fails, chalk will proceed,
-just without doing any signing / verifying.    
-"""    
+just without doing any signing / verifying.
+"""
   }
 
   field signing_key_location {
@@ -2277,7 +2323,7 @@ However, if you want to disable it in your config file, you can just set:
 
 ```
 custom_report_terminal_chalk_time.enabled: false
-custom_report.terminal_env_time.enabled: false  
+custom_report.terminal_env_time.enabled: false
 custom_report.terminal_other_op.enabled: false
 ```
 """
@@ -2291,14 +2337,14 @@ custom_report.terminal_other_op.enabled: false
     doc: """
 Chalk never follows directory links. When running non-chalking operations, chalk will read the file on the other end of the link, and report using the file name of the link.
 
-For insertion operations, Chalk will, out of the box, warn on symbolic links, without processing them. 
+For insertion operations, Chalk will, out of the box, warn on symbolic links, without processing them.
 
 This variable controls what happens in those cases:
 
 - <em>skip</em>   will not process files that are linked.
 - <em>clobber</em> will read the artifact on the other end of the link, and, if writing, try to replace the file being linked to.
 - <em>copy</em> will read the artifact on the other end of the link, and, if writing, will replace the link with a modified file, leaving the file on the other end of the link intact.
-"""    
+"""
   }
 
   field install_completion_script {
@@ -2312,7 +2358,7 @@ script in the local user's directory:
 ~/.local/share/bash_completion/completions/chalk.bash
 
 If it's not present, chalk will attempt to install it.
-"""    
+"""
   }
 
   field crashoverride_usage_reporting_url {
@@ -2463,10 +2509,10 @@ func override_key_check(keyname: string, val: list[string]) {
 
 func liftable_key_check(keyname, val: list[string]) {
   result := ""
-  
+
   for i from 0 to len(val) {
     item := val[i]
-    
+
     if not keyspec_exists(item) {
       return (keyname + ": key '" + item + " is specified to be liftable, " +
       "but no such key has been defined.")
@@ -2525,9 +2571,9 @@ func profile_check_base(profile_name, profile_type, cmd) {
 
     if profile_type == PTChalk {
         if key_kind == RunTimeArtifact or key_kind == RunTimeHost { continue }
-        
+
         flag := false
-        
+
         if attr_get(spec_base + ".required_in_chalk_mark", bool) {
           flag := true
         }
@@ -2546,8 +2592,8 @@ func profile_check_base(profile_name, profile_type, cmd) {
     keyconfbase := "profile." + profile_name + ".key." + key_name + "."
 
     if attr_get(keyconfbase + "report", bool) == false { continue }
-    
-    
+
+
     # By here, we know this profile wants to set this key explicitly,
     # and that we are not in a chalk profile.
     #
@@ -2556,7 +2602,7 @@ func profile_check_base(profile_name, profile_type, cmd) {
     #   and in host-reports as long as the keyspec set never_early to 'false'
     #   *and* the key is in the `keys_that_can_lift` field. Otherwise,
     #   it can only appear in an artifact report.
-    
+
     # - RunTimeArtifact keys can appear in per-artifact reports only.
     # - RunTimeHost keys can appear in host reports only.
     #
@@ -2946,7 +2992,7 @@ func sink_config_check(path) {
         "sink configuration.")
       }
     }
-    
+
   }
 
   for i from 0 to len(sinkfields) {

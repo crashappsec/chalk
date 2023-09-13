@@ -18,7 +18,7 @@ type
     udpSockInfoCache: Option[ProcTable]
     psInfoCache:      Option[ProcFdSet]
 
-template readOneFile(fname: string): Option[string] =
+template readOneFile*(fname: string): Option[string] =
   let stream = newFileStream(fname, fmRead)
   if stream == nil:
     none(string)

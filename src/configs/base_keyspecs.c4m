@@ -3006,7 +3006,7 @@ When running Chalk inside a container, this information will be the virtualized 
 
 keyspec _AWS_INSTANCE_IDENTITY_DOCUMENT {
     kind:             RunTimeHost
-    type:             `x
+    type:             dict[string, `x]
     standard:         true
     since:            "0.1.1"
     doc: """
@@ -3115,7 +3115,7 @@ This key is only available as a run-time key, and only when running in AWS where
 
 keyspec _AWS_IAM_INFO {
     kind:             RunTimeHost
-    type:             string
+    type:             dict[string, `x]
     standard:         true
     since:            "0.1.1"
     doc: """
@@ -3324,11 +3324,23 @@ This key is only available as a run-time key, and only when running in AWS where
 
 keyspec _AWS_SECURITY_GROUPS {
     kind:             RunTimeHost
-    type:             string
+    type:             list[string]
     standard:         true
     since:            "0.1.1"
     doc: """
 The names of the security groups applied to the instance.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_SECURITY_GROUP_IDS {
+    kind:             RunTimeHost
+    type:             list[string]
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The IDs of the security groups to which the network interface belongs.
 
 This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
 """
@@ -3360,7 +3372,7 @@ This key is only available as a run-time key, and only when running in AWS where
 
 keyspec _AWS_TAGS {
     kind:             RunTimeHost
-    type:             string
+    type:             dict[string, string]
     standard:         true
     since:            "0.1.1"
     doc: """
@@ -3456,7 +3468,7 @@ This key is only available as a run-time key, and only when running in AWS where
 
 keyspec _AWS_IDENTITY_CREDENTIALS_EC2_INFO {
     kind:             RunTimeHost
-    type:             string
+    type:             dict[string, `x]
     standard:         true
     since:            "0.1.2"
     doc: """
@@ -3468,7 +3480,7 @@ This key is only available as a run-time key, and only when running in AWS where
 
 keyspec _AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE {
     kind:             RunTimeHost
-    type:             string
+    type:             dict[string, `x]
     standard:         true
     since:            "0.1.2"
     doc: """
@@ -3498,6 +3510,42 @@ keyspec _AWS_MAC {
     since:            "0.1.2"
     doc: """
 The instance's media access control (MAC) address. In cases where multiple network interfaces are present, this refers to the eth0 device (the device for which the device number is 0).
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_INTERFACE_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The ID of the network interface.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_SUBNET_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The ID of the subnet in which the interface resides.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_VPC_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The ID of the VPC in which the interface resides.
 
 This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
 """
@@ -3685,25 +3733,4 @@ keyspec $CHALK_SECRET_ENDPOINT_URI {
    doc:                    """
 ...
 """
-}
-
-# Used in a keyspec above.
-func call_rand(key) { return $(lower(hex(rand())));  }
-func get_args(key) { return command_argv(); }
-
-default_command = "help"
-
-# Currently, these need to be here for singleton defaults to take hold.
-extract {
-}
-
-source_marks {
-}
-
-exec {
-  search_path: array_add(split(env("PATH"), ":"), ["."])
-}
-
-docker {
-  wrap_entrypoint: false # TODO, this shouldn't need to be here either.
 }

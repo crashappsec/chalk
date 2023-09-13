@@ -8,6 +8,7 @@ from ..utils.bin import sha256
 
 from ..conf import MAGIC
 from ..utils.log import get_logger
+from ..utils.dict import ContainsMixin
 from ..utils.os import run, Program, CalledProcessError
 from ..utils.docker import Docker
 
@@ -32,7 +33,7 @@ ChalkLogLevel = Literal[
 logger = get_logger()
 
 
-class ChalkReport(dict):
+class ChalkReport(ContainsMixin, dict):
     def __init__(self, report: dict[str, Any]):
         super().__init__(**report)
 
@@ -61,7 +62,7 @@ class ChalkReport(dict):
         assert self["_OPERATION"] == operation
 
 
-class ChalkMark(dict):
+class ChalkMark(ContainsMixin, dict):
     @classmethod
     def from_binary(cls, path: Path):
         text = path.read_text(errors="ignore")

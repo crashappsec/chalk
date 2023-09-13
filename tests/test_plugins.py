@@ -1,5 +1,7 @@
+import re
 import shutil
 from pathlib import Path
+from typing import IO
 from unittest import mock
 
 import os
@@ -12,7 +14,7 @@ from .chalk.validate import (
     validate_extracted_chalk,
     validate_virtual_chalk,
 )
-from .conf import CODEOWNERS, LS_PATH
+from .conf import CODEOWNERS, CONFIGS, LS_PATH
 from .utils.git import init
 from .utils.log import get_logger
 
@@ -118,4 +120,89 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
         artifact_map=artifact,
         virtual=False,
         chalk_action="insert",
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+def test_imds(
+    copy_files: list[Path],
+    chalk: Chalk,
+    tmp_file: IO,
+    server_imds: str,
+):
+    # make imds plugin think we are running in EC2
+    with tmp_file as fid:
+        fid.write(b"amazon")
+    bin_path = copy_files[0]
+    insert = chalk.insert(bin_path, config=CONFIGS / "imds.conf")
+    assert insert.report.contains(
+        {
+            "_AWS_AMI_ID": "ami-0abcdef1234567890",
+            "_AWS_AMI_LAUNCH_INDEX": "0",
+            "_AWS_AMI_MANIFEST_PATH": "(unknown)",
+            "_AWS_AZ": "us-east-1e",
+            "_AWS_AZ_ID": "use1-az3",
+            "_AWS_HOSTNAME": "ip-10-251-50-12.ec2.internal",
+            "_AWS_IAM_INFO": {
+                "Code": "Success",
+                "LastUpdated": "2023-09-12T15:16:58Z",
+                "InstanceProfileArn": "arn:aws:iam::123456789012:instance-profile/IMDSTestEc2Role",
+                "InstanceProfileId": "AIPATILQWXT62BCWDUQCT",
+            },
+            "_AWS_INSTANCE_ID": "i-abc123xyz789",
+            "_AWS_MAC": "00:25:96:FF:FE:12:34:56",
+            "_AWS_VPC_ID": "vpc-1234567890",
+            "_AWS_SUBNET_ID": "subnet-1234567890",
+            "_AWS_INTERFACE_ID": "eni-1234567890",
+            "_AWS_SECURITY_GROUPS": {"default", "test"},
+            "_AWS_SECURITY_GROUP_IDS": {"sg-1234567890", "sg-098764321"},
+            "_AWS_INSTANCE_IDENTITY_DOCUMENT": {
+                "accountId": "123456789012",
+                "architecture": "x86_64",
+                "availabilityZone": "us-east-1e",
+                "billingProducts": None,
+                "devpayProductCodes": None,
+                "marketplaceProductCodes": None,
+                "imageId": "ami-0abcdef1234567890",
+                "instanceId": "i-abc123xyz789",
+                "instanceType": "t2.medium",
+                "kernelId": None,
+                "pendingTime": "2023-09-11T06:01:38Z",
+                "privateIp": "10.251.50.12",
+                "ramdiskId": None,
+                "region": "us-east-1",
+                "version": "2017-09-30",
+            },
+            "_AWS_INSTANCE_IDENTITY_PKCS7": re.compile(r"^.*=+$"),
+            "_AWS_INSTANCE_IDENTITY_SIGNATURE": re.compile(r"^.*=+$"),
+            "_AWS_INSTANCE_LIFE_CYCLE": "on-demand",
+            "_AWS_INSTANCE_TYPE": "t2.medium",
+            "_AWS_LOCAL_HOSTNAME": "ip-10-251-50-12.ec2.internal",
+            "_AWS_LOCAL_IPV4_ADDR": "10.251.50.12",
+            "_AWS_OPENSSH_PUBKEY": re.compile(r"^ssh-rsa .* test$"),
+            "_AWS_PARTITION_NAME": "aws",
+            "_AWS_PUBLIC_HOSTNAME": "ec2-203-0-113-25.compute-1.amazonaws.com",
+            "_AWS_PUBLIC_IPV4_ADDR": "203.0.113.25",
+            "_AWS_REGION": "us-east-1",
+            "_AWS_RESOURCE_DOMAIN": "amazonaws.com",
+            "_AWS_TAGS": {
+                "Name": "foobar",
+                "Environment": "staging",
+            },
+            "_AWS_IDENTITY_CREDENTIALS_EC2_INFO": {
+                "Code": "Success",
+                "LastUpdated": "2023-09-13T13:13:39Z",
+                "AccountId": "123456789012",
+            },
+            "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE": {
+                "Code": "Success",
+                "LastUpdated": "2023-09-13T13:12:26Z",
+                "Type": "AWS-HMAC",
+                "AccessKeyId": "ASIATILQWXT67VGGR4O2",
+                "SecretAccessKey": "<<redacted>>",
+                "Token": "<<redacted>>",
+                "Expiration": "2023-09-13T19:40:12Z",
+            },
+        }
     )

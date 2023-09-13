@@ -1,5 +1,13 @@
+volumes:
+  tmp:
+
 networks:
   chalk:
+  imds:
+    ipam:
+      driver: default
+      config:
+        - subnet: 169.254.169.254/24
 
 services:
   # --------------------------------------------------------------------------
@@ -120,6 +128,25 @@ services:
   # --------------------------------------------------------------------------
   # TESTS
 
+  # there is no official imds test container so we have very simple wrapper
+  imds:
+    build:
+      context: ./tests
+    entrypoint: uvicorn
+    command: app:app --host=0.0.0.0 --port=80 --reload
+    working_dir: /imds
+    volumes:
+      - ./tests/imds:/imds
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - sh -c "curl -f http://localhost/health"
+      start_period: 10s
+      interval: 1s
+    networks:
+      imds:
+        ipv4_address: 169.254.169.254
+
   tests:
     image: chalk_local_tests
     container_name: chalk_local_tests
@@ -129,15 +156,19 @@ services:
       - .:/chalk
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HOME}/.aws:/root/.aws
+      - tmp:/sys/class/dmi/id/
     working_dir: /chalk/tests
     networks:
       - chalk
+      - imds
     depends_on:
       registry:
         condition: service_healthy
       server:
         condition: service_healthy
       server-tls:
+        condition: service_healthy
+      imds:
         condition: service_healthy
     environment:
       AWS_PROFILE: ${AWS_PROFILE:-}

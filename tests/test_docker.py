@@ -311,7 +311,7 @@ def test_extract(chalk: Chalk, random_hex: str):
         type="Docker Image",
         host_info={
             "_OPERATION": "extract",
-            "_OP_EXE_NAME": "chalk",
+            "_OP_EXE_NAME": chalk.binary.name,
             "_OP_UNMARKED_COUNT": 0,
             "_OP_CHALK_COUNT": 1,
         },
@@ -357,7 +357,7 @@ def test_extract(chalk: Chalk, random_hex: str):
         type="Docker Container",
         host_info={
             "_OPERATION": "extract",
-            "_OP_EXE_NAME": "chalk",
+            "_OP_EXE_NAME": chalk.binary.name,
             "_OP_UNMARKED_COUNT": 0,
             "_OP_CHALK_COUNT": 1,
         },
