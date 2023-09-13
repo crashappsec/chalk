@@ -3370,6 +3370,212 @@ This key is only available as a run-time key, and only when running in AWS where
 """
 }
 
+keyspec _AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+Value showing the target Auto Scaling lifecycle state that an Auto Scaling instance is transitioning to. Present when the instance transitions to one of the target lifecycle states after March 10, 2022. Possible values: Detached | InService | Standby | Terminated | Warmed:Hibernated | Warmed:Running | Warmed:Stopped | Warmed:Terminated. See Retrieve the target lifecycle state through instance metadata in the Amazon EC2 Auto Scaling User Guide.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_BLOCK_DEVICE_MAPPING_AMI {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The virtual device that contains the root/boot file system.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_BLOCK_DEVICE_MAPPING_ROOT {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The virtual devices or partitions associated with the root devices or partitions on the virtual device, where the root (/ or C:) file system is associated with the given instance.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_BLOCK_DEVICE_MAPPING_SWAP {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The virtual devices associated with swap. Not always present.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_EVENTS_MAINTENANCE_HISTORY {
+    kind:             RunTimeHost
+    type:             `x
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+If there are completed or canceled maintenance events for the instance, contains a JSON string with information about the events. For more information, see To view event history about completed or canceled events.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_EVENTS_MAINTENANCE_SCHEDULED {
+    kind:             RunTimeHost
+    type:             `x
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+If there are active maintenance events for the instance, contains a JSON string with information about the events. For more information, see View scheduled events.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_EVENTS_RECOMMENDATIONS_REBALANCE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The approximate time, in UTC, when the EC2 instance rebalance recommendation notification is emitted for the instance. The following is an example of the metadata for this category: {"noticeTime": "2020-11-05T08:22:00Z"}. This category is available only after the notification is emitted. For more information, see EC2 instance rebalance recommendations.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_IDENTITY_CREDENTIALS_EC2_INFO {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+Information about the credentials in identity-credentials/ec2/security-credentials/ec2-instance.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+Credentials for the instance identity role that allow on-instance software to identify itself to AWS to support features such as EC2 Instance Connect and AWS Systems Manager Default Host Management Configuration. These credentials have no policies attached, so they have no additional AWS API permissions beyond identifying the instance to the AWS feature.
+This option will not log the SecretAccessKey and Token.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_INSTANCE_ACTION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+Notifies the instance that it should reboot in preparation for bundling. Valid values: none | shutdown | bundle-pending.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_MAC {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The instance's media access control (MAC) address. In cases where multiple network interfaces are present, this refers to the eth0 device (the device for which the device number is 0).
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_METRICS_VHOSTMD {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+No longer available.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_PRODUCT_CODES {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+AWS Marketplace product codes associated with the instance, if any.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_RAMDISK_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The ID of the RAM disk specified at launch time, if applicable.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_RESERVATION_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The ID of the reservation.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_SPOT_INSTANCE_ACTION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The action (hibernate, stop, or terminate) and the approximate time, in UTC, when the action will occur. This item is present only if the Spot Instance has been marked for hibernate, stop, or terminate. For more information, see instance-action.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+keyspec _AWS_SPOT_TERMINATION_TIME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    doc: """
+The approximate time, in UTC, that the operating system for your Spot Instance will receive the shutdown signal. This item is present and contains a time value (for example, 2015-01-05T18:02:00Z) only if the Spot Instance has been marked for termination by Amazon EC2. The termination-time item is not set to a time if you terminated the Spot Instance yourself. For more information, see termination-time.
+
+This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+"""
+}
+
+
 keyspec _CHALK_EXTERNAL_ACTION_AUDIT {
     kind: RunTimeHost
     type: list[(string, string)]

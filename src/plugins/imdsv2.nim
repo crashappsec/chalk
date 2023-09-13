@@ -4,7 +4,8 @@
 ## :Copyright: 2023, Crash Override, Inc.
 
 import httpclient, net, uri, ../config, ../plugin_api
-from ../chalkjson import nimJsonToBox
+import std/strutils
+import std/json
 
 const
   baseUri     = "http://169.254.169.254/latest/"
@@ -14,6 +15,21 @@ const
   identityDoc = baseUri & "dynamic/instance-identity/document"
   identityPkcs = baseUri & "dynamic/instance-identity/pkcs7"
   identitySig = baseUri & "dynamic/instance-identity/signature"
+
+
+# XXX can we re-use it from procfs?
+template readOneFile(fname: string): Option[string] =
+  let stream = newFileStream(fname, fmRead)
+  if stream == nil:
+    none(string)
+  else:
+    let contents = stream.readAll().strip()
+    if len(contents) == 0:
+       none(string)
+    else:
+      stream.close()
+      some(contents)
+
 proc getAwsToken(): Option[string] =
   let
     uri      = parseURI(baseUri & "api/token")
@@ -42,6 +58,14 @@ proc hitAwsEndpoint(path: string, token: string): Option[string] =
   trace("Retrieved AWS metadata token")
   return some(response.bodyStream.readAll().strip())
 
+proc redact(keyname: string, raw: string): string =
+  if keyname == "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE":
+    let creds = parseJson(raw)
+    creds["SecretAccessKey"] = newJString("<<redacted>>")
+    creds["Token"] = newJString("<<redacted>>")
+    return $(creds)
+  return raw
+
 template oneItem(keyname: string, url: string) =
   if isSubscribedKey(keyname):
     let resultOpt = hitAwsEndpoint(url, token)
@@ -49,11 +73,39 @@ template oneItem(keyname: string, url: string) =
       # log failing keys in trace mode only as some are expected to be absent
       trace("With valid IMDSv2 token, could not retrieve metadata from: " & url)
     else:
-      setIfNotEmpty(result, keyname, resultOpt.get())
+      setIfNotEmpty(result, keyname, redact(keyname, resultOpt.get()))
+
+
+proc isAwsEc2Host(): bool =
+  # ref: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
+
+  # older Xen instances
+  let uuid = readOneFile("/sys/hypervisor/uuid")
+  if uuid.isSome() and strutils.toLowerAscii(uuid.get())[0..2] == "ec2":
+      return true
+
+  # nitro instances
+  let vendor = readOneFile("/sys/class/dmi/id/board_vendor")
+  if vendor.isSome() and contains(strutils.toLowerAscii(vendor.get()), "amazon"):
+      return true
+
+  # this will only work if we have root, normally sudo dmidecode  --string system-uuid
+  # gives the same output
+  let product_uuid = readOneFile("/sys/devices/virtual/dmi/id/product_uuid")
+  if product_uuid.isSome() and strutils.toLowerAscii(product_uuid.get())[0..2] == "ec2":
+      return true
+
+  return false
 
 proc imdsv2GetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
                                ChalkDict {.cdecl.} =
   result = ChalkDict()
+
+  let isAwsEc2 = isAwsEc2Host()
+  if not isAwsEc2:
+    trace("Not an EC2 instance - skipping check for IMDSv2")
+    return
+
   var tokenOpt: Option[string]
 
   try:
@@ -105,6 +157,23 @@ proc imdsv2GetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   oneItem("_AWS_PARTITION_NAME",      mdUri & "services/partition")
   oneItem("_AWS_TAGS",                mdUri & "tags/instance")
 
+  oneitem("_AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE", mdUri & "autoscaling/target-lifecycle-state")
+  oneitem("_AWS_BLOCK_DEVICE_MAPPING_AMI", mdUri & "block-device-mapping/ami")
+  oneitem("_AWS_BLOCK_DEVICE_MAPPING_ROOT", mdUri & "block-device-mapping/root")
+  oneitem("_AWS_BLOCK_DEVICE_MAPPING_SWAP", mdUri & "block-device-mapping/swap")
+  oneitem("_AWS_EVENTS_MAINTENANCE_HISTORY", mdUri & "events/maintenance/history")
+  oneitem("_AWS_EVENTS_MAINTENANCE_SCHEDULED", mdUri & "events/maintenance/scheduled")
+  oneitem("_AWS_EVENTS_RECOMMENDATIONS_REBALANCE", mdUri & "events/recommendations/rebalance")
+  oneitem("_AWS_IDENTITY_CREDENTIALS_EC2_INFO", mdUri & "identity-credentials/ec2/info")
+  oneitem("_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE", mdUri & "identity-credentials/ec2/security-credentials/ec2-instance")
+  oneitem("_AWS_INSTANCE_ACTION", mdUri & "instance-action")
+  oneitem("_AWS_MAC", mdUri & "mac")
+  oneitem("_AWS_METRICS_VHOSTMD", mdUri & "metrics/vhostmd")
+  oneitem("_AWS_PRODUCT_CODES", mdUri & "product-codes")
+  oneitem("_AWS_RAMDISK_ID", mdUri & "ramdisk-id")
+  oneitem("_AWS_RESERVATION_ID", mdUri & "reservation-id")
+  oneitem("_AWS_SPOT_INSTANCE_ACTION", mdUri & "spot/instance-action")
+  oneitem("_AWS_SPOT_TERMINATION_TIME", mdUri & "spot/termination-time")
 
 proc loadImdsv2*() =
   newPlugin("imdsv2", rtHostCallback = RunTimeHostCb(imdsv2GetrunTimeHostInfo))

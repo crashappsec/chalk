@@ -883,9 +883,9 @@ profile host_report_default {
   key._AWS_INSTANCE_MONITORING.report  = true
 
   key._AWS_AMI_ID.report               = true
-  key._AWS_AMI_LAUNCH_INDEX.report               = true
-  key._AWS_AMI_MANIFEST_PATH.report        = true
-  key._AWS_ANCESTOR_AMI_IDS.report        = true
+  key._AWS_AMI_LAUNCH_INDEX.report     = true
+  key._AWS_AMI_MANIFEST_PATH.report    = true
+  key._AWS_ANCESTOR_AMI_IDS.report     = true
   key._AWS_HOSTNAME.report             = true
   key._AWS_IAM_INFO.report             = true
   key._AWS_INSTANCE_ID.report          = true
@@ -908,6 +908,25 @@ profile host_report_default {
   key._AWS_RESOURCE_DOMAIN.report      = true
   key._AWS_PARTITION_NAME.report       = true
   key._AWS_TAGS.report                 = true
+
+
+  key._AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE.report    = true
+  key._AWS_BLOCK_DEVICE_MAPPING_AMI.report              = true
+  key._AWS_BLOCK_DEVICE_MAPPING_ROOT.report             = true
+  key._AWS_BLOCK_DEVICE_MAPPING_SWAP.report             = true
+  key._AWS_EVENTS_MAINTENANCE_HISTORY.report            = true
+  key._AWS_EVENTS_MAINTENANCE_SCHEDULED.report          = true
+  key._AWS_EVENTS_RECOMMENDATIONS_REBALANCE.report      = true
+  key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.report         = true
+  key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.report = true
+  key._AWS_INSTANCE_ACTION.report       = true
+  key._AWS_MAC.report                   = true
+  key._AWS_METRICS_VHOSTMD.report       = true
+  key._AWS_PRODUCT_CODES.report         = true
+  key._AWS_RAMDISK_ID.report            = true
+  key._AWS_RESERVATION_ID.report        = true
+  key._AWS_SPOT_INSTANCE_ACTION.report  = true
+  key._AWS_SPOT_TERMINATION_TIME.report = true
 }
 
 profile host_report_minimal {
