@@ -77,12 +77,14 @@ def determine_sys_arch():
         # /usr/bin/arch yields i386
         # uname -a yields x86_64 on emulated binary
         try:
-            raw = subprocess.check_output(
-                ["sysctl", "sysctl.proc_translated"], shell=False
+            raw = subprocess.run(
+                ["sysctl", "sysctl.proc_translated"],
+                shell=False,
+                capture_output=True,
+                text=True,
             )
-            if raw is not None:
-                translated = raw.strip().decode()
-                if "unknown oid" in translated or "proc_translated: 0" in translated:
+            if raw.stdout or raw.stderr:
+                if "unknown oid" in raw.stderr or "proc_translated: 0" in raw.stdout:
                     machine = platform.machine()
                 else:
                     machine = "arm64"
@@ -92,7 +94,7 @@ def determine_sys_arch():
                 machine = "arm64"
         except Exception as e:
             logger.error(
-                f"Could not determine if darwing binary is emulated. Setting arch to arm64. {e}"
+                f"Could not determine if darwin binary is emulated. Setting arch to arm64. {e}"
             )
             machine = "arm64"
     else:
@@ -114,7 +116,7 @@ def check_for_updates():
     Return True if updates available
     """
     # Get running version
-    curr_version = __version__.split('.post')[0]
+    curr_version = __version__.split(".post")[0]
 
     # Get latest version from server
     latest_version = get_latest_version()
@@ -153,7 +155,7 @@ def get_chalk_name(release=True):
     system, machine = determine_sys_arch()
 
     # pull chalk version matching this release only
-    curr_version = __version__.split('.post')[0]
+    curr_version = __version__.split(".post")[0]
 
     chalk_name = f"chalk-{curr_version}-{system}-{machine}"
 

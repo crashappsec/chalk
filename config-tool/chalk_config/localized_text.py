@@ -168,9 +168,7 @@ Note that this does NOT remove any binaries generated for this configuration.
 GENERATION_FAILED =  """# Warning: Binary Generation Failed
 Your configuration has been saved, but no binary has been produced.
 
-Generally, this is one of two issues:
-1. Connectivity to the base binary (currently, it should go in ./bin/chalk)
-2. You're running on a Mac; we only inject on Linux.  Export the con4m config from the main menu, and on a Linux machine run:
+Generally, this is due to not being able to locate or execute the base binary (currently, it should go in ./bin/chalk)
 ```
 chalk load [yourconfig]
 ```
