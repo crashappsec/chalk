@@ -11,7 +11,6 @@ exec commands are tested in test_exec.py as they are more involved
 """
 from pathlib import Path
 
-
 import pytest
 
 from .chalk.runner import Chalk
@@ -182,9 +181,8 @@ def test_setup(chalk_copy: Chalk):
     """
     needs to display password, and public and private key info in chalk
     """
-    result = chalk_copy.run(
-        command="setup", params=["--no-api-login"], log_level="error"
-    )
+    # API login requires interactive session to login via UI
+    result = chalk_copy.run(command="setup", no_api_login=True, log_level="error")
 
     report = result.report
     assert report["_OPERATION"] == "setup"

@@ -544,7 +544,7 @@ proc getChalkApiToken(): string =
     failFr: string = "[☠☠☠☠]"
     succFr: string = "[❤❤❤❤]"
     timeout: int = cast[int](chalkConfig.getSecretManagerTimeout())
-    uri:     Uri = parseUri("https://chalk.crashoverride.run/v0.1/auth/code")
+    uri:     Uri = parseUri("https://chalk.crashoverride.run/v0.1/auth/code?flow=setup")
 
   # request auth code from API
   info("Requesting Chalk authentication code from " & $uri)
