@@ -1,8 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This is a simple codec for dealing with python bytecode files;
 ##  i.e., currently ones that have the extensions .pyc, .pyo, .pyd
-##
-## :Author: Rich Smith (rich@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import ../config, ../plugin_api, ../util
 

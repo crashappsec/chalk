@@ -1,3 +1,10 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This is the base configuration file that will be loaded when the
 ## chalk command is run as an entrypoint.
 ##
@@ -10,9 +17,6 @@
 ## the 'docker' section of your config file.  You also have the ability
 ## to write a custom con4m function to do any sink / report installation
 ## that you'd like to do (the default is an https post).
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2023, Crash Override, Inc.
 
 
 recursive:                 false

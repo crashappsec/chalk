@@ -1,12 +1,16 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This provides the base methods for plugins / codecs.
 ## Additionally, it provides utility functions to be used
 ## by plugins, as well as code for registering plugins.
 ##
 ## All of the data collection these plugins do is orchestrated in
 ## collect.nim
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import re, config, chalkjson, util, algorithm
 

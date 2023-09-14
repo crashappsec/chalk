@@ -1,7 +1,11 @@
-## Builtin attestation implementation(s).
 ##
-## :Author: Theofilos Petsios (theofilos@crashoverride.com)
-## :Copyright: 2023, Crash Override, Inc.
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+## Builtin attestation implementation(s).
 
 
 # installs attestation and returns true if it succeeded.
@@ -11,7 +15,7 @@ func install_cosign() {
   # to install attestation
   #
   # First attempt to install the go version
-  
+
   output, go_exists := system("which go")
   if go_exists == 0 {
     install_out, ok := system("go install github.com/sigstore/cosign/v2/cmd/cosign@latest")
@@ -20,7 +24,7 @@ func install_cosign() {
             "attempting curl install")
     } else {
       return true
-    }      
+    }
   }
 
   # go was not present (or errored) - attempt to install via curl in /tmp
@@ -35,13 +39,13 @@ func install_cosign() {
   download_cmd := ["curl", "-O", "-L", install_url]
   chmod_cmd    := ["chmod", "+x", install_name]
   mv_cmd       := ["mv", install_name, "/tmp/cosign"]
-  
+
   attestation_download_cmd := [download_cmd.join(" "),
                                chmod_cmd.join(" "),
                                mv_cmd.join(" ")]
-                               
+
   output, code := system(attestation_download_cmd.join(" && "))
-  
+
   if code == 0 {
     trace("Successfully installed attestation into /tmp/cosign")
     return true
@@ -61,7 +65,7 @@ func load_attestation_binary() {
     if install_cosign() {
       attestation_binary := find_exe("cosign", supplemental_path)
       if attestation_binary == "" {
-        error("cosign could not be found!!!")      
+        error("cosign could not be found!!!")
         return attestation_binary
       }
     }

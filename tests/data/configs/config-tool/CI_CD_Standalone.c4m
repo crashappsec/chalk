@@ -1,3 +1,9 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
 cmd := command_name()
 default_command = "insert"
 # WARNING: This configuration was automatically generated

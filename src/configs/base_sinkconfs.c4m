@@ -1,8 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## Part of the base configuration.  See the comment at the top of
 ## `base_keyspecs.c4m`
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 sink_config console_err {
   sink: "stderr"

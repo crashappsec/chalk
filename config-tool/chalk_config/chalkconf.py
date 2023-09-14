@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# Copyright (c) 2023, Crash Override, Inc.
+#
+# This file is part of Chalk
+# (see https://crashoverride.com/docs/chalk)
+
 # John Viega. john@crashoverride.com
 import asyncio
 import hashlib

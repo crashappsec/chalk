@@ -1,8 +1,13 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## Plugin loading; currently this is only static plugins.
 ##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
-# We only need to load plugins that aren't loaded by anything else.
+## We only need to load plugins that aren't loaded by anything else.
 
 import macros
 

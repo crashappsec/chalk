@@ -1,8 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## Make sure multiple chalk exes don't invoke each other in a
 ## recursive loop.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2023, Crash Override, Inc.
 
 import config
 

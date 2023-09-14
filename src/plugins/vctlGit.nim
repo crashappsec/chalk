@@ -1,8 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## The plugin responsible for pulling metadata from the git
 ## repository.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import ../config, ../plugin_api
 

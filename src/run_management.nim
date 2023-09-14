@@ -1,9 +1,13 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## Common items related to managing the chalk run, including key
 ## setting, status stuff, and the core scan state ("collection
 ## contexts"), that the subscan module pushes and pops.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2023, Crash Override, Inc.
 
 import chalk_common, posix, std/monotimes
 export chalk_common

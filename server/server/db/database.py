@@ -1,3 +1,7 @@
+# Copyright (c) 2023, Crash Override, Inc.
+#
+# This file is part of Chalk
+# (see https://crashoverride.com/docs/chalk)
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base

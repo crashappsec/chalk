@@ -1,9 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This is where we provide sane defaults for I/O.  Chalk is very
 ## flexible in this regard, and almost nothing is hardcoded.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
-
 
 custom_report terminal_chalk_time {
   enabled:         true
@@ -42,7 +45,7 @@ if not using_tty() {
 
 if skip_summary_report {
   custom_report.terminal_chalk_time.enabled: false
-  custom_report.terminal_env_time.enabled: false  
+  custom_report.terminal_env_time.enabled: false
   custom_report.terminal_other_op.enabled: false
 }
 
@@ -96,7 +99,7 @@ elif quieter_cmds.contains(cmd) {
 else {
     log_level: "info"
 }
-  
+
 
 # Note that there are already two pre-built output configurations.
 # They are both subscribed to the 'stderr' sink.  You can remove those

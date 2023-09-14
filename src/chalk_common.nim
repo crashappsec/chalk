@@ -1,12 +1,16 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This file contains common type definitions and a few helper
 ## functions that couldn't easily live in a more naturally named
 ## module due to cross-module dependency issues.
 ##
 ## This file should never import other chalk modules; it's at the root
 ## of the dependency tree.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import os, json, streams, tables, options, strutils, nimutils, sugar, posix,
        nimutils/logging, nimutils/managedtmp, con4m, c4autoconf, unicode, re

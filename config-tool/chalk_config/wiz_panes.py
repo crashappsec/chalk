@@ -1,3 +1,8 @@
+# Copyright (c) 2023, Crash Override, Inc.
+#
+# This file is part of Chalk
+# (see https://crashoverride.com/docs/chalk)
+
 # This file has the panes specific to this app, so we can more easily
 # reuse the wizard for other things.
 

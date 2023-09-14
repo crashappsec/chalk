@@ -1,8 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## Common docker-specific utility bits used in various parts of the
 ## implementation.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2023, Crash Override, Inc.
 
 import osproc, config, util
 

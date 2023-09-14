@@ -1,8 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This is the con4m specification to enable con4m to automatically
 ## validate chalk config files.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2023, Crash Override, Inc.
 
 
 default_key_priority := 4611686018427387904  # 2^62.

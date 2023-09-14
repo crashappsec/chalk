@@ -1,3 +1,10 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This is the first configuration file loaded, and basically provides
 ## data and defaults. The bulk of it specifies the default metadata
 ## schema (key blocks).
@@ -41,9 +48,6 @@
 ## 12. If I had any doubt that the runtime key's name might be confused with
 ##     something that one might expect be collected chalk-time, I added _OP.
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 ## CHALK SCHEMA
 chalk_version :=   "0.1.0"

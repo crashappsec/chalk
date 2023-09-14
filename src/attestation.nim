@@ -1,6 +1,9 @@
-## :Author: Theofilos Petsios
-## :Copyright: 2023, Crash Override, Inc.
-
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
 import base64, chalkjson, config, httpclient, net, os, QRgen, selfextract, terminal, uri
 
 type ValidateResult* = enum
@@ -330,7 +333,7 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
       return true
     else:
       error("Could not retrieve secret from API")
-      return false 
+      return false
 
   error("Could not retrieve API token from chalk mark")
   return false
@@ -490,7 +493,7 @@ proc attemptToLoadKeys*(silent=false): bool =
   cosignLoaded = true
   return saveSigningSetup(pubKey, priKey, "", false)
 
-template jwtSplitAndDecode(jwtString: string, doDecode: bool): string = 
+template jwtSplitAndDecode(jwtString: string, doDecode: bool): string =
   # this is pretty crude in terms of JWT structure validation to say the least
   let parts = split(jwtString, '.')
   if len(parts) != 3:
@@ -504,7 +507,7 @@ template jwtSplitAndDecode(jwtString: string, doDecode: bool): string =
 
 proc getChalkApiToken(): string =
   var
-    apiJwtPayload:     string 
+    apiJwtPayload:     string
     authId:            string
     authnSuccess:      bool   = false
     authnFailure:      bool   = false
@@ -519,13 +522,13 @@ proc getChalkApiToken(): string =
     pollPayloadBase64: string
     pollUri:           Uri
     pollUrl:           string
-    pollInt:           int 
+    pollInt:           int
     response:          Response
     responsePoll:      Response
     ret:               string = ""
     token:             string
     totalSleepTime:    float  = 0.0
-  type 
+  type
     frameList = array[8, string]
   let
     frames: frameList = [
@@ -581,7 +584,7 @@ proc getChalkApiToken(): string =
           clientPoll  = newHttpClient(sslContext = contextPoll, timeout = timeout)
         else:
           clientPoll  = newHttpClient(timeout = timeout)
-        
+
         responsePoll  = clientPoll.request(url = pollUri, httpMethod = HttpGet, body = "")
         clientPoll.close()
 
@@ -606,18 +609,18 @@ proc getChalkApiToken(): string =
           var userInfoStr = ""
           userInfoStr &= "User: " & $userDict["name"] & "\n"
           userInfoStr &= "       Email: " & $userDict["email"]
-          #info("Workspace ID: " & $decodedPollJwt["workspaceId"]) 
+          #info("Workspace ID: " & $decodedPollJwt["workspaceId"])
           info(userInfoStr)
           ret = apiJwtPayload
 
         elif responsePoll.status.startswith("428"):
           # sleep for requested polling period while showing spinner before polling again
-          
+
           # restart spinner animation - reset vars
           frameIndex     = 0
           framerate      = (pollInt * 1000) / frames.len
           totalSleepTime = 0.0
-          
+
           # display spinner one frame at a time until poll timeout exceeded
           while true:
             eraseLine()
@@ -657,8 +660,8 @@ proc attemptToGenKeys*(): bool =
       return false
     else:
       info("API Token received: " & apiToken)
-    
-  
+
+
   if getCosignLocation() == "":
     return false
 

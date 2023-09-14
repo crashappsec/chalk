@@ -1,7 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This is for any common code for system stuff, such as executing
 ## code.
-##
-## :Author: John Viega :Copyright: 2023, Crash Override, Inc.
 
 import  std/tempfiles, osproc, posix, config, subscan, nimutils/managedtmp,
         std/monotimes

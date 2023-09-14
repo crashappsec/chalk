@@ -1,12 +1,16 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## Chalk-specific functions exposable via con4m.  Currently, this
 ## consists of a call to get the chalk version, and then API calls for
 ## our logging system.
 ##
 ## Though, it might be a decent thing to push the logging stuff into
 ## con4m at some point, as long as it's all optional.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import config, reporting, sinks
 

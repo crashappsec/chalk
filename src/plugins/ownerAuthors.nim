@@ -1,7 +1,11 @@
-## Plugin that looks for an old school AUTHOR/AUTHORS file.
 ##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+## Plugin that looks for an old school AUTHOR/AUTHORS file.
 
 import ../config, ../plugin_api
 

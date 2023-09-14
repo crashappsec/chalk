@@ -1,8 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## Part of the base configuration.  See the comment at the top of
 ## `base_keyspecs.c4m`
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 ## The default sink implementations are currently in the nimutils
 ## library, except for 'custom', which is in output.nim.  That one
@@ -32,7 +36,7 @@ sink rotating_log {
   ~max:               true
   ~log_search_path:   false
   ~truncation_amount: false
-  ~on_write_msg:      false  
+  ~on_write_msg:      false
   doc:       "A truncating log file."
 }
 
@@ -42,7 +46,7 @@ sink s3 {
   ~uri:      true
   ~region:   false
   ~extra:    false
-  ~on_write_msg:    false  
+  ~on_write_msg:    false
   doc:       "A sink for S3 buckets"
 }
 
@@ -53,6 +57,6 @@ sink post {
   ~disallow_http:    false
   ~timeout:          false
   ~pinned_cert_file: false
-  ~on_write_msg:    false  
+  ~on_write_msg:    false
   doc:       "Generic HTTP/HTTPS post to a URL. Headers must be one per-line."
 }

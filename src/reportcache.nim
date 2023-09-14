@@ -1,3 +1,10 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This module implements report caching in the face of sink failures.
 ##
 ## If a sink fails, we stick an entry in the report cache, which is
@@ -14,9 +21,6 @@
 ## anything left in the cache, then we figure out whether any of the
 ## 'current' sinks need to catch up.  If so, we UNSUBSCRIBE them from
 ## the current topic, and re-subscribe them to a topic just for them.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2023, Crash Override, Inc.
 
 import std/tempfiles, config, sinks, util
 

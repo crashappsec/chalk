@@ -1,8 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## Handle JAR, WAR and other ZIP-based formats.  Works fine w/ JAR
 ## signing, because it only signs what's in the manifest.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2023, Crash Override, Inc.
 
 import zippy/ziparchives_v1, algorithm, ../config, ../chalkjson,
        ../util, ../subscan, ../plugin_api

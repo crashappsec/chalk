@@ -5,3 +5,28 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ["--maxkb=128"]
+
+  - repo: https://github.com/johann-petrak/licenseheaders
+    rev: 8e2d6f944aea639d62c8d26cd99dab4003c3904d
+    hooks:
+      - id: licenseheaders
+        name: chalkcopyright
+        args:
+          - --tmpl=.github/copyright.tmpl
+          - --current-year
+          # - --years=2022,2023
+          - --projname=Chalk
+          - --projurl=https://crashoverride.com/docs/chalk
+          - --additional-extensions
+          - script=.nim,.c4m,.c42spec,.bash
+          - robot=.py # native python each run adds another newline
+          - --files
+        files: \.(nim|c4m|c42spec|bash|py)$
+        # selfsigned is not our copyright
+        # data has test data for python encoding so we leave it alone
+        exclude: |
+          (?x)(
+            selfsigned.py|
+            defaultconfig.c4m|
+            data/.*
+          )$

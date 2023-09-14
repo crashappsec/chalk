@@ -1,3 +1,7 @@
+# Copyright (c) 2023, Crash Override, Inc.
+#
+# This file is part of Chalk
+# (see https://crashoverride.com/docs/chalk)
 CHALK_VERSION = "0.4.3"
 CHALK_TITLE = "Chalk v." + CHALK_VERSION + " Configuration Tool"
 

@@ -1,3 +1,10 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## Core JSON parsing library; we couldn't use the default NIM library
 ## because it requires we know up front where the end of our input
 ## is. But we don't know as there is no length encoding; we only find
@@ -5,9 +12,6 @@
 ##
 ## Additionally, any utilities around the Nim JSON (which we do use
 ## where possible), are here.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 when (NimMinor, NimPatch) >= (6, 14):
   {.warning[CastSizes]: off.}

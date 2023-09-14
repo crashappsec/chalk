@@ -1,7 +1,11 @@
-## Super cheezy plugin for MacOS. I can't believe this even worked.
 ##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+## Super cheezy plugin for MacOS. I can't believe this even worked.
 
 # We use slightly different magic for our heredoc. It's uppercase and longer.
 

@@ -1,8 +1,11 @@
-## Wrappers for more abstracted accessing of configuration information
 ##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
-#
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+## Wrappers for more abstracted accessing of configuration information
 
 import run_management
 export run_management

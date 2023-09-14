@@ -1,9 +1,13 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This codec is intended for handling interpreted languages that ship
 ## source code, including shell scripts. It considers the shebang line
 ## if any, and the file extension.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import ../config, ../plugin_api
 

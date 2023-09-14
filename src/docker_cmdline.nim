@@ -1,11 +1,15 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This module deals with extracting information we need from the
 ## docker command line. The command line is automatically parsed by
 ## con4m when we call processDockerCmdLine (the spec it uses to parse
 ## is in configs/dockercmd.c4m), so we really just need to look at
 ## the command and flag info returned.
-
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2023, Crash Override, Inc.
 
 import config
 

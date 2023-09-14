@@ -1,9 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This plugin is responsible for providing metadata gleaned from a
 ## Jenkins CI environment.
-##
-## :Author: Rich Smith (rich@crashoverride.com) heaviily based on
-## code by Miroslav Shubernetskiy (miroslav@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 
 import ../config, ../plugin_api

@@ -1,3 +1,10 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## This was our prototype for the ELF plugin. It takes advantage of
 ## the fact that you can always add garbage to the end on an ELF
 ## binary; it will never get used.
@@ -16,9 +23,6 @@
 ## This should *not* ever take higher priority than the proper ELF
 ## codec; doing so will break compatibility. The built-in
 ## configuration enforces this, but please don't ever change it!
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import  endians, ../config, ../util, ../plugin_api
 

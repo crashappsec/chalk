@@ -1,3 +1,7 @@
+# Copyright (c) 2023, Crash Override, Inc.
+#
+# This file is part of Chalk
+# (see https://crashoverride.com/docs/chalk)
 import shutil
 import sqlite3
 from contextlib import ExitStack, chdir, closing

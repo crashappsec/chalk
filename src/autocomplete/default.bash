@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 
 # Basic bash completion script. Con4m should start generating these.
 # Until then, maintain it manually.
-#
-# :Author: John Viega (john@crashoverride.com)
-# :Copyright: 2023, Crash Override, Inc.
 
 
 function _chalk_setup_either {

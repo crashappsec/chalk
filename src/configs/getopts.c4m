@@ -1,7 +1,11 @@
-# Spec for command line.
 ##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2023, Crash Override, Inc.
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+# Spec for command line.
 
 default_recursive_doc := """
 "Determines whether a file scan will recursively walk paths to find artifacts.
@@ -86,7 +90,7 @@ The reporting cache keeps a local copy of any reports made, to provide redundanc
     field_to_set: "report_total_time"
     doc: """
 Reports the total run time of the chalk executable in seconds.
-"""    
+"""
   }
 
   flag_yn use_embedded_config {
@@ -156,7 +160,7 @@ Skip publishing the command report (i.e., the PRIMARY report). NO output sinks w
 
 For most commands, this defeats the purpose of Chalk, so use it sparingly.
 
-Note that this doesn't turn off any custom reports; you have to disable those seprately.    
+Note that this doesn't turn off any custom reports; you have to disable those seprately.
 """
   }
 
@@ -164,7 +168,7 @@ Note that this doesn't turn off any custom reports; you have to disable those se
     field_to_set: "skip_summary_report"
     doc: """
 Whether to skip the summary report to the terminal.
-"""    
+"""
   }
 
   flag_choice symlink_behavior {
@@ -175,14 +179,14 @@ Whether to skip the summary report to the terminal.
     doc: """
 Chalk never follows directory links. When running non-chalking operations, chalk will read the file on the other end of the link, and report using the file name of the link.
 
-For insertion operations, Chalk will, out of the box, warn on symbolic links, without processing them. 
+For insertion operations, Chalk will, out of the box, warn on symbolic links, without processing them.
 
 This variable controls what happens in those cases:
 
 - <em>skip</em>   will not process files that are linked.
 - <em>clobber</em> will read the artifact on the other end of the link, and, if writing, try to replace the file being linked to.
 - <em>copy</em> will read the artifact on the other end of the link, and, if writing, will replace the link with a modified file, leaving the file on the other end of the link intact.
-"""    
+"""
   }
 
   flag_yn wrap {
@@ -199,7 +203,7 @@ If, when wrapping, your chalk binary is using an external
 configuration file, that file will NOT get used inside the
 container. The wrapped binary currently only uses the embedded
 configuration present in the binary at the time of the wrapping.
-"""    
+"""
   }
 
   command insert {
@@ -290,7 +294,7 @@ report.
 
     flag_yn search_layers {
       doc: """
-When a mark in an image can't be found, should we try to report on overwitten marks?      
+When a mark in an image can't be found, should we try to report on overwitten marks?
 """
       field_to_set: "extract.search_base_layers_for_marks"
     }
@@ -301,14 +305,14 @@ When a mark in an image can't be found, should we try to report on overwitten ma
 This command will look at any docker images available locally, attempting to find chalk marks in them.
 
 Note that this does not look through running containers; use 'chalk extract containers' or 'chalk extract all'.
-"""      
+"""
     }
 
     command containers {
       aliases: ["container", "con", "c"]
       doc: """
 This command will look at any docker containers available locally, attempting to find chalk marks in them.
-"""      
+"""
     }
 
     command all {
@@ -319,7 +323,7 @@ This command will look at any docker containers available locally, attempting to
 This command will attempt to extract chalk marks in all containers,
 container images for anything it can find on the local machine, AND will
 search the current working directory for chalk marks.
-"""      
+"""
     }
 }
 
@@ -388,14 +392,14 @@ When using the 'exec' command, this allows you to explicitly set the command to 
 When set to true, 'chalk exec' will leave chalk as the parent process (By default, the process to exec stays the parent, and chalk is forked off).
 
 This is most useful for short-lived processes, as it ensures chalk will complete any reporting.
-"""      
+"""
     }
 
     flag_yn heartbeat {
     field_to_set: "exec.heartbeat"
     doc: """
-When set to true, causes periodic reports to be run, past the initial one.    
-"""    
+When set to true, causes periodic reports to be run, past the initial one.
+"""
     }
 
     flag_arg artifact_profile {
@@ -476,7 +480,7 @@ When on, validate config files before loading them, by doing a trial run.
       field_to_set: "validation_warning"
       doc: """
 This verbose flag controls whether or not you get the verbose warning.  It's much better turning this off in your embedded configuration :)
-"""      
+"""
     }
   }
 
@@ -486,7 +490,7 @@ This verbose flag controls whether or not you get the verbose warning.  It's muc
 Outputs basic version information for the chalk binary.
 """
   }
-  
+
 #% INTERNAL
    command rawattrs {
      doc: """
@@ -499,7 +503,7 @@ Outputs basic version information for the chalk binary.
      Raw dump of the spec state.
      """
    }
-   
+
    command helpdump {
      doc: """
 Dumps documentation into a single JSON structure.  Currently, this only captures static structure, not configuration.
@@ -520,7 +524,7 @@ All arguments appearing after the word 'docker' are passed to docker.  No flags 
   }
 
   command setup {
-    arg_sub_mutex: false # should be the default?  
+    arg_sub_mutex: false # should be the default?
     doc: """
 Set up code signing / attestation.
 
@@ -549,14 +553,14 @@ Sets the location of the signing key file on local disk. This should
 point to the private key file and end in `.key`. The public key file
 must be in the same base location, with the same file name, except
 with `.pub` as the file extension.
-"""    
+"""
   }
 
   flag_yn api_login {
     field_to_set: "api_login"
     doc: """Skip login to API for secret manager"""
   }
-  
+
   command gen {
     doc: """
 Chalk will generate a new
@@ -592,9 +596,9 @@ been generated by chalk, and encrypted with a password.
 
 Pass `--store-password` to keep an encrypted copy of the password
 internally, per the `gen` command.
-"""    
+"""
   }
-  
+
   }
 
   command help {
@@ -616,16 +620,16 @@ You're living it!
       aliases:            ["keys", "k"]
       arg_sub_mutex: false # should be the default?
       doc: """
-Shows information about all chalk keys."      
-"""      
+Shows information about all chalk keys."
+"""
       args: (0, high())
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
         doc: """
-Shows con4m property documentation for key specifications.        
-"""        
+Shows con4m property documentation for key specifications.
+"""
       }
 
       command chalk {
@@ -633,38 +637,38 @@ Shows con4m property documentation for key specifications.
         args: (0, high())
         doc: """
 Filters keys to those that are chalkable artifact keys.
-"""        
+"""
       }
 
       command host {
         aliases: ["h"]
         args: (0, high())
         doc: """
-Filters keys to those that are chalkable host keys.        
-"""        
+Filters keys to those that are chalkable host keys.
+"""
       }
 
       command art {
         aliases: ["a", "artifact"]
         args: (0, high())
         doc: """
-Filters keys to those that are run-time artifact keys.        
-"""        
+Filters keys to those that are run-time artifact keys.
+"""
       }
 
       command report {
         aliases: ["r", "rep"]
         args: (0, high())
         doc: """
-Filters keys to those that are run-time host keys.        
-"""        
+Filters keys to those that are run-time host keys.
+"""
       }
 
       command search {
         aliases: ["s"]
         args: (1, high())
         doc: """
-Allows you to search for a specific pattern in key documentation, only returning keys that match the pattern.        
+Allows you to search for a specific pattern in key documentation, only returning keys that match the pattern.
         """
       }
   }
@@ -674,15 +678,15 @@ Allows you to search for a specific pattern in key documentation, only returning
       args: (0, high())
       arg_sub_mutex: false # should be the default?
       doc: """
-Provides overview documentation of the chalk config file's `keyspec` section type, which can be used to add new keys.      
-"""      
+Provides overview documentation of the chalk config file's `keyspec` section type, which can be used to add new keys.
+"""
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
         doc: """
 Shows the field properties for the chalk config file's `keyspec` section type.
-"""        
+"""
       }
     }
 
@@ -691,15 +695,15 @@ Shows the field properties for the chalk config file's `keyspec` section type.
       arg_sub_mutex: false # should be the default?
       args: (0, high())
       doc: """
-Provides overview documentation of the chalk config file's `profile` section type, which can be used to create new reporting profiles.      
-"""            
+Provides overview documentation of the chalk config file's `profile` section type, which can be used to create new reporting profiles.
+"""
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
         doc: """
 Shows the field properties for the chalk config file's `profile` section type.
-"""        
+"""
       }
     }
 
@@ -708,16 +712,16 @@ Shows the field properties for the chalk config file's `profile` section type.
       args: (0, high())
       arg_sub_mutex: false # should be the default?
       doc: """
-Provides overview documentation of the chalk config file's `tool` section type, which can be used to create new external tools.      
-"""            
-      
+Provides overview documentation of the chalk config file's `tool` section type, which can be used to create new external tools.
+"""
+
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
         doc: """
 Shows the field properties for the chalk config file's `tool` section type.
-"""        
+"""
       }
     }
 
@@ -727,14 +731,14 @@ Shows the field properties for the chalk config file's `tool` section type.
       args: (0, high())
       doc: """
 Provides overview documentation of the chalk config file's `plugin` section type, which are used to configure data collection modules (called plugins)
-"""            
+"""
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
         doc: """
 Shows the field properties for the chalk config file's `plugin` section type.
-"""                
+"""
       }
     }
 
@@ -744,14 +748,14 @@ Shows the field properties for the chalk config file's `plugin` section type.
       args: (0, high())
       doc: """
 Provides overview documentation of the chalk config file's `sink` section type, which is used to configure available output types.
-"""            
+"""
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
         doc: """
 Shows the field properties for the chalk config file's `sink` section type.
-"""        
+"""
       }
     }
 
@@ -761,14 +765,14 @@ Shows the field properties for the chalk config file's `sink` section type.
       args: (0, high())
       doc: """
 Provides overview documentation of the chalk config file's `outconf` section type, which can be used to map profiles to reports.
-"""            
+"""
 
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
         doc: """
 Shows the field properties for the chalk config file's `outconf` section type.
-"""        
+"""
       }
     }
 
@@ -777,14 +781,14 @@ Shows the field properties for the chalk config file's `outconf` section type.
       arg_sub_mutex: false
       args: (0, high())
       doc: """
-Provides overview documentation of the chalk config file's `custom_report` section type, which can be used to create new reports beyond the default command reporting..      
-"""            
+Provides overview documentation of the chalk config file's `custom_report` section type, which can be used to create new reports beyond the default command reporting..
+"""
       command props {
         aliases: ["properties", "p", "pr", "prop", "show"]
         args: (0, high())
         doc: """
 Shows the field properties for the chalk config file's `custom_report` section type.
-"""        
+"""
       }
     }
 
@@ -793,16 +797,16 @@ Shows the field properties for the chalk config file's `custom_report` section t
       arg_sub_mutex: false
       args: (0, high())
       doc: """
-Shows information about any SBOM tools configured, if any.      
-"""      
+Shows information about any SBOM tools configured, if any.
+"""
     }
 
     command sast {
       args: (0, high())
       arg_sub_mutex: false
       doc: """
-Shows information about any SAST tools configured, if any.      
-"""      
+Shows information about any SAST tools configured, if any.
+"""
     }
   }
 

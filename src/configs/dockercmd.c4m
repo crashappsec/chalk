@@ -1,8 +1,11 @@
-## Used to (liberally) parse the docker command line.
 ##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2023, Crash Override, Inc.
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
 
+## Used to (liberally) parse the docker command line.
 
 docker {
   getopts {
@@ -266,7 +269,7 @@ docker {
 
       flag_multi_arg output_type {
       }
-      
+
       flag_yn pull {
         yes_aliases: []
         no_aliases: []

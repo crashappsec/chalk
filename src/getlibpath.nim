@@ -1,7 +1,11 @@
-## Helper used in jtiso
 ##
-## :Author: Brandon Edwards (brandon@crashoverride.com)
-## :Copyright: 2023 Crash Override, Inc.
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+## Helper used in jtiso
 
 import os, strutils
 

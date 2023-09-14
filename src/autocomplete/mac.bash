@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
 
 function _chalk_setup_either {
             COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-profile --disable-profile --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --use-external-config --no-use-external-config --publish-defaults --no-publish-defaults --use-report-cache --no-use-report-cache --debug --no-debug --skip-command-report --no-skip-command-report --store-password --no-store-password --key-file" -- ${_CHALK_CUR_WORD}))

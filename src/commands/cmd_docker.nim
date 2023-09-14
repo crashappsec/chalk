@@ -1,3 +1,10 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## The `chalk docker` command logic.
 ##
 ## Whereas other commands use the `collect` module for their overall
@@ -14,9 +21,6 @@
 ##
 ## But when wrapping docker, this module does the bulk of the work and
 ## is responsible for all of the collection logic.
-##
-## :Author: John Viega, Theofilos Petsios
-## :Copyright: 2023, Crash Override, Inc.
 
 import posix, unicode, base64, ../config, ../collect, ../reporting,
        ../chalkjson, ../docker_cmdline, ../docker_base, ../subscan,

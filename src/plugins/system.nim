@@ -1,8 +1,12 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## The system plugin that runs FIRST.  Though, there's not really much
 ## that HAD to happen first.
-##
-## :Author: John Viega (john@crashoverride.com)
-## :Copyright: 2022, 2023, Crash Override, Inc.
 
 import std/monotimes, nativesockets, sequtils, times, ../config,
        ../plugin_api, ../normalize, ../chalkjson, ../selfextract,
