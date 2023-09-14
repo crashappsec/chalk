@@ -1,6 +1,13 @@
 BINARY=chalk
 CHALK_BUILD?=release
-_DOCKER=docker compose run --rm chalk
+
+# if CON4M_DEV exists, pass that to docker-compose
+# as docker-compose does not allow conditional env vars
+_DOCKER_ARGS=
+ifneq "$(shell echo $${CON4M_DEV+missing})" ""
+_DOCKER_ARGS=-e CON4M_DEV=true
+endif
+_DOCKER=docker compose run --rm $(_DOCKER_ARGS) chalk
 DOCKER?=$(_DOCKER)
 
 SOURCES=$(wildcard *.nims)

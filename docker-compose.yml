@@ -1,6 +1,3 @@
-volumes:
-  tmp:
-
 networks:
   chalk:
   imds:
@@ -23,6 +20,10 @@ services:
     working_dir: /chalk
     volumes:
       - .:/chalk/
+      - ../nimutils:/nimutils
+      - ../con4m:/con4m
+    # environment:
+    # CON4M_DEV is conditionally set in Makefile
 
   chalk-release:
     build:
@@ -156,7 +157,6 @@ services:
       - .:/chalk
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HOME}/.aws:/root/.aws
-      - tmp:/sys/class/dmi/id/
     working_dir: /chalk/tests
     networks:
       - chalk
