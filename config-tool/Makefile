@@ -4,7 +4,8 @@ SHELL=bash
 # this must match pyproject.toml name
 NAME=config-tool
 
-.PHONLY: config
+.PHONY: config
+
 config:
 	docker compose run --rm config
 

@@ -1,7 +1,15 @@
 FROM python:3.11.3-alpine3.17 as base
 
-# install system deps
+# install common system deps
 RUN apk add --no-cache git
+
+# M1-only deps to compile wheels on ARM
+RUN if uname -m | grep -Ei "arm|aarch"; then \
+    apk add --no-cache \
+    gcc \
+    libffi-dev \
+    libc-dev \
+    ; fi
 
 # https://github.com/actions/runner/issues/2033
 # This is needed because the container runs as a different user than likely

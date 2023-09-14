@@ -330,7 +330,7 @@ class DisplayQrCode(WizContainer):
     def compose(self):
         yield Container(
             self.qr_widget,
-            self.url_widget,  ## Add in URL that it represents
+            self.url_widget,  # Add in URL that it represents
         )
 
 

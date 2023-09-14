@@ -545,12 +545,12 @@ class QrCode(Static):
 
 class C0ApiToggle(Switch):
     def on_switch_changed(self):
-        ##Based on switch position......
+        # Based on switch position......
         if self.value:
-            ##Enable the inline login button
+            # Enable the inline login button
             get_wizard().query_one("#wiz_login_button").disabled = False
 
-            ##Disable the Next button if we are not yet authenticated and wanting to use the API
+            # Disable the Next button if we are not yet authenticated and wanting to use the API
             if (
                 not get_app().login_widget.authenticated == True
                 and get_wizard().current_panel == get_wizard().panels[1]
