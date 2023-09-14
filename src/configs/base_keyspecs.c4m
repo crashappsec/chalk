@@ -3711,6 +3711,18 @@ Also necessary for attestations.
 """
 }
 
+keyspec $CHALK_API_KEY {
+   required_in_self_mark:  true
+   kind:                   ChalkTimeArtifact
+   type:                   string
+   standard:               true
+   system:                 true
+   since:                  "0.1.3"
+   doc:                    """
+API key used to optionally save/load attestation keys to cloud.
+"""
+}
+
 keyspec $CHALK_ATTESTATION_TOKEN {
    required_in_self_mark:  true
    kind:                   ChalkTimeArtifact

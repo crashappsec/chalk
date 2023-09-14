@@ -1996,6 +1996,15 @@ Chalk will also embed the keypairs internally, for future operations.
 """
 }
 
+  field api_login {
+    type:     bool
+    default:  true
+    shortdoc: "Skip API login"
+    doc: """
+Skip login to API for secret manager
+"""
+  }
+
   field ignore_patterns {
     type:     list[string]
     default:  [".*/**", "*.txt", "*.json"]

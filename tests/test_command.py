@@ -178,7 +178,9 @@ def test_setup(chalk_copy: Chalk):
     """
     needs to display password, and public and private key info in chalk
     """
-    result = chalk_copy.run(command="setup", log_level="error")
+    result = chalk_copy.run(
+        command="setup", params=["--no-api-login"], log_level="error"
+    )
 
     report = result.report
     assert report["_OPERATION"] == "setup"

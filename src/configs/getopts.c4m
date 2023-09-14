@@ -551,6 +551,11 @@ must be in the same base location, with the same file name, except
 with `.pub` as the file extension.
 """    
   }
+
+  flag_yn api_login {
+    field_to_set: "api_login"
+    doc: """Skip login to API for secret manager"""
+  }
   
   command gen {
     doc: """

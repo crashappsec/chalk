@@ -1,7 +1,7 @@
 ## :Author: Theofilos Petsios
 ## :Copyright: 2023, Crash Override, Inc.
 
-import base64, config, selfextract, chalkjson, httpclient, net, uri
+import base64, chalkjson, config, httpclient, net, os, QRgen, selfextract, terminal, uri
 
 type ValidateResult* = enum
   vOk, vSignedOk, vBadMd, vNoCosign, vBadSig, vNoHash, vNoPk
@@ -97,7 +97,7 @@ generate_keypair(char **s1, char **s2) {
 ## not finished enough to replace what we already have.
 
 
-template callTheSecretService(base: string, prKey: string, bodytxt: untyped,
+template callTheSecretService(base: string, prKey: string, apiToken: string, bodytxt: untyped,
                               mth: untyped): Response =
   let
     timeout:  int    = cast[int](chalkConfig.getSecretManagerTimeout())
@@ -127,11 +127,15 @@ template callTheSecretService(base: string, prKey: string, bodytxt: untyped,
   else:
     client  = newHttpClient(timeout = timeout)
 
+  # add in API token obtained via user login process if set
+  if apiToken != "":
+    client.headers = newHttpHeaders({"Authorization": "Bearer " & $apiToken})
+
   response  = client.request(url = uri, httpMethod = mth, body = bodytxt)
   client.close()
   response
 
-proc saveToSecretManager*(content: string, prkey: string): bool =
+proc saveToSecretManager*(content: string, prkey: string, apiToken: string): bool =
   var
     nonce:    string
     response: Response
@@ -145,7 +149,7 @@ proc saveToSecretManager*(content: string, prkey: string): bool =
     return false
 
   let body = nonce.hex() & ct.hex()
-  response = callTheSecretService(base, prkey, body, HttpPut)
+  response = callTheSecretService(base, prkey, apiToken, body, HttpPut)
 
   trace("Sending encrypted secret: " & body)
   if response.status.startswith("405"):
@@ -157,7 +161,7 @@ proc saveToSecretManager*(content: string, prkey: string): bool =
     info("Successfully stored secret.")
   return true
 
-proc loadFromSecretManager*(prkey: string): bool =
+proc loadFromSecretManager*(prkey: string, apikey: string): bool =
 
   if cosignPw != "":
     return true
@@ -165,10 +169,10 @@ proc loadFromSecretManager*(prkey: string): bool =
   let
     base: string = chalkConfig.getSecretManagerUrl()
 
-  if len(base) == 0 or prkey == "":
+  if len(base) == 0 or prkey == "" or apikey == "":
     return false
 
-  let response = callTheSecretService(base, prKey, "", HttpGet)
+  let response = callTheSecretService(base, prKey, apikey, "", HttpGet)
 
   if response.status[0] != '2':
     warn("Could not retrieve signing secret: " & response.status & "\n" &
@@ -265,14 +269,14 @@ proc generateKeyMaterial*(cosign: string): bool =
   else:
     return true
 
-proc commitPassword(pri: string, gen: bool) =
+proc commitPassword(pri, apiToken: string, gen: bool) =
   var
     storeIt = chalkConfig.getUseSecretManager()
     printIt = not storeIt
 
   if storeIt:
     # If the manager doesn't work, then we need to fall back.
-    if not cosignPw.saveToSecretManager(pri):
+    if not cosignPw.saveToSecretManager(pri, apiToken):
       error("Could not store password. Either try again later, or " &
         "use the below password with the CHALK_PASSWORD environment " &
         "variable. We attempt to store as long as use_secret_manager is " &
@@ -297,7 +301,6 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
   var
     prikey = optfile
 
-
   if existsEnv("CHALK_PASSWORD"):
     cosignPw = getEnv("CHALK_PASSWORD")
     delEnv("CHALK_PASSWORD")
@@ -316,9 +319,20 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
     if prikey == "":
       return false
 
-  if loadFromSecretManager(prikey):
-    return true
+  # get API key to pass to secret manager
+  let boxedOptApi = selfChalkGetKey("$CHALK_API_KEY")
+  if boxedOptApi.isSome():
+    let
+       boxedApi = boxedOptApi.get()
+       apikey   = unpack[string](boxedApi)
+    info("API token retrieved from chalk mark: " & $apikey)
+    if loadFromSecretManager(prikey, apikey):
+      return true
+    else:
+      error("Could not retrieve secret from API")
+      return false 
 
+  error("Could not retrieve API token from chalk mark")
   return false
 
 proc testSigningSetup(pubKey, priKey: string): bool =
@@ -365,13 +379,14 @@ proc testSigningSetup(pubKey, priKey: string): bool =
 
 proc writeSelfConfig(selfChalk: ChalkObj): bool {.importc, discardable.}
 
-proc saveSigningSetup(pubKey, priKey: string, gen: bool): bool =
+proc saveSigningSetup(pubKey, priKey, apiToken: string, gen: bool): bool =
   let selfChalk = getSelfExtraction().get()
 
   selfChalk.extract["$CHALK_ENCRYPTED_PRIVATE_KEY"] = pack(priKey)
   selfChalk.extract["$CHALK_PUBLIC_KEY"]            = pack(pubKey)
+  selfChalk.extract["$CHALK_API_KEY"]               = pack(apiToken)
 
-  commitPassword(prikey, gen)
+  commitPassword(prikey, apiToken, gen)
 
   when false:
     # This is old code, but it might make a comeback at some point,
@@ -473,9 +488,177 @@ proc attemptToLoadKeys*(silent=false): bool =
     return false
 
   cosignLoaded = true
-  return saveSigningSetup(pubKey, priKey, false)
+  return saveSigningSetup(pubKey, priKey, "", false)
+
+template jwtSplitAndDecode(jwtString: string, doDecode: bool): string = 
+  # this is pretty crude in terms of JWT structure validation to say the least
+  let parts = split(jwtString, '.')
+  if len(parts) != 3:
+    raise newException(Exception, "Invalid JWT format")
+  let apiJwtPayload = parts[1]
+  if doDecode:
+    let decodedApiJwt = decode(apiJwtPayload)
+    $decodedApiJwt
+  else:
+    $apiJwtPayload
+
+proc getChalkApiToken(): string =
+  var
+    apiJwtPayload:     string 
+    authId:            string
+    authnSuccess:      bool   = false
+    authnFailure:      bool   = false
+    authUrl:           string
+    client:            HttpClient
+    clientPoll:        HttpClient
+    context:           SslContext
+    contextPoll:       SslContext
+    frameIndex:        int    = 0
+    framerate:         float
+    jwtString:         string
+    pollPayloadBase64: string
+    pollUri:           Uri
+    pollUrl:           string
+    pollInt:           int 
+    response:          Response
+    responsePoll:      Response
+    ret:               string = ""
+    token:             string
+    totalSleepTime:    float  = 0.0
+  type 
+    frameList = array[8, string]
+  let
+    frames: frameList = [
+          "[    ]",
+          "[   =]",
+          "[  ==]",
+          "[ ===]",
+          "[====]",
+          "[=== ]",
+          "[==  ]",
+          "[=   ]",
+          ]
+    failFr: string = "[☠☠☠☠]"
+    succFr: string = "[❤❤❤❤]"
+    timeout: int = cast[int](chalkConfig.getSecretManagerTimeout())
+    uri:     Uri = parseUri("https://chalk.crashoverride.run/v0.1/auth/code")
+
+  # request auth code from API
+  info("Requesting Chalk authentication code from " & $uri)
+  if uri.scheme == "https":
+    context = newContext(verifyMode = CVerifyPeer)
+    client  = newHttpClient(sslContext = context, timeout = timeout)
+  else:
+    client  = newHttpClient(timeout = timeout)
+  response  = client.request(url = uri, httpMethod = HttpPost, body = "")
+  client.close()
+
+  if response.status.startswith("200"):
+    # parse json response and save / return values
+    let jsonNode = parseJson(response.body())
+    authId  = jsonNode["id"].getStr()
+    authUrl = jsonNode["authUrl"].getStr()
+    pollUrl = jsonNode["pollUrl"].getStr()
+    pollInt = jsonNode["pollIntervalSeconds"].getInt()
+
+    # check JWT structure
+    jwtString = $pollUrl.split("=")[1]
+    apiJwtPayload = jwtSplitAndDecode(jwtString, false)
+
+    # show user url to authentication against + qr code
+    print("<h2>To login please follow this link in a browser:</h2>\n\n\t" & $authUrl & "\n")
+    print("<h2>Or, use this QR code to login with your smart phone:</h2>")
+    let authnQR = newQR($authUrl)
+    authnQR.printTerminal
+
+    # sit in sync loop polling the URL to see if user has authenticated
+    print("<h2>Waiting for authentication to complete...</h2>\n")
+    while not authnSuccess and not authnFailure:
+        # poll the API to see if login succeeded
+        pollUri = parseUri($pollUrl)
+        if pollUri.scheme == "https":
+          contextPoll = newContext(verifyMode = CVerifyPeer)
+          clientPoll  = newHttpClient(sslContext = contextPoll, timeout = timeout)
+        else:
+          clientPoll  = newHttpClient(timeout = timeout)
+        
+        responsePoll  = clientPoll.request(url = pollUri, httpMethod = HttpGet, body = "")
+        clientPoll.close()
+
+        # check response - HTTP 200 = yes, HTTP 428 = Not yet
+        if responsePoll.status.startswith("200"):
+          authnSuccess = true
+          eraseLine()
+          stdout.write(succFr)
+          stdout.flushFile()
+          print("<h5>Authentication successful!</h5>\n")
+
+          # parse json response and save / return values()
+          let jsonPollNode = parseJson(responsePoll.body())
+          let userDict     = jsonPollNode["user"].getFields()
+          token            = jsonPollNode["token"].getStr()
+          trace($jsonPollNode)
+
+          # decode JWT
+          pollPayloadBase64 = jwtSplitAndDecode($token, true)
+          let decodedPollJwt    = parseJson(pollPayloadBase64)
+
+          var userInfoStr = ""
+          userInfoStr &= "User: " & $userDict["name"] & "\n"
+          userInfoStr &= "       Email: " & $userDict["email"]
+          #info("Workspace ID: " & $decodedPollJwt["workspaceId"]) 
+          info(userInfoStr)
+          ret = apiJwtPayload
+
+        elif responsePoll.status.startswith("428"):
+          # sleep for requested polling period while showing spinner before polling again
+          
+          # restart spinner animation - reset vars
+          frameIndex     = 0
+          framerate      = (pollInt * 1000) / frames.len
+          totalSleepTime = 0.0
+          
+          # display spinner one frame at a time until poll timeout exceeded
+          while true:
+            eraseLine()
+            stdout.write(frames[frameIndex])
+            stdout.flushFile()
+            frameIndex = (frameIndex + 1) mod frames.len
+            sleep(int(framerate))
+            totalSleepTime += framerate
+            if totalSleepTime >= float(pollInt * 1000):
+              break
+        else:
+          authnFailure = true
+          eraseLine()
+          stdout.write(failFr)
+          stdout.flushFile()
+          print("<h4>Authentication failed\n</h4>")
+          error("Unhandled HTTP Error when polling authentication status. Aborting")
+          break
+
+  else:
+    authnFailure = true
+    eraseLine()
+    stdout.write(failFr)
+    stdout.flushFile()
+    echo "\n"
+    error("Unhandled HTTP Error when getting authntication code. Aborting")
+
+  return ret
 
 proc attemptToGenKeys*(): bool =
+  var apiToken = ""
+  let use_api = chalkConfig.getApiLogin()
+  info($use_api)
+  if use_api:
+    apiToken = getChalkApiToken()
+    if apiToken == "":
+      return false
+    else:
+      info("API Token received: " & apiToken)
+    
+  
   if getCosignLocation() == "":
     return false
 
@@ -506,7 +689,10 @@ proc attemptToGenKeys*(): bool =
     copyGeneratedKeys(pubKey, priKey, keyOutLoc)
     cosignLoaded = true
 
-    result = saveSigningSetup(pubKey, priKey, true)
+    if use_api:
+      result = saveSigningSetup(pubKey, priKey, apiToken, true)
+    else:
+      result = saveSigningSetup(pubKey, priKey, "", true)
 
 proc canAttest*(): bool =
   if getCosignLocation() == "":
