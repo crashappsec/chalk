@@ -148,6 +148,24 @@ services:
       imds:
         ipv4_address: 169.254.169.254
 
+  # simple server for serving static files
+  static:
+    build:
+      context: ./tests
+    entrypoint: python
+    command: -m http.server 8000
+    working_dir: /chalk/tests
+    volumes:
+      - .:/chalk
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - sh -c "curl -f http://localhost:8000/conftest.py"
+      start_period: 10s
+      interval: 1s
+    networks:
+      chalk:
+
   tests:
     image: chalk_local_tests
     container_name: chalk_local_tests
@@ -169,6 +187,8 @@ services:
       server-tls:
         condition: service_healthy
       imds:
+        condition: service_healthy
+      static:
         condition: service_healthy
     environment:
       AWS_PROFILE: ${AWS_PROFILE:-}

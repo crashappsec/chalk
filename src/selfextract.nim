@@ -7,7 +7,7 @@
 
 ## Code specific to reading and writing Chalk's own chalk mark.
 
-import config, plugin_api, posix, collect, con4mfuncs, chalkjson, util
+import config, httpclient, plugin_api, posix, collect, con4mfuncs, chalkjson, util, uri
 
 proc handleSelfChalkWarnings*() =
   if not canSelfInject:
@@ -156,22 +156,42 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
   return true
 
 template loadConfigFile*(filename: string) =
-    let f = newFileStream(resolvePath(filename))
-    if f == nil:
-      cantLoad(filename & ": could not open configuration file")
-    try:
-      newCon4m = f.readAll()
-      f.close()
-      if selfChalk.extract != nil:
-        # Overwrite what we extracted, as it'll get "preserved" when
-        # writing out the chalk file.
-        selfChalk.extract["$CHALK_CONFIG"] = pack(newCon4m)
-      else:
-        selfChalk.collectedData["$CHALK_CONFIG"] = pack(newCon4m)
+  let f = newFileStream(resolvePath(filename))
+  if f == nil:
+    cantLoad(filename & ": could not open configuration file")
+  loadConfigStream(filename, f)
 
-    except:
-      dumpExOnDebug()
-      cantLoad(filename & ": could not read configuration file")
+template loadConfigUrl*(url: string) =
+  let uri = parseUri(url)
+  var stream: Stream
+  try:
+    let
+      client   = newHttpClient(timeout = 5000) # 5 seconds
+      response = client.request(uri)
+    stream = response.bodyStream
+
+  except:
+    dumpExOnDebug()
+    cantLoad(url & ": could not request configuration")
+
+  loadConfigStream(url, stream)
+
+template loadConfigStream*(name: string, stream: Stream) =
+  try:
+    newCon4m = stream.readAll()
+    if selfChalk.extract != nil:
+      # Overwrite what we extracted, as it'll get "preserved" when
+      # writing out the chalk file.
+      selfChalk.extract["$CHALK_CONFIG"] = pack(newCon4m)
+    else:
+      selfChalk.collectedData["$CHALK_CONFIG"] = pack(newCon4m)
+
+  except:
+    dumpExOnDebug()
+    cantLoad(name & ": could not read configuration")
+
+  finally:
+    stream.close()
 
 template testConfigFile*(filename: string, newCon4m: string) =
   info(filename & ": Validating configuration.")

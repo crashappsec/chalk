@@ -30,6 +30,7 @@ BASE_OUTCONF = ROOT.parent / "src" / "configs" / "base_outconf.c4m"
 REGISTRY = "localhost:5044"
 
 SERVER_IMDS = "http://169.254.169.254"
+SERVER_STATIC = "http://static:8000"
 SERVER_HTTP = "http://chalk.local:8585"
 SERVER_HTTPS = "https://tls.chalk.local:5858"
 SERVER_DB = (Path(__file__).parent.parent / "server" / "chalkdb.sqlite").resolve()

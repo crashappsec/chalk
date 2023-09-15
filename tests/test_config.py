@@ -105,7 +105,7 @@ def test_valid_load(
     chalk_copy: Chalk, test_config_file: str, expected_error: str, use_embedded: bool
 ):
     # call chalk load on valid config
-    chalk_copy.load(CONFIGS / test_config_file, use_embedded)
+    chalk_copy.load(CONFIGS / test_config_file, use_embedded=use_embedded)
 
     # extract should succeed, but the error we put in should show up
     extract = chalk_copy.extract(chalk_copy.binary, ignore_errors=True)
@@ -121,6 +121,20 @@ def test_valid_load(
                     "report has unexpected errors", errors=report["_OP_ERRORS"]
                 )
             assert "_OP_ERRORS" not in report
+
+
+@pytest.mark.parametrize(
+    "path, expected_success",
+    [
+        ("data/configs/validation/valid_1.conf", True),
+        ("data/configs/validation/invalid_1.conf", False),
+        ("nonexisting", False),
+    ],
+)
+def test_load_url(
+    chalk_copy: Chalk, server_static: str, path: str, expected_success: bool
+):
+    chalk_copy.load(f"{server_static}/{path}", expected_success=expected_success)
 
 
 # tests for configs that are found in the chalk search path
@@ -402,7 +416,7 @@ def test_profiles(
     configs = merged_configs(CONFIGS / test_config_file)
 
     # call chalk load on test config
-    chalk_copy.load(CONFIGS / test_config_file, use_embedded)
+    chalk_copy.load(CONFIGS / test_config_file, use_embedded=use_embedded)
 
     # insert report should have keys listed
     insert = chalk_copy.insert(bin_path)

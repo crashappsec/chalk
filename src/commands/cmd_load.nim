@@ -41,7 +41,12 @@ proc runCmdConfLoad*() =
       selfChalk.collectedData.del("$CHALK_CONFIG")
       info("Installing the default configuration file.")
   else:
-    loadConfigFile(filename)
+    if filename.startswith("http://") or filename.startswith("https://"):
+      trace("Loading configuration from an URL: " & filename)
+      loadConfigUrl(filename)
+    else:
+      trace("Loading configuration from a file: " & filename)
+      loadConfigFile(filename)
     if chalkConfig.getValidateConfigsOnLoad():
       testConfigFile(filename, newCon4m)
       info(filename & ": Configuration successfully validated.")

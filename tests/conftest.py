@@ -16,7 +16,14 @@ import requests
 from filelock import FileLock
 
 from .chalk.runner import Chalk
-from .conf import SERVER_CERT, SERVER_DB, SERVER_HTTP, SERVER_HTTPS, SERVER_IMDS
+from .conf import (
+    SERVER_CERT,
+    SERVER_DB,
+    SERVER_HTTP,
+    SERVER_HTTPS,
+    SERVER_IMDS,
+    SERVER_STATIC,
+)
 from .utils.log import get_logger
 
 
@@ -199,3 +206,10 @@ def server_imds():
     if not is_server_up(f"{SERVER_IMDS}/health"):
         pytest.skip(f"{SERVER_IMDS} is down. skipping test")
     return SERVER_IMDS
+
+
+@pytest.fixture()
+def server_static():
+    if not is_server_up(f"{SERVER_STATIC}/conftest.py"):
+        pytest.skip(f"{SERVER_STATIC} is down. skipping test")
+    return SERVER_STATIC

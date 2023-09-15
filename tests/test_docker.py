@@ -226,7 +226,7 @@ def test_nonvirtual_invalid(chalk: Chalk, test_file: str, random_hex: str):
 @pytest.mark.slow()
 def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
     tag = f"test_image_{random_hex}"
-    chalk_copy.load(CONFIGS / "docker_heartbeat.conf", False)
+    chalk_copy.load(CONFIGS / "docker_heartbeat.conf", use_embedded=False)
 
     # build dockerfile with chalk docker entrypoint wrapping
     chalk_copy.docker_build(

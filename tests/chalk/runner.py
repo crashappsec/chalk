@@ -181,7 +181,7 @@ class Chalk:
         *,
         command: Optional[ChalkCommand] = None,
         target: Optional[Path | str] = None,
-        config: Optional[Path] = None,
+        config: Optional[Path | str] = None,
         use_embedded: bool = True,
         virtual: bool = False,
         debug: bool = False,
@@ -205,7 +205,8 @@ class Chalk:
         if virtual:
             cmd += ["--virtual"]
         if config:
-            cmd += [f"--config-file={config.absolute()}"]
+            absolute = config.absolute() if isinstance(config, Path) else config
+            cmd += [f"--config-file={absolute}"]
             if use_embedded:
                 cmd += ["--use-embedded-config"]
             else:
@@ -317,8 +318,9 @@ class Chalk:
 
     def load(
         self,
-        config: Path,
-        use_embedded: bool,
+        config: Path | str,
+        *,
+        use_embedded: bool = False,
         expected_success: bool = True,
         ignore_errors: bool = False,
     ) -> ChalkProgram:
