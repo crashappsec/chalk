@@ -21,12 +21,20 @@ RUN apt-get update -y && \
         && \
     apt-get clean -y
 
-WORKDIR /tmp
-ARG CON4M_BRANCH=main
-RUN git clone https://github.com/crashappsec/con4m -b $CON4M_BRANCH
-
 WORKDIR /tmp/con4m
-RUN nimble install
+
+# note this is not copied from nimble file on purpose
+# as static libs take a while to build so we want to cache
+# even when versions change
+ARG CON4M_VERSION=v0.1.1
+# for testing if we want to build on top of con4m branch
+# we can set this arg
+ARG CON4M_BRANCH=
+
+RUN set -x && \
+    git clone https://github.com/crashappsec/con4m . && \
+    git checkout ${CON4M_BRANCH:-${CON4M_VERSION}} && \
+    nimble install
 
 # -------------------------------------------------------------------
 

@@ -72,8 +72,7 @@ var
   default  = getEnvDir("HOME") & ".local/c0"
   localDir = getEnvDir("LOCAL_INSTALL_DIR", default)
   libDir   = localdir & "libs"
-  libs     = ["pcre", "ssl", "crypto", "cmark-gfm", "cmark-gfm-extensions",
-              "gumbo"]
+  libs     = ["pcre", "ssl", "crypto", "gumbo"]
 
 when defined(linux):
   var
