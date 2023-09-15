@@ -20,7 +20,7 @@ from .chalk.validate import (
     validate_extracted_chalk,
     validate_virtual_chalk,
 )
-from .conf import DATE_PATH, LS_PATH
+from .conf import CONFIGS, DATE_PATH, LS_PATH
 from .utils.log import get_logger
 from .utils.os import run
 
@@ -182,7 +182,12 @@ def test_setup(chalk_copy: Chalk):
     needs to display password, and public and private key info in chalk
     """
     # API login requires interactive session to login via UI
-    result = chalk_copy.run(command="setup", no_api_login=True, log_level="error")
+    result = chalk_copy.run(
+        command="setup",
+        no_api_login=True,
+        log_level="error",
+        config=CONFIGS / "nosecretmanager.conf",
+    )
 
     report = result.report
     assert report["_OPERATION"] == "setup"
