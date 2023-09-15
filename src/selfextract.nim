@@ -7,7 +7,7 @@
 
 ## Code specific to reading and writing Chalk's own chalk mark.
 
-import config, httpclient, plugin_api, posix, collect, con4mfuncs, chalkjson, util, uri
+import config, httpclient, plugin_api, posix, collect, con4mfuncs, chalkjson, util, uri, nimutils/sinks
 
 proc handleSelfChalkWarnings*() =
   if not canSelfInject:
@@ -167,7 +167,7 @@ template loadConfigUrl*(url: string) =
   try:
     let
       client   = newHttpClient(timeout = 5000) # 5 seconds
-      response = client.request(uri)
+      response = client.safeRequest(uri)
     stream = response.bodyStream
 
   except:

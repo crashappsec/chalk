@@ -4,7 +4,7 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import base64, chalkjson, config, httpclient, net, os, QRgen, selfextract, terminal, uri
+import base64, chalkjson, config, httpclient, net, os, QRgen, selfextract, terminal, uri, nimutils/sinks
 
 type ValidateResult* = enum
   vOk, vSignedOk, vBadMd, vNoCosign, vBadSig, vNoHash, vNoPk
@@ -134,7 +134,7 @@ template callTheSecretService(base: string, prKey: string, apiToken: string, bod
   if apiToken != "":
     client.headers = newHttpHeaders({"Authorization": "Bearer " & $apiToken})
 
-  response  = client.request(url = uri, httpMethod = mth, body = bodytxt)
+  response  = client.safeRequest(url = uri, httpMethod = mth, body = bodytxt)
   client.close()
   response
 
@@ -553,7 +553,7 @@ proc getChalkApiToken(): string =
     client  = newHttpClient(sslContext = context, timeout = timeout)
   else:
     client  = newHttpClient(timeout = timeout)
-  response  = client.request(url = uri, httpMethod = HttpPost, body = "")
+  response  = client.safeRequest(url = uri, httpMethod = HttpPost, body = "")
   client.close()
 
   if response.status.startswith("200"):
@@ -585,7 +585,7 @@ proc getChalkApiToken(): string =
         else:
           clientPoll  = newHttpClient(timeout = timeout)
 
-        responsePoll  = clientPoll.request(url = pollUri, httpMethod = HttpGet, body = "")
+        responsePoll  = clientPoll.safeRequest(url = pollUri, httpMethod = HttpGet, body = "")
         clientPoll.close()
 
         # check response - HTTP 200 = yes, HTTP 428 = Not yet

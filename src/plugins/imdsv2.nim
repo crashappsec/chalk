@@ -9,6 +9,7 @@
 
 import httpclient, net, uri
 import std/strutils, std/json
+import nimutils/sinks
 import ../config, ../plugin_api, ../chalkjson, ./procfs
 
 const
@@ -23,7 +24,7 @@ proc getAwsToken(): Option[string] =
     uri      = parseURI(baseUri & "api/token")
     hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
     client   = newHttpClient(timeout = 250) # 1/4 of a second
-    response = client.request(url = uri, httpMethod = HttpPut, headers = hdrs)
+    response = client.safeRequest(url = uri, httpMethod = HttpPut, headers = hdrs)
 
   if response.status[0] != '2':
     trace("Could not retrieve IMDSv2 token from: " & $uri)
@@ -37,7 +38,7 @@ proc hitAwsEndpoint(path: string, token: string): Option[string] =
     uri      = parseUri(path)
     hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
     client   = newHttpClient(timeout = 250) # 1/4 of a second
-    response = client.request(url = uri, httpMethod = HttpGet, headers = hdrs)
+    response = client.safeRequest(url = uri, httpMethod = HttpGet, headers = hdrs)
 
   if response.status[0] != '2':
     trace("With valid IMDSv2 token, could not retrieve metadata from: " & $uri)
