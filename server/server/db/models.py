@@ -9,21 +9,22 @@ from .database import Base
 
 class Chalk(Base):
     __tablename__ = "chalks"
+
     metadata_id = Column(String, primary_key=True, index=True)
     metadata_hash = Column(String)
-    id = Column(String)
+    chalk_id = Column(String)
     raw = Column(JSON)
-    # TODO fill out rest
 
 
-class Exec(Base):
-    __tablename__ = "execs"
+class Report(Base):
+    __tablename__ = "reports"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
+    operation = Column(String)  # exec, heartbeat
     raw = Column(JSON)
-    # TODO fill out rest
 
 
-class Stats(Base):
+class Stat(Base):
     __tablename__ = "stats"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

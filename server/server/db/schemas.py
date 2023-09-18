@@ -2,26 +2,7 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-from datetime import datetime
-
-from pydantic import BaseModel, Field, Json
-
-
-class Exec(BaseModel):
-    raw: Json
-
-    class Config:
-        orm_mode = True
-
-
-class Chalk(BaseModel):
-    id: str
-    metadata_hash: str
-    metadata_id: str
-    raw: Json
-
-    class Config:
-        orm_mode = True
+from pydantic import BaseModel, Field
 
 
 class Stat(BaseModel):
@@ -33,5 +14,4 @@ class Stat(BaseModel):
     op_platform: str = Field(alias="_OP_PLATFORM")
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        populate_by_name = True
