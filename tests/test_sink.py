@@ -195,7 +195,7 @@ def _test_server(
     server_sql: Callable[[str], str | None],
     verify: str | None,
 ):
-    initial_chalks_count = int(server_sql("SELECT count(id) FROM chalks") or 0)
+    initial_chalks_count = int(server_sql("SELECT count(*) FROM chalks") or 0)
 
     # post url must be set
     assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
@@ -212,10 +212,10 @@ def _test_server(
     metadata_id = proc.mark["METADATA_ID"]
     assert metadata_id, "metadata id for created chalk not found in stderr"
 
-    db_id = server_sql(f"SELECT id FROM chalks WHERE metadata_id='{metadata_id}'")
+    db_id = server_sql(f"SELECT chalk_id FROM chalks WHERE metadata_id='{metadata_id}'")
     assert db_id is not None
 
-    chalks_count = int(server_sql("SELECT count(id) FROM chalks") or 0)
+    chalks_count = int(server_sql("SELECT count(*) FROM chalks") or 0)
     # tests can run in parallel so we cant know exact number except it has to be higher
     assert chalks_count > initial_chalks_count
 
