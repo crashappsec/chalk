@@ -732,6 +732,10 @@ proc insertChalkSection*(self: ElfFile, name: string, data: string): bool =
   var stringTableData  = self.fileData[stringTableOffset ..<
                                        stringTableOffset + stringTableSize]
 
+  # save the old string table offset, which we'll need to use a few lines down,
+  # the explanation for which is given when we use it
+  let originalStringTableOffset = stringTableOffset
+
   # now calculate the new offset for the string data to be after chalk section
   stringTableOffset    = chalkSectionOffset + dataLen
   # align the string section offset and stored data
@@ -757,6 +761,15 @@ proc insertChalkSection*(self: ElfFile, name: string, data: string): bool =
   # we make a copy of the data and calculate the new offset + padding
   var sectionTableData = self.fileData[sectionTableOffset ..<
                                        sectionTableOffset + sectionTableSize]
+
+  # Before we calculate the new offset and padding, write back the original
+  # string table offset to its original location: this is to leave the original
+  # contents intact for the case that the string table was earlier in the file
+  # (vs being the last section, which is most common but not always). The reason
+  # is to avoid disrupting potentially jettisoned data which remains and impacts
+  # the prechalked hash
+  self.setElfIntValue(stringHeader.offset, originalStringTableOffset)
+
   sectionTableOffset   = stringTableOffset + stringTableSize
   alignmentNeeded      = pad8(sectionTableOffset)
   sectionTableOffset  += alignmentNeeded
