@@ -19,6 +19,7 @@
 # Default fields skip (i.e., value for skip by default is true)
 # But we list them all here to make it easier to cut, paste and change.
 profile chalk_large {
+  shortdoc: "Use to add most plausable content to a chalk mark."
   doc: """
   This profile is intended to be used for chalking artifacts, when you
   want to put pretty much all available metadata into a chalk mark.
@@ -97,6 +98,7 @@ profile chalk_large {
 }
 
 profile chalk_default {
+  shortdoc: "Default items added to a chalk mark."
   doc: """
   The default values for what goes into chalk marks when using the
   'insert' and 'docker' commands shipped with Chalk.  This only turns on
@@ -146,6 +148,7 @@ profile chalk_default {
 # This is the same as the `chalk_default` profile, except the first three
 # keys are off.
 profile chalk_reproducable {
+  shortdoc: "Use for adding chalk marks for reproducable builds"
   doc: """
   This profile is based on `chalk_default` but with the time and the
   nonce removed.
@@ -185,6 +188,7 @@ profile chalk_reproducable {
 }
 
 profile chalk_minimal {
+  shortdoc: "For minimal chalk marks."
   doc: """
   This profile is for what gets inserted into artifacts when we are
   sending metadata somewhere This profile is meant to be
@@ -208,6 +212,7 @@ profile chalk_minimal {
 }
 
 profile artifact_report_large {
+shortdoc: "Report most available items, minus expensive items"
 doc: """
   This profile reports most things, except large stuff that's mostly
   redundant, like _OP_ALL_IMAGE_METADATA. This does report stuff that's
@@ -477,6 +482,7 @@ doc: """
 }
 
 profile artifact_report_default {
+  shortdoc: "Report most available items, but no spammy or expensive ones"
   doc: """
   This profile turns is based on `artifact_report_large`, removing
   things that are spammy.
@@ -745,6 +751,8 @@ profile artifact_report_default {
 }
 
 profile host_report_large {
+  shortdoc: "Report most available items, but no expensive ones"
+  doc: "This is going to go away soon I think."
   key.CHALK_VERSION.report                       = true
   key.DATE_CHALKED.report                        = true
   key.TIME_CHALKED.report                        = true
@@ -809,6 +817,7 @@ profile host_report_large {
 }
 
 profile host_report_default {
+  shortdoc: "Report most available items, but no spammy or expensive ones"
   doc: """
   This reports lots of info on Linux boxes, but skips stuff that's spammy.
   It reports all PS info, but only if definitely running in a container.
@@ -940,6 +949,7 @@ profile host_report_default {
 }
 
 profile host_report_minimal {
+  shortdoc: "Report only basic identifying information"
   doc: """
   This is for reporting only basic identifying and operational info.
 """
@@ -957,8 +967,10 @@ profile host_report_minimal {
 }
 
 profile unknown_docker_report {
+  shortdoc: "Report basic command invocation info for docker commands" 
   doc: """
-  This is for reporting only basic identifying and operational info.
+Intended for reporting only basic identifying information for docker commands
+that do not generate a chalk report.
 """
   key._OPERATION.report                          = true
   key._ACTION_ID.report                          = true
@@ -972,6 +984,7 @@ profile unknown_docker_report {
 }
 
 profile push_report_default {
+  shortdoc: "Default report for docker push commands"
   doc: """
   When we report on a 'docker push', these are the important
   per-artifact items we collect. The CURRENT_HASH and REPO_DIGESTS
@@ -990,6 +1003,7 @@ profile push_report_default {
 }
 
 profile audit_report {
+  shortdoc: "Default audit report (audits are off by default)"
   doc: """
   Here, we only report key bits about the configuration used, for audit
   purposes. This is implemented as the "audit" report below; the
@@ -1012,6 +1026,7 @@ profile audit_report {
 
 profile usage_report {
   enabled: true
+  shortdoc: "Reports on summary statistics"
   doc: """
   These fields are, by default, sent back up to Crash Override to keep
   high-level statistics on Chalk usage (via an attempted post to an
@@ -1034,6 +1049,7 @@ profile usage_report {
 }
 
 profile chalk_labels {
+  shortdoc: "Auto-added labels for docker containers"
   doc: """
   This profile is for chalkable keys that are automatically added as
   labels to a container when running `docker build`.
@@ -1044,6 +1060,7 @@ profile chalk_labels {
 }
 
 profile terminal_host_report {
+  shortdoc: "The summary report that outputs to your terminal by default"
   key._OPERATION.report                          = true
   key._DATETIME.report                           = true
   key._CHALKS.report                             = true
@@ -1055,6 +1072,7 @@ profile terminal_host_report {
 }
 
 profile terminal_artifact_report_when_chalking {
+  shortdoc: "The summary report that outputs to your terminal by default pt 2"
   key.CHALK_ID.report                            = true
   key.PRE_CHALK_HASH.report                      = true
   key.PATH_WHEN_CHALKED.report                   = true
@@ -1076,6 +1094,7 @@ profile terminal_artifact_report_when_chalking {
 }
 
 profile terminal_env_host_report {
+  shortdoc: "Going to redo these profiles soon."
   key._OPERATION.report                          = true
   key._DATETIME.report                           = true
   key._CHALKS.report                             = true
@@ -1088,6 +1107,7 @@ profile terminal_env_host_report {
 }
 
 profile terminal_artifact_report_all_others {
+  shortdoc: "Going to redo these profiles soon."
   key.CHALK_ID.report                            = true
   key.PATH_WHEN_CHALKED.report                   = true
   key.ARTIFACT_TYPE.report                       = true

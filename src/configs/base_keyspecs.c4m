@@ -103,7 +103,18 @@ keyspec MAGIC {
     ~value:                 ascii_magic
     since:                  "0.1.0"
     normalized_order:       0
-    doc:  "Used to identify the start of JSON encoded output only"
+    shortdoc:         "Marker for identifying chalk marks"
+    doc:              """
+This key must appear as the first item in all chalk marks, and the
+value cannot be changed. It is used to identify the beginning of a
+chalk mark. While JSON objects typically do not support ordered keys,
+we still require conforming marks to put this one first.
+
+The chalk mark itself may be embedded in various ways, depending on
+the artifact type. Still, this key is used to help ease detection.
+
+This key should generally never be reported, as it is redundant to do so.
+"""
 }
 
 keyspec CHALK_VERSION {
@@ -116,7 +127,12 @@ keyspec CHALK_VERSION {
     ~value:                 chalk_version
     since:                  "0.1.0"
     normalized_order:       2
-    doc:                    "Spec version used for inserted objects"
+    shortdoc:         "Version of Chalk used for insertion"
+    doc:              """
+This represents the Chalk version used at the time of the insertion of
+the Chalk mark. This must be added to each Chalk mark, to help ensure
+compatibility with future versions.
+"""
 }
 
 keyspec DATE_CHALKED {
@@ -127,10 +143,14 @@ keyspec DATE_CHALKED {
     conf_as_system:   true
     since:            "0.1.0"
     normalized_order:  4
+    shortdoc:         "Date of Chalk mark insertion"
     doc:              """
-_TIMESTAMP, converted to a date string, in the local time zone.  Note that this
-only has one value per run-- when chalking, TIMESTAMP_WHEN_CHALKED gives per-chalk time
-values, but all other fields only time to the run.
+This gives a readable date that the chalk operation occured, in the
+local time zone set for the machine where the marking happened.
+
+This field does *not* include the time of the marking. For that, you
+can add the `TIME_CHALKED` key, use the `DATETIME_WHEN_CHALKED` key,
+or use the `TIMESTAMP_WHEN_CHALKED` key.
 """
 }
 
@@ -141,11 +161,14 @@ keyspec TIME_CHALKED {
     system:           true
     conf_as_system:   true
     since:            "0.1.0"
-    normalized_order:  5
+    normalized_order:  5    
+    shortdoc:         "Time of Chalk mark insertion"
     doc:              """
-_TIMESTAMP, converted to the current time, in the local time zone. Note that
-this only has one value per run-- when chalking, TIMESTAMP_WHEN_CHALKED gives per-chalk
-time values, but all other fields only time to the run.
+This is a string indicating the time of the chalk operation, in human
+readable format, given in the local time zone of the machine on which
+the chalk operation occured. This only has one value per run-- when
+chalking, `TIMESTAMP_WHEN_CHALKED` gives per-chalk time values, if
+desired.
 """
 }
 
@@ -157,8 +180,11 @@ keyspec TZ_OFFSET_WHEN_CHALKED {
     conf_as_system:   true
     since:            "0.1.0"
     normalized_order: 6
-    doc:              "Time Zone offset from UTC for any non-numeric " +
-                      "date-time objects."
+    shortdoc:         "Time Zone for host when Chalk mark was inserted"
+    doc:              """
+The time zone offset from UTC of the machine on which the chalk
+operation occured, as collected when the chalk operation occured.
+"""
 }
 
 keyspec DATETIME_WHEN_CHALKED {
@@ -169,8 +195,17 @@ keyspec DATETIME_WHEN_CHALKED {
     conf_as_system:   true
     since:            "0.1.0"
     normalized_order: 7
-    doc:              "Full ISO-8601 Date-time w/ timezone, base on the " +
-                      "value of _TIMESTAMP."
+    shortdoc:         "Date and time of Chalk mark insertion"
+    doc:              """
+This field is a human readable time stamp indicating the time that the
+chalk mark was made, using the local clock of the machine that did the
+chalking. The value is a full ISO-8601 Date-time string, including a
+timezone offset.
+
+For insertion operatins (including docker insertion), the value of
+this field will represent the same moment in time that the reported
+value of `_TIMESTAMP` would give for the operation.
+"""
 }
 
 keyspec EARLIEST_VERSION {
@@ -181,7 +216,10 @@ keyspec EARLIEST_VERSION {
     conf_as_system:   true
     ~value:           chalk_version
     since:            "0.1.0"
-    doc:              "Reserved for future use"
+    shortdoc:         "Reserved for future use"
+    doc:              """
+This key is reserved for future use; it is not currently used in any capacity.
+"""
 }
 
 keyspec HOSTINFO_WHEN_CHALKED {
@@ -189,7 +227,13 @@ keyspec HOSTINFO_WHEN_CHALKED {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "Host information at injection"
+    shortdoc:         "Host platform information at Chalk time"
+    doc:              """
+This returns information about the host on which the chalk operation
+occured, collected at the the time of that operation. On posix
+systems, it's taken from the 'version' field obtained from a call to
+the `uname()` system call.
+"""
 }
 
 keyspec NODENAME_WHEN_CHALKED {
@@ -197,9 +241,11 @@ keyspec NODENAME_WHEN_CHALKED {
     type:             string
     standard:         true
     since:            "0.1.0"
+    shortdoc:         "Host node name at Chalk time"
     doc:              """
-The node name at the time of insertion. On posix systems, this should be
-equivolent to the uname 'nodename' field.
+The node name at the time of the software's chalk mark insertion. On
+posix systems, this will be equivolent to the `uname()` field
+`nodename`.
 """
 }
 
@@ -208,7 +254,10 @@ keyspec INJECTOR_CHALK_ID {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "chalk ID of the chalk binary"
+    shortdoc: "CHALK_ID of the Chalk implementation creatining the mark"
+    doc:              """
+The `CHALK_ID` of the chalk binary used to create the chalk mark
+"""
 }
 
 keyspec INJECTOR_PUBLIC_KEY {
@@ -230,7 +279,11 @@ keyspec INJECTOR_VERSION {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "Version of the chalk binary used for injection"
+    shortdoc: "Version of chalk binary used to create the chalk mark"
+    doc:              """
+The software version for the chalk binary used in creating the chalk
+mark (see also, `INJECTOR_CHALK_ID`).
+"""
 }
 
 keyspec PLATFORM_WHEN_CHALKED {
@@ -239,7 +292,11 @@ keyspec PLATFORM_WHEN_CHALKED {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "OS / system info at time of insertion"
+    shortdoc: "OS and architecture chalk mark was created on"
+    doc:              """
+A string consisting of the OS and system architecture of the platform
+on which the chalk mark was created.
+"""
 }
 
 keyspec INJECTOR_COMMIT_ID {
@@ -248,7 +305,11 @@ keyspec INJECTOR_COMMIT_ID {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "The commit hash or id from which the injector was built."
+    shortdoc: "Commit ID for the injecting Chalk binary"
+    doc:              """
+The commit hash used to build the chalk binary that created the chalk
+mark.
+"""
 }
 
 keyspec INJECTOR_ARGV {
@@ -259,7 +320,11 @@ keyspec INJECTOR_ARGV {
     conf_as_system:   true
     ~callback:        func get_args
     since:            "0.1.0"
-    doc:              "The full contents of argv used on invocation"
+    shortdoc: "Chalk insertion operation's command line args"
+    doc:              """
+This field contains the full contents of the command line arguments
+used to invoke `chalk` at the time of an insertion operation.
+"""
 }
 
 keyspec INJECTOR_ENV {
@@ -268,15 +333,27 @@ keyspec INJECTOR_ENV {
     standard:         true
     system:           true
     since:            "0.1.0"
+    shortdoc: "Environment variables at Chalk mark insertion time"
     doc:              """
-Environment variables set when the process is run. Because chalk may be used to proxy container entry points that could contain sensitive data, it's possible to redact variables, or skip them outright.  The behavior is configured with the following configuration attributes:
+Environment variables set at the time when `chalk` was invoked for an
+insertion operation.
 
-- {bold}env_always_show{reset}, a list of environment variables to show unredacted.
-- {bold}env_never_show{reset}, a list of environment variables NOT to show in this report.
-- {bold}env_redact{reset}, a list of environment variables to redact.
-- {bold}env_default_action{reset}, a value ("show", "redact", "ignore") that indicates what to do for unnamed environment variables.  This defaults to "redact"
+Data from environment variables defaults to being redacted, meaning
+the variable names will be reported, but not the contents. However,
+this can be tweaked on a per-environment variable basis.
 
-Currently, this filtering is not handled per-report.
+The behavior is configured with the following configuration attributes:
+
+- **env_always_show**, a list of environment variables to show unredacted.
+- **env_never_show**, a list of environment variables NOT to show in this
+  report.
+- **env_redact**, a list of environment variables to redact.
+- **env_default_action**, a value ("show", "redact", "ignore") that indicates
+  what to do for unnamed environment variables. This defaults to "redact".
+
+Currently, this filtering is not handled per-report, meaning `ENV` and
+`_ENV` will always be identical if you attempt to collect both at
+chalk time.
 """
 }
 
@@ -285,8 +362,15 @@ keyspec TENANT_ID_WHEN_CHALKED {
     type:             string
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Tenant info added at mark time"
     doc:              """
-A user-defined unique identifier intended to capture any meaningful user data.
+A user-defined unique identifier, intended to represent a unique user
+in multi-tenant environments. This key is set only at the time in
+which a chalk operation occurs. Its value can be used at that time for
+various URL substitutions (for instance, in the `CHALK_PTR` key).
+
+The default OSS configuration never sets this value, but it can be
+configured manually, or in binaries created by tooling.
 """
 }
 
@@ -299,9 +383,39 @@ keyspec CHALK_ID {
     system:                 true
     since:                  "0.1.0"
     normalized_order:       1
-    doc:                    """
-A unique ID for the artifact, taken from the artifact hash provided by
-the codec
+   shortdoc:         "Unique identifier for unchalked software artifacts"
+    doc:              """
+This is a unique identifier for an *unchalked* software artifact. When
+possible, if the same unchalked artifact is chalked on two different
+machines, it will give identical `CHALK_ID`s.
+
+Chalk marks are always four groups of characters separated by dashes;
+the first and last group are six characters, and the middle two groups
+four characters.
+
+The non-dash characters are taken from a base32 character set, and the
+letters will always be upper case.
+
+Any time a chalk mark is created for a piece of software, this field
+must be part of the mark.
+
+Whenever possible, the `CHALK_ID` will be derived from the hash of the
+unchalked artifact (we encoded 100 bits from the hash). This helps
+ensure that different machines will calculate the same `CHALK_ID` on
+the same artifact.
+
+Currently, the hash is used for calculating this value for all
+artifact types *EXPECT* docker images, where we cannot reliably get
+such a value. In that case, the value is randomly selected, and will
+be different every time.
+
+This identifier differs from the `METADATA_ID` in that the `CHALK_ID`
+is a unique identifier for the unchalked artifact, whereas
+`METADATA_ID` is a unique identifier for the *CHALKED* artifact. A
+single file can have multiple `METADATA_ID`s when chalked multiple
+times, but only one `CHALK_ID` (again, excepting docker images).
+
+See the documentation for `METADATA_ID` for more information.
 """
 }
 
@@ -313,11 +427,20 @@ keyspec TIMESTAMP_WHEN_CHALKED {
     conf_as_system:   true
     since:            "0.1.0"
     normalized_order: 3
+    shortdoc:         "Time of Chalk mark insertion"
     doc:              """
-Milliseconds since the Unix epoch for each chalk. Should generally show the
-time between chalks, and will not be the same as _TIMESTAMP, or other time
-formatting, which only happens once at the beginning of each chalk run.
-"""
+This field consists of the number of milliseconds since the Unix
+epoch, at the time the chalk mark was created for the given
+artifact. The Unix epoch started at the beginning of Jan 1, 1970, UTC.
+
+When multiple pieces of software are marked in the same run of Chalk,
+this will generally indicate the time between chalks.
+
+If, instead of an integer, you would like a more readable
+representation, check out the `DATE_CHALKED`, `TIME_CHALKED`,
+`TZ_OFFSET_WHEN_CHALKED` and `DATETIME_WHEN_CHALKED` keys, though
+those keys are computed once per-run, and not on a per-artifact basis.
+""" 
 }
 
 keyspec CHALK_PTR {
@@ -326,9 +449,33 @@ keyspec CHALK_PTR {
     standard:              true
     since:                 "0.1.0"
     apply_substitutions:   true
+    shortdoc:              "Reference to storage for artifact metadata"
     doc:                   """
-When enabled, injects minimal metadata; this field then gets a URL you supply
-to point to the rest of the data.
+This field is set at Chalk time, and is user definable. It should be
+used to inject a URL into the software, where the URL indicates the
+location of the report created at Chalk time for this artifact.
+
+
+There are special substitution variables to allow you to include
+artifact-specific information in the URL, all of which are evaluated
+at the time of chalking:
+
+ - **{chalk_id}** is replaced with the `CHALK_ID` for this software.
+ - **{now}** is replaced with an integer timestamp, and will be identical
+   to the value of the software's `TIMESTAMP_WHEN_CHALKED` field, if used.
+ - **{path}** is replaced with the `PATH_WHEN_CHALKED` field for the artifact,
+ generally representing the software's location on the file system at the time
+ of chalking.
+ - **{hash}** is replaced with the software artifact's `HASH` field (the Chalk
+ hash; see `chalk help hashing`).
+ - **{tenant}** is replaced with the software artifact's
+ `TENANT_ID_WHEN_CHALKED` field, as set at the time of chalking.
+ - **{random}** is replaced with the value of `CHALK_RAND`, as set at the
+ time of chalking.
+ 
+The above substitutions all occur, even if the given keys are not
+added to the software's chalk mark. See the documentation on those
+individual metadata keys for more information about their semantics.
 """
 }
 
@@ -338,8 +485,11 @@ keyspec PATH_WHEN_CHALKED {
     type:             string
     standard:         true
     codec:            true
-    since:            "0.1.0"
-    doc:              "Path of artifact on host where injection occured"
+    shortdoc:         "Location for software at Chalk time"
+    doc:              """
+This key represents the file system path for the artifact, _at the time the
+chalk mark was added_.
+"""
 }
 
 keyspec PATH_WITHIN_ZIP {
@@ -376,6 +526,24 @@ keyspec ARTIFACT_TYPE {
     standard:         true
     codec:            true
     since:            "0.1.0"
+    shortdoc:         "Type of the artifact, determined during Chalk marking"
+    doc: """
+A string indicating the type of a software artifact, as determined when the
+chalk mark was added. Values can include:
+
+ - ELF (non-MacOS Unix)
+ - Mach-O executable
+ - Unix Script
+ - Docker Image
+ - Docker Container
+ - Python
+ - Python Bytecode
+ - ZIP
+ - JAR
+ - WAR
+ - EAR
+
+"""
 }
 
 keyspec HASH {
@@ -385,6 +553,7 @@ keyspec HASH {
     standard:         true
     codec:            true
     since:            "0.1.0"
+    shortdoc:         "SHA-256 hash of the normalized, unmarked software"    
     doc:              """
 Hash file of artifact w/o chalk in it, to ensure extracted chalk is
 intact.  The hash algorithm is specific to the codec, and is generally
@@ -419,6 +588,11 @@ on the file system, at the end of the current operation.
 file system hash before insertion. __However__, this is calculated
 without considering whether it is already chalked of not.
 
+Additionally, some types of artifact (particularly Docker containers)
+may not have a pre-chalk HASH value that we can easily compute, in
+which case this field will not be reported.
+
+See `chalk help hashing` for more information.
 """
 }
 
@@ -428,8 +602,8 @@ keyspec PRE_CHALK_HASH {
     standard:            true
     since:               "0.1.1"
     doc:                 """
-For chalking operations only, this is the hash value of the file, before the
-chalking operation took place.
+For chalking operations only, this is the SHA-256 hash value of the
+file, before the chalking operation took place.
 
 This key does process chalk marks, only bits on disk. That is, if the
 file was previously chalked before the current insertion, the hash
@@ -449,7 +623,11 @@ keyspec ORIGIN_URI {
     standard:            true
     since:               "0.1.0"
     apply_substitutions: true
-    doc:                 "URI of origin for repo from which artifact was built"
+    shortdoc:            "URI for repository associated at time of marking"
+    doc:                 """
+The URI associated with the origin of the source code repository found at the
+time of chalk mark insertion.
+"""
 }
 
 keyspec BRANCH {
@@ -457,7 +635,11 @@ keyspec BRANCH {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "Version control branch the artifact was built from"
+    shortdoc:         "Current repo branch at time of marking"
+    doc:              """
+The branch name found in the source code repository found at the time
+of chalk mark insertion.
+"""
 }
 
 keyspec COMMIT_ID {
@@ -465,8 +647,11 @@ keyspec COMMIT_ID {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "The commit hash or id for the repository the artifact " +
-                      "was built from"
+    shortdoc:         "Commit ID in current repo at time of marking"
+    doc:              """
+The most recent commit hash or id for the current repository and
+branch identified at the time of chalk mark insertion.
+"""
 }
 
 keyspec ARTIFACT_VERSION {
@@ -474,7 +659,15 @@ keyspec ARTIFACT_VERSION {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "Reserved for future use; can be custom."
+    shortdoc:         "Version info for software artifact"
+    doc:              """
+This is reserved for future use; plugins specific to managed software
+environments are expected to set this field. However, you can manually
+set this value if desired.
+
+This metadata key is meant to represent a software artifact's version
+information, at the time that a chalk mark is inserted.
+"""
 }
 
 keyspec STORE_URI {
@@ -483,8 +676,19 @@ keyspec STORE_URI {
     standard:            true
     since:               "0.1.0"
     apply_substitutions: true
-    doc:                 "URI for the intended artifact storage location," +
-                         " at the time of chalking."
+    shortdoc: "URI for intended internal storage repo for artifact"
+    doc:                 """
+This field's value should be set to the URI of the software artifact's
+intended storage location, at the time of chalking. Generally, this
+field is meant for internal repository information, not public
+information.
+
+Currently, this field is not set by any chalk plugins. The user can
+configure it to be set to a custom value.
+
+This field can apply any of the same substitutions supported in the
+`CHALK_PTR` field (see that key for details).
+"""
 }
 
 keyspec PACKAGE_URI {
@@ -493,7 +697,18 @@ keyspec PACKAGE_URI {
     standard:           true
     since:              "0.1.0"
     apply_substitutions: true
-    doc:                 "Public distribution point."
+    shortdoc: "URI for public distribution point for this artifact"
+    doc:                 """
+This field's value should be set to the URI associated with a primary
+public distribution point for the software artifact, as of the time of
+chalking.
+
+Currently, this field is not set by any chalk plugins. The user can
+configure it to be set to a custom value.
+
+This field can apply any of the same substitutions supported in the
+`CHALK_PTR` field (see that key for details).
+"""
 }
 
 keyspec CODE_OWNERS {
@@ -501,7 +716,16 @@ keyspec CODE_OWNERS {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "Code owners associated with the artifact."
+    shortdoc: "Code owners determined at Chalk time"
+    doc:              """
+This contains any identified code owners at the time that software was
+chalked. Generally, this is a free-form field.
+
+In the case where the chalking operation finds a `CODEOWNERS` or
+`AUTHORS` file, it currently captures the entire free-form file. The
+system does NOT currently attempt to extract only relevent parties,
+based on local file system path.
+"""
 }
 
 keyspec VCS_DIR_WHEN_CHALKED {
@@ -509,7 +733,14 @@ keyspec VCS_DIR_WHEN_CHALKED {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "Directory at Chalk time under VCS"
+    shortdoc:         "Directory at Chalk time under VCS"
+    doc:              """
+The version control directory tied to an artifact, identified at the
+time of chalking.
+
+This will contain the path information as found on the host on which
+the artifact was chalked.
+"""    
 }
 
 keyspec BUILD_ID {
@@ -517,7 +748,12 @@ keyspec BUILD_ID {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "The ID of the CI/CD job"
+    shortdoc: "CI/CD job info when adding chalk mark"
+    doc:              """
+
+If, at the time of chalking, the system can field will contain the
+associated job ID.
+"""
 }
 
 keyspec BUILD_URI {
@@ -526,7 +762,15 @@ keyspec BUILD_URI {
     standard:            true
     since:               "0.1.0"
     apply_substitutions: true
-    doc:                 "URI to the CI/CD job"
+    shortdoc: "URI associated with build job at time of chalk"
+    doc:                 """
+If, at the time of chalking, the system can identify a CI/CD job, this
+field will contain the URI associated with the job, if found.
+
+This field is generally expected to be supplied by the user, and can
+use the same substitutions allowed for the `CHALK_PTR` field (see that
+key's documentation for more detail).
+"""    
 }
 
 keyspec BUILD_API_URI {
@@ -535,8 +779,16 @@ keyspec BUILD_API_URI {
     standard:            true
     since:               "0.1.0"
     apply_substitutions: true
-    doc:                 "URI to the CI/CD api if more information needs to  " +
-                         "be queried"
+    shortdoc: "API endpoint associated with chalk-time CI/CD job"
+    doc:                 """
+If, at the time of chalking, the system an identify a CI/CD job, and
+there is a discernable API endpoint, this field will contain the URI
+for that endpoint.
+
+This field is generally expected to be supplied by the user, and can
+use the same substitutions allowed for the `CHALK_PTR` field (see that
+key's documentation for more detail).
+"""
 }
 
 keyspec BUILD_TRIGGER {
@@ -544,7 +796,10 @@ keyspec BUILD_TRIGGER {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "What event triggered CI/CD job"
+    shortdoc: "Any recorded build trigger found at chalk time."
+    doc:              """
+Any recorded build trigger found at chalk time.
+"""
 }
 
 keyspec BUILD_CONTACT {
@@ -552,7 +807,11 @@ keyspec BUILD_CONTACT {
     type:             list[string]
     standard:         true
     since:            "0.1.0"
-    doc:              "List of contacts which triggered CI/CD job"
+    shortdoc: "CI/CD contact info"
+    doc:              """
+Contact information set at chalk time for the person or people
+asscoiated with the triggered CI/CD job.
+"""
 }
 
 
@@ -564,9 +823,23 @@ keyspec CHALK_RAND {
     conf_as_system:   true
     ~callback:        func call_rand
     since:            "0.1.0"
-    doc:              "64-bit random value generally selected per chalk " +
-                      "(if enabled), intended to help ensure unique metadata " +
-		      " IDs in all circumstances.  Presented as hex digits."
+    shortdoc: "Chalk-time random number"
+    doc:              """
+A 64-bit random value created at chalk time only. This field is
+selected per chalk (if enabled), and is intended to help ensure unique
+`METADATA_ID` fields for artifacts in all circumstances. This is
+encoded as hex digits.
+
+This is intended for those people who want to be able to trace
+specific artifacts to a specific build system.
+
+Certainly, this key should be disabled in chalk marks if attempting
+reproducable builds (in which case, also be sure not to chalk any keys
+consisting of timestamps).
+
+While there is a config-file callback associated with this metadata
+key, it is set by the system, and cannot be overriden by the user.
+"""
 }
 
 keyspec OLD_CHALK_METADATA_HASH {
@@ -576,8 +849,24 @@ keyspec OLD_CHALK_METADATA_HASH {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "Metadata hash of old chalk info associated with an " +
-                      "artifact, when a new mark is inserted"
+    shortdoc: "Metadata hash captured when overwriting an existing chalk mark"
+    doc:              """
+In cases where a chalk insertion operation is being performed on a
+software artifact that already contains a chalk mark, this field
+represents the value of the `METADATA_HASH` field of the chalk mark
+that is being replaced.
+
+This helps support tracability in multi-stage CI/CD processes, where
+it makes sense to inject (and/or report on) data at different points.
+
+This field assumes that the old chalk mark was previously reported on,
+in which case this field can be used as a reference to recover the
+linked information.
+
+See also the related key `OLD_CHALK_METADATA_ID`, which essentially
+serves the same purpose, but using a different representation of the
+data.
+"""
 }
 
 keyspec OLD_CHALK_METADATA_ID {
@@ -587,8 +876,24 @@ keyspec OLD_CHALK_METADATA_ID {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "Metadata ID of old chalk info associated with an " +
-                      "artifact, when a new mark is inserted"
+    shortdoc: "Metadata ID captured when overwriting an existing chalk mark"
+    doc:              """
+In cases where a chalk insertion operation is being performed on a
+software artifact that already contains a chalk mark, this field
+represents the value of the `METADATA_ID` field of the chalk mark that
+is being replaced.
+
+This helps support tracability in multi-stage CI/CD processes, where
+it makes sense to inject (and/or report on) data at different points.
+
+This field assumes that the old chalk mark was previously reported on,
+in which case this field can be used as a reference to recover the
+linked information.
+
+See also the related key `OLD_CHALK_METADATA_HASH`, which essentially
+serves the same purpose, but using a different representation of the
+data.
+"""
 }
 
 keyspec EMBEDDED_CHALK {
@@ -598,7 +903,23 @@ keyspec EMBEDDED_CHALK {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    doc:              "Other artifacts contained in this artifact"
+    shortdoc: "Captured chalk marks for embedded documents"
+    doc:              """
+In cases where a software artifact consists of a container consisting
+of other software artifacts, this field captures the full chalk marks
+for any such embedded software, at the time in which artifacts are
+chalked.
+
+The format of this key is an array of chalk marks, identical to the
+contents of the `_CHALKS` key.
+
+Currently, this embedding can only be recorded with ZIP-formatted
+artifacts, such as JAR files. This will not be collected unless the
+configuration variable `chalk_contained_items` is set.
+
+We do not currently support this capability with containers, or any
+other type of embedded artifact.
+"""
 }
 
 keyspec EMBEDDED_TMPDIR {
@@ -608,8 +929,12 @@ keyspec EMBEDDED_TMPDIR {
     standard:         true
     codec:            true
     since:            "0.1.0"
+    shortdoc: "Temporary directory used for processing embedded chalks, if used"
     doc:              """
-Temporary directory for embedded contents that was used when chalking. Any directories in the sub-chalk should be under this path.
+When chalking embedded contents, the system uses a temporary
+directory. This key captures the directory used for that
+operation. Any directories in the sub-chalk will be under this path,
+which will be reflected in path information for embedded artifacts.
 """
 }
 
@@ -618,8 +943,12 @@ keyspec CLOUD_METADATA_WHEN_CHALKED {
     type:             string
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Cloud provider metadata at chalk-time"
     doc:              """
-Metadata reported by the local cloud provider.  The contents are specific to the provider, but should generally be a string that can itself be interpreted as JSON.
+Deprecated, and only available for the simplest of AWS environments.
+
+Instead, please use individual metadata fields for cloud provider
+metadata.
 """
 }
 
@@ -628,7 +957,25 @@ keyspec SBOM {
     type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
-    doc:              "SBOMs associated with this artifact"
+    shortdoc: "SBOM(s) collected at Chalk time"
+    doc:              """
+This field is meant to captures any SBOMs associated with a chalking
+(i.e., a chalk mark insertion operation). The value, when provided, is
+a dictionary. The keys of that dictionary indicate the tool used to
+perform the chalking, and the value consists of a free-form JSON
+object returned if the SBOM creation is successful.
+
+Currently, the only supported tool integration is `syft`. It does not
+run by default, but if you enable the config variable `run_sbom_tools`
+(which can be also done on the command line with `--run-sbom-tools`),
+and if you configure the key to be chalked or reported (by editing the
+appropriate profile), then chalk insertion operations will attempt to
+run the tool, even downloading it from its official distribution
+source if needed.
+
+You may also set the field yourself if you have other tooling for
+collecting this information.
+"""
 }
 
 keyspec SAST {
@@ -636,7 +983,27 @@ keyspec SAST {
     type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
-    doc:              "Static analysis scan results"
+    shortdoc: "SAST scan results collected at Chalk time"
+    doc:              """
+This field captures any static analysis security tooling reports that
+are associated with a chalking (i.e., a chalk mark insertion
+operation). The value, when provided, is a dictionary. The keys to
+that dictionary indicate the tool used to perform the chalking, and
+the value consists of a free-form JSON object returned if the SBOM
+creation is successful.
+
+Currently, the only supported tool integration is `semgrep`. It does
+not run by default, but if you enable the config variable
+`run_sast_tools` (which can be also done on the command line with
+`--run-sast-tools`), and if you configure the key to be chalked or
+reported (by editing the appropriate profile), then chalk insertion
+operations will attempt to run the tool, even downloading it, if
+needed, from its official distribution source (via Python's pip, which
+you will need locally for this to work).
+
+You may also set the field yourself if you have other tooling for
+collecting this information.
+"""    
 }
 
 keyspec ERR_INFO {
@@ -646,7 +1013,19 @@ keyspec ERR_INFO {
     system:           true
     since:            "0.1.0"
     normalized_order: high() - 500
-    doc:              "Errors when inserting metadata"
+    shortdoc: "Errors collected during chalk time"
+    doc:              """
+This can capture any errors or other logging information reported
+during the chalk insertion process. The errors are filtered based on
+log level.
+
+Only messages of a log level at least as severe as that found in the
+configuration variable `chalk_log_level` are capture. By default, this
+value is set to "error".
+
+That configuration variable is independent from the `log_level`
+variable that controls console logging output.
+"""
 }
 
 keyspec SIGNING {
@@ -657,14 +1036,20 @@ keyspec SIGNING {
     system:           true
     since:            "0.1.0"
     normalized_order: high() - 400
-    doc:              "Must be added per-chalk when signing to ensure that " +
-                      "deleted signatures can be detected (which is why this " +
-		      "may not be lifted to the host-reporting level; " +
-		      "generally, there is no good reason to ever report it)"
+    shortdoc:         "Indicator that a chalk mark has been signed"
+    doc:              """
+This key must be added into chalk marks whenever chalk marks are being
+digitally signed, to help ensure that it's possible to detect deleted
+signatures.
+
+It also generally does NOT need to be reported. If this field isn't
+reported, and an attacker attempts to delete a signature, they could
+remove this field. However, the (required when signing)
+`METADATA_HASH` field will NOT validate if this field is deleted.
+"""
 }
 
 keyspec METADATA_HASH {
-    required_in_chalk_mark: true
     kind:                   ChalkTimeArtifact
     never_early:            true
     type:                   string
@@ -672,9 +1057,35 @@ keyspec METADATA_HASH {
     system:                 true
     since:                  "0.1.0"
     normalized_order:       high() - 300
-    doc:                    """
-A hash of all the preceding metadata, in a canonicalized format. This includes
-user-defined keys.
+    shortdoc:         "Hash of normalized Chalk mark metadata"
+    doc:            """
+This field is used to help authenticate the rest of the metadata
+placed into the chalk mark. It constiutes a hash of all the metadata
+that is in the actual chalk mark.
+
+Again, this is NOT derived from the insertion-time report; instead, it
+is derived from the remainder chalk mark itself. That way, whenever
+the chalk mark is extracted, the contents can be validated, thus
+detecting whether software has been changed since marked.
+
+For instance, if you mark a shell script, and then edit it, you will
+get a validation error on any subsequent operation involving that
+artifact until a new mark is inserted, the changes are reverted, or
+the mark is deleted.
+
+We use a simple binary normalization format for the hash, which sorts
+keys in a well-known order. `METADATA_ID` isn't used in this
+computation since it is derived from the `METADATA_HASH`, and
+signature-related fields are not used, since they sign this value.
+
+Whenever available at chalk time, the `HASH` field should be added to
+artifacts (or the `CHALK_ID`, which would be derived from the same
+value), in which case the `METADATA_HASH` protects the integrity of
+the entire artifact, not just the associated metadata.
+
+The `METADATA_ID` field is derived from the `METADATA_HASH` value, but
+is more human-readable. It can also be used for metadata integrity,
+which is why this field is not strictly required in a chalk mark.
 """
 }
 
@@ -687,8 +1098,11 @@ keyspec METADATA_ID {
     system:                 true
     since:                  "0.1.0"
     normalized_order:       high() - 200
-    doc:                    """
-A more readable unique identifier for all metadata.
+    shortdoc:         "Unique ID for marked software artifact"
+    doc:              """
+This is a more readable unique identifier for a chalked artifact. It
+is always derived from 100 bits of the artifact's `METADATA_HASH`
+field, and is encoded in the same way the `CHALK_ID` key is.
 """
 }
 
@@ -700,10 +1114,13 @@ keyspec SIGNATURE {
     system:           true
     since:            "0.1.0"
     normalized_order: high()
+    shortdoc:         "Digital signature of the chalk mark"    
     doc:              """
 Embedded digital signature for artifact. Note that this is only
 supported for file system artifacts; containers and images use
 detached signatures only.
+
+Signatures are generated using the In-Toto standard.
 """
 }
 
@@ -713,8 +1130,10 @@ keyspec DOCKER_FILE {
     standard:         true
     system:           false
     since:            "0.1.0"
+    shortdoc: "Docker file contents pre-chalk"
     doc: """
-When chalking docker containers, this gets the contents of the topmost docker file passed to the docker command line, prior to any entry point wrapping.
+When chalking docker containers, this gets the contents of the topmost
+docker file passed to the docker command line, prior to any chalking.
 """
 }
 
@@ -724,8 +1143,9 @@ keyspec DOCKERFILE_PATH {
     standard:         true
     system:           false
     since:            "0.1.0"
+    shortdoc: "Platform passed to docker build"
     doc: """
-Path to the docker file on the system on which it was built.
+Platform passed when performing `docker build`, if any.
 """
 }
 
@@ -746,8 +1166,9 @@ keyspec DOCKER_LABELS {
     standard:          true
     system:            false
     since:             "0.1.0"
+    shortdoc: "Labels added to docker image during build process"
     doc: """
-Labels added to a docker image.
+Labels added to a docker image during the build process, if any.
 """
 }
 
@@ -757,8 +1178,9 @@ keyspec DOCKER_TAGS {
     standard:          true
     system:            false
     since:             "0.1.0"
+    shortdoc: "Chalk-time image tags"
     doc: """
-Tags added to a docker image.  Will be in the form: REPOSITORY:TAG
+Tags added to a docker image. Will be in the form: REPOSITORY:TAG
 """
 }
 
@@ -768,8 +1190,9 @@ keyspec DOCKER_CONTEXT {
     standard:          true
     system:            false
     since:             "0.1.0"
+    shortdoc: "Context for container build"
     doc: """
-Primary context used when building a container.
+The docker context used when building a container.
 """
 }
 
@@ -824,6 +1247,17 @@ keyspec _OP_ARTIFACT_TYPE {
     standard:         true
     codec:            true
     since:            "0.1.0"
+    shortdoc:         "Type of the artifact when the operation ran"
+    doc : """
+A string indicating the type of a software artifact, as determined at
+the time a report was generated. The possible values are identical to
+those listed in the documentation for the chalk-time key,
+`ARTIFACT_TYPE`.
+
+During insertion operations, this key is redundant with
+`ARTIFACT_TYPE`, so there is generally no reason to report on both of
+these at insertion time.
+"""    
 }
 
 keyspec _OP_ARTIFACT_PATH {
@@ -832,7 +1266,18 @@ keyspec _OP_ARTIFACT_PATH {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "Artifact location as found for the current op only"
+    shortdoc:         "Path software was found during the current operation"
+    doc:              """
+The file system location (or alternate location information if not
+file-system based) for a given artifact, in the environment local for
+the current operation. For instance, if running a `chalk extract`
+operation or a `chalk exec` operation, this value will represent where
+software is at the time, which likely will not match the path captured
+during the build process (which lives in the `PATH_WHEN_CHALKED` key).
+
+However, on insertion operations, this field is redunant with
+`PATH_WHEN_CHALKED`, except that it cannot be added to a chalk mark.
+"""
 }
 
 keyspec _CURRENT_HASH {
@@ -841,10 +1286,21 @@ keyspec _CURRENT_HASH {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    doc:              "Hash of the artifact at the end of the current op. " +
-                      "In a chalk operation, it will be the hash after " +
-                      "the chalk is fully inserted. Otherwise, it will be " +
-                      "the hash calculated on the object in its current state."
+    shortdoc: "SHA-256 hash at the end of the current operation"
+    doc:              """
+This field contains the SHA-256 hash of a software artifact, as
+calculated by its codec, at the end of the current chalk operation,
+whatever it is.
+
+On insertion operations, this will capture the post-chalking hash
+value, and thus will generally be different than the value of the
+`HASH` key.
+
+For extraction and exec operations, since they do not modify the
+artifact, this will represent the same post-chalked artifact hash,
+except in cases where the artifact isn't chalked, naturally.
+"""
+    
 }
 
 keyspec _VALIDATED_METADATA {
@@ -854,10 +1310,11 @@ keyspec _VALIDATED_METADATA {
     system:           true
     since:            "0.1.0"
     doc:              """
-This is set to `true` if an object's metadata is okay, and the chalk mark was
-well-formed. If an object is unsigned, this being `true` does NOT mean that
-the metadata is authentic, just that the data is all consistent.  If there is
-also a validated signature as well, _VALIDATED_SIGNATURE will also be true.
+This is set to `true` if an object's metadata is okay, and the chalk
+mark was well-formed. If an object is unsigned, this being `true` does
+NOT mean that the metadata is authentic, just that the data is all
+consistent.  If there is also a validated signature as well,
+_VALIDATED_SIGNATURE will also be true.
 """
 }
 
@@ -868,8 +1325,8 @@ keyspec _VALIDATED_SIGNATURE {
     system:           true
     since:            "0.1.0"
     doc:              """
-This is set to true if a signature is both present and validated in
-an artifact.
+This is set to true if a signature is both present and validated in an
+artifact.
 
 If, for some reason, there is a signature but we could not validate
 (e.g., the public key is not available), then this will be set to
@@ -887,7 +1344,16 @@ keyspec _VIRTUAL {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "Set on chalking ops only, indicating if the chalk was virtual."
+    shortdoc:         "Whether 'virtual' chalk was used during an insertion op"
+    doc:              """
+This reporting field indicates that a chalk mark was created for a
+given artifact, but that the mark was NOT inserted into the artifact
+(ideally, it would have instead been escrowed somewhere easy to
+track).
+
+Despite the fact that this key cannot be inserted into a chalk mark,
+it is only ever set when performing chalking operations.
+"""
 }
 
 keyspec _OP_CHALKED_KEYS {
@@ -896,8 +1362,12 @@ keyspec _OP_CHALKED_KEYS {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "For insert operations only, a list of all keys that " +
-                      "were added to the chalk"
+    shortdoc:         "List of keys added to chalk mark; insertion ops only"
+    doc:              """
+Collected for `chalk insert` operations only, a list of all keys that
+were added to the chalk mark. This only consists of the names of the
+keys chalked, not any of the values.
+"""
 }
 
 keyspec _OP_ARTIFACT_REPORT_KEYS {
@@ -906,8 +1376,13 @@ keyspec _OP_ARTIFACT_REPORT_KEYS {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "For insert operations only, a list of all keys that " +
-                      "were added to the chalk"
+    shortdoc: "Artifact specific keys used in primary report; insertion only"
+    doc:              """
+Collected for `chalk insert` operations only, a list of all _artifact
+specific_ key names that will reported on in the primary operation
+report. This is primarily intended for auxillary (custom) reports
+where the full contents are not being duplicated.
+"""
 }
 
 keyspec _PROCESS_PID {
@@ -915,10 +1390,13 @@ keyspec _PROCESS_PID {
     type:             int
     standard:         true
     since:            "0.1.0"
+    shortdoc:         "Process PID for exec'd command"    
     doc: """
 The process ID of the running process associated with the artifact.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a 'chalk exec' operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -927,16 +1405,17 @@ keyspec _PROCESS_DETAIL {
     type:             dict[string, string]
     standard:         true
     since:            "0.1.0"
+    shortdoc:         "All process detail for exec operation"
     doc: """
-Collects key process info; the same info as in _OP_ALL_PS_INFO, but only for the given process.
+Collects key process info; the same info as in `_OP_ALL_PS_INFO`, but
+only for the given process.
 
-Note that this overlaps with many of the other keys beginning with _PROCESS.
+This overlaps with many of the other keys beginning with `_PROCESS`.
+
 If you use this key, then the only such keys that do not overlap are:
-
-_PROCESS_FD_INFO
-_PROCESS_MOUNT_INFO
-
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+``` _PROCESS_FD_INFO _PROCESS_MOUNT_INFO ``` Currently, this is only
+available during a `chalk exec` operation, where Chalk has been
+configured to report when spawning the container entry point.
 """
 }
 
@@ -945,10 +1424,13 @@ keyspec _PROCESS_PARENT_PID {
     type:             int
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Process ID of parent process"
     doc: """
 The process ID of the parent process.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -957,10 +1439,13 @@ keyspec _PROCESS_START_TIME {
     type:             float
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Start time of process based on local boot time"
     doc: """
 Process start time, in seconds since boot.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -969,9 +1454,14 @@ keyspec _PROCESS_UTIME {
     type:             float
     standard:         true
     since:            "0.1.0"
+    shortdoc: "User mode time of exec'd process since starting"
     doc: """
-The amount of time the process has spent in user mode since starting, in seconds.
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+The amount of time the process has spent in user mode since starting,
+in seconds.
+
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -979,11 +1469,14 @@ keyspec _PROCESS_STIME {
     kind:             RunTimeArtifact
     type:             float
     standard:         true
-    since:            "0.1.0"
+    shortdoc: "Kernel mode time of exec'd process since starting"
     doc: """
-The amount of time the process has spent in kernel mode since starting, in seconds.
+The amount of time the process has spent in kernel mode since
+starting, in seconds.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -992,10 +1485,13 @@ keyspec _PROCESS_CHILDREN_UTIME {
     type:             float
     standard:         true
     since:            "0.1.0"
+    shortdoc: "User mode time of exec'd process children"
     doc: """
 User mode time of the proc's waited-for children.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1004,10 +1500,13 @@ keyspec _PROCESS_CHILDREN_STIME {
     type:             float
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Kernel mode time of exec'd process children"
     doc: """
 Kernel mode time of the proc's waited-for children.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1016,10 +1515,13 @@ keyspec _PROCESS_STATE {
     type:             string
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Process state of exec'd process at time of report"
     doc: """
 The state of the process (e.g, Running, Sleeping, Zombie, ...)
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1028,10 +1530,13 @@ keyspec _PROCESS_PGID {
     type:             int
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Process group ID od exec'd process"
     doc: """
 The process group associated with the process.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1040,10 +1545,13 @@ keyspec _PROCESS_UMASK {
     type:             int
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Umask of exec'd process"
     doc: """
 The umask associated with the process.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1052,10 +1560,14 @@ keyspec _PROCESS_UID {
     type:             list[int]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "UID info for exec'd process"
     doc: """
-A list containing the real, effective, saved and fs UID of the process.
+A list containing the real, effective, saved and fs UID of the
+process.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1064,10 +1576,14 @@ keyspec _PROCESS_GID {
     type:             list[int]
     standard:         true
     since:            "0.1.0"
+    since:            "0.1.0"
     doc: """
-A list containing the real, effective, saved and fs GID of the process.
+A list containing the real, effective, saved and fs GID of the
+process.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1077,10 +1593,13 @@ keyspec _PROCESS_NUM_FD_SIZE {
     type:             int
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Allocated file descriptors for exec'd process"
     doc: """
 The number of allocated file descriptors.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1089,10 +1608,13 @@ keyspec _PROCESS_GROUPS {
     type:             list[int]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Supplemental groups for exec'd process"
     doc: """
 A list of the supplementary groups to which the process belongs.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1101,10 +1623,13 @@ keyspec _PROCESS_SECCOMP_STATUS {
     type:             string
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Seccomp status of exec'd process"
     doc: """
-The process' Seccomp status ('disabled', 'strict' or 'filter').
+The process' Seccomp status (`disabled`, `strict` or `filter`).
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1113,10 +1638,14 @@ keyspec _PROCESS_ARGV {
     type:             list[string]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Exec'd process argv via proc"
     doc: """
-The arv as reported via proc for the exec'd process we are reporting on.
+The arv as reported via proc for the exec'd process we are reporting
+on.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1125,10 +1654,13 @@ keyspec _PROCESS_CWD {
     type:             string
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Exec'd process CWD"
     doc: """
 The current working directory of the process.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1137,10 +1669,13 @@ keyspec _PROCESS_EXE_PATH {
     type:             string
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Exec'd process's local path on file system"
     doc: """
 The path to the executable of the process being reported on.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1149,10 +1684,13 @@ keyspec _PROCESS_COMMAND_NAME {
     type:             string
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Name of exec'd command"
     doc: """
 The current name of the process image being reported on.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1161,13 +1699,12 @@ keyspec _PROCESS_FD_INFO {
     type:             dict[string, dict[string, string]]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Info on file descriptors of exec'd process"
     doc: """
 Returns information for all file descriptors in the process.
 Keys are file descriptor numbers, but encoded as a string.
 
 Values are dictionaries of info that vary based on the file type.
-
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
 """
 }
 
@@ -1176,10 +1713,13 @@ keyspec _PROCESS_MOUNT_INFO {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Mount info reported for exec'd process"
     doc: """
 A list of mounts available to the process.
 
-Currently, this is only available during a 'chalk exec' operation, where Chalk has been configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation,
+where Chalk has been configured to report when spawning the container
+entry point.
 """
 }
 
@@ -1187,8 +1727,10 @@ keyspec _OP_ALL_IMAGE_METADATA {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
+    shortdoc:         "Reported metadata from image inspect"
     doc: """
-All reported metadata for am image as examined, in JSON format.  With docker, this is equivolent to running 'docker inspect' on the image.
+All reported metadata for am image as examined, in JSON format. With
+docker, this is equivolent to running `docker inspect` on the image.
 """
 }
 
@@ -1196,47 +1738,56 @@ keyspec _OP_ALL_CONTAINER_METADATA {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
+    shortdoc:         "Reported metadata from running container inspect"
     doc: """
-All reported metadata for the running container, as reported by the container runtime, in JSON format.  With docker, this is equivolent to running 'docker inspect' on a running container.
+All reported metadata for the running container, as reported by the
+container runtime, in JSON format. With docker, this is equivolent to
+running `docker inspect` on a running container.
 """
 }
 
 keyspec _IMAGE_ID {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
+    shortdoc: "Reported image ID for a container"
     doc: """
-The image ID associated with a container image.
+The image ID reported by docker for a container image.
 """
 }
 
 keyspec _IMAGE_COMMENT {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
+    shortdoc: "Comment reported for a container image"
     doc: """
+Any comment explicitly set for the image.
 """
 }
 
 keyspec _IMAGE_CREATION_DATETIME {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
+    shortdoc: "Reported creation date and time for a container image"
     doc: """
+The DATETIME formatted string for the reported container image
+creation time.
 """
 }
 
 keyspec _IMAGE_DOCKER_VERSION {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_AUTHOR {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
@@ -1246,261 +1797,279 @@ keyspec _IMAGE_ARCHITECTURE {
     kind: RunTimeArtifact
     type: string
     standard: true
+    shortdoc: "Architecture reported for a container image"
     doc: """
+The reported architecture that the image was built for.
 """
 }
 
 keyspec _IMAGE_VARIANT {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_OS {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
+    shortdoc: "OS for which a container image was built"
     doc: """
+Linux. The answer is linux.
 """
 }
 
 keyspec _IMAGE_OS_VERSION {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_SIZE {
-    kind: RunTimeArtifact
-    type: int
+    kind:     RunTimeArtifact
+    type:     int
     standard: true
+    shortdoc: "Size of container image"
     doc: """
+The reported size of the image.
 """
 }
 
 keyspec _IMAGE_ROOT_FS_TYPE {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_ROOT_FS_LAYERS {
-    kind: RunTimeArtifact
-    type: list[string]
+    kind:     RunTimeArtifact
+    type:     list[string]
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_HOSTNAME {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_DOMAINNAME {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_USER {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_EXPOSED_PORTS {
-    kind: RunTimeArtifact
-    type: dict[string, dict[string, `x]]
+    kind:     RunTimeArtifact
+    type:     dict[string, dict[string, `x]]
     standard: true
+    shortdoc: "Exposed ports allowed for container instance"
     doc: """
+Explicitly configured ports that instances of the image may bind to on
+external interfaces. The keys will be of the form 'port/family', e.g.,
+`446/tcp`. The values are info about specific interfaces where those
+ports are bound, if provided. Otherwise, it's expected to be across
+all interfaces.
 """
 }
 
 keyspec _IMAGE_ENV {
-    kind: RunTimeArtifact
-    type: list[string]
+    kind:     RunTimeArtifact
+    type:     list[string]
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_CMD {
-    kind: RunTimeArtifact
-    type: list[string]
+    kind:     RunTimeArtifact
+    type:     list[string]
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_NAME {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
+    shortdoc: "Reported image name for a container instance"
     doc: """
+The image name associated with a container, as reported by the
+runtime.
 """
 }
 
 keyspec _IMAGE_HEALTHCHECK_TEST {
-    kind: RunTimeArtifact
-    type: list[string]
+    kind:     RunTimeArtifact
+    type:     list[string]
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_HEALTHCHECK_INTERVAL {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_HEALTHCHECK_TIMEOUT {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_HEALTHCHECK_START_PERIOD {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_HEALTHCHECK_START_INTERVAL {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_HEALTHCHECK_RETRIES {
-    kind: RunTimeArtifact
-    type: int
+    kind:     RunTimeArtifact
+    type:     int
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_MOUNTS {
-    kind: RunTimeArtifact
-    type: dict[string, `x]
+    kind:     RunTimeArtifact
+    type:     dict[string, `x]
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_WORKINGDIR {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_ENTRYPOINT {
-    kind: RunTimeArtifact
-    type: list[string]
+    kind:     RunTimeArtifact
+    type:     list[string]
     standard: true
+    shortdoc: "Reported entrypoint for a container image"
     doc: """
+The path to the command within the contained file system, relative to
+the root of the environment.
 """
 }
 
 keyspec _IMAGE_NETWORK_DISABLED {
-    kind: RunTimeArtifact
-    type: bool
+    kind:     RunTimeArtifact
+    type:     bool
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_MAC_ADDR {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_ONBUILD {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_LABELS {
-    kind: RunTimeArtifact
-    type: dict[string, string]
+    kind:     RunTimeArtifact
+    type:     dict[string, string]
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_STOP_SIGNAL {
-    kind: RunTimeArtifact
-    type: int
+    kind:     RunTimeArtifact
+    type:     int
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_STOP_TIMEOUT {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_SHELL {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_VIRTUAL_SIZE {
-    kind: RunTimeArtifact
-    type: int
+    kind:     RunTimeArtifact
+    type:     int
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_LAST_TAG_TIME {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: """
 """
 }
 
 keyspec _IMAGE_STORAGE_METADATA {
-    kind: RunTimeArtifact
-    type: dict[string, string]
+    kind:     RunTimeArtifact
+    type:     dict[string, string]
     standard: true
     doc: """
 """
@@ -1514,8 +2083,8 @@ keyspec _STORE_URI {
     since:               "0.1.0"
     apply_substitutions: true
     doc:                 """
-URI where an artifact is none to have been stored, generally as a part of the
-current operation.
+URI where an artifact is none to have been stored, generally as a part
+of the current operation.
 """
 }
 
@@ -1525,7 +2094,8 @@ keyspec _INSTANCE_CONTAINER_ID {
     type:             string
     standard:         true
     doc: """
-Any reported instance ID, such as the container ID for a running container.
+Any reported instance ID, such as the container ID for a running
+container.
 """
 }
 
@@ -1534,7 +2104,8 @@ keyspec _INSTANCE_CREATION_DATETIME {
     type:             string
     standard:         true
     doc: """
-The DATETIME formatted string for the reported container creation time.
+The DATETIME formatted string for the reported container creation
+time.
 """
 }
 
@@ -1543,7 +2114,8 @@ keyspec _INSTANCE_ENTRYPOINT_PATH {
     type:             string
     standard:         true
     doc: """
-The path to the command, if running in a containerized / virtual environment.  The path is relative to the root of the environment.
+The path to the command, if running in a containerized / virtual
+environment.  The path is relative to the root of the environment.
 """
 }
 
@@ -1551,6 +2123,7 @@ keyspec _INSTANCE_ENTRYPOINT_ARGS {
     kind:             RunTimeArtifact
     type:             list[string]
     standard:         true
+    shortdoc: "Reported arguments passed to a container instance"    
     doc: """
 The arguments used when starting the instance.
 """
@@ -1560,82 +2133,93 @@ keyspec _INSTANCE_ENV {
     kind:             RunTimeArtifact
     type:             list[string]
     standard:         true
+    shortdoc: "Reported environment variables for a container instance"
     doc: """
-Environment variables made available to the instance, in VAR=value format.
+Environment variables made available to the instance, in VAR=value
+format.
 """
 }
 
 keyspec _INSTANCE_RESOLVE_CONF_PATH {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: ""
 }
 
 keyspec _INSTANCE_HOSTNAME_PATH {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: ""
 }
 
 keyspec _INSTANCE_HOSTS_PATH {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: ""
 }
 
 keyspec _INSTANCE_LOG_PATH {
-    kind: RunTimeArtifact
-    type: string
+    kind:     RunTimeArtifact
+    type:     string
     standard: true
     doc: ""
 }
 
 keyspec _INSTANCE_IMAGE_ID {
-    kind:             RunTimeArtifact
-    type:             string
-    standard:         true
+    kind:     RunTimeArtifact
+    type:     string
+    standard: true
+    shortdoc: "Reported _image_ ID for a container instance"
     doc: """
-The image ID associated with the instance, as a hash.  Will generally
-be lower-case ASCII prefixed with 'sha256:'
+The image ID associated with the instance, as a hash. Will generally
+be lower-case ASCII prefixed with the string `sha256:`
 """
 }
 
 keyspec _INSTANCE_STATUS {
-    kind:             RunTimeArtifact
-    type:             string
-    standard:         true
+    kind:     RunTimeArtifact
+    type:     string
+    standard: true
+    shortdoc: "Reported status info for a container instance"
     doc: """
-The status of a container or virtual instance (running, paused, stopped, etc) as reported by the container runtime.
+The status of a container or virtual instance (running, paused,
+stopped, etc) as reported by the container runtime.
 """
 }
 
 keyspec _INSTANCE_PID {
-    kind:             RunTimeArtifact
-    type:             int
-    standard:         true
+    kind:     RunTimeArtifact
+    type:     int
+    standard: true
+    shortdoc: "Reported pid for container instance"
     doc: """
-The process ID of the instance as reported by the container runtime.  This will generally be the actual PID, not a virtualized PID.
+The process ID of the instance as reported by the container
+runtime. This will generally be the actual PID, not a virtualized PID.
 """
 }
 
 keyspec _INSTANCE_NAME {
-    kind:             RunTimeArtifact
-    type:             string
-    standard:         true
+    kind:     RunTimeArtifact
+    type:     string
+    standard: true
+    shortdoc: "Reported container instance name"
     doc: """
-The name this instance has been given by the container runtime.
+The name this container instance has been given by the container
+runtime.
 """
 }
 
 keyspec _INSTANCE_RESTART_COUNT {
-    kind:             RunTimeArtifact
-    type:             int
-    standard:         true
+    kind:     RunTimeArtifact
+    type:     int
+    standard: true
+    shortdoc: "Reported instance restart count"
     doc: """
-The number of restarts the runtime reports associated with the container.
+The number of restarts the runtime reports associated with the
+container.
 """
 }
 
@@ -1647,19 +2231,22 @@ keyspec _INSTANCE_DRIVER {
 }
 
 keyspec _INSTANCE_PLATFORM {
-    kind:             RunTimeArtifact
-    type:             string
-    standard:         true
+    kind:     RunTimeArtifact
+    type:     string
+    standard: true
+    shortdoc: "Reported platform of container instance"
     doc: """
 Platform of an instance, as reported by the runtime.
 """
 }
 
 keyspec _INSTANCE_MOUNT_LABEL {
-    kind:             RunTimeArtifact
-    type:             string
-    standard:         true
+    kind:     RunTimeArtifact
+    type:     string
+    standard: true
+    shortdoc: "Reported mount labels for an instance"
     doc: """
+Mounts labels associated with the running container.
 """
 }
 
@@ -1766,6 +2353,7 @@ keyspec _INSTANCE_ADDED_CAPS {
     kind: RunTimeArtifact
     type: list[string]
     standard: true
+    shortdoc: "Reported capabilities added to container instance"
     doc: """
 Capabilities explicitly added to an instance.
 """
@@ -1775,9 +2363,10 @@ keyspec _INSTANCE_DROPPED_CAPS {
     kind: RunTimeArtifact
     type: list[string]
     standard: true
+    shortdoc: "Reported capabilities dropped from container instance"
     doc: """
 Capabilities explicitly dropped from an instance.
- """
+"""
 }
 
 keyspec _INSTANCE_CGROUP_NS_MODE {
@@ -1833,8 +2422,10 @@ keyspec _INSTANCE_CGROUP {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
+    shortdoc: "Reported cgroup for container instance"
     doc: """
-CGroup associated with the instance, as reported by the container runtime
+CGroup associated with the instance, as reported by the container
+runtime
 """
 }
 
@@ -1863,8 +2454,10 @@ keyspec _INSTANCE_IS_PRIVILEGED {
     kind: RunTimeArtifact
     type: bool
     standard: true
+    shortdoc: "Reported priv status for container instance"
     doc: """
-Whether or not the workload is running with admin privileges on the underlying node.
+Whether or not the workload is running with admin privileges on the
+underlying node.
 """
 }
 
@@ -1880,7 +2473,8 @@ keyspec _INSTANCE_READONLY_ROOT_FS {
     type:             bool
     standard:         true
         doc: """
-Whether the root file system is immutable.  Note that this does not preclude filesystem mounts that allow writing.
+Whether the root file system is immutable.  Note that this does not
+preclude filesystem mounts that allow writing.
 """
 }
 
@@ -1916,18 +2510,20 @@ keyspec _INSTANCE_RUNTIME {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
+    shortdoc: "Reported container runtime"
     doc: """
 The container runtime associated with the instance.
- """
-
+"""
 }
 
 keyspec _INSTANCE_ISOLATION {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
+    shortdoc: "Reported isolation technology for container instance"
     doc: """
-Isolation technology in use for the instance, if reported by the container runtime.
+Isolation technology in use for the instance, if reported by the
+container runtime.
 """
 }
 
@@ -2168,27 +2764,30 @@ keyspec _INSTANCE_HOSTNAME {
     kind: RunTimeArtifact
     type: string
     standard: true
+    shortdoc: "Reported container hostname"
     doc: """
 The hostname of the instance, if reported by the container runtime.
- """
+"""
 }
 
 keyspec _INSTANCE_DOMAINNAME {
     kind: RunTimeArtifact
     type: string
     standard: true
+    shortdoc: "Reported container domainname"
     doc: """
 The domain name of the instance, if any.
- """
+"""
 }
 
 keyspec _INSTANCE_USER {
     kind: RunTimeArtifact
     type: string
     standard: true
+    shortdoc: "Reported container userid info"
     doc: """
 The user reported by the runtime, if any.
- """
+"""
 }
 
 
@@ -2217,14 +2816,23 @@ keyspec _INSTANCE_EXPOSED_PORTS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    shortdoc: "Exposed ports for container instance"
+    doc: """
+Information on exposed ports from the runtime. The keys will be of the
+form 'port/family', e.g., `446/tcp`. The values are info about
+specific interfaces where those ports are bound, if
+provided. Otherwise, it's expected to be across all interfaces.
+"""    
 }
 
 keyspec _INSTANCE_HAS_TTY {
     kind:             RunTimeArtifact
     type:             bool
     standard:         true
-    doc: "Whether the instance is using a TTY."
+    shortdoc: "Whether container is using a tty"
+    doc: """
+Whether the instance is using a TTY.
+"""
 }
 
 keyspec _INSTANCE_OPEN_STDIN {
@@ -2287,7 +2895,10 @@ keyspec _INSTANCE_LABELS {
     kind:             RunTimeArtifact
     type:             dict[string, string]
     standard:         true
-    doc: "Labels attached to the instance."
+    shortdoc: "Labels attached to container instance"
+    doc: """
+Reported labels attached to the instance.
+"""
 }
 
 keyspec _INSTANCE_BRIDGE {
@@ -2330,7 +2941,10 @@ keyspec _INSTANCE_BOUND_PORTS {
     type:             dict[string, dict[string, `x]]
     standard:         true
     doc: """
-Information on bound ports from the runtime.  The keys will be of the form 'port/family', e.g., 446/tcp'.  The values are info about specific interfaces where those ports are bound, if provided.  Otherwise, it's expected to be across all interfaces.
+Information on bound ports from the runtime.  The keys will be of the
+form 'port/family', e.g., 446/tcp'.  The values are info about
+specific interfaces where those ports are bound, if provided.
+Otherwise, it's expected to be across all interfaces.
 """
 }
 
@@ -2366,16 +2980,20 @@ keyspec _INSTANCE_GATEWAY {
     kind: RunTimeArtifact
     type: string
     standard: true
+    shortdoc: "Network gateway (v4) for container instance"
     doc: """
 The network gateway used by the instance.
- """
+"""
 }
 
 keyspec _INSTANCE_GLOBAL_IPV6_ADDRESS {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    doc: ""
+    shortdoc: "IPv6 address for instance"
+    doc: """
+The externally bound IPv6 address for a container instance.
+"""    
 }
 
 keyspec _INSTANCE_GLOBAL_IPV6_PREFIX_LEN {
@@ -2389,7 +3007,10 @@ keyspec _INSTANCE_IP {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: "The primary IPv4 address for the instance."
+    shortdoc: "Primary IP for container instance"
+    doc: """
+The primary IPv4 address for the instance.
+"""
 }
 
 keyspec _INSTANCE_IP_PREFIX_LEN {
@@ -2412,8 +3033,10 @@ keyspec _INSTANCE_MAC {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
+    shortdoc: "MAC address for container instance"
     doc: """
-The MAC address associated with the instance's primary network instance.
+The MAC address associated with the instance's primary network
+instance.
 """
 }
 
@@ -2430,8 +3053,8 @@ keyspec _REPO_TAGS {
     standard:         true
     since:            "0.1.0"
     doc: """
-When reporting on operations involving a repository (e.g., a push or pull), any
-tags associated with the artifact in the operation.
+When reporting on operations involving a repository (e.g., a push or
+pull), any tags associated with the artifact in the operation.
 """
 }
 
@@ -2441,8 +3064,9 @@ keyspec _REPO_DIGESTS {
     standard:         true
     since:            "0.1.0"
     doc: """
-When reporting on operations involving a repository (e.g., a push or pull), any
-SHA256 digests associated with the artifact in the operation, mapped to the associated tag.
+When reporting on operations involving a repository (e.g., a push or
+pull), any SHA256 digests associated with the artifact in the
+operation, mapped to the associated tag.
 """
 }
 
@@ -2452,7 +3076,9 @@ keyspec _FOUND_BASE_MARK {
     standard:         true
     since:            "0.1.0"
     doc: """
-When extracting from a docker image that is unmarked at the top layer, if lower layers are searched, this will be set to the found values of CHALK_ID and METADATA_ID, in the highest layer where a mark was found.
+When extracting from a docker image that is unmarked at the top layer,
+if lower layers are searched, this will be set to the found values of
+CHALK_ID and METADATA_ID, in the highest layer where a mark was found.
 
 These values will not have been validated.
 """
@@ -2492,8 +3118,19 @@ keyspec _ACTION_ID {
     conf_as_system:   true
     ~callback:        func call_rand
     since:            "0.1.0"
-    doc:              "Unique identifier per-action (i.e., per run of chalk), " +
-                      "Which is a 64-bit random value presented as hex digits."
+    shortdoc: "Unique ID per chalk report"
+    doc:              """
+This is a unique identifier generated for the current run of chalk. It
+is not insertable into chalk marks, but may appear in any host report.
+
+The purpose of this value is to ensure every chalk action has a unique
+identifier, if desired.
+
+The value is a 64-bit (secure) random value, encoded as hex.
+
+While there is a config-file callback associated with this metadata
+key, it is set by the system, and cannot be overriden by the user.
+"""
 }
 
 keyspec _ARGV {
@@ -2507,15 +3144,34 @@ keyspec _ARGV {
     doc:              "The full contents of argv used on invocation"
 }
 
-
 keyspec _ENV {
     kind:             RunTimeHost
     type:             dict[string, string]
     standard:         true
     system:           true
     since:            "0.1.0"
+    shortdoc: "Enviornment variables during the current Chalk op"
     doc:              """
-Same as INJECTOR_ENV, but for a non-chalking context (e.g., extraction time). It respects the same environment variables.
+This field, which can only appear in reports, contains information
+about environment variables at the time of ANY chalk invocation. For a
+chalkable version, see the documentation for `INJECTOR_ENV`.
+
+Because chalk may be used to proxy container entry points that could
+contain sensitive data, we support to redacting environment variables,
+including skipping them outright. The behavior is configured with the
+following configuration attributes:
+
+- **env_always_show**, a list of environment variables to show unredacted.
+- **env_never_show**, a list of environment variables NOT to show in this
+  report.
+- **env_redact**, a list of environment variables to redact.
+- **env_default_action**, a value ("show", "redact", "ignore") that
+  indicates what to do for unnamed environment variables. This defaults to
+  "redact".
+
+Currently, this filtering is not handled per-report, meaning
+`INJECTOR_ENV` and `_ENV` will always be identical if you attempt to
+collect both at chalk time.
 """
 }
 
@@ -2524,8 +3180,12 @@ keyspec _TENANT_ID {
     type:             string
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Tenant info during the current chalk operation"
     doc:              """
-A user-defined unique identifier intended to capture any meaningful user data.
+Akin to `TENANT_ID_WHEN_CHALKED`, but will not be added to a chalk
+mark, and can be set for any given operation. The default OSS
+configuration never sets this value, but it can be configured
+manually, or in binaries created by tooling.
 """
 }
 
@@ -2537,8 +3197,36 @@ keyspec _OPERATION {
     system:           true
     since:            "0.1.0"
     normalized_order: 0
-    doc:              "Added to reporting data to distinguish operations. " +
-                      "Not intended for artifact embedding."
+    shortdoc: "Operation name for operation being reported on"
+    doc:              """
+This field can be provided for any chalk report, and represents the
+top-level command used to invoke chalk. The value might be slightly
+different from the one invoked on the command line, even though it is
+often the same.
+
+This field will always be one of the following values:
+
+ - `insert`, created via `chalk insert`
+ - `extract`, created via `chalk extract`
+ - `build`, created via `chalk docker` commands that build a container.
+ - `push`, created via `chalk docker` commands that push a container
+   (at which point we collect data to link the build image to the pushed image).
+ - `exec`, created when `chalk exec` is used to spawn a process.
+ - `heartbeat`, used for subsequent reports when `chalk exec` is used.
+ - `delete`, created via `chalk delete`
+ - `env`, created when `chalk env` is called to create a moment-in-time report
+   for a current environment.
+ - `load`, created when a new configuration is inserted into a chalk binary. 
+ - `setup`, used for reporting on self-chalking after `chalk setup` is run.
+ - `docker`, created for other (unhandled) docker commands, but not used in the
+    default configuration.
+
+These values correspond to the names used by the `outconf`
+configuration section for setting up report I/O.
+
+The `help`, `dump`, `version`, and `defaults` commands do not ever
+generate reports.
+"""
 }
 
 keyspec _TIMESTAMP {
@@ -2549,7 +3237,16 @@ keyspec _TIMESTAMP {
     conf_as_system:   true
     since:            "0.1.0"
     normalized_order: 1
-    doc:              "Milliseconds since the Unix epoch for the current op."
+    shortdoc: "Time (as integer) associated with operation being reported on"
+    doc:              """
+For the current operation only, this represents the number of
+milliseconds since the Unix epoch. See the documentation for the
+`TIMESTAMP` key for more details.
+
+This is collected and reported on a per-chalk-invocation basis, not on
+a per-software-artifact basis. It also cannot be directly added to a
+chalk mark (but can be in a report for any chalk operation).
+"""
 }
 
 keyspec _DATE {
@@ -2560,7 +3257,12 @@ keyspec _DATE {
     conf_as_system:   true
     since:            "0.1.0"
     normalized_order: 2
-    doc:              "_TIMESTAMP, converted to a date string, in the local time zone."
+    shortdoc: "Date associated with operation being reported on"
+    doc:              """
+A human-readable date associated with the operation currently being
+reported on. This is derived from the same value used if `_TIMESTAMP`
+is reported.
+"""
 }
 
 keyspec _TIME {
@@ -2571,7 +3273,15 @@ keyspec _TIME {
     conf_as_system:   true
     since:            "0.1.0"
     normalized_order: 3
-    doc:              "_TIMESTAMP, converted to the current time, in the local time zone."
+    shortdoc: "Time associated with operation being reported on"
+    doc:              """
+A human-readable string containing the time associated with the
+operation currently being reported on. This is derived from the same
+value used if `_TIMESTAMP` is reported.
+
+This value is reported based on the clock and time zone of the machine
+performing the chalk operation.
+"""
 }
 
 keyspec _TZ_OFFSET {
@@ -2582,7 +3292,10 @@ keyspec _TZ_OFFSET {
     conf_as_system:   true
     since:            "0.1.0"
     normalized_order: 4
-    doc:              "Time Zone offset from UTC for the current operation."
+    shortdoc: "Timezone on host during operation being reported on"
+    doc:              """
+The Time Zone offset from UTC for the current chalk operation.
+"""
 }
 
 keyspec _DATETIME {
@@ -2593,10 +3306,12 @@ keyspec _DATETIME {
     conf_as_system:    true
     since:             "0.1.0"
     normalized_order:  5
-    doc:               "Full ISO-8601 Date-time w/ Timezone offset for the " +
-                       "current operation."
+    shortdoc: "Date and time (as string) for operation being reported on"
+    doc:               """
+A full ISO-8601 Date-time w/ timezone offset for the current
+operation, derived from the same value used to set the _TIMESTAMP key.
+"""
 }
-
 
 keyspec _CHALKS {
     kind:             RunTimeHost
@@ -2605,9 +3320,15 @@ keyspec _CHALKS {
     system:           true
     since:            "0.1.0"
     normalized_order: 6
-    doc:              "Used to report chalks the operation worked on. " +
-                      "A host report without this key set will not output " +
-		      "chalks"
+    shortdoc: "Contains software artifact information for the current operation"
+    doc:              """
+Used to report chalks the operation worked on.
+
+**IMPORTANT!**
+
+Host reports using a profile that does not configure this key to
+report will NOT output chalks.
+"""
 }
 
 keyspec _OP_CHALK_COUNT {
@@ -2617,9 +3338,12 @@ keyspec _OP_CHALK_COUNT {
     system:           true
     since:            "0.1.0"
     normalized_order: high() - 100
-    doc:              "The number of chalks the operation worked on, meant " +
-                      "primarily for contexts where the chalks themselves " +
-		      "are not being reported."
+    shortdoc: "How many software artifacts are reported in _CHALKS"
+    doc:              """
+The number of chalks the operation worked on, meant primarily for
+contexts where the chalks themselves are not being reported, such as
+when reporting on aggregate stats.
+"""
 }
 
 keyspec _OP_UNMARKED_COUNT {
@@ -2629,8 +3353,15 @@ keyspec _OP_UNMARKED_COUNT {
     system:           true
     since:            "0.1.0"
     normalized_order: high() - 90
+    shortdoc: "Unmarked software artifact count in current operation"
     doc:              """
-The number of unmarked artifacts that codecs saw. For inserts, this will be items seen but ignored. For other ops, it will be artifacts w/o chalk marks.
+The number of unmarked artifacts that codecs saw in the current
+operation. For inserts, this number will represent the number of items
+that come codec was willing to chalk, except that the configuration
+indicated to ignore the file (which will frequently happen with
+scripts in a `.git` directory, for instance). For non-insertion
+operations, the value will represent the number of software artifacts
+processed that did not contain chalk marks.
 """
 }
 
@@ -2640,8 +3371,14 @@ keyspec _OP_CMD_FLAGS {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "Fully resolved command-line flags and values used in " +
-                      "the current command invocation."
+    shortdoc:         "Command flags w/ values for Chalk invocation, after any processing."
+    doc:              """
+Fully resolved command-line flags and values used in the current chalk
+command's invocation.
+
+This is slightly different from `_ARGV` in that arguments may have
+experienced some processing.
+"""
 }
 
 keyspec _OP_SEARCH_PATH {
@@ -2650,8 +3387,11 @@ keyspec _OP_SEARCH_PATH {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 1000500
-    doc:              "Artifact search path used for the current command"
+    shortdoc:         "Search path for software used in the current operation"
+    doc:              """
+The artifact search path used for the current chalk command's attempt
+to locate chalked artifacts.
+"""
 }
 
 keyspec _OP_EXE_NAME {
@@ -2660,8 +3400,15 @@ keyspec _OP_EXE_NAME {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 1000600
-    doc:              "The executable name, approximately argv[0]"
+    shortdoc:         "Executable name for current chalk invocation"
+    doc:              """
+The executable name for the current chalk invocation, which is
+approximately argv[0].
+
+This key attemtps to use information from the command-line invocation
+of chalk, instead of system-specific information on running processes
+(see `_PROCESS_COMMAND_NAME`).
+"""
 }
 
 keyspec _OP_EXE_PATH {
@@ -2670,9 +3417,15 @@ keyspec _OP_EXE_PATH {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 1000700
-    doc:              "The local path to this chalk executable (does not " +
-                      "include the actual exe name"
+    shortdoc:         "Local path to chalk exe for current invocation"
+    doc:              """
+The local path to the chalk executable for the current
+invocation. This generally does not include the actual exe name.
+
+This key attemtps to use information from the command-line invocation
+of chalk, instead of system-specific information on running processes
+(see `_PROCESS_EXE_PATH`).
+"""
 }
 
 keyspec _OP_ARGV {
@@ -2681,10 +3434,12 @@ keyspec _OP_ARGV {
     standard:       true
     system:         true
     since:          "0.1.0"
-    normalized_order : 1000800
+    shortdoc: "Command-line arguments for the current Chalk op"    
     doc:              """
-Full value of the command-line as passed to the process; should contain the
-raw data used to determine _OP_EXE_NAME, _OP_SEARCH_PATH and _OP_CMD_FLAGS
+This field contains the full contents of the command line arguments
+used to invoke `chalk` for the current invocation. This field cannot
+be inserted into chalk marks, but will have the same value as the
+`INJECTOR_ARGV` key on any insertion operations.
 """
 }
 
@@ -2694,11 +3449,11 @@ keyspec _OP_CONFIG {
     standard:         true
     system:           true
     since:            "0.1.0"
-    normalized_order: 1000900
+    shortdoc:         "Contents of user-definable external config"
     doc:              """
-The contents of any user-definable configuration file, if an external
- configuration file is used (otherwise, even if requested, no value will be
- returned)
+The contents of any user-definable configuration file used in the
+current operation, if an external configuration file is used at all
+(otherwise, even if requested, no value will be returned)
 """
 }
 
@@ -2708,8 +3463,14 @@ keyspec _UNMARKED {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "Artifacts seen in the artifact search path that were " +
-                      "not marked."
+    shortdoc:         "List of unmarked artifacts for current operation"
+    doc:              """
+A list of artifact path information for any artifacts identified
+during the current operation that were NOT marked. For insertion, this
+means artifacts a codec should have processed but didn't due to
+error. Otherwise, it will indicate a software artifact that the system
+could have marked, but where no mark was found.
+"""
 }
 
 keyspec _OP_CHALKER_COMMIT_ID {
@@ -2718,7 +3479,11 @@ keyspec _OP_CHALKER_COMMIT_ID {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "The commit hash or id for this chalk command."
+    shortdoc:         "Repo commit ID for binary used in current operation"
+    doc:              """
+The commit hash of the repository used to build the chalk binary used
+in the current operation.
+"""
 }
 
 keyspec _OP_CHALKER_VERSION {
@@ -2727,7 +3492,11 @@ keyspec _OP_CHALKER_VERSION {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "Version info for this chalk command."
+    shortdoc:         "Chalk version for Chalk binary used in current operation"
+    doc:              """
+Version information for the chalk command used in the current chalk
+invocation.
+"""
 }
 
 keyspec _OP_PLATFORM {
@@ -2735,7 +3504,10 @@ keyspec _OP_PLATFORM {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "The platform information for this chalk command."
+    shortdoc:         "Platform info for current information"
+    doc:              """
+Platform info (os and architecture) for the current chalk invocation.
+"""
 }
 
 keyspec _OP_HOSTNAME {
@@ -2743,7 +3515,11 @@ keyspec _OP_HOSTNAME {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "Hostname information for this chalk command."
+    shortdoc:         "Hostname info during the current chalk invocation"
+    doc:              """
+ Hostname information found that is associated with the machine on
+ which the current chalk command was executed.
+"""
 }
 
 keyspec _OP_HOSTINFO {
@@ -2751,8 +3527,13 @@ keyspec _OP_HOSTINFO {
     type:             string
     standard:         true
     since:            "0.1.0"
-    doc:              "Detailed host info reported at the time of the " +
-                      "operation.  System provides a default."
+    shortdoc:         "Detailed host info from current operation"
+    doc:              """
+This returns information about the host on which the urrent operation
+occured, collected at the the time of that operation. On posix
+systems, it's taken from the 'version' field obtained from a call to
+the `uname()` system call.
+"""
 }
 
 keyspec _OP_NODENAME {
@@ -2761,7 +3542,8 @@ keyspec _OP_NODENAME {
     standard:         true
     since:            "0.1.0"
     doc:              """
-The node name at the time of the current operation. On posix systems, this should be equivolent to the uname 'nodename' field.
+The node name at the time of the current operation. On posix systems,
+this should be equivolent to the uname 'nodename' field.
 """
 }
 
@@ -2770,8 +3552,12 @@ keyspec _OP_CLOUD_METADATA {
     type:             string
     standard:         true
     since:            "0.1.0"
+    shortdoc:         "Cloud metadata during current operation"    
     doc:              """
-Metadata reported by the local cloud provider.  The contents are specific to the provider, but should generally be a string that can itself be interpreted as JSON.
+Deprecated, and only available for the simplest of AWS environments.
+
+Instead, please use individual metadata fields for cloud provider
+metadata.
 """
 }
 
@@ -2781,7 +3567,12 @@ keyspec _OP_ERRORS {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "Errors on the current operation."
+    shortdoc:         "Errors identified for current operation."
+    doc:              """
+Errors identified during the current operation, not associated with a
+particular artifact. See the documentation for `ERR_INFO`, which
+shares the same log-level configuration.
+"""    
 }
 
 keyspec _OP_HOST_REPORT_KEYS {
@@ -2790,8 +3581,13 @@ keyspec _OP_HOST_REPORT_KEYS {
     standard:         true
     system:           true
     since:            "0.1.0"
-    doc:              "For insert operations only, a list of all keys that " +
-                      "were added to the chalk"
+    shortdoc: "Host keys used in primary report; insertion only"
+    doc:             """
+Collected for `chalk insert` operations only, a list of all
+_host-level_ key names that will reported on in the primary operation
+report. This is primarily intended for auxillary (custom) reports
+where the full contents are not being duplicated.
+"""
 }
 
 keyspec _OP_TCP_SOCKET_INFO {
@@ -2799,8 +3595,11 @@ keyspec _OP_TCP_SOCKET_INFO {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Local TCP socket info during run-time exec op"    
     doc: """
-On Linux machines, will return information about existing TCP sockets, to the degree that the chalk process has permissions to access this information.
+On Linux machines, will return information about existing TCP sockets,
+to the degree that the chalk process has permissions to access this
+information.
 
 One socket is returned per row. The columns returned are:
 1. The local IP address in use
@@ -2811,7 +3610,8 @@ One socket is returned per row. The columns returned are:
 6. The UID of the process that owns the socket
 7. The inode associated with the socket
 
-When running Chalk inside a container, this information will be the virtualized view available insider the container.
+When running Chalk inside a container, this information will be the
+virtualized view available insider the container.
 """
 }
 
@@ -2820,8 +3620,10 @@ keyspec _OP_UDP_SOCKET_INFO {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Local UDP socket info during run-time exec op"    
     doc: """
-On Linux machines, will return UDP state information, to the degree that the chalk process has permissions to access this information.
+On Linux machines, will return UDP state information, to the degree
+that the chalk process has permissions to access this information.
 
 One socket is returned per row. The columns returned are:
 1. The local IP address in use
@@ -2832,7 +3634,8 @@ One socket is returned per row. The columns returned are:
 6. The UID of the process that owns the socket
 7. The inode associated with the socket
 
-When running Chalk inside a container, this information will be the virtualized view available insider the container.
+When running Chalk inside a container, this information will be the
+virtualized view available insider the container.
 """
 }
 
@@ -2841,8 +3644,11 @@ keyspec _OP_IPV4_ROUTES {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Local IPV4 routes during run-time exec op"    
     doc: """
-On Linux machines, will return IPV4 routing table information, to the degree that the chalk process has permissions to access this information.
+On Linux machines, will return IPV4 routing table information, to the
+degree that the chalk process has permissions to access this
+information.
 
 One route is returned per row. The columns returned are:
 1. The destination network
@@ -2857,7 +3663,8 @@ One route is returned per row. The columns returned are:
 10. The kernel's 'Window' field
 11. The kernel's 'IRTT' field
 
-When running Chalk inside a container, this information will be the virtualized view available insider the container.
+When running Chalk inside a container, this information will be the
+virtualized view available insider the container.
 """
 }
 
@@ -2865,9 +3672,12 @@ keyspec _OP_IPV6_ROUTES {
     kind:             RunTimeHost
     type:             list[list[string]]
     standard:         true
+    shortdoc: "Local IPV6 routes during run-time exec op"    
     since:            "0.1.0"
     doc: """
-On Linux machines, will return IPV6 routing table information, to the degree that the chalk process has permissions to access this information.
+On Linux machines, will return IPV6 routing table information, to the
+degree that the chalk process has permissions to access this
+information.
 
 One route is returned per row.  The columns returned are:
 1. The destination network
@@ -2881,7 +3691,8 @@ One route is returned per row.  The columns returned are:
 9. The kernel's 'Use' field
 10. The kernel's 'Metric' field
 
-When running Chalk inside a container, this information will be the virtualized view available insider the container.
+When running Chalk inside a container, this information will be the
+virtualized view available insider the container.
 """
 }
 
@@ -2890,6 +3701,7 @@ keyspec _OP_IPV4_INTERFACES {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Local IPV4 interfaces during run-time exec op"    
     doc: """
 On Linux machines, will return information on IPV4 interface status.
 
@@ -2902,7 +3714,8 @@ bytes, packets, errors, drops, fifo, frame, compressed, multicast
 The remaining columns are transmission statistics:
 bytes, packets, errors, drops, fifo, colls, carrier, compressed
 
-When running Chalk inside a container, this information will be the virtualized view available insider the container.
+When running Chalk inside a container, this information will be the
+virtualized view available insider the container.
 """
 }
 
@@ -2911,6 +3724,7 @@ keyspec _OP_IPV6_INTERFACES {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Local IPV6 interfaces routes during run-time exec op"    
     doc: """
 On Linux machines, will return information on IPV6 interface status.
 
@@ -2923,16 +3737,17 @@ The remaining columns are:
 - The kernel's 'Scope value' (see include/net/ipv6.h)
 - The kernel's 'Interface flags' (see include/linux/rtnetlink.h')
 
-When running Chalk inside a container, this information will be the virtualized view available insider the container.
+When running Chalk inside a container, this information will be the
+virtualized view available insider the container.
 """
 }
-
 
 keyspec _OP_ARP_TABLE {
     kind:             RunTimeHost
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Local ARP table during run-time exec op"    
     doc: """
 On Linux machines, will return the ARP table.
 
@@ -2944,7 +3759,8 @@ One row is returned for each ARP entry.  The columns are:
 5. The kernel's record 'Mask' field
 6. The network device from which the entry broadcasts.
 
-When running Chalk inside a container, this information will be the virtualized view available insider the container.
+When running Chalk inside a container, this information will be the
+virtualized view available insider the container.
 """
 }
 
@@ -2953,9 +3769,10 @@ keyspec _OP_CPU_INFO {
     type:             dict[string, string]
     standard:         true
     since:            "0.1.0"
+    shortdoc: "Load info during exec op; to be expanded."    
     doc: """
-Currently, this just returns CPU basic load average info, including number
-of processes.
+Currently, this just returns CPU basic load average info, including
+number of processes.
 
 The values are all presented as strings.  The current available item info is:
 
@@ -2964,7 +3781,8 @@ The values are all presented as strings.  The current available item info is:
 - runnable_procs: the number of current running processes
 - total_procs: the total number of running processes.
 
-When running Chalk inside a container, this information will be the virtualized view available insider the container.
+When running Chalk inside a container, this information will be the
+virtualized view available insider the container.
 """
 }
 
@@ -2973,8 +3791,11 @@ keyspec _OP_ALL_PS_INFO {
     type:             dict[string, dict[string, string]]
     standard:         true
     since:            "0.1.0"
+    shortdoc:         "Visible host process info found during exec op"    
     doc: """
-For every process visible to Chalk, reports key process info.  The keys are the PID as a string, even when they are clearly numeric values.
+For every process visible to Chalk, reports key process info.  The
+keys are the PID as a string, even when they are clearly numeric
+values.
 
 The values are dictionaries of information associated with that process:
 
@@ -2984,8 +3805,10 @@ The values are dictionaries of information associated with that process:
 - sid:  The session ID of the process.
 - tty_nr: The encoded TTY number for the controlling terminal of the process.
 - tpgid: The ID of the terminal's process group.
-- user_time: The amount of time the process has spent in user mode since starting, in seconds.
-- system_time: The amount of time the process has spent in kernel mode since starting, in seconds.
+- user_time: The amount of time the process has spent in user mode since
+  starting, in seconds.
+- system_time: The amount of time the process has spent in kernel mode since
+  starting, in seconds.
 - child_utime: User mode time of the proc's waited-for children.
 - child_stime: Kernel mode time of the proc's waited-for children.
 - priority: The real-time scheduler's priority field reported by Linux.
@@ -3004,7 +3827,8 @@ The values are dictionaries of information associated with that process:
 - name: The short name of the process, as determined by /proc/pid/stat
 - command: The short name of the command, as determined by proc/pid/comm
 
-When running Chalk inside a container, this information will be the virtualized view available insider the container.
+When running Chalk inside a container, this information will be the
+virtualized view available insider the container.
 """
 }
 
@@ -3014,9 +3838,11 @@ keyspec _AWS_INSTANCE_IDENTITY_DOCUMENT {
     standard:         true
     since:            "0.1.1"
     doc: """
-JSON containing instance attributes, such as instance-id, private IP address, etc. See Instance identity documents.
+JSON containing instance attributes, such as instance-id, private IP
+address, etc. See Instance identity documents.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3026,9 +3852,11 @@ keyspec _AWS_INSTANCE_IDENTITY_PKCS7 {
     standard:         true
     since:            "0.1.1"
     doc: """
-Used to verify the document's authenticity and content against the signature. See Instance identity documents.
+Used to verify the document's authenticity and content against the
+signature. See Instance identity documents.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3038,9 +3866,11 @@ keyspec _AWS_INSTANCE_IDENTITY_SIGNATURE {
     standard:         true
     since:            "0.1.1"
     doc: """
-Data that can be used by other parties to verify identity document's origin and authenticity.  See Instance identity documents.
+Data that can be used by other parties to verify identity document's
+origin and authenticity.  See Instance identity documents.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3050,9 +3880,11 @@ keyspec _AWS_INSTANCE_MONITORING {
     standard:         true
     since:            "0.1.1"
     doc: """
-Value showing whether the customer has enabled detailed one-minute monitoring in CloudWatch. Valid values: `enabled`, `disabled`.
+Value showing whether the customer has enabled detailed one-minute
+monitoring in CloudWatch. Valid values: `enabled`, `disabled`.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3064,7 +3896,8 @@ keyspec _AWS_AMI_ID {
     doc: """
 The AMI ID used to launch the instance.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3074,9 +3907,12 @@ keyspec _AWS_AMI_LAUNCH_INDEX {
     standard:         true
     since:            "0.1.1"
     doc: """
-If you started more than one instance at the same time, this value indicates the order in which the instance was launched. The value of the first instance launched is 0.
+If you started more than one instance at the same time, this value
+indicates the order in which the instance was launched. The value of
+the first instance launched is 0.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3086,9 +3922,11 @@ keyspec _AWS_AMI_MANIFEST_PATH {
     standard:         true
     since:            "0.1.1"
     doc: """
-The path to the AMI manifest file in Amazon S3. If you used an Amazon EBS-backed AMI to launch the instance, the returned result is unknown.
+The path to the AMI manifest file in Amazon S3. If you used an Amazon
+EBS-backed AMI to launch the instance, the returned result is unknown.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3098,9 +3936,12 @@ keyspec _AWS_ANCESTOR_AMI_IDS {
     standard:         true
     since:            "0.1.1"
     doc: """
-The AMI IDs of any instances that were rebundled to create this AMI. This value will only exist if the AMI manifest file contained an ancestor-amis key.
+The AMI IDs of any instances that were rebundled to create this
+AMI. This value will only exist if the AMI manifest file contained an
+ancestor-amis key.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3111,9 +3952,16 @@ keyspec _AWS_HOSTNAME {
     standard:         true
     since:            "0.1.1"
     doc: """
-If the EC2 instance is using IP-based naming (IPBN), this is the private IPv4 DNS hostname of the instance. If the EC2 instance is using Resource-based naming (RBN), this is the RBN. In cases where multiple network interfaces are present, this refers to the eth0 device (the device for which the device number is 0). For more information about IPBN and RBN, see Amazon EC2 instance hostname types.
+If the EC2 instance is using IP-based naming (IPBN), this is the
+private IPv4 DNS hostname of the instance. If the EC2 instance is
+using Resource-based naming (RBN), this is the RBN. In cases where
+multiple network interfaces are present, this refers to the eth0
+device (the device for which the device number is 0). For more
+information about IPBN and RBN, see Amazon EC2 instance hostname
+types.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3123,9 +3971,13 @@ keyspec _AWS_IAM_INFO {
     standard:         true
     since:            "0.1.1"
     doc: """
-If there is an IAM role associated with the instance, contains information about the last time the instance profile was updated, including the instance's LastUpdated date, InstanceProfileArn, and InstanceProfileId. Otherwise, not present.
+If there is an IAM role associated with the instance, contains
+information about the last time the instance profile was updated,
+including the instance's LastUpdated date, InstanceProfileArn, and
+InstanceProfileId. Otherwise, not present.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3138,8 +3990,8 @@ keyspec _AWS_INSTANCE_ID {
     doc: """
 The ID of an AWS instance.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
-
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3150,9 +4002,11 @@ keyspec _AWS_INSTANCE_LIFE_CYCLE {
     since:            "0.1.1"
     doc: """
 The purchasing option of this instance. For more information see:
+
 <ul><li>https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-purchasing-options.html</li></ul>
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3163,9 +4017,11 @@ keyspec _AWS_INSTANCE_TYPE {
     since:            "0.1.1"
     doc: """
 The type of instance. For more information, see:
+
 <ul><li>https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html</li></ul>
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3175,9 +4031,12 @@ keyspec _AWS_IPV6_ADDR {
     standard:         true
     since:            "0.1.1"
     doc: """
-The IPv6 address of the instance, if any. In cases where multiple network interfaces are present, this refers to the eth0 device network interface and the first IPv6 address assigned.
+The IPv6 address of the instance, if any. In cases where multiple
+network interfaces are present, this refers to the eth0 device network
+interface and the first IPv6 address assigned.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3189,7 +4048,8 @@ keyspec _AWS_KERNEL_ID {
     doc: """
 The ID of the kernel launched with this instance, if applicable.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3199,10 +4059,17 @@ keyspec _AWS_LOCAL_HOSTNAME {
     standard:         true
     since:            "0.1.1"
     doc: """
-In cases where multiple network interfaces are present, this refers to the eth0 device (the device for which the device number is 0). If the EC2 instance is using IP-based naming (IPBN), this is the private IPv4 DNS hostname of the instance. If the EC2 instance is using Resource-based naming (RBN), this is the RBN. For more information about IPBN, RBN, and EC2 instance naming, see:
+In cases where multiple network interfaces are present, this refers to
+the eth0 device (the device for which the device number is 0). If the
+EC2 instance is using IP-based naming (IPBN), this is the private IPv4
+DNS hostname of the instance. If the EC2 instance is using
+Resource-based naming (RBN), this is the RBN. For more information
+about IPBN, RBN, and EC2 instance naming, see:
+
 <ul><li>https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-naming.html</li></ul>
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3212,9 +4079,12 @@ keyspec _AWS_LOCAL_IPV4_ADDR {
     standard:         true
     since:            "0.1.1"
     doc: """
-The private IPv4 address of the instance, if any. In cases where multiple network interfaces are present, this refers to the eth0 device (the device for which the device number is 0).
+The private IPv4 address of the instance, if any. In cases where
+multiple network interfaces are present, this refers to the eth0
+device (the device for which the device number is 0).
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3226,7 +4096,8 @@ keyspec _AWS_AZ {
     doc: """
 The Availability Zone in which the instance launched.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3236,9 +4107,12 @@ keyspec _AWS_AZ_ID {
     standard:         true
     since:            "0.1.1"
     doc: """
-The static Availability Zone ID in which the instance is launched. The Availability Zone ID is consistent across accounts. However, it might be different from the Availability Zone, which can vary by account.
+The static Availability Zone ID in which the instance is launched. The
+Availability Zone ID is consistent across accounts. However, it might
+be different from the Availability Zone, which can vary by account.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3250,7 +4124,8 @@ keyspec _AWS_PLACEMENT_GROUP {
     doc: """
 The name of the placement group in which the instance is launched.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3260,9 +4135,11 @@ keyspec _AWS_DEDICATED_HOST_ID {
     standard:         true
     since:            "0.1.1"
     doc: """
-The ID of the host on which the instance is launched. Applicable only to Dedicated Hosts.
+The ID of the host on which the instance is launched. Applicable only
+to Dedicated Hosts.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3274,7 +4151,8 @@ keyspec _AWS_PARTITION_NUMBER {
     doc: """
 The number of the partition in which the instance is launched.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3286,7 +4164,8 @@ keyspec _AWS_REGION {
     doc: """
 The AWS Region in which the instance is launched.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3296,9 +4175,15 @@ keyspec _AWS_PUBLIC_HOSTNAME {
     standard:         true
     since:            "0.1.1"
     doc: """
-The instance's public DNS (IPv4). This category is only returned if the enableDnsHostnames attribute is set to true. For more information, see [DNS attributes for your VPC](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-dns.html) in the Amazon VPC User Guide. If the instance only has a public-IPv6 address and no public-IPv4 address, this item is not set.
+The instance's public DNS (IPv4). This category is only returned if
+the enableDnsHostnames attribute is set to true. For more information,
+see [DNS attributes for your
+VPC](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-dns.html) in
+the Amazon VPC User Guide. If the instance only has a public-IPv6
+address and no public-IPv4 address, this item is not set.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3308,9 +4193,11 @@ keyspec _AWS_PUBLIC_IPV4_ADDR {
     standard:         true
     since:            "0.1.1"
     doc: """
-The public IPv4 address. If an Elastic IP address is associated with the instance, the value returned is the Elastic IP address.
+The public IPv4 address. If an Elastic IP address is associated with
+the instance, the value returned is the Elastic IP address.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3320,9 +4207,11 @@ keyspec _AWS_OPENSSH_PUBKEY {
     standard:         true
     since:            "0.1.1"
     doc: """
-Public key for SSH access. Only available if supplied at instance launch time.
+Public key for SSH access. Only available if supplied at instance
+launch time.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3334,7 +4223,8 @@ keyspec _AWS_SECURITY_GROUPS {
     doc: """
 The names of the security groups applied to the instance.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3346,7 +4236,8 @@ keyspec _AWS_SECURITY_GROUP_IDS {
     doc: """
 The IDs of the security groups to which the network interface belongs.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3358,7 +4249,8 @@ keyspec _AWS_RESOURCE_DOMAIN {
     doc: """
 The domain for AWS resources for the Region.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3368,9 +4260,13 @@ keyspec _AWS_PARTITION_NAME {
     standard:         true
     since:            "0.1.1"
     doc: """
-The partition that the resource is in. For standard AWS Regions, the partition is aws. If you have resources in other partitions, the partition is aws-partitionname. For example, the partition for resources in the China (Beijing) Region is aws-cn.
+The partition that the resource is in. For standard AWS Regions, the
+partition is aws. If you have resources in other partitions, the
+partition is aws-partitionname. For example, the partition for
+resources in the China (Beijing) Region is aws-cn.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3380,9 +4276,13 @@ keyspec _AWS_TAGS {
     standard:         true
     since:            "0.1.1"
     doc: """
-The instance tags associated with the instance. Only available if you explicitly allow access to tags in instance metadata. For more information, see [Allow access to tags in instance metadata](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html#allow-access-to-tags-in-IMDS).
+The instance tags associated with the instance. Only available if you
+explicitly allow access to tags in instance metadata. For more
+information, see [Allow access to tags in instance
+metadata](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html#allow-access-to-tags-in-IMDS).
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3392,9 +4292,16 @@ keyspec _AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE {
     standard:         true
     since:            "0.1.2"
     doc: """
-Value showing the target Auto Scaling lifecycle state that an Auto Scaling instance is transitioning to. Present when the instance transitions to one of the target lifecycle states after March 10, 2022. Possible values: Detached | InService | Standby | Terminated | Warmed:Hibernated | Warmed:Running | Warmed:Stopped | Warmed:Terminated. See Retrieve the target lifecycle state through instance metadata in the Amazon EC2 Auto Scaling User Guide.
+Value showing the target Auto Scaling lifecycle state that an Auto
+Scaling instance is transitioning to. Present when the instance
+transitions to one of the target lifecycle states after March 10,
+2022. Possible
+values: Detached | InService | Standby | Terminated | Warmed:Hibernated | Warmed:Running | Warmed:Stopped | Warmed:Terminated. See Retrieve
+the target lifecycle state through instance metadata in the Amazon EC2
+Auto Scaling User Guide.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3406,7 +4313,8 @@ keyspec _AWS_BLOCK_DEVICE_MAPPING_AMI {
     doc: """
 The virtual device that contains the root/boot file system.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3416,9 +4324,12 @@ keyspec _AWS_BLOCK_DEVICE_MAPPING_ROOT {
     standard:         true
     since:            "0.1.2"
     doc: """
-The virtual devices or partitions associated with the root devices or partitions on the virtual device, where the root (/ or C:) file system is associated with the given instance.
+The virtual devices or partitions associated with the root devices or
+partitions on the virtual device, where the root (/ or C:) file system
+is associated with the given instance.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3430,7 +4341,8 @@ keyspec _AWS_BLOCK_DEVICE_MAPPING_SWAP {
     doc: """
 The virtual devices associated with swap. Not always present.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3440,9 +4352,13 @@ keyspec _AWS_EVENTS_MAINTENANCE_HISTORY {
     standard:         true
     since:            "0.1.2"
     doc: """
-If there are completed or canceled maintenance events for the instance, contains a JSON string with information about the events. For more information, see To view event history about completed or canceled events.
+If there are completed or canceled maintenance events for the
+instance, contains a JSON string with information about the
+events. For more information, see To view event history about
+completed or canceled events.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3452,9 +4368,12 @@ keyspec _AWS_EVENTS_MAINTENANCE_SCHEDULED {
     standard:         true
     since:            "0.1.2"
     doc: """
-If there are active maintenance events for the instance, contains a JSON string with information about the events. For more information, see View scheduled events.
+If there are active maintenance events for the instance, contains a
+JSON string with information about the events. For more information,
+see View scheduled events.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3464,9 +4383,15 @@ keyspec _AWS_EVENTS_RECOMMENDATIONS_REBALANCE {
     standard:         true
     since:            "0.1.2"
     doc: """
-The approximate time, in UTC, when the EC2 instance rebalance recommendation notification is emitted for the instance. The following is an example of the metadata for this category: {"noticeTime": "2020-11-05T08:22:00Z"}. This category is available only after the notification is emitted. For more information, see EC2 instance rebalance recommendations.
+The approximate time, in UTC, when the EC2 instance rebalance
+recommendation notification is emitted for the instance. The following
+is an example of the metadata for this category: {"noticeTime":
+"2020-11-05T08:22:00Z"}. This category is available only after the
+notification is emitted. For more information, see EC2 instance
+rebalance recommendations.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3476,9 +4401,11 @@ keyspec _AWS_IDENTITY_CREDENTIALS_EC2_INFO {
     standard:         true
     since:            "0.1.2"
     doc: """
-Information about the credentials in identity-credentials/ec2/security-credentials/ec2-instance.
+Information about the credentials
+in identity-credentials/ec2/security-credentials/ec2-instance.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3488,10 +4415,16 @@ keyspec _AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE {
     standard:         true
     since:            "0.1.2"
     doc: """
-Credentials for the instance identity role that allow on-instance software to identify itself to AWS to support features such as EC2 Instance Connect and AWS Systems Manager Default Host Management Configuration. These credentials have no policies attached, so they have no additional AWS API permissions beyond identifying the instance to the AWS feature.
-This option will not log the SecretAccessKey and Token.
+Credentials for the instance identity role that allow on-instance
+software to identify itself to AWS to support features such as EC2
+Instance Connect and AWS Systems Manager Default Host Management
+Configuration. These credentials have no policies attached, so they
+have no additional AWS API permissions beyond identifying the instance
+to the AWS feature.  This option will not log the SecretAccessKey and
+Token.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3501,9 +4434,11 @@ keyspec _AWS_INSTANCE_ACTION {
     standard:         true
     since:            "0.1.2"
     doc: """
-Notifies the instance that it should reboot in preparation for bundling. Valid values: none | shutdown | bundle-pending.
+Notifies the instance that it should reboot in preparation for
+bundling. Valid values: none | shutdown | bundle-pending.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3513,9 +4448,12 @@ keyspec _AWS_MAC {
     standard:         true
     since:            "0.1.2"
     doc: """
-The instance's media access control (MAC) address. In cases where multiple network interfaces are present, this refers to the eth0 device (the device for which the device number is 0).
+The instance's media access control (MAC) address. In cases where
+multiple network interfaces are present, this refers to the eth0
+device (the device for which the device number is 0).
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3527,7 +4465,8 @@ keyspec _AWS_INTERFACE_ID {
     doc: """
 The ID of the network interface.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3539,7 +4478,8 @@ keyspec _AWS_SUBNET_ID {
     doc: """
 The ID of the subnet in which the interface resides.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3551,7 +4491,8 @@ keyspec _AWS_VPC_ID {
     doc: """
 The ID of the VPC in which the interface resides.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3563,7 +4504,8 @@ keyspec _AWS_METRICS_VHOSTMD {
     doc: """
 No longer available.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3575,7 +4517,8 @@ keyspec _AWS_PRODUCT_CODES {
     doc: """
 AWS Marketplace product codes associated with the instance, if any.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3587,7 +4530,8 @@ keyspec _AWS_RAMDISK_ID {
     doc: """
 The ID of the RAM disk specified at launch time, if applicable.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3599,7 +4543,8 @@ keyspec _AWS_RESERVATION_ID {
     doc: """
 The ID of the reservation.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3609,9 +4554,13 @@ keyspec _AWS_SPOT_INSTANCE_ACTION {
     standard:         true
     since:            "0.1.2"
     doc: """
-The action (hibernate, stop, or terminate) and the approximate time, in UTC, when the action will occur. This item is present only if the Spot Instance has been marked for hibernate, stop, or terminate. For more information, see instance-action.
+The action (hibernate, stop, or terminate) and the approximate time,
+in UTC, when the action will occur. This item is present only if the
+Spot Instance has been marked for hibernate, stop, or terminate. For
+more information, see instance-action.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3621,9 +4570,15 @@ keyspec _AWS_SPOT_TERMINATION_TIME {
     standard:         true
     since:            "0.1.2"
     doc: """
-The approximate time, in UTC, that the operating system for your Spot Instance will receive the shutdown signal. This item is present and contains a time value (for example, 2015-01-05T18:02:00Z) only if the Spot Instance has been marked for termination by Amazon EC2. The termination-time item is not set to a time if you terminated the Spot Instance yourself. For more information, see termination-time.
+The approximate time, in UTC, that the operating system for your Spot
+Instance will receive the shutdown signal. This item is present and
+contains a time value (for example, 2015-01-05T18:02:00Z) only if the
+Spot Instance has been marked for termination by Amazon EC2. The
+termination-time item is not set to a time if you terminated the Spot
+Instance yourself. For more information, see termination-time.
 
-This key is only available as a run-time key, and only when running in AWS where imdsv2 is available.
+This key is only available as a run-time key, and only when running in
+AWS where imdsv2 is available.
 """
 }
 
@@ -3661,9 +4616,13 @@ keyspec $CHALK_CONFIG {
     standard:              true
     system:                true
     since:                 "0.1.0"
-    doc:                   """
-Embedded configuration file; this is special-purpose and will be ignored
-outsde of dump / load cmds.
+    shortdoc:         "Configuration embedded in chalk exe"
+    doc:              """
+This key is only used with chalk executables. It holds the embedded
+configuration for that instance of the chalk command.
+
+Chalk executables can only have their configuration changed via the
+`chalk config` command, or `chalk setup`.
 """
 }
 

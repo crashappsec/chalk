@@ -5,7 +5,8 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-# Spec for command line.
+## Spec for command line.
+
 
 default_recursive_doc := """
 "Determines whether a file scan will recursively walk paths to find artifacts.
@@ -18,21 +19,23 @@ getopts {
   default_no_prefixes: ["no"]
   show_doc_on_err: true
   add_help_commands: true
+  shortdoc: """Chalk
+Collect and report software and host metadata  
+"""  
   doc: """
-{bold}Insert or extract metadata from software artifacts.{reset}
-
-It's particularly useful for helping to map production with development, providing full tracability. Usually, metadata is produced at CI/CD time after software is built, and then collected from production. This command can both insert and extract, and send data off as appropriate.
-
-This tool is meant to be easy in CI/CD-- just drop it into the right place in the pipeline, and never think about it again.
-
-At the same time, it's very customizable. Administrators can easily produce stand-alone binaries that collect custom metadata.
-
-Currently, chalk's behavior is easily customized, primarily via a flexible configuration file. The options provided at the command line are reserved for items where there's an obvious utilitiy in overriding without editing the config file.
-
-%{-
-See 'help config' for an overview of the configuration file.
-See 'help topics' for a list of all help topics.
-}%
+Chalk's core purpose is to map production software with its
+development, and to provide information about those artifacts in CI/CD
+and in production. Usually, metadata is produced at CI/CD time after
+software is built, and then collected from production. This command
+can both insert and extract, and send data off as appropriate. This
+tool is meant to be easy in CI/CD-- just drop it into the right place
+in the pipeline, and never think about it again. At the same time,
+it's very customizable. Administrators can easily produce stand-alone
+binaries that collect custom metadata. The chalk command's behavior is
+easily customized, primarily via a flexible configuration file. The
+options provided at the command line are reserved for items where
+there's an obvious utilitiy in overriding without editing the config
+file. See the Chalk Users Guide for more information.
 """
   arg_name: "ARG"
 
@@ -50,38 +53,58 @@ See 'help topics' for a list of all help topics.
     choices:      ["verbose", "trace", "info", "warn", "error", "none"]
     add_choice_flags: true
     field_to_set: "log_level"
-    doc: "Set the console log-level (overriding any config file settings)"
+    doc: """
+Sets the console log-level to the specified value, controling what logs are output to the terminal.  Note that "verbose" and "trace" are aliases.
+"""
   }
 
   flag_arg config_file {
     aliases:  ["f"]
     callback: func set_config_file
-    doc: "Location from which to read an external config file"
+    doc: """
+The location from which to read an external config file.
+
+When this flag is passed, chalk ignores its search path; the only file it attempts to load is this one.
+"""
   }
 
   flag_multi_arg enable_profile {
     callback: func set_enabled_profiles
-    doc: "List of reporting profiles to explicitly enable"
+    doc: """
+Explicitly enable a particular reporting profile from the configuration file or embedded configuration, even if the profile is explicitly disabled in that configuration.
+
+Reporting profiles can be viewed with the `chalk profile` command.
+"""
   }
 
   flag_multi_arg disable_profile {
     callback: func set_disabled_profiles
-    doc: "List of reporting profiles to explicitly disable"
+    doc: """
+Explicitly *disable* a particular reporting profile from the configuration file or embedded configuration.
+
+Reporting profiles can be viewed with the `chalk profile` command.    
+"""    
   }
 
   flag_multi_arg enable_report {
     callback: func set_enabled_reports
-    doc: "A list of reporting configurations to explicitly enable"
+    doc: """
+Explicitly enable a specfic `custom_report` defined in the configuration file, even if it is not enabled in that configuration file.
+"""
+
   }
 
   flag_multi_arg disable_report {
     callback: func set_disabled_reports
-    doc: "A list of reporting configurations to explicitly disable"
+    doc: """
+Explicitly _disable_ a specfic `custom_report` defined in the configuration file.
+"""
   }
 
   flag_arg report_cache_file {
     callback: func set_report_cache_file
-    doc: """The location to use for the reporting cache, overriding any config file settings.
+    doc: """
+This overrides the locaction of the report cache, if chalk is configured to use it.
 The reporting cache keeps a local copy of any reports made, to provide redundancy if there are network errors.
 """
   }
@@ -90,12 +113,21 @@ The reporting cache keeps a local copy of any reports made, to provide redundanc
     field_to_set: "report_total_time"
     doc: """
 Reports the total run time of the chalk executable in seconds.
-"""
+"""    
   }
 
   flag_yn use_embedded_config {
     field_to_set: "load_embedded_config"
-    doc: "Turn off running the embedded configuration."
+    doc: """
+Ensure that embedded configuration runs. This flag should never be
+necessary, since there is no way to override the internal value before
+the embedded configuration runs.  However, the negation flag can be
+used to keep the embedded configuration from running.
+
+This is most useful when testing configuration files via an external
+configuration file, to avoid conflicts that can arise when running
+both configurations.
+"""
   }
 
   flag_yn use_external_config {
@@ -107,26 +139,41 @@ Turn on/off checking for (and running) any external configuration file.
 
   flag_yn publish_defaults {
     field_to_set: "publish_defaults"
-    doc: "Show config info. See 'help defaults' for more info."
+    doc: """This flag runs chalk, then, at the end, outputs state information specific to that invocation of chalk.
+
+This is similar to the `chalk defaults` command, except shows state information specific to this particular invocation (whereas `chalk defaults` doesn't perform any action other than loading the configuration file).
+"""
   }
 
   flag_yn run_sbom_tools {
     field_to_set: "run_sbom_tools"
     doc: """
-Run any configured tools for static analysis. Ignored if not inserting.
+For insertion operations, this flag forces running any configured tools for SBOM collection. It does not guarantee reporting or chalking; that is up to the reporting configuration.
+
+In the default chalk configuration, these tools do not run at all.
+
+This flag is defined for all chalk commands, but currently is ignored for any command except "insert" or "docker".
 """
   }
 
   flag_yn run_sast_tools {
     field_to_set: "run_sast_tools"
     doc: """
-Run any configured tools for static analysis. Ignored if not inserting.
+For insertion operations, this flag forces running any configured tools for performing static analysis. It does not guarantee reporting or chalking; that is up to the reporting configuration.
+
+In the default chalk configuration, these tools do not run at all.
+
+This flag is defined for all chalk commands, but currently is ignored for any command except "insert" or "docker".
 """
   }
 
   flag_yn use_report_cache {
     field_to_set: "use_report_cache"
-    doc: "Enables or disables the reporting cache."
+    doc: """
+Enables or disables the reporting cache.  The reporting cache is a ring buffer stored locally, that contains reporting information that could not be delivered to its configured sources, due to some outage.
+
+When using the report cache, any time chalk does run reports, it will try to flush as much of the cache as it can.
+"""
   }
 
   flag_yn virtual {
@@ -135,8 +182,11 @@ Run any configured tools for static analysis. Ignored if not inserting.
     field_to_set: "virtual_chalk"
 
     doc: """
-When chalking, do NOT modify artifacts (overrides config file).  Ignored for non-chalking operations.
-By default, this will write to "./virtual-chalk.json"
+When chalking, do NOT modify artifacts, overriding anything defined in the config file. This is completely ignored for operations that do not normally modify artifacts.
+
+Specifically, this flag only works with `chalk insert`, `chalk docker build`, and `chalk delete`.
+
+By default, this will write to "./virtual-chalk.json".
 """
   }
 
@@ -158,9 +208,9 @@ Additionally, if temporary files might be useful to inspect, this causes them to
     doc: """
 Skip publishing the command report (i.e., the PRIMARY report). NO output sinks will get it.
 
-For most commands, this defeats the purpose of Chalk, so use it sparingly.
+_For most commands, this defeats the purpose of Chalk, so use it sparingly._
 
-Note that this doesn't turn off any custom reports; you have to disable those seprately.
+Note that this doesn't turn off any custom reports; you have to disable those seprately.    
 """
   }
 
@@ -168,7 +218,7 @@ Note that this doesn't turn off any custom reports; you have to disable those se
     field_to_set: "skip_summary_report"
     doc: """
 Whether to skip the summary report to the terminal.
-"""
+"""    
   }
 
   flag_choice symlink_behavior {
@@ -178,15 +228,15 @@ Whether to skip the summary report to the terminal.
     field_to_set: "symlink_behavior"
     doc: """
 Chalk never follows directory links. When running non-chalking operations, chalk will read the file on the other end of the link, and report using the file name of the link.
-
-For insertion operations, Chalk will, out of the box, warn on symbolic links, without processing them.
-
+<p>
+For insertion operations, Chalk will, out of the box, warn on symbolic links, without processing them. 
+<p>
 This variable controls what happens in those cases:
 
 - <em>skip</em>   will not process files that are linked.
 - <em>clobber</em> will read the artifact on the other end of the link, and, if writing, try to replace the file being linked to.
 - <em>copy</em> will read the artifact on the other end of the link, and, if writing, will replace the link with a modified file, leaving the file on the other end of the link intact.
-"""
+"""    
   }
 
   flag_yn wrap {
@@ -198,26 +248,42 @@ containers will do a chalk report when they launch.  Note that the
 'docker' command passes through ALL flags, so this flag needs to
 technically be part of the 'global' flags, even though nothing else
 uses it.
-
+<p>
 If, when wrapping, your chalk binary is using an external
 configuration file, that file will NOT get used inside the
 container. The wrapped binary currently only uses the embedded
 configuration present in the binary at the time of the wrapping.
-"""
+"""    
   }
+
+    flag_yn pager {
+      no_aliases: ["no-more", "no-less"]
+      field_to_set: "use_pager"
+      doc: """
+Sets whether to display documents in the system pager for output.
+
+At the moment, this is only honored for the `chalk help` command.
+"""      
+     }
+
 
   command insert {
     aliases:  ["inject", "ins", "in", "i"]
     args:     (0, high())
+    shortdoc: "Add chalk marks to artifacts"
     doc:      """
+Add chalk marks to artifacts found on the file system.  See the `docker` command for adding marks to docker containers.
+    
 On chalking, what gets put into the chalk mark will be determined by the active chalk profile after any user config file has loaded.  Each command's output configuration can be specified using the 'outconf' section in the configuration file.
-
+<p>
 For instance, if you create a new profile named 'my_chalk_mark', you can activate it for both regular and docker insertions with the following in your configuration file:
 
+```
 outconf.insert.chalk = "myconf"
 outconf.docker.chalk = "myconf"
+```
 
-For information on profiles, see: 'help profile'
+For information on profiles on the command line, see: `chalk help profile`
 """
     callback: func set_artifact_search_path(list[string])
 
@@ -260,10 +326,10 @@ profile (which obviously must exist).
     args:          (0, high())
     callback:      func set_artifact_search_path(list[string])
     arg_sub_mutex: false
-
+    shortdoc: "Find chalk marks in artifacts"
     doc: """
 This command looks for existing chalk marks in artifacts as specified by any command line arguments passed. The arguments can be files, directories, container identifiers, or container image identifiers.
-
+<p>
 Chalk will attempt to find all matching marks, and willreports on what it finds, based on your reporting configuration.
 """
 
@@ -294,36 +360,39 @@ report.
 
     flag_yn search_layers {
       doc: """
-When a mark in an image can't be found, should we try to report on overwitten marks?
+When a mark in an image can't be found, should we try to report on overwitten marks?      
 """
       field_to_set: "extract.search_base_layers_for_marks"
     }
 
     command images {
       aliases: ["image", "img", "i"]
+      shortdoc: "Find marks in local docker images"
       doc: """
 This command will look at any docker images available locally, attempting to find chalk marks in them.
-
-Note that this does not look through running containers; use 'chalk extract containers' or 'chalk extract all'.
+<p>
+Note that this does not look through running containers; use `chalk extract containers` or `chalk extract all`.
 """
     }
 
     command containers {
       aliases: ["container", "con", "c"]
+      shortdoc: "Find marks in running containers"
       doc: """
 This command will look at any docker containers available locally, attempting to find chalk marks in them.
-"""
+"""      
     }
 
     command all {
       aliases:  ["a"]
       args:     (0, high())
       callback: func set_artifact_search_path(list[string])
+      shortdoc: "Find all docker marks, plus filesystem marks"
       doc: """
 This command will attempt to extract chalk marks in all containers,
 container images for anything it can find on the local machine, AND will
 search the current working directory for chalk marks.
-"""
+"""      
     }
 }
 
@@ -331,6 +400,7 @@ search the current working directory for chalk marks.
     aliases:  ["del"]
     args:     (0, high())
     callback: func set_artifact_search_path(list[string])
+    shortdoc: "Delete chalk marks from software"
     doc: """
 Deletes metadata from all artifacts specified in the search path.
 """
@@ -363,17 +433,19 @@ report.
 
   command env {
     aliases: ["environment"]
-    doc: """
-About to be revamped to be the same as exec but w/o the fork and exec.
+    shortdoc: "Run a chalk report on the current environment"
+ doc: """
+Reports environmental information, without scanning for chalk. If a chalk ID or metadata ID is passed at the command line, then a chalk can be reported with just that metadata. This is intended to be a lightweight version of 'extract' tied to a single artifact.
 """
   }
 
   command exec {
     args:     (0, high())
     ignore_bad_flags: true
+    shortdoc: "Start a program, and report on it"
     doc: """
 Directly execs a specified process, and in parallel forks off to reports environmental information, without scanning for chalk.  If a chalk ID or metadata ID is passed at the command line, then a chalk can be reported with just that metadata.
-
+<p>
 This is like the 'env' command, except for the exec'ing.  The configuration for 'exec' is best put into the configuration file.
 """
 
@@ -390,16 +462,16 @@ When using the 'exec' command, this allows you to explicitly set the command to 
       field_to_set: "exec.chalk_as_parent"
       doc: """
 When set to true, 'chalk exec' will leave chalk as the parent process (By default, the process to exec stays the parent, and chalk is forked off).
-
+<p>
 This is most useful for short-lived processes, as it ensures chalk will complete any reporting.
-"""
+"""      
     }
 
     flag_yn heartbeat {
     field_to_set: "exec.heartbeat"
     doc: """
-When set to true, causes periodic reports to be run, past the initial one.
-"""
+When set to true, causes periodic reports to be run, past the initial one.    
+"""    
     }
 
     flag_arg artifact_profile {
@@ -422,35 +494,42 @@ report.
   }
   command defaults {
     aliases:  ["def"]
+    shortdoc: "Show configuration variables and settings"
     doc: """
 Shows the results of evaluating the configuration, without actually doing any work with artifacts.
-
+<p>
 Even though they are related, there is a significant difference between the 'defaults' command and the --defaults flag.  They both dump the configuration after evaluating any config file, but they may easily produce different results.
-
+<p>
 That's because chalk uses 'con4m' for configuration, which, while typically just looking like a regular config file, can have arbitrary code added, with conditionals, and so-on.  The default configuration does, for instance, configure different output handlers, depending on the command given.
-
+<p>
 Running the 'defaults' command will therefore give you the information about the evaluation just when that command ran.  Whereas, '--publish-defaults extract' will dump the config as it resolves when you run the 'extract' command, which could be very similar, or very different.
-
+<p>
 Importantly though, running '--publish-defaults extract' still runs the 'extract' command.
-
+<p>
 This command does not show the contents of the config file(s) used, just key results from executing those config files.  And, generally there will be at least two 'stacked' configuration files.  See 'help config' for more information on the configuration file and con4m.
 """
 }
 
 command profile {
-   aliases: ["prof"]
+   aliases: ["prof", "profiles"]
    args: (0, high())
+   shortdoc: "Show details of individual profiles."
    doc: """
-Show details of individual profiles.
+Alias for `chalk help profile`; without arguments, shows available
+profiles, and with arguments, shows details on what specific profiles
+report on.
+
+`chalk profile all` will show details on all profiles.
 """
   }
 
   command dump {
     aliases: ["confdump"]
     args:    (0, 1)
+    shortdoc: "Print the embedded configuration file"
     doc: """
 Reads the embedded configuration file, and outputs it, based on your output configuration (see 'help output').  In the default configuration, if no argument is given, the config file is written to stdout; and if an argument is provided, it will try write the configuration to the file specified by the argument.
-
+<p>
 This behavior can be overridden by the configuration file, where you can specify different output configurations.  See 'help config' for an overview of the configuration file format, and 'help output' for an overview of the output system.
 
 """
@@ -460,13 +539,14 @@ This behavior can be overridden by the configuration file, where you can specify
     aliases:  ["confload"]
     args:     (1, 1)
     callback: func on_conf_load(list[string])
+    shortdoc: "Load a new configuration into the chalk binary"
     doc: """
 Attempt to replaces the embedded configuration file, reading from the
 specified file name.
-
+<p>
 You can use the 'dump' command to dump the output first.
-
-See 'help config' for an overview of the configuration file format.
+<p>
+From the command line, See 'help config' for an overview of the configuration file format.
 """
 
     flag_yn validation {
@@ -480,56 +560,47 @@ When on, validate config files before loading them, by doing a trial run.
       field_to_set: "validation_warning"
       doc: """
 This verbose flag controls whether or not you get the verbose warning.  It's much better turning this off in your embedded configuration :)
-"""
+"""      
     }
   }
 
   command version {
     aliases: ["vers", "v"]
+    shortdoc: "Give version information"
     doc: """
 Outputs basic version information for the chalk binary.
 """
   }
-
-#% INTERNAL
-   command rawattrs {
-     doc: """
-     Raw dump of the attr state in Json, unlike helpdump.
-     """
-   }
-
-   command rawspec {
-     doc: """
-     Raw dump of the spec state.
-     """
-   }
-
-   command helpdump {
-     doc: """
-Dumps documentation into a single JSON structure.  Currently, this only captures static structure, not configuration.
+  
+   command docgen {
+     shortdoc: "Generate the web documentation."
+     doc: """          
+Writes web documentation into `./chalk-docs/` in Markdown format, with
+some inline HTML.
 """
    }
-#% END
 
   command docker {
+    shortdoc: "Run a docker command, then chalk built or pushed containers"
     args:    (0, high())
     ignore_all_flags: true
     doc: """
 Chalk a container operation.  This always transparently calls docker, as long as it is anywhere in your path (even if 'chalk' is named 'docker').
 
 Currently, Chalk only collects metadata for 'docker' and 'push' commands.
-
+<p>
 All arguments appearing after the word 'docker' are passed to docker.  No flags to chalk can appear after the command.
 """
   }
 
   command setup {
     arg_sub_mutex: false # should be the default?
+    shortdoc: "Set up automatic code signing"
     doc: """
 Set up code signing / attestation.
-
+<p>
 This is used to either generate or load a keypair for code signing.
-
+<p>
 Without a subcommand, chalk will first attempt to run as if the `load`
 subcommand were given, and if it doesn't find a keypair to load, then
 it will run the `gen` command to create one.
@@ -553,477 +624,92 @@ Sets the location of the signing key file on local disk. This should
 point to the private key file and end in `.key`. The public key file
 must be in the same base location, with the same file name, except
 with `.pub` as the file extension.
-"""
+"""    
   }
 
   flag_yn api_login {
     field_to_set: "api_login"
     doc: """Skip login to API for secret manager"""
   }
-
+  
   command gen {
+    shortdoc: "Force generation of new signing key"
     doc: """
 Chalk will generate a new
 password and keypair.  It will write the password to the terminal a
 single time, and will write the keypair to `./chalk.key` (private key)
 and `./chalk.pub` (public key).
-
+<p>
 The password is needed to load the keys into a different chalk binary,
 and is required for signing. By default, you must provide the password
 in an environment variable named `CHALK_PASSWORD`.  Be careful to
 remove it from the environment after your chalk invocation, to avoid
 leakage.
-
+<p>
 Generally, that option is intended for running with a secrets
 manager. However, if you are going to hardcode the password and rely
 on operational security, you can hardcode the password directly into
 the Chalk binary with the `--store-password` option.
-
+<p>
 That will store the password inside the chalk mark, encrypted with a
 key that is chosen at `gen` time (on a Mac this is not possible; it's
 chosen when you compile the binary).
-
+<p>
 This approach will NOT thwart someone who has read access to the
 binary, so a proper secret manager is the recommended solution.
 """
   }
 
   command load {
+    shortdoc: "Load existing signing key"
     doc: """
 This looks for a keypair to import, by default in ./chalk.key (private
 key) and ./chalk.pub (public key).  The key should have previously
 been generated by chalk, and encrypted with a password.
-
+<p>
 Pass `--store-password` to keep an encrypted copy of the password
 internally, per the `gen` command.
-"""
+"""    
   }
-
-  }
+  
+}
 
   command help {
-    ignore_bad_flags:   true
+    ignore_all_flags:   true
     arg_sub_mutex: false # should be the default?
     args: (0, high())
-    doc: """
-You're living it!
-"""
-
-    command builtins {
-      aliases: ["bi", "funcs"]
-      arg_sub_mutex: false
-      args: (0, high())
-      doc: "Show detail about builtin functions you can use from your config."
-    }
-
-    command key {
-      aliases:            ["keys", "k"]
-      arg_sub_mutex: false # should be the default?
-      doc: """
-Shows information about all chalk keys."
-"""
-      args: (0, high())
-
-      command props {
-        aliases: ["properties", "p", "pr", "prop", "show"]
-        args: (0, high())
-        doc: """
-Shows con4m property documentation for key specifications.
-"""
-      }
-
-      command chalk {
-        aliases: ["c"]
-        args: (0, high())
-        doc: """
-Filters keys to those that are chalkable artifact keys.
-"""
-      }
-
-      command host {
-        aliases: ["h"]
-        args: (0, high())
-        doc: """
-Filters keys to those that are chalkable host keys.
-"""
-      }
-
-      command art {
-        aliases: ["a", "artifact"]
-        args: (0, high())
-        doc: """
-Filters keys to those that are run-time artifact keys.
-"""
-      }
-
-      command report {
-        aliases: ["r", "rep"]
-        args: (0, high())
-        doc: """
-Filters keys to those that are run-time host keys.
-"""
-      }
-
-      command search {
-        aliases: ["s"]
-        args: (1, high())
-        doc: """
-Allows you to search for a specific pattern in key documentation, only returning keys that match the pattern.
-        """
-      }
-  }
-
-    command keyspec {
-      aliases:            ["ks", "spec", "specs"]
-      args: (0, high())
-      arg_sub_mutex: false # should be the default?
-      doc: """
-Provides overview documentation of the chalk config file's `keyspec` section type, which can be used to add new keys.
-"""
-
-      command props {
-        aliases: ["properties", "p", "pr", "prop", "show"]
-        args: (0, high())
-        doc: """
-Shows the field properties for the chalk config file's `keyspec` section type.
-"""
-      }
-    }
-
-    command profile {
-      aliases:             ["profiles", "pro", "pr"]
-      arg_sub_mutex: false # should be the default?
-      args: (0, high())
-      doc: """
-Provides overview documentation of the chalk config file's `profile` section type, which can be used to create new reporting profiles.
-"""
-
-      command props {
-        aliases: ["properties", "p", "pr", "prop", "show"]
-        args: (0, high())
-        doc: """
-Shows the field properties for the chalk config file's `profile` section type.
-"""
-      }
-    }
-
-    command tool {
-      aliases: ["tools", "t"]
-      args: (0, high())
-      arg_sub_mutex: false # should be the default?
-      doc: """
-Provides overview documentation of the chalk config file's `tool` section type, which can be used to create new external tools.
-"""
-
-
-      command props {
-        aliases: ["properties", "p", "pr", "prop", "show"]
-        args: (0, high())
-        doc: """
-Shows the field properties for the chalk config file's `tool` section type.
-"""
-      }
-    }
-
-    command plugin {
-      aliases: ["plugins", "pi"]
-      arg_sub_mutex: false # should be the default?
-      args: (0, high())
-      doc: """
-Provides overview documentation of the chalk config file's `plugin` section type, which are used to configure data collection modules (called plugins)
-"""
-
-      command props {
-        aliases: ["properties", "p", "pr", "prop", "show"]
-        args: (0, high())
-        doc: """
-Shows the field properties for the chalk config file's `plugin` section type.
-"""
-      }
-    }
-
-    command sink {
-      aliases: ["sinks"]
-      arg_sub_mutex: false # should be the default?
-      args: (0, high())
-      doc: """
-Provides overview documentation of the chalk config file's `sink` section type, which is used to configure available output types.
-"""
-
-      command props {
-        aliases: ["properties", "p", "pr", "prop", "show"]
-        args: (0, high())
-        doc: """
-Shows the field properties for the chalk config file's `sink` section type.
-"""
-      }
-    }
-
-    command outconf {
-      aliases: ["outconfs"]
-      arg_sub_mutex: false
-      args: (0, high())
-      doc: """
-Provides overview documentation of the chalk config file's `outconf` section type, which can be used to map profiles to reports.
-"""
-
-      command props {
-        aliases: ["properties", "p", "pr", "prop", "show"]
-        args: (0, high())
-        doc: """
-Shows the field properties for the chalk config file's `outconf` section type.
-"""
-      }
-    }
-
-    command custom_report {
-      aliases: ["report", "reports"]
-      arg_sub_mutex: false
-      args: (0, high())
-      doc: """
-Provides overview documentation of the chalk config file's `custom_report` section type, which can be used to create new reports beyond the default command reporting..
-"""
-      command props {
-        aliases: ["properties", "p", "pr", "prop", "show"]
-        args: (0, high())
-        doc: """
-Shows the field properties for the chalk config file's `custom_report` section type.
-"""
-      }
-    }
-
-    command sbom {
-      aliases: ["sboms"]
-      arg_sub_mutex: false
-      args: (0, high())
-      doc: """
-Shows information about any SBOM tools configured, if any.
-"""
-    }
-
-    command sast {
-      args: (0, high())
-      arg_sub_mutex: false
-      doc: """
-Shows information about any SAST tools configured, if any.
-"""
-    }
-  }
-
-  topics {
-    topics: """
-For info on metadata keys: 'chalk help keys'
-
-For info on config file sections, use 'chalk help' with the metadata section as an argument.
-
-%{H Available sections: }%
-keyspec, tool, plugin, sink, outconf, custom_report, profile
-
-For each section, you'll get an overview by default.  To then examine the properties, add 'props' after the command.  For instance:
-
-%{T
-Command::Description
-chalk help keyspec        :: Gives detailed info about keyspecs & metadata keys
-chalk help keyspec props  :: Gives info about each important keyspec field.
-}%
-"""
-  commands: """
-%{T
-Command  ::Description
-insert   ::Insert chalk metadata into software artifacts.
-extract  ::Retrieve locally-stored metadata from software artifacts.
-delete   ::Delete locally stored metadata from software objects.
-defaults ::Loads configuration and shows keys defaults. See 'help defaults'.
-dump     ::Export the self-contained configuration file.
-load     ::Load a new configuration file.
-docker   ::Adds a chalk mark to docker containers, and wraps the entry point.
-version  ::Shows program version information
-help     ::You're doing it now!
-}%
-See {bold}{appName} help 'command'{reset} for help on individual commands.
-"""
-  config: """
-%{H Chalk Configuration Files }%
-
-In their simplest form, they are fairly typical key-value configuration files for setting default values.
-
-For instance, you can set some basic properties like so:
-
-%{c
-color: true
-log_level: "warn"{brown} # Don't print out informational bits.
-keyspec {red}CHALK_PTR{cyan} {{
-  {brown}# This field is meant to be a URL to redirect people from the artifact
-  {brown}# to where the full metadata is kept.
-  value: {green}"https://www.myrepo.com/chalklookup/${{chalkid}}"
-}}
-}%
-
-If you run {bold}{appName} defaults{reset}, the last table will show configuration variables you can set in your configs.
-
-The {bold}keyspec{reset} object type is used to define all the properties of the metadata fields that we can collect at any phase.  See {bold}{appName} help keyspec{reset} for an introduction to the types of metadata in chalk, and {bold}{appName} help keyspec props{reset} for the fields inside keyspec objects.
-
-Generally, understanding keyspec fields is helpful for understanding metadata keys, but you only need to write these sections if you're defining new metadata (for instance, when writing a plugin).
-
-However, there will be some cases where it's useful to override fields keyspec objects.
-
-If you want to override a field, you just need to redefine it.  For instance, if you want to change the order in which metadata keys output by default, you can change the keyspec's {bold}output_order{reset} field.  Let's day that you wanted the {red}TIMESTAMP{reset} field (which defaults to 3), to go after the {red}CHALK_PTR{reset} field (which defaults to 400).
-
-First, let's look at the base configuration for the timestamp field:
-%{c
-keyspec {red}TIMESTAMP{cyan} {{
-    kind:             {green}Chalk   {brown} # An inherited enum value
-    type:             {green}int     {brown} # An actual type literal
-    standard:         {green}true    {brown} # A bool literal
-    system:           {green}true
-    conf_as_system:   {green}true
-    since:            {green}"0.1.0" {brown} # A string literal
-    output_order:     {green}3
-}}
-}%
-
-You can simply write:
-%{c
-  keyspec.{red}TIMESTAMP.{cyan}output_order = {green}401
-}%
-
-This will clobber the output_order field for the base configuration.  Note that this syntax is identical to the following:
-%{c
-keyspec {red}TIMESTAMP{cyan} {{
-  output_order: {green}401
-}}
-}%
-
-The section style and property style are the same, and : and = do the same thing too.  The format should be really familiar to anyone who has ever written a configuration file.
-
-Note that some properties cannot be overridden; you will get an error loading your config file if you try to redefine them.  In fact, many properties in keyspect sections cannot be modified.
-
-Whether fields are locked or not depends on the metadata key.  For instance, the metadata key {bold}MAGIC{reset}, which is only used to identify chalk marks in artifacts, must always appear first in any context in which it appears. So its output_order field is locked.
-
-Lock information will be coming soon to the detail you see when you run, for example, {bold}{appName} help key TIMESTAMP{reset}.
-
-For fields in keyspecs that you can set, some keys (especially those not marked as 'system' keys) can have their value set, either statically once the configuration loads, via the 'value' property, or dynamically, on a per-artifact basis with the 'callback' property.
-
-For instance, even though you cannot override it, the {red}CHALK_RAND{reset} metadata field, which produces a new random 64-bit number for each artifact chalked (in hex format), is implemented in the base configuration as so:
-
-%{c
-  keyspec.{red}CHALK_RAND.{cyan}callback: {green}func call_rand
-
-  func {red}call_rand{cyan}({green}key{cyan}) {{
-    return {green} $(lower(hex(rand())))  {brown}# $() converts items to strings
-  }}
-}%
-
-Chalk embeds a small, efficient DSL called {bold}con4m{reset}, specifically made to intertwine configuration and customization with lightweight code.
-
-Chalk aims to make it both easy and flexible to capture arbitrary metadata about software artifacts, the fact that the world isn't homogenous requires a lot of flexibility that can definitely require advanced customization. Con4m was designed explicitly to be a CONfiguration file for (4) Most people, but make it really easy for those who need to do more advanced customization to do so.
-
-Everything is strongly typed statically wherever possible, and almost fully type interenced (one only needs to specify types when a function call is ambiguous... con4m does static dispatch for everything currently).
-
-This gives us the flexibility to change how Chalk behaves based on the operating environment. For instance, if you have two data stores, one for things running AWS, and one for everything else, you could decide to do different things with a key, depending on whether AWS is going to get used.  For instance:
-
-%{c
-keyspec {red}CHALK_PTR{cyan} {{
-  if envExists({green}"AWS_S3_BUCKET_URI"{cyan}) and envExists({green}"AWS_ACCESS_SECRET"{cyan}) {{
-    value: {green}"s3://some-bucket/chalk-${{artifactid}}"
-  }} else {{
-    value: {green}"https://www.myrepo.com/chalklookup/${{artifactid}}"
-  }}
-}}
-}%
-
-This is equally written as:
-%{c
-  if envExists({green}"AWS_S3_BUCKET_URI"{cyan}) and envExists({green}"AWS_ACCESS_SECRET"{cyan}) {{
-    keyspec.{red}CHALK_PTR.{cyan}value = {green}"s3://some-bucket/chalk-${{artifactid}}"
-  }} else {{
-    keyspec.{red}CHALK_PTR.{cyan}value = {green}"https://www.myrepo.com/chalklookup/${{artifactid}}"
-  }}
-}%
-
-Chalk has typical core data types, including strings, ints, floats, lists and dictionaries. Strings used as values need to be put in quotes. It also has a bunch of other data types that are used internally.  See the con4m manual (link below) for more.
-
-%{h Configuration stacking}%
-Chalk configuration files {invert}stack{reset}. Specifically:
-
-- The system loads a base configuration file that loads the underlying schema and some core implementation details.
-
-- A second set of configurations are run, unless completely disabled by command-line flag, setting up third party tools like SAST tools and SBOM tools (You can also disable these via your config file, of course).
-
-- An 'embedded' configuration file loads, that is carried around with the chalk executable (which can be changed). This configuration typically configures when and where to send different kinds of output, and can contain any custom metadata collection. See '{appName} help output' for more information on output.
-
-- A user configuration file loads.
-
-The result of the configuration file executing is a set of key / value pairs. For those pairs, items defined in the most recent configuration file take priority, unless fields get "locked" (primarily, key bits of the underlying metadata schema are locked to help ensure correct metadata collection).
-
-Con4m's features are documented at {red}https://github.com/crashappsec/con4m{reset}. It comes with a number of built-in functions that can be called from the configuration file. chalk exports all of those, and adds other builtins.
-
-See {red}{appName} help builtins{reset} for a list of builtin functions that can be called from the configuration file that are specific to Chalk (we also make available all of Con4m's builtins).
-"""
-  output: """
-%{H Output basics}%
-Chalk currently defines the following "sinks" that you can output to:
-%{T
-Sink name::Description :: Configuration Parameters
-stdout :: Write to stdout::n/a
-stderr :: Write to stderr::n/a
-file::Write to a local file::{red}filename
-post :: Write via a HTTP/HTTPS post:: {red}uri, {red}headers {black}(must be in MIME format)
-s3 :: Write to an S3 bucket :: {red}uid, {red}secret, {red}uri {black}(must be a link in the form: s3://bucket-name/object-name), {red}cacheid
-custom :: Write to a con4m callback :: Any of the above
-}%
-Via configuration file, you can {green}configure{reset} each sink, and then attach those configurations to "topics".
-
-Each sink can have multiple attached configurations.  Each configuration can set up parameters such as credentials and locations, and can also set up output filters.
-
-Note that sinks are not used for data injection itself. But, before it exits, the system will publish chalk metadata, filtering based on profiles you control (it can be different keys than what you injected), and sending reports to any outputs you've configured.
-
-The default output profiles attached to each command publish to the "report" topic.  You can also set up custom reports, to send different metadata to different places. For instacnce, there are built-in auditing profiles, and a built-in stat beacon upon insertion.  Each custom report automatically defines its own topic.  You just need to hook up an output sink.
-
-The output system has the following built-in topics:
-%{T
-Topic::What it's for
-report:: Default output reports go to this topic in JSON format. By default, this is attached to a local (self-truncating) log file, and stdout.  If you add an external sink, we recommend you unsubscribing stdout (but, unless you're using immutable or transient infra, not the log file, which is intended for redundancy).
-defaults:: Show information about how the results of config file execution. Generally this goes to stderr by default.
-audit:: For recording use of the command, along w/ command line flags and any external configuration file.  This goes to a self-truncating log file by default.
-confdump:: For where to output the configuration when the "dump" command is invoked. By default, this will be stdout if no args are given, or to the file specified if one arg is given.
-version:: Outputting basic command version info, when you run the {appName}version command. By default, this is connected to stderr.
-help::Outputting help messages.  Connected to stderr.
-log::Printing error messages, that are filtered based on the global log-level setting. Connected to stderr, and internally to chalk output (you can control them going into reports with the ERR_INFO and _OP_ERRORS keys... see {appName} help keys search ERR for a starting point on more info.
-}%
-
-There are also a few available filters:
-%{T
-Filter Name::Description
-prettyJson::Format output as somewhat pretty-printed JSON.  Intended only for used with topics that write JSON, particularly, {red}extract, {red}inject, {red}nesting, {red}delete, {red}audit.
-addTopic::Add topic information to the beginning and end of the output.
-logLevel::Filter based on log-level.  Only works with the 'log' topic.
-logPrefix::Adds the colored prefix to the log message.  Only works with the 'log' topic.
-}%
-
-%{h Examples }%
-
-This first example connects the output of the {bold}defaults{reset} command to stdout when you run it, but if you don't run it, and pass the --defaults flag (which also publishes to the 'defaults' topic, publishing will go to stderr instead. This is taken from the 'default' configuration file.
-%{c
-sink_config({green}"redirectableOut"{cyan}, {green}"stdout"{cyan}, {{}})
-sink_config({green}"defaultOut"{cyan},      {green}"stderr"{cyan}, {{}})
-{brown} #argv() gets the command name.
-if command_name() != {green}"defaults"{cyan} {{
-    subscribe({green}"defaults"{cyan}, {green}"defaultOut"{cyan})
-}} else {{
-    subscribe({green}"defaults"{cyan}, {green}"redirectableOut"{cyan})
-}}
-}%
-
-This example configures S3 as a sink, taking the configuration needed for that sink from environment variables.  You could test the existence of these environment variables first (and indeed we do that in the default configuration).
-%{c
-sink_config({green}"s3"{cyan}, {green}"s3"{cyan}, {{ {green}"secret"{cyan} : env({green}"AWS_ACCESS_SECRET"{cyan}),
-                            {green}"uid"{cyan}    : env({green}"AWS_ACCESS_ID"{cyan}),
-                            {green}"uri"{cyan}    : env({green}"AWS_S3_BUCKET_URI"{cyan}) }} )
-
-{brown}# This is NOT done in the default config, you'd have to add it yourself.
-subscribe({green}"report"{cyan}, {green}"s3"{cyan})
-}%
+    shortdoc: "Observability for the Software Development Lifecycle"
+    doc: """Chalk is an observability tool for the software development
+lifecycle, helping developers get visibility into where and how their
+software is deployed, and helping Ops people get visibility on who
+owns the software and what it does. It's kind of like GPS for your
+software.
+<p>
+Chalk generally drops into CI/CD to collect information about the
+source and build, then adds a **chalk mark** to software to make it
+easy to identify in the real world. It can also **wrap** the software,
+which basically means chalk will follow the software into production
+to collect telemetry about the deployment environment.
+<p>
+Chalk is meant to be 'easy' in that you can just drop it into a CI/CD
+pipeline and never have to think about it. However, it is tremendously
+flexible in what it can collect and how it reports.
+<p>
+There's a graphical configuration tool in progress. There is also
+plenty of in-command help. Currently, the interface is being redone,
+but for the moment:
+<p>
+
+
+- <jazzberry>chalk help commands</jazzberry> shows the overview help for the command line.
+- <jazzberry>chalk help "cmdname" </jazzberry> shows the help for an individual command, as does <fandango>chalk "cmdname" --help</fandango>
+- <jazzberry>chalk help config</jazzberry> shows the overview help for configuration options you can set via the <fandango>chalk load</fandango> command.
+- <jazzberry>chalk help metadata</jazzberry> shows information about the many types of metadata that you can choose to collect.
+- <jazzberry>chalk help builtins</jazzberry> shows information about built-in functions that you can use in a custom configuration to do your own data collection or customization.
+- <jazzberry>chalk help topics</jazzberry> will show a list of long-form help documents that
+  can be read from the command line.
+- <jazzberry>chalk help search "term"</jazzberry> will search all help documents (as will help
+commands that do not match known topics)
 """
   }
 }

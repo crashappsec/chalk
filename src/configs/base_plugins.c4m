@@ -8,12 +8,318 @@
 ## Part of the base configuration.  See the comment at the top of
 ## `base_keyspecs.c4m`
 
+# This plugin is the only thing allowed to set these keys.
+plugin system {
+  ~enabled:         true
+  pre_run_keys:     ["INJECTOR_CHALK_ID", "INJECTOR_VERSION", "TIME_CHALKED",
+                     "INJECTOR_COMMIT_ID", "DATE_CHALKED",
+                     "TZ_OFFSET_WHEN_CHALKED", "DATETIME_WHEN_CHALKED",
+                     "INJECTOR_ENV", "HOSTINFO_WHEN_CHALKED",
+                      "NODENAME_WHEN_CHALKED", "PLATFORM_WHEN_CHALKED",
+                      "INJECTOR_PUBLIC_KEY"]
+
+  artifact_keys:   ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
+                    "PRE_CHALK_HASH", "TIMESTAMP_WHEN_CHALKED"]
+
+  post_chalk_keys: ["_OP_ARTIFACT_PATH", "_CURRENT_HASH",
+                    "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS", "_VIRTUAL",
+                    "_VALIDATED_SIGNATURE", "_VALIDATED_METADATA",
+                    "_INVALID_SIGNATURE"]
+
+  post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
+                    "_OP_HOSTINFO", "_OP_NODENAME", "_OP_PLATFORM",
+		    "_OP_CHALKER_COMMIT_ID", "_OP_CHALKER_VERSION",
+		    "_OP_CHALK_COUNT", "_OP_CMD_FLAGS", "_OP_EXE_NAME",
+		    "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
+		    "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
+		    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV"]
+
+  ~priority:       0
+  doc: """
+The system data collection module is the first thing to run for any
+data collection phase. The metadata it reports on are all things that
+are not overridable via other plugins.
+"""  
+}
+
+# These keys are system keys, but need to go LAST, not first.  The
+# OLD_CHALK field needs to know what fields get written before it can
+# figure out what to write.
+#
+# `metsys` is essentially meant to be "system end" in the sense of the
+# old algol days where an if statement's end delimeter was `fi` and a
+# case statement's end was `esac`. But also, this is where system
+# stuff goes that needs other metadata before it can write its own, so
+# I thought it was particularly appropriate.
+#
+# The priority field is set to high(int64).
+
+plugin metsys {
+    ~enabled: true
+    artifact_keys: ["METADATA_HASH", "SIGNATURE", "ERR_INFO", "METADATA_ID"]
+    post_run_keys: ["_CHALK_EXTERNAL_ACTION_AUDIT"]
+    ~priority:     high()
+    doc: """
+Like the `system` module, this module is non-overridable keys added by
+Chalk. It's just the ones that need to be computed at the very end of
+a data collection phase, so integrity / signing and audit.
+"""    
+}
+
+
+# Probably should add file time of artifact, date of branch
+# and any tag associated.
+plugin vctl_git {
+    enabled:         true
+    pre_run_keys:    ["COMMIT_ID", "BRANCH", "ORIGIN_URI",
+                      "VCS_DIR_WHEN_CHALKED"]
+    artifact_keys:   ["COMMIT_ID", "BRANCH", "ORIGIN_URI",
+                      "VCS_DIR_WHEN_CHALKED"]
+    doc: """
+This plugin collects version control information from .git directories
+that artifacts are found in.
+
+This only runs when adding chalk marks.
+
+If chalking docker builds, this will start in the docker context
+folder looking for a git directory, and work its way up the file
+system if one isn't found.
+
+If chalking file system artifacts, the plugin will search based on
+where Chalk is configured to look for artifacts. If that spans
+multiple directories, and multiple repositories are in scope, then
+individual artifacts will report the repo information that is in scope
+for them.
+
+In other cases where there is just a single .git directory found, all
+artifacts will be attached to that info.
+"""    
+}
+
+plugin ci_github {
+    enabled:         true
+    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
+                     "BUILD_TRIGGER", "BUILD_CONTACT"]
+    doc: """
+Collects information about associated build jobs in github actions.
+
+This only collects data when adding chalk marks.
+"""    
+}
+
+plugin ci_jenkins {
+    enabled:         true
+    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI"]
+    doc: """
+Collects information about associated build jobs in Jenkins.
+
+This only collects data when adding chalk marks.
+"""    
+}
+
+plugin ci_gitlab {
+    enabled:         true
+    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
+                      "BUILD_TRIGGER", "BUILD_CONTACT"]
+    doc: """
+Collects information about associated build jobs in Gitlab.
+
+This only collects data when adding chalk marks.
+"""    
+}
+
+plugin github_codeowners {
+    enabled:         true
+    artifact_keys:   ["CODE_OWNERS"]
+    doc: """
+Captures the contents of a github-style CODEOWNERS file.
+
+This only collects data when adding chalk marks.
+"""    
+}
+
+plugin authors {
+    # Since there's only one key it might export, go ahead and
+    # lock it; if you want to disable that key, turn off the whole plugin.
+    enabled:         true
+    pre_run_keys:    ["CODE_OWNERS"]
+    doc: """
+Captures the value of old school AUTHOR(S) files.
+
+This only collects data when adding chalk marks.
+"""    
+}
+
+plugin procfs {
+    enabled:         true
+    post_chalk_keys: ["_PROCESS_PID", "_PROCESS_DETAIL",
+                      "_PROCESS_PARENT_PID", "_PROCESS_START_TIME",
+                      "_PROCESS_STATE", "_PROCESS_PGID", "_PROCESS_UTIME",
+                      "_PROCESS_STIME", "_PROCESS_CHILDREN_UTIME",
+                      "_PROCESS_CHILDREN_STIME", "_PROCESS_UMASK",
+                      "_PROCESS_UID", "_PROCESS_GID",
+                      "_PROCESS_NUM_FD_SIZE", "_PROCESS_GROUPS",
+                      "_PROCESS_SECCOMP_STATUS", "_PROCESS_ARGV",
+                      "_PROCESS_CWD", "_PROCESS_EXE_PATH",
+                      "_PROCESS_COMMAND_NAME", "_PROCESS_FD_INFO",
+                      "_PROCESS_MOUNT_INFO"]
+
+    post_run_keys:   ["_OP_TCP_SOCKET_INFO", "_OP_UDP_SOCKET_INFO",
+                      "_OP_IPV4_ROUTES", "_OP_IPV6_ROUTES",
+                      "_OP_IPV4_INTERFACES", "_OP_IPV6_INTERFACES",
+                      "_OP_ARP_TABLE", "_OP_CPU_INFO", "_OP_ALL_PS_INFO"]
+    doc: """
+Captures host-level information for Linux machines from the proc file
+system interface, including process and network information.
+
+Can capture data both during build and during process run time.
+"""    
+}
+
+plugin imdsv2 {
+    enabled:         true
+    post_run_keys:   [
+    "_AWS_AMI_ID", "_AWS_AMI_LAUNCH_INDEX", "_AWS_AMI_MANIFEST_PATH",
+    "_AWS_ANCESTOR_AMI_IDS", "_AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE",
+    "_AWS_AZ", "_AWS_AZ_ID", "_AWS_BLOCK_DEVICE_MAPPING_AMI",
+    "_AWS_BLOCK_DEVICE_MAPPING_ROOT", "_AWS_BLOCK_DEVICE_MAPPING_SWAP",
+    "_AWS_DEDICATED_HOST_ID", "_AWS_EVENTS_MAINTENANCE_HISTORY",
+    "_AWS_EVENTS_MAINTENANCE_SCHEDULED",
+    "_AWS_EVENTS_RECOMMENDATIONS_REBALANCE", "_AWS_HOSTNAME",
+    "_AWS_IAM_INFO", "_AWS_IDENTITY_CREDENTIALS_EC2_INFO",
+    "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE",
+    "_AWS_INSTANCE_ACTION", "_AWS_INSTANCE_ID",
+    "_AWS_INSTANCE_IDENTITY_DOCUMENT", "_AWS_INSTANCE_IDENTITY_PKCS7",
+    "_AWS_INSTANCE_IDENTITY_SIGNATURE", "_AWS_INSTANCE_LIFE_CYCLE",
+    "_AWS_INSTANCE_MONITORING", "_AWS_INSTANCE_TYPE",  "_AWS_INTERFACE_ID",
+    "_AWS_IPV6_ADDR", "_AWS_KERNEL_ID", "_AWS_LOCAL_HOSTNAME",
+    "_AWS_LOCAL_IPV4_ADDR", "_AWS_MAC", "_AWS_METRICS_VHOSTMD",
+    "_AWS_OPENSSH_PUBKEY", "_AWS_PARTITION_NAME", "_AWS_PARTITION_NUMBER",
+    "_AWS_PLACEMENT_GROUP", "_AWS_PRODUCT_CODES", "_AWS_PUBLIC_HOSTNAME",
+    "_AWS_PUBLIC_IPV4_ADDR", "_AWS_RAMDISK_ID", "_AWS_REGION",
+    "_AWS_RESERVATION_ID", "_AWS_RESOURCE_DOMAIN",  "_AWS_SECURITY_GROUPS",
+    "_AWS_SECURITY_GROUP_IDS", "_AWS_SPOT_INSTANCE_ACTION",
+    "_AWS_SPOT_TERMINATION_TIME", "_AWS_SUBNET_ID", "_AWS_VPC_ID",
+    "_AWS_TAGS"]
+    doc: """
+Captures metadata from AWS instances supporting IMDS.  
+"""    
+}
+
+plugin aws_ecs {
+    enabled:         true
+    pre_run_keys:    ["CLOUD_METADATA_WHEN_CHALKED"]
+    post_run_keys:   ["_OP_CLOUD_METADATA"]
+    doc: """
+Captures metadata from the primary endpoint for the original ECS
+metdata interface.
+"""    
+}
+
+# This plugin takes values from the conf file, whether they're static
+# values, or callbacks. By default, these are of the lowest priority
+# of anything that can conflict.
+#
+# For static values read from the profile, this plugin attempts to
+# apply substitutions to text strings, where appropriate. See the plugin
+# implementation for details on the substitutions.
+#
+# For callbacks, it passes in the artifact path as a first parameter, and
+# expects the callback to return the proper value.
+#
+# This really should go next to last, since it fills in default values
+# when no other plugin does.  For string fields, it will do string
+# substitutions too:
+#
+# {chalkid} -> value of CHALK_ID
+# {now}     -> value of TIMESTAMP
+# {path}    -> value of PATH_WHEN_CHALKED
+# {hash}    -> value of HASH
+# {tenant}  -> value of TENANT_ID_WHEN_CHALKED
+#
+#
+# While we don't enforce that, if you want to ensure callbacks are called,
+# and that provided values clobber plugin values, you can leave the
+# priority as is, and set the overrides field.
+
+plugin conffile {
+    pre_run_keys:     ["*"]  # Host-only keys are evaluated here.
+    artifact_keys:    ["*"]  # Chalk-only keys are evaluated here.
+    post_chalk_keys:  ["*"]  # Non-chalkable artifact keys here.
+    post_run_keys:    ["*"]  # Post-run keys here.
+    priority:         high() - 1
+    doc: """
+This plugin is responsible for collecting any values explicitly set in
+the configuration file by the user. The user can set values statically
+when the configuration loads, by specifying:
+
+```keyspec.KEY_NAME.value = ...```
+
+In this case, per-artifact data will be the same across all artifacts
+processed.
+
+Or, the user can implement a callback that gets called per-artifact,
+using the `callback` field, in which case they can define a con4m
+function.
+
+This plugin cannot set keys handled by the system / metsys modules.
+
+Additionally, by default, other plugins values, if supplied, will get
+priority over anything generated by this plugin.  This behavior can be
+changed by making the plugin high priority instead of low priority.
+
+For instance, if you really wanted, you could set:
+
+```plugin.conffile.priority = 2```
+"""    
+}
+
+plugin zippeditem {
+    enabled:         true
+    artifact_keys:   ["CONTAINING_ARTIFACT_WHEN_CHALKED", "PATH_WITHIN_ZIP"]
+    doc: """
+Adds additional information to artifacts embedded in ZIP files about
+the ZIP file they're stored in.
+    """
+}
+
+plugin tool {
+    enabled:         true
+    pre_run_keys:    ["*"]
+    artifact_keys:   ["*"]
+    doc: """
+Allows running multiple external SAST or SBOM tools. Out of the box, only
+one example tool in each category is supported, `semgrep` and `syft`.
+
+Additional tools can be supported easily in the configuration.
+
+Note that associated metadata keys must also be enabled in a report.
+"""    
+}
+
 plugin elf {
     ~enabled:        true
     codec:           true
     artifact_keys:   ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     ~priority:       45
+    doc: """
+This is a codec specifically for manipulating chalk marks in ELF
+executables. It works by adding a small, new data section to
+existing ELF files.
+<p>
+It does not interfere with executable content in any way, and is
+robust to the `strip` command.
+<p>
+This plugin can mark ELF executables even if running on systems that
+cannot run them.
+<p>
+This plugin will be able to handle any ELF produced by a typical
+compiler (including C, C++ or Go compilers) or assembler. Hand-written
+assembly without a section table is not handled; whenever this
+happens, the plugin will refuse to operate on the executable, and the
+`elf_last_resort` codec will be used instead.
+"""    
 }
 
 plugin elf_last_resort {
@@ -21,6 +327,15 @@ plugin elf_last_resort {
     artifact_keys:   ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     ~priority: high() - 1
+    doc: """
+This codec is only used for operating on chalk marks for oddball
+hand-written elf-files. It works by leveraging the fact that appending
+to a valid elf executable can never impact the behavior of that
+executable, and is still valid ELF.
+<p>
+However, the `strip` command will happily remove marks written by this
+plugin. Ideally though, it will never ever get used anyway.
+"""    
 }
 
 plugin source {
@@ -29,6 +344,34 @@ plugin source {
     artifact_keys:   ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     priority: 1000
+    doc: """
+This codec is responsible for manipulating chalk marks for programs
+that are generally distributed in source form, like Bash scripts,
+Python programs, etc.
+<p>
+In such programs, we add Chalk marks by adding a comment into the
+source code. By default, the comment will be placed at the end of the
+file. However, it's possible to specify the exact location of the mark
+by adding a *chalk placeholder*, which is simply the string:
+
+```
+ { "MAGIC" : "dadfedabbadabbed" }
+ ```
+
+This allows you to put marks wherever is most convenient, and also
+does allow you to put a mark inside something like a Python tri-quote
+string.
+<p>
+There are some configuration parameters for configuring this plugin,
+in the `source_marks` configuration section. For example, you could
+choose to mark all script files, or just ones that have a Unix
+"shebang".
+<p>
+Within the Chalk command, you can do `help source_marks` to see more
+details on these options.
+<p>
+This codec currently only processes files that seem to be valid UTF-8.
+"""    
 }
 
 plugin macos {
@@ -37,7 +380,75 @@ plugin macos {
     artifact_keys:   ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     priority:        2  # Should come before shebang for sure.
+    doc: """
+This codec for MacOS Mach-O files is the only current plugin that
+doesn't add metadata directly into a binary, though we do expect to
+add such capabilities in the future.
+<p>
+For the time being, this works by moving the binary being chalked, and
+leaving behind a small shell script that will:
+
+1. Validate (via SHA256 hash) and execute the binary when the script is run.
+2. Re-write the chalked binary if the moved copy cannot be found (a complete
+copy is stored in the script).
+3. Keep the chalk mark and any associated metadata.
+
+Chalk validation validates both the actual binary, and the wrapper.
+<p>
+This approach is done because MacOS does do extensive validation of
+binaries, and adding Chalk marks directly would require re-signing
+them in Apple's ecosystem, which we have not implemented.
+"""    
 }
+
+plugin zip {
+    codec:           true
+    priority:        1
+    enabled:         true
+    artifact_keys:   ["EMBEDDED_CHALK", "EMBEDDED_TMPDIR", "ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    doc: """
+The `zip` codec is responsible for manipulating Chalk marks in any
+executable content packaged using the ZIP file format under the hood,
+including all common Java formats, and some popular formats for
+bundling serverless content.
+<p>
+Currently the codec will only process files with a file extension
+named in the `zip_extensions` configuration field. By default, we
+process the extensions: "zip", "jar", "war" and "ear".
+<p>
+This codec can be configured to collect chalk marks for artifacts
+placed into the ZIP file as well, if the configuration variabe
+`chalk_contained_items` is `true`; by default it is NOT on. When this
+is on, subchalks are available via the `EMBEDDED_CHALK` key.
+<p>
+The Chalk mark is placed in the root of the Zip file in a file called
+`chalk.json`.
+<p>
+Note that this does not in any way interfere with Java's code signing
+system. Java only signs what's explicitly in their manifest files, so
+they consider the chalk mark benign.
+<p>
+However, Chalk's signature, if used, covers all the content at the
+time of Chalking, so can detect any subsequent modifications.
+"""    
+}
+
+plugin python_pyc {
+    codec:           true
+    priority:        1
+    enabled:         true
+    artifact_keys:   ["ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    doc: """
+This codec allows chalking of Python programs that are not distributed
+as source, but are distributed as python byte code (.pyc files).
+<p>
+Accepted file extensions can be set using the `pyc_extensions`
+configuration variable.
+"""    
+}
+
 
 plugin docker {
     ~enabled: true
@@ -119,234 +530,13 @@ plugin docker {
         "_INSTANCE_MAC", "_INSTANCE_NETWORKS",  "_OP_ALL_CONTAINER_METADATA",
         "_OP_ALL_IMAGE_METADATA", "_STORE_URI"
     ]
-}
+    doc: """
+The docker Codec is responsible for chalk marks for Docker images and
+containers, but also does all of the docker-specific data collection
+for containers and images.
 
-plugin zip {
-    codec:           true
-    priority:        1
-    enabled:         true
-    artifact_keys:   ["EMBEDDED_CHALK", "EMBEDDED_TMPDIR", "ARTIFACT_TYPE"]
-    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
-}
-
-plugin zippeditem {
-    enabled:         true
-    artifact_keys:   ["CONTAINING_ARTIFACT_WHEN_CHALKED", "PATH_WITHIN_ZIP"]
-}
-
-plugin python_pyc {
-    codec:           true
-    priority:        1
-    enabled:         true
-    artifact_keys:   ["ARTIFACT_TYPE"]
-    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
-}
-
-plugin tool {
-    enabled:         true
-    pre_run_keys:    ["*"]
-    artifact_keys:   ["*"]
-}
-
-# Probably should add file time of artifact, date of branch
-# and any tag associated.
-plugin vctl_git {
-    enabled:         true
-    pre_run_keys:    ["COMMIT_ID", "BRANCH", "ORIGIN_URI",
-                      "VCS_DIR_WHEN_CHALKED"]
-    artifact_keys:   ["COMMIT_ID", "BRANCH", "ORIGIN_URI",
-                      "VCS_DIR_WHEN_CHALKED"]
-}
-
-plugin ci_github {
-    enabled:         true
-    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
-                     "BUILD_TRIGGER", "BUILD_CONTACT"]
-}
-
-plugin ci_jenkins {
-    enabled:         true
-    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI"]
-}
-
-plugin ci_gitlab {
-    enabled:         true
-    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
-                      "BUILD_TRIGGER", "BUILD_CONTACT"]
-}
-
-plugin authors {
-    # Since there's only one key it might export, go ahead and
-    # lock it; if you want to disable that key, turn off the whole plugin.
-    enabled:         true
-    pre_run_keys:    ["CODE_OWNERS"]
-}
-
-plugin github_codeowners {
-    enabled:         true
-    artifact_keys:   ["CODE_OWNERS"]
-}
-
-plugin aws_ecs {
-    enabled:         true
-    pre_run_keys:    ["CLOUD_METADATA_WHEN_CHALKED"]
-    post_run_keys:   ["_OP_CLOUD_METADATA"]
-}
-
-plugin imdsv2 {
-    enabled:         true
-    post_run_keys:   ["_AWS_AMI_ID",
-                      "_AWS_AMI_LAUNCH_INDEX",
-                      "_AWS_AMI_MANIFEST_PATH",
-                      "_AWS_ANCESTOR_AMI_IDS",
-                      "_AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE",
-                      "_AWS_AZ",
-                      "_AWS_AZ_ID",
-                      "_AWS_BLOCK_DEVICE_MAPPING_AMI",
-                      "_AWS_BLOCK_DEVICE_MAPPING_ROOT",
-                      "_AWS_BLOCK_DEVICE_MAPPING_SWAP",
-                      "_AWS_DEDICATED_HOST_ID",
-                      "_AWS_EVENTS_MAINTENANCE_HISTORY",
-                      "_AWS_EVENTS_MAINTENANCE_SCHEDULED",
-                      "_AWS_EVENTS_RECOMMENDATIONS_REBALANCE",
-                      "_AWS_HOSTNAME",
-                      "_AWS_IAM_INFO",
-                      "_AWS_IDENTITY_CREDENTIALS_EC2_INFO",
-                      "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE",
-                      "_AWS_INSTANCE_ACTION",
-                      "_AWS_INSTANCE_ID",
-                      "_AWS_INSTANCE_IDENTITY_DOCUMENT",
-                      "_AWS_INSTANCE_IDENTITY_PKCS7",
-                      "_AWS_INSTANCE_IDENTITY_SIGNATURE",
-                      "_AWS_INSTANCE_LIFE_CYCLE",
-                      "_AWS_INSTANCE_MONITORING",
-                      "_AWS_INSTANCE_TYPE",
-                      "_AWS_INTERFACE_ID",
-                      "_AWS_IPV6_ADDR",
-                      "_AWS_KERNEL_ID",
-                      "_AWS_LOCAL_HOSTNAME",
-                      "_AWS_LOCAL_IPV4_ADDR",
-                      "_AWS_MAC",
-                      "_AWS_METRICS_VHOSTMD",
-                      "_AWS_OPENSSH_PUBKEY",
-                      "_AWS_PARTITION_NAME",
-                      "_AWS_PARTITION_NUMBER",
-                      "_AWS_PLACEMENT_GROUP",
-                      "_AWS_PRODUCT_CODES",
-                      "_AWS_PUBLIC_HOSTNAME",
-                      "_AWS_PUBLIC_IPV4_ADDR",
-                      "_AWS_RAMDISK_ID",
-                      "_AWS_REGION",
-                      "_AWS_RESERVATION_ID",
-                      "_AWS_RESOURCE_DOMAIN",
-                      "_AWS_SECURITY_GROUPS",
-                      "_AWS_SECURITY_GROUP_IDS",
-                      "_AWS_SPOT_INSTANCE_ACTION",
-                      "_AWS_SPOT_TERMINATION_TIME",
-                      "_AWS_SUBNET_ID",
-                      "_AWS_VPC_ID",
-                      "_AWS_TAGS"]
-}
-
-plugin procfs {
-    enabled:         true
-    post_chalk_keys: ["_PROCESS_PID", "_PROCESS_DETAIL",
-                      "_PROCESS_PARENT_PID", "_PROCESS_START_TIME",
-                      "_PROCESS_STATE", "_PROCESS_PGID", "_PROCESS_UTIME",
-                      "_PROCESS_STIME", "_PROCESS_CHILDREN_UTIME",
-                      "_PROCESS_CHILDREN_STIME", "_PROCESS_UMASK",
-                      "_PROCESS_UID", "_PROCESS_GID",
-                      "_PROCESS_NUM_FD_SIZE", "_PROCESS_GROUPS",
-                      "_PROCESS_SECCOMP_STATUS", "_PROCESS_ARGV",
-                      "_PROCESS_CWD", "_PROCESS_EXE_PATH",
-                      "_PROCESS_COMMAND_NAME", "_PROCESS_FD_INFO",
-                      "_PROCESS_MOUNT_INFO"]
-
-    post_run_keys:   ["_OP_TCP_SOCKET_INFO", "_OP_UDP_SOCKET_INFO",
-                      "_OP_IPV4_ROUTES", "_OP_IPV6_ROUTES",
-                      "_OP_IPV4_INTERFACES", "_OP_IPV6_INTERFACES",
-                      "_OP_ARP_TABLE", "_OP_CPU_INFO", "_OP_ALL_PS_INFO"]
-
-}
-
-# This plugin is the only thing allowed to set these keys.
-plugin system {
-  ~enabled:         true
-  pre_run_keys:     ["INJECTOR_CHALK_ID", "INJECTOR_VERSION", "TIME_CHALKED",
-                     "INJECTOR_COMMIT_ID", "DATE_CHALKED",
-                     "TZ_OFFSET_WHEN_CHALKED", "DATETIME_WHEN_CHALKED",
-                     "INJECTOR_ENV", "HOSTINFO_WHEN_CHALKED",
-                      "NODENAME_WHEN_CHALKED", "PLATFORM_WHEN_CHALKED",
-                      "INJECTOR_PUBLIC_KEY"]
-
-  artifact_keys:   ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
-                    "PRE_CHALK_HASH", "TIMESTAMP_WHEN_CHALKED"]
-
-  post_chalk_keys: ["_OP_ARTIFACT_PATH", "_CURRENT_HASH",
-                    "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS", "_VIRTUAL",
-                    "_VALIDATED_SIGNATURE", "_VALIDATED_METADATA",
-                    "_INVALID_SIGNATURE"]
-
-  post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
-                    "_OP_HOSTINFO", "_OP_NODENAME", "_OP_PLATFORM",
-		    "_OP_CHALKER_COMMIT_ID", "_OP_CHALKER_VERSION",
-		    "_OP_CHALK_COUNT", "_OP_CMD_FLAGS", "_OP_EXE_NAME",
-		    "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
-		    "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
-		    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV"]
-
-  ~priority:       0
-}
-
-# These keys are system keys, but need to go LAST, not first.  The
-# OLD_CHALK field needs to know what fields get written before it can
-# figure out what to write.
-#
-# `metsys` is essentially meant to be "system end" in the sense of the
-# old algol days where an if statement's end delimeter was `fi` and a
-# case statement's end was `esac`. But also, this is where system
-# stuff goes that needs other metadata before it can write its own, so
-# I thought it was particularly appropriate.
-#
-# The priority field is set to high(int64).
-
-plugin metsys {
-    ~enabled: true
-    artifact_keys: ["METADATA_HASH", "SIGNATURE", "ERR_INFO", "METADATA_ID"]
-    post_run_keys: ["_CHALK_EXTERNAL_ACTION_AUDIT"]
-    ~priority:     high()
-}
-
-# This plugin takes values from the conf file, whether they're static
-# values, or callbacks. By default, these are of the lowest priority
-# of anything that can conflict.
-#
-# For static values read from the profile, this plugin attempts to
-# apply substitutions to text strings, where appropriate. See the plugin
-# implementation for details on the substitutions.
-#
-# For callbacks, it passes in the artifact path as a first parameter, and
-# expects the callback to return the proper value.
-#
-# This really should go next to last, since it fills in default values
-# when no other plugin does.  For string fields, it will do string
-# substitutions too:
-#
-# {chalkid} -> value of CHALK_ID
-# {now}     -> value of TIMESTAMP
-# {path}    -> value of PATH_WHEN_CHALKED
-# {hash}    -> value of HASH
-# {tenant}  -> value of TENANT_ID_WHEN_CHALKED
-#
-#
-# While we don't enforce that, if you want to ensure callbacks are called,
-# and that provided values clobber plugin values, you can leave the
-# priority as is, and set the overrides field.
-
-plugin conffile {
-    pre_run_keys:     ["*"]  # Host-only keys are evaluated here.
-    artifact_keys:    ["*"]  # Chalk-only keys are evaluated here.
-    post_chalk_keys:  ["*"]  # Non-chalkable artifact keys here.
-    post_run_keys:    ["*"]  # Post-run keys here.
-    priority:         high() - 1
+To ensure Chalk works without any configuration or compatability
+issues, we use the underlying docker command to collect most data,
+instead of using the docker socket.
+"""    
 }

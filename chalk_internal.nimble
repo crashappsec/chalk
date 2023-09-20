@@ -9,8 +9,7 @@ bin           = @["chalk"]
 # Dependencies
 requires "nim >= 1.6.12"
 # TODO figure out why == does not work here
-requires "https://github.com/crashappsec/con4m.git#v0.1.3"
-requires "https://github.com/crashappsec/nimutils.git#v0.1.3"
+requires "https://github.com/crashappsec/con4m.git == 0.1.4"
 requires "https://github.com/viega/zippy == 0.10.7"
 requires "https://github.com/aruZeta/QRgen == 3.0.0"
 

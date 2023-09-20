@@ -19,8 +19,15 @@ outconf extract {
   host_report:            "host_report_default"
 }
 
-outconf env {
+
+outconf build {
+  chalk:                  "chalk_minimal"
   artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf push {
+  artifact_report:        "push_report_default"
   host_report:            "host_report_default"
 }
 
@@ -35,6 +42,11 @@ outconf heartbeat {
 }
 
 outconf delete {
+  artifact_report:        "artifact_report_default"
+  host_report:            "host_report_default"
+}
+
+outconf env {
   artifact_report:        "artifact_report_default"
   host_report:            "host_report_default"
 }
@@ -54,33 +66,15 @@ outconf dump {
 # This is only used when the 'docker' command is run for an unknown
 # command, and when `report_unwrapped_commands` is also true.
 
-outconf docker {
-  host_report:            "unknown_docker_report"
-}
-
-outconf build {
-  chalk:                  "chalk_minimal"
-  artifact_report:        "artifact_report_default"
-  host_report:            "host_report_default"
-}
-
-outconf push {
-  artifact_report:        "push_report_default"
-  host_report:            "host_report_default"
-}
-
 outconf setup {
   chalk:                  "chalk_default"
   artifact_report:        "artifact_report_default"
   host_report:            "host_report_default"
 }
 
-outconf help {
+outconf docker {
+  host_report:            "unknown_docker_report"
 }
-
-outconf fail {
-}
-
 
 custom_report chalk_usage_stats {
   sink_configs:  []

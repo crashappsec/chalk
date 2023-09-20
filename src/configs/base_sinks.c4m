@@ -11,24 +11,41 @@
 ## The default sink implementations are currently in the nimutils
 ## library, except for 'custom', which is in output.nim.  That one
 ## allows you to define your own sink in con4m by supplying the
-## callback outhook() If you do add more hardcoded sinks, please do
-## make sure they get locked in the lockBuiltinKeys() function in
-## config.nim.
-
-sink stdout {
-  doc:             "A sink that writes to stdout"
-}
-
-sink stderr {
-  doc:             "A sink that writes to stderr"
-}
+## callback outhook() 
 
 sink file {
   ~filename:        true
   ~log_search_path: false
   ~use_search_path: false
   ~on_write_msg:    false
-  doc:       "A sink that writes a local file"
+  shortdoc:  "Log appending to a local file"
+  doc:       """
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `filename` | `string` | yes | The file name for the output. |
+| `log_search_path` | `list[string]` | no | An ordered list of directories for the file to live. |
+| `use_search_path` | `bool` | no | Controls whether or not to use the `log_search_path` at all.  Defaults to `true`. |
+
+The log file consists of rows of JSON objects (the `jsonl` format).
+
+The `log_search_path` is a Unix style path (colon separated) that the
+system will march down, trying to find a place where it can open the
+named, skipping directories where there isn't write permission. In no
+value is provided, the default is `["/var/log/", "~/log/", "."]`.
+
+If the `filename` parameter has a slash in it, it will always be tried
+first, before the search path is checked.
+
+If nothing in the search path is openable, or if no search path was
+given, and the file location was not writable, tthe system tries to
+write to a temporary file as a last resort.
+
+If `use_search_path` is false, the system just looks at the `filename`
+field; if it's a relative path, it resolves it based on the current
+working directory.  In this mode, if the log file cannot be opened,
+then the sink configuration will error when usd.
+"""
 }
 
 sink rotating_log {
@@ -37,17 +54,72 @@ sink rotating_log {
   ~log_search_path:   false
   ~truncation_amount: false
   ~on_write_msg:      false
-  doc:       "A truncating log file."
+  shortdoc:       "A self-truncating log file"
+  doc: """
+  
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `filename` | `string` | true | The name to use for the log file. |
+| `max` | `Size` | true | The size at which truncation should occur. |
+| `log_search_path` | list[string]` | false | An ordered list of directories for the file to live. |
+| `truncation_amount` | `Size` | false | The target size to which the log file should be truncated. |
+
+When the file size reaches the `max` threshold (in bytes), it is
+truncated, removing records until it has truncated `truncation_amount`
+bytes of data. If the `truncation_amount` field is not provided, it is
+set to 25% of `max`.
+
+The log file consists of rows of JSON objects (the `jsonl`
+format). When we delete, we delete full records, from oldest to
+newest. Since we delete full reocrds, we may delete slightly more than
+the truncation amount specified as a result.
+
+The deletion process guards against catastrophic failure by copying
+undeleted data into a new, temporary log file, and swapping it into
+the destination file once finished. As a result, you should assume you
+need 2x the value of `max` available in terms of disk space.
+
+`max` and `truncation_amount` should be Size objects (eg, `<< 100mb >>` )
+"""  
 }
 
 sink s3 {
-  ~secret:   true
-  ~uid:      true
-  ~uri:      true
-  ~region:   false
-  ~extra:    false
-  ~on_write_msg:    false
-  doc:       "A sink for S3 buckets"
+  ~secret:        true
+  ~uid:           true
+  ~uri:           true
+  ~region:        false
+  ~extra:         false
+  ~on_write_msg:  false
+  shortdoc:       "S3 object storage"
+  doc:       """
+
+| Parameter | Type | Required | Description |
+|-----------|------|---------|--------------|
+| `secret` | `string` | true | A valid AWS auth token |
+| `uid` | `string` | true | A valid AWS access identifier |
+| `uri` | `string` | true | The URI for the bucket in `s3:` format; see below |
+| `region` | `string` | false | The region (defaults to "us-east-1") |
+| `extra` | `string` | false | A prefix added to the object path within the bucket |
+
+To ensure uniqueness, each run of chalk constructs a unique object
+name. Here are the components:
+
+1. An integer consisting of the machine's local time in ms
+2. A 26-character cryptographically random ID (using a base32 character set)
+3. The value of the `extra` field, if provided.
+4. Anything provided in the `uri` field after the host.
+
+These items are separated by dashes.
+
+The timestamp goes before the timestamp to ensure files are listed in
+a sane order.
+
+The user is responsible for making sure the last two values are valid;
+this will not be checked; the operation will fail if they are not.
+
+Generally, you should not use dots in your bucket name, as this will
+thwart TLS protection of the connection.
+"""
 }
 
 sink post {
@@ -57,6 +129,71 @@ sink post {
   ~disallow_http:    false
   ~timeout:          false
   ~pinned_cert_file: false
-  ~on_write_msg:    false
-  doc:       "Generic HTTP/HTTPS post to a URL. Headers must be one per-line."
+  ~on_write_msg:     false
+  shortdoc:          "HTTP/HTTPS POST"
+  doc:       """
+  
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `uri` | true | The full URI to the endpoint to which the POST should be made. |
+| `content_type` | false | The value to pass for the "content-type" header |
+| `headers` | false | A dictionary of additional mime headers |
+| `disallow_http` | false | Do not allow HTTP connections, only HTTPS |
+| `timeout` | false | Connection timeout in ms |
+| `pinned_cert_file` | false | TLS certificate file |
+
+The post will always be a single JSON object, and the default
+content-type field will be `application/json`. Changing this value
+doesn't change what is posted; it is only there in case a particular
+endpoint requires a different value.
+
+If HTTPS is used, the connection will fail if the server doesn't have
+a valid certificate. Unless you provide a specific certificate via the
+`pinned_cert_file` field, self-signed certificates will not be
+considered valid.
+
+The underlying TLS library requires certificates to live on the file
+system.  However, you can embed your certificate in your configuration
+in PEM format, and use config builtin functions to write it to disk,
+if needed, before configuring the sink.
+
+If additional headers need to be passed (for instance, a bearer
+token), the `headers` field is converted directly to MIME.  If you
+wish to pass the raw MIME, you can use the `mime_to_dict` builtin.
+For example, the default configuration uses the following sink
+configuration:
+
+```
+sink_config my_https_config {
+  sink:    "post"
+  uri:     env("CHALK_POST_URL")
+
+  if env_exists("TLS_CERT_FILE") {
+    pinned_cert_file: env("TLS_CERT_FILE")
+  }
+
+  if env_exists("CHALK_POST_HEADERS") {
+    headers: mime_to_dict(env("CHALK_POST_HEADERS"))
+  }
 }
+```
+"""
+  
+}
+
+sink stdout {
+  shortdoc:  "Write to stdout"
+  doc:             """
+
+When configuring, this sink take no configuration parameters.
+"""  
+}
+
+sink stderr {
+  shortdoc:  "Write to stderr"
+  doc:             """
+
+This sink take no configuration parameters.
+"""  
+}
+

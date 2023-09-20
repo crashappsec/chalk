@@ -21,7 +21,7 @@ when isMainModule:
     warn("No working codec is available for the native executable type")
 
   if passedHelpFlag:
-    showCommandHelp() # no return; in cmd_help.nim
+    runChalkHelp("help") # no return; in cmd_help.nim
 
   setupDefaultLogConfigs() # src/sinks.nim
   checkSetupStatus()       # attestation.nim
@@ -38,22 +38,11 @@ when isMainModule:
   of "defaults":           showConfig(force = true)
   of "version":            runCmdVersion()
   of "docker":             runCmdDocker(getArgs())
-  of "profile":            runCmdProfile(getArgs())
   of "exec":               runCmdExec(getArgs())
   of "setup":              runCmdSetup(gen=true, load=true)
   of "setup.gen":          runCmdSetup(gen=true, load=false)
   of "setup.load":         runCmdSetup(gen=false, load=true)
-  #% INTERNAL
-  of "rawattrs":
-    let runtime = getChalkRuntime()
-    echo parseJson(runtime.attrs.scopeToJson()).pretty()
-    quit(1)
-  of "rawspec":
-    let runtime = getValidationRuntime()
-    echo parseJson(runtime.attrs.scopeToJson()).pretty()
-    quit(1)
-  of "helpdump":           runCmdHelpDump()
-  #% END
+  of "docgen":             runChalkDocGen() # in cmd_help
   else:
     runChalkHelp(getCommandName()) # noreturn, will not show config.
 
