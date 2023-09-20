@@ -239,18 +239,16 @@ def test_custom_report(
 outconf = {
     "insert",
     "extract",
-    "env",
-    "exec",
-    "delete",
-    "load",
-    "dump",
-    "docker",
     "build",
     "push",
-    "setup",
-    "help",
-    "fail",
+    "exec",
     "heartbeat",
+    "delete",
+    "env",
+    "load",
+    "dump",
+    "setup",
+    "docker",
 }
 
 
@@ -430,7 +428,6 @@ def test_profiles(
         "MAGIC",
         "CHALK_ID",
         "CHALK_VERSION",
-        "METADATA_HASH",
         "METADATA_ID",
     }
     logger.info("chalk insert config", config=configs["insert"]["chalk"])

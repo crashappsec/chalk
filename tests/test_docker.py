@@ -131,15 +131,17 @@ def test_virtual_valid(
         chalk_report=build.report, artifact=artifact_info, virtual=True
     )
 
-    metadata_hash = build.mark["METADATA_HASH"]
+    chalk_version = build.report["CHALK_VERSION"]
     metadata_id = build.mark["METADATA_ID"]
 
     vchalk = validate_virtual_chalk(
         tmp_data_dir, artifact_map={image_hash: artifact_info}, virtual=True
     )
+
+    # required keys in min chalk mark
     assert "CHALK_ID" in vchalk
     assert vchalk["MAGIC"] == MAGIC
-    assert vchalk["METADATA_HASH"] == metadata_hash
+    assert vchalk["CHALK_VERSION"] == chalk_version
     assert vchalk["METADATA_ID"] == metadata_id
 
     _, result = Docker.run(
@@ -196,7 +198,7 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
         chalk_report=build.report, artifact=artifact_info, virtual=False
     )
 
-    metadata_hash = build.mark["METADATA_HASH"]
+    chalk_version = build.report["CHALK_VERSION"]
     metadata_id = build.mark["METADATA_ID"]
 
     _, result = Docker.run(
@@ -208,7 +210,7 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
 
     assert "CHALK_ID" in chalk_json
     assert chalk_json["MAGIC"] == MAGIC, "chalk magic value incorrect"
-    assert chalk_json["METADATA_HASH"] == metadata_hash
+    assert chalk_json["CHALK_VERSION"] == chalk_version
     assert chalk_json["METADATA_ID"] == metadata_id
 
 
