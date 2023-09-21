@@ -1,3 +1,4 @@
+SHELL=bash
 BINARY=chalk
 CHALK_BUILD?=release
 
