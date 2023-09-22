@@ -8,7 +8,7 @@
 ## The `chalk setup` command.
 
 import ../config, ../attestation, ../reporting, ../selfextract, ../util,
-       ../collect
+       ../collect, strutils
 
 proc runCmdSetup*(gen, load: bool) =
   setCommandName("setup")
@@ -22,6 +22,7 @@ proc runCmdSetup*(gen, load: bool) =
 
   selfChalk.addToAllChalks()
   info("Ensuring cosign is present to setup attestation.")
+
   if getCosignLocation() == "":
     quitChalk(1)
   if load:

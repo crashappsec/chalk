@@ -2325,7 +2325,8 @@ manager currently does not run. We may eventually make it a fallback.
 
   field secret_manager_url {
     type:     string
-    default:  "https://chalkapi-test.crashoverride.run/v0.1/signkeys/"
+    # default:  "https://chalkapi-test.crashoverride.run/v0.1/signkeys/"
+    default:  "https://fcsoi192wd.execute-api.us-east-1.amazonaws.com/api/secrets-manager"
     hidden:   true
     shortdoc: "URL for secret manager"
     doc: """

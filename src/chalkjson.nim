@@ -472,8 +472,19 @@ proc prepareContents*(dict: ChalkDict,
                       t: MarkTemplate | ReportTemplate): string =
   return dict.filterByTemplate(t).toJson(t)
 
+proc forcePrivateKeys() =
+  var toForce: seq[string]
+
+  for k, _ in chalkConfig.keySpecs:
+    if k.startswith("$"):
+      toForce.add(k)
+
+  forceChalkKeys(toForce)
+
 proc getChalkMark*(obj: ChalkObj): ChalkDict =
   trace("Creating mark using template: " & getOutputConfig().markTemplate)
+
+  forcePrivateKeys()
 
   let templ = getMarkTemplate()
 
