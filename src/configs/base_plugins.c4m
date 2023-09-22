@@ -71,8 +71,6 @@ a data collection phase, so integrity / signing and audit.
 # and any tag associated.
 plugin vctl_git {
     enabled:         true
-    pre_run_keys:    ["COMMIT_ID", "BRANCH", "ORIGIN_URI",
-                      "VCS_DIR_WHEN_CHALKED"]
     artifact_keys:   ["COMMIT_ID", "BRANCH", "ORIGIN_URI",
                       "VCS_DIR_WHEN_CHALKED"]
     doc: """
@@ -142,7 +140,7 @@ plugin authors {
     # Since there's only one key it might export, go ahead and
     # lock it; if you want to disable that key, turn off the whole plugin.
     enabled:         true
-    pre_run_keys:    ["CODE_OWNERS"]
+    artifact_keys:   ["CODE_OWNERS"]
     doc: """
 Captures the value of old school AUTHOR(S) files.
 
@@ -448,7 +446,6 @@ Accepted file extensions can be set using the `pyc_extensions`
 configuration variable.
 """    
 }
-
 
 plugin docker {
     ~enabled: true

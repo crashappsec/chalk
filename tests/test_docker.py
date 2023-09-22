@@ -131,7 +131,7 @@ def test_virtual_valid(
         chalk_report=build.report, artifact=artifact_info, virtual=True
     )
 
-    chalk_version = build.report["CHALK_VERSION"]
+    chalk_version = build.mark["CHALK_VERSION"]
     metadata_id = build.mark["METADATA_ID"]
 
     vchalk = validate_virtual_chalk(
@@ -198,7 +198,7 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
         chalk_report=build.report, artifact=artifact_info, virtual=False
     )
 
-    chalk_version = build.report["CHALK_VERSION"]
+    chalk_version = build.mark["CHALK_VERSION"]
     metadata_id = build.mark["METADATA_ID"]
 
     _, result = Docker.run(

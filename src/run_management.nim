@@ -18,6 +18,8 @@ var
   startTime*          = getMonoTime().ticks()
 
 
+proc increfStream(chalk: ChalkObj) {.importc.}
+
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
 proc startTestRun*() =
@@ -63,11 +65,13 @@ proc setAllChalks*(s: seq[ChalkObj]) =
   collectionCtx.allChalks = s
 proc removeFromAllChalks*(o: ChalkObj) =
   if o in collectionCtx.allChalks:
+    # Note that this is NOT an order-preserving delete; it's O(1)
     collectionCtx.allChalks.del(collectionCtx.allChalks.find(o))
 proc getUnmarked*(): seq[string] = collectionCtx.unmarked
 proc addUnmarked*(s: string) =
   collectionCtx.unmarked.add(s)
 proc isMarked*(chalk: ChalkObj): bool {.inline.} = return chalk.marked
+
 proc newChalk*(name:         string            = "",
                pid:          Option[Pid]       = none(Pid),
                fsRef:        string            = "",
@@ -82,6 +86,7 @@ proc newChalk*(name:         string            = "",
                cache:        RootRef           = RootRef(nil),
                codec:        Plugin            = Plugin(nil),
                addToAllChalks                  = false): ChalkObj =
+
   result = ChalkObj(name:          name,
                     pid:           pid,
                     fsRef:         fsRef,
@@ -99,7 +104,7 @@ proc newChalk*(name:         string            = "",
                     myCodec:       codec)
 
   if stream != FileStream(nil):
-    cachedChalkStreams.add(result)
+    result.increfStream()
 
   if addToAllChalks:
     result.addToAllChalks()

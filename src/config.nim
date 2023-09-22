@@ -11,41 +11,47 @@ import run_management
 export run_management
 from macros import parseStmt
 
-proc filterByProfile*(dict: ChalkDict, p: Profile): ChalkDict =
+proc filterByTemplate*(dict: ChalkDict, p: MarkTemplate | ReportTemplate): ChalkDict =
   result = ChalkDict()
   for k, v in dict:
-    if k in p.keys and p.keys[k].report: result[k] = v
-
-proc filterByProfile*(host, obj: ChalkDict, p: Profile): ChalkDict =
-  result = ChalkDict()
-  # Let obj-level clobber host-level.
-  for k, v in host:
-    if k in p.keys and p.keys[k].report: result[k] = v
-  for k, v in obj:
-    if k in p.keys and p.keys[k].report: result[k] = v
+    if k in p.keys and p.keys[k].use: result[k] = v
 
 proc getOutputConfig*(): OutputConfig =
   return chalkConfig.outputConfigs[getBaseCommandName()]
 
-template baseForceKeys(keynames: openarray[string], reportSym: untyped) =
+template getMarkTemplate*(): MarkTemplate =
   let
-    reportName = getOutputConfig().reportSym
-    profile    = chalkConfig.profiles[reportName]
+    outconf  = chalkConfig.outputConfigs[getBaseCommandName()]
+    tmplName = outconf.mark_template
+
+  chalkConfig.markTemplates[tmplName]
+
+template getReportTemplate*(): ReportTemplate =
+  let
+    outconf  = chalkConfig.outputConfigs[getBaseCommandName()]
+    tmplName = outconf.report_template
+
+  chalkConfig.reportTemplates[tmplName]
+
+template forceReportKeys*(keynames: openarray[string]) =
+  let templateRef = getReportTemplate()
 
   for item in keynames:
-    if item in profile.keys:
-      profile.keys[item].report = true
+    if item in templateRef.keys:
+      templateRef.keys[item].use = true
     else:
-      profile.keys[item] = KeyConfig(report: true)
-
-template forceHostKeys*(keynames: openarray[string]) =
-  baseForceKeys(keynames, host_report)
-
-template forceArtifactKeys*(keynames: openarray[string]) =
-  baseForceKeys(keynames, artifact_report)
+      templateRef.keys[item] = KeyConfig(use: true)
 
 template forceChalkKeys*(keynames: openarray[string]) =
-  baseForceKeys(keynames, chalk)
+  if isChalkingOp():
+    let
+      templateRef = getMarkTemplate()
+
+    for item in keynames:
+      if item in templateRef.keys:
+        templateRef.keys[item].use = true
+      else:
+        templateRef.keys[item] = KeyConfig(use: true)
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.sCall(cb, args)

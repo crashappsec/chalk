@@ -1,0 +1,1706 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+## Part of the base configuration.  See the comment at the top of
+## `base_keyspecs.c4m`
+
+
+## Pre-defined templates for reporting.
+
+report_template report_all {
+  shortdoc: "You don't care, let's see it all, every time!"
+  doc: """
+This profile reports EVERYTHING, even if it's slow to collect or
+redundant.
+
+We really don't recommend this, but it's also valid to start with this
+report and subtract from it.
+"""
+
+  key.MAGIC.use                              = true
+  key.CHALK_VERSION.use                      = true
+  key.DATE_CHALKED.use                       = true
+  key.TIME_CHALKED.use                       = true
+  key.TZ_OFFSET_WHEN_CHALKED.use             = true
+  key.DATETIME_WHEN_CHALKED.use              = true
+  key.EARLIEST_VERSION.use                   = true
+  key.HOSTINFO_WHEN_CHALKED.use              = true
+  key.NODENAME_WHEN_CHALKED.use              = true
+  key.INJECTOR_CHALK_ID.use                  = true
+  key.INJECTOR_PUBLIC_KEY.use                = true
+  key.INJECTOR_VERSION.use                   = true
+  key.PLATFORM_WHEN_CHALKED.use              = true
+  key.INJECTOR_COMMIT_ID.use                 = true
+  key.INJECTOR_ARGV.use                      = true
+  key.INJECTOR_ENV.use                       = true
+  key.TENANT_ID_WHEN_CHALKED.use             = true
+  key.CHALK_ID.use                           = true
+  key.TIMESTAMP_WHEN_CHALKED.use             = true
+  key.CHALK_PTR.use                          = true
+  key.PATH_WHEN_CHALKED.use                  = true
+  key.PATH_WITHIN_ZIP.use                    = true
+  key.CONTAINING_ARTIFACT_WHEN_CHALKED.use   = true
+  key.ARTIFACT_TYPE.use                      = true
+  key.HASH.use                               = true
+  key.PRE_CHALK_HASH.use                     = true
+  key.ORIGIN_URI.use                         = true
+  key.BRANCH.use                             = true
+  key.COMMIT_ID.use                          = true
+  key.ARTIFACT_VERSION.use                   = true
+  key.STORE_URI.use                          = true
+  key.PACKAGE_URI.use                        = true
+  key.CODE_OWNERS.use                        = true
+  key.VCS_DIR_WHEN_CHALKED.use               = true
+  key.BUILD_ID.use                           = true
+  key.BUILD_URI.use                          = true
+  key.BUILD_API_URI.use                      = true
+  key.BUILD_TRIGGER.use                      = true
+  key.BUILD_CONTACT.use                      = true
+  key.CHALK_RAND.use                         = true
+  key.OLD_CHALK_METADATA_HASH.use            = true
+  key.OLD_CHALK_METADATA_ID.use              = true
+  key.EMBEDDED_CHALK.use                     = true
+  key.EMBEDDED_TMPDIR.use                    = true
+  key.CLOUD_METADATA_WHEN_CHALKED.use        = true
+  key.SBOM.use                               = true
+  key.SAST.use                               = true
+  key.ERR_INFO.use                           = true
+  key.SIGNING.use                            = true
+  key.METADATA_HASH.use                      = true
+  key.METADATA_ID.use                        = true
+  key.SIGNATURE.use                          = true
+  key.DOCKER_FILE.use                        = true
+  key.DOCKERFILE_PATH.use                    = true
+  key.DOCKER_PLATFORM.use                    = true
+  key.DOCKER_LABELS.use                      = true
+  key.DOCKER_TAGS.use                        = true
+  key.DOCKER_CONTEXT.use                     = true
+  key.DOCKER_ADDITIONAL_CONTEXTS.use         = true
+  key.DOCKER_CHALK_ADDED_LABELS.use          = true
+  key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use   = true
+  key.DOCKER_CHALK_TEMPORARY_TAG.use         = true
+  key._OP_ARTIFACT_TYPE.use                  = true
+  key._OP_ARTIFACT_PATH.use                  = true
+  key._CURRENT_HASH.use                      = true
+  key._VALIDATED_METADATA.use                = true
+  key._VALIDATED_SIGNATURE.use               = true
+  key._VIRTUAL.use                           = true
+  key._OP_CHALKED_KEYS.use                   = true
+  key._OP_ARTIFACT_REPORT_KEYS.use           = true
+  key._PROCESS_PID.use                       = true
+  key._PROCESS_DETAIL.use                    = true
+  key._PROCESS_PARENT_PID.use                = true
+  key._PROCESS_START_TIME.use                = true
+  key._PROCESS_UTIME.use                     = true
+  key._PROCESS_STIME.use                     = true
+  key._PROCESS_CHILDREN_UTIME.use            = true
+  key._PROCESS_CHILDREN_STIME.use            = true
+  key._PROCESS_STATE.use                     = true
+  key._PROCESS_PGID.use                      = true
+  key._PROCESS_UMASK.use                     = true
+  key._PROCESS_UID.use                       = true
+  key._PROCESS_GID.use                       = true
+  key._PROCESS_NUM_FD_SIZE.use               = true
+  key._PROCESS_GROUPS.use                    = true
+  key._PROCESS_SECCOMP_STATUS.use            = true
+  key._PROCESS_ARGV.use                      = true
+  key._PROCESS_CWD.use                       = true
+  key._PROCESS_EXE_PATH.use                  = true
+  key._PROCESS_COMMAND_NAME.use              = true
+  key._PROCESS_FD_INFO.use                   = true
+  key._PROCESS_MOUNT_INFO.use                = true
+  key._OP_ALL_IMAGE_METADATA.use             = true
+  key._OP_ALL_CONTAINER_METADATA.use         = true
+  key._IMAGE_ID.use                          = true
+  key._IMAGE_COMMENT.use                     = true
+  key._IMAGE_CREATION_DATETIME.use           = true
+  key._IMAGE_DOCKER_VERSION.use              = true
+  key._IMAGE_AUTHOR.use                      = true
+  key._IMAGE_ARCHITECTURE.use                = true
+  key._IMAGE_VARIANT.use                     = true
+  key._IMAGE_OS.use                          = true
+  key._IMAGE_OS_VERSION.use                  = true
+  key._IMAGE_SIZE.use                        = true
+  key._IMAGE_ROOT_FS_TYPE.use                = true
+  key._IMAGE_ROOT_FS_LAYERS.use              = true
+  key._IMAGE_HOSTNAME.use                    = true
+  key._IMAGE_DOMAINNAME.use                  = true
+  key._IMAGE_USER.use                        = true
+  key._IMAGE_EXPOSED_PORTS.use               = true
+  key._IMAGE_ENV.use                         = true
+  key._IMAGE_CMD.use                         = true
+  key._IMAGE_NAME.use                        = true
+  key._IMAGE_HEALTHCHECK_TEST.use            = true
+  key._IMAGE_HEALTHCHECK_INTERVAL.use        = true
+  key._IMAGE_HEALTHCHECK_TIMEOUT.use         = true
+  key._IMAGE_HEALTHCHECK_START_PERIOD.use    = true
+  key._IMAGE_HEALTHCHECK_START_INTERVAL.use  = true
+  key._IMAGE_HEALTHCHECK_RETRIES.use         = true
+  key._IMAGE_MOUNTS.use                      = true
+  key._IMAGE_WORKINGDIR.use                  = true
+  key._IMAGE_ENTRYPOINT.use                  = true
+  key._IMAGE_NETWORK_DISABLED.use            = true
+  key._IMAGE_MAC_ADDR.use                    = true
+  key._IMAGE_ONBUILD.use                     = true
+  key._IMAGE_LABELS.use                      = true
+  key._IMAGE_STOP_SIGNAL.use                 = true
+  key._IMAGE_STOP_TIMEOUT.use                = true
+  key._IMAGE_SHELL.use                       = true
+  key._IMAGE_VIRTUAL_SIZE.use                = true
+  key._IMAGE_LAST_TAG_TIME.use               = true
+  key._IMAGE_STORAGE_METADATA.use            = true
+  key._STORE_URI.use                         = true
+  key._INSTANCE_CONTAINER_ID.use             = true
+  key._INSTANCE_CREATION_DATETIME.use        = true
+  key._INSTANCE_ENTRYPOINT_PATH.use          = true
+  key._INSTANCE_ENTRYPOINT_ARGS.use          = true
+  key._INSTANCE_ENV.use                      = true
+  key._INSTANCE_RESOLVE_CONF_PATH.use        = true
+  key._INSTANCE_HOSTNAME_PATH.use            = true
+  key._INSTANCE_HOSTS_PATH.use               = true
+  key._INSTANCE_LOG_PATH.use                 = true
+  key._INSTANCE_IMAGE_ID.use                 = true
+  key._INSTANCE_STATUS.use                   = true
+  key._INSTANCE_PID.use                      = true
+  key._INSTANCE_NAME.use                     = true
+  key._INSTANCE_RESTART_COUNT.use            = true
+  key._INSTANCE_DRIVER.use                   = true
+  key._INSTANCE_PLATFORM.use                 = true
+  key._INSTANCE_MOUNT_LABEL.use              = true
+  key._INSTANCE_PROCESS_LABEL.use            = true
+  key._INSTANCE_APP_ARMOR_PROFILE.use        = true
+  key._INSTANCE_EXEC_IDS.use                 = true
+  key._INSTANCE_BINDS.use                    = true
+  key._INSTANCE_CONTAINER_ID_FILE.use        = true
+  key._INSTANCE_LOG_CONFIG.use               = true
+  key._INSTANCE_NETWORK_MODE.use             = true
+  key._INSTANCE_RESTART_POLICY_NAME.use      = true
+  key._INSTANCE_RESTART_RETRY_COUNT.use      = true
+  key._INSTANCE_AUTOREMOVE.use               = true
+  key._INSTANCE_VOLUME_DRIVER.use            = true
+  key._INSTANCE_VOLUMES_FROM.use             = true
+  key._INSTANCE_CONSOLE_SIZE.use             = true
+  key._INSTANCE_ADDED_CAPS.use               = true
+  key._INSTANCE_DROPPED_CAPS.use             = true
+  key._INSTANCE_CGROUP_NS_MODE.use           = true
+  key._INSTANCE_DNS.use                      = true
+  key._INSTANCE_DNS_OPTIONS.use              = true
+  key._INSTANCE_DNS_SEARCH.use               = true
+  key._INSTANCE_EXTRA_HOSTS.use              = true
+  key._INSTANCE_GROUP_ADD.use                = true
+  key._INSTANCE_IPC_MODE.use                 = true
+  key._INSTANCE_CGROUP.use                   = true
+  key._INSTANCE_LINKS.use                    = true
+  key._INSTANCE_OOM_SCORE_ADJ.use            = true
+  key._INSTANCE_PID_MODE.use                 = true
+  key._INSTANCE_IS_PRIVILEGED.use            = true
+  key._INSTANCE_PUBLISH_ALL_PORTS.use        = true
+  key._INSTANCE_READONLY_ROOT_FS.use         = true
+  key._INSTANCE_SECURITY_OPT.use             = true
+  key._INSTANCE_UTS_MODE.use                 = true
+  key._INSTANCE_USER_NS_MODE.use             = true
+  key._INSTANCE_SHM_SIZE.use                 = true
+  key._INSTANCE_RUNTIME.use                  = true
+  key._INSTANCE_ISOLATION.use                = true
+  key._INSTANCE_CPU_SHARES.use               = true
+  key._INSTANCE_MEMORY.use                   = true
+  key._INSTANCE_NANO_CPUS.use                = true
+  key._INSTANCE_CGROUP_PARENT.use            = true
+  key._INSTANCE_BLOCKIO_WEIGHT.use           = true
+  key._INSTANCE_BLOCKIO_WEIGHT_DEVICE.use    = true
+  key._INSTANCE_BLOCKIO_DEVICE_READ_BPS.use  = true
+  key._INSTANCE_BLOCKIO_DEVICE_WRITE_BPS.use = true
+  key._INSTANCE_BLOCKIO_DEVICE_READ_IOPS.use = true
+  key._INSTANCE_BLOCKIO_DEVICE_WRITE_IOPS.use= true
+  key._INSTANCE_CPU_PERIOD.use               = true
+  key._INSTANCE_CPU_QUOTA.use                = true
+  key._INSTANCE_CPU_REALTIME_PERIOD.use      = true
+  key._INSTANCE_CPU_REALTIME_RUNTIME.use     = true
+  key._INSTANCE_CPUSET_CPUS.use              = true
+  key._INSTANCE_CPUSET_MEMS.use              = true
+  key._INSTANCE_DEVICES.use                  = true
+  key._INSTANCE_CGROUP_RULES.use             = true
+  key._INSTANCE_DEVICE_REQUESTS.use          = true
+  key._INSTANCE_MEMORY_RESERVATION.use       = true
+  key._INSTANCE_MEMORY_SWAP.use              = true
+  key._INSTANCE_MEMORY_SWAPPINESS.use        = true
+  key._INSTANCE_OOM_KILL_DISABLE.use         = true
+  key._INSTANCE_PIDS_LIMIT.use               = true
+  key._INSTANCE_ULIMITS.use                  = true
+  key._INSTANCE_CPU_COUNT.use                = true
+  key._INSTANCE_CPU_PERCENT.use              = true
+  key._INSTANCE_IO_MAX_IOPS.use              = true
+  key._INSTANCE_IO_MAX_BPS.use               = true
+  key._INSTANCE_MASKED_PATHS.use             = true
+  key._INSTANCE_READONLY_PATHS.use           = true
+  key._INSTANCE_STORAGE_METADATA.use         = true
+  key._INSTANCE_MOUNTS.use                   = true
+  key._INSTANCE_HOSTNAME.use                 = true
+  key._INSTANCE_DOMAINNAME.use               = true
+  key._INSTANCE_USER.use                     = true
+  key._INSTANCE_ATTACH_STDIN.use             = true
+  key._INSTANCE_ATTACH_STDOUT.use            = true
+  key._INSTANCE_ATTACH_STDERR.use            = true
+  key._INSTANCE_EXPOSED_PORTS.use            = true
+  key._INSTANCE_HAS_TTY.use                  = true
+  key._INSTANCE_OPEN_STDIN.use               = true
+  key._INSTANCE_STDIN_ONCE.use               = true
+  key._INSTANCE_CMD.use                      = true
+  key._INSTANCE_CONFIG_IMAGE.use             = true
+  key._INSTANCE_VOLUMES.use                  = true
+  key._INSTANCE_WORKING_DIR.use              = true
+  key._INSTANCE_ENTRYPOINT.use               = true
+  key._INSTANCE_ONBUILD.use                  = true
+  key._INSTANCE_LABELS.use                   = true
+  key._INSTANCE_BRIDGE.use                   = true
+  key._INSTANCE_SANDBOXID.use                = true
+  key._INSTANCE_HAIRPINMODE.use              = true
+  key._INSTANCE_LOCAL_IPV6.use               = true
+  key._INSTANCE_LOCAL_IPV6_PREFIX_LEN.use    = true
+  key._INSTANCE_BOUND_PORTS.use              = true
+  key._INSTANCE_SANDBOX_KEY.use              = true
+  key._INSTANCE_SECONDARY_IPS.use            = true
+  key._INSTANCE_SECONDARY_IPV6_ADDRS.use     = true
+  key._INSTANCE_ENDPOINTID.use               = true
+  key._INSTANCE_GATEWAY.use                  = true
+  key._INSTANCE_GLOBAL_IPV6_ADDRESS.use      = true
+  key._INSTANCE_GLOBAL_IPV6_PREFIX_LEN.use   = true
+  key._INSTANCE_IP.use                       = true
+  key._INSTANCE_IP_PREFIX_LEN.use            = true
+  key._INSTANCE_IPV6_GATEWAY.use             = true
+  key._INSTANCE_MAC.use                      = true
+  key._INSTANCE_NETWORKS.use                 = true
+  key._REPO_TAGS.use                         = true
+  key._REPO_DIGESTS.use                      = true
+  key._FOUND_BASE_MARK.use                   = true
+  key._SIGNATURE.use                         = true
+  key._INVALID_SIGNATURE.use                 = true
+  key._ACTION_ID.use                         = true
+  key._ARGV.use                              = true
+  key._ENV.use                               = true
+  key._TENANT_ID.use                         = true
+  key._OPERATION.use                         = true
+  key._TIMESTAMP.use                         = true
+  key._DATE.use                              = true
+  key._TIME.use                              = true
+  key._TZ_OFFSET.use                         = true
+  key._DATETIME.use                          = true
+  key._CHALKS.use                            = true
+  key._OP_CHALK_COUNT.use                    = true
+  key._OP_UNMARKED_COUNT.use                 = true
+  key._OP_CMD_FLAGS.use                      = true
+  key._OP_SEARCH_PATH.use                    = true
+  key._OP_EXE_NAME.use                       = true
+  key._OP_EXE_PATH.use                       = true
+  key._OP_ARGV.use                           = true
+  key._OP_CONFIG.use                         = true
+  key._UNMARKED.use                          = true
+  key._OP_CHALKER_COMMIT_ID.use              = true
+  key._OP_CHALKER_VERSION.use                = true
+  key._OP_PLATFORM.use                       = true
+  key._OP_HOSTNAME.use                       = true
+  key._OP_HOSTINFO.use                       = true
+  key._OP_NODENAME.use                       = true
+  key._OP_CLOUD_METADATA.use                 = true
+  key._OP_ERRORS.use                         = true
+  key._OP_HOST_REPORT_KEYS.use               = true
+  key._OP_TCP_SOCKET_INFO.use                = true
+  key._OP_UDP_SOCKET_INFO.use                = true
+  key._OP_IPV4_ROUTES.use                    = true
+  key._OP_IPV6_ROUTES.use                    = true
+  key._OP_IPV4_INTERFACES.use                = true
+  key._OP_IPV6_INTERFACES.use                = true
+  key._OP_ARP_TABLE.use                      = true
+  key._OP_CPU_INFO.use                       = true
+  key._OP_ALL_PS_INFO.use                    = true
+  key._AWS_INSTANCE_IDENTITY_DOCUMENT.use    = true
+  key._AWS_INSTANCE_IDENTITY_PKCS7.use       = true
+  key._AWS_INSTANCE_IDENTITY_SIGNATURE.use   = true
+  key._AWS_INSTANCE_MONITORING.use           = true
+  key._AWS_AMI_ID.use                        = true
+  key._AWS_AMI_LAUNCH_INDEX.use              = true
+  key._AWS_AMI_MANIFEST_PATH.use             = true
+  key._AWS_ANCESTOR_AMI_IDS.use              = true
+  key._AWS_HOSTNAME.use                      = true
+  key._AWS_IAM_INFO.use                      = true
+  key._AWS_INSTANCE_ID.use                   = true
+  key._AWS_INSTANCE_LIFE_CYCLE.use           = true
+  key._AWS_INSTANCE_TYPE.use                 = true
+  key._AWS_IPV6_ADDR.use                     = true
+  key._AWS_KERNEL_ID.use                     = true
+  key._AWS_LOCAL_HOSTNAME.use                = true
+  key._AWS_LOCAL_IPV4_ADDR.use               = true
+  key._AWS_AZ.use                            = true
+  key._AWS_AZ_ID.use                         = true
+  key._AWS_PLACEMENT_GROUP.use               = true
+  key._AWS_DEDICATED_HOST_ID.use             = true
+  key._AWS_PARTITION_NUMBER.use              = true
+  key._AWS_REGION.use                        = true
+  key._AWS_PUBLIC_HOSTNAME.use               = true
+  key._AWS_PUBLIC_IPV4_ADDR.use              = true
+  key._AWS_OPENSSH_PUBKEY.use                = true
+  key._AWS_SECURITY_GROUPS.use               = true
+  key._AWS_SECURITY_GROUP_IDS.use            = true
+  key._AWS_RESOURCE_DOMAIN.use               = true
+  key._AWS_PARTITION_NAME.use                = true
+  key._AWS_TAGS.use                          = true
+  key._AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE.use = true
+  key._AWS_BLOCK_DEVICE_MAPPING_AMI.use      = true
+  key._AWS_BLOCK_DEVICE_MAPPING_ROOT.use     = true
+  key._AWS_BLOCK_DEVICE_MAPPING_SWAP.use     = true
+  key._AWS_EVENTS_MAINTENANCE_HISTORY.use    = true
+  key._AWS_EVENTS_MAINTENANCE_SCHEDULED.use  = true
+  key._AWS_EVENTS_RECOMMENDATIONS_REBALANCE.use = true
+  key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use = true
+  key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
+  key._AWS_INSTANCE_ACTION.use               = true
+  key._AWS_MAC.use                           = true
+  key._AWS_INTERFACE_ID.use                  = true
+  key._AWS_SUBNET_ID.use                     = true
+  key._AWS_VPC_ID.use                        = true
+  key._AWS_METRICS_VHOSTMD.use               = true
+  key._AWS_PRODUCT_CODES.use                 = true
+  key._AWS_RAMDISK_ID.use                    = true
+  key._AWS_RESERVATION_ID.use                = true
+  key._AWS_SPOT_INSTANCE_ACTION.use          = true
+  key._AWS_SPOT_TERMINATION_TIME.use         = true
+  key._CHALK_EXTERNAL_ACTION_AUDIT.use       = true
+  key._CHALK_RUN_TIME.use                    = true
+  key.$CHALK_CONFIG.use                      = true
+  key.$CHALK_IMPLEMENTATION_NAME.use         = true
+  key.$CHALK_LOAD_COUNT.use                  = true
+  key.$CHALK_PUBLIC_KEY.use                  = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.use       = true
+  key.$CHALK_API_KEY.use                     = true
+  key.$CHALK_ATTESTATION_TOKEN.use           = true
+  key.$CHALK_SECRET_ENDPOINT_URI.use         = true
+}
+
+report_template report_large {
+shortdoc: "Report most available items, minus expensive items"
+doc: """
+  This profile reports most things, except large stuff that's mostly
+  redundant, like _OP_ALL_IMAGE_METADATA. This does report stuff that's
+  more expensive to capture (like full ps when available).
+"""
+  # Host keys.
+  key.CHALK_VERSION.use                       = true
+  key.DATE_CHALKED.use                        = true
+  key.TIME_CHALKED.use                        = true
+  key.TZ_OFFSET_WHEN_CHALKED.use              = true
+  key.DATETIME_WHEN_CHALKED.use               = true
+  key.EARLIEST_VERSION.use                    = true
+  key.HOSTINFO_WHEN_CHALKED.use               = true
+  key.NODENAME_WHEN_CHALKED.use               = true
+  key.INJECTOR_CHALK_ID.use                   = true
+  key.INJECTOR_VERSION.use                    = true
+  key.INJECTOR_PUBLIC_KEY.use                 = true
+  key.PLATFORM_WHEN_CHALKED.use               = true
+  key.INJECTOR_COMMIT_ID.use                  = true
+  key.INJECTOR_ARGV.use                       = true
+  key.INJECTOR_ENV.use                        = true
+  key.TENANT_ID_WHEN_CHALKED.use              = true
+  key.SBOM.use                                = true
+  key.SAST.use                                = true
+  key._ACTION_ID.use                          = true
+  key._ARGV.use                               = true
+  key._ENV.use                                = true
+  key._TENANT_ID.use                          = true
+  key._OPERATION.use                          = true
+  key._TIMESTAMP.use                          = true
+  key._DATE.use                               = true
+  key._TIME.use                               = true
+  key._TZ_OFFSET.use                          = true
+  key._DATETIME.use                           = true
+  key._CHALKS.use                             = true
+  key._OP_CHALK_COUNT.use                     = true
+  key._OP_UNMARKED_COUNT.use                  = true
+  key._OP_CMD_FLAGS.use                       = true
+  key._OP_SEARCH_PATH.use                     = true
+  key._OP_EXE_NAME.use                        = true
+  key._OP_EXE_PATH.use                        = true
+  key._OP_ARGV.use                            = true
+  key._OP_CONFIG.use                          = true
+  key._UNMARKED.use                           = true
+  key._OP_CHALKER_COMMIT_ID.use               = true
+  key._OP_CHALKER_VERSION.use                 = true
+  key._OP_PLATFORM.use                        = true
+  key._OP_HOSTNAME.use                        = true
+  key._OP_HOSTINFO.use                        = true
+  key._OP_NODENAME.use                        = true
+  key._OP_CLOUD_METADATA.use                  = true
+  key._OP_ERRORS.use                          = true
+  key._OP_HOST_REPORT_KEYS.use                = true
+  key._OP_TCP_SOCKET_INFO.use                 = true
+  key._OP_UDP_SOCKET_INFO.use                 = true
+  key._OP_IPV4_ROUTES.use                     = true
+  key._OP_IPV6_ROUTES.use                     = true
+  key._OP_IPV4_INTERFACES.use                 = true
+  key._OP_IPV6_INTERFACES.use                 = true
+  key._OP_ARP_TABLE.use                       = true
+  key._OP_CPU_INFO.use                        = true
+  key._OP_ALL_PS_INFO.use                     = true
+  key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
+
+  # IMDS keys
+  # dynamic
+  key._AWS_INSTANCE_IDENTITY_DOCUMENT.use            = true
+  key._AWS_INSTANCE_IDENTITY_PKCS7.use               = true
+  key._AWS_INSTANCE_IDENTITY_SIGNATURE.use           = true
+  key._AWS_INSTANCE_MONITORING.use                   = true
+
+  key._AWS_AMI_ID.use                                = true
+  key._AWS_AMI_LAUNCH_INDEX.use                      = true
+  key._AWS_AMI_MANIFEST_PATH.use                     = true
+  key._AWS_ANCESTOR_AMI_IDS.use                      = true
+  key._AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE.use    = true
+  key._AWS_AZ.use                                    = true
+  key._AWS_AZ_ID.use                                 = true
+  key._AWS_BLOCK_DEVICE_MAPPING_AMI.use              = true
+  key._AWS_BLOCK_DEVICE_MAPPING_ROOT.use             = true
+  key._AWS_BLOCK_DEVICE_MAPPING_SWAP.use             = true
+  key._AWS_DEDICATED_HOST_ID.use                     = true
+  key._AWS_EVENTS_MAINTENANCE_HISTORY.use            = true
+  key._AWS_EVENTS_MAINTENANCE_SCHEDULED.use          = true
+  key._AWS_EVENTS_RECOMMENDATIONS_REBALANCE.use      = true
+  key._AWS_HOSTNAME.use                              = true
+  key._AWS_INSTANCE_ACTION.use                       = true
+  key._AWS_INSTANCE_ID.use                           = true
+  key._AWS_INSTANCE_LIFE_CYCLE.use                   = true
+  key._AWS_INSTANCE_TYPE.use                         = true
+  key._AWS_INTERFACE_ID.use                          = true
+  key._AWS_IPV6_ADDR.use                             = true
+  key._AWS_KERNEL_ID.use                             = true
+  key._AWS_LOCAL_HOSTNAME.use                        = true
+  key._AWS_LOCAL_IPV4_ADDR.use                       = true
+  key._AWS_MAC.use                                   = true
+  key._AWS_METRICS_VHOSTMD.use                       = true
+  key._AWS_OPENSSH_PUBKEY.use                        = true
+  key._AWS_PARTITION_NAME.use                        = true
+  key._AWS_PARTITION_NUMBER.use                      = true
+  key._AWS_PLACEMENT_GROUP.use                       = true
+  key._AWS_PRODUCT_CODES.use                         = true
+  key._AWS_PUBLIC_HOSTNAME.use                       = true
+  key._AWS_PUBLIC_IPV4_ADDR.use                      = true
+  key._AWS_RAMDISK_ID.use                            = true
+  key._AWS_REGION.use                                = true
+  key._AWS_RESERVATION_ID.use                        = true
+  key._AWS_RESOURCE_DOMAIN.use                       = true
+  key._AWS_SPOT_INSTANCE_ACTION.use                  = true
+  key._AWS_SPOT_TERMINATION_TIME.use                 = true
+  key._AWS_SUBNET_ID.use                             = true
+  key._AWS_TAGS.use                                  = true
+  key._AWS_VPC_ID.use                                = true
+
+  # list
+  key._AWS_SECURITY_GROUP_IDS.use                    = true
+  key._AWS_SECURITY_GROUPS.use                       = true
+
+  # json
+  key._AWS_IAM_INFO.use                              = true
+  key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
+  key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
+
+  # Artifact keys.
+  key.DATE_CHALKED.use                        = true
+  key.TIME_CHALKED.use                        = true
+  key.TZ_OFFSET_WHEN_CHALKED.use              = true
+  key.DATETIME_WHEN_CHALKED.use               = true
+  key.EARLIEST_VERSION.use                    = true
+  key.HOSTINFO_WHEN_CHALKED.use               = true
+  key.NODENAME_WHEN_CHALKED.use               = true
+  key.INJECTOR_CHALK_ID.use                   = true
+  key.INJECTOR_PUBLIC_KEY.use                 = true
+  key.INJECTOR_VERSION.use                    = true
+  key.PLATFORM_WHEN_CHALKED.use               = true
+  key.INJECTOR_COMMIT_ID.use                  = true
+  key.INJECTOR_ARGV.use                       = true
+  key.INJECTOR_ENV.use                        = true
+  key.TENANT_ID_WHEN_CHALKED.use              = true
+  key.CHALK_ID.use                            = true
+  key.TIMESTAMP_WHEN_CHALKED.use              = true
+  key.CHALK_PTR.use                           = true
+  key.PATH_WHEN_CHALKED.use                   = true
+  key.PATH_WITHIN_ZIP.use                     = true
+  key.CONTAINING_ARTIFACT_WHEN_CHALKED.use    = true
+  key.ARTIFACT_TYPE.use                       = true
+  key.HASH.use                                = true
+  key.ORIGIN_URI.use                          = true
+  key.BRANCH.use                              = true
+  key.COMMIT_ID.use                           = true
+  key.ARTIFACT_VERSION.use                    = true
+  key.STORE_URI.use                           = true
+  key.PACKAGE_URI.use                         = true
+  key.CODE_OWNERS.use                         = true
+  key.VCS_DIR_WHEN_CHALKED.use                = true
+  key.BUILD_ID.use                            = true
+  key.BUILD_URI.use                           = true
+  key.BUILD_API_URI.use                       = true
+  key.BUILD_TRIGGER.use                       = true
+  key.BUILD_CONTACT.use                       = true
+  key.CHALK_RAND.use                          = true
+  key.OLD_CHALK_METADATA_HASH.use             = true
+  key.OLD_CHALK_METADATA_ID.use               = true
+  key.EMBEDDED_CHALK.use                      = true
+  key.EMBEDDED_TMPDIR.use                     = true
+  key.CLOUD_METADATA_WHEN_CHALKED.use         = true
+  key.SBOM.use                                = true
+  key.SAST.use                                = true
+  key.ERR_INFO.use                            = true
+  key.SIGNING.use                             = false
+  key.METADATA_HASH.use                       = true
+  key.METADATA_ID.use                         = true
+  key.SIGNATURE.use                           = true
+  key.DOCKER_FILE.use                         = true
+  key.DOCKERFILE_PATH.use                     = true
+  key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_LABELS.use                       = true
+  key.DOCKER_TAGS.use                         = true
+  key.DOCKER_CONTEXT.use                      = true
+  key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
+  key.DOCKER_CHALK_ADDED_LABELS.use           = true
+  key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use    = true
+  key.DOCKER_CHALK_TEMPORARY_TAG.use          = true
+  key._OP_ARTIFACT_TYPE.use                   = true
+  key._OP_ARTIFACT_PATH.use                   = true
+  key._CURRENT_HASH.use                       = true
+  key._VIRTUAL.use                            = true
+  key._OP_ARTIFACT_REPORT_KEYS.use            = false
+  key._PROCESS_PID.use                        = true
+  key._PROCESS_DETAIL.use                     = true
+  key._PROCESS_PARENT_PID.use                 = true
+  key._PROCESS_START_TIME.use                 = true
+  key._PROCESS_UTIME.use                      = true
+  key._PROCESS_STIME.use                      = true
+  key._PROCESS_CHILDREN_UTIME.use             = true
+  key._PROCESS_CHILDREN_STIME.use             = true
+  key._PROCESS_STATE.use                      = true
+  key._PROCESS_PGID.use                       = true
+  key._PROCESS_UMASK.use                      = true
+  key._PROCESS_UID.use                        = true
+  key._PROCESS_GID.use                        = true
+  key._PROCESS_NUM_FD_SIZE.use                = true
+  key._PROCESS_GROUPS.use                     = true
+  key._PROCESS_SECCOMP_STATUS.use             = true
+  key._PROCESS_ARGV.use                       = true
+  key._PROCESS_CWD.use                        = true
+  key._PROCESS_EXE_PATH.use                   = true
+  key._PROCESS_COMMAND_NAME.use               = true
+  key._PROCESS_FD_INFO.use                    = true
+  key._PROCESS_MOUNT_INFO.use                 = true
+  key._OP_ALL_IMAGE_METADATA.use              = false
+  key._OP_ALL_CONTAINER_METADATA.use          = false
+  key._IMAGE_ID.use                           = true
+  key._IMAGE_COMMENT.use                      = true
+  key._IMAGE_CREATION_DATETIME.use            = true
+  key._IMAGE_DOCKER_VERSION.use               = true
+  key._IMAGE_AUTHOR.use                       = true
+  key._IMAGE_ARCHITECTURE.use                 = true
+  key._IMAGE_VARIANT.use                      = true
+  key._IMAGE_OS.use                           = true
+  key._IMAGE_OS_VERSION.use                   = true
+  key._IMAGE_SIZE.use                         = true
+  key._IMAGE_ROOT_FS_TYPE.use                 = true
+  key._IMAGE_ROOT_FS_LAYERS.use               = true
+  key._IMAGE_HOSTNAME.use                     = true
+  key._IMAGE_DOMAINNAME.use                   = true
+  key._IMAGE_USER.use                         = true
+  key._IMAGE_EXPOSED_PORTS.use                = true
+  key._IMAGE_ENV.use                          = true
+  key._IMAGE_CMD.use                          = true
+  key._IMAGE_NAME.use                         = true
+  key._IMAGE_HEALTHCHECK_TEST.use             = true
+  key._IMAGE_HEALTHCHECK_INTERVAL.use         = true
+  key._IMAGE_HEALTHCHECK_TIMEOUT.use          = true
+  key._IMAGE_HEALTHCHECK_START_PERIOD.use     = true
+  key._IMAGE_HEALTHCHECK_START_INTERVAL.use   = true
+  key._IMAGE_HEALTHCHECK_RETRIES.use          = true
+  key._IMAGE_MOUNTS.use                       = true
+  key._IMAGE_WORKINGDIR.use                   = true
+  key._IMAGE_ENTRYPOINT.use                   = true
+  key._IMAGE_NETWORK_DISABLED.use             = true
+  key._IMAGE_MAC_ADDR.use                     = true
+  key._IMAGE_ONBUILD.use                      = true
+  key._IMAGE_LABELS.use                       = true
+  key._IMAGE_STOP_SIGNAL.use                  = true
+  key._IMAGE_STOP_TIMEOUT.use                 = true
+  key._IMAGE_SHELL.use                        = true
+  key._IMAGE_VIRTUAL_SIZE.use                 = true
+  key._IMAGE_LAST_TAG_TIME.use                = true
+  key._IMAGE_STORAGE_METADATA.use             = true
+  key._INSTANCE_CONTAINER_ID.use              = true
+  key._INSTANCE_CREATION_DATETIME.use         = true
+  key._INSTANCE_ENTRYPOINT_PATH.use           = true
+  key._INSTANCE_ENTRYPOINT_ARGS.use           = true
+  key._INSTANCE_ENV.use                       = true
+  key._INSTANCE_RESOLVE_CONF_PATH.use         = true
+  key._INSTANCE_HOSTNAME_PATH.use             = true
+  key._INSTANCE_HOSTS_PATH.use                = true
+  key._INSTANCE_LOG_PATH.use                  = true
+  key._INSTANCE_IMAGE_ID.use                  = true
+  key._INSTANCE_STATUS.use                    = true
+  key._INSTANCE_PID.use                       = true
+  key._INSTANCE_NAME.use                      = true
+  key._INSTANCE_RESTART_COUNT.use             = true
+  key._INSTANCE_DRIVER.use                    = true
+  key._INSTANCE_PLATFORM.use                  = true
+  key._INSTANCE_MOUNT_LABEL.use               = true
+  key._INSTANCE_PROCESS_LABEL.use             = true
+  key._INSTANCE_APP_ARMOR_PROFILE.use         = true
+  key._INSTANCE_EXEC_IDS.use                  = true
+  key._INSTANCE_BINDS.use                     = true
+  key._INSTANCE_CONTAINER_ID_FILE.use         = true
+  key._INSTANCE_LOG_CONFIG.use                = true
+  key._INSTANCE_NETWORK_MODE.use              = true
+  key._INSTANCE_RESTART_POLICY_NAME.use       = true
+  key._INSTANCE_RESTART_RETRY_COUNT.use       = true
+  key._INSTANCE_AUTOREMOVE.use                = true
+  key._INSTANCE_VOLUME_DRIVER.use             = true
+  key._INSTANCE_VOLUMES_FROM.use              = true
+  key._INSTANCE_CONSOLE_SIZE.use              = true
+  key._INSTANCE_ADDED_CAPS.use                = true
+  key._INSTANCE_DROPPED_CAPS.use              = true
+  key._INSTANCE_CGROUP_NS_MODE.use            = true
+  key._INSTANCE_DNS.use                       = true
+  key._INSTANCE_DNS_OPTIONS.use               = true
+  key._INSTANCE_DNS_SEARCH.use                = true
+  key._INSTANCE_EXTRA_HOSTS.use               = true
+  key._INSTANCE_GROUP_ADD.use                 = true
+  key._INSTANCE_IPC_MODE.use                  = true
+  key._INSTANCE_CGROUP.use                    = true
+  key._INSTANCE_LINKS.use                     = true
+  key._INSTANCE_OOM_SCORE_ADJ.use             = true
+  key._INSTANCE_PID_MODE.use                  = true
+  key._INSTANCE_IS_PRIVILEGED.use             = true
+  key._INSTANCE_PUBLISH_ALL_PORTS.use         = true
+  key._INSTANCE_READONLY_ROOT_FS.use          = true
+  key._INSTANCE_SECURITY_OPT.use              = true
+  key._INSTANCE_UTS_MODE.use                  = true
+  key._INSTANCE_USER_NS_MODE.use              = true
+  key._INSTANCE_SHM_SIZE.use                  = true
+  key._INSTANCE_RUNTIME.use                   = true
+  key._INSTANCE_ISOLATION.use                 = true
+  key._INSTANCE_CPU_SHARES.use                = true
+  key._INSTANCE_MEMORY.use                    = true
+  key._INSTANCE_NANO_CPUS.use                 = true
+  key._INSTANCE_CGROUP_PARENT.use             = true
+  key._INSTANCE_BLOCKIO_WEIGHT.use            = true
+  key._INSTANCE_BLOCKIO_WEIGHT_DEVICE.use     = true
+  key._INSTANCE_BLOCKIO_DEVICE_READ_BPS.use   = true
+  key._INSTANCE_BLOCKIO_DEVICE_WRITE_BPS.use  = true
+  key._INSTANCE_BLOCKIO_DEVICE_READ_IOPS.use  = true
+  key._INSTANCE_BLOCKIO_DEVICE_WRITE_IOPS.use = true
+  key._INSTANCE_CPU_PERIOD.use                = true
+  key._INSTANCE_CPU_QUOTA.use                 = true
+  key._INSTANCE_CPU_REALTIME_PERIOD.use       = true
+  key._INSTANCE_CPU_REALTIME_RUNTIME.use      = true
+  key._INSTANCE_CPUSET_CPUS.use               = true
+  key._INSTANCE_CPUSET_MEMS.use               = true
+  key._INSTANCE_DEVICES.use                   = true
+  key._INSTANCE_CGROUP_RULES.use              = true
+  key._INSTANCE_DEVICE_REQUESTS.use           = true
+  key._INSTANCE_MEMORY_RESERVATION.use        = true
+  key._INSTANCE_MEMORY_SWAP.use               = true
+  key._INSTANCE_MEMORY_SWAPPINESS.use         = true
+  key._INSTANCE_OOM_KILL_DISABLE.use          = true
+  key._INSTANCE_PIDS_LIMIT.use                = true
+  key._INSTANCE_ULIMITS.use                   = true
+  key._INSTANCE_CPU_COUNT.use                 = true
+  key._INSTANCE_CPU_PERCENT.use               = true
+  key._INSTANCE_IO_MAX_IOPS.use               = true
+  key._INSTANCE_IO_MAX_BPS.use                = true
+  key._INSTANCE_MASKED_PATHS.use              = true
+  key._INSTANCE_READONLY_PATHS.use            = true
+  key._INSTANCE_STORAGE_METADATA.use          = true
+  key._INSTANCE_MOUNTS.use                    = true
+  key._INSTANCE_HOSTNAME.use                  = true
+  key._INSTANCE_DOMAINNAME.use                = true
+  key._INSTANCE_USER.use                      = true
+  key._INSTANCE_ATTACH_STDIN.use              = true
+  key._INSTANCE_ATTACH_STDOUT.use             = true
+  key._INSTANCE_ATTACH_STDERR.use             = true
+  key._INSTANCE_EXPOSED_PORTS.use             = true
+  key._INSTANCE_HAS_TTY.use                   = true
+  key._INSTANCE_OPEN_STDIN.use                = true
+  key._INSTANCE_STDIN_ONCE.use                = true
+  key._INSTANCE_ENV.use                       = true
+  key._INSTANCE_CMD.use                       = true
+  key._INSTANCE_CONFIG_IMAGE.use              = true
+  key._INSTANCE_VOLUMES.use                   = true
+  key._INSTANCE_WORKING_DIR.use               = true
+  key._INSTANCE_ENTRYPOINT.use                = true
+  key._INSTANCE_ONBUILD.use                   = true
+  key._INSTANCE_LABELS.use                    = true
+  key._INSTANCE_BRIDGE.use                    = true
+  key._INSTANCE_SANDBOXID.use                 = true
+  key._INSTANCE_HAIRPINMODE.use               = true
+  key._INSTANCE_LOCAL_IPV6.use                = true
+  key._INSTANCE_LOCAL_IPV6_PREFIX_LEN.use     = true
+  key._INSTANCE_BOUND_PORTS.use               = true
+  key._INSTANCE_SANDBOX_KEY.use               = true
+  key._INSTANCE_SECONDARY_IPS.use             = true
+  key._INSTANCE_SECONDARY_IPV6_ADDRS.use      = true
+  key._INSTANCE_ENDPOINTID.use                = true
+  key._INSTANCE_GATEWAY.use                   = true
+  key._INSTANCE_GLOBAL_IPV6_ADDRESS.use       = true
+  key._INSTANCE_GLOBAL_IPV6_PREFIX_LEN.use    = true
+  key._INSTANCE_IP.use                        = true
+  key._INSTANCE_IP_PREFIX_LEN.use             = true
+  key._INSTANCE_IPV6_GATEWAY.use              = true
+  key._INSTANCE_MAC.use                       = true
+  key._INSTANCE_NETWORKS.use                  = true
+  key._STORE_URI.use                          = true
+  key._REPO_TAGS.use                          = true
+  key._REPO_DIGESTS.use                       = true
+  key._FOUND_BASE_MARK.use                    = true
+  key._SIGNATURE.use                          = true
+  key._INVALID_SIGNATURE.use                  = true
+  key._VALIDATED_SIGNATURE.use                = true
+  key._VALIDATED_METADATA.use                 = true
+  key.$CHALK_CONFIG.use                       = true
+  key.$CHALK_IMPLEMENTATION_NAME.use          = true
+  key.$CHALK_LOAD_COUNT.use                   = true
+  key.$CHALK_PUBLIC_KEY.use                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
+  key.$CHALK_ATTESTATION_TOKEN.use            = true
+}
+
+report_template report_default {
+  shortdoc: "Report most available items, but no spammy or expensive ones"
+  doc: """
+This template is similar `large`, removing things that are spammy.
+
+Chalk uses this report by default for most operations. However, if
+used in operations that add chalk marks, it would do a lot of
+duplicate reporting.
+
+Instead, those operations, by default, use the template
+`insertion_default`.
+
+This reports lots of info on Linux boxes, but skips stuff that's
+spammy.  It reports all PS info, but only if definitely running in a
+container.
+"""
+
+  key._OP_HOST_REPORT_KEYS.use                = false
+  key._OP_ARP_TABLE.use                       = false
+  key._OP_CPU_INFO.use                        = false
+  key._OP_IPV4_ROUTES.use                     = false
+  key._OP_IPV6_ROUTES.use                     = false
+  key._OP_IPV4_INTERFACES.use                 = false
+  key._OP_IPV6_INTERFACES.use                 = false
+  key._OP_UDP_SOCKET_INFO.use                 = false
+  key._OP_TCP_SOCKET_INFO.use                 = false
+  if not in_container() {
+    key._OP_ALL_PS_INFO.use                   = false
+  }
+  key.CHALK_VERSION.use                       = true
+  key.DATE_CHALKED.use                        = true
+  key.TIME_CHALKED.use                        = true
+  key.TZ_OFFSET_WHEN_CHALKED.use              = true
+  key.DATETIME_WHEN_CHALKED.use               = true
+  key.EARLIEST_VERSION.use                    = true
+  key.HOSTINFO_WHEN_CHALKED.use               = true
+  key.NODENAME_WHEN_CHALKED.use               = true
+  key.INJECTOR_CHALK_ID.use                   = true
+  key.INJECTOR_VERSION.use                    = true
+  key.INJECTOR_PUBLIC_KEY.use                 = true
+  key.PLATFORM_WHEN_CHALKED.use               = true
+  key.INJECTOR_COMMIT_ID.use                  = true
+  key.INJECTOR_ARGV.use                       = true
+  key.INJECTOR_ENV.use                        = true
+  key.TENANT_ID_WHEN_CHALKED.use              = true
+  key.SBOM.use                                = true
+  key.SAST.use                                = true
+
+  # Runtime host keys.
+  key._ACTION_ID.use                          = true
+  key._ARGV.use                               = true
+  key._ENV.use                                = true
+  key._TENANT_ID.use                          = true
+  key._OPERATION.use                          = true
+  key._TIMESTAMP.use                          = true
+  key._DATE.use                               = false # Go with _DATETIME
+  key._TIME.use                               = false
+  key._TZ_OFFSET.use                          = false
+  key._DATETIME.use                           = true
+  key._CHALKS.use                             = true
+  key._OP_CHALK_COUNT.use                     = true
+  key._OP_UNMARKED_COUNT.use                  = true
+  key._OP_CMD_FLAGS.use                       = true
+  key._OP_SEARCH_PATH.use                     = true
+  key._OP_EXE_NAME.use                        = true
+  key._OP_EXE_PATH.use                        = true
+  key._OP_ARGV.use                            = true
+  key._OP_CONFIG.use                          = true
+  key._UNMARKED.use                           = true
+  key._OP_CHALKER_COMMIT_ID.use               = true
+  key._OP_CHALKER_VERSION.use                 = true
+  key._OP_PLATFORM.use                        = true
+  key._OP_HOSTNAME.use                        = true
+  key._OP_HOSTINFO.use                        = true
+  key._OP_NODENAME.use                        = true
+  key._OP_CLOUD_METADATA.use                  = true
+  key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
+  key._OP_ERRORS.use                          = true
+
+
+  # IMDS keys
+  # dynamic
+  key._AWS_INSTANCE_IDENTITY_DOCUMENT.use            = true
+  key._AWS_INSTANCE_IDENTITY_PKCS7.use               = true
+  key._AWS_INSTANCE_IDENTITY_SIGNATURE.use           = true
+  key._AWS_INSTANCE_MONITORING.use                   = true
+
+  key._AWS_AMI_ID.use                                = true
+  key._AWS_AMI_LAUNCH_INDEX.use                      = true
+  key._AWS_AMI_MANIFEST_PATH.use                     = true
+  key._AWS_ANCESTOR_AMI_IDS.use                      = true
+  key._AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE.use    = true
+  key._AWS_AZ.use                                    = true
+  key._AWS_AZ_ID.use                                 = true
+  key._AWS_BLOCK_DEVICE_MAPPING_AMI.use              = true
+  key._AWS_BLOCK_DEVICE_MAPPING_ROOT.use             = true
+  key._AWS_BLOCK_DEVICE_MAPPING_SWAP.use             = true
+  key._AWS_DEDICATED_HOST_ID.use                     = true
+  key._AWS_EVENTS_MAINTENANCE_HISTORY.use            = true
+  key._AWS_EVENTS_MAINTENANCE_SCHEDULED.use          = true
+  key._AWS_EVENTS_RECOMMENDATIONS_REBALANCE.use      = true
+  key._AWS_HOSTNAME.use                              = true
+  key._AWS_INSTANCE_ACTION.use                       = true
+  key._AWS_INSTANCE_ID.use                           = true
+  key._AWS_INSTANCE_LIFE_CYCLE.use                   = true
+  key._AWS_INSTANCE_TYPE.use                         = true
+  key._AWS_INTERFACE_ID.use                          = true
+  key._AWS_IPV6_ADDR.use                             = true
+  key._AWS_KERNEL_ID.use                             = true
+  key._AWS_LOCAL_HOSTNAME.use                        = true
+  key._AWS_LOCAL_IPV4_ADDR.use                       = true
+  key._AWS_MAC.use                                   = true
+  key._AWS_METRICS_VHOSTMD.use                       = true
+  key._AWS_OPENSSH_PUBKEY.use                        = true
+  key._AWS_PARTITION_NAME.use                        = true
+  key._AWS_PARTITION_NUMBER.use                      = true
+  key._AWS_PLACEMENT_GROUP.use                       = true
+  key._AWS_PRODUCT_CODES.use                         = true
+  key._AWS_PUBLIC_HOSTNAME.use                       = true
+  key._AWS_PUBLIC_IPV4_ADDR.use                      = true
+  key._AWS_RAMDISK_ID.use                            = true
+  key._AWS_REGION.use                                = true
+  key._AWS_RESERVATION_ID.use                        = true
+  key._AWS_RESOURCE_DOMAIN.use                       = true
+  key._AWS_SPOT_INSTANCE_ACTION.use                  = true
+  key._AWS_SPOT_TERMINATION_TIME.use                 = true
+  key._AWS_SUBNET_ID.use                             = true
+  key._AWS_TAGS.use                                  = true
+  key._AWS_VPC_ID.use                                = true
+
+  # list
+  key._AWS_SECURITY_GROUP_IDS.use                    = true
+  key._AWS_SECURITY_GROUPS.use                       = true
+
+  # json
+  key._AWS_IAM_INFO.use                              = true
+  key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
+  key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
+
+
+  # Artifact keys
+  key._PROCESS_DETAIL.use                     = false
+  key._INSTANCE_LOCAL_IPV6.use                = false
+  key._INSTANCE_LOCAL_IPV6_PREFIX_LEN.use     = false
+  key.CHALK_ID.use                            = true
+  key.TIMESTAMP_WHEN_CHALKED.use              = true
+  key.CHALK_PTR.use                           = true
+  key.PATH_WHEN_CHALKED.use                   = true
+  key.PATH_WITHIN_ZIP.use                     = true
+  key.CONTAINING_ARTIFACT_WHEN_CHALKED.use    = true
+  key.ARTIFACT_TYPE.use                       = true
+  key.HASH.use                                = true
+  key.ORIGIN_URI.use                          = true
+  key.BRANCH.use                              = true
+  key.COMMIT_ID.use                           = true
+  key.ARTIFACT_VERSION.use                    = true
+  key.STORE_URI.use                           = true
+  key.PACKAGE_URI.use                         = true
+  key.CODE_OWNERS.use                         = true
+  key.VCS_DIR_WHEN_CHALKED.use                = true
+  key.BUILD_ID.use                            = true
+  key.BUILD_URI.use                           = true
+  key.BUILD_API_URI.use                       = true
+  key.BUILD_TRIGGER.use                       = true
+  key.BUILD_CONTACT.use                       = true
+  key.CHALK_RAND.use                          = true
+  key.OLD_CHALK_METADATA_HASH.use             = true
+  key.OLD_CHALK_METADATA_ID.use               = true
+  key.EMBEDDED_CHALK.use                      = true
+  key.EMBEDDED_TMPDIR.use                     = true
+  key.CLOUD_METADATA_WHEN_CHALKED.use         = true
+  key.SBOM.use                                = true
+  key.SAST.use                                = true
+  key.ERR_INFO.use                            = true
+  key.SIGNING.use                             = false
+  key.METADATA_HASH.use                       = true
+  key.METADATA_ID.use                         = true
+  key.SIGNATURE.use                           = true
+  key.DOCKER_FILE.use                         = true
+  key.DOCKERFILE_PATH.use                     = true
+  key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_LABELS.use                       = true
+  key.DOCKER_TAGS.use                         = true
+  key.DOCKER_CONTEXT.use                      = true
+  key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
+  key.DOCKER_CHALK_ADDED_LABELS.use           = true
+  key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use    = true
+  key.DOCKER_CHALK_TEMPORARY_TAG.use          = true
+  key._OP_ARTIFACT_TYPE.use                   = true
+  key._OP_ARTIFACT_PATH.use                   = true
+  key._CURRENT_HASH.use                       = true
+  key._VIRTUAL.use                            = true
+  key._OP_ARTIFACT_REPORT_KEYS.use            = false
+  key._PROCESS_PID.use                        = true
+  key._PROCESS_PARENT_PID.use                 = true
+  key._PROCESS_START_TIME.use                 = true
+  key._PROCESS_UTIME.use                      = true
+  key._PROCESS_STIME.use                      = true
+  key._PROCESS_CHILDREN_UTIME.use             = true
+  key._PROCESS_CHILDREN_STIME.use             = true
+  key._PROCESS_STATE.use                      = true
+  key._PROCESS_PGID.use                       = true
+  key._PROCESS_UMASK.use                      = true
+  key._PROCESS_UID.use                        = true
+  key._PROCESS_GID.use                        = true
+  key._PROCESS_NUM_FD_SIZE.use                = true
+  key._PROCESS_GROUPS.use                     = true
+  key._PROCESS_SECCOMP_STATUS.use             = true
+  key._PROCESS_ARGV.use                       = true
+  key._PROCESS_CWD.use                        = true
+  key._PROCESS_EXE_PATH.use                   = true
+  key._PROCESS_COMMAND_NAME.use               = true
+  key._PROCESS_FD_INFO.use                    = true
+  key._PROCESS_MOUNT_INFO.use                 = true
+  key._OP_ALL_IMAGE_METADATA.use              = false
+  key._OP_ALL_CONTAINER_METADATA.use          = false
+  key._IMAGE_ID.use                           = true
+  key._IMAGE_COMMENT.use                      = true
+  key._IMAGE_CREATION_DATETIME.use            = true
+  key._IMAGE_DOCKER_VERSION.use               = true
+  key._IMAGE_AUTHOR.use                       = true
+  key._IMAGE_ARCHITECTURE.use                 = true
+  key._IMAGE_VARIANT.use                      = true
+  key._IMAGE_OS.use                           = true
+  key._IMAGE_OS_VERSION.use                   = true
+  key._IMAGE_SIZE.use                         = true
+  key._IMAGE_ROOT_FS_TYPE.use                 = true
+  key._IMAGE_ROOT_FS_LAYERS.use               = true
+  key._IMAGE_HOSTNAME.use                     = true
+  key._IMAGE_DOMAINNAME.use                   = true
+  key._IMAGE_USER.use                         = true
+  key._IMAGE_EXPOSED_PORTS.use                = true
+  key._IMAGE_ENV.use                          = true
+  key._IMAGE_CMD.use                          = true
+  key._IMAGE_NAME.use                         = true
+  key._IMAGE_HEALTHCHECK_TEST.use             = true
+  key._IMAGE_HEALTHCHECK_INTERVAL.use         = true
+  key._IMAGE_HEALTHCHECK_TIMEOUT.use          = true
+  key._IMAGE_HEALTHCHECK_START_PERIOD.use     = true
+  key._IMAGE_HEALTHCHECK_START_INTERVAL.use   = true
+  key._IMAGE_HEALTHCHECK_RETRIES.use          = true
+  key._IMAGE_MOUNTS.use                       = true
+  key._IMAGE_WORKINGDIR.use                   = true
+  key._IMAGE_ENTRYPOINT.use                   = true
+  key._IMAGE_NETWORK_DISABLED.use             = true
+  key._IMAGE_MAC_ADDR.use                     = true
+  key._IMAGE_ONBUILD.use                      = true
+  key._IMAGE_LABELS.use                       = true
+  key._IMAGE_STOP_SIGNAL.use                  = true
+  key._IMAGE_STOP_TIMEOUT.use                 = true
+  key._IMAGE_SHELL.use                        = true
+  key._IMAGE_VIRTUAL_SIZE.use                 = true
+  key._IMAGE_LAST_TAG_TIME.use                = true
+  key._IMAGE_STORAGE_METADATA.use             = true
+  key._INSTANCE_CONTAINER_ID.use              = true
+  key._INSTANCE_CREATION_DATETIME.use         = true
+  key._INSTANCE_ENTRYPOINT_PATH.use           = true
+  key._INSTANCE_ENTRYPOINT_ARGS.use           = true
+  key._INSTANCE_ENV.use                       = true
+  key._INSTANCE_RESOLVE_CONF_PATH.use         = true
+  key._INSTANCE_HOSTNAME_PATH.use             = true
+  key._INSTANCE_HOSTS_PATH.use                = true
+  key._INSTANCE_LOG_PATH.use                  = true
+  key._INSTANCE_IMAGE_ID.use                  = true
+  key._INSTANCE_STATUS.use                    = true
+  key._INSTANCE_PID.use                       = true
+  key._INSTANCE_NAME.use                      = true
+  key._INSTANCE_RESTART_COUNT.use             = true
+  key._INSTANCE_DRIVER.use                    = true
+  key._INSTANCE_PLATFORM.use                  = true
+  key._INSTANCE_MOUNT_LABEL.use               = true
+  key._INSTANCE_PROCESS_LABEL.use             = true
+  key._INSTANCE_APP_ARMOR_PROFILE.use         = true
+  key._INSTANCE_EXEC_IDS.use                  = true
+  key._INSTANCE_BINDS.use                     = true
+  key._INSTANCE_CONTAINER_ID_FILE.use         = true
+  key._INSTANCE_LOG_CONFIG.use                = true
+  key._INSTANCE_NETWORK_MODE.use              = true
+  key._INSTANCE_RESTART_POLICY_NAME.use       = true
+  key._INSTANCE_RESTART_RETRY_COUNT.use       = true
+  key._INSTANCE_AUTOREMOVE.use                = true
+  key._INSTANCE_VOLUME_DRIVER.use             = true
+  key._INSTANCE_VOLUMES_FROM.use              = true
+  key._INSTANCE_CONSOLE_SIZE.use              = true
+  key._INSTANCE_ADDED_CAPS.use                = true
+  key._INSTANCE_DROPPED_CAPS.use              = true
+  key._INSTANCE_CGROUP_NS_MODE.use            = true
+  key._INSTANCE_DNS.use                       = true
+  key._INSTANCE_DNS_OPTIONS.use               = true
+  key._INSTANCE_DNS_SEARCH.use                = true
+  key._INSTANCE_EXTRA_HOSTS.use               = true
+  key._INSTANCE_GROUP_ADD.use                 = true
+  key._INSTANCE_IPC_MODE.use                  = true
+  key._INSTANCE_CGROUP.use                    = true
+  key._INSTANCE_LINKS.use                     = true
+  key._INSTANCE_OOM_SCORE_ADJ.use             = true
+  key._INSTANCE_PID_MODE.use                  = true
+  key._INSTANCE_IS_PRIVILEGED.use             = true
+  key._INSTANCE_PUBLISH_ALL_PORTS.use         = true
+  key._INSTANCE_READONLY_ROOT_FS.use          = true
+  key._INSTANCE_SECURITY_OPT.use              = true
+  key._INSTANCE_UTS_MODE.use                  = true
+  key._INSTANCE_USER_NS_MODE.use              = true
+  key._INSTANCE_SHM_SIZE.use                  = true
+  key._INSTANCE_RUNTIME.use                   = true
+  key._INSTANCE_ISOLATION.use                 = true
+  key._INSTANCE_CPU_SHARES.use                = true
+  key._INSTANCE_MEMORY.use                    = true
+  key._INSTANCE_NANO_CPUS.use                 = true
+  key._INSTANCE_CGROUP_PARENT.use             = true
+  key._INSTANCE_BLOCKIO_WEIGHT.use            = true
+  key._INSTANCE_BLOCKIO_WEIGHT_DEVICE.use     = true
+  key._INSTANCE_BLOCKIO_DEVICE_READ_BPS.use   = true
+  key._INSTANCE_BLOCKIO_DEVICE_WRITE_BPS.use  = true
+  key._INSTANCE_BLOCKIO_DEVICE_READ_IOPS.use  = true
+  key._INSTANCE_BLOCKIO_DEVICE_WRITE_IOPS.use = true
+  key._INSTANCE_CPU_PERIOD.use                = true
+  key._INSTANCE_CPU_QUOTA.use                 = true
+  key._INSTANCE_CPU_REALTIME_PERIOD.use       = true
+  key._INSTANCE_CPU_REALTIME_RUNTIME.use      = true
+  key._INSTANCE_CPUSET_CPUS.use               = true
+  key._INSTANCE_CPUSET_MEMS.use               = true
+  key._INSTANCE_DEVICES.use                   = true
+  key._INSTANCE_CGROUP_RULES.use              = true
+  key._INSTANCE_DEVICE_REQUESTS.use           = true
+  key._INSTANCE_MEMORY_RESERVATION.use        = true
+  key._INSTANCE_MEMORY_SWAP.use               = true
+  key._INSTANCE_MEMORY_SWAPPINESS.use         = true
+  key._INSTANCE_OOM_KILL_DISABLE.use          = true
+  key._INSTANCE_PIDS_LIMIT.use                = true
+  key._INSTANCE_ULIMITS.use                   = true
+  key._INSTANCE_CPU_COUNT.use                 = true
+  key._INSTANCE_CPU_PERCENT.use               = true
+  key._INSTANCE_IO_MAX_IOPS.use               = true
+  key._INSTANCE_IO_MAX_BPS.use                = true
+  key._INSTANCE_MASKED_PATHS.use              = true
+  key._INSTANCE_READONLY_PATHS.use            = true
+  key._INSTANCE_STORAGE_METADATA.use          = true
+  key._INSTANCE_MOUNTS.use                    = true
+  key._INSTANCE_HOSTNAME.use                  = true
+  key._INSTANCE_DOMAINNAME.use                = true
+  key._INSTANCE_USER.use                      = true
+  key._INSTANCE_ATTACH_STDIN.use              = true
+  key._INSTANCE_ATTACH_STDOUT.use             = true
+  key._INSTANCE_ATTACH_STDERR.use             = true
+  key._INSTANCE_EXPOSED_PORTS.use             = true
+  key._INSTANCE_HAS_TTY.use                   = true
+  key._INSTANCE_OPEN_STDIN.use                = true
+  key._INSTANCE_STDIN_ONCE.use                = true
+  key._INSTANCE_ENV.use                       = true
+  key._INSTANCE_CMD.use                       = true
+  key._INSTANCE_CONFIG_IMAGE.use              = true
+  key._INSTANCE_VOLUMES.use                   = true
+  key._INSTANCE_WORKING_DIR.use               = true
+  key._INSTANCE_ENTRYPOINT.use                = true
+  key._INSTANCE_ONBUILD.use                   = true
+  key._INSTANCE_LABELS.use                    = true
+  key._INSTANCE_BRIDGE.use                    = true
+  key._INSTANCE_SANDBOXID.use                 = true
+  key._INSTANCE_HAIRPINMODE.use               = true
+  key._INSTANCE_BOUND_PORTS.use               = true
+  key._INSTANCE_SANDBOX_KEY.use               = true
+  key._INSTANCE_SECONDARY_IPS.use             = true
+  key._INSTANCE_SECONDARY_IPV6_ADDRS.use      = true
+  key._INSTANCE_ENDPOINTID.use                = true
+  key._INSTANCE_GATEWAY.use                   = true
+  key._INSTANCE_GLOBAL_IPV6_ADDRESS.use       = true
+  key._INSTANCE_GLOBAL_IPV6_PREFIX_LEN.use    = true
+  key._INSTANCE_IP.use                        = true
+  key._INSTANCE_IP_PREFIX_LEN.use             = true
+  key._INSTANCE_IPV6_GATEWAY.use              = true
+  key._INSTANCE_MAC.use                       = true
+  key._INSTANCE_NETWORKS.use                  = true
+  key._STORE_URI.use                          = true
+  key._REPO_TAGS.use                          = true
+  key._REPO_DIGESTS.use                       = true
+  key._FOUND_BASE_MARK.use                    = true
+  key._SIGNATURE.use                          = true
+  key._INVALID_SIGNATURE.use                  = true
+  key._VALIDATED_SIGNATURE.use                = true
+  key._VALIDATED_METADATA.use                 = true
+  key.$CHALK_CONFIG.use                       = true
+  key.$CHALK_IMPLEMENTATION_NAME.use          = true
+  key.$CHALK_LOAD_COUNT.use                   = true
+  key.$CHALK_PUBLIC_KEY.use                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
+  key.$CHALK_ATTESTATION_TOKEN.use            = true
+
+}
+report_template insertion_default {
+  shortdoc: "The default template for insertion operations"
+  doc: """
+
+This is the same as the `default` report_template, except that we
+remove information that is either mostly irrelevent or redundant.
+
+By "mostly irrelevent", we mean that the keys are useful information
+in the stand-alone chalk mark, but are not particularly valuable. For
+instance, `TIME_CHALKED` does give different timestamps per artifact,
+but the `_DATETIME` field seems like plenty for most uses.
+
+At chalk-time, "redundant" keys occur when there are chalk-time keys
+and a run-time variant that will give the same results. Many
+operations have those duplicates, unless the information only makes
+sense to collect at chalk-time.
+
+When choosing between two identical keys, we drop the chalk-time key,
+and keep the run-time key.
+"""
+
+
+  key._OP_HOST_REPORT_KEYS.use                = false
+  key._OP_ARP_TABLE.use                       = false
+  key._OP_CPU_INFO.use                        = false
+  key._OP_IPV4_ROUTES.use                     = false
+  key._OP_IPV6_ROUTES.use                     = false
+  key._OP_IPV4_INTERFACES.use                 = false
+  key._OP_IPV6_INTERFACES.use                 = false
+  key._OP_UDP_SOCKET_INFO.use                 = false
+  key._OP_TCP_SOCKET_INFO.use                 = false
+  if not in_container() {
+    key._OP_ALL_PS_INFO.use                   = false
+  }
+  key.CHALK_VERSION.use                       = true
+  key.DATE_CHALKED.use                        = false
+  key.TIME_CHALKED.use                        = false
+  key.TZ_OFFSET_WHEN_CHALKED.use              = false
+  key.DATETIME_WHEN_CHALKED.use               = false
+  key.EARLIEST_VERSION.use                    = false
+  key.HOSTINFO_WHEN_CHALKED.use               = false
+  key.NODENAME_WHEN_CHALKED.use               = false
+  key.INJECTOR_CHALK_ID.use                   = true
+  key.INJECTOR_VERSION.use                    = true
+  key.INJECTOR_PUBLIC_KEY.use                 = true
+  key.PLATFORM_WHEN_CHALKED.use               = true
+  key.INJECTOR_COMMIT_ID.use                  = true
+  key.INJECTOR_ARGV.use                       = true
+  key.INJECTOR_ENV.use                        = true
+  key.TENANT_ID_WHEN_CHALKED.use              = true
+  
+  # Runtime host keys.
+  key._ACTION_ID.use                          = true
+  key._ARGV.use                               = true
+  key._ENV.use                                = true
+  key._TENANT_ID.use                          = true
+  key._OPERATION.use                          = true
+  key._TIMESTAMP.use                          = true
+  key._DATE.use                               = false # Go with _DATETIME
+  key._TIME.use                               = false
+  key._TZ_OFFSET.use                          = false
+  key._DATETIME.use                           = true
+  key._CHALKS.use                             = true
+  key._OP_CHALK_COUNT.use                     = true
+  key._OP_UNMARKED_COUNT.use                  = true
+  key._OP_CMD_FLAGS.use                       = true
+  key._OP_SEARCH_PATH.use                     = true
+  key._OP_EXE_NAME.use                        = true
+  key._OP_EXE_PATH.use                        = true
+  key._OP_ARGV.use                            = true
+  key._OP_CONFIG.use                          = true
+  key._UNMARKED.use                           = true
+  key._OP_CHALKER_COMMIT_ID.use               = true
+  key._OP_CHALKER_VERSION.use                 = true
+  key._OP_PLATFORM.use                        = true
+  key._OP_HOSTNAME.use                        = true
+  key._OP_HOSTINFO.use                        = true
+  key._OP_NODENAME.use                        = true
+  key._OP_CLOUD_METADATA.use                  = true
+  key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
+  key._OP_ERRORS.use                          = true
+
+
+  # IMDS keys
+  # dynamic
+  key._AWS_INSTANCE_IDENTITY_DOCUMENT.use            = true
+  key._AWS_INSTANCE_IDENTITY_PKCS7.use               = true
+  key._AWS_INSTANCE_IDENTITY_SIGNATURE.use           = true
+  key._AWS_INSTANCE_MONITORING.use                   = true
+
+  key._AWS_AMI_ID.use                                = true
+  key._AWS_AMI_LAUNCH_INDEX.use                      = true
+  key._AWS_AMI_MANIFEST_PATH.use                     = true
+  key._AWS_ANCESTOR_AMI_IDS.use                      = true
+  key._AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE.use    = true
+  key._AWS_AZ.use                                    = true
+  key._AWS_AZ_ID.use                                 = true
+  key._AWS_BLOCK_DEVICE_MAPPING_AMI.use              = true
+  key._AWS_BLOCK_DEVICE_MAPPING_ROOT.use             = true
+  key._AWS_BLOCK_DEVICE_MAPPING_SWAP.use             = true
+  key._AWS_DEDICATED_HOST_ID.use                     = true
+  key._AWS_EVENTS_MAINTENANCE_HISTORY.use            = true
+  key._AWS_EVENTS_MAINTENANCE_SCHEDULED.use          = true
+  key._AWS_EVENTS_RECOMMENDATIONS_REBALANCE.use      = true
+  key._AWS_HOSTNAME.use                              = true
+  key._AWS_INSTANCE_ACTION.use                       = true
+  key._AWS_INSTANCE_ID.use                           = true
+  key._AWS_INSTANCE_LIFE_CYCLE.use                   = true
+  key._AWS_INSTANCE_TYPE.use                         = true
+  key._AWS_INTERFACE_ID.use                          = true
+  key._AWS_IPV6_ADDR.use                             = true
+  key._AWS_KERNEL_ID.use                             = true
+  key._AWS_LOCAL_HOSTNAME.use                        = true
+  key._AWS_LOCAL_IPV4_ADDR.use                       = true
+  key._AWS_MAC.use                                   = true
+  key._AWS_METRICS_VHOSTMD.use                       = true
+  key._AWS_OPENSSH_PUBKEY.use                        = true
+  key._AWS_PARTITION_NAME.use                        = true
+  key._AWS_PARTITION_NUMBER.use                      = true
+  key._AWS_PLACEMENT_GROUP.use                       = true
+  key._AWS_PRODUCT_CODES.use                         = true
+  key._AWS_PUBLIC_HOSTNAME.use                       = true
+  key._AWS_PUBLIC_IPV4_ADDR.use                      = true
+  key._AWS_RAMDISK_ID.use                            = true
+  key._AWS_REGION.use                                = true
+  key._AWS_RESERVATION_ID.use                        = true
+  key._AWS_RESOURCE_DOMAIN.use                       = true
+  key._AWS_SPOT_INSTANCE_ACTION.use                  = true
+  key._AWS_SPOT_TERMINATION_TIME.use                 = true
+  key._AWS_SUBNET_ID.use                             = true
+  key._AWS_TAGS.use                                  = true
+  key._AWS_VPC_ID.use                                = true
+
+  # list
+  key._AWS_SECURITY_GROUP_IDS.use                    = true
+  key._AWS_SECURITY_GROUPS.use                       = true
+
+  # json
+  key._AWS_IAM_INFO.use                              = true
+  key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
+  key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
+
+
+  # Artifact keys
+  key._PROCESS_DETAIL.use                     = false
+  key._INSTANCE_LOCAL_IPV6.use                = false
+  key._INSTANCE_LOCAL_IPV6_PREFIX_LEN.use     = false
+  key.CHALK_ID.use                            = true
+  key.TIMESTAMP_WHEN_CHALKED.use              = false
+  key.CHALK_PTR.use                           = false
+  key.PATH_WHEN_CHALKED.use                   = true
+  key.PATH_WITHIN_ZIP.use                     = true
+  key.CONTAINING_ARTIFACT_WHEN_CHALKED.use    = true
+  key.ARTIFACT_TYPE.use                       = true
+  key.HASH.use                                = true
+  key.ORIGIN_URI.use                          = true
+  key.BRANCH.use                              = true
+  key.COMMIT_ID.use                           = true
+  key.ARTIFACT_VERSION.use                    = true
+  key.STORE_URI.use                           = true
+  key.PACKAGE_URI.use                         = true
+  key.CODE_OWNERS.use                         = true
+  key.VCS_DIR_WHEN_CHALKED.use                = true
+  key.BUILD_ID.use                            = true
+  key.BUILD_URI.use                           = true
+  key.BUILD_API_URI.use                       = true
+  key.BUILD_TRIGGER.use                       = true
+  key.BUILD_CONTACT.use                       = true
+  key.CHALK_RAND.use                          = true
+  key.OLD_CHALK_METADATA_HASH.use             = true
+  key.OLD_CHALK_METADATA_ID.use               = true
+  key.EMBEDDED_CHALK.use                      = true
+  key.EMBEDDED_TMPDIR.use                     = true
+  key.CLOUD_METADATA_WHEN_CHALKED.use         = true
+  key.SBOM.use                                = true
+  key.SAST.use                                = true
+  key.ERR_INFO.use                            = true
+  key.SIGNING.use                             = false
+  key.METADATA_HASH.use                       = true
+  key.METADATA_ID.use                         = true
+  key.SIGNATURE.use                           = true
+  key.DOCKER_FILE.use                         = true
+  key.DOCKERFILE_PATH.use                     = true
+  key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_LABELS.use                       = true
+  key.DOCKER_TAGS.use                         = true
+  key.DOCKER_CONTEXT.use                      = true
+  key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
+  key.DOCKER_CHALK_ADDED_LABELS.use           = true
+  key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use    = true
+  key.DOCKER_CHALK_TEMPORARY_TAG.use          = true
+  key._OP_ARTIFACT_TYPE.use                   = true
+  key._OP_ARTIFACT_PATH.use                   = true
+  key._CURRENT_HASH.use                       = true
+  key._VIRTUAL.use                            = true
+  key._OP_ARTIFACT_REPORT_KEYS.use            = false
+  key._PROCESS_PID.use                        = true
+  key._PROCESS_PARENT_PID.use                 = true
+  key._PROCESS_START_TIME.use                 = true
+  key._PROCESS_UTIME.use                      = true
+  key._PROCESS_STIME.use                      = true
+  key._PROCESS_CHILDREN_UTIME.use             = true
+  key._PROCESS_CHILDREN_STIME.use             = true
+  key._PROCESS_STATE.use                      = true
+  key._PROCESS_PGID.use                       = true
+  key._PROCESS_UMASK.use                      = true
+  key._PROCESS_UID.use                        = true
+  key._PROCESS_GID.use                        = true
+  key._PROCESS_NUM_FD_SIZE.use                = true
+  key._PROCESS_GROUPS.use                     = true
+  key._PROCESS_SECCOMP_STATUS.use             = true
+  key._PROCESS_ARGV.use                       = true
+  key._PROCESS_CWD.use                        = true
+  key._PROCESS_EXE_PATH.use                   = true
+  key._PROCESS_COMMAND_NAME.use               = true
+  key._PROCESS_FD_INFO.use                    = true
+  key._PROCESS_MOUNT_INFO.use                 = true
+  key._OP_ALL_IMAGE_METADATA.use              = false
+  key._OP_ALL_CONTAINER_METADATA.use          = false
+  key._IMAGE_ID.use                           = true
+  key._IMAGE_COMMENT.use                      = true
+  key._IMAGE_CREATION_DATETIME.use            = true
+  key._IMAGE_DOCKER_VERSION.use               = true
+  key._IMAGE_AUTHOR.use                       = true
+  key._IMAGE_ARCHITECTURE.use                 = true
+  key._IMAGE_VARIANT.use                      = true
+  key._IMAGE_OS.use                           = true
+  key._IMAGE_OS_VERSION.use                   = true
+  key._IMAGE_SIZE.use                         = true
+  key._IMAGE_ROOT_FS_TYPE.use                 = true
+  key._IMAGE_ROOT_FS_LAYERS.use               = true
+  key._IMAGE_HOSTNAME.use                     = true
+  key._IMAGE_DOMAINNAME.use                   = true
+  key._IMAGE_USER.use                         = true
+  key._IMAGE_EXPOSED_PORTS.use                = true
+  key._IMAGE_ENV.use                          = true
+  key._IMAGE_CMD.use                          = true
+  key._IMAGE_NAME.use                         = true
+  key._IMAGE_HEALTHCHECK_TEST.use             = true
+  key._IMAGE_HEALTHCHECK_INTERVAL.use         = true
+  key._IMAGE_HEALTHCHECK_TIMEOUT.use          = true
+  key._IMAGE_HEALTHCHECK_START_PERIOD.use     = true
+  key._IMAGE_HEALTHCHECK_START_INTERVAL.use   = true
+  key._IMAGE_HEALTHCHECK_RETRIES.use          = true
+  key._IMAGE_MOUNTS.use                       = true
+  key._IMAGE_WORKINGDIR.use                   = true
+  key._IMAGE_ENTRYPOINT.use                   = true
+  key._IMAGE_NETWORK_DISABLED.use             = true
+  key._IMAGE_MAC_ADDR.use                     = true
+  key._IMAGE_ONBUILD.use                      = true
+  key._IMAGE_LABELS.use                       = true
+  key._IMAGE_STOP_SIGNAL.use                  = true
+  key._IMAGE_STOP_TIMEOUT.use                 = true
+  key._IMAGE_SHELL.use                        = true
+  key._IMAGE_VIRTUAL_SIZE.use                 = true
+  key._IMAGE_LAST_TAG_TIME.use                = true
+  key._IMAGE_STORAGE_METADATA.use             = true
+  key._INSTANCE_CONTAINER_ID.use              = true
+  key._INSTANCE_CREATION_DATETIME.use         = true
+  key._INSTANCE_ENTRYPOINT_PATH.use           = true
+  key._INSTANCE_ENTRYPOINT_ARGS.use           = true
+  key._INSTANCE_ENV.use                       = true
+  key._INSTANCE_RESOLVE_CONF_PATH.use         = true
+  key._INSTANCE_HOSTNAME_PATH.use             = true
+  key._INSTANCE_HOSTS_PATH.use                = true
+  key._INSTANCE_LOG_PATH.use                  = true
+  key._INSTANCE_IMAGE_ID.use                  = true
+  key._INSTANCE_STATUS.use                    = true
+  key._INSTANCE_PID.use                       = true
+  key._INSTANCE_NAME.use                      = true
+  key._INSTANCE_RESTART_COUNT.use             = true
+  key._INSTANCE_DRIVER.use                    = true
+  key._INSTANCE_PLATFORM.use                  = true
+  key._INSTANCE_MOUNT_LABEL.use               = true
+  key._INSTANCE_PROCESS_LABEL.use             = true
+  key._INSTANCE_APP_ARMOR_PROFILE.use         = true
+  key._INSTANCE_EXEC_IDS.use                  = true
+  key._INSTANCE_BINDS.use                     = true
+  key._INSTANCE_CONTAINER_ID_FILE.use         = true
+  key._INSTANCE_LOG_CONFIG.use                = true
+  key._INSTANCE_NETWORK_MODE.use              = true
+  key._INSTANCE_RESTART_POLICY_NAME.use       = true
+  key._INSTANCE_RESTART_RETRY_COUNT.use       = true
+  key._INSTANCE_AUTOREMOVE.use                = true
+  key._INSTANCE_VOLUME_DRIVER.use             = true
+  key._INSTANCE_VOLUMES_FROM.use              = true
+  key._INSTANCE_CONSOLE_SIZE.use              = true
+  key._INSTANCE_ADDED_CAPS.use                = true
+  key._INSTANCE_DROPPED_CAPS.use              = true
+  key._INSTANCE_CGROUP_NS_MODE.use            = true
+  key._INSTANCE_DNS.use                       = true
+  key._INSTANCE_DNS_OPTIONS.use               = true
+  key._INSTANCE_DNS_SEARCH.use                = true
+  key._INSTANCE_EXTRA_HOSTS.use               = true
+  key._INSTANCE_GROUP_ADD.use                 = true
+  key._INSTANCE_IPC_MODE.use                  = true
+  key._INSTANCE_CGROUP.use                    = true
+  key._INSTANCE_LINKS.use                     = true
+  key._INSTANCE_OOM_SCORE_ADJ.use             = true
+  key._INSTANCE_PID_MODE.use                  = true
+  key._INSTANCE_IS_PRIVILEGED.use             = true
+  key._INSTANCE_PUBLISH_ALL_PORTS.use         = true
+  key._INSTANCE_READONLY_ROOT_FS.use          = true
+  key._INSTANCE_SECURITY_OPT.use              = true
+  key._INSTANCE_UTS_MODE.use                  = true
+  key._INSTANCE_USER_NS_MODE.use              = true
+  key._INSTANCE_SHM_SIZE.use                  = true
+  key._INSTANCE_RUNTIME.use                   = true
+  key._INSTANCE_ISOLATION.use                 = true
+  key._INSTANCE_CPU_SHARES.use                = true
+  key._INSTANCE_MEMORY.use                    = true
+  key._INSTANCE_NANO_CPUS.use                 = true
+  key._INSTANCE_CGROUP_PARENT.use             = true
+  key._INSTANCE_BLOCKIO_WEIGHT.use            = true
+  key._INSTANCE_BLOCKIO_WEIGHT_DEVICE.use     = true
+  key._INSTANCE_BLOCKIO_DEVICE_READ_BPS.use   = true
+  key._INSTANCE_BLOCKIO_DEVICE_WRITE_BPS.use  = true
+  key._INSTANCE_BLOCKIO_DEVICE_READ_IOPS.use  = true
+  key._INSTANCE_BLOCKIO_DEVICE_WRITE_IOPS.use = true
+  key._INSTANCE_CPU_PERIOD.use                = true
+  key._INSTANCE_CPU_QUOTA.use                 = true
+  key._INSTANCE_CPU_REALTIME_PERIOD.use       = true
+  key._INSTANCE_CPU_REALTIME_RUNTIME.use      = true
+  key._INSTANCE_CPUSET_CPUS.use               = true
+  key._INSTANCE_CPUSET_MEMS.use               = true
+  key._INSTANCE_DEVICES.use                   = true
+  key._INSTANCE_CGROUP_RULES.use              = true
+  key._INSTANCE_DEVICE_REQUESTS.use           = true
+  key._INSTANCE_MEMORY_RESERVATION.use        = true
+  key._INSTANCE_MEMORY_SWAP.use               = true
+  key._INSTANCE_MEMORY_SWAPPINESS.use         = true
+  key._INSTANCE_OOM_KILL_DISABLE.use          = true
+  key._INSTANCE_PIDS_LIMIT.use                = true
+  key._INSTANCE_ULIMITS.use                   = true
+  key._INSTANCE_CPU_COUNT.use                 = true
+  key._INSTANCE_CPU_PERCENT.use               = true
+  key._INSTANCE_IO_MAX_IOPS.use               = true
+  key._INSTANCE_IO_MAX_BPS.use                = true
+  key._INSTANCE_MASKED_PATHS.use              = true
+  key._INSTANCE_READONLY_PATHS.use            = true
+  key._INSTANCE_STORAGE_METADATA.use          = true
+  key._INSTANCE_MOUNTS.use                    = true
+  key._INSTANCE_HOSTNAME.use                  = true
+  key._INSTANCE_DOMAINNAME.use                = true
+  key._INSTANCE_USER.use                      = true
+  key._INSTANCE_ATTACH_STDIN.use              = true
+  key._INSTANCE_ATTACH_STDOUT.use             = true
+  key._INSTANCE_ATTACH_STDERR.use             = true
+  key._INSTANCE_EXPOSED_PORTS.use             = true
+  key._INSTANCE_HAS_TTY.use                   = true
+  key._INSTANCE_OPEN_STDIN.use                = true
+  key._INSTANCE_STDIN_ONCE.use                = true
+  key._INSTANCE_ENV.use                       = true
+  key._INSTANCE_CMD.use                       = true
+  key._INSTANCE_CONFIG_IMAGE.use              = true
+  key._INSTANCE_VOLUMES.use                   = true
+  key._INSTANCE_WORKING_DIR.use               = true
+  key._INSTANCE_ENTRYPOINT.use                = true
+  key._INSTANCE_ONBUILD.use                   = true
+  key._INSTANCE_LABELS.use                    = true
+  key._INSTANCE_BRIDGE.use                    = true
+  key._INSTANCE_SANDBOXID.use                 = true
+  key._INSTANCE_HAIRPINMODE.use               = true
+  key._INSTANCE_BOUND_PORTS.use               = true
+  key._INSTANCE_SANDBOX_KEY.use               = true
+  key._INSTANCE_SECONDARY_IPS.use             = true
+  key._INSTANCE_SECONDARY_IPV6_ADDRS.use      = true
+  key._INSTANCE_ENDPOINTID.use                = true
+  key._INSTANCE_GATEWAY.use                   = true
+  key._INSTANCE_GLOBAL_IPV6_ADDRESS.use       = true
+  key._INSTANCE_GLOBAL_IPV6_PREFIX_LEN.use    = true
+  key._INSTANCE_IP.use                        = true
+  key._INSTANCE_IP_PREFIX_LEN.use             = true
+  key._INSTANCE_IPV6_GATEWAY.use              = true
+  key._INSTANCE_MAC.use                       = true
+  key._INSTANCE_NETWORKS.use                  = true
+  key._STORE_URI.use                          = true
+  key._REPO_TAGS.use                          = true
+  key._REPO_DIGESTS.use                       = true
+  key._FOUND_BASE_MARK.use                    = true
+  key._SIGNATURE.use                          = true
+  key._INVALID_SIGNATURE.use                  = true
+  key._VALIDATED_SIGNATURE.use                = true
+  key._VALIDATED_METADATA.use                 = true
+  key.$CHALK_CONFIG.use                       = true
+  key.$CHALK_IMPLEMENTATION_NAME.use          = true
+  key.$CHALK_LOAD_COUNT.use                   = true
+  key.$CHALK_PUBLIC_KEY.use                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
+  key.$CHALK_ATTESTATION_TOKEN.use            = true
+
+
+}
+
+report_template unknown_docker {
+  shortdoc: "Report BASIC command invocation info for docker commands" 
+  doc: """
+Intended for reporting only basic identifying information for docker commands
+that do not generate a chalk report.
+"""
+  key._OPERATION.use                          = true
+  key._ACTION_ID.use                          = true
+  key._DATETIME.use                           = true
+  key._ARGV.use                               = true
+  key._OP_CHALKER_COMMIT_ID.use               = true
+  key._OP_CHALKER_VERSION.use                 = true
+  key._OP_PLATFORM.use                        = true
+  key._OP_HOSTINFO.use                        = true
+  key._OP_NODENAME.use                        = true
+}
+
+report_template push_default {
+  shortdoc: "Default report for docker push commands"
+  doc: """
+  When we report on a 'docker push', these are the important
+  per-artifact items we collect. The `CURRENT_HASH` and `REPO_DIGESTS`
+  fields are both necessary for following the breadcrumbs, so should be
+  on in all circumstances (we'll probably force them on eventually).
+
+  You can certainly collect a lot more data here, but we expect it
+  should usually be redundant w/ the info you collected during a build.
+"""
+  key._OPERATION.use                          = true
+  ~key._CURRENT_HASH.use                      = true
+  key._STORE_URI.use                          = true
+  key._REPO_TAGS.use                          = true
+  ~key._REPO_DIGESTS.use                      = true
+  key.INJECTOR_PUBLIC_KEY.use                 = true
+  key.CHALK_ID.use                            = true
+}
+
+report_template audit {
+  shortdoc: "Default audit report (audits are off by default)"
+  doc: """
+  Here, we only report key bits about the configuration used, for audit
+  purposes. This is implemented as the "audit" report below; the
+  implementation special-cases it a bit; the "publish_audit" variable
+  can be used to control this (right now, just turn it on or off, though
+  you can certainly change this report, and change the output sink(s)
+  subscribed to the 'audit' topic).
+
+  Note that in the default configuration, "publish_audit" is OFF.
+"""
+  key._OPERATION.use                          = true
+  key._ACTION_ID.use                          = true
+  key._TIMESTAMP.use                          = true
+  key._DATETIME.use                           = true
+  key._OP_CHALK_COUNT.use                     = true
+  key._OP_CMD_FLAGS.use                       = true
+  key._OP_CONFIG.use                          = true
+  key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
+}
+
+report_template usage {
+  shortdoc: "Reports on summary statistics"
+  doc: """
+  These fields are, by default, sent back up to Crash Override to keep
+  high-level statistics on Chalk usage (via an attempted post to an
+  HTTPS endpoint).
+"""
+  ~key._OPERATION.use                         = true
+  ~key._TIMESTAMP.use                         = true
+  ~key._OP_CHALK_COUNT.use                    = true
+  ~key._TENANT_ID.use                         = true
+  ~key._OP_CHALKER_COMMIT_ID.use              = true
+  ~key._OP_CHALKER_VERSION.use                = true
+  ~key._OP_PLATFORM.use                       = true
+}
+
+report_template terminal_insert {
+  shortdoc: "What you see on insertion on the default command line"
+  doc: """
+
+The summary report that outputs to your terminal by default, when
+running insert commands.
+"""  
+  key._OPERATION.use                          = true
+  key._DATETIME.use                           = true
+  key._CHALKS.use                             = true
+  key._OP_ARGV.use                            = true
+  key._OP_CHALKER_VERSION.use                 = true
+  key._OP_CHALK_COUNT.use                     = true
+  key._OP_UNMARKED_COUNT.use                  = true
+  key._OP_ERRORS.use                          = true
+  key._ENV.use                                = true
+  key.CHALK_ID.use                            = true
+  key.CHALK_VERSION.use                       = true
+  key.PRE_CHALK_HASH.use                      = true
+  key.PATH_WHEN_CHALKED.use                   = true
+  key.ARTIFACT_TYPE.use                       = true
+  key.ORIGIN_URI.use                          = true
+  key.BRANCH.use                              = true
+  key.COMMIT_ID.use                           = true
+  key.EMBEDDED_CHALK.use                      = true
+  key.ERR_INFO.use                            = true
+  key.DOCKER_FILE.use                         = true
+  key.DOCKERFILE_PATH.use                     = true
+  key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_LABELS.use                       = true
+  key.DOCKER_TAGS.use                         = true
+  key.METADATA_ID.use                         = true
+  key._VIRTUAL.use                            = true
+  key._CURRENT_HASH.use                       = true
+  key._IMAGE_ID.use                           = true
+}
+
+report_template terminal_rest {
+  shortdoc: "What you see for non-insertion operations on the default command line"
+  doc: """
+
+The summary report that outputs to your terminal by default, when
+running commands that do NOT insert chalk marks.
+"""
+  key._OPERATION.use                          = true
+  key._DATETIME.use                           = true
+  key._CHALKS.use                             = true
+  key._OP_ARGV.use                            = true
+  key._OP_CHALKER_VERSION.use                 = true
+  key._OP_CHALK_COUNT.use                     = true
+  key._OP_UNMARKED_COUNT.use                  = true
+  key._OP_ERRORS.use                          = true
+  key._ENV.use                                = true
+  key.CHALK_ID.use                            = true
+  key.CHALK_VERSION.use                       = true
+  key.PATH_WHEN_CHALKED.use                   = true
+  key.ARTIFACT_TYPE.use                       = true
+  key.ORIGIN_URI.use                          = true
+  key.BRANCH.use                              = true
+  key.COMMIT_ID.use                           = true
+  key.EMBEDDED_CHALK.use                      = true
+  key.ERR_INFO.use                            = true
+  key.DOCKER_FILE.use                         = true
+  key.DOCKERFILE_PATH.use                     = true
+  key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_LABELS.use                       = true
+  key.DOCKER_TAGS.use                         = true
+  key.METADATA_ID.use                         = true
+  key._CURRENT_HASH.use                       = true  
+  key._OP_ARTIFACT_TYPE.use                   = true
+  key._OP_ARTIFACT_PATH.use                   = true
+  key._CURRENT_HASH.use                       = true
+  key._IMAGE_ID.use                           = true
+  key._INSTANCE_CONTAINER_ID.use              = true
+  key._INSTANCE_NAME.use                      = true
+  key._REPO_TAGS.use                          = true
+ }

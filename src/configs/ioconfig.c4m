@@ -10,32 +10,21 @@
 
 custom_report terminal_chalk_time {
   enabled:         true
-  host_report:     "terminal_host_report"
-  artifact_report: "terminal_artifact_report_when_chalking"
+  report_template: "terminal_insert"
   sink_configs:    ["json_console_out"]
   use_when:        ["insert", "build"]
 }
 
-custom_report terminal_env_time {
-  enabled:         true
-  host_report:     "terminal_env_host_report"
-  artifact_report: "terminal_artifact_report_all_others"
-  sink_configs:    ["json_console_out"]
-  use_when:        ["env"]
-}
-
 custom_report terminal_other_op {
   enabled:         true
-  host_report:     "terminal_host_report"
-  artifact_report: "terminal_artifact_report_all_others"
+  report_template: "terminal_rest"
   sink_configs:    ["json_console_out"]
-  use_when:        ["extract", "delete", "exec"]
+  use_when:        ["extract", "delete", "exec", "env", "heartbeat", "push"]
 }
 
 if not using_tty() {
   color: false
   custom_report.terminal_chalk_time.enabled: false
-  custom_report.terminal_env_time.enabled: false
   custom_report.terminal_other_op.enabled: false
 } elif env_exists("NO_COLOR") {
   color: false
@@ -45,7 +34,6 @@ if not using_tty() {
 
 if skip_summary_report {
   custom_report.terminal_chalk_time.enabled: false
-  custom_report.terminal_env_time.enabled: false
   custom_report.terminal_other_op.enabled: false
 }
 
@@ -60,15 +48,7 @@ subscribe("report",   "default_out")
 subscribe("audit",    "default_out")
 subscribe("version",  "console_out")
 subscribe("virtual",  "virtual_chalk_log")
-#% INTERNAL
-if cmd == "helpdump" {
-    subscribe("help", "json_console_out")
-} else {
-#% END
 subscribe("help",     "console_out")
-#% INTERNAL
-}
-#% END
 
 if cmd == "dump" {
   args := command_argv()
@@ -79,11 +59,6 @@ if cmd == "dump" {
     sink_config.dump_out.filename = args[0]
     subscribe("confdump", "dump_out")
   }
-}
-elif cmd == "defaults" {
-    subscribe("defaults", "console_out")
-} else {
-    subscribe("defaults", "console_err")
 }
 
 # Set up the log level based on the command.

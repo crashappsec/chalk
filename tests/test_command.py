@@ -153,7 +153,7 @@ def test_insert_extract_delete(copy_files: list[Path], chalk: Chalk):
 
 def test_version(chalk: Chalk):
     result = chalk.run(command="version", no_color=True)
-    printed_version = result.find("Chalk version")
+    printed_version = result.find("Chalk version").strip("┋ ")
 
     # version output should match the version in chalk_internal.nimble
     internal_version = next(

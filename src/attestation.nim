@@ -252,7 +252,7 @@ proc getKeyFileLoc*(): string =
     return ""
 
   let
-    (dir, file) = result.splitPath()
+    (dir, _) = result.splitPath()
 
   if dirExists(dir):
     return
@@ -609,7 +609,7 @@ proc getChalkApiToken(): string =
           var userInfoStr = ""
           userInfoStr &= "User: " & $userDict["name"] & "\n"
           userInfoStr &= "       Email: " & $userDict["email"]
-          #info("Workspace ID: " & $decodedPollJwt["workspaceId"])
+          info("Workspace ID: " & $decodedPollJwt["workspaceId"])
           info(userInfoStr)
           ret = apiJwtPayload
 

@@ -35,7 +35,7 @@ when isMainModule:
   of "env":                runCmdEnv()
   of "dump":               runCmdConfDump()
   of "load":               runCmdConfLoad()
-  of "defaults":           showConfig(force = true)
+  of "config":             showConfigValues(force = true)
   of "version":            runCmdVersion()
   of "docker":             runCmdDocker(getArgs())
   of "exec":               runCmdExec(getArgs())
@@ -46,5 +46,5 @@ when isMainModule:
   else:
     runChalkHelp(getCommandName()) # noreturn, will not show config.
 
-  showConfig()
+  showConfigValues()
   quitChalk()

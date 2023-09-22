@@ -46,7 +46,7 @@ proc findAuthorsFile(fullpath: string): string =
 
   return ""
 
-proc authorsGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
+proc authorsGetChalkTimeArtifactInfo*(self: Plugin, ignore: ChalkObj): ChalkDict {.cdecl.} =
   result = ChalkDict()
 
   var fname: string
@@ -73,4 +73,4 @@ proc authorsGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
 
 proc loadOwnerAuthors*() =
   newPlugin("authors",
-          ctHostCallback = ChalkTimeHostCb(authorsGetChalkTimeHostInfo))
+          ctArtCallback = ChalkTimeArtifactCb(authorsGetChalkTimeArtifactInfo))

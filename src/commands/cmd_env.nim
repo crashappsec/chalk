@@ -6,17 +6,10 @@
 ##
 
 ## The `chalk env` command.
+## Yes, this is all it (currently) does.
 
-import ../config, ../collect, ../reporting
-
-template oneEnvItem(key: string, f: untyped) =
-  let item = chalkConfig.envConfig.`get f`()
-  if item.isSome():
-    dict[key] = pack[string](item.get())
+import ../collect, ../reporting
 
 proc runCmdEnv*() =
   initCollection()
-
-
-
   doReporting()

@@ -7,7 +7,7 @@
 
 ## The `chalk help` command.
 
-import ../config, std/terminal
+import ../config, ../sinks
 
 const helpFiles = newFileTable("../docs/")
 
@@ -19,16 +19,9 @@ const allConfigVarSections = ["", "docker", "exec", "extract", "env_config",
 const allCommandSections = ["", "insert", "docker", "extract", "extract.images",
                             "extract.containers", "extract.all", "exec",
                             "setup", "setup.gen", "setup.load", "env",
-                            "defaults", "dump", "load", "delete", "version"]
+                            "config", "dump", "load", "delete", "version"]
 
 # template dbug(a, b) = print("<jazzberry>" & a & ": </jazzberry>" & b)
-
-proc showCommandHelp*(cmd = getCommandName()) {.noreturn.} =
-  let spec = getArgCmdSpec()
-
-  publish("help", getCmdHelp(getArgCmdSpec(), getArgs()))
-
-  quit(0)
 
 proc kindEnumToString(s, v: string): string =
   case v
@@ -63,6 +56,7 @@ template getKeyspecTable(state: ConfigState, filterValueStr: string): string =
                            transformers = transformers,
                            docKind      = docKind,
                            markdownFields = mdFields)
+
 proc keyHelp(state: ConfigState, args: seq[string] = @[],
              summary = false,
              docKind = CDocConsole) :string =
@@ -77,10 +71,6 @@ proc keyHelp(state: ConfigState, args: seq[string] = @[],
     fieldsToUse.add("shortdoc")
   else:
     fieldsToUse.add("doc")
-
-
-  if docKind == CDocRaw:
-    mdFields = @[]
 
   transformers["kind"] = FieldTransformer(kindEnumToString)
 
@@ -146,11 +136,6 @@ proc highlightMatches(s: string, terms: seq[string]): string =
   result = s
   for term in terms:
     result = result.replace(term, "<strong><em>" & term & "</em></strong>")
-
-proc highlightMatchesMd(s: string, terms: seq[string]): string =
-  result = s
-  for term in terms:
-    result = result.replace(term, "**" & term & "**")
 
 proc searchEmbeddedDocs(terms: seq[string]): string =
   # Terminal only.
@@ -292,29 +277,6 @@ proc searchCommandDescriptions(state: ConfigState, args: seq[string]): string =
       result &= "</tbody></table>"
       result &= match[2]
 
-proc fullTextSearch(state: ConfigState, args: seq[string]): string =
-  result &= "<h1>Searching documentation for term"
-
-  if len(args) == 1:
-    result &= ": " & args[0] & "</h1>"
-
-  else:
-    result &= "s: " & args.join(", ") & "</h1>"
-
-  result &= state.searchCommandDescriptions(args)
-  result &= state.searchFlags(args)
-  result &= state.searchConfigVars(args)
-  result &= state.searchMetadataKeys(args)
-  result &= searchEmbeddedDocs(args)
-  result = result.stylize()
-
-  # TODO:
-  # - Search sinks.
-  # - Search sink configs.
-  # - Search profiles.
-  # - Search developer docs.
-
-
 proc getHelpTopics(state: ConfigState): string =
   result &= "<h1>Additional help topics </h1>"
   result &= "<h2>Use `chalk help <topicname>` to read</h2>"
@@ -365,91 +327,123 @@ proc getPluginHelp(state: ConfigState): string =
 
   result = result.stylize()
 
-proc getProfileHelp(state: ConfigState, args: seq[string]): string =
-  if len(args) == 0:
-    result= """<h1>Available profiles </h1>
-You can see what each of the below profiles sets with `chalk help profile "name"`.
+proc getMarkTemplateDocs(state: ConfigState): string =
+    result = stylize("# Chalk Mark Templates")
 
-See `chalk help reporting` for more information on reporting.
-"""
-    result &= state.getAllInstanceDocs("profile",["shortdoc"],
-                                       ["Profile Name", "Description"])
+    result &= state.getAllInstanceDocs("mark_template",["shortdoc"],
+                                       ["Template Name", "Description"])
+
+proc getReportTemplateDocs(state: ConfigState): string =
+  result = stylize("# Report Templates")
+  result &= state.getAllInstanceDocs("report_template",["shortdoc"],
+                                       ["Template Name", "Description"])
+
+proc formatOneTemplate(state: ConfigState,
+                     tmpl: MarkTemplate | ReportTemplate): string =
+  var
+    keysToReport: seq[string]
+
+  result &= tmpl.doc.getOrElse("No description available.").stylize()
+
+  for k, v in tmpl.keys:
+    if v.use == true:
+      keysToReport.add(k)
+
+  if len(keysToReport) == 0:
+    result &= stylize("<h3>This template is empty, and will only " &
+                      "produce default values </h3>")
   else:
-    var profiles: seq[string]
+    result &= stylize("<h3>Keys this template produces (beyond " &
+                      "any required defaults): </h3>")
 
-    if "all" in args:
-      for k, v in chalkConfig.profiles:
-        profiles.add(k)
-    else:
-      for item in args:
-        if item notin chalkConfig.profiles:
-          result &= "<h3>Profile not found: " & item & "<h3>"
-        else:
-          profiles.add(item)
+    result &= instantTable(keysToReport)
 
-    if len(profiles) == 0:
-      result &= "<h1>No matching profiles found.</h1>"
+proc getTemplateHelp(state: ConfigState, args: seq[string]): string =
+    result &= state.getReportTemplateDocs()
+    result &= state.getMarkTemplateDocs()
+
+    if len(args) == 0:
+      result &= instantTable(@["""To see details on a template's contents,
+do `chalk help template [name]`
+or `chalk help template all` to see all templates.
+
+See `chalk help reporting` for more information on templates.
+"""])
       return
 
-    for profile in profiles:
-      result &= "<h1>Profile: " & profile & "</h1>"
+    var
+      markTemplates:   seq[string]
+      reportTemplates: seq[string]
 
-      var
-        keysToReport: seq[string]
-        theProfile = chalkConfig.profiles[profile]
-        profileDoc = theProfile.doc.getOrElse("No description available.")
-        maxKeyLen  = 0
-        numCols    = 1
-        tw         = terminalWidth()
+    if "all" in args:
+      for k, v in chalkConfig.markTemplates:
+        markTemplates.add(k)
+      for k, v in chalkConfig.reportTemplates:
+        reportTemplates.add(k)
+    else:
+      for item in args:
+        if item notin chalkConfig.markTemplates and
+           item notin chalkConfig.reportTemplates:
+          result &= stylize("<h3>No template found named: " & item & "<h3>")
+        else:
+          if item in chalkConfig.markTemplates:
+            markTemplates.add(item)
+          if item in chalkConfig.reportTemplates:
+            reportTemplates.add(item)
 
-      result &= profileDoc
+    if len(markTemplates) + len(reportTemplates) == 0:
+      result &= stylize("<h1>No matching templates found.</h1>")
+      return
 
-      if theProfile.enabled != true:
-        result &= "<h3>Warning: Profile is disabled and must be enabled " &
-          "before using</h3>"
+    for markTmplName in markTemplates:
+      let theTemplate = chalkConfig.markTemplates[markTmplName]
 
-      for k, v in theProfile.keys:
-        if v.report == true:
-          keysToReport.add(k)
-          if len(k) > maxKeyLen:
-            maxKeyLen = len(k)
+      result &= stylize("<h2>Mark Template: " & markTmplName & "</h2>")
+      result &= state.formatOneTemplate(theTemplate)
 
-      if len(keysToReport) == 0:
-        result &= "<h2>This profile is empty, and will only report default " &
-          "values </h2>"
+    for repTmplName in reportTemplates:
+      let theTemplate = chalkConfig.reportTemplates[repTmplName]
 
-      else:
-        result &= "<h2>Keys this profile reports (beyond any required "&
-          "defaults): </h2>"
-        if tw > maxKeyLen:
-          numCols = tw div (maxKeyLen + 1)
+      result &= stylize("<h2>Report Template: " & repTmplName & "</h2>")
+      result &= state.formatOneTemplate(theTemplate)
 
-        result &= "<table><tbody><tr>"
+proc fullTextSearch(state: ConfigState, args: seq[string]): string =
+  result &= "<h1>Searching documentation for term"
 
-        for i in 0 ..< len(keysToReport):
-          result &= "<td>" & keysToReport[i] & "</td>"
-          if (i + 1) mod numCols == 0:
-            result &= "</tr>"
-            if (i + 1) != len(keysToReport):
-              result &= "<tr>"
+  if len(args) == 1:
+    result &= ": " & args[0] & "</h1>"
 
-        result &= "</tr></tbody></table><p><p>"
+  else:
+    result &= "s: " & args.join(", ") & "</h1>"
 
+  result &= state.searchCommandDescriptions(args)
+  result &= state.searchFlags(args)
+  result &= state.searchConfigVars(args)
+  result &= state.searchMetadataKeys(args)
+  result &= searchEmbeddedDocs(args)
   result = result.stylize()
+
+  # TODO:
+  # - Search sinks.
+  # - Search sink configs.
+  # - Search templates.
+  # - Search developer docs.
 
 proc getOutputHelp(state: ConfigState, kind = CDocConsole): string =
   let
-    (profshort, proflong) = state.getSectionDocs("profile", kind)
-    (sconfsh, sconflong)  = state.getSectionDocs("sink_config", kind)
-    (custshort, custlong) = state.getSectionDocs("custom_report", kind)
+    (_, mtlong)     = state.getSectionDocs("mark_template", kind)
+    (_, rtlong)     = state.getSectionDocs("report_template", kind)
+    (_, oclong)     = state.getSectionDocs("outconf", kind)
+    (_, sconflong)  = state.getSectionDocs("sink_config", kind)
+    (_, custlong) = state.getSectionDocs("custom_report", kind)
 
-  result  = proflong
+  result  = mtlong
+  result &= rtlong
+  result &= oclong
   result &= sconflong
   result &= custlong
 
   result &= state.getSinkHelp(kind)
-
-  result = result.docFormat(kind)
 
 proc runChalkHelp*(cmdName = "help") {.noreturn.} =
   var
@@ -458,18 +452,15 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
     con4mRuntime = getChalkRuntime()
 
   if cmdName != "help":
-    if cmdName == "profile":
-      toOut &= con4mRuntime.getProfileHelp(args)
-    else:
-      toOut = con4mRuntime.getCommandDocs(cmdName)
+    toOut = con4mRuntime.getCommandDocs(cmdName)
   elif len(args) == 0:
     toOut = con4mRuntime.getHelpOverview()
-  elif args[0] in ["metadata", "keys"]:
+  elif args[0] in ["metadata", "keys", "key"]:
       toOut = con4mRuntime.keyHelp(args)
   elif args[0] == "search":
     toOut = con4mRuntime.fullTextSearch(args[1 .. ^1])
-  elif args[0] in ["profile", "profiles"]:
-    toOut &= con4mRuntime.getProfileHelp(args[1 .. ^1])
+  elif args[0] in ["template", "templates"]:
+    toOut &= con4mRuntime.getTemplateHelp(args[1 .. ^1])
   else:
     for arg in args:
       case arg
@@ -477,8 +468,8 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
         toOut &= con4mRuntime.getOutputHelp()
       of "plugins":
         toOut &= con4mRuntime.getPluginHelp()
-      of "insert", "delete", "env", "dump", "load", "defaults",
-         "version", "docker", "profile", "exec":
+      of "insert", "delete", "env", "dump", "load", "config",
+         "version", "docker", "exec":
         toOut &= con4mRuntime.getCommandDocs(arg)
       of "extract":
         toOut &= con4mRuntime.getCommandDocs("extract")
@@ -491,7 +482,7 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
         toOut &= con4mRuntime.getCommandDocs("setup.load")
       of "commands":
         toOut &= con4mRuntime.getCommandDocs("")
-      of "config", "configs":
+      of "configuration", "configurations", "conffile", "configs", "conf":
         for section in allConfigVarSections:
           toOut &= con4mRuntime.getConfigOptionDocs(section)
       of "topics":
@@ -521,6 +512,117 @@ const
   outconf  = docDir.joinPath("output-config.md")
   keyinfo  = docDir.joinPath("metadata.md")
   builtins = docDir.joinPath("builtins.md")
+
+proc filterForCodecs(inarr: seq[seq[string]]): seq[seq[string]] =
+  for row in inarr:
+    if row[2] == "true":
+      result.add(@[row[0], row[1], row[3], row[4], row[5]])
+
+proc filterForPlugins(inarr: seq[seq[string]]): seq[seq[string]] =
+  for row in inarr:
+    if row[2] == "false":
+      result.add(@[row[0], row[1], row[3], row[4], row[5]])
+
+proc paramFmt(t: StringTable): string =
+  var parts: seq[string] = @[]
+
+  for key, val in t:
+    if key == "secret": parts.add(key & " : " & "(redacted)")
+    else:               parts.add(key & " : " & val)
+
+  return parts.join(", ")
+
+proc filterFmt(flist: seq[MsgFilter]): string =
+  var parts: seq[string] = @[]
+
+  for filter in flist: parts.add(filter.getFilterName().get())
+
+  return parts.join(", ")
+
+proc buildSinkConfigData(): seq[seq[string]] =
+  var
+    sinkConfigs = getSinkConfigs()
+    subLists:     Table[SinkConfig, seq[string]]
+
+  for topic, obj in allTopics:
+    let subscribers = obj.getSubscribers()
+
+    for config in subscribers:
+      if config notin subLists: subLists[config] = @[topic]
+      else:                     subLists[config].add(topic)
+
+  for key, config in sinkConfigs:
+    if config notin sublists:
+      sublists[config] = @[]
+    result.add(@[key, config.mySink.getName(), paramFmt(config.params),
+                   filterFmt(config.filters), sublists[config].join(", ")])
+
+proc getConfigValues(): string =
+
+  var
+    configTables: OrderedTable[string, seq[seq[string]]]
+  let
+    state         = getChalkRuntime()
+    cols          = [CcVarName, CcShort, CcCurValue]
+    outConfFields = ["report_template", "mark_template"]
+    cReportFields = ["enabled", "report_template", "use_when"]
+    sinkCfgFields = ["sink", "filters"]
+    plugFields    = ["enabled", "codec", "priority", "ignore", "overrides"]
+    confHdrs      = ["Config Variable", "Description", "Current Value"]
+    plugHdrs      = ["Name", "Enabled", "Priority", "Ignore", "Overrides"]
+    outConHdrs    = ["Operation", "Reporting Template", "Chalk Mark Template"]
+    custRepHdrs   = ["Name", "Enabled", "Template", "Operations where applied"]
+    sinkHdrs      = ["Config Name", "Sink", "Parameters", "filters", "Topics"]
+
+    fn            = getValuesForAllObjects
+    outConfData   = fn(state, "outconf",       outConfFields, asLit = false)
+    custRepData   = fn(state, "custom_report", cReportFields, asLit = false)
+    allPluginData = fn(state, "plugin",        plugFields,    asLit = false)
+    sinkCfgData   = buildSinkConfigData()
+    codecData     = filterForCodecs(allPluginData)
+    pluginData    = filterForPlugins(allPluginData)
+    (coRows, coHdr) = codecData.filterEmptyColumns(plugHdrs)
+    (piRows, piHdr) = pluginData.filterEmptyColumns(plugHdrs)
+
+  for item in allConfigVarSections:
+    configTables[item] = state.getMatchingConfigOptions(item, cols = cols,
+                                                        sectionPath = item)
+  for k, v in configTables:
+    if len(v) == 0 or len(v[0]) == 0:
+      continue
+
+    if k == "":
+      result &= "<h1>Global configuration variables</h1>"
+    else:
+      result &= "<h1>Config variables in the '" & k & "' section</h1>"
+
+    result &= v.formatCellsAsHtmlTable(confHdrs)
+
+  result &= "<h1>Metadata template configuration</h1>"
+  result &= outConfData.formatCellsAsHtmlTable(outConHdrs)
+
+  result &= "<h1>Additional reports configured</h1>"
+  result &= custRepData.formatCellsAsHtmlTable(custRepHdrs)
+
+  result &= "<h1>I/O configuration</h1>"
+  result &= sinkCfgData.formatCellsAsHtmlTable(sinkHdrs)
+
+  result &= "<h1>Codecs</h1>"
+  result &= coRows.formatCellsAsHtmlTable(coHdr)
+
+  result &= "<h1>Additional Data Collectors</h1>"
+  result &= piRows.formatCellsAsHtmlTable(piHdr)
+
+proc showConfigValues*(force = false) =
+  once:
+    if not (chalkConfig.getShowConfig() or force): return
+
+    let toOut = getConfigValues().stylize()
+
+    if chalkConfig.getUsePager():
+      runPager(toOut)
+    else:
+      echo toOut
 
 proc runChalkDocGen*() =
   var

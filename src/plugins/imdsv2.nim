@@ -89,7 +89,6 @@ template getTags(keyname: string, url: string) =
     if resultOpt.isSome():
       let
         value = resultOpt.get()
-        lines = value.split("\n")
         tags  = ChalkDict()
       # tag reponse is a newline-delimited list of tags
       # which are set on the instance
@@ -141,13 +140,12 @@ proc imdsv2GetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     if tokenOpt.isNone():
       trace("IMDSv2 token not available.")
       return
-    let token = tokenOpt.get()
   except:
     trace("IMDSv2 metadata not available.")
     return
 
   let
-    token    = tokenOpt.get()
+    token = tokenOpt.get()
 
   # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-categories.html
   # dynamic entries

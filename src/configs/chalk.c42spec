@@ -11,9 +11,9 @@
 default_key_priority := 4611686018427387904  # 2^62.
 
 # These are the valid command-line commands.
-valid_chalk_cmds     := ["help", "insert", "extract", "delete", "defaults",
+valid_chalk_cmds     := ["help", "insert", "extract", "delete", "config",
                          "load", "dump", "docker", "version", "env", "exec",
-                         "profile", "setup", "docgen"]
+                         "setup", "docgen"]
 
 all_cmds_that_insert := ["insert", "build", "load", "setup"]
 
@@ -66,11 +66,12 @@ enum ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
 
 enum CCPreRun, CCArtifact, CCPostChalk, CCPostRun
 
-# PT == Profile Type.
-enum PTChalk, PTArtifact, PTHost, PTChalkTimeArtifact
+# Make these available through future configuration stacks.  Enums are
+# automatically avalable.
+#
+# At some point, I'm going to change this in con4m to automatically
+# export.
 
-# Make these available through stacks.  Enums are automatically
-# avalable through stacks.
 export default_key_priority, valid_chalk_cmds, all_cmds_that_insert
 export known_sink_filters, other_report_ops
 
@@ -81,20 +82,26 @@ object key {
   gen_typename:  "KeyConfig"
   gen_setters:   false
   doc:           """
-Specifies profile-specific properties for specific metadata keys. Currently, there is only a `report` field.
 
-See the Chalk Config File guide, or on the command line, `chalk help keyspec` for an overview of how keys are specified, `chalk help keys` for lists of metadata keys, or `chalk help key KEYNAME` for all information on a single key.
+These objects are used in reporting templates and chalking templates
+to help determine what to produce. The two fields in this object are:
+
+- `use`, which controls whether a report or a chalk mark will contain
+the metadata (if it can be found); and
+
+- `order`, which, sets the order in which items are output.
+
+See the Chalk Config File guide, or on the command line `chalk help
+keys` for lists of metadata keys, or `chalk help key KEYNAME` for all
+information on a single key (this actually searches the table for all
+instances of the string in the table).
 """
 
-  field report {
+  field use {
     type:     bool
     default:  true
     doc: """
-Whether to include the specific key when the profile reports.
-
-Note that, when you explicitly enable keys in a profile, any reporting
-context using the profile must be valid for the keys set to 'report',
-or else you will get an error.
+Whether to include the specific key when the template is applied.
 """
   }
 
@@ -102,192 +109,139 @@ or else you will get an error.
     type:     int
     require:  false
     doc:      """
-Used to set the reporting order. If not provided, this will inherit
+Used to set the output order. If not provided, this will inherit
 the normalization order from the associated keyspec.
 """
   }
 }
 
-object profile {
+object mark_template {
   user_def_ok:   false
-  gen_fieldname: "profiles"
-  gen_typename:  "Profile"
+  gen_fieldname: "markTemplates"
+  gen_typename:  "MarkTemplate"
   gen_setters:   false
   doc: """
-You can configure what gets metadata gets written into Chalk marks,
-and you can configure what metadata goes into reports.
 
-Chalk _profiles_ specify what keys should be added to a chalk mark, or
-should be output in a report.
+# Chalk Mark Templates
 
-Chalk profiles are consulted when producing reports or chalking. But
-having a key set in a profile does not guarantee that the metadata key
-will appear in the output.
+Chalk decides what metadata keys should be added to a chalk mark based
+on what keys are listed in the active `mark_template`. You can
+configure a mark template for any command that creates chalk marks,
+currently:
 
-> :exclaim: Chalk **does not** add keys to a chalk mark or to a report if the
-  data in question cannot be collected. Many keys have circumstances
-  where they will not be available.
+- `chalk insert` (the *insert* operation)
+- `chalk docker build` (the *build* operation)
+- `chalk setup` (the *setup* operation)
+- `chalk load` (the *load* operation)
 
-Output reports and chalk marks are always output as Json objects. 
+Just because a key is added in a mark template doesn't mean that the
+mark will contain the key; the requested metadata needs to be
+available at Chalk time. If it doesn't exist, Chalk omits the data
+instead of adding empty value to the output.
 
-## Available Profiles
+Chalk marks are always output as JSON objects. The following keys are
+required to be in a Chalk mark and will always be added, even if not
+listed in the active `mark_template` (or even if turned off in the
+template):
 
-There are a number of available profiles out of the box (see `chalk
-help profiles`). You can attach these profiles to individual chalk
-reports, like the `insert` report that is produced on `chalk insert`,
-or the `build` report that is produced on `chalk docker build`.
+- `MAGIC`
+- `CHALK_ID`
+- `CHALK_VERSION`
+- `METADATA_ID`
 
-Most chalk commands produce at least one report, and can produce more
-than one, depending on the configuration.
+## Existing Chalk Mark Templates
 
-You can specify which profiles are in use for a given report by
-changing the profile name in the report's `outconf` section, as
-discussed below.
+Chalk ships with several templates you can use for your chalk marks,
+depending on what information you want to keep around in your
+artifacts.
 
-You can also use profiles to produce additional reports, through a
-`custom_report`. also discussed below.
+You can list available templates and see what keys they set by running
+`chalk help templates`.
 
-## Editing Profiles
+If you wish to switch out the template that is being used for a
+particular chalking operation, you need to reconfigure the operation,
+which is done by setting the `mark_template` field in the operation's
+`outconf` seciton, as shown below.
 
-We are working on a TUI to abstract away any configuration of
-profiles. However, until that is available, you might wish to change
-what metadata keys a profile causes to be output.
+If you don't like any of the existing templates, you can easily edit
+the ones provided, or create your own.
 
-You can do that in two ways:
+## Editing Chalk Mark Templates
 
-1. Changing a built-in profile.
-2. Creating a new profile.
+Let's say you're using the default chalk mark template for insertion,
+but you have enabled SBOMs and you don't like they're not written into
+chalk marks!
 
-In the configuration file, profiles are mainly a collection of key
-objects, where only one field is currently used, which controls
-whether a profile will cause a metadata key to be used.  We call that
-field, perhaps obviously, `use`.
+The default `mark_template` object for insertion is called
+`mark_default`. For each key you want the template to use, you add a
+`key` object in it, with the name of the key, and set it's `use` field
+to `true`.
 
-Let's say we'd like to remove the `CHALK_PTR` key from the profile
-named `chalk_minimal`, so that this field does NOT show up in chalk
-marks.
+Let's say that you also HATE that we write the `ARTIFACT_TYPE` in by
+default, because, hey, that's redundant! You just have to set the
+appropriate field to `false`.
 
-We can do so by adding the following to our configuration file:
+The following configuration will do it!
 
 ```
-profile chalk_minimal {
-  key CHALK_PTR {
+mark_template mark_default {
+  key SBOM {
+    use: true
+  }
+
+  key ARTIFACT_TYPE {
     use: false
   }
 }
 ```
 
-In Chalk config files, the above does NOT blow away the whole
-profile. If the profile already exists (which it does), Chalk just
-modifies the one value. If you prefer, you can get exactly the same
-results with object dot notation:
+In the Chalk config file, the above syntax doesn't overwrite the
+entire existing template.  The above syntax is 100% equal to:
 
 ```
-profile.chalk_minimal.key.CHALK_PTR.use: false
+mark_template.mark_default.key.SBOM.use          = true
+mark_template.mark_default.key.ARTIFACT_TYPE.use = false
 ```
 
-> :exclaim: The Chalk config file treats dot assignments and sections the
-  same.  The two notations are 100% interchangable.
+> ❗ The Chalk config file treats dot assignments and sections the
+  same.  The two notations are 100% interchangable. And, the colon and
+  the equals sign are the same thing.
 
-Creating new profiles works the same way. For example, if we wanted to
-create a new 'minimal' profile for adding chalk marks from the ground up,
-we could do:
+
+Similarly, you can go for a combination of the two styles:
 
 ```
-profile my_minimal_chalk_profile {
-  key.DATETIME_WHEN_CHALKED.use = true
+mark_template mark_default {
+  key.SBOM.use         = true
+  key.ARTIFACT_TYPE.use: false
 }
 ```
+> ⚠️ Mark templates only accept metadata keys available at
+  'chalk time'. Such keys are distinguished from 'run time' keys by
+  their first character. Run-time keys always start with an
+  underscore, whereas chalk-time keys do not.
 
-Note that, when actually adding chalk marks, there are a few required
-fields (incluing `MAGIC`, `CHALK_ID` and `METADATA_ID`), that you do
-not have to specify. Even if you try to turn them off, they will still
-be added to a chalk mark.
+## Creating New Chalk Mark Templates
 
-Therefore, the above profile is one more key then we even need to
-have.
+You can use the exact same syntax as above to define new
+templates. Any key you do not explicitly specify to use will NOT be
+used, unless it's required in chalk marks.
 
-To use the above profile, we'd just have to tell the system when to
-use this profile.
+> ❗ There are a few required fields (incluing `MAGIC`, `CHALK_ID` and
+  `METADATA_ID`), that you do not have to specify. Even if you try to
+  turn them off, they will still be added to a chalk mark.
 
-For example, if we want it to be used for chalk marks when performing
-chalk mark insertions via `chalk insert` or `chalk docker`, we do that
-by setting the appropriate output configurations:
-
-
-```
-outconf insert {
-  chalk: "my_minimal_chalk_profile"
-}
-
-outconf build {
-  chalk: "my_minimal_chalk_profile"
-}
-```
-
-If you'd instead like to control what keys get added to the report
-that gets sent on an `insert` or `build` operation, you can set the
-outconf `report` field instead:
-
-```
-outconf insert {
-  report: "my_custom_reporting_profile"
-}
-```
-
-If you'd like to add an additional report, or modify an existing
-additional report, then you will jusr need to set the appropriate
-`report` field in the `custom_report` object (see below).
-
-### Understanding the rules for profiles
-
-- Chalk profiles can only contain keys that are available at
-  chalk-time, which are always ones that DO NOT have a leading
-  underscore.
-
-- Report profiles can contain any keys you might wish to report on.
-
-- When you set a key in a reporting profile during an operation that
-  inserts a chalk mark, the report will contain that key if it's
-  available, WHETHER OR NOT the key was actually added to the chalk
-  mark.
-
-- For all other operations, when a chalk-time key (ones that lack the
-  leading underscore) is in a reporting profile, Chalk will try to
-  EXTRACT that key from any artifacts it reports on. The value in the
-  report will be from the value set in the artifact at chalk time.
-
-- Keys with leading underscores are called **run-time keys**; they
-  report metadata as discovered at the time of the current operation.
-  This kind of key never goes in a chalk mark.
-
-- While no keys are required in a report profile, many of them are
-  highly recommended. For instance, `_OPERATION` is important for
-  showing what type of operation is being performed.
-
-- If you specify reporting on any metadata keys that are specific to
-  an artifact (instead of host-level keys), then the `_CHALKS` key
-  will appear in your output, even if you didn't ask for it.
+Once you have added a new mark template to your configuration, all you
+have to do to apply it is add your new report name into the
+appropriate `outconf` field, as discussed below.
 
 """
-
-  field enabled {
-    type:    bool
-    default: true
-    doc: """
-Reporting profiles can be explicitly *disabled* by setting this field, in which case the report will not be used, even if it's been configured as the primary report for the current command (via the command's `outspec` configuration).
-
-This is intended to make it easy to create supplementary reports that are always defined in your configuration, but only get used if certain conditions are met. For instance, if you only want a secondary report to run on insertions (perhaps one providing high-level metrics), you can just add an `if` statement to enable the report when the chalk subcommand is the one you want to report on.
-
-> :exclaim: If the chalk report is disabled during any marking operation (currently `insert` and the docker `build`), then chalk will not run.
-"""
-  }
 
   field shortdoc {
     type:     string
     require:  false
     doc: """
-A short description of the profile.
+A short description of the template, shown when running `chalk templates`.
 """
   }
 
@@ -295,19 +249,71 @@ A short description of the profile.
     type:     string
     require:  false
     doc: """
-This field will be shown when the running command `chalk profile [your_report_name]` (which also shows the current keys that are configured for that reporting profile).
+This field will be shown when showing the full template in help documentation.
 """
   }
 
   allow key {}
-  # This doc string is shown w/ help profile props
+}
+
+object report_template {
+  user_def_ok:   false
+  gen_fieldname: "reportTemplates"
+  gen_typename:  "ReportTemplate"
+  gen_setters:   false
   doc: """
-Each profile can have a number of "key" objects, the name of which should be a key.
 
-The sole variable in a "key" object is "report", which is a boolean, indicating whether this profile should report on that key.
+# Report Templates
 
-See 'chalk help keys' for more on individual keys.
+Report templates specify what metadata gets added into reports. You
+can use them for configuring what the primary report for any operation
+will try to report. Similarly, you can use them to create custom
+reports.
+
+In many ways, report templates are similar to Chalk mark
+templates. There are out-of-the-box templates that are also seen via
+`chalk help templates`. You can edit them or replace them in the same
+way.
+
+The major difference is that report templates can contain ANY key,
+whereas mark templates are limited to what's available at chalk
+time. For an operation that inserts chalk marks, the data collection
+for reporting is done after chalk marks are written, so keys only
+available once an artifact is processed become available in the
+report.
+
+Similarly, when reporting in production environments with the `chalk
+exec` command or the `chalk extract` command, you can report on any
+available operational metadata from any one run of Chalk.
+
+> ⚠️ When report templates are applied, chalk-keys are handled
+  differently, depending on the operation. For insertion operations,
+  they report what *would have been chalked* (there is no requirement
+  for your report to bubble up the fields actually chalked).  Other
+  operations report these keys only if they're extracted from
+  artifacts.
+  
+To use the above template, we'd just have to tell the system when to
+use this template, as described below.
 """
+
+  field shortdoc {
+    type:     string
+    require:  false
+    doc: """
+A short description of the template.
+"""
+  }
+
+  field doc {
+    type:     string
+    require:  false
+    doc: """
+This field will be shown when the running command `chalk template [your_report_name]` (which also shows the current keys that are configured for that reporting template).
+"""
+  }
+
+  allow key {}
 }
 
 object tool {
@@ -335,11 +341,16 @@ You can run multiple tools of the same kind. Each tool metadata key
 returns a key-value pair, the keys representing tools as named in the
 configuration file, and the value being the output in string format:
 
-- SBOMs are expected be returned in CycloneDX format. The appropriate  metadata key these will be reported through, is `SBOM`.
+- SBOMs are expected be returned in CycloneDX format. The appropriate
+  metadata key these will be reported through, is `SBOM`.
 - SAST output is expected to be returned in the SARIF format.
 
-Note that chalk itself is not currently validating the format, but the tools that ship with chalk (see `chalk defaults tools`) currently respect it (with appropriate escaping to marshal them into a JSON string).
+Note that chalk itself is not currently validating the format, but the
+tools that ship with chalk (see `chalk config`) currently respect it
+(with appropriate escaping to marshal them into a JSON string).
+
 """
+
    field enabled {
      type:     bool
      default:  true
@@ -374,7 +385,10 @@ Prioritizes the order tools get called in. Lower numbers are higher priorities.
      type:     bool
      default:  false
      doc:      """
-Use this if you only want to run one tool, but want to try a number of tools until one is found. Specifically, If a tool sets this and runs successfully, no tool of the same kind that has a lower priority will run at all.
+Use this if you only want to run one tool, but want to try a number of
+tools until one is found. Specifically, If a tool sets this and runs
+successfully, no tool of the same kind that has a lower priority will
+run at all.
 """
    }
 
@@ -478,13 +492,25 @@ expected to be artifact-specific.  They're collected after any
 artifacts are processed.
 </tr>
 
-For clarity as to what is chalkable, all keys that are NOT chalk-time keys start with a leading _. No chalk-time keys may start with _.
+For clarity as to what is chalkable, all keys that are NOT chalk-time
+keys start with a leading _. No chalk-time keys may start with _.
 
-Chalk defines many metadata keys, but you may also define your own, by adding your own keyspec sections, as long as they start with either `X-` (for keys that can appear in a chalk mark), or `_X-` (for keys that are unchalkable metadata, often per-run keys).
+Chalk defines many metadata keys, but you may also define your own, by
+adding your own keyspec sections, as long as they start with either
+`X-` (for keys that can appear in a chalk mark), or `_X-` (for keys
+that are unchalkable metadata, often per-run keys).
 
-Some fields in keyspecs will be overridable; for instance, you can set default values or change output order priorities for many keys. However, there will be some keys where the implementation must be handled by the system to be conformant, or where there are technical considerations the output should mirror (for instance, the SIGNATURE should really go after everything being signed).
+Some fields in keyspecs will be overridable; for instance, you can set
+default values or change output order priorities for many
+keys. However, there will be some keys where the implementation must
+be handled by the system to be conformant, or where there are
+technical considerations the output should mirror (for instance, the
+SIGNATURE should really go after everything being signed).
 
-Generally, when reviewing specific keyspecs at the command line with `chalk help key KEY_NAME`, when they have fields with `write_lock` set, those fields will not be overwritable.
+Generally, when reviewing specific keyspecs at the command line with
+`chalk help key KEY_NAME`, when they have fields with `write_lock`
+set, those fields will not be overwritable.
+
 """
 
   field required_in_chalk_mark {
@@ -823,9 +849,12 @@ object sink_config {
   doc: """
 ## Configuring Output Destinations
 
-Virtually all output in Chalk is handled through a 'pub-sub' (publish-subscribe) model. Chalk "publishes" data to "topics".  To listen to a topic:
+Virtually all output in Chalk is handled through a 'pub-sub'
+(publish-subscribe) model. Chalk "publishes" data to "topics".  To
+listen to a topic:
 
-1. Create a `sink_config`, which basically configures a specific output option, like a HTTP POST endpoint, an S3 bucket, or a log file.
+1. Create a `sink_config`, which basically configures a specific
+   output option, like a HTTP POST endpoint, an S3 bucket, or a log file.
 2. Subscribe that configuration to the topic.
 3. Optionally, unsubscribe any default configuration you'd like to remove.
 
@@ -837,7 +866,8 @@ Custom reports get their own topic, and when you create a custom
 report (see below), you will specify any `sink_config` objects to
 auto-subscribe to the report.
 
-> :exclaim: All other pub-topics should be considered internal; re-configure with care.
+> ❗ All other pub-topics should be considered internal; re-configure
+  with care.
 
 The documentation for each sink type will indicate what fields can be and/or need to be provided in the `sink_config`.
 
@@ -849,7 +879,11 @@ To remove it, simply add to your configuration:
 
 `unsubscribe("report", "default_out")`
 
-> :smiley: You can have multiple sinks configured simultaneously to send the report to multiple places (and the default configuration can do that via the above environment variables). If you want to send a different set of data, use a custom report instead.
+> ☺ You can have multiple sinks configured simultaneously to send the
+  report to multiple places (and the default configuration can do that
+  via the above environment variables). If you want to send a
+  different set of data, use a custom report instead.
+
 """
 
   field enabled {
@@ -900,17 +934,40 @@ object outconf {
   gen_setters:   false
   user_def_ok:   false
   doc:           """
+
+## Changing reports for operations
   
-Each chalk command that reports metadata will have one or more
+Each chalk operation that reports metadata will have one or more
 associated `outconf` sections in the configuration. These sections do
 only two things:
 
-1. Specify what profile to use when deciding which keys to report on,
-   in the default reporting for that command.
+1. Specify which Chalk mark template to use for insertion (if the
+   operation does insertion).
 
-2. If the report in question is associated with a chalk insertion
-operation (`insert`, `build`, `load` and `setup`), then the section
-will specify a profile used to select keys to go into the chalk mark.
+2. Specify what template to use when deciding which keys to report on
+for a given operation (for the default operation report)
+
+> ❗ Chalk marks are only inserted as part of the following operations:
+  `insert`, `build`, `load` and `setup`
+
+For specifying a chalk mark template, set the `outconf` section's
+`mark_template` field to the name of the mark template you defined (it
+must be a `mark_template` object). For specifying a report, just set
+the `report_template` field.
+
+As a simple example, to install a new report that completely redoes
+the output when running `chalk exec`, if you've added a template for
+this called `my_exec` you can install it with:
+
+```
+outconf exec {
+  report_template: "my_exec"
+}
+```
+
+That's it.
+
+## More `outconf` detail
 
 There isn't a one-to-one mapping between commands and reports, because
 a few commands can produce multiple reports
@@ -931,82 +988,38 @@ The report name is always specified in the `_OPERATION` metadata
 key. The `outconf` section requires the **report name**, not the
 command that causes the report to run.
  
-Out of the box, Chalk defines default profiles that you can edit. If
-you edit the profile(s) already in use by an outconf section, you
+Out of the box, Chalk defines default templates that you can edit. If
+you edit the template(s) already in use by an outconf section, you
 don't need to do anything else. However, if you wish to switch to a
-different profile, or to create your own profile, you will need to
-change the appropriate `outconf` section to point to the new profile.
+different template, or to create your own template, you will need to
+change the appropriate `outconf` section to point to the new template.
 
-For examples, see `chalk help profiles`
 """
 
-  field chalk {
+  field mark_template {
     type:      string
     default:   ""
-    validator: func outconf_chalk_check
+    validator: func outconf_mark_template_check
     doc:       """
-This profile is only allowed for commands that create chalk objects, and
-governs what will be put into the chalk mark.
+This field is only allowed for commands that create chalk objects,
+and governs what will be put into the chalk mark. The template named in
+this field must consist only of chalk-time keys. That is, no keys with
+underscores are allowed!
 """
   }
 
-  field artifact_report {
+  field report_template {
     type:      string
     default:   ""
-    validator: func outconf_artifact_check
+    validator: func outconf_report_template_check
     doc:       """
-The named profile is used for when reporting on per-artifact any
+The named template is used for when reporting on per-artifact any
 information, so works with any command. If both this field and the
-'invalid_chalk_report' field are defined, then this profile gets used
+'invalid_chalk_report' field are defined, then this template gets used
 when the extracted chalk mark fully validates.  That DOES generally
 require you to be using signatures, though at some point we may
 optionally allow validation to be considered 'successful' only if the
 integrity check passes, even if this makes marks forgable.
-"""
-  }
-
-  field invalid_chalk_report {
-    type:      string
-    default:   ""
-    validator: func outconf_invalid_chalk_check
-    hidden:    true
-    doc:       """
-The named profile is used for reporting per-artifact, any time the
-digital signature is fully validated. The general idea here is that,
-if you like, you can minimize the amount of data you send back to a
-server by only retrieving a minimal amount of data, and only send up
-full chalks when chalks do not validate.
-
-That could be useful when you've performed the chalk operation, so
-validation helps ensure you already have the rest of the information
-server-side.
-
-However, there is currently no easy mechanism for checking to see if
-you already know about this chalk mark. If it was chalked from some
-other organization, but the validation check is passed, you will still
-get this profile.
-
-As a result, our preferred method for dealing with duplicate info is
-to check the METADATA_ID server-side before insertion into any data
-store.
-
-However, if you choose to save on bandwidth, we recommend you pass
-back enough identifying information (via non-chalk per-artifact keys),
-that you can re-run chalk forcing a different profile (and ideally in
-a way you fully automate).
-"""
-  }
-
-  field host_report {
-    type:      string
-    default:   ""
-    validator: func outconf_host_check
-    doc:       """
-The named profile is used to determine which host-level metadata keys
-will be used in the report.  Note that, without this report enabling
-the `_CHALKS` key, *NO* artifact-level information will be reported,
-which generally makes managing chalk information harder, since the
-artifact will, at the point of chalk, be the sole record of the mark.
 """
   }
 
@@ -1016,7 +1029,7 @@ artifact will, at the point of chalk, be the sole record of the mark.
     hidden:   true
   }
   doc: """
-Specifies what reporting profiles to use for I/O on a per-command
+Specifies what reporting templates to use for I/O on a per-command
 basis. Only valid chalk commands are valid section names.
 """
 }
@@ -1026,12 +1039,13 @@ object custom_report {
   gen_typename:  "ReportSpec"
   gen_setters:   false
   user_def_ok:   false
+  
   doc:           """
 ## Adding additional reports
   
 A `custom_report` section allows you to create secondary reports for
 whatever purpose. For instance, in the default Chalk configuration,
-the `primary` report logs to a file, but a secondary report gives
+the *primary* report logs to a file, but a secondary report gives
 summary information on the terminal.
 
 Similarly, you could use a custom report to send summary statistics to
@@ -1059,10 +1073,10 @@ subscribers get sent the report.
 
 Custom reports require the following:
 
-1. You must set the `report` field, which must be a string naming
-valid `profile`, per above.
+1. You must set the `report_template` field, which must be a string naming
+valid `report_template`, per above.
 2. You must associate an output method, by first configuring an output
-method (done via a `sink_config` section), and then add it to the
+sink (done via a `sink_config` section), and then add it to the
 custom report's `sink_configs` field (which is a list of valid sink
 configurations to get the report)
 3. You can specify when the custom report should be run, based on what
@@ -1076,7 +1090,7 @@ generates a report as a matter of course.
 Additionally, you can set the `enabled` field to `false` if you want
 to disable it (it's true by default).
 
-> :exclaim: Sink configurations can have different requirements to set
+> ❗ Sink configurations can have different requirements to set
   up. Within Chalk, see `chalk help sinks` for more details.
 
 Putting it all together, here's a simple example of adding a custom
@@ -1084,7 +1098,7 @@ report that simply logs new `METADATA_ID`s to a log file whenever
 chalking occurs:
 
 ```
-profile mdlog_report {
+report_template mdlog_report {
   key.METADATA_ID.use = true
 }
 
@@ -1094,9 +1108,9 @@ sink_config mdlog_file {
 }
 
 custom_report mdlog {
-  report:       "mdlog_report"
-  sink_configs: ["mdlog_file"]
-  use_when:     ["insert", "build"]
+  report_template: "mdlog_report"
+  sink_configs:    ["mdlog_file"]
+  use_when:        ["insert", "build"]
 }
 ```
 
@@ -1128,6 +1142,16 @@ Custom reports never chalk; you must use the appropriate `outconf` report.
 """
   }
 
+  field report_template {
+    type:      string
+    default:   ""
+    validator: func custom_report_template_check
+    doc:       """
+The named template is used to determine which metadata keys will be
+used in any report.  The named template can contain any metadata key.
+"""
+  }
+
   field sink_configs {
     type:      list[string]
     require:   true
@@ -1135,43 +1159,6 @@ Custom reports never chalk; you must use the appropriate `outconf` report.
     doc: """
 A list of sink configurations that should be subscribed to this report.
 Basically, this controls where your report will output.
-"""
-  }
-
-  field invalid_chalk_report {
-    type:       string
-    default:    ""
-    validator:  func custom_report_artifact_check
-    doc:        """
-If provided, this is the profile used for non-validating chalks, instead of
-the profile given in artifact_report.  See the 'outconf' field
-'invalid_chalk_report' for considerations.
-"""
-  }
-
-  field artifact_report {
-    type:       string
-    default:    ""
-    validator:  func custom_report_artifact_check
-    doc:        """
-The named profile is used for when reporting on per-artifact any
-information. If both this field and the `invalid_chalk_report` field
-are defined, then this profile gets used when the extracted chalk mark
-fully validates.  That DOES generally require you to be using
-signatures, though at some point we may optionally allow validation to
-be considered `successful` only if the integrity check passes, even if
-this makes marks forgable.
-"""
-  }
-
-  field host_report {
-    type:      string
-    default:   ""
-    validator: func custom_report_host_check
-    doc:       """
-The named profile is used to determine which host-level metadata keys
-will be used in any report.  Note that, without this report enabling
-the '_CHALKS' key, *NO* artifact-level information will be reported.
 """
   }
 
@@ -1202,17 +1189,19 @@ singleton extract {
   gen_setters: false
   user_def_ok: false
   doc: """
+  
 These are configuration options specific to how container extraction
 works for containers (plenty of the global options apply to
 extraction). Currently, the only options involve how we handle looking
 for chalk marks on images, particularly since extracting large docker
 images to look for marks in the top layer isn't necessarily fast.
-<p>
+
 If you have code signing set up, marks will be added locally on build,
 but when you push, we will add a signed attestation using the In Toto
 standard (and the Cosign tool for the moment).  Such marks are MUCH
 faster to accss reliably. and are the preferred method. See the `chalk
 setup` command.
+
 """
 
   field ignore_unsigned_images {
@@ -1344,16 +1333,16 @@ your own organization here.
 """
   }
 
-  field label_profile {
+  field label_template {
     type:    string
     default: "chalk_labels"
-    validator: func label_profile_check
-    shortdoc: "Auto-added label profile"
+    validator: func label_template_check
+    shortdoc: "Auto-added label template"
     doc: """
-This profile guides what labels will be automatically added to docker
-images when we successfully chalk them. The only allowed keys are
-Chalk-time keys. And, if the metadata is not available, then no key
-will be added.
+The named `mark_template` guides what labels will be automatically
+added to docker images when we successfully chalk them. The only
+allowed keys are Chalk-time keys. And, if the metadata is not
+available, then no key will be added.
 
 For instance, the `HASH` key cannot currently appear in docker chalks,
 because it is not available for chalk-time, so will not appear as
@@ -1600,6 +1589,7 @@ singleton env_config {
   gen_setters:   false
   user_def_ok:   false
   doc: """
+  
 This section is for internal configuration information gathering
 runtime environment information when running with the 'env' command,
 which is similar to the exec command, but where the exec command
@@ -1609,6 +1599,7 @@ interested.
 
 Eventually it (and the exec command) will allow you to specify process
 patterns to explicitly report on as well.
+
 """
 
   field process_report_patterns {
@@ -1797,8 +1788,7 @@ since it's the thing we're likely to see in a shebang line.
     type: dict[string, string]
     shortdoc: "File extensions to runtime binary"
     doc: "Maps file extensions to the binary names for lang runtimes"
-    hidden: true
-    # Hidden for the moment because it's somehow triggering a rope bug.
+
     default: {
       "sh"              : "sh",
       "csh"             : "csh",
@@ -1916,6 +1906,9 @@ since it's the thing we're likely to see in a shebang line.
       "nawk"            : "nawk"
     }
     doc: """
+Maps file extensions to the binary names for lang runtimes. We use
+this for more reliable language detection, which is why we go with
+pretty weird language names.
 """
   }
 }
@@ -1981,22 +1974,24 @@ root {
   gen_setters:  false
   user_def_ok:  false
 
-  allow keyspec       { }
-  allow plugin        { }
-  allow sink          { }
-  allow sink_config   { }
-  allow profile       { }
-  allow outconf       { }
-  allow custom_report { }
-  allow tool          { }
-  allow extract       { }
-  allow docker        { }
-  allow exec          { }
-  allow env_config    { }
-  allow source_marks  { }
-  allow aws           { }
+  allow keyspec         { }
+  allow plugin          { }
+  allow sink            { }
+  allow sink_config     { }
+  allow mark_template   { }
+  allow report_template { }
+  allow outconf         { }
+  allow custom_report   { }
+  allow tool            { }
+  allow extract         { }
+  allow docker          { }
+  allow exec            { }
+  allow env_config      { }
+  allow source_marks    { }
+  allow aws             { }
 
   shortdoc: "Chalk Configuration Options"
+  
   doc: """
   This guide details all of the configuration options available in Chalk. These are all configurable variables that you can add in your configuration file. In some cases, there will also be other ways to set these values:
 
@@ -2266,8 +2261,8 @@ when chalking. If it's false, Chalk will still try to sign when
 chalking containers, as otherwise it's not practical to determine when
 containers have been modified since chalking.
 
-Even if this is false, Chalk will try to sign if either the chalk
-profile or the artifact reporting profile have SIGNATURE set.
+Even if this is false, Chalk will try to sign if either the chalking
+template or the reporting template have SIGNATURE set.
 """
   }
 
@@ -2286,8 +2281,9 @@ its environment, this will cause an info-level message to be logged.
     default:  false
     shortdoc: "Use transparency logging"
     doc: """
-When this is true, digital signings will get published to a transparency log, and extracts from container images will attempt to validate in the transparency log.
-
+When this is true, digital signings will get published to a
+transparency log, and extracts from container images will attempt to
+validate in the transparency log.
 """
   }
 
@@ -2465,16 +2461,16 @@ When this is true, docker builds will chalk items in any local context directori
 """
   }
 
-  field publish_defaults {
+  field show_config {
     type:       bool
     default:    false
     write_lock: true
-    shortdoc:   "Publish Defaults"
+    shortdoc:   "Display current configuration"
     doc:        """
-When set to true, configuration information will be published to the
-"defaults" topic, which, by default, will print to stderr.
+When set to true,configuration information will be output after Chalk
+otherwise has finished running.
 
-This is similar to the 'chalk defaults' command, except that it causes
+This is similar to the 'chalk config' command, except that it causes
 the same type of information to be added at the end of *any*
 operation.
 
@@ -2492,17 +2488,6 @@ specific sets of command-line arguments.
     doc:        "Internal; used to map key type enum values back to text, and I think isn't even used anymore."
   }
 
-  field defaults_disclaimer {
-    type:       string
-    hidden:     true
-    doc:        "Externalize disclaimer string."
-    write_lock: true
-    default:  """
-Note that these values can change based on logic in the config file.  You can cause the current configuration to be published to the 'defaults' topic on any run by setting 'publish_defaults' in the con4m configuration or passing '--publish-defaults' on the command line.
-
-Note that '--no-publish-defaults' at the command line will block this feature, even if the configuration file asks for it to be used. Running the 'defaults' command always publishes, though.
-"""
-  }
   field use_report_cache {
     type:       bool
     default:    true
@@ -2648,35 +2633,37 @@ Show the (admittedly verbose) warning you get when running 'chalk load'.
 """
   }
 
-  field keys_that_can_lift {
-    type:    list[string]
-    default: ["SBOM", "SAST"]
-    validator: func liftable_key_check
-    shortdoc: "Specify which chalk keys *can* be lifted."
-    doc: """
-Normally, at chalk time, chalkable artifact keys can only appear in
-the artifact report, even if it's the same info across all artifacts
-being chalked at once. You will get an error if trying to add them to
-the host report.
+# Leaving this; I might add it back in someday.
+#
+#   field keys_that_can_lift {
+#     type:    list[string]
+#     default: ["SBOM", "SAST"]
+#     validator: func liftable_key_check
+#     shortdoc: "Specify which chalk keys *can* be lifted."
+#     doc: """
+# Normally, at chalk time, chalkable artifact keys can only appear in
+# the artifact report, even if it's the same info across all artifacts
+# being chalked at once. You will get an error if trying to add them to
+# the host report.
 
-However, some items like SBOMs and SAST scan results can be huge, and
-the duplication not awesome.
+# However, some items like SBOMs and SAST scan results can be huge, and
+# the duplication not awesome.
 
-Such keys must be itemized here, but you get 3 choices:
+# Such keys must be itemized here, but you get 3 choices:
 
-1. Leave the key in the artifact report and accept the spam.
+# 1. Leave the key in the artifact report and accept the spam.
 
-2. Put the key in the host report but NOT the artifact report; if all
-artifacts have the same value, it'll be reported at the host level a
-single time. However, if it's not the same across all chalked
-artifacts, it gets DROPPED.
+# 2. Put the key in the host report but NOT the artifact report; if all
+# artifacts have the same value, it'll be reported at the host level a
+# single time. However, if it's not the same across all chalked
+# artifacts, it gets DROPPED.
 
-3. Put the key in BOTH places. If you do that, it'll report at the
-host level if all values are the same, and at the artifact level if
-not.
-"""
+# 3. Put the key in BOTH places. If you do that, it'll report at the
+# host level if all values are the same, and at the artifact level if
+# not.
+# """
 
-  }
+#   }
 
   field skip_command_report {
     type:        bool
@@ -2705,7 +2692,6 @@ However, if you want to disable it in your config file, you can just set:
 
 ```
 custom_report_terminal_chalk_time.enabled: false
-custom_report.terminal_env_time.enabled: false
 custom_report.terminal_other_op.enabled: false
 ```
 """
@@ -2901,139 +2887,62 @@ func override_key_check(keyname: string, val: list[string]) {
   }
 }
 
-func liftable_key_check(keyname, val: list[string]) {
+func validate_mark_template(template_name) {
   result := ""
 
-  for i from 0 to len(val) {
-    item := val[i]
-
-    if not keyspec_exists(item) {
-      return (keyname + ": key '" + item + " is specified to be liftable, " +
-      "but no such key has been defined.")
-    }
-
-    base       := "keyspec." + item + "."
-    kind_field := base + "kind"
-    kind       := attr_get(kind_field, int)
-
-    if kind != ChalkTimeArtifact {
-      return (keyname + ": specified key '" + item + "' is not liftable " +
-      "because it is not a chalkable artifact key.")
-    }
-  }
-}
-
-func pc_err(profile, key, specified, err) {
-  if specified {
-      return ("Profile '" + profile + "' specifies reporting key '" + key +
-           "', but " + err)
-  }
-
-  return ("Profile '" + profile + "' does not specify reporting key '" + key +
-           "', but " + err)
-}
-
-func profile_check_base(profile_name, profile_type, cmd) {
-  result := ""
-  sects  := sections("profile")
-
-  if profile_name == "" {
-    if profile_type == PTChalk and all_cmds_that_insert.contains(cmd) {
-      return ("outconf configuration for command '" + cmd + "' must provide " +
-      "a valid profile for chalking.")
-    }
+  if template_name == "" {
     return
   }
-  if not sects.contains(profile_name) {
-    return "there is no defined profile named '" + profile_name + "'"
+  
+  sects := sections("mark_template")
+
+  if not sects.contains(template_name) {
+    return ("specifies a Chalk mark template '" + template_name + "', but no " +
+    "such template exists")
   }
 
   specs         := sections("keyspec")
-  key_attr_path := "profile." + profile_name + ".key"
-  profile_keys  := sections(key_attr_path)
+  key_attr_path := "mark_template." + template_name + ".key"
+  template_keys := sections(key_attr_path)
 
-  for i from 0 to len(profile_keys) {
-    if not specs.contains(profile_keys[i]) {
-        return ("profile '" + profile_name + "' contains a key: '" +
-                profile_keys[i] + "', which has no associated keyspec.")
+  for i from 0 to len(template_keys) {
+    if not specs.contains(template_keys[i]) {
+        return ("Chalk mark template '" +template_name + "' contains a key: '" +
+                template_keys[i] + "', which does not exist " +
+                " (no matching keyspec section found).")
+    }
+
+    full_value_path := key_attr_path + "." + template_keys[i] + ".use"
+
+    if find(template_keys[i], "_") == 0 {
+        return ("Chalk mark template '" + template_name +  
+        "' contains a key: '" + template_keys[i] +
+        "' which is not a chalk-time key. Chalk-time " +
+        "keys are those that do NOT start with an underscore.")
     }
   }
-  for i from 0 to len(specs) {
-    key_name   := specs[i]
-    spec_base  := "keyspec." + key_name
-    key_kind   := attr_get(spec_base + ".kind", int)
+}
 
-    if profile_type == PTChalk {
-        if key_kind == RunTimeArtifact or key_kind == RunTimeHost { continue }
+func validate_report_template(name) {
+  result := ""
 
-        flag := false
+  sects := sections("report_template")
 
-        if attr_get(spec_base + ".required_in_chalk_mark", bool) {
-          flag := true
-        }
-        if cmd == "load" and attr_get(spec_base + ".required_in_self_mark",
-                                       bool) {
-          flag := true
-        }
-        if flag {
-          add_override(key_attr_path + "." + key_name + ".report", true)
-        }
-      continue
+  if not sects.contains(name) {
+    return ("specificate a Report template '" + name + "', but no " +
+    "such template exists")
+  }
+
+  specs         := sections("keyspec")
+  key_attr_path := "report_template." + name + ".key"
+  template_keys := sections(key_attr_path)
+
+  for i from 0 to len(template_keys) {
+    if not specs.contains(template_keys[i]) {
+        return ("Report template '" + name + "' contains a key: '" +
+                template_keys[i] + "', which does not exist " +
+                " (no matching keyspec section found).")
     }
-
-    if not profile_keys.contains(key_name) { continue }
-
-    keyconfbase := "profile." + profile_name + ".key." + key_name + "."
-
-    if attr_get(keyconfbase + "report", bool) == false { continue }
-
-
-    # By here, we know this profile wants to set this key explicitly,
-    # and that we are not in a chalk profile.
-    #
-    # - ChalkTimeHost keys can appear anywhere.
-    # - ChalkTimeArtifact keys can appear in per-artifact reports,
-    #   and in host-reports as long as the keyspec set never_early to 'false'
-    #   *and* the key is in the `keys_that_can_lift` field. Otherwise,
-    #   it can only appear in an artifact report.
-
-    # - RunTimeArtifact keys can appear in per-artifact reports only.
-    # - RunTimeHost keys can appear in host reports only.
-    #
-    # If the profile type is PTChalkTimeArtifact, we don't allow RunTimeArtifact
-    # or RunTimeHost keys.
-
-    valid_lifts := attr_get("keys_that_can_lift", list[string])
-
-    if profile_type == PTArtifact or profile_type == PTChalkTimeArtifact {
-      if key_kind == RunTimeHost {
-        return pc_err(profile_name, key_name, true,
-                      "that key cannot appear in artifact report spec")
-      }
-      if key_kind == RunTimeArtifact and profile_type == PTChalkTimeArtifact {
-        return pc_err(profile_name, key_name, true,
-        "This report is used at build time, so keys collected post-chalk " +
-        "aren't allowed.")
-      }
-      continue
-    }
-    # Else, profile type is PTHost
-    if key_kind == RunTimeArtifact {
-       return pc_err(profile_name, key_name, true,
-          "non-chalkable artifact info can't be in a host-level report spec")
-    }
-    elif key_kind == ChalkTimeArtifact {
-      if attr_get("keyspec." + key_name + ".never_early", bool) == true {
-        return pc_err(profile_name, key_name, true,
-        "that key is artifact specific, so can't be in host-level report spec")
-      }
-      if valid_lifts.contains(key_name) {
-        continue
-      }
-      return pc_err(profile_name, key_name, true,
-      "That key is not configured to be liftable.")
-    }
-    # Otherwise, all is good in the cosmos.
   }
 }
 
@@ -3047,77 +2956,46 @@ func in_report(name) {
   return "In custom report '" + reportname + "': "
 }
 
-func outconf_chalk_check(name, profile_name) {
-  if profile_name == "" { return ""; }
+func outconf_mark_template_check(name, template_name) {
   result := ""
   path   := split(name, ".")
   cmd    := path[1]
 
-  if not contains(all_cmds_that_insert, cmd) {
-    return (in_outconf(name) + "' Cannot have a chalk profile; " +
-            "It's only valid for commands that add chalk marks.")
+  if template_name != "" and not contains(all_cmds_that_insert, cmd) {
+    return (in_outconf(name) + "' Cannot define a chalk mark template; " +
+            "They are only valid for commands that add chalk marks.")
   }
 
-  result := profile_check_base(profile_name, PTChalk, cmd)
+  result := validate_mark_template(template_name)
   if result != "" {
     result := in_outconf(name) + result
   }
 }
 
-func outconf_artifact_check(name, profile_name) {
-  if profile_name == "" {
-    return ""
-  }
-  result := profile_check_base(profile_name, PTArtifact, "")
+func outconf_report_template_check(name, template_name) {
+  result := validate_report_template(template_name)
+  
   if result != "" {
     result := in_outconf(name) + result
   }
 }
 
-func outconf_host_check(name, profile_name) {
-  if profile_name == "" {
-    return ""
-  }
-  result := profile_check_base(profile_name, PTHost, "")
-  if result != "" {
-    result := in_outconf(name) + result
-  }
-}
-
-func outconf_invalid_chalk_check(name, profile_name) {
-  result := ""
-  path   := split(name, ".")
-  cmd    := path[1]
-
-  if profile_name == "" {
-    return ""
-  }
-
- if contains(all_cmds_that_insert, cmd) {
-    return (in_outconf(cmd) + "' Cannot have an invalid chalk profile; " +
-            "It's only valid for commands that do NOT add chalk marks.")
-  }
-
-  result := profile_check_base(profile_name, PTArtifact, "")
-  if result != "" {
-    result := in_outconf(name) + result
-  }
-}
-
-func custom_report_artifact_check(name, profile_name) {
-  result := profile_check_base(profile_name, PTArtifact, "")
+func custom_report_template_check(name, report_template_name) {
+  result := validate_report_template(report_template_name)
+  
   if result != "" {
     result := in_report(name) + result
   }
 }
 
-func label_profile_check(name, profile_name) {
-  if profile_name == "" {
-    return ""
+func label_template_check(name, mark_template_name) {
+  if mark_template_name == "" {
+    return "" # Not specifies is okay, just won't get used.
   }
-  result := profile_check_base(profile_name, PTChalkTimeArtifact, "")
+  result := validate_mark_template(mark_template_name)
   if result != "" {
-    result := in_report(name) + result
+    result := "When specifying a label template: " + result
+    result := result + " (template must be an existing mark_template)"
   }
 }
 
@@ -3201,13 +3079,6 @@ func use_when_check(name, value: list[string]) {
   }
 }
 
-func custom_report_host_check(name, profile_name) {
-  result := profile_check_base(profile_name, PTHost, "")
-  if result != "" {
-    result := in_report(name) + result
-  }
-}
-
 func sink_check(name, scfg: string) {
   result := ""
   if not sections("sink_config").contains(scfg) {
@@ -3285,10 +3156,8 @@ func custom_report_extra_validation() {
   report_sects := sections("custom_report")
   for i from 0 to len(report_sects) {
     base := "custom_report." + report_sects[i] + "."
-    s1   := attr_get(base + "artifact_report", string)
-    s2   := attr_get(base + "host_report", string)
-    if s1 == "" and s2 == "" {
-      return "Custom Report '" + report_sects[i] + "' must set a valid profile"
+    if attr_get(base + "report_template", string) == "" {
+      return "Custom Report '" + report_sects[i] + "' must set a report"
     }
   }
 }
@@ -3404,9 +3273,31 @@ func sink_config_check(path) {
   }
 }
 
+func outconf_mark_templates_exist()
+{
+  result := ""
+  
+  # If they've been explicitly set, then they will have been checked by
+  # a value validator. So all we need to do here is make sure that the
+  # insertion outconfs have non-null values.
+
+  for i from 0 to len(all_cmds_that_insert) {
+    s := attr_get("outconf." + all_cmds_that_insert[i] + ".mark_template",
+                  string)
+
+    if s == "" {
+      return ("Outconf section for command '" + all_cmds_that_insert[i] +
+      "' is missing a valid `mark_template`; all commands that add " +
+      "chalk marks must have one defined.")
+    }
+  }
+}
+
 func final_check() {
   result := key_name_validation()
   if result != "" { return; }
   result := custom_report_extra_validation()
+  if result != "" { return; }
+  result := outconf_mark_templates_exist()
   if result != "" { return; }
 }

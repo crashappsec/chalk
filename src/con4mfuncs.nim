@@ -14,6 +14,8 @@
 
 import config, reporting, sinks
 
+setLogLevelPrefix(llTrace, stylize("<jazzberry>trace: </jazzberry>").strip())
+
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
 
@@ -29,7 +31,7 @@ proc logBase(ll: string, args: seq[Box], s: ConfigState): Option[Box] =
     color    = s.attrLookup("color").get()
     llevel   = s.attrLookup("log_level").get()
 
-  setShowColors(unpack[bool](color))
+  setShowColor(unpack[bool](color))
   setLogLevel(unpack[string](llevel))
 
   log(ll, msg)

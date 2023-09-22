@@ -57,8 +57,14 @@ proc verifyChalkStart(data: string): int =
   return index
 
 proc elfScan*(codec: Plugin, location: string): Option[ChalkObj] {.cdecl.} =
+  var stream: FileStream
+
   try:
-    var stream = newFileStream(location)
+    stream = newFileStream(location)
+
+    if stream == nil:
+      return none(ChalkObj)
+
     var magicBuffer: array[4, char]
     stream.read(magicBuffer)
     if magicBuffer != ELF_MAGIC_BYTES:
@@ -89,7 +95,12 @@ proc elfScan*(codec: Plugin, location: string): Option[ChalkObj] {.cdecl.} =
     chalkObject.cache = ElfCodecCache(fileData: fileData)
     return some(chalkObject)
   except:
+    if stream != nil:
+      stream.close()
     return none(ChalkObj)
+
+  if stream != nil:
+    stream.close()
   return none(ChalkObj)
 
 proc elfGetUnchalkedHash*(codec: Plugin, chalk: ChalkObj):

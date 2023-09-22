@@ -18,7 +18,8 @@
 ## - base_keyspecs.c4m
 ## - base_plugins.c4m
 ## - base_sinks.c4m
-## - base_profiles.c4m
+## - base_chalk_templates.c4m
+## - base_report_templates.c4m
 ## - base_outconf.c4m
 ## - base_sinkconfs.c4m
 ##
@@ -119,7 +120,7 @@ This key should generally never be reported, as it is redundant to do so.
 
 keyspec CHALK_VERSION {
     required_in_chalk_mark: true
-    kind:                   ChalkTimeHost
+    kind:                   ChalkTimeArtifact
     type:                   string
     standard:               true
     system:                 true

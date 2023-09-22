@@ -16,7 +16,7 @@
 when (NimMinor, NimPatch) >= (6, 14):
   {.warning[CastSizes]: off.}
 
-import unicode, parseutils, algorithm, config, util
+import unicode, parseutils, algorithm, config
 
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']
@@ -431,12 +431,13 @@ proc extractOneChalkJson*(stream: Stream, path: string): ChalkDict =
   return unpack[ChalkDict](valueFromJson(stream.chalkParseJson(), path))
 
 # Output ordering for keys.
-proc orderKeys*(dict: ChalkDict, profile: Profile = nil): seq[string] =
+proc orderKeys*(dict: ChalkDict,
+                tplate: MarkTemplate | ReportTemplate): seq[string] =
   var tmp: seq[(int, string)] = @[]
   for k, _ in dict:
     var order = chalkConfig.keySpecs[k].normalizedOrder
-    if profile != nil and k in profile.keys:
-      let orderOpt = profile.keys[k].order
+    if tplate != nil and k in tplate.keys:
+      let orderOpt = tplate.keys[k].order
       if orderOpt.isSome():
         order = orderOpt.get()
     tmp.add((order, k))
@@ -449,10 +450,10 @@ proc orderKeys*(dict: ChalkDict, profile: Profile = nil): seq[string] =
 # we need, which gives us a JsonNode object, that we then convert
 # back to a string, with necessary quotes intact.
 
-proc toJson*(dict: ChalkDict, profile: Profile = nil): string =
+proc toJson*(dict: ChalkDict, tplate: MarkTemplate | ReportTemplate): string =
   result    = ""
   var comma = ""
-  let keys = dict.orderKeys(profile)
+  let keys = dict.orderKeys(tplate)
 
   for fullKey in keys:
     let
@@ -464,50 +465,39 @@ proc toJson*(dict: ChalkDict, profile: Profile = nil): string =
 
   result = "{ " & result & " }"
 
-proc prepareContents*(dict: ChalkDict, p: Profile): string =
-  return dict.filterByProfile(p).toJson(p)
+proc toJson*(dict: ChalkDict): string =
+  return dict.toJson(MarkTemplate(nil))
 
-proc prepareContents*(host, obj: ChalkDict, oneProfile: Profile): string =
-  return host.filterByProfile(obj, oneProfile).toJson(oneProfile)
-
-template profileEnabledCheck(profile: Profile) =
-  if profile.enabled == false:
-    error("FATAL: invalid to disable the chalk profile when inserting." &
-          " did you mean to use the virtual chalk feature?")
-    quitChalk(1)
-
-template enforceMagic() =
-  forceChalkKeys(["MAGIC", "CHALK_ID", "METADATA_ID"])
+proc prepareContents*(dict: ChalkDict,
+                      t: MarkTemplate | ReportTemplate): string =
+  return dict.filterByTemplate(t).toJson(t)
 
 proc getChalkMark*(obj: ChalkObj): ChalkDict =
-  trace("Creating mark using profile: " & getOutputConfig().chalk)
+  trace("Creating mark using template: " & getOutputConfig().markTemplate)
 
-  let profile = chalkConfig.profiles[getOutputConfig().chalk]
-  profile.profileEnabledCheck()
+  let templ = getMarkTemplate()
 
-  enforceMagic()
+  assert "CHALK_VERSION" in hostInfo or "CHALK_VERSION" in obj.collectedData
 
-  result = hostInfo.filterByProfile(obj.collectedData, profile)
+  result              = hostInfo.filterByTemplate(templ)
+  let artifactResults = obj.collectedData.filterByTemplate(templ)
+
+  for k, v in artifactResults:
+    result[k] = v
 
 proc getChalkMarkAsStr*(obj: ChalkObj): string =
   if obj.cachedMark != "":
     return obj.cachedMark
 
-  trace("Converting Mark to JSON. Profile name is: " & getOutputConfig().chalk)
+  trace("Converting Mark to JSON. Mark template is: " &
+    getOutputConfig().markTemplate)
+
   if obj.cachedMark != "":
     return obj.cachedMark
 
-  let profileName = getOutputConfig().chalk
+  let mark = obj.getChalkMark()
 
-  if profileName == "":
-    error("Configuration error: `chalk` profile cannot be empty")
-    quit(1)
-
-  let  profile = chalkConfig.profiles[profileName]
-  profile.profileEnabledCheck()
-
-  enforceMagic()
-  result         = hostInfo.prepareContents(obj.collectedData, profile)
+  result = mark.toJson()
   obj.cachedMark = result
 
   if not result.startswith("""{ "MAGIC" :"""):

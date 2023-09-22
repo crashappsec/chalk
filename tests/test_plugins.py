@@ -75,7 +75,7 @@ def test_github(copy_files: list[Path], chalk: Chalk):
     bin_path = copy_files[0]
     artifact = ArtifactInfo.one_elf(
         bin_path,
-        chalk_info={
+        host_info={
             "BUILD_ID": "1658821493",
             "BUILD_TRIGGER": "tag",
             "BUILD_CONTACT": ["octocat"],
@@ -84,6 +84,7 @@ def test_github(copy_files: list[Path], chalk: Chalk):
         },
     )
     insert = chalk.insert(bin_path)
+
     validate_chalk_report(
         chalk_report=insert.report,
         artifact_map=artifact,
@@ -110,7 +111,7 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
     bin_path = copy_files[0]
     artifact = ArtifactInfo.one_elf(
         bin_path,
-        chalk_info={
+        host_info={
             "BUILD_ID": "4999820578",
             "BUILD_TRIGGER": "push",
             "BUILD_CONTACT": ["user"],

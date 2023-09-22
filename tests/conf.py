@@ -19,7 +19,8 @@ SINK_CONFIGS = DATA / "sink_configs"
 ZIPS = DATA / "zip"
 
 # base profiles and outconf
-BASE_PROFILES = ROOT.parent / "src" / "configs" / "base_profiles.c4m"
+BASE_REPORT_TEMPLATES = ROOT.parent / "src" / "configs" / "base_report_templates.c4m"
+BASE_MARK_TEMPLATES = ROOT.parent / "src" / "configs" / "base_chalk_templates.c4m"
 BASE_OUTCONF = ROOT.parent / "src" / "configs" / "base_outconf.c4m"
 
 # pushing to a registry is orchestrated over the docker socket

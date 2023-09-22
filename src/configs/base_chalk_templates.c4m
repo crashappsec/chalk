@@ -1,0 +1,304 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+## Part of the base configuration.  See the comment at the top of
+## `base_keyspecs.c4m`
+
+
+## Pre-defined templates for what to add to a chalk mark.
+
+
+mark_template mark_all {
+  shortdoc: "Adds all metadata available for insertion into a chalk mark"
+  doc: """
+
+This template will add any metadata that can be collected at the time
+of chalking into the artifact.
+
+Note that this is different from what will be reported on at Chalk
+time; that is controlled via a `report_template` object instead.
+
+There is no requirement for things in the chalk mark to be reported,
+or vice versa.
+"""  
+  key.MAGIC.use                              = true
+  key.CHALK_VERSION.use                      = true
+  key.DATE_CHALKED.use                       = true
+  key.TIME_CHALKED.use                       = true
+  key.TZ_OFFSET_WHEN_CHALKED.use             = true
+  key.DATETIME_WHEN_CHALKED.use              = true
+  key.EARLIEST_VERSION.use                   = true
+  key.HOSTINFO_WHEN_CHALKED.use              = true
+  key.NODENAME_WHEN_CHALKED.use              = true
+  key.INJECTOR_CHALK_ID.use                  = true
+  key.INJECTOR_PUBLIC_KEY.use                = true
+  key.INJECTOR_VERSION.use                   = true
+  key.PLATFORM_WHEN_CHALKED.use              = true
+  key.INJECTOR_COMMIT_ID.use                 = true
+  key.INJECTOR_ARGV.use                      = true
+  key.INJECTOR_ENV.use                       = true
+  key.TENANT_ID_WHEN_CHALKED.use             = true
+  key.CHALK_ID.use                           = true
+  key.TIMESTAMP_WHEN_CHALKED.use             = true
+  key.CHALK_PTR.use                          = true
+  key.PATH_WHEN_CHALKED.use                  = true
+  key.PATH_WITHIN_ZIP.use                    = true
+  key.CONTAINING_ARTIFACT_WHEN_CHALKED.use   = true
+  key.ARTIFACT_TYPE.use                      = true
+  key.HASH.use                               = true
+  key.PRE_CHALK_HASH.use                     = true
+  key.ORIGIN_URI.use                         = true
+  key.BRANCH.use                             = true
+  key.COMMIT_ID.use                          = true
+  key.ARTIFACT_VERSION.use                   = true
+  key.STORE_URI.use                          = true
+  key.PACKAGE_URI.use                        = true
+  key.CODE_OWNERS.use                        = true
+  key.VCS_DIR_WHEN_CHALKED.use               = true
+  key.BUILD_ID.use                           = true
+  key.BUILD_URI.use                          = true
+  key.BUILD_API_URI.use                      = true
+  key.BUILD_TRIGGER.use                      = true
+  key.BUILD_CONTACT.use                      = true
+  key.CHALK_RAND.use                         = true
+  key.OLD_CHALK_METADATA_HASH.use            = true
+  key.OLD_CHALK_METADATA_ID.use              = true
+  key.EMBEDDED_CHALK.use                     = true
+  key.EMBEDDED_TMPDIR.use                    = true
+  key.CLOUD_METADATA_WHEN_CHALKED.use        = true
+  key.SBOM.use                               = true
+  key.SAST.use                               = true
+  key.ERR_INFO.use                           = true
+  key.SIGNING.use                            = true
+  key.METADATA_HASH.use                      = true
+  key.METADATA_ID.use                        = true
+  key.SIGNATURE.use                          = true
+  key.DOCKER_FILE.use                        = true
+  key.DOCKERFILE_PATH.use                    = true
+  key.DOCKER_PLATFORM.use                    = true
+  key.DOCKER_LABELS.use                      = true
+  key.DOCKER_TAGS.use                        = true
+  key.DOCKER_CONTEXT.use                     = true
+  key.DOCKER_ADDITIONAL_CONTEXTS.use         = true
+  key.DOCKER_CHALK_ADDED_LABELS.use          = true
+  key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use   = true
+  key.DOCKER_CHALK_TEMPORARY_TAG.use         = true
+}
+
+mark_template mark_large {
+  shortdoc: "Use to add most plausable content to a chalk mark."
+  doc: """
+  This template is intended to be used for chalking artifacts, when you
+  want to put pretty much all available metadata into a chalk mark.
+
+  Except that we don't put quite everything in, especially the
+  potentially huge items like SBOM and SAST. But, it's far more than you
+  probably want, especially if you're shipping metadata somewhere.
+
+  By default, CHALK_RAND is on for unique builds. If you want
+  reproducable builds, turn it off, along w/ items that cary the time.
+"""
+  # We go w/ Datetime
+  key.DATE_CHALKED.use                        = false
+  key.TIME_CHALKED.use                        = false
+  key.TZ_OFFSET_WHEN_CHALKED.use              = false
+  key.DATETIME_WHEN_CHALKED.use               = true
+  key.EARLIEST_VERSION.use                    = true
+  key.HOSTINFO_WHEN_CHALKED.use               = true
+  key.NODENAME_WHEN_CHALKED.use               = true
+  key.INJECTOR_CHALK_ID.use                   = true
+  key.INJECTOR_VERSION.use                    = true
+  key.PLATFORM_WHEN_CHALKED.use               = true
+  key.INJECTOR_COMMIT_ID.use                  = true
+  key.INJECTOR_ARGV.use                       = true
+  key.INJECTOR_ENV.use                        = true
+  key.INJECTOR_PUBLIC_KEY.use                 = true
+  key.TENANT_ID_WHEN_CHALKED.use              = true
+  key.TIMESTAMP_WHEN_CHALKED.use              = true
+  key.CHALK_PTR.use                           = true
+  key.PATH_WHEN_CHALKED.use                   = true
+  key.PATH_WITHIN_ZIP.use                     = true
+  key.CONTAINING_ARTIFACT_WHEN_CHALKED.use    = true
+  key.ARTIFACT_TYPE.use                       = true
+  key.HASH.use                                = true
+  key.ORIGIN_URI.use                          = true
+  key.BRANCH.use                              = true
+  key.COMMIT_ID.use                           = true
+  key.ARTIFACT_VERSION.use                    = true
+  key.STORE_URI.use                           = true
+  key.PACKAGE_URI.use                         = true
+  key.CODE_OWNERS.use                         = true
+  key.VCS_DIR_WHEN_CHALKED.use                = true
+  key.BUILD_ID.use                            = true
+  key.BUILD_URI.use                           = true
+  key.BUILD_API_URI.use                       = true
+  key.BUILD_TRIGGER.use                       = true
+  key.BUILD_CONTACT.use                       = true
+  key.CHALK_RAND.use                          = true
+  key.OLD_CHALK_METADATA_HASH.use             = true
+  key.OLD_CHALK_METADATA_ID.use               = true
+  key.EMBEDDED_CHALK.use                      = true
+  key.EMBEDDED_TMPDIR.use                     = true
+  key.CLOUD_METADATA_WHEN_CHALKED.use         = true
+  # Don't chalk these, just report!  They're too big.
+  key.SBOM.use                                = false
+  key.SAST.use                                = false
+  key.ERR_INFO.use                            = true
+  # This one will get forced on us if signing is
+  # properly configured; otherwise, we don't need
+  # it junking up things.
+  key.SIGNING.use                             = false
+  key.SIGNATURE.use                           = true
+  key.INJECTOR_PUBLIC_KEY.use                 = true  
+  key.DOCKER_FILE.use                         = true
+  key.DOCKERFILE_PATH.use                     = true
+  key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_LABELS.use                       = true
+  key.DOCKER_TAGS.use                         = true
+  key.DOCKER_CONTEXT.use                      = true
+  key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
+  key.DOCKER_CHALK_ADDED_LABELS.use           = true
+  key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use    = true
+  key.DOCKER_CHALK_TEMPORARY_TAG.use          = true
+  key.$CHALK_CONFIG.use                       = true
+  key.$CHALK_IMPLEMENTATION_NAME.use          = true
+  key.$CHALK_LOAD_COUNT.use                   = true
+  key.$CHALK_PUBLIC_KEY.use                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
+  key.$CHALK_ATTESTATION_TOKEN.use            = true
+}
+
+mark_template mark_default {
+  shortdoc: "Default items added during `chalk insert`."
+  doc: """
+The default values for what goes into chalk marks when using the
+`chalk insert` command shipped with Chalk.
+
+The default configuration will also use this template for `setup` and
+`chalk load`.
+
+However, the default is to use the `minimal` template for docker chalks. 
+
+This is not a config suitable for a reproducable build. To make it one,
+use the mark template named `reproducable`.
+"""
+  key.DATE_CHALKED.use                        = false
+  key.TIME_CHALKED.use                        = false
+  key.TZ_OFFSET_WHEN_CHALKED.use              = false
+  key.DATETIME_WHEN_CHALKED.use               = true
+  key.TIMESTAMP_WHEN_CHALKED.use              = true
+  key.CHALK_RAND.use                          = true
+  key.CHALK_PTR.use                           = true
+  key.PLATFORM_WHEN_CHALKED.use               = true
+  key.INJECTOR_COMMIT_ID.use                  = true
+  key.INJECTOR_PUBLIC_KEY.use                 = true
+  key.TENANT_ID_WHEN_CHALKED.use              = true
+  key.ARTIFACT_TYPE.use                       = true
+  key.HASH.use                                = true
+  key.ORIGIN_URI.use                          = true
+  key.BRANCH.use                              = true
+  key.COMMIT_ID.use                           = true
+  key.ARTIFACT_VERSION.use                    = true
+  key.STORE_URI.use                           = true
+  key.PACKAGE_URI.use                         = true
+  key.CODE_OWNERS.use                         = true
+  key.BUILD_ID.use                            = true
+  key.BUILD_URI.use                           = true
+  key.BUILD_API_URI.use                       = true
+  key.BUILD_TRIGGER.use                       = true
+  key.BUILD_CONTACT.use                       = true
+  key.OLD_CHALK_METADATA_HASH.use             = true
+  key.OLD_CHALK_METADATA_ID.use               = true
+  key.EMBEDDED_CHALK.use                      = true
+  key.EMBEDDED_TMPDIR.use                     = true
+  key.SIGNATURE.use                           = true
+  key.INJECTOR_PUBLIC_KEY.use                 = true  
+  key.$CHALK_CONFIG.use                       = true
+  key.$CHALK_IMPLEMENTATION_NAME.use          = true
+  key.$CHALK_LOAD_COUNT.use                   = true
+  key.$CHALK_PUBLIC_KEY.use                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
+  key.$CHALK_ATTESTATION_TOKEN.use            = true
+}
+
+# This is the same as the `default` template, except the first three
+# keys are off.
+
+mark_template reproducable {
+  shortdoc: "Use for adding chalk marks for reproducable builds"
+  doc: """
+This template is based on the `default` Chalk mark template but with
+the time and the nonce removed.
+"""
+  key.DATETIME_WHEN_CHALKED.use               = false
+  key.TIMESTAMP_WHEN_CHALKED.use              = false
+  key.CHALK_RAND.use                          = false
+  key.CHALK_PTR.use                           = true
+  key.PLATFORM_WHEN_CHALKED.use               = true
+  key.INJECTOR_COMMIT_ID.use                  = true
+  key.INJECTOR_PUBLIC_KEY.use                 = true
+  key.TENANT_ID_WHEN_CHALKED.use              = true
+  key.ARTIFACT_TYPE.use                       = true
+  key.HASH.use                                = true
+  key.ORIGIN_URI.use                          = true
+  key.BRANCH.use                              = true
+  key.COMMIT_ID.use                           = true
+  key.ARTIFACT_VERSION.use                    = true
+  key.STORE_URI.use                           = true
+  key.PACKAGE_URI.use                         = true
+  key.CODE_OWNERS.use                         = true
+  key.BUILD_ID.use                            = true
+  key.BUILD_URI.use                           = true
+  key.BUILD_API_URI.use                       = true
+  key.BUILD_TRIGGER.use                       = true
+  key.BUILD_CONTACT.use                       = true
+  key.OLD_CHALK_METADATA_HASH.use             = true
+  key.OLD_CHALK_METADATA_ID.use               = true
+  key.EMBEDDED_CHALK.use                      = true
+  key.EMBEDDED_TMPDIR.use                     = true
+  key.SIGNATURE.use                           = true
+  key.INJECTOR_PUBLIC_KEY.use                 = true  
+  key.$CHALK_CONFIG.use                       = true
+  key.$CHALK_IMPLEMENTATION_NAME.use          = true
+  key.$CHALK_LOAD_COUNT.use                   = true
+  key.$CHALK_PUBLIC_KEY.use                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
+  key.$CHALK_ATTESTATION_TOKEN.use            = true
+}
+
+mark_template minimal {
+  shortdoc: "Used for minimal chalk marks."
+  doc: """
+
+This template is intended for when you're durably recording artifact
+information, and want to keep just enough information in the mark to
+facilitate other people being able to validate the mark.
+
+This is the default for `docker` chalk marks.
+"""
+  key.DATETIME_WHEN_CHALKED.use               = true
+  key.CHALK_PTR.use                           = true
+  key.SIGNATURE.use                           = true  
+  key.INJECTOR_PUBLIC_KEY.use                 = true
+  key.$CHALK_CONFIG.use                       = true
+  key.$CHALK_IMPLEMENTATION_NAME.use          = true
+  key.$CHALK_LOAD_COUNT.use                   = true
+  key.$CHALK_PUBLIC_KEY.use                   = true
+  key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
+  key.$CHALK_ATTESTATION_TOKEN.use            = true
+}
+
+mark_template chalk_labels {
+  shortdoc: "Auto-added labels for docker containers"
+  doc: """
+  This template is for chalkable keys that are automatically added as
+  labels to a container when running `docker build`.
+"""
+  key.COMMIT_ID.use                           = true
+  key.ORIGIN_URI.use                          = true
+  key.BRANCH.use                              = true
+}

@@ -63,8 +63,6 @@ proc pycHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
     #Read entire rest of file
       post = stream.readAll()
 
-  chalkCloseStream(chalk)
-
   #Build up a 'toWrite' string that will replace entire file
   if encoded.isSome():
     toWrite = pre

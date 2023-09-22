@@ -299,7 +299,8 @@ const
                         staticRead("configs/base_keyspecs.c4m") &
                         staticRead("configs/base_plugins.c4m") &
                         staticRead("configs/base_sinks.c4m") &
-                        staticRead("configs/base_profiles.c4m") &
+                        staticRead("configs/base_chalk_templates.c4m") &
+                        staticRead("configs/base_report_templates.c4m") &
                         staticRead("configs/base_outconf.c4m") &
                         staticRead("configs/base_sinkconfs.c4m") &
                         staticRead("configs/dockercmd.c4m")
@@ -312,10 +313,7 @@ const
   commitID*           = staticexec("git rev-parse HEAD")
   archStr*            = staticexec("uname -m")
   osStr*              = staticexec("uname -o")
-  #% INTERNAL
-  entryPtTemplateLoc* = "configs/entrypoint.c4m"
-  entryPtTemplate*    = staticRead(entryPtTemplateLoc)
-  #% END
+
   # Make sure that ARTIFACT_TYPE fields are consistently named. I'd love
   # these to be const, but nim doesn't seem to be able to handle that :(
 let

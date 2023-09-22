@@ -68,6 +68,10 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
                              extract      = stream.extractOneChalkJson(cid),
                              codec        = getPluginByName("docker"))
 
+
+    for k, v in chalk.extract:
+      chalk.collectedData[k] = v
+
     if chalk.containerId != "":
       chalk.resourceType = chalk.resourceType + {ResourceContainer}
 
@@ -139,11 +143,16 @@ proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
   if chalkOpt.isSome():
     let chalk = chalkOpt.get()
 
-    if not chalk.isMarked():
-      addUnmarked(chalk.name)
 
     chalk.addToAllChalks()
     chalk.collectedData = ChalkDict()
+
+    if not chalk.isMarked():
+      addUnmarked(chalk.name)
+
+    for k, v in chalk.extract:
+      chalk.collectedData[k] = v
+
     chalk.collectRunTimeArtifactInfo()
   doReporting()
 

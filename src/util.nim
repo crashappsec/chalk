@@ -351,14 +351,14 @@ proc dockerFailsafe*(info: DockerInvocation) {.noreturn.} =
   doReporting("fail")
   quitChalk(exitCode)
 
-proc increfStream*(chalk: ChalkObj) =
+proc increfStream*(chalk: ChalkObj) {.exportc.} =
   if chalk.streamRefCt != 0:
     chalk.streamRefCt += 1
     return
 
   chalk.streamRefCt = 1
 
-  if len(cachedChalkStreams) + 1 == chalkConfig.getCacheFdLimit():
+  if len(cachedChalkStreams) >= chalkConfig.getCacheFdLimit():
     let removing = cachedChalkStreams[0]
 
     trace("Too many cached file descriptors. Closing fd for: " & chalk.name)
@@ -369,6 +369,7 @@ proc increfStream*(chalk: ChalkObj) =
 
     removing.stream      = FileStream(nil)
     removing.streamRefCt = 0
+    cachedChalkStreams = cachedChalkStreams[1 .. ^1]
 
   cachedChalkStreams.add(chalk)
 

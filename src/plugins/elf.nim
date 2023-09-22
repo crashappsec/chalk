@@ -25,9 +25,6 @@ const
   ELF_MAGIC_BYTES*           = "\x7F\x45\x4C\x46"
   ELF_LITTLE_ENDIAN          = "\x01"
   ELF_VERSION1               = "\x01\x00\x00\x00"
-  ELF_PROGRAM_FLAG_EXEC      = 0x01
-  ELF_PROGRAM_FLAG_WRITE     = 0x02
-  ELF_PROGRAM_FLAG_READ      = 0x04
   ELF64_HEADER_SIZE          = 0x40
   ELF64_PROGRAM_HEADER_SIZE  = 0x38
   ELF64_SECTION_HEADER_SIZE  = 0x40
@@ -78,7 +75,6 @@ const
   ELF64_SECTION_ENTRYSIZE_64 = 0x38
 
 const
-  SHN_UNDEF                  = 0x00
   SHN_LORESERVE              = 0xFF00
 
 # Chalk strings for the section header names
@@ -102,7 +98,6 @@ const
   ERR_SECTION_HEADER_SIZE         = "section header too small"
   ERR_NO_SHSTRTAB_UNIMPLEMENTED   = "unimplemented: missing shstrtab"
   ERR_SHSTRTAB_LINK_UNIMPLEMENTED = "unimplemented: shstrtab uses sh_link"
-  ERR_SHTABLE_NOT_LAST            = "unsupported: SH table not at end"
   ERR_SHSTRTAB_ADDRESS            = "unsupported: SH table has address"
 
 type
@@ -359,7 +354,6 @@ proc getValue[T](data: var string, whence: uint64): ElfIntValue[T] =
 
 proc locateChalkSection(self: ElfFile) =
   var sectionHeaders = self.sectionHeaders
-  var fileData = self.fileData
   for index in low(sectionHeaders) .. high(sectionHeaders):
     var header = sectionHeaders[index]
     if header.headerType.value != uint32(SHT_PROGBITS):

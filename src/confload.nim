@@ -73,7 +73,7 @@ proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
 
 proc loadLocalStructs*(state: ConfigState) =
   chalkConfig = state.attrs.loadChalkConfig()
-  if chalkConfig.color.isSome(): setShowColors(chalkConfig.color.get())
+  if chalkConfig.color.isSome(): setShowColor(chalkConfig.color.get())
   setLogLevel(chalkConfig.logLevel)
   for i in 0 ..< len(chalkConfig.configPath):
     chalkConfig.configPath[i] = chalkConfig.configPath[i].resolvePath()
@@ -123,7 +123,6 @@ proc loadAllConfigs*() =
     res:      ArgResult # Used across macros above.
     resFound: bool
 
-
   let
     toStream = newStringStream
     stack    = newConfigStack()
@@ -162,7 +161,6 @@ proc loadAllConfigs*() =
     stack.addConfLoad(sbomConfName,   toStream(sbomConfig),   checkNone)
     stack.addConfLoad(sastConfName,   toStream(sastConfig),   checkNone)
 
-
   stack.addCallback(loadLocalStructs)
   doRun()
 
@@ -174,7 +172,7 @@ proc loadAllConfigs*() =
   let configFile = getEmbeddedConfig()
 
   if chalkConfig.getLoadEmbeddedConfig():
-    stack.addConfLoad("<<embedded config>>", toStream(configFile)).
+    stack.addConfLoad("[embedded config]", toStream(configFile)).
           addCallback(loadLocalStructs)
     doRun()
 

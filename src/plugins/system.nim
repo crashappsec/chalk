@@ -161,17 +161,15 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, ins: bool):
       result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
 
   var
-    config     = getOutputConfig()
-    reportName = config.artifactReport
+    config       = getOutputConfig()
+    templateName = config.reportTemplate
 
-  if obj.opFailed and config.invalidChalkReport != "":
-    reportName = config.invalidChalkReport
-
-  if reportName != "":
+  if templateName != "":
     let
-      profile    = chalkConfig.profiles[reportName]
-      report     = hostInfo.filterByProfile(obj.collectedData, profile)
-      reportKeys = pack(toSeq(report.keys))
+      tmpl       = getReportTemplate()
+      hostKeys   = hostInfo.filterByTemplate(tmpl)
+      artKeys    = obj.collectedData.filterByTemplate(tmpl)
+      reportKeys = toSeq(hostKeys.keys()) & toSeq(artKeys.keys())
 
     result["_OP_ARTIFACT_REPORT_KEYS"] = pack(reportKeys)
 
@@ -246,10 +244,11 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     result["_ENV"] = getEnvDict()
 
   if isSubscribedKey("_OP_HOST_REPORT_KEYS") and
-     getOutputConfig().hostReport != "":
+     getOutputConfig().reportTemplate != "":
     let
-      profile    = chalkConfig.profiles[getOutputConfig().hostReport]
-      reportKeys = toSeq(hostInfo.filterByProfile(profile).keys)
+      templateName  = getOutputConfig().reportTemplate
+      templateToUse = chalkConfig.reportTemplates[templateName]
+      reportKeys    = toSeq(hostInfo.filterByTemplate(templateToUse).keys)
 
     result["_OP_HOST_REPORT_KEYS"] = pack(reportKeys)
 

@@ -28,11 +28,17 @@ class ArtifactInfo:
             return "ELF"
 
     @classmethod
-    def one_elf(cls, path: Path, chalk_info: Optional[dict[str, Any]] = None):
+    def one_elf(
+        cls,
+        path: Path,
+        chalk_info: Optional[dict[str, Any]] = None,
+        host_info: Optional[dict[str, Any]] = None,
+    ):
         return {
             str(path): cls(
                 type=cls.path_type(path),
                 chalk_info=chalk_info or {},
+                host_info=host_info or {},
             )
         }
 
@@ -89,6 +95,13 @@ def validate_chalk_report(
     assert len(chalk_report["_CHALKS"]) == len(
         artifact_map
     ), "chalks missing from report"
+
+    # check arbitrary host report values
+    for artifact_path in artifact_map:
+        artifact = artifact_map[artifact_path]
+        for key, value in artifact.host_info.items():
+            assert key in chalk_report
+            assert value == chalk_report[key]
 
     for chalk in chalk_report["_CHALKS"]:
         path = chalk["PATH_WHEN_CHALKED"]

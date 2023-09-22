@@ -5,21 +5,19 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-## The `chalk insert` command.
+## The `chalk version` command.
 
 import ../config
 
 proc runCmdVersion*() =
-  var
-    rows = @[@["Chalk version", getChalkExeVersion()],
-             @["Commit ID",     getChalkCommitID()],
-             @["Build OS",      hostOS],
-             @["Build CPU",     hostCPU],
-             @["Build Date",    CompileDate],
-             @["Build Time",    CompileTime & " UTC"]]
-    t    = tableC4mStyle(2, rows=rows)
+  var txt = "<table><tbody>"
 
-  t.setTableBorders(false)
-  t.setNoHeaders()
+  txt &= "<tr><td>Chalk version</td><td>" & getChalkExeVersion() & "</td></tr>"
+  txt &= "<tr><td>Commit ID</td><td>" & getChalkCommitID() & "</td></tr>"
+  txt &= "<tr><td>Build OS</td><td>" & hostOS & "</td></tr>"
+  txt &= "<tr><td>Build CPU</td><td>" & hostCPU & "</td></tr>"
+  txt &= "<tr><td>Build Date</td><td>" & CompileDate & "</td></tr>"
+  txt &= "<tr><td>Build Time</td><td>" & CompileTime & "</td></tr>"
+  txt &= "</tbody></table>"
 
-  publish("version", t.render() & "\n")
+  publish("version", txt.stylize())

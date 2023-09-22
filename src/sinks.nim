@@ -57,7 +57,6 @@ var   sinkErrors*: seq[SinkConfig] = @[]
 const quietTopics* = ["chalk_usage_stats"]
 
 template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
-  let base = "Publishing" & t.name & ": "
   var line = ""
 
   case cfg.mySink.name

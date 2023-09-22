@@ -24,7 +24,7 @@
 
 import posix, unicode, base64, ../config, ../collect, ../reporting,
        ../chalkjson, ../docker_cmdline, ../docker_base, ../subscan,
-       ../dockerfile, ../commands/cmd_defaults, ../util, ../attestation,
+       ../dockerfile, ../util, ../attestation, ../commands/cmd_help,
        ../plugin_api
 
 {.warning[CStringConv]: off.}
@@ -105,20 +105,21 @@ proc addNewLabelsToDockerFile(ctx: DockerInvocation) =
     for k, v in labelOps.get():
       ctx.addedInstructions.add(formatLabel(k, v, true))
 
-  let labelProfileName = chalkConfig.dockerConfig.getLabelProfile()
-  if labelProfileName == "":
+  let labelTemplName = chalkConfig.dockerConfig.getLabelTemplate()
+  if labelTemplName == "":
     return
 
-  let labelProfile = chalkConfig.profiles[labelProfileName]
-
-  if not labelProfile.enabled:
-    return
+  let labelTemplate = chalkConfig.markTemplates[labelTemplName]
 
   let
-    chalkObj    = ctx.opChalkObj.collectedData
-    labelsToAdd = filterByProfile(hostInfo, chalkObj, labelProfile)
+    chalkObj         = ctx.opChalkObj.collectedData
+    hostLabelsToAdd  = hostInfo.filterByTemplate(labelTemplate)
+    artLabelsToAdd   = chalkObj.filterByTemplate(labelTemplate)
 
-  for k, v in labelsToAdd:
+  for k, v in hostLabelsToAdd:
+    ctx.addedInstructions.add(formatLabel(k, boxToJson(v), true))
+
+  for k, v in artLabelsToAdd:
     ctx.addedInstructions.add(formatLabel(k, boxToJson(v), true))
 
 proc setPreferredTag(ctx: DockerInvocation) =
@@ -402,6 +403,16 @@ proc handleTrueInsertion(ctx: DockerInvocation, mark: string) =
   ctx.addAnyExtraEnvVars()
   ctx.writeChalkMark(mark)
 
+template addVirtualLabels(labelsToAdd: untyped) =
+  for k, v in labelsToAdd:
+    let val = boxToJson(v)
+
+    if val.len() <= 2:
+      continue
+
+    ctx.newCmdLine.add("--label")
+    ctx.newCmdLine.add(formatLabel(k, val, false))
+
 proc prepVirtualInsertion(ctx: DockerInvocation) =
   # Virtual insertion for Docker does not rewrite the entry point
   # either.
@@ -419,27 +430,19 @@ proc prepVirtualInsertion(ctx: DockerInvocation) =
       ctx.newCmdLine.add("--label")
       ctx.newCmdline.add(k & "=" & escapeJson(v))
 
-  let labelProfileName = chalkConfig.dockerConfig.getLabelProfile()
-  if labelProfileName == "":
+  let labelTemplName = chalkConfig.dockerConfig.getLabelTemplate()
+  if labelTemplName == "":
     return
 
-  let labelProfile = chalkConfig.profiles[labelProfileName]
-
-  if not labelProfile.enabled:
-    return
+  let labelTemplate = chalkConfig.markTemplates[labelTemplName]
 
   let
-    chalkObj    = ctx.opChalkObj.collectedData
-    labelsToAdd = filterByProfile(hostInfo, chalkObj, labelProfile)
+    chalkObj        = ctx.opChalkObj.collectedData
+    hostLabelsToAdd = hostInfo.filterByTemplate(labelTemplate)
+    artLabelsToAdd  = chalkObj.filterByTemplate(labelTemplate)
 
-  for k, v in labelsToAdd:
-    let val = boxToJson(v)
-
-    if val.len() <= 2:
-      continue
-
-    ctx.newCmdLine.add("--label")
-    ctx.newCmdLine.add(formatLabel(k, val, false))
+  addVirtualLabels(hostLabelsToAdd)
+  addVirtualLabels(artLabelsToAdd)
 
 proc addBuildCmdMetadataToMark(ctx: DockerInvocation) =
   let dict = ctx.opChalkObj.collectedData
@@ -587,8 +590,8 @@ template gotPushCommand() =
         else:
           for k, v in mark:
             ctx.opChalkObj.collectedData[k] = v
-            ctx.opChalkObj.extract          = mark
-            ctx.opChalkObj.marked           = true
+          ctx.opChalkObj.extract          = mark
+          ctx.opChalkObj.marked           = true
   except:
     error("Docker push operation failed.")
   exitCode = 0
@@ -633,7 +636,7 @@ proc runCmdDocker*(args: seq[string]) =
   if not ctx.cmdBuild and not ctx.cmdPush:
     passThroughLogic()
   else:
-      forceArtifactKeys(["_REPO_TAGS", "_REPO_DIGESTS"])
+      forceReportKeys(["_REPO_TAGS", "_REPO_DIGESTS"])
       if ctx.cmdBuild:
         gotBuildCommand()
 
@@ -648,5 +651,5 @@ proc runCmdDocker*(args: seq[string]) =
         reporting.doReporting("report")
 
   # For paths that didn't call doReporting, which generally cleans these up.
-  showConfig()
+  showConfigValues()
   quitChalk(exitCode)

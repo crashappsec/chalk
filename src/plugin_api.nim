@@ -256,7 +256,7 @@ proc getNewScriptContents*(fileContents: string,
   ##
   ## If there's no mark found, we shove it at the end of the output,
   ## with our comment prelude added beforehand.
-  var (cs, r, ignore) = fileContents.findFirstValidChalkMark(chalk.fsRef,
+  var (cs, r, _) = fileContents.findFirstValidChalkMark(chalk.fsRef,
                                                              true)
 
   if cs == -1:
@@ -330,7 +330,7 @@ proc scriptHandleWrite*(plugin:  Plugin,
   if encoded.isNone():
     if not chalk.marked:  # Unmarked, so nothing to do.
       return
-    let (toWrite, ignore) = contents.getUnmarkedScriptContent(chalk,
+    let (toWrite, _) = contents.getUnmarkedScriptContent(chalk,
                                                 chalk.commentPrefix, true)
     if not chalk.replaceFileContents(toWrite):
       chalk.opFailed = true
@@ -367,6 +367,7 @@ proc loadChalkFromFStream*(codec:  Plugin,
     result.startOffset   = result.stream.getPosition()
     result.extract       = result.stream.extractOneChalkJson(result.name)
     result.endOffset     = result.stream.getPosition()
+
   except:
     error(loc & ": Invalid JSON: " & getCurrentExceptionMsg())
     dumpExOnDebug()
@@ -567,8 +568,7 @@ proc defaultCodecWrite*(s:     Plugin,
 
 var
   installedPlugins: Table[string, Plugin]
-  plugins:          seq[Plugin]           = @[]
-  codecs:           seq[Plugin]           = @[]
+  codecs:           seq[Plugin] = @[]
 
 template isCodec*(plugin: Plugin): bool = plugin.configInfo.codec
 

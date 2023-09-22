@@ -334,20 +334,6 @@ template setVcsStuff(info: RepoInfo) =
     result["BRANCH"] = pack(info.branch)
   break
 
-proc gitGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
-  result    = ChalkDict()
-  let cache = GitInfo(self.internalState)
-
-  for path in getContextDirectories():
-    cache.findAndLoad(path.resolvePath())
-
-  if len(cache.vcsDirs) == 0:
-    return # No git directory, so no work to do.
-
-  # Don't know an easier way to get the first one in an ordered table
-  for dir, info in cache.vcsDirs:
-    info.setVcsStuff()
-
 proc isInRepo(obj: ChalkObj, repo: string): bool =
   if obj.fsRef == "":
     return false
@@ -358,8 +344,17 @@ proc isInRepo(obj: ChalkObj, repo: string): bool =
 
   return false
 
+proc gitInit(self: Plugin) =
+  let cache = GitInfo(self.internalState)
+
+  for path in getContextDirectories():
+    cache.findAndLoad(path.resolvePath())
+
 proc gitGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
                                 ChalkDict {.cdecl.} =
+  once:
+    self.gitInit()
+
   result    = ChalkDict()
   let cache = GitInfo(self.internalState)
 
@@ -376,6 +371,5 @@ proc gitGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
 
 proc loadVctlGit*() =
   newPlugin("vctl_git",
-            ctHostCallback = ChalkTimeHostCb(gitGetChalkTimeHostInfo),
             ctArtCallback  = ChalkTimeArtifactCb(gitGetChalkTimeArtifactInfo),
             cache          =  RootRef(GitInfo()))

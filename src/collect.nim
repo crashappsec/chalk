@@ -5,8 +5,6 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-## Load information based on profiles.
-
 import re, config, util, plugin_api
 
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
@@ -52,9 +50,11 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   error("Plugin '" & plugin.name & "' can't write system key: '" & key & "'")
   return false
 
-proc registerProfileKeys(profiles: openarray[string]): int {.discardable.} =
-  result = 0
+proc registerKeys(templ: MarkTemplate | ReportTemplate) =
+  for name, content in templ.keys:
+    if content.use: subscribedKeys[name] = true
 
+proc registerOutconfKeys() =
   # We always subscribe to _VALIDATED, even if they don't want to
   # report it; they might subscribe to the error logs it generates.
   #
@@ -64,12 +64,13 @@ proc registerProfileKeys(profiles: openarray[string]): int {.discardable.} =
   # TODO: The config should hand us a list of keys to force.
   subscribedKeys["_VALIDATED"] = true
 
-  for item in profiles:
-    if item == "" or chalkConfig.profiles[item] == nil or
-       chalkConfig.profiles[item].enabled == false: continue
-    result = result + 1
-    for name, content in chalkConfig.profiles[item].keys:
-      if content.report: subscribedKeys[name] = true
+  let outconf = getOutputConfig()
+
+  if outconf.markTemplate != "":
+    chalkConfig.markTemplates[outConf.markTemplate].registerKeys()
+
+  if outconf.reportTemplate != "":
+    chalkConfig.reportTemplates[outConf.reportTemplate].registerKeys()
 
 proc collectChalkTimeHostInfo*() =
   if hostCollectionSuspended():
@@ -103,24 +104,21 @@ proc initCollection*() =
   ## then, if we are chalking, it collects ChalkTimeHostInfo data
 
   trace("Collecting host-level chalk-time data")
-  let config       = getOutputConfig()
-  let cmdprofnames = [config.chalk, config.hostreport, config.artifactReport,
-                      config.invalidChalkReport]
 
-  # First, deal with the default output configuration.
-  if registerProfileKeys(cmdprofnames) == 0:
-    error("FATAL: no output reporting configured (all specs in the " &
-          "command's 'outconf' object are disabled")
-    quitChalk(1)
+  forceChalkKeys(["MAGIC", "CHALK_VERSION", "CHALK_ID", "METADATA_ID"])
+  registerOutconfKeys()
+
 
   # Next, register for any custom reports.
   for name, report in chalkConfig.reportSpecs:
     if (getBaseCommandName() notin report.use_when and
         "*" notin report.use_when):
       continue
-    registerProfileKeys([report.artifactReport,
-                         report.hostReport,
-                         report.invalidChalkReport])
+
+    let templName = report.reportTemplate
+
+    if templName != "":
+      chalkConfig.reportTemplates[templName].registerKeys()
 
   if isChalkingOp():
       collectChalkTimeHostInfo()

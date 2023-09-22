@@ -122,15 +122,15 @@ def test_exec_heartbeat(
         params=["5"],
     )
 
-    report = result.reports[0]
-    assert report["_OPERATION"] == "exec"
-    assert report.mark["_OP_ARTIFACT_PATH"] == str(bin_path)
-    assert report.mark["_CURRENT_HASH"] == chalk_hash
-    assert report.mark["ARTIFACT_TYPE"] == "ELF"
-    assert report.mark["_PROCESS_PID"] != ""
+    exec_report = result.reports[0]
+    assert exec_report["_OPERATION"] == "exec"
+    assert exec_report.mark["_OP_ARTIFACT_PATH"] == str(bin_path)
+    assert exec_report.mark["_CURRENT_HASH"] == chalk_hash
+    assert exec_report.mark["ARTIFACT_TYPE"] == "ELF"
+    assert exec_report.mark["_PROCESS_PID"] != ""
 
     # there should be a few heartbeats
     assert len(result.reports) > 1
-    for other_report in result.reports[1:]:
-        assert other_report["_OPERATION"] == "heartbeat"
-        assert other_report.mark == report.mark
+    for heartbeat_report in result.reports[1:]:
+        assert heartbeat_report["_OPERATION"] == "heartbeat"
+        assert heartbeat_report.mark == exec_report.mark

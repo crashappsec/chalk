@@ -127,12 +127,12 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
 
   if selfChalk.opFailed:
     let
-      (path, fname) = selfChalk.fsRef.splitPath()
-      maybe         = getCurrentDir().joinPath(fname)
-      actual        = if maybe == selfChalk.fsRef:
-                        selfChalk.fsRef & ".new"
-                      else:
-                        maybe
+      (_, fname) = selfChalk.fsRef.splitPath()
+      maybe      = getCurrentDir().joinPath(fname)
+      actual     = if maybe == selfChalk.fsRef:
+                     selfChalk.fsRef & ".new"
+                   else:
+                     maybe
 
     warn(selfChalk.fsRef & ": unable to modify file.")
     warn("Attempting to write a copy of the binary with the new config to: " &

@@ -43,6 +43,7 @@ LATEST_NUTIL=`ls ${NIMBLE_PKGS} | egrep "^nimutils" | sort -V | tail -1`
 
 echo $(color CYAN "con4m version:  ") $LATEST_CON4M
 echo $(color CYAN "nimutils vers:  ") $LATEST_NUTIL
+echo $(color yellow "If you have two copies of the same version you'll have issues")
 
 CON4M_TARGET=${NIMBLE_PKGS}/${LATEST_CON4M}
 NIMUTILS_TARGET=${NIMBLE_PKGS}/${LATEST_NUTIL}
@@ -92,7 +93,7 @@ function push_ext_files {
 
 push_ext_files ${CON4M_DIR}/files/ ${CON4M_TARGET}/ nim
 push_ext_files ${CON4M_DIR}/files/con4m ${CON4M_TARGET}/con4m nim
-push_ext_files ${CON4M_DIR}/files/c ${CON4M_TARGET}/c c
-push_ext_files ${CON4M_DIR}/files/c ${CON4M_TARGET}/c h
+push_ext_files ${CON4M_DIR}/files/con4m/c4m ${CON4M_TARGET}/con4m/c4m c4m
+push_ext_files ${CON4M_DIR}/files/con4m/c4m ${CON4M_TARGET}/con4m/c4m c42spec
 push_ext_files ${NIMUTILS_DIR}/nimutils ${NIMUTILS_TARGET}/nimutils nim
 push_ext_files ${NIMUTILS_DIR}/nimutils/headers ${NIMUTILS_TARGET}/nimutils/headers nim

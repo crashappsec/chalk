@@ -32,7 +32,7 @@ template coreExtractFiles(path: seq[string]) =
   for item in artifacts(path):
     numExtracts += 1
 
-  if numExtracts == 0 and getCommandName() == "extract":
+  if not inSubscan() and numExtracts == 0 and getCommandName() == "extract":
     warn("No chalk marks extracted")
 
 template coreExtractImages() =

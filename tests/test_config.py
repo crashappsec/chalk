@@ -10,7 +10,13 @@ import pytest
 
 from .chalk.runner import Chalk, ChalkMark, ChalkReport
 from .utils.log import get_logger
-from .conf import BASE_OUTCONF, LS_PATH, CONFIGS, BASE_PROFILES
+from .conf import (
+    BASE_OUTCONF,
+    LS_PATH,
+    CONFIGS,
+    BASE_REPORT_TEMPLATES,
+    BASE_MARK_TEMPLATES,
+)
 
 logger = get_logger()
 
@@ -88,10 +94,11 @@ def test_invalid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bo
     "test_config_file, expected_error",
     [
         ("validation/valid_1.conf", VALIDATION_ERROR),
-        ("config-tool/CI_CD_Docker.c4m", ""),
-        ("config-tool/CI_CD_Standalone.c4m", ""),
-        ("config-tool/default-USING-API.c4m", ""),
-        ("config-tool/default.c4m", ""),
+        # TODO: re-enable these once config-tool is updated
+        # ("config-tool/CI_CD_Docker.c4m", ""),
+        # ("config-tool/CI_CD_Standalone.c4m", ""),
+        # ("config-tool/default-USING-API.c4m", ""),
+        # ("config-tool/default.c4m", ""),
     ],
 )
 @pytest.mark.parametrize(
@@ -148,10 +155,11 @@ def test_load_url(
     [
         ("validation/valid_1.conf", True, VALIDATION_ERROR),
         ("validation/invalid_1.conf", False, ""),
-        ("config-tool/CI_CD_Docker.c4m", True, ""),
-        ("config-tool/CI_CD_Standalone.c4m", True, ""),
-        ("config-tool/default-USING-API.c4m", True, ""),
-        ("config-tool/default.c4m", True, ""),
+        # TODO: re-enable these once config-tool is updated
+        # ("config-tool/CI_CD_Docker.c4m", True, ""),
+        # ("config-tool/CI_CD_Standalone.c4m", True, ""),
+        # ("config-tool/default-USING-API.c4m", True, ""),
+        # ("config-tool/default.c4m", True, ""),
     ],
 )
 def test_external_configs(
@@ -309,13 +317,13 @@ def get_outconf(
     return outconfs
 
 
-def get_profiles(
-    path: Path = BASE_PROFILES, base: Optional[dict[str, set[str]]] = None
+def get_report_templates(
+    path: Path = BASE_REPORT_TEMPLATES, base: Optional[dict[str, set[str]]] = None
 ) -> dict[str, set[str]]:
     profiles: dict[str, set[str]] = base or {}
     for block in _get_blocks(
         iter(path.read_text().splitlines()),
-        start_at=lambda i: i.startswith("profile ") and i.endswith("{"),
+        start_at=lambda i: i.startswith("report_template ") and i.endswith("{"),
         end_at=lambda i: i.startswith("}"),
         adjust=lambda i: i.split("#")[0].strip(),
         keep=lambda i: i.strip().startswith("key."),
@@ -324,7 +332,7 @@ def get_profiles(
         name = start.split()[1]
         assert (
             name not in profiles
-        ), "profile definitions should not have duplicates in the same config file"
+        ), "report template definitions should not have duplicates in the same config file"
         conf = profiles.setdefault(name, set())
         for line in lines:
             var, enabled = line.split("=")
@@ -338,21 +346,56 @@ def get_profiles(
     return profiles
 
 
-# returns a map of profile names to enabled keys for that profile
-# that are defined in test_config_file + base_profiles
+def get_mark_templates(
+    path: Path = BASE_MARK_TEMPLATES, base: Optional[dict[str, set[str]]] = None
+) -> dict[str, set[str]]:
+    profiles: dict[str, set[str]] = base or {}
+    for block in _get_blocks(
+        iter(path.read_text().splitlines()),
+        start_at=lambda i: i.startswith("mark_template ") and i.endswith("{"),
+        end_at=lambda i: i.startswith("}"),
+        adjust=lambda i: i.split("#")[0].strip(),
+        keep=lambda i: i.strip().startswith("key."),
+    ):
+        start, *lines = block
+        name = start.split()[1]
+        assert (
+            name not in profiles
+        ), "mark template definitions should not have duplicates in the same config file"
+        conf = profiles.setdefault(name, set())
+        for line in lines:
+            var, enabled = line.split("=")
+            key = var.split(".")[1].strip()
+            enabled = enabled.strip()
+            assert enabled in {"true", "false"}
+            if enabled == "true":
+                conf.add(key)
+            else:
+                conf.discard(key)
+    return profiles
+
+
+# returns a map of template names to enabled keys for that template for each outconf
+# that are defined in test_config_file + base_report_templates.c4m + base_chalk_templates.c4m
 def merged_configs(
     test_config_file: Optional[Path] = None,
 ) -> dict[str, dict[str, set[str]]]:
     outconfs = get_outconf()
-    profiles = get_profiles()
+    # templates now stored in chalk template + report template
+    report_templates = get_report_templates()
+    mark_templates = get_mark_templates()
 
     if test_config_file:
         # update configs with custom config
         get_outconf(test_config_file, outconfs)
-        get_profiles(test_config_file, profiles)
+        get_report_templates(test_config_file, report_templates)
+        get_mark_templates(test_config_file, mark_templates)
+
+    # merging ok as names should be globally unique
+    report_templates.update(mark_templates)
 
     return {
-        cmd: {report: profiles[profile] for report, profile in outconf.items()}
+        cmd: {report: report_templates[profile] for report, profile in outconf.items()}
         for cmd, outconf in outconfs.items()
     }
 
@@ -361,22 +404,13 @@ def validate_chalk_report_keys(
     report: dict[str, Any],
     config: dict[str, set[str]],
 ):
-    host_profile_keys = config["host_report"]
-    validate_profile_keys(report, host_profile_keys)
-
-    # artifact keys only checked if "_CHALKS" enabled in reporting
-    if "_CHALKS" in host_profile_keys:
-        assert "_CHALKS" in report
-        artifact_profile_keys = config["artifact_report"]
-        for _chalk in report["_CHALKS"]:
-            validate_profile_keys(_chalk, artifact_profile_keys)
-    else:
-        assert "_CHALKS" not in report
+    report_keys = config["report_template"]
+    validate_report_keys(report, report_keys)
 
 
-def validate_profile_keys(report: dict[str, Any], expected_keys: set[str]):
+def validate_report_keys(report: dict[str, Any], expected_keys: set[str]):
     """
-    Validate report keys adhere to profile keys
+    Validate report keys adhere to template report keys
 
     not all expected keys will show up in the report if they can't be found
     but we shouldn't have extra keys that aren't defined
@@ -391,7 +425,7 @@ def validate_profile_keys(report: dict[str, Any], expected_keys: set[str]):
     "test_config_file",
     [
         ("profiles/empty_profile.conf"),
-        # ("profiles/default.conf"),
+        ("profiles/default.conf"),
         ("profiles/minimal_profile.conf"),
         ("profiles/large_profile.conf"),
     ],
@@ -430,9 +464,11 @@ def test_profiles(
         "CHALK_VERSION",
         "METADATA_ID",
     }
-    logger.info("chalk insert config", config=configs["insert"]["chalk"])
+    for key in minimal_chalk:
+        assert key in chalk_mark
+    logger.info("chalk insert config", config=configs["insert"]["mark_template"])
     # validate all keys (minimal+rest) in the chalk mark profile
-    validate_profile_keys(chalk_mark, configs["insert"]["chalk"] | minimal_chalk)
+    validate_report_keys(chalk_mark, configs["insert"]["mark_template"] | minimal_chalk)
 
     # extract
     extract = chalk_copy.extract(bin_path)

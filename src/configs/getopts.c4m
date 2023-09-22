@@ -68,24 +68,6 @@ When this flag is passed, chalk ignores its search path; the only file it attemp
 """
   }
 
-  flag_multi_arg enable_profile {
-    callback: func set_enabled_profiles
-    doc: """
-Explicitly enable a particular reporting profile from the configuration file or embedded configuration, even if the profile is explicitly disabled in that configuration.
-
-Reporting profiles can be viewed with the `chalk profile` command.
-"""
-  }
-
-  flag_multi_arg disable_profile {
-    callback: func set_disabled_profiles
-    doc: """
-Explicitly *disable* a particular reporting profile from the configuration file or embedded configuration.
-
-Reporting profiles can be viewed with the `chalk profile` command.    
-"""    
-  }
-
   flag_multi_arg enable_report {
     callback: func set_enabled_reports
     doc: """
@@ -137,11 +119,13 @@ Turn on/off checking for (and running) any external configuration file.
 """
   }
 
-  flag_yn publish_defaults {
-    field_to_set: "publish_defaults"
+  flag_yn show_config {
+    yes_aliases: ["config"]
+    
+    field_to_set: "show_config"
     doc: """This flag runs chalk, then, at the end, outputs state information specific to that invocation of chalk.
 
-This is similar to the `chalk defaults` command, except shows state information specific to this particular invocation (whereas `chalk defaults` doesn't perform any action other than loading the configuration file).
+This is similar to the `chalk config` command, except it shows state information specific to this particular invocation (whereas `chalk config` doesn't perform any action other than loading the configuration file).
 """
   }
 
@@ -274,16 +258,16 @@ At the moment, this is only honored for the `chalk help` command.
     doc:      """
 Add chalk marks to artifacts found on the file system.  See the `docker` command for adding marks to docker containers.
     
-On chalking, what gets put into the chalk mark will be determined by the active chalk profile after any user config file has loaded.  Each command's output configuration can be specified using the 'outconf' section in the configuration file.
+On chalking, what gets put into the chalk mark will be determined by the active chalk mark template after any user config file has loaded.  Each command's output configuration can be specified using the 'outconf' section in the configuration file.
 <p>
-For instance, if you create a new profile named 'my_chalk_mark', you can activate it for both regular and docker insertions with the following in your configuration file:
+For instance, if you create a new mark template named 'my_chalk_mark', you can activate it for both regular and docker insertions with the following in your configuration file:
 
 ```
 outconf.insert.chalk = "myconf"
 outconf.docker.chalk = "myconf"
 ```
 
-For information on profiles on the command line, see: `chalk help profile`
+For information on mark templates on the command line, see: `chalk help templates`
 """
     callback: func set_artifact_search_path(list[string])
 
@@ -294,29 +278,20 @@ For information on profiles on the command line, see: `chalk help profile`
       field_to_set: "recursive"
     }
 
-    flag_arg artifact_profile {
-      field_to_set: "outconf.insert.artifact_report"
+    flag_arg mark_template {
+      field_to_set: "outconf.insert.mark_template"
       doc: """
-This change the artifact profile to use. for the default report. This can
-be useful if you are running on the command line and want a more minimal
-report.
+This changes which template to use to create any chalk marks for this
+run. The named Chalk mark template must already exist in your
+configuration.
 """
     }
 
-    flag_arg host_profile {
-      field_to_set: "outconf.insert.host_report"
+    flag_arg report_template {
+      field_to_set: "outconf.insert.report_template"
       doc: """
-This change the host profile to use for the default report. This can be
-useful if you are running on the command line and want a more minimal
-report.
-"""
-    }
-
-    flag_arg chalk_profile {
-      field_to_set: "outconf.insert.chalk"
-      doc: """
-This change the profile to use for generating chalk marks to the named
-profile (which obviously must exist).
+This changes the reporting template to use for the default report.
+The named reporting template must already exist in your configuration.
 """
     }
 }
@@ -328,9 +303,12 @@ profile (which obviously must exist).
     arg_sub_mutex: false
     shortdoc: "Find chalk marks in artifacts"
     doc: """
-This command looks for existing chalk marks in artifacts as specified by any command line arguments passed. The arguments can be files, directories, container identifiers, or container image identifiers.
-<p>
-Chalk will attempt to find all matching marks, and willreports on what it finds, based on your reporting configuration.
+This command looks for existing chalk marks in artifacts as specified
+by any command line arguments passed. The arguments can be files,
+directories, container identifiers, or container image identifiers.
+
+Chalk will attempt to find all matching marks, and will report on what
+it finds, based on your reporting configuration.
 """
 
     flag_yn recursive {
@@ -340,21 +318,11 @@ Chalk will attempt to find all matching marks, and willreports on what it finds,
       field_to_set: "recursive"
     }
 
-    flag_arg artifact_profile {
-      field_to_set: "outconf.extract.artifact_report"
+    flag_arg report_template {
+      field_to_set: "outconf.extract.report_template"
       doc: """
-This change the artifact profile to use. for the default report. This can
-be useful if you are running on the command line and want a more minimal
-report.
-"""
-    }
-
-    flag_arg host_profile {
-      field_to_set: "outconf.extract.host_report"
-      doc: """
-This change the host profile to use for the default report. This can be
-useful if you are running on the command line and want a more minimal
-report.
+This changes the reporting template to use for the default report.
+The named reporting template must already exist in your configuration.
 """
     }
 
@@ -412,21 +380,11 @@ Deletes metadata from all artifacts specified in the search path.
       field_to_set: "recursive"
     }
 
-    flag_arg artifact_profile {
-      field_to_set: "outconf.delete.artifact_report"
+    flag_arg report_template {
+      field_to_set: "outconf.delete.report_template"
       doc: """
-This change the artifact profile to use. for the default report. This can
-be useful if you are running on the command line and want a more minimal
-report.
-"""
-    }
-
-    flag_arg host_profile {
-      field_to_set: "outconf.delete.host_report"
-      doc: """
-This change the host profile to use for the default report. This can be
-useful if you are running on the command line and want a more minimal
-report.
+This changes the reporting template to use for the default report.
+The named reporting template must already exist in your configuration.
 """
     }
   }
@@ -474,54 +432,31 @@ When set to true, causes periodic reports to be run, past the initial one.
 """    
     }
 
-    flag_arg artifact_profile {
-      field_to_set: "outconf.exec.artifact_report"
+    flag_arg report_template {
+      field_to_set: "outconf.exec.report_template"
       doc: """
-This change the artifact profile to use. for the default report. This can
-be useful if you are running on the command line and want a more minimal
-report.
-"""
-    }
-
-    flag_arg host_profile {
-      field_to_set: "outconf.exec.host_report"
-      doc: """
-This change the host profile to use for the default report. This can be
-useful if you are running on the command line and want a more minimal
-report.
+This changes the reporting template to use for the default report.
+The named reporting template must already exist in your configuration.
 """
     }
   }
-  command defaults {
+  command config {
     aliases:  ["def"]
     shortdoc: "Show configuration variables and settings"
     doc: """
 Shows the results of evaluating the configuration, without actually doing any work with artifacts.
 <p>
-Even though they are related, there is a significant difference between the 'defaults' command and the --defaults flag.  They both dump the configuration after evaluating any config file, but they may easily produce different results.
+Even though they are related, there is a significant difference between the 'config' command and the --show-config flag.  They both dump the configuration after evaluating any config file, but they may easily produce different results.
 <p>
 That's because chalk uses 'con4m' for configuration, which, while typically just looking like a regular config file, can have arbitrary code added, with conditionals, and so-on.  The default configuration does, for instance, configure different output handlers, depending on the command given.
 <p>
-Running the 'defaults' command will therefore give you the information about the evaluation just when that command ran.  Whereas, '--publish-defaults extract' will dump the config as it resolves when you run the 'extract' command, which could be very similar, or very different.
+Running the 'defaults' command will therefore give you the information about the evaluation just when that command ran.  Whereas, '--show-config extract' will dump the config as it resolves when you run the 'extract' command, which could be very similar, or very different.
 <p>
-Importantly though, running '--publish-defaults extract' still runs the 'extract' command.
+Importantly though, running '--show-config extract' still runs the 'extract' command.
 <p>
 This command does not show the contents of the config file(s) used, just key results from executing those config files.  And, generally there will be at least two 'stacked' configuration files.  See 'help config' for more information on the configuration file and con4m.
 """
 }
-
-command profile {
-   aliases: ["prof", "profiles"]
-   args: (0, high())
-   shortdoc: "Show details of individual profiles."
-   doc: """
-Alias for `chalk help profile`; without arguments, shows available
-profiles, and with arguments, shows details on what specific profiles
-report on.
-
-`chalk profile all` will show details on all profiles.
-"""
-  }
 
   command dump {
     aliases: ["confdump"]
@@ -722,26 +657,8 @@ func set_config_file(filename) {
    return ""
 }
 
-profiles_seen := []
 reports_seen  := []
-export profiles_seen
 export reports_seen
-
-func set_profile_on_off(names: list[string], val) {
-   result := ""
-   profs := sections("profile")
-   for i from 0 to len(names) {
-     if profiles_seen.contains(names[i]) {
-       return "Already set a value for profile '" + names[i] + "'"
-     }
-     profiles_seen := array_add(profiles_seen, [names[i]])
-     if not profs.contains(names[i]) {
-       return ("No such profile: '" + names[i] + "'\nKnown profiles are: " +
-               profs.join(", "))
-     }
-     add_override("profile." + names[i] + ".enabled", val)
-   }
-}
 
 func set_reports_on_off(names: list[string], val) {
    result := ""
@@ -757,14 +674,6 @@ func set_reports_on_off(names: list[string], val) {
      }
      add_override("custom_report." + names[i] + ".enabled", val)
    }
-}
-
-func set_enabled_profiles(names) {
-  return set_profile_on_off(names, true)
-}
-
-func set_disabled_profiles(names) {
-  return set_profile_on_off(names, false)
 }
 
 func set_enabled_reports(names) {
