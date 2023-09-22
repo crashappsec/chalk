@@ -16,8 +16,9 @@ func install_cosign() {
   #
   # First attempt to install the go version
 
-  output, go_exists := system("which go")
-  if go_exists == 0 {
+  go_path := find_exe("go", [])
+  
+  if go_path != "" {
     install_out, ok := system("go install github.com/sigstore/cosign/v2/cmd/cosign@latest")
     if ok != 0 {
       warn("unable to install attestation into $GOPATH/bin/cosign; " +
@@ -33,26 +34,23 @@ func install_cosign() {
   if host_os == "macosx" {
     host_os := "darwin"
   }
+  
   install_name := "cosign-" + host_os + "-" + host_arch
   install_url  := "https://github.com/sigstore/cosign/releases/latest/download/" + install_name
+  contents     := url_get(install_url)
 
-  download_cmd := ["curl", "-O", "-L", install_url]
-  chmod_cmd    := ["chmod", "+x", install_name]
-  mv_cmd       := ["mv", install_name, "/tmp/cosign"]
+  trace("Downloaded cosign.")
+  write_file("/tmp/cosign", contents)
+  trace(run("chmod +x /tmp/cosign"))
 
-  attestation_download_cmd := [download_cmd.join(" "),
-                               chmod_cmd.join(" "),
-                               mv_cmd.join(" ")]
-
-  output, code := system(attestation_download_cmd.join(" && "))
-
-  if code == 0 {
-    trace("Successfully installed attestation into /tmp/cosign")
+  cosign_path := find_exe("cosign", ["/tmp"])
+  
+  if cosign_path != "" {
+    trace("Successfully installed attestation into: " + cosign_path)
     return true
   }
 
-  trace("Unable to install attestation via curl. url:" + install_url +
-        " output: " + output)
+  trace("Unable to install cosign (cannot write to tmp?)")
   return false
 }
 

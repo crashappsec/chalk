@@ -149,9 +149,9 @@ proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
 
     if not chalk.isMarked():
       addUnmarked(chalk.name)
-
-    for k, v in chalk.extract:
-      chalk.collectedData[k] = v
+    else:
+      for k, v in chalk.extract:
+        chalk.collectedData[k] = v
 
     chalk.collectRunTimeArtifactInfo()
   doReporting()

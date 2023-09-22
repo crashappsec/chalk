@@ -15,12 +15,12 @@ tool syft {
   ~produce_keys:      (func extract_syft_sbom(string, int) ->
                                                   dict[string, string])
   syft_exe_dir:      "/tmp"
-  syft_installer:    "raw.githubusercontent.com/anchore/syft/main/install.sh"
+  syft_installer:    "https://raw.githubusercontent.com/anchore/syft/main/install.sh"
   syft_argv:         " -o cyclonedx-json"  # CycloneDX by default.
   ~doc:              """
 This runs the syft SBOM tool.  If it can't be found in the current path,
 chalk will attempt to install it into /tmp, via the official installer,
-using 'curl'.
+located at `https://raw.githubusercontent.com/anchore/syft/main/install.sh`
 
 You can configure the following fields in the tool.syft object:
 
@@ -32,21 +32,37 @@ syft_argv:      Command-line flags to pass to syft. Defaults to:
 }
 
 func find_syft(ignore) {
-  output, code := system("export PATH=$PATH:" + tool.syft.syft_exe_dir +
-                         "; which syft")
-  if code != 0 {
+  result := find_exe("syft", ["/tmp"]) # /tmp is in addition to $PATH
+
+  if result == "" {
     trace("find_syft: Unable to find syft in $PATH")
-    return ""
+  } else {
+    trace("found syft at: " + result)
   }
-  output := output.strip()
-  trace("found syft at: " + output)
-  return output
 }
 
 func install_syft(ignore) {
-syft_download := ("curl -sSfL https://" + tool.syft.syft_installer +
-                     " | sh -s -- -b " + tool.syft.syft_exe_dir)
-  output, code := system(syft_download)
+  info("Attempting to install syft from " + tool.syft.syft_installer)
+
+  contents := url_get(tool.syft.syft_installer)
+
+  if not starts_with(contents, "#!") {
+    error("Unable to install syft into: " + tool.syft.syft_exe_dir + ": " +
+    contents)
+    
+    return false
+  }
+
+  trace("Downloaded syft successfully.")
+
+  installer := to_tmp_file(contents, ".sh")
+  cmdline   := "sh " + installer + " -b " + tool.syft.syft_exe_dir
+  
+  trace("Running: " + cmdline)
+  
+  sout, code := system(cmdline)
+
+  info(sout)
   if code == 0 {
     trace("Successfully installed syft into: " + tool.syft.syft_exe_dir)
     return true

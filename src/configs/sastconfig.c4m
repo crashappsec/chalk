@@ -31,15 +31,13 @@ semgrep_metrics:        Whether to ping semgrep. 'on' or 'off'. Defaults to 'off
 }
 
 func find_semgrep(ignore) {
-  output, code := system("which semgrep")
+  result := find_exe("semgrep", [])
 
-  if code != 0 {
+  if result == "" {
     trace("find_semgrep: Unable to find semgrep in $PATH")
-    return ""
+  } else {
+    trace("found semgrep at: " + result)
   }
-  output := output.strip()
-  trace("found semgrep at: " + output)
-  return output
 }
 
 func install_semgrep(ignore) {
