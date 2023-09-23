@@ -162,7 +162,7 @@ keyspec TIME_CHALKED {
     system:           true
     conf_as_system:   true
     since:            "0.1.0"
-    normalized_order:  5    
+    normalized_order:  5
     shortdoc:         "Time of Chalk mark insertion"
     doc:              """
 This is a string indicating the time of the chalk operation, in human
@@ -441,7 +441,7 @@ If, instead of an integer, you would like a more readable
 representation, check out the `DATE_CHALKED`, `TIME_CHALKED`,
 `TZ_OFFSET_WHEN_CHALKED` and `DATETIME_WHEN_CHALKED` keys, though
 those keys are computed once per-run, and not on a per-artifact basis.
-""" 
+"""
 }
 
 keyspec CHALK_PTR {
@@ -473,7 +473,7 @@ at the time of chalking:
  `TENANT_ID_WHEN_CHALKED` field, as set at the time of chalking.
  - **{random}** is replaced with the value of `CHALK_RAND`, as set at the
  time of chalking.
- 
+
 The above substitutions all occur, even if the given keys are not
 added to the software's chalk mark. See the documentation on those
 individual metadata keys for more information about their semantics.
@@ -554,7 +554,7 @@ keyspec HASH {
     standard:         true
     codec:            true
     since:            "0.1.0"
-    shortdoc:         "SHA-256 hash of the normalized, unmarked software"    
+    shortdoc:         "SHA-256 hash of the normalized, unmarked software"
     doc:              """
 Hash file of artifact w/o chalk in it, to ensure extracted chalk is
 intact.  The hash algorithm is specific to the codec, and is generally
@@ -741,7 +741,7 @@ time of chalking.
 
 This will contain the path information as found on the host on which
 the artifact was chalked.
-"""    
+"""
 }
 
 keyspec BUILD_ID {
@@ -771,7 +771,7 @@ field will contain the URI associated with the job, if found.
 This field is generally expected to be supplied by the user, and can
 use the same substitutions allowed for the `CHALK_PTR` field (see that
 key's documentation for more detail).
-"""    
+"""
 }
 
 keyspec BUILD_API_URI {
@@ -1004,7 +1004,7 @@ you will need locally for this to work).
 
 You may also set the field yourself if you have other tooling for
 collecting this information.
-"""    
+"""
 }
 
 keyspec ERR_INFO {
@@ -1115,7 +1115,7 @@ keyspec SIGNATURE {
     system:           true
     since:            "0.1.0"
     normalized_order: high()
-    shortdoc:         "Digital signature of the chalk mark"    
+    shortdoc:         "Digital signature of the chalk mark"
     doc:              """
 Embedded digital signature for artifact. Note that this is only
 supported for file system artifacts; containers and images use
@@ -1258,7 +1258,7 @@ those listed in the documentation for the chalk-time key,
 During insertion operations, this key is redundant with
 `ARTIFACT_TYPE`, so there is generally no reason to report on both of
 these at insertion time.
-"""    
+"""
 }
 
 keyspec _OP_ARTIFACT_PATH {
@@ -1301,7 +1301,7 @@ For extraction and exec operations, since they do not modify the
 artifact, this will represent the same post-chalked artifact hash,
 except in cases where the artifact isn't chalked, naturally.
 """
-    
+
 }
 
 keyspec _VALIDATED_METADATA {
@@ -1391,7 +1391,7 @@ keyspec _PROCESS_PID {
     type:             int
     standard:         true
     since:            "0.1.0"
-    shortdoc:         "Process PID for exec'd command"    
+    shortdoc:         "Process PID for exec'd command"
     doc: """
 The process ID of the running process associated with the artifact.
 
@@ -1783,6 +1783,7 @@ keyspec _IMAGE_DOCKER_VERSION {
     type:     string
     standard: true
     doc: """
+Docker version used to built the image
 """
 }
 
@@ -1791,6 +1792,7 @@ keyspec _IMAGE_AUTHOR {
     type:     string
     standard: true
     doc: """
+The author of the image (see LABEL maintainer)
 """
 }
 
@@ -1800,7 +1802,7 @@ keyspec _IMAGE_ARCHITECTURE {
     standard: true
     shortdoc: "Architecture reported for a container image"
     doc: """
-The reported architecture that the image was built for.
+The reported architecture that the image was built for, for example `amd64` or `ppc64le`.
 """
 }
 
@@ -1809,6 +1811,7 @@ keyspec _IMAGE_VARIANT {
     type:     string
     standard: true
     doc: """
+Specifies a variant of the CPU, for example `armv6l` to specify a particular CPU variant of the ARM CPU.
 """
 }
 
@@ -1827,8 +1830,19 @@ keyspec _IMAGE_OS_VERSION {
     type:     string
     standard: true
     doc: """
+Specifies the operating system version, for example 10.0.10586.
 """
 }
+
+# FIXME https://docs.docker.com/registry/spec/manifest-v2-2/
+#keyspec _IMAGE_OS_FEATURES {
+#    kind: RunTimeArtifact
+#    type: list[string]
+#    standard: true
+#    doc: """
+#Specifies an array of strings, each listing a required OS feature (for example on Windows win32k)
+#"""
+#}
 
 keyspec _IMAGE_SIZE {
     kind:     RunTimeArtifact
@@ -1836,7 +1850,7 @@ keyspec _IMAGE_SIZE {
     standard: true
     shortdoc: "Size of container image"
     doc: """
-The reported size of the image.
+The size in bytes of the image. This field exists so that a client will have an expected size for the content before validating. If the length of the retrieved content does not match the specified length, the content should not be trusted.
 """
 }
 
@@ -1845,6 +1859,7 @@ keyspec _IMAGE_ROOT_FS_TYPE {
     type:     string
     standard: true
     doc: """
+The type of the image's root filesystem
 """
 }
 
@@ -1853,6 +1868,7 @@ keyspec _IMAGE_ROOT_FS_LAYERS {
     type:     list[string]
     standard: true
     doc: """
+The layer IDs of the image's root filesystem
 """
 }
 
@@ -1861,6 +1877,7 @@ keyspec _IMAGE_HOSTNAME {
     type:     string
     standard: true
     doc: """
+The hostname a container uses for itself.
 """
 }
 
@@ -1869,6 +1886,7 @@ keyspec _IMAGE_DOMAINNAME {
     type:     string
     standard: true
     doc: """
+The domain name of the image.
 """
 }
 
@@ -1877,6 +1895,7 @@ keyspec _IMAGE_USER {
     type:     string
     standard: true
     doc: """
+User associated with the image.
 """
 }
 
@@ -1899,6 +1918,7 @@ keyspec _IMAGE_ENV {
     type:     list[string]
     standard: true
     doc: """
+The environment configuration of an image.
 """
 }
 
@@ -1907,6 +1927,7 @@ keyspec _IMAGE_CMD {
     type:     list[string]
     standard: true
     doc: """
+The default CMD of an image with its arguments.
 """
 }
 
@@ -1926,6 +1947,7 @@ keyspec _IMAGE_HEALTHCHECK_TEST {
     type:     list[string]
     standard: true
     doc: """
+Healthcheck command to be run to determine health status.
 """
 }
 
@@ -1934,6 +1956,7 @@ keyspec _IMAGE_HEALTHCHECK_INTERVAL {
     type:     string
     standard: true
     doc: """
+Interval by which to run the healthcheck command.
 """
 }
 
@@ -1942,6 +1965,7 @@ keyspec _IMAGE_HEALTHCHECK_TIMEOUT {
     type:     string
     standard: true
     doc: """
+Timeout after which the healthcheck is considered failed/unhealthy if not OK.
 """
 }
 
@@ -1950,6 +1974,8 @@ keyspec _IMAGE_HEALTHCHECK_START_PERIOD {
     type:     string
     standard: true
     doc: """
+Healthcheck start period provides initialization time for containers that need time to bootstrap.
+Probe failure during that period will not be counted towards the maximum number of retries.
 """
 }
 
@@ -1958,6 +1984,7 @@ keyspec _IMAGE_HEALTHCHECK_START_INTERVAL {
     type:     string
     standard: true
     doc: """
+The time between health checks during the container start period.
 """
 }
 
@@ -1966,6 +1993,7 @@ keyspec _IMAGE_HEALTHCHECK_RETRIES {
     type:     int
     standard: true
     doc: """
+How many time to attempt to retry the healthcheck before considering it failed.
 """
 }
 
@@ -1974,6 +2002,7 @@ keyspec _IMAGE_MOUNTS {
     type:     dict[string, `x]
     standard: true
     doc: """
+Different types of mounts (e.g., cache, bind) of an image
 """
 }
 
@@ -1982,6 +2011,7 @@ keyspec _IMAGE_WORKINGDIR {
     type:     string
     standard: true
     doc: """
+The WORKDIR instruction switches to a specific directory in the Docker image, like the application code directory, to make it easier to reference files in subsequent instructions.
 """
 }
 
@@ -2001,6 +2031,7 @@ keyspec _IMAGE_NETWORK_DISABLED {
     type:     bool
     standard: true
     doc: """
+Whether the networking stack of a container is isolated or not
 """
 }
 
@@ -2009,6 +2040,7 @@ keyspec _IMAGE_MAC_ADDR {
     type:     string
     standard: true
     doc: """
+The set MAC address for a container
 """
 }
 
@@ -2017,6 +2049,7 @@ keyspec _IMAGE_ONBUILD {
     type:     string
     standard: true
     doc: """
+The ONBUILD instruction which adds to the image a trigger instruction to be executed at a later time, when the image is used as the base for another build.
 """
 }
 
@@ -2025,6 +2058,7 @@ keyspec _IMAGE_LABELS {
     type:     dict[string, string]
     standard: true
     doc: """
+Key-value pairs adding metadata to images
 """
 }
 
@@ -2033,6 +2067,7 @@ keyspec _IMAGE_STOP_SIGNAL {
     type:     int
     standard: true
     doc: """
+The signal to be sent to the main process inside the container, which by default is SIGTERM
 """
 }
 
@@ -2041,6 +2076,7 @@ keyspec _IMAGE_STOP_TIMEOUT {
     type:     string
     standard: true
     doc: """
+The timeout, which is 10 seconds by default for each container to stop. If even one of your containers does not respond to SIGTERM signals, Docker will wait for 10 seconds at least.
 """
 }
 
@@ -2049,6 +2085,7 @@ keyspec _IMAGE_SHELL {
     type:     string
     standard: true
     doc: """
+The shell used within an image (e.g., `/bin/sh`) used to execute ENTRYPOINT, RUN and/or CMD commands
 """
 }
 
@@ -2057,6 +2094,7 @@ keyspec _IMAGE_VIRTUAL_SIZE {
     type:     int
     standard: true
     doc: """
+The amount of data used for the read-only image data used by the container plus the container's writable layer size.
 """
 }
 
@@ -2065,6 +2103,7 @@ keyspec _IMAGE_LAST_TAG_TIME {
     type:     string
     standard: true
     doc: """
+Last time an image was tagged.
 """
 }
 
@@ -2073,6 +2112,7 @@ keyspec _IMAGE_STORAGE_METADATA {
     type:     dict[string, string]
     standard: true
     doc: """
+Storage metadata (key value pairs) associated with an image.
 """
 }
 
@@ -2124,7 +2164,7 @@ keyspec _INSTANCE_ENTRYPOINT_ARGS {
     kind:             RunTimeArtifact
     type:             list[string]
     standard:         true
-    shortdoc: "Reported arguments passed to a container instance"    
+    shortdoc: "Reported arguments passed to a container instance"
     doc: """
 The arguments used when starting the instance.
 """
@@ -2145,28 +2185,28 @@ keyspec _INSTANCE_RESOLVE_CONF_PATH {
     kind:     RunTimeArtifact
     type:     string
     standard: true
-    doc: ""
+    doc: "Configuration path for DNS settings of the instance"
 }
 
 keyspec _INSTANCE_HOSTNAME_PATH {
     kind:     RunTimeArtifact
     type:     string
     standard: true
-    doc: ""
+    doc: "Configuration path for hostname settings of the instance"
 }
 
 keyspec _INSTANCE_HOSTS_PATH {
     kind:     RunTimeArtifact
     type:     string
     standard: true
-    doc: ""
+    doc: "Configuration path for hosts settings of the instance"
 }
 
 keyspec _INSTANCE_LOG_PATH {
     kind:     RunTimeArtifact
     type:     string
     standard: true
-    doc: ""
+    doc: "Path for storing logs for instance execution"
 }
 
 keyspec _INSTANCE_IMAGE_ID {
@@ -2228,7 +2268,7 @@ keyspec _INSTANCE_DRIVER {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    doc: ""
+    doc: "The instance driver (e.g., docker container driver, buildx) used, as reported by the runtime."
 }
 
 keyspec _INSTANCE_PLATFORM {
@@ -2256,6 +2296,7 @@ keyspec _INSTANCE_PROCESS_LABEL {
     type:             string
     standard:         true
     doc: """
+Process label for a running instance.
 """
 }
 
@@ -2264,6 +2305,7 @@ keyspec _INSTANCE_APP_ARMOR_PROFILE {
     type:             `x
     standard:         true
     doc: """
+Any AppArmor profile enabled for the instance.
 """
 }
 
@@ -2272,6 +2314,7 @@ keyspec _INSTANCE_EXEC_IDS {
     type:             `x
     standard:         true
     doc: """
+Instance execution ids as captured at runtime..
 """
 }
 
@@ -2280,6 +2323,7 @@ keyspec _INSTANCE_BINDS {
     type:             `x
     standard:         true
     doc: """
+Binds specified for a running instance.
 """
 }
 
@@ -2288,6 +2332,7 @@ keyspec _INSTANCE_CONTAINER_ID_FILE {
     type:             `x
     standard:         true
     doc: """
+An instance's container ID file
 """
 }
 
@@ -2296,6 +2341,7 @@ keyspec _INSTANCE_LOG_CONFIG {
     type:             `x
     standard:         true
     doc: """
+Log configuration for a running instance.
 """
 }
 
@@ -2304,6 +2350,7 @@ keyspec _INSTANCE_NETWORK_MODE {
     type:             string
     standard:         true
     doc: """
+Network mode for a running instance.
 """
 }
 
@@ -2311,42 +2358,42 @@ keyspec _INSTANCE_RESTART_POLICY_NAME {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Name of the restart policy for the running instance."
 }
 
 keyspec _INSTANCE_RESTART_RETRY_COUNT {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "An instance's restart retry count."
 }
 
 keyspec _INSTANCE_AUTOREMOVE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Whether the container should be getting removed after its stopped"
 }
 
 keyspec _INSTANCE_VOLUME_DRIVER {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Volume driver information (e.g., vieux/sshfs driver info) related to a running instance"
 }
 
 keyspec _INSTANCE_VOLUMES_FROM {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Mount an instance's volume from another container as described in this option"
 }
 
 keyspec _INSTANCE_CONSOLE_SIZE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "An instance's console size"
 }
 
 
@@ -2374,35 +2421,35 @@ keyspec _INSTANCE_CGROUP_NS_MODE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Cgroup namespace mode of an instance"
 }
 
 keyspec _INSTANCE_DNS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "DNS settings for an instance"
 }
 
 keyspec _INSTANCE_DNS_OPTIONS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "DNS options configured for the instance"
 }
 
 keyspec _INSTANCE_DNS_SEARCH {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "DNS search configuration for an instance."
 }
 
 keyspec _INSTANCE_EXTRA_HOSTS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Additional hosts to be looked up when there are network or DNS issues"
 }
 
 keyspec _INSTANCE_GROUP_ADD {
@@ -2416,7 +2463,7 @@ keyspec _INSTANCE_IPC_MODE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "IPC mode of an instance"
 }
 
 keyspec _INSTANCE_CGROUP {
@@ -2434,21 +2481,27 @@ keyspec _INSTANCE_LINKS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: """
+Links of a running instance (legacy):
+The link feature allows containers to discover each other and securely transfer information about one container to another container"
+"""
 }
 
+# https://docs.docker.com/engine/reference/run/#runtime-constraints-on-resources
 keyspec _INSTANCE_OOM_SCORE_ADJ {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Running instance's OOM preferences (-1000 to 1000)"
 }
 
 keyspec _INSTANCE_PID_MODE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: """
+The PID mode of the container (e.g. "host")
+"""
 }
 
 keyspec _INSTANCE_IS_PRIVILEGED {
@@ -2466,7 +2519,7 @@ keyspec _INSTANCE_PUBLISH_ALL_PORTS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Whether the instance publishes all exposed ports to the host interfaces"
 }
 
 keyspec _INSTANCE_READONLY_ROOT_FS {
@@ -2483,28 +2536,28 @@ keyspec _INSTANCE_SECURITY_OPT {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Security options for the running instance."
 }
 
 keyspec _INSTANCE_UTS_MODE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "UTS namespace mode for the running instance."
 }
 
 keyspec _INSTANCE_USER_NS_MODE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "User namespace mode for the running instance."
 }
 
 keyspec _INSTANCE_SHM_SIZE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Size of /dev/shm for the running instance. The format is <number><unit>"
 }
 
 keyspec _INSTANCE_RUNTIME {
@@ -2528,228 +2581,229 @@ container runtime.
 """
 }
 
+# https://docs.docker.com/config/containers/resource_constraints/
 keyspec _INSTANCE_CPU_SHARES {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "A value greater or less than the default of 1024, increases or reduces the instances's weight, and gives it access to a greater or lesser proportion of the host machine's CPU cycles"
 }
 
 keyspec _INSTANCE_MEMORY {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Memory allocated to the running instance"
 }
 
 keyspec _INSTANCE_NANO_CPUS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's NanoCpus that represents CPU quota in units of 10-9 CPUs."
 }
 
 keyspec _INSTANCE_CGROUP_PARENT {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Optional parent cgroup for the running instance"
 }
 
 keyspec _INSTANCE_BLOCKIO_WEIGHT {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's block IO weight (relative weight). Accepts a weight value between 10 and 1000."
 }
 
 keyspec _INSTANCE_BLOCKIO_WEIGHT_DEVICE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance' block IO weight (relative device weight, format: DEVICE_NAME:WEIGHT)"
 }
 
 keyspec _INSTANCE_BLOCKIO_DEVICE_READ_BPS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's limit on read rate from a device (format: <device-path>:<number>[<unit>]). Number is a positive integer. Unit can be one of kb, mb, or gb"
 }
 
 keyspec _INSTANCE_BLOCKIO_DEVICE_WRITE_BPS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's limit on write rate to a device (format: <device-path>:<number>[<unit>]). Number is a positive integer. Unit can be one of kb, mb, or gb.on "
 }
 
 keyspec _INSTANCE_BLOCKIO_DEVICE_READ_IOPS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's limit read rate (IO per second) from a device (format: <device-path>:<number>). Number is a positive integer."
 }
 
 keyspec _INSTANCE_BLOCKIO_DEVICE_WRITE_IOPS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's limit on write rate (IO per second) to a device (format: <device-path>:<number>). Number is a positive integer."
 }
 
 keyspec _INSTANCE_CPU_PERIOD {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's limit on the CPU CFS (Completely Fair Scheduler) period"
 }
 
 keyspec _INSTANCE_CPU_QUOTA {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's limit the CPU CFS (Completely Fair Scheduler) quota"
 }
 
 keyspec _INSTANCE_CPU_REALTIME_PERIOD {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's limit on the CPU real-time period. In microseconds. Requires parent cgroups be set and cannot be higher than parent. Also check rtprio ulimits."
 }
 
 keyspec _INSTANCE_CPU_REALTIME_RUNTIME {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's limit on the CPU real-time runtime. In microseconds. Requires parent cgroups be set and cannot be higher than parent. Also check rtprio ulimits."
 }
 
 keyspec _INSTANCE_CPUSET_CPUS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's CPUs in which to allow execution (0-3, 0,1)"
 }
 
 keyspec _INSTANCE_CPUSET_MEMS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's memory nodes (MEMs) in which to allow execution (0-3, 0,1). Only effective on NUMA systems."
 }
 
 keyspec _INSTANCE_DEVICES {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's devices."
 }
 
 keyspec _INSTANCE_CGROUP_RULES {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's cgroup rules."
 }
 
 keyspec _INSTANCE_DEVICE_REQUESTS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's device requests."
 }
 
 keyspec _INSTANCE_MEMORY_RESERVATION {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "The platform must guarantee the container can allocate at least the configured amount of memory"
 }
 
 keyspec _INSTANCE_MEMORY_SWAP {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "The amount of memory this container is allowed to swap to disk"
 }
 
 keyspec _INSTANCE_MEMORY_SWAPPINESS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Setting from 0 to 100 tuning the percentage of anonymous pages used by a running container instance that the host kernel can swap out."
 }
 
 keyspec _INSTANCE_OOM_KILL_DISABLE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Whether the out of memory kill is disabled for the running instance."
 }
 
 keyspec _INSTANCE_PIDS_LIMIT {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "The limit of an instance's PIDs. -1 denotes unlimited PIDs."
 }
 
 keyspec _INSTANCE_ULIMITS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "ulimit settings for the running instance."
 }
 
 keyspec _INSTANCE_CPU_COUNT {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "CPU count for the running instance."
 }
 
 keyspec _INSTANCE_CPU_PERCENT {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Percentage of CPU for the running instance"
 }
 
 keyspec _INSTANCE_IO_MAX_IOPS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "IO max IOPS setting for the running instance"
 }
 
 keyspec _INSTANCE_IO_MAX_BPS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "IO max BPS for the running instance"
 }
 
 keyspec _INSTANCE_MASKED_PATHS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Paths that are masked for the running instance, as they are not safe to mount inside the running instance."
 }
 
 keyspec _INSTANCE_READONLY_PATHS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Paths that are read-only for the running instance."
 }
 
 keyspec _INSTANCE_STORAGE_METADATA {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Storage metadata for the running instance."
 }
 
 keyspec _INSTANCE_MOUNTS {
@@ -2796,21 +2850,21 @@ keyspec _INSTANCE_ATTACH_STDIN {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Wether stdin is attached to a running instance, so it can be used within chained pipe commands."
 }
 
 keyspec _INSTANCE_ATTACH_STDOUT {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Wether stdout is attached to a running instance, so it can be used within chained pipe commands."
 }
 
 keyspec _INSTANCE_ATTACH_STDERR {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Wether stderr is attached to a running instance, so it can be used within chained pipe commands."
 }
 
 keyspec _INSTANCE_EXPOSED_PORTS {
@@ -2823,7 +2877,7 @@ Information on exposed ports from the runtime. The keys will be of the
 form 'port/family', e.g., `446/tcp`. The values are info about
 specific interfaces where those ports are bound, if
 provided. Otherwise, it's expected to be across all interfaces.
-"""    
+"""
 }
 
 keyspec _INSTANCE_HAS_TTY {
@@ -2840,56 +2894,56 @@ keyspec _INSTANCE_OPEN_STDIN {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's stdin open status"
 }
 
 keyspec _INSTANCE_STDIN_ONCE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Whether the container runtime should close the stdin channel after it has been opened by a single attach."
 }
 
 keyspec _INSTANCE_CMD {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's CMD"
 }
 
 keyspec _INSTANCE_CONFIG_IMAGE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's config image"
 }
 
 keyspec _INSTANCE_VOLUMES {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance volumes"
 }
 
 keyspec _INSTANCE_WORKING_DIR {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "WORKDIR of a running instance"
 }
 
 keyspec _INSTANCE_ENTRYPOINT {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance's entrypoint directive"
 }
 
 keyspec _INSTANCE_ONBUILD {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance on build directive"
 }
 
 keyspec _INSTANCE_LABELS {
@@ -2906,35 +2960,35 @@ keyspec _INSTANCE_BRIDGE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance bridge setting"
 }
 
 keyspec _INSTANCE_SANDBOXID {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance sandbox id"
 }
 
 keyspec _INSTANCE_HAIRPINMODE {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "HairpinMode of an instance"
 }
 
 keyspec _INSTANCE_LOCAL_IPV6 {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance local IPv6"
 }
 
 keyspec _INSTANCE_LOCAL_IPV6_PREFIX_LEN {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance local IPv6 prefix length"
 }
 
 keyspec _INSTANCE_BOUND_PORTS {
@@ -2953,28 +3007,28 @@ keyspec _INSTANCE_SANDBOX_KEY {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Instance sandbox key"
 }
 
 keyspec _INSTANCE_SECONDARY_IPS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "An instance's secondary IPs"
 }
 
 keyspec _INSTANCE_SECONDARY_IPV6_ADDRS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "An instance's secondary IPv6 addresses"
 }
 
 keyspec _INSTANCE_ENDPOINTID {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "An instance's endpoint id"
 }
 
 keyspec _INSTANCE_GATEWAY {
@@ -2994,14 +3048,14 @@ keyspec _INSTANCE_GLOBAL_IPV6_ADDRESS {
     shortdoc: "IPv6 address for instance"
     doc: """
 The externally bound IPv6 address for a container instance.
-"""    
+"""
 }
 
 keyspec _INSTANCE_GLOBAL_IPV6_PREFIX_LEN {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "An instance's global IPv6 prefix length."
 }
 
 keyspec _INSTANCE_IP {
@@ -3018,7 +3072,7 @@ keyspec _INSTANCE_IP_PREFIX_LEN {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "An instance's IP prefix length."
 }
 
 keyspec _INSTANCE_IPV6_GATEWAY {
@@ -3045,7 +3099,7 @@ keyspec _INSTANCE_NETWORKS {
     kind:             RunTimeArtifact
     type:             `x
     standard:         true
-    doc: ""
+    doc: "Networks for a running instance."
 }
 
 keyspec _REPO_TAGS {
@@ -3217,7 +3271,7 @@ This field will always be one of the following values:
  - `delete`, created via `chalk delete`
  - `env`, created when `chalk env` is called to create a moment-in-time report
    for a current environment.
- - `load`, created when a new configuration is inserted into a chalk binary. 
+ - `load`, created when a new configuration is inserted into a chalk binary.
  - `setup`, used for reporting on self-chalking after `chalk setup` is run.
  - `docker`, created for other (unhandled) docker commands, but not used in the
     default configuration.
@@ -3435,7 +3489,7 @@ keyspec _OP_ARGV {
     standard:       true
     system:         true
     since:          "0.1.0"
-    shortdoc: "Command-line arguments for the current Chalk op"    
+    shortdoc: "Command-line arguments for the current Chalk op"
     doc:              """
 This field contains the full contents of the command line arguments
 used to invoke `chalk` for the current invocation. This field cannot
@@ -3553,7 +3607,7 @@ keyspec _OP_CLOUD_METADATA {
     type:             string
     standard:         true
     since:            "0.1.0"
-    shortdoc:         "Cloud metadata during current operation"    
+    shortdoc:         "Cloud metadata during current operation"
     doc:              """
 Deprecated, and only available for the simplest of AWS environments.
 
@@ -3573,7 +3627,7 @@ keyspec _OP_ERRORS {
 Errors identified during the current operation, not associated with a
 particular artifact. See the documentation for `ERR_INFO`, which
 shares the same log-level configuration.
-"""    
+"""
 }
 
 keyspec _OP_HOST_REPORT_KEYS {
@@ -3596,7 +3650,7 @@ keyspec _OP_TCP_SOCKET_INFO {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
-    shortdoc: "Local TCP socket info during run-time exec op"    
+    shortdoc: "Local TCP socket info during run-time exec op"
     doc: """
 On Linux machines, will return information about existing TCP sockets,
 to the degree that the chalk process has permissions to access this
@@ -3621,7 +3675,7 @@ keyspec _OP_UDP_SOCKET_INFO {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
-    shortdoc: "Local UDP socket info during run-time exec op"    
+    shortdoc: "Local UDP socket info during run-time exec op"
     doc: """
 On Linux machines, will return UDP state information, to the degree
 that the chalk process has permissions to access this information.
@@ -3645,7 +3699,7 @@ keyspec _OP_IPV4_ROUTES {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
-    shortdoc: "Local IPV4 routes during run-time exec op"    
+    shortdoc: "Local IPV4 routes during run-time exec op"
     doc: """
 On Linux machines, will return IPV4 routing table information, to the
 degree that the chalk process has permissions to access this
@@ -3673,7 +3727,7 @@ keyspec _OP_IPV6_ROUTES {
     kind:             RunTimeHost
     type:             list[list[string]]
     standard:         true
-    shortdoc: "Local IPV6 routes during run-time exec op"    
+    shortdoc: "Local IPV6 routes during run-time exec op"
     since:            "0.1.0"
     doc: """
 On Linux machines, will return IPV6 routing table information, to the
@@ -3702,7 +3756,7 @@ keyspec _OP_IPV4_INTERFACES {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
-    shortdoc: "Local IPV4 interfaces during run-time exec op"    
+    shortdoc: "Local IPV4 interfaces during run-time exec op"
     doc: """
 On Linux machines, will return information on IPV4 interface status.
 
@@ -3725,7 +3779,7 @@ keyspec _OP_IPV6_INTERFACES {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
-    shortdoc: "Local IPV6 interfaces routes during run-time exec op"    
+    shortdoc: "Local IPV6 interfaces routes during run-time exec op"
     doc: """
 On Linux machines, will return information on IPV6 interface status.
 
@@ -3748,7 +3802,7 @@ keyspec _OP_ARP_TABLE {
     type:             list[list[string]]
     standard:         true
     since:            "0.1.0"
-    shortdoc: "Local ARP table during run-time exec op"    
+    shortdoc: "Local ARP table during run-time exec op"
     doc: """
 On Linux machines, will return the ARP table.
 
@@ -3770,7 +3824,7 @@ keyspec _OP_CPU_INFO {
     type:             dict[string, string]
     standard:         true
     since:            "0.1.0"
-    shortdoc: "Load info during exec op; to be expanded."    
+    shortdoc: "Load info during exec op; to be expanded."
     doc: """
 Currently, this just returns CPU basic load average info, including
 number of processes.
@@ -3792,7 +3846,7 @@ keyspec _OP_ALL_PS_INFO {
     type:             dict[string, dict[string, string]]
     standard:         true
     since:            "0.1.0"
-    shortdoc:         "Visible host process info found during exec op"    
+    shortdoc:         "Visible host process info found during exec op"
     doc: """
 For every process visible to Chalk, reports key process info.  The
 keys are the PID as a string, even when they are clearly numeric
