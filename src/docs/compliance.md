@@ -46,15 +46,15 @@ effectively, and make the data available to the people who need it.
 This recipe does assume access to your build system, and assumes your
 project successfully builds.
 
-## Steps
-
-### 1 - Download Chalk
+It also assumes you have Chalk installed.
 
 The easiest way to get Chalk is to download a pre-built binary from
 our [release page](https://crashoverride.com/releases). It's a
 self-contained binary with no dependencies to install.
 
-### 2 - Load a `compliance` configuration
+## Steps
+
+### Step 1 - Load a `compliance` configuration
 
 Chalk is designed so that you can easily pre-configure it for the
 behavior you want, so that you can generally just run a single binary
