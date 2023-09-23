@@ -164,7 +164,7 @@ proc saveToSecretManager*(content: string, prkey: string, apiToken: string): boo
     info("This secret is already saved.")
   elif response.status[0] != '2':
     error("When attempting to save signing secret: " & response.status)
-    info(response.body())
+    trace(response.body())
     return false
   else:
     info("Successfully stored secret.")
@@ -175,8 +175,7 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
   if cosignPw != "":
     return true
 
-  let
-    base: string = chalkConfig.getSecretManagerUrl()
+  let base: string = chalkConfig.getSecretManagerUrl()
 
   if len(base) == 0 or prkey == "" or apikey == "":
     return false
@@ -479,16 +478,12 @@ proc attemptToLoadKeys*(silent=false): bool =
       return false
 
   if use_api:
-    #let selfChalk = getSelfExtraction().get()
-    #let api_key = selfChalk.extract["$CHALK_API_KEY"]
-    #info("API extracted from self-chalkmark " & api_key)
-
     # get API key to pass to secret manager
     let boxedOptApi = selfChalkGetKey("$CHALK_API_KEY")
     if boxedOptApi.isSome():
       let boxedApi = boxedOptApi.get()
       apikey   = unpack[string](boxedApi)
-      info("API token retrieved from chalk mark: " & $apikey)
+      trace("API token retrieved from chalk mark: " & $apikey)
 
   var
     pubKey = tryToLoadFile(withoutExtension & ".pub")
@@ -524,11 +519,7 @@ template jwtSplitAndDecode(jwtString: string, doDecode: bool): string =
   if len(parts) != 3:
     raise newException(Exception, "Invalid JWT format")
   let apiJwtPayload = parts[1]
-  let apiJwtPayload2 = parts[2]
-  let apiJwtPayload0 = parts[0]
-  #info($decode(apiJwtPayload))
-  #info($decode(apiJwtPayload2))
-  #info($decode(apiJwtPayload0))
+
   if doDecode:
     let decodedApiJwt = decode(apiJwtPayload)
     $decodedApiJwt
@@ -578,22 +569,26 @@ proc getChalkApiToken(): string =
           ]
     failFr: string = "[☠☠☠☠]"
     succFr: string = "[❤❤❤❤]"
-    timeout: int = cast[int](chalkConfig.getSecretManagerTimeout())
-    uri:     Uri = parseUri("https://fcsoi192wd.execute-api.us-east-1.amazonaws.com/api/login")
-
+    timeout:   int = cast[int](chalkConfig.getSecretManagerTimeout())
+  
+  # set api login endpoint
+  var
+    login_url        = uri.parseUri(chalkConfig.getSecretManagerUrl())
+  login_url.path   = "/api/login" 
+  
   # request auth code from API
-  info("Requesting Chalk authentication code from " & $uri)
-  if uri.scheme == "https":
+  info("Requesting Chalk authentication code" & $login_url)
+  if login_url.scheme == "https":
     context = newContext(verifyMode = CVerifyPeer)
     client  = newHttpClient(sslContext = context, timeout = timeout)
   else:
     client  = newHttpClient(timeout = timeout)
-  response  = client.safeRequest(url = uri, httpMethod = HttpPost, body = "")
+  response  = client.safeRequest(url = login_url, httpMethod = HttpPost, body = "")
   client.close()
 
   if response.status.startswith("200"):
     # parse json response and save / return values
-    info(response.body())
+    trace(response.body())
     let jsonNode = parseJson(response.body())
     authId       = jsonNode["id"].getStr()
     authUrl      = jsonNode["authUrl"].getStr()
@@ -601,10 +596,6 @@ proc getChalkApiToken(): string =
     deviceCode   = jsonNode["deviceCode"].getStr()
     pollUrl      = jsonNode["pollUrl"].getStr()
     pollInt      = jsonNode["pollIntervalSeconds"].getInt()
-
-    # check JWT structure - original chalk authn api
-    # jwtString = $pollUrl.split("=")[1]
-    # apiJwtPayload = jwtSplitAndDecode(jwtString, false)
 
     # show user url to authentication against + qr code
     print("<h2>To login please follow this link in a browser:</h2>\n\n\t" & $authUrl & "\n")
@@ -615,10 +606,9 @@ proc getChalkApiToken(): string =
     # sit in sync loop polling the URL to see if user has authenticated
     print("<h2>Waiting for authentication to complete...</h2>\n")
     while not authnSuccess and not authnFailure:
-        # poll the API to see if login succeeded
-        #pollUri = parseUri($pollUrl)
-        pollUri = parseUri("https://fcsoi192wd.execute-api.us-east-1.amazonaws.com/api/poll/" & deviceCode)
-
+        # poll the API with deviceCode to see if login succeeded yet
+        pollUri = parseUri(pollUrl & deviceCode)
+      
         if pollUri.scheme == "https":
           contextPoll = newContext(verifyMode = CVerifyPeer)
           clientPoll  = newHttpClient(sslContext = contextPoll, timeout = timeout)
@@ -635,29 +625,23 @@ proc getChalkApiToken(): string =
           stdout.write(succFr)
           stdout.flushFile()
           print("<h5>Authentication successful!</h5>\n")
-
-          trace(responsePoll.status)
-          trace(responsePoll.body())
+          trace(responsePoll.status & responsePoll.body())
 
           # parse json response and save / return values()
           let jsonPollNode = parseJson(responsePoll.body())
-          #let userDict     = jsonPollNode["user"].getFields()
-          #token            = jsonPollNode["token"].getStr()
           token            = jsonPollNode["access_token"].getStr()
           trace($jsonPollNode)
 
           # decode JWT
           pollPayloadBase64 = jwtSplitAndDecode($token, true)
           let decodedPollJwt    = parseJson(pollPayloadBase64)
-          info($decodedPollJwt)
+          trace($decodedPollJwt)
           var userInfoStr = ""
           ret = $token
 
-        #elif responsePoll.status.startswith("428"):
         elif responsePoll.status.startswith("428") or responsePoll.status.startswith("403"):
-          trace(responsePoll.status)
           # sleep for requested polling period while showing spinner before polling again
-
+          
           # restart spinner animation - reset vars
           frameIndex     = 0
           framerate      = (pollInt * 1000) / frames.len
@@ -674,14 +658,14 @@ proc getChalkApiToken(): string =
             if totalSleepTime >= float(pollInt * 1000):
               break
         else:
-          info(responsePoll.status)
-          info(responsePoll.body())
           authnFailure = true
           eraseLine()
           stdout.write(failFr)
           stdout.flushFile()
           print("<h4>Authentication failed\n</h4>")
           error("Unhandled HTTP Error when polling authentication status. Aborting")
+          trace(responsePoll.status)
+          trace(responsePoll.body())
           break
 
   else:
@@ -697,7 +681,7 @@ proc getChalkApiToken(): string =
 proc attemptToGenKeys*(): bool =
   var apiToken = ""
   let use_api = chalkConfig.getApiLogin()
-  info($use_api)
+  
   if use_api:
     apiToken = getChalkApiToken()
     if apiToken == "":
