@@ -333,7 +333,7 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
     let
        boxedApi = boxedOptApi.get()
        apikey   = unpack[string](boxedApi)
-    info("API token retrieved from chalk mark: " & $apikey)
+    trace("API token retrieved from chalk mark: " & $apikey)
 
     if loadFromSecretManager(prikey, apikey):
       return true
@@ -636,8 +636,8 @@ proc getChalkApiToken(): string =
           stdout.flushFile()
           print("<h5>Authentication successful!</h5>\n")
 
-          info(responsePoll.status)
-          info(responsePoll.body())
+          trace(responsePoll.status)
+          trace(responsePoll.body())
 
           # parse json response and save / return values()
           let jsonPollNode = parseJson(responsePoll.body())
@@ -703,7 +703,7 @@ proc attemptToGenKeys*(): bool =
     if apiToken == "":
       return false
     else:
-      info("API Token received: " & apiToken)
+      trace("API Token received: " & apiToken)
 
 
   if getCosignLocation() == "":
