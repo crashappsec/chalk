@@ -168,6 +168,7 @@ proc saveToSecretManager*(content: string, prkey: string, apiToken: string): boo
     return false
   else:
     info("Successfully stored secret.")
+    warn("Please Note: Secrets that have not been READ in the previous 30 days will be deleted!")
   return true
 
 proc loadFromSecretManager*(prkey: string, apikey: string): bool =
