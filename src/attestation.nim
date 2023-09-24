@@ -508,10 +508,7 @@ proc attemptToLoadKeys*(silent=false): bool =
     return false
 
   cosignLoaded = true
-  if apikey != "":
-    return saveSigningSetup(pubKey, priKey, api_key, false)
-  else:
-    return saveSigningSetup(pubKey, priKey, "", false)
+  return true
 
 template jwtSplitAndDecode(jwtString: string, doDecode: bool): string =
   # this is pretty crude in terms of JWT structure validation to say the least
@@ -577,7 +574,7 @@ proc getChalkApiToken(): string =
   login_url.path   = "/api/login" 
   
   # request auth code from API
-  info("Requesting Chalk authentication code" & $login_url)
+  info("Requesting Chalk authentication code " & $login_url)
   if login_url.scheme == "https":
     context = newContext(verifyMode = CVerifyPeer)
     client  = newHttpClient(sslContext = context, timeout = timeout)
