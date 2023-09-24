@@ -84,7 +84,7 @@ proc macScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   if header.hasMachMagic():
     trace("Found MACH binary @ " & fullpath)
 
-    cache.binStream = stream
+    cache.binStream = newFileStream(fullPath)
     cache.binFName  = fullpath
 
     let ix = fullpath.find("_CHALK")
@@ -105,10 +105,11 @@ proc macScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       # It's an unmarked Mach-O binary of some kind.
       chalk = newChalk(name         = fullpath,
                        fsRef        = fullpath,
-                       stream       = stream,
                        resourceType = {ResourceFile},
                        cache        = cache,
                        codec        = self)
+
+      stream.close()
 
       return some(chalk)
   else:
@@ -168,7 +169,6 @@ proc macScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   # At this point, the marked object is well formed.
   chalk = newChalk(name         = fullpath,
                    fsRef        = fullpath,
-                   stream       = wrapStream,
                    resourceType = {ResourceFile},
                    cache        = cache,
                    codec        = self,
@@ -176,6 +176,11 @@ proc macScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
                    marked       = true)
 
   cache.b64 = some(lines[0])
+
+  if wrapStream != stream:
+    stream.close()
+
+  wrapStream.close()
 
   return some(chalk)
 

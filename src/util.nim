@@ -11,6 +11,31 @@
 import  std/tempfiles, osproc, posix, config, subscan, nimutils/managedtmp,
         std/monotimes
 
+proc increfStream*(chalk: ChalkObj) {.exportc.} =
+  if chalk.streamRefCt != 0:
+    chalk.streamRefCt += 1
+    return
+
+  chalk.streamRefCt = 1
+
+  if len(cachedChalkStreams) >= chalkConfig.getCacheFdLimit():
+    let removing = cachedChalkStreams[0]
+
+    trace("Too many cached file descriptors. Closing fd for: " & chalk.name)
+    try:
+      removing.stream.close()
+    except:
+      discard
+
+    removing.stream      = FileStream(nil)
+    removing.streamRefCt = 0
+    cachedChalkStreams = cachedChalkStreams[1 .. ^1]
+
+  cachedChalkStreams.add(chalk)
+
+proc decrefStream*(chalk: ChalkObj) =
+  chalk.streamRefCt -= 1
+
 let sigNameMap = { 1: "SIGHUP", 2: "SIGINT", 3: "SIGQUIT", 4: "SIGILL",
                    6: "SIGABRT",7: "SIGBUS", 9: "SIGKILL", 11: "SIGSEGV",
                    15: "SIGTERM" }.toTable()
@@ -169,8 +194,6 @@ elif hostOs == "macosx":
 
 else:
     template makeCompletionAutoSource() = discard
-
-
 
 proc autocompleteFileCheck*() =
   if isatty(0) == 0 or chalkConfig.getInstallCompletionScript() == false:
@@ -350,31 +373,6 @@ proc dockerFailsafe*(info: DockerInvocation) {.noreturn.} =
     exitCode = runDocker(info.originalArgs)
   doReporting("fail")
   quitChalk(exitCode)
-
-proc increfStream*(chalk: ChalkObj) {.exportc.} =
-  if chalk.streamRefCt != 0:
-    chalk.streamRefCt += 1
-    return
-
-  chalk.streamRefCt = 1
-
-  if len(cachedChalkStreams) >= chalkConfig.getCacheFdLimit():
-    let removing = cachedChalkStreams[0]
-
-    trace("Too many cached file descriptors. Closing fd for: " & chalk.name)
-    try:
-      removing.stream.close()
-    except:
-      discard
-
-    removing.stream      = FileStream(nil)
-    removing.streamRefCt = 0
-    cachedChalkStreams = cachedChalkStreams[1 .. ^1]
-
-  cachedChalkStreams.add(chalk)
-
-proc decrefStream*(chalk: ChalkObj) =
-  chalk.streamRefCt -= 1
 
 template chalkUseStream*(chalk: ChalkObj, code: untyped) {.dirty.} =
   var

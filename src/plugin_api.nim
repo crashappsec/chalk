@@ -69,11 +69,12 @@ template callGetChalkId*(obj: ChalkObj): string =
   cb(plugin, obj)
 
 template callHandleWrite*(obj: ChalkObj, toWrite: Option[string]) =
-  let
-    plugin = obj.myCodec
-    cb     = plugin.handleWrite
+  obj.chalkUseStream():
+    let
+      plugin = obj.myCodec
+      cb     = plugin.handleWrite
 
-  cb(plugin, obj, toWrite)
+    cb(plugin, obj, toWrite)
 
 proc findFirstValidChalkMark*(s:            string,
                               artifactPath: string,
@@ -285,7 +286,7 @@ proc getNewScriptContents*(fileContents: string,
   else:
     return fileContents[0 ..< cs] & markContents & fileContents[r .. ^1]
 
-proc scriptLoadMark*(codec:  Plugin, stream: FileStream,
+proc scriptLoadMark*(codec:  Plugin, stream: Stream,
                      path: string, comment: string):
                    Option[ChalkObj] =
   ## We expect this helper function will work for MOST
@@ -300,9 +301,10 @@ proc scriptLoadMark*(codec:  Plugin, stream: FileStream,
     chalk          = newChalk(name         = path,
                               fsRef        = path,
                               codec        = codec,
-                              stream       = stream,
                               resourceType = {ResourceFile})
     (toHash, dict) = contents.getUnmarkedScriptContent(chalk, comment)
+
+  stream.close()
 
   result = some(chalk)
 
@@ -382,30 +384,6 @@ proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
     if path.match(item):
       return true
 
-{.emit: """
-#include <unistd.h>
-#include <stdio.h>
-
-static int
-get_path_max()
-{
-  return PATH_MAX;
-}
-
-static void
-do_read_link(const char *filename, char *buf) {
-  readlink(filename, buf, PATH_MAX);
-}
-""".}
-
-proc do_read_link(s: cstring, p: pointer): void {.cdecl,importc,nodecl.}
-proc get_path_max(): cint {.cdecl,importc,nodecl.}
-
-proc readLink*(s: string): string =
-  var v = newStringOfCap(int(get_path_max()));
-  do_read_link(cstring(s), addr s[0])
-  result = resolvePath(v)
-
 template symlinkCheck(path: string) =
   if skipLinks:
     warn("Skipping symbolic link: " & path & """\n
@@ -426,7 +404,9 @@ or --copy to copy the file and replace the symlink.""")
     if i != 0:
       let opt = self.scanLocation(newPath)
       if opt.isSome():
-        result.add(opt.get())
+        let chalk = opt.get()
+        result.add(chalk)
+        chalk.chalkCloseStream()
 
 proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
                         seq[ChalkObj] =
@@ -435,64 +415,52 @@ proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
   result = @[]
 
   var
-    skipLinks  = false
-    useDstName = false
+    # The first item we pass to getAllFileNames(). If we're following file
+    # links then we're going to set it to false.
+    #
+    # But if we're skipping all links, we're still going to ask
+    # getAllFileNames() to return those links so that we can warn on
+    # them.
+    #
+    # The second item is the ACTUAL desirec behavior, which we check when
+    # we determine a link was yielded.
+    yieldLinks   = true
+    skipLinks    = false
+    followFLinks = false
 
   if isChalkingOp():
     let symLinkBehavior = chalkConfig.getSymlinkBehavior()
     if symLinkBehavior == "skip":
       skipLinks = true
     elif symLinkBehavior == "clobber":
-      useDstName = true
+      followFLinks = true
+      yieldLinks   = false
 
   for path in state.filePaths:
     trace("Codec " & self.name & ": beginning scan of " & path)
-    var info: FileInfo
-    try:
-      info = getFileInfo(path, followSymlink = false)
-    except:
-      continue
 
-    if info.kind == pcFile:
-      if path in state.fileExclusions: continue
-      if path.mustIgnore(state.skips): continue
-      trace(path & ": scanning file")
-      let opt = self.scanLocation(path)
+    let p = path.resolvePath()
+    for item in p.getAllFileNames(state.recurse, yieldLinks, followFLinks):
+      if item in state.fileExclusions or item.mustIgnore(state.skips):
+        continue
+      if skipLinks:
+        var info: FileInfo
+        try:
+          info = getFileInfo(path, followSymlink = false)
+        except:
+          continue
+        if info.kind == pcLinkToFile:
+          warn("Skipping symbolic link: " & path & """\n
+Use --clobber to follow and clobber the linked-to file when inserting,
+or --copy to copy the file and replace the symlink.""")
+          continue
+
+      trace(item & ": scanning file")
+      let opt = self.scanLocation(item)
       if opt.isSome():
-        result.add(opt.get())
-    elif info.kind == pcLinkToFile:
-      symLinkCheck(path)
-
-    elif state.recurse:
-      dirWalk(true):
-        if item in state.fileExclusions:     continue
-        if item.mustIgnore(state.skips):     continue
-        case getFileInfo(item, followSymlink = false).kind
-        of pcFile:
-          trace(item & ": scanning file")
-          let opt = self.scanLocation(item)
-          if opt.isSome():
-            result.add(opt.get())
-        of pcLinkToFile:
-          symlinkCheck(item)
-        else:
-          continue
-
-    else:
-      dirWalk(false):
-        if item in state.fileExclusions:     continue
-        if item.mustIgnore(state.skips):     continue
-        case getFileInfo(item, followSymlink = false).kind
-        of pcFile:
-          trace("Non-recursive dir walk examining: " & item)
-          let opt = self.scanLocation(item)
-          if opt.isSome():
-            result.add(opt.get())
-        of pcLinkToFile:
-          symLinkCheck(item)
-        else:
-          continue
-
+        let chalk = opt.get()
+        result.add(chalk)
+        chalk.chalkCloseStream()
 proc simpleHash(self: Plugin, chalk: ChalkObj): Option[string] =
   # The default if the stream can't be acquired.
   result = none(string)

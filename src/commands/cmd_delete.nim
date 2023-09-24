@@ -7,7 +7,7 @@
 
 ## The `chalk delete` command.
 
-import ../config, ../collect, ../reporting, ../plugin_api
+import ../config, ../collect, ../reporting, ../plugin_api, ../util
 
 proc runCmdDelete*(path: seq[string]) {.exportc,cdecl.} =
   setContextDirectories(path)

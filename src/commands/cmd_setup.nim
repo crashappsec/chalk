@@ -8,7 +8,7 @@
 ## The `chalk setup` command.
 
 import ../config, ../attestation, ../reporting, ../selfextract, ../util,
-       ../collect, strutils
+       ../collect
 
 proc runCmdSetup*(gen, load: bool) =
   setCommandName("setup")

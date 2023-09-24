@@ -344,13 +344,14 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
         if getCommandName() in ["insert", "docker"]:
           obj.persistInternalValues()
+        obj.chalkCloseStream()
         yield obj
 
         clearErrorObject()
         if not inSubscan() and not obj.forceIgnore and
            obj.name notin getUnmarked():
           obj.collectRuntimeArtifactInfo()
-          chalkCloseStream(obj)
+        obj.chalkCloseStream()
 
   if not inSubscan():
     if getCommandName() != "extract":
