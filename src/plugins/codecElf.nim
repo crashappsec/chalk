@@ -114,7 +114,7 @@ proc elfGetUnchalkedHash*(codec: Plugin, chalk: ChalkObj):
     let cache = ElfCodecCache(chalk.cache)
     let hashElf = newElfFileFromData(cache.fileData)
     if hashElf.parse() and hashElf.unchalk():
-      return some(hashElf.getChalkSectionData().sha256Hex())
+      return some(hashElf.getChalkSectionData().hex())
     return some(cache.fileData.sha256Hex())
   return none(string)
 
