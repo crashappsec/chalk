@@ -7,9 +7,8 @@ srcDir        = "src"
 bin           = @["chalk"]
 
 # Dependencies
-requires "nim >= 1.6.12"
-# TODO figure out why == does not work here
-requires "https://github.com/crashappsec/con4m.git#85753151161a9d2f874b193912598f5405fe9bb2"
+requires "nim >= 2.0.0"
+requires "https://github.com/crashappsec/con4m == 0.1.5"
 requires "https://github.com/viega/zippy == 0.10.7"
 requires "https://github.com/aruZeta/QRgen == 3.0.0"
 

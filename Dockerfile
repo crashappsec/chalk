@@ -2,41 +2,6 @@ FROM ghcr.io/crashappsec/nim:ubuntu-2.0.0 as nim
 FROM gcr.io/projectsigstore/cosign as cosign
 
 # -------------------------------------------------------------------
-# con4m install static deps for build which requires
-# more system deps so we do that in a separate docker step
-
-FROM nim as con4m
-
-# deps for compiling static deps
-RUN apt-get update -y && \
-    apt-get install -y \
-        autoconf \
-        cmake \
-        file \
-        g++ \
-        gcc \
-        git \
-        m4 \
-        make \
-        && \
-    apt-get clean -y
-
-WORKDIR /tmp/con4m
-
-# note this is not copied from nimble file on purpose
-# as static libs take a while to build so we want to cache
-# even when versions change
-ARG CON4M_VERSION=v0.1.1
-# for testing if we want to build on top of con4m branch
-# we can set this arg
-ARG CON4M_BRANCH=
-
-RUN set -x && \
-    git clone https://github.com/crashappsec/con4m . && \
-    git checkout ${CON4M_BRANCH:-${CON4M_VERSION}} && \
-    nimble install
-
-# -------------------------------------------------------------------
 
 FROM nim as deps
 
@@ -44,6 +9,7 @@ FROM nim as deps
 RUN apt-get update -y && \
     apt-get install -y \
         curl \
+        musl-tools \
         && \
     apt-get clean -y
 
@@ -54,7 +20,6 @@ RUN if which git; then git config --global --add safe.directory "*"; fi
 WORKDIR /chalk
 
 COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
-COPY --from=con4m /root/.local/c0 /root/.local/c0
 COPY *.nimble /chalk/
 
 # build chalk so that all deps are installed

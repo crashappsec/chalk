@@ -14,9 +14,6 @@ services:
     build:
       context: .
       target: deps
-      args:
-        # set if need to test con4m static libs
-        CON4M_BRANCH: ${CON4M_BRANCH:-}
     command: nimble ${CHALK_BUILD:-release}
     working_dir: /chalk
     volumes:
@@ -31,8 +28,6 @@ services:
       context: .
       args:
         CHALK_BUILD: ${CHALK_BUILD:-release}
-        # set if need to test con4m static libs
-        CON4M_BRANCH: ${CON4M_BRANCH:-}
       target: ${BASE:-ubuntu}
     working_dir: $PWD
     volumes:
