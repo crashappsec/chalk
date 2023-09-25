@@ -1,53 +1,50 @@
-# exec heartbeat
 exec.heartbeat: true
-exec.heartbeat_rate: <<10 seconds>>
+exec.heartbeat_rate: <<30 minutes>>
+
+sink_config output_to_screen {
+  sink:    "stdout"
+  enabled: true
+}
+
+sink_config output_to_http {
+  enabled: false
+  sink:    "post"
+  uri:     "http://some.web.location/webhook"
+}
+
+sink_config output_to_file {
+  sink:     "file"
+  enabled:  false
+  filename: "/tmp/network_heartbeat.log"
+}
+
+custom_report network_heartbeat_report {
+  report_template: "network_report"
+  # you can add/remove sinks in the list defined below
+  sink_configs: ["output_to_screen", "output_to_file", "output_to_http"]
+  use_when: ["heartbeat"]
+}
 
 # docker wrapping
 docker.wrap_entrypoint: true
 
 # network reporting template
 report_template network_report {
-  key.CHALK_ID.use                            = true
-  key.CHALK_PTR.use                           = true
-
-  key._OPERATION.use                          = true
-  key._TIMESTAMP.use                          = true
-
-  key._CHALKS.use                             = true
-
-  key._OP_PLATFORM.use                        = true
-  key._OP_HOSTNAME.use                        = true
-  key._OP_HOSTINFO.use                        = true
-  key._OP_NODENAME.use                        = true
-
-  key._OP_ERRORS.use                          = true
-
-  key._OP_TCP_SOCKET_INFO.use                 = true
-  key._OP_UDP_SOCKET_INFO.use                 = true
-  key._OP_IPV4_ROUTES.use                     = true
-  key._OP_IPV6_ROUTES.use                     = true
-  key._OP_IPV4_INTERFACES.use                 = true
-  key._OP_IPV6_INTERFACES.use                 = true
-  key._OP_ARP_TABLE.use                       = true
-}
-
-
-# output sinks
-sink_config network_std_out {
-  sink: "stdout"
-  enabled: true
-}
-
-sink_config network_file_out {
-  sink: "file"
-  enabled: true
-  filename: "~/network_heartbeat_log.log"
-}
-
-# custom reporting
-custom_report network_heartbeat_report {
-  enabled: true
-  report_template: "network_report"
-  sink_configs: ["network_std_out", "network_file_out"]
-  use_when: ["heartbeat"]
+  key.CHALK_ID.use            = true
+  key.CHALK_PTR.use           = true
+  key._OPERATION.use          = true
+  key._TIMESTAMP.use          = true
+  key._CHALKS.use             = true
+  key._OP_PLATFORM.use        = true
+  key._OP_HOSTNAME.use        = true
+  key._OP_HOSTINFO.use        = true
+  key._OP_NODENAME.use        = true
+  key._OP_ERRORS.use          = true
+  key._OP_TCP_SOCKET_INFO.use = true
+  key._OP_UDP_SOCKET_INFO.use = true
+  key._OP_IPV4_ROUTES.use     = true
+  key._OP_IPV6_ROUTES.use     = true
+  key._OP_IPV4_INTERFACES.use = true
+  key._OP_IPV6_INTERFACES.use = true
+  key._OP_ARP_TABLE.use       = true
 }
