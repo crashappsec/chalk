@@ -1,0 +1,32 @@
+# Make it easy to impersonate docker.
+default_command: "docker"
+
+# Collect runtime information by wrapping docker entry points.
+wrap_entrypoint: true
+
+# Set up output to our API server.
+# This bit configures the info.
+
+sink_config output_to_http {
+  enabled: true
+  sink:    "post"
+  uri:     "http://localhost:8080/report"
+}
+
+
+# We subscribe our new sink to the "report" topic, which is the main
+# report for any command.
+
+subscribe("report", "output_to_http")
+
+# Unsubscribe the 'default' log file report:
+
+unsubscribe("report", "default_out")
+
+
+# Optional: remove the terminal summary reports, which
+# are additional `custom` reports. These just need to have
+# their `enabled` property turned off.
+
+#  custom_report.terminal_chalk_time.enabled: false
+#  custom_report.terminal_other_op.enabled: false

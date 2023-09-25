@@ -54,7 +54,7 @@ self-contained binary with no dependencies to install.
 
 ## Steps
 
-### Step 1 - Load a `compliance` configuration
+### Step 1: Load a `compliance` configuration
 
 Chalk is designed so that you can easily pre-configure it for the
 behavior you want, so that you can generally just run a single binary
@@ -69,13 +69,13 @@ Assuming you've downloaded Chalk into your working directory, in the
 docker case, you would run:
 
 ```
-./chalk load https://chalkdust.io/compliance-docker
+./chalk load https://chalkdust.io/compliance-docker.c4m
 ```
 
 Otherwise, run:
 
 ```
-./chalk load https://chalkdust.io/compliance-other
+./chalk load https://chalkdust.io/compliance-other.c4m
 ```
 
 The profile we've loaded changes only three things from the default
@@ -94,7 +94,7 @@ By default, Chalk is already collecting provenance information by
 examining your project's build environment, including the .git
 directory and any common CI/CD environment variables.
 
-### 3 - Set up signing
+### Step 2: Set up signing
 
 Simply run:
 ```
@@ -113,7 +113,7 @@ At this point, your Chalk binary will have re-written itself to
 contain most of what it needs to sign, except for a `secret` that it
 requests dynamically from our secret service.
 
-### 4 - Chalk and Win
+### Step 3: Chalk and Win
 
 Now's that the binary is configured, you probably will want to move
 the `chalk` binary to a system directory that's in your `PATH`.
@@ -125,7 +125,7 @@ How you run chalk depends on whether you're building via `docker` or not:
 
 - *Without docker* : You simply invoke `chalk` in your build pipeline.
 
-#### 4a - Docker
+#### Step 3a: Docker
 
 Your `build` operations will add a file (the *"chalk mark"*) into the
 container with provenance info and other metadata, and any SBOM
@@ -157,7 +157,7 @@ use features that `chalk` doesn't understand), the program will
 *always* makes sure the original `docker` command gets run if it
 doesn't successfully exit when wrapped.
 
-#### 4b - when not using Docker
+#### Step 3b: when not using Docker
 
 When you invoke Chalk as configured, it searches your working
 directory for artifacts, collects environmental data, and then injects
@@ -180,7 +180,7 @@ file. JAR files (and other artifacts based on the ZIP format) are
 handled similarly to container images, and there are marking
 approaches for a few other formats, with more to come.
 
-### 5 - Tell people where to look
+### Step 4: Tell people where to look
 
 As configured, anyone with access to the artifact can use Chalk to not
 only see the chalk mark, but to validate the signature.

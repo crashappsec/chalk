@@ -297,6 +297,8 @@ As a big red button once told me, "That was easy!"
 
 Now, you can use the data however you like.
 
+<!---
+
 ## Related HowTos
 [The complete guide to network heartbeats with chalk](http://FIXME/LimingsDoc) 
 
