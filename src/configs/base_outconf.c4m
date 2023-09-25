@@ -66,7 +66,8 @@ outconf docker {
 custom_report chalk_usage_stats {
   sink_configs:     []
   ~report_template: "usage"
-  use_when:         ["insert", "build", "push", "delete"]
+  use_when:         ["insert", "build", "push", "delete", "exec",
+                     "load", "setup"]
 }
 
 custom_report audit {
