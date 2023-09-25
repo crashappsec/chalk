@@ -131,7 +131,7 @@ have the correct dependencies installed.
 
 If you are running on a **Linux** distribution the easiest way to
 build the project is to use the supplied container to both compile and
-run Chalk, which will install all dependencies properly.  This
+run Chalk, which will install all dependencies properly. This
 requires that you have [docker
 installed](https://docs.docker.com/engine/install/).
 
@@ -159,12 +159,12 @@ on MacOs), you will need to have Nim installed, generally with the
 Nimble package manager.
 
 The easiest way to do this, is with `choosenim` and then setting it to
-version 1.6.14 (Chalk does not work with Nim 2.0):
+version 2.0.0.
 
 ```sh
 curl https://nim-lang.org/choosenim/init.sh -sSf | sh
 export PATH=$PATH:~/.nimble/bin/
-choosenim 1.6.14
+choosenim 2.0.0
 ```
 
 All nim tools will live in ~/.nimble/bin, if you want to update in
@@ -185,7 +185,6 @@ desired.
 If you encounter any issues with building Chalk using the above instructions
 please submit an issue in
 [Chalk GitHub repository](https://github.com/crashappsec/chalk/issues)
-
 
 ## Learn More
 
