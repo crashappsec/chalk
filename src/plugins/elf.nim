@@ -6,17 +6,6 @@
 ##
 import ../config, algorithm
 
-# Notes:
-# Some improvements could be made:
-# - intersection is really only used as a count right now, so making
-#   a function that instead returns a count of intersections vs array
-
-# note on the below: ELF64_HEADER_SIZE is a weird one, because there is also
-# a field in the header to specify ELF64_HEADER_SIZE, I guess because it can
-# be larger than the 64 bytes? Although 32bit and 64bit ELF headers differ in
-# size, the only datapoint which should be required to distinguish them is the
-# value at ELF_CLASS_OFFSET. Anyway here we use the fixed size 64 to ensure
-# at least that much data is present
 const
   NOT8                       = uint64(0) - 9
   NULLBYTE                   = '\x00'
@@ -42,8 +31,7 @@ const
   ELF_MACHINE_16             = 0x12
   ELF_VERSION_32             = 0x14
 
-# ElfHeader 64bit-only field offsets
-const
+  # ELF header 64bit-only field offsets
   ELF64_ENTRY_64             = 0x18
   ELF64_PH_TABLE_64          = 0x20
   ELF64_SH_TABLE_64          = 0x28
@@ -53,8 +41,7 @@ const
   ELF64_SH_COUNT_16          = 0x3C
   ELF64_SH_STRIDX_16         = 0x3E
 
-# Program Header 64bit-only field offsets
-const
+  # Program header 64bit-only field offsets
   ELF64_PROGRAM_TYPE_32      = 0x00
   ELF64_PROGRAM_FLAGS_32     = 0x04
   ELF64_PROGRAM_OFFSET_64    = 0x08
@@ -63,8 +50,7 @@ const
   ELF64_PROGRAM_MEMSIZE_64   = 0x28
   ELF64_PROGRAM_ALIGN_64     = 0x30
 
-# Section Header
-const
+  # Section header
   ELF64_SECTION_NAME_32      = 0x00
   ELF64_SECTION_TYPE_32      = 0x04
   ELF64_SECTION_FLAGS_64     = 0x08
@@ -74,95 +60,104 @@ const
   ELF64_SECTION_ALIGN_64     = 0x30
   ELF64_SECTION_ENTRYSIZE_64 = 0x38
 
-const
+  # Section header string table index special value
+  SHN_UNDEF                  = 0x00
   SHN_LORESERVE              = 0xFF00
 
-# Chalk strings for the section header names
-const
-  SH_NAME_CHALKMARK*              = ".chalk.mark"
-  SH_NAME_CHALKFREE*              = ".chalk.free"
-  SHA256_BYTE_LENGTH*             = 32
+  # ELF header types
+  ET_NONE                    = 0x00
+  ET_REL                     = 0x01
+  ET_EXEC                    = 0x02
+  ET_DYN                     = 0x03
+  ET_CORE                    = 0x04
+  ET_LOOS                    = 0xFE00
+  ET_HIOS                    = 0xFEFF
+  ET_LOPROC                  = 0xFF00
+  ET_HIPROC                  = 0xFFFF
 
-# errors
-const
-  ERR_FAILED_ELF_HEADER_READ      = "failed to read enough data for ELF header"
-  ERR_BAD_ELF_MAGIC               = "incorrect ELF magic bytes"
-  ERR_ONLY_VERSION1               = "only ELF version 1 is supported"
-  ERR_ONLY_LITTLE_ENDIAN          = "only little-endian is supported"
-  ERR_ONLY_MACHINE_AMD64          = "only AMD64 architecture is supported"
-  ERR_ONLY_CLASS_ELF64            = "only ELF 64-bit is supported"
-  ERR_PROGRAM_OUT_OF_RANGE        = "program header table or entry beyond EOF"
-  ERR_SECTION_OUT_OF_RANGE        = "section header table or entry beyond EOF"
-  ERR_INVALID_FIELD               = "invalid size/count field"
-  ERR_PROGRAM_HEADER_SIZE         = "program header too small"
-  ERR_SECTION_HEADER_SIZE         = "section header too small"
-  ERR_NO_SHSTRTAB_UNIMPLEMENTED   = "unimplemented: missing shstrtab"
-  ERR_SHSTRTAB_LINK_UNIMPLEMENTED = "unimplemented: shstrtab uses sh_link"
-  ERR_SHSTRTAB_ADDRESS            = "unsupported: SH table has address"
+  PT_NULL                    = 0x00
+  PT_LOAD                    = 0x01
+  PT_DYNAMIC                 = 0x02
+  PT_INTERP                  = 0x03
+  PT_NOTE                    = 0x04
+  PT_SHLIB                   = 0x05
+  PT_PHDR                    = 0x06
+  PT_TLS                     = 0x07
+  PT_LOOS                    = 0x60000000
+  PT_HIOS                    = 0x6FFFFFFF
+  PT_LOPROC                  = 0x70000000
+  PT_HIPROC                  = 0x7FFFFFFF
+
+  SHT_NULL                   = 0x00
+  SHT_PROGBITS               = 0x01
+  SHT_SYMTAB                 = 0x02
+  SHT_STRTAB                 = 0x03
+  SHT_RELA                   = 0x04
+  SHT_HASH                   = 0x05
+  SHT_DYNAMIC                = 0x06
+  SHT_NOTE                   = 0x07
+  SHT_NOBITS                 = 0x08
+  SHT_REL                    = 0x09
+  SHT_SHLIB                  = 0x0A
+  SHT_DYNSYM                 = 0x0B
+  SHT_INIT_ARRAY             = 0x0E
+  SHT_FINI_ARRAY             = 0x0F
+  SHT_PREINIT_AT             = 0x10
+  SHT_GROUP                  = 0x11
+  SHT_SYMTABL_SHNDX          = 0x12
+  SHT_NUM                    = 0x13
+  SHT_LOOS                   = 0x60000000
+
+  # errors
+  ERR_ELF_PARSE_GENERAL      = "could not parse ELF"
+  ERR_ELF_HEADER_READ        = "failed to read enough data for ELF header"
+  ERR_BAD_ELF_MAGIC          = "incorrect ELF magic bytes"
+  ERR_ONLY_VERSION1          = "only ELF version 1 is supported"
+  ERR_ONLY_LITTLE_ENDIAN     = "only little-endian is supported"
+  ERR_ONLY_MACHINE_AMD64     = "only AMD64 architecture is supported"
+  ERR_ONLY_CLASS_ELF64       = "only ELF 64-bit is supported"
+  ERR_PROGRAM_OUT_OF_RANGE   = "program header table or entry beyond EOF"
+  ERR_NO_SECTION_TABLE       = "no section table defined"
+  ERR_SECTION_TABLE_ELF_HDR  = "table offset points inside ELF header"
+  ERR_SECTION_OUT_OF_RANGE   = "section header table or entry beyond EOF"
+  ERR_INVALID_FIELD          = "invalid size/count field"
+  ERR_PROGRAM_HEADER_SIZE    = "program header too small"
+  ERR_SECTION_HEADER_SIZE    = "section header too small"
+  ERR_SHSTRTAB_UNIMPLEMENTED = "unimplemented: missing shstrtab"
+  ERR_SHLINK_UNIMPLEMENTED   = "unimplemented: shstrtab uses sh_link"
+  ERR_SHTABLE_NOT_LAST       = "unsupported: SH table not at end"
+  ERR_SHSTRTAB_ADDRESS       = "unsupported: string section has address"
+  ERR_INVALID_SHSTRTAB       = "string section type is invalid (NOBITS)"
+  ERR_INVALID_STRTAB_INDEX   = "section name index beyond sizeof strtab"
+  ERR_SETCHALK_MISSING_CHALK = "setChalkSection(): no chalk section present"
+  ERR_SETCHALK_INVALID_NAME  = "setChalkSection(): invalid name length"
+  ERR_SETCHALK_INTERSECT     = "setChalkSection(): unexpected ELF structure"
+
+  # Chalk strings for the section header names
+  SH_NAME_CHALKMARK*         = ".chalk.mark"
+  SH_NAME_CHALKFREE*         = ".chalk.free"
+  SHA256_BYTE_LENGTH*        = 32
+
+  # range names
+  ELF_HEADER_NAME            = "ELF Header"
+  PROGRAM_TABLE_NAME         = "Program Header Table"
+  SECTION_TABLE_NAME         = "Section Header Table"
+
+  # logging strings for errors and testing
+  LOG_SECTION_TABLE_OFFSET   = "section table offset 0x"
+  LOG_SECTION_TABLE_SIZE     = "section table size 0x"
+  LOG_SECTION_HEADER         = "section header index 0x"
+  LOG_SECTION_OFFSET         = "section offset 0x"
+  LOG_SECTION_SIZE           = "section size 0x"
+  LOG_SECTION_NAME           = "section name "
+  LOG_PROGRAM_OFFSET         = "program offset 0x"
+  LOG_PROGRAM_SIZE           = "program size 0x"
+  LOG_PROGRAM_TYPE           = "program type 0x"
+  LOG_FILE_SIZE              = "file size 0x"
+  LOG_BEGIN_RANGE            = "BEGIN: "
+  LOG_END_RANGE              = "END:   "
 
 type
-  ElfType*                   = enum
-    ET_NONE                  = 0x00,
-    ET_REL                   = 0x01,
-    ET_EXEC                  = 0x02,
-    ET_DYN                   = 0x03,
-    ET_CORE                  = 0x04,
-    ET_LOOS                  = 0xFE00,
-    ET_HIOS                  = 0xFEFF,
-    ET_LOPROC                = 0xFF00,
-    ET_HIPROC                = 0xFFFF
-
-  ProgramHeaderType*         = enum
-    PT_NULL                  = 0x00,
-    PT_LOAD                  = 0x01,
-    PT_DYNAMIC               = 0x02,
-    PT_INTERP                = 0x03,
-    PT_NOTE                  = 0x04,
-    PT_SHLIB                 = 0x05,
-    PT_PHDR                  = 0x06,
-    PT_TLS                   = 0x07,
-    PT_LOOS                  = 0x60000000,
-    PT_HIOS                  = 0x6FFFFFFF,
-    PT_LOPROC                = 0x70000000,
-    PT_HIPROC                = 0x7FFFFFFF
-
-  SectionHeaderType*         = enum
-    SHT_NULL                 = 0x00,
-    SHT_PROGBITS             = 0x01,
-    SHT_SYMTAB               = 0x02,
-    SHT_STRTAB               = 0x03,
-    SHT_RELA                 = 0x04,
-    SHT_HASH                 = 0x05,
-    SHT_DYNAMIC              = 0x06,
-    SHT_NOTE                 = 0x07,
-    SHT_NOBITS               = 0x08,
-    SHT_REL                  = 0x09,
-    SHT_SHLIBa               = 0x0A,
-    SHT_DYNSYM               = 0x0B,
-    SHT_INIT_ARRAY           = 0x0E,
-    SHT_FINI_ARRAY           = 0x0F,
-    SHT_PREINIT_AT           = 0x10,
-    SHT_GROUP                = 0x11,
-    SHT_SYMTABL_SHNDX        = 0x12,
-    SHT_NUM                  = 0x13,
-    SHT_LOOS                 = 0x60000000
-
-  SectionHeaderFlags*        = enum
-    SHF_WRITE                = 0x01,
-    SHF_ALLOC                = 0x02,
-    SHF_EXECINSTR            = 0x04,
-    SHF_MERGE                = 0x10,
-    SHF_STRINGS              = 0x20,
-    SHF_INFO_LINK            = 0x40,
-    SHF_LINK_ORDER           = 0x80,
-    SHF_OS_NONCONFORMING     = 0x100,
-    SHF_GROUP                = 0x200,
-    SHF_TLS                  = 0x400,
-    SHF_ORDERED              = 0x4000000,
-    SHF_EXCLUDE              = 0x8000000,
-    SHF_MASKOS               = 0x0FF00000,
-    SHF_MASKPROC             = 0xF0000000
-
   fixedElfBytesCheck         = ref object of RootRef
     whence:                  int
     value:                   string
@@ -241,16 +236,16 @@ proc setInt[T](data: var string, whence: uint64, value: T) =
 proc showItem*(item: RootRef, prefix: string="") =
   if item of ElfSectionHeader:
     var sectionHeader = ElfSectionHeader(item)
-    echo prefix       &
-         "section 0x" & sectionHeader.offset.value.toHex() &
-         " size 0x"   & sectionHeader.size.value.toHex()   &
-         " name "     & sectionHeader.name
+    echo prefix &
+      LOG_SECTION_OFFSET & sectionHeader.offset.value.toHex() &
+      LOG_SECTION_SIZE   & sectionHeader.size.value.toHex()   &
+      LOG_SECTION_NAME   & sectionHeader.name
   elif item of ElfProgramHeader:
     var programHeader = ElfProgramHeader(item)
-    echo prefix       &
-         "program 0x" & programHeader.offset.value.toHex()     &
-         " size 0x"   & programHeader.sizeInFile.value.toHex() &
-         " name "     & $ProgramHeaderType(programHeader.headerType.value)
+    echo prefix &
+      LOG_PROGRAM_OFFSET & programHeader.offset.value.toHex()     &
+      LOG_PROGRAM_SIZE   & programHeader.sizeInFile.value.toHex() &
+      LOG_PROGRAM_TYPE   & programHeader.headerType.value.toHex()
   elif item of ElfElement:
     var element = ElfElement(item)
     echo prefix & element.name
@@ -299,6 +294,10 @@ proc highest*(self: Intersector): uint64 =
   self.sort()
   return self.keys[][^1]
 
+# NOTE on room for improvement: intersection is really only used as a count
+# right now, it might make sense to add a function which returns a count
+# instead of an array
+
 proc intersect*(self: Intersector, whence: uint64, size: uint64): seq[RootRef] =
   var starts     = self.starts
   var stops      = self.stops
@@ -330,12 +329,12 @@ proc show*(self: Intersector) =
       var endPoints = stops[key][]
       for index in countdown(high(endPoints), 0):
         var elfObject = endPoints[index]
-        showItem(elfObject, "END:   " & align("", depth, '-'))
+        showItem(elfObject, LOG_END_RANGE & align("", depth, '-'))
         depth -= 2
     if starts.hasKey(key):
       for elfObject in starts[key][]:
         depth += 2
-        showItem(elfObject, "BEGIN: " & align("", depth, '-'))
+        showItem(elfObject, LOG_BEGIN_RANGE & align("", depth, '-'))
 
 proc addElfIntValue[T](self:       ElfFile,
                        elfValue:   var ElfIntValue[T],
@@ -362,11 +361,11 @@ proc locateChalkSection(self: ElfFile) =
       self.chalkSectionHeader = header
     if header.name == SH_NAME_CHALKFREE:
       self.chalkSectionHeader = header
-      self.hasBeenUnchalked = true
+      self.hasBeenUnchalked   = true
 
 proc parseHeader*(self: ElfFile): bool =
   let
-    # skipping as many fields as I can for now, but these are necessary
+    # skipping many fields for now, but these are necessary
     checks = @[fixedElfBytesCheck(whence: ELF_MAGIC_32,
                                   value:  ELF_MAGIC_BYTES,
                                   error:  ERR_BAD_ELF_MAGIC),
@@ -383,8 +382,14 @@ proc parseHeader*(self: ElfFile): bool =
                                   value:  ELF_VERSION1,
                                   error:  ERR_ONLY_VERSION1)]
   var data = self.fileData
+  # note on the below: ELF64_HEADER_SIZE is a weird one, because there is also
+  # a field in the header to specify ELF64_HEADER_SIZE, I guess because it can
+  # be larger than the 64 bytes? Although 32bit and 64bit ELF headers differ in
+  # size, the only datapoint which should be required to distinguish them is the
+  # value at ELF_CLASS_OFFSET. Anyway here we use the fixed size 64 to ensure
+  # at least that much data is present
   if len(data) <= ELF64_HEADER_SIZE:
-    self.errors.add(ERR_FAILED_ELF_HEADER_READ)
+    self.errors.add(ERR_ELF_HEADER_READ)
     return false
   for index in low(checks) .. high(checks):
     var check = checks[index]
@@ -403,13 +408,13 @@ proc parseHeader*(self: ElfFile): bool =
     sectionCount:       getValue[uint16](data, ELF64_SH_COUNT_16),
     sectionStringIndex: getValue[uint16](data, ELF64_SH_STRIDX_16),
   )
-  self.ranges.insertString(0, ELF64_HEADER_SIZE, "ELF Header")
+  self.ranges.insertString(0, ELF64_HEADER_SIZE, ELF_HEADER_NAME)
   let shStrTabIndex = self.header.sectionStringIndex.value
   if shStrTabIndex == 0:
-    self.errors.add(ERR_NO_SHSTRTAB_UNIMPLEMENTED)
+    self.errors.add(ERR_SHSTRTAB_UNIMPLEMENTED)
     return false
   if shStrTabIndex >= SHN_LORESERVE:
-    self.errors.add(ERR_SHSTRTAB_LINK_UNIMPLEMENTED)
+    self.errors.add(ERR_SHLINK_UNIMPLEMENTED)
     return false
   if shStrTabIndex >= self.header.sectionCount.value:
     self.errors.add(ERR_SECTION_OUT_OF_RANGE)
@@ -422,7 +427,8 @@ proc parseProgramTable(self: ElfFile): bool =
   var elfHeader   = self.header
   var tableOffset = elfHeader.programTable.value
   if tableOffset > dataLen or tableOffset < ELF64_HEADER_SIZE:
-    # for more thorough checks we could add an interval tree, but not today
+    # we could add range intersection checks here but for now
+    # just doing a basic bounds check
     self.errors.add(ERR_PROGRAM_OUT_OF_RANGE)
     return false
   let programHeaderSize = elfHeader.programHeaderSize.value
@@ -437,7 +443,7 @@ proc parseProgramTable(self: ElfFile): bool =
     self.errors.add(ERR_PROGRAM_OUT_OF_RANGE)
     return false
   let ranges = self.ranges
-  ranges.insertString(tableOffset, programTableSize, "Program Header Table")
+  ranges.insertString(tableOffset, programTableSize, PROGRAM_TABLE_NAME)
   var offset = tableOffset
   while offset < tableOffset + uint64(programTableSize):
     var programHeader = ElfProgramHeader(
@@ -475,30 +481,29 @@ proc parseSectionHeader(self: ElfFile, offset: uint64): ElfSectionHeader =
       align:          getValue[uint64](data, offset+ELF64_SECTION_ALIGN_64))
 
 proc logInvalidSection(self: ElfFile, header: ElfSectionHeader, index: int) =
-  self.errors.add("section header index=0x" & index.toHex())
-  self.errors.add("section offset=0x" & header.offset.value.toHex())
-  self.errors.add("section size=0x" & header.size.value.toHex())
-  self.errors.add("file length=0x" & len(self.fileData).toHex())
+  self.errors.add(LOG_SECTION_HEADER & index.toHex())
+  self.errors.add(LOG_SECTION_OFFSET & header.offset.value.toHex())
+  self.errors.add(LOG_SECTION_SIZE   & header.size.value.toHex())
+  self.errors.add(LOG_FILE_SIZE      & len(self.fileData).toHex())
 
 proc parseSectionTable(self: ElfFile): bool =
-  #FIXME nitpick: move all strings to consts
   var data        = self.fileData
   var dataLen     = uint64(len(data))
   var elfHeader   = self.header
   var tableOffset = elfHeader.sectionTable.value
   if tableOffset > dataLen or tableOffset < ELF64_HEADER_SIZE:
     self.errors.add(ERR_SECTION_OUT_OF_RANGE)
-    self.errors.add("tableOffset=" & tableOffset.toHex())
+    self.errors.add(LOG_SECTION_TABLE_OFFSET & tableOffset.toHex())
     if tableOffset > dataLen:
-      self.errors.add("file length=" & dataLen.toHex())
+      self.errors.add(LOG_FILE_SIZE & dataLen.toHex())
     elif tableOffset == 0:
       #FIXME: file this as a known bug, and write an issue for
       # supporting this. It is possible to produce an ELF without
       # defining a section table, and in that case we could simply
       # add a section table, strtab, and chalk section
-      self.errors.add("no section table defined")
+      self.errors.add(ERR_NO_SECTION_TABLE)
     else:
-      self.errors.add("table offset points inside ELF header")
+      self.errors.add(ERR_SECTION_TABLE_ELF_HDR)
     return false
   let sectionHeaderSize = elfHeader.sectionHeaderSize.value
   if sectionHeaderSize < ELF64_SECTION_HEADER_SIZE:
@@ -507,15 +512,15 @@ proc parseSectionTable(self: ElfFile): bool =
   let sectionTableSize = sectionHeaderSize * elfHeader.sectionCount.value
   if sectionTableSize < sectionHeaderSize: # catches int wrap and sectionCount=0
     self.errors.add(ERR_INVALID_FIELD)
-    self.errors.add("calculated sectionTableSize=" & sectionTableSize.toHex())
+    self.errors.add(LOG_SECTION_TABLE_SIZE & sectionTableSize.toHex())
     return false
   if uint64(sectionTableSize) > dataLen:
     self.errors.add(ERR_SECTION_OUT_OF_RANGE)
-    self.errors.add("calculated sectionTableSize=" & sectionTableSize.toHex())
-    self.errors.add("file length=" & dataLen.toHex())
+    self.errors.add(LOG_SECTION_TABLE_SIZE & sectionTableSize.toHex())
+    self.errors.add(LOG_FILE_SIZE          & dataLen.toHex())
     return false
   let ranges = self.ranges
-  ranges.insertString(tableOffset, sectionTableSize, "Section Header Table")
+  ranges.insertString(tableOffset, sectionTableSize, SECTION_TABLE_NAME)
   var offset = tableOffset
   var sectionHeaders = self.sectionHeaders
   while offset < tableOffset + uint64(sectionTableSize):
@@ -531,10 +536,9 @@ proc parseSectionTable(self: ElfFile): bool =
         self.errors.add(ERR_SECTION_OUT_OF_RANGE)
         self.logInvalidSection(sectionHeader, len(sectionHeaders))
         return false
-        # not checking for int wrap since it would mean len(data)>=2**63
-        # ...in process memory...
-        # which, I mean amazing, but, *unlikely* ;) That being said, we should
-        # check if offset+size > data
+        # Not checking for int wrap here since it would mean len(data)>=2**63
+        # in process memory. That being said, this does check that offset+size
+        # is not more than the available data
       if sectionOffset + sectionSize > dataLen:
         self.errors.add(ERR_SECTION_OUT_OF_RANGE)
         self.logInvalidSection(sectionHeader, len(sectionHeaders))
@@ -546,7 +550,7 @@ proc parseSectionTable(self: ElfFile): bool =
   self.sectionHeaders   = sectionHeaders
   var nameSectionHeader = sectionHeaders[self.header.sectionStringIndex.value]
   if nameSectionHeader.headerType.value == uint32(SHT_NOBITS):
-    self.errors.add("string section type is invalid (NOBITS)")
+    self.errors.add(ERR_INVALID_SHSTRTAB)
     return false
   var startIndex        = int(nameSectionHeader.offset.value)
   var endIndex          = startIndex + int(nameSectionHeader.size.value)
@@ -558,7 +562,7 @@ proc parseSectionTable(self: ElfFile): bool =
     var nameIndex     = sectionHeader.nameIndex.value
     if nameIndex > maxNameIndex:
       self.errors.add(ERR_SECTION_OUT_OF_RANGE)
-      self.errors.add("section name index beyond sizeof strtab")
+      self.errors.add(ERR_INVALID_STRTAB_INDEX)
       return false
     sectionHeader.name = $(cstring(nameSection[int(nameIndex) .. ^1]))
   self.nameSectionHeader = nameSectionHeader
@@ -583,7 +587,7 @@ proc parseAndShow*(fileData: string) =
     fileData: fileData,
   )
   if not file.parse():
-    echo "parseAndShow(): could not parse elf"
+    echo ERR_ELF_PARSE_GENERAL
     return
   file.ranges.show()
 
@@ -596,6 +600,7 @@ proc setChalkSection*(self: ElfFile, name, data: string): bool =
   # file is: chalk section + strtab section + sh table
   let chalkHeader = self.chalkSectionHeader
   if chalkHeader == nil:
+    self.errors.add(ERR_SETCHALK_MISSING_CHALK)
     return false
 
   # for now just support the case of uniform length chalk section names,
@@ -603,13 +608,14 @@ proc setChalkSection*(self: ElfFile, name, data: string): bool =
   # see `IMPORTANT` comment referring to this check further down in this
   # function
   if len(chalkHeader.name) != len(name):
+    self.errors.add(ERR_SETCHALK_INVALID_NAME)
     return false
 
-  let eof                = uint64(len(self.fileData))
-  let chalkSectionOffset = chalkHeader.offset.value
-  var sectionTableOffset = self.header.sectionTable.value
-  var stringTableOffset  = self.nameSectionHeader.offset.value
-  let stringTableSize    = self.nameSectionHeader.size.value
+  let eof                    = uint64(len(self.fileData))
+  let chalkSectionOffset     = chalkHeader.offset.value
+  var sectionTableOffset     = self.header.sectionTable.value
+  var stringTableOffset      = self.nameSectionHeader.offset.value
+  let stringTableSize        = self.nameSectionHeader.size.value
   let sectionTableIntersects = self.ranges.intersect(sectionTableOffset,
                                                      eof - sectionTableOffset)
   let stringTableIntersects  = self.ranges.intersect(stringTableOffset,
@@ -625,6 +631,7 @@ proc setChalkSection*(self: ElfFile, name, data: string): bool =
     # does do some reordering, the reordering is in accordance with how chalk
     # marks are inserted--tl;dr this should be a rare (or never) case, and if
     # we find we need to support it we can revisit this
+    self.errors.add(ERR_SETCHALK_INTERSECT)
     return false
 
   # update the chalk header
@@ -712,7 +719,7 @@ proc insertChalkSection*(self: ElfFile, name: string, data: string): bool =
     else:
       truncateOffset = sectionTableOffset
   elif len(stringTableIntersections) == 1:
-    truncateOffset = stringTableOffset
+    truncateOffset   = stringTableOffset
   # else truncateOffset is eof
 
   # Now begin calculating the changes.
@@ -723,8 +730,8 @@ proc insertChalkSection*(self: ElfFile, name: string, data: string): bool =
 
   # next setup the string table string table
   # first store the original string data
-  var stringTableData  = self.fileData[stringTableOffset ..<
-                                       stringTableOffset + stringTableSize]
+  var stringTableData    = self.fileData[stringTableOffset ..<
+                                         stringTableOffset + stringTableSize]
 
   # save the old string table offset, which we'll need to use a few lines down,
   # the explanation for which is given when we use it
@@ -799,11 +806,11 @@ proc insertChalkSection*(self: ElfFile, name: string, data: string): bool =
   else:
     sectionTableData &= sectionHeader
 
-  var fileData = self.fileData
-  fileData = fileData[0 ..< truncateOffset]
-  fileData &= chalkSectionData
-  filedata &= stringTableData
-  fileData &= sectionTableData
+  var fileData  = self.fileData
+  fileData      = fileData[0 ..< truncateOffset]
+  fileData     &= chalkSectionData
+  filedata     &= stringTableData
+  fileData     &= sectionTableData
   self.fileData = fileData
   return self.parse()
 
@@ -816,12 +823,12 @@ proc unchalk*(self: ElfFile): bool =
     if not self.setChalkSection(SH_NAME_CHALKFREE, unmark):
       return false
   var chalkOffset = self.chalkSectionHeader.offset.value
-  var unchalked = self.fileData[0 ..< chalkOffset] &
-                  self.fileData[chalkOffset + SHA256_BYTE_LENGTH .. ^1]
-  var hash = unchalked.sha256()
-  self.fileData = self.fileData[0 ..< chalkOffset] &
-                  hash                             &
-                  self.fileData[chalkOffset + SHA256_BYTE_LENGTH .. ^1]
+  var unchalked   = self.fileData[0 ..< chalkOffset] &
+                    self.fileData[chalkOffset + SHA256_BYTE_LENGTH .. ^1]
+  var hash        = unchalked.sha256()
+  self.fileData   = self.fileData[0 ..< chalkOffset] &
+                    hash                             &
+                    self.fileData[chalkOffset + SHA256_BYTE_LENGTH .. ^1]
   return true
 
 proc getChalkSectionData*(self: ElfFile): string =
@@ -831,14 +838,6 @@ proc getChalkSectionData*(self: ElfFile): string =
   let offset = chalkHeader.offset.value
   let size   = chalkHeader.size.value
   return self.fileData[offset ..< offset + size]
-
-proc extractChalk*(self: ElfFile): string =
-  if self.chalkSectionHeader == nil or self.hasBeenUnchalked:
-    return ""
-  let chalkHeader = self.chalkSectionHeader
-  let chalkStart  = chalkHeader.offset.value
-  let chalkEnd    = chalkStart + chalkHeader.size.value
-  return self.fileData[chalkStart ..< chalkEnd]
 
 proc newElfFileFromData*(fileData: string): ElfFile =
   return ElfFile(
