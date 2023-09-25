@@ -38,13 +38,13 @@ Wrap your Docker builds with Chalk to:
 
 1. Automatically collect information about software in CI/CD.
 
-2. Automatically Configure built containers to report information on
-start-up.
+2. Automatically configure built containers to report information on
+   start-up.
 
-Send the data to a web service (that we'll deploy via Docker) running
-SQLite.
+3. Send the data to a web service. For the purposes of this guide, we will
+   locally deploy a web server backed by SQLite via Docker.
 
-### Alernative solutions
+### Alternative solutions
 
 Many companies have artifact repositories, but they don't do a good
 job providing a clear line back to the repo, developer and version.
@@ -96,7 +96,7 @@ info you collect with SQL, or by adding any frontend you desire.
 Or, you can easily use any HTTP / HTTPS endpoint you like.
 
 The base configuration for this recipe though, will assume the
-reporting container is always running on 'localhost:7878'.
+reporting container is always running on 'localhost:8585'.
 
 We can fix that after we get things up and running. For now, let's
 just install the base.
@@ -104,7 +104,7 @@ just install the base.
 Assuming that you've downloaded Chalk, and it's in your current
 directory, you would simply run:
 
-```
+```bash
 ./chalk load https://chalkdust.io/app-inventory.c4m
 ```
 
@@ -119,11 +119,11 @@ not, then copy the binary and run it from someplace you do.
 We are going to set up two containers:
 
 1. A simple Python-based API Server that will accept reports from the
-chalk binary we're configuring, and stick things in the SQLite
-database.
+   chalk binary we're configuring, and stick things in the SQLite
+   database.
 
 2. A container running an SQLite Web interface to give us a reasonable
-GUI on top of it.
+   GUI on top of it.
 
 Both of these images will need to share a single SQLite database. The
 API server we'll want to configure to listen for connections on
@@ -137,17 +137,34 @@ Let's put our SQLite database in `~/.local/c0/chalkdb.sqlite`.
 First, let's start up the API server, which will create our database
 for us:
 
-```
-docker run --rm -d -w /db -v ${HOME}/.local/c0/:/db ghcr.io/crashappsec/chalk-test-server
+```bash
+docker run \
+    --rm \
+    -d \
+    -w /db \
+    -v $HOME/.local/c0/:/db \
+    -p 8585:8585 \
+    ghcr.io/crashappsec/chalk-test-server
 ```
 
 This will set up an API server on port 8585 on your machine,
-accessible from any interface. Note, it will run in the foreground, 
+accessible from any interface. Note, it will run in the background.
+You can verify the healthcheck of the server by running
+
+```bash
+curl http://localhost:8585/health
+```
 
 Now, let's start up the SQL browser container on port 8080:
 
-```
-docker run --rm -d -e SQLITE_DATABASE=/db/chalkdb.sqlite -v {$HOME}/.local/c0/:/db coleifer/sqlite-web
+```bash
+docker run \
+    --rm \
+    -d \
+    -e SQLITE_DATABASE=/db/chalkdb.sqlite \
+    -v $HOME/.local/c0/:/db \
+    -p 8080:8080 \
+    coleifer/sqlite-web
 ```
 
 The database GUI will be available on port 8080. But, our database
@@ -159,18 +176,22 @@ data after we've got a bit of it.
 Our Chalk binary just needs to point to our API server. Lets first
 dump the configuration we loaded to a file:
 
-`chalk dump app-inventory.c4m`
+```bash
+chalk dump app-inventory.c4m
+```
 
 Now, open `app-inventory.c4m` in your favorite text editor.
 
 You'll see the following:
 
-```
+```con4m
+...
 sink_config output_to_http {
   enabled: true
   sink:    "post"
-  uri:     "http://localhost:8080/report"
+  uri:     "http://localhost:8585/report"
 }
+...
 ```
 
 Edit the URI to point to your API container; you really just need to
@@ -179,11 +200,13 @@ one).
 
 Once you've saved your change, reconfigure your binary with:
 
-`chalk load app-inventory.c4m`
+```bash
+chalk load app-inventory.c4m
+```
 
-### Step 4: Automate calling docker via `chalk` in your build environment. 
+### Step 4: Automate calling docker via `chalk` in your build environment.
 
-You *could* now deploy chalk and ask everyone to run it by invoking
+You _could_ now deploy chalk and ask everyone to run it by invoking
 `chalk` before their docker commands. But that's easy to forget. It's
 really better to automatically call `chalk` when invoking Docker.
 
@@ -194,7 +217,7 @@ configuration, usually `/etc/bash.bashrc` (but less commonly
 
 This runs when any bash shell starts. All you need to add to it is:
 
-```
+```bash
 alias docker=chalk
 ```
 
@@ -202,13 +225,13 @@ Then, you need to move `chalk` to someplace that's going to be in the
 default path (usually putting it in the same directory as your docker
 executable is a safe bet).
 
-> 💀 We do *not* recomment /etc/profile.d because some (non-login)
-  shells will not use this.
+> 💀 We do _not_ recomment /etc/profile.d because some (non-login)
+> shells will not use this.
 
 Once you add this, you can log out and log back in to make the alias
 take effect, our simply `source` the file:
 
-```
+```bash
 source /etc/bash.bashrc
 ```
 
@@ -223,16 +246,13 @@ in our case:
 1. Collects information about the build environment; and
 
 2. Slightly adjusts the Docker input so that Chalk will also start up
-with containers, and report to your Inventory web service.
+   with containers, and report to your Inventory web service.
 
 ### Step 5: Use it!
 
 Build and deploy some workloads. Once you do, from the machine you
-deployed the containers, browse to:
-
-```
-http://localhost:8080
-```
+deployed the containers, browse SQLite database at
+[http://localhost:8080](http://localhost:8080).
 
 The database will be capturing both the repositories you're using to
 build, and the containers you deploy.
@@ -242,11 +262,29 @@ unique per container, but be associated both with the repository
 information AND the containers you deploy.
 
 > ❗While you may be tempted to correlate by container ID, note that
-  Docker `push` operations will generally result in the remote
-  container being different, so running containers are very likely to
-  report different image IDs. Chalk does capture the relationship when
-  wrapping `docker push`, but you'll have to go through extra work to
-  link them together; the CHALK_ID will work.
+> Docker `push` operations will generally result in the remote
+> container being different, so running containers are very likely to
+> report different image IDs. Chalk does capture the relationship when
+> wrapping `docker push`, but you'll have to go through extra work to
+> link them together; the CHALK_ID will work.
+
+In addition to manually browsing the SQLite database, you can query
+some of the data via the API.
+
+To list all built docker images you can list all chalk marks:
+
+```bash
+curl "http://localhost:8585/chalks" -s | jq
+```
+
+To see all `exec` chalk reports from running containers:
+
+```bash
+curl "http://localhost:8585/reports?operation=exec" -s | jq
+```
+
+To see all available endpoints you can see the Swagger docs of the API
+at [http://localhost:8585/docs](http://localhost:8585/docs)
 
 ## Suggested Next Steps
 

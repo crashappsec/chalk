@@ -2,7 +2,7 @@
 default_command: "docker"
 
 # Collect runtime information by wrapping docker entry points.
-wrap_entrypoint: true
+docker.wrap_entrypoint: true
 
 # Set up output to our API server.
 # This bit configures the info.
@@ -10,7 +10,7 @@ wrap_entrypoint: true
 sink_config output_to_http {
   enabled: true
   sink:    "post"
-  uri:     "http://localhost:8080/report"
+  uri:     "http://localhost:8585/report"
 }
 
 

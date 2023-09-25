@@ -12,6 +12,8 @@ on:
       - tests/**
       - config.nims
       - "*.nimble"
+    paths-ignore:
+      - src/docs/**
   workflow_dispatch:
     inputs:
   schedule:
