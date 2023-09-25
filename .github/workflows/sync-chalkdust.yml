@@ -1,0 +1,40 @@
+name: chalkdust
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - configs/**
+  workflow_dispatch:
+    inputs:
+
+permissions:
+  contents: read
+  id-token: write # for aws role
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    concurrency:
+      # only allow one job per PR running
+      # older pending jobs will be cancelled not to waste CI minutes
+      # cannot use github.job here https://github.com/community/community/discussions/13496
+      group: ${{ github.workflow }}-chalkdust-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Assume AWS Role
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.CHALKDUST_SYNC_ROLE }}
+          role-session-name: GithubSync
+
+      - name: Sync Configs
+        run: |
+          aws s3 sync configs/ s3://${{ secrets.CHALKDUST_BUCKET }} --delete
