@@ -1,191 +1,60 @@
-# Chalk: GPS for Software.
+![Chalk Logo](https://crashoverride.com/images/logos/chalk-logo.png)
 
-Chalk is designed to make it incredibly easy to correlate knowledge
-about code in your dev environment to what's actually running in
-production.
+# Total visibility of your software engineering lifecycle.
 
-Chalk can capture metadata at build time, and can, at that point, add
-a small 'chalk mark' to any artifacts, so they can be identified in
-production. Chalk can also extract chalk marks and collect metadata
-about the operating environment when it does so.
+## About Chalk
 
-It's also very easy to collect custom metadata, and control where
-metadata goes.
+Chalk™ captures metadata at build time, and can add a small 'chalk mark' (metadata) to any artifacts, so they can be identified in production. Chalk can also extract chalk marks and collect additional metadata about the operating environment when it does this.
 
-This is all geared to help people connect the dots much more quickly:
+Using Chalk, you can build a graph connecting development and production, so that devops engineers understand what is happening in the development process, and so that developers can understand what is happening in the infrastructure. With this information they can work better together.
 
-- When there's any kind of production issue, you can easily figure out
-  exactly which build you're dealing with (down to the commit).
+Visibility into development and production also enables security engineers to better manage risk. 
 
-- If you don't own the software, but have to investigate an incident,
-  you can easily figure out where the code lives, how it was built, and
-  who owns it.
+## How-tos
 
-- You can come into a code base, and easily understand the environments
-  where particular branches are running.
+You can use Chalk to solve a variety of specific use cases such as: 
 
-For developers / DevOps types, this can not only be useful when there
-are incidents, but it can help other functions get the answers they
-need, without having to come to you for knowlege.
+#### How-to build a central SBOM registry 
+Automatically create SBOMs for every build of every code repo, including auto-deploying and using built-in SBOM generation and collection tools. Send these SBOMs to a central location for further analysis, and to maintain a record across your environment. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-build-and-maintain-an-sbom-registry).
 
-For instance, security teams often look to understand who owns software,
-and then, to do their jobs, generally need help understanding where it's
-deployed, how it relates to other software, how it was built, and so on.
-This not only can help with their incident response, but can keep them
-from pursuing "incidents" on repos that security tools are flagging that
-aren't even in use.
+#### How-to build a real-time application inventory
+From a code base, easily understand the environments where code and even particular branches are running. Gather code owners for the applications and code repos. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-build-a-real-time-application-inventory).
 
-Additionally, Chalk aims to shelter developers from having to spend
-unnecessary time on emerging security requirements. The security team
-feels you need to collect SBOMs or produce attestations on the build
-provenance? They can do the work to set it up, and it can all be
-transparent to everyone else.
+#### How-to handle "software security supply chain" requests with minimal effort
+Many companies and the US Government are now mandating suppliers providing supply chain statements when delivering software. This how to is an easy button to deliver the SBOM, code and builds provenance and supports [SLSA](https://www.slsa.dev), Supply-chain Levels for Software Artifacts, [level 2](https://slsa.dev/spec/v1.0/levels) compliance (an emerging supply chain standard) before SLSA [level 1](https://slsa.dev/spec/v1.0/levels) has been mandated. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-handle-software-security-supply-chain-requests-with-minimal-effort).
 
-## Overview
+#### How-to keep track of your container network services
+Understanding which services run in containers can help you build a service map. Use Chalk to automatically create periodic reports on container network tables, or visibility into service availability. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-keep-track-of-your-containers-network-services).
 
-1. Chalk collects metadata about software during the build process. It's
-   easily extensible what's collected. You control where that metadata
-   goes.
+All documentation for Chalk is available at https://crashoverride.com/docs and is also fully accessible though the command line interface.
 
-1. Chalk makes it easy to tell what collected metadata ties to what
-   artifacts. It does this by adding a 'chalk mark' to software (which does
-   not affect execution in any way). This chalk mark is easy to grep for;
-   the chalk tool can also extract marks.
+## Getting started
 
-1. Chalk, on release, will ship with an API server with an attached
-   SQLLite database, so that you can get started easily with a central
-   repository for information on software.
+We recommend following the [getting started guide](/src/docs/getting-started.md) on our documentation web site. Full documentation is also available directly inside the CLI. 
 
-### Data collection Capabilities
+We provide free binary downloads on our [release page](https://crashoverride.com/releases).
 
-By default, Chalk collects information about the repository software
-is built from, and basic information the artifacts produced. That can
-include, for instance, if a Docker image gets pushed, the info for the
-new image, and to where it got pushed.
-
-You can also turn on third party CI/CD-time integrations, like Semgrep
-(static security analysis), or SBOM generation tools.
-
-Additionally, if you use Chalk to extract marks from production, it
-can report basic information about the host operating environment. If
-you like, you can configure Chalk in 'exec' mode, where you have it be
-your entry point; it starts your process, then in the background ships
-metadata back to you. Or you can just have your software run a chalk
-report whenever you like as an easy push-based health check (and you can
-easily configure it to send back custom app data).
-
-## Getting Started
-
-The way to get started is to pull and run our Chalk configuration tool
-(or, download and run it). You can just have it give you a default
-configuration, or you can do light customization. If you want to do
-more advanced customization, you can create your own configuration file
-manually, and have Chalk inject it into itself. That will be covered in
-coming tutorials for advanced use cases.
-
-As part of the configuration, you can choose to send data to any HTTPS
-endpoint that accepts JSON, to files, or to an S3 bucket. And, we will
-soon give a couple of additional options:
-
-1. You will be able to send data to Crash Override's service. You'll
-   be enrolled in the free tier as part of the process. Note that at this
-   time, being pre-release, there is ONLY a free tier. Our intent is to
-   layer additional enterprise functionality on top of this; we'd love to
-   make basic chalk management easy and free, wherever was can reasonably
-   afford to eat the cost!
-
-2. If you don't want to do that, we'll bundle a container image with an
-   open source app server solution with our Chalk API that will 'just work'
-   out of the box, in conjunction with our configuration tool.
-
-Specific instructions are coming soon.
-
-### CI/CD integration
-
-For getting Chalk integrated into CI/CD, part of the goal of having
-the configuration tool is so you can produce different self-contained
-configurations of a single chalk binary that make chalk easy for DevOps
-to integrate, never harder than, "run this binary after artifacts are
-built".
-
-Sometimes, it can be even easier than that. For instance, for builds
-involving Docker, chalk supports a wrap mode, where you can globally
-alias 'docker' to 'chalk'; Chalk will do its data collection and
-reporting, and can mark containers, but always makes sure the docker
-command executes (even if it's not a sub-command that we care about for
-reporting purposes).
-
-For serverless, you'll need to manually add Chalk in 'exec' mode. Note
-you can configure Chalk to probabilistically report when you've got
-functions that gets used at massive volumes.
-
-## Building Chalk
-
-For a majority of users downloading a pre-compiled
-[stable Chalk release](https://github.com/crashappsec/chalk/releases)
-is the recommended way to use Chalk, however if you would prefer to
-build Chalk from source please follow the instructions and ensure you
-have the correct dependencies installed.
-
-### Building Chalk in a Container (Recommended)
-
-If you are running on a **Linux** distribution the easiest way to
-build the project is to use the supplied container to both compile and
-run Chalk, which will install all dependencies properly. This
-requires that you have [docker
-installed](https://docs.docker.com/engine/install/).
-
-To build `chalk` run the following command from the root of the repository:
-
-```sh
-make  # rebuilds only if source files changed
-```
-
-You can build a debug build with `make debug`, which will result in a
-considerably slower binary, but will enable stack traces.
-
-Once the compilation has finished the resulting static `chalk` binary will be
-written to the current working directory and can be run directly on any x64
-Linux system:
-
-```sh
-./chalk
-```
-
-### Building Chalk Natively
-
-If you would like to build Chalk natively on your system (particularly
-on MacOs), you will need to have Nim installed, generally with the
-Nimble package manager.
-
-The easiest way to do this, is with `choosenim` and then setting it to
-version 2.0.0.
-
-```sh
-curl https://nim-lang.org/choosenim/init.sh -sSf | sh
-export PATH=$PATH:~/.nimble/bin/
-choosenim 2.0.0
-```
-
-All nim tools will live in ~/.nimble/bin, if you want to update in
-your shell's config file. Then, from the root of the repository, you
-can build chalk simply by typing:
-
-```sh
-nimble build
-```
-
-Nimble will do the rest and download a few additional
-dependencies. Nimble keeps all its state in ~/.nimble; choosenim keeps
-the compiler in ~/.choosenim; you can delete the 2.0 toolchain if
-desired.
 
 ## Issues
+If you encounter any issues with Chalk please submit a Github issue to 
+[this repo](https://github.com/crashappsec/chalk/issues).
 
-If you encounter any issues with building Chalk using the above instructions
-please submit an issue in
-[Chalk GitHub repository](https://github.com/crashappsec/chalk/issues)
+## Ideas and feedback 
+We are constantly learning about emerging use cases for Chalk, and are always interested in hearing about how others are using it. We are also interested in ideas and feature requests.If you would like to talk, please get in touch using hello@crashoverride.com. 
 
-## Learn More
 
-More resources are coming soon.
+## Making contributions
+
+We welcome contributions but do require you to complete a contributor license agreement or CLA. You can read the CLA and about our process [here](https://crashoverride.com/docs/other/contrnuting).
+
+## Getting additional help 
+
+If you need additional help including a demo of the cloud platform, please contact us using hello@crashoverride.com
+
+## License
+Chalk is licensed under the GPL version 3 license. 
+
+## Join the waiting list for our cloud platform. 
+Our cloud hosted platform is built using Chalk. It make enterprise deployment easy, and provides additional functionality including prebuilt integrations to enrich your data, an in-built query editor, an API and more.
+
+There are both free and paid plans. You can [join the waiting list](https://crashoverride.com/join-the-waiting-list) for early access.
