@@ -12,8 +12,8 @@ on:
       - tests/**
       - config.nims
       - "*.nimble"
-    paths-ignore:
-      - src/docs/**
+      # ignore docs not to waste CI minutes
+      - "!src/docs/**"
   workflow_dispatch:
     inputs:
   schedule:
