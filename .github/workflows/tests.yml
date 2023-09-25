@@ -16,6 +16,10 @@ on:
       - "!src/docs/**"
   workflow_dispatch:
     inputs:
+      chalk_url:
+        description: URL where to download chalk binary for tests
+        required: false
+        default: ""
   schedule:
     # UTC 12:30
     # EST 8:30
@@ -67,8 +71,16 @@ jobs:
           docker buildx bake chalk server tests --load
 
       - name: Compile Chalk
+        if: inputs.chalk_url == ''
         run: |
           make
+
+      - name: Download Chalk
+        if: inputs.chalk_url != ''
+        run: |
+          curl -L "${{ inputs.chalk_url }}" > chalk
+          chmod +x chalk
+          ./chalk version
 
       - name: Run tests (Fast)
         # run fast tests by default on PRs when
