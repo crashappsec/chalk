@@ -137,6 +137,14 @@ proc highlightMatches(s: string, terms: seq[string]): string =
   for term in terms:
     result = result.replace(term, "<strong><em>" & term & "</em></strong>")
 
+proc resolveHelpFileName(docName: string): string =
+  if docName.startsWith("core-"):
+    result = docName[5 .. ^1]
+  elif docName.startsWith("howto-") or docName.startsWith("guide-"):
+    result = docName[6 .. ^1]
+  else:
+    result = docName
+
 proc searchEmbeddedDocs(terms: seq[string]): string =
   # Terminal only.
   for key, doc in helpfiles:
@@ -147,7 +155,9 @@ proc searchEmbeddedDocs(terms: seq[string]): string =
         matchedTerms.add(term)
 
     if len(matchedTerms) != 0:
-      result &= "<h2>Match on document: " & key & "</h2>"
+      let docName = resolveHelpFileName(key)
+
+      result &= "<h2>Match on document: " & docName & "</h2>"
       result &= doc.highlightMatches(matchedTerms)
 
   if result == "":
@@ -283,7 +293,7 @@ proc getHelpTopics(state: ConfigState): string =
   result &= "<ul>"
 
   for k, _ in helpFiles:
-    result &= "<li>" & k & "</li>"
+    result &= "<li>" & resolveHelpFileName(k) & "</li>"
 
   result &= "</ul>"
 
@@ -490,9 +500,16 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
       of "builtins":
         toOut = con4mRuntime.getBuiltinsTableDoc()
       else:
-        if arg in helpFiles:
-          toOut &= helpFiles[arg].markdownToHtml().stylize()
-        else:
+        let toCheck = [arg, "core-" & arg, "howto-" & arg, "guide" & arg]
+        var gotIt = false
+
+        for item in toCheck:
+          if item in helpFiles:
+            toOut &= helpFiles[arg].markdownToHtml().stylize()
+            gotit = true
+            break
+
+        if gotIt == false:
           # If we see an unknown argument at any position, stop what
           # we were doing and run a full-text search on all passed
           # arguments.
