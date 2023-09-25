@@ -375,7 +375,11 @@ proc loadChalkFromFStream*(codec:  Plugin,
     dumpExOnDebug()
 
 proc scanLocation(self: Plugin, loc: string): Option[ChalkObj] =
-  result = callScan(self, loc)
+  try:
+    result = callScan(self, loc)
+  except:
+    error(loc & "Scan canceled: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
 
 proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
   result = false
