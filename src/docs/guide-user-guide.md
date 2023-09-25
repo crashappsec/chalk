@@ -1,9 +1,9 @@
 # Chalk™ User Guide
 
-## About this guide
+## About This Guide
 
 Chalk is like GPS for software, allowing you to easily see where
-software came from, and where else it is deployed. Chalk collects,
+software comes from and where it is deployed. Chalk collects,
 stores, and reports metadata about software from build to production.
 
 The tie is generally made by adding an identifying mark (which we call
@@ -35,24 +35,24 @@ Beyond this document, there's an extensive amount of reference material for user
 | [**Config File Builtins**](./config-builtins.md)                  | Shows the functions you can call from within a configuration file                                                                  |
 | [**Known Issues**](./known-issues.md)                             | Lists key known issues in the current release of Chalk                                                                             |
 
-We believe most configuration needs can be met through our
-configuration wizard. Currently, this is not fully documented, and not
-quite complete. However, it should be straightforward to use. It's
-also available through the [Chalk Getting Started
-Guide](./getting-started.md).
+<!-- TODO: link to how to guides -->
+We have provided chalk with sensible default configurations for demo
+and testing, as well as some sample configs for specific use cases
+available through the [Chalk Getting Started Guide](./getting-started.md) 
+and the how-to guides. We will soon also be releasing a configuration 
+wizard, which we expect will meet most configuration needs.
 
-## Source code availability
+## Source Code Availability
 
 We will be making source code available at the time of our public
-launch, and will be providing instructions at that point, including a
-direct build and building via docker file.
+launch. Instructions on how to build directly and building via docker 
+file are availabe in the [Chalk Getting Started
+Guide](./getting-started.md), as well as instructions on how to 
+download pre-built chalk binaries.
 
-In the interim, you can get Chalk binaries for Linux/x86 systems via
-our [Getting Started Guide](./getting-started.md).
+## Basic Concepts
 
-## Basic concepts
-
-##### Section contents
+##### Section Contents
 
 - [Reports](#reports)
 - [Configuration](#configuration)
@@ -64,28 +64,27 @@ our [Getting Started Guide](./getting-started.md).
 - [Identifying Chalked Containers](#identifying-chalked-containers)
 - [Using Chalk to Launch Processes](#using-chalk-to-launch-processes)
 - [Metadata Keys](#metadata-keys)
-- [Custom Keys](#custom-keys)
 
 Chalk operates on _software metadata_. Generally, it's most important
-to run Chalk during CI/CD, to collect metadata on the build process,
+to run chalk during CI/CD, to collect metadata on the build process,
 and insert an identifier into any built artifacts. The process of
 adding metadata into an artifact is what we call _chalk marking_.
 
 Chalk can also report on existing chalk marks in artifacts at any
 other time. Of particular interest, it can be set up to launch a
 program, and, in parallel, report on that program and its operating
-environment.
+environment on a regular heartbeat.
 
-There's lots of different kinds of metadata Chalk can report on and
+There's lots of different kinds of metadata chalk can report on and
 inject into artifacts. Basic use would involve capturing enough
 build-time info to be able to identify, when looking at a production
-artifact, what code repository it came from, and which specific build
+artifact, what code repository it came from and which specific build
 it is.
 
-But there are plenty of other things you can collect, including
+But there is plenty of other data that chalk can collect, including
 results from running analysis tools, such as security analysis or SBOM
 (software bill of materials) generation tools. This flexibility can
-help meet a wife variety of requirements (for instance, SLSA level 3
+help meet a wide variety of requirements (for instance, SLSA level 3
 compliance if a customer is requesting it).
 
 After chalk marks are added, the Chalk tool's focus is on both
@@ -104,28 +103,28 @@ Chalk reports are fully configurable. You can configure what metadata
 gets added to reports, and in what circumstances. Reports can be sent
 to the terminal, logged, posted to a web URL, or written to object
 storage. You can make multiple reports for a single chalk operation,
-and you individually control where data from those reports go.
-
+and you individually control where data from those reports go. 
 Typically, we recommend sending the bulk of the metadata collected
-directly to some kind of durable storage. And generally, at least some
-metadata will get inserted into the artifact itself to make it easy to
-tie artifacts in production to their metadata. Chalk itself can be
-used to find metadata in production environments.
+directly to some kind of durable storage.
+
+Generally, at least some metadata will get inserted into the artifact 
+itself to make it easy to tie artifacts in production to their 
+metadata. Chalk can then be used to find metadata in production 
+environments.
 
 ### Configuration
 
-Chalk stores its own configuration inside its own binary, using a
-chalk mark. This configuration is used to set up behavior and
-preferences for each command, including how marking and reporting
-happens.
+Chalk stores its own configuration inside its own binary. This 
+configuration is used to set up behavior and preferences for each 
+command, including how marking and reporting happens.
 
-There's a terminal-based UI (TUI) that should make it easy to
-configure in most cases, which is available via the [Getting Started
-Guide](./getting-started.md). For more advanced cases, Chalk supports
+<!-- TODO: if this is actually released at the same time, update to link -->
+We will soon be releasing a terminal-based UI (TUI) that should make it 
+easy to configure in most cases. For more advanced cases, Chalk supports
 a more traditional NGINX-style configuration, but with far more
 flexibility.
 
-### Command Line Operation
+### Command Line Operations
 
 Chalk insertion operations attempt to add chalk marks to artifacts,
 and then run any configured reporting. Currently, the `chalk insert`
@@ -147,10 +146,8 @@ like `chalk help` and `chalk version`. These are also detailed in the
 command line reference.
 
 In the default shipped configuration, when you invoke `chalk` on the
-command line, you will get a report to `stdout`. To report elsewhere,
-you must either configure your Chalk executable with some other
-reporting option or use an environment variable to configure a place
-to send reports.
+command line, you will get a summary report to `stdout` and a full 
+report sent to a local log file. Chalk can be configured to send reports elsewhere, such as a server endpoint or an s3 bucket.
 
 In the default configuration, the log level for error messages
 defaults to `info`. The log level is easily changed in the
@@ -167,20 +164,20 @@ recursively.
 
 ### Basic Marking Experience
 
-Philosophically, Chalk aims to make the actual deployment into the
-CI/CD pipeline as easy as possible. While Chalk is incredibly
+Philosophically, chalk aims to make the actual deployment into the
+CI/CD pipeline as easy as possible. While chalk is incredibly
 flexible, the intent is to pre-configure behavior and embed that
 configuration into the binary. That way, you can hand a binary to
-someone else, and say, “just run this after building your artifacts”,
+someone else and say, “just run this after building your artifacts”,
 and it should automagically work.
 
 However, the software universe isn’t that simple. Different types of
 artifacts can have different types of considerations. Currently, the
-Chalk binary works in two modes:
+chalk binary works in two modes:
 
 1. **Build wrapping**, in which it wraps the command that builds the
 artifact, adding a chalk mark into the artifact at build time.
-2. **Stand-alone insertion**, in which it chalks supported artifact
+2. **Stand-alone insertion**, in which it chalks the supported artifact
 types after the artifact has been built.
 
 Currently, build wrapping only works with `docker`, and is introduced
@@ -193,25 +190,24 @@ typing:
 
 `chalk insert`
 
-After hitting enter, the file system is scanned from the current
-working directory, marking any runnable software (except for any
-scripts that live in the `${CWD}/.git` directory).
+After running this command, the file system is scanned from the current
+working directory, marking any runnable software (except for any artifacts that live in hidden directories, such as scripts in `${CWD}/.git`).
 
-By default, Chalk will try to collect basic metadata:
+By default, chalk will try to collect basic metadata:
 
 - It will look for a `.git` directory to associate a git repository.
-- It will collect host information about the build environment.
-- It will see if there's a local `CODEOWNERS` or `AUTHORS` file, and
-  capture it, if so.
+- It will collect host information about the build environment such as environment variables and platform details.
+- It will see if there's a local `CODEOWNERS` or `AUTHORS` file, and capture it, if so.
 - It will generate identifiers for the artifact, including the
   `CHALK_ID` which uniquely identifies the unchalked artifact, and the
   `METADATA_ID` which uniquely identifies the artifact plus the
   metadata inserted into the chalk mark.
 
-You can also configure Chalk to do a static security analysis via
+You can also configure chalk to do a static security analysis via
 `semgrep`, or to create SBOMs via `syft`. Chalk also supports custom
 metadata collection and digital signing. We will soon produce HOW-TO
 documents for these items.
+<!-- TODO: link to the how-to documents that are already created -->
 
 > ❗ You can configure chalk to use `insert` as the default command,
   in which case the binary can be deployed with no command line
@@ -223,7 +219,7 @@ The experience for chalking containers is different, as it leverages
 build wrapping.
 
 Currently, build wrapping is only supported for building docker
-containers with `docker build`, although we are currently working on
+containers with `docker build`, although we are working on
 other options. The deployment could take various forms, all of which
 will work out of the box:
 
@@ -234,7 +230,7 @@ path that will generally show up before the actual docker command.
 3. Configure build systems to start up with global aliases, aliasing
 `docker` to `chalk`.
 
-In all these cases, Chalk will search the rest of the user's `PATH`
+In all these cases, chalk will search the rest of the user's `PATH`
 for docker (unless configured to look in a specific location).
 
 Build wrapping is conservative in that if chalk cannot, for some
@@ -247,78 +243,62 @@ will, by default:
 
 1. Add labels to the produced image with repository metadata.
 2. Rewrite the Dockerfile to add a chalk mark.
-3. Report on metadata.
+3. Generate a chalk report with metadata on the build operation.
 
 Chalk also reports a bit of metadata when pushing images to help
 provide full tracability.
 
-Soon, Chalk will also add a build-time attestation when possible.
+Chalk can also be configured to add build-time attestation when possible.
 
+<!-- TODO: is this true? what about reproducible mark template? -->
 Because of the way Docker works, there's currently not a simple,
 pre-defined algorithm for getting a repeatable hash of a container
 image. As a result, the `CHALK_ID` will be based on a random value,
 and there will be some validation considerations if not using
-attestations. This may change in future versions.
+attestations.
 
+<!-- TODO: in terms of chalking contents, do we do this? -->
+<!-- TODO: https://github.com/crashappsec/chalk-internal/pull/496 -->
 Currently, build wrapping for docker only chalks the overall image; it
 does not, by default, chalk the contents of the file system. We may
-add that as an option in the near future.
+add that as an option in the future.
 
-### Basic extraction experience
-
-Running `chalk extract` recursively searches the current directory for
-artifacts with chalk marks (_including_ any scripts that live in the
-`${CWD}/.git` directory). Running `chalk extract container` will
-search running containers.
-
-Soon, we will add options to search container images and to perform
-multiple operations in one extraction operation.
-
-Here, Chalk runs once, reports what it finds (including information
-about the host environment), and then exits. Unlike insertion, it does
-not accept exclusions like `.git`; if there are chalk marks in
-specified paths, it will report them, even if they perhaps never
-should have been added in the first place.
-
-### On-demand extraction
+### Basic Extraction Experience
 
 The chalk command is capable of extracting full chalk marks, and can
-report the presence of those chalk marks, with the full flexibility of
+report the presence of those chalk marks with the full flexibility of
 insertion. That means you have full flexibility in selecting what to
-report on and where to send reports.
+report on and where to send reports. Additionally, on-demand extraction can report metadata about the runtime environment.
 
-Additionally, on-demand extraction can report metadata about the
-runtime environment.
+During the extraction operation, chalk runs once, reports what it finds (including information about the host environment), and then exits. Unlike insertion, it does not accept exclusions like `.git`; if there are chalk marks in specified paths, it will report them, even if they perhaps never should have been added in the first place.
 
-By default, the `chalk extract` command will scan the file system from
-the current directory, or locations passed in as arguments on the
-command line. Directory scanning is recursive unless specified
-otherwise with `recursive: true` in the chalk config or
-`--no-recursive` on the command line.
+### On-demand Extraction
 
-In addition, soon you will be able extract chalk from a specific
-docker image with the `docker` subcommand, which takes one or more
-container IDs or container names as an argument (or the word ‘all’ to
-return results for all running containers on a host). For instance:
+By default, running `chalk extract` recursively searches the current directory for artifacts with chalk marks (_including_ any scripts that live in the hidden directories such as `${CWD}/.git`).Directory scanning is recursive unless specified otherwise with `recursive: true` in the chalk config or `--no-recursive` on the command line.
 
+If we want to extract chalk from a single artifact (or directory), we can specify the target:
 ```bash
-chalk extract docker 0ed38928691b
-[
-... chalk mark omitted ...
-]
+chalk extract testbinary
+```
+which will extract the chalk mark only from the target.
+
+Running `chalk extract container` will search all running containers for chalk marks; likewise, `chalk extract image` will search all images for chalk marks (but be aware that chalk extraction from docker images may take a long time, particularly if there are many images).
+
+Similarly, to extract chalk marks from a specific container or image, we can specify the image ID, image name, container ID, or container name. For example:
+```bash
+chalk extract 0ed38928691b
 ```
 
-Generally, when using chalk for container extraction, it is best to
-run it in the context of the host OS, as non-privileged containers may
-not have enough information to ensure which image is running.
+Generally, when using chalk for container extraction, it is best to run it in the context of the host OS, as non-privileged containers may not have enough information to ensure which image is running.
 
+<!-- TODO: is is still true that there's no way to tie the image? -->
 In most cases, the container ID will be available from within the
 container in the `HOSTNAME` environment variable. But there generally
 won’t be any easy, ironclad way to tie that to the image from within
-the container, short of integrity checking the entire file system from
-the entry point.
+the container, short of integrity checking the entire file system 
+from the entry point.
 
-### Identifying chalked containers
+### Identifying Chalked Containers
 
 While containers do keep the chalk mark in a file on the root of their
 file system, it can often be inconvenient, or even impossible, to get
@@ -348,27 +328,22 @@ Note that when Chalk is in Docker mode, it also wraps `docker push`,
 which generally will result in a new image ID. Capturing that info on
 push provides the needed breadcrumbs.
 
-### Using Chalk to launch processes
+### Using Chalk to Launch Processes
 
-If you want to better automate tracability across software's life
-cycle, you can configure Chalk to run software (ideally, software that
-you've previously marked via `chalk insert` or `chalk docker build`).
+If you want to better automate traceability across software's life
+cycle, you can configure chalk to run software (ideally, software that
+you've previously marked via `chalk insert` or `chalk docker build`). Chalk supports a `chalk exec` operation where it will run your process, as well as report on that process and the host environment.
 
-Using `chalk exec`, you can configure a chalk executable with what it
-should run and have flexibility over how arguments get handled.
-
-On startup, Chalk lets your process run, then reports on that process
-as well as the host environment.
-
-The current behavior for Chalk is then to exit quietly, without
-impacting your process. Eventually Chalk will support other options,
-such as periodic beacons or on-demand reporting.
+The current default behavior for chalk is then to exit quietly, without
+impacting your process. Chalk can also be configured to continue running
+in the background and emit a periodic heartbeat report that is fully
+customizable.
 
 Setting up `chalk exec` to run your software is easy, and basic
-examples are shown for both Docker and without in the [Getting Started
+examples are shown for both with and without docker in [Getting Started
 Guide](./getting-started.md).
 
-### Metadata keys
+### Metadata Keys
 
 Metadata is at the core of Chalk, which categorizes data into four types:
 
@@ -378,27 +353,28 @@ be put into a chalk mark, and it can also be seprately reported
 without putting it in the chalk mark.
 
 2. **Chalk-time host metadata**, which is data about the environment
-in which Chalk ran in when inserting chalk marks. This data can also
-be added to the individual marks inserted, if it's desired.
+in which chalk ran in when inserting chalk marks. This data can also
+be added to the individual marks inserted, if desired.
 
 3. **Run-time artifact metadata**, which is data about software
-artifacts that can be collected on any invocation of Chalk, such as
+artifacts that can be collected on any invocation of chalk, such as
 when launching a program you've previously marked, or when searching
 for chalk marks on a system.
 
 4. **Run-time host metadata**, which is data about the host, captured
-for any Chalk invocation.
+for any chalk invocation.
 
 Some things to note about metadata:
 
 - Some metadata is inappropriate for those looking for fully
-  reproducable builds, such as time-specific keys. The default is to
-  include some of these items, which appeals to a different set of
+  reproducible builds, such as time-specific keys. The default is to
+  include some of these items, which are useful to a different set of
   people who want to be able to track which build came from which
-  environment.These concerns can be dealt with via the configuration.
+  environment. These concerns can be dealt with via the configuration
+  by setting up custom reports for different consumers.
 - Chalk-time keys can be reported at run-time if they're being
-  extracted from a Chalk mark, but they will always contain the values
-  added at Chalk time.
+  extracted from a chalk mark, but they will always contain the values
+  added at chalk time.
 - Run-time keys cannot be added to chalk marks.
 - If the implementation is unable to collect a piece of metadata, it
   is _not_ included in any reporting, no matter the configuration.
@@ -415,28 +391,28 @@ reference](./metadata-overview.md).
   so means that deployed software will need to be independently
   identified and correlated, negating a lot of the value of Chalk.
 
-## Additional detail and specs
+## Additional Detail and Specs
 
 ##### Section contents
 
 - [Configuring Chalk](#configuring-chalk)
-- [Chalk mark basics](#chalk-mark-basics)
-- [Custom keys](#custom-keys)
-- [Marks versus reports](#marks-versus-reports)
-- [Required keys in chalk marks](#required-keys-in-chalk-marks)
-- [Current Chalk mark insertion algorithms](#current-chalk-mark-insertion-algorithms)
-- [Future insertion algorithms](#future-insertion-algorithms)
-- [About the HASH field](#about-the-hash-field)
-- [Multiple marks in an artifact](#multiple-marks-in-an-artifact)
-- [Replacing existing marks](#replacing-existing-marks)
-- [Mark extraction algorithms](#mark-extraction-algorithms)
-- [Mark reporting](#mark-reporting)
-- [Mark validation](#mark-validation)
-- [Mark deletion](#mark-deletion)
-- [Configuration file syntax basics](#configuration-file-syntax-basics)
-- [Testing configurations](#testing-configurations)
-- [Overview of reporting profiles](#overview-of-reporting-profiles)
-- [Reporting profiles for docker labels](#reporting-profiles-for-docker-labels)
+- [Chalk Mark Basics](#chalk-mark-basics)
+- [Custom Keys](#custom-keys)
+- [Marks Versus Reports](#marks-versus-reports)
+- [Required Keys in Chalk Marks](#required-keys-in-chalk-marks)
+- [Current Chalk Mark Insertion Algorithms](#current-chalk-mark-insertion-algorithms)
+- [Future Insertion Algorithms](#future-insertion-algorithms)
+- [About the HASH Field](#about-the-hash-field)
+- [Multiple Marks in an Artifact](#multiple-marks-in-an-artifact)
+- [Replacing Existing Marks](#replacing-existing-marks)
+- [Mark Extraction Algorithms](#mark-extraction-algorithms)
+- [Mark Reporting](#mark-reporting)
+- [Mark Validation](#mark-validation)
+- [Mark Deletion](#mark-deletion)
+- [Configuration File Dyntax Basics](#configuration-file-syntax-basics)
+- [Testing Configurations](#testing-configurations)
+- [Overview of Reporting Profiles](#overview-of-reporting-profiles)
+- [Reporting Profiles for Docker Labels](#reporting-profiles-for-docker-labels)
 
 In this section, we will go into more detail on key Chalk concepts,
 and give pointers to deeper reference material where appropriate.
@@ -474,21 +450,21 @@ compliance.
 The current version for this document should be considered a DRAFT
 version of Chalk 0.1.1. The current release of the reference chalk
 implementation is 0.1.0; no other implementation shall implement
-0.1.0.Significant differences from 0.1.0 will be mentioned in this
+0.1.0. Significant differences from 0.1.0 will be mentioned in this
 document for the benefit of those using the preview release. But note
 that we do not intend this release to be used in production, so 0.1.1
 will not assume the need to be backward compatible.
 
 Also, following Semver, until Chalk is declared 1.0.0, new versions of
-the spec may contain breaking changes.We will document these as they
+the spec may contain breaking changes. We will document these as they
 happen.
 
 ### Configuring Chalk
 
-Our Chalk implementation stores its configuration inside its
-binary. Configurations can be extracted from a binary with the `chalk
-dump` command, and new ones loaded with the `chalk load` command.
+Chalk stores its configuration inside its binary. Configurations can be extracted from a binary with the `chalk dump` command, and new ones loaded with the `chalk load` command.
 
+<!-- TODO: link to our config tool -->
+<!-- TODO: or remove this if we're not going to be advertising it -->
 Chalk comes with a command-line configuration tool that takes a
 wizard-based approach to generating a configuration and automatically
 loading the configuration into Chalk. This tool abstracts away a LOT
@@ -505,21 +481,25 @@ file whenever possible, while making advanced use possible.
 The configuration file format itself is mostly in line with the NGINX
 family of configuration files, with sections and key/value pairs. But
 for those advanced use cases, the config file also does support
-limited programmibility.
+limited programmability.
 
 Generally, the average user shouldn't need such features (again, our
 hope is the TUI can get the job done most of the time), but the people
 who do should find the syntax to be straightforward to anyone with
 basic programming experience.
 
+<!-- TODO: this is not in the getting started guide -->
 We will be providing more documentation about the TUI as it matures,
 but it's currently available for use via the [Chalk Getting Started
 Guide](./getting-started.md).
 
-For people who want to dig into the actual configuration file, we will
-provide some more detailed HOW-TO's soon enough. However, we currently
-provide the following resources:
+<!-- TODO: link to how to's -->
+For people who want to dig into the actual configuration file, we
+provide some more detailed HOW-TO's. 
 
+We currently provide the following resources:
+
+<!-- TODO: I can't find any of these documents, do they still exist? -->
 - [The Chalk Configuration Options Guide](./config-vars.md) covers the
   basics about how config files work (including both the embedded
   config and on-disk files), and details the available variables you
@@ -540,10 +520,10 @@ own configuration mechanisms.
 Chalk writes arbitrary metadata into software artifacts. The metadata
 written into a single artifact is called the **chalk mark**. The mark
 itself is always a (utf-8 encoded) JSON object, where the first
-key/value pair is `"MAGIC" : "dadfedabbadabbed"`.
+key/value pair is always `"MAGIC" : "dadfedabbadabbed"`.
 
 The presence of this value is required to consider data embedded into
-an artifact a chalk mark.
+an artifact a _chalk mark_.
 
 Beyond the initial key pair, key/value pairs can appear in any order.
 
@@ -570,6 +550,7 @@ With Chalk 0.1.0, the `$CHALK_CONFIG` key is the only allowable key,
 and is specific only to the reference implementation and shall not be
 used elsewhere.
 
+<!-- TODO: everything below has not been looked at -->
 ### Custom Keys
 
 Users of the reference implementation of Chalk and other conforming
@@ -581,7 +562,7 @@ keys. Any key starting with an `X_` is reserved for custom chalkable
 keys (both host and artifact), and any key starting with `_X_` is
 reserved for custom run-time keys.
 
-### Marks versus reports
+### Marks Versus Reports
 
 Marks are JSON objects generally inserted into a software artifact.
 
