@@ -2360,9 +2360,9 @@ Chalk will also embed the keypairs internally, for future operations.
   field api_login {
     type:     bool
     default:  true
-    shortdoc: "Skip API login"
+    shortdoc: "Use CrashOverride API"
     doc: """
-Skip login to API for secret manager
+Enable the use of the Crash Override API for secret management.
 """
   }
 
