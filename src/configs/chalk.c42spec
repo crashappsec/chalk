@@ -2368,7 +2368,7 @@ Skip login to API for secret manager
 
   field ignore_patterns {
     type:     list[string]
-    default:  [".*/**", "*.txt", "*.json"]
+    default:  [".*/\\..*", ".*\\.txt", ".*\\.json"]
     shortdoc: "Ignore Patterns"
     doc:       """
 For operations that insert or remove chalk marks, this is a list of

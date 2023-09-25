@@ -380,8 +380,12 @@ proc scanLocation(self: Plugin, loc: string): Option[ChalkObj] =
 proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
   result = false
 
-  for item in regexes:
+  for i, item in regexes:
     if path.match(item):
+      once:
+        trace(path & ": ignored due to matching ignore pattern: " &
+          chalkConfig.getIgnorePatterns()[i])
+        trace("We will NOT report additional path skips.")
       return true
 
 template symlinkCheck(path: string) =

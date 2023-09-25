@@ -221,8 +221,21 @@ proc collectRunTimeHostInfo*() =
 # The two below functions are helpers for the artifacts() iterator
 # and the self-extractor (in the case of findChalk anyway).
 proc ignoreArtifact(path: string, regexps: seq[Regex]): bool {.inline.} =
-  for item in regexps:
-    if path.match(item): return true
+  # If plugins use the default implementation of scanning, then it
+  # will already have checked the 'ignore' list. That short circuits
+  # us much faster than letting plugins do a bunch of extraction, then
+  # checking here, afterward.
+  #
+  # But, what if they forget to check?  We check again here, and give
+  # an appropriate message, though at the trace level.
+
+  for i, item in regexps:
+    if path.match(item):
+      trace(path & ": returned artifact ignored due to matching: " &
+        chalkConfig.getIgnorePatterns()[i])
+      trace("Developers: codecs should not be returning ignored artifacts.")
+      return true
+
   return false
 
 proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
@@ -246,10 +259,15 @@ proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
 proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
   new result
 
-  let selfPath = resolvePath(getMyAppPath())
+  let
+    selfPath = resolvePath(getMyAppPath())
+    skipList = chalkConfig.getIgnorePatterns()
 
   result.fileExclusions = @[selfPath]
   result.recurse        = chalkConfig.getRecursive()
+
+  for item in skipList:
+    result.skips.add(re(item))
 
   if len(argv) == 0:
     result.filePaths.add(getCurrentDir())
