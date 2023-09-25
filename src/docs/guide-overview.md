@@ -101,10 +101,10 @@ couple of additional options:
    the Chalk™ API, which can be deployed locally to your environment and be
    configured in conjunction with our configuration tool.
 
-See the [Getting Started](./getting-started.md) section for an introductory
+See the [Getting Started](./guide-getting-started.md) section for an introductory
 overview in running Chalk™ under different configurations, accessing chalk marks
 and using the Chalk™ configuration tool, and the
-[Chalk™ User Guide](./user-guide.md) for more information on available
+[Chalk™ User Guide](./guide-user-guide.md) for more information on available
 customization options.
 
 ## CI/CD Integration
@@ -130,4 +130,4 @@ functions that get used at massive volumes.
 Chalk™ is currently in an early alpha preview mode. Documentation and
 features are expected to be getting modified frequently over the next
 months and until the first (1.0) release. We will be keeping a
-publicly available list of known issues [here](./known-issues.md).
+publicly available list of known issues [here](./core-known-issues.md).

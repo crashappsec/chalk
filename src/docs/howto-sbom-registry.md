@@ -27,8 +27,8 @@ developer, security and infrastructure tools such as the
 CloudCustodian CSPM, so you can prioritise what to work on - Now, next
 or Never.
 
-If you do not understand how chalk works we recommend reading the
-[Chalk overview](overview.md).
+If you do not understand how Chalk works we recomend reading the
+[Chalk overview](./guide-overview.md).
 
 ## When to use this
 
@@ -313,13 +313,13 @@ we'll emit a lot of it, but you should see something like:
 
 ### Step 2 - Configuring Your SBOM Registry Destination
 
-You can also read the complete help guide, [Configuring Chalk Reports]().
+You can also read the complete help guide, [Configuring Chalk Reports](./guide-config-overview.md).
 
 To send the SBOM metadata to a data destination or sink of your
 choice, you simply include `key.SBOM.use = true` in your chalk
-[reports template](TODO-what-is-a-template) and set
+[reports template](./guide-config-overview.md) and set
 `run_sbom_tools=true` in the corresponding [config
-file](TODO-what-is-a-config).
+file](./guide-config-overview.md).
 
 <!--- JV: These should probably link into the user guide? Or the gen'd
 sections? --->
@@ -385,7 +385,7 @@ There are both free and paid plans. You can [join the waiting list](https://cras
 
 ## Related How tos
 
-[How to enrich SBOMs with CSPM data using Chalk, to make better security decisions]()
+<!-- How to enrich SBOMs with CSPM data using Chalk, to make better security decisions -->
 
 [How-to Handle "Software Security Supply Chain" Requests With Minimal Effort](howto-compliance.md)
 

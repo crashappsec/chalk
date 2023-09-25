@@ -73,7 +73,7 @@ guide, you do not need to worry about what the individual metadata keys are, or 
 differences between naming conventions (e.g., keys starting with `_` vs not).
 All you need to know is that we can define if we care about them inside templates.
 
-> You can read more about metadata keys and their semantics or restrictions in [the metadata reference](/docs/chalk/metadata).
+> You can read more about metadata keys and their semantics or restrictions in [the metadata reference](./metadata.md).
 
 ## Chalkmarks
 
@@ -135,7 +135,7 @@ sink_config log_file_sink {
 }
 ```
 
-> For more information on the types of the sinks supported see the [output configuration documentation](/docs/chalk/output-config),
+> For more information on the types of the sinks supported see the [output configuration documentation](./output-config.md),
 
 Virtually all output in Chalk is handled through a 'pub-sub'
 (publish-subscribe) model. Chalk actions "publish" data to "topics", then sinks
@@ -149,7 +149,7 @@ subscribe("report", "log_file_sink")
 Chalk comes with a set of sinks already configured for both chalkmarks and reports,
 and different chalk operations send data to different sinks by default.
 
-> For a full list of what sinks are active for the different chalk operations see [here](TODO).
+> For a full list of what sinks are active for the different chalk operations see [here](./output-config.md).
 
 ## Writing a custom config with a custom template
 
@@ -273,3 +273,14 @@ outconf insert {
   report_template: "report_minimal"
 }
 ```
+
+# Related Documentation and References
+
+Beyond this document, there's an extensive amount of reference material for users:
+
+| Name                                                          | What it is                                                                                                                       |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| [**Metadata Reference**](./metadata.md)                       | Details what metadata Chalk can collect and report on, and in what circumstances                                                 |
+| [**The Chalk Configuration Options Guide**](./config-file.md) | Details properties you can set in Chalk's configuration file, if you choose to use it over our command-line configuration wizard |
+| [**Output Configuration Reference**](./output-config.md)      | Shows how to set up sending reports wherever you like, using the config file.                                                    |
+| [**Config File Builtins**](./builtins.md)                     | Shows the functions you can call from within a configuration file                                                                |
