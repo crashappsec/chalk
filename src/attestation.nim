@@ -19,6 +19,7 @@ var
   cosignLoc     = ""
   cosignPw      = ""    # Note this is not encrypted in memory.
   cosignLoaded  = false
+  signingID     = ""
 
 template withCosignPassword(code: untyped) =
   putEnv("COSIGN_PASSWORD", cosignPw)
@@ -103,23 +104,25 @@ template callTheSecretService(base: string, prKey: string, apiToken: string, bod
                               mth: untyped): Response =
   let
     timeout:  int    = cast[int](chalkConfig.getSecretManagerTimeout())
-    id:       string = sha256Hex(attestationObfuscator & prkey)
   var
     url:      string
     uri:      Uri
     client:   HttpClient
     context:  SslContext
     response: Response
+  
+  # This is the id that will be used to identify the secret in the API
+  signingID = sha256Hex(attestationObfuscator & prkey)
 
   if mth == HttPGet:
-    trace("Calling secret manager to retrieve key with id: " & id)
+    trace("Calling secret manager to retrieve key with id: " & signingID)
   else:
-    trace("Calling secret manager to store key with id: " & id)
+    trace("Calling secret manager to store key with id: " & signingID)
 
   if base[^1] == '/':
-    url = base & id
+    url = base & signingID
   else:
-    url = base & "/" & id
+    url = base & "/" & signingID
 
   uri = parseUri(url)
 
@@ -292,7 +295,10 @@ proc commitPassword(pri, apiToken: string, gen: bool) =
 
       if gen:
         printIt = true
-
+    
+    else:
+      let idString = "The ID of the backed up key is: " & $signingID
+      info(idString)
 
   if printIt:
     echo "------------------------------------------"
