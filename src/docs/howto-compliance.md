@@ -1,4 +1,4 @@
-# How-to  Handle "Software Security Supply Chain" Requests With Minimal Effort
+# How-to Handle "Software Security Supply Chain" Requests With Minimal Effort
 
 ## Ticking Off Pesky Software Security Supply Chain Compliance Checkboxes Boxes Fast, and Easy
 

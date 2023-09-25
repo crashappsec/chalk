@@ -1,55 +1,34 @@
-# Create and maintain an SBOM registry using Chalk
+# Create And Maintain An SBOM Registry Using Chalk
 
-### Automatically generate SBOMs in your build process for every code repo, and send this data to a central location for further analysis
+### Automatically Generate SBOMs In Your Build Process For Every Code Repo, And Send This Data To A Central Location For Further Analysis
 
 ## Summary
 
 By adding one line to your CI/CD build script, you can automatically
 create an SBOMs or software bill of materials, when each code repo
 that is built. You can use your existing SCA or Software Composition
-Analysis tools, or fall back to `Chalk` built-in defaults.
+Analysis tools, or fall back to Chalk™ built-in defaults.
 
-After automatically sending the SBOMs to a central location using
-`Chalk`, you can then query all of your SBOMs across your environment
+After automatically sending the SBOMs to a central location using chalk, you can then query all of your SBOMs across your environment
 to solve additional problems including understanding where you have
 specific 3rd party libraries, which ones may have vulnerabilities, or
 which ones have licenses that are not compatible with your company
 policy.
 
-By using `Chalk` and following this how to, instead of alternative
+By using chalk and following this how to, instead of alternative
 methodologies, you are able to automatically add additional valuable
-metadata that `Chalk` collects or generates, so that you can
+metadata that chalk collects or generates, so that you can
 prioritise what to work on - Now, next or Never.
 
-<!--  Useful [`Chalk`]()
-metadata includes build information and .....
-
-Add other interesting data here
-
-This is written up in [How to add metadata to your SBOM registry to
-prioritise what to work on]().
-
--->
-
-By using `Chalk` and following this how to, instead of alternative
-methodologies, you are able to automatically use metadata that `Chalk`
+By using chalk and following this how-to, instead of alternative
+methodologies, you are able to automatically use metadata that chalk
 collects or generates, and combine it with data from your existing
 developer, security and infrastructure tools such as the
 CloudCustodian CSPM, so you can prioritise what to work on - Now, next
 or Never.
 
-<!--
-This is written up in [How to add CSPM data to your SBOM registry to prioritise what to work on]().
--->
-
-If you do not understand how Chalk works we recomend reading the
+If you do not understand how chalk works we recommend reading the
 [Chalk overview](overview.md).
-
-This how-to uses the open-source project Chalk. The Crash Override
-cloud platform provides an advanced, out-of-the-box, end-to-end
-solution for this with additional features and capabilities. You can
-sign up for a free account at
-[crashoverride.com](https://crashoverride.com).
 
 ## When to use this
 
@@ -68,23 +47,18 @@ You could achieve the same results by manually scanning each code repo
 with commercial or open source software composition analysis tools,
 and writing a script to send the data to a central location.
 
-This How To first saves you significant time and work, by doing all of
+This how-to saves you significant time and work, by doing all of
 the steps above out of the box but importantly is enables you to
-enrich the central SBOM registry with valuable metadata from Chalk and
+enrich the central SBOM registry with valuable metadata from chalk and
 other tools.
-
-<!--- This is written up in [How to add metadata to your SBOM
-registry to prioritise what to work on]().
-
--->
 
 ## Prerequisites
 
 ### Required
 
-- You must have a working installation of `Chalk`.
+- You must have a working installation of chalk.
 
-The easiest way to get Chalk is to download a pre-built binary from
+The easiest way to get chalk is to download a pre-built binary from
 our [release page](https://crashoverride.com/releases). It's a
 self-contained binary with no dependencies to install.
 
@@ -92,8 +66,6 @@ self-contained binary with no dependencies to install.
   [`git`](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git). This
   is only required to follow the step here and not needed for a
   production build installation, depending on your set up.
-
-<!-- We spoke earlier about have a simple default node app with a lock file so it doesnt need to build in which will be easier to control for sample output. -->
 
 ### Optional
 
@@ -127,8 +99,8 @@ You should expect the output to be something like:
 
 But, probably in color, and with a different commit ID.
 
-You should now have a working installation of `Chalk`. You should now
-test that your `Chalk` installation will create valid `Chalk`
+You should now have a working installation of chalk. You should now
+test that your chalk installation will create valid chalk
 marks. In the example below we have created a simple Node project but
 you can easily substitute this with your own code repo.
 
@@ -153,7 +125,7 @@ This injects chalk metadata and create a `Chalk` report in the local folder. To 
 tail -1 ~/.local/chalk/chalk.log | jq
 ```
 
-You are now able to successfully generate `Chalk` marks.
+You are now able to successfully generate chalk marks.
 
 ### Step 1 - How to generate the SBOM
 
@@ -165,17 +137,17 @@ directory type
 chalk insert --run-sbom-tools
 ```
 
-Without optional configuration `Chalk` has now created the SBOM using
+Without optional configuration chalk has now created the SBOM using
 the built-in SBOM generation tool
 [Syft](https://github.com/anchore/syft) and created a
 [CycloneDX](https://www.cyclonedx.org) SBOM.
 
-When using `--run-sbom-tools`, Chalk added the SBOM to a Chalk report
-rather than to the Chalk mark. This is because SBOMs can become very
+When using `--run-sbom-tools`, chalk added the SBOM to a chalk report
+rather than to the chalk mark. This is because SBOMs can become very
 large documents and would affect global performance. Chalk reports are
 sent to a destination location, by default the local filesystem.
 
-To view the local Chalk report containing the SBOM, in your terminal type
+To view the local chalk report containing the SBOM, in your terminal type
 
 ```bash
 tail -1 ~/.local/chalk/chalk.log | jq
@@ -337,14 +309,14 @@ we'll emit a lot of it, but you should see something like:
 
 > ❗ By default, when you run `chalk extract` on an artifact to report
 > on it, it will not show all the contents, just a small summary. You
-> must inspect the Chalk report in the chalk.log file.
+> must inspect the chalk report in the chalk.log file.
 
 ### Step 2 - Configuring Your SBOM Registry Destination
 
 You can also read the complete help guide, [Configuring Chalk Reports]().
 
 To send the SBOM metadata to a data destination or sink of your
-choice, you simply include `key.SBOM.use = true` in your Chalk
+choice, you simply include `key.SBOM.use = true` in your chalk
 [reports template](TODO-what-is-a-template) and set
 `run_sbom_tools=true` in the corresponding [config
 file](TODO-what-is-a-config).
@@ -355,8 +327,8 @@ sections? --->
 To create a central SBOM registry we recommend sending all of your
 SBOMs to an Amazon Web Services or AWS S3 bucket.
 
-For this how to we will can send Chalk reports containing the SBOMs
-from any local Chalk event, to a shared local folder.
+For this how to we will can send chalk reports containing the SBOMs
+from any local chalk event, to a shared local folder.
 
 To create that folder type the following in your terminal `mkdir -p ~/chalk-sbom-registry`
 
@@ -392,8 +364,8 @@ run_sbom_tools = true
 EOF
 ```
 
-Using this configuration, each time Chalk runs, it will generate a
-Chalk report, containing an SBOM and send it to the central folder.
+Using this configuration, each time chalk runs, it will generate a
+chalk report, containing an SBOM and send it to the central folder.
 
 Try the above using
 
@@ -406,23 +378,27 @@ and verify that custom_report.log was created under ~/chalk-sbom-registry
 We recommend sending SBOMs to an AWS S3 bucket, where you can connect
 them to data analysis tools of your choice.
 
+## Next Steps
+Our cloud hosted platform is built using Chalk. It makes enterprise deployment easy, and provides additional functionality including prebuilt integrations to enrich your data, a built-in query editor, an API and more.
+
+There are both free and paid plans. You can [join the waiting list](https://crashoverride.com/join-the-waiting-list) for early access.
+
 ## Related How tos
 
 [How to enrich SBOMs with CSPM data using Chalk, to make better security decisions]()
 
-[How to get easy SLSA level 2 compliance using Chalk](howto-compliance.md)
+[How-to Handle "Software Security Supply Chain" Requests With Minimal Effort](howto-compliance.md)
 
-## Background Information About SBOMs
+## Background Information
+
+Software Composition Analysis or SCA is a term used to describe tools that collect and report on the software inside of a project, normally the list of third-party open-source packages. These tools have become a standard part of the appsec and DevSecOps tool chains, since the rise of software security supply chain attacks. 
 
 SBOMs or [Software Bills of Materials
 (SBOMs)](https://www.cisa.gov/sbom) have gained significant traction
 in the security and developer community over the past years.
 
-Lots more to add to this ...
+There are two main formats for SBOMs. [CycloneDX](https://cyclonedx.org/) is the most widely adopted and most comprehensive specification. CycloneDX is a BOM or Bill of Materials that has sub specifications including the SBOM or Software Bill Of Materials. [SPDX](https://spdx.org) is a specification maintained by the Linux Foundation that has its roots in software license compliance. 
 
-<!--This is where the SEO gold can happen by describing everything
-from CycloneDX to SPDX etc. how SCA is used to map SBOMS to vulns,
-keywords like CVEs and OSVD -->
 
 ## FAQ
 
@@ -437,7 +413,7 @@ keywords like CVEs and OSVD -->
 
 - Q: **How can we embed SBOM metadata to the chalked artifact?**
 
-  A: SBOMs can get fairly large, but we do show how to do this in our [Compliance Recipe](howto-compliance.md)
+  A: SBOMs can get fairly large, but we do show how to do this in our [How-to Handle "Software Security Supply Chain" Requests With Minimal Effort](howto-compliance.md)
 
 ## Related Docs and References
 
