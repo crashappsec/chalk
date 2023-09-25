@@ -19,15 +19,9 @@ from .certs.selfsigned import generate_selfsigned_cert
 
 logger = logging.getLogger(api.__name__.split(".")[0])
 
-IS_PYINSTALLER = "_MEI" in __file__
-
 parser = argparse.ArgumentParser(
     title, formatter_class=argparse.ArgumentDefaultsHelpFormatter
 )
-
-
-def pyi_suppress(help: str):
-    return help if not IS_PYINSTALLER else argparse.SUPPRESS
 
 
 def existing_file(p):
@@ -75,18 +69,14 @@ group = server.add_mutually_exclusive_group()
 group.add_argument(
     "-r",
     "--reload",
-    # pyinstaller forks processes incorrectly which causes infinite recursion
-    # fork when reload/workers > 1
-    help=pyi_suppress("reload server on changes"),
+    help="reload server on changes",
     action="store_true",
     default=False,
 )
 group.add_argument(
     "-k",
     "--workers",
-    # pyinstaller forks processes incorrectly which causes infinite recursion
-    # fork when reload/workers > 1
-    help=pyi_suppress("number of workers for the server"),
+    help="number of workers for the server",
     type=int,
 )
 certfile = server.add_argument(
@@ -167,10 +157,6 @@ def run_server(
     workers = workers or os.cpu_count()
     if reload:
         workers = None
-    # pyinstaller does not fork processes as expected
-    if IS_PYINSTALLER:
-        reload = False
-        workers = 1
     uvicorn.run(
         app,
         port=port,

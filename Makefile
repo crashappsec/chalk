@@ -17,7 +17,7 @@ SOURCES+=$(shell find src/ -name '*.nim')
 SOURCES+=$(shell find src/ -name '*.c4m')
 SOURCES+=$(shell find src/ -name '*.c42spec')
 
-VERSION=$(shell cat *.nimble | grep -E "version\s+=" | cut -d'"' -f2)
+VERSION=$(shell cat *.nimble | grep -E "version\s+=" | cut -d'"' -f2 | head -n1)
 
 # in case nimble bin is not in PATH - e.g. vanilla shell
 export PATH:=$(HOME)/.nimble/bin:$(PATH)

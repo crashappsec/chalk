@@ -16,18 +16,8 @@ env:
   CHALK_BINARIES_BUCKET: ${{ secrets.CHALK_BINARIES_BUCKET }}
 
 jobs:
-  binary:
-    runs-on: ${{ matrix.builder }}
-
-    strategy:
-      matrix:
-        include:
-          - builder: ubuntu-latest
-            arch: amd64
-            os: linux
-          - builder: buildjet-2vcpu-ubuntu-2204-arm
-            arch: arm64
-            os: linux
+  docker:
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
@@ -39,25 +29,11 @@ jobs:
         uses: ./.github/actions/release
         with:
           secrets: ${{ toJSON(secrets) }}
-          arch: ${{ matrix.arch }}
-          os: ${{ matrix.os }}
-
-      - name: Build Server Binary
-        working-directory: ./server
-        run: |
-          make release
 
       - name: Sanity check
-        working-directory: ./server
         run: |
-          ./chalkserver --version
+          docker compose run --rm server-release --help
 
-      - name: Dist
-        working-directory: ./server
+      - name: Bake Server Release
         run: |
-          make dist
-
-      - name: Upload To S3
-        working-directory: ./server
-        run: |
-          make upload
+          VERSION=$(make version) docker buildx bake server-release --push

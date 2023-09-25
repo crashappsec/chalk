@@ -112,7 +112,7 @@ services:
       context: ./server
       additional_contexts:
         git: ./.git
-      target: static
+      target: release
     networks:
       chalk:
         aliases:
