@@ -4,10 +4,9 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import base64, chalkjson, config, httpclient, net, os, QRgen, selfextract, terminal, uri, nimutils/sinks
 
-type ValidateResult* = enum
-  vOk, vSignedOk, vBadMd, vNoCosign, vBadSig, vNoHash, vNoPk
+import base64, chalkjson, config, httpclient, net, os, QRgen, selfextract,
+       terminal, uri, nimutils/sinks
 
 const
   attestationObfuscator = staticExec(
@@ -568,12 +567,12 @@ proc getChalkApiToken(): string =
     failFr: string = "[☠☠☠☠]"
     succFr: string = "[❤❤❤❤]"
     timeout:   int = cast[int](chalkConfig.getSecretManagerTimeout())
-  
+
   # set api login endpoint
-  var
-    login_url        = uri.parseUri(chalkConfig.getSecretManagerUrl())
-  login_url.path   = "/api/login" 
-  
+  var login_url = uri.parseUri(chalkConfig.getSecretManagerUrl())
+
+  login_url.path = "/api/login"
+
   # request auth code from API
   info("Requesting Chalk authentication code " & $login_url)
   if login_url.scheme == "https":
@@ -606,7 +605,7 @@ proc getChalkApiToken(): string =
     while not authnSuccess and not authnFailure:
         # poll the API with deviceCode to see if login succeeded yet
         pollUri = parseUri(pollUrl & deviceCode)
-      
+
         if pollUri.scheme == "https":
           contextPoll = newContext(verifyMode = CVerifyPeer)
           clientPoll  = newHttpClient(sslContext = contextPoll, timeout = timeout)
@@ -639,7 +638,7 @@ proc getChalkApiToken(): string =
 
         elif responsePoll.status.startswith("428") or responsePoll.status.startswith("403"):
           # sleep for requested polling period while showing spinner before polling again
-          
+
           # restart spinner animation - reset vars
           frameIndex     = 0
           framerate      = (pollInt * 1000) / frames.len
@@ -679,7 +678,7 @@ proc getChalkApiToken(): string =
 proc attemptToGenKeys*(): bool =
   var apiToken = ""
   let use_api = chalkConfig.getApiLogin()
-  
+
   if use_api:
     apiToken = getChalkApiToken()
     if apiToken == "":

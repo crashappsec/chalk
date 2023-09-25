@@ -9,7 +9,7 @@
 ## code.
 
 import  std/tempfiles, osproc, posix, config, subscan, nimutils/managedtmp,
-        std/monotimes
+        std/monotimes, parseutils
 
 proc increfStream*(chalk: ChalkObj) {.exportc.} =
   if chalk.streamRefCt != 0:
@@ -101,13 +101,14 @@ proc setupManagedTemp*() =
 
 
 when hostOs == "macosx":
-  const scriptLoc = "autocomplete/mac.bash"
+  const staticScriptLoc = "autocomplete/mac.bash"
 else:
-  const scriptLoc = "autocomplete/default.bash"
+  const staticScriptLoc = "autocomplete/default.bash"
 
 const
-  bashScript      = staticRead(scriptLoc)
+  bashScript      = staticRead(staticScriptLoc)
   autoCompleteLoc = "~/.local/share/bash_completion/completions/chalk.bash"
+
 when hostOs == "linux":
   template makeCompletionAutoSource() =
     var
@@ -195,24 +196,77 @@ elif hostOs == "macosx":
 else:
     template makeCompletionAutoSource() = discard
 
+const currentAutocompleteVersion = (0, 1, 1)
+proc validateMetadata*(obj: ChalkObj): ValidateResult {.importc.}
+
 proc autocompleteFileCheck*() =
   if isatty(0) == 0 or chalkConfig.getInstallCompletionScript() == false:
     return
-  let dst = resolvePath(autoCompleteLoc)
-  if fileExists(dst):
-    return
-  try:
-    createDir(resolvePath(dst.splitPath().head))
-  except:
-    warn("No permission to create auto-completion directory: " &
-      dst.splitPath().head)
-    return
+  let
+    dst           = resolvePath(autoCompleteLoc)
+    alreadyExists = fileExists(dst)
+
+  if alreadyExists:
+    var invalidMark = true
+
+    let
+      subscan   = runChalkSubscan(dst, "extract")
+      allchalks = subscan.getallChalks()
+
+    if len(allChalks) != 0 and allChalks[0].extract != nil:
+      if "ARTIFACT_VERSION" in allChalks[0].extract and
+         allChalks[0].validateMetadata() == vOk:
+        let
+          boxedVers    = allChalks[0].extract["ARTIFACT_VERSION"]
+          foundRawVers = unpack[string](boxedVers)
+          splitVers    = foundRawVers.split(".")
+
+        if len(splitVers) == 3:
+          var
+            major, minor, patch: int
+            totalParsed = 2
+
+          totalParsed += parseInt(splitVers[0], major)
+          totalParsed += parseInt(splitVers[1], minor)
+          totalParsed += parseInt(splitVers[2], patch)
+
+          if totalParsed == len(foundRawVers):
+            invalidMark = false
+
+            trace("Extracted semver string from existing autocomplete file: " &
+                  foundRawVers)
+
+          if (major, minor, patch) != (0, 0, 0) and
+             currentAutoCompleteVersion > (major, minor, patch):
+            var curVers = $(currentAutocompleteVersion[0]) & "." &
+                          $(currentAutocompleteVersion[1]) & "." &
+                          $(currentAutocompleteVersion[2])
+
+            info("Updating autocomplete script to version: " & curVers)
+          else:
+            trace("Autocomplete script does not need updating.")
+            return
+
+    if invalidMark:
+      info("Invalid chalk mark in autocompletion script. Updating.")
+
+  if not alreadyExists:
+    try:
+      createDir(resolvePath(dst.splitPath().head))
+    except:
+      warn("No permission to create auto-completion directory: " &
+        dst.splitPath().head)
+      return
+
   if not tryToWriteFile(dst, bashScript):
     warn("Could not write to auto-completion file: " & dst)
     return
   else:
-    info("Wrote bash auto-completion file to: " & dst)
-  makeCompletionAutoSource()
+    info("Installed bash auto-completion file to: " & dst)
+
+  if not alreadyExists:
+    makeCompletionAutoSource()
+    info("Script should be sourced automatically on your next login.")
 
 template otherSetupTasks*() =
   setupManagedTemp()

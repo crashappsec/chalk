@@ -28,6 +28,6 @@ repos:
           (?x)(
             selfsigned.py|
             defaultconfig.c4m|
-            configs/*.c4m|
+            configs/.*.c4m|
             data/.*
           )$

@@ -272,6 +272,10 @@ type
     dfSectionAliases*:  OrderedTable[string, DockerFileSection]
     addedInstructions*: seq[string]
 
+  ValidateResult* = enum
+    vOk, vSignedOk, vBadMd, vNoCosign, vBadSig, vNoHash, vNoPk
+
+
 # # Compile-time only helper for generating one of the consts below.
 # proc commentC4mCode(s: string): string =
 #   let lines = s.split("\n")

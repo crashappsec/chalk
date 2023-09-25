@@ -151,6 +151,9 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
   if hashOpt.isSome():
     artifact.collectedData["_CURRENT_HASH"] = pack(hashOpt.get())
 
+proc rtaiLinkingHack*(artifact: ChalkObj) {.cdecl, exportc.} =
+  artifact.collectRunTimeArtifactInfo()
+
 proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
   # Note that callers must have set obj.collectedData to something
   # non-null.

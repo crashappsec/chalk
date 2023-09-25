@@ -328,7 +328,8 @@ The named reporting template must already exist in your configuration.
 
     flag_yn search_layers {
       doc: """
-When a mark in an image can't be found, should we try to report on overwitten marks?      
+When a mark in an image can't be found, should we try to report on
+overwitten marks?      
 """
       field_to_set: "extract.search_base_layers_for_marks"
     }

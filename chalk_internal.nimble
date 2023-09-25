@@ -13,7 +13,7 @@ requires "https://github.com/crashappsec/con4m.git#4a7b50b6dacce5eb078c6704a80a7
 requires "https://github.com/viega/zippy == 0.10.7"
 requires "https://github.com/aruZeta/QRgen == 3.0.0"
 
-import std/strformat
+import std/strformat, strutils
 
 # this allows us to get version externally without grepping for it in the file
 task version, "Show current version":
@@ -89,3 +89,26 @@ task s3, "Publish release build to S3 bucket. Requires AWS cli + creds":
   exec "aws s3 cp " & bin[0] & " s3://" & bucket & "/latest/$(uname -m)"
   exec "aws s3 cp " & bin[0] & " s3://" & bucket &
           "/" & version & "/$(uname -m)"
+
+let completion_script_version = version
+
+task mark_completion, "Replace the chalk mark in a completion script, including the articact version":
+
+  exec """cat > tmpcfg.c4m << EOF
+keyspec.ARTIFACT_VERSION.value = "REPLACE_ME"
+keyspec.CHALK_PTR.value = ("This mark determines when to update the script." +
+" If there is no mark, or the mark is invalid it will be replaced. " +
+" To customize w/o Chalk disturbing it when it can update, add a valid " +
+" mark with a version key higher than the current chalk verison, or " +
+" use version 0.0.0 to prevent updates")
+
+mark_template.mark_default.key.BRANCH.use = false
+mark_template.mark_default.key.CHALK_RAND.use = false
+mark_template.mark_default.key.CODE_OWNERS.use = false
+mark_template.mark_default.key.COMMIT_ID.use = false
+mark_template.mark_default.key.PLATFORM_WHEN_CHALKED.use = false
+EOF
+""".replace("REPLACE_ME", completion_script_version)
+
+  exec "chalk --use-external-config --config-file=./tmpcfg.c4m --no-use-embedded-config --skip-command-report insert src/autocomplete"
+  exec "rm ./tmpcfg.c4m"

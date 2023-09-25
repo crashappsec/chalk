@@ -15,15 +15,15 @@ import std/monotimes, nativesockets, sequtils, times, ../config,
 when defined(posix): import posix_utils
 
 var
-  externalActions: seq[(string, string)] = @[]
+  externalActions: seq[seq[string]] = @[]
 
 proc recordExternalActions(kind: string, details: string) =
-  externalActions.add((kind, details))
+  externalActions.add(@[kind, details])
 
 setExternalActionCallback(recordExternalActions)
 
 
-proc validateMetadata(obj: ChalkObj): ValidateResult =
+proc validateMetadata*(obj: ChalkObj): ValidateResult {.cdecl, exportc.} =
   let fields = obj.extract
 
   # Re-compute the chalk ID.
@@ -58,6 +58,9 @@ proc validateMetadata(obj: ChalkObj): ValidateResult =
   if obj.fsRef == "":
     # For containers, validation currently happens via cmd_docker.nim;
     # They could definitely come together.
+    #
+    # TODO: Probably should add a check here to make sure the codec is
+    # on a list of ones that may not set fsRef.
     return vOk
 
   if "SIGNATURE" notin fields:
@@ -83,7 +86,7 @@ proc validateMetadata(obj: ChalkObj): ValidateResult =
     sig    = unpack[string](fields["SIGNATURE"])
     pubkey = unpack[string](fields["INJECTOR_PUBLIC_KEY"])
 
-  return obj.cosignNonContainerVerify(artHash.get(), computed, sig, pubkey)
+  result = obj.cosignNonContainerVerify(artHash.get(), computed, sig, pubkey)
 
 # Even if you don't subscribe to TIMESTAMP_WHEN_CHALKED we collect it in case
 # you're subscribed to something that uses it in a substitution.
