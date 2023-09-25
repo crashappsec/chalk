@@ -86,7 +86,7 @@ proc validateMetadata*(obj: ChalkObj): ValidateResult {.cdecl, exportc.} =
     sig    = unpack[string](fields["SIGNATURE"])
     pubkey = unpack[string](fields["INJECTOR_PUBLIC_KEY"])
 
-  result = obj.cosignNonContainerVerify(artHash.get(), computed, sig, pubkey)
+  result = obj.cosignNonContainerVerify(artHash.get(), computed.hex(), sig, pubkey)
 
 # Even if you don't subscribe to TIMESTAMP_WHEN_CHALKED we collect it in case
 # you're subscribed to something that uses it in a substitution.
