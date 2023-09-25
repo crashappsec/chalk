@@ -103,6 +103,10 @@ proc newChalk*(name:         string            = "",
                     cache:         cache,
                     myCodec:       codec)
 
+  if extract != nil and len(extract) > 1:
+    result.marked = true
+
+
   if stream != FileStream(nil):
     result.increfStream()
 

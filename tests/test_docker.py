@@ -242,14 +242,14 @@ def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
     )
     chalk_result = ChalkProgram.from_program(result)
 
-    report = chalk_result.reports[0]
-    assert report["_OPERATION"] == "exec"
+    exec_report = chalk_result.reports[0]
+    assert exec_report["_OPERATION"] == "exec"
 
     # there should be a few heartbeats
     assert len(chalk_result.reports) > 1
-    for other_report in chalk_result.reports[1:]:
-        assert other_report["_OPERATION"] == "heartbeat"
-        assert other_report.mark == report.mark
+    for heartbeat_report in chalk_result.reports[1:]:
+        assert heartbeat_report["_OPERATION"] == "heartbeat"
+        assert heartbeat_report.mark == exec_report.mark
 
 
 def test_docker_labels(chalk: Chalk, random_hex: str):
