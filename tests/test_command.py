@@ -9,6 +9,7 @@ dump + load tested in test_config.py
 docker commands are not tested here but as part of the docker codec tests in test_docker.py
 exec commands are tested in test_exec.py as they are more involved
 """
+import glob
 from pathlib import Path
 
 import pytest
@@ -153,14 +154,13 @@ def test_insert_extract_delete(copy_files: list[Path], chalk: Chalk):
 
 def test_version(chalk: Chalk):
     result = chalk.run(command="version", no_color=True)
-    printed_version = result.find("Chalk version").strip("┋ ")
+    printed_version = result.find("Chalk version", words=2).split()[-1]
 
+    nimble = Path(glob.glob(f"{Path(__file__).parent.parent / '*.nimble'}")[0])
     # version output should match the version in chalk_internal.nimble
     internal_version = next(
         i.split("=")[1].strip().strip('"')
-        for i in (Path(__file__).parent.parent / "chalk_internal.nimble")
-        .read_text()
-        .splitlines()
+        for i in nimble.read_text().splitlines()
         if i.startswith("version")
     )
 
