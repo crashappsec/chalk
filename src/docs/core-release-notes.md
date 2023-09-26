@@ -46,7 +46,7 @@ At release time, here are known issues:
 
 - In fact, Linux and Mac on the two major hardware architectures are
   the only platforms we are currently supporting. More Posix platforms
-  *may* work, but we are making no effort there at this point.
+  _may_ work, but we are making no effort there at this point.
 
 ### Data collection and Marking
 
@@ -69,7 +69,7 @@ At release time, here are known issues:
   writes to files by multiple chalk instances (particularly meant for
   protecting log files). This can lead to chalk instances giving up on
   obtaining the lock if you run multiple instances in the same
-  environment at once. 
+  environment at once.
 
 ## Major changes since the preview releases
 
@@ -164,6 +164,6 @@ releasing services around Chalk (with a free tier).
 
 - Better support for specific platforms for serverless apps.
 
-Note that Windows support is *not* a priority for us currently. We'd
+Note that Windows support is _not_ a priority for us currently. We'd
 love to get there eventually, but do not expect to get to it any time
 soon, unless contributed by the community.

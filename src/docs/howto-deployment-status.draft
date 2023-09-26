@@ -1,47 +1,29 @@
-# How to Know if a Repository is Deployed to Production Using Chalk and Cloud Custodian
+# Is my code 'prod or not'?
+
+### Use Chalk and CloudCustodian to know what code repos have and haven't been deployed to production
 
 ## Summary
+Teams constantly create code repos but very few actually make it into production. Automated tools like Dependabot are often configured to run on every code repo, resulting in noisy alerts and lots of busy work.
 
-Understanding where code is deployed is non-trivial when we are dealing with
-modern complex applications with multiple dependencies: different versions of
-those dependencies could be deployed at different environments at any given
-time. Tracking where code is deployed allows your team to prioritize work
-appropriately and respond in a timely fashion to security vulnerabilities or
-requests for new features.
+Knowledge about what is, and what isn't important, is usually tribal and not easily accessible.
 
-In this tutorial, we will examine how chalk can be combined with [cloud
-custodian](https://cloudcustodian.io/) to build a map of where services are
-deployed. For the purposes of this tutorial, we will only focus on code deployed
-to Amazon's Elastic Container Services (ECS),
-however the logic of this tutorial applies to any type deployment in AWS or
-other cloud provider.
+By combining chalk data and [Cloud
+Custodian](https://cloudcustodian.io/) data, a popular infrastructure  management tool, you can derive what code is 'prod or not'. 
 
-Although this how-to involves serveral manual steps to achieve the desired
-end-to-end functionality, we are providing an easy-to-use,
-working-out-of-the-box overview of where your code is deployed in our freemium
-version of the Crash Override Console (TBD), that requires minimal setup on
-the user end: all you need to do is connect chalk to your deployment pipelines,
-and set up integrations with your cloud providers, and you get the full map
-of where your code is deployed without any additional work. For now, however,
-let's see how you could set this up on your own, for a small-scale example
+This how-to uses Chalk™ to automate this in three steps:
 
-## Prerequisities
+1. Configure Chalk to make it easy to identify production images
 
-- A deployment pipeline that deploys docker containers to ECR, with those
-  containers being used in ECS services, and working AWS credentials to query said deployments.
-- A working installation of [cloud custodian](https://cloudcustodian.io/).
-- A working chalk binary (see [here](./guide-user-guide) on setting that up).
+2. Add chalk to every build so it generates image hashes and sends them to your chalk registry
+2. Collect image hashes from Cloud Custodian, compare them to your chalk marks and derives what is and what isn't in production
 
 ## Steps
 
-The steps overview for this how-to is as follows:
+### Before you start 
 
-1. Generate Chalk marks for the repo and collect the image hashes for containers
-   built
-2. Connect to Cloud Custodian and collect the images hashes for deployed
-   services
-3. Compare the two sets of information to determine which repositories are
-   deployed where
+You should have a working installation of chalk. See the [getting started guide]()
+
+This how-to uses Cloud Custodian and assumes production software is deployed to AWS ECR services. To follow the steps you will need a deployment pipeline that deploys docker containers to ECR, and working AWS credentials to query those deployments. You will also need a working installation of [cloud custodian](https://cloudcustodian.io/).
 
 ### Step 1: Build your repository's containers with chalk
 

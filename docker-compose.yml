@@ -2,9 +2,8 @@ services:
   chalk:
     build:
       context: .
-      args:
-        CHALK_BUILD: ${CHALK_BUILD:-debug}
-      target: ${BASE:-ubuntu}
-    working_dir: $PWD
+      target: deps
+    command: nimble ${CHALK_BUILD:-release}
+    working_dir: /chalk
     volumes:
-      - $PWD:$PWD
+      - .:/chalk/

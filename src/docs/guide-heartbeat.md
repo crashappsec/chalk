@@ -4,14 +4,6 @@
 
 1.0.0
 
-### Author
-
-Crash Override (what email should we put here?)
-
-### Tags
-
-TODO:
-
 ## TLDR
 
 This document is a guide on how to configure chalk so that a chalked binary or docker container emits a snapshot of network connections at set intervals.
@@ -23,16 +15,18 @@ This document is a guide on how to configure chalk so that a chalked binary or d
 
 ### Related Docs and References
 
-The sample configuration file used for reference is available at `heartbeat_network.conf`.
+The sample configuration file used for reference is available at `https://chalkdust.io/guide-heartbeat.c4m`.
 
 ## Steps
 
 ### Step 1: Enabling Heartbeat Via Config
 
 #### Exec Heartbeat
+
 The heartbeat functionality on the `chalk exec` command allows the user to set a heartbeat that will emit a chalk report at the specified interval as long as the target of the exec command is running. The target will not be affected by any report generation or output and should run as normal.
 
 To enable heartbeat and set a heartbeat rate, add the following to the chalk config file:
+
 ```
 exec.heartbeat: true
 exec.heartbeat_rate: <<10 minutes>>
@@ -41,9 +35,11 @@ exec.heartbeat_rate: <<10 minutes>>
 With this configuration, heartbeat will output a chalk report every 10 minutes.
 
 #### Docker Wrapping (Optional)
+
 If the target of the `chalk exec` command is intended to be run via docker, the docker image must be built by chalk with entrypoint wrapping enabled.
 
 To enable docker entrypoint wrapping, add the following to the chalk config file:
+
 ```
 docker.wrap_entrypoint: true
 ```
@@ -53,6 +49,7 @@ Then build the Dockerfile with `chalk docker build`.
 For docker entrypoint wrapping to work, chalk will build the docker image with a copy of the chalk binary inside the image that will then run `chalk exec` on the original docker entrypoint. By default, the chalk running `chalk docker build` will attempt to copy itself into the docker image, but will not do so if it detects an architecture mismatch (ex, if the chalk binary was built for `linux/arm64` but the target docker image is `linux/amd64`). In this case, chalk will not be available inside the container and no reports will be generated, although this will not otherwise affect the running of the container.
 
 If you have a compatible chalk binary available for the target container architecture, this chalk can be passed into the build by adding the following line into the config file:
+
 ```
 docker.arch_binary_locations: {"linux/amd64": "/path/to/amd/chalk"}
 ```
@@ -66,6 +63,7 @@ Now that heartbeat is enabled, a chalk report will be generated on every heartbe
 #### Report Template
 
 Our reporting template will include some basic data about the system, as well as the networking-specific data we are looking for. We define it in the config file as follows:
+
 ```
 # network reporting template
 report_template network_report {
@@ -73,7 +71,7 @@ report_template network_report {
   key.CHALK_PTR.use                           = true
   key._OPERATION.use                          = true
   key._TIMESTAMP.use                          = true
-  
+
   key._CHALKS.use                             = true
   key._OP_PLATFORM.use                        = true
   key._OP_HOSTNAME.use                        = true
@@ -91,6 +89,7 @@ report_template network_report {
 ```
 
 Let's examine the reporting keys that we have enabled in this profile:
+
 - `CHALK_ID` and `CHALK_PTR` are useful to have here to link chalked artifacts
 - `_OPERATION` in this case will always be `heartbeat` for heartbeat reports
 - `_TIMESTAMP` is the time when the heartbeat report was generated
@@ -103,6 +102,7 @@ The other keys provide the networking data for the host on which chalk is runnin
 ### Step 3: Defining Output Sinks
 
 To separate our networking reports from normal chalk logs, we can specify custom output sinks where we would like them to be sent. Let's say that we want to print our network reports to terminal, as well as write them to a file for later analysis. We can add the following to our config file:
+
 ```
 sink_config network_std_out {
   sink: "stdout"
@@ -116,6 +116,7 @@ sink_config network_file_out {
 ```
 
 Here we have defined two sink configurations:
+
 - `network_std_out` sends output to the `stdout` sink
 - `network_file_out` sends output to a `file` sink, in this case the log file `~/network_heartbeat_log.log`. If the file does not exist, it will be created.
 
@@ -124,6 +125,7 @@ Note that if we are running chalk inside a docker container, the reports going t
 ### Step 4: Defining A Custom Report
 
 Now that the report template and sink outputs are defined, we can enable them on heartbeat events by creating a custom report that uses these components and adding it to our config file:
+
 ```
 custom_report network_heartbeat_report {
   enabled: true
@@ -134,6 +136,7 @@ custom_report network_heartbeat_report {
 ```
 
 The fields in the custom report `network_heartbeat_report` are:
+
 - `enabled` to toggle the report on or off
 - `report_template` takes the report template that we want to display, in this case the `network_report`
 - `sink_configs` takes an array of sink outputs that we want to report to, in this case to stdout and to the file we have specified in the `network_file_out` definition
@@ -148,16 +151,19 @@ Also note that this custom report will not interfere with any default reporting 
 We can test our newly created configuration file by running `chalk exec` on a target binary and checking that the resulting heartbeat reports contain the expected networking information.
 
 First, we load our configuration into the chalk binary:
+
 ```
 chalk load https://chalkdust.io/guide-heartbeat.c4m
 ```
 
 Then we run `chalk exec` on a target binary. For testing purposes, we will use sleep:
+
 ```
 chalk exec --exec-command-name=sleep 5000
 ```
 
 After 10 minutes, we should expect a chalk report on the `heartbeat` operation that looks similar to this:
+
 ```
 [
     {
@@ -225,26 +231,27 @@ This report will be printed to stdout, and checking the log file we have specifi
 Setting up heartbeat reports is slightly different for docker.
 
 First, we have to load the configuration file into our chalk binary:
-```
-chalk load heartbeat_network.conf
+
+```bash
+chalk load https://chalkdust.io/guide-heartbeat.c4m
 ```
 
 Then, we have to build the target dockerfile with chalk:
-```
+
+```bash
 chalk docker build -t [tagname] -f [path/to/dockerfile]
 ```
 
 Run the resulting docker image as usual:
-```
+
+```bash
 docker run [tagname]
 ```
 
 The docker logs can be checked via
-```
+
+```bash
 docker logs [container-name]
 ```
+
 which should have the same chalk report on the `heartbeat` operation as above. Alternatively, you can shell into the running docker container and examine the file `~/network_heartbeat_log.log` to see the reports.
-
-## Suggested Next Steps
-
-## FAQ

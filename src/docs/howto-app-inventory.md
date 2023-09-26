@@ -1,6 +1,6 @@
-# How to build a real-time application inventory
+# Create a real-time application inventory
 
-## Just like putting GPS trackers on your software
+### Use Chalk to create an always up-to-date database of what code is where, and who owns it
 
 ## Summary
 
@@ -15,62 +15,22 @@ figure out where the code lives and who owns it.
 Similarly, developers often would like to know what versions of their
 code are deployed where, especially when a bug report comes in.
 
-In this recipe, we'll build a real-time asset inventory for our
-software that ties together the repositories and code owners to what
-we've deployed.
+This how-to uses Chalk™ to automate this in five steps:
 
-Not only will you spend less time thrashing around for information,
-but other people will have a resource they can use to self-serve
-without having to take more of your time.
+1. Load our `app-inventory` configuration
+2. Set up the Inventory web service
+3. Configure where Chalk reports get sent
 
-## When to use this
+4. Automate calling docker via `chalk` in your build environment.
+5. Use it
 
-This is applicable for most organizations deploying software in a
-cloud environment, especially when that software is managed out of
-version control systems (whether or not code tends to be written
-in-house).
+## Steps
 
-For this recipe, we do limit ourselves to workloads build via Docker.
-
-## Solution
-
-Wrap your Docker builds with Chalk to:
-
-1. Automatically collect information about software in CI/CD.
-
-2. Automatically configure built containers to report information on
-   start-up.
-
-3. Send the data to a web service. For the purposes of this guide, we will
-   locally deploy a web server backed by SQLite via Docker.
-
-### Alternative solutions
-
-Many companies have artifact repositories, but they don't do a good
-job providing a clear line back to the repo, developer and version.
-
-Some companies that require using a single build / deploy environment
-can reliably find these answers without talking to people, though it
-generally requires manually following a trail of breadcrumbs.
-
-Many large enterprises have regulatory requirements to keep an
-inventory like this, but do it manually (through spreadsheets), which
-is slow and error prone.
-
-## Prerequisites
-
-This recipe does assume access to your build system, and assumes
-tracked workloads are built through Docker (and therefore deployed as
-container). Chalk can be used beyond that, but it's outside the scope
-of this recipe.
-
-It also assumes you have Chalk installed.
+### Before you start
 
 The easiest way to get Chalk is to download a pre-built binary from
 our [release page](https://crashoverride.com/releases). It's a
 self-contained binary with no dependencies to install.
-
-## Steps
 
 ### Step 1: Load our `app-inventory` configuration
 
@@ -171,7 +131,7 @@ The database GUI will be available on port 8080. But, our database
 will be empty until we start using Chalk, so let's come back to the
 data after we've got a bit of it.
 
-### Step 3: Reconfigure Chalk
+### Step 3: Configure chalk reports sink destination
 
 Our Chalk binary just needs to point to our API server. Lets first
 dump the configuration we loaded to a file:
@@ -225,7 +185,7 @@ Then, you need to move `chalk` to someplace that's going to be in the
 default path (usually putting it in the same directory as your docker
 executable is a safe bet).
 
-> 💀 We do _not_ recomment /etc/profile.d because some (non-login)
+> 💀 We do _not_ recommend /etc/profile.d because some (non-login)
 > shells will not use this.
 
 Once you add this, you can log out and log back in to make the alias
@@ -248,7 +208,7 @@ in our case:
 2. Slightly adjusts the Docker input so that Chalk will also start up
    with containers, and report to your Inventory web service.
 
-### Step 5: Use it!
+### Step 5: Use it
 
 Build and deploy some workloads. Once you do, from the machine you
 deployed the containers, browse SQLite database at
@@ -286,30 +246,20 @@ curl "http://localhost:8585/reports?operation=exec" -s | jq
 To see all available endpoints you can see the Swagger docs of the API
 at [http://localhost:8585/docs](http://localhost:8585/docs)
 
-## Suggested Next Steps
+## Warning
 
-- Ideally, the server would have a layer of authentication behind it.
+This how-to was written for local demonstration purposes only.There is no security for this how-to. You should always have authn, authz and uses SSL as an absolute minimum.
 
-- If you want to make sure to detect that containers you're reporting
-  on haven't been modified since the build info being reported, you
-  can turn on digital signing; see our compliance recipe for more
-  info.
+## Our cloud platform
 
-- You can hook up operational information to help automatically
-  categorize workloads by their environment, so that people can easily
-  pick out what's in prod and what's not. See our recipe on
-  integrating with Cloud Custodian as an example.
+While creating a basic app inventory with Chalk is easy, our cloud platform makes it even easier. It is designed for enterprise deployments, and provides additional functionality including prebuilt configurations to solve common tasks, prebuilt integrations to enrich your data, a built-in query editor, an API and more.
 
-- Make the query interface easily available to other people in your
-  organization!
-
-- Setup HTTPS, at least for the API server.
-
-- Crash Override will soon be offering a service that includes a more
-  polished interface around application inventory management, where
-  you can give your dev teams a nicer view onto their apps, where
-  they're deployed. Sign up for the waiting list!
+There are both free and paid plans. You can [join the waiting list](https://crashoverride.com/join-the-waiting-list) for early access.
 
 ### Background Information
 
-Mark, please fill this one out!
+Traditionally IT departments maintained list of their hardware and software assets in a CMDB or [configuration management data base](https://en.wikipedia.org/wiki/Configuration_management_database). These systems were not designed for modern cloud based software and the complexity of code that they are made from.
+
+Spotify created a project called [Backstage](https://backstage.io) to centralise developer documentation. Many companies now use it as a source of truth for their development teams.
+
+Many companies create application inventories using spreadsheets.

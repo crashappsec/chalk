@@ -1,66 +1,47 @@
-# How-to Handle "Software Security Supply Chain" Requests With Minimal Effort
+# Create software security supply chain compliance reports automatically
 
-## Ticking Off Pesky Software Security Supply Chain Compliance Checkboxes Boxes Fast, and Easy
+### Use Chalk to fulfil pesky security supply chain compliance requests, and tick pesky compliance checkboxes fast and easy
 
 ## Summary
 
-The US Government, several big corporations, and the Linux foundation with their [SBOM Everywhere](https://openssf.org/blog/2023/06/30/sbom-everywhere-and-the-security-tooling-working-group-providing-the-best-security-tools-for-open-source-developers/) initiative, 
-are all driving the industry to adopt a series of requirements around
-"supply chain" security, including:
+The US Government, several big corporations, and the Linux foundation with their [SBOM Everywhere](https://openssf.org/blog/2023/06/30/sbom-everywhere-and-the-security-tooling-working-group-providing-the-best-security-tools-for-open-source-developers/) initiative, are all driving the industry to adopt a series of requirements around
+"software supply chain security", including:
 
-- SBOMs (Software Bills of Material) to show what 3rd party components
+- SBOMs (Software Bills of Materials) to show what 3rd party components
   are in the code.
 
-- "Code provenance" -- data allowing you to tie software in the field
-  to the commit it came from, and the build process that created it.
+- **Code provenance** data that allows you to tie software in the field
+
+  to the code commit where it originated from, and the build process that created it.
 
 - Digital signatures on the above.
 
-With almost no effort, you can be [Level 2](https://slsa.dev/spec/v1.0/levels) compliant with the emerging
-[SLSA](https://slsa.dev) framework well before people start officially requiring [Level 1](https://slsa.dev/spec/v1.0/levels)
-compliance!
+This information is complex and tedious to generate, and manage.
 
-## When To Use This
+This how-to uses Chalk™ to automate this in two steps:
 
-If you're getting any asks from customers around supply-chain security
-at all.
+1. Configure chalk to generate SBOMs, collect code provenance data, and digitally sign it
 
-## Solution
+2. Configure chalk to automatically generate compliance reports
 
-Have Chalk™ automatically collect SBOMs and provenance data, then sign
-it, as an automatic step in your build process.
-
-Chalk will add a small data blob (the **chalk mark**) to your
-artifacts to make the information easy to find.
-
-### Alternative Solutions
-
-Right now, lots of people are scrambling to understand what they are
-being asked to do, researching a vast maze of different tech-focused tools.
-
-They're then left figuring out how-to  operationalize any of it
-effectively, and make the data available to the people who need it.
-
-## Prerequisites
-
-This how-to  assumes access to your build system, and assumes your
-project successfully builds.
-
-It also assumes you have chalk installed.
-
-The easiest way to get chalk is to download a pre-built binary from
-our [release page](https://crashoverride.com/releases). It's a
-self-contained binary with no dependencies to install.
+As a big bonus, with no extra effort, you can be [SLSA](https://slsa.dev) [level 2](https://slsa.dev/spec/v1.0/levels) compliant, before people start officially requiring SLSA [level 1](https://slsa.dev/spec/v1.0/levels)
+compliance.
 
 ## Steps
 
-### Step 1: Load a `compliance` Configuration
+### Before you start
+
+The easiest way to get Chalk is to download a pre-built binary from
+our [release page](https://crashoverride.com/releases). It's a
+self-contained binary with no dependencies to install.
+
+### Step 1: Configure chalk to generate SBOMs, collect code provenance data, and digitally sign it
 
 Chalk is designed so that you can easily pre-configure it for the
-behavior you want, so that you can generally just run a single binary
+behavior you want, and so that you can generally just run a single binary
 with no arguments, to help avoid using it wrong.
 
-Therefore, for this how-to , you should configure your binary with
+Therefore, for this how-to, you should configure your binary with
 either our `compliance-docker` configuration, or our
 `compliance-other` configuration, depending on whether you're using
 docker or not.
@@ -94,40 +75,70 @@ By default, chalk is already collecting provenance information by
 examining your project's build environment, including the .git
 directory and any common CI/CD environment variables.
 
-### Step 2: Set Up Signing
+To setup digital signing we have built yet another easy button.
 
 Simply run:
+
 ```
 ./chalk setup
 ```
 
 You'll get a link to connect an account for authentication, to be able
-to use Crash Override's secret service for chalk (the account is
+to use Crash Override's secret service for chalk. The account is
 totally free, and the account is only used to keep us from being an
-easy Denial-of-Service target).
+easy Denial-of-Service target.
 
-Once you successfully connect an account, you'll get a series of
+Once you have successfully connect an account, you'll get a series of
 success messages.
 
 At this point, your chalk binary will have re-written itself to
 contain most of what it needs to sign, except for a `secret` that it
 requests dynamically from our secret service.
 
-### Step 3: Chalk and Win
+### Step 2: Configure chalk to automatically generate compliance reports
 
-Now's that the binary is configured, you probably will want to move
+Now that the binary is configured, you probably will want to move
 the `chalk` binary to a system directory that's in your `PATH`.
 
 How you run chalk depends on whether you're building via `docker` or not:
 
-- *With docker*: You "wrap" your `docker` commands by putting the
+- _With docker_: You "wrap" your `docker` commands by putting the
   word `chalk` in front of them.
 
-- *Without docker* : You simply invoke `chalk` in your build pipeline.
+- _Without docker_ : You simply invoke `chalk` in your build pipeline.
 
-#### Step 3a: Docker
+As configured, anyone with access to the artifact can use chalk to not
+only see the chalk mark, but to validate the signature.
 
-Your `build` operations will add a file (the *"chalk mark"*) into the
+Any build of chalk can extract the chalk mark, and verify
+everything. While we configured our binary to add marks by default,
+the `extract` command will pull them out and verify them.
+
+By default, it will look on the file system in the same way that
+insertion did when we weren't using Docker. So:
+
+```
+chalk extract
+```
+
+Chalk extract will report on anything it finds under your current working directory,
+And so will extract the mark from any artifacts you chalked that weren't
+containerized. But if you built the example container, we can extract
+from the example container easily by just by providing a reference to it:
+
+```
+chalk extract ghcr.io/viega/wordsmith:latest
+```
+
+Either will pull all the metadata chalk saved during the first
+operation, and log it, showing only a short summary report to your
+console. If the signature validation fails, then you'll get an obvious
+error! If anyone tampers with a mark, or changes a file after the
+chalking, it's easily detected.
+
+#### Step 2a: Docker
+
+Your `build` operations will add a file (the _"chalk mark"_) into the
 container with provenance info and other metadata, and any SBOM
 generated. And, when you `push` containers to a registry, chalk will
 auto-sign them, including the entire mark.
@@ -146,7 +157,7 @@ cd wordsmith/api
 chalk docker build -t ghcr.io/viega/wordsmith:latest . --push
 ```
 
-You'll see Docker run normally (It'll take a minute or so).  If your
+You'll see Docker run normally (It'll take a minute or so). If your
 permissions are right, it will also push to the registry. Once Docker
 is finished, you'll see some summary info from chalk on your command
 line in JSON format, including the contents of the Dockerfile used.
@@ -154,10 +165,10 @@ line in JSON format, including the contents of the Dockerfile used.
 If there's ever any sort of condition that chalk cannot handle (e.g.,
 if you move to a future docker upgrade without updating chalk, then
 use features that `chalk` doesn't understand), the program will
-*always* makes sure the original `docker` command gets run if it
+_always_ makes sure the original `docker` command gets run if it
 doesn't successfully exit when wrapped.
 
-#### Step 3b: When Not Using Docker
+#### Step 2b: When Not Using Docker
 
 When you invoke chalk as configured, it searches your working
 directory for artifacts, collects environmental data, and then injects
@@ -180,65 +191,21 @@ file. JAR files (and other artifacts based on the ZIP format) are
 handled similarly to container images, and there are marking
 approaches for a few other formats, with more to come.
 
-### Step 4: Configure Your Compliance Reports Location
+## Our cloud platform
 
-As configured, anyone with access to the artifact can use chalk to not
-only see the chalk mark, but to validate the signature.
-
-Any build of chalk can extract the chalk mark, and verify
-everything. While we configured our binary to add marks by default,
-the `extract` command will pull them out and verify them.
-
-By default, it will look on the file system in the same way that
-insertion did when we weren't using Docker. So:
-
-```
-chalk extract
-```
-
-Will report on anything it finds under your current working directory,
-so would extract the mark from any artifacts you chalked that weren't
-containerized. But if you built the example container, we can extract
-from the example container easily just by providing a reference to it:
-
-```
-chalk extract ghcr.io/viega/wordsmith:latest
-```
-
-Either will pull all the metadata chalk saved during the first
-operation, and log it, showing only a short summary report to your
-console. If the signature validation fails, then you'll get an obvious
-error! So if anyone tampers with a mark, or changes a file after the
-chalking, it's easily detected.
-
-## Suggested Next Steps
-
-- You can give people a web page to go to to see the compliance
-  info. You can do this by configuring chalk to send a copy of the
-  relevant metadata somewhere else. 
-
-- When using docker, you can easily ensure people don't forget about
-  it by setting up an alias for `docker` that points to chalk (or,
-  more robustly, you can rename `chalk` to `docker`, move docker out
-  of the PATH, and configure `chalk` to know where to find the real
-    `docker` command).
-
-## Join the Waiting List For Our Cloud Platform. 
-Our cloud hosted platform is built using Chalk. It make enterprise deployment easy, and provides additional functionality including prebuilt integrations to enrich your data, an in-built query editor, an API and more.
+While creating compliance reports with chalk is easy, our cloud platform makes it even easier. It is designed for enterprise deployments, and provides additional functionality including prebuilt configurations to solve common tasks, prebuilt integrations to enrich your data, a built-in query editor, an API and more.
 
 There are both free and paid plans. You can [join the waiting list](https://crashoverride.com/join-the-waiting-list) for early access.
 
-
-### Background Information
+### Background information
 
 Below is a bit more information on supply chain security and the
 emerging compliance environment around it, as well as some details on
 how chalk addresses some of these things under the hood.
 
-#### Supply Chain Security And The US Government 
+#### Supply chain security and the US government
 
-In May 2021, President Biden issued [Executive Order 14028](https://www.nist.gov/itl/executive-order-14028-improving-nations-cybersecurity#:~:text=Assignments%20%7C%20Latest%20Updates-,Overview,of%20the%20software%20supply%20chain.) to enhance cyber security and the integrity of the software supply chain. NIST or the National Institute for Standards published [Security Measures for “EO-Critical Software” Use Under Executive Order (EO)](https://www.nist.gov/system/files/documents/2021/07/09/Critical%20Software%20Use%20Security%20Measures%20Guidance.pdf) on July 2021 in response. 
-
+In May 2021, President Biden issued [Executive Order 14028](https://www.nist.gov/itl/executive-order-14028-improving-nations-cybersecurity#:~:text=Assignments%20%7C%20Latest%20Updates-,Overview,of%20the%20software%20supply%20chain.) to enhance cyber security and the integrity of the software supply chain. NIST or the National Institute for Standards published [Security Measures for “EO-Critical Software” Use Under Executive Order (EO)](https://www.nist.gov/system/files/documents/2021/07/09/Critical%20Software%20Use%20Security%20Measures%20Guidance.pdf) on July 2021 in response.
 
 #### SBOMs
 
@@ -266,7 +233,7 @@ general tool facility does allow you to generate multiple SBOMs for
 the same project, so we will likely provide multiple tools by default
 when turned on.
 
-#### Provenance
+#### Code provenance
 
 The drive to understand the provenance in software builds is highest
 from the government and from large F500 companies, who have found
@@ -300,7 +267,7 @@ out the relationships in their software. However, the exact same
 approach turns out to give other companies extactly what they're
 looking for.
 
-#### Digital Signatures
+#### Digital signatures
 
 For companies that care about provenance data, they would definitely
 prefer some level of assurance that they're looking at the RIGHT data,
@@ -338,14 +305,14 @@ provide out-of-band.
 
 That's why, when you ran `chalk setup`, Chalk output to disk two files:
 
-1. *chalk.pub* The public key you can give people out of band.
-2 *chalk.pri* The ENCRYPTED private key (just in case you want to load
-the same key into a future chalk binary).
+1. _chalk.pub_ The public key you can give people out of band.
+   2 _chalk.pri_ The ENCRYPTED private key (just in case you want to load
+   the same key into a future chalk binary).
 
 When you run `chalk setup`, we generate a keypair for you, and encrypt
 the private key. The key is encrypted with a randomly generated
 password (128 random bits encoded), and that password is escrowed with
-our secret service.  The chalk binary receives a token that it can use
+our secret service. The chalk binary receives a token that it can use
 to recover the secret when it needs to sign.
 
 The token and the private key are embedded into the chalk binary, so
@@ -382,23 +349,23 @@ can be very difficult for people to address, which the developers of
 the framework did recognize. Thankfully, they made the wise decision
 to frame their asks in terms of "Security Levels":
 
-- *Level 0* means you're not doing anything to address provenance
-   risks.
+- _Level 0_ means you're not doing anything to address provenance
+  risks.
 
-- *Level 1* compliance basically means that you'll provide people
-   provenance information about how you built the package. This now no
-   longer explicitly asks for SBOMs, but the need for component
-   information is implicit, since they're asking for details on the
-   build process.
+- _Level 1_ compliance basically means that you'll provide people
+  provenance information about how you built the package. This now no
+  longer explicitly asks for SBOMs, but the need for component
+  information is implicit, since they're asking for details on the
+  build process.
 
-- *Level 2* compliance primarily adds the requirement for the
-   provenance information to be output at the end of your build
-   process along with a digital signature of that information, which
-   can absolutely be fully automated.
+- _Level 2_ compliance primarily adds the requirement for the
+  provenance information to be output at the end of your build
+  process along with a digital signature of that information, which
+  can absolutely be fully automated.
 
-- *Level 3* compliance requires more hardening still; it's currently
-   more ill-defined, but the gist is that they are hoping people will
-   invest in demonstrating their build processes are 'tamper-evident'.
+- _Level 3_ compliance requires more hardening still; it's currently
+  more ill-defined, but the gist is that they are hoping people will
+  invest in demonstrating their build processes are 'tamper-evident'.
 
 That goes back to our discussion on automated digital signatures
 above. The SLSA designers realize that, in most domains, asking for
@@ -415,28 +382,31 @@ around any of this yet, and that in many places, they'll be lucky to
 get the basic info without the extra work of signatures.
 
 But, in good news for everyone, chalk gives you everything you need to
-*easily* meet the Level 2 requirement for signed-provenance generated
+_easily_ meet the Level 2 requirement for signed-provenance generated
 by a hosted build platform.
 
-#### A List Of Well Known Software Supply Chain Attacks
+#### A List of well known software supply chain attacks
 
 ##### Lodash
-Lodash is a popular NPM library that was, in March 2021 found to have a prototype pollution vulnerability. It was the most depended on package in NPM meaning almost all applications built in Node.js were affected. 
+
+Lodash is a popular NPM library that was, in March 2021 found to have a prototype pollution vulnerability. It was the most depended on package in NPM meaning almost all applications built in Node.js were affected.
 
 [Prototype Pollution in lodash](https://github.com/advisories/GHSA-p6mc-m468-83gw) - Github
 
 ##### Netbeans
- Ih 2020 it was reported that a tool called the Octopus scanner was searching Github and injecting malware into projects that were using the popular Java development framework Netbeans and then serving up malware to all applications built from those code repos. 
 
- [https://duo.com/decipher/malware-infects-netbeans-projects-in-software-supply-chain-attack](https://duo.com/decipher/malware-infects-netbeans-projects-in-software-supply-chain-attack) - Duo Research Labs
+Ih 2020 it was reported that a tool called the Octopus scanner was searching Github and injecting malware into projects that were using the popular Java development framework Netbeans and then serving up malware to all applications built from those code repos.
+
+[https://duo.com/decipher/malware-infects-netbeans-projects-in-software-supply-chain-attack](https://duo.com/decipher/malware-infects-netbeans-projects-in-software-supply-chain-attack) - Duo Research Labs
 
 ##### Log4j and Log4Shell
+
 Log4J is a popular logging library for the Java programming language. In late 2021 a vulnerability was discovered that allowed hackers remote access to applications using it. Several vulnerabilities followed the initial disclosure and attackers created exploits that were used in the wild. Variants included names like Log4Shell and Log4Text.
 
 [Apache Log4j Vulnerability Guidance](https://www.cisa.gov/news-events/news/apache-log4j-vulnerability-guidance) - CISA, Critical Infrastructure Security Agency
 
 ##### SolarWinds
+
 The SolarWinds attack used an IT monitoring system, Orion, which which had over 30,000 organizations including Cisco, Deloitte, Intel, Microsoft, FireEye, and US government departments, including the Department of Homeland Security. The attackers created a backdoor that was delivered via a software update.
 
 [The Untold Story of the Boldest Supply-Chain Hack Ever](https://www.wired.com/story/the-untold-story-of-solarwinds-the-boldest-supply-chain-hack-ever/) - Wired Magazine
-

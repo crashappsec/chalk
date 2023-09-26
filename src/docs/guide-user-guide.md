@@ -34,7 +34,7 @@ Beyond this document, there's an extensive amount of reference material for user
 | [**Output Configuration Reference**](./output-config.md)      | Shows how to set up sending reports wherever you like, using the config file.                                                      |
 | [**Metadata Report Configuration Guide**](./metadata.md)      | Shows how to specify what data to collect, when, and how to report different things to different places, if using the config file. |
 | [**Config File Builtins**](./builtins.md)                     | Shows the functions you can call from within a configuration file                                                                  |
-| [**Known Issues**](./core-known-issues.md)                    | Lists key known issues in the current release of Chalk                                                                             |
+| [**Release Notes**](./release-notes.md)                       | Includes key known issues in the current release of Chalk                                                                          |
 
 We have provided chalk with sensible default configurations for demo
 and testing, as well as some sample configs for specific use cases
@@ -118,7 +118,7 @@ Chalk stores its own configuration inside its own binary. This
 configuration is used to set up behavior and preferences for each
 command, including how marking and reporting happens.
 
-We will soon be releasing a terminal-based UI (TUI) that should make it 
+We will soon be releasing a terminal-based UI (TUI) that should make it
 easy to configure in most cases. For more advanced cases, Chalk supports
 a more traditional NGINX-style configuration, but with far more
 flexibility.
@@ -146,7 +146,8 @@ command line reference.
 
 In the default shipped configuration, when you invoke `chalk` on the
 command line, you will get a summary report to `stdout` and a full
-report sent to a local log file. Chalk can be configured to send reports elsewhere, such as a server endpoint or an s3 bucket.
+report sent to a local log file. Chalk can be configured to send
+reports elsewhere, such as a server endpoint or an s3 bucket.
 
 In the default configuration, the log level for error messages
 defaults to `info`. The log level is easily changed in the
@@ -189,14 +190,18 @@ typing:
 
 `chalk insert`
 
-After running this command, the file system is scanned from the current
-working directory, marking any runnable software (except for any artifacts that live in hidden directories, such as scripts in `${CWD}/.git`).
+After running this command, the file system is scanned from the
+current working directory, marking any runnable software (except for
+any artifacts that live in hidden directories, such as scripts in
+`${CWD}/.git`).
 
 By default, chalk will try to collect basic metadata:
 
 - It will look for a `.git` directory to associate a git repository.
-- It will collect host information about the build environment such as environment variables and platform details.
-- It will see if there's a local `CODEOWNERS` or `AUTHORS` file, and capture it, if so.
+- It will collect host information about the build environment such as
+  environment variables and platform details.
+- It will see if there's a local `CODEOWNERS` or `AUTHORS` file, and
+  capture it, if so.
 - It will generate identifiers for the artifact, including the
   `CHALK_ID` which uniquely identifies the unchalked artifact, and the
   `METADATA_ID` which uniquely identifies the artifact plus the
@@ -204,7 +209,7 @@ By default, chalk will try to collect basic metadata:
 
 You can also configure chalk to do a static security analysis via
 `semgrep`, or to create SBOMs via `syft`. Chalk also supports custom
-metadata collection and digital signing. For some examples of what 
+metadata collection and digital signing. For some examples of what
 you can do with config, see the how-to guides.
 
 > ❗ You can configure chalk to use `insert` as the default command,
@@ -223,10 +228,10 @@ will work out of the box:
 
 1. Put `chalk` in front of the build command. E.g.: `chalk docker
 build -tsome:thing .`
-2. Rename the `chalk` binary to docker, and put it somewhere in the
-   path that will generally show up before the actual docker command.
-3. Configure build systems to start up with global aliases, aliasing
+2. Configure build systems to start up with global aliases, aliasing
    `docker` to `chalk`.
+3. Rename the `chalk` binary to docker, and put it somewhere in the
+   path that will generally show up before the actual docker command.
 
 In all these cases, chalk will search the rest of the user's `PATH`
 for docker (unless configured to look in a specific location).
@@ -248,8 +253,6 @@ provide full tracability.
 
 Chalk can also be configured to add build-time attestation when possible.
 
-<!-- TODO: is this true? what about reproducible mark template? -->
-
 Because of the way Docker works, there's currently not a simple,
 pre-defined algorithm for getting a repeatable hash of a container
 image. As a result, the `CHALK_ID` will be based on a random value,
@@ -261,15 +264,25 @@ attestations.
 The chalk command is capable of extracting full chalk marks, and can
 report the presence of those chalk marks with the full flexibility of
 insertion. That means you have full flexibility in selecting what to
-report on and where to send reports. Additionally, on-demand extraction can report metadata about the runtime environment.
+report on and where to send reports. Additionally, on-demand
+extraction can report metadata about the runtime environment.
 
-During the extraction operation, chalk runs once, reports what it finds (including information about the host environment), and then exits. Unlike insertion, it does not accept exclusions like `.git`; if there are chalk marks in specified paths, it will report them, even if they perhaps never should have been added in the first place.
+During the extraction operation, chalk runs once, reports what it
+finds (including information about the host environment), and then
+exits. Unlike insertion, it does not accept exclusions like `.git`; if
+there are chalk marks in specified paths, it will report them, even if
+they perhaps never should have been added in the first place.
 
 ### On-demand Extraction
 
-By default, running `chalk extract` recursively searches the current directory for artifacts with chalk marks (_including_ any scripts that live in the hidden directories such as `${CWD}/.git`).Directory scanning is recursive unless specified otherwise with `recursive: true` in the chalk config or `--no-recursive` on the command line.
+By default, running `chalk extract` recursively searches the current
+directory for artifacts with chalk marks (_including_ any scripts that
+live in the hidden directories such as `${CWD}/.git`).Directory
+scanning is recursive unless specified otherwise with `recursive:
+true` in the chalk config or `--no-recursive` on the command line.
 
-If we want to extract chalk from a single artifact (or directory), we can specify the target:
+If we want to extract chalk from a single artifact (or directory), we
+can specify the target:
 
 ```bash
 chalk extract testbinary
@@ -277,15 +290,22 @@ chalk extract testbinary
 
 which will extract the chalk mark only from the target.
 
-Running `chalk extract container` will search all running containers for chalk marks; likewise, `chalk extract image` will search all images for chalk marks (but be aware that chalk extraction from docker images may take a long time, particularly if there are many images).
+Running `chalk extract container` will search all running containers
+for chalk marks; likewise, `chalk extract image` will search all
+images for chalk marks (but be aware that chalk extraction from docker
+images may take a long time, particularly if there are many images).
 
-Similarly, to extract chalk marks from a specific container or image, we can specify the image ID, image name, container ID, or container name. For example:
+Similarly, to extract chalk marks from a specific container or image,
+we can specify the image ID, image name, container ID, or container
+name. For example:
 
 ```bash
 chalk extract 0ed38928691b
 ```
 
-Generally, when using chalk for container extraction, it is best to run it in the context of the host OS, as non-privileged containers may not have enough information to ensure which image is running.
+Generally, when using chalk for container extraction, it is best to
+run it in the context of the host OS, as non-privileged containers may
+not have enough information to ensure which image is running.
 
 In most cases, the container ID will be available from within the
 container in the `HOSTNAME` environment variable. But there generally
@@ -327,7 +347,10 @@ push provides the needed breadcrumbs.
 
 If you want to better automate traceability across software's life
 cycle, you can configure chalk to run software (ideally, software that
-you've previously marked via `chalk insert` or `chalk docker build`). Chalk supports a `chalk exec` operation where it will run your process, as well as report on that process and the host environment.
+you've previously marked via `chalk insert` or `chalk docker
+build`). Chalk supports a `chalk exec` operation where it will run
+your process, as well as report on that process and the host
+environment.
 
 The current default behavior for chalk is then to exit quietly, without
 impacting your process. Chalk can also be configured to continue running
@@ -376,7 +399,9 @@ Some things to note about metadata:
 
 There's plenty of flexibility on when to collect and report on
 metadata. This document covers some of the basics at a high
-level. More detailed information on metadata keys is available through the help documentation via `chalk help metadata`, or for information on a single specific key, `chalk help metadata [keyname]`.
+level. More detailed information on metadata keys is available through
+the help documentation via `chalk help metadata`, or for information
+on a single specific key, `chalk help metadata [keyname]`.
 
 > ⚠️ It _is_ possible to create chalk marks without inserting
 > identifiers into artifacts, called "virtual chalking". However, it
@@ -453,18 +478,27 @@ happen.
 
 ### Configuring Chalk
 
-Chalk stores its configuration inside its binary. Configurations can be extracted from a binary with the `chalk dump` command, and new ones loaded with the `chalk load` command.
+Chalk stores its configuration inside its binary. Configurations can
+be extracted from a binary with the `chalk dump` command, and new ones
+loaded with the `chalk load` command, which loads from either a local
+file or an https URL.
 
-The actual configuration format is designed to be at least as simple as 
-the typical \*NIX config file whenever possible, while still supporting 
-advanced use cases. The configuration file format itself is mostly in 
-line with the NGINX family of configuration files, with sections and 
-key/value pairs. For those advanced use cases, the config file also 
+The actual configuration format is designed to be at least as simple as
+the typical \*NIX config file whenever possible, while still supporting
+advanced use cases. The configuration file format itself is mostly in
+line with the NGINX family of configuration files, with sections and
+key/value pairs. For those advanced use cases, the config file also
 supports some limited programmability.
 
-Generally, the average user shouldn't need such features (and we expect the upcoming configuration wizard to fulfill most of their needs), but the people who do should find the syntax to be straightforward to anyone with basic programming experience.
+Generally, the average user shouldn't need such features (and we
+expect the upcoming configuration wizard to fulfill most of their
+needs), but the people who do should find the syntax to be
+straightforward to anyone with basic programming experience.
 
-For people who want to dig into the actual configuration file, we provide an overview in [Config Overview](./guide-config-overview.md), and more details in the how-to guides for specific use cases. We also provide documentation via the help in `chalk help config`.
+For people who want to dig into the actual configuration file, we
+provide an overview in [Config Overview](./guide-config-overview.md),
+and more details in the how-to guides for specific use cases. We also
+provide documentation via the help in `chalk help config`.
 
 Note that other implementations of Chalk are free to implement their
 own configuration mechanisms.
@@ -508,27 +542,39 @@ used elsewhere.
 
 Users of the reference implementation of Chalk and other conforming
 implementations of Chalk cannot add arbitrary chalkable keys or
-arbitrary runtime keys, and the keys defined must conform. However, if 
-these keys don't meet your needs, you can add custom keys. Any key 
-starting with an `X_` is reserved for custom chalkable keys (both host 
-and artifact), and any key starting with `_X_` is reserved for custom 
+arbitrary runtime keys, and the keys defined must conform. However, if
+these keys don't meet your needs, you can add custom keys. Any key
+starting with an `X_` is reserved for custom chalkable keys (both host
+and artifact), and any key starting with `_X_` is reserved for custom
 run-time keys.
 
 ### Marks Versus Reports
 
-Marks are JSON objects inserted into a software artifact, or into a `virtual-chalk.json` file if virtual chalking is enabled (not recommended).
+Marks are JSON objects inserted into a software artifact, or into a
+`virtual-chalk.json` file if virtual chalking is enabled (not
+recommended).
 
-Chalk can also generate _reports_ that are separate from the artifact. These reports can be generated at the time of chalking, but they can also be generated at any point after a mark is added, such as on `extract` or `exec` operations. Chalk reports are also structured as JSON. The format and requirements around such reports are discussed in [Overview of Reporting Templates](#overview-of-reporting-templates).
+Chalk can also generate _reports_ that are separate from the
+artifact. These reports can be generated at the time of chalking, but
+they can also be generated at any point after a mark is added, such as
+on `extract` or `exec` operations. Chalk reports are also structured
+as JSON. The format and requirements around such reports are discussed
+in [Overview of Reporting
+Templates](#overview-of-reporting-templates).
 
 It's important to understand the basic semantics of reports and how
 they differ from marks:
 
 1. Reports can occur at any time, not just when inserting chalk marks.
 2. When inserting chalk marks, if a report is also generated, the data in
-the mark and the data in the report can overlap, but does NOT need to
-be identical.
+   the mark and the data in the report can overlap, but does NOT need to
+   be identical.
 
-It will be common, at chalk insertion time, to add data about the software artifact to a report that is _not_ added to the chalk mark itself, as discussed shortly. In such a case, metadata keys can get reported that are not in the mark. Similarly, it is fine for metadata to be put into the mark that is not in the associated report.
+It will be common, at chalk insertion time, to add data about the
+software artifact to a report that is _not_ added to the chalk mark
+itself, as discussed shortly. In such a case, metadata keys can get
+reported that are not in the mark. Similarly, it is fine for metadata
+to be put into the mark that is not in the associated report.
 
 When a report is generated because a chalk mark is seen in the field
 (meaning not on an insertion operation), the report can report some,
@@ -552,7 +598,12 @@ what metadata will be added to the chalk mark itself.
 
 There are two key reasons for this:
 
-1. **Privacy**. Depending on where the software is distributed and who has access to it, there may be information captured that people examining the artifact shouldn't see. In this case, there should be enough information stored in the mark to find the report record that was generated at the time of chalking without leaking sensitive data in the mark itself.
+1. **Privacy**. Depending on where the software is distributed and who
+   has access to it, there may be information captured that people
+   examining the artifact shouldn't see. In this case, there should be
+   enough information stored in the mark to find the report record
+   that was generated at the time of chalking without leaking
+   sensitive data in the mark itself.
 
 2. **Mark size**. Although size generally won't be much of a concern
    in practice, some metadata objects may be quite large, such as
@@ -578,14 +629,21 @@ To be considered a valid chalk mark, the following keys must be present:
    unambiguously determined. Otherwise, it derived from 100 bits selected
    from a cryptographic PRNG.
 3. `CHALK_VERSION`. This value is required so that extractors can
-unambiguously deal with future changes to Chalk.
+   unambiguously deal with future changes to Chalk.
 4. `METADATA_ID`. In contrast to the `CHALK_ID`, this is a unique identifier for the _chalked_ artifact.
 
-Additionally, for all non-image artifact types, the `HASH` metadata key should be added to chalk marks. Note that the `HASH` value of an artifact is NOT equivalent to the file system hash, as the chalk `HASH` algorithm used will be specific to each codec. For more information, see the help entry `chalk help hashing`.
+Details about what keys contain can be found in `chalk help
+metadata`. Compliant implementations of Chalk must insert compatible
+information.
 
-Details about what keys contain can be found in `chalk help metadata`. Compliant implementations of Chalk must insert compatible information.
+If you're looking for more information on Chalk's use of SHA-256 and
+the ways you can use hashes in identification, see `chalk help hashing`.
 
-The JSON object representing the chalk mark can contain arbitrary spaces that would otherwise be valid in JSON, but cannot contain newlines (newlines in values are encoded). This requirement is only for chalk marks stored in an artifact; there are no requirements on presentation when displaying chalk marks.
+The JSON object representing the chalk mark can contain arbitrary
+spaces that would otherwise be valid in JSON, but cannot contain
+newlines (newlines in values are encoded). This requirement is only
+for chalk marks stored in an artifact; there are no requirements on
+presentation when displaying chalk marks.
 
 ### Current Chalk Mark Insertion Algorithms
 
@@ -669,29 +727,38 @@ the mark stored in the root of its file system, either as `chalk.json`
 or `.chalk.json`. Anything else will generally be stored in a way
 where the raw JSON would be directly visible in the artifact's bytes.
 
-We want marking strategies to be unambiguous to implement and easy to extract, wherever possible. To that end, any algorithm that doesn't meet the requirements laid out here should be brought to the project to be considered for approval.
+We want marking strategies to be unambiguous to implement and easy to
+extract, wherever possible. To that end, any algorithm that doesn't
+meet the requirements laid out here should be brought to the project
+to be considered for approval.
 
 ### Multiple marks in an artifact
 
 Sometimes it might make sense for a software artifact to have multiple
 Chalk marks. For instance:
 
-- A zip file deployment might itself be marked, and contain multiple executables that also have marks.
-- A single script-based program may consist of several files, all independently marked, particularly when an entry point cannot easily be programmatically determined.
-- Individually compiled ELF objects could conceivably be marked independently, and then composed into an ELF object that is also marked.
+- A zip file deployment might itself be marked, and contain multiple
+  executables that also have marks.
+- A single script-based program may consist of several files, all
+  independently marked, particularly when an entry point cannot easily
+  be programmatically determined.
+- Individually compiled ELF objects could conceivably be marked
+  independently, and then composed into an ELF object that is also
+  marked.
 
 In the first two cases, no changes need to be made; sub-items can be
 marked unambiguously. Implementations can either:
 
 - Leave sub-marks in place.
 - Lift them into the top-level object in full, adding them to the
-  `EMBEDDED_CHALK` key, in which case they should not be placed in the embedded objects, or should be removed from them if already there.
+  `EMBEDDED_CHALK` key, in which case they should not be placed in the
+  embedded objects, or should be removed from them if already there.
 
 In the third case, allowing individual object marks to exist
 independently in the artifact would make it harder to support simple
-extraction. As of the current version, multiple marks independently existing in a
-single document (such as executables) that is not a well-defined image
-format is not allowed.
+extraction. As of the current version, multiple marks independently
+existing in a single document (such as executables) that is not a
+well-defined image format is not allowed.
 
 ### Replacing existing marks
 
@@ -703,11 +770,19 @@ from the build process should be preserved.
 
 In such cases, there are three options:
 
-1. The old chalk mark can be kept, in its entirety, in a key in the new chalk mark called `OLD_CHALK_MARK`.
-2. If the user is confident that data about the chalk mark being replaced was captured, then the mark can be replaced with the single key `OLD_CHALK_METADATA_ID`, where the value of this key is the `METADATA_ID` of the mark being replaced.
-3. Similarly, one can use the `OLD_CHALK_METADATA_HASH`, if full hashes are preferred to IDs.
+1. The old chalk mark can be kept, in its entirety, in a key in the
+   new chalk mark called `OLD_CHALK_MARK`.
+2. If the user is confident that data about the chalk mark being
+   replaced was captured, then the mark can be replaced with the
+   single key `OLD_CHALK_METADATA_ID`, where the value of this key is
+   the `METADATA_ID` of the mark being replaced.
+3. Similarly, one can use the `OLD_CHALK_METADATA_HASH`, if full
+   hashes are preferred to IDs.
 
-Particularly in the latter two scenarios, note that if the old chalk mark is not reported before being replaced, and then the mark is replaced again, the link between marks will be lost. Therefore we strongly discourage using those keys without reporting.
+Particularly in the latter two scenarios, note that if the old chalk
+mark is not reported before being replaced, and then the mark is
+replaced again, the link between marks will be lost. Therefore we
+strongly discourage using those keys without reporting.
 
 ### Mark Extraction Algorithms
 
@@ -721,25 +796,27 @@ unambiguously locate the primary mark.
 
 ### Mark Reporting
 
-As mentioned in the section [Marks Versus Reports](#marks-versus-reports), chalk reports do not have to contain the same data as in chalk marks.
+As mentioned in the section [Marks Versus
+Reports](#marks-versus-reports), chalk reports do not have to contain
+the same data as in chalk marks.
 
 Currently, Chalk can generate reports when any of the following
 operations are performed:
 
-| Operation | How to invoke the operation                                  | Description                                                                                                                                               |
-| --------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `insert`  | `chalk insert`                                               | Adds chalk marks to non-container artifacts.                                                                                                              |
-| `extract` | `chalk extract`                                              | Scan an environment, looking for existing marks in software artifacts.                                                                                    |
-| `build`   | `chalk docker ...` where the docker command leads to a build | Adds chalk marks while building a container.                                                                                                              |
-| `push`    | `chalk docker ...` where the docker command leads to a push  | Report when pushing a container to a registry.                                                                                                            |
-| `exec`    | `chalk exec`                                                 | Spawn a process, and perform reporting.                                                                                                                   |
-| `heartbeat` | `chalk exec --heartbeat`                                   | Same as `exec`, but with heartbeat enabled.                                                                                                               |
-| `delete`  | `chalk delete`                                               | Delete chalk marks from existing artifacts.                                                                                                               |
-| `env`     | `chalk env`                                                  | Perform reporting on a host environment without performing a scan (as `chalk extract` does), and without spawning another process (as `chalk exec` does). |
-| `load`    | `chalk load`                                                 | Replace a chalk executable's configuration.                                                                                                               |
-| `dump`    | `chalk dump`                                                 | Output the currently loaded configuration.                                                                                                               |
-| `setup`   | `chalk setup`                                                | Setup signing and attestation.                                                                                                               |
-| `docker`  | `chalk docker ...`, where chalk encounters an error.         | Still runs docker, but reports on cases where `insert` or `push` operations could not complete.                                                           |
+| Operation   | How to invoke the operation                                  | Description                                                                                                                                               |
+| ----------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `insert`    | `chalk insert`                                               | Adds chalk marks to non-container artifacts.                                                                                                              |
+| `extract`   | `chalk extract`                                              | Scan an environment, looking for existing marks in software artifacts.                                                                                    |
+| `build`     | `chalk docker ...` where the docker command leads to a build | Adds chalk marks while building a container.                                                                                                              |
+| `push`      | `chalk docker ...` where the docker command leads to a push  | Report when pushing a container to a registry.                                                                                                            |
+| `exec`      | `chalk exec`                                                 | Spawn a process, and perform reporting.                                                                                                                   |
+| `heartbeat` | `chalk exec --heartbeat`                                     | Same as `exec`, but with heartbeat enabled.                                                                                                               |
+| `delete`    | `chalk delete`                                               | Delete chalk marks from existing artifacts.                                                                                                               |
+| `env`       | `chalk env`                                                  | Perform reporting on a host environment without performing a scan (as `chalk extract` does), and without spawning another process (as `chalk exec` does). |
+| `load`      | `chalk load`                                                 | Replace a chalk executable's configuration.                                                                                                               |
+| `dump`      | `chalk dump`                                                 | Output the currently loaded configuration.                                                                                                                |
+| `setup`     | `chalk setup`                                                | Setup signing and attestation.                                                                                                                            |
+| `docker`    | `chalk docker ...`, where chalk encounters an error.         | Still runs docker, but reports on cases where `insert` or `push` operations could not complete.                                                           |
 
 The operation associated with a report is available via the `_OPERATION` key.
 
@@ -748,13 +825,31 @@ For more details on the command line usage of chalk, see the help documentation 
 Chalk reports can contain per-artifact information, as well as
 information specific to the host environment.
 
-An chalk report is output as an array of JSON objects that contains the report, so in most cases the array will only have a single object. However, when reports are sent, they're always sent in a JSON array that may have multiple objects, in case an implementation has cached reports that have not been delivered.
+An chalk report is output as an array of JSON objects that contains
+the report, so in most cases the array will only have a single
+object. However, when reports are sent, they're always sent in a JSON
+array that may have multiple objects, in case an implementation has
+cached reports that have not been delivered.
 
-For each single report, the JSON keys that are valid in the top-level report will NEVER be artifact-specific data. Only what we call 'host data' is included at the top level, by which we mean data specific to one run of chalk on one host.
+For each single report, the JSON keys that are valid in the top-level
+report will NEVER be artifact-specific data. Only what we call 'host
+data' is included at the top level, by which we mean data specific to
+one run of chalk on one host.
 
-For artifact data, there's a host-level metadata key called `_CHALKS`, the value of which is an array of JSON objects, containing the metadata specific to that artifact to be reported on. Each element in the array corresponds to a single artifact's chalk information.
+For artifact data, there's a host-level metadata key called `_CHALKS`,
+the value of which is an array of JSON objects, containing the
+metadata specific to that artifact to be reported on. Each element in
+the array corresponds to a single artifact's chalk information.
 
-The data in a report contained in `_CHALKS` does not have to consist of a full chalk mark; the user could choose to report on a subset of keys, or no keys from the chalk mark at all. Furthermore, the artifact data in a `_CHALKS` field will not consist solely of chalk-time information; it can also contain information from the time the report was run. For instance, a single artifact report could contain both the filesystem path where the software lived when it was chalked in the build environment, as well as the file system path for its current location (`PATH_WHEN_CHALKED` vs `_OP_ARTIFACT_PATH` keys).
+The data in a report contained in `_CHALKS` does not have to consist
+of a full chalk mark; the user could choose to report on a subset of
+keys, or no keys from the chalk mark at all. Furthermore, the artifact
+data in a `_CHALKS` field will not consist solely of chalk-time
+information; it can also contain information from the time the report
+was run. For instance, a single artifact report could contain both the
+filesystem path where the software lived when it was chalked in the
+build environment, as well as the file system path for its current
+location (`PATH_WHEN_CHALKED` vs `_OP_ARTIFACT_PATH` keys).
 
 In all cases, the chalk-time keys at the top level of the report and
 at the top level of the objects in the `_CHALKS` array _will not_
@@ -782,8 +877,12 @@ is done with Chalk's _custom reporting_ facility.
 
 For more information, see the following:
 
-- `chalk help metadata` contains documentation for what metadata keys are available in which operations, as well as the meaning of the fields. Documentation for keys will also include the conditions where the reference implementation can find them.
-- [The Config Overview Guide](./guide-config-overview.md) covers how to to configure WHERE reports get sent.
+- `chalk help metadata` contains documentation for what metadata keys
+  are available in which operations, as well as the meaning of the
+  fields. Documentation for keys will also include the conditions
+  where the reference implementation can find them.
+- [The Config Overview Guide](./guide-config-overview.md) covers how
+  to to configure WHERE reports get sent.
 
 Note that compliant insertion implementations do not require compliant
 reporting implementations. But compliant chalk tools for other
@@ -798,8 +897,6 @@ not compliant, is not a Chalk report.
 
 ### Mark Validation
 
-<!-- TODO: someone familiar with how chalk marks are calculated needs to validate this entire section -->
-
 Any time a mark is extracted, Chalk must go through a validation process.
 
 _IF_ the artifact isn't a container, extractors independently compute
@@ -808,7 +905,8 @@ computed for containers).
 
 That value is then used to derive what we expect the `CHALK_ID` to
 be. If it is not a valid value, we log an error, which may print to
-the terminal depending on the log level, and will generally be added to any chalk operation report under the top-level key `_OP_ERRORS`.
+the terminal depending on the log level, and will generally be added
+to any chalk operation report under the top-level key `_OP_ERRORS`.
 
 If the `CHALK_ID` validates, or if the artifact is a container, the we
 must also validate the `METADATA_ID`.
@@ -819,20 +917,39 @@ added into a chalk mark.
 
 The normalization algorithm is as follows:
 
-1. The following key/value pairs are removed: `MAGIC`, `METADATA_HASH`, `METADATA_ID`, `SIGN_PARAMS`, `SIGNATURE`, `EMBEDDED_CHALK`.
-2. The following key/value pairs are encoded first, in order (whenever present; they are skipped if they were not added to the mark): `CHALK_ID`, `CHALK_VERSION`, `TIMESTAMP`, `DATE`, `TIME`, `TZ_OFFSET`, `DATETIME`.
-3. The following key/value pair is encoded LAST, (whenever present): `ERR_INFO`.
+1. The following key/value pairs are removed: `MAGIC`,
+   `METADATA_HASH`, `METADATA_ID`, `SIGN_PARAMS`, `SIGNATURE`,
+   `EMBEDDED_CHALK`.
+2. The following key/value pairs are encoded first, in order (whenever
+   present; they are skipped if they were not added to the mark):
+   `CHALK_ID`, `CHALK_VERSION`, `TIMESTAMP`, `DATE`, `TIME`,
+   `TZ_OFFSET`, `DATETIME`.
+3. The following key/value pair is encoded LAST, (whenever present):
+   `ERR_INFO`.
 4. The remaining keys are encoded in lexigraphical order.
-5. The encoding starts with the number of keys in the normalization, as a 32-bit little endian integer.
-6. Each key/value pair is encoded in order by encoding the key, and then the value, using the item normalization algorithm below.
+5. The encoding starts with the number of keys in the normalization,
+   as a 32-bit little endian integer.
+6. Each key/value pair is encoded in order by encoding the key, and
+   then the value, using the item normalization algorithm below.
 
 Individual items are conceptually normalized as follows:
 
-- Strings are normalized by adding the byte `\x01`, followed by the length of the JSON-encoded string in bytes represented as a 32-bit little endian unsigned value, followed by the encoded string.
-- Integers are normalized by adding the byte `\x02`, followed by the 64-bit value of integer, when represented as a little-endian unsigned value.
-- Booleans are represented as two bytes each: `\x03\x00` for `false` and `x03\x01` for `true`.
-- Arrays are normalized by adding the byte `\x04`, followed by the number of items in the array encoded as a little endian 32-bit integer, followed by the normalized version of each item in order.
-- Dictionaries / Json objects must be stored ordered in Chalk values.They are normalized by adding the byte `\x05`, followed by the number of key/value pairs in the dictionary encoded as a 32-bit little endian integer, followed by paired encodings for each pair, in their stored ordering.
+- Strings are normalized by adding the byte `\x01`, followed by the
+  length of the JSON-encoded string in bytes represented as a 32-bit
+  little endian unsigned value, followed by the encoded string.
+- Integers are normalized by adding the byte `\x02`, followed by the
+  64-bit value of integer, when represented as a little-endian
+  unsigned value.
+- Booleans are represented as two bytes each: `\x03\x00` for `false`
+  and `x03\x01` for `true`.
+- Arrays are normalized by adding the byte `\x04`, followed by the
+  number of items in the array encoded as a little endian 32-bit
+  integer, followed by the normalized version of each item in order.
+- Dictionaries / Json objects must be stored ordered in Chalk
+  values.They are normalized by adding the byte `\x05`, followed by
+  the number of key/value pairs in the dictionary encoded as a 32-bit
+  little endian integer, followed by paired encodings for each pair,
+  in their stored ordering.
 
 The complete normalized string is hashed with SHA-256. The resulting
 256-bit binary value is the base of both the `METADATA_HASH` field and
@@ -881,30 +998,37 @@ reports. When these IDs correlate, you can be confident that the
 metadata is identical across reports (and the files in question as
 well, as long as there is a `HASH` field).
 
-Alternately, you can do digital signing. Currently, our implementation
-of signing is experimental, and do not yet recommend using it until we finalize the feature.
+In containers, where we do not have an easy, reliable hash, metadata
+normalization and validation works the same way. But we strongly
+recommend automatic digitial signatures to ensure that you can detect
+changes to the container.
 
-Of course, since container images do not have an easily calculable
-`HASH` and no current normalization function defined, it's not yet
-possible to ensure integrity of the underlying image. However, we are
-in the process of adding attestation support which will address this
-problem. We may add a normalization function as well.
+Digital signing can be used both with containers and with other
+artifacts. With containers, we use Sigstore with their In-Toto
+attestations that we appply on `docker push`. The mark is replicated
+in full inside the attestation.
 
-In the interim, we have heard from many people that "perfect is the
-enemy of good enough", and making strides in traceability without
-requiring full cryptographic attestation is still incredibly valuable
-for many organizations.
+For other artifacts, the signature is stored in the Chalk mark, but is
+(necessarily) not part of the metadata hashing, since it needs to sign
+that data.
 
 ### Mark Deletion
+
 If needed, it's possible to delete chalk marks from most artifacts,
 with containers being the exception (they should be rebuilt
 instead). This can be done with the `chalk delete` command, which will
-recursively delete chalk marks from all artifacts in the current working directory, or with the `chalk delete [targetpath]` command, which will delete chalk marks from the target artifact or directory. The `delete` operation will produce a report where the deleted chalk mark (if any) will be reported, along with run-time environmental information.
+recursively delete chalk marks from all artifacts in the current
+working directory, or with the `chalk delete [targetpath]` command,
+which will delete chalk marks from the target artifact or
+directory. The `delete` operation will produce a report where the
+deleted chalk mark (if any) will be reported, along with run-time
+environmental information.
 
 ### Configuration File Syntax Basics
 
 Many of the things you might want to configure simply involve setting
-configuration variables. For instance, we could create and load the following configuration file:
+configuration variables. For instance, we could create and load the
+following configuration file:
 
 ```bash
 color: false # Also could set NO_COLOR env variable.
@@ -919,7 +1043,10 @@ report_cache_location: "/var/log/chalk-reports"
 docker.label_prefix: "com.example."
 ```
 
-In the configuration file, we can also set up environment variables for reporting, such as by defining new environment variablaes and using simple if / else logic to set a default if the environment variable is not set on the host. For example:
+In the configuration file, we can also set up environment variables
+for reporting, such as by defining new environment variablaes and
+using simple if / else logic to set a default if the environment
+variable is not set on the host. For example:
 
 ```bash
 if env_exists("CHALK_LABEL_PREFIX") {
@@ -929,7 +1056,9 @@ if env_exists("CHALK_LABEL_PREFIX") {
 }
 ```
 
-In this case, if `CHALK_LABEL_PREFIX` is set on the host, then all docker images built with chalk will have that label prefix; otherwise the label prefix will be `com.default.`.
+In this case, if `CHALK_LABEL_PREFIX` is set on the host, then all
+docker images built with chalk will have that label prefix; otherwise
+the label prefix will be `com.default.`.
 
 ### Testing Configurations
 
@@ -937,11 +1066,14 @@ When you load a new configuration, Chalk will test it
 automatically. But you can generally test your configuration more
 quickly by leaving it in an external file.
 
-Out of the box, Chalk will search the current directory, `/etc/chalk`, `/ect/`, `~/.config/chalk/` and `~` for a file named `chalk.conf` on
+Out of the box, Chalk will search the current directory, `/etc/chalk`,
+`/ect/`, `~/.config/chalk/` and `~` for a file named `chalk.conf` on
 startup. Or you can specify the specific file to use with
 `--config-file` (also `-f`).
 
-> 👀 Note that running `chalk help commands` will show globally available flags, and `chalk defaults` shows common configuration variables.
+> 👀 Note that running `chalk help commands` will show globally
+> available flags, and `chalk config` shows common configuration
+> variables.
 
 By default, Chalk will happily evaluate the embedded configuration,
 and then a configuration on disk. You can also force Chalk to skip one
@@ -966,11 +1098,19 @@ viega@UpDog chalk %
 
 ### Overview of Reporting Templates
 
-Reports and chalk marks decide which keys to add based on report templates and mark templates, respectively. These are essentially lists of keys to include or not include for a given situation.
+Reports and chalk marks decide which keys to add based on report
+templates and mark templates, respectively. These are essentially
+lists of keys to include or not include for a given situation.
 
-While you can build your own templates, the easiest thing to do is to change the default templates. Defaults are available in `src/configs/base_report_templates.c4m` for report templates and in `src/configs/base_chalk_templates.c4m` for mark templates.
+While you can build your own templates, the easiest thing to do is to
+change the default templates. Defaults are available in
+`src/configs/base_report_templates.c4m` for report templates and in
+`src/configs/base_chalk_templates.c4m` for mark templates.
 
-The upcoming configuration TUI can generate configurations that modify the default templates. Templates can be  also be configured manually in the configuration file, which is covered in the [Config Overview Guide](./guide-config-overview.md).
+The upcoming configuration TUI can generate configurations that modify
+the default templates. Templates can be also be configured manually in
+the configuration file, which is covered in the [Config Overview
+Guide](./guide-config-overview.md).
 
 ### Reporting Templates for Docker Labels
 
@@ -995,14 +1135,14 @@ reporting on any of those keys.
 | Artifact           | Any software artifact handled by Chalk, which can recursively include other artifacts. For instance, a Zip file is an artifact type that can currently be chalked, which can contain ELF executables that can also be chalked.                                                                                                                                                                                          |
 | Chalk Mark         | JSON containing metadata about a software artifact, generally inserted directly into the artifact in a way that doesn’t affect execution. Often, a chalk mark will be minimal, containing only small bits of identifying information that can be used to correlate the artifact with other metadata collected.                                                                                                          |
 | Unchalked          | A software artifact that does not have a chalk mark embedded in it.                                                                                                                                                                                                                                                                                                                                                     |
-| Metadata Key       | Each piece of metadata Chalk is able to collect (metadata being data about an artifact or a host on which an artifact has been found) is associated with a metadata key. Chalk reports all metadata in JSon key/value pairs, and you specify what gets added to a chalk mark and what gets reported on by listing the metadata keys you’re interested in via the report template and mark emplate.                                                               |
+| Metadata Key       | Each piece of metadata Chalk is able to collect (metadata being data about an artifact or a host on which an artifact has been found) is associated with a metadata key. Chalk reports all metadata in JSon key/value pairs, and you specify what gets added to a chalk mark and what gets reported on by listing the metadata keys you’re interested in via the report template and mark emplate.                      |
 | Chalking           | The act of adding metadata to a software artifact. Aka, “insertion”.                                                                                                                                                                                                                                                                                                                                                    |
-| Extraction         | The act of reading metadata from artifacts and reporting on them.                                                                                                                                                                                                                                                                                                                                                   |
+| Extraction         | The act of reading metadata from artifacts and reporting on them.                                                                                                                                                                                                                                                                                                                                                       |
 | Report             | Every time Chalk runs, it will want to report on its activity. That can include information about artifacts, and also about the host. Reports are “published” to output “sinks”. By default, you’ll get reports output to the console, and written to a local log file, but can easily set up HTTPS post or writing to object storage either by supplying environment variables, or by editing the Chalk configuration. |
-| Report Template  | You have complete flexibility over what goes into chalk reports. A report template is a specification of metadata keys that you want to report on. They’re used to configure reports, and also to configure things like which metadata items should be automatically added to a container as labels.                                                                                      |
-| Mark Template  | Like report templates, you have complete flexibility over what goes into chalk marks. A mark template is a specification of metadata keys that you want to go into the chalk mark.                                                                                      |
-| Sinks              | Output types handled by Chalk. Currently, chalk supports JSON log files, rotating (self-truncating) JSON log files, s3 objects, http/https post, and stdin/stdout.                                                                                                                                                                                                                                                           |
+| Report Template    | You have complete flexibility over what goes into chalk reports. A report template is a specification of metadata keys that you want to report on. They’re used to configure reports, and also to configure things like which metadata items should be automatically added to a container as labels.                                                                                                                    |
+| Mark Template      | Like report templates, you have complete flexibility over what goes into chalk marks. A mark template is a specification of metadata keys that you want to go into the chalk mark.                                                                                                                                                                                                                                      |
+| Sinks              | Output types handled by Chalk. Currently, chalk supports JSON log files, rotating (self-truncating) JSON log files, s3 objects, http/https post, and stdin/stdout.                                                                                                                                                                                                                                                      |
 | Chalk ID           | A value unique to an unchalked artifact. Usually, it is derived from the SHA-256 hash of the unchalked artifact, except when that hash is not available at chalking time, in which case, it’s random. Chalk IDs are 100 bits, and human readable (Base32).                                                                                                                                                              |
 | Metadata ID        | A value unique to a chalked artifact. It is always derived from a normalized hash of all other metadata (except for any metadata keys involved in signing the Metadata ID). Metdata IDs are also 100 bits, and Base32 encoded.                                                                                                                                                                                          |
 | Chalkable keys     | Metadata keys that can be added to chalk marks. When reported for an artifact (e.g., during extraction in production), they will always indicated chalk-time metadata.                                                                                                                                                                                                                                                  |
-| Non-chalkable keys | Metadata keys that will NOT be added to chalk marks. They will always be reported for the current operation, and start with a `_`. There are plenty of metadata keys that have chalkable and non-chalkable versions.                                                                                                                                                                                                     |
+| Non-chalkable keys | Metadata keys that will NOT be added to chalk marks. They will always be reported for the current operation, and start with a `_`. There are plenty of metadata keys that have chalkable and non-chalkable versions.                                                                                                                                                                                                    |

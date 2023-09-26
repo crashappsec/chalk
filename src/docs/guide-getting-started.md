@@ -41,7 +41,6 @@ export PATH=$PATH:~/.local/bin
 
 This will put `chalk` in your path until you log out.
 
-
 ### Building From Source
 
 Alternatively, you can build chalk from source. First, let's checkout the chalk repository:
@@ -60,9 +59,11 @@ docker compose build chalk
 ```
 
 Then build chalk:
+
 ```bash
 make chalk
 ```
+
 (or `make debug` for a debug version).
 
 There should now be a binary `chalk` in the current directory. Ensure
@@ -126,7 +127,7 @@ int
 main(int argc, char *argv[], char *envp[]) {
   execve("${LSPATH}", argv, envp);
   return -1;
-}  
+}
 
 EOF
 printf 'all:\n\tcc -o ls lswrapper.c\n' > Makefile
@@ -147,6 +148,7 @@ make
 ```
 
 You should see:
+
 ```bash
 Makefile	ls		lswrapper.c
 ```
@@ -171,6 +173,7 @@ chalk insert ls
 ```
 
 We should see something like the following output:
+
 ```bash
 warn:  Code signing not initialized. Run `chalk setup` to fix.
 info:  /home/liming/workspace/chalktest/ls: chalk mark successfully added
@@ -205,7 +208,7 @@ info:  Full chalk report appended to: ~/.local/chalk/chalk.log
     "_OP_ARGV": [
       "/home/liming/workspace/chalktest/chalk",
       "insert",
-      "ls"      
+      "ls"
     ],
     "_OP_CHALKER_VERSION": "0.1.1",
     "_OP_CHALK_COUNT": 1,
@@ -235,12 +238,12 @@ been chalked and the host environment. Here are a few important things
 to note for now:
 
 1. We've captured basic information about the build environment,
-including our repo, branch and commit ID. If you pull a repo remotely
-from Github or Gitlab, the "ORIGIN_URI" key will give the URL where
-the repository is hosted, instead of `local`.
+   including our repo, branch and commit ID. If you pull a repo remotely
+   from Github or Gitlab, the "ORIGIN_URI" key will give the URL where
+   the repository is hosted, instead of `local`.
 
 2. In addition to the report, we inserted a JSON blob into our
-executable, the _chalk mark_. We'll look at it in a minute.
+   executable, the _chalk mark_. We'll look at it in a minute.
 
 3. The `CHALK_ID` key is unique to the _unchalked_ executable, and is just an encoding of 100 bits of the `HASH` field.
 
@@ -271,6 +274,7 @@ have chalk report on what it inserted into artifacts:
 ```
 
 This will output a chalk report on `ls`:
+
 ```json
 liming@liming-virtual-machine:~/workspace/chalktest$ ./chalk extract ls
 warn:  Code signing not initialized. Run `chalk setup` to fix.
@@ -347,8 +351,25 @@ strings ls | grep MAGIC
 ```
 
 You'll see there's an embedded JSON string in the `ls` binary, which is the chalk mark:
+
 ```json
-{ "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "64V66C-V36G-TK8D-HJCSHK", "CHALK_VERSION" : "0.1.1", "TIMESTAMP_WHEN_CHALKED" : 1695487268282, "DATETIME_WHEN_CHALKED" : "2023-09-23T12:41:08.124-04:00", "ARTIFACT_TYPE" : "ELF", "BRANCH" : "main", "CHALK_RAND" : "049d278b2137c27d", "CODE_OWNERS" : "* @viega\n", "COMMIT_ID" : "5f89bf133d4ca803f2b5ed24ccfe1feff7e11f6b", "HASH" : "16c3c45462fc89d7fcc84c3749cb0900bdd1052f760ebd7cea1ab3956ad7326f", "INJECTOR_COMMIT_ID" : "f48980a19298ce27d9584baa1f7dd0fed715ef56", "ORIGIN_URI" : "local", "PLATFORM_WHEN_CHALKED" : "GNU/Linux x86_64", "METADATA_ID" : "WFAEY0-D2S3-WK98-SEAV85" }
+{
+  "MAGIC": "dadfedabbadabbed",
+  "CHALK_ID": "64V66C-V36G-TK8D-HJCSHK",
+  "CHALK_VERSION": "0.1.1",
+  "TIMESTAMP_WHEN_CHALKED": 1695487268282,
+  "DATETIME_WHEN_CHALKED": "2023-09-23T12:41:08.124-04:00",
+  "ARTIFACT_TYPE": "ELF",
+  "BRANCH": "main",
+  "CHALK_RAND": "049d278b2137c27d",
+  "CODE_OWNERS": "* @viega\n",
+  "COMMIT_ID": "5f89bf133d4ca803f2b5ed24ccfe1feff7e11f6b",
+  "HASH": "16c3c45462fc89d7fcc84c3749cb0900bdd1052f760ebd7cea1ab3956ad7326f",
+  "INJECTOR_COMMIT_ID": "f48980a19298ce27d9584baa1f7dd0fed715ef56",
+  "ORIGIN_URI": "local",
+  "PLATFORM_WHEN_CHALKED": "GNU/Linux x86_64",
+  "METADATA_ID": "WFAEY0-D2S3-WK98-SEAV85"
+}
 ```
 
 Chalk marks are data segments that are safely inserted into the binary
@@ -370,6 +391,7 @@ backend that you can use. This can be built and run from the
 repository root.
 
 First build the server image with docker compose:
+
 ```bash
 docker compose build server
 ```
@@ -377,14 +399,15 @@ docker compose build server
 The server will run on port 8585 by default, so ensure that this port
 is not taken by another process before running the server. To start
 the server, run:
+
 ```bash
 make server
 ```
 
 **Please Note - it does NOT run in the background, so you should
-  either start a second shell, or manually background the server
-  process. Starting in a separate shell is recommended so that you can
-  observe the server output**.
+either start a second shell, or manually background the server
+process. Starting in a separate shell is recommended so that you can
+observe the server output**.
 
 Note that the server can be configured to use HTTPS, yet we've left it
 unconfigured for demo simplicity. Please be mindful of this when
@@ -440,71 +463,62 @@ curl http://127.0.0.1:8585/chalks
 ```
 
 The latest insertion will be at the bottom:
+
 ```json
-  {
-    "CHALK_ID": "64V66C-V36G-TK8D-HJCSHK",
-    "HASH": "16c3c45462fc89d7fcc84c3749cb0900bdd1052f760ebd7cea1ab3956ad7326f",
-    "PATH_WHEN_CHALKED": "/home/liming/workspace/chalktest/ls",
-    "ARTIFACT_TYPE": "ELF",
-    "CODE_OWNERS": "* @viega\n",
-    "VCS_DIR_WHEN_CHALKED": "/home/liming/workspace/chalktest",
-    "ORIGIN_URI": "local",
-    "COMMIT_ID": "5f89bf133d4ca803f2b5ed24ccfe1feff7e11f6b",
-    "BRANCH": "main",
-    "CHALK_VERSION": "0.1.1",
-    "CHALK_RAND": "02fb17e5e1694baf",
-    "METADATA_HASH": "f2a1fc1300e98d61674f6a06144125901134f6c34748a8b6b5aa37bf9d911ef0",
-    "METADATA_ID": "YAGZR4-R0X6-6P2S-TFD831",
-    "_VIRTUAL": false,
-    "_OP_ARTIFACT_TYPE": "ELF",
-    "_CURRENT_HASH": "c96756d855f432872103f6f68aef4fe44ec5c8cb2eab9940f4b7adb10646b90a",
-    "_OPERATION": "insert",
-    "_TIMESTAMP": 1695487471882,
-    "_DATETIME": "2023-09-23T12:44:31.882-04:00",
-    "INJECTOR_ARGV": [
-      "ls"
-    ],
-    "INJECTOR_COMMIT_ID": "f48980a19298ce27d9584baa1f7dd0fed715ef56",
-    "INJECTOR_ENV": {
-      "PWD": "/home/liming/workspace/chalktest",
-      "XDG_SESSION_TYPE": "wayland",
-      "AWS_SECRET_ACCESS_KEY": "<<redact>>",
-      "USER": "liming",
-      "PATH": "/home/liming/workspace/chalktest/config-tool/dist:/home/liming/workspace/chalktest/bin:/home/liming/workspace/chalktest:/home/liming/.local/bin:/home/liming/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/usr/local/go/bin:/usr/local/go/bin"
-    },
-    "INJECTOR_VERSION": "0.1.1",
-    "PLATFORM_WHEN_CHALKED": "GNU/Linux x86_64",
-    "_ACTION_ID": "8c87b883793695a1",
-    "_ARGV": [
-      "ls"
-    ],
-    "_ENV": {
-      "PWD": "/home/liming/workspace/chalktest",
-      "XDG_SESSION_TYPE": "wayland",
-      "AWS_SECRET_ACCESS_KEY": "<<redact>>",
-      "USER": "liming",
-      "PATH": "/home/liming/workspace/chalktest/config-tool/dist:/home/liming/workspace/chalktest/bin:/home/liming/workspace/chalktest:/home/liming/.local/bin:/home/liming/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/usr/local/go/bin:/usr/local/go/bin"
-    },
-    "_OP_ARGV": [
-      "/home/liming/workspace/chalktest/chalk",
-      "insert",
-      "ls"
-    ],
-    "_OP_CHALKER_COMMIT_ID": "f48980a19298ce27d9584baa1f7dd0fed715ef56",
-    "_OP_CHALKER_VERSION": "0.1.1",
-    "_OP_CMD_FLAGS": [],
-    "_OP_EXE_NAME": "chalk",
-    "_OP_EXE_PATH": "/home/liming/workspace/chalktest",
-    "_OP_HOSTINFO": "#32~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Aug 18 10:40:13 UTC 2",
-    "_OP_HOSTNAME": "liming-virtual-machine",
-    "_OP_NODENAME": "liming-virtual-machine",
-    "_OP_PLATFORM": "GNU/Linux x86_64",
-    "_OP_SEARCH_PATH": [
-      "ls"
-    ],
-    "_OP_CHALK_COUNT": 1,
-    "_OP_UNMARKED_COUNT": 0
-  }
+{
+  "CHALK_ID": "64V66C-V36G-TK8D-HJCSHK",
+  "HASH": "16c3c45462fc89d7fcc84c3749cb0900bdd1052f760ebd7cea1ab3956ad7326f",
+  "PATH_WHEN_CHALKED": "/home/liming/workspace/chalktest/ls",
+  "ARTIFACT_TYPE": "ELF",
+  "CODE_OWNERS": "* @viega\n",
+  "VCS_DIR_WHEN_CHALKED": "/home/liming/workspace/chalktest",
+  "ORIGIN_URI": "local",
+  "COMMIT_ID": "5f89bf133d4ca803f2b5ed24ccfe1feff7e11f6b",
+  "BRANCH": "main",
+  "CHALK_VERSION": "0.1.1",
+  "CHALK_RAND": "02fb17e5e1694baf",
+  "METADATA_HASH": "f2a1fc1300e98d61674f6a06144125901134f6c34748a8b6b5aa37bf9d911ef0",
+  "METADATA_ID": "YAGZR4-R0X6-6P2S-TFD831",
+  "_VIRTUAL": false,
+  "_OP_ARTIFACT_TYPE": "ELF",
+  "_CURRENT_HASH": "c96756d855f432872103f6f68aef4fe44ec5c8cb2eab9940f4b7adb10646b90a",
+  "_OPERATION": "insert",
+  "_TIMESTAMP": 1695487471882,
+  "_DATETIME": "2023-09-23T12:44:31.882-04:00",
+  "INJECTOR_ARGV": ["ls"],
+  "INJECTOR_COMMIT_ID": "f48980a19298ce27d9584baa1f7dd0fed715ef56",
+  "INJECTOR_ENV": {
+    "PWD": "/home/liming/workspace/chalktest",
+    "XDG_SESSION_TYPE": "wayland",
+    "AWS_SECRET_ACCESS_KEY": "<<redact>>",
+    "USER": "liming",
+    "PATH": "/home/liming/workspace/chalktest/config-tool/dist:/home/liming/workspace/chalktest/bin:/home/liming/workspace/chalktest:/home/liming/.local/bin:/home/liming/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/usr/local/go/bin:/usr/local/go/bin"
+  },
+  "INJECTOR_VERSION": "0.1.1",
+  "PLATFORM_WHEN_CHALKED": "GNU/Linux x86_64",
+  "_ACTION_ID": "8c87b883793695a1",
+  "_ARGV": ["ls"],
+  "_ENV": {
+    "PWD": "/home/liming/workspace/chalktest",
+    "XDG_SESSION_TYPE": "wayland",
+    "AWS_SECRET_ACCESS_KEY": "<<redact>>",
+    "USER": "liming",
+    "PATH": "/home/liming/workspace/chalktest/config-tool/dist:/home/liming/workspace/chalktest/bin:/home/liming/workspace/chalktest:/home/liming/.local/bin:/home/liming/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin:/usr/local/go/bin:/usr/local/go/bin"
+  },
+  "_OP_ARGV": ["/home/liming/workspace/chalktest/chalk", "insert", "ls"],
+  "_OP_CHALKER_COMMIT_ID": "f48980a19298ce27d9584baa1f7dd0fed715ef56",
+  "_OP_CHALKER_VERSION": "0.1.1",
+  "_OP_CMD_FLAGS": [],
+  "_OP_EXE_NAME": "chalk",
+  "_OP_EXE_PATH": "/home/liming/workspace/chalktest",
+  "_OP_HOSTINFO": "#32~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Aug 18 10:40:13 UTC 2",
+  "_OP_HOSTNAME": "liming-virtual-machine",
+  "_OP_NODENAME": "liming-virtual-machine",
+  "_OP_PLATFORM": "GNU/Linux x86_64",
+  "_OP_SEARCH_PATH": ["ls"],
+  "_OP_CHALK_COUNT": 1,
+  "_OP_UNMARKED_COUNT": 0
+}
 ```
 
 ### Basic Configurations
@@ -519,11 +533,12 @@ cat demo-http.c4m
 ```
 
 You should see:
+
 ```
 sink_config demo_http_config {
   # The 'post' sink type is for HTTP and HTTPS posting.
   # Note that all the below quotes are required.
-  sink: "post"                  
+  sink: "post"
   uri:  "http://localhost:8585/report"
 }
 
@@ -534,6 +549,7 @@ unsubscribe("report", "default_out")
 The configuration language is called [con4m](https://github.com/crashappsec/con4m).
 
 In this case, the http config does three things:
+
 1. It adds a 'sink configuration', specifying where to post (e.g., to a web endpoint, an S3 bucket, or a rotating log file).
 2. It subscribes this configuration to the primary report produced by the command (the report that has been going to our log file).
 3. It removes the builtin subscription that causes the default report to go to the log file (note that this is different from the terminal summary report, which should still display).
@@ -546,6 +562,7 @@ show us what it installed (or throw an error if the config is not
 valid).
 
 When in doubt, we can always return chalk to its default configuration. Let's try that now by running:
+
 ```bash
 chalk load default
 ```
@@ -598,6 +615,7 @@ chmod +x hi.sh
 ```
 
 Let's run it and make sure it works:
+
 ```bash
 ./hi.sh
 ```
@@ -626,10 +644,10 @@ Now, we could build this by `wrapping` it with chalk. We just put the
 word `chalk` in front of the docker command we'd normally use.
 
 The problem with that is people then have to remember to add `chalk`
-in front of all their docker operations. We can easily make the 
-chalking process automatic if we just tell `chalk` that, if it doesn't 
+in front of all their docker operations. We can easily make the
+chalking process automatic if we just tell `chalk` that, if it doesn't
 see any other `chalk` command, it should impersonate docker; then we
-can add either a user alias or a system-wide alias, and chalk will do 
+can add either a user alias or a system-wide alias, and chalk will do
 the right thing when it's invoked.
 
 Impersonation is set up simply by telling your Chalk binary that its
@@ -651,12 +669,12 @@ chalk load https://chalkdust.io/demo-docker.c4m
 If you want to edit the contents to change the server address from
 localhost to a real IP, you can go ahead and do so.
 
-Chalk is smart about masquerading as docker; so long as the *real*
+Chalk is smart about masquerading as docker; so long as the _real_
 docker appears anywhere in your path, it will find it and run it.
 
 This means, if you would like to not even have to worry about an
 alias, you could name your chalk binary `docker` and stick it higher
-up in the default path than the *real* docker, and everything will
+up in the default path than the _real_ docker, and everything will
 just work (or you can take Docker out of your path completely and
 configure Chalk to tell it where docker lives).
 
@@ -665,6 +683,7 @@ But for this demo, let's just do the alias:
 ```bash
 alias docker=chalk
 ```
+
 Assuming you have docker installed and configured, you can now run:
 
 ```bash
@@ -698,12 +717,11 @@ if you hadn't used Chalk:
  => => exporting layers                                                                                                            0.0s
  => => writing image sha256:9f23f7871afd26d36e307a6e742225dfeec6b2857b36c6596565f1496ba0238a                                       0.0s
  => => naming to docker.io/library/chalk-demo:latest                                                                               0.0s
- ```
+```
 
 The only slight difference is that, after the user's Dockerfile
 commands, we copied the chalk mark into the container, which does show
 up in the above output.
-
 
 If we inspect the image we produced:
 
@@ -728,9 +746,8 @@ the repo. The other two fields tell you exactly which version of the
 code you're running.
 
 > 🤗 It's also easy to get Chalk to automatically sign the chalk mark
-  and container when you build it. See our compliance guide for more
-  information.
-
+> and container when you build it. See our compliance guide for more
+> information.
 
 Chalk really only monitors a subset of docker commands, but when
 wrapping docker, it will pass through all docker commands even if it
@@ -742,8 +759,8 @@ pre-existing pipelines.
 ## Run-time reporting
 
 > ⚠️ This section will not work as-is on OS X, since Docker is running
-  a different OS from your chalk binary; dealing with that is beyond
-  the scope of this tutorial.
+> a different OS from your chalk binary; dealing with that is beyond
+> the scope of this tutorial.
 
 So far, we've focused on ease of adding chalk marks. But chalk's goal
 is to bridge code managed in repositories to what's running in
@@ -763,10 +780,10 @@ binary. Chalk will simply copy itself into the container and have
 that binary do the reporting.
 
 > 🤖 Chalk does not need to be reconfigured to go into the
-   container. It gets run using the `chalk exec` command, which tells
-   it the context it needs. It's possible to change how you report
-   based on the chalk command used; see the Chalk I/O configuration
-   guide for more info.
+> container. It gets run using the `chalk exec` command, which tells
+> it the context it needs. It's possible to change how you report
+> based on the chalk command used; see the Chalk I/O configuration
+> guide for more info.
 
 Let's apply this config automatically with:
 

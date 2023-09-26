@@ -1,7 +1,9 @@
 # IDs and Hashing in Chalk
 
+**NOTE** this document is still WIP
+
 Chalk uses cryptographic hashing (SHA-256) to help uniquely identify
-artifacts. Key to this is the concept of the *Chalk Hash*, which is a
+artifacts. Key to this is the concept of the _Chalk Hash_, which is a
 normalized hash of an artifact, without a chalk mark inserted.
 
 The normalized hash is generally used to create the `CHALK_ID`
@@ -15,14 +17,14 @@ multiple ways, they will produce different `METADATA_ID`s.
 There are important things to understand about the system:
 
 1. The Chalk hash may not always be the same as what you'd get from
-hashing the bits on disk.
+   hashing the bits on disk.
 
 2. Chalking of docker images and docker containers cannot currently
-work the same way.
+   work the same way.
 
 3. Digital Signatures using the In-Toto standard are available across
-all artifact times to provide some additional assurance to those who
-want it.
+   all artifact times to provide some additional assurance to those who
+   want it.
 
 In this document, we explain the trade-offs, and look at how to handle
 related use cases with Chalk.
@@ -83,7 +85,7 @@ significant additional work and require some storage to make this
 operation invertable.
 
 As a result, the Chalk Hash (the `HASH` metadata key), is not defined
-based on the file system hash. Instead, it is a *normalized* hash,
+based on the file system hash. Instead, it is a _normalized_ hash,
 meaning it should be a deterministic hash where the exact same input
 will always give the same output.
 
@@ -124,16 +126,8 @@ complains.
 
 ## Doing file-system level comparisons.
 
-
-
 2. The
-
 
 adds a data section to executables, which
 we want to do in a way that is as obviously correct as possible. To
 that end, we always end up moving the section table to the
-
-
-
-
-
