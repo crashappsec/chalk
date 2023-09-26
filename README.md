@@ -14,17 +14,23 @@ Visibility into development and production also enables security engineers to be
 
 You can use Chalk to solve a variety of specific use cases such as: 
 
-#### How-to build a central SBOM registry 
-Automatically create SBOMs for every build of every code repo, including auto-deploying and using built-in SBOM generation and collection tools. Send these SBOMs to a central location for further analysis, and to maintain a record across your environment. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-build-and-maintain-an-sbom-registry).
-
-#### How-to build a real-time application inventory
-From a code base, easily understand the environments where code and even particular branches are running. Gather code owners for the applications and code repos. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-build-a-real-time-application-inventory).
-
-#### How-to handle "software security supply chain" requests with minimal effort
+#### Create software security supply chain compliance reports automatically
 Many companies and the US Government are now mandating suppliers providing supply chain statements when delivering software. This how to is an easy button to deliver the SBOM, code and builds provenance and supports [SLSA](https://www.slsa.dev), Supply-chain Levels for Software Artifacts, [level 2](https://slsa.dev/spec/v1.0/levels) compliance (an emerging supply chain standard) before SLSA [level 1](https://slsa.dev/spec/v1.0/levels) has been mandated. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-handle-software-security-supply-chain-requests-with-minimal-effort).
 
-#### How-to keep track of your container network services
+#### Create and maintain real-time application inventory
+From a code base, easily understand the environments where code and even particular branches are running. Gather code owners for the applications and code repos. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-build-a-real-time-application-inventory).
+
+#### Create network services visibility reports from containers 
 Understanding which services run in containers can help you build a service map. Use Chalk to automatically create periodic reports on container network tables, or visibility into service availability. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-keep-track-of-your-containers-network-services).
+
+#### Create and maintain an SBOM registry
+Automatically create SBOMs for every build of every code repo, including auto-deploying and using built-in SBOM generation and collection tools. Send these SBOMs to a central location for further analysis, and to maintain a record across your environment. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-build-and-maintain-an-sbom-registry).
+
+
+
+
+
+
 
 All documentation for Chalk is available at https://crashoverride.com/docs and is also fully accessible though the command line interface.
 
