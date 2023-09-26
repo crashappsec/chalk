@@ -76,19 +76,6 @@ task debug, "Get a debug build":
   # additional flags are configured in config.nims
   exec "nimble build --define:debug"
 
-#% INTERNAL
-task release, "Package the release build":
-  exec "nimble build"
-
-let bucket = "crashoverride-chalk-binaries"
-
-task s3, "Publish release build to S3 bucket. Requires AWS cli + creds":
-  exec "nimble release"
-  exec "ls -lh " & bin[0]
-  exec "aws s3 cp " & bin[0] & " s3://" & bucket & "/latest/$(uname -m)"
-  exec "aws s3 cp " & bin[0] & " s3://" & bucket &
-          "/" & version & "/$(uname -m)"
-
 let completion_script_version = version
 
 task mark_completion, "Replace the chalk mark in a completion script, including the articact version":
