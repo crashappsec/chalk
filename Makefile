@@ -72,4 +72,4 @@ tests_parallel: tests
 .PHONY: sqlite
 sqlite: server/sqlite
 
-include .github/Makefile.dist
+include $(wildcard .github/Makefile.*)

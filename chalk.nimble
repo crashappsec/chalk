@@ -76,6 +76,9 @@ task debug, "Get a debug build":
   # additional flags are configured in config.nims
   exec "nimble build --define:debug"
 
+task release, "Package the release build":
+  exec "nimble build"
+
 let completion_script_version = version
 
 task mark_completion, "Replace the chalk mark in a completion script, including the articact version":
