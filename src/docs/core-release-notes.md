@@ -58,14 +58,8 @@ At release time, here are known issues:
 
 ### Other
 
-- Signing for non-container items has a bug keeping it from working.
-
-- There is a new bash autocomplete script; but on Linux the
-  autoinstall is not yet working in most environments.
-
-- The bash autocomplete script *does* install fine on a Mac, but
-  because it's not a zsh script, it will not autocomplete file
-  arguments, etc.
+- The bash autocomplete script installson a Mac, but because it's not
+  a zsh script, it will not autocomplete file arguments, etc.
 
 - The signing functionality does download the `cosign` binary if not
   present and needed; this can take a bit of time, and should
@@ -79,11 +73,12 @@ At release time, here are known issues:
 
 ## Major changes since the preview releases
 
-- We've added automatic container signing; run `chalk setup`; if you
-  create a free account for our secret service, it'll generate a
-  keypair for you, encrypt the private key, and automatically sign
-  whenever possible. If you don't want to use the service, you'll have
-  to provide a secret via environment variable.
+- We've added automatic signing; run `chalk setup`; if you create a
+  free account for our secret service, it'll generate a keypair for
+  you, encrypt the private key, and automatically sign whenever
+  possible. If you don't want to use the service, you'll have to
+  provide a secret via environment variable, and should run setup with
+  the `--no-api-login` flag.
 
 - We added automatic wrapping of container entry points, so that you
   can get beacon data when containers start up (via the `chalk exec`
@@ -94,7 +89,8 @@ At release time, here are known issues:
   runtime workloads after startup.
 
 - There were several config file format changes based on
-  feedback. Please contact us if you want help migrating.
+  feedback. Please contact us if you want help migrating, but things
+  are even easier now.
 
 - ELF Chalk marks are now put into their own ELF section in the
   binary, so they will survive a `strip` operation.
@@ -130,9 +126,9 @@ Github.
 All of the below are targets for our Open Source; we also will soon be
 releasing services around Chalk (with a free tier).
 
-- A TUI (using Python 3) to make it very easy to
-  build custom configurations for most needs, without having to touch
-  a configuration file.
+- A TUI (using Python 3) to make it very easy to build custom
+  configurations for most needs, without having to touch a
+  configuration file.
 
 - On-demand data collection from runtime environments (via triggers).
 
