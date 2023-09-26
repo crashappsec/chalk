@@ -812,6 +812,3 @@ running executable prefixed with `_PROCESS`.
 
 You can also configure Chalk to periodically report back on
 environment information. See our heartbeat guide for that.
-
-## Next Steps
-
