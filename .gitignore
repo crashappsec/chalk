@@ -17,6 +17,7 @@ src/c4autoconf.nim
 *.o
 *.json
 *.jsonl
+!.github/**.json
 *.pyc
 *.lck
 *.vim

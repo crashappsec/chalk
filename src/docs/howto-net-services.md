@@ -263,7 +263,7 @@ There are both free and paid plans. You can [join the waiting list](https://cras
 
 ## Related how-tos
 
-[The complete guide to network heartbeats with chalk](/src/docs/guide-heartbeat.md)
+[The complete guide to network heartbeats with chalk](./guide-heartbeat.md)
 
 ## Background information
 

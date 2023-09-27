@@ -1,0 +1,25 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^http://localhost*"
+    },
+    {
+      "pattern": "^https://localhost*"
+    },
+    {
+      "pattern": "./builtins.md"
+    },
+    {
+      "pattern": "./metadata.md"
+    },
+    {
+      "pattern": "./command-line.md"
+    },
+    {
+      "pattern": "./config-file.md"
+    },
+    {
+      "pattern": "./output-config.md"
+    }
+  ]
+}

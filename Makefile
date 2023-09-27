@@ -16,6 +16,7 @@ SOURCES+=$(wildcard *.nimble)
 SOURCES+=$(shell find src/ -name '*.nim')
 SOURCES+=$(shell find src/ -name '*.c4m')
 SOURCES+=$(shell find src/ -name '*.c42spec')
+SOURCES+=$(shell find src/ -name '*.md')
 
 VERSION=$(shell cat *.nimble | grep -E "version\s+=" | cut -d'"' -f2 | head -n1)
 
@@ -41,6 +42,10 @@ version:
 .PHONY: clean
 clean:
 	-rm -f $(BINARY) src/c4autoconf.nim dist
+
+.PHONY: chalk-docs
+chalk-docs: $(BINARY)
+	./$(BINARY) docgen
 
 # ----------------------------------------------------------------------------
 # TOOL MAKEFILES

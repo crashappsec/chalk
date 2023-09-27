@@ -21,7 +21,7 @@ This how-to uses Chalk™ to automate this in three steps:
 
 ### Before you start 
 
-You should have a working installation of chalk. See the [getting started guide]()
+You should have a working installation of chalk. See the [getting started guide](./guide-getting-started.md)
 
 This how-to uses Cloud Custodian and assumes production software is deployed to AWS ECR services. To follow the steps you will need a deployment pipeline that deploys docker containers to ECR, and working AWS credentials to query those deployments. You will also need a working installation of [cloud custodian](https://cloudcustodian.io/).
 
