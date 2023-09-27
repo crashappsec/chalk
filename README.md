@@ -34,7 +34,7 @@ All documentation for Chalk is available at https://crashoverride.com/docs and i
 
 ## Getting started
 
-We recommend following the [getting started guide](/src/docs/getting-started.md) on our documentation web site. Full documentation is also available directly inside the CLI.
+We recommend following the [getting started guide](/src/docs/guide-getting-started.md) on our documentation web site. Full documentation is also available directly inside the CLI.
 
 We provide free binary downloads on our [release page](https://crashoverride.com/releases).
 
