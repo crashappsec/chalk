@@ -49,7 +49,7 @@ We are constantly learning about emerging use cases for Chalk, and are always in
 
 ## Making contributions
 
-We welcome contributions but do require you to complete a contributor license agreement or CLA. You can read the CLA and about our process [here](https://crashoverride.com/docs/other/contrnuting).
+We welcome contributions but do require you to complete a contributor license agreement or CLA. You can read the CLA and about our process [here](https://crashoverride.com/docs/other/contributing).
 
 ## Getting additional help
 
