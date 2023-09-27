@@ -34,7 +34,7 @@ Beyond this document, there's an extensive amount of reference material for user
 | [**Output Configuration Reference**](./output-config.md)      | Shows how to set up sending reports wherever you like, using the config file.                                                      |
 | [**Metadata Report Configuration Guide**](./metadata.md)      | Shows how to specify what data to collect, when, and how to report different things to different places, if using the config file. |
 | [**Config File Builtins**](./builtins.md)                     | Shows the functions you can call from within a configuration file                                                                  |
-| [**Release Notes**](./release-notes.md)                       | Includes key known issues in the current release of Chalk                                                                          |
+| [**Release Notes**](./core-release-notes.md)                  | Includes key known issues in the current release of Chalk                                                                          |
 
 We have provided chalk with sensible default configurations for demo
 and testing, as well as some sample configs for specific use cases
@@ -47,7 +47,7 @@ wizard, which we expect will meet most configuration needs.
 We will be making source code available at the time of our public
 launch. Instructions on how to build directly and building via docker
 file are availabe in the [Chalk Getting Started
-Guide](./getting-started.md), as well as instructions on how to
+Guide](./guide-getting-started.md), as well as instructions on how to
 download pre-built chalk binaries.
 
 ## Basic Concepts
@@ -56,7 +56,7 @@ download pre-built chalk binaries.
 
 - [Reports](#reports)
 - [Configuration](#configuration)
-- [Command Line Operation](#command-line-operation)
+- [Command Line Operations](#command-line-operations)
 - [Basic Marking Experience](#basic-marking-experience)
 - [Build Wrapping](#build-wrapping)
 - [Basic Extraction Experience](#basic-extraction-experience)
@@ -358,8 +358,8 @@ in the background and emit a periodic heartbeat report that is fully
 customizable.
 
 Setting up `chalk exec` to run your software is easy, and basic
-examples are shown for both with and without docker in [Getting Started
-Guide](./guide-getting-started.md).
+examples are shown for both with and without docker in
+[Getting Started Guide](./guide-getting-started.md).
 
 ### Metadata Keys
 

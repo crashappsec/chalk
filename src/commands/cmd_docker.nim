@@ -190,12 +190,26 @@ RUN echo "CHALK_TARGET_PLATFORM=$TARGETPLATFORM"
   # collision boundary.
 
   let
-    preTag = binStr.encode(safe=true).replace("-", ".").replace("=","")
-    tmpTag = preTag.toLowerAscii()
+    preTag         = binStr.encode(safe=true).replace("-", ".").replace("=","")
+    tmpTag         = preTag.toLowerAscii()
+    buildKitKey    = "DOCKER_BUILDKIT"
+    buildKitKeySet = existsEnv(buildKitKey)
+  var buildKitValue: string
+  if buildKitKeySet:
+    buildKitValue  = getEnv(buildKitKey)
+  putEnv(buildKitKey, "1")
+  let
     allOut = runDockerGetEverything(@["build", "-t", tmpTag, "-f",
                                           "-", "."], probeFile)
     stdErr = allOut.getStderr()
     parts  = stdErr.split("CHALK_TARGET_PLATFORM=")
+
+  if buildKitKeySet:
+    # key was set before us, so restore whatever the value was
+    putEnv(buildKitKey, buildKitValue)
+  else:
+    # key was not set, restore that state
+    delEnv(buildKitKey)
 
   discard runDockerGetEverything(@["rmi", tmpTag])
 

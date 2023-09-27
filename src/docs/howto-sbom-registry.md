@@ -17,7 +17,7 @@ This how-to uses Chalk™ to automate this in two steps:
 
 ### Before you start
 
-You should have a working installation of chalk. See the [Getting Started Guide](/src/docs/guide-getting-started.md).
+You should have a working installation of chalk. See the [Getting Started Guide](./guide-getting-started.md).
 
 You should have a working installation of
 [`git`](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git). This
@@ -48,7 +48,7 @@ the built-in SBOM generation tool
 [Syft](https://github.com/anchore/syft), in the
 [CycloneDX](https://www.cyclonedx.org) SBOM specification.
 
-When using `--run-sbom-tools`, chalk adds the SBOM to a chalk report, rather than to the chalk mark. This is because SBOMs can be very large documents and would affect global performance. See the [Chalk User Guide](/src/docs/guide-user-guide.md) to understand more about chalk marks and chalk reports. This is because SBOMs can be very
+When using `--run-sbom-tools`, chalk adds the SBOM to a chalk report, rather than to the chalk mark. This is because SBOMs can be very large documents and would affect global performance. See the [Chalk User Guide](./guide-user-guide.md) to understand more about chalk marks and chalk reports. This is because SBOMs can be very
 large documents and would affect global performance.
 
 To view the SBOM that chalk created, you can look in the chalk report, by default in local filesystem.
@@ -130,7 +130,6 @@ To test this locally, all chalk reports containing the SBOMs from any local chal
 Save the following config in your current working folder.
 
 ```bash
-
 cat > custom_report_sbom.con4m << EOF
 
 report_template sbom_report_sample {
@@ -173,7 +172,7 @@ There are both free and paid plans. You can [join the waiting list](https://cras
 
 ## Related how-tos
 
-[Create software security supply chain compliance report requests, automatically](/src/docs/howto-compliance.md)
+[Create software security supply chain compliance report requests, automatically](./howto-compliance.md)
 
 ## Background information
 

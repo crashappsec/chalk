@@ -15,6 +15,6 @@ We publish how-tos that use chalk to solve specific problems on this documentati
 
 ## Getting started
 
-We recommend first reading the [user guide](/src/docs/guide-getting-started.md) and then following the [getting started guide](/src/docs/getting-started.md).
+We recommend first reading the [user guide](./guide-user-guide.md) and then following the [getting started guide](./guide-getting-started.md).
 
 Note : full documentation is also available directly inside the CLI.

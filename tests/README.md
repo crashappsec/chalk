@@ -11,9 +11,7 @@ internally uses the `pytest` framework.
 Tests assume that a chalk binary is present in the root directory of
 the repo, and will use that binary in all tests cases.
 
-More details on building the chalk binary can be found in the main
-[BUILD.sh](../BUILD.sh), but the quickest way to get a binary with the
-current local changes is:
+The quickest way to get a binary with the current local changes is:
 
 1. Build chalk deps container:
 
