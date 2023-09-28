@@ -114,7 +114,6 @@ const
   ERR_BAD_ELF_MAGIC          = "incorrect ELF magic bytes"
   ERR_ONLY_VERSION1          = "only ELF version 1 is supported"
   ERR_ONLY_LITTLE_ENDIAN     = "only little-endian is supported"
-  ERR_ONLY_MACHINE_AMD64     = "only AMD64 architecture is supported"
   ERR_ONLY_CLASS_ELF64       = "only ELF 64-bit is supported"
   ERR_PROGRAM_OUT_OF_RANGE   = "program header table or entry beyond EOF"
   ERR_NO_SECTION_TABLE       = "no section table defined"
@@ -375,9 +374,6 @@ proc parseHeader*(self: ElfFile): bool =
                fixedElfBytesCheck(whence: ELF_ENDIAN_8,
                                   value:  ELF_LITTLE_ENDIAN,
                                   error:  ERR_ONLY_LITTLE_ENDIAN),
-               fixedElfBytesCheck(whence: ELF_MACHINE_16,
-                                  value:  ELF_MACHINE_AMD64,
-                                  error:  ERR_ONLY_MACHINE_AMD64),
                fixedElfBytesCheck(whence: ELF_VERSION_32,
                                   value:  ELF_VERSION1,
                                   error:  ERR_ONLY_VERSION1)]
