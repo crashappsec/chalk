@@ -2251,6 +2251,38 @@ Set the default path to search for artifacts, unless overriden by command-line a
 """
   }
 
+  field default_tmp_dir {
+    type:    string
+    require: false
+    shortdoc: "Specify a default place for /tmp files if needed"
+    doc: """
+
+Generally, systems use `/tmp` for temporary files, and most modern API
+interfaces to using `/tmp` take mitigation against file-based race
+condtions, for instance, by leveraging per-app directories and
+randomness in selecting file names.
+
+However, there are times when the system default isn't a good option
+for Chalk when it needs temporary space. Specifically, we've learned
+that, for those running Docker via Snap on Ubuntu systems, Snap's
+isolation of temporary files means that users will get an error if we
+try to use /tmp to, for instance, write out a temporary docker file
+that we want to use with a container.
+
+Specifying a directory outside of `/tmp` addresses that problem, which
+can easily be done with the quite standard `TMPDIR` environment
+variable.
+
+However, Chalk philosophically doesn't want to leave opportunity for
+people to "forget" to do things when deploying us. So this field
+allows you to pick a place for temporary files to use IF no value for
+`TMPDIR` is provided.
+
+If neither is provided, you may very well end up with `/tmp` or
+`/var/tmp`, which should be great in most cases.
+"""    
+  }
+
   field always_try_to_sign {
     type:     bool
     default:  true

@@ -409,6 +409,8 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
         yield item
         clearErrorObject()
 
+proc dockerFailsafe(info: DockerInvocation) {.importc.}
+
 proc getPushChalkObj*(info: DockerInvocation): ChalkObj =
     let chalkOpt = scanOne(getPluginByName("docker"), info.prefTag)
 
