@@ -1,6 +1,9 @@
 name: tests
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     types:
       - opened
@@ -24,9 +27,17 @@ jobs:
     runs-on: ubuntu-latest
 
     if: |
-      github.event_name != 'pull_request' || (
+      (
+        github.event_name == 'pull_request' &&
         !github.event.pull_request.draft &&
         !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
+      ) || (
+        github.event_name == 'push' &&
+        endsWith(github.repository, 'chalk')
+      ) || (
+        github.event_name == 'workflow_dispatch'
+      ) || (
+        github.event_name == 'schedule'
       )
 
     concurrency:
