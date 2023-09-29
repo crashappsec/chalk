@@ -270,6 +270,7 @@ type
     dfCommands*:        seq[InfoBase]
     dfSections*:        seq[DockerFileSection]
     dfSectionAliases*:  OrderedTable[string, DockerFileSection]
+    dfPassOnStdin*:     bool
     addedInstructions*: seq[string]
 
   ValidateResult* = enum

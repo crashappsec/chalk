@@ -92,9 +92,15 @@ proc reportTmpFileExitState*(files, dirs, errs: seq[string]) =
 
 
 proc setupManagedTemp*() =
+  let customTmpDirOpt = chalkConfig.getDefaultTmpDir()
+
+  if customTmpDirOpt.isSome() and not existsEnv("TMPDIR"):
+    putenv("TMPDIR", customTmpDirOpt.get())
+
   if chalkConfig.getChalkDebug():
     info("Debug is on; temp files / dirs will be moved, not deleted.")
     setManagedTmpCopyLocation(resolvePath("chalk-tmp"))
+
   setManagedTmpExitCallback(reportTmpFileExitState)
   setDefaultTmpFilePrefix(tmpFilePrefix)
   setDefaultTmpFileSuffix(tmpFileSuffix)
@@ -368,65 +374,15 @@ proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
   error("Chalk: exec could not find a working executable to run.")
   quitChalk(1)
 
-proc runWithNewStdin*(exe:      string,
-                      args:     seq[string],
-                      contents: string): int {.discardable.} =
-  let
-    fd   = cReplaceStdinWithPipe()
-    subp = startProcess(exe,
-                        args = args,
-                        options = {poParentStreams})
-  if not fWriteData(fd, contents):
-    error("Write to pipe failed: " & $(strerror(errno)))
+proc runProcNoOutputCapture*(exe:      string,
+                             args:     seq[string],
+                             newStdin = ""): int {.discardable.} =
 
-  discard close(fd)
-  let code = subp.waitForExit()
-  subp.close()
+  let execOutput = runCmdGetEverything(exe, args, newStdIn,
+                                       passthrough = true,
+                                       timeoutUsec = 0) # No timeout
+  result = execOutput.getExit()
 
-  result = int(code)
-
-# I'd rather these live in docker_base.nim, but it'd be more work than
-# it's worth to make that happen.
-proc runWrappedDocker*(args: seq[string], df: string): int {.discardable.} =
-  trace("Running docker w/ stdin dockerfile by calling: " & dockerExeLocation &
-    " " & args.join(" "))
-
-  let code = runWithNewStdin(dockerExeLocation, args, df)
-
-  if code != 0:
-    trace("Docker exited with code: " & $(code))
-
-proc runDocker*(args: seq[string]): int {.discardable.} =
-  trace("Running: " & dockerExeLocation & " " & args.join(" "))
-
-  let pid = fork()
-  if pid != 0:
-    var stat_ptr: cint
-    discard waitpid(pid, stat_ptr, 0)
-    result = int(WEXITSTATUS(stat_ptr))
-    if result != 0:
-      trace("Docker exited with code: " & $(result))
-  else:
-    let cArgs = allocCStringArray(@[dockerExeLocation] & args)
-    discard execv(cstring(dockerExeLocation), cargs)
-
-template runWrappedDocker*(info: DockerInvocation): int =
-  let res = runDocker(info.newCmdLine)
-  if res != 0:
-    error("Wrapped docker call failed; reverting to original docker cmd")
-    raise newException(ValueError, "doh")
-  res
-
-proc doReporting*(topic: string){.importc.}
-
-proc dockerFailsafe*(info: DockerInvocation) {.noreturn.} =
-  var exitCode: int
-  if info.dockerFileLoc == ":stdin:":
-    exitCode = runWrappedDocker(info.originalArgs, info.inDockerFile)
-  else:
-    exitCode = runDocker(info.originalArgs)
-  doReporting("fail")
-  quitChalk(exitCode)
 
 template chalkUseStream*(chalk: ChalkObj, code: untyped) {.dirty.} =
   var

@@ -90,7 +90,10 @@ proc getDockerFileLoc*(state: DockerInvocation): string =
   if state.inDockerFile != "":
     return state.dockerFileLoc
   else:
-    state.dockerFileLoc = resolvePath(state.foundContext).joinPath("Dockerfile")
+    if state.foundContext == "-":
+      state.dockerFileLoc = resolvePath(".").joinPath("Dockerfile")
+    else:
+      state.dockerFileLoc = resolvePath(state.foundContext).joinPath("Dockerfile")
     return state.dockerFileLoc
 
 proc extractDockerFileFlag(state: DockerInvocation) =
