@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - src/**
+      - tests/**
+      - config.nims
+      - "*.nimble"
+      # ignore docs not to waste CI minutes
+      - "!src/docs/**"
   pull_request:
     types:
       - opened

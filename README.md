@@ -1,5 +1,7 @@
 ![Chalk Logo](https://crashoverride.com/images/logos/chalk-logo.png)
 
+[![tests](https://github.com/crashappsec/chalk/actions/workflows/tests.yml/badge.svg?branch=main&event=push)](https://github.com/crashappsec/chalk/actions/workflows/tests.yml?query=branch%3Amain)
+
 # Total visibility of your software engineering lifecycle.
 
 ## About Chalk
