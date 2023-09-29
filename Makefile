@@ -45,7 +45,8 @@ clean:
 
 .PHONY: chalk-docs
 chalk-docs: $(BINARY)
-	./$(BINARY) docgen
+	rm -rf $@
+	$(DOCKER) ./$(BINARY) docgen
 
 # ----------------------------------------------------------------------------
 # TOOL MAKEFILES

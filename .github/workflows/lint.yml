@@ -1,0 +1,34 @@
+name: lint
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+
+    if: |
+      !github.event.pull_request.draft &&
+      !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
+
+    concurrency:
+      # only allow one job per PR running
+      # older pending jobs will be cancelled not to waste CI minutes
+      # cannot use github.job here https://github.com/community/community/discussions/13496
+      group: ${{ github.workflow }}-pre-commit-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v3
+
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.0
