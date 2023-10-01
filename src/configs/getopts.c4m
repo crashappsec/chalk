@@ -252,7 +252,7 @@ At the moment, this is only honored for the `chalk help` command.
 
 
   command insert {
-    aliases:  ["inject", "ins", "in", "i"]
+    aliases:  ["inject"]
     args:     (0, high())
     shortdoc: "Add chalk marks to artifacts"
     doc:      """
@@ -297,7 +297,7 @@ The named reporting template must already exist in your configuration.
 }
 
   command extract {
-    aliases:       ["ex", "e"]
+    aliases:       []
     args:          (0, high())
     callback:      func set_artifact_search_path(list[string])
     arg_sub_mutex: false
@@ -335,7 +335,6 @@ overwitten marks?
     }
 
     command images {
-      aliases: ["image", "img", "i"]
       shortdoc: "Find marks in local docker images"
       doc: """
 This command will look at any docker images available locally, attempting to find chalk marks in them.
@@ -345,7 +344,6 @@ Note that this does not look through running containers; use `chalk extract cont
     }
 
     command containers {
-      aliases: ["container", "con", "c"]
       shortdoc: "Find marks in running containers"
       doc: """
 This command will look at any docker containers available locally, attempting to find chalk marks in them.
@@ -353,7 +351,7 @@ This command will look at any docker containers available locally, attempting to
     }
 
     command all {
-      aliases:  ["a"]
+      aliases:  []
       args:     (0, high())
       callback: func set_artifact_search_path(list[string])
       shortdoc: "Find all docker marks, plus filesystem marks"
@@ -366,7 +364,7 @@ search the current working directory for chalk marks.
 }
 
   command delete {
-    aliases:  ["del"]
+    aliases:  []
     args:     (0, high())
     callback: func set_artifact_search_path(list[string])
     shortdoc: "Delete chalk marks from software"
@@ -442,7 +440,7 @@ The named reporting template must already exist in your configuration.
     }
   }
   command config {
-    aliases:  ["def"]
+    aliases:  []
     shortdoc: "Show configuration variables and settings"
     doc: """
 Shows the results of evaluating the configuration, without actually doing any work with artifacts.
@@ -460,7 +458,6 @@ This command does not show the contents of the config file(s) used, just key res
 }
 
   command dump {
-    aliases: ["confdump"]
     args:    (0, 1)
     shortdoc: "Print the embedded configuration file"
     doc: """
@@ -472,7 +469,7 @@ This behavior can be overridden by the configuration file, where you can specify
   }
 
   command load {
-    aliases:  ["confload"]
+    aliases:  []
     args:     (1, 1)
     callback: func on_conf_load(list[string])
     shortdoc: "Load a new configuration into the chalk binary"
@@ -501,7 +498,6 @@ This verbose flag controls whether or not you get the verbose warning.  It's muc
   }
 
   command version {
-    aliases: ["vers", "v"]
     shortdoc: "Give version information"
     doc: """
 Outputs basic version information for the chalk binary.
