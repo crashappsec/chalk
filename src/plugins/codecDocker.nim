@@ -4,8 +4,8 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import osproc, ../config, ../docker_base, ../chalkjson, ../util,
-       ../attestation, ../plugin_api
+import osproc, ../config, ../docker_base, ../chalkjson, ../attestation,
+       ../plugin_api
 
 const
   markFile     = "chalk.json"
@@ -35,7 +35,9 @@ proc extractImageMark(chalk: ChalkObj): ChalkDict =
   try:
     setCurrentDir(dir)
 
-    if runDocker(@["save", imageId, "-o", "image.tar"]) != 0:
+    let procInfo = runDockerGetEverything(@["save", imageId, "-o", "image.tar"])
+
+    if procInfo.getExit() != 0:
       error("Image " & imageId & ": error extracting chalk mark")
       extractFinish()
     if execCmd("tar -xf image.tar manifest.json") != 0:

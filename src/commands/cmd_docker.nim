@@ -29,6 +29,21 @@ import posix, unicode, base64, ../config, ../collect, ../reporting,
 
 {.warning[CStringConv]: off.}
 
+proc runMungedDockerInvocation*(ctx: DockerInvocation): int =
+  var
+    newStdin = "" # Indicated passthrough.
+    args     = ctx.newCmdLine
+
+  trace("Running docker: " & dockerExeLocation & " " & args.join(" "))
+
+  if ctx.dfPassOnStdin:
+    newStdin = ctx.inDockerFile & ctx.addedInstructions.join("\n")
+    trace("Passing on stdin: \n" & newStdin)
+
+  result = runProcNoOutputCapture(dockerExeLocation, args, newStdin)
+
+proc doReporting*(topic: string){.importc.}
+
 proc launchDockerSubscan(ctx:     DockerInvocation,
                          contexts: seq[string]): Box =
 
@@ -96,7 +111,6 @@ proc formatLabel(name: string, value: string, addLabel: bool): string =
   result &= processLabelKey(name) & "=" & processLabelValue(value)
   trace("Formatting label: " & result)
 
-
 proc addNewLabelsToDockerFile(ctx: DockerInvocation) =
   # First, add totally custom labels.
   let labelOps = chalkConfig.dockerConfig.getCustomLabels()
@@ -137,14 +151,28 @@ proc setPreferredTag(ctx: DockerInvocation) =
   ctx.opChalkObj.name = ctx.prefTag
   ctx.opChalkObj.userRef = ctx.prefTag
 
-proc writeNewDockerFile(ctx: DockerInvocation) =
-  # TODO: can just plan to always send the Dockerfile on stdin, unless the
-  # context was provided on stdin.
-
+proc writeNewDockerFileIfNeeded(ctx: DockerInvocation) =
+  # If we're not changing the Docker file, then we add an explicit -f
+  # specifying the location. This may not have been specified by the
+  # user, but it is good to be explicit.
   if len(ctx.addedInstructions) == 0 and ctx.dockerFileLoc != ":stdin:":
     ctx.newCmdLine.add("-f")
     ctx.newCmdLine.add(ctx.dockerFileLoc)
     return
+
+  # If the context is passed on stdin we keep it on stdin, so in that
+  # case we do need to write out the Dockerfile. Otherwise, set the
+  # flag telling us to pass it on stdin.
+
+  if ctx.foundContext != "-":
+    ctx.newCmdLine.add("-f")
+    ctx.newCmdLine.add("-")
+    ctx.dfPassOnStdin = true
+    return
+
+  # Otherwise, when we have to write out an actual Docker file, we
+  # should properly be using a temporary file, because it's a place
+  # we're generally guaranteed to be able to write.
 
   let (f, path) = getNewTempFile()
 
@@ -190,12 +218,26 @@ RUN echo "CHALK_TARGET_PLATFORM=$TARGETPLATFORM"
   # collision boundary.
 
   let
-    preTag = binStr.encode(safe=true).replace("-", ".").replace("=","")
-    tmpTag = preTag.toLowerAscii()
+    preTag         = binStr.encode(safe=true).replace("-", ".").replace("=","")
+    tmpTag         = preTag.toLowerAscii()
+    buildKitKey    = "DOCKER_BUILDKIT"
+    buildKitKeySet = existsEnv(buildKitKey)
+  var buildKitValue: string
+  if buildKitKeySet:
+    buildKitValue  = getEnv(buildKitKey)
+  putEnv(buildKitKey, "1")
+  let
     allOut = runDockerGetEverything(@["build", "-t", tmpTag, "-f",
                                           "-", "."], probeFile)
     stdErr = allOut.getStderr()
     parts  = stdErr.split("CHALK_TARGET_PLATFORM=")
+
+  if buildKitKeySet:
+    # key was set before us, so restore whatever the value was
+    putEnv(buildKitKey, buildKitValue)
+  else:
+    # key was not set, restore that state
+    delEnv(buildKitKey)
 
   discard runDockerGetEverything(@["rmi", tmpTag])
 
@@ -396,7 +438,6 @@ proc addAnyExtraEnvVars(ctx: DockerInvocation) =
     ctx.addedInstructions.add(newEnvLine)
     info("Added to Dockerfile: " & newEnvLine)
 
-
 proc handleTrueInsertion(ctx: DockerInvocation, mark: string) =
   if chalkConfig.dockerConfig.getWrapEntryPoint():
     ctx.rewriteEntryPoint()
@@ -511,10 +552,9 @@ proc runBuild(ctx: DockerInvocation): int =
   else:
     ctx.handleTrueInsertion(chalkMark)
     ctx.addNewLabelsToDockerFile()
-    ctx.writeNewDockerFile()
+    ctx.writeNewDockerFileIfNeeded()
 
-  # TODO: ctx.addEnvVarsToDockerfile()
-  result = ctx.runWrappedDocker()
+  result = ctx.runMungedDockerInvocation()
 
   if chalkConfig.getVirtualChalk() and result == 0:
     publish("virtual", chalkMark)
@@ -538,7 +578,9 @@ proc runPush(ctx: DockerInvocation): int =
   # Here, if we fail, there's no re-run. Either (in the second branch), we
   # ran their original command line, or we've got nothing to fall back on,
   # because the build already succeeded.
-  result = runDocker(ctx.newCmdLine)
+  let cmdInfo = runDockerGetEverything(ctx.newCmdLine)
+
+  result = cmdInfo.getExit()
   return result
 
 # TODO: Any other noteworthy commands to wrap (run, etc)
@@ -546,7 +588,7 @@ proc runPush(ctx: DockerInvocation): int =
 template passThroughLogic() =
   try:
     # Silently pass through other docker commands right now.
-    exitCode = runDocker(args)
+    exitCode = runProcNoOutputCapture(dockerExeLocation, args)
     if chalkConfig.dockerConfig.getReportUnwrappedCommands():
       reporting.doReporting("report")
   except:
@@ -562,7 +604,7 @@ template gotBuildCommand() =
       ctx.dockerFailsafe()
     else:
       if not ctx.opChalkObj.extractBasicImageInfo():
-        error("Could not inspect image after successful build." &
+        error("Could not inspect image after successful build. " &
           "Chalk reporting will be limited.")
   except:
     dumpExOnDebug()

@@ -8,7 +8,7 @@
 ## Common docker-specific utility bits used in various parts of the
 ## implementation.
 
-import osproc, config, util
+import osproc, config, util, reporting
 
 var
   buildXVersion: float  = 0   # Major and minor only
@@ -65,12 +65,26 @@ proc getBuildXVersion*(): float =
 template haveBuildContextFlag*(): bool =
   buildXVersion >= 0.8
 
-proc runDockerGetOutput*(args: seq[string]): string =
-  trace("Running: " & dockerExeLocation & " " & args.join(" "))
-  return runCmdGetOutput(dockerExeLocation, args = args)
-
 template runDockerGetEverything*(args: seq[string], stdin = ""): ExecOutput =
   runCmdGetEverything(dockerExeLocation, args, stdin)
+
+proc dockerFailsafe*(info: DockerInvocation) {.cdecl, exportc.} =
+  # If our mundged docker invocation fails, then we conservatively
+  # assume we made some big mistake, and run Docker the way it
+  # was originally called.
+
+  var newStdin = "" # Passthrough; either nothing or a build context
+
+  # Here, a docker file was passed on stdin, and we have already
+  # read it, so we need to put it back on stdin.
+  if info.dockerFileLoc == ":stdin:":
+    newStdin = info.inDockerFile
+
+  let exitCode = runProcNoOutputCapture(dockerExeLocation,
+                                        info.originalArgs,
+                                        newStdin)
+  doReporting("fail")
+  quitChalk(exitCode)
 
 var contextCounter = 0
 
@@ -161,7 +175,7 @@ proc populateBasicImageInfo*(chalk: ChalkObj, info: JSonNode) =
 
 proc getBasicImageInfo*(refName: string): Option[JSonNode] =
   let
-    allInfo = runDockerGetEverything(@["images", "--format", "json"])
+    allInfo = runDockerGetEverything(@["images", "--format", "{{json . }}"])
     stdout  = allInfo.getStdout().strip()
 
   if allInfo.getExit() != 0 or stdout == "":
