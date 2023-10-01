@@ -21,7 +21,7 @@ when isMainModule:
     warn("No working codec is available for the native executable type")
 
   if passedHelpFlag:
-    runChalkHelp("help") # no return; in cmd_help.nim
+    runChalkHelp(getCommandName()) # no return; in cmd_help.nim
 
   setupDefaultLogConfigs() # src/sinks.nim
   checkSetupStatus()       # attestation.nim

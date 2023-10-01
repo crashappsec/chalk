@@ -462,8 +462,16 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
     con4mRuntime = getChalkRuntime()
 
   if cmdName != "help":
-    toOut = con4mRuntime.getCommandDocs(cmdName)
-  elif len(args) == 0:
+    # In this branch, the --help flag got passed, and we will check to
+    # see if the command was explicitly passed, or if it was implicit.
+    # If it was implicit, give the help overview instead of the command
+    # overview.
+    let defaultCmd = chalkConfig.getDefaultCommand().getOrElse("")
+    if defaultCmd != "" and defaultCmd notin commandLineParams():
+      toOut = con4mRuntime.getHelpOverview()
+    else:
+      toOut = con4mRuntime.getCommandDocs(cmdName)
+  elif len(args) == 0 or "--help" in args:
     toOut = con4mRuntime.getHelpOverview()
   elif args[0] in ["metadata", "keys", "key"]:
       toOut = con4mRuntime.keyHelp(args)
