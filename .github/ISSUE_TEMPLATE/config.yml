@@ -2,4 +2,4 @@ blank_issues_enabled: true
 contact_links:
   - name: Chalk Discussion
     url: https://github.com/crashappsec/chalk/discussions
-    about: Please ask and answer questions about Rust on the user forum.
+    about: Please ask and answer questions about Chalk on the user forum.
