@@ -455,6 +455,17 @@ proc getOutputHelp(state: ConfigState, kind = CDocConsole): string =
 
   result &= state.getSinkHelp(kind)
 
+proc hasHelpFlag(args: seq[string]): bool =
+  for item in args:
+    if not item.startswith("-"):
+      continue
+    var s = item[1 .. ^1]
+    while s.startswith("-"):
+      s = s[1 .. ^1]
+
+    if s in ["help", "h"]:
+      return true
+
 proc runChalkHelp*(cmdName = "help") {.noreturn.} =
   var
     args         = getArgs()
@@ -471,7 +482,7 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
       toOut = con4mRuntime.getHelpOverview()
     else:
       toOut = con4mRuntime.getCommandDocs(cmdName)
-  elif len(args) == 0 or "--help" in args:
+  elif len(args) == 0 or args.hasHelpFlag():
     toOut = con4mRuntime.getHelpOverview()
   elif args[0] in ["metadata", "keys", "key"]:
       toOut = con4mRuntime.keyHelp(args)
