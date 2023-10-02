@@ -5,7 +5,7 @@ about: Proposal for a new Chalk Feature
 
 ## Description
 
-<!-- what new feature would you like to see in chalk? please include a link to the associated high-level objective -->
+<!-- what new feature would you like to see in chalk? please include a link to any related tickets -->
 
 ## Result
 
