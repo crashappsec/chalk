@@ -37,6 +37,8 @@ proc runMungedDockerInvocation*(ctx: DockerInvocation): int =
   trace("Running docker: " & dockerExeLocation & " " & args.join(" "))
 
   if ctx.dfPassOnStdin:
+    if not ctx.inDockerFile.endswith("\n"):
+      ctx.inDockerFile &= "\n"
     newStdin = ctx.inDockerFile & ctx.addedInstructions.join("\n")
     trace("Passing on stdin: \n" & newStdin)
 
