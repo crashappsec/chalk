@@ -159,11 +159,17 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
            getBuildXVersion() > 0:
           ctx.addedInstructions.add("COPY --chmod=0755" & file & " " & " /" &
             newname)
+        elif chmod:
+          let useDirective = ctx.dfSections[^1].lastUser
+
+          if useDirective != nil:
+            ctx.addedInstructions.add("USER root")
+          ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
+          ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
+          if useDirective != nil:
+            ctx.addedInstructions.add("USER " & useDirective.str)
         else:
           ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
-          if chmod:
-            ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
-
         registerTempFile(dstLoc)
 
     except:
