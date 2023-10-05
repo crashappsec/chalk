@@ -101,6 +101,7 @@ def test_build(
     [
         "valid/sample_1",
         "valid/sample_2",
+        "valid/sample_3",
     ],
 )
 def test_virtual_valid(
@@ -173,7 +174,7 @@ def test_virtual_invalid(
     ).is_file(), "virtual-chalk.json should not have been created!"
 
 
-@pytest.mark.parametrize("test_file", ["valid/sample_1", "valid/sample_2"])
+@pytest.mark.parametrize("test_file", ["valid/sample_1", "valid/sample_2", "valid/sample_3"])
 def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
     tag = f"{test_file}_{random_hex}"
     image_hash, build = chalk.docker_build(
