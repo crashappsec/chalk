@@ -130,13 +130,36 @@ class Program:
         *,
         after: Optional[str] = None,
         text: Optional[str] = None,
-        log_level: Literal["error", "debug"] = "error",
+        log_level: Optional[Literal["error", "debug"]] = "error",
+        everything: bool = True,
     ):
+        data, _ = self._valid_json(
+            after=after, text=text, log_level=log_level, everything=everything
+        )
+        return data
+
+    def _valid_json(
+        self,
+        *,
+        after: Optional[str] = None,
+        text: Optional[str] = None,
+        log_level: Optional[Literal["error", "debug"]] = "error",
+        everything: bool = True,
+    ):
+        text = self.after(match=after, text=text)
         try:
-            return json.loads(self.after(match=after, text=text), strict=False)
+            return json.loads(text), len(text)
         except Exception as e:
-            getattr(self.logger, log_level)("output is invalid json", error=e)
-            raise
+            # if there is extra data we grab valid json until the
+            # invalid character
+            e_str = str(e)
+            if everything or not e_str.startswith("Extra data:"):
+                if log_level:
+                    getattr(self.logger, log_level)("output is invalid json", error=e)
+                raise
+            # Extra data: line 25 column 1 (char 596)
+            char = int(e_str.split()[-1].strip(")"))
+            return json.loads(text[:char]), char
 
 
 def run(

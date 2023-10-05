@@ -1,6 +1,4 @@
 .TODO
-.config-tool-bin/
-config-tool-outdir
 /bin/chalk
 /chalk
 /src/getlibpath

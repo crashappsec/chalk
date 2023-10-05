@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from .chalk.runner import Chalk, ChalkReport
+from .chalk.runner import Chalk
 from .conf import CONFIGS, SLEEP_PATH, UNAME_PATH
 from .utils.bin import sha256
 from .utils.log import get_logger
