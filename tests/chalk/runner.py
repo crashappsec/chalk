@@ -347,6 +347,7 @@ class Chalk:
         expected_success: bool = True,
         virtual: bool = False,
         cwd: Optional[Path] = None,
+        args: Optional[dict[str, str]] = None,
         config: Optional[Path] = None,
         buildkit: bool = True,
     ) -> tuple[str, ChalkProgram]:
@@ -358,6 +359,7 @@ class Chalk:
             tag=tag,
             context=context,
             dockerfile=dockerfile,
+            args=args,
             cwd=cwd,
             expected_success=expected_success,
             buildkit=buildkit,
@@ -375,6 +377,7 @@ class Chalk:
                     tag=tag,
                     context=context,
                     dockerfile=dockerfile,
+                    args=args,
                 ),
                 expected_success=expected_success,
                 cwd=cwd,
