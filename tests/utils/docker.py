@@ -29,7 +29,7 @@ class Docker:
         if dockerfile:
             cmd += ["-f", str(dockerfile)]
         for name, value in (args or {}).items():
-            cmd += [f"--build-arg={name}={name}"]
+            cmd += [f"--build-arg={name}={value}"]
         cmd += [str(context or ".")]
         return cmd
 
@@ -49,11 +49,12 @@ class Docker:
         """
         return Docker.with_image_id(
             run(
-                Docker.build_cmd(tag=tag, context=context, dockerfile=dockerfile),
+                Docker.build_cmd(
+                    tag=tag, context=context, dockerfile=dockerfile, args=args
+                ),
                 expected_exit_code=int(not expected_success),
                 env=Docker.build_env(buildkit=buildkit),
                 cwd=cwd,
-                args=args,
             )
         )
 
