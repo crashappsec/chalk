@@ -22,6 +22,7 @@ from .chalk.validate import (
 from .conf import CONFIGS, DOCKERFILES, REGISTRY
 from .utils.docker import Docker
 from .utils.log import get_logger
+from .utils.os import run
 
 
 logger = get_logger()
@@ -117,6 +118,29 @@ def test_composite_build(
     buildkit: bool,
     random_hex: str,
 ):
+    expected_success = False
+    # if the buildx version is not 0, and docker version is greater than 20
+    #  we expect the docker wrapping with chalk copying to work
+    # otherwise, we expect it to fail
+    buildx_version = 0
+    buildx_version_proc = run(["docker", "buildx", "version"])
+    if buildx_version_proc.returncode == 0:
+        buildx_version = (buildx_version_proc.stdout.decode()).split()[1]
+        buildx_version = buildx_version.strip("v")
+
+    docker_version = 0
+    docker_version_proc = run(["docker", "version"])
+    if docker_version_proc.returncode == 0:
+        _stdout = docker_version_proc.stdout.decode().splitlines()
+        for line in _stdout:
+            if "Version" in line:
+                docker_version = line.split()[1]
+                break
+
+    if buildx_version != 0 and int(docker_version.split(".")[0]) > 20:
+        expected_success = True
+
+    # return
     image_id, _ = chalk.docker_build(
         dockerfile=base,
         buildkit=buildkit,
@@ -131,9 +155,9 @@ def test_composite_build(
         buildkit=buildkit,
         args={"BASE": random_hex},
         config=CONFIGS / "docker_wrap.conf",
-        expected_success=buildkit,
+        expected_success=expected_success,
     )
-    if buildkit:
+    if expected_success:
         assert second_image_id
 
 

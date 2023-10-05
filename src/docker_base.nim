@@ -65,7 +65,7 @@ proc getBuildXVersion*(): float =
 
 proc getDockerVersion*(): string =
   once:
-    let (output, exitcode) = execCmdEx(dockerExeLocation & " buildx version")
+    let (output, exitcode) = execCmdEx(dockerExeLocation & " version")
     if exitcode == 0:
       let words = output.split(" ")
 
