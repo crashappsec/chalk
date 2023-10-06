@@ -22,6 +22,7 @@ from .chalk.validate import (
 from .conf import CONFIGS, DOCKERFILES, REGISTRY
 from .utils.docker import Docker
 from .utils.log import get_logger
+from .utils.os import run
 
 
 logger = get_logger()
@@ -69,6 +70,10 @@ def do_docker_cleanup() -> Iterator[None]:
         (DOCKERFILES / "valid" / "sample_1", None, False),
         # PWD=foo && docker build -t test .
         (DOCKERFILES / "valid" / "sample_1", None, True),
+        # PWD=foo && docker build .
+        (DOCKERFILES / "valid" / "sample_3", None, False),
+        # PWD=foo && docker build -t test .
+        (DOCKERFILES / "valid" / "sample_3", None, True),
         # docker build -f foo/Dockerfile foo
         (None, DOCKERFILES / "valid" / "sample_1" / "Dockerfile", False),
         # docker build -f foo/Dockerfile -t test foo
@@ -91,8 +96,50 @@ def test_build(
         cwd=cwd,
         tag=random_hex if tag else None,
         buildkit=buildkit,
+        config=CONFIGS / "docker_wrap.conf",
     )
     assert image_id
+
+
+@pytest.mark.parametrize("buildkit", [True, False])
+@pytest.mark.parametrize(
+    "base, test",
+    [
+        (
+            DOCKERFILES / "valid" / "split_dockerfiles" / "base.Dockerfile",
+            DOCKERFILES / "valid" / "split_dockerfiles" / "test.Dockerfile",
+        ),
+    ],
+)
+def test_composite_build(
+    chalk: Chalk,
+    base: Path,
+    test: Path,
+    buildkit: bool,
+    random_hex: str,
+):
+    image_id, _ = Docker.build(
+        dockerfile=base,
+        buildkit=buildkit,
+        tag=random_hex,
+    )
+    assert image_id
+
+    # TODO this is a known limitation for the moment
+    # we EXPECT this case to fail without buildkit enabled,
+    # as base image adjusts USER and child Dockerfile
+    # does not have any indication that USER was adjusted
+    # and so we cannot detect USER from base image.
+    # In this case chalk falls back to standard docker build
+    # which means there is no chalk report in the output
+    second_image_id, result = chalk.docker_build(
+        dockerfile=test,
+        buildkit=buildkit,
+        args={"BASE": random_hex},
+        config=CONFIGS / "docker_wrap.conf",
+        expecting_report=buildkit,
+    )
+    assert second_image_id
 
 
 @mock.patch.dict(os.environ, {"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"})
@@ -101,6 +148,7 @@ def test_build(
     [
         "valid/sample_1",
         "valid/sample_2",
+        "valid/sample_3",
     ],
 )
 def test_virtual_valid(
@@ -173,12 +221,15 @@ def test_virtual_invalid(
     ).is_file(), "virtual-chalk.json should not have been created!"
 
 
-@pytest.mark.parametrize("test_file", ["valid/sample_1", "valid/sample_2"])
+@pytest.mark.parametrize(
+    "test_file", ["valid/sample_1", "valid/sample_2", "valid/sample_3"]
+)
 def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
     tag = f"{test_file}_{random_hex}"
     image_hash, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
+        config=CONFIGS / "docker_wrap.conf",
     )
 
     # artifact is the docker image

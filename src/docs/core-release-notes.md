@@ -1,3 +1,26 @@
+# Release Notes for Chalk version 0.1.3
+
+## Fixes
+
+- Docker support when installed via `Snap`.
+  [9](https://github.com/crashappsec/chalk/pull/9)
+- Removes error log when using chalk on ARM Linux as chalk fully
+  runs on ARM Linux now.
+  [7](https://github.com/crashappsec/chalk/pull/7)
+- When a `Dockerfile` uses `USER` directive, chalk can now wrap
+  entrypoint in that image
+  (`docker.wrap_entrypoint = true` in chalk config).
+  [34](https://github.com/crashappsec/chalk/pull/34)
+
+## Known Issues
+
+### Containers
+
+- When a `Dockerfile` does not use `USER` directive but base image
+  uses it to change default image user, chalk cannot wrap the
+  image as it on legacy Docker builder (not buildx) as it will
+  fail to `chmod` permissions of chalk during the build.
+
 # Release Notes for Chalk version 0.1.2
 
 This is the first open source release of Chalk. For those who

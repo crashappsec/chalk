@@ -12,6 +12,7 @@ import osproc, config, util, reporting
 
 var
   buildXVersion: float  = 0   # Major and minor only
+  dockerVersion: string = ""
 
 const
   hashHeader* = "sha256:"
@@ -62,6 +63,19 @@ proc getBuildXVersion*(): float =
 
   return buildXVersion
 
+proc getDockerVersion*(): string =
+  once:
+    let (output, exitcode) = execCmdEx(dockerExeLocation & " version")
+    if exitcode == 0:
+      let words = output.split(" ")
+
+      for item in words:
+        if '.' in item:
+          dockerVersion = item
+          break
+
+  return dockerVersion
+
 template haveBuildContextFlag*(): bool =
   buildXVersion >= 0.8
 
@@ -105,12 +119,15 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
     once:
       trace("Docker injection method: --build-context")
 
+    var chmodstr = ""
+
+    if chmod:
+      chmodstr = "--chmod=0755 "
+
     ctx.newCmdLine.add("--build-context")
     ctx.newCmdLine.add("chalkexedir" & $(contextCounter) & "=\"" & dir & "\"")
-    ctx.addedInstructions.add("COPY --from=chalkexedir" & $(contextCounter) &
-      " " & file & " /" & newname)
-    if chmod:
-      ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
+    ctx.addedInstructions.add("COPY " & chmodstr & "--from=chalkexedir" &
+      $(contextCounter) & " " & file & " /" & newname)
     contextCounter += 1
     if move:
       registerTempFile(loc)
@@ -138,10 +155,24 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
           copyFile(loc, dstLoc)
           trace("Copied " & loc & " to " & dstLoc)
 
-        ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
-        if chmod:
-          ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
+        if chmod and getDockerVersion().startswith("2") and
+           getBuildXVersion() > 0:
+          ctx.addedInstructions.add("COPY --chmod=0755 " & file & " " & " /" &
+            newname)
+        elif chmod:
+          let useDirective = ctx.dfSections[^1].lastUser
 
+          # TODO detect user from base image if possible but thats not
+          # trivial as what is a base image is not a trivial question
+          # due to multi-stage build possibilities...
+          if useDirective != nil:
+            ctx.addedInstructions.add("USER root")
+          ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
+          ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
+          if useDirective != nil:
+            ctx.addedInstructions.add("USER " & useDirective.str)
+        else:
+          ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
         registerTempFile(dstLoc)
 
     except:

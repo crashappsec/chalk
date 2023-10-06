@@ -21,12 +21,15 @@ class Docker:
         tag: Optional[str],
         context: Optional[Path] = None,
         dockerfile: Optional[Path] = None,
+        args: Optional[dict[str, str]] = None,
     ):
         cmd = ["docker", "build"]
         if tag:
             cmd += ["-t", tag]
         if dockerfile:
             cmd += ["-f", str(dockerfile)]
+        for name, value in (args or {}).items():
+            cmd += [f"--build-arg={name}={value}"]
         cmd += [str(context or ".")]
         return cmd
 
@@ -36,6 +39,7 @@ class Docker:
         tag: Optional[str] = None,
         context: Optional[Path] = None,
         dockerfile: Optional[Path] = None,
+        args: Optional[dict[str, str]] = None,
         cwd: Optional[Path] = None,
         expected_success: bool = True,
         buildkit: bool = True,
@@ -45,7 +49,9 @@ class Docker:
         """
         return Docker.with_image_id(
             run(
-                Docker.build_cmd(tag=tag, context=context, dockerfile=dockerfile),
+                Docker.build_cmd(
+                    tag=tag, context=context, dockerfile=dockerfile, args=args
+                ),
                 expected_exit_code=int(not expected_success),
                 env=Docker.build_env(buildkit=buildkit),
                 cwd=cwd,
