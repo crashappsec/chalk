@@ -240,10 +240,11 @@ proc loadHead(info: RepoInfo) =
 
   info.branch   = parts[2 .. ^1].join($DirSep)
   trace("branch: " & info.branch)
-  let fNameRef = info.vcsDir.joinPath(fname)
 
-  if fileExists(fNameRef):
-    let reffile   = newFileStream(fNameRef)
+  let
+    fNameRef = info.vcsDir.joinPath(fname)
+    reffile   = newFileStream(fNameRef)
+  if reffile != nil:
     info.commitId = reffile.readAll().strip()
     reffile.close()
     trace("commit ID: " & info.commitID)
