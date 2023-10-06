@@ -22,7 +22,6 @@ services:
       - ../con4m:/con4m
     # environment:
     # CON4M_DEV is conditionally set in Makefile
-      
 
   # --------------------------------------------------------------------------
   # SERVER
@@ -62,7 +61,6 @@ services:
         - sh -c "curl -f https://localhost:5858/health --insecure"
       start_period: 30s
       interval: 1s
-
 
   # --------------------------------------------------------------------------
   # TESTS
@@ -107,6 +105,12 @@ services:
   tests:
     build:
       context: ./tests
+      args:
+        BASE: ${BASE:-ubuntu}
+    cap_add:
+      - SYS_PTRACE # for gdb
+    security_opt:
+      - seccomp=unconfined # for gdb
     volumes:
       - .:/chalk
       - /var/run/docker.sock:/var/run/docker.sock
@@ -160,4 +164,3 @@ services:
         - sh -c "echo 'GET / HTTP/1.1' | nc -v localhost 8080"
       start_period: 30s
       interval: 1s
-

@@ -51,7 +51,7 @@ chalk-docs: $(BINARY)
 # ----------------------------------------------------------------------------
 # TOOL MAKEFILES
 
-TOOLS=config-tool server
+TOOLS=server
 
 .PHONY: $(TOOLS)
 $(TOOLS):

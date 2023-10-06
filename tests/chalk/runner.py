@@ -42,9 +42,14 @@ class ChalkReport(ContainsMixin, dict):
         super().__init__(**report)
 
     @property
+    def marks(self):
+        assert len(self["_CHALKS"]) > 0
+        return [ChalkMark(i, report=self) for i in self["_CHALKS"]]
+
+    @property
     def mark(self):
-        assert len(self["_CHALKS"]) == 1
-        return ChalkMark(self, self["_CHALKS"][0])
+        assert len(self.marks) == 1
+        return self.marks[0]
 
     @property
     def errors(self):
@@ -62,9 +67,6 @@ class ChalkReport(ContainsMixin, dict):
     def from_json(cls, data: str):
         return cls(json.loads(data)[0])
 
-    def validate(self, operation: str):
-        assert self["_OPERATION"] == operation
-
 
 class ChalkMark(ContainsMixin, dict):
     @classmethod
@@ -81,8 +83,14 @@ class ChalkMark(ContainsMixin, dict):
         assert mark
         return cls(report=ChalkReport({}), mark=mark)
 
-    def __init__(self, report: ChalkReport, mark: dict[str, Any]):
-        self.report = report
+    @classmethod
+    def from_json(cls, data: str):
+        return cls(json.loads(data))
+
+    def __init__(
+        self, mark: dict[str, Any], *, report: Optional[dict[str, Any]] = None
+    ):
+        self.report = ChalkReport(report or {})
         super().__init__(**mark)
 
     @property
@@ -129,18 +137,10 @@ class ChalkProgram(Program):
         while text.strip():
             try:
                 # assume all of text is valid json
-                reports += json.loads(text)
+                reports += self.json(text=text, log_level=None)
             except json.JSONDecodeError as e:
-                # if not we grab valid json until the invalid
-                # character and then keep doing that until we
-                # find all reports in the text
-                e_str = str(e)
-                if not e_str.startswith("Extra data:"):
-                    self.logger.error("output is invalid json", error=e)
-                    raise
-                # Extra data: line 25 column 1 (char 596)
-                char = int(e_str.split()[-1].strip(")"))
-                reports += self.json(text=text[:char])
+                next_reports, char = self._valid_json(text=text, everything=False)
+                reports += next_reports
                 text = text[char:]
             else:
                 break
@@ -260,7 +260,7 @@ class Chalk:
                 if not operation and "docker" in params:
                     operation = params[params.index("docker") + 1]
                 if operation:
-                    report.validate(operation)
+                    assert report.has(_OPERATION=operation)
 
         return result
 
