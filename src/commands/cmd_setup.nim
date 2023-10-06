@@ -21,10 +21,16 @@ proc runCmdSetup*(gen, load: bool) =
     return
 
   selfChalk.addToAllChalks()
-  info("Ensuring cosign is present to setup attestation.")
-
-  if getCosignLocation() == "":
+  if getSignerLocation() == "":
     quitChalk(1)
+
+  var chosenSigner = ""
+  if chalkConfig.getUseCosign():
+    chosenSigner = "cosign"
+  else:
+    chosenSigner = "minisign"
+  info("Ensuring " & chosenSigner & " is present to setup attestation.")
+
   if load:
     # If we fall back to 'gen' we don't want attemptToLoadKeys
     # to give an error when we don't find keys.

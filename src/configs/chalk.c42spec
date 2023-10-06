@@ -2389,6 +2389,15 @@ Chalk will also embed the keypairs internally, for future operations.
 """
 }
 
+  field use_cosign {
+    type:     bool
+    default:  false
+    shortdoc: "Use cosign for attestation and signing"
+    doc: """
+Use cosign for attestation and signing rather than the default of minisign
+"""
+  }
+
   field api_login {
     type:     bool
     default:  true

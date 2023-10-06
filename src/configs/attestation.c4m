@@ -54,7 +54,7 @@ func install_cosign() {
   return false
 }
 
-func load_attestation_binary() {
+func load_cosign_binary() {
   result             := ""
   supplemental_path  := [env("GOPATH") + "/bin", "~/go/bin", "/tmp"]
   attestation_binary := find_exe("cosign", supplemental_path)
@@ -71,3 +71,59 @@ func load_attestation_binary() {
 
   return attestation_binary
 }
+
+func install_minisign() {
+
+  host_os := osname()
+  contents := ""
+  inflate_cmd := ""
+  if host_os == "macosx" or host_os == "darwin" {
+    trace("macosx")
+    install_url  := "https://github.com/jedisct1/minisign/releases/download/0.11/minisign-0.11-macos.zip"
+    inflate_cmd  := "unzip /tmp/minisign.zip -d /tmp/"
+    contents     := url_get(install_url)
+    write_file("/tmp/minisign.zip", contents)
+  }
+  elif host_os == "linux" {
+    trace("linux")
+    install_url  := "https://github.com/jedisct1/minisign/releases/download/0.11/minisign-0.11-linux.tar.gz"
+    inflate_cmd  := "tar -zxf /tmp/minisign.tar.gz -C /tmp/" 
+    contents     := url_get(install_url)
+    write_file("/tmp/minisign.tar.gz", contents)
+  }
+  else {
+    trace("unsupoprtted OS for minisign "+ host_os)
+  }
+
+  trace("Downloaded minisign.")
+  trace(run(inflate_cmd))
+  trace(run("chmod +x /tmp/minisign"))
+
+  minisign_path := find_exe("minisign", ["/tmp"])
+
+  if minisign_path != "" {
+    trace("Successfully installed attestation into: " + minisign_path)
+    return true
+  }
+
+  trace("Unable to install minisign (cannot write to tmp?)")
+  return false
+
+}
+
+func load_minisign_binary() {
+  result             := ""
+
+  attestation_binary := find_exe("minisign", ["/tmp"])
+  if attestation_binary == "" {
+    if install_minisign() {
+      attestation_binary := find_exe("minisign", ["/tmp"])
+      if attestation_binary == "" {
+        error("minisign could not be found!!!")
+        return attestation_binary
+      }
+    }
+  }
+
+  return attestation_binary
+  }

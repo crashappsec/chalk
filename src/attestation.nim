@@ -11,18 +11,20 @@ import api, base64, chalkjson, config, httpclient, net, os, selfextract,
 const
   attestationObfuscator = staticExec(
     "dd status=none if=/dev/random bs=1 count=16 | base64").decode()
-  cosignLoader = "load_attestation_binary() -> string"
+  cosignLoader = "load_cosign_binary() -> string"
+  minisignLoader = "load_minisign_binary() -> string"
   #c4mAttest    = "push_attestation(string, string, string) -> bool"
 
 var
-  cosignTempDir = ""
-  cosignLoc     = ""
-  cosignPw      = ""    # Note this is not encrypted in memory.
-  cosignLoaded  = false
-  signingID     = ""
+  signerTempDir  = ""
+  cosignLoc      = ""
+  minisignLoc    = ""
+  attestationPw       = ""    # Note this is not encrypted in memory.
+  signerLoaded   = false
+  signingID      = ""
 
 template withCosignPassword(code: untyped) =
-  putEnv("COSIGN_PASSWORD", cosignPw)
+  putEnv("COSIGN_PASSWORD", attestationPw)
   trace("Adding COSIGN_PASSWORD to env")
 
   try:
@@ -152,7 +154,7 @@ proc saveToSecretManager*(content: string, prkey: string, apiToken: string): boo
 
   let
     base  = chalkConfig.getSecretManagerUrl()
-    ct    = prp(attestationObfuscator, cosignPw, nonce)
+    ct    = prp(attestationObfuscator, attestationPw, nonce)
 
   if len(base) == 0:
     error("Cannot save secret; no secret manager URL configured.")
@@ -175,7 +177,7 @@ proc saveToSecretManager*(content: string, prkey: string, apiToken: string): boo
 
 proc loadFromSecretManager*(prkey: string, apikey: string): bool =
 
-  if cosignPw != "":
+  if attestationPw != "":
     return true
 
   let base: string = chalkConfig.getSecretManagerUrl()
@@ -195,8 +197,6 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
     hexBits: string
 
   try:
-    #hexBits = response.bodyStream.readAll().strip()
-    #body    = hexBits.parseHexStr()
     hexBits = response.body()
     body    = parseHexStr($hexBits)
 
@@ -213,11 +213,13 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
     nonce = body[0 ..< 16]
     ct    = body[16 .. ^1]
 
-  cosignPw = brb(attestationObfuscator, ct, nonce)
+  attestationPw = brb(attestationObfuscator, ct, nonce)
+
+  trace("attestation pw is " & attestationPw)
 
   return true
 
-proc getCosignLocation*(): string =
+proc getCosignLocation(): string =
   once:
     cosignLoc = unpack[string](runCallback(cosignLoader, @[]).get())
 
@@ -226,23 +228,43 @@ proc getCosignLocation*(): string =
 
   return cosignLoc
 
-proc getCosignTempDir(): string =
+proc getMinisignLocation(): string =
   once:
-    if cosignTempDir == "":
+    minisignLoc = unpack[string](runCallback(minisignLoader, @[]).get())
+
+    if minisignLoc == "":
+      warn("Could not find or install minisign; cannot sign or verify.")
+
+  return minisignLoc
+
+proc getSignerLocation*(): string = 
+
+  # By default minisign is now used as its a much smaller d/l
+  # cosign can still be forced by setting use_cosign in the config
+  let useCosign = chalkConfig.getUseCosign()
+
+  if useCosign:
+    return getCosignLocation()
+  else:
+    return getMinisignLocation()
+
+proc getSignerTempDir(): string =
+  once:
+    if signerTempDir == "":
       let
         extract = getSelfExtraction().get().extract
         priKey  = unpack[string](extract["$CHALK_ENCRYPTED_PRIVATE_KEY"])
         pubKey  = unpack[string](extract["$CHALK_PUBLIC_KEY"])
 
-      cosignTempDir = getNewTempDir()
-      withWorkingDir(cosignTempDir):
+      signerTempDir = getNewTempDir()
+      withWorkingDir(signerTempDir):
         if not (tryToWriteFile("chalk.key", priKey) and
                 tryToWriteFile("chalk.pub", pubKey)):
           error("Cannot write to temporary directory; sign and verify " &
                 "will not work this run.")
-          cosignTempDir = ""
+          signerTempDir = ""
 
-  return cosignTempDir
+  return signerTempDir
 
 proc getKeyFileLoc*(): string =
   let
@@ -267,12 +289,23 @@ proc getKeyFileLoc*(): string =
     error("Directory '" & dir & "' does not exist.")
     return ""
 
-proc generateKeyMaterial*(cosign: string): bool =
-  let keyCmd  = @["generate-key-pair", "--output-key-prefix", "chalk"]
+proc generateKeyMaterial*(signerPath: string): bool =
   var results: ExecOutput
 
-  withCosignPassword:
-    results = runCmdGetEverything(cosign, keyCmd)
+  if chalkConfig.getUseCosign():
+    let keyCmd  = @["generate-key-pair", "--output-key-prefix", "chalk"]
+    withCosignPassword:
+      results = runCmdGetEverything(signerPath, keyCmd)
+  else:
+    # do minisign
+    info("Generating keys with minisign")
+    let keyCmd  = @["-G", "-f", "-p", "chalk.pub", "-s", "chalk.key"]
+    let setPwStr = attestationPw & "\n" & attestationPw
+    results = runCmdGetEverything(signerPath, keyCmd, newStdIn = setPwStr)
+    info($results.getStdOut())
+    info($results.getStdErr())
+
+  trace($attestationPw)
 
   if results.getExit() != 0:
     return false
@@ -286,7 +319,7 @@ proc commitPassword(pri, apiToken: string, gen: bool) =
 
   if storeIt:
     # If the manager doesn't work, then we need to fall back.
-    if not cosignPw.saveToSecretManager(pri, apiToken):
+    if not attestationPw.saveToSecretManager(pri, apiToken):
       error("Could not store password. Either try again later, or " &
         "use the below password with the CHALK_PASSWORD environment " &
         "variable. We attempt to store as long as use_secret_manager is " &
@@ -302,7 +335,7 @@ proc commitPassword(pri, apiToken: string, gen: bool) =
 
   if printIt:
     echo "------------------------------------------"
-    echo "Your password is: ", cosignPw
+    echo "Your password is: ", attestationPw
     echo """------------------------------------------
 
 Write this down. Even if you embedded it in the Chalk binary, you
@@ -315,7 +348,7 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
     prikey = optfile
 
   if existsEnv("CHALK_PASSWORD"):
-    cosignPw = getEnv("CHALK_PASSWORD")
+    attestationPw = getEnv("CHALK_PASSWORD")
     delEnv("CHALK_PASSWORD")
     return true
 
@@ -349,47 +382,155 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
   error("Could not retrieve API token from chalk mark")
   return false
 
-proc testSigningSetup(pubKey, priKey: string): bool =
-  cosignTempDir = getNewTempDir()
+proc cosignFile(): bool =
+  # Sign provided file with cosign
+  return true
 
-  if cosignTempDir == "":
+proc minisignFile(): bool =
+  # Sign provided file with minisign
+  return true
+
+proc signFile*(): bool=
+  return true
+
+template cosignBlob() =
+  # Sign provided datablob with cosign
+  withCosignPassword:
+    let signArgs = @["sign-blob", "--tlog-upload=false", "--yes",
+                  "--key=chalk.key", "-"]
+    signOut  = getCosignLocation().runCmdGetEverything(signArgs, tosign)
+    sig      = signOut.getStdout()
+    # ToDo ensure sig actually contains only the sig
+
+template minisignBlob() =
+  # Sign provided datablob with minisign
+  
+  # get random tempfile
+  var (testFileToSign, testFileToSignPath) = getNewTempFile()
+  if $testFileToSignPath == "":
+    error("Unable to generate a new temporary file object; sign and verify NOT " &
+          "configured.")
+    return ""
+
+  # Write test string to tmp file
+  if not tryToWriteFile($testFileToSignPath, toSign):
+    error("Cannot write testfile to temporary directory; sign and verify NOT " &
+          "configured.")
+    return ""
+  
+  else:
+    # Sign temp file
+    let 
+      signArgs = @["-Sm", $testFileToSignPath, "-s", "chalk.key"]
+    signOut  = getSignerLocation().runCmdGetEverything(signArgs, newStdIn = attestationPw)
+
+    # ToDo check success true / false
+    info(signOut.getStdout())
+
+    # Read sig from file & set as sig, gets return from calling proc
+    sig = tryToLoadFile($testFileToSignPath & ".minisig")
+
+proc signBlob*(toSign: string): string=
+  # top level proc to sign a blob with whicherver signer is configured
+
+  let
+    signerBin = getSignerLocation()
+  var 
+    signOut: ExecOutput
+    sig = ""
+
+  # sign with whichever signer has been configured - cosign or minisign
+  if chalkConfig.getUseCosign():
+    # sign blob with cosign
+    cosignBlob()
+  else:
+    # sign blob with minisign
+    minisignBlob()
+  trace($sig)
+
+  # test for signing success
+  if signOut.getExit() != 0 or sig == "":
+    return ""
+  
+  return sig
+
+template cosignVerifyBlob() =
+  withCosignPassword:
+    let
+      vfyArgs = @["verify-blob", "--key=chalk.pub",
+                  "--insecure-ignore-tlog=true",
+                  "--insecure-ignore-sct=true", ("--signature=" & sig), "-"]
+      vfyOut  = runCmdGetEverything(signerBin, vfyArgs, tosign)
+
+template minisignVerifyBlob() =
+  # write provided signature to verify to .minisig file to then verify
+  
+  # get random tempfile
+  var (sigToVerifyAsFile, sigToVerifyAsFilePath) = getNewTempFile()
+  if $sigToVerifyAsFilePath == "":
+    error("Unable to generate a new temporary file object; sign and verify NOT " &
+          "configured.")
+    return false 
+
+  # write sign string to that temp file
+  if not tryToWriteFile($sigToVerifyAsFilePath, sig):
+    error("Cannot write testfile to temporary directory; sign and verify NOT " &
+          "configured.")
+  
+  let 
+    vfyArgs = @["-Vm", $sigToVerifyAsFilePath, "-p", "chalk.pub"]
+    vfyOut  = runCmdGetEverything(signerBin, vfyArgs)
+  
+proc verifyBlob*(sig, toSign: string): bool=
+
+  let 
+    signerBin   = getSignerLocation()
+  var 
+    vfyOut : ExecOutput
+
+  if chalkConfig.getUseCosign():
+    # verify blob with cosign
+    cosignVerifyBlob()
+  else:
+    # verify blob with minisign
+    minisignVerifyBlob()
+
+  if vfyOut.getExit() != 0:
+    error("Could not validate; public key is invalid.")
     return false
 
-  withWorkingDir(cosignTempDir):
+  return true
+
+proc testSigningSetup(pubKey, priKey: string): bool =
+  signerTempDir = getNewTempDir()
+  if signerTempDir == "":
+    return false
+  
+  withWorkingDir(signerTempDir):
+    # Organise keys in temp dir, check perms
     if not (tryToWriteFile("chalk.key", priKey) and
             tryToWriteFile("chalk.pub", pubKey)):
-        error("Cannot write to temporary directory; sign and verify NOT " &
-              "configured.")
-        return false
+      error("Cannot write to temporary directory; sign and verify NOT " &
+            "configured.")
+      return false
 
-    withCosignPassword:
-      let
-        cosign   = getCosignLocation()
-        toSign   = "Test string for signing"
-        signArgs = @["sign-blob", "--tlog-upload=false", "--yes",
-                     "--key=chalk.key", "-"]
-        signOut  = getCosignLocation().runCmdGetEverything(signArgs, tosign)
-        sig      = signOut.getStdout()
-
-      if signOut.getExit() != 0 or sig == "":
-        error("Could not sign; either password is wrong, or key is invalid.")
-        return false
-
+    # Perform test signing operation
+    let toSign = "Test string for signing"
+    var sig    = signBlob(toSign)
+    if sig == "":
+      error("Could not sign; either password is wrong, or key is invalid.")
+      return false
+    else:
       info("Test sign successful.")
 
-      let
-        vfyArgs = @["verify-blob", "--key=chalk.pub",
-                    "--insecure-ignore-tlog=true",
-                    "--insecure-ignore-sct=true", ("--signature=" & sig), "-"]
-        vfyOut  = runCmdGetEverything(cosign, vfyArgs, tosign)
-
-      if vfyOut.getExit() != 0:
-        error("Could not validate; public key is invalid.")
-        return false
-
+    # Verify the test signature
+    if not verifyBlob(sig, toSign):
+      error("Could not verify; either password is wrong, or key is invalid.")
+      return false
+    else:
       info("Test verify successful.")
-
-      return true
+    
+    return true
 
 proc writeSelfConfig(selfChalk: ChalkObj): bool {.importc, discardable.}
 
@@ -407,7 +548,7 @@ proc saveSigningSetup(pubKey, priKey, apiToken: string, gen: bool): bool =
     # This is old code, but it might make a comeback at some point,
     # so I'm not removing it.
     if chalkConfig.getUseInternalPassword():
-      let pw = pack(encryptPassword(cosignPw))
+      let pw = pack(encryptPassword(attestationPw))
       selfChalk.extract["$CHALK_ATTESTATION_TOKEN"] = pw
     else:
       if "$CHALK_ATTESTATION_TOKEN" in selfChalk.extract:
@@ -452,7 +593,7 @@ proc loadSigningSetup(): bool =
   if "$CHALK_PUBLIC_KEY" notin extract:
     return false
 
-  if cosignPw == "":
+  if attestationPw == "":
     error("Cannot attest; no password is available for the private key. " &
       "Note that the private key *must* be encrypted.")
     return false
@@ -461,17 +602,18 @@ proc loadSigningSetup(): bool =
     priKey = unpack[string](extract["$CHALK_ENCRYPTED_PRIVATE_KEY"])
     pubKey = unpack[string](extract["$CHALK_PUBLIC_KEY"])
 
-  withWorkingDir(getCosignTempDir()):
+  withWorkingDir(getSignerTempDir()):
       if not tryToWriteFile("chalk.key", priKey):
         return false
       if not tryToWriteFile("chalk.pub", pubKey):
         return false
 
-  cosignLoaded = true
-  return cosignLoaded
+  signerLoaded = true
+  return signerLoaded
 
 proc attemptToLoadKeys*(silent=false): bool =
-  if getCosignLocation() == "":
+  #if getCosignLocation() == "":
+  if getSignerLocation() == "":
     return false
 
   let
@@ -505,15 +647,15 @@ proc attemptToLoadKeys*(silent=false): bool =
     return false
 
   acquirePassword(priKey)
-  if cosignPw == "":
-    cosignPw = getPasswordViaTty()
-    if cosignPw == "":
+  if attestationPw == "":
+    attestationPw = getPasswordViaTty()
+    if attestationPw == "":
       return false
 
   if not testSigningSetup(pubKey, priKey):
     return false
 
-  cosignLoaded = true
+  signerLoaded = true
   return true
 
 proc attemptToGenKeys*(): bool =
@@ -527,8 +669,7 @@ proc attemptToGenKeys*(): bool =
     else:
       trace("API Token received: " & apiToken)
 
-
-  if getCosignLocation() == "":
+  if getSignerLocation() == "":
     return false
 
   let
@@ -539,15 +680,21 @@ proc attemptToGenKeys*(): bool =
   if keyOutLoc == "":
     return false
 
-  if cosignTempDir == "":
-    cosignTempDir = getNewTempDir()
+  if signerTempDir == "":
+    signerTempDir = getNewTempDir()
 
-  withWorkingDir(cosignTempDir):
-    cosignPw = randString(16).encode(safe = true)
+  withWorkingDir(signerTempDir):
+    attestationPw = randString(16).encode(safe = true)
 
-    withCosignPassword:
-      if not generateKeyMaterial(getCosignLocation()):
-        return false
+    if chalkConfig.getUseCosign():
+      withCosignPassword:
+        if not generateKeyMaterial(getSignerLocation()):
+          return false
+    else:
+      if not generateKeyMaterial(getSignerLocation()):
+          error("Error generating keys with minisign")
+          return false
+
     let
       pubKey = tryToLoadFile("chalk.pub")
       priKey = tryToLoadFile("chalk.key")
@@ -556,7 +703,7 @@ proc attemptToGenKeys*(): bool =
       return false
 
     copyGeneratedKeys(pubKey, priKey, keyOutLoc)
-    cosignLoaded = true
+    signerLoaded = true
 
     if use_api:
       result = saveSigningSetup(pubKey, priKey, apiToken, true)
@@ -564,9 +711,9 @@ proc attemptToGenKeys*(): bool =
       result = saveSigningSetup(pubKey, priKey, "", true)
 
 proc canAttest*(): bool =
-  if getCosignLocation() == "":
+  if getSignerLocation() == "":
     return false
-  return cosignLoaded
+  return signerLoaded
 
 proc checkSetupStatus*() =
   # This should really only be called from chalk.nim.
@@ -592,7 +739,7 @@ proc checkSetupStatus*() =
       # Don't auto-load when compiling.
       return
 
-    if cosignPw != "":
+    if attestationPw != "":
       warn("Found CHALK_PASSWORD; looking for code signing keys.")
       if not attemptToLoadKeys(silent=true):
         warn("Could not load code signing keys. Run `chalk setup` to generate")
@@ -642,13 +789,6 @@ proc writeInToto(info:      DockerInvocation,
   f.write(toto)
   f.close()
 
-  #let
-  #  args = @[pack(path), pack(digestStr), pack(cosign)]
-  #  box  = runCallback(c4mAttest, args).get()
-
-  #info("c4mpush called with args = " & $(args))
-  #result  = unpack[bool](box)
-
   let
     log  = $(chalkConfig.getUseTransparencyLog())
     args = @["attest", ("--tlog-upload=" & log), "--yes", "--key",
@@ -675,11 +815,15 @@ proc callC4mPushAttestation*(info: DockerInvocation, mark: string): bool =
   trace("Writing chalk mark via in toto attestation for image id " &
     chalk.imageId & " with sha256 hash of " & chalk.repoHash)
 
-  withWorkingDir(getCosignTempDir()):
-    withCosignPassword:
-      result = info.writeInToto(chalk.repo,
-                                chalk.repo & "@sha256:" & chalk.repoHash,
-                                mark, getCosignLocation())
+  withWorkingDir(getSignerTempDir()):
+    if chalkConfig.getUseCosign():
+      withCosignPassword:
+        result = info.writeInToto(chalk.repo,
+                                  chalk.repo & "@sha256:" & chalk.repoHash,
+                                  mark, getSignerLocation())
+    else:
+      info("Unsupported operation with minisign, please enable use of cosign via setting 'use_cosign=true' in your chalk config")
+      result = false
   if result:
     chalk.signed = true
 
@@ -716,7 +860,7 @@ proc coreVerify(pk: string, chalk: ChalkObj): bool =
                  "--insecure-ignore-tlog=" & $(noTlog), "--type", "custom",
                  chalk.repo & "@sha256:" & chalk.repoHash]
     let
-      allOut = runCmdGetEverything(getCosignLocation(), args)
+      allOut = runCmdGetEverything(getSignerLocation(), args)
       res    = allout.getStdout()
       code   = allout.getExit()
 
@@ -772,7 +916,7 @@ proc extractAttestationMark*(chalk: ChalkObj): ChalkDict =
   let
     refStr = chalk.repo & "@sha256:" & chalk.repoHash
     args   = @["download", "attestation", refStr]
-    cosign = getCosignLocation()
+    cosign = getSignerLocation()
 
   trace("Attempting to download attestation via: cosign " & args.join(" "))
 
@@ -808,7 +952,7 @@ proc extractAndValidateSignature*(chalk: ChalkObj) {.exportc,cdecl.} =
   if not chalk.signed:
     info(chalk.name & ": Not signed.")
 
-  withWorkingDir(getCosignTempDir()):
+  withWorkingDir(getSignerTempDir()):
     if getCommandName() in ["build", "push"]:
       chalk.extractSigAndValidateAfterInsert()
     else:
@@ -843,29 +987,23 @@ proc signNonContainer*(chalk: ChalkObj, unchalkedMD, metadataMD : string):
                      string =
   let
     log    = $(chalkConfig.getUseTransparencyLog())
-    args   = @["sign-blob", ("--tlog-upload=" & log), "--yes", "--key",
-               "chalk.key", "-"]
     blob   = unchalkedMD & metadataMD
 
   trace("signing blob: " & blob )
-  withWorkingDir(getCosignTempDir()):
-    withCosignPassword:
-      let allOutput = getCosignLocation().runCmdGetEverything(args, blob & "\n")
-
-      result = allOutput.getStdout().strip()
-
-      if result == "":
-        error(chalk.name & ": Signing failed. Cosign error: " &
-          allOutput.getStderr())
+  withWorkingDir(getSignerTempDir()):
+    var sig = signBlob(blob)
+    if sig == "":
+      error("Could not sign NonContainer ; either password is wrong, or key is invalid.")
+      return ""
+    else:
+      info("NonContainer sign successful.")
+      return sig
 
 proc cosignNonContainerVerify*(chalk: ChalkObj,
                                artHash, mdHash, sig, pk: string):
                              ValidateResult =
   let
     log    = $(not chalkConfig.getUseTransparencyLog())
-    args   = @["verify-blob", ("--insecure-ignore-tlog=" & log),
-               "--key=chalk.pub", ("--signature=" & sig),
-               "--insecure-ignore-sct=true", "-"]
     blob   = artHash & mdHash
 
   trace("blob = >>" & blob & "<<")
@@ -874,13 +1012,10 @@ proc cosignNonContainerVerify*(chalk: ChalkObj,
       error(chalk.name & ": cannot validate; could not write to tmp file.")
       return vNoCosign
 
-    withCosignPassword:
-      let allOutput = getCosignLocation().runCmdGetEverything(args, blob & "\n")
-
-      if allOutput.getExit() == 0:
-        info(chalk.name & ": Signature successfully validated.")
-        return vSignedOk
-      else:
-        info(chalk.name & ": Signature failed. Cosign reported: " &
-          allOutput.getStderr())
-        return vBadSig
+    # Verify the test signature
+    if not verifyBlob(sig, blob):
+      error("Could not NonContainer verify; either password is wrong, or key is invalid.")
+      return vBadSig
+    else:
+      info("NonContainer verify successful.")
+      return vSignedOk

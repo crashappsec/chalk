@@ -74,7 +74,7 @@ proc validateMetadata*(obj: ChalkObj): ValidateResult {.cdecl, exportc.} =
     error(obj.name & ": Bad chalk mark; signed, but missing INJECTOR_PUBLIC_KEY")
     return vNoPk
 
-  if getCosignLocation() == "":
+  if getSignerLocation() == "":
     warn(obj.name & ": Signed but cannot validate; run `chalk setup` to fix")
     return vNoCosign
 
