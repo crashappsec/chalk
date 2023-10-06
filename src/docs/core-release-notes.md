@@ -11,6 +11,9 @@
   entrypoint in that image
   (`docker.wrap_entrypoint = true` in chalk config).
   [34](https://github.com/crashappsec/chalk/pull/34)
+- Segfault when running chalk operation (e.g. `insert`) in empty
+  git repo without any commits.
+  [39](https://github.com/crashappsec/chalk/pull/39)
 
 ## Known Issues
 

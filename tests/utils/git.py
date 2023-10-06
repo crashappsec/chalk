@@ -22,10 +22,20 @@ def get_latest_commit(gitdir: Path) -> Optional[str]:
             return None
 
 
-def init(path: Path):
+def init(
+    path: Path,
+    *,
+    first_commit: bool = True,
+    add: bool = True,
+    remote: Optional[str] = None
+):
     run(["git", "init"], cwd=path)
     run(["git", "branch", "-m", "main"], cwd=path)
     run(["git", "config", "user.name", "test"], cwd=path)
     run(["git", "config", "user.email", "test@test.com"], cwd=path)
-    run(["git", "add", "."], cwd=path)
-    run(["git", "commit", "--allow-empty", "-m", "dummy"], cwd=path)
+    if remote:
+        run(["git", "remote", "add", "origin", remote], cwd=path)
+    if add or first_commit:
+        run(["git", "add", "."], cwd=path)
+    if first_commit:
+        run(["git", "commit", "--allow-empty", "-m", "dummy"], cwd=path)

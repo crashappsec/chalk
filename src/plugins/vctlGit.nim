@@ -19,7 +19,7 @@ const
   ghUrl        = "url"
   ghOrigin     = "origin"
   ghLocal      = "local"
-  eBadGitConf  = "Github configuration file is invalid"
+  eBadGitConf  = "Git configuration file is invalid"
 
 type
   KVPair*  = (string, string)
@@ -219,7 +219,7 @@ proc loadHead(info: RepoInfo) =
     except:
       discard
   except:
-    error(fNameHead & ": github HEAD file couldn't be read")
+    error(fNameHead & ": Git HEAD file couldn't be read")
     dumpExOnDebug()
     return
 
@@ -235,16 +235,21 @@ proc loadHead(info: RepoInfo) =
               fname.split("/")
 
   if parts.len() < 3:
-    error(fNameHead & ": github HEAD file couldn't be loaded")
+    error(fNameHead & ": Git HEAD file couldn't be loaded")
     return
 
   info.branch   = parts[2 .. ^1].join($DirSep)
-  var reffile   = newFileStream(info.vcsDir.joinPath(fname))
-  info.commitId = reffile.readAll().strip()
-  reffile.close()
-
   trace("branch: " & info.branch)
-  trace("commit ID: " & info.commitID)
+
+  let
+    fNameRef = info.vcsDir.joinPath(fname)
+    reffile   = newFileStream(fNameRef)
+  if reffile != nil:
+    info.commitId = reffile.readAll().strip()
+    reffile.close()
+    trace("commit ID: " & info.commitID)
+  else:
+    warn(fNameRef & ": Git ref file for branch '" & info.branch & "' doesnt exist. Most likely its an empty git repo.")
 
 proc calcOrigin(self: RepoInfo, conf: seq[SecInfo]): string =
   # We are generally looking for the remote origin, because we expect
@@ -316,7 +321,7 @@ proc findAndLoad(plugin: GitInfo, path: string) =
       let config = f.parseGitConfig()
       info.origin = info.calcOrigin(config)
   except:
-    error(confFileName & ": Github configuration file not parsed.")
+    error(confFileName & ": Git configuration file not parsed.")
     dumpExOnDebug()
 
   if info.commitId == "":
