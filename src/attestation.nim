@@ -298,14 +298,14 @@ proc generateKeyMaterial*(signerPath: string): bool =
       results = runCmdGetEverything(signerPath, keyCmd)
   else:
     # do minisign
-    info("Generating keys with minisign")
+    info("Generating keys with minisign...")
     let keyCmd  = @["-G", "-f", "-p", "chalk.pub", "-s", "chalk.key"]
     let setPwStr = attestationPw & "\n" & attestationPw
     results = runCmdGetEverything(signerPath, keyCmd, newStdIn = setPwStr)
-    info($results.getStdOut())
-    info($results.getStdErr())
+    trace($results.getStdOut())
+    trace($results.getStdErr())
 
-  trace($attestationPw)
+  trace("Password used to protect key: " & $attestationPw)
 
   if results.getExit() != 0:
     return false
@@ -382,16 +382,45 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
   error("Could not retrieve API token from chalk mark")
   return false
 
-proc cosignFile(): bool =
-  # Sign provided file with cosign
-  return true
+template cosignFile() =
+  # ToDo - Sign provided file with cosign
+  sig = ""
 
-proc minisignFile(): bool =
+template minisignFile(filePathToSign) =
   # Sign provided file with minisign
-  return true
+  
+  let 
+    signArgs = @["-Sm", filePathToSign, "-s", "chalk.key"]
+  signOut  = signerBin.runCmdGetEverything(signArgs, newStdIn = attestationPw)
 
-proc signFile*(): bool=
-  return true
+  trace(signOut.getStdout())
+
+  # Read sig from file & set as sig, gets return from calling proc
+  sig = tryToLoadFile($filePathToSign & ".minisig")
+
+proc signFile*(pathToSign: string): string=
+    # top level proc to sign a blob with whicherver signer is configured
+
+  let
+    signerBin = getSignerLocation()
+    filePathToSign = pathToSign
+  var 
+    signOut: ExecOutput
+    sig = ""
+
+  # sign with whichever signer has been configured - cosign or minisign
+  if chalkConfig.getUseCosign():
+    # sign blob with cosign
+    cosignFile()
+  else:
+    # sign blob with minisign
+    minisignFile($filePathToSign)
+
+  # test for signing success
+  if signOut.getExit() != 0 or sig == "":
+    return ""
+  
+  return sig
 
 template cosignBlob() =
   # Sign provided datablob with cosign
@@ -406,29 +435,19 @@ template minisignBlob() =
   # Sign provided datablob with minisign
   
   # get random tempfile
-  var (testFileToSign, testFileToSignPath) = getNewTempFile()
-  if $testFileToSignPath == "":
+  var (testFileToSign, filePathToSign) = getNewTempFile()
+  if $filePathToSign == "":
     error("Unable to generate a new temporary file object; sign and verify NOT " &
           "configured.")
-    return ""
-
+  
   # Write test string to tmp file
-  if not tryToWriteFile($testFileToSignPath, toSign):
+  elif not tryToWriteFile($filePathToSign, toSign):
     error("Cannot write testfile to temporary directory; sign and verify NOT " &
           "configured.")
-    return ""
-  
+
   else:
     # Sign temp file
-    let 
-      signArgs = @["-Sm", $testFileToSignPath, "-s", "chalk.key"]
-    signOut  = getSignerLocation().runCmdGetEverything(signArgs, newStdIn = attestationPw)
-
-    # ToDo check success true / false
-    info(signOut.getStdout())
-
-    # Read sig from file & set as sig, gets return from calling proc
-    sig = tryToLoadFile($testFileToSignPath & ".minisig")
+    minisignFile($filePathToSign)
 
 proc signBlob*(toSign: string): string=
   # top level proc to sign a blob with whicherver signer is configured

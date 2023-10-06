@@ -80,16 +80,18 @@ func install_minisign() {
   if host_os == "macosx" or host_os == "darwin" {
     trace("macosx")
     install_url  := "https://github.com/jedisct1/minisign/releases/download/0.11/minisign-0.11-macos.zip"
-    inflate_cmd  := "unzip /tmp/minisign.zip -d /tmp/"
     contents     := url_get(install_url)
-    write_file("/tmp/minisign.zip", contents)
+    tmp_fn := to_tmp_file(contents, ".zip")
+    trace("writing minisign zip to " + tmp_fn)
+    inflate_cmd  := "unzip " + tmp_fn + " -d /tmp/"
   }
   elif host_os == "linux" {
     trace("linux")
     install_url  := "https://github.com/jedisct1/minisign/releases/download/0.11/minisign-0.11-linux.tar.gz"
-    inflate_cmd  := "tar -zxf /tmp/minisign.tar.gz -C /tmp/" 
     contents     := url_get(install_url)
-    write_file("/tmp/minisign.tar.gz", contents)
+    tmp_fn := to_tmp_file(contents, ".tar.gz")
+    trace("writing minisign tar.gz to " + tmp_fn)
+    inflate_cmd  := "tar -zxf " + tmp_fn + " -C /tmp/"
   }
   else {
     trace("unsupoprtted OS for minisign "+ host_os)
