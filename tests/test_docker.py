@@ -22,7 +22,6 @@ from .chalk.validate import (
 from .conf import CONFIGS, DOCKERFILES, REGISTRY
 from .utils.docker import Docker
 from .utils.log import get_logger
-from .utils.os import run
 
 
 logger = get_logger()
@@ -322,6 +321,7 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
     assert TEST_LABEL in labels.values()
 
 
+@pytest.mark.parametrize("push", [True, False])
 @pytest.mark.parametrize(
     "test_file",
     [
@@ -332,19 +332,25 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
     platform.system() == "Darwin",
     reason="Skipping local docker push on mac due to issues https://github.com/docker/for-mac/issues/6704",
 )
-def test_build_and_push(chalk: Chalk, test_file: str):
-    tag_base = f"{REGISTRY}/{test_file}"
+def test_build_and_push(chalk: Chalk, test_file: str, random_hex: str, push: bool):
+    tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
     tag = f"{tag_base}:latest"
 
-    current_hash_build, _ = chalk.docker_build(
+    current_hash_build, push_result = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
+        push=push,
     )
 
-    # push docker wrapped
-    push = chalk.docker_push(tag)
-    current_hash_push = push.mark["_CURRENT_HASH"]
-    repo_digest_push = push.mark["_REPO_DIGESTS"][tag_base]
+    # if without --push at build time, explicitly push to registry
+    if not push:
+        push_result = chalk.docker_push(tag)
+
+    current_hash_push = push_result.mark["_CURRENT_HASH"]
+    repo_digest_push = push_result.mark["_REPO_DIGESTS"][tag_base]
+    assert "CHALK_ID" in push_result.mark
+    # primary key needed to associate build+push
+    assert "METADATA_ID" in push_result.mark
 
     assert current_hash_build == current_hash_push
 
