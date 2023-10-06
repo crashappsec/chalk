@@ -36,7 +36,9 @@ proc setDockerExeLocation*() =
       exeOpt   = chalkConfig.getDockerExe()
 
     if exeOpt.isSome():
-      userPath.add(exeOpt.get())
+      # prepend on purpose so that docker_exe config
+      # takes precedence over rest of dirs in PATH
+      userPath = @[exeOpt.get()] & userPath
 
     dockerPathOpt     = findExePath("docker", userPath, ignoreChalkExes = true)
     dockerExeLocation = dockerPathOpt.get("")
