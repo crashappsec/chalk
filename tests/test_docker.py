@@ -118,47 +118,28 @@ def test_composite_build(
     buildkit: bool,
     random_hex: str,
 ):
-    expected_success = False
-    # if the buildx version is not 0, and docker version is greater than 20
-    #  we expect the docker wrapping with chalk copying to work
-    # otherwise, we expect it to fail
-    buildx_version = 0
-    buildx_version_proc = run(["docker", "buildx", "version"])
-    if buildx_version_proc.returncode == 0:
-        buildx_version = (buildx_version_proc.stdout.decode()).split()[1]
-        buildx_version = buildx_version.strip("v")
-
-    docker_version = 0
-    docker_version_proc = run(["docker", "version"])
-    if docker_version_proc.returncode == 0:
-        _stdout = docker_version_proc.stdout.decode().splitlines()
-        for line in _stdout:
-            if "Version" in line:
-                docker_version = line.split()[1]
-                break
-
-    if buildx_version != 0 and int(docker_version.split(".")[0]) > 20:
-        expected_success = True
-
-    # return
-    image_id, _ = chalk.docker_build(
+    image_id, _ = Docker.build(
         dockerfile=base,
         buildkit=buildkit,
         tag=random_hex,
     )
     assert image_id
 
+    # TODO this is a known limitation for the moment
     # we EXPECT this case to fail without buildkit enabled,
-    # as we cannot detect USER from base image
-    second_image_id, _ = chalk.docker_build(
+    # as base image adjusts USER and child Dockerfile
+    # does not have any indication that USER was adjusted
+    # and so we cannot detect USER from base image.
+    # In this case chalk falls back to standard docker build
+    # which means there is no chalk report in the output
+    second_image_id, result = chalk.docker_build(
         dockerfile=test,
         buildkit=buildkit,
         args={"BASE": random_hex},
         config=CONFIGS / "docker_wrap.conf",
-        expected_success=expected_success,
+        expecting_report=buildkit,
     )
-    if expected_success:
-        assert second_image_id
+    assert second_image_id
 
 
 @mock.patch.dict(os.environ, {"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"})

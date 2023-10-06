@@ -345,6 +345,7 @@ class Chalk:
         tag: Optional[str] = None,
         context: Optional[Path] = None,
         expected_success: bool = True,
+        expecting_report: bool = True,
         virtual: bool = False,
         cwd: Optional[Path] = None,
         args: Optional[dict[str, str]] = None,
@@ -387,11 +388,18 @@ class Chalk:
         dockerfile = dockerfile or (
             (cwd or context or Path(os.getcwd())) / "Dockerfile"
         )
-        if expected_success:
+        if expecting_report and expected_success:
             # sanity check that chalk mark includes basic chalk keys
             assert image_hash == result.mark["_CURRENT_HASH"]
             assert image_hash == result.mark["_IMAGE_ID"]
             assert str(dockerfile) == result.mark["DOCKERFILE_PATH"]
+        elif not expecting_report:
+            try:
+                assert not result.reports
+            except json.JSONDecodeError:
+                # we are not expecting any report json to be present in output
+                # so this exception is expected here
+                pass
         return image_hash, result
 
     def docker_push(self, image: str):

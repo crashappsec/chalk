@@ -157,11 +157,14 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
 
         if chmod and getDockerVersion().startswith("2") and
            getBuildXVersion() > 0:
-          ctx.addedInstructions.add("COPY --chmod=0755" & file & " " & " /" &
+          ctx.addedInstructions.add("COPY --chmod=0755 " & file & " " & " /" &
             newname)
         elif chmod:
           let useDirective = ctx.dfSections[^1].lastUser
 
+          # TODO detect user from base image if possible but thats not
+          # trivial as what is a base image is not a trivial question
+          # due to multi-stage build possibilities...
           if useDirective != nil:
             ctx.addedInstructions.add("USER root")
           ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
