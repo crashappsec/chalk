@@ -37,9 +37,7 @@ proc runCmdSetup*(gen, load: bool) =
     if attemptToLoadKeys(silent=gen):
       doReporting()
       return
-    let
-      base = getKeyFileLoc()
-
+    let base = getKeyFileLoc()
 
     if not gen:
       error("Failed to load signing keys. Aborting.")
