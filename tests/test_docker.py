@@ -284,6 +284,7 @@ def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
     chalk_copy.docker_build(
         dockerfile=DOCKERFILES / "valid" / "sleep" / "Dockerfile",
         tag=tag,
+        log_level="trace",
     )
 
     _, result = Docker.run(
