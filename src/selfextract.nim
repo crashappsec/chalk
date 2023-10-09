@@ -7,7 +7,7 @@
 
 ## Code specific to reading and writing Chalk's own chalk mark.
 
-import config, httpclient, plugin_api, posix, collect, con4mfuncs, chalkjson, util, uri, nimutils/sinks
+import config, plugin_api, posix, collect, con4mfuncs, chalkjson, util
 
 proc handleSelfChalkWarnings*() =
   if not canSelfInject:
@@ -17,6 +17,11 @@ proc handleSelfChalkWarnings*() =
         warn("No existing self-chalk mark found.")
     elif "CHALK_ID" notin selfChalk.extract:
         error("Self-chalk mark found, but is invalid.")
+
+template cantLoad*(s: string) =
+  error(s)
+  quit(1)
+
 
 proc getSelfExtraction*(): Option[ChalkObj] =
   # If we call twice and we're on a platform where we don't
@@ -70,25 +75,34 @@ proc getSelfExtraction*(): Option[ChalkObj] =
   else:
     result = none(ChalkObj)
 
-template selfChalkGetKey*(keyName: string): Option[Box] =
+proc selfChalkGetKey*(keyName: string): Option[Box] =
   if selfChalk == nil or selfChalk.extract == nil or
      keyName notin selfChalk.extract:
-    none(Box)
+    return none(Box)
   else:
-    some(selfChalk.extract[keyName])
+    return some(selfChalk.extract[keyName])
+
+proc selfChalkSetKey*(keyName: string, val: Box) =
+  if selfChalk.extract != nil:
+    # Overwrite what we extracted, as it'll get "preserved" when
+    # writing out the chalk file.
+    selfChalk.extract[keyName] = val
+  else:
+    selfChalk.collectedData[keyName] = val
+
+proc selfChalkDelKey*(keyName: string) =
+  if selfChalk.extract != nil and keyName in selfChalk.extract:
+     selfChalk.extract.del(keyName)
+  if keyName in selfChalk.collectedData:
+    selfChalk.collectedData.del(keyName)
 
 # The rest of this is specific to writing the self-config.
-template cantLoad*(s: string) =
-  error(s)
-  quit(1)
 
 proc newConfFileError(err, tb: string): bool =
   if chalkConfig != nil and chalkConfig.getChalkDebug():
-    error(err & "\n" & tb)
+    cantLoad(err & "\n" & tb)
   else:
-    error(err)
-
-  quit(1)
+    cantLoad(err)
 
 proc makeExecutable(f: File) =
   ## Todo: this can move to nimutils actually.
@@ -108,7 +122,7 @@ proc makeExecutable(f: File) =
 
 proc writeSelfConfig*(selfChalk: ChalkObj): bool
     {.cdecl, exportc, discardable.} =
-  selfChalk.persistInternalValues()
+  selfChalk.persistInternalValues()   # Found in run_management.nim
   collectChalkTimeHostInfo()
 
   let lastCount = if "$CHALK_LOAD_COUNT" notin selfChalk.collectedData:
@@ -155,47 +169,9 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
   selfChalk.makeNewValuesAvailable()
   return true
 
-template loadConfigFile*(filename: string) =
-  let f = newFileStream(resolvePath(filename))
-  if f == nil:
-    cantLoad(filename & ": could not open configuration file")
-  loadConfigStream(filename, f)
-
-template loadConfigUrl*(url: string) =
-  let uri = parseUri(url)
-  var stream: Stream
-  try:
-    let
-      client   = newHttpClient(timeout = 5000) # 5 seconds
-      response = client.safeRequest(uri)
-    stream = response.bodyStream
-
-  except:
-    dumpExOnDebug()
-    cantLoad(url & ": could not request configuration")
-
-  loadConfigStream(url, stream)
-
-template loadConfigStream*(name: string, stream: Stream) =
-  try:
-    newCon4m = stream.readAll()
-    if selfChalk.extract != nil:
-      # Overwrite what we extracted, as it'll get "preserved" when
-      # writing out the chalk file.
-      selfChalk.extract["$CHALK_CONFIG"] = pack(newCon4m)
-    else:
-      selfChalk.collectedData["$CHALK_CONFIG"] = pack(newCon4m)
-
-  except:
-    dumpExOnDebug()
-    cantLoad(name & ": could not read configuration")
-
-  finally:
-    stream.close()
-
-template testConfigFile*(filename: string, newCon4m: string) =
-  info(filename & ": Validating configuration.")
-  if chalkConfig.getValidationWarning():
+proc testConfigFile*(uri: string, newCon4m: string) =
+  info(uri & ": Validating configuration.")
+  if chalkConfig.loadConfig.getValidationWarning():
     warn("Note: validation involves creating a new configuration context"  &
          " and evaluating your code to make sure it at least evaluates "   &
          "fine on a default path.  subscribe() and unsubscribe() will "    &
@@ -214,17 +190,107 @@ template testConfigFile*(filename: string, newCon4m: string) =
                addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
                addConfLoad(baseConfName, toStream(baseConfig)).
                setErrorHandler(newConfFileError).
-               addConfLoad(ioConfName,   toStream(ioConfig))
+               addConfLoad(ioConfName,   toStream(ioConfig)).
+               addConfLoad(attestConfName, toStream(attestConfig)).
+               addConfLoad(sbomConfName, toStream(sbomConfig)).
+               addConfLoad(sastConfName, toStream(sastConfig))
   try:
     # Test Run will cause (un)subscribe() to ignore subscriptions, and
     # will suppress log messages, etc.
     stack.run()
     startTestRun()
-    stack.addConfLoad(filename, toStream(newCon4m)).run()
+    stack.addConfLoad(uri, toStream(newCon4m)).run()
     endTestRun()
     if stack.errored:
       quit(1)
+    info(uri & ": Configuration successfully validated.")
   except:
     dumpExOnDebug()
-    error(getCurrentExceptionMsg() & "\n")
-    quit(1)
+    cantLoad(getCurrentExceptionMsg() & "\n")
+
+proc handleConfigLoad*(path: string) =
+  assert selfChalk != nil
+
+  let
+    runtime          = getChalkRuntime()
+    alreadyCached    = haveComponentFromUrl(runtime, path).isSome()
+    (uri, module, _) = path.fullUrlToParts()
+    curConfOpt       = selfChalkGetKey("$CHALK_CONFIG")
+
+  var
+    component: ComponentInfo
+    replace:   bool
+
+  try:
+    component  = runtime.loadComponentFromUrl(path)
+    replace    = chalkConfig.loadConfig.getReplaceConf()
+
+
+  except:
+    dumpExOnDebug()
+    cantLoad(getCurrentExceptionMsg() & "\n")
+
+  var
+    toConfigure = component.getUsedComponents(paramOnly = true)
+    newEmbedded: string
+
+  if replace or curConfOpt.isNone():
+    newEmbedded = defaultConfig
+  else:
+    newEmbedded = unpack[string](curConfOpt.get())
+
+    if not alreadyCached:
+      if not newEmbedded.endswith("\n"):
+        newEmbedded.add("\n")
+
+      newEmbedded.add("use " & module & " from " & uri & "\n")
+
+  if len(toConfigure) == 0:
+    info("Attempting to replace base configuration from: " & path)
+  else:
+    info("Attempting to load configuration module from: " & path)
+    runtime.basicConfigureParameters(component, toConfigure)
+
+  # While loadConfig() above did do a bunch of checking, it doesn't
+  # fully check; there could be runtime errors due to value
+  # incompatability.
+  #
+  # Therefore, we create a new context to run the new configuration in.
+
+  if replace or alreadyCached == false:
+    # If we just reconfigured a component, then we don't bother testing.
+    if chalkConfig.loadConfig.getValidateConfigsOnLoad():
+      testConfigFile(path, newEmbedded)
+    else:
+      warn("Skipping configuration validation. This could break chalk.")
+
+    selfChalkSetKey("$CHALK_CONFIG", pack(newEmbedded))
+
+  # Now, load the code cache.
+  var cachedCode = OrderedTableRef[string, string]()
+
+  for name, component in runtime.components:
+    if component.source != "":
+      cachedCode[name] = component.source
+
+  # Load any saved parameters.
+  var params: seq[Box]
+
+  for component in runtime.programRoot.getUsedComponents(paramOnly = true):
+    for _, v in component.varParams:
+      let tup = (false, component.url, v.name, v.defaultType, v.value.get())
+      params.add(pack(tup))
+
+    for _, v in component.attrParams:
+      let tup = (true, component.url, v.name, v.defaultType, v.value.get())
+      params.add(pack(tup))
+
+  if cachedCode.len() > 0:
+    selfChalkSetKey("$CHALK_COMPONENT_CACHE", pack(cachedCode))
+  else:
+    selfChalkDelKey("$CHALK_COMPONENT_CACHE")
+
+  if params.len() > 0:
+    selfChalkSetKey("$CHALK_SAVED_COMPONENT_PARAMETERS", pack(params))
+  else:
+    selfChalkDelKey("$CHALK_SAVED_COMPONENT_PARAMETERS")

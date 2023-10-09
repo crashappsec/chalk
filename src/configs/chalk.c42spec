@@ -1259,7 +1259,7 @@ will run it again without itself in the way. Such cases are the only
 times in the default configuration where error messages are logged to
 the console (when running `chalk docker`).
 """
-  allow getopts { }
+  allow getopts 
 
   field wrap_entrypoint {
     type:    bool
@@ -1411,6 +1411,59 @@ will add something to the dockerfile like:
 ```
 ENV ARTIFACT_IDENTIFIER="X6VRPZ-C828-KDNS-QDXRT0"
 ```
+"""
+  }
+}
+
+singleton load {
+  gen_fieldname: "loadConfig"
+  gen_typename:  "LoadConfig"
+  gen_setters:   false
+  user_def_ok:   false
+  doc: """
+Options that control how the `chalk load` command works.
+"""
+
+  field replace_conf {
+    type:     bool
+    default:  false
+    shortdoc: "Replace on load"
+    doc: """
+    
+When this value is true, the entire stored configuration file will be
+REPLACED with the specified configuration, as long as that
+configuration loads successfully.
+
+Otherwise, the passed configuration is treated like a component:
+
+1. If you are not using the component in your embbeded configuration
+   already, it will be added to your config, and if it requires any
+   parameters, you will be prompted to configure them.
+
+2. If you are already using it, it will be updated, and you will be
+   prompted to reconfigure any items necessary for the component.
+
+This flag is ignored when running `chalk load default`, which will
+_always_ reset the embedded configuration to the default.
+
+"""    
+  }
+
+  field validate_configs_on_load {
+    type:        bool
+    default:     true
+    hidden:      true
+    doc:         """
+Suppress validation of configuration files on loading.  Please don't do this!
+"""
+  }
+
+  field validation_warning {
+    type:        bool
+    default:     true
+    shortdoc: "Show 'chalk load' validation warning"
+    doc:         """
+Show the (admittedly verbose) warning you get when running 'chalk load'.
 """
   }
 }
@@ -1959,7 +2012,7 @@ singleton aws {
   shortdoc: """
 Configuration information for the AWS Cloud Provider
 """
-  allow ec2 { }
+  allow ec2 
 }
 
 root {
@@ -1974,21 +2027,22 @@ root {
   gen_setters:  false
   user_def_ok:  false
 
-  allow keyspec         { }
-  allow plugin          { }
-  allow sink            { }
-  allow sink_config     { }
-  allow mark_template   { }
-  allow report_template { }
-  allow outconf         { }
-  allow custom_report   { }
-  allow tool            { }
-  allow extract         { }
-  allow docker          { }
-  allow exec            { }
-  allow env_config      { }
-  allow source_marks    { }
-  allow aws             { }
+  allow keyspec         
+  allow plugin          
+  allow sink            
+  allow sink_config     
+  allow mark_template   
+  allow report_template 
+  allow outconf         
+  allow custom_report   
+  allow tool            
+  allow extract         
+  allow docker          
+  allow exec
+  allow load
+  allow env_config      
+  allow source_marks    
+  allow aws             
 
   shortdoc: "Chalk Configuration Options"
   
@@ -2645,24 +2699,6 @@ if env_exists("AWS_IAM_ROLE") {
 }
 ```
 """    
-  }
-
-  field validate_configs_on_load {
-    type:        bool
-    default:     true
-    hidden:      true
-    doc:         """
-Suppress validation of configuration files on loading.  Please don't do this!
-"""
-  }
-
-  field validation_warning {
-    type:        bool
-    default:     true
-    shortdoc: "Show 'chalk load' validation warning"
-    doc:         """
-Show the (admittedly verbose) warning you get when running 'chalk load'.
-"""
   }
 
 # Leaving this; I might add it back in someday.
