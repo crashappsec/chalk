@@ -352,6 +352,7 @@ class Chalk:
         push: bool = False,
         config: Optional[Path] = None,
         buildkit: bool = True,
+        log_level: ChalkLogLevel = "none",
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
         context = context or getattr(dockerfile, "parent", cwd)
@@ -372,7 +373,7 @@ class Chalk:
             self.run(
                 # TODO remove log level but there are error bugs due to --debug
                 # which fail the command validation
-                log_level="none",
+                log_level=log_level,
                 debug=True,
                 virtual=virtual,
                 config=config,
