@@ -202,26 +202,12 @@ proc getDefaultPlatformInfo(ctx: DockerInvocation): string =
     return ctx.foundPlatform
 
   let
-    probeFile    = """
+    probeFile      = """
 FROM alpine
 ARG TARGETPLATFORM
 RUN echo "CHALK_TARGET_PLATFORM=$TARGETPLATFORM"
 """
-    randomBinary = secureRand[array[16, char]]()
-  var
-    binStr       = newStringOfCap(16)
-
-  for ch in randomBinary:
-    binStr.add(ch)
-
-  # Base64 gives a mix of upper and lower, but docker only accepts
-  # lower in tags. So we lose some entropy, which is why we use a
-  # pretty long tag to make sure we're way above an accidental
-  # collision boundary.
-
-  let
-    preTag         = binStr.encode(safe=true).replace("-", ".").replace("=","")
-    tmpTag         = "chalk_" & preTag.toLowerAscii() & "_probe"
+    tmpTag         = chooseNewTag()
     buildKitKey    = "DOCKER_BUILDKIT"
     buildKitKeySet = existsEnv(buildKitKey)
   var buildKitValue: string
