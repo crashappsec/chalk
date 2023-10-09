@@ -248,7 +248,7 @@ at [http://localhost:8585/docs](http://localhost:8585/docs)
 
 ## Warning
 
-This how-to was written for local demonstration purposes only.There is no security for this how-to. You should always have authn, authz and uses SSL as an absolute minimum.
+This how-to was written for local demonstration purposes only. There is no security for this how-to. You should always have authentication, authorization and use TLS/SSL as an absolute minimum.
 
 ## Our cloud platform
 

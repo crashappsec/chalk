@@ -243,7 +243,7 @@ in those environments often take advantage of access to build
 environments to subtly trojan software.
 
 Therefore, very mature security programs in places with an acute
-awareness of wisk, very much want the ability to monitor the integrity
+awareness of risk, very much want the ability to monitor the integrity
 of builds throughout their supply chain. And, baring that, they'd are
 looking to get as much information as possible, or at least some
 assurances of build practices.
@@ -264,7 +264,7 @@ was deployed and what else was going on in the environment.
 Chalk was built originally for those internal use cases, to get people
 the data they need to be able to automate the work they do to graph
 out the relationships in their software. However, the exact same
-approach turns out to give other companies extactly what they're
+approach turns out to give other companies exactly what they're
 looking for.
 
 #### Digital signatures
@@ -391,11 +391,11 @@ by a hosted build platform.
 
 Lodash is a popular NPM library that was, in March 2021 found to have a prototype pollution vulnerability. It was the most depended on package in NPM meaning almost all applications built in Node.js were affected.
 
-[Prototype Pollution in lodash](https://github.com/advisories/GHSA-p6mc-m468-83gw) - Github
+[Prototype Pollution in lodash](https://github.com/advisories/GHSA-p6mc-m468-83gw) - GitHub
 
 ##### Netbeans
 
-Ih 2020 it was reported that a tool called the Octopus scanner was searching Github and injecting malware into projects that were using the popular Java development framework Netbeans and then serving up malware to all applications built from those code repos.
+In 2020 it was reported that a tool called the Octopus scanner was searching GitHub and injecting malware into projects that were using the popular Java development framework Netbeans and then serving up malware to all applications built from those code repos.
 
 [https://duo.com/decipher/malware-infects-netbeans-projects-in-software-supply-chain-attack](https://duo.com/decipher/malware-infects-netbeans-projects-in-software-supply-chain-attack) - Duo Research Labs
 
@@ -407,6 +407,6 @@ Log4J is a popular logging library for the Java programming language. In late 20
 
 ##### SolarWinds
 
-The SolarWinds attack used an IT monitoring system, Orion, which which had over 30,000 organizations including Cisco, Deloitte, Intel, Microsoft, FireEye, and US government departments, including the Department of Homeland Security. The attackers created a backdoor that was delivered via a software update.
+The SolarWinds attack used an IT monitoring system, Orion, which had over 30,000 organizations including Cisco, Deloitte, Intel, Microsoft, FireEye, and US government departments, including the Department of Homeland Security. The attackers created a backdoor that was delivered via a software update.
 
 [The Untold Story of the Boldest Supply-Chain Hack Ever](https://www.wired.com/story/the-untold-story-of-solarwinds-the-boldest-supply-chain-hack-ever/) - Wired Magazine
