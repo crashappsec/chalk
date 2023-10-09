@@ -1,10 +1,10 @@
 # Chalk Testing
 
-This directory contains all the basic functionality tests for chalk.
-Tests are run via docker compose in a separate `tests` container which
-internally uses the `pytest` framework.
+This directory contains all the basic functionality tests for chalk. Tests are run via `docker compose` in the `tests` container which internally uses the `pytest` framework.
 
-## Requirements
+While `pytest` can be used to run the tests directly,
+
+## Setup
 
 ### Chalk Binary
 
@@ -38,7 +38,7 @@ Please ensure you have an up-to-date container with:
 docker compose build tests
 ```
 
-### Running Tests
+## Running Tests
 
 All commands given are assumed to be run from the root of the repo.
 
@@ -117,7 +117,7 @@ make tests args="[TESTFILE]::[TESTNAME] --pdb"
 Alternatively you can add `breakpoint()` before the failing assertion
 and manually invoke the single test.
 
-### Adding a Test
+## Adding a Test
 
 #### Pytest Convention
 
