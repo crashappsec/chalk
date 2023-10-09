@@ -1,8 +1,8 @@
 # Chalk Testing
 
-This directory contains all the basic functionality tests for chalk. Tests are run via `docker compose` in the `tests` container which internally uses the `pytest` framework.
+This directory contains all the basic functionality tests for chalk. Tests are run via `make tests`, which `docker compose` in the `tests` container which internally uses the `pytest` framework.
 
-While `pytest` can be used to run the tests directly,
+While `pytest` can be used to run the tests directly, it is recommended to use the makefile
 
 ## Setup
 
