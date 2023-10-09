@@ -221,7 +221,7 @@ RUN echo "CHALK_TARGET_PLATFORM=$TARGETPLATFORM"
 
   let
     preTag         = binStr.encode(safe=true).replace("-", ".").replace("=","")
-    tmpTag         = preTag.toLowerAscii()
+    tmpTag         = "chalk_" & preTag.toLowerAscii() & "_probe"
     buildKitKey    = "DOCKER_BUILDKIT"
     buildKitKeySet = existsEnv(buildKitKey)
   var buildKitValue: string
@@ -233,6 +233,8 @@ RUN echo "CHALK_TARGET_PLATFORM=$TARGETPLATFORM"
                                           "-", "."], probeFile)
     stdErr = allOut.getStderr()
     parts  = stdErr.split("CHALK_TARGET_PLATFORM=")
+
+  trace("Probing for current docker build platform:\n" & stdErr)
 
   if buildKitKeySet:
     # key was set before us, so restore whatever the value was
