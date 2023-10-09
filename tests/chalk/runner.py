@@ -132,16 +132,38 @@ class ChalkProgram(Program):
 
     @property
     def reports(self):
+        # strip chalk logs from stdout so we can find just json reports
+        text = "\n".join(
+            [
+                i
+                for i in self.text.splitlines()
+                if not any(
+                    # color ansi is 11 or 13 chars
+                    i.startswith(j) or i[11:].startswith(j) or i[13:].startswith(j)
+                    for j in {"info:", "trace:", "error:"}
+                )
+            ]
+        )
         reports = []
-        text = self.after(match=r"\[\s")
+        # find start of report structure. it should start with either:
+        # * `[{"` - start of report
+        # * `[{}`
+        # with any number of whitespace in-between
+        # the report is either:
+        # * empty object
+        # * has a string key
+        match = r'\[\s+\{\s*["\}]'
+        text = self.after(match=match, text=text)
         while text.strip():
             try:
                 # assume all of text is valid json
                 reports += self.json(text=text, log_level=None)
-            except json.JSONDecodeError as e:
+            except json.JSONDecodeError:
                 next_reports, char = self._valid_json(text=text, everything=False)
                 reports += next_reports
-                text = text[char:]
+                text = self.after(match=match, text=text[char:])
+                if not text.strip().startswith("["):
+                    break
             else:
                 break
         return [ChalkReport(i) for i in reports]
@@ -352,6 +374,7 @@ class Chalk:
         push: bool = False,
         config: Optional[Path] = None,
         buildkit: bool = True,
+        log_level: ChalkLogLevel = "none",
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
         context = context or getattr(dockerfile, "parent", cwd)
@@ -372,7 +395,7 @@ class Chalk:
             self.run(
                 # TODO remove log level but there are error bugs due to --debug
                 # which fail the command validation
-                log_level="none",
+                log_level=log_level,
                 debug=True,
                 virtual=virtual,
                 config=config,
