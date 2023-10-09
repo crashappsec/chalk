@@ -14,6 +14,8 @@
 - Segfault when running chalk operation (e.g. `insert`) in empty
   git repo without any commits.
   [39](https://github.com/crashappsec/chalk/pull/39)
+- Sometimes Docker build would not wrap entrypoint.
+  [45](https://github.com/crashappsec/chalk/pull/45)
 
 ## Known Issues
 
@@ -61,7 +63,7 @@ At release time, here are known issues:
 - Chalk does not yet handle Docker HEREDOCs (which we've found aren't
   yet getting heavy use).
 
-- Chalk currently will refuse to automaticlly wrap or sign
+- Chalk currently will refuse to automatically wrap or sign
   multi-architecture builds. It still will produce the desired
   container with a chalk mark, however.
 
@@ -84,7 +86,7 @@ At release time, here are known issues:
 
 ### Other
 
-- The bash autocomplete script installson a Mac, but because it's not
+- The bash autocomplete script installation a Mac, but because it's not
   a zsh script, it will not autocomplete file arguments, etc.
 
 - The signing functionality does download the `cosign` binary if not
@@ -144,10 +146,10 @@ At release time, here are known issues:
 
 We are actively developing Chalk, and listening closely to the people
 already using it. Below are a number of key items in our backlog that
-we're considering. However, we have made no descisions on the order
+we're considering. However, we have made no decisions on the order
 we'll work on these things, and may add or drop items from the
 list. For a more up-to-date view, please check our issues list in
-Github.
+GitHub.
 
 All of the below are targets for our Open Source; we also will soon be
 releasing services around Chalk (with a free tier).
