@@ -23,7 +23,7 @@ proc runCmdSetup*(gen, load: bool) =
   selfChalk.addToAllChalks()
   info("Ensuring cosign is present to setup attestation.")
 
-  if getCosignLocation() == "":
+  if getCosignLocation(downloadCosign = true) == "":
     quitChalk(1)
   if load:
     # If we fall back to 'gen' we don't want attemptToLoadKeys
