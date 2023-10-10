@@ -54,12 +54,12 @@ func install_cosign() {
   return false
 }
 
-func load_attestation_binary() {
+func load_attestation_binary(download_if_not_present: bool) {
   result             := ""
   supplemental_path  := [env("GOPATH") + "/bin", "~/go/bin", "/tmp"]
   attestation_binary := find_exe("cosign", supplemental_path)
 
-  if attestation_binary == "" {
+  if attestation_binary == "" and download_if_not_present == true {
     if install_cosign() {
       attestation_binary := find_exe("cosign", supplemental_path)
       if attestation_binary == "" {

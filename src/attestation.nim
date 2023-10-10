@@ -11,7 +11,7 @@ import api, base64, chalkjson, config, httpclient, net, os, selfextract,
 const
   attestationObfuscator = staticExec(
     "dd status=none if=/dev/random bs=1 count=16 | base64").decode()
-  cosignLoader = "load_attestation_binary() -> string"
+  cosignLoader = "load_attestation_binary(bool) -> string"
   #c4mAttest    = "push_attestation(string, string, string) -> bool"
 
 var
@@ -217,9 +217,13 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
 
   return true
 
-proc getCosignLocation*(): string =
+proc getCosignLocation*(downloadCosign = false): string =
   once:
-    cosignLoc = unpack[string](runCallback(cosignLoader, @[]).get())
+    var args = @[pack(false)]
+    if downloadCosign == true:
+      args = @[pack(true)]
+      
+    cosignLoc = unpack[string](runCallback(cosignLoader, args).get())
 
     if cosignLoc == "":
       warn("Could not find or install cosign; cannot sign or verify.")
