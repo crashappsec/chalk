@@ -1,2 +1,3 @@
 FROM ubuntu
-ENTRYPOINT ["/usr/bin/sleep", "5"]
+COPY sleep.sh /sleep.sh
+ENTRYPOINT ["/bin/sh", "/sleep.sh"]

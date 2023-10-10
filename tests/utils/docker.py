@@ -83,9 +83,14 @@ class Docker:
                     "writing image",
                     text=build.logs,
                     words=1,  # there is "done" after hash
+                    reverse=True,
                 ).split(":")[1]
             except ValueError:
-                image_id = build.find("Successfully built", words=1)
+                image_id = build.find(
+                    "Successfully built",
+                    words=1,
+                    reverse=True,
+                )
                 # legacy builder returns short id so we figure out longer id
                 image_id = run(
                     ["docker", "inspect", image_id, "--format", "{{ .ID }}"],
