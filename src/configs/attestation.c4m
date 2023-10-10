@@ -19,6 +19,7 @@ func install_cosign() {
   go_path := find_exe("go", [])
 
   if go_path != "" {
+    info("Go-install'ing cosign.....")
     install_out, ok := system("go install github.com/sigstore/cosign/v2/cmd/cosign@latest")
     if ok != 0 {
       warn("unable to install attestation into $GOPATH/bin/cosign; " +
@@ -37,6 +38,7 @@ func install_cosign() {
 
   install_name := "cosign-" + host_os + "-" + host_arch
   install_url  := "https://github.com/sigstore/cosign/releases/latest/download/" + install_name
+  info("Downloading cosign.....")
   contents     := url_get(install_url)
 
   trace("Downloaded cosign.")
