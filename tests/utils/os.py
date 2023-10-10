@@ -103,8 +103,17 @@ class Program:
             self.exit_code, self.cmd, output=self.stdout, stderr=self.stderr
         )
 
-    def find(self, needle: str, text: Optional[str] = None, words: int = 0) -> str:
-        for line in (text or self.text).splitlines():
+    def find(
+        self,
+        needle: str,
+        text: Optional[str] = None,
+        words: int = 0,
+        reverse: bool = False,
+    ) -> str:
+        lines = (text or self.text).splitlines()
+        if reverse:
+            lines = lines[::-1]
+        for line in lines:
             if needle in line:
                 i = line.find(needle)
                 result = line[i:].replace(needle, "", 1).strip()
@@ -149,7 +158,7 @@ class Program:
         text = self.after(match=after, text=text)
         try:
             return json.loads(text), len(text)
-        except Exception as e:
+        except json.JSONDecodeError as e:
             # if there is extra data we grab valid json until the
             # invalid character
             e_str = str(e)
