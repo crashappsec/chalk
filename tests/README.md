@@ -56,7 +56,9 @@ WARNING: Debug builds are very slow, so it is not recommended to run the entire 
 
 ## Running Tests
 
-All commands given are assumed to be run from the root of the repo.
+### Makefile
+
+The easiest way to run tests is via the makefile. All commands given are assumed to be run from the root of the repo.
 
 To run all tests:
 
@@ -101,7 +103,37 @@ make tests args="test_elf.py::test_virtual_valid[copy_files0]"
 
 Any arguments passed in through `args` will be directly passed through to the underlying `pytest` call. See [pytest docs](https://docs.pytest.org/en/7.1.x/how-to/usage.html) for more invocation options.
 
-### Slow Tests
+### Running Tests Directly
+
+While tests can be run directly via `pytest`, this is not recommended. However, if you would like to do so, ensure that you have the following:
+
+- `python` version 3.11 or greater
+- `pipx` (recommended) or `pip` package installer for python
+- `docker` for the docker tests
+
+To set up the testing framework:
+
+1. Install poetry with `pipx install poetry`
+2. Install dependencies with `poetry install` (the list of dependencies to be installed is located at `tests/pyproject.toml`)
+
+To run the tests:
+
+1. From the repository root: `cd ./tests`
+2. Start poetry shell with `poetry shell`
+3. Run tests with `pytest` (flags and arguments as in the previous section)
+
+WARNING: Since the chalk tests were intended to be run via `docker compose`, running them directly through `pytest` will cause a number of failures. In particular:
+
+- Several tests rely on the chalk server or other services to be started by `docker compose`, and these tests will not run if the services are not available.
+- Several tests that act on elf binaries expect the binaries to be found on host (ex: at `/usr/bin/ls`), and if these binaries don't exist, the test will fail.
+- Any tests involving an elf binary will fail on MacOS.
+- Several tests attempt to read or write files on host outside of the repository root (ex: config tests will attempt to put a chalk config in `/etc/chalk`). If the test process doesn't have the appropriate permissions to do so, the test will fail.
+
+Also note that some files may not be cleaned up, like chalk intermediate files when building docker. These files will need to be manually deleted.
+
+### Pytest Flags
+
+#### Slow Tests
 
 To run slower tests which are by default skipped add the `--slow` argument:
 
@@ -110,7 +142,7 @@ To run slower tests which are by default skipped add the `--slow` argument:
 make tests args="--slow"
 ```
 
-### Live Logs
+#### Live Logs
 
 By default logs will only show for failed tests. To show all logs of running tests as they run, add the `--logs` argument:
 
@@ -118,7 +150,7 @@ By default logs will only show for failed tests. To show all logs of running tes
 make tests args="--logs"
 ```
 
-### Parallel Tests
+#### Parallel Tests
 
 To run tests in parallel, add `-nauto` argument which will run tests
 in number of workers as there are CPU cores on the system:
