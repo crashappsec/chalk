@@ -76,7 +76,7 @@ proc getChalkApiToken*(): (string, string) =
     response:          Response
     responsePoll:      Response
     ret                = ("","")
-    token:             string
+    accessToken:       string
     totalSleepTime:    float  = 0.0
   type
     frameList = array[8, string]
@@ -97,7 +97,6 @@ proc getChalkApiToken*(): (string, string) =
 
   # set api login endpoint
   var login_url = uri.parseUri(chalkConfig.getSecretManagerUrl())
-
   login_url.path = "/api/login"
 
   # request auth code from API
@@ -151,13 +150,13 @@ proc getChalkApiToken*(): (string, string) =
 
           # parse json response and save / return values()
           let jsonPollNode = parseJson(responsePoll.body())
-          token            = jsonPollNode["access_token"].getStr()
+          accessToken            = jsonPollNode["access_token"].getStr()
           refreshToken     = jsonPollNode["refresh_token"].getStr()
 
           # decode JWT
-          pollPayloadBase64  = jwtSplitAndDecode($token, true)
+          pollPayloadBase64  = jwtSplitAndDecode($accessToken, true)
           let decodedPollJwt = parseJson(pollPayloadBase64)
-          ret = ($token, $refreshToken)
+          ret = ($accessToken, $refreshToken)
 
         elif responsePoll.status.startswith("428") or responsePoll.status.startswith("403"):
           # sleep for requested polling period while showing spinner before polling again
