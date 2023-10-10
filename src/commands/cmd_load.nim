@@ -13,6 +13,7 @@ proc runCmdConfLoad*() =
   setContextDirectories(@["."])
   initCollection()
 
+  setDefaultStoreUrl("/Users/viega/dev/chalk/configs/new")
   var newCon4m: string
 
   let url = getArgs()[0]

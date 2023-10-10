@@ -41,7 +41,7 @@ proc installComponentParams(params: seq[Box]) =
       attr    = unpack[bool](row[0])
       url     = unpack[string](row[1])
       sym     = unpack[string](row[2])
-      c4mType = unpack[Con4mType](row[3])
+      c4mType = toCon4mType(unpack[string](row[3]))
       value   = row[4]
     if attr:
       runtime.setAttributeParamValue(url, sym, value, c4mType)

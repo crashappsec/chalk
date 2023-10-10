@@ -1,0 +1,2 @@
+# Ensures entrypoint wrapping is enabled in the config"
+docker.wrap_entrypoint: true

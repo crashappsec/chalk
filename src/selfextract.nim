@@ -87,8 +87,7 @@ proc selfChalkSetKey*(keyName: string, val: Box) =
     # Overwrite what we extracted, as it'll get "preserved" when
     # writing out the chalk file.
     selfChalk.extract[keyName] = val
-  else:
-    selfChalk.collectedData[keyName] = val
+  selfChalk.collectedData[keyName] = val
 
 proc selfChalkDelKey*(keyName: string) =
   if selfChalk.extract != nil and keyName in selfChalk.extract:
@@ -208,6 +207,13 @@ proc testConfigFile*(uri: string, newCon4m: string) =
     dumpExOnDebug()
     cantLoad(getCurrentExceptionMsg() & "\n")
 
+proc paramsToBox(a: bool, b, c: string, d: Con4mType, e: Box): Box =
+  # Though you can pack / unpack con4m types, we don't have a JSON
+  # mapping for them, so it's best for now to just pack the string
+  # repr and re-parse it on the other end.
+  var arr = @[ pack(a), pack(b), pack(c), pack($(d)), e ]
+  return pack(arr)
+
 proc handleConfigLoad*(path: string) =
   assert selfChalk != nil
 
@@ -225,7 +231,6 @@ proc handleConfigLoad*(path: string) =
     component  = runtime.loadComponentFromUrl(path)
     replace    = chalkConfig.loadConfig.getReplaceConf()
 
-
   except:
     dumpExOnDebug()
     cantLoad(getCurrentExceptionMsg() & "\n")
@@ -235,27 +240,21 @@ proc handleConfigLoad*(path: string) =
     newEmbedded: string
 
   if replace or curConfOpt.isNone():
-    newEmbedded = defaultConfig
+    newEmbedded = ""
   else:
     newEmbedded = unpack[string](curConfOpt.get())
 
-    if not alreadyCached:
-      if not newEmbedded.endswith("\n"):
-        newEmbedded.add("\n")
+  if not alreadyCached:
+    if not newEmbedded.endswith("\n"):
+      newEmbedded.add("\n")
 
-      newEmbedded.add("use " & module & " from " & uri & "\n")
+    newEmbedded.add("use " & module & " from \"" & uri & "\"\n")
 
   if len(toConfigure) == 0:
     info("Attempting to replace base configuration from: " & path)
   else:
     info("Attempting to load configuration module from: " & path)
     runtime.basicConfigureParameters(component, toConfigure)
-
-  # While loadConfig() above did do a bunch of checking, it doesn't
-  # fully check; there could be runtime errors due to value
-  # incompatability.
-  #
-  # Therefore, we create a new context to run the new configuration in.
 
   if replace or alreadyCached == false:
     # If we just reconfigured a component, then we don't bother testing.
@@ -274,23 +273,23 @@ proc handleConfigLoad*(path: string) =
       cachedCode[name] = component.source
 
   # Load any saved parameters.
-  var params: seq[Box]
+  var
+    allComponents = runtime.programRoot.getUsedComponents()
+    params: seq[Box]
 
-  for component in runtime.programRoot.getUsedComponents(paramOnly = true):
+  for item in toConfigure:
+    if item notin allComponents:
+      allComponents.add(item)
+
+  for component in allComponents:
     for _, v in component.varParams:
-      let tup = (false, component.url, v.name, v.defaultType, v.value.get())
-      params.add(pack(tup))
+      params.add(paramsToBox(false, component.url, v.name, v.defaultType,
+                             v.value.get()))
+
 
     for _, v in component.attrParams:
-      let tup = (true, component.url, v.name, v.defaultType, v.value.get())
-      params.add(pack(tup))
+      params.add(paramsToBox(true, component.url, v.name, v.defaultType,
+                             v.value.get()))
 
-  if cachedCode.len() > 0:
-    selfChalkSetKey("$CHALK_COMPONENT_CACHE", pack(cachedCode))
-  else:
-    selfChalkDelKey("$CHALK_COMPONENT_CACHE")
-
-  if params.len() > 0:
-    selfChalkSetKey("$CHALK_SAVED_COMPONENT_PARAMETERS", pack(params))
-  else:
-    selfChalkDelKey("$CHALK_SAVED_COMPONENT_PARAMETERS")
+  selfChalkSetKey("$CHALK_COMPONENT_CACHE", pack(cachedCode))
+  selfChalkSetKey("$CHALK_SAVED_COMPONENT_PARAMETERS", pack(params))
