@@ -33,27 +33,22 @@ The quickest way to manually build a binary with the current local changes is:
 
 1. Build chalk deps container:
 
-```sh
-docker compose build chalk
-```
+   ```sh
+   docker compose build chalk
+   ```
 
-(this step can be skipped if the `chalk` container is up to date)
+   (this step can be skipped if the `chalk` container is up to date)
 
-2. Compile `chalk`.
-
-For a release build:
-
-```sh
-# root of the repo
-make chalk
-```
-
-For a debug build:
-
-```sh
-# root of the repo
-make debug
-```
+2. Compile `chalk`. For a release build:
+   ```sh
+   # root of the repo
+   make chalk
+   ```
+   For a debug build:
+   ```sh
+   # root of the repo
+   make debug
+   ```
 
 The second command should drop a `chalk` binary that is usable by tests. You can also manually build with `nimble build`, but this is not recommended as it doesn't guarantee that the architecture will be compatible with the `tests` container.
 
@@ -98,7 +93,11 @@ To run a single case of a single test:
 make tests args="[TESTFILE]::[TESTNAME][test-case]"
 ```
 
-ex: `make tests args="test_elf.py::test_virtual_valid[copy_files0]"`
+ex:
+
+```sh
+make tests args="test_elf.py::test_virtual_valid[copy_files0]"
+```
 
 Any arguments passed in through `args` will be directly passed through to the underlying `pytest` call. See [pytest docs](https://docs.pytest.org/en/7.1.x/how-to/usage.html) for more invocation options.
 
@@ -162,21 +161,21 @@ All python tests must follow `pytest` conventions to be picked up by the test ru
 
 ### Datafile Location
 
-All new test files should added to the `tests/` directory, and any test data should be added to the `tests/data` directory.
+All new test files should be added to the `tests/` directory, and any test data should be added to the `tests/data` directory.
 
-WARNING: Any files (including test files and data files) that are NOT in the `/tests` directory will not be accessible from within the `tests` container. Any data files that need to be in a specific path for testing (ex: config files loaded from `/etc/chalk`) must be copied to the target path as part of test setup, which happens inside the container after startup.
+WARNING: Any files (including test files and data files) that are NOT in the root directory of the reporistory will not be accessible from within the `tests` container. Any data files that need to be in a specific path for testing (ex: config files loaded from `/etc/chalk`) must be stored in `tests/data`, and then as part of test setup which happens inside the container after startup, copied to the target path. A config file located in `/etc/chalk` on host WILL NOT be available from inside the testing container.
 
 ### Test Fixtures
 
 Global test fixtures are defined in `conftest.py`. Any test fixtures used across multiple test files should be defined in `conftest.py`; any test fixtures used only in a single test file should be defined in the test file.
 
-More information about fixtures can be found [here](https://docs.pytest.org/en/6.2.x/fixture.html).
+More information about fixtures can be found [here](https://docs.pytest.org/en/7.2.x/fixture.html).
 
 The following is a summary of the most commonly used fixtures in chalk testing:
 
 - `tmp_data_dir`: creates a temporary data directory for each test that will be destroyed at the end of that test. All tests are run from within their temporary directories, and each test has its own temporary directory that does not conflict with any other temporary directories. It is recommended that any tests that mutate data (ex: chalking a system binary) first copy that data into the `tmp_data_dir` and then act on the copy, so that subsequent or parallel tests don't run into conflicts.
 - `copy_files`: copies files into the temporary directory.
-- `chalk`: retrieves the chalk binary to be used in testing (which will be the chalk binary at the root of the repository), and loads it with the default testing configuration which subscribes to console output (ensuring that we get chalk reports to stdout even if chalk is not run in a tty). Note that the scope of this fixture is `session`, so this will be the SAME chalk binary for ALL tests in a single invocation of `make chalk`. If your test needs to make any changes to the chalk binary itself, use `chalk_copy` instead.
+- `chalk`: retrieves the chalk binary to be used in testing (which will be the chalk binary at the root of the repository), and loads it with the default testing configuration which subscribes to console output (ensuring that we get chalk reports to stdout even if chalk is not run in a tty). Note that the scope of this fixture is `session`, so this will be the SAME chalk binary for ALL tests in a single invocation of `make tests`. If your test needs to make any changes to the chalk binary itself, use `chalk_copy` instead.
 - `chalk_copy`: makes a copy of the chalk binary loaded with the default testing configuration into the test's `tmp_data_dir`. The test will invoke this copy, and it will be removed as part of the test's cleanup afterwards. Any tests that make changes to the chalk binary, such as the ones that change `config` in `test_config.py`, should use this fixture so that the changes don't persist across the remaining tests.
 - `chalk_default`: retrieves the chalk binary without loading the default testing configuration.
 
