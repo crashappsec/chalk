@@ -50,7 +50,11 @@ proc installComponentParams(params: seq[Box]) =
 
 proc loadCachedComponents(cache: OrderedTableRef[string, string]) =
   for url, src in cache:
+    echo "Attempting to load cached URL: ", url, " (src.len() = ", len(src), ")"
+
     let component = getChalkRuntime().getComponentReference(url)
+    echo component.url
+    echo component.hash.hex()
     component.cacheComponent(src)
     trace("Loaded cached version of: " & url & ".c4m")
 

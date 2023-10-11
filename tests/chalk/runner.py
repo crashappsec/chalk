@@ -344,8 +344,8 @@ class Chalk:
     def load(
         self,
         config: Path | str,
-        replace: bool = True,
         *,
+        replace: bool = True,
         use_embedded: bool = False,
         expected_success: bool = True,
         ignore_errors: bool = False,
@@ -355,6 +355,7 @@ class Chalk:
             command="load",
             params=[str(config)],
             log_level="error",
+            replace=replace,
             use_embedded=use_embedded,
             expected_success=expected_success,
             ignore_errors=ignore_errors,

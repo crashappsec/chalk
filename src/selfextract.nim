@@ -214,6 +214,11 @@ proc paramsToBox(a: bool, b, c: string, d: Con4mType, e: Box): Box =
   var arr = @[ pack(a), pack(b), pack(c), pack($(d)), e ]
   return pack(arr)
 
+const nocache = ["configs/ioconfig.c4m", "configs/sastconfig.c4m",
+                 "[embedded config]", "configs/base_*.c4m",
+                 "configs/sbomconfig.c4m", "configs/attestation.c4m",
+                 "configs/getopts.c4m"]
+
 proc handleConfigLoad*(path: string) =
   assert selfChalk != nil
 
@@ -245,10 +250,13 @@ proc handleConfigLoad*(path: string) =
     newEmbedded = unpack[string](curConfOpt.get())
 
   if not alreadyCached:
-    if not newEmbedded.endswith("\n"):
-      newEmbedded.add("\n")
+    if not replace:
+      if not newEmbedded.endswith("\n"):
+        newEmbedded.add("\n")
 
-    newEmbedded.add("use " & module & " from \"" & uri & "\"\n")
+      newEmbedded.add("use " & module & " from \"" & uri & "\"\n")
+    else:
+      newEmbedded = component.source
 
   if len(toConfigure) == 0:
     info("Attempting to replace base configuration from: " & path)
@@ -268,9 +276,13 @@ proc handleConfigLoad*(path: string) =
   # Now, load the code cache.
   var cachedCode = OrderedTableRef[string, string]()
 
-  for name, component in runtime.components:
-    if component.source != "":
-      cachedCode[name] = component.source
+  for _, onecomp in runtime.components:
+    if onecomp.url in nocache:
+      continue
+    if replace and onecomp == component:
+      continue
+    if onecomp.source != "":
+      cachedCode[onecomp.url] = onecomp.source
 
   # Load any saved parameters.
   var
