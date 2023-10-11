@@ -219,7 +219,6 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
 
 proc getCosignLocation*(downloadCosign = false): string =
   once:
-    var args = @[pack(false)]
     let args = @[pack(downloadCosign)]
     cosignLoc = unpack[string](runCallback(cosignLoader, args).get())
 
