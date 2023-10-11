@@ -42,9 +42,14 @@ class ChalkReport(ContainsMixin, dict):
         super().__init__(**report)
 
     @property
+    def marks(self):
+        assert len(self["_CHALKS"]) > 0
+        return [ChalkMark(i, report=self) for i in self["_CHALKS"]]
+
+    @property
     def mark(self):
-        assert len(self["_CHALKS"]) == 1
-        return ChalkMark(self, self["_CHALKS"][0])
+        assert len(self.marks) == 1
+        return self.marks[0]
 
     @property
     def errors(self):
@@ -62,9 +67,6 @@ class ChalkReport(ContainsMixin, dict):
     def from_json(cls, data: str):
         return cls(json.loads(data)[0])
 
-    def validate(self, operation: str):
-        assert self["_OPERATION"] == operation
-
 
 class ChalkMark(ContainsMixin, dict):
     @classmethod
@@ -81,8 +83,14 @@ class ChalkMark(ContainsMixin, dict):
         assert mark
         return cls(report=ChalkReport({}), mark=mark)
 
-    def __init__(self, report: ChalkReport, mark: dict[str, Any]):
-        self.report = report
+    @classmethod
+    def from_json(cls, data: str):
+        return cls(json.loads(data))
+
+    def __init__(
+        self, mark: dict[str, Any], *, report: Optional[dict[str, Any]] = None
+    ):
+        self.report = ChalkReport(report or {})
         super().__init__(**mark)
 
     @property
@@ -124,24 +132,38 @@ class ChalkProgram(Program):
 
     @property
     def reports(self):
+        # strip chalk logs from stdout so we can find just json reports
+        text = "\n".join(
+            [
+                i
+                for i in self.text.splitlines()
+                if not any(
+                    # color ansi is 11 or 13 chars
+                    i.startswith(j) or i[11:].startswith(j) or i[13:].startswith(j)
+                    for j in {"info:", "trace:", "error:"}
+                )
+            ]
+        )
         reports = []
-        text = self.after(match=r"\[\s")
+        # find start of report structure. it should start with either:
+        # * `[{"` - start of report
+        # * `[{}`
+        # with any number of whitespace in-between
+        # the report is either:
+        # * empty object
+        # * has a string key
+        match = r'\[\s+\{\s*["\}]'
+        text = self.after(match=match, text=text)
         while text.strip():
             try:
                 # assume all of text is valid json
-                reports += json.loads(text)
-            except json.JSONDecodeError as e:
-                # if not we grab valid json until the invalid
-                # character and then keep doing that until we
-                # find all reports in the text
-                e_str = str(e)
-                if not e_str.startswith("Extra data:"):
-                    self.logger.error("output is invalid json", error=e)
-                    raise
-                # Extra data: line 25 column 1 (char 596)
-                char = int(e_str.split()[-1].strip(")"))
-                reports += self.json(text=text[:char])
-                text = text[char:]
+                reports += self.json(text=text, log_level=None)
+            except json.JSONDecodeError:
+                next_reports, char = self._valid_json(text=text, everything=False)
+                reports += next_reports
+                text = self.after(match=match, text=text[char:])
+                if not text.strip().startswith("["):
+                    break
             else:
                 break
         return [ChalkReport(i) for i in reports]
@@ -260,7 +282,7 @@ class Chalk:
                 if not operation and "docker" in params:
                     operation = params[params.index("docker") + 1]
                 if operation:
-                    report.validate(operation)
+                    assert report.has(_OPERATION=operation)
 
         return result
 
@@ -345,10 +367,14 @@ class Chalk:
         tag: Optional[str] = None,
         context: Optional[Path] = None,
         expected_success: bool = True,
+        expecting_report: bool = True,
         virtual: bool = False,
         cwd: Optional[Path] = None,
+        args: Optional[dict[str, str]] = None,
+        push: bool = False,
         config: Optional[Path] = None,
         buildkit: bool = True,
+        log_level: ChalkLogLevel = "none",
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
         context = context or getattr(dockerfile, "parent", cwd)
@@ -358,7 +384,9 @@ class Chalk:
             tag=tag,
             context=context,
             dockerfile=dockerfile,
+            args=args,
             cwd=cwd,
+            push=push,
             expected_success=expected_success,
             buildkit=buildkit,
         )
@@ -367,7 +395,7 @@ class Chalk:
             self.run(
                 # TODO remove log level but there are error bugs due to --debug
                 # which fail the command validation
-                log_level="none",
+                log_level=log_level,
                 debug=True,
                 virtual=virtual,
                 config=config,
@@ -375,6 +403,8 @@ class Chalk:
                     tag=tag,
                     context=context,
                     dockerfile=dockerfile,
+                    args=args,
+                    push=push,
                 ),
                 expected_success=expected_success,
                 cwd=cwd,
@@ -384,11 +414,18 @@ class Chalk:
         dockerfile = dockerfile or (
             (cwd or context or Path(os.getcwd())) / "Dockerfile"
         )
-        if expected_success:
+        if expecting_report and expected_success:
             # sanity check that chalk mark includes basic chalk keys
             assert image_hash == result.mark["_CURRENT_HASH"]
             assert image_hash == result.mark["_IMAGE_ID"]
             assert str(dockerfile) == result.mark["DOCKERFILE_PATH"]
+        elif not expecting_report:
+            try:
+                assert not result.reports
+            except json.JSONDecodeError:
+                # we are not expecting any report json to be present in output
+                # so this exception is expected here
+                pass
         return image_hash, result
 
     def docker_push(self, image: str):

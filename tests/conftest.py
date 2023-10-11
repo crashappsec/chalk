@@ -17,6 +17,7 @@ from filelock import FileLock
 
 from .chalk.runner import Chalk
 from .conf import (
+    GDB_PATH,
     SERVER_CERT,
     SERVER_DB,
     SERVER_HTTP,
@@ -63,6 +64,12 @@ def be_exclusive(request, worker_id):
         else:
             with lock(f"worker-{worker_id}.lck"):
                 yield
+
+
+@pytest.fixture(autouse=True)
+def requires_gdb(request):
+    if request.node.get_closest_marker("requires_gdb") and not GDB_PATH:
+        pytest.skip(f"gdb is not installed. skipping test")
 
 
 @pytest.fixture()

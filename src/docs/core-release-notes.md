@@ -1,3 +1,31 @@
+# Release Notes for Chalk version 0.1.3
+
+## Fixes
+
+- Docker support when installed via `Snap`.
+  [9](https://github.com/crashappsec/chalk/pull/9)
+- Removes error log when using chalk on ARM Linux as chalk fully
+  runs on ARM Linux now.
+  [7](https://github.com/crashappsec/chalk/pull/7)
+- When a `Dockerfile` uses `USER` directive, chalk can now wrap
+  entrypoint in that image
+  (`docker.wrap_entrypoint = true` in chalk config).
+  [34](https://github.com/crashappsec/chalk/pull/34)
+- Segfault when running chalk operation (e.g. `insert`) in empty
+  git repo without any commits.
+  [39](https://github.com/crashappsec/chalk/pull/39)
+- Sometimes Docker build would not wrap entrypoint.
+  [45](https://github.com/crashappsec/chalk/pull/45)
+
+## Known Issues
+
+### Containers
+
+- When a `Dockerfile` does not use `USER` directive but base image
+  uses it to change default image user, chalk cannot wrap the
+  image as it on legacy Docker builder (not buildx) as it will
+  fail to `chmod` permissions of chalk during the build.
+
 # Release Notes for Chalk version 0.1.2
 
 This is the first open source release of Chalk. For those who
@@ -35,7 +63,7 @@ At release time, here are known issues:
 - Chalk does not yet handle Docker HEREDOCs (which we've found aren't
   yet getting heavy use).
 
-- Chalk currently will refuse to automaticlly wrap or sign
+- Chalk currently will refuse to automatically wrap or sign
   multi-architecture builds. It still will produce the desired
   container with a chalk mark, however.
 
@@ -58,7 +86,7 @@ At release time, here are known issues:
 
 ### Other
 
-- The bash autocomplete script installson a Mac, but because it's not
+- The bash autocomplete script installation a Mac, but because it's not
   a zsh script, it will not autocomplete file arguments, etc.
 
 - The signing functionality does download the `cosign` binary if not
@@ -118,10 +146,10 @@ At release time, here are known issues:
 
 We are actively developing Chalk, and listening closely to the people
 already using it. Below are a number of key items in our backlog that
-we're considering. However, we have made no descisions on the order
+we're considering. However, we have made no decisions on the order
 we'll work on these things, and may add or drop items from the
 list. For a more up-to-date view, please check our issues list in
-Github.
+GitHub.
 
 All of the below are targets for our Open Source; we also will soon be
 releasing services around Chalk (with a free tier).

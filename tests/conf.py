@@ -10,6 +10,7 @@ import os
 
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
+GDB = ROOT / "gdb"
 
 CODEOWNERS = DATA / "codeowners"
 CONFIGS = DATA / "configs"
@@ -47,3 +48,4 @@ DATE_PATH = shutil.which("date")
 LS_PATH = shutil.which("ls")
 UNAME_PATH = shutil.which("uname")
 SLEEP_PATH = shutil.which("sleep")
+GDB_PATH = shutil.which("gdb")

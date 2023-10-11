@@ -2,13 +2,14 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
 from ..conf import MAGIC, SHEBANG
+from ..utils.dict import ANY, MISSING, Contains, IfExists, Length
 from ..utils.log import get_logger
+from .runner import ChalkMark, ChalkReport
 
 
 logger = get_logger()
@@ -61,154 +62,108 @@ def validate_virtual_chalk(
         return {}
 
     assert vjsonf.is_file(), "virtual-chalk.json not found"
-    virtual_chalks_jsonl = vjsonf.read_text()
-
     # jsonl is one json object per line, NOT array of json
     # number of json objects is number of artifacts chalked
-    all_vchalks = virtual_chalks_jsonl.splitlines()
-    assert len(all_vchalks) == len(artifact_map)
+    all_vchalks = [ChalkMark.from_json(i) for i in vjsonf.read_text().splitlines()]
 
     for vchalk in all_vchalks:
-        vjson = json.loads(vchalk)
-
-        assert "CHALK_ID" in vjson
-        assert vjson["MAGIC"] == MAGIC, "virtual chalk magic value incorrect"
+        assert vchalk.has(
+            CHALK_ID=ANY,
+            MAGIC=MAGIC,
+        )
 
     # return first one
-    return json.loads(all_vchalks[0])
+    return all_vchalks[0]
 
 
 # chalk report is created after `chalk insert` operation
 def validate_chalk_report(
-    chalk_report: dict[str, Any],
+    chalk_report: ChalkReport,
     artifact_map: dict[str, ArtifactInfo],
     virtual: bool,
     chalk_action: str = "insert",
 ):
-    assert chalk_report["_OPERATION"] == chalk_action
+    assert chalk_report.has(_OPERATION=chalk_action)
 
     if not artifact_map:
-        assert "_CHALKS" not in chalk_report
+        assert chalk_report.has(_CHALKS=MISSING)
         return
 
-    assert "_CHALKS" in chalk_report
-    assert len(chalk_report["_CHALKS"]) == len(
-        artifact_map
-    ), "chalks missing from report"
+    assert chalk_report.has(_CHALKS=Length(len(artifact_map)))
 
     # check arbitrary host report values
-    for artifact_path in artifact_map:
-        artifact = artifact_map[artifact_path]
-        for key, value in artifact.host_info.items():
-            assert key in chalk_report
-            assert value == chalk_report[key]
+    for artifact in artifact_map.values():
+        assert chalk_report.contains(artifact.host_info)
 
-    for chalk in chalk_report["_CHALKS"]:
+    for chalk in chalk_report.marks:
         path = chalk["PATH_WHEN_CHALKED"]
         assert path in artifact_map, "chalked artifact incorrect"
         artifact = artifact_map[path]
 
-        # artifact specific fields
-        assert artifact.type == chalk["ARTIFACT_TYPE"], "artifact type doesn't match"
-
-        # check arbitrary artifact values
-        for key, value in artifact.chalk_info.items():
-            assert key in chalk
-            assert value == chalk[key]
-
-        if chalk_action == "insert":
-            assert virtual == chalk["_VIRTUAL"], "_VIRTUAL mismatch"
+        assert chalk.has(
+            ARTIFACT_TYPE=artifact.type,
+            **artifact.chalk_info,
+        )
+        assert chalk.has_if(
+            chalk_action == "insert",
+            _VIRTUAL=virtual,
+        )
 
 
 # slightly different from above
 def validate_docker_chalk_report(
-    chalk_report: dict[str, Any],
+    chalk_report: ChalkReport,
     artifact: ArtifactInfo,
     virtual: bool,
     chalk_action: str = "build",
 ):
-    assert chalk_report["_OPERATION"] == chalk_action
+    assert chalk_report.has(_OPERATION=chalk_action, _CHALKS=Length(1))
+    assert chalk_report.contains(artifact.host_info)
 
-    assert "_CHALKS" in chalk_report
-    assert (
-        len(chalk_report["_CHALKS"]) == 1
-    ), "should only get one chalk report per docker image"
-
-    for key in artifact.host_info:
-        assert artifact.host_info[key] == chalk_report[key]
-
-    for chalk in chalk_report["_CHALKS"]:
-        for key in artifact.chalk_info:
-            if isinstance(artifact.chalk_info[key], list):
-                assert all(i in chalk[key] for i in artifact.chalk_info[key])
-            else:
-                assert artifact.chalk_info[key] == chalk[key]
-        # chalk id should always exist
-        assert "CHALK_ID" in chalk
-
-        assert artifact.type == chalk["_OP_ARTIFACT_TYPE"]
-        if chalk_action == "build":
-            assert virtual == chalk["_VIRTUAL"]
+    for chalk in chalk_report.marks:
+        assert chalk.has(
+            # chalk id should always exist
+            CHALK_ID=ANY,
+            _OP_ARTIFACT_TYPE=artifact.type,
+        )
+        assert chalk.contains(artifact.chalk_info)
+        assert chalk.has_if(
+            chalk_action == "build",
+            _VIRTUAL=virtual,
+        )
 
 
 # extracted chalk is created after `chalk extract` operation
 def validate_extracted_chalk(
-    extracted_chalk: dict[str, Any],
+    extracted_chalk: ChalkReport,
     artifact_map: dict[str, ArtifactInfo],
     virtual: bool,
 ) -> None:
-    assert (
-        extracted_chalk["_OPERATION"] == "extract"
-    ), "operation expected to be extract"
+    # there should not be operation errors
+    assert extracted_chalk.has(_OPERATION="extract", _OP_ERRORS=IfExists(Length(0)))
 
     if len(artifact_map) == 0:
-        assert "_CHALKS" not in extracted_chalk
+        assert extracted_chalk.has(_CHALKS=MISSING)
         return
 
     if virtual:
-        assert (
-            "_UNMARKED" in extracted_chalk and "_CHALKS" not in extracted_chalk
-        ), "Expected that artifact to not have chalks embedded"
-
-        # everything should be unmarked, but not everything is an artifact
-        assert len(extracted_chalk["_UNMARKED"]) >= len(
-            artifact_map
-        ), "wrong number of unmarked chalks"
-
-        # we should find artifact in _UNMARKED
-        for key in artifact_map:
-            assert key in extracted_chalk["_UNMARKED"]
+        assert extracted_chalk.has(
+            _CHALKS=MISSING,
+            _UNMARKED=Contains(set(artifact_map)),
+        )
 
     else:
-        if len(artifact_map) > 0:
-            # okay to have _UNMARKED as long as the chalk mark is still there
-            assert (
-                "_CHALKS" in extracted_chalk
-            ), "Expected that artifact to have chalks embedded"
+        # okay to have _UNMARKED as long as the chalk mark is still there
+        assert extracted_chalk.has(_CHALKS=Length(len(artifact_map)))
 
-            assert len(extracted_chalk["_CHALKS"]) == len(
-                artifact_map
-            ), "wrong number of chalks"
+        for chalk in extracted_chalk.marks:
+            path = chalk["_OP_ARTIFACT_PATH"]
+            assert path in artifact_map, "path not found"
+            artifact_info = artifact_map[path]
 
-            for chalk in extracted_chalk["_CHALKS"]:
-                path = chalk["_OP_ARTIFACT_PATH"]
-                assert path in artifact_map, "path not found"
-                artifact_info = artifact_map[path]
-
-                assert artifact_info.type == chalk["ARTIFACT_TYPE"]
-
+            assert chalk.has(
+                ARTIFACT_TYPE=artifact_info.type,
                 # top level vs chalk-level sanity check
-                assert chalk["PLATFORM_WHEN_CHALKED"] == extracted_chalk["_OP_PLATFORM"]
-                assert (
-                    chalk["INJECTOR_COMMIT_ID"]
-                    == extracted_chalk["_OP_CHALKER_COMMIT_ID"]
-                )
-        else:
-            assert "_CHALKS" not in extracted_chalk
-
-    # there should not be operation errors
-    try:
-        assert len(extracted_chalk["_OP_ERRORS"]) == 0
-    except KeyError:
-        # fine if this key doesn't exist
-        pass
+                PLATFORM_WHEN_CHALKED=extracted_chalk["_OP_PLATFORM"],
+                INJECTOR_COMMIT_ID=extracted_chalk["_OP_CHALKER_COMMIT_ID"],
+            )

@@ -1,19 +1,42 @@
-FROM gcr.io/projectsigstore/cosign as cosign
+# this needs to be before any FROM clauses
+ARG BASE=ubuntu
+ARG PYTHON_VERSION=3.11.3
 
-FROM python:3.11.3-alpine3.17
+# ----------------------------------------------------------------------------
 
-ARG POETRY_VERSION=1.5.1
+FROM python:$PYTHON_VERSION-alpine3.17 as alpine
 
 # install chalk runtime deps
 RUN apk add --no-cache curl git
 
-# M1-only deps to compile wheels on ARM
 RUN if uname -m | grep -Ei "arm|aarch"; then \
     apk add --no-cache \
         gcc \
         libffi-dev \
         musl-dev \
     ; fi
+
+# ----------------------------------------------------------------------------
+
+FROM python:$PYTHON_VERSION-slim as ubuntu
+
+RUN apt-get update -y && \
+    apt-get install -y \
+        curl \
+        git \
+        gdb \
+        && \
+    apt-get clean -y
+
+# ----------------------------------------------------------------------------
+
+FROM gcr.io/projectsigstore/cosign as cosign
+
+# ----------------------------------------------------------------------------
+
+FROM $BASE
+
+ARG POETRY_VERSION=1.5.1
 
 COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
 

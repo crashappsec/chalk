@@ -69,6 +69,10 @@ def do_docker_cleanup() -> Iterator[None]:
         (DOCKERFILES / "valid" / "sample_1", None, False),
         # PWD=foo && docker build -t test .
         (DOCKERFILES / "valid" / "sample_1", None, True),
+        # PWD=foo && docker build .
+        (DOCKERFILES / "valid" / "sample_3", None, False),
+        # PWD=foo && docker build -t test .
+        (DOCKERFILES / "valid" / "sample_3", None, True),
         # docker build -f foo/Dockerfile foo
         (None, DOCKERFILES / "valid" / "sample_1" / "Dockerfile", False),
         # docker build -f foo/Dockerfile -t test foo
@@ -91,8 +95,50 @@ def test_build(
         cwd=cwd,
         tag=random_hex if tag else None,
         buildkit=buildkit,
+        config=CONFIGS / "docker_wrap.conf",
     )
     assert image_id
+
+
+@pytest.mark.parametrize("buildkit", [True, False])
+@pytest.mark.parametrize(
+    "base, test",
+    [
+        (
+            DOCKERFILES / "valid" / "split_dockerfiles" / "base.Dockerfile",
+            DOCKERFILES / "valid" / "split_dockerfiles" / "test.Dockerfile",
+        ),
+    ],
+)
+def test_composite_build(
+    chalk: Chalk,
+    base: Path,
+    test: Path,
+    buildkit: bool,
+    random_hex: str,
+):
+    image_id, _ = Docker.build(
+        dockerfile=base,
+        buildkit=buildkit,
+        tag=random_hex,
+    )
+    assert image_id
+
+    # TODO this is a known limitation for the moment
+    # we EXPECT this case to fail without buildkit enabled,
+    # as base image adjusts USER and child Dockerfile
+    # does not have any indication that USER was adjusted
+    # and so we cannot detect USER from base image.
+    # In this case chalk falls back to standard docker build
+    # which means there is no chalk report in the output
+    second_image_id, result = chalk.docker_build(
+        dockerfile=test,
+        buildkit=buildkit,
+        args={"BASE": random_hex},
+        config=CONFIGS / "docker_wrap.conf",
+        expecting_report=buildkit,
+    )
+    assert second_image_id
 
 
 @mock.patch.dict(os.environ, {"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"})
@@ -101,6 +147,7 @@ def test_build(
     [
         "valid/sample_1",
         "valid/sample_2",
+        "valid/sample_3",
     ],
 )
 def test_virtual_valid(
@@ -173,12 +220,15 @@ def test_virtual_invalid(
     ).is_file(), "virtual-chalk.json should not have been created!"
 
 
-@pytest.mark.parametrize("test_file", ["valid/sample_1", "valid/sample_2"])
+@pytest.mark.parametrize(
+    "test_file", ["valid/sample_1", "valid/sample_2", "valid/sample_3"]
+)
 def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
     tag = f"{test_file}_{random_hex}"
     image_hash, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
+        config=CONFIGS / "docker_wrap.conf",
     )
 
     # artifact is the docker image
@@ -234,6 +284,7 @@ def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
     chalk_copy.docker_build(
         dockerfile=DOCKERFILES / "valid" / "sleep" / "Dockerfile",
         tag=tag,
+        log_level="trace",
     )
 
     _, result = Docker.run(
@@ -271,6 +322,7 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
     assert TEST_LABEL in labels.values()
 
 
+@pytest.mark.parametrize("push", [True, False])
 @pytest.mark.parametrize(
     "test_file",
     [
@@ -281,19 +333,25 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
     platform.system() == "Darwin",
     reason="Skipping local docker push on mac due to issues https://github.com/docker/for-mac/issues/6704",
 )
-def test_build_and_push(chalk: Chalk, test_file: str):
-    tag_base = f"{REGISTRY}/{test_file}"
+def test_build_and_push(chalk: Chalk, test_file: str, random_hex: str, push: bool):
+    tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
     tag = f"{tag_base}:latest"
 
-    current_hash_build, _ = chalk.docker_build(
+    current_hash_build, push_result = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
+        push=push,
     )
 
-    # push docker wrapped
-    push = chalk.docker_push(tag)
-    current_hash_push = push.mark["_CURRENT_HASH"]
-    repo_digest_push = push.mark["_REPO_DIGESTS"][tag_base]
+    # if without --push at build time, explicitly push to registry
+    if not push:
+        push_result = chalk.docker_push(tag)
+
+    current_hash_push = push_result.mark["_CURRENT_HASH"]
+    repo_digest_push = push_result.mark["_REPO_DIGESTS"][tag_base]
+    assert "CHALK_ID" in push_result.mark
+    # primary key needed to associate build+push
+    assert "METADATA_ID" in push_result.mark
 
     assert current_hash_build == current_hash_push
 

@@ -788,6 +788,8 @@ proc parseAndEval*(s:      Stream,
     of "CMD":
       firstFromCheck()
       res.add(parse.parseCmd(cmd))
+    of "USER":
+      res.add(DfUserInfo(str: unicode.strip(cmd.rawArg)))
     of "ONBUILD":
       firstFromCheck()
       res.add(parse.parseOnBuild(cmd))
@@ -855,6 +857,8 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation) =
       section.cmd = CmdInfo(obj)
     elif obj of ShellInfo:
       section.shell = ShellInfo(obj)
+    elif obj of DfUserInfo:
+      section.lastUser = DfUserInfo(obj)
     elif obj of LabelInfo:
       for k, v in LabelInfo(obj).labels:
         labels[k] = v

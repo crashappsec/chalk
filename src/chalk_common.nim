@@ -229,6 +229,9 @@ type
     rawSrc*: seq[string]
     rawDst*: string
 
+  DfUserInfo* = ref object of InfoBase
+    str*: string
+
   LabelInfo* = ref object of InfoBase
     labels*: OrderedTable[string, string]
 
@@ -238,6 +241,7 @@ type
     entryPoint*:  EntryPointInfo
     cmd*:         CmdInfo
     shell*:       ShellInfo
+    lastUser*:    DfUserInfo
 
   DockerInvocation* = ref object
     dockerExe*:         string
