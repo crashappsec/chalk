@@ -13,8 +13,9 @@ from .chalk.validate import (
     validate_extracted_chalk,
     validate_virtual_chalk,
 )
-from .conf import LS_PATH
+from .conf import DATE_PATH, GDB, LS_PATH, UNAME_PATH
 from .utils.log import get_logger
+from .utils.os import run
 
 
 logger = get_logger()
@@ -63,3 +64,35 @@ def test_nonvirtual_valid(copy_files: list[Path], tmp_data_dir: Path, chalk: Cha
     validate_virtual_chalk(
         tmp_data_dir=tmp_data_dir, artifact_map=artifact_info, virtual=False
     )
+
+
+@pytest.mark.requires_gdb
+@pytest.mark.parametrize(
+    "copy_files",
+    [
+        [i]
+        for i in [
+            LS_PATH,
+            DATE_PATH,
+            UNAME_PATH,
+        ]
+        if i and not Path(i).is_symlink()
+    ],
+    indirect=True,
+)
+def test_entrypoint(copy_files: list[Path], chalk: Chalk):
+    """
+    Validate ELF entrypoints
+
+    Since chalk rewrites the entrypoints on elf when wrapping
+    we want to validate that we don't clobber the entrypoint
+    or corrupt memoryfor the elf when we do so
+    """
+    bin_path = copy_files[0]
+    cmd = ["gdb", "--quiet", "-x", "./commands.gdb", str(bin_path)]
+
+    before = run(cmd, cwd=GDB).json(after="{", everything=False)
+    chalk.insert(bin_path, virtual=False)
+    after = run(cmd, cwd=GDB).json(after="{", everything=False)
+
+    assert before == after

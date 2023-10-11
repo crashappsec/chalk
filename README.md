@@ -8,7 +8,7 @@
 
 Chalk™ captures metadata at build time, and can add a small 'chalk mark' (metadata) to any artifacts, so they can be identified in production. Chalk can also extract chalk marks and collect additional metadata about the operating environment when it does this.
 
-Using Chalk, you can build a graph connecting development and production, so that devops engineers understand what is happening in the development process, and so that developers can understand what is happening in the infrastructure. With this information they can work better together.
+Using Chalk, you can build a graph connecting development and production, so that devops engineers understand what is happening in the development process, and so that developers can understand what is happening in the infrastructure. With this information, they can work better together.
 
 Visibility into development and production also enables security engineers to better manage risk.
 
@@ -63,6 +63,6 @@ Chalk is licensed under the GPL version 3 license.
 
 ## Join the waiting list for our cloud platform.
 
-Our cloud hosted platform is built using Chalk. It make enterprise deployment easy, and provides additional functionality including prebuilt integrations to enrich your data, an in-built query editor, an API and more.
+Our cloud hosted platform is built using Chalk. It makes enterprise deployments easy, and provides additional functionality including prebuilt integrations to enrich your data, an in-built query editor, an API and more.
 
 There are both free and paid plans. You can [join the waiting list](https://crashoverride.com/join-the-waiting-list) for early access.

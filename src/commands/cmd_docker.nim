@@ -37,6 +37,8 @@ proc runMungedDockerInvocation*(ctx: DockerInvocation): int =
   trace("Running docker: " & dockerExeLocation & " " & args.join(" "))
 
   if ctx.dfPassOnStdin:
+    if not ctx.inDockerFile.endswith("\n"):
+      ctx.inDockerFile &= "\n"
     newStdin = ctx.inDockerFile & ctx.addedInstructions.join("\n")
     trace("Passing on stdin: \n" & newStdin)
 
@@ -200,26 +202,12 @@ proc getDefaultPlatformInfo(ctx: DockerInvocation): string =
     return ctx.foundPlatform
 
   let
-    probeFile    = """
+    probeFile      = """
 FROM alpine
 ARG TARGETPLATFORM
 RUN echo "CHALK_TARGET_PLATFORM=$TARGETPLATFORM"
 """
-    randomBinary = secureRand[array[16, char]]()
-  var
-    binStr       = newStringOfCap(16)
-
-  for ch in randomBinary:
-    binStr.add(ch)
-
-  # Base64 gives a mix of upper and lower, but docker only accepts
-  # lower in tags. So we lose some entropy, which is why we use a
-  # pretty long tag to make sure we're way above an accidental
-  # collision boundary.
-
-  let
-    preTag         = binStr.encode(safe=true).replace("-", ".").replace("=","")
-    tmpTag         = preTag.toLowerAscii()
+    tmpTag         = chooseNewTag()
     buildKitKey    = "DOCKER_BUILDKIT"
     buildKitKeySet = existsEnv(buildKitKey)
   var buildKitValue: string
@@ -231,6 +219,8 @@ RUN echo "CHALK_TARGET_PLATFORM=$TARGETPLATFORM"
                                           "-", "."], probeFile)
     stdErr = allOut.getStderr()
     parts  = stdErr.split("CHALK_TARGET_PLATFORM=")
+
+  trace("Probing for current docker build platform:\n" & stdErr)
 
   if buildKitKeySet:
     # key was set before us, so restore whatever the value was

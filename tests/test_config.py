@@ -94,11 +94,6 @@ def test_invalid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bo
     "test_config_file, expected_error",
     [
         ("validation/valid_1.conf", VALIDATION_ERROR),
-        # TODO: re-enable these once config-tool is updated
-        # ("config-tool/CI_CD_Docker.c4m", ""),
-        # ("config-tool/CI_CD_Standalone.c4m", ""),
-        # ("config-tool/default-USING-API.c4m", ""),
-        # ("config-tool/default.c4m", ""),
     ],
 )
 @pytest.mark.parametrize(
@@ -155,11 +150,6 @@ def test_load_url(
     [
         ("validation/valid_1.conf", True, VALIDATION_ERROR),
         ("validation/invalid_1.conf", False, ""),
-        # TODO: re-enable these once config-tool is updated
-        # ("config-tool/CI_CD_Docker.c4m", True, ""),
-        # ("config-tool/CI_CD_Standalone.c4m", True, ""),
-        # ("config-tool/default-USING-API.c4m", True, ""),
-        # ("config-tool/default.c4m", True, ""),
     ],
 )
 def test_external_configs(
