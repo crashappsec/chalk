@@ -73,6 +73,7 @@ proc addUnmarked*(s: string) =
 proc isMarked*(chalk: ChalkObj): bool {.inline.} = return chalk.marked
 
 proc newChalk*(name:         string            = "",
+               chalkId:      string            = "",
                pid:          Option[Pid]       = none(Pid),
                fsRef:        string            = "",
                tag:          string            = "",
@@ -102,6 +103,9 @@ proc newChalk*(name:         string            = "",
                     extract:       extract,
                     cache:         cache,
                     myCodec:       codec)
+
+  if chalkId != "":
+    result.collectedData["CHALK_ID"] = pack(chalkId)
 
   if extract != nil and len(extract) > 1:
     result.marked = true

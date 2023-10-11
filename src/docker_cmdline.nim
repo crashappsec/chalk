@@ -11,7 +11,27 @@
 ## is in configs/dockercmd.c4m), so we really just need to look at
 ## the command and flag info returned.
 
-import config
+import config, docker_base
+
+proc getPlatforms*(state: DockerInvocation): seq[string] =
+  if "platform" in state.flags:
+    return unpack[seq[string]](state.flags["platform"].getValue())
+  return @[]
+
+proc isMultiPlatform*(state: DockerInvocation): bool =
+  return len(state.getPlatforms()) > 1
+
+proc getTagForPlatform*(state: DockerInvocation, tag: string, platform: string): string =
+  let
+    tagParts = parseTag(tag)
+    name = tagParts[0]
+    version = tagParts[1]
+  return name & ":" & version & "-" & platform.replace("/", "-")
+
+proc getTagsForPlatform*(state: DockerInvocation, platform: string): seq[string] =
+  result = @[]
+  for tag in state.foundTags:
+    result.add(state.getTagForPlatform(tag, platform))
 
 proc extractOpInfo(state: DockerInvocation) =
   case state.cmd
@@ -28,7 +48,13 @@ proc extractOpInfo(state: DockerInvocation) =
   of "push":
     state.cmdPush = true
 
-proc addBackAllOutputFlags*(state: DockerInvocation) =
+proc addBackBuildCommonPushFlags*(state: DockerInvocation) =
+  for tag in state.foundTags:
+    state.newCmdLine.add("--tag=" & tag)
+  if state.foundPlatform != "":
+    state.newCmdLine.add("--platform=" & state.foundPlatform)
+
+proc addBackBuildWithoutPushFlags*(state: DockerInvocation) =
   # Here, we know 'push' isn't in the list.
   if "load" in state.flags:
     state.newCmdLine.add("--load")
@@ -37,7 +63,7 @@ proc addBackAllOutputFlags*(state: DockerInvocation) =
   for item in unpack[seq[string]](state.flags["output"].getValue()):
     state.newCmdLine.add("--output=" & item)
 
-proc addBackOtherOutputFlags*(state: DockerInvocation) =
+proc addBackBuildWithPushFlags*(state: DockerInvocation) =
   # If this was a buildx build command that had a push in there too,
   # we add a --load for good measure.
   if "output" in state.flags or "load" in state.flags or "push" in state.flags:
@@ -65,12 +91,11 @@ proc extractTags(state: DockerInvocation) =
 
 proc extractPlatform(state: DockerInvocation) =
   if "platform" in state.flags:
-    let platforms = unpack[seq[string]](state.flags["platform"].getValue())
-    if len(platforms) > 1:
+    if state.isMultiPlatform():
       # We don't want to try to wrap this right now.
       state.foundPlatform = "multi-arch"
     else:
-      state.foundPlatform = platforms[0]
+      state.foundPlatform = state.getPlatforms()[0]
 
 proc extractBuildArgs(state: DockerInvocation) =
   if "build-arg" in state.flags:
@@ -225,26 +250,34 @@ proc stripFlagsWeRewrite*(ctx: DockerInvocation) =
   ##
   ## 1. Any dockerfile passed. (--file or -f)
   ## 2. Any --push flag (we generate a separate push command).
-  ## 3. Any --outpute fields, as --push is an alias for
+  ## 3. Any --output fields, as --push is an alias for
   ##    --output=type=repository.
   ## 4. The build stage set via --target
+  ## 5. Any --tag to normalize for multi-platform builds
+  ## 6. Any --platform to normalize for multi-platform builds
   ##
   ## Everything else we just ignore, and pass through in place.
   ##
   ## We treat the ones that take args as it they could be added
-  ## multiple times, even though I don't think you can for any
-  ## of them. But just trying to be conservative; could imagine
+  ## multiple times, even though only some of them can accept that
+  ## (e.g. --tag). But just trying to be conservative; could imagine
   ## multiple values for --output-type for instance.
 
   let reparse = CommandSpec(maxArgs: high(int), dockerSingleArg: true,
                             unknownFlagsOk: true, noSpace: false)
 
-  reparse.addYesNoFlag("push", ["push"], [])
-  reparse.addYesNoFlag("load", ["load"], [])
-  reparse.addFlagWithArg("file", ["f", "file"], true, true, optArg = false)
-  reparse.addFlagWithArg("target", [], true, true, optArg = false)
-  reparse.addFlagWithArg("output", [], true, true, optArg = false)
-
+  reparse.addYesNoFlag("push", yesValues = ["push"], noValues = [])
+  reparse.addYesNoFlag("load", yesValues = ["load"], noValues = [])
+  reparse.addFlagWithArg("file", ["f", "file"], multi = true,
+                         clobberOk = true, optArg = false)
+  reparse.addFlagWithArg("target", [], multi = true,
+                         clobberOk = true, optArg = false)
+  reparse.addFlagWithArg("output", [], multi = true,
+                         clobberOk = true, optArg = false)
+  reparse.addFlagWithArg("platform", ["platform"], multi = true,
+                         clobberOk = true, optArg = false)
+  reparse.addFlagWithArg("tag", ["t", "tag"], multi = true,
+                         clobberOk = true, optArg = false)
 
   ctx.newCmdLine = reparse.parse(ctx.originalArgs).args[""]
 
@@ -267,6 +300,7 @@ proc processDockerCmdLine*(args: seq[string]): DockerInvocation =
 
   con4mRuntime.addStartGetopts("docker.getopts", args = args).run()
 
+  result.chalkId       = dockerGenerateChalkId()
   result.originalArgs  = args
   result.foundLabels   = OrderedTableRef[string, string]()
   result.otherContexts = OrderedTableRef[string, string]()

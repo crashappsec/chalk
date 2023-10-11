@@ -8,7 +8,7 @@
 ## Common docker-specific utility bits used in various parts of the
 ## implementation.
 
-import osproc, config, util, reporting
+import uri, osproc, config, util, reporting
 
 var
   buildXVersion: float  = 0   # Major and minor only
@@ -81,8 +81,15 @@ proc getDockerVersion*(): string =
 template haveBuildContextFlag*(): bool =
   buildXVersion >= 0.8
 
-template runDockerGetEverything*(args: seq[string], stdin = ""): ExecOutput =
-  runCmdGetEverything(dockerExeLocation, args, stdin)
+proc runDockerGetEverything*(args: seq[string], stdin = "", silent = true): ExecOutput =
+  if not silent:
+    trace("Running docker: " & dockerExeLocation & " " & args.join(" "))
+    if stdin != "":
+      trace("Passing on stdin: \n" & stdin)
+  result = runCmdGetEverything(dockerExeLocation, args, stdin)
+  if not silent and result.exitCode > 0:
+    trace(strutils.strip(result.stderr & result.stdout))
+  return result
 
 proc dockerFailsafe*(info: DockerInvocation) {.cdecl, exportc.} =
   # If our mundged docker invocation fails, then we conservatively
@@ -189,6 +196,21 @@ proc chooseNewTag*(): string =
 
   return "chalk-" & hexVal & ":latest"
 
+proc parseTag*(tag: string): (string, string) =
+  # parseUri requires some scheme to parse url correctly so we add dummy https
+  # parsed uri will allow us to figure out if tag contains version
+  # (note that tag can be full registry path which can include
+  # port in the hostname)
+  let uri = parseUri("https://" & tag)
+  if ":" in uri.path:
+    let
+      tagParts = tag.rsplit(":", maxsplit = 1)
+      name     = tagParts[0]
+      version  = tagParts[1]
+    return (name, version)
+  else:
+    return (tag, "latest")
+
 proc getAllDockerContexts*(info: DockerInvocation): seq[string] =
   if info.foundContext != "" and info.foundContext != "-":
     result.add(resolvePath(info.foundContext))
@@ -249,3 +271,10 @@ proc extractBasicImageInfo*(chalk: ChalkObj): bool =
 
   chalk.populateBasicImageInfo(info.get())
   return true
+
+proc dockerGenerateChalkId*(): string =
+  var
+    b      = secureRand[array[32, char]]()
+    preRes = newStringOfCap(32)
+  for ch in b: preRes.add(ch)
+  return preRes.idFormat()

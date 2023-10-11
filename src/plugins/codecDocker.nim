@@ -14,11 +14,7 @@ const
 proc dockerGetChalkId*(self: Plugin, chalk: ChalkObj): string {.cdecl.} =
   if chalk.extract != nil and "CHALK_ID" in chalk.extract:
     return unpack[string](chalk.extract["CHALK_ID"])
-  var
-    b      = secureRand[array[32, char]]()
-    preRes = newStringOfCap(32)
-  for ch in b: preRes.add(ch)
-  return preRes.idFormat()
+  return dockerGenerateChalkId()
 
 template extractFinish(res: bool = false) =
   setCurrentDir(cwd)

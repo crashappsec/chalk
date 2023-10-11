@@ -285,7 +285,7 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
     if selfIdOpt.isSome(): result["INJECTOR_CHALK_ID"] = pack(selfIdOpt.get())
 
 proc metsysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
-                                   ChalkDict {.cdecl.} =
+                                     ChalkDict {.cdecl.} =
   result = ChalkDict()
 
   # We add these directly into collectedData so that it can get
