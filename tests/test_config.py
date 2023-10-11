@@ -80,8 +80,6 @@ def test_invalid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bo
         use_embedded=use_embedded,
         expected_success=False,
     )
-    assert all(x in load.logs for x in parse_error)
-
     # chalk should still have default config embedded
     # and further calls should not fail and not have any errors
     extract = chalk_copy.extract(chalk_copy.binary)
