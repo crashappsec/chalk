@@ -208,6 +208,7 @@ class Chalk:
         virtual: bool = False,
         debug: bool = False,
         heartbeat: bool = False,
+        replace: bool = False,
         log_level: Optional[ChalkLogLevel] = None,
         exec_command: Optional[str | Path] = None,
         as_parent: Optional[bool] = None,
@@ -241,6 +242,8 @@ class Chalk:
             cmd += ["--chalk-as-parent"]
         if heartbeat:
             cmd += ["--heartbeat"]
+        if replace:
+            cmd += ["--replace"]
         if debug:
             cmd += ["--debug"]
         if no_color:
@@ -341,6 +344,7 @@ class Chalk:
     def load(
         self,
         config: Path | str,
+        replace: bool = True,
         *,
         use_embedded: bool = False,
         expected_success: bool = True,
