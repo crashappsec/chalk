@@ -186,9 +186,37 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
   let response = callTheSecretService(base, prKey, apikey, "", HttpGet)
 
   if response.status[0] != '2':
-    warn("Could not retrieve signing secret: " & response.status & "\n" &
-      "Will not be able to sign / verify.")
-    return false
+    # authentication issue / token expiration - begin reauth
+    if response.status.startswith("401"):
+      # parse json response and save / return values()
+      let jsonNodeReason = parseJson(response.body())
+      let reasonCode     = jsonNodeReason["Message"].getStr()
+
+      if reasonCode.startswith("token_expired"):
+        info("API access token expired, refreshing ...")
+        # Remove current API token from self chalk mark
+        selfChalk.extract["$CHALK_API_KEY"] = pack("")
+
+        # refresh access_token 
+        let boxedOptRefresh = selfChalkGetKey("$CHALK_API_REFRESH_TOKEN")
+        if boxedOptRefresh.isSome():
+          let
+            boxedRefresh  = boxedOptRefresh.get()
+            refreshToken = unpack[string](boxedRefresh)
+          trace("Refresh token retrieved from chalk mark: " & $refreshToken)
+
+          let newApiToken = refreshAccessToken($refreshToken)
+          if newApiToken == "":
+            return false
+          else:
+            trace("API Token refreshed: " & newApiToken)
+            #save new api token to self chalk mark
+            selfChalk.extract["$CHALK_API_KEY"] = pack($newApiToken)
+            return loadFromSecretManager(prkey, $newApiToken)
+    else:
+      warn("Could not retrieve signing secret: " & response.status & "\n" &
+        "Will not be able to sign / verify.")
+      return false
 
   var
     body:    string
@@ -394,13 +422,14 @@ proc testSigningSetup(pubKey, priKey: string): bool =
 
 proc writeSelfConfig(selfChalk: ChalkObj): bool {.importc, discardable.}
 
-proc saveSigningSetup(pubKey, priKey, apiToken: string, gen: bool): bool =
+proc saveSigningSetup(pubKey, priKey, apiToken, refreshToken: string, gen: bool): bool =
   let selfChalk = getSelfExtraction().get()
 
   selfChalk.extract["$CHALK_ENCRYPTED_PRIVATE_KEY"] = pack(priKey)
   selfChalk.extract["$CHALK_PUBLIC_KEY"]            = pack(pubKey)
   if apiToken != "":
     selfChalk.extract["$CHALK_API_KEY"]             = pack(apiToken)
+    selfChalk.extract["$CHALK_API_REFRESH_TOKEN"]   = pack(refreshToken)
 
   commitPassword(prikey, apiToken, gen)
 
@@ -478,19 +507,9 @@ proc attemptToLoadKeys*(silent=false): bool =
   let
     withoutExtension = getKeyFileLoc()
     use_api = chalkConfig.getApiLogin()
-  var
-    apikey  = ""
 
   if withoutExtension == "":
       return false
-
-  if use_api:
-    # get API key to pass to secret manager
-    let boxedOptApi = selfChalkGetKey("$CHALK_API_KEY")
-    if boxedOptApi.isSome():
-      let boxedApi = boxedOptApi.get()
-      apikey   = unpack[string](boxedApi)
-      trace("API token retrieved from chalk mark: " & $apikey)
 
   var
     pubKey = tryToLoadFile(withoutExtension & ".pub")
@@ -515,14 +534,23 @@ proc attemptToLoadKeys*(silent=false): bool =
     return false
 
   cosignLoaded = true
+
+  # Ensure any changed chalk keys are saved to self
+  let savedCommandName = getCommandName()
+  setCommandName("setup")
+  result = selfChalk.writeSelfConfig()
+  setCommandName(savedCommandName)
+
   return true
 
 proc attemptToGenKeys*(): bool =
-  var apiToken = ""
-  let use_api = chalkConfig.getApiLogin()
+  var 
+    apiToken     = ""
+    refreshToken = ""
+  let use_api    = chalkConfig.getApiLogin()
 
   if use_api:
-    apiToken = getChalkApiToken()
+    (apiToken, refreshToken) = getChalkApiToken()
     if apiToken == "":
       return false
     else:
@@ -560,9 +588,9 @@ proc attemptToGenKeys*(): bool =
     cosignLoaded = true
 
     if use_api:
-      result = saveSigningSetup(pubKey, priKey, apiToken, true)
+      result = saveSigningSetup(pubKey, priKey, apiToken, refreshToken, true)
     else:
-      result = saveSigningSetup(pubKey, priKey, "", true)
+      result = saveSigningSetup(pubKey, priKey, "", "", true)
 
 proc canAttest*(): bool =
   if getCosignLocation() == "":

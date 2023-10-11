@@ -20,7 +20,36 @@ template jwtSplitAndDecode(jwtString: string, doDecode: bool): string =
   else:
     $apiJwtPayload
 
-proc getChalkApiToken*(): string =
+proc refreshAccessToken*(refresh_token: string): string =
+
+  # Mechanism to support access_token refresh via OIDC
+  let timeout:   int = cast[int](chalkConfig.getSecretManagerTimeout())
+  var 
+      refresh_url = uri.parseUri(chalkConfig.getSecretManagerUrl())
+      context:           SslContext
+      client:            HttpClient
+
+  refresh_url.path = "/api/refresh"
+
+  # request new access_token via refresh
+  info("Refreshing API access token....")
+  if refresh_url.scheme == "https":
+    let context = newContext(verifyMode = CVerifyPeer)
+    client  = newHttpClient(sslContext = context, timeout = timeout)
+  else:
+    client  = newHttpClient(timeout = timeout)
+  let response  = client.safeRequest(url = refresh_url, httpMethod = HttpPost, body = $refresh_token)
+  client.close()
+
+  if response.status.startswith("200"):
+    # parse json response and save / return values
+    let jsonNode = parseJson(response.body())
+    let new_access_token = jsonNode["access_token"].getStr()
+    let new_id_token     = jsonNode["id_token"].getStr()
+
+    return new_access_token
+
+proc getChalkApiToken*(): (string, string) =
 
   # ToDo check if token already self chalked in and gecan be read
 
@@ -43,10 +72,11 @@ proc getChalkApiToken*(): string =
     pollUri:           Uri
     pollUrl:           string
     pollInt:           int
+    refreshToken:      string
     response:          Response
     responsePoll:      Response
-    ret:               string = ""
-    token:             string
+    ret                = ("","")
+    accessToken:       string
     totalSleepTime:    float  = 0.0
   type
     frameList = array[8, string]
@@ -67,7 +97,6 @@ proc getChalkApiToken*(): string =
 
   # set api login endpoint
   var login_url = uri.parseUri(chalkConfig.getSecretManagerUrl())
-
   login_url.path = "/api/login"
 
   # request auth code from API
@@ -82,7 +111,6 @@ proc getChalkApiToken*(): string =
 
   if response.status.startswith("200"):
     # parse json response and save / return values
-    trace(response.body())
     let jsonNode = parseJson(response.body())
     authId       = jsonNode["id"].getStr()
     authUrl      = jsonNode["authUrl"].getStr()
@@ -119,18 +147,16 @@ proc getChalkApiToken*(): string =
           stdout.write(succFr)
           stdout.flushFile()
           print("<h5>Authentication successful!</h5>\n")
-          trace(responsePoll.status & responsePoll.body())
 
           # parse json response and save / return values()
           let jsonPollNode = parseJson(responsePoll.body())
-          token            = jsonPollNode["access_token"].getStr()
-          trace($jsonPollNode)
+          accessToken            = jsonPollNode["access_token"].getStr()
+          refreshToken     = jsonPollNode["refresh_token"].getStr()
 
           # decode JWT
-          pollPayloadBase64 = jwtSplitAndDecode($token, true)
-          let decodedPollJwt    = parseJson(pollPayloadBase64)
-          trace($decodedPollJwt)
-          ret = $token
+          pollPayloadBase64  = jwtSplitAndDecode($accessToken, true)
+          let decodedPollJwt = parseJson(pollPayloadBase64)
+          ret = ($accessToken, $refreshToken)
 
         elif responsePoll.status.startswith("428") or responsePoll.status.startswith("403"):
           # sleep for requested polling period while showing spinner before polling again
