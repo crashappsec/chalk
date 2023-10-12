@@ -105,7 +105,11 @@ Any arguments passed in through `args` will be directly passed through to the un
 
 ### Running Tests Directly
 
-While tests can be run directly via `pytest`, this is not recommended. However, if you would like to do so, ensure that you have the following:
+While tests can be run directly via `pytest`, this is not recommended; they are intended to be run through the `docker compose` environment, and many of them are likely to fail without the correct setup.
+
+WARNING: These tests are ELF only.
+
+If you would really like to run tests directly, ensure that you have the following:
 
 - `python` version 3.11 or greater
 - `pipx` (recommended) or `pip` package installer for python
@@ -114,7 +118,8 @@ While tests can be run directly via `pytest`, this is not recommended. However, 
 To set up the testing framework:
 
 1. Install poetry with `pipx install poetry`
-2. Install dependencies with `poetry install` (the list of dependencies to be installed is located at `tests/pyproject.toml`)
+2. From the repository root: `cd ./tests`
+3. Install dependencies with `poetry install` (the list of dependencies to be installed is located at `tests/pyproject.toml`)
 
 To run the tests:
 
