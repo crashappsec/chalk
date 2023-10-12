@@ -124,8 +124,9 @@ To set up the testing framework:
 To run the tests:
 
 1. From the repository root: `cd ./tests`
-2. Start poetry shell with `poetry shell`
-3. Run tests with `pytest` (flags and arguments as in the previous section)
+2. Run tests via poetry with `poetry run pytest` (flags and arguments as in the previous section)
+
+Alternatively, you can start a poetry shell with `poetry shell` and then run `pytest`, but this may not work for all shells.
 
 WARNING: Since the chalk tests were intended to be run via `docker compose`, running them directly through `pytest` will cause a number of failures. In particular:
 
