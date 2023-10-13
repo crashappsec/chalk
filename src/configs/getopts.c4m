@@ -644,6 +644,14 @@ but for the moment:
 commands that do not match known topics)
 """
   }
+
+command login {
+    shortdoc: "Start API login process"
+    doc: """
+Starts the API login process and will provide a URL to follow in a browser to complete authentication.
+"""
+  }
+
 }
 
 func set_config_file(filename) {

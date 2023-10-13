@@ -504,9 +504,7 @@ proc attemptToLoadKeys*(silent=false): bool =
   if getCosignLocation() == "":
     return false
 
-  let
-    withoutExtension = getKeyFileLoc()
-    use_api = chalkConfig.getApiLogin()
+  let withoutExtension = getKeyFileLoc()
 
   if withoutExtension == "":
       return false
@@ -550,11 +548,36 @@ proc attemptToGenKeys*(): bool =
   let use_api    = chalkConfig.getApiLogin()
 
   if use_api:
-    (apiToken, refreshToken) = getChalkApiToken()
-    if apiToken == "":
-      return false
+    # Possible we already have API keys chalked into ourself
+    # refresh token 
+    let boxedOptRefresh = selfChalkGetKey("$CHALK_API_REFRESH_TOKEN")
+    if boxedOptRefresh.isSome():
+      let boxedRefresh  = boxedOptRefresh.get()
+      refreshToken = unpack[string](boxedRefresh)
+      trace("Refresh token retrieved from chalk mark: " & $refreshToken)
+    
+      # access_token
+      let boxedOptAccess = selfChalkGetKey("$CHALK_API_KEY")
+      if boxedOptAccess.isSome():
+        let boxedAccess  = boxedOptAccess.get()
+        apiToken = unpack[string](boxedAccess)
+        trace("Access token retrieved from chalk mark: " & $apiToken)
+      else:
+        trace("empty access token")
+    
+    else:
+      trace("empty refresh token")
+    
+    if apiToken == "" or refreshToken == "":
+      # could not retreive so requesting new
+      trace("Missing token, starting new login..." & apiToken & refreshToken)
+      (apiToken, refreshToken) = getChalkApiToken()
+      if apiToken == "" or refreshToken == "":
+        trace("Unable to retrieve API access and refresh tokens.")
+        return false
     else:
       trace("API Token received: " & apiToken)
+      trace("Refresh Token received: " & refreshToken)
 
 
   if getCosignLocation() == "":
