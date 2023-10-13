@@ -8,7 +8,7 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 2.0.0"
-requires "https://github.com/crashappsec/con4m#1c32341c07c49d75dff5b336dff716f1e8bd04a5"
+requires "https://github.com/crashappsec/con4m#968b331c4b64ff2575a53ec39d7eefc4f2f42dc7"
 requires "https://github.com/viega/zippy == 0.10.7"
 requires "https://github.com/aruZeta/QRgen == 3.0.0"
 
