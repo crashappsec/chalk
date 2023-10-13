@@ -349,12 +349,13 @@ class Chalk:
         use_embedded: bool = False,
         expected_success: bool = True,
         ignore_errors: bool = False,
+        log_level: ChalkLogLevel = "error",
     ) -> ChalkProgram:
         hash = sha256(self.binary)
         result = self.run(
             command="load",
             params=[str(config)],
-            log_level="error",
+            log_level=log_level,
             replace=replace,
             use_embedded=use_embedded,
             expected_success=expected_success,

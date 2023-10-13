@@ -126,15 +126,18 @@ def test_valid_load(
 @pytest.mark.parametrize(
     "path, expected_success",
     [
-        ("data/configs/validation/valid_1.conf", True),
-        ("data/configs/validation/invalid_1.conf", False),
+        ("demo-http.c4m", True),
         ("nonexisting", False),
     ],
 )
 def test_load_url(
-    chalk_copy: Chalk, server_static: str, path: str, expected_success: bool
+    chalk_copy: Chalk, server_chalkdust: str, path: str, expected_success: bool
 ):
-    chalk_copy.load(f"{server_static}/{path}", expected_success=expected_success)
+    chalk_copy.load(
+        f"{server_chalkdust}/{path}",
+        log_level="trace",
+        expected_success=expected_success,
+    )
 
 
 # tests for configs that are found in the chalk search path
