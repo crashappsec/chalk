@@ -12,8 +12,8 @@ import config, confload, commands, norecurse, sinks, docker_base,
 
 when isMainModule:
   setupSignalHandlers() # util.nim
-  addDefaultSinks()     # nimutils/sinks.nim
-  loadAllConfigs()      # config.nim
+  ioSetup()             # sinks.nim
+  loadAllConfigs()      # confload.nim
   recursionCheck()      # norecurse.nim
   otherSetupTasks()     # util.nim
   # Wait for this warning until after configs load.
