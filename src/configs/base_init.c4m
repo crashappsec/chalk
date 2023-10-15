@@ -26,6 +26,7 @@ docker { }
 load { }
 
 
-aws {
-  ec2 { }
+cloud_provider {
+  cloud_instance_hw_identifiers {
+  }
 }

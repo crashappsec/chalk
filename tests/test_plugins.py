@@ -2,13 +2,13 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import os
 import re
 import shutil
 from pathlib import Path
 from typing import IO
 from unittest import mock
 
-import os
 import pytest
 
 from .chalk.runner import Chalk
@@ -21,7 +21,6 @@ from .chalk.validate import (
 from .conf import CODEOWNERS, CONFIGS, LS_PATH
 from .utils.git import init
 from .utils.log import get_logger
-
 
 logger = get_logger()
 
@@ -138,11 +137,13 @@ def test_imds(
 ):
     # make imds plugin think we are running in EC2
     with tmp_file as fid:
-        fid.write(b"amazon")
+        fid.write(b"Amazon")
     bin_path = copy_files[0]
     insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
     assert insert.report.contains(
         {
+            "_OP_CLOUD_PROVIDER": "aws",
+            "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ec2",
             "_AWS_AMI_ID": "ami-0abcdef1234567890",
             "_AWS_AMI_LAUNCH_INDEX": "0",
             "_AWS_AMI_MANIFEST_PATH": "(unknown)",
@@ -208,6 +209,267 @@ def test_imds(
                 "SecretAccessKey": "<<redacted>>",
                 "Token": "<<redacted>>",
                 "Expiration": "2023-09-13T19:40:12Z",
+            },
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+def test_imds_ecs(
+    copy_files: list[Path],
+    chalk: Chalk,
+    tmp_file: IO,
+    server_imds: str,
+):
+    # make imds plugin think we are running in EC2
+    with tmp_file as fid:
+        fid.write(b"Amazon")
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "imds.c4m",
+        env={"ECS_CONTAINER_METADATA_URI": "foobar"},
+    )
+    assert insert.report.contains(
+        {
+            "_OP_CLOUD_PROVIDER": "aws",
+            "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ecs",
+        }
+    )
+
+
+@mock.patch.dict(
+    os.environ,
+    {
+        "KUBERNETES_PORT": "tests",
+    },
+)
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+def test_imds_eks(
+    copy_files: list[Path],
+    chalk: Chalk,
+    tmp_file: IO,
+    server_imds: str,
+):
+    # make imds plugin think we are running in EC2
+    with tmp_file as fid:
+        fid.write(b"Amazon")
+    bin_path = copy_files[0]
+    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
+    assert insert.report.contains(
+        {
+            "_OP_CLOUD_PROVIDER": "aws",
+            "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_eks",
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+def test_metadata_azure(
+    copy_files: list[Path],
+    chalk: Chalk,
+    tmp_file: IO,
+    server_imds: str,
+):
+    # make imds plugin think we are running in EC2
+    with tmp_file as fid:
+        fid.write(b"Microsoft Corporation")
+    bin_path = copy_files[0]
+    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
+    assert insert.report.contains(
+        {
+            "_OP_CLOUD_PROVIDER": "azure",
+            "_AZURE_INSTANCE_METADATA": {
+                "compute": {
+                    "azEnvironment": "AzurePublicCloud",
+                    "customData": "",
+                    "evictionPolicy": "",
+                    "isHostCompatibilityLayerVm": "true",
+                    "licenseType": "",
+                    "location": "westeurope",
+                    "name": "myVm",
+                    "offer": "0001-com-ubuntu-server-focal",
+                    "osProfile": {
+                        "adminUsername": "testuser",
+                        "computerName": "myVm",
+                        "disablePasswordAuthentication": "true",
+                    },
+                    "osType": "Linux",
+                    "placementGroupId": "",
+                    "plan": {"name": "", "product": "", "publisher": ""},
+                    "platformFaultDomain": "0",
+                    "platformUpdateDomain": "0",
+                    "priority": "",
+                    "provider": "Microsoft.Compute",
+                    "publicKeys": [
+                        {
+                            "keyData": "ssh-rsa AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJQPr4RsDbaJdKPHl2gfCwiWcTRVEu0XlQvsPgdvCH/Io8Im1VfBMamtRhTIEqlEoTaRD8h9ETDQAPg7GUVkg07P3ZgDfFf94KePpxADso7GoqaPsGuL4OQpURa4DQCmf1Jw+kDg0TI1ERYIQoNOGduiS5cuB74A5BxcgW2A52ocVoiINS1tPudZBIvnr8iQXa6BhB5EgUVP0w+pGaOgI4jHga8ThT9weGqzBrtBcyiZ44jfT2Tg/AjI4GuXq14HdFEN0096vk= generated-by-azure",
+                            "path": "/home/testuser/.ssh/authorized_keys",
+                        }
+                    ],
+                    "publisher": "canonical",
+                    "resourceGroupName": "myVm_group",
+                    "resourceId": "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/myVm_group/providers/Microsoft.Compute/virtualMachines/myVm",
+                    "securityProfile": {
+                        "secureBootEnabled": "true",
+                        "virtualTpmEnabled": "true",
+                    },
+                    "sku": "20_04-lts-gen2",
+                    "storageProfile": {
+                        "dataDisks": [],
+                        "imageReference": {
+                            "id": "",
+                            "offer": "0001-com-ubuntu-server-focal",
+                            "publisher": "canonical",
+                            "sku": "20_04-lts-gen2",
+                            "version": "latest",
+                        },
+                        "osDisk": {
+                            "caching": "ReadWrite",
+                            "createOption": "FromImage",
+                            "diffDiskSettings": {"option": ""},
+                            "diskSizeGB": "30",
+                            "encryptionSettings": {"enabled": "false"},
+                            "image": {"uri": ""},
+                            "managedDisk": {
+                                "id": "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/myVm_group/providers/Microsoft.Compute/disks/myVm_disk1_5e2103587ca646929255128ff64b5bdb",
+                                "storageAccountType": "Premium_LRS",
+                            },
+                            "name": "myVm_disk1_5e2103587ca646929255128ff64b5bdb",
+                            "osType": "Linux",
+                            "vhd": {"uri": ""},
+                            "writeAcceleratorEnabled": "false",
+                        },
+                        "resourceDisk": {"size": "34816"},
+                    },
+                    "subscriptionId": "11111111-1111-1111-1111-111111111111",
+                    "tags": "",
+                    "tagsList": [],
+                    "userData": "",
+                    "version": "20.04.202308310",
+                    "vmId": "e94f3f7f-6b23-4395-be46-ea363c549f71",
+                    "vmScaleSetName": "",
+                    "vmSize": "Standard_B1ls",
+                    "zone": "2",
+                },
+                "network": {
+                    "interface": [
+                        {
+                            "ipv4": {
+                                "ipAddress": [
+                                    {
+                                        "privateIpAddress": "10.0.0.4",
+                                        "publicIpAddress": "",
+                                    }
+                                ],
+                                "subnet": [{"address": "10.0.0.0", "prefix": "24"}],
+                            },
+                            "ipv6": {"ipAddress": []},
+                            "macAddress": "AAAAAAAAAAAA",
+                        }
+                    ]
+                },
+            },
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+def test_metadata_gcp(
+    copy_files: list[Path],
+    chalk: Chalk,
+    tmp_file: IO,
+    server_imds: str,
+):
+    # make imds plugin think we are running in EC2
+    with tmp_file as fid:
+        fid.write(b"Google")
+    bin_path = copy_files[0]
+    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
+    assert insert.report.contains(
+        {
+            "_OP_CLOUD_PROVIDER": "gcp",
+            "_GCP_INSTANCE_METADATA": {
+                "attributes": {
+                    "ssh-keys": 'test:ecdsa-sha2-nistp256 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKgXTiO1+sSWCEsq/bWaLdY= google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:11:57+0000"}\ntest:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCvddnbJ/XWxMUPXOsDMNoRHJeaCgwqk6g7UYvrXqogwmJ1WpC1QPuG3mhDjmBOcjINi7TYsozDKZilL2BDu2i6CGC1s2Tokq41lsgnCePNdnYmPcA318PmuMmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeT7R92kx google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:12:12+0000"}'
+                },
+                "cpuPlatform": "Intel Broadwell",
+                "description": "",
+                "disks": [
+                    {
+                        "deviceName": "instance-1",
+                        "index": 0,
+                        "interface": "SCSI",
+                        "mode": "READ_WRITE",
+                        "type": "PERSISTENT-BALANCED",
+                    }
+                ],
+                "guestAttributes": {},
+                "hostname": "instance-1.europe-west1-b.c.test-chalk-402014.internal",
+                "id": 133380848178631130,
+                "image": "projects/debian-cloud/global/images/debian-11-bullseye-v20231010",
+                "licenses": [{"id": "4324324324234234234"}],
+                "machineType": "projects/11111111111/machineTypes/e2-micro",
+                "maintenanceEvent": "NONE",
+                "name": "instance-1",
+                "networkInterfaces": [
+                    {
+                        "accessConfigs": [
+                            {"externalIp": "35.205.62.123", "type": "ONE_TO_ONE_NAT"}
+                        ],
+                        "dnsServers": ["169.254.169.254"],
+                        "forwardedIps": [],
+                        "gateway": "10.132.0.1",
+                        "ip": "10.132.0.2",
+                        "ipAliases": [],
+                        "mac": "42:01:0a:84:00:02",
+                        "mtu": 1460,
+                        "network": "projects/11111111111/networks/default",
+                        "subnetmask": "255.255.240.0",
+                        "targetInstanceIps": [],
+                    }
+                ],
+                "partnerAttributes": {},
+                "preempted": "FALSE",
+                "remainingCpuTime": -1,
+                "scheduling": {
+                    "automaticRestart": "TRUE",
+                    "onHostMaintenance": "MIGRATE",
+                    "preemptible": "FALSE",
+                },
+                "serviceAccounts": {
+                    "11111111111-compute@developer.gserviceaccount.com": {
+                        "aliases": ["default"],
+                        "email": "11111111111-compute@developer.gserviceaccount.com",
+                        "scopes": [
+                            "https://www.googleapis.com/auth/devstorage.read_only",
+                            "https://www.googleapis.com/auth/logging.write",
+                            "https://www.googleapis.com/auth/monitoring.write",
+                            "https://www.googleapis.com/auth/servicecontrol",
+                            "https://www.googleapis.com/auth/service.management.readonly",
+                            "https://www.googleapis.com/auth/trace.append",
+                        ],
+                    },
+                    "default": {
+                        "aliases": ["default"],
+                        "email": "11111111111-compute@developer.gserviceaccount.com",
+                        "scopes": [
+                            "https://www.googleapis.com/auth/devstorage.read_only",
+                            "https://www.googleapis.com/auth/logging.write",
+                            "https://www.googleapis.com/auth/monitoring.write",
+                            "https://www.googleapis.com/auth/servicecontrol",
+                            "https://www.googleapis.com/auth/service.management.readonly",
+                            "https://www.googleapis.com/auth/trace.append",
+                        ],
+                    },
+                },
+                "tags": [],
+                "virtualClock": {"driftToken": "0"},
+                "zone": "projects/11111111111/zones/europe-west1-b",
             },
         }
     )

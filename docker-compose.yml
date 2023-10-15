@@ -1,5 +1,6 @@
 networks:
   chalk:
+  gcp:
   imds:
     ipam:
       driver: default
@@ -83,6 +84,11 @@ services:
     networks:
       imds:
         ipv4_address: 169.254.169.254
+      gcp:
+        # XXX for simplicity's sake, use a single imds app server for all
+        # of AWS, Azure, GCP
+        aliases:
+          - metadata.google.internal
 
   # simple server for serving static files
   static:
@@ -118,6 +124,7 @@ services:
     networks:
       - chalk
       - imds
+      - gcp
     depends_on:
       registry:
         condition: service_healthy

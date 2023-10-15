@@ -39,7 +39,7 @@ plugin system {
 The system data collection module is the first thing to run for any
 data collection phase. The metadata it reports on are all things that
 are not overridable via other plugins.
-"""  
+"""
 }
 
 # These keys are system keys, but need to go LAST, not first.  The
@@ -63,7 +63,7 @@ plugin metsys {
 Like the `system` module, this module is non-overridable keys added by
 Chalk. It's just the ones that need to be computed at the very end of
 a data collection phase, so integrity / signing and audit.
-"""    
+"""
 }
 
 
@@ -91,7 +91,7 @@ for them.
 
 In other cases where there is just a single .git directory found, all
 artifacts will be attached to that info.
-"""    
+"""
 }
 
 plugin ci_github {
@@ -102,7 +102,7 @@ plugin ci_github {
 Collects information about associated build jobs in github actions.
 
 This only collects data when adding chalk marks.
-"""    
+"""
 }
 
 plugin ci_jenkins {
@@ -112,7 +112,7 @@ plugin ci_jenkins {
 Collects information about associated build jobs in Jenkins.
 
 This only collects data when adding chalk marks.
-"""    
+"""
 }
 
 plugin ci_gitlab {
@@ -123,7 +123,7 @@ plugin ci_gitlab {
 Collects information about associated build jobs in Gitlab.
 
 This only collects data when adding chalk marks.
-"""    
+"""
 }
 
 plugin github_codeowners {
@@ -133,7 +133,7 @@ plugin github_codeowners {
 Captures the contents of a github-style CODEOWNERS file.
 
 This only collects data when adding chalk marks.
-"""    
+"""
 }
 
 plugin authors {
@@ -145,7 +145,7 @@ plugin authors {
 Captures the value of old school AUTHOR(S) files.
 
 This only collects data when adding chalk marks.
-"""    
+"""
 }
 
 plugin procfs {
@@ -171,12 +171,13 @@ Captures host-level information for Linux machines from the proc file
 system interface, including process and network information.
 
 Can capture data both during build and during process run time.
-"""    
+"""
 }
 
-plugin imdsv2 {
+plugin cloudMetadata {
     enabled:         true
-    post_run_keys:   [
+    post_run_keys:   ["_GCP_INSTANCE_METADATA", "_AZURE_INSTANCE_METADATA",
+    "_OP_CLOUD_PROVIDER", "_OP_CLOUD_PROVIDER_SERVICE_TYPE",
     "_AWS_AMI_ID", "_AWS_AMI_LAUNCH_INDEX", "_AWS_AMI_MANIFEST_PATH",
     "_AWS_ANCESTOR_AMI_IDS", "_AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE",
     "_AWS_AZ", "_AWS_AZ_ID", "_AWS_BLOCK_DEVICE_MAPPING_AMI",
@@ -200,8 +201,8 @@ plugin imdsv2 {
     "_AWS_SPOT_TERMINATION_TIME", "_AWS_SUBNET_ID", "_AWS_VPC_ID",
     "_AWS_TAGS"]
     doc: """
-Captures metadata from AWS instances supporting IMDS.  
-"""    
+Captures metadata from cloud instances.
+"""
 }
 
 plugin aws_ecs {
@@ -211,7 +212,7 @@ plugin aws_ecs {
     doc: """
 Captures metadata from the primary endpoint for the original ECS
 metdata interface.
-"""    
+"""
 }
 
 # This plugin takes values from the conf file, whether they're static
@@ -269,7 +270,7 @@ changed by making the plugin high priority instead of low priority.
 For instance, if you really wanted, you could set:
 
 ```plugin.conffile.priority = 2```
-"""    
+"""
 }
 
 plugin zippeditem {
@@ -292,7 +293,7 @@ one example tool in each category is supported, `semgrep` and `syft`.
 Additional tools can be supported easily in the configuration.
 
 Note that associated metadata keys must also be enabled in a report.
-"""    
+"""
 }
 
 plugin elf {
@@ -317,7 +318,7 @@ compiler (including C, C++ or Go compilers) or assembler. Hand-written
 assembly without a section table is not handled; whenever this
 happens, the plugin will refuse to operate on the executable, and the
 `elf_last_resort` codec will be used instead.
-"""    
+"""
 }
 
 plugin elf_last_resort {
@@ -333,7 +334,7 @@ executable, and is still valid ELF.
 <p>
 However, the `strip` command will happily remove marks written by this
 plugin. Ideally though, it will never ever get used anyway.
-"""    
+"""
 }
 
 plugin source {
@@ -369,7 +370,7 @@ Within the Chalk command, you can do `help source_marks` to see more
 details on these options.
 <p>
 This codec currently only processes files that seem to be valid UTF-8.
-"""    
+"""
 }
 
 plugin macos {
@@ -396,7 +397,7 @@ Chalk validation validates both the actual binary, and the wrapper.
 This approach is done because MacOS does do extensive validation of
 binaries, and adding Chalk marks directly would require re-signing
 them in Apple's ecosystem, which we have not implemented.
-"""    
+"""
 }
 
 plugin zip {
@@ -429,7 +430,7 @@ they consider the chalk mark benign.
 <p>
 However, Chalk's signature, if used, covers all the content at the
 time of Chalking, so can detect any subsequent modifications.
-"""    
+"""
 }
 
 plugin python_pyc {
@@ -444,7 +445,7 @@ as source, but are distributed as python byte code (.pyc files).
 <p>
 Accepted file extensions can be set using the `pyc_extensions`
 configuration variable.
-"""    
+"""
 }
 
 plugin docker {
@@ -535,5 +536,5 @@ for containers and images.
 To ensure Chalk works without any configuration or compatability
 issues, we use the underlying docker command to collect most data,
 instead of using the docker socket.
-"""    
+"""
 }

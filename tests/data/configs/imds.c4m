@@ -1,1 +1,1 @@
-aws.ec2.sys_vendor_path: "/tmp/vendor"
+cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path: "/tmp/vendor"
