@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/crashappsec/chalk/actions/workflows/tests.yml/badge.svg?branch=main&event=push)](https://github.com/crashappsec/chalk/actions/workflows/tests.yml?query=branch%3Amain)
 
-# Total visibility of your software engineering lifecycle.
+# Telemetry & observability for the software development lifecycle.
 
 ## About Chalk
 
