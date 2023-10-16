@@ -21,7 +21,7 @@ from .conf import (
 logger = get_logger()
 
 
-VALIDATION_ERROR = "XXXXXX"
+VALIDATION_ERROR = "TEST ERROR HERE XXXXXX"
 parse_error = "Parse error"
 
 
@@ -41,7 +41,7 @@ def test_dump_load(tmp_data_dir: Path, chalk_copy: Chalk, use_embedded: bool):
     result = chalk_copy.load(
         tmp_conf, use_embedded=use_embedded, expected_success=False
     )
-    assert VALIDATION_ERROR in result.logs
+    assert VALIDATION_ERROR in " ".join(i.strip() for i in result.logs.splitlines())
 
 
 # sanity check that default config has not changed
@@ -185,9 +185,7 @@ def test_external_configs(
         assert expected_error in result_external.logs
 
 
-@pytest.mark.parametrize(
-    "test_config_file", [CONFIGS / "validation/custom_report.c4m"]
-)
+@pytest.mark.parametrize("test_config_file", [CONFIGS / "validation/custom_report.c4m"])
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_custom_report(
     chalk_copy: Chalk,

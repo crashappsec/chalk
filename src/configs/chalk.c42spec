@@ -292,7 +292,7 @@ available operational metadata from any one run of Chalk.
   for your report to bubble up the fields actually chalked).  Other
   operations report these keys only if they're extracted from
   artifacts.
-  
+
 To use the above template, we'd just have to tell the system when to
 use this template, as described below.
 """
@@ -809,7 +809,7 @@ object sink {
   user_def_ok:   true
   validator:     func sink_object_check
   doc:           """
-  
+
 This object type is needed to add new data sinks to chalk. If you're
 not a Chalk developer, this probably isn't going to be particularly
 useful; Instead, use `sink_config` to configure a sink, and then
@@ -936,7 +936,7 @@ object outconf {
   doc:           """
 
 ## Changing reports for operations
-  
+
 Each chalk operation that reports metadata will have one or more
 associated `outconf` sections in the configuration. These sections do
 only two things:
@@ -987,7 +987,7 @@ Similarly, `chalk exec` can produce two reports:
 The report name is always specified in the `_OPERATION` metadata
 key. The `outconf` section requires the **report name**, not the
 command that causes the report to run.
- 
+
 Out of the box, Chalk defines default templates that you can edit. If
 you edit the template(s) already in use by an outconf section, you
 don't need to do anything else. However, if you wish to switch to a
@@ -1039,10 +1039,10 @@ object custom_report {
   gen_typename:  "ReportSpec"
   gen_setters:   false
   user_def_ok:   false
-  
+
   doc:           """
 ## Adding additional reports
-  
+
 A `custom_report` section allows you to create secondary reports for
 whatever purpose. For instance, in the default Chalk configuration,
 the *primary* report logs to a file, but a secondary report gives
@@ -1174,7 +1174,7 @@ report will NOT run.
 
 If not specified, reports apply to any command that reports.
 """
-  }   
+  }
 
   field doc {
     type:     string
@@ -1189,7 +1189,7 @@ singleton extract {
   gen_setters: false
   user_def_ok: false
   doc: """
-  
+
 These are configuration options specific to how container extraction
 works for containers (plenty of the global options apply to
 extraction). Currently, the only options involve how we handle looking
@@ -1259,7 +1259,7 @@ will run it again without itself in the way. Such cases are the only
 times in the default configuration where error messages are logged to
 the console (when running `chalk docker`).
 """
-  allow getopts 
+  allow getopts
 
   field wrap_entrypoint {
     type:    bool
@@ -1429,7 +1429,7 @@ Options that control how the `chalk load` command works.
     default:  false
     shortdoc: "Replace on load"
     doc: """
-    
+
 When this value is true, the entire stored configuration file will be
 REPLACED with the specified configuration, as long as that
 configuration loads successfully.
@@ -1446,7 +1446,7 @@ Otherwise, the passed configuration is treated like a component:
 This flag is ignored when running `chalk load default`, which will
 _always_ reset the embedded configuration to the default.
 
-"""    
+"""
   }
 
   field validate_configs_on_load {
@@ -1642,7 +1642,7 @@ singleton env_config {
   gen_setters:   false
   user_def_ok:   false
   doc: """
-  
+
 This section is for internal configuration information gathering
 runtime environment information when running with the 'env' command,
 which is similar to the exec command, but where the exec command
@@ -1977,7 +1977,7 @@ Configuration information for AWS EC2
   doc: """
 The fields in this section probably will never need to be changed by
 end users.
-"""  
+"""
 
   field sys_hypervisor_path {
     # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
@@ -2012,7 +2012,7 @@ singleton aws {
   shortdoc: """
 Configuration information for the AWS Cloud Provider
 """
-  allow ec2 
+  allow ec2
 }
 
 root {
@@ -2027,25 +2027,25 @@ root {
   gen_setters:  false
   user_def_ok:  false
 
-  allow keyspec         
-  allow plugin          
-  allow sink            
-  allow sink_config     
-  allow mark_template   
-  allow report_template 
-  allow outconf         
-  allow custom_report   
-  allow tool            
-  allow extract         
-  allow docker          
+  allow keyspec
+  allow plugin
+  allow sink
+  allow sink_config
+  allow mark_template
+  allow report_template
+  allow outconf
+  allow custom_report
+  allow tool
+  allow extract
+  allow docker
   allow exec
   allow load
-  allow env_config      
-  allow source_marks    
-  allow aws             
+  allow env_config
+  allow source_marks
+  allow aws
 
   shortdoc: "Chalk Configuration Options"
-  
+
   doc: """
   This guide details all of the configuration options available in Chalk. These are all configurable variables that you can add in your configuration file. In some cases, there will also be other ways to set these values:
 
@@ -2071,7 +2071,7 @@ The config file types can be disabled with the command-line flags `--no-use-embe
 
   field config_filename {
     type:       string
-    default:    "chalk.conf"
+    default:    "chalk.c4m"
     write_lock: true
     doc:        "The file name to look for when searching for a file"
     shortdoc:   "Configuration File Name"
@@ -2194,7 +2194,7 @@ By default, virtual chalk marks will get appended to the file `./virtual-chalk.j
     hidden:     true
     doc:        "Extensions that we assume are in ZIP format for the zip codec"
   }
-  
+
   field pyc_extensions {
     type:       list[string]
     default:    ["pyc", "pyo", "pyd"]
@@ -2256,7 +2256,7 @@ Chalk can report the time from start until the time a report is produced
 by subscribing to the `_CHALK_RUN_TIME` host key. However, if you're running
 on the command line, and want the total time to be output to stderr as the
 very last thing, you can use this option (`--time` on the command line).
-"""    
+"""
   }
 
   field audit_location {
@@ -2334,7 +2334,7 @@ allows you to pick a place for temporary files to use IF no value for
 
 If neither is provided, you may very well end up with `/tmp` or
 `/var/tmp`, which should be great in most cases.
-"""    
+"""
   }
 
   field always_try_to_sign {
@@ -2698,7 +2698,7 @@ if env_exists("AWS_IAM_ROLE") {
   aws_iam_role = env("AWS_IAM_ROLE")
 }
 ```
-"""    
+"""
   }
 
 # Leaving this; I might add it back in someday.
@@ -2806,7 +2806,7 @@ When using the help system, this controls whether documents are dumped
 directly to the terminal, or passed through your system's pager.
 
 To skip the pager on the command line, use the `--no-pager` flag.
-"""   
+"""
  }
 
   field crashoverride_usage_reporting_url {
@@ -2961,7 +2961,7 @@ func validate_mark_template(template_name) {
   if template_name == "" {
     return
   }
-  
+
   sects := sections("mark_template")
 
   if not sects.contains(template_name) {
@@ -2983,7 +2983,7 @@ func validate_mark_template(template_name) {
     full_value_path := key_attr_path + "." + template_keys[i] + ".use"
 
     if find(template_keys[i], "_") == 0 {
-        return ("Chalk mark template '" + template_name +  
+        return ("Chalk mark template '" + template_name +
         "' contains a key: '" + template_keys[i] +
         "' which is not a chalk-time key. Chalk-time " +
         "keys are those that do NOT start with an underscore.")
@@ -3042,7 +3042,7 @@ func outconf_mark_template_check(name, template_name) {
 
 func outconf_report_template_check(name, template_name) {
   result := validate_report_template(template_name)
-  
+
   if result != "" {
     result := in_outconf(name) + result
   }
@@ -3050,7 +3050,7 @@ func outconf_report_template_check(name, template_name) {
 
 func custom_report_template_check(name, report_template_name) {
   result := validate_report_template(report_template_name)
-  
+
   if result != "" {
     result := in_report(name) + result
   }
@@ -3344,7 +3344,7 @@ func sink_config_check(path) {
 func outconf_mark_templates_exist()
 {
   result := ""
-  
+
   # If they've been explicitly set, then they will have been checked by
   # a value validator. So all we need to do here is make sure that the
   # insertion outconfs have non-null values.
