@@ -641,10 +641,9 @@ plenty of in-command help. Currently, the interface is being redone,
 but for the moment:
 <p>
 
-
 - <jazzberry>chalk help commands</jazzberry> shows the overview help for the command line.
-- <jazzberry>chalk help "cmdname" </jazzberry> shows the help for an individual command, as does <fandango>chalk "cmdname" --help</fandango>
-- <jazzberry>chalk help config</jazzberry> shows the overview help for configuration options you can set via the <fandango>chalk load</fandango> command.
+- <jazzberry>chalk help "cmdname" </jazzberry> shows the help for an individual command, as does <em>chalk "cmdname" --help</em>
+- <jazzberry>chalk help config</jazzberry> shows the overview help for configuration options you can set via the <em>chalk load</em> command.
 - <jazzberry>chalk help metadata</jazzberry> shows information about the many types of metadata that you can choose to collect.
 - <jazzberry>chalk help builtins</jazzberry> shows information about built-in functions that you can use in a custom configuration to do your own data collection or customization.
 - <jazzberry>chalk help topics</jazzberry> will show a list of long-form help documents that
