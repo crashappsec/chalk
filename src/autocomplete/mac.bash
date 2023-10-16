@@ -128,6 +128,14 @@ function _chalk_toplevel_completions {
             _chalk_shift_one
             _chalk_help_completions
             ;;
+        login)
+            _chalk_shift_one
+            _chalk_login_completions
+            ;;
+        logout)
+            _chalk_shift_one
+            _chalk_logout_completions
+            ;;
         *)
             if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]] ; then
                 _chalk_shift_one
@@ -153,4 +161,4 @@ function _chalk_completions {
 }
 
 complete -F _chalk_completions chalk
-# { "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "CNK3CD-K36C-V68R-HJ74RK", "CHALK_VERSION" : "0.1.2", "TIMESTAMP_WHEN_CHALKED" : 1697041887569, "DATETIME_WHEN_CHALKED" : "2023-10-11T12:31:27.407-04:00", "ARTIFACT_TYPE" : "bash", "ARTIFACT_VERSION" : "0.1.2", "CHALK_PTR" : "This mark determines when to update the script. If there is no mark, or the mark is invalid it will be replaced.  To customize w/o Chalk disturbing it when it can update, add a valid  mark with a version key higher than the current chalk verison, or  use version 0.0.0 to prevent updates", "HASH" : "ef66c36db2913d2f7d04e28b936ee05364efcc642370a58927d77f7ac9309141", "INJECTOR_COMMIT_ID" : "b1c06256a1dce6d8720cde642f95e0e2b07052a3", "ORIGIN_URI" : "git@github.com:crashappsec/chalk.git", "METADATA_ID" : "BMHQQ0-QTAE-P5AA-MD40QG" }
+# { "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "CMWKGR-V16G-RKCE-B5C9JK", "CHALK_VERSION" : "0.1.3", "TIMESTAMP_WHEN_CHALKED" : 1697490789234, "DATETIME_WHEN_CHALKED" : "2023-10-16T17:13:09.050-04:00", "ARTIFACT_TYPE" : "bash", "ARTIFACT_VERSION" : "0.1.3", "CHALK_PTR" : "This mark determines when to update the script. If there is no mark, or the mark is invalid it will be replaced.  To customize w/o Chalk disturbing it when it can update, add a valid  mark with a version key higher than the current chalk verison, or  use version 0.0.0 to prevent updates", "HASH" : "e98ca4169ebe623b9686f253b71e135da5fa160d622a42dd8a6565906f7a5c52", "INJECTOR_COMMIT_ID" : "db872eb11801a82587abced82074db7182b72c0a", "ORIGIN_URI" : "git@github.com:crashappsec/chalk.git", "METADATA_ID" : "6RATQ8-XBKJ-S2BD-MFNK5P" }
