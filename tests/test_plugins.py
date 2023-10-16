@@ -140,7 +140,7 @@ def test_imds(
     with tmp_file as fid:
         fid.write(b"amazon")
     bin_path = copy_files[0]
-    insert = chalk.insert(bin_path, config=CONFIGS / "imds.conf")
+    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
     assert insert.report.contains(
         {
             "_AWS_AMI_ID": "ami-0abcdef1234567890",
