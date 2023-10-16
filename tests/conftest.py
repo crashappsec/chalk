@@ -142,7 +142,7 @@ def chalk(
     chalk = Chalk(binary=tmp)
     # sanity check
     assert chalk.binary and chalk.binary.is_file()
-    chalk.load(Path(__file__).parent / "testing.conf", use_embedded=False)
+    chalk.load(Path(__file__).parent / "testing.c4m", use_embedded=False)
     yield chalk
 
 

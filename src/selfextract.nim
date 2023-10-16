@@ -219,9 +219,20 @@ const nocache = ["configs/ioconfig.c4m", "configs/sastconfig.c4m",
                  "configs/sbomconfig.c4m", "configs/attestation.c4m",
                  "configs/getopts.c4m"]
 
-proc handleConfigLoad*(path: string) =
+proc handleConfigLoad*(inpath: string) =
   assert selfChalk != nil
 
+  var path: string
+
+  if inpath.endswith(".c4m"):
+    path = inpath
+  else:
+    path = inpath & ".c4m"
+
+  if fileExists(path):
+    path = inpath.resolvePath()
+  else:
+    path = inpath
   let
     runtime          = getChalkRuntime()
     alreadyCached    = haveComponentFromUrl(runtime, path).isSome()
@@ -231,15 +242,9 @@ proc handleConfigLoad*(path: string) =
   var
     component: ComponentInfo
     replace:   bool
-    fullPath:  string
-
-  if path.endswith(".c4m"):
-    fullPath = path
-  else:
-    fullPath = path & ".c4m"
 
   try:
-    component  = runtime.loadComponentFromUrl(fullPath)
+    component  = runtime.loadComponentFromUrl(path)
     replace    = chalkConfig.loadConfig.getReplaceConf()
 
   except:
