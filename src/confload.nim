@@ -19,6 +19,8 @@
 import config, selfextract, con4mfuncs, plugin_load
 import macros except error
 
+const chalkDefaultconfigStore = "https://chalkdust.io/new/"
+
 # Since these are system keys, we are the only one able to write them,
 # and it's easier to do it directly here than in the system plugin.
 proc stashFlags(winner: ArgResult) =
@@ -50,11 +52,7 @@ proc installComponentParams(params: seq[Box]) =
 
 proc loadCachedComponents(cache: OrderedTableRef[string, string]) =
   for url, src in cache:
-    echo "Attempting to load cached URL: ", url, " (src.len() = ", len(src), ")"
-
     let component = getChalkRuntime().getComponentReference(url)
-    echo component.url
-    echo component.hash.hex()
     component.cacheComponent(src)
     trace("Loaded cached version of: " & url & ".c4m")
 
@@ -158,6 +156,8 @@ proc loadAllConfigs*() =
     params:   seq[string] = commandLineParams()
     res:      ArgResult # Used across macros above.
     resFound: bool
+
+  setDefaultStoreUrl(chalkDefaultConfigStore)
 
   let
     toStream = newStringStream

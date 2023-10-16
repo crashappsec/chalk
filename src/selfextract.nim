@@ -231,9 +231,15 @@ proc handleConfigLoad*(path: string) =
   var
     component: ComponentInfo
     replace:   bool
+    fullPath:  string
+
+  if path.endswith(".c4m"):
+    fullPath = path
+  else:
+    fullPath = path & ".c4m"
 
   try:
-    component  = runtime.loadComponentFromUrl(path)
+    component  = runtime.loadComponentFromUrl(fullPath)
     replace    = chalkConfig.loadConfig.getReplaceConf()
 
   except:
