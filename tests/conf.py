@@ -2,11 +2,9 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import os
 import shutil
 from pathlib import Path
-
-import os
-
 
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
@@ -31,6 +29,7 @@ BASE_OUTCONF = ROOT.parent / "src" / "configs" / "base_outconf.c4m"
 # insecure registry https://docs.docker.com/registry/insecure/
 REGISTRY = "localhost:5044"
 
+SERVER_CHALKDUST = "https://chalkdust.io"
 SERVER_IMDS = "http://169.254.169.254"
 SERVER_STATIC = "http://static:8000"
 SERVER_HTTP = "http://chalk.local:8585"

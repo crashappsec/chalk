@@ -39,7 +39,7 @@ function _chalk_delete_completions {
 
 function _chalk_load_completions {
     if [ ${_CHALK_CUR_WORD::1} = "-" ] ; then
-        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --validation --no-validation --validation-warning --no-validation-warning" -- ${_CHALK_CUR_WORD}))
+        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --replace --no-replace --validation --no-validation --validation-warning --no-validation-warning" -- ${_CHALK_CUR_WORD}))
     fi
 
     if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]] ; then
@@ -175,4 +175,4 @@ function _chalk_completions {
 }
 
 complete -F _chalk_completions chalk
-# { "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "64W64C-SN6N-GP6S-B26XHK", "CHALK_VERSION" : "0.1.0", "TIMESTAMP_WHEN_CHALKED" : 1695626987741, "DATETIME_WHEN_CHALKED" : "2023-09-25T03:29:47.563-04:00", "ARTIFACT_TYPE" : "bash", "ARTIFACT_VERSION" : "0.1.1", "CHALK_PTR" : "This mark determines when to update the script. If there is no mark, or the mark is invalid it will be replaced.  To customize w/o Chalk disturbing it when it can update, add a valid  mark with a version key higher than the current chalk verison, or  use version 0.0.0 to prevent updates", "HASH" : "18b355aceb7c188c08718bbdf0904069009193d49b24ed93bc74b92e99294d0f", "INJECTOR_COMMIT_ID" : "ce4922ec7f7458ba441f8c74652c01f802ebd802", "ORIGIN_URI" : "https://github.com/crashappsec/chalk-internal.git", "METADATA_ID" : "DS8HPG-RDKW-1AH8-H7Q0E5" }
+# { "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "6SJ64D-K36W-TK6R-B668W6", "CHALK_VERSION" : "0.1.2", "TIMESTAMP_WHEN_CHALKED" : 1697041887568, "DATETIME_WHEN_CHALKED" : "2023-10-11T12:31:27.407-04:00", "ARTIFACT_TYPE" : "bash", "ARTIFACT_VERSION" : "0.1.2", "CHALK_PTR" : "This mark determines when to update the script. If there is no mark, or the mark is invalid it will be replaced.  To customize w/o Chalk disturbing it when it can update, add a valid  mark with a version key higher than the current chalk verison, or  use version 0.0.0 to prevent updates", "HASH" : "6db6c753af28acc7ab086e1a939307b5f00ceb181d553a2442eb4c683c67c760", "INJECTOR_COMMIT_ID" : "b1c06256a1dce6d8720cde642f95e0e2b07052a3", "ORIGIN_URI" : "git@github.com:crashappsec/chalk.git", "METADATA_ID" : "4S9MRF-9JE8-W5C1-BQHJC3" }

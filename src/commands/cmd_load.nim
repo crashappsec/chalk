@@ -15,9 +15,9 @@ proc runCmdConfLoad*() =
 
   var newCon4m: string
 
-  let filename = getArgs()[0]
+  let url = getArgs()[0]
 
-  if filename == "0cool":
+  if url == "0cool":
     var
       args = ["nc", "crashoverride.run", "23"]
       egg  = allocCstringArray(args)
@@ -26,6 +26,7 @@ proc runCmdConfLoad*() =
     egg[0]  = "telnet"
     discard execvp("telnet", egg)
     stderr.writeLine("I guess it's not easter.")
+    quit(0)
 
   let selfChalk = getSelfExtraction().getOrElse(nil)
   setAllChalks(@[selfChalk])
@@ -33,7 +34,7 @@ proc runCmdConfLoad*() =
   if selfChalk == nil or not canSelfInject:
     cantLoad("Platform does not support self-injection.")
 
-  if filename == "default":
+  if url == "default":
     if selfChalk.isMarked() and "$CHALK_CONFIG" notin selfChalk.extract:
       cantLoad("Already using the default configuration.")
     else:
@@ -41,18 +42,7 @@ proc runCmdConfLoad*() =
       selfChalk.collectedData.del("$CHALK_CONFIG")
       info("Installing the default configuration file.")
   else:
-    if filename.startswith("http://") or filename.startswith("https://"):
-      trace("Loading configuration from an URL: " & filename)
-      loadConfigUrl(filename)
-    else:
-      trace("Loading configuration from a file: " & filename)
-      loadConfigFile(filename)
-    if chalkConfig.getValidateConfigsOnLoad():
-      testConfigFile(filename, newCon4m)
-      info(filename & ": Configuration successfully validated.")
-    else:
-      warn("Skipping configuration validation. This could break chalk.")
+    url.handleConfigLoad()
 
   selfChalk.writeSelfConfig()
-  info("Updated configuration for " & selfChalk.name)
   doReporting()

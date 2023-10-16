@@ -17,16 +17,16 @@ exec {
 # TODO Remove all sections below
 # Currently, these need to be here for singleton defaults to take hold.
 
-extract {
-}
+extract { }
 
-source_marks {
-}
+source_marks { }
 
-docker {
-}
+docker { }
 
-aws {
-  ec2 {
+load { }
+
+
+cloud_provider {
+  cloud_instance_hw_identifiers {
   }
 }

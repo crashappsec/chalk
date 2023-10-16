@@ -482,15 +482,24 @@ You can use the 'dump' command to dump the output first.
 From the command line, See 'help config' for an overview of the configuration file format.
 """
 
+    flag_yn replace {
+      field_to_set: "load.replace_conf"
+      doc: """
+When on, the entire stored configuration file will be REPLACED with the
+provided argument. When off, it's used only as a component that's added
+to the config.
+"""      
+    }
+    
     flag_yn validation {
-      field_to_set: "validate_configs_on_load"
+      field_to_set: "load.validate_configs_on_load"
       doc: """
 When on, validate config files before loading them, by doing a trial run.
 """
     }
 
     flag_yn validation_warning {
-      field_to_set: "validation_warning"
+      field_to_set: "load.validation_warning"
       doc: """
 This verbose flag controls whether or not you get the verbose warning.  It's much better turning this off in your embedded configuration :)
 """      
@@ -632,10 +641,9 @@ plenty of in-command help. Currently, the interface is being redone,
 but for the moment:
 <p>
 
-
 - <jazzberry>chalk help commands</jazzberry> shows the overview help for the command line.
-- <jazzberry>chalk help "cmdname" </jazzberry> shows the help for an individual command, as does <fandango>chalk "cmdname" --help</fandango>
-- <jazzberry>chalk help config</jazzberry> shows the overview help for configuration options you can set via the <fandango>chalk load</fandango> command.
+- <jazzberry>chalk help "cmdname" </jazzberry> shows the help for an individual command, as does <em>chalk "cmdname" --help</em>
+- <jazzberry>chalk help config</jazzberry> shows the overview help for configuration options you can set via the <em>chalk load</em> command.
 - <jazzberry>chalk help metadata</jazzberry> shows information about the many types of metadata that you can choose to collect.
 - <jazzberry>chalk help builtins</jazzberry> shows information about built-in functions that you can use in a custom configuration to do your own data collection or customization.
 - <jazzberry>chalk help topics</jazzberry> will show a list of long-form help documents that
