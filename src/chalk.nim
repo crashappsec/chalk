@@ -11,6 +11,7 @@ import config, confload, commands, norecurse, sinks, docker_base,
        attestation, util
 
 when isMainModule:
+  
   setupSignalHandlers() # util.nim
   ioSetup()             # sinks.nim
   loadAllConfigs()      # confload.nim
@@ -35,6 +36,7 @@ when isMainModule:
   of "env":                runCmdEnv()
   of "dump":               runCmdConfDump()
   of "load":               runCmdConfLoad()
+  of "login":              runCmdLogin()
   of "config":             showConfigValues(force = true)
   of "version":            runCmdVersion()
   of "docker":             runCmdDocker(getArgs())
@@ -45,6 +47,6 @@ when isMainModule:
   of "docgen":             runChalkDocGen() # in cmd_help
   else:
     runChalkHelp(getCommandName()) # noreturn, will not show config.
-
+    
   showConfigValues()
   quitChalk()
