@@ -10,8 +10,7 @@
 import uri, config
 
 proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
-  return (msg.perLineWrap(startingMaxLineWidth = -7,
-                          firstHangingIndent   = 7), true)
+  return (msg, true)
 
 const
   availableFilters = { "log_level"     : MsgFilter(logLevelFilter),
@@ -338,3 +337,61 @@ proc setupDefaultLogConfigs*() =
                              logger=okCbOpt).get()
 
   discard subscribe("chalk_usage_stats", useConf)
+
+proc ioSetup*(bgColor = "darkslategray") =
+  let
+    ourPink      = "hotpink"        # True color is jazzberry
+    ourPurple    = "mediumpurple"   # True color is fandango
+    chalkDefault = newStyle(overflow = OWrap, rpad = 0, tmargin = 0, lpad = 0,
+                            bgColor = bgColor, fgColor = "gainsboro")
+    chalkH1      = newStyle(fgColor = ourPink, bold = BoldOn,
+                            italic = ItalicOn, casing = CasingUpper,
+                            align = AlignC)
+    chalkH2      = newStyle(fgColor = "atomiclime", bgColor = "darkslategray",
+                            bold = BoldOn, align = AlignL, italic = ItalicOn,
+                            tmargin = 2)
+    chalkH3      = newStyle(bgColor = ourPink, fgColor = "white",
+                            italic = ItalicOn, tmargin = 1,
+                            casing = CasingUpper)
+    chalkH4      = newStyle(fgColor = ourPink, italic = ItalicOn,
+                            underline = UnderlineSingle, casing = CasingTitle)
+    chalkH5      = newStyle(fgColor = "atomiclime", bgColor = "black",
+                                    italic = ItalicOn, casing = CasingTitle)
+    chalkH6      = newStyle(fgColor = "white", bgColor = bgColor,
+                          underline = UnderlineSingle, casing = CasingTitle)
+    chalkEm      = newStyle(fgColor = ourPink, italic = ItalicOn)
+    chalkTH      = newStyle(fgColor = "black", bold = BoldOn, overflow = OWrap,
+                            casing = CasingUpper, tmargin = 0,
+                            bgColor = "atomiclime", align = AlignC)
+    chalkTR      = newStyle(fgColor = "white", bold = BoldOn, lpad = 0,
+                            rpad = 0, overflow = OWrap, tmargin = 0,
+                            bgColor = ourPink)
+    chalkEven    = newStyle(fgColor = "white", bgColor = ourPink,
+                            overflow = OWrap)
+    chalkOdd     = newStyle(fgColor = "white", bgColor = ourPurple,
+                            overflow = OWrap)
+    chalkCaption = newStyle(bgColor = "black", fgColor = "atomiclime",
+                            align = AlignC, italic = ItalicOn, bmargin = 2)
+    chalkTable   = newStyle(borders = [BorderAll], overflow = OWrap,
+                                 fgColor = "white",
+                                 bgcolor = bgColor)
+
+  setDefaultStyle(chalkDefault)
+  setStyle("h1", chalkH1)
+  setStyle("h2", chalkH2)
+  setStyle("h3", chalkH3)
+  setStyle("h4", chalkH4)
+  setStyle("h5", chalkH5)
+  setStyle("h6", chalkH6)
+  setStyle("em", chalkEm)
+  setStyle("th", chalkTH)
+  setStyle("tr", chalkTR)
+  setStyle("tr.even", chalkEven)
+  setStyle("tr.odd",  chalkOdd)
+  setStyle("caption", chalkCaption)
+  setStyle("table", chalkTable)
+  setStyle("thead", chalkTable)
+  setStyle("tbody", chalkTable)
+  setStyle("tfoot", chalkTable)
+  once:
+    addDefaultSinks()

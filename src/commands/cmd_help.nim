@@ -47,25 +47,31 @@ proc displayPluginKeys(s, v: string): string =
     return "Any"
   return asArr.join(", ")
 
-template getKeyspecTable(state: ConfigState, filterValueStr: string): string =
+template getKeyspecTable(state: ConfigState, filterValueStr: string,
+                         colwidths: seq[int]): string =
+  let caption = "See <em>help key &lt;term&gt;</em> to search the table only"
+
   state.getAllInstanceDocs("keyspec",
-                           fieldsToUse = fieldsToUse,
-                           filterField = "kind",
-                           filterValue = filterValueStr,
-                           headings = headingsToUse,
-                           transformers = transformers,
-                           docKind      = docKind,
+                           fieldsToUse    = fieldsToUse,
+                           filterField    = "kind",
+                           filterValue    = filterValueStr,
+                           headings       = headingsToUse,
+                           transformers   = transformers,
+                           docKind        = docKind,
+                           colwidths      = colwidths,
+                           caption        = caption,
                            markdownFields = mdFields)
 
 proc keyHelp(state: ConfigState, args: seq[string] = @[],
              summary = false,
              docKind = CDocConsole) :string =
   var
-    transformers = TransformTableRef()
-    filter: bool = false
-    mdFields     = @["doc"]
-    fieldsToUse  = @["kind", "type"]
+    transformers  = TransformTableRef()
+    filter: bool  = false
+    mdFields      = @["doc"]
+    fieldsToUse   = @["kind", "type"]
     headingsToUse = @["Key", "Collection Type", "Value Type", "Description"]
+    colwidths     = @[20, 20, 20, 40]
 
   if summary:
     fieldsToUse.add("shortdoc")
@@ -76,7 +82,7 @@ proc keyHelp(state: ConfigState, args: seq[string] = @[],
 
   case len(args)
   of 0, 1:
-    result = state.getKeyspecTable("")
+    result = state.getKeyspecTable("", colwidths = colwidths)
   of 2:
     case args[1].toLowerAscii()
     of "help", "--help":
@@ -97,24 +103,24 @@ any word that matches is returned.
 """
     of "chalk", "chalk-time", "chalktime":
       result = "# Chalk-Time Host Metadata Keys"
-      result &= state.getKeyspecTable("0")
+      result &= state.getKeyspecTable("0", colwidths = colwidths)
       result = "# Chalk-Time Artifact Metadata Keys"
-      result &= state.getKeyspecTable("1")
+      result &= state.getKeyspecTable("1", colwidths = colwidths)
     of "runtime", "run-time":
       result = "# Run-Time Artifact Metadata Keys"
-      result &= state.getKeyspecTable("2")
+      result &= state.getKeyspecTable("2", colwidths = colwidths)
       result = "# Run-Time Host Metadata Keys"
-      result &= state.getKeyspecTable("3")
+      result &= state.getKeyspecTable("3", colwidths = colwidths)
     of "host":
       result = "# Chalk-Time Host Metadata Keys"
-      result &= state.getKeyspecTable("0")
+      result &= state.getKeyspecTable("0", colwidths = colwidths)
       result = "# Run-Time Host Metadata Keys"
-      result &= state.getKeyspecTable("3")
+      result &= state.getKeyspecTable("3", colwidths = colwidths)
     of "artifact":
       result = "# Chalk-Time Artifact Metadata Keys"
-      result &= state.getKeyspecTable("1")
+      result &= state.getKeyspecTable("1", colwidths = colwidths)
       result = "# Run-Time Artifact Metadata Keys"
-      result &= state.getKeyspecTable("2")
+      result &= state.getKeyspecTable("2", colwidths = colwidths)
     else:
       filter = true
   else:
@@ -129,6 +135,7 @@ any word that matches is returned.
                                               "Collection Type",
                                               "Value Type",
                                               "Description"],
+                                  colwidths = colwidths,
                                   transformers = transformers,
                                   markdownFields=["shortdoc", "doc"])
 
@@ -159,9 +166,10 @@ proc searchEmbeddedDocs(terms: seq[string]): string =
 
       result &= "<h2>Match on document: " & docName & "</h2>"
       result &= doc.highlightMatches(matchedTerms)
+      result &= "<p></p>"
 
   if result == "":
-    result = "<h2>No matches in other documents.</h2>"
+    result = "<h2>No matches in other documents.</h2><p></p>"
 
 proc searchMetadataKeys(state: ConfigState, terms: seq[string]): string =
   var transformers     = TransformTableRef()
@@ -210,10 +218,10 @@ proc searchConfigVars(state: ConfigState, args: seq[string]): string =
       result &= "<tr><th>Config value type</th><td>" & match[1]
       result &=  "</td></tr>"
       result &= "<tr><th>Default value</th></td><td>" & match[2]
-      result &= "</td></tr></tbody></table>"
+      result &= "</td></tr></tbody></table><p></p>"
 
   if result == "":
-    result = "<h2>No matches in configuration variables</h2>"
+    result = "<h2>No matches in configuration variables</h2><p></p>"
 
 proc formatCommandName(dotted: string): string =
   let parts = dotted.split(".")
@@ -260,18 +268,18 @@ proc searchFlags(state: ConfigState, args: seq[string]): string =
         if match.autoFlags:
           result &= "<tr><th>Choices are also valid flags:</th><td>Yes</td></tr>"
 
-      result &= "</tbody></table>"
+      result &= "</tbody></table><p></p>"
 
       result &= match.doc
 
   if result == "":
-    result = "<h2>No matches found in command-line flag documentation</h2>"
+    result = "<h2>No matches found in command-line flag documentation</h2><p></p>"
 
 proc searchCommandDescriptions(state: ConfigState, args: seq[string]): string =
   let matches = state.getCommandNonFlagData(allCommandSections, args)
 
   if len(matches) == 0:
-    result &= "<h2>No matches in command descriptions</h2>"
+    result &= "<h2>No matches in command descriptions</h2><p></p>"
 
   else:
     for match in matches:
@@ -295,7 +303,7 @@ proc getHelpTopics(state: ConfigState): string =
   for k, _ in helpFiles:
     result &= "<li>" & resolveHelpFileName(k) & "</li>"
 
-  result &= "</ul>"
+  result &= "</ul><p></p>"
 
   result = result.stylize()
 
@@ -402,7 +410,7 @@ See `chalk help reporting` for more information on templates.
             reportTemplates.add(item)
 
     if len(markTemplates) + len(reportTemplates) == 0:
-      result &= stylize("<h1>No matching templates found.</h1>")
+      result &= stylize("<h1>No matching templates found.</h1><p></p>")
       return
 
     for markTmplName in markTemplates:
@@ -410,12 +418,14 @@ See `chalk help reporting` for more information on templates.
 
       result &= stylize("<h2>Mark Template: " & markTmplName & "</h2>")
       result &= state.formatOneTemplate(theTemplate)
+      result &= "<p></p>"
 
     for repTmplName in reportTemplates:
       let theTemplate = chalkConfig.reportTemplates[repTmplName]
 
       result &= stylize("<h2>Report Template: " & repTmplName & "</h2>")
       result &= state.formatOneTemplate(theTemplate)
+      result &= "<p></p>"
 
 proc fullTextSearch(state: ConfigState, args: seq[string]): string =
   result &= "<h1>Searching documentation for term"
@@ -445,7 +455,7 @@ proc getOutputHelp(state: ConfigState, kind = CDocConsole): string =
     (_, rtlong)     = state.getSectionDocs("report_template", kind)
     (_, oclong)     = state.getSectionDocs("outconf", kind)
     (_, sconflong)  = state.getSectionDocs("sink_config", kind)
-    (_, custlong) = state.getSectionDocs("custom_report", kind)
+    (_, custlong)   = state.getSectionDocs("custom_report", kind)
 
   result  = mtlong
   result &= rtlong
@@ -465,6 +475,26 @@ proc hasHelpFlag(args: seq[string]): bool =
 
     if s in ["help", "h"]:
       return true
+
+proc makeColorTable(): string =
+  perClassStyles["light"] = newStyle(fgColor = "white")
+  perClassStyles["dark"]  = newStyle(fgColor = "black")
+  styleMap.del("tr.even")
+  styleMap.del("tr.odd")
+  styleMap["tr"] = newStyle(bgColor = "default")
+
+
+
+  result  = "<table class=light><tbody>"
+  for color, v in colorTable:
+    if v < 0x400000:
+      result &= """<tr class=light><td class=light><center><bg-""" &
+        color & ">" & color & "</bg-" & color & "></center></td></tr>"
+    else:
+      result &= """<tr class=dark><td class=dark><center><bg-""" & color &
+        ">" & color & "</bg-" & color & "></center></td></tr>"
+  result &= "</tbody></table>"
+  result = result.stylize()
 
 proc runChalkHelp*(cmdName = "help") {.noreturn.} =
   var
@@ -493,6 +523,8 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
   else:
     for arg in args:
       case arg
+      of "nikon":
+        toOut &= makeColorTable()
       of "output", "reports", "reporting":
         toOut &= con4mRuntime.getOutputHelp()
       of "plugins":
