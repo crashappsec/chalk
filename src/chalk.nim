@@ -12,7 +12,7 @@ import config, confload, commands, norecurse, sinks, docker_base,
 
 when isMainModule:
   setupSignalHandlers() # util.nim
-  addDefaultSinks()     # nimutils/sinks.nim
+  ioSetup()             # sinks.nim
   loadAllConfigs()      # confload.nim
   recursionCheck()      # norecurse.nim
   otherSetupTasks()     # util.nim
