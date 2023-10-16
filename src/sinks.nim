@@ -340,33 +340,35 @@ proc setupDefaultLogConfigs*() =
 
 proc ioSetup*(bgColor = "darkslategray") =
   let
+    ourPink      = "hotpink"        # True color is jazzberry
+    ourPurple    = "mediumpurple"   # True color is fandango
     chalkDefault = newStyle(overflow = OWrap, rpad = 0, tmargin = 0, lpad = 0,
                             bgColor = bgColor, fgColor = "gainsboro")
-    chalkH1      = newStyle(fgColor = "jazzberry", bold = BoldOn,
+    chalkH1      = newStyle(fgColor = ourPink, bold = BoldOn,
                             italic = ItalicOn, casing = CasingUpper,
                             align = AlignC)
     chalkH2      = newStyle(fgColor = "atomiclime", bgColor = "darkslategray",
                             bold = BoldOn, align = AlignL, italic = ItalicOn,
                             tmargin = 2)
-    chalkH3      = newStyle(bgColor = "jazzberry", fgColor = "white",
+    chalkH3      = newStyle(bgColor = ourPink, fgColor = "white",
                             italic = ItalicOn, tmargin = 1,
                             casing = CasingUpper)
-    chalkH4      = newStyle(fgColor = "jazzberry", italic = ItalicOn,
+    chalkH4      = newStyle(fgColor = ourPink, italic = ItalicOn,
                             underline = UnderlineSingle, casing = CasingTitle)
     chalkH5      = newStyle(fgColor = "atomiclime", bgColor = "black",
                                     italic = ItalicOn, casing = CasingTitle)
     chalkH6      = newStyle(fgColor = "white", bgColor = bgColor,
                           underline = UnderlineSingle, casing = CasingTitle)
-    chalkEm      = newStyle(fgColor = "jazzberry", italic = ItalicOn)
+    chalkEm      = newStyle(fgColor = ourPink, italic = ItalicOn)
     chalkTH      = newStyle(fgColor = "black", bold = BoldOn, overflow = OWrap,
                             casing = CasingUpper, tmargin = 0,
                             bgColor = "atomiclime", align = AlignC)
     chalkTR      = newStyle(fgColor = "white", bold = BoldOn, lpad = 0,
                             rpad = 0, overflow = OWrap, tmargin = 0,
-                            bgColor = "jazzberry")
-    chalkEven    = newStyle(fgColor = "white", bgColor = "jazzberry",
+                            bgColor = ourPink)
+    chalkEven    = newStyle(fgColor = "white", bgColor = ourPink,
                             overflow = OWrap)
-    chalkOdd     = newStyle(fgColor = "white", bgColor = "fandango",
+    chalkOdd     = newStyle(fgColor = "white", bgColor = ourPurple,
                             overflow = OWrap)
     chalkCaption = newStyle(bgColor = "black", fgColor = "atomiclime",
                             align = AlignC, italic = ItalicOn, bmargin = 2)
