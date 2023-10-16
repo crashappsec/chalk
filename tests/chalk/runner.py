@@ -2,19 +2,18 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-from pathlib import Path
-import json
 import datetime
+import json
 import os
+from pathlib import Path
 from typing import Any, Literal, Optional, cast
 
-from ..utils.bin import sha256
-
 from ..conf import MAGIC
-from ..utils.log import get_logger
+from ..utils.bin import sha256
 from ..utils.dict import ContainsMixin
-from ..utils.os import run, Program, CalledProcessError
 from ..utils.docker import Docker
+from ..utils.log import get_logger
+from ..utils.os import CalledProcessError, Program, run
 
 ChalkCommand = Literal[
     "delete",
@@ -297,6 +296,7 @@ class Chalk:
         config: Optional[Path] = None,
         # suppress output since all we want is the chalk report
         log_level: ChalkLogLevel = "none",
+        env: Optional[dict[str, str]] = None,
     ) -> ChalkProgram:
         return self.run(
             command="insert",
@@ -304,6 +304,7 @@ class Chalk:
             config=config,
             virtual=virtual,
             log_level=log_level,
+            env=env,
         )
 
     def extract(

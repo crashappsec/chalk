@@ -2,6 +2,7 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import os
 import shutil
 import sqlite3
 from contextlib import ExitStack, chdir, closing
@@ -10,7 +11,6 @@ from pathlib import Path
 from secrets import token_bytes
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
-import os
 import pytest
 import requests
 from filelock import FileLock
@@ -27,7 +27,6 @@ from .conf import (
     SERVER_STATIC,
 )
 from .utils.log import get_logger
-
 
 logger = get_logger()
 
