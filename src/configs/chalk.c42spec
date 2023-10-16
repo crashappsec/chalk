@@ -13,10 +13,9 @@ default_key_priority := 4611686018427387904  # 2^62.
 # These are the valid command-line commands.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "config",
                          "load", "dump", "docker", "version", "env", "exec",
-                         "setup", "docgen", "login", "logout"]
+                         "setup", "login", "logout"]
 
-all_cmds_that_insert := ["insert", "build", "load", "setup", "docgen",
-                         "login", "logout"]
+all_cmds_that_insert := ["insert", "build", "load", "setup", "login", "logout"]
 
 
 

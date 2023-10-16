@@ -1242,18 +1242,6 @@ tag so we can reliably inspect it after the build.
 """
 }
 
-keyspec WARCHALK_SYMBOL {
-    kind:              ChalkTimeArtifact
-    type:              string
-    standard:          true
-    system:            false
-    since:             "0.1.4"
-    doc: """
-Embedded image stored as hex encoded bytes
-"""
-}
-
-
 keyspec _OP_ARTIFACT_TYPE {
     kind:             RunTimeArtifact
     type:             string

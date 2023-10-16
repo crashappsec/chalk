@@ -512,14 +512,6 @@ This verbose flag controls whether or not you get the verbose warning.  It's muc
 Outputs basic version information for the chalk binary.
 """
   }
-  
-   command docgen {
-     shortdoc: "Generate the web documentation."
-     doc: """          
-Writes web documentation into `./chalk-docs/` in Markdown format, with
-some inline HTML.
-"""
-   }
 
   command docker {
     shortdoc: "Run a docker command, then chalk built or pushed containers"
