@@ -4741,6 +4741,19 @@ API key used to optionally save/load attestation keys to cloud.
 """
 }
 
+keyspec $CHALK_API_REFRESH_TOKEN {
+   required_in_self_mark:  true
+   kind:                   ChalkTimeArtifact
+   type:                   string
+   standard:               true
+   system:                 true
+   since:                  "0.1.4"
+   doc:                    """
+Key to hopld the OIDC refresh token for non-user present API 
+re-authentication.
+"""
+}
+
 keyspec $CHALK_ATTESTATION_TOKEN {
    required_in_self_mark:  true
    kind:                   ChalkTimeArtifact
