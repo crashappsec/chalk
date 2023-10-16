@@ -19,7 +19,7 @@
 import config, selfextract, con4mfuncs, plugin_load
 import macros except error
 
-const chalkDefaultconfigStore = "https://chalkdust.io/new/"
+const chalkDefaultconfigStore = "https://chalkdust.io/"
 
 # Since these are system keys, we are the only one able to write them,
 # and it's easier to do it directly here than in the system plugin.
