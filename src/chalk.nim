@@ -36,6 +36,7 @@ when isMainModule:
   of "env":                runCmdEnv()
   of "dump":               runCmdConfDump()
   of "load":               runCmdConfLoad()
+  of "logout":             runCmdLogout()
   of "login":              runCmdLogin()
   of "config":             showConfigValues(force = true)
   of "version":            runCmdVersion()
