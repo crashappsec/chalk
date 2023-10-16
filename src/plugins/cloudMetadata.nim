@@ -33,72 +33,43 @@ proc getAwsToken(): Option[string] =
   trace("Retrieved AWS metadata token")
   return some(response.bodyStream.readAll().strip())
 
-proc hitAwsEndpoint(path: string, token: string): Option[string] =
+proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
   let
     uri      = parseUri(path)
-    hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
     client   = newHttpClient(timeout = 250) # 1/4 of a second
     response = client.safeRequest(url = uri, httpMethod = HttpGet, headers = hdrs)
 
   if response.status[0] != '2':
-    trace("With valid IMDSv2 token, could not retrieve metadata from: " & $uri)
+    trace("Could not retrieve metadata from: " & $uri)
     return none(string)
 
-  trace("Retrieved AWS metadata " & uri.path)
+  trace("Retrieved metadata from: " & uri.path)
   result = some(response.bodyStream.readAll().strip())
   if not result.isSome():
     # log failing keys in trace mode only as some are expected to be absent
-    trace("With valid IMDSv2 token, could not retrieve metadata from: " & uri.path)
-
-proc hitAzureEndpoint(path: string): Option[string] =
-  let
-    uri      = parseUri(path)
-    hdrs     = newHttpHeaders([("Metadata", "true")])
-    client   = newHttpClient(timeout = 250) # 1/4 of a second
-    response = client.safeRequest(url = uri, httpMethod = HttpGet, headers = hdrs)
-
-  if response.status[0] != '2':
-    trace("Could not retrieve Azure metadata from: " & $uri)
-    return none(string)
-
-  trace("Retrieved Azure metadata " & uri.path)
-  result = some(response.bodyStream.readAll().strip())
-  if not result.isSome():
-    # log failing keys in trace mode only as some are expected to be absent
-    trace("Got empty Azure metadata from: " & uri.path)
-
-proc hitGcpEndpoint(path: string): Option[string] =
-  let
-    uri      = parseUri(path)
-    hdrs     = newHttpHeaders([("Metadata-Flavor", "Google")])
-    client   = newHttpClient(timeout = 250) # 1/4 of a second
-    response = client.safeRequest(url = uri, httpMethod = HttpGet, headers = hdrs)
-
-  if response.status[0] != '2':
-    trace("Could not retrieve GCP metadata from: " & $uri)
-    return none(string)
-
-  trace("Retrieved GCP metadata " & uri.path)
-  result = some(response.bodyStream.readAll().strip())
-  if not result.isSome():
-    # log failing keys in trace mode only as some are expected to be absent
-    trace("Got empty GCP metadata from: " & uri.path)
+    trace("Got empty metadata from: " & uri.path)
 
 template oneItem(keyname: string, url: string) =
   if isSubscribedKey(keyname):
-    let resultOpt = hitAwsEndpoint(url, token)
+    let
+      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
+      resultOpt = hitProviderEndpoint(url, hdrs)
     if resultOpt.isSome():
       setIfNotEmpty(result, keyname, resultOpt.get())
 
 template listKey(keyname: string, url: string) =
   if isSubscribedKey(keyname):
-    let resultOpt = hitAwsEndpoint(url, token)
+    let
+      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
+      resultOpt = hitProviderEndpoint(url, hdrs)
     if resultOpt.isSome():
       setIfNeeded(result, keyname, resultOpt.get().splitLines())
 
 template jsonKey(keyname: string, url: string) =
   if isSubscribedKey(keyname):
-    let resultOpt = hitAwsEndpoint(url, token)
+    let
+      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
+      resultOpt = hitProviderEndpoint(url, hdrs)
     if resultOpt.isSome():
       let value = resultOpt.get()
       # imdsv2 does not respond with application/json content-type
@@ -119,7 +90,9 @@ template jsonKey(keyname: string, url: string) =
 
 template getTags(keyname: string, url: string) =
   if isSubscribedKey(keyname):
-    let resultOpt = hitAwsEndpoint(url, token)
+    let
+      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
+      resultOpt = hitProviderEndpoint(url, hdrs)
     if resultOpt.isSome():
       let
         value = resultOpt.get()
@@ -132,7 +105,7 @@ template getTags(keyname: string, url: string) =
         let name = line.strip()
         if name == "":
           continue
-        let tagOpt = hitAwsEndpoint(url & "/" & name, token)
+        let tagOpt = hitProviderEndpoint(url & "/" & name, hdrs)
         if tagOpt.isSome():
           tags[name] = pack(tagOpt.get())
         setIfNeeded(result, keyname, tags)
@@ -172,7 +145,7 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   # GCP
   #
   if isSubscribedKey("_GCP_INSTANCE_METADATA") and isGoogleHost(vendor):
-    let resultOpt = hitGcpEndpoint("http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true")
+    let resultOpt = hitProviderEndpoint("http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
     if not resultOpt.isSome():
         trace("Did not get metadata back from GCP endpoint")
         return
@@ -195,7 +168,7 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   # Azure
   #
   if isSubscribedKey("_AZURE_INSTANCE_METADATA") and isAzureHost(vendor):
-    let resultOpt = hitAzureEndpoint("http://169.254.169.254/metadata/instance?api-version=2021-02-01")
+    let resultOpt = hitProviderEndpoint("http://169.254.169.254/metadata/instance?api-version=2021-02-01", newHttpHeaders([("Metadata", "true")]))
     if not resultOpt.isSome():
         trace("Did not get metadata back from Azure endpoint")
         return
