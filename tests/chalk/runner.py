@@ -175,6 +175,10 @@ class ChalkProgram(Program):
     def mark(self):
         return self.report.mark
 
+    @property
+    def marks(self):
+        return self.report.marks
+
 
 class Chalk:
     def __init__(
@@ -283,7 +287,10 @@ class Chalk:
                 operation = cast(str, command)
                 # when calling docker, the arg after docker is the operation
                 if not operation and "docker" in params:
-                    operation = params[params.index("docker") + 1]
+                    try:
+                        operation = params[params.index("buildx") + 1]
+                    except ValueError:
+                        operation = params[params.index("docker") + 1]
                 if operation:
                     assert report.has(_OPERATION=operation)
 
@@ -382,6 +389,8 @@ class Chalk:
         cwd: Optional[Path] = None,
         args: Optional[dict[str, str]] = None,
         push: bool = False,
+        platforms: Optional[list[str]] = None,
+        buildx: bool = False,
         config: Optional[Path] = None,
         buildkit: bool = True,
         log_level: ChalkLogLevel = "none",
@@ -397,8 +406,10 @@ class Chalk:
             args=args,
             cwd=cwd,
             push=push,
+            platforms=platforms,
             expected_success=expected_success,
             buildkit=buildkit,
+            buildx=buildx,
         )
 
         image_hash, result = Docker.with_image_id(
@@ -415,6 +426,8 @@ class Chalk:
                     dockerfile=dockerfile,
                     args=args,
                     push=push,
+                    platforms=platforms,
+                    buildx=buildx,
                 ),
                 expected_success=expected_success,
                 cwd=cwd,
@@ -424,11 +437,15 @@ class Chalk:
         dockerfile = dockerfile or (
             (cwd or context or Path(os.getcwd())) / "Dockerfile"
         )
-        if expecting_report and expected_success:
+        if expecting_report and expected_success and image_hash:
+            if platforms:
+                assert len(result.marks) == len(platforms)
+            else:
+                assert len(result.marks) == 1
             # sanity check that chalk mark includes basic chalk keys
-            assert image_hash == result.mark["_CURRENT_HASH"]
-            assert image_hash == result.mark["_IMAGE_ID"]
-            assert str(dockerfile) == result.mark["DOCKERFILE_PATH"]
+            assert image_hash == result.marks[-1]["_CURRENT_HASH"]
+            assert image_hash == result.marks[-1]["_IMAGE_ID"]
+            assert str(dockerfile) == result.marks[-1]["DOCKERFILE_PATH"]
         elif not expecting_report:
             try:
                 assert not result.reports

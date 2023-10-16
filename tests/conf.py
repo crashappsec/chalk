@@ -27,7 +27,7 @@ BASE_OUTCONF = ROOT.parent / "src" / "configs" / "base_outconf.c4m"
 # therefore this is sufficient for the docker push command
 # FIXME: once we have buildx support we'll need to enable
 # insecure registry https://docs.docker.com/registry/insecure/
-REGISTRY = "localhost:5044"
+REGISTRY = f"{os.environ.get('IP') or 'localhost'}:5044"
 
 SERVER_CHALKDUST = "https://chalkdust.io"
 SERVER_IMDS = "http://169.254.169.254"

@@ -113,6 +113,7 @@ services:
       context: ./tests
       args:
         BASE: ${BASE:-ubuntu}
+    entrypoint: ./entrypoint.sh
     cap_add:
       - SYS_PTRACE # for gdb
     security_opt:
@@ -136,6 +137,7 @@ services:
         condition: service_healthy
     environment:
       GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}
+      IP: ${IP:-} # host IP for docker registry tests
 
   # --------------------------------------------------------------------------
   # MISC DEPS

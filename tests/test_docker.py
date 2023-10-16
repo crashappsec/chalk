@@ -2,6 +2,7 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import itertools
 import platform
 import time
 from contextlib import ExitStack
@@ -357,6 +358,53 @@ def test_build_and_push(chalk: Chalk, test_file: str, random_hex: str, push: boo
 
     pull = chalk.docker_pull(tag)
     assert pull.find("Digest:") == f"sha256:{repo_digest_push}"
+
+
+@pytest.mark.parametrize("push", [True, False])
+@pytest.mark.parametrize(
+    "test_file",
+    [
+        "valid/sample_1",
+    ],
+)
+@pytest.mark.skipif(
+    platform.system() == "Darwin",
+    reason="Skipping local docker push on mac due to issues https://github.com/docker/for-mac/issues/6704",
+)
+def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push: bool):
+    tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
+    tag = f"{tag_base}:latest"
+    platforms = {"linux/amd64", "linux/arm64"}
+
+    image_id, build = chalk.docker_build(
+        dockerfile=DOCKERFILES / test_file / "Dockerfile",
+        tag=tag,
+        push=push,
+        platforms=list(platforms),
+    )
+
+    assert len(build.marks) == len(platforms)
+    assert {i["DOCKER_PLATFORM"] for i in build.marks} == platforms
+
+    if not push:
+        return
+
+    chalk_ids = {i["CHALK_ID"] for i in build.marks}
+    metadata_ids = {i["METADATA_ID"] for i in build.marks}
+    hashes = {i["_CURRENT_HASH"] for i in build.marks}
+    digests = {i["_REPO_DIGESTS"][tag_base] for i in build.marks}
+    tags = set(itertools.chain(*[i["DOCKER_TAGS"] for i in build.marks]))
+
+    assert len(chalk_ids) == 1
+    assert len(metadata_ids) == len(platforms)
+    assert image_id in hashes
+    assert len(hashes) == len(platforms)
+    assert len(digests) == len(platforms)
+    assert len(tags) == len(platforms)
+    for t in tags:
+        assert t != tag
+        assert t.startswith(tag)
+        assert any(t.endswith(i.replace("/", "-")) for i in platforms)
 
 
 # extract on image id, and image name, running container id + container name, exited container id + container name
