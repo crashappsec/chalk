@@ -56,6 +56,11 @@ outconf setup {
   report_template:        "insertion_default"      
 }
 
+outconf logout {
+  mark_template:          "mark_default"
+  report_template:        "report_default"
+}
+
 # This is only used when the 'docker' command is run for an unknown
 # command, and when `report_unwrapped_commands` is also true.
 
