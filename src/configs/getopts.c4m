@@ -482,15 +482,24 @@ You can use the 'dump' command to dump the output first.
 From the command line, See 'help config' for an overview of the configuration file format.
 """
 
+    flag_yn replace {
+      field_to_set: "load.replace_conf"
+      doc: """
+When on, the entire stored configuration file will be REPLACED with the
+provided argument. When off, it's used only as a component that's added
+to the config.
+"""      
+    }
+    
     flag_yn validation {
-      field_to_set: "validate_configs_on_load"
+      field_to_set: "load.validate_configs_on_load"
       doc: """
 When on, validate config files before loading them, by doing a trial run.
 """
     }
 
     flag_yn validation_warning {
-      field_to_set: "validation_warning"
+      field_to_set: "load.validation_warning"
       doc: """
 This verbose flag controls whether or not you get the verbose warning.  It's much better turning this off in your embedded configuration :)
 """      

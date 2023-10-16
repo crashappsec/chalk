@@ -127,8 +127,6 @@ services:
         condition: service_healthy
       imds:
         condition: service_healthy
-      static:
-        condition: service_healthy
     environment:
       GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}
 

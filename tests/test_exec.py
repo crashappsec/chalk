@@ -117,7 +117,7 @@ def test_exec_heartbeat(
     result = chalk.run(
         command="exec",
         heartbeat=True,
-        config=CONFIGS / "heartbeat.conf",
+        config=CONFIGS / "heartbeat.c4m",
         exec_command=bin_path,
         params=["5"],
     )

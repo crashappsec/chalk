@@ -56,7 +56,7 @@ def test_file_present(tmp_data_dir: Path, chalk: Chalk, copy_files: list[Path]):
         os.utime(file_output_path, None)
     assert file_output_path.is_file(), "file sink path must be a valid path"
 
-    config = SINK_CONFIGS / "file.conf"
+    config = SINK_CONFIGS / "file.c4m"
     chalk.insert(config=config, artifact=artifact)
 
     # check that file output is correct
@@ -82,7 +82,7 @@ def test_rotating_log(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
     rotating_log_output_path = Path(os.environ["SINK_TEST_OUTPUT_ROTATING_LOG"])
     rotating_log_output_path.unlink(missing_ok=True)
 
-    config = SINK_CONFIGS / "rotating_log.conf"
+    config = SINK_CONFIGS / "rotating_log.c4m"
     chalk.insert(config=config, artifact=artifact)
 
     # check that file output is correct
@@ -113,7 +113,7 @@ def test_s3(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
     # basic validation of s3 env vars
     assert os.environ["AWS_S3_BUCKET_URI"], "s3 bucket uri must not be empty"
 
-    config = SINK_CONFIGS / "s3.conf"
+    config = SINK_CONFIGS / "s3.c4m"
     proc = chalk.insert(config=config, artifact=artifact, log_level="info")
 
     # expecting log line from chalk of form
@@ -153,7 +153,7 @@ def test_post_http_fastapi(
     _test_server(
         artifact=copy_files[0],
         chalk=chalk,
-        conf="post_https_local.conf",
+        conf="post_https_local.c4m",
         url=server_http,
         server_sql=server_sql,
         verify=None,
@@ -180,7 +180,7 @@ def test_post_https_fastapi(
     _test_server(
         artifact=copy_files[0],
         chalk=chalk,
-        conf="post_https_local.conf",
+        conf="post_https_local.c4m",
         url=server_https,
         server_sql=server_sql,
         verify=server_cert,

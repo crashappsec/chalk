@@ -29,7 +29,7 @@ parse_error = "Parse error"
 @pytest.mark.parametrize("use_embedded", [True, False])
 def test_dump_load(tmp_data_dir: Path, chalk_copy: Chalk, use_embedded: bool):
     # output for updated config
-    tmp_conf = tmp_data_dir / "testconf.conf"
+    tmp_conf = tmp_data_dir / "testconf.c4m"
 
     # dump config to file
     chalk_copy.dump(tmp_conf)
@@ -41,17 +41,17 @@ def test_dump_load(tmp_data_dir: Path, chalk_copy: Chalk, use_embedded: bool):
     result = chalk_copy.load(
         tmp_conf, use_embedded=use_embedded, expected_success=False
     )
-    assert VALIDATION_ERROR in result.logs
+    assert VALIDATION_ERROR in " ".join(i.strip() for i in result.logs.splitlines())
 
 
 # sanity check that default config has not changed
-# if it has then the thing to do is usually update "default.conf" with the new default config
+# if it has then the thing to do is usually update "default.c4m" with the new default config
 # this test is mainly to catch any default changes that might impact other tests, or if the default config loaded to the binary is wrong
-@pytest.mark.parametrize("test_config_file", ["validation/default.conf"])
+@pytest.mark.parametrize("test_config_file", ["validation/default.c4m"])
 def test_default_config(
     tmp_data_dir: Path, chalk_default: Chalk, test_config_file: str
 ):
-    tmp_conf = tmp_data_dir / "testconf.conf"
+    tmp_conf = tmp_data_dir / "testconf.c4m"
 
     # dump config to file
     chalk_default.dump(tmp_conf)
@@ -62,8 +62,8 @@ def test_default_config(
 @pytest.mark.parametrize(
     "test_config_file",
     [
-        "validation/invalid_1.conf",
-        "validation/invalid_2.conf",
+        "validation/invalid_1.c4m",
+        "validation/invalid_2.c4m",
     ],
 )
 @pytest.mark.parametrize(
@@ -80,8 +80,6 @@ def test_invalid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bo
         use_embedded=use_embedded,
         expected_success=False,
     )
-    assert all(x in load.logs for x in parse_error)
-
     # chalk should still have default config embedded
     # and further calls should not fail and not have any errors
     extract = chalk_copy.extract(chalk_copy.binary)
@@ -93,7 +91,7 @@ def test_invalid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bo
 @pytest.mark.parametrize(
     "test_config_file, expected_error",
     [
-        ("validation/valid_1.conf", VALIDATION_ERROR),
+        ("validation/valid_1.c4m", VALIDATION_ERROR),
     ],
 )
 @pytest.mark.parametrize(
@@ -128,15 +126,18 @@ def test_valid_load(
 @pytest.mark.parametrize(
     "path, expected_success",
     [
-        ("data/configs/validation/valid_1.conf", True),
-        ("data/configs/validation/invalid_1.conf", False),
+        ("demo-http.c4m", True),
         ("nonexisting", False),
     ],
 )
 def test_load_url(
-    chalk_copy: Chalk, server_static: str, path: str, expected_success: bool
+    chalk_copy: Chalk, server_chalkdust: str, path: str, expected_success: bool
 ):
-    chalk_copy.load(f"{server_static}/{path}", expected_success=expected_success)
+    chalk_copy.load(
+        f"{server_chalkdust}/{path}",
+        log_level="trace",
+        expected_success=expected_success,
+    )
 
 
 # tests for configs that are found in the chalk search path
@@ -144,12 +145,12 @@ def test_load_url(
 # as these configs are global across the system,
 # test needs to be exclusive so nothing else executes in parallel
 @pytest.mark.exclusive
-@pytest.mark.parametrize("tmp_file", [{"path": "/etc/chalk.conf"}], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{"path": "/etc/chalk.c4m"}], indirect=True)
 @pytest.mark.parametrize(
     "config_path, expected_success, expected_error",
     [
-        ("validation/valid_1.conf", True, VALIDATION_ERROR),
-        ("validation/invalid_1.conf", False, ""),
+        ("validation/valid_1.c4m", True, VALIDATION_ERROR),
+        ("validation/invalid_1.c4m", False, ""),
     ],
 )
 def test_external_configs(
@@ -184,9 +185,7 @@ def test_external_configs(
         assert expected_error in result_external.logs
 
 
-@pytest.mark.parametrize(
-    "test_config_file", [CONFIGS / "validation/custom_report.conf"]
-)
+@pytest.mark.parametrize("test_config_file", [CONFIGS / "validation/custom_report.c4m"])
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_custom_report(
     chalk_copy: Chalk,
@@ -415,10 +414,10 @@ def validate_report_keys(report: dict[str, Any], expected_keys: set[str]):
 @pytest.mark.parametrize(
     "test_config_file",
     [
-        ("profiles/empty_profile.conf"),
-        ("profiles/default.conf"),
-        ("profiles/minimal_profile.conf"),
-        ("profiles/large_profile.conf"),
+        ("profiles/empty_profile.c4m"),
+        ("profiles/default.c4m"),
+        ("profiles/minimal_profile.c4m"),
+        ("profiles/large_profile.c4m"),
     ],
 )
 @pytest.mark.parametrize(

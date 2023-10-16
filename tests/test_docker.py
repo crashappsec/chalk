@@ -95,7 +95,7 @@ def test_build(
         cwd=cwd,
         tag=random_hex if tag else None,
         buildkit=buildkit,
-        config=CONFIGS / "docker_wrap.conf",
+        config=CONFIGS / "docker_wrap.c4m",
     )
     assert image_id
 
@@ -135,7 +135,7 @@ def test_composite_build(
         dockerfile=test,
         buildkit=buildkit,
         args={"BASE": random_hex},
-        config=CONFIGS / "docker_wrap.conf",
+        config=CONFIGS / "docker_wrap.c4m",
         expecting_report=buildkit,
     )
     assert second_image_id
@@ -228,7 +228,7 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
     image_hash, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
-        config=CONFIGS / "docker_wrap.conf",
+        config=CONFIGS / "docker_wrap.c4m",
     )
 
     # artifact is the docker image
@@ -278,7 +278,7 @@ def test_nonvirtual_invalid(chalk: Chalk, test_file: str, random_hex: str):
 @pytest.mark.slow()
 def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
     tag = f"test_image_{random_hex}"
-    chalk_copy.load(CONFIGS / "docker_heartbeat.conf", use_embedded=False)
+    chalk_copy.load(CONFIGS / "docker_heartbeat.c4m", use_embedded=False)
 
     # build dockerfile with chalk docker entrypoint wrapping
     chalk_copy.docker_build(
@@ -310,7 +310,7 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
     chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "sample_1" / "Dockerfile",
         tag=tag,
-        config=CONFIGS / "docker_heartbeat.conf",
+        config=CONFIGS / "docker_heartbeat.c4m",
     )
 
     inspected = Docker.inspect(tag)
