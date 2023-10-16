@@ -497,12 +497,13 @@ proc getChalkMark*(obj: ChalkObj): ChalkDict =
     result[k] = v
 
 proc getChalkMarkAsStr*(obj: ChalkObj): string =
-  if obj.cachedMark != "":
-    return obj.cachedMark
 
+  if obj.cachedMark != "":
+    trace("RETURN CACHEMARK " & $obj.cachedMark)
+    return obj.cachedMark
   trace("Converting Mark to JSON. Mark template is: " &
     getOutputConfig().markTemplate)
-
+    
   if obj.cachedMark != "":
     return obj.cachedMark
 

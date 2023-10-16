@@ -660,6 +660,14 @@ Logs out of the API by deleting the saved API tokens.
 """
 }
 
+command login {
+    shortdoc: "Start API login process"
+    doc: """
+Starts the API login process and will provide a URL to follow in a browser to complete authentication.
+"""
+  }
+
+
 }
 
 func set_config_file(filename) {
