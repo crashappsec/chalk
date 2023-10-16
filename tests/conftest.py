@@ -2,6 +2,7 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import os
 import shutil
 import sqlite3
 from contextlib import ExitStack, chdir, closing
@@ -10,7 +11,6 @@ from pathlib import Path
 from secrets import token_bytes
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
-import os
 import pytest
 import requests
 from filelock import FileLock
@@ -19,6 +19,7 @@ from .chalk.runner import Chalk
 from .conf import (
     GDB_PATH,
     SERVER_CERT,
+    SERVER_CHALKDUST,
     SERVER_DB,
     SERVER_HTTP,
     SERVER_HTTPS,
@@ -26,7 +27,6 @@ from .conf import (
     SERVER_STATIC,
 )
 from .utils.log import get_logger
-
 
 logger = get_logger()
 
@@ -141,7 +141,7 @@ def chalk(
     chalk = Chalk(binary=tmp)
     # sanity check
     assert chalk.binary and chalk.binary.is_file()
-    chalk.load(Path(__file__).parent / "testing.conf", use_embedded=False)
+    chalk.load(Path(__file__).parent / "testing.c4m", use_embedded=False)
     yield chalk
 
 
@@ -220,3 +220,8 @@ def server_static():
     if not is_server_up(f"{SERVER_STATIC}/conftest.py"):
         pytest.skip(f"{SERVER_STATIC} is down. skipping test")
     return SERVER_STATIC
+
+
+@pytest.fixture()
+def server_chalkdust():
+    return SERVER_CHALKDUST

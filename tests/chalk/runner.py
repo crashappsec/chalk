@@ -2,19 +2,18 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-from pathlib import Path
-import json
 import datetime
+import json
 import os
+from pathlib import Path
 from typing import Any, Literal, Optional, cast
 
-from ..utils.bin import sha256
-
 from ..conf import MAGIC
-from ..utils.log import get_logger
+from ..utils.bin import sha256
 from ..utils.dict import ContainsMixin
-from ..utils.os import run, Program, CalledProcessError
 from ..utils.docker import Docker
+from ..utils.log import get_logger
+from ..utils.os import CalledProcessError, Program, run
 
 ChalkCommand = Literal[
     "delete",
@@ -208,6 +207,7 @@ class Chalk:
         virtual: bool = False,
         debug: bool = False,
         heartbeat: bool = False,
+        replace: bool = False,
         log_level: Optional[ChalkLogLevel] = None,
         exec_command: Optional[str | Path] = None,
         as_parent: Optional[bool] = None,
@@ -241,6 +241,8 @@ class Chalk:
             cmd += ["--chalk-as-parent"]
         if heartbeat:
             cmd += ["--heartbeat"]
+        if replace:
+            cmd += ["--replace"]
         if debug:
             cmd += ["--debug"]
         if no_color:
@@ -294,6 +296,7 @@ class Chalk:
         config: Optional[Path] = None,
         # suppress output since all we want is the chalk report
         log_level: ChalkLogLevel = "none",
+        env: Optional[dict[str, str]] = None,
     ) -> ChalkProgram:
         return self.run(
             command="insert",
@@ -301,6 +304,7 @@ class Chalk:
             config=config,
             virtual=virtual,
             log_level=log_level,
+            env=env,
         )
 
     def extract(
@@ -342,15 +346,18 @@ class Chalk:
         self,
         config: Path | str,
         *,
+        replace: bool = True,
         use_embedded: bool = False,
         expected_success: bool = True,
         ignore_errors: bool = False,
+        log_level: ChalkLogLevel = "error",
     ) -> ChalkProgram:
         hash = sha256(self.binary)
         result = self.run(
             command="load",
             params=[str(config)],
-            log_level="error",
+            log_level=log_level,
+            replace=replace,
             use_embedded=use_embedded,
             expected_success=expected_success,
             ignore_errors=ignore_errors,

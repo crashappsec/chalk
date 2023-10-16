@@ -29,6 +29,7 @@ repos:
             selfsigned.py|
             defaultconfig.c4m|
             configs/.*.c4m|
+            tests/.*.c4m|
             data/.*
           )$
 

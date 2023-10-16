@@ -3887,6 +3887,58 @@ virtualized view available insider the container.
 """
 }
 
+keyspec _OP_CLOUD_PROVIDER {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+In case of chalk running in the cloud, the type of the cloud provider the
+node is running in. Examples: gcp, aws, azure
+"""
+}
+
+keyspec _OP_CLOUD_PROVIDER_SERVICE_TYPE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+In case of chalk running in the cloud, the type of the service the node is
+running in, (eks, ecs for AWS etc.)
+
+This functionality is currently experimental, and only EKS, EC2, ECS are inferred
+for AWS.
+"""
+}
+
+
+keyspec _AZURE_INSTANCE_METADATA {
+    kind:             RunTimeHost
+    type:             dict[string, `x]
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+JSON containing cloud instance attributes, such as instance-id, IP
+addresses, etc.
+
+See https://learn.microsoft.com/en-us/azure/virtual-machines/instance-metadata-service for more
+"""
+}
+
+keyspec _GCP_INSTANCE_METADATA {
+    kind:             RunTimeHost
+    type:             dict[string, `x]
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+JSON containing cloud instance attributes, such as instance-id, IP
+addresses, etc.
+
+See https://cloud.google.com/compute/docs/metadata/overview for more
+"""
+}
+
 keyspec _AWS_INSTANCE_IDENTITY_DOCUMENT {
     kind:             RunTimeHost
     type:             dict[string, `x]
@@ -4749,7 +4801,7 @@ keyspec $CHALK_API_REFRESH_TOKEN {
    system:                 true
    since:                  "0.1.4"
    doc:                    """
-Key to hopld the OIDC refresh token for non-user present API 
+Key to hopld the OIDC refresh token for non-user present API
 re-authentication.
 """
 }
@@ -4776,4 +4828,53 @@ keyspec $CHALK_SECRET_ENDPOINT_URI {
    doc:                    """
 ...
 """
+}
+
+keyspec $CHALK_SAVED_COMPONENT_PARAMETERS {
+   required_in_self_mark:  true
+   kind:                   ChalkTimeArtifact
+   
+   # Note that I'm not sure the 'proper' type would work yet (in fact,
+   # I am somewhat sure it will not). I haven't had time to test it;
+   # ideally the fact that `x is in a typespec parameter would mean it
+   # re-binds for every typecheck against the list, but I don't think
+   # this is actually the case yet.
+   #
+   # At the very least, as long as con4m never operates on the values,
+   # it will happily accept `x.
+   # 
+   # type:                   list[tuple[bool, string, string, typespec[`x], `x]]
+   
+   type:                   `x
+   standard:               true
+   system:                 true
+   since:                  "0.1.2"
+   doc:                    """
+This is where we save configuration parameters for components that
+have been imported.
+
+The items in the list consist of five-tuples:
+
+1) A boolean indicating whether it's an attribute parameter (false
+   means it's a variable parameter)
+2) The base URL reference for the component
+3) The name of the variable or attribute.
+4) The Con4m type of the parameter.
+5) The stored value (which will be of the type provided)
+"""
+
+}
+
+keyspec $CHALK_COMPONENT_CACHE {
+   required_in_self_mark:  true
+   kind:                   ChalkTimeArtifact
+   type:                   dict[string, string]
+   standard:               true
+   system:                 true
+   since:                  "0.1.2"
+   doc: """
+This consists of URLs (minus the file extension) mapped to source code
+for components.
+"""   
+
 }
