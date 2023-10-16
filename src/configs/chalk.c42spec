@@ -1966,13 +1966,13 @@ pretty weird language names.
   }
 }
 
-singleton ec2 {
-  gen_fieldname: "ec2Config"
-  gen_typename:  "EC2Config"
+singleton cloud_instance_hw_identifiers {
+  gen_fieldname: "cloudInstanceHwConfig"
+  gen_typename:  "CloudInstanceHwConfig"
   gen_setters:   false
   user_def_ok:   false
   shortdoc: """
-Configuration information for AWS EC2
+Configuration information for AWS EC2, GCP, or Azure nodes
 """
   doc: """
 The fields in this section probably will never need to be changed by
@@ -1992,7 +1992,7 @@ end users.
     type:    string
     default: "/sys/class/dmi/id/board_vendor"
     hidden:  true
-    doc:     "Path where to check AWS board vendor if running in AWS EC2"
+    doc:     "Path where to check AWS board vendor if running in AWS, Google or Microsoft nodes"
   }
 
   field sys_product_path {
@@ -2000,19 +2000,19 @@ end users.
     type:    string
     default: "/sys/devices/virtual/dmi/id/product_uuid"
     hidden:  true
-    doc:     "Path where to check AWS product if running in AWS EC2"
+    doc:     "Path where to check product uuid for cloud nodes"
   }
 }
 
-singleton aws {
-  gen_fieldname: "awsConfig"
-  gen_typename:  "AwsConfig"
+singleton cloud_provider {
+  gen_fieldname: "cloudProviderConfig"
+  gen_typename:  "CloudProviderConfig"
   gen_setters:   false
   user_def_ok:   false
   shortdoc: """
-Configuration information for the AWS Cloud Provider
+Configuration information for the different Cloud Provider
 """
-  allow ec2
+  allow cloud_instance_hw_identifiers { }
 }
 
 root {
@@ -2042,7 +2042,7 @@ root {
   allow load
   allow env_config
   allow source_marks
-  allow aws
+  allow cloud_provider
 
   shortdoc: "Chalk Configuration Options"
 

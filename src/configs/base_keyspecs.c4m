@@ -3899,6 +3899,58 @@ virtualized view available insider the container.
 """
 }
 
+keyspec _OP_CLOUD_PROVIDER {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+In case of chalk running in the cloud, the type of the cloud provider the
+node is running in. Examples: gcp, aws, azure
+"""
+}
+
+keyspec _OP_CLOUD_PROVIDER_SERVICE_TYPE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+In case of chalk running in the cloud, the type of the service the node is
+running in, (eks, ecs for AWS etc.)
+
+This functionality is currently experimental, and only EKS, EC2, ECS are inferred
+for AWS.
+"""
+}
+
+
+keyspec _AZURE_INSTANCE_METADATA {
+    kind:             RunTimeHost
+    type:             dict[string, `x]
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+JSON containing cloud instance attributes, such as instance-id, IP
+addresses, etc.
+
+See https://learn.microsoft.com/en-us/azure/virtual-machines/instance-metadata-service for more
+"""
+}
+
+keyspec _GCP_INSTANCE_METADATA {
+    kind:             RunTimeHost
+    type:             dict[string, `x]
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+JSON containing cloud instance attributes, such as instance-id, IP
+addresses, etc.
+
+See https://cloud.google.com/compute/docs/metadata/overview for more
+"""
+}
+
 keyspec _AWS_INSTANCE_IDENTITY_DOCUMENT {
     kind:             RunTimeHost
     type:             dict[string, `x]
@@ -4761,7 +4813,7 @@ keyspec $CHALK_API_REFRESH_TOKEN {
    system:                 true
    since:                  "0.1.4"
    doc:                    """
-Key to hopld the OIDC refresh token for non-user present API 
+Key to hopld the OIDC refresh token for non-user present API
 re-authentication.
 """
 }

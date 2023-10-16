@@ -318,6 +318,10 @@ report and subtract from it.
   key._OP_ARP_TABLE.use                      = true
   key._OP_CPU_INFO.use                       = true
   key._OP_ALL_PS_INFO.use                    = true
+  key._OP_CLOUD_PROVIDER.use                 = true
+  key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use    = true
+  key._AZURE_INSTANCE_METADATA.use           = true
+  key._GCP_INSTANCE_METADATA.use             = true
   key._AWS_INSTANCE_IDENTITY_DOCUMENT.use    = true
   key._AWS_INSTANCE_IDENTITY_PKCS7.use       = true
   key._AWS_INSTANCE_IDENTITY_SIGNATURE.use   = true
@@ -449,6 +453,8 @@ doc: """
   key._OP_CPU_INFO.use                        = true
   key._OP_ALL_PS_INFO.use                     = true
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
+  key._OP_CLOUD_PROVIDER.use                  = true
+  key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
 
   # IMDS keys
   # dynamic
@@ -505,6 +511,8 @@ doc: """
   key._AWS_SECURITY_GROUPS.use                       = true
 
   # json
+  key._AZURE_INSTANCE_METADATA.use                   = true
+  key._GCP_INSTANCE_METADATA.use                     = true
   key._AWS_IAM_INFO.use                              = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
@@ -853,6 +861,8 @@ container.
   key._OP_CLOUD_METADATA.use                  = true
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
   key._OP_ERRORS.use                          = true
+  key._OP_CLOUD_PROVIDER.use                  = true
+  key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
 
 
   # IMDS keys
@@ -910,6 +920,8 @@ container.
   key._AWS_SECURITY_GROUPS.use                       = true
 
   # json
+  key._AZURE_INSTANCE_METADATA.use                   = true
+  key._GCP_INSTANCE_METADATA.use                     = true
   key._AWS_IAM_INFO.use                              = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
@@ -1215,7 +1227,7 @@ and keep the run-time key.
   key.INJECTOR_ARGV.use                       = true
   key.INJECTOR_ENV.use                        = true
   key.TENANT_ID_WHEN_CHALKED.use              = true
-  
+
   # Runtime host keys.
   key._ACTION_ID.use                          = true
   key._ARGV.use                               = true
@@ -1246,6 +1258,8 @@ and keep the run-time key.
   key._OP_CLOUD_METADATA.use                  = true
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
   key._OP_ERRORS.use                          = true
+  key._OP_CLOUD_PROVIDER.use                  = true
+  key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
 
 
   # IMDS keys
@@ -1303,6 +1317,8 @@ and keep the run-time key.
   key._AWS_SECURITY_GROUPS.use                       = true
 
   # json
+  key._AZURE_INSTANCE_METADATA.use                   = true
+  key._GCP_INSTANCE_METADATA.use                     = true
   key._AWS_IAM_INFO.use                              = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
@@ -1560,7 +1576,7 @@ and keep the run-time key.
 }
 
 report_template unknown_docker {
-  shortdoc: "Report BASIC command invocation info for docker commands" 
+  shortdoc: "Report BASIC command invocation info for docker commands"
   doc: """
 Intended for reporting only basic identifying information for docker commands
 that do not generate a chalk report.
@@ -1641,7 +1657,7 @@ report_template terminal_insert {
 
 The summary report that outputs to your terminal by default, when
 running insert commands.
-"""  
+"""
   key._OPERATION.use                          = true
   key._DATETIME.use                           = true
   key._CHALKS.use                             = true
@@ -1705,7 +1721,7 @@ running commands that do NOT insert chalk marks.
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
   key.METADATA_ID.use                         = true
-  key._CURRENT_HASH.use                       = true  
+  key._CURRENT_HASH.use                       = true
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_PATH.use                   = true
   key._CURRENT_HASH.use                       = true
