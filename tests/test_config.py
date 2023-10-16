@@ -21,7 +21,7 @@ from .conf import (
 logger = get_logger()
 
 
-VALIDATION_ERROR = "TEST ERROR HERE XXXXXX"
+VALIDATION_ERROR = "XXXXXX"
 parse_error = "Parse error"
 
 
