@@ -379,6 +379,8 @@ report and subtract from it.
   key.$CHALK_API_REFRESH_TOKEN.use           = true
   key.$CHALK_ATTESTATION_TOKEN.use           = true
   key.$CHALK_SECRET_ENDPOINT_URI.use         = true
+  key.$CHALK_COMPONENT_CACHE.use             = false
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use  = true
 }
 
 report_template report_large {
@@ -768,6 +770,8 @@ doc: """
   key.$CHALK_PUBLIC_KEY.use                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
+  key.$CHALK_COMPONENT_CACHE.use              = false
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true  
 }
 
 report_template report_default {
@@ -1157,7 +1161,8 @@ container.
   key.$CHALK_PUBLIC_KEY.use                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
-
+  key.$CHALK_COMPONENT_CACHE.use              = false
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true    
 }
 report_template insertion_default {
   shortdoc: "The default template for insertion operations"
@@ -1549,8 +1554,8 @@ and keep the run-time key.
   key.$CHALK_PUBLIC_KEY.use                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
-
-
+  key.$CHALK_COMPONENT_CACHE.use              = false
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true  
 }
 
 report_template unknown_docker {

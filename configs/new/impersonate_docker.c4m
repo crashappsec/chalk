@@ -1,0 +1,3 @@
+## Forces setting of the default command to 'docker'.
+
+default_command: "docker"

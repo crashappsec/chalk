@@ -1,0 +1,10 @@
+parameter var disable_default_report {
+  shortdoc: "Disable the log report"
+  doc: """
+Causes Chalk to turn off the default log report when enabled.
+"""
+}
+
+if disable_default_report {
+  unsubscribe("report", "default_out")
+}

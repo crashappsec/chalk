@@ -1,0 +1,36 @@
+# TODO: default
+
+func validate_url(url) {
+  result := ""
+
+  if (not url.starts_with("http://")) and (not url.starts_with("https://")) {
+    return "Only http / https URLs are supported"
+  }
+}
+
+func get_local_url() {
+  out, code := system("ifconfig -a | grep inet | grep broadcast | head -1 | " +
+                     "awk '{ print $2 }'")
+  if code != 0 {
+    return "https://localhost:7890"
+  }
+
+  return "https://" + out.strip() + ":7890"
+}
+
+parameter sink_config.output_to_http.uri {
+  shortdoc:  "URL for reporting server"
+  doc: """
+A config for sending reports to a custom implementation of the test
+reporting server.
+"""
+  validator: func validate_url(string) -> string
+  default: func get_local_url() -> string
+}
+
+sink_config output_to_http {
+  enabled: true
+  sink:    "post"
+
+  # The URI should get filled in automatically.
+}
