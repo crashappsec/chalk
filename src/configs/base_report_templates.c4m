@@ -319,6 +319,11 @@ report and subtract from it.
   key._OP_ALL_PS_INFO.use                    = true
   key._OP_CLOUD_PROVIDER.use                 = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use    = true
+  key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use    = true
+  key._OP_CLOUD_PROVIDER_REGION.use          = true
+  key._OP_CLOUD_PROVIDER_IP.use              = true
+  key._OP_CLOUD_PROVIDER_TAGS.use            = true
+  key._OP_CLOUD_PROVIDER_INSTANCE_TYPE.use   = true
   key._AZURE_INSTANCE_METADATA.use           = true
   key._GCP_INSTANCE_METADATA.use             = true
   key._AWS_INSTANCE_IDENTITY_DOCUMENT.use    = true
@@ -454,6 +459,11 @@ doc: """
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
   key._OP_CLOUD_PROVIDER.use                  = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
+  key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use     = true
+  key._OP_CLOUD_PROVIDER_REGION.use           = true
+  key._OP_CLOUD_PROVIDER_IP.use               = true
+  key._OP_CLOUD_PROVIDER_TAGS.use             = true
+  key._OP_CLOUD_PROVIDER_INSTANCE_TYPE.use    = true
 
   # IMDS keys
   # dynamic
@@ -779,7 +789,7 @@ doc: """
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
-  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true  
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
 
 report_template report_default {
@@ -862,6 +872,11 @@ container.
   key._OP_ERRORS.use                          = true
   key._OP_CLOUD_PROVIDER.use                  = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
+  key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use     = true
+  key._OP_CLOUD_PROVIDER_REGION.use           = true
+  key._OP_CLOUD_PROVIDER_IP.use               = true
+  key._OP_CLOUD_PROVIDER_TAGS.use             = true
+  key._OP_CLOUD_PROVIDER_INSTANCE_TYPE.use    = true
 
 
   # IMDS keys
@@ -1174,7 +1189,7 @@ container.
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
-  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true    
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
 report_template insertion_default {
   shortdoc: "The default template for insertion operations"
@@ -1259,6 +1274,11 @@ and keep the run-time key.
   key._OP_ERRORS.use                          = true
   key._OP_CLOUD_PROVIDER.use                  = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
+  key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use     = true
+  key._OP_CLOUD_PROVIDER_REGION.use           = true
+  key._OP_CLOUD_PROVIDER_IP.use               = true
+  key._OP_CLOUD_PROVIDER_TAGS.use             = true
+  key._OP_CLOUD_PROVIDER_INSTANCE_TYPE.use    = true
 
 
   # IMDS keys
@@ -1571,7 +1591,7 @@ and keep the run-time key.
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
-  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true  
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
 
 report_template unknown_docker {
