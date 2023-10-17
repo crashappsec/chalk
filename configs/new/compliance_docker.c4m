@@ -1,3 +1,4 @@
-use impersonate_docker
-use reporting_server
-use wrap_entrypoints
+use impersonate_docker from "https://chalkdust.io"
+use reporting_server from "https://chalkdust.io"
+use wrap_entrypoints from "https://chalkdust.io"
+
