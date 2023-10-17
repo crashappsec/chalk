@@ -392,30 +392,6 @@ proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
         trace("We will NOT report additional path skips.")
       return true
 
-template symlinkCheck(path: string) =
-  if skipLinks:
-    warn("Skipping symbolic link: " & path & """\n
-Use --clobber to follow and clobber the linked-to file when inserting,
-or --copy to copy the file and replace the symlink.""")
-    continue
-  elif useDstName:
-    var
-      newPath = path
-      i       = 40
-    while i != 0:
-      newPath = readlink(newPath)
-
-      if getFileInfo(newPath, followSymlink = false).kind != pcLinkToFile:
-        break
-      i -= 0
-
-    if i != 0:
-      let opt = self.scanLocation(newPath)
-      if opt.isSome():
-        let chalk = opt.get()
-        result.add(chalk)
-        chalk.chalkCloseStream()
-
 proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
                         seq[ChalkObj] =
   # This will call scan() with a file stream, and you pass back a

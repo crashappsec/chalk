@@ -7,7 +7,7 @@
 
 ## The `chalk logout` command.
 
-import ../api, ../collect, ../config, ../reporting, ../selfextract, ../util
+import ../collect, ../config, ../reporting, ../selfextract
 
 proc runCmdLogout*() =
     info("Logging out of API, discarding saved tokens.")
@@ -28,15 +28,15 @@ proc runCmdLogout*() =
       selfChalk.extract.del("$CHALK_API_KEY")
       #selfChalk.collectedData.del("$CHALK_API_KEY")
       info("Removed $CHALK_API_KEY successfully.")
-      
+
     if "$CHALK_API_REFRESH_TOKEN" in selfChalk.extract:
       selfChalk.extract.del("$CHALK_API_REFRESH_TOKEN")
       #selfChalk.collectedData.del("$CHALK_API_REFRESH_TOKEN")
       info("Removed $CHALK_API_REFRESH_TOKEN successfully.")
-    
+
     info("Updated configuration for " & selfChalk.name)
     selfChalk.writeSelfConfig()
     info("API logout successful.")
-    
+
     doReporting()
     return

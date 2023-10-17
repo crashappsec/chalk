@@ -13,8 +13,6 @@ proc runCmdConfLoad*() =
   setContextDirectories(@["."])
   initCollection()
 
-  var newCon4m: string
-
   let url = getArgs()[0]
 
   if url == "0cool":
