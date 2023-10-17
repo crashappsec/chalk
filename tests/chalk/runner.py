@@ -2,6 +2,7 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import re
 import datetime
 import json
 import os
@@ -132,15 +133,13 @@ class ChalkProgram(Program):
     @property
     def reports(self):
         # strip chalk logs from stdout so we can find just json reports
+        # https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
+        text = re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", self.text)
         text = "\n".join(
             [
                 i
-                for i in self.text.splitlines()
-                if not any(
-                    # color ansi is 11 or 13 chars
-                    i.startswith(j) or i[11:].startswith(j) or i[13:].startswith(j)
-                    for j in {"info:", "trace:", "error:"}
-                )
+                for i in text.splitlines()
+                if not any(i.startswith(j) for j in {"info:", "trace:", "error:"})
             ]
         )
         reports = []

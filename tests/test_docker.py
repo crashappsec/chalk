@@ -274,9 +274,10 @@ def test_nonvirtual_invalid(chalk: Chalk, test_file: str, random_hex: str):
     )
 
 
-# exec heartbeat from inside docker
-@pytest.mark.slow()
 def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
+    """
+    exec heartbeat from inside docker
+    """
     tag = f"test_image_{random_hex}"
     chalk_copy.load(CONFIGS / "docker_heartbeat.c4m", use_embedded=False)
 
