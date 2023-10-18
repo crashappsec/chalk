@@ -4,7 +4,10 @@ docker.wrap_entrypoint: true
 myarch := arch()
 binary_dir := "~/.local/chalk/bin/linux-" + myarch + "/"
 
-if osname() == "macosx" {
+if osname() == "macosx"
+  and command_name() == "docker"
+  and contains(program_args(), "build")
+{
   if not is_dir(binary_dir) {
     mkdir(binary_dir)
   }
