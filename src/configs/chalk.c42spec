@@ -1462,10 +1462,13 @@ Suppress validation of configuration files on loading.  Please don't do this!
 
   field validation_warning {
     type:        bool
-    default:     true
+    default:     false
     shortdoc: "Show 'chalk load' validation warning"
     doc:         """
 Show the (admittedly verbose) warning you get when running 'chalk load'.
+This is off by default, under the assumption that most people are going
+to use the component system exclusively, and everyone else can read the
+docs :)
 """
   }
 }

@@ -238,6 +238,7 @@ proc handleConfigLoad*(inpath: string) =
     alreadyCached    = haveComponentFromUrl(runtime, path).isSome()
     (uri, module, _) = path.fullUrlToParts()
     curConfOpt       = selfChalkGetKey("$CHALK_CONFIG")
+    validate         = chalkConfig.loadConfig.getValidateConfigsOnLoad()
 
   var
     component: ComponentInfo
@@ -269,15 +270,21 @@ proc handleConfigLoad*(inpath: string) =
     else:
       newEmbedded = component.source
 
-  if len(toConfigure) == 0:
+  if replace:
     info("Attempting to replace base configuration from: " & path)
   else:
-    info("Attempting to load configuration module from: " & path)
-    runtime.basicConfigureParameters(component, toConfigure)
+    info("Attempting to load module from: " & path)
+
+    if validate:
+      let prompt = "Press [enter] to check your configuration for conflicts."
+      runtime.basicConfigureParameters(component, toConfigure, prompt)
+    else:
+      runtime.basicConfigureParameters(component, toConfigure, )
+    )
 
   if replace or alreadyCached == false:
     # If we just reconfigured a component, then we don't bother testing.
-    if chalkConfig.loadConfig.getValidateConfigsOnLoad():
+    if validate:
       testConfigFile(path, newEmbedded)
     else:
       warn("Skipping configuration validation. This could break chalk.")
