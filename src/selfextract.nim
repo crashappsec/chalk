@@ -22,7 +22,6 @@ template cantLoad*(s: string) =
   error(s)
   quit(1)
 
-
 proc getSelfExtraction*(): Option[ChalkObj] =
   # If we call twice and we're on a platform where we don't
   # have a codec for this type of executable, avoid dupe errors.

@@ -356,9 +356,13 @@ var
 
 template dumpExOnDebug*() =
   if chalkConfig != nil and chalkConfig.getChalkDebug():
-    let msg = "Handling exception (msg = " & getCurrentExceptionMsg() & ")\n" &
-      getCurrentException().getStackTrace()
-    publish("debug", msg)
+    let
+      msg = "" # "Handling exception (msg = " & getCurrentExceptionMsg() & ")\n"
+      tb  = "Traceback (most recent call last)\n" &
+             getCurrentException().getStackTrace()
+      ii  = default(InstInfo)
+
+    publish("debug", formatCompilerError(msg, nil, tb, ii))
 
 proc getBaseCommandName*(): string =
   if '.' in commandName:

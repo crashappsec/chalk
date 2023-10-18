@@ -1,4 +1,4 @@
-version       = "0.1.2"
+version       = "0.1.3"
 author        = "John Viega"
 description   = "Software artifact metadata to make it easy to tie " &
                 "deployments to source code and collect metadata."
@@ -8,7 +8,7 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 2.0.0"
-requires "https://github.com/crashappsec/con4m#ff834cf3b0dc4c4b7b78d7b0e6c6c327d4f689d3"
+requires "https://github.com/crashappsec/con4m#53f939b1ea6d1a386081f43c2e7accb10f4bd445"
 requires "https://github.com/viega/zippy == 0.10.7"
 requires "https://github.com/aruZeta/QRgen == 3.0.0"
 
