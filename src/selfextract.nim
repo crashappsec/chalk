@@ -279,8 +279,7 @@ proc handleConfigLoad*(inpath: string) =
       let prompt = "Press [enter] to check your configuration for conflicts."
       runtime.basicConfigureParameters(component, toConfigure, prompt)
     else:
-      runtime.basicConfigureParameters(component, toConfigure, )
-    )
+      runtime.basicConfigureParameters(component, toConfigure)
 
   if replace or alreadyCached == false:
     # If we just reconfigured a component, then we don't bother testing.
