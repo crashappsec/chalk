@@ -193,8 +193,11 @@ RESPONSES = {
                     "resourceDisk": {"size": "34816"},
                 },
                 "subscriptionId": "11111111-1111-1111-1111-111111111111",
-                "tags": "",
-                "tagsList": [],
+                "tags": "testtag:testvalue;testtag2:testvalue2",
+                "tagsList": [
+                    {"name": "testtag", "value": "testvalue"},
+                    {"name": "testtag2", "value": "testvalue2"},
+                ],
                 "userData": "",
                 "version": "20.04.202308310",
                 "vmId": "e94f3f7f-6b23-4395-be46-ea363c549f71",
@@ -207,7 +210,10 @@ RESPONSES = {
                     {
                         "ipv4": {
                             "ipAddress": [
-                                {"privateIpAddress": "10.0.0.4", "publicIpAddress": ""}
+                                {
+                                    "privateIpAddress": "10.0.0.4",
+                                    "publicIpAddress": "20.242.32.12",
+                                }
                             ],
                             "subnet": [{"address": "10.0.0.0", "prefix": "24"}],
                         },
