@@ -1,2 +1,42 @@
 # Ensures entrypoint wrapping is enabled in the config"
 docker.wrap_entrypoint: true
+
+myarch := arch()
+binary_dir := "~/.local/chalk/bin/linux-" + myarch + "/"
+
+if osname() == "macosx" {
+  if not is_dir(binary_dir) {
+    mkdir(binary_dir)
+  }
+
+  linux_chalk_location := binary_dir + "chalk"
+  docker.arch_binary_locations = { "linux/" + myarch : linux_chalk_location }
+  
+  if not is_file(linux_chalk_location) {
+    echo("MacOS requires downloading a Linux binary to wrap " +
+    "docker entry points.")
+    chalk_url_base := "https://crashoverride.com/dl/chalk/chalk-"
+    chalk_url      := chalk_url_base + version() + "-linux-" + myarch
+
+    info("Downloading chalk from: " + chalk_url)
+    
+    bits := url_get(chalk_url)
+    
+    info("Writing to: " + linux_chalk_location)
+    write_file(linux_chalk_location, bits)
+    info("Configuring chalk via docker.")
+    config := run(program_path() + " dump")
+    write_file(binary_dir + "config.c4m", config)
+    params := run(program_path() + " dump --params")
+    write_file(binary_dir + "config.params", params + "\n")
+    info("Using docker to install configuration")
+    output := run("docker run --rm -v " + binary_dir +
+                  "chalk:/chalk -v " + binary_dir +
+                  "config.params:/config.params -v " + binary_dir +
+                  "config.c4m:/config.c4m alpine sh -c
+                  'chmod +x /chalk && /chalk load --replace /config.c4m " +
+                  "< config.params'")
+    info(output)
+    info("Done! You can now do entry-point wrapping.")
+  }
+}

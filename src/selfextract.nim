@@ -274,20 +274,43 @@ proc handleConfigLoad*(inpath: string) =
   else:
     info("Attempting to load module from: " & path)
 
-    if validate:
+    if chalkConfig.loadConfig.getParamsViaStdin():
+      try:
+        let
+          chalkJsonTree = newStringStream(stdin.readLine()).chalkParseJson()
+          runtime       = getChalkRuntime()
+
+        if chalkJsonTree.kind != CJArray:
+          raise newException(IOError, "")
+        for row in chalkJsonTree.items:
+          if row.kind != CJArray or row.items.len() != 5:
+            raise newException(IOError, "")
+          let
+            attr    = row.items[0].boolval
+            url     = row.items[1].strval
+            sym     = row.items[2].strval
+            c4mType = row.items[3].strval.toCon4mType()
+            value   = row.items[4].jsonNodeToBox()
+          if attr:
+            runtime.setAttributeParamValue(url, sym, value, c4mType)
+          else:
+            runtime.setVariableParamValue(url, sym, value, c4mType)
+      except:
+        error("Invalid json parameters via stdin: " & getCurrentExceptionMsg())
+        dumpExOnDebug()
+        quit(1)
+    elif validate:
       let prompt = "Press [enter] to check your configuration for conflicts."
       runtime.basicConfigureParameters(component, toConfigure, prompt)
     else:
       runtime.basicConfigureParameters(component, toConfigure)
 
-  if replace or alreadyCached == false:
-    # If we just reconfigured a component, then we don't bother testing.
-    if validate:
-      testConfigFile(path, newEmbedded)
-    else:
-      warn("Skipping configuration validation. This could break chalk.")
+  if validate:
+    testConfigFile(path, newEmbedded)
+  else:
+    warn("Skipping configuration validation. This could break chalk.")
 
-    selfChalkSetKey("$CHALK_CONFIG", pack(newEmbedded))
+  selfChalkSetKey("$CHALK_CONFIG", pack(newEmbedded))
 
   # Now, load the code cache.
   var cachedCode = OrderedTableRef[string, string]()

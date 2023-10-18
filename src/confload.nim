@@ -32,7 +32,7 @@ proc stashFlags(winner: ArgResult) =
 
   hostInfo["_OP_CMD_FLAGS"] = pack(flagStrs)
 
-proc installComponentParams(params: seq[Box]) =
+proc installComponentParams*(params: seq[Box]) =
   let runtime = getChalkRuntime()
 
   for item in params:

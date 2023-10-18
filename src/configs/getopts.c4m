@@ -466,6 +466,13 @@ Reads the embedded configuration file, and outputs it, based on your output conf
 This behavior can be overridden by the configuration file, where you can specify different output configurations.  See 'help config' for an overview of the configuration file format, and 'help output' for an overview of the output system.
 
 """
+    flag_yn params {
+      field_to_set: "dump.params"
+      doc: """
+Don't output the saved configuration. Instead, dump the JSON for any
+saved parameters.
+"""      
+    }
   }
 
   command load {
@@ -489,6 +496,16 @@ When on, the entire stored configuration file will be REPLACED with the
 provided argument. When off, it's used only as a component that's added
 to the config.
 """      
+    }
+
+    flag_yn params {
+      field_to_set: "load.params_via_stdin"
+      doc: """
+When provided, parameters will be taken from stdin, as a json
+dictionary.  Keys are the parameter name as specified in the
+'parameter' block. If parameters that are needed aren't supplied, then
+defaults will be accepted.
+"""
     }
     
     flag_yn validation {

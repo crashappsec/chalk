@@ -9,13 +9,24 @@
 
 import ../config, ../selfextract
 
+const
+  configKey = "$CHALK_CONFIG"
+  paramKey  = "$CHALK_SAVED_COMPONENT_PARAMETERS"
+
 proc runCmdConfDump*() =
   var
     toDump  = defaultConfig
     chalk   = getSelfExtraction().getOrElse(nil)
     extract = if chalk != nil: chalk.extract else: nil
+    params  = chalkConfig.dumpConfig.getParams()
 
-  if chalk != nil and extract != nil and extract.contains("$CHALK_CONFIG"):
-    toDump  = unpack[string](extract["$CHALK_CONFIG"])
+  if params:
+    if chalk == nil or extract == nil or paramKey notin extract:
+      toDump = "[]\n"
+    else:
+      toDump = boxToJson(extract[paramKey])
+  else:
+    if chalk != nil and extract != nil and configKey in extract:
+      toDump = unpack[string](extract[configKey])
 
   publish("confdump", toDump)
