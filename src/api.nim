@@ -12,19 +12,18 @@ template jwtSplitAndDecode(jwtString: string, doDecode: bool): string =
   let parts = split(jwtString, '.')
   if len(parts) != 3:
     raise newException(Exception, "Invalid JWT format")
-  let apiJwtPayload = parts[1]
 
   if doDecode:
     let decodedApiJwt = decode(apiJwtPayload)
     $decodedApiJwt
   else:
-    $apiJwtPayload
+    $(parts[1]) #apiJwtPayload
 
 proc refreshAccessToken*(refresh_token: string): string =
 
   # Mechanism to support access_token refresh via OIDC
   let timeout:   int = cast[int](chalkConfig.getSecretManagerTimeout())
-  var 
+  var
       refresh_url = uri.parseUri(chalkConfig.getSecretManagerUrl())
       context:           SslContext
       client:            HttpClient
@@ -34,7 +33,7 @@ proc refreshAccessToken*(refresh_token: string): string =
   # request new access_token via refresh
   info("Refreshing API access token....")
   if refresh_url.scheme == "https":
-    let context = newContext(verifyMode = CVerifyPeer)
+    context = newContext(verifyMode = CVerifyPeer)
     client  = newHttpClient(sslContext = context, timeout = timeout)
   else:
     client  = newHttpClient(timeout = timeout)
@@ -43,9 +42,9 @@ proc refreshAccessToken*(refresh_token: string): string =
 
   if response.status.startswith("200"):
     # parse json response and save / return values
-    let jsonNode = parseJson(response.body())
-    let new_access_token = jsonNode["access_token"].getStr()
-    let new_id_token     = jsonNode["id_token"].getStr()
+    let
+      jsonNode         = parseJson(response.body())
+      new_access_token = jsonNode["access_token"].getStr()
 
     return new_access_token
 
@@ -67,7 +66,6 @@ proc getChalkApiToken*(): (string, string) =
     contextPoll:       SslContext
     frameIndex:        int    = 0
     framerate:         float
-    jwtString:         string
     pollPayloadBase64: string
     pollUri:           Uri
     pollUrl:           string
@@ -155,7 +153,6 @@ proc getChalkApiToken*(): (string, string) =
 
           # decode JWT
           pollPayloadBase64  = jwtSplitAndDecode($accessToken, true)
-          let decodedPollJwt = parseJson(pollPayloadBase64)
           ret = ($accessToken, $refreshToken)
 
         elif responsePoll.status.startswith("428") or responsePoll.status.startswith("403"):

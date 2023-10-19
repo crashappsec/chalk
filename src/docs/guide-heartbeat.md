@@ -8,7 +8,7 @@
 
 This document is a guide on how to configure chalk so that a chalked binary or docker container emits a snapshot of network connections at set intervals.
 
-### Prerequisities
+### Prerequisites
 
 - chalk binary
 - (optional) dockerfile for a docker image with compatible architecture

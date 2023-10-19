@@ -7,6 +7,12 @@
 
 ## Pull metadata from the proc file system on Linux.
 
+# There are a few unused symbols in here that we intend to use later.
+# Plus, on MacOS, we'll get unused symbol errors too. So just turn
+# them off for this file.
+
+{. hint[XDeclaredButNotUsed]: off.}
+
 when hostOs != "linux":
   {.warning[UnusedImport]: off.}
 
@@ -496,9 +502,8 @@ template getTCPSockInfo(): ProcTable =
 template getUDPSockInfo(): ProcTable =
     getSockInfo(getRawUDPSockInfo().get(""), udpStatusMap)
 
-# Can be used for UDP or TCP
-# but currently isn't being used yet.
-proc getProcSockInfo(allSockInfo: ProcTable, myFdInfo: ProcFdSet): ProcTable =
+proc getProcSockInfo(allSockInfo: ProcTable, myFdInfo: ProcFdSet):
+                    ProcTable  =
   var allInodes: seq[string]
 
   for k, v in myFdInfo:

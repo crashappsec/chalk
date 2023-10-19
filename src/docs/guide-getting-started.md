@@ -12,9 +12,9 @@ CI/CD pipeline. In many cases, it can be completely transparent to
 the user.
 
 Any configuration should be done up-front by whoever needs the data
-from chalk. While chalk is designed to be deeply customisable, we also
+from chalk. While chalk is designed to be deeply customizable, we also
 worked hard to make out-of-the-box configurations useful, and to make
-it very easy to configure common usecases.
+it very easy to configure common use-cases.
 
 First, let's do some basics to get up and running, both with
 chalking artifacts, and reporting on them in production.
@@ -239,7 +239,7 @@ to note for now:
 
 1. We've captured basic information about the build environment,
    including our repo, branch and commit ID. If you pull a repo remotely
-   from Github or Gitlab, the "ORIGIN_URI" key will give the URL where
+   from GitHub or GitLab, the "ORIGIN_URI" key will give the URL where
    the repository is hosted, instead of `local`.
 
 2. In addition to the report, we inserted a JSON blob into our
@@ -583,7 +583,7 @@ without specifying a file name (which will just print to stdout):
 chalk dump
 ```
 
-Youu should see:
+You should see:
 
 ```bash
 # The default config is empty. Please see chalk documentation for examples.
@@ -751,7 +751,7 @@ code you're running.
 
 Chalk really only monitors a subset of docker commands, but when
 wrapping docker, it will pass through all docker commands even if it
-doesn't do any of its own processing on them. If chalk encoounters an
+doesn't do any of its own processing on them. If chalk encounters an
 error while attempting to wrap docker, it will then execute the
 underlying docker command without chalk so that this doesn't break any
 pre-existing pipelines.
@@ -820,7 +820,7 @@ curl http://127.0.0.1:8585/execs
 # for pretty json output if you have jq installed, run `curl http://127.0.0.1:8585/execs | jq`
 ```
 
-![serverout](./img/execout.png){ loading=lazy }
+![exec output](./img/execout.png){ loading=lazy }
 
 You can see that, in addition to artifact information, there is also
 information about the operating environment, including the container

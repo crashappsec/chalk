@@ -19,8 +19,6 @@
 import config, selfextract, con4mfuncs, plugin_load
 import macros except error
 
-const chalkDefaultconfigStore = "https://chalkdust.io/"
-
 # Since these are system keys, we are the only one able to write them,
 # and it's easier to do it directly here than in the system plugin.
 proc stashFlags(winner: ArgResult) =
@@ -34,7 +32,7 @@ proc stashFlags(winner: ArgResult) =
 
   hostInfo["_OP_CMD_FLAGS"] = pack(flagStrs)
 
-proc installComponentParams(params: seq[Box]) =
+proc installComponentParams*(params: seq[Box]) =
   let runtime = getChalkRuntime()
 
   for item in params:
@@ -119,8 +117,8 @@ proc loadLocalStructs*(state: ConfigState) =
   setCon4mVerbosity(c4errLevel)
 
 proc handleCon4mErrors(err, tb: string): bool =
-  if chalkConfig == nil or chalkConfig.chalkDebug:
-    error(err & "\n" & tb)
+  if tb != "" and chalkConfig == nil or chalkConfig.chalkDebug:
+     echo formatCompilerError(err, nil, tb, default(InstInfo))
   else:
     error(err)
   return true
@@ -156,8 +154,6 @@ proc loadAllConfigs*() =
     params:   seq[string] = commandLineParams()
     res:      ArgResult # Used across macros above.
     resFound: bool
-
-  setDefaultStoreUrl(chalkDefaultConfigStore)
 
   let
     toStream = newStringStream

@@ -13,7 +13,7 @@ default_key_priority := 4611686018427387904  # 2^62.
 # These are the valid command-line commands.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "config",
                          "load", "dump", "docker", "version", "env", "exec",
-                         "setup", "login", "logout"]
+                         "setup", "login", "logout", "docgen"]
 
 all_cmds_that_insert := ["insert", "build", "load", "setup", "login", "logout"]
 
@@ -1423,7 +1423,9 @@ singleton load {
   gen_setters:   false
   user_def_ok:   false
   doc: """
-Options that control how the `chalk load` command works.
+Options that control how the `chalk load` command works. Note that
+these values are taken from the starting configuration, not any
+configuration being loaded.
 """
 
   field replace_conf {
@@ -1447,7 +1449,6 @@ Otherwise, the passed configuration is treated like a component:
 
 This flag is ignored when running `chalk load default`, which will
 _always_ reset the embedded configuration to the default.
-
 """
   }
 
@@ -1462,20 +1463,51 @@ Suppress validation of configuration files on loading.  Please don't do this!
 
   field validation_warning {
     type:        bool
-    default:     true
-    shortdoc: "Show 'chalk load' validation warning"
+    default:     false
+    shortdoc:    "Show 'chalk load' validation warning"
     doc:         """
 Show the (admittedly verbose) warning you get when running 'chalk load'.
+This is off by default, under the assumption that most people are going
+to use the component system exclusively, and everyone else can read the
+docs :)
 """
+  }
+
+  field params_via_stdin {
+    type:        bool
+    default:     false
+    doc:         """
+When this is on, loads will not use the interactive interface for
+configuring parameters. Instead, chalk will read parameters from
+stdin.
+
+Parameters should be in the format Chalk uses internally. You can
+get the parameters via `chalk dump --params` or by setting the
+configuration parameter `dump.params`
+"""
+  }
+
+  field update_arch_binaries {
+    type:    bool
+    default: true
+    doc:     """
+When this is true, if you run a `chalk load` on this binary, it will
+try to (via docker) load the exact same configuration into any
+cross-architecture binaries listed in docker.arch_binary_locations.
+
+Note that, if you source config components from a local directory, you
+currently will need to update them manually, as those directories will
+not be mapped into the container.
+"""    
   }
 }
 
 singleton exec {
-gen_fieldname: "execConfig"
-gen_typename:  "ExecConfig"
-gen_setters:   false
-user_def_ok:   false
-doc: """
+  gen_fieldname: "execConfig"
+  gen_typename:  "ExecConfig"
+  gen_setters:   false
+  user_def_ok:   false
+  doc: """
 When the `chalk docker` command wraps a container, it inserts a
 version of itself into the container, to be able to do data collection
 in the runtime environment. Although we do this by replacing the

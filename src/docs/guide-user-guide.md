@@ -46,7 +46,7 @@ wizard, which we expect will meet most configuration needs.
 
 We will be making source code available at the time of our public
 launch. Instructions on how to build directly and building via docker
-file are availabe in the [Chalk Getting Started
+file are available in the [Chalk Getting Started
 Guide](./guide-getting-started.md), as well as instructions on how to
 download pre-built chalk binaries.
 
@@ -249,7 +249,7 @@ will, by default:
 3. Generate a chalk report with metadata on the build operation.
 
 Chalk also reports a bit of metadata when pushing images to help
-provide full tracability.
+provide full traceability.
 
 Chalk can also be configured to add build-time attestation when possible.
 
@@ -367,7 +367,7 @@ Metadata is at the core of Chalk, which categorizes data into four types:
 
 1. **Chalk-time artifact metadata**, which is data specific to a
    software artifact, collected when inserting chalk marks. This data can
-   be put into a chalk mark, and it can also be seprately reported
+   be put into a chalk mark, and it can also be separately reported
    without putting it in the chalk mark.
 
 2. **Chalk-time host metadata**, which is data about the environment
@@ -441,7 +441,7 @@ interoperability across implementations.
 
 For instance, it is easy to write a compliant chalk library that
 allows programs to store their implementations inside their
-executable, and retrieve them, while still interoperating with other
+executable, and retrieve them, while still inter-operating with other
 programs that collect a wider range of metadata.
 
 We certainly intend to allow other people to implement compatible
@@ -531,7 +531,7 @@ modify chalk marks.
 
 Starting with Chalk 0.1.1, Chalk mark injectors that find an existing
 chalk mark in an artifact will, if replacing the chalk mark, keep `$`
-keys they do not recognize, unless specificly configured to remove
+keys they do not recognize, unless specifically configured to remove
 them, while also considering them part of the previous chalk mark.
 
 With Chalk 0.1.0, the `$CHALK_CONFIG` key is the only allowable key,
@@ -593,7 +593,7 @@ keys will always be directly taken from the chalk mark. No keys
 without the leading underscore can be reported for non-insertion
 operations unless they are found in a chalk mark.
 
-We do recommend, at chalk insertion time, to to be thoughtful about
+We do recommend, at chalk insertion time, to be thoughtful about
 what metadata will be added to the chalk mark itself.
 
 There are two key reasons for this:
@@ -609,7 +609,7 @@ There are two key reasons for this:
    in practice, some metadata objects may be quite large, such as
    generated SBOMs or static analysis reports.
 
-The first concern is, by far, the most sigificant. Even in cases where
+The first concern is, by far, the most significant. Even in cases where
 software never intentionally leaves an organization, there can be
 risks. For instance, if the chalk mark contains code ownership or
 other contact information, while it does make life easier for
@@ -669,7 +669,7 @@ In the first case, the mark does NOT need to be at the end of the
 file, due to the support for placeholders.
 
 A valid placeholder consists of the JSON object `{ "MAGIC" :
-"dadfedabbadabbed" }`. The presense of spaces and the number of spaces
+"dadfedabbadabbed" }`. The presence of spaces and the number of spaces
 is all flexible, but no newlines are allowed.
 
 The intent here is to allow developers to specify where they want
@@ -694,8 +694,8 @@ solution. Currently, we're considering two approaches:
 
 1. File-based artifacts will need to be scanned in their entirety
    before marking, and if a mark is found, the spot is reused. This would
-   make things easier on implementators, but could impact performance for
-   some larger artifiacts.
+   make things easier on implementors, but could impact performance for
+   some larger artifacts.
 
 2. We may require marking the locations that older versions would have
    selected with a mark that invalidates the location, and points to the
@@ -763,7 +763,7 @@ well-defined image format is not allowed.
 ### Replacing existing marks
 
 When a Chalk mark already exists in a document, it's up to the context
-of the insertion whether the the existing chalk mark should be
+of the insertion whether the existing chalk mark should be
 removed. In most cases, an existing chalk mark should be preserved. For
 instance, when chalking during deployment, any previous chalk mark
 from the build process should be preserved.
@@ -788,7 +788,7 @@ strongly discourage using those keys without reporting.
 
 Extractors generally do not need to care about file structure for
 non-image formats. It should be sufficient for them to scan the bytes
-of such artifacts, looking for the existance of Chalk `MAGIC` key.
+of such artifacts, looking for the existence of Chalk `MAGIC` key.
 
 However, for image-based formats, the extractor needs to be aware
 enough of the marking requirements for that format to be able to
@@ -882,7 +882,7 @@ For more information, see the following:
   fields. Documentation for keys will also include the conditions
   where the reference implementation can find them.
 - [The Config Overview Guide](./guide-config-overview.md) covers how
-  to to configure WHERE reports get sent.
+  to configure WHERE reports get sent.
 
 Note that compliant insertion implementations do not require compliant
 reporting implementations. But compliant chalk tools for other
@@ -890,7 +890,7 @@ operations MUST produce fully conformant JSON.
 
 However, there are no requirements on how that JSON gets distributed
 or managed, other than that compliant implementations must provide a
-straightforward way to make the JSON avilable to users if desired.
+straightforward way to make the JSON available to users if desired.
 
 A report not in the proper format, or with key/values pairs that are
 not compliant, is not a Chalk report.
@@ -926,7 +926,7 @@ The normalization algorithm is as follows:
    `TZ_OFFSET`, `DATETIME`.
 3. The following key/value pair is encoded LAST, (whenever present):
    `ERR_INFO`.
-4. The remaining keys are encoded in lexigraphical order.
+4. The remaining keys are encoded in lexicographical order.
 5. The encoding starts with the number of keys in the normalization,
    as a 32-bit little endian integer.
 6. Each key/value pair is encoded in order by encoding the key, and
@@ -974,7 +974,7 @@ validation discussed below built on top of the `METADATA_ID`.
 We currently omit `EMBEDDED_CHALK`, instead allowing them to be
 independently validated, if desired. While this does mean the
 `EMBEDDED_CHALK` key can be excised without detection at validation
-time, we expect that either the relevent sub-artifacts will have
+time, we expect that either the relevant sub-artifacts will have
 embedded chalk marks themselves, or the server will have record of the
 insertion.
 
@@ -1000,12 +1000,12 @@ well, as long as there is a `HASH` field).
 
 In containers, where we do not have an easy, reliable hash, metadata
 normalization and validation works the same way. But we strongly
-recommend automatic digitial signatures to ensure that you can detect
+recommend automatic digital signatures to ensure that you can detect
 changes to the container.
 
 Digital signing can be used both with containers and with other
 artifacts. With containers, we use Sigstore with their In-Toto
-attestations that we appply on `docker push`. The mark is replicated
+attestations that we apply on `docker push`. The mark is replicated
 in full inside the attestation.
 
 For other artifacts, the signature is stored in the Chalk mark, but is
@@ -1044,7 +1044,7 @@ docker.label_prefix: "com.example."
 ```
 
 In the configuration file, we can also set up environment variables
-for reporting, such as by defining new environment variablaes and
+for reporting, such as by defining new environment variables and
 using simple if / else logic to set a default if the environment
 variable is not set on the host. For example:
 
@@ -1135,7 +1135,7 @@ reporting on any of those keys.
 | Artifact           | Any software artifact handled by Chalk, which can recursively include other artifacts. For instance, a Zip file is an artifact type that can currently be chalked, which can contain ELF executables that can also be chalked.                                                                                                                                                                                          |
 | Chalk Mark         | JSON containing metadata about a software artifact, generally inserted directly into the artifact in a way that doesn’t affect execution. Often, a chalk mark will be minimal, containing only small bits of identifying information that can be used to correlate the artifact with other metadata collected.                                                                                                          |
 | Unchalked          | A software artifact that does not have a chalk mark embedded in it.                                                                                                                                                                                                                                                                                                                                                     |
-| Metadata Key       | Each piece of metadata Chalk is able to collect (metadata being data about an artifact or a host on which an artifact has been found) is associated with a metadata key. Chalk reports all metadata in JSon key/value pairs, and you specify what gets added to a chalk mark and what gets reported on by listing the metadata keys you’re interested in via the report template and mark emplate.                      |
+| Metadata Key       | Each piece of metadata Chalk is able to collect (metadata being data about an artifact or a host on which an artifact has been found) is associated with a metadata key. Chalk reports all metadata in JSon key/value pairs, and you specify what gets added to a chalk mark and what gets reported on by listing the metadata keys you’re interested in via the report template and mark template.                     |
 | Chalking           | The act of adding metadata to a software artifact. Aka, “insertion”.                                                                                                                                                                                                                                                                                                                                                    |
 | Extraction         | The act of reading metadata from artifacts and reporting on them.                                                                                                                                                                                                                                                                                                                                                       |
 | Report             | Every time Chalk runs, it will want to report on its activity. That can include information about artifacts, and also about the host. Reports are “published” to output “sinks”. By default, you’ll get reports output to the console, and written to a local log file, but can easily set up HTTPS post or writing to object storage either by supplying environment variables, or by editing the Chalk configuration. |
@@ -1143,6 +1143,6 @@ reporting on any of those keys.
 | Mark Template      | Like report templates, you have complete flexibility over what goes into chalk marks. A mark template is a specification of metadata keys that you want to go into the chalk mark.                                                                                                                                                                                                                                      |
 | Sinks              | Output types handled by Chalk. Currently, chalk supports JSON log files, rotating (self-truncating) JSON log files, s3 objects, http/https post, and stdin/stdout.                                                                                                                                                                                                                                                      |
 | Chalk ID           | A value unique to an unchalked artifact. Usually, it is derived from the SHA-256 hash of the unchalked artifact, except when that hash is not available at chalking time, in which case, it’s random. Chalk IDs are 100 bits, and human readable (Base32).                                                                                                                                                              |
-| Metadata ID        | A value unique to a chalked artifact. It is always derived from a normalized hash of all other metadata (except for any metadata keys involved in signing the Metadata ID). Metdata IDs are also 100 bits, and Base32 encoded.                                                                                                                                                                                          |
+| Metadata ID        | A value unique to a chalked artifact. It is always derived from a normalized hash of all other metadata (except for any metadata keys involved in signing the Metadata ID). Metadata IDs are also 100 bits, and Base32 encoded.                                                                                                                                                                                         |
 | Chalkable keys     | Metadata keys that can be added to chalk marks. When reported for an artifact (e.g., during extraction in production), they will always indicated chalk-time metadata.                                                                                                                                                                                                                                                  |
 | Non-chalkable keys | Metadata keys that will NOT be added to chalk marks. They will always be reported for the current operation, and start with a `_`. There are plenty of metadata keys that have chalkable and non-chalkable versions.                                                                                                                                                                                                    |

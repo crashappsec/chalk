@@ -33,6 +33,7 @@ or vice versa.
   key.DATETIME_WHEN_CHALKED.use              = true
   key.EARLIEST_VERSION.use                   = true
   key.HOSTINFO_WHEN_CHALKED.use              = true
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use      = true
   key.NODENAME_WHEN_CHALKED.use              = true
   key.INJECTOR_CHALK_ID.use                  = true
   key.INJECTOR_PUBLIC_KEY.use                = true
@@ -109,6 +110,7 @@ mark_template mark_large {
   key.DATETIME_WHEN_CHALKED.use               = true
   key.EARLIEST_VERSION.use                    = true
   key.HOSTINFO_WHEN_CHALKED.use               = true
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use       = true  
   key.NODENAME_WHEN_CHALKED.use               = true
   key.INJECTOR_CHALK_ID.use                   = true
   key.INJECTOR_VERSION.use                    = true
