@@ -15,16 +15,13 @@ figure out where the code lives and who owns it.
 Similarly, developers often would like to know what versions of their
 code are deployed where, especially when a bug report comes in.
 
-This how-to uses Chalk™ to automate this easily in five steps:
+This how-to uses Chalk™ to automate this easily:
 
-1. Load our `app-inventory` configuration
-2. Set up the Inventory web service
-3. Configure where Chalk reports get sent
+1. Start a web service to collect data (via docker)
+2. Load our `app-inventory` configuration
+3. (Optional) Start up a service to let us browse collected data.
 
-4. Automate calling docker via `chalk` in your build environment.
-5. Use it
-
-## Steps
+Each of the steps involves running only a single command.
 
 ### Before you start
 
@@ -32,176 +29,109 @@ The easiest way to get Chalk is to download a pre-built binary from
 our [release page](https://crashoverride.com/releases). It's a
 self-contained binary with no dependencies to install.
 
-### Step 1: Load our `app-inventory` configuration
+Additionally, the reporting web service we'll install by running two
+docker containers, one for collecting logs, and the other to give us a
+web frontend to browse them.
 
-Chalk is designed so that you can easily pre-configure it for the
-behavior you want, so that you can generally just run a single binary
-with no arguments, to help avoid using it wrong.
+### Step 1: Set up the Inventory web service
 
-We're going to download and install a chalk configuration that does
-the following:
+We've put together a simple Python-based API Server that will accept
+reports from the chalk binary we're configuring, and stick things
+in an SQLite database.
 
-1. Sets up Chalk to be able to seamlessly wrap invocations of Docker
-   via a global alias.
+The SQLite database will live in `~/.local/c0/chalkdb.sqlite`.
 
-2. Configures Chalk to report not only build-time information, but
-   runtime information when containers built with this recipe are run.
-
-3. Has everything report back to a container we'll deploy in the next step.
-
-The container we'll deploy is a simple Python-based HTTP server
-integrated with SQLite. You'll be able to browse and search all the
-info you collect with SQL, or by adding any frontend you desire.
-
-Or, you can easily use any HTTP / HTTPS endpoint you like.
-
-The base configuration for this recipe though, will assume the
-reporting container is always running on 'localhost:8585'.
-
-We can fix that after we get things up and running. For now, let's
-just install the base.
-
-Assuming that you've downloaded Chalk, and it's in your current
-directory, you would simply run:
+To start up the API server, which will create our database, run:
 
 ```bash
-./chalk load https://chalkdust.io/app-inventory.c4m
+docker run --rm -d -w /db -v $HOME/.local/c0/:/db -p 8585:8585 --restart unless-stopped  ghcr.io/crashappsec/chalk-test-server
 ```
 
-This downloads our config, tests it, and loads it into the binary.
-Note that Chalk reconfigures itself by editing its binary. So it's
-best when configuring to have write access to the binary. If you do
-not, then copy the binary and run it from someplace you do.
-
-### Step 2: Set up the Inventory web service
-
-We are going to set up two containers:
-1. A simple Python-based API Server that will accept reports from the
-   chalk binary we're configuring, and stick things in the SQLite
-   database.
-2. A container running an SQLite Web interface to give us a reasonable
-   GUI on top of it.
-Both of these images will need to share a single SQLite database. The
-API server we'll want to configure to listen for connections on
-external interfaces.
-Then, in the next step, we're going to want to re-configure our Chalk
-binary to use the public IP address of the container.
-Let's put our SQLite database in `~/.local/c0/chalkdb.sqlite`.
-First, let's start up the API server, which will create our database
-for us:
-```bash
-docker run \
-    --rm \
-    -d \
-    -w /db \
-    -v $HOME/.local/c0/:/db \
-    -p 8585:8585 \
-    ghcr.io/crashappsec/chalk-test-server
-```
 This will set up an API server on port 8585 on your machine,
 accessible from any interface. Note, it will run in the background.
-You can verify the healthcheck of the server by running
+```
+
+### Step 2: Load our `app-inventory` configuration
+
+Chalk can load remote modules to reconfigure functionality. Even if
+you've already configured Chalk, you should simply just run:
+
+```
+./chalk load https://chalkdust.io/app_inventory.c4m
+```
+
+You will be prompted to enter the IP address for the server we set up
+in the previous step. The default will be your personal IP
+address. For instance, I get:
+
+![Output 1](../img/appinv-ss1.png)
+
+Generally, the default should work just fine. 
+
+After accepting the binary, it'll prompt you one more time to finish
+the setup. The resulting binary will be fully configured, and can be
+taken to other machines, as long as your server container stays up.
+
+There's nothing else you need to do to keep this new configuration--
+Chalk rewrites data fields in its own binary when saving the
+configuration changes.
+
+### Step 3: Browse some data!
+
+Now, we should build and deploy some containers using Chalk, so you
+can see real data in the database.
+
+As a really simple example, let's build a container that prints load
+averages once a minute to stdout.
+
+First, we'll write a script for this:
 ```bash
-curl http://localhost:8585/health
+cat > example.sh <<EOF
+#!/bin/sh
+while true
+  do
+    uptime
+    sleep 60
+  done
+EOF
 ```
 
-Now, let's start up the SQL browser container on port 8080:
-
+Now, let's create the Dockerfile:
 ```bash
-docker run \
-    --rm \
-    -d \
-    -e SQLITE_DATABASE=/db/chalkdb.sqlite \
-    -v $HOME/.local/c0/:/db \
-    -p 8080:8080 \
-    coleifer/sqlite-web
+cat > Dockerfile <<EOF
+FROM alpine
+COPY example.sh /
+ENTRYPOINT ["/bin/sh", "example.sh"]
+EOF
 ```
 
-The database GUI will be available on port 8080. But, our database
-will be empty until we start using Chalk, so let's come back to the
-data after we've got a bit of it.
-
-### Step 3: Configure chalk reports sink destination
-
-Our Chalk binary just needs to point to our API server. Lets first
-dump the configuration we loaded to a file:
-
+Now, build the container with chalk:
 ```bash
-chalk dump app-inventory.c4m
+./chalk docker build -t loadavg:current .
 ```
 
-Now, open `app-inventory.c4m` in your favorite text editor.
+You can then run the container:
 
-You'll see the following:
-
-```con4m
-...
-sink_config output_to_http {
-  enabled: true
-  sink:    "post"
-  uri:     "http://localhost:8585/report"
-}
-...
+```
+./chalk docker run -it loadavg:current
 ```
 
-Edit the URI to point to your API container; you really just need to
-replace `localhost` with your IP address (or a DNS name if you have
-one).
+As run, this will block our terminal until will hit CTRL-C.
 
-Once you've saved your change, reconfigure your binary with:
-
-```bash
-chalk load app-inventory.c4m
-```
-
-### Step 4: Automate calling docker via `chalk` in your build environment.
-
-You _could_ now deploy chalk and ask everyone to run it by invoking
-`chalk` before their docker commands. But that's easy to forget. It's
-really better to automatically call `chalk` when invoking Docker.
-
-You can do this easily with a global alias. How this is done can
-differ, but typically your systems will have a global file for bash
-configuration, usually `/etc/bash.bashrc` (but less commonly
-`/etc/bashrc`)
-
-This runs when any bash shell starts. All you need to add to it is:
-
-```bash
-alias docker=chalk
-```
-
-Then, you need to move `chalk` to someplace that's going to be in the
-default path (usually putting it in the same directory as your docker
-executable is a safe bet).
-
-> 💀 We do _not_ recommend /etc/profile.d because some (non-login)
-> shells will not use this.
-
-Once you add this, you can log out and log back in to make the alias
-take effect, our simply `source` the file:
+If you're not an SQLite expert, we can run a web service that points
+to the same database, that makes it a bit easier to browse. 
+Let's set it up on port 8080:
 
 ```bash
-source /etc/bash.bashrc
+docker run -d -p 3000:3000 -p 3001:3001 -v $HOME/.local/c0/chalkdb.sqlite:/chalkdb.sqlite  lscr.io/linuxserver/sqlitebrowser:latest
 ```
 
-Now, whenever a new bash shell gets created that starts a `docker`
-process, they'll be automatically configured to call `chalk`
-instead. The way we've configured `chalk`, when it doesn't see any of
-its own commands, it knows to use the Chalk `docker` command.
+The database GUI will be available on port 3000. But, our database
+will be empty until we start using Chalk, so definitely use chalk to
+build and deploy some workloads.
 
-That command always runs the Docker command intended by the user, but
-in our case:
 
-1. Collects information about the build environment; and
-
-2. Slightly adjusts the Docker input so that Chalk will also start up
-   with containers, and report to your Inventory web service.
-
-### Step 5: Use it
-
-Build and deploy some workloads. Once you do, from the machine you
-deployed the containers, browse SQLite database at
+Now, you can browse your SQLite database at
 [http://localhost:8080](http://localhost:8080).
 
 The database will be capturing both the repositories you're using to
@@ -218,38 +148,37 @@ information AND the containers you deploy.
 > wrapping `docker push`, but you'll have to go through extra work to
 > link them together; the CHALK_ID will work.
 
-In addition to manually browsing the SQLite database, you can query
-some of the data via the API.
-
-To list all built docker images you can list all chalk marks:
-
-```bash
-curl "http://localhost:8585/chalks" -s | jq
-```
-
-To see all `exec` chalk reports from running containers:
-
-```bash
-curl "http://localhost:8585/reports?operation=exec" -s | jq
-```
-
-To see all available endpoints you can see the Swagger docs of the API
-at [http://localhost:8585/docs](http://localhost:8585/docs)
+If you like Chalk, you can easily deploy across your docker builds and
+deploys by adding a global alias. See the [howto for docker deployment](./howto-deploy-chalk-globally-using-docker.md)
 
 ## Warning
 
-This how-to was written for local demonstration purposes only. There is no security for this how-to. You should always have authentication, authorization and use TLS/SSL as an absolute minimum.
+This how-to was written for local demonstration purposes only.There is
+no security for this how-to. You should always have authn, authz and
+uses SSL as an absolute minimum.
 
 ## Our cloud platform
 
-While creating a basic app inventory with Chalk is easy, our cloud platform makes it even easier. It is designed for enterprise deployments, and provides additional functionality including prebuilt configurations to solve common tasks, prebuilt integrations to enrich your data, a built-in query editor, an API and more.
+While creating a basic app inventory with Chalk is easy, our cloud
+platform makes it even easier. It is designed for enterprise
+deployments, and provides additional functionality including prebuilt
+configurations to solve common tasks, prebuilt integrations to enrich
+your data, a built-in query editor, an API and more.
 
-There are both free and paid plans. You can [join the waiting list](https://crashoverride.com/join-the-waiting-list) for early access.
+There are both free and paid plans. You can [join the waiting
+list](https://crashoverride.com/join-the-waiting-list) for early
+access.
 
 ### Background Information
 
-Traditionally IT departments maintained list of their hardware and software assets in a CMDB or [configuration management data base](https://en.wikipedia.org/wiki/Configuration_management_database). These systems were not designed for modern cloud based software and the complexity of code that they are made from.
+Traditionally IT departments maintained list of their hardware and
+software assets in a CMDB or [configuration management data
+base](https://en.wikipedia.org/wiki/Configuration_management_database). These
+systems were not designed for modern cloud based software and the
+complexity of code that they are made from.
 
-Spotify created a project called [Backstage](https://backstage.io) to centralise developer documentation. Many companies now use it as a source of truth for their development teams.
+Spotify created a project called [Backstage](https://backstage.io) to
+centralise developer documentation. Many companies now use it as a
+source of truth for their development teams.
 
 Many companies create application inventories using spreadsheets.
