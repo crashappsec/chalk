@@ -34,7 +34,7 @@ Automatically create SBOMs for every build of every code repo, including auto-de
 
 #### How-to deploy Chalk globally using Docker
 
-You can deploy Chalk by setting a global alias for Docker and having it call Chalk, so that every build that runs through your build server using Docker, will automatically be 'chalked'. It's a technique that can be combined with chalks ability to deploy tools and configure monitoring, to automatically add security controls and collect information for every application. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-deploy-chalk-globally-using-docker)]
+You can deploy Chalk by setting a global alias for Docker and having it call Chalk, so that every build that runs through your build server using Docker, will automatically be 'chalked'. It's a technique that can be combined with chalks ability to deploy tools and configure monitoring, to automatically add security controls and collect information for every application. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-deploy-chalk-globally-using-docker)]
 
 All documentation for Chalk is available at https://crashoverride.com/docs and is also fully accessible though the command line interface.
 
