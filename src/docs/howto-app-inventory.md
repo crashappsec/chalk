@@ -49,7 +49,6 @@ docker run --rm -d -w /db -v $HOME/.local/c0/:/db -p 8585:8585 --restart unless-
 
 This will set up an API server on port 8585 on your machine,
 accessible from any interface. Note, it will run in the background.
-```
 
 ### Step 2: Load our `app-inventory` configuration
 
