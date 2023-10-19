@@ -698,12 +698,12 @@ proc runChalkDocGen*() =
     con4mRuntime = getChalkRuntime()
     opts         = CmdLineDocOpts(docKind: CDocRaw)
 
-  # 1. Dump embedded markdown docs.
   createDir(docDir)
-  for k, v in helpFiles:
-    f = newFileStream(docDir.joinPath(k) & ".md", fmWrite)
-    f.write(v)
-    f.close()
+  # 1. Dump embedded markdown docs.
+  #for k, v in helpFiles:
+  #  f = newFileStream(docDir.joinPath(k) & ".md", fmWrite)
+  #  f.write(v)
+  #  f.close()
 
   # 2. Write out command docs.
   f = newFileStream(cmdline, fmWrite)
