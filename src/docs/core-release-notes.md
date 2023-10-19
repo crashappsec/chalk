@@ -1,4 +1,48 @@
-# Release Notes for Chalk version 0.1.3
+# Release Notes for Chalk version 0.1.3 (Oct 19, 2023)
+
+## New Features
+
+- Added a module so that most users can easily install complex
+  configurations without editing any configuration information
+  whatsoever. Modules can be loaded from https URLs or from the local
+  file system. Our recepies will host modules on chalkdust.io.
+
+  Modules can have parameters that you provide when installing them,
+  and can have arbitrary defaults (for instance, any module importing
+  the module for connecting to our demo web server defaults to your
+  current IP address).
+
+  We do extensive conflict checking to ensure that modules that are
+  incompatible will not run (and generally won't even load).
+
+  We will eventually do an in-app UI to browse and install modules.
+  [47](https://github.com/crashappsec/chalk/pull/47)
+  [67](https://github.com/crashappsec/chalk/pull/67)
+
+- Added initial metadata collection for GCP and Azure, along with a
+  metadata key to provide the current cloud provider, and a key that
+  distinguishes the cloud provider's environments. Currently, this
+  only does AWS (eks, ecs, ec2).
+  [59](https://github.com/crashappsec/chalk/pull/59)
+  [65](https://github.com/crashappsec/chalk/pull/65)
+
+- Added OIDC token refreshing, along with `chalk login` and `chalk
+  logout` commands to log out of auth for the secret manager.
+  [51](https://github.com/crashappsec/chalk/pull/51)
+  [55](https://github.com/crashappsec/chalk/pull/55)
+  [60](https://github.com/crashappsec/chalk/pull/60)
+
+- The initial rendering engine work was completed. This means `chalk
+  help`, `chalk help metadata` are fully functional.  This engine is
+  effectively most of the way to a web browser, and will enable us to
+  offload a lot of the documentation, and do a little storefront (once
+  we integrate in notcurses).
+  [58](https://github.com/crashappsec/chalk/pull/58)
+
+- If you're doing multi-arch binary support, Chalk can now pass your
+  native binary's configuration to other arches, though it does
+  currently re-install modules, so the original module locations need
+  to be available.
 
 ## Fixes
 
@@ -16,17 +60,20 @@
   [39](https://github.com/crashappsec/chalk/pull/39)
 - Sometimes Docker build would not wrap entrypoint.
   [45](https://github.com/crashappsec/chalk/pull/45)
+- Cosign now only gets installed if needed.
+  [49](https://github.com/crashappsec/chalk/pull/49)
 
 ## Known Issues
 
-### Containers
+- There are still embedded docs that need to be fixed now that the
+  entire rendering engine is working well enough.
 
-- When a `Dockerfile` does not use `USER` directive but base image
-  uses it to change default image user, chalk cannot wrap the
-  image as it on legacy Docker builder (not buildx) as it will
-  fail to `chmod` permissions of chalk during the build.
+- When a `Dockerfile` does not use the `USER` directive but base image
+  uses it to change default image user, chalk cannot wrap the image as
+  it on legacy Docker builder (not buildx) as it will fail to `chmod`
+  permissions of chalk during the build.
 
-# Release Notes for Chalk version 0.1.2
+# Release Notes for Chalk version 0.1.2 (Sept 26, 2023)
 
 This is the first open source release of Chalk. For those who
 participated in the public preview, there have been massive changes
