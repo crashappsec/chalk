@@ -498,6 +498,19 @@ to the config.
 """      
     }
 
+    flag_yn update_arch_binaries {
+      field_to_set: "load.update_arch_binaries"
+      doc: """
+When this is true, if you run a `chalk load` on this binary, it will
+try to (via docker) load the exact same configuration into any
+cross-architecture binaries listed in docker.arch_binary_locations.
+
+Note that, if you source config components from a local directory, you
+currently will need to update them manually, as those directories will
+not be mapped into the container.
+"""      
+    }
+
     flag_yn params {
       field_to_set: "load.params_via_stdin"
       doc: """
@@ -518,7 +531,8 @@ When on, validate config files before loading them, by doing a trial run.
     flag_yn validation_warning {
       field_to_set: "load.validation_warning"
       doc: """
-This verbose flag controls whether or not you get the verbose warning.  It's much better turning this off in your embedded configuration :)
+This verbose flag controls whether or not you get the verbose warning.
+It's much better turning this off in your embedded configuration :)
 """      
     }
   }

@@ -4,10 +4,7 @@ docker.wrap_entrypoint: true
 myarch := arch()
 binary_dir := "~/.local/chalk/bin/linux-" + myarch + "/"
 
-if osname() == "macosx"
-  and command_name() == "docker"
-  and contains(program_args(), "build")
-{
+if osname() == "macosx" {
   if not is_dir(binary_dir) {
     mkdir(binary_dir)
   }
@@ -27,21 +24,7 @@ if osname() == "macosx"
 
     info("Writing to: " + linux_chalk_location)
     write_file(linux_chalk_location, bits)
-    info("Configuring chalk via docker.")
     config := run(program_path() + " dump")
     write_file(binary_dir + "config.c4m", config)
-    params := run(program_path() + " dump --params")
-    write_file(binary_dir + "config.params", params + "\n")
-    info("Using docker to install configuration")
-    output := run("docker run --rm " +
-                  "-v " + linux_chalk_location + ":/chalk " +
-                  "-v " + binary_dir + "config.params:/config.params " +
-                  "-v " + binary_dir + "config.c4m:/config.c4m " +
-                  "alpine sh -c '" +
-                  "chmod +x /chalk && " +
-                  "/chalk load --replace /config.c4m < config.params" +
-                  "'")
-    info(output)
-    info("Done! You can now do entry-point wrapping.")
   }
 }
