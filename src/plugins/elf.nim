@@ -6,6 +6,10 @@
 ##
 import ../config, algorithm
 
+# We've got a lot of ELF-specific defines we're not using but we
+# want to keep around, so silence any warnings.
+{.hint[XDeclaredButNotUsed]: off.}
+
 const
   NOT8                       = uint64(0) - 9
   NULLBYTE                   = '\x00'

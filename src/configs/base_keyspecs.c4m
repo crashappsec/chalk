@@ -51,7 +51,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.1.2"
+chalk_version :=   "0.1.3"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -235,6 +235,19 @@ occured, collected at the the time of that operation. On posix
 systems, it's taken from the 'version' field obtained from a call to
 the `uname()` system call.
 """
+}
+
+keyspec PUBLIC_IPV4_ADDR_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.3"
+    shortdoc:         "IPv4 address at Chalk time"
+    doc:              """
+This returns the IPv4 address on the local machine used to route
+external traffic. It's determined by setting up a UDP connection to
+Cloudflare's public DNS service, but does not involve sending any data.
+"""    
 }
 
 keyspec NODENAME_WHEN_CHALKED {
@@ -3590,6 +3603,24 @@ systems, it's taken from the 'version' field obtained from a call to
 the `uname()` system call.
 """
 }
+
+keyspec _OP_PUBLIC_IPV4_ADDR {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.3"
+    shortdoc:         "IPv4 address"
+    doc:              """
+This returns the IPv4 address on the local machine used to route
+external traffic. It's determined by setting up a UDP connection to
+Cloudflare's public DNS service, but does not involve sending any
+data.
+
+There are other keys for reported IPs via other systems, including
+cloud provider APIs, docker, procfs, etc.
+"""    
+}
+
 
 keyspec _OP_NODENAME {
     kind:             RunTimeHost

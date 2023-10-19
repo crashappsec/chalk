@@ -1,4 +1,4 @@
-version       = "0.1.2"
+version       = "0.1.3"
 author        = "John Viega"
 description   = "Software artifact metadata to make it easy to tie " &
                 "deployments to source code and collect metadata."
@@ -8,7 +8,7 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 2.0.0"
-requires "https://github.com/crashappsec/con4m#da5a430616ef2740da603438b35436d184c36938"
+requires "https://github.com/crashappsec/con4m#816585633835c30e5aaf4f53fdfb8eb4dd91f97a"
 requires "https://github.com/viega/zippy == 0.10.7"
 requires "https://github.com/aruZeta/QRgen == 3.0.0"
 
@@ -70,7 +70,7 @@ before install:
 after build:
   when not defined(debug):
     exec "set -x && strip " & bin[0]
-  exec "set -x && ./" & bin[0] & " --no-use-external-config --skip-command-report load default"
+  exec "set -x && ./" & bin[0] & " --debug --no-use-external-config --skip-command-report load default"
 
 task debug, "Get a debug build":
   # additional flags are configured in config.nims

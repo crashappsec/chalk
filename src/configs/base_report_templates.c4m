@@ -29,6 +29,7 @@ report and subtract from it.
   key.DATETIME_WHEN_CHALKED.use              = true
   key.EARLIEST_VERSION.use                   = true
   key.HOSTINFO_WHEN_CHALKED.use              = true
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use      = true  
   key.NODENAME_WHEN_CHALKED.use              = true
   key.INJECTOR_CHALK_ID.use                  = true
   key.INJECTOR_PUBLIC_KEY.use                = true
@@ -303,6 +304,7 @@ report and subtract from it.
   key._OP_CHALKER_VERSION.use                = true
   key._OP_PLATFORM.use                       = true
   key._OP_HOSTNAME.use                       = true
+  key._OP_PUBLIC_IPV4_ADDR.use               = true
   key._OP_HOSTINFO.use                       = true
   key._OP_NODENAME.use                       = true
   key._OP_CLOUD_METADATA.use                 = true
@@ -407,6 +409,7 @@ doc: """
   key.DATETIME_WHEN_CHALKED.use               = true
   key.EARLIEST_VERSION.use                    = true
   key.HOSTINFO_WHEN_CHALKED.use               = true
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use       = true  
   key.NODENAME_WHEN_CHALKED.use               = true
   key.INJECTOR_CHALK_ID.use                   = true
   key.INJECTOR_VERSION.use                    = true
@@ -442,6 +445,7 @@ doc: """
   key._OP_CHALKER_VERSION.use                 = true
   key._OP_PLATFORM.use                        = true
   key._OP_HOSTNAME.use                        = true
+  key._OP_PUBLIC_IPV4_ADDR.use                = true  
   key._OP_HOSTINFO.use                        = true
   key._OP_NODENAME.use                        = true
   key._OP_CLOUD_METADATA.use                  = true
@@ -533,6 +537,7 @@ doc: """
   key.DATETIME_WHEN_CHALKED.use               = true
   key.EARLIEST_VERSION.use                    = true
   key.HOSTINFO_WHEN_CHALKED.use               = true
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use       = true  
   key.NODENAME_WHEN_CHALKED.use               = true
   key.INJECTOR_CHALK_ID.use                   = true
   key.INJECTOR_PUBLIC_KEY.use                 = true
@@ -828,6 +833,7 @@ container.
   key.DATETIME_WHEN_CHALKED.use               = true
   key.EARLIEST_VERSION.use                    = true
   key.HOSTINFO_WHEN_CHALKED.use               = true
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use       = true    
   key.NODENAME_WHEN_CHALKED.use               = true
   key.INJECTOR_CHALK_ID.use                   = true
   key.INJECTOR_VERSION.use                    = true
@@ -865,6 +871,7 @@ container.
   key._OP_CHALKER_VERSION.use                 = true
   key._OP_PLATFORM.use                        = true
   key._OP_HOSTNAME.use                        = true
+  key._OP_PUBLIC_IPV4_ADDR.use                = true    
   key._OP_HOSTINFO.use                        = true
   key._OP_NODENAME.use                        = true
   key._OP_CLOUD_METADATA.use                  = true
@@ -1232,6 +1239,7 @@ and keep the run-time key.
   key.DATETIME_WHEN_CHALKED.use               = false
   key.EARLIEST_VERSION.use                    = false
   key.HOSTINFO_WHEN_CHALKED.use               = false
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use       = false    
   key.NODENAME_WHEN_CHALKED.use               = false
   key.INJECTOR_CHALK_ID.use                   = true
   key.INJECTOR_VERSION.use                    = true
@@ -1267,6 +1275,7 @@ and keep the run-time key.
   key._OP_CHALKER_VERSION.use                 = true
   key._OP_PLATFORM.use                        = true
   key._OP_HOSTNAME.use                        = true
+  key._OP_PUBLIC_IPV4_ADDR.use                = true    
   key._OP_HOSTINFO.use                        = true
   key._OP_NODENAME.use                        = true
   key._OP_CLOUD_METADATA.use                  = true

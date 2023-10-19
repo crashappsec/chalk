@@ -9,7 +9,7 @@
 
 
 default_recursive_doc := """
-"Determines whether a file scan will recursively walk paths to find artifacts.
+Determines whether a file scan will recursively walk paths to find artifacts.
 """
 
 getopts {
@@ -132,31 +132,40 @@ This is similar to the `chalk config` command, except it shows state information
   flag_yn run_sbom_tools {
     field_to_set: "run_sbom_tools"
     doc: """
-For insertion operations, this flag forces running any configured tools for SBOM collection. It does not guarantee reporting or chalking; that is up to the reporting configuration.
+For insertion operations, this flag forces running any configured
+tools for SBOM collection. It does not guarantee reporting or
+chalking; that is up to the reporting configuration.
 
 In the default chalk configuration, these tools do not run at all.
 
-This flag is defined for all chalk commands, but currently is ignored for any command except "insert" or "docker".
+This flag is defined for all chalk commands, but currently is ignored
+for any command except "insert" or "docker".
 """
   }
 
   flag_yn run_sast_tools {
     field_to_set: "run_sast_tools"
     doc: """
-For insertion operations, this flag forces running any configured tools for performing static analysis. It does not guarantee reporting or chalking; that is up to the reporting configuration.
+For insertion operations, this flag forces running any configured
+tools for performing static analysis. It does not guarantee reporting
+or chalking; that is up to the reporting configuration.
 
 In the default chalk configuration, these tools do not run at all.
 
-This flag is defined for all chalk commands, but currently is ignored for any command except "insert" or "docker".
+This flag is defined for all chalk commands, but currently is ignored
+for any command except "insert" or "docker".
 """
   }
 
   flag_yn use_report_cache {
     field_to_set: "use_report_cache"
     doc: """
-Enables or disables the reporting cache.  The reporting cache is a ring buffer stored locally, that contains reporting information that could not be delivered to its configured sources, due to some outage.
+Enables or disables the reporting cache.  The reporting cache is a
+ring buffer stored locally, that contains reporting information that
+could not be delivered to its configured sources, due to some outage.
 
-When using the report cache, any time chalk does run reports, it will try to flush as much of the cache as it can.
+When using the report cache, any time chalk does run reports, it will
+try to flush as much of the cache as it can.
 """
   }
 
@@ -166,9 +175,12 @@ When using the report cache, any time chalk does run reports, it will try to flu
     field_to_set: "virtual_chalk"
 
     doc: """
-When chalking, do NOT modify artifacts, overriding anything defined in the config file. This is completely ignored for operations that do not normally modify artifacts.
+When chalking, do NOT modify artifacts, overriding anything defined in
+the config file. This is completely ignored for operations that do not
+normally modify artifacts.
 
-Specifically, this flag only works with `chalk insert`, `chalk docker build`, and `chalk delete`.
+Specifically, this flag only works with `chalk insert`, `chalk docker
+build`, and `chalk delete`.
 
 By default, this will write to "./virtual-chalk.json".
 """
@@ -178,9 +190,12 @@ By default, this will write to "./virtual-chalk.json".
     field_to_set: "chalk_debug"
 
     doc: """
-Shows nim stack traces where appropriate, generally where exceptions were caught.
+Shows nim stack traces where appropriate, generally where exceptions
+were caught.
 
-Additionally, if temporary files might be useful to inspect, this causes them to not get deleted.  Specifically, docker temporary files (most notably any docker file modifications) get left behind.
+Additionally, if temporary files might be useful to inspect, this
+causes them to not get deleted.  Specifically, docker temporary files
+(most notably any docker file modifications) get left behind.
 """
   }
 
@@ -190,11 +205,13 @@ Additionally, if temporary files might be useful to inspect, this causes them to
     no_aliases:  []
 
     doc: """
-Skip publishing the command report (i.e., the PRIMARY report). NO output sinks will get it.
+Skip publishing the command report (i.e., the PRIMARY report). NO
+output sinks will get it.
 
 _For most commands, this defeats the purpose of Chalk, so use it sparingly._
 
-Note that this doesn't turn off any custom reports; you have to disable those seprately.    
+Note that this doesn't turn off any custom reports; you have to
+disable those seprately.
 """
   }
 
@@ -211,10 +228,13 @@ Whether to skip the summary report to the terminal.
     add_choice_flags: true
     field_to_set: "symlink_behavior"
     doc: """
-Chalk never follows directory links. When running non-chalking operations, chalk will read the file on the other end of the link, and report using the file name of the link.
-<p>
-For insertion operations, Chalk will, out of the box, warn on symbolic links, without processing them. 
-<p>
+Chalk never follows directory links. When running non-chalking
+operations, chalk will read the file on the other end of the link, and
+report using the file name of the link.
+
+For insertion operations, Chalk will, out of the box, warn on symbolic
+links, without processing them.
+
 This variable controls what happens in those cases:
 
 - <em>skip</em>   will not process files that are linked.
@@ -232,7 +252,7 @@ containers will do a chalk report when they launch.  Note that the
 'docker' command passes through ALL flags, so this flag needs to
 technically be part of the 'global' flags, even though nothing else
 uses it.
-<p>
+
 If, when wrapping, your chalk binary is using an external
 configuration file, that file will NOT get used inside the
 container. The wrapped binary currently only uses the embedded
@@ -256,18 +276,25 @@ At the moment, this is only honored for the `chalk help` command.
     args:     (0, high())
     shortdoc: "Add chalk marks to artifacts"
     doc:      """
-Add chalk marks to artifacts found on the file system.  See the `docker` command for adding marks to docker containers.
+Add chalk marks to artifacts found on the file system.  See the
+`docker` command for adding marks to docker containers.
     
-On chalking, what gets put into the chalk mark will be determined by the active chalk mark template after any user config file has loaded.  Each command's output configuration can be specified using the 'outconf' section in the configuration file.
-<p>
-For instance, if you create a new mark template named 'my_chalk_mark', you can activate it for both regular and docker insertions with the following in your configuration file:
+On chalking, what gets put into the chalk mark will be determined by
+the active chalk mark template after any user config file has loaded.
+Each command's output configuration can be specified using the
+'outconf' section in the configuration file.
+
+For instance, if you create a new mark template named 'my_chalk_mark',
+you can activate it for both regular and docker insertions with the
+following in your configuration file:
 
 ```
 outconf.insert.chalk = "myconf"
 outconf.docker.chalk = "myconf"
 ```
 
-For information on mark templates on the command line, see: `chalk help templates`
+For information on mark templates on the command line, see: `chalk
+help templates`
 """
     callback: func set_artifact_search_path(list[string])
 
@@ -443,29 +470,71 @@ The named reporting template must already exist in your configuration.
     aliases:  []
     shortdoc: "Show configuration variables and settings"
     doc: """
-Shows the results of evaluating the configuration, without actually doing any work with artifacts.
-<p>
-Even though they are related, there is a significant difference between the 'config' command and the --show-config flag.  They both dump the configuration after evaluating any config file, but they may easily produce different results.
-<p>
-That's because chalk uses 'con4m' for configuration, which, while typically just looking like a regular config file, can have arbitrary code added, with conditionals, and so-on.  The default configuration does, for instance, configure different output handlers, depending on the command given.
-<p>
-Running the 'defaults' command will therefore give you the information about the evaluation just when that command ran.  Whereas, '--show-config extract' will dump the config as it resolves when you run the 'extract' command, which could be very similar, or very different.
-<p>
-Importantly though, running '--show-config extract' still runs the 'extract' command.
-<p>
-This command does not show the contents of the config file(s) used, just key results from executing those config files.  And, generally there will be at least two 'stacked' configuration files.  See 'help config' for more information on the configuration file and con4m.
+Shows the results of evaluating the configuration, without actually
+doing any work with artifacts.
+
+Even though they are related, there is a significant difference
+between the 'config' command and the --show-config flag.  They both
+dump the configuration after evaluating any config file, but they may
+easily produce different results.
+
+That's because chalk uses 'con4m' for configuration, which, while
+typically just looking like a regular config file, can have arbitrary
+code added, with conditionals, and so-on.  The default configuration
+does, for instance, configure different output handlers, depending on
+the command given.
+
+Running the 'defaults' command will therefore give you the information
+about the evaluation just when that command ran.  Whereas,
+'--show-config extract' will dump the config as it resolves when you
+run the 'extract' command, which could be very similar, or very
+different.
+
+Importantly though, running '--show-config extract' still runs the
+'extract' command.
+
+This command does not show the contents of the config file(s) used,
+just key results from executing those config files.  And, generally
+there will be at least two 'stacked' configuration files.  See 'help
+config' for more information on the configuration file and con4m.
 """
 }
 
   command dump {
     args:    (0, 1)
-    shortdoc: "Print the embedded configuration file"
+    arg_sub_mutex: false    
+    shortdoc: "Print the embedded configuration file"    
     doc: """
-Reads the embedded configuration file, and outputs it, based on your output configuration (see 'help output').  In the default configuration, if no argument is given, the config file is written to stdout; and if an argument is provided, it will try write the configuration to the file specified by the argument.
-<p>
-This behavior can be overridden by the configuration file, where you can specify different output configurations.  See 'help config' for an overview of the configuration file format, and 'help output' for an overview of the output system.
+Reads the embedded configuration file, and outputs it, based on your
+output configuration (see 'help output').  In the default
+configuration, if no argument is given, the config file is written to
+stdout; and if an argument is provided, it will try write the
+configuration to the file specified by the argument.
 
+This behavior can be overridden by the configuration file, where you
+can specify different output configurations.  See 'help config' for an
+overview of the configuration file format, and 'help output' for an
+overview of the output system.
 """
+    command params {
+      shortdoc: "Output saved component parameters as JSON"
+      doc: """
+This does not output the saved configuration. Instead, it dump the
+JSON for any saved parameters. That JSON can then be loaded into
+another binary via chalk load --params, which takes parameters over
+stdin, while setting a configuration. This is used in transfering
+configurations to cross-platform binaries.
+"""      
+    }
+
+    command cache {
+      shortdoc: "Output source for cached components"
+      doc: """
+This does a more complete dump of source code; not just the base
+configuration, but also any cached components that have been loaded.
+"""      
+    
+    }
   }
 
   command load {
@@ -490,6 +559,29 @@ provided argument. When off, it's used only as a component that's added
 to the config.
 """      
     }
+
+    flag_yn update_arch_binaries {
+      field_to_set: "load.update_arch_binaries"
+      doc: """
+When this is true, if you run a `chalk load` on this binary, it will
+try to (via docker) load the exact same configuration into any
+cross-architecture binaries listed in docker.arch_binary_locations.
+
+Note that, if you source config components from a local directory, you
+currently will need to update them manually, as those directories will
+not be mapped into the container.
+"""      
+    }
+
+    flag_yn params {
+      field_to_set: "load.params_via_stdin"
+      doc: """
+When provided, parameters will be taken from stdin, as a json
+dictionary.  Keys are the parameter name as specified in the
+'parameter' block. If parameters that are needed aren't supplied, then
+defaults will be accepted.
+"""
+    }
     
     flag_yn validation {
       field_to_set: "load.validate_configs_on_load"
@@ -501,7 +593,8 @@ When on, validate config files before loading them, by doing a trial run.
     flag_yn validation_warning {
       field_to_set: "load.validation_warning"
       doc: """
-This verbose flag controls whether or not you get the verbose warning.  It's much better turning this off in your embedded configuration :)
+This verbose flag controls whether or not you get the verbose warning.
+It's much better turning this off in your embedded configuration :)
 """      
     }
   }
@@ -658,7 +751,12 @@ command login {
 Starts the API login process and will provide a URL to follow in a browser to complete authentication.
 """
   }
-
+command docgen {
+    shortdoc: "Generate technical documentation"
+    doc: """
+Internal function to generate technical documentation in markdown format.
+"""
+  }
 
 }
 

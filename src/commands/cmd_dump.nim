@@ -7,15 +7,71 @@
 
 ## The `chalk dump` command.
 
-import ../config, ../selfextract
+import ../config, ../selfextract, unicode
 
-proc runCmdConfDump*() =
+const
+  configKey = "$CHALK_CONFIG"
+  paramKey  = "$CHALK_SAVED_COMPONENT_PARAMETERS"
+  cacheKey  = "$CHALK_COMPONENT_CACHE"
+
+template baseDump(code: untyped) {.dirty.} =
   var
-    toDump  = defaultConfig
+    toDump: Rope
     chalk   = getSelfExtraction().getOrElse(nil)
     extract = if chalk != nil: chalk.extract else: nil
 
-  if chalk != nil and extract != nil and extract.contains("$CHALK_CONFIG"):
-    toDump  = unpack[string](extract["$CHALK_CONFIG"])
+  code
 
-  publish("confdump", toDump)
+  print(toDump)
+  echo("")
+  quit(0)
+
+proc dumpToFile*(f: string) =
+  let
+    chalk   = getSelfExtraction().getOrElse(nil)
+    extract = if chalk != nil: chalk.extract else: nil
+    config  = if extract == nil or configKey notin extract:
+                defaultConfig
+              else:
+                unpack[string](extract[configKey])
+
+  publish("confdump", config)
+  quit(0)
+
+proc runCmdConfDump*() =
+  let args = getArgs()
+
+  if len(args) > 0:
+    dumpToFile(args[0])
+  baseDump:
+    var s: string
+    if chalk != nil and extract != nil and configKey in extract:
+      s = unpack[string](extract[configKey])
+    else:
+      s = defaultConfig
+
+    toDump = Rope(kind: RopeTaggedContainer, tag: "blockquote",
+                  contained: Rope(kind: RopeAtom, text: s.toRunes()))
+
+proc runCmdConfDumpParams*() =
+  baseDump:
+    if chalk == nil or extract == nil or paramKey notin extract:
+      toDump = Rope(kind: RopeTaggedContainer, tag: "blockquote",
+                    contained: Rope(kind: RopeAtom, text: "[]".toRunes()))
+    else:
+      toDump = boxToJson(extract[paramKey]).rawStrToRope(pre = false)
+
+proc runCmdConfDumpCache*() =
+  baseDump:
+    if chalk == nil or extract == nil or cacheKey notin extract:
+      runCmdConfDump()
+
+    let
+      componentInfo = selfChalk.extract[cacheKey]
+      unpackedInfo  = unpack[OrderedTableRef[string, string]](componentInfo)
+
+    for url, contents in unpackedInfo:
+      toDump = toDump + htmlStringToRope("<h2> URL: " & url & "</h2>\n")
+      toDump = toDump + Rope(kind: RopeTaggedContainer, tag: "blockquote",
+                             contained: Rope(kind: RopeAtom,
+                                             text: contents.toRunes()))
