@@ -278,6 +278,8 @@ proc autocompleteFileCheck*() =
 template otherSetupTasks*() =
   setupManagedTemp()
   autocompleteFileCheck()
+  if isatty(1) == 0:
+    setShowColor(false)
 
 var exitCode = 0
 
