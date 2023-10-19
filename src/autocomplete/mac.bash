@@ -32,7 +32,7 @@ function _chalk_delete_completions {
 
 function _chalk_load_completions {
     if [ ${_CHALK_CUR_WORD::1} = "-" ] ; then
-        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --replace --no-replace --validation --no-validation --validation-warning --no-validation-warning" -- ${_CHALK_CUR_WORD}))
+        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --replace --no-replace --update-arch-binaries --no-update-arch-binaries --params --no-params --validation --no-validation --validation-warning --no-validation-warning" -- ${_CHALK_CUR_WORD}))
     fi
 
     if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]] ; then
@@ -47,6 +47,9 @@ function _chalk_load_completions {
 function _chalk_dump_completions {
     if [ ${_CHALK_CUR_WORD::1} = "-" ] ; then
         COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --validation --no-validation --validation-warning --no-validation-warning" -- ${_CHALK_CUR_WORD}))
+    else
+        EXTRA=($(compgen -W "params cache" -- ${_CHALK_CUR_WORD}))
+        COMPREPLY+=(${EXTRA[@]})
     fi
 
     if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]] ; then
@@ -161,4 +164,4 @@ function _chalk_completions {
 }
 
 complete -F _chalk_completions chalk
-# { "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "CMWKGR-V16G-RKCE-B5C9JK", "CHALK_VERSION" : "0.1.3", "TIMESTAMP_WHEN_CHALKED" : 1697490789234, "DATETIME_WHEN_CHALKED" : "2023-10-16T17:13:09.050-04:00", "ARTIFACT_TYPE" : "bash", "ARTIFACT_VERSION" : "0.1.3", "CHALK_PTR" : "This mark determines when to update the script. If there is no mark, or the mark is invalid it will be replaced.  To customize w/o Chalk disturbing it when it can update, add a valid  mark with a version key higher than the current chalk verison, or  use version 0.0.0 to prevent updates", "HASH" : "e98ca4169ebe623b9686f253b71e135da5fa160d622a42dd8a6565906f7a5c52", "INJECTOR_COMMIT_ID" : "db872eb11801a82587abced82074db7182b72c0a", "ORIGIN_URI" : "git@github.com:crashappsec/chalk.git", "METADATA_ID" : "6RATQ8-XBKJ-S2BD-MFNK5P" }
+# { "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "60W68D-31C8-S3JD-SQCSJK", "CHALK_VERSION" : "0.1.3", "TIMESTAMP_WHEN_CHALKED" : 1697697525538, "DATETIME_WHEN_CHALKED" : "2023-10-19T02:38:42.027-04:00", "ARTIFACT_TYPE" : "bash", "ARTIFACT_VERSION" : "0.1.3", "CHALK_PTR" : "This mark determines when to update the script. If there is no mark, or the mark is invalid it will be replaced.  To customize w/o Chalk disturbing it when it can update, add a valid  mark with a version key higher than the current chalk verison, or  use version 0.0.0 to prevent updates", "HASH" : "08d4ab2977fe93a16d3f62c8ffe3492cbfa35d7f53cd574b8f7b17d99442a7d5", "INJECTOR_COMMIT_ID" : "8001314ff4406ee96ee75395320b3b806ab2f068", "ORIGIN_URI" : "git@github.com:crashappsec/chalk.git", "METADATA_ID" : "PHX481-971S-JMFX-4ZK4A3" }
