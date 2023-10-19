@@ -25,9 +25,6 @@ docker { }
 
 load { }
 
-dump { }
-
-
 cloud_provider {
   cloud_instance_hw_identifiers {
   }

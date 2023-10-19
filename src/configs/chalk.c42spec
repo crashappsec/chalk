@@ -1502,25 +1502,6 @@ not be mapped into the container.
   }
 }
 
-singleton dump {
-  gen_fieldname: "dumpConfig"
-  gen_typename:  "DumpConfig"
-  gen_setters:   false
-  user_def_ok:   false
-  doc: """
-Options that control how the `chalk load` command works.  
-"""
-
- field params {
-   type:    bool
-   default: false
-   shortdoc: "Show existing saved parameters as JSON"
-   doc: """
-Parameters are in the format needed for `chalk load --params-via-stdin`   
-"""   
- }
-}
-
 singleton exec {
   gen_fieldname: "execConfig"
   gen_typename:  "ExecConfig"
@@ -2093,7 +2074,6 @@ root {
   allow docker
   allow exec
   allow load
-  allow dump  
   allow env_config
   allow source_marks
   allow cloud_provider
