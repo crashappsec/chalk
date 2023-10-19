@@ -10,6 +10,7 @@
 import uri, config
 
 proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
+
   return (msg, true)
 
 const

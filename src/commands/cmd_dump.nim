@@ -7,7 +7,7 @@
 
 ## The `chalk dump` command.
 
-import ../config, ../selfextract, unicode
+import ../config, ../selfextract, posix
 
 const
   configKey = "$CHALK_CONFIG"
@@ -16,33 +16,28 @@ const
 
 template baseDump(code: untyped) {.dirty.} =
   var
-    toDump: Rope
+    toDump: string
     chalk   = getSelfExtraction().getOrElse(nil)
     extract = if chalk != nil: chalk.extract else: nil
 
   code
 
-  print(toDump)
-  echo("")
+  publish("confdump", toDump)
   quit(0)
 
-proc dumpToFile*(f: string) =
-  let
-    chalk   = getSelfExtraction().getOrElse(nil)
-    extract = if chalk != nil: chalk.extract else: nil
-    config  = if extract == nil or configKey notin extract:
-                defaultConfig
-              else:
-                unpack[string](extract[configKey])
-
-  publish("confdump", config)
-  quit(0)
+proc dumpToFile*() =
+  baseDump:
+    toDump = if extract == nil or configKey notin extract:
+               defaultConfig
+             else:
+               unpack[string](extract[configKey])
 
 proc runCmdConfDump*() =
   let args = getArgs()
 
-  if len(args) > 0:
-    dumpToFile(args[0])
+  if len(args) > 0 or isatty(1) == 0:
+    dumpToFile()
+
   baseDump:
     var s: string
     if chalk != nil and extract != nil and configKey in extract:
@@ -50,16 +45,14 @@ proc runCmdConfDump*() =
     else:
       s = defaultConfig
 
-    toDump = Rope(kind: RopeTaggedContainer, tag: "blockquote",
-                  contained: Rope(kind: RopeAtom, text: s.toRunes()))
+    toDump = stylize(s, "blockquote")
 
 proc runCmdConfDumpParams*() =
   baseDump:
     if chalk == nil or extract == nil or paramKey notin extract:
-      toDump = Rope(kind: RopeTaggedContainer, tag: "blockquote",
-                    contained: Rope(kind: RopeAtom, text: "[]".toRunes()))
+      toDump = "[]"
     else:
-      toDump = boxToJson(extract[paramKey]).rawStrToRope(pre = false)
+      toDump = boxToJson(extract[paramKey])
 
 proc runCmdConfDumpCache*() =
   baseDump:
@@ -71,7 +64,5 @@ proc runCmdConfDumpCache*() =
       unpackedInfo  = unpack[OrderedTableRef[string, string]](componentInfo)
 
     for url, contents in unpackedInfo:
-      toDump = toDump + htmlStringToRope("<h2> URL: " & url & "</h2>\n")
-      toDump = toDump + Rope(kind: RopeTaggedContainer, tag: "blockquote",
-                             contained: Rope(kind: RopeAtom,
-                                             text: contents.toRunes()))
+      toDump &= stylizeHtml("<h2> URL: " & url & "</h2>")
+      toDump &= stylize(contents, "blockquote")
