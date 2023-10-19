@@ -415,5 +415,4 @@ proc handleConfigLoad*(inpath: string) =
       updateArchBinaries(newEmbedded, params, archOpt.get())
       return
 
-  echo "SAD"
   updateArchBinaries(newEmbedded, params)
