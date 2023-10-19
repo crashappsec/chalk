@@ -70,7 +70,7 @@ before install:
 after build:
   when not defined(debug):
     exec "set -x && strip " & bin[0]
-  exec "set -x && ./" & bin[0] & " --no-use-external-config --skip-command-report load default"
+  exec "set -x && ./" & bin[0] & " --debug --no-use-external-config --skip-command-report load default"
 
 task debug, "Get a debug build":
   # additional flags are configured in config.nims

@@ -1,5 +1,3 @@
-# TODO: default
-
 func validate_url(url) {
   result := ""
 
@@ -17,6 +15,12 @@ parameter sink_config.output_to_http.uri {
   doc: """
 A config for sending reports to a custom implementation of the test
 reporting server.
+
+Run the server via:
+
+```
+docker run --rm - -w /db -v $HOME/.local/c0/:/db -p 8585:8585  ghcr.io/crashappsec/chalk-test-server
+```
 """
   validator: func validate_url(string) -> string
   default: func get_local_url() -> string

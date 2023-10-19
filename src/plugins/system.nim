@@ -95,7 +95,6 @@ proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   result                           = ChalkDict()
   result["MAGIC"]                  = pack(magicUTF8)
   result["TIMESTAMP_WHEN_CHALKED"] = pack(unixTimeInMS())
-  result.setIfNeeded("PUBLIC_IPV4_ADDR_WHEN_CHALKED", pack(getMyIpV4Addr()))
 
   if isSubscribedKey("PRE_CHALK_HASH") and obj.fsRef != "":
     chalkUseStream(obj):
@@ -275,6 +274,7 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result.setIfNeeded("TZ_OFFSET_WHEN_CHALKED", pack(getOffset()))
   result.setIfNeeded("DATETIME_WHEN_CHALKED", pack(getDateTime()))
   result.setIfNeeded("PLATFORM_WHEN_CHALKED", getChalkPlatform())
+  result.setIfNeeded("PUBLIC_IPV4_ADDR_WHEN_CHALKED", pack(getMyIpV4Addr()))
 
   when defined(posix):
     result.setIfNeeded("HOSTINFO_WHEN_CHALKED", uinfo.version)
