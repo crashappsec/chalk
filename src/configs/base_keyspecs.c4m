@@ -3925,7 +3925,64 @@ keyspec _OP_CLOUD_PROVIDER {
     since:            "0.1.3"
     doc: """
 In case of chalk running in the cloud, the type of the cloud provider the
-node is running in. Examples: gcp, aws, azure
+node is running in. Currently the only supported values are gcp, aws, azure
+"""
+}
+
+keyspec _OP_CLOUD_PROVIDER_ACCOUNT_INFO {
+    kind:             RunTimeHost
+    type:             `x
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+In case of chalk running in the cloud, the account ID or other identifying metadata
+for the account owning the environment in which chalk executes in.
+
+ - For AWS this is the AWS Account ID
+ - For Azure this is the Subscription ID
+ - For GCP its the Service Account
+"""
+}
+
+keyspec _OP_CLOUD_PROVIDER_REGION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+In case of chalk running in the cloud, the region in which chalk executes in
+"""
+}
+
+keyspec _OP_CLOUD_PROVIDER_IP {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+In case of chalk running in the cloud, the public IPv4 of the host in which chalk
+executes in
+"""
+}
+
+keyspec _OP_CLOUD_PROVIDER_INSTANCE_TYPE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+In case of chalk running in the cloud, the instance type where chalk
+executes in (e.g., t2.medium for AWS)
+"""
+}
+
+keyspec _OP_CLOUD_PROVIDER_TAGS {
+    kind:             RunTimeHost
+    type:             `x
+    standard:         true
+    since:            "0.1.3"
+    doc: """
+In case of chalk running in the cloud, tags associated with the instance
 """
 }
 
@@ -3942,7 +3999,6 @@ This functionality is currently experimental, and only EKS, EC2, ECS are inferre
 for AWS.
 """
 }
-
 
 keyspec _AZURE_INSTANCE_METADATA {
     kind:             RunTimeHost
@@ -4832,7 +4888,7 @@ keyspec $CHALK_API_REFRESH_TOKEN {
    system:                 true
    since:                  "0.1.4"
    doc:                    """
-Key to hopld the OIDC refresh token for non-user present API
+Key to hold the OIDC refresh token for non-user present API
 re-authentication.
 """
 }
@@ -4864,7 +4920,7 @@ keyspec $CHALK_SECRET_ENDPOINT_URI {
 keyspec $CHALK_SAVED_COMPONENT_PARAMETERS {
    required_in_self_mark:  true
    kind:                   ChalkTimeArtifact
-   
+
    # Note that I'm not sure the 'proper' type would work yet (in fact,
    # I am somewhat sure it will not). I haven't had time to test it;
    # ideally the fact that `x is in a typespec parameter would mean it
@@ -4873,9 +4929,9 @@ keyspec $CHALK_SAVED_COMPONENT_PARAMETERS {
    #
    # At the very least, as long as con4m never operates on the values,
    # it will happily accept `x.
-   # 
+   #
    # type:                   list[tuple[bool, string, string, typespec[`x], `x]]
-   
+
    type:                   `x
    standard:               true
    system:                 true
@@ -4906,6 +4962,6 @@ keyspec $CHALK_COMPONENT_CACHE {
    doc: """
 This consists of URLs (minus the file extension) mapped to source code
 for components.
-"""   
+"""
 
 }

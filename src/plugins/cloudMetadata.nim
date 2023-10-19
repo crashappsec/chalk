@@ -88,6 +88,24 @@ template jsonKey(keyname: string, url: string) =
         except:
           trace("IMDSv2 responded with invalid json for URL: " & url)
 
+template extractJsonKey(keyname: string, url: string, subkey: string) =
+  if isSubscribedKey(keyname):
+    let
+      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
+      resultOpt = hitProviderEndpoint(url, hdrs)
+    if resultOpt.isSome():
+      let value = resultOpt.get()
+      # imdsv2 does not respond with application/json content-type
+      # header and so we check first char before attempting json parse
+      if not value.startswith("{"):
+        trace("Provider Didn't respond with json object. Ignoring it. URL: " & url)
+      else:
+        try:
+          let jsonValue = parseJson(value)
+          setIfNotEmpty(result, keyname, jsonValue[subkey].getStr())
+        except:
+          trace("Could not set " & keyname & " with subkey " & subkey & " from " & url)
+
 template getTags(keyname: string, url: string) =
   if isSubscribedKey(keyname):
     let
@@ -144,7 +162,14 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   #
   # GCP
   #
-  if isSubscribedKey("_GCP_INSTANCE_METADATA") and isGoogleHost(vendor):
+  if isGoogleHost(vendor) and
+    (isSubscribedKey("_GCP_INSTANCE_METADATA") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_IP") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")):
     let resultOpt = hitProviderEndpoint("http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
     if not resultOpt.isSome():
         trace("Did not get metadata back from GCP endpoint")
@@ -155,7 +180,40 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
         return
     try:
         let jsonValue = parseJson(value)
-        setIfNeeded(result, "_GCP_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+        try:
+            setIfNeeded(result, "_GCP_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+        except:
+            trace("Could not insert _GCP_INSTANCE_METADATA")
+        try:
+            setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["tags"].nimJsonToBox())
+        except:
+            trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
+        try:
+            setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["serviceAccounts"].nimJsonToBox())
+        except:
+            trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
+        try:
+            for iface in jsonValue["networkInterfaces"]:
+                var found = false
+                for config in iface["accessConfigs"]:
+                    let ipv4 = config["externalIp"].getStr()
+                    if ipv4 != "":
+                        found = true
+                        # just pick the first
+                        setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
+                        break
+                if found:
+                    break
+        except:
+            trace("Could not insert _OP_CLOUD_PROVIDER_IP for gcp")
+        try:
+            setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["zone"].getStr().split("/")[^1])
+        except:
+            trace("Could not insert _OP_CLOUD_PROVIDER_REGION for gcp")
+        try:
+            setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["machineType"].getStr().split("/")[^1])
+        except:
+            trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for gcp")
     except:
         trace("GCP metadata responded with invalid json")
 
@@ -167,7 +225,14 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   #
   # Azure
   #
-  if isSubscribedKey("_AZURE_INSTANCE_METADATA") and isAzureHost(vendor):
+  if isAzureHost(vendor) and
+    (isSubscribedKey("_AZURE_INSTANCE_METADATA") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_IP") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")):
     let resultOpt = hitProviderEndpoint("http://169.254.169.254/metadata/instance?api-version=2021-02-01", newHttpHeaders([("Metadata", "true")]))
     if not resultOpt.isSome():
         trace("Did not get metadata back from Azure endpoint")
@@ -179,6 +244,36 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     try:
         let jsonValue = parseJson(value)
         setIfNeeded(result, "_AZURE_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+        try:
+            setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["compute"]["tagsList"].nimJsonToBox())
+        except:
+            trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for azure")
+        try:
+            for iface in jsonValue["network"]["interface"]:
+                var found = false
+                for address in iface["ipv4"]["ipAddress"]:
+                    let ipv4 = address["publicIpAddress"].getStr()
+                    if ipv4 != "":
+                        found = true
+                        # just pick the first
+                        setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
+                        break
+                if found:
+                    break
+        except:
+            trace("Could not insert _OP_CLOUD_PROVIDER_IP for azure")
+        try:
+            setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["compute"]["subscriptionId"].getStr())
+        except:
+            trace("Could not insert _OP_CLOUD_PROVIDER_ACCOUNT_INFO for azure")
+        try:
+            setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["compute"]["location"].getStr())
+        except:
+            trace("Could not insert _OP_CLOUD_PROVIDER_REGION for azure")
+        try:
+            setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["compute"]["vmSize"].getStr())
+        except:
+            trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for azure")
     except:
         trace("Azure metadata responded with invalid json")
 
@@ -246,6 +341,9 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   # dynamic entries
   # dynamic data categories
   jsonKey("_AWS_INSTANCE_IDENTITY_DOCUMENT",         awsDynUri & "instance-identity/document")
+  extractJsonKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO",  awsDynUri & "instance-identity/document", "accountId")
+  extractJsonKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE", awsDynUri & "instance-identity/document", "instanceType")
+  extractJsonKey("_OP_CLOUD_PROVIDER_INSTANCE_ARCH", awsDynUri & "instance-identity/document", "architecture")
   oneItem("_AWS_INSTANCE_IDENTITY_PKCS7",            awsDynUri & "instance-identity/pkcs7")
   oneItem("_AWS_INSTANCE_IDENTITY_SIGNATURE",        awsDynUri & "instance-identity/signature")
   oneItem("_AWS_INSTANCE_MONITORING",                awsDynUri & "fws/instance-monitoring")
@@ -282,8 +380,10 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   oneItem("_AWS_PRODUCT_CODES",                      awsMdUri & "product-codes")
   oneItem("_AWS_PUBLIC_HOSTNAME",                    awsMdUri & "public-hostname")
   oneItem("_AWS_PUBLIC_IPV4_ADDR",                   awsMdUri & "public-ipv4")
+  oneItem("_OP_CLOUD_PROVIDER_IP",                   awsMdUri & "public-ipv4")
   oneItem("_AWS_RAMDISK_ID",                         awsMdUri & "ramdisk-id")
   oneItem("_AWS_REGION",                             awsMdUri & "placement/region")
+  oneItem("_OP_CLOUD_PROVIDER_REGION",               awsMdUri & "placement/region")
   oneItem("_AWS_RESERVATION_ID",                     awsMdUri & "reservation-id")
   oneItem("_AWS_RESOURCE_DOMAIN",                    awsMdUri & "services/domain")
   oneItem("_AWS_SPOT_INSTANCE_ACTION",               awsMdUri & "spot/instance-action")
@@ -296,6 +396,7 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   jsonKey(AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS,   awsMdUri & "identity-credentials/ec2/security-credentials/ec2-instance")
 
   getTags("_AWS_TAGS",                               awsMdUri & "tags/instance")
+  getTags("_OP_CLOUD_PROVIDER_TAGS",                 awsMdUri & "tags/instance")
 
   if "_AWS_MAC" in result:
     let mac = unpack[string]result["_AWS_MAC"]
