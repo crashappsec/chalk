@@ -30,7 +30,7 @@ our [release page](https://crashoverride.com/releases). It's a
 self-contained binary with no dependencies to install.
 
 Configuring Chalk is also easy. For the sake of example, we will use
-our [compliance configuration](./compliance.md).
+our [compliance configuration](./howto-compliance.md).
 
 If Chalk is in your current directory, run:
 
@@ -79,7 +79,7 @@ collect and report on environmental info.
 
 You can also ask Chalk to add automatic data reporting on startup to
 built containers ig you like, as described in [our how-to on building
-an application inventory](./app-inventory.md)
+an application inventory](./howto-app-inventory.md)
 
 ## Our cloud platform
 
