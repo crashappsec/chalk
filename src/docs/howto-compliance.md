@@ -20,154 +20,87 @@ This information is complex and tedious to generate, and manage.
 
 This how-to uses Chalk™ to automate this in two steps:
 
-1. Load our basic compliance configuration.
+1. Configure chalk to generate SBOMs, collect code provenance data, and digitally sign it
 
-2. Turn on signing.
-
-3. Build software using Docker.
+2. Configure chalk to automatically generate compliance reports
 
 As a big bonus, with no extra effort, you can be [SLSA](https://slsa.dev) [level 2](https://slsa.dev/spec/v1.0/levels) compliant, before people start officially requiring SLSA [level 1](https://slsa.dev/spec/v1.0/levels)
 compliance.
-
-## Steps
-
-### Before you start
-
-The easiest way to get Chalk is to download a pre-built binary from
-our [release page](https://crashoverride.com/releases). It's a
-self-contained binary with no dependencies to install.
-
-### Step 1: Configure chalk to generate SBOMs, collect code provenance data, and digitally sign it
-
-Chalk is designed so that you can easily pre-configure it for the
+	@@ -41,40 +43,28 @@ Chalk is designed so that you can easily pre-configure it for the
 behavior you want, and so that you can generally just run a single binary
 with no arguments, to help avoid using it wrong.
 
-Assuming you've downloaded chalk into your working directory, you just
-need to run:
+Therefore, for this how-to, you should configure your binary with
+either our `compliance-docker` configuration, or our
+`compliance-other` configuration, depending on whether you're using
+docker or not.
+
+Assuming you've downloaded chalk into your working directory, in the
+docker case, you would run:
 
 ```
-./chalk load https://chalkdust.io/compliance_docker.c4m
+./chalk load https://chalkdust.io/compliance-docker.c4m
 ```
 
-The profile we've loaded changes two key things from the default
+Otherwise, run:
+
+```
+./chalk load https://chalkdust.io/compliance-other.c4m
+```
+
+The profile we've loaded changes only three things from the default
 behavior:
 
 1. It enables the collection of SBOMS (off by default because on large
    projects this can add a small delay to the build)
 
-2. Specifies that any SBOM produced should be added to built
-artifacts.
+2. Specifies that any SBOM produced should be added to the chalk mark.
+
+3. It configures the default action for the binary, when no specific
+   command is applied (this is the only difference between the two
+   configurations).
 
 By default, chalk is already collecting provenance information by
 examining your project's build environment, including the .git
 directory and any common CI/CD environment variables.
 
-### Step 2: Turn on signing
-
 To setup digital signing we have built yet another easy button.
 
 Simply run:
-
-```
-./chalk setup
-```
-
-You'll get a link to connect an account for authentication, to be able
-to use Crash Override's secret service for chalk. The account is
-totally free, and the account is only used to keep us from being an
-easy Denial-of-Service target.
-
-Once you have successfully connect an account, you'll get a series of
-success messages.
-
-At this point, your chalk binary will have re-written itself to
+	@@ -95,48 +85,23 @@ At this point, your chalk binary will have re-written itself to
 contain most of what it needs to sign, except for a `secret` that it
 requests dynamically from our secret service.
 
-### Step 3: Build software
+### Step 2: Configure chalk to automatically generate compliance reports
 
-Now that the binary is configured, you probably may want to move the
-`chalk` binary to a system directory that's in your `PATH`. If you're
-running Docker, we recommend adding a global alias, so that Chalk
-always runs, See the [howto for docker deployment](./how-to-deploy-globally-using-docker.md)
+Now that the binary is configured, you probably will want to move
+the `chalk` binary to a system directory that's in your `PATH`.
 
 How you run chalk depends on whether you're building via `docker` or not:
 
 - _With docker_: You "wrap" your `docker` commands by putting the
-  word `chalk` in front of them. That's it.
+  word `chalk` in front of them.
 
-- _Without docker_ : You simply invoke `chalk insert` in your build
-  pipeline. It defaults to inserting marks into artifacts in your
-  current working directory.
+- _Without docker_ : You simply invoke `chalk` in your build pipeline.
 
-#### Step 3a: Docker
+As configured, anyone with access to the artifact can use chalk to not
+only see the chalk mark, but to validate the signature.
 
-Your `build` operations will add a file (the _"chalk mark"_) into the
-container with provenance info and other metadata, and any SBOM
-generated. And, when you `push` containers to a registry, chalk will
-auto-sign them, including the entire mark.
+Any build of chalk can extract the chalk mark, and verify
+everything. While we configured our binary to add marks by default,
+the `extract` command will pull them out and verify them.
 
-For instance, let's pick an off-the-shelf project, and treat it like
-we're building part of it in a build pipeline. We'll use a sample
-Docker project called `wordsmith`.
-
-Then, let's login to a docker registry where we push our images. For
-me, that'd be ghcr.io; update the repo info below to wherever you push
-things, and make sure you have permission to push, then do:
+By default, it will look on the file system in the same way that
+insertion did when we weren't using Docker. So:
 
 ```
-git clone https://github.com/dockersamples/wordsmith
-cd wordsmith/api
-chalk docker build -t ghcr.io/viega/wordsmith:latest . --push
+chalk extract
 ```
 
-You'll see Docker run normally (It'll take a minute or so). If your
-permissions are right, it will also push to the registry. Once Docker
-is finished, you'll see some summary info from chalk on your command
-line in JSON format, including the contents of the Dockerfile used.
-
-If there's ever any sort of condition that chalk cannot handle (e.g.,
-if you move to a future docker upgrade without updating chalk, then
-use features that `chalk` doesn't understand), the program will
-_always_ makes sure the original `docker` command gets run if it
-doesn't successfully exit when wrapped.
-
-#### Step 3b: When Not Using Docker
-
-When you invoke chalk as configured, it searches your working
-directory for artifacts, collects environmental data, and then injects
-a "chalk mark" into any artifacts it finds.
-
-Chalk, therefore, should run after any builds are done, but it should
-still have access to the repo you're building from. If you copy out
-artifacts, then, instead of letting chalk use the working directory as
-the build context, you can supply a list of locations on the command
-line.
-
-The chalk mark is always stored as a JSON blob, but how it's embedded
-into an artifact varies based on the type of file. For example, with
-ELF executables as produced by C, C++, Go, Rust, etc, chalk creates a
-new "section" in the binary; it doesn't change what your program does
-in any way.
-
-For scripting content, it just adds a comment to the bottom of the
-file. JAR files (and other artifacts based on the ZIP format) are
-handled similarly to container images, and there are marking
-approaches for a few other formats, with more to come.
-
-### What to tell other people
-
-Any `chalk` executable can extract the chalk mark, and verify
-everything.  While we configured our binary to add marks by default, the
-`extract` command will pull them out and verify them.
-
-Chalk extract will report on anything it finds under your current
-working directory, And so will extract the mark from any artifacts you
-chalked that weren't containerized. But if you built the example
-container, we can extract from the example container easily (or any
-other container you have a local copy of) by just by providing a
-reference to it:
+Chalk extract will report on anything it finds under your current working directory,
+And so will extract the mark from any artifacts you chalked that weren't
+containerized. But if you built the example container, we can extract
+from the example container easily by just by providing a reference to it:
 
 ```
 chalk extract ghcr.io/viega/wordsmith:latest
@@ -177,24 +110,29 @@ Either will pull all the metadata chalk saved during the first
 operation, and log it, showing only a short summary report to your
 console. If the signature validation fails, then you'll get an obvious
 error! If anyone tampers with a mark, or changes a file after the
-chalking, it is clear in the output.
+chalking, it's easily detected.
+
+#### Step 2a: Docker
+
+Your `build` operations will add a file (the _"chalk mark"_) into the
+container with provenance info and other metadata, and any SBOM
+	@@ -168,7 +133,7 @@ use features that `chalk` doesn't understand), the program will
+_always_ makes sure the original `docker` command gets run if it
+doesn't successfully exit when wrapped.
+
+#### Step 2b: When Not Using Docker
+
+When you invoke chalk as configured, it searches your working
+directory for artifacts, collects environmental data, and then injects
+	@@ -191,11 +156,39 @@ file. JAR files (and other artifacts based on the ZIP format) are
+handled similarly to container images, and there are marking
+approaches for a few other formats, with more to come.
 
 ## Our cloud platform
 
-While creating compliance reports with chalk is easy, our cloud
-platform makes it even easier. Not only can you collect software
-compliance information automatically, you can easily share it with
-anyone who needs it.
+While creating compliance reports with chalk is easy, our cloud platform makes it even easier. It is designed for enterprise deployments, and provides additional functionality including prebuilt configurations to solve common tasks, prebuilt integrations to enrich your data, a built-in query editor, an API and more.
 
-There are both free and paid plans. You can [join the waiting
-list](https://crashoverride.com/join-the-waiting-list) for early
-access.
-
-### Background information
-
-Below is a bit more information on supply chain security and the
-emerging compliance environment around it, as well as some details on
-how chalk addresses some of these things under the hood.
+There are both free and paid plans. You can [join the waiting list](https://crashoverride.com/join-the-waiting-list) for early access.
 
 #### Supply chain security and the US government
 
@@ -236,7 +174,7 @@ in those environments often take advantage of access to build
 environments to subtly trojan software.
 
 Therefore, very mature security programs in places with an acute
-awareness of wisk, very much want the ability to monitor the integrity
+awareness of risk, very much want the ability to monitor the integrity
 of builds throughout their supply chain. And, baring that, they'd are
 looking to get as much information as possible, or at least some
 assurances of build practices.
@@ -257,7 +195,7 @@ was deployed and what else was going on in the environment.
 Chalk was built originally for those internal use cases, to get people
 the data they need to be able to automate the work they do to graph
 out the relationships in their software. However, the exact same
-approach turns out to give other companies extactly what they're
+approach turns out to give other companies exactly what they're
 looking for.
 
 #### Digital signatures
@@ -384,11 +322,11 @@ by a hosted build platform.
 
 Lodash is a popular NPM library that was, in March 2021 found to have a prototype pollution vulnerability. It was the most depended on package in NPM meaning almost all applications built in Node.js were affected.
 
-[Prototype Pollution in lodash](https://github.com/advisories/GHSA-p6mc-m468-83gw) - Github
+[Prototype Pollution in lodash](https://github.com/advisories/GHSA-p6mc-m468-83gw) - GitHub
 
 ##### Netbeans
 
-Ih 2020 it was reported that a tool called the Octopus scanner was searching Github and injecting malware into projects that were using the popular Java development framework Netbeans and then serving up malware to all applications built from those code repos.
+In 2020 it was reported that a tool called the Octopus scanner was searching Github and injecting malware into projects that were using the popular Java development framework Netbeans and then serving up malware to all applications built from those code repos.
 
 [https://duo.com/decipher/malware-infects-netbeans-projects-in-software-supply-chain-attack](https://duo.com/decipher/malware-infects-netbeans-projects-in-software-supply-chain-attack) - Duo Research Labs
 
@@ -400,6 +338,6 @@ Log4J is a popular logging library for the Java programming language. In late 20
 
 ##### SolarWinds
 
-The SolarWinds attack used an IT monitoring system, Orion, which which had over 30,000 organizations including Cisco, Deloitte, Intel, Microsoft, FireEye, and US government departments, including the Department of Homeland Security. The attackers created a backdoor that was delivered via a software update.
+The SolarWinds attack used an IT monitoring system, Orion, which had over 30,000 organizations including Cisco, Deloitte, Intel, Microsoft, FireEye, and US government departments, including the Department of Homeland Security. The attackers created a backdoor that was delivered via a software update.
 
 [The Untold Story of the Boldest Supply-Chain Hack Ever](https://www.wired.com/story/the-untold-story-of-solarwinds-the-boldest-supply-chain-hack-ever/) - Wired Magazine
