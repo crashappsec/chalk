@@ -295,6 +295,27 @@ proc findProperBinaryToCopyIntoContainer(ctx: DockerInvocation): string =
          ")")
     return ""
 
+proc formatExecString(command: string): string =
+  let
+    parts = strutils.split(command, maxsplit = 1)
+    name  = parts[0]
+    args  = if len(parts) > 1:
+              " -- " & parts[1]
+            else:
+              ""
+  return strutils.strip("exec /chalk exec --exec-command-name " &
+    name & args)
+
+proc formatExecArray(args: JsonNode): string =
+  let arr = `%*`(["/chalk", "exec", "--exec-command-name"])
+  var i = 0
+  for item in args.items():
+    if i == 1:
+      arr.add(`%`("--"))
+    arr.add(item)
+    i.inc()
+  return $(arr)
+
 proc rewriteEntryPoint*(ctx: DockerInvocation) =
   var
     lastEntryPoint = EntryPointInfo(nil)
@@ -341,14 +362,9 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
     # will get ignored, as long as we keep ENTRYPOINT in string form.
     if lastEntryPoint.str != "":
       # In shell form, be a good citizen and exec so that `sh` isn't pid 1
-      newInstruction =  "ENTRYPOINT exec /chalk exec --exec-command-name " &
-        lastEntryPoint.str
+      newInstruction =  "ENTRYPOINT " & formatExecString(lastEntryPoint.str)
     else:
-      let arr = `%*`(["/chalk", "exec", "--exec-command-name"])
-      for item in lastEntryPoint.json.items():
-        arr.add(item)
-
-      newInstruction = "ENTRYPOINT " & $(arr)
+      newInstruction = "ENTRYPOINT " & formatExecArray(lastEntryPoint.json)
   else:
       # If we only have a CMD:
       # 1. shell form executes the full thing.
@@ -360,14 +376,9 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
       # If not, we'll have to explicitly skip it.
 
     if lastCmd.str != "":
-      newInstruction = "CMD exec /chalk exec --exec-command-name " &
-        lastCmd.str
+      newInstruction = "CMD " & formatExecString(lastCmd.str)
     else:
-      let arr = `%*`(["/chalk", "exec", "--exec-command-name"])
-      for item in lastCmd.json.items():
-        arr.add(item)
-
-      newInstruction = "CMD " & $(arr)
+      newInstruction = "CMD " & formatExecArray(lastCmd.json)
 
   ctx.addedInstructions.add(newInstruction)
   info("Entry point wrapped.")

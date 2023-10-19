@@ -62,6 +62,10 @@
   [45](https://github.com/crashappsec/chalk/pull/45)
 - Cosign now only gets installed if needed.
   [49](https://github.com/crashappsec/chalk/pull/49)
+- Docker `ENTRYPOINT`/`COMMAND` wrapping now preserves all named
+  arguments from original `ENTRYPOINT`/`COMMAND`.
+  (e.g. `ENTRYPOINT ["ls", "-la"]`)
+  [70](https://github.com/crashappsec/chalk/issues/70)
 
 ## Known Issues
 
