@@ -26,7 +26,23 @@ template baseDump(code: untyped) {.dirty.} =
   echo("")
   quit(0)
 
+proc dumpToFile*(f: string) =
+  let
+    chalk   = getSelfExtraction().getOrElse(nil)
+    extract = if chalk != nil: chalk.extract else: nil
+    config  = if extract == nil or configKey notin extract:
+                defaultConfig
+              else:
+                unpack[string](extract[configKey])
+
+  publish("confdump", config)
+  quit(0)
+
 proc runCmdConfDump*() =
+  let args = getArgs()
+
+  if len(args) > 0:
+    dumpToFile(args[0])
   baseDump:
     var s: string
     if chalk != nil and extract != nil and configKey in extract:
