@@ -751,7 +751,12 @@ command login {
 Starts the API login process and will provide a URL to follow in a browser to complete authentication.
 """
   }
-
+command docgen {
+    shortdoc: "Generate technical documentation"
+    doc: """
+Internal function to generate technical documentation in markdown format.
+"""
+  }
 
 }
 
