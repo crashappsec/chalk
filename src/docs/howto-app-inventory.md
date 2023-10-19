@@ -7,13 +7,15 @@
 In software organizations, people lose plenty of time asking around
 for information around software, because they don't have a good
 real-time view of what they have.
+
 For instance, when something breaks in production, ops people may not
 know what software they're looking at, and often lose time trying to
 figure out where the code lives and who owns it.
+
 Similarly, developers often would like to know what versions of their
 code are deployed where, especially when a bug report comes in.
 
-This how-to uses Chalk™ to automate this in five steps:
+This how-to uses Chalk™ to automate this easily in five steps:
 
 1. Load our `app-inventory` configuration
 2. Set up the Inventory web service
@@ -175,6 +177,7 @@ executable is a safe bet).
 
 > 💀 We do _not_ recommend /etc/profile.d because some (non-login)
 > shells will not use this.
+
 Once you add this, you can log out and log back in to make the alias
 take effect, our simply `source` the file:
 
@@ -203,6 +206,7 @@ deployed the containers, browse SQLite database at
 
 The database will be capturing both the repositories you're using to
 build, and the containers you deploy.
+
 The `CHALK_ID` field is one field that ties them together-- it will be
 unique per container, but be associated both with the repository
 information AND the containers you deploy.
