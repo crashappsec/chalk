@@ -7,19 +7,18 @@
 In software organizations, people lose plenty of time asking around
 for information around software, because they don't have a good
 real-time view of what they have.
-
 For instance, when something breaks in production, ops people may not
 know what software they're looking at, and often lose time trying to
 figure out where the code lives and who owns it.
-
 Similarly, developers often would like to know what versions of their
 code are deployed where, especially when a bug report comes in.
 
-This how-to uses Chalk™ to automate this easily in five steps:
+This how-to uses Chalk™ to automate this in five steps:
 
 1. Load our `app-inventory` configuration
 2. Set up the Inventory web service
 3. Configure where Chalk reports get sent
+
 4. Automate calling docker via `chalk` in your build environment.
 5. Use it
 
@@ -71,7 +70,9 @@ This downloads our config, tests it, and loads it into the binary.
 Note that Chalk reconfigures itself by editing its binary. So it's
 best when configuring to have write access to the binary. If you do
 not, then copy the binary and run it from someplace you do.
+
 ### Step 2: Set up the Inventory web service
+
 We are going to set up two containers:
 1. A simple Python-based API Server that will accept reports from the
    chalk binary we're configuring, and stick things in the SQLite
@@ -201,9 +202,18 @@ deployed the containers, browse SQLite database at
 [http://localhost:8080](http://localhost:8080).
 
 The database will be capturing both the repositories you're using to
-	@@ -228,38 +148,37 @@ information AND the containers you deploy.
+build, and the containers you deploy.
+The `CHALK_ID` field is one field that ties them together-- it will be
+unique per container, but be associated both with the repository
+information AND the containers you deploy.
+
+> ❗While you may be tempted to correlate by container ID, note that
+> Docker `push` operations will generally result in the remote
+> container being different, so running containers are very likely to
+> report different image IDs. Chalk does capture the relationship when
 > wrapping `docker push`, but you'll have to go through extra work to
 > link them together; the CHALK_ID will work.
+
 In addition to manually browsing the SQLite database, you can query
 some of the data via the API.
 
