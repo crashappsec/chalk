@@ -9,13 +9,7 @@ func validate_url(url) {
 }
 
 func get_local_url() {
-  out, code := system("ifconfig -a | grep inet | grep broadcast | head -1 | " +
-                     "awk '{ print $2 }'")
-  if code != 0 {
-    return "https://localhost:7890"
-  }
-
-  return "https://" + out.strip() + ":7890"
+  return "https://" + external_ip() + ":7890"
 }
 
 parameter sink_config.output_to_http.uri {

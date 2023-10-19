@@ -95,6 +95,7 @@ proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   result                           = ChalkDict()
   result["MAGIC"]                  = pack(magicUTF8)
   result["TIMESTAMP_WHEN_CHALKED"] = pack(unixTimeInMS())
+  result.setIfNeeded("PUBLIC_IPV4_ADDR_WHEN_CHALKED", pack(getMyIpV4Addr()))
 
   if isSubscribedKey("PRE_CHALK_HASH") and obj.fsRef != "":
     chalkUseStream(obj):
