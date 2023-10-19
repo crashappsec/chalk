@@ -6,7 +6,7 @@ signing and attestation operations.
 
 All secrets and keying material are locally generated on the
 system running chalk, with the secret itself being encrypted
-locally priot to being sent to the API.
+locally prior to being sent to the API.
 
 This document provides an overview of the Secret Manager API, how
 data is stored securely, and how chalk interacts with the API as a
@@ -125,7 +125,7 @@ open source.
 The encryption scheme makes use of a PRP using the Luby-Rackoff
 construction. The easiest thing for us to do is to break the input
 into two 'halves',one being 128 bits (the width of AES, which we
-will call the 'lefthalf'), and the other the rest of the remaining
+will call the 'left half'), and the other the rest of the remaining
 width of the input (the 'right half').
 
 The nonce is random.
@@ -145,13 +145,13 @@ generate a key stream, that we XOR into the right half.
 The other PRF is HMAC-3. We take the round key, HMAC the right
 side, truncate the result to 128 bits, then XOR into the left half.
 
-The PRFs are used in a feistel cipher, so we alternate PRFs through
-our four feistel rounds.
+The PRFs are used in a Feistel cipher, so we alternate PRFs through
+our four Feistel rounds.
 
 While three-round Luby-Rackoff is secure against some use cases, we
 go through the full four rounds.
 
-PRPs are reversable, and with feistel contstructions, it's by
+PRPs are reversible, and with Feistel construction, it's by
 running the rounds backward.
 
 Once constructed it is this encrypted value that is sent to the

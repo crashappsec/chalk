@@ -32,7 +32,7 @@ The exact metadata that will be getting included in a report are defined in
 _templates_ which are simply collections of metadata keys (with optional conditions
 on when said metadata should be getting emitted). The same template
 can be re-used across many reports, however each of the different reports
-making use of the template could have different trigger/generation condidtions
+making use of the template could have different trigger/generation conditions
 and different destinations.
 
 Here is an excerpt from the template used by default for any metadata extracted
@@ -235,7 +235,7 @@ custom_report chalk_s3_logger {
 
 ```
 
-Notice that we have also suppreassed local terminal output for the above report.
+Notice that we have also suppressed local terminal output for the above report.
 
 ### Updating the used templates
 
