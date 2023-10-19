@@ -1,9 +1,0 @@
-run_sbom_tools: true
-
-# `chalk insert` uses the mark_default template.
-mark_template.mark_default.key.SBOM.use: true
-
-# `chalk docker build` uses the `minimal` template.
-mark_template.minimal.key.SBOM.use: true
-
-default_command: "insert"
