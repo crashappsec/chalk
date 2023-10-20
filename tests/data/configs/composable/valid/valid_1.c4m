@@ -1,0 +1,6 @@
+# this config is included to test for bug that was causing a crash
+# fixed in pr https://github.com/crashappsec/chalk/pull/72
+use reporting_server from "https://chalkdust.io"
+use wrap_entrypoints from "https://chalkdust.io"
+use impersonate_docker from "https://chalkdust.io"
+use use_heartbeats from "https://chalkdust.io"
