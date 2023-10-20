@@ -27,6 +27,10 @@ proc u64ToStr(i: uint64): string =
   for ch in arr:
     result.add(ch)
 
+proc floatToStr(f: float): string =
+  result = newStringOfCap(sizeof(float)+1)
+  let arr = cast[array[8, char]](f)
+
 proc binEncodeItem(self: Box): string
 proc binEncodeStr(s: string): string =
   return "\x01" & u32ToStr(uint32(len(s))) & s
@@ -46,6 +50,9 @@ proc binEncodeObj(self: ChalkDict): string =
     let val = self[outputKey]
     result  = result & binEncodeStr(outputKey) & binEncodeItem(val)
 
+proc binEncodeFloat(f: float): string =
+  result = "\x06" & floatToStr(f)
+
 proc binEncodeItem(self: Box): string =
   case self.kind
   of MkBool:  return binEncodeBool(unpack[bool](self))
@@ -53,7 +60,10 @@ proc binEncodeItem(self: Box): string =
   of MkStr:   return binEncodeStr(unpack[string](self))
   of MkTable: return binEncodeObj(unpack[ChalkDict](self))
   of MkSeq:   return binEncodeArr(unpack[seq[Box]](self))
-  else:       unreachable
+  of MkFloat: return binEncodeFloat(unpack[float](self))
+  else:
+    echo self.kind, " ", $self
+    unreachable
 
 
 proc getSortedKeys(d: ChalkDict): seq[string] {.inline.}=

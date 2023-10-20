@@ -14,7 +14,7 @@
 
 import config, reporting, sinks
 
-setLogLevelPrefix(llTrace, "trace: ".withColor("jazzberry").strip())
+setLogLevelPrefix(llTrace, "<jazzberry><bg-off>trace: </bg-off></jazzberry>")
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
