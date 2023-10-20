@@ -30,4 +30,4 @@ proc runCmdVersion*() =
   txt &= "<tr><td>Build Time</td><td>" & CompileTime & "</td></tr>"
   txt &= "</tbody></table>"
 
-  publish("version", txt.stylize())
+  publish("version", txt.stylizeHtml())

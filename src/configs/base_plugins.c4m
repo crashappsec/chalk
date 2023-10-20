@@ -57,7 +57,7 @@ are not overridable via other plugins.
 plugin metsys {
     ~enabled: true
     artifact_keys: ["METADATA_HASH", "SIGNATURE", "ERR_INFO", "METADATA_ID"]
-    post_run_keys: ["_CHALK_EXTERNAL_ACTION_AUDIT"]
+    post_run_keys: ["_CHALK_EXTERNAL_ACTION_AUDIT", "_CHALK_RUN_TIME"]
     ~priority:     high()
     doc: """
 Like the `system` module, this module is non-overridable keys added by
