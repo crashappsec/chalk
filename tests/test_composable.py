@@ -135,14 +135,42 @@ def test_composable_multiple(
 @pytest.mark.parametrize(
     "test_config_file, expected_error",
     [
-        ("composable/invalid/circular/circular_1.c4m", "blah"),
-        ("composable/invalid/invalid_file/invalid_file.c4m", "blah"),
-        ("composable/invalid/invalid_remote/invalid_remote.c4m", "blah"),
+        (
+            "composable/invalid/circular/circular_1.c4m",
+            "Cyclical components are not allowed",
+        ),
+        (
+            "composable/invalid/invalid_file/invalid_file.c4m",
+            "Could not retrieve needed source file",
+        ),
+        (
+            "composable/invalid/invalid_remote/invalid_remote.c4m",
+            "Could not retrieve needed source file",
+        ),
     ],
 )
-def test_composable_invalid(test_config_file: str, expected_error: str):
-    # TODO: fill this out
-    return
+@pytest.mark.parametrize(
+    "replace",
+    [
+        True,
+        False,
+    ],
+)
+def test_composable_invalid(
+    test_config_file: str,
+    expected_error: str,
+    chalk_copy: Chalk,
+    replace: bool,
+):
+    # load the composable config
+    _load = chalk_copy.load(
+        config=(CONFIGS / test_config_file).absolute(),
+        replace=replace,
+        stdin=b"\n" * 2**15,
+        log_level="error",
+        expected_success=False,
+    )
+    assert expected_error in _load.stderr.decode()
 
 
 @pytest.mark.parametrize(
