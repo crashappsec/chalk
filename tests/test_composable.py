@@ -22,9 +22,7 @@ def get_current_config(tmp_data_dir: Path, chalk: Chalk) -> str:
     if output.is_file():
         os.remove(output)
     chalk.dump(output)
-    with open(output) as f:
-        lines = f.read()
-        return lines
+    return output.read_text()
 
 
 @pytest.mark.parametrize(
@@ -61,9 +59,7 @@ def test_composable_valid(
     # check chalk dump to validate that loaded config matches
     current_config_path = tmp_data_dir / "output.c4m"
     chalk_copy.dump(current_config_path)
-    current_config = ""
-    with open(current_config_path) as f:
-        current_config = f.read()
+    current_config = current_config_path.read_text()
 
     if replace:
         # replaces current config with content of incoming
@@ -116,9 +112,7 @@ def test_composable_multiple(
     # check chalk dump to validate that loaded config matches
     current_config_path = tmp_data_dir / "output.c4m"
     chalk_copy.dump(current_config_path)
-    current_config = ""
-    with open(current_config_path) as f:
-        current_config = f.read()
+    current_config = current_config_path.read_text()
 
     # expecting output config has `use xxx from yyy`
     # for each config in sample configs
