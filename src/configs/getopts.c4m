@@ -20,8 +20,8 @@ getopts {
   show_doc_on_err: true
   add_help_commands: true
   shortdoc: """Chalk
-Collect and report software and host metadata  
-"""  
+Collect and report software and host metadata
+"""
   doc: """
 Chalk's core purpose is to map production software with its
 development, and to provide information about those artifacts in CI/CD
@@ -34,7 +34,7 @@ it's very customizable. Administrators can easily produce stand-alone
 binaries that collect custom metadata. The chalk command's behavior is
 easily customized, primarily via a flexible configuration file. The
 options provided at the command line are reserved for items where
-there's an obvious utilitiy in overriding without editing the config
+there's an obvious utility in overriding without editing the config
 file. See the Chalk Users Guide for more information.
 """
   arg_name: "ARG"
@@ -54,7 +54,7 @@ file. See the Chalk Users Guide for more information.
     add_choice_flags: true
     field_to_set: "log_level"
     doc: """
-Sets the console log-level to the specified value, controling what logs are output to the terminal.  Note that "verbose" and "trace" are aliases.
+Sets the console log-level to the specified value, controlling what logs are output to the terminal.  Note that "verbose" and "trace" are aliases.
 """
   }
 
@@ -71,7 +71,7 @@ When this flag is passed, chalk ignores its search path; the only file it attemp
   flag_multi_arg enable_report {
     callback: func set_enabled_reports
     doc: """
-Explicitly enable a specfic `custom_report` defined in the configuration file, even if it is not enabled in that configuration file.
+Explicitly enable a specific `custom_report` defined in the configuration file, even if it is not enabled in that configuration file.
 """
 
   }
@@ -79,14 +79,14 @@ Explicitly enable a specfic `custom_report` defined in the configuration file, e
   flag_multi_arg disable_report {
     callback: func set_disabled_reports
     doc: """
-Explicitly _disable_ a specfic `custom_report` defined in the configuration file.
+Explicitly _disable_ a specific `custom_report` defined in the configuration file.
 """
   }
 
   flag_arg report_cache_file {
     callback: func set_report_cache_file
     doc: """
-This overrides the locaction of the report cache, if chalk is configured to use it.
+This overrides the location of the report cache, if chalk is configured to use it.
 The reporting cache keeps a local copy of any reports made, to provide redundancy if there are network errors.
 """
   }
@@ -95,7 +95,7 @@ The reporting cache keeps a local copy of any reports made, to provide redundanc
     field_to_set: "report_total_time"
     doc: """
 Reports the total run time of the chalk executable in seconds.
-"""    
+"""
   }
 
   flag_yn use_embedded_config {
@@ -121,7 +121,7 @@ Turn on/off checking for (and running) any external configuration file.
 
   flag_yn show_config {
     yes_aliases: ["config"]
-    
+
     field_to_set: "show_config"
     doc: """This flag runs chalk, then, at the end, outputs state information specific to that invocation of chalk.
 
@@ -211,7 +211,7 @@ output sinks will get it.
 _For most commands, this defeats the purpose of Chalk, so use it sparingly._
 
 Note that this doesn't turn off any custom reports; you have to
-disable those seprately.
+disable those separately.
 """
   }
 
@@ -219,7 +219,7 @@ disable those seprately.
     field_to_set: "skip_summary_report"
     doc: """
 Whether to skip the summary report to the terminal.
-"""    
+"""
   }
 
   flag_choice symlink_behavior {
@@ -240,7 +240,7 @@ This variable controls what happens in those cases:
 - <em>skip</em>   will not process files that are linked.
 - <em>clobber</em> will read the artifact on the other end of the link, and, if writing, try to replace the file being linked to.
 - <em>copy</em> will read the artifact on the other end of the link, and, if writing, will replace the link with a modified file, leaving the file on the other end of the link intact.
-"""    
+"""
   }
 
   flag_yn wrap {
@@ -257,7 +257,7 @@ If, when wrapping, your chalk binary is using an external
 configuration file, that file will NOT get used inside the
 container. The wrapped binary currently only uses the embedded
 configuration present in the binary at the time of the wrapping.
-"""    
+"""
   }
 
     flag_yn pager {
@@ -267,7 +267,7 @@ configuration present in the binary at the time of the wrapping.
 Sets whether to display documents in the system pager for output.
 
 At the moment, this is only honored for the `chalk help` command.
-"""      
+"""
      }
 
 
@@ -278,7 +278,7 @@ At the moment, this is only honored for the `chalk help` command.
     doc:      """
 Add chalk marks to artifacts found on the file system.  See the
 `docker` command for adding marks to docker containers.
-    
+
 On chalking, what gets put into the chalk mark will be determined by
 the active chalk mark template after any user config file has loaded.
 Each command's output configuration can be specified using the
@@ -356,7 +356,7 @@ The named reporting template must already exist in your configuration.
     flag_yn search_layers {
       doc: """
 When a mark in an image can't be found, should we try to report on
-overwitten marks?      
+overwritten marks?
 """
       field_to_set: "extract.search_base_layers_for_marks"
     }
@@ -374,7 +374,7 @@ Note that this does not look through running containers; use `chalk extract cont
       shortdoc: "Find marks in running containers"
       doc: """
 This command will look at any docker containers available locally, attempting to find chalk marks in them.
-"""      
+"""
     }
 
     command all {
@@ -386,7 +386,7 @@ This command will look at any docker containers available locally, attempting to
 This command will attempt to extract chalk marks in all containers,
 container images for anything it can find on the local machine, AND will
 search the current working directory for chalk marks.
-"""      
+"""
     }
 }
 
@@ -448,14 +448,14 @@ When using the 'exec' command, this allows you to explicitly set the command to 
 When set to true, 'chalk exec' will leave chalk as the parent process (By default, the process to exec stays the parent, and chalk is forked off).
 <p>
 This is most useful for short-lived processes, as it ensures chalk will complete any reporting.
-"""      
+"""
     }
 
     flag_yn heartbeat {
     field_to_set: "exec.heartbeat"
     doc: """
-When set to true, causes periodic reports to be run, past the initial one.    
-"""    
+When set to true, causes periodic reports to be run, past the initial one.
+"""
     }
 
     flag_arg report_template {
@@ -502,8 +502,8 @@ config' for more information on the configuration file and con4m.
 
   command dump {
     args:    (0, 1)
-    arg_sub_mutex: false    
-    shortdoc: "Print the embedded configuration file"    
+    arg_sub_mutex: false
+    shortdoc: "Print the embedded configuration file"
     doc: """
 Reads the embedded configuration file, and outputs it, based on your
 output configuration (see 'help output').  In the default
@@ -524,7 +524,7 @@ JSON for any saved parameters. That JSON can then be loaded into
 another binary via chalk load --params, which takes parameters over
 stdin, while setting a configuration. This is used in transfering
 configurations to cross-platform binaries.
-"""      
+"""
     }
 
     command cache {
@@ -532,8 +532,8 @@ configurations to cross-platform binaries.
       doc: """
 This does a more complete dump of source code; not just the base
 configuration, but also any cached components that have been loaded.
-"""      
-    
+"""
+
     }
   }
 
@@ -557,7 +557,7 @@ From the command line, See 'help config' for an overview of the configuration fi
 When on, the entire stored configuration file will be REPLACED with the
 provided argument. When off, it's used only as a component that's added
 to the config.
-"""      
+"""
     }
 
     flag_yn update_arch_binaries {
@@ -570,7 +570,7 @@ cross-architecture binaries listed in docker.arch_binary_locations.
 Note that, if you source config components from a local directory, you
 currently will need to update them manually, as those directories will
 not be mapped into the container.
-"""      
+"""
     }
 
     flag_yn params {
@@ -582,7 +582,7 @@ dictionary.  Keys are the parameter name as specified in the
 defaults will be accepted.
 """
     }
-    
+
     flag_yn validation {
       field_to_set: "load.validate_configs_on_load"
       doc: """
@@ -595,7 +595,7 @@ When on, validate config files before loading them, by doing a trial run.
       doc: """
 This verbose flag controls whether or not you get the verbose warning.
 It's much better turning this off in your embedded configuration :)
-"""      
+"""
     }
   }
 
@@ -636,7 +636,7 @@ it will run the `gen` command to create one.
     field_to_set: "use_internal_password"
     doc: """
 Sets whether to cache an encrypted copy of the password inside the
-chalk binary. This requires good operationational security on the
+chalk binary. This requires good operational security on the
 binary, so using a secret manager to set the password is ideal, but
 this option is better than hardcoding the password in a script that
 calls Chalk.
@@ -650,14 +650,14 @@ Sets the location of the signing key file on local disk. This should
 point to the private key file and end in `.key`. The public key file
 must be in the same base location, with the same file name, except
 with `.pub` as the file extension.
-"""    
+"""
   }
 
   flag_yn api_login {
     field_to_set: "api_login"
     doc: """Enable/disable the use of the Crash Override API for secret management."""
   }
-  
+
   command gen {
     shortdoc: "Force generation of new signing key"
     doc: """
@@ -695,9 +695,9 @@ been generated by chalk, and encrypted with a password.
 <p>
 Pass `--store-password` to keep an encrypted copy of the password
 internally, per the `gen` command.
-"""    
+"""
   }
-  
+
 }
 
   command help {

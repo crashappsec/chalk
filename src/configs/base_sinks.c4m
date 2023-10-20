@@ -11,7 +11,7 @@
 ## The default sink implementations are currently in the nimutils
 ## library, except for 'custom', which is in output.nim.  That one
 ## allows you to define your own sink in con4m by supplying the
-## callback outhook() 
+## callback outhook()
 
 sink file {
   ~filename:        true
@@ -38,13 +38,13 @@ If the `filename` parameter has a slash in it, it will always be tried
 first, before the search path is checked.
 
 If nothing in the search path is openable, or if no search path was
-given, and the file location was not writable, tthe system tries to
+given, and the file location was not writable, the system tries to
 write to a temporary file as a last resort.
 
 If `use_search_path` is false, the system just looks at the `filename`
 field; if it's a relative path, it resolves it based on the current
 working directory.  In this mode, if the log file cannot be opened,
-then the sink configuration will error when usd.
+then the sink configuration will error when used.
 """
 }
 
@@ -56,7 +56,7 @@ sink rotating_log {
   ~on_write_msg:      false
   shortdoc:       "A self-truncating log file"
   doc: """
-  
+
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `filename` | `string` | true | The name to use for the log file. |
@@ -79,8 +79,8 @@ undeleted data into a new, temporary log file, and swapping it into
 the destination file once finished. As a result, you should assume you
 need 2x the value of `max` available in terms of disk space.
 
-`max` and `truncation_amount` should be Size objects (eg, `<< 100mb >>` )
-"""  
+`max` and `truncation_amount` should be Size objects (e.g., `<< 100mb >>` )
+"""
 }
 
 sink s3 {
@@ -132,7 +132,7 @@ sink post {
   ~on_write_msg:     false
   shortdoc:          "HTTP/HTTPS POST"
   doc:       """
-  
+
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `uri` | true | The full URI to the endpoint to which the POST should be made. |
@@ -179,7 +179,7 @@ sink_config my_https_config {
 }
 ```
 """
-  
+
 }
 
 sink stdout {
@@ -187,7 +187,7 @@ sink stdout {
   doc:             """
 
 When configuring, this sink take no configuration parameters.
-"""  
+"""
 }
 
 sink stderr {
@@ -195,6 +195,5 @@ sink stderr {
   doc:             """
 
 This sink take no configuration parameters.
-"""  
+"""
 }
-
