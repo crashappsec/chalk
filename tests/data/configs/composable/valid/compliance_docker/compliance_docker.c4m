@@ -1,0 +1,3 @@
+use impersonate_docker from "/chalk/tests/data/configs/composable/valid/compliance_docker"
+use reporting_server from "/chalk/tests/data/configs/composable/valid/compliance_docker"
+run_sbom_tools: true
