@@ -38,8 +38,7 @@ def get_current_config(tmp_data_dir: Path, chalk: Chalk) -> str:
 @pytest.mark.parametrize(
     "replace",
     [
-        # TODO: enable these once the replace bug has been fixed
-        # True,
+        True,
         False,
     ],
 )
@@ -55,7 +54,6 @@ def test_composable_valid(
         config=(CONFIGS / test_config_file).absolute(),
         replace=replace,
         stdin=b"\n" * 2**15,
-        log_level="trace",
     )
     assert _load.report["_OPERATION"] == "load"
     assert "_OP_ERRORS" not in _load.report
@@ -67,11 +65,18 @@ def test_composable_valid(
     with open(current_config_path) as f:
         current_config = f.read()
 
-    # expecting output config has `use xxx from yyy`
-    config_name = test_config_file.split("/")[-1].removesuffix(".c4m")
-    config_path = "/".join((CONFIGS / test_config_file).__str__().split("/")[:-1])
-    use_output = f'use {config_name} from "{config_path}"'
-    assert use_output in current_config
+    if replace:
+        # replaces current config with content of incoming
+        with open(CONFIGS / test_config_file) as f:
+            original_config = f.read()
+            assert current_config == original_config
+    else:
+        # adds incoming as component
+        # expecting output config has `use xxx from yyy`
+        config_name = test_config_file.split("/")[-1].removesuffix(".c4m")
+        config_path = "/".join((CONFIGS / test_config_file).__str__().split("/")[:-1])
+        use_output = f'use {config_name} from "{config_path}"'
+        assert use_output in current_config
 
     # basic check insert operation
     bin_path = copy_files[0]
@@ -104,7 +109,6 @@ def test_composable_multiple(
             config=config.absolute(),
             replace=False,
             stdin=b"\n" * 2**15,
-            log_level="trace",
             expected_success=True,
         )
         assert _load.report["_OPERATION"] == "load"
@@ -187,8 +191,7 @@ def test_composable_invalid(
     "replace",
     [
         True,
-        # TODO: enable these once the replace bug has been fixed
-        # False,
+        False,
     ],
 )
 def test_composable_reload(
