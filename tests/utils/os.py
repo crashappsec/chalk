@@ -252,6 +252,7 @@ def run(
             cmd,
             stdout=stdout,
             stderr=stderr,
+            stdin=PIPE if stdin is not None else None,
             cwd=cwd,
             env=env_vars,
             shell=shell,

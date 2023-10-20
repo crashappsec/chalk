@@ -1,0 +1,34 @@
+func validate_url(url) {
+  result := ""
+
+  if (not url.starts_with("http://")) and (not url.starts_with("https://")) {
+    return "Only http / https URLs are supported"
+  }
+}
+
+func get_local_url() {
+  return "https://" + external_ip() + ":7890"
+}
+
+parameter sink_config.output_to_http.uri {
+  shortdoc:  "URL for reporting server"
+  doc: """
+A config for sending reports to a custom implementation of the test
+reporting server.
+
+Run the server via:
+
+```
+docker run --rm - -w /db -v $HOME/.local/c0/:/db -p 8585:8585  ghcr.io/crashappsec/chalk-test-server
+```
+"""
+  validator: func validate_url(string) -> string
+  default: func get_local_url() -> string
+}
+
+sink_config output_to_http {
+  enabled: true
+  sink:    "post"
+
+  # The URI should get filled in automatically.
+}

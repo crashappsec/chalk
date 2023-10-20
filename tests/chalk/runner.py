@@ -217,6 +217,7 @@ class Chalk:
         ignore_errors: bool = False,
         cwd: Optional[Path] = None,
         env: Optional[dict[str, str]] = None,
+        stdin: Optional[bytes] = None,
     ) -> ChalkProgram:
         params = params or []
         cmd: list[str] = [str(self.binary)]
@@ -265,6 +266,7 @@ class Chalk:
                 expected_exit_code=int(not expected_success),
                 cwd=cwd,
                 env=env,
+                stdin=stdin,
             )
         )
         if not ignore_errors and expected_success and result.errors:
@@ -350,6 +352,7 @@ class Chalk:
         expected_success: bool = True,
         ignore_errors: bool = False,
         log_level: ChalkLogLevel = "error",
+        stdin: Optional[bytes] = None,
     ) -> ChalkProgram:
         hash = sha256(self.binary)
         result = self.run(
@@ -360,6 +363,7 @@ class Chalk:
             use_embedded=use_embedded,
             expected_success=expected_success,
             ignore_errors=ignore_errors,
+            stdin=stdin,
         )
         # sanity check that chalk binary was changed
         if expected_success:
