@@ -74,7 +74,7 @@ def test_composable_valid(
         # adds incoming as component
         # expecting output config has `use xxx from yyy`
         config_name = test_config_file.stem
-        config_path = "/".join((CONFIGS / test_config_file).__str__().split("/")[:-1])
+        config_path = str((CONFIGS / test_config_file).parent)
         use_output = f'use {config_name} from "{config_path}"'
         assert use_output in current_config
 
