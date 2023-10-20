@@ -1,4 +1,4 @@
-# Release Notes for Chalk version 0.1.3 (Oct 19, 2023)
+# Release Notes for Chalk version 0.2.0 (Oct 20, 2023)
 
 ## New Features
 
