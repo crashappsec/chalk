@@ -67,9 +67,8 @@ def test_composable_valid(
 
     if replace:
         # replaces current config with content of incoming
-        with open(CONFIGS / test_config_file) as f:
-            original_config = f.read()
-            assert current_config == original_config
+        original_config = (CONFIGS / test_config_file).read_text()
+        assert current_config == original_config
     else:
         # adds incoming as component
         # expecting output config has `use xxx from yyy`
