@@ -2,7 +2,6 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import os
 import pytest
 
 from pathlib import Path
@@ -19,8 +18,7 @@ logger = get_logger()
 
 def get_current_config(tmp_data_dir: Path, chalk: Chalk) -> str:
     output = tmp_data_dir / "output.c4m"
-    if output.is_file():
-        os.remove(output)
+    output.unlink(missing_ok=True)
     chalk.dump(output)
     return output.read_text()
 
@@ -68,7 +66,7 @@ def test_composable_valid(
     else:
         # adds incoming as component
         # expecting output config has `use xxx from yyy`
-        config_name = test_config_file.stem
+        config_name = (CONFIGS / test_config_file).stem
         config_path = str((CONFIGS / test_config_file).parent)
         use_output = f'use {config_name} from "{config_path}"'
         assert use_output in current_config
