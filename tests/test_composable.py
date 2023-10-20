@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from pathlib import Path
@@ -12,6 +13,16 @@ from .conf import (
 logger = get_logger()
 
 
+def get_current_config(tmp_data_dir: Path, chalk: Chalk) -> str:
+    output = tmp_data_dir / "output.c4m"
+    if output.is_file():
+        os.remove(output)
+    chalk.dump(output)
+    with open(output) as f:
+        lines = f.read()
+        return lines
+
+
 @pytest.mark.parametrize(
     "test_config_file",
     [
@@ -20,16 +31,25 @@ logger = get_logger()
     ],
 )
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+@pytest.mark.parametrize(
+    "replace",
+    [
+        # TODO: enable these once the replace bug has been fixed
+        # True,
+        False,
+    ],
+)
 def test_composable_valid(
     tmp_data_dir: Path,
     copy_files: list[Path],
     chalk_copy: Chalk,
     test_config_file: str,
+    replace: bool,
 ):
     # load the composable config
     _load = chalk_copy.load(
         config=(CONFIGS / test_config_file).absolute(),
-        replace=False,
+        replace=replace,
         stdin=b"\n" * 2**15,
         log_level="trace",
     )
@@ -128,25 +148,45 @@ def test_composable_invalid(test_config_file: str, expected_error: str):
 @pytest.mark.parametrize(
     "test_config_file",
     [
-        "composable/valid/mulitple/sample_1.c4m",
+        "composable/valid/multiple/sample_1.c4m",
+    ],
+)
+@pytest.mark.parametrize(
+    "replace",
+    [
+        True,
+        # TODO: enable these once the replace bug has been fixed
+        # False,
     ],
 )
 def test_composable_reload(
-    tmp_data_dir: Path,
-    # copy_files: list[Path],
-    chalk_copy: Chalk,
-    test_config_file: str,
+    tmp_data_dir: Path, chalk_copy: Chalk, test_config_file: str, replace: bool
 ):
     # load sample valid config
     config = CONFIGS / test_config_file
-    _load = chalk_copy.load(
+    chalk_copy.load(
         config=config.absolute(),
-        replace=False,
+        replace=replace,
         stdin=b"\n" * 2**15,
-        log_level="trace",
         expected_success=True,
     )
-    assert _load.report["_OPERATION"] == "load"
-    assert "_OP_ERRORS" not in _load.report
-    # TODO: load default
-    # TODO: load another config
+
+    first_load_config = get_current_config(tmp_data_dir, chalk_copy)
+
+    # load default config
+    chalk_copy.run(command="load", params=["default"])
+    default_load_config = get_current_config(tmp_data_dir, chalk_copy)
+
+    # reload sample valid config and ensure default is overwritten
+    chalk_copy.load(
+        config=config.absolute(),
+        replace=replace,
+        stdin=b"\n" * 2**15,
+        expected_success=True,
+    )
+
+    second_load_config = get_current_config(tmp_data_dir, chalk_copy)
+
+    assert second_load_config != ""
+    assert second_load_config != default_load_config
+    assert second_load_config in first_load_config
