@@ -2,7 +2,6 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import os
 import pytest
 
 from pathlib import Path
@@ -19,12 +18,9 @@ logger = get_logger()
 
 def get_current_config(tmp_data_dir: Path, chalk: Chalk) -> str:
     output = tmp_data_dir / "output.c4m"
-    if output.is_file():
-        os.remove(output)
+    output.unlink(missing_ok=True)
     chalk.dump(output)
-    with open(output) as f:
-        lines = f.read()
-        return lines
+    return output.read_text()
 
 
 @pytest.mark.parametrize(
@@ -38,8 +34,7 @@ def get_current_config(tmp_data_dir: Path, chalk: Chalk) -> str:
 @pytest.mark.parametrize(
     "replace",
     [
-        # TODO: enable these once the replace bug has been fixed
-        # True,
+        True,
         False,
     ],
 )
@@ -55,7 +50,6 @@ def test_composable_valid(
         config=(CONFIGS / test_config_file).absolute(),
         replace=replace,
         stdin=b"\n" * 2**15,
-        log_level="trace",
     )
     assert _load.report["_OPERATION"] == "load"
     assert "_OP_ERRORS" not in _load.report
@@ -63,15 +57,19 @@ def test_composable_valid(
     # check chalk dump to validate that loaded config matches
     current_config_path = tmp_data_dir / "output.c4m"
     chalk_copy.dump(current_config_path)
-    current_config = ""
-    with open(current_config_path) as f:
-        current_config = f.read()
+    current_config = current_config_path.read_text()
 
-    # expecting output config has `use xxx from yyy`
-    config_name = test_config_file.split("/")[-1].removesuffix(".c4m")
-    config_path = "/".join((CONFIGS / test_config_file).__str__().split("/")[:-1])
-    use_output = f'use {config_name} from "{config_path}"'
-    assert use_output in current_config
+    if replace:
+        # replaces current config with content of incoming
+        original_config = (CONFIGS / test_config_file).read_text()
+        assert current_config == original_config
+    else:
+        # adds incoming as component
+        # expecting output config has `use xxx from yyy`
+        config_name = (CONFIGS / test_config_file).stem
+        config_path = str((CONFIGS / test_config_file).parent)
+        use_output = f'use {config_name} from "{config_path}"'
+        assert use_output in current_config
 
     # basic check insert operation
     bin_path = copy_files[0]
@@ -104,7 +102,6 @@ def test_composable_multiple(
             config=config.absolute(),
             replace=False,
             stdin=b"\n" * 2**15,
-            log_level="trace",
             expected_success=True,
         )
         assert _load.report["_OPERATION"] == "load"
@@ -113,9 +110,7 @@ def test_composable_multiple(
     # check chalk dump to validate that loaded config matches
     current_config_path = tmp_data_dir / "output.c4m"
     chalk_copy.dump(current_config_path)
-    current_config = ""
-    with open(current_config_path) as f:
-        current_config = f.read()
+    current_config = current_config_path.read_text()
 
     # expecting output config has `use xxx from yyy`
     # for each config in sample configs
@@ -187,8 +182,7 @@ def test_composable_invalid(
     "replace",
     [
         True,
-        # TODO: enable these once the replace bug has been fixed
-        # False,
+        False,
     ],
 )
 def test_composable_reload(
