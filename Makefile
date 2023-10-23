@@ -64,7 +64,7 @@ $(addsuffix /%,$(TOOLS)):
 # TESTS
 
 # needed for the registry tests
-export IP=$(firstword $(shell hostname -i 2> /dev/null))
+export IP=$(firstword $(shell hostname -I 2> /dev/null || hostname -i 2> /dev/null))
 
 # normally this is not required to run on a host
 # as it always runs within the test container
