@@ -594,48 +594,13 @@ proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
     for platform in platforms:
       platformTags.add(ctx.getTagForPlatform(tag, platform))
 
-    var manifest = runDockerGetEverything(
-      @["manifest", "create", "--amend"] & platformTags,
-      silent = false,
+    let exitCode = runProcNoOutputCapture(
+      dockerExeLocation,
+      @["buildx", "imagetools", "create", "-t"] & platformTags,
     )
-
-    if manifest.exitCode != 0 and manifest.stderr.startsWith("no such manifest:"):
-      # docker and buildx have separate configurations how they interact
-      # with external registries. For example to push to an insecure
-      # registry, its URL needs to be whitelisted in the appropriate
-      # config (e.g. /etc/docker/daemon.json or buildx node --config)
-      # however docker manifest DOES NOT honor any of these configs (booo!)
-      # and it will refuse to push to an insecure registry without --insecure
-      # flag and so if we see specific message which happens on insecure registries
-      # we retry with --insecure flag
-      trace("Retrying with --insecure flag")
-      manifest = runDockerGetEverything(
-        @["manifest", "create", "--amend", "--insecure"] & platformTags,
-        silent = false,
-      )
-
-    if manifest.exitCode != 0:
-      error(tag & ": Could not create multi-platform manifest")
-      return manifest.exitCode
-
-    info(tag & ": Successfully created multi-platform manifest")
-
-    var push = runDockerGetEverything(
-      @["manifest", "push"] & @[platformTags[0]],
-      silent = false,
-    )
-
-    if push.exitCode != 0 and "server gave HTTP response to HTTPS client" in push.stderr:
-      # similar to above push also needs insecure flag
-      trace("Retrying with --insecure flag")
-      push = runDockerGetEverything(
-        @["manifest", "push", "--insecure"] & @[platformTags[0]],
-        silent = false,
-      )
-
-    if push.exitCode != 0:
+    if exitCode != 0:
       error(tag & ": Could not push multi-platform manifest")
-      return push.exitCode
+      return exitCode
 
     info(tag & ": Successfully pushed multi-platform manifest")
 
