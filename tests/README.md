@@ -255,6 +255,16 @@ That will:
   - your machine IP address
 - restart `docker` via `systemctl`
 
+##### Platform Emulation
+
+In order to be able to build multi-platform builds, you'll need to enable
+[QEMU](https://docs.docker.com/build/building/multi-platform/#qemu)
+on your host:
+
+```sh
+docker run --privileged --rm tonistiigi/binfmt --install all
+```
+
 ##### Buildx
 
 If you run tests using docker, you don't need to configure anything. Tests container will automatically configure `buildx` instances to support insecure registry.
