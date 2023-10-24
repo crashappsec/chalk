@@ -105,7 +105,7 @@ tests_parallel: tests
 
 .PHONY: tests_bash
 tests_bash:
-	docker compose run --no-deps tests bash
+	docker compose run --rm --no-deps tests bash
 
 # ----------------------------------------------------------------------------
 # MISC
