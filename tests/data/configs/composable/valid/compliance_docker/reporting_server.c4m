@@ -7,7 +7,7 @@ func validate_url(url) {
 }
 
 func get_local_url() {
-  return "https://" + external_ip() + ":7890"
+  return "http://" + external_ip() + ":8585"
 }
 
 parameter sink_config.output_to_http.uri {
@@ -19,7 +19,7 @@ reporting server.
 Run the server via:
 
 ```
-docker run --rm - -w /db -v $HOME/.local/c0/:/db -p 8585:8585  ghcr.io/crashappsec/chalk-test-server
+docker run -w /db -v $HOME/.local/c0/:/db -p 8585:8585 --restart=unless-stopped ghcr.io/crashappsec/chalk-test-server
 ```
 """
   validator: func validate_url(string) -> string
@@ -32,3 +32,5 @@ sink_config output_to_http {
 
   # The URI should get filled in automatically.
 }
+
+subscribe("report", "output_to_http")
