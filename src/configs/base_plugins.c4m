@@ -72,6 +72,8 @@ a data collection phase, so integrity / signing and audit.
 plugin vctl_git {
     enabled:         true
     artifact_keys:   ["COMMIT_ID", "BRANCH", "ORIGIN_URI",
+                      "AUTHOR", "AUTHOR_DATE",
+                      "COMMITTER", "COMMIT_DATE",
                       "VCS_DIR_WHEN_CHALKED"]
     doc: """
 This plugin collects version control information from .git directories
