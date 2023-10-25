@@ -78,6 +78,7 @@ async def ping(stats: list[schemas.Stat], db: Session = Depends(get_db)):
 
 
 @app.post("/report", status_code=200)
+@app.put("/report", status_code=200)
 async def accept_report(
     reports: list[dict],
     response: Response,
