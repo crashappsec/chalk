@@ -7,7 +7,7 @@ func validate_url(url) {
 }
 
 func get_local_url() {
-  return "http://" + external_ip() + ":8585"
+  return "http://" + external_ip() + ":8585/report"
 }
 
 parameter sink_config.output_to_http.uri {
