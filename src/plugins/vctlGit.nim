@@ -8,18 +8,31 @@
 ## The plugin responsible for pulling metadata from the git
 ## repository.
 
-import ../config, ../plugin_api
+import ../config, ../plugin_api, zippy
 
 const
+  eBadGitConf  = "Git configuration file is invalid"
+  fanoutTable  = 8
+  fanoutSize   = (256 * 4)
   fNameHead    = "HEAD"
   fNameConfig  = "config"
+  highBit32    = 0x80000000
   ghRef        = "ref:"
   ghBranch     = "branch"
   ghRemote     = "remote"
   ghUrl        = "url"
   ghOrigin     = "origin"
   ghLocal      = "local"
-  eBadGitConf  = "Git configuration file is invalid"
+  gitAuthor    = "author"
+  gitCommitter = "committer"
+  gitIdxAll    = "*.idx"
+  gitIdxExt    = ".idx"
+  gitIdxHeader = "\xff\x7f\x4f\x63\x00\x00\x00\x02"
+  gitObjects   = "objects" & DirSep
+  gitPack      = gitObjects.joinPath("pack")
+  gitPackExt   = ".pack"
+  gitTimeFmt   = "ddd MMM dd HH:mm:ss YYYY"
+  gitObjCommit = 1
 
 type
   KVPair*  = (string, string)
@@ -36,6 +49,12 @@ proc newLine(s: Stream) =
 
 proc comment(s: Stream) =
   while s.readChar() notin ['\n', '\x00']: discard
+
+proc getUint32BE(data: string, whence: int=0): uint32 =
+  result = cast[ref [uint32]](addr data[whence])[]
+  result = (result shl 16) or (result shr 16)
+  result = ((result and uint32(0xff00ff00)) shr 8) or
+           ((result and uint32(0x00ff00ff)) shl 8)
 
 # Comments aren't allowed in between the brackets
 proc header(s: Stream): (string, string) =
@@ -191,16 +210,116 @@ proc findGitDir(fullpath: string): string =
 # Using this in the GitRepo plugin too.
 type
   RepoInfo = ref object
-    vcsDir:   string
-    origin:   string
-    branch:   string
-    commitId: string
+    vcsDir:     string
+    origin:     string
+    branch:     string
+    commitId:   string
+    author:     string
+    authorDate: string
+    committer:  string
+    commitDate: string
 
   GitInfo = ref object of RootRef
     branchName: Option[string]
     commitId:   Option[string]
     origin:     Option[string]
     vcsDirs:    OrderedTable[string, RepoInfo]
+
+proc formatCommitObjectTime(line: string): string =
+  let parts = line.split(" ")
+  return fromUnix(parseInt(parts[^2])).format(gitTimeFmt) & " " & parts[^1]
+
+proc readPackedCommit(path: string, offset: uint64): string =
+  let fileStream = newFileStream(path)
+  if fileStream == nil:
+    raise(newException(CatchableError, "failed to open " & path))
+  fileStream.setPosition(offset)
+  let initialReadSize = 0x1000
+  var
+    data = fileStream.readStr(initialReadSize)
+    byte = data[offset]
+  if (byte shr 4) and 7 != gitObjCommit:
+    raise(newException(CatchableError, "invalid commit object"))
+  var
+    uncompressedSize = byte & 0x0F
+    shiftBits        = 4
+    currentOffset    = offset
+  while byte and 0x80 != 0:
+    currentOffset += 1
+    byte = data[offset]
+    uncompressedSize += ((byte and 0x7F) shr shiftBits)
+    shiftBits += 8
+  # My understanding is that we do not have a way to know the compressed size.
+  # We assume that either the uncompressed size is bigger than the compressed
+  # size, or that a scenario where compressed size is larger would likely only
+  # happen with smaller objects (smaller than our initial read size of 0x1000).
+  # It seems particularly unlikely with git commit objects, but if these
+  # assumptions prove wrong, the resulting failure is a signal we report.
+
+  # Given the assumption above, we attempt to read up to uncompressedSize
+  let remaining = initialReadSize - (currentOffset - offset):
+  if uncompressedSize > remaining:
+    data &= fileStream.readStr(remaining)
+  return uncompress(data[currentOffset .. ^1], dataFormat=dfZlib)
+
+proc findPackedGitCommit(vcsDir, commitId: string): string =
+  let
+    nameBytes       = parseHexStr(commitId)
+    nameLen         = len(nameBytes)
+    firstByte       = nameBytes[0]
+  var offset: uint64
+  for file in walkFiles(vcsDir.joinPath(gitPack, gitIdxAll)):
+    if file.kind != pcFile:
+      continue
+    let fileSteam = newFileSteam(file.path)
+    if fileStream == nil:
+      continue
+    let data = file.readAll()
+    # Note: this check is both 32bit magic and 32bit version, and they can
+    # be split out if a new version comes out, since at that time we would
+    # need to revisit this code anyway.
+    # Note: we don't support v1 because v2 came out 9+ years ago, and the
+    # the repo we are examining would need to have been fetched with a v1
+    # version of the git client (even if fetching an old repo, the client
+    # only emits v2 .idx and .pack files).
+    if data[0 ..< 8] != gitIdxHeader:
+      warn("unsupported .idx file " & file.path)
+      continue
+    let
+      skipCount  = if firstByte > 0:
+                     getUint32BE(data, fanoutTable + int(firstByte - 1))
+                   else:
+                     0
+      candidates = getUint32BE(data, fanoutTable + int(firstByte)) - skipCount
+    if candidates == 0:
+      continue
+    let
+      nameTable   = fanoutTable + fanoutSize
+      startOffset = nameTable   + (skipCount        * nameLen)
+      lastOffset  = startOffset + ((candidates - 1) * nameLen)
+    var found     = 0
+    for offset in countUp(startOffset, lastOffset, nameLen):
+      let currentNameBytes = data[offset ..< offset + nameLen]
+      if currentNameBytes == nameBytes:
+        found = offset
+      else if currentNameBytes[0] != firstByte:
+        break
+    if found == 0:
+      continue
+    found = (found - startOffset) / nameLen
+    let
+      entryCount    = getUint32BE(data, fanoutTable + (0xFF * 4))
+      tableCrc32    = nameTable     + (totalEntries * nameLen)
+      tableSize32   = totalEntries  * 4
+      tableOffset32 = tableCrc32    + tableSize32
+      tableOffset64 = tableOffset32 + tableSize32
+    offset = uint64(getUint32BE(data, tableOffset32 + found))
+    if offset & highBit32 != 0:
+      offset = offset xor highBit32
+      offset = uint64(getUint32BE(data, tableOffset64, offset))
+    let packFilePath = "pack-" & file.path.replace(".idx", ".pack")
+    return readPackedCommit(path.path.replace(packFilePath, offset)
+  raise(newException(CatchableError, "failed to parse git index")
 
 proc loadHead(info: RepoInfo) =
   var
@@ -243,13 +362,45 @@ proc loadHead(info: RepoInfo) =
 
   let
     fNameRef = info.vcsDir.joinPath(fname)
-    reffile   = newFileStream(fNameRef)
+    reffile  = newFileStream(fNameRef)
   if reffile != nil:
     info.commitId = reffile.readAll().strip()
     reffile.close()
     trace("commit ID: " & info.commitID)
+    let
+      commitId = info.commitId
+      # assuming the most recent commit this branch refers to was actually
+      # on this branch, we can just read the commit object on the filesystem
+      # git objects are stored as: .git/objects/01/23456789abcdef
+      objPath = gitObjects.joinPath(commitId[0 ..< 2], commitId[2 .. ^1])
+      objFile = newFileStream(info.vcsDir.joinPath(objPath))
+    var objData string
+    try:
+      if objFile != nil:
+        objData = uncompress(objFile.readAll(), dataFormat=dfZlib)
+      else:
+        # the most recent commit for this branch did not happen on this branch
+        # this can happen if users checkout a new branch and haven't committed
+        # anything to it yet; we need to unpack this commit from packed objects
+        objData = findPackedGitCommit(info.vcsDir, commitId)
+      let lines = objData.split("\n")
+      for index, line in lines:
+        if line.startsWith(gitAuthor):
+          # this makes only the same assumptions as git itself:
+          # https://github.com/git/git/blob/master/commit.c#L97 ddcb8fd
+          # only in a Nim try/except block so we don't explicitly check bounds
+          info.author     = line
+          info.authorDate = formatCommitObjectTime(line)
+          info.committer  = lines[index+1]
+          info.commitDate = formatCommitObjectTime(lines[index+1])
+          break
+    except:
+      warn("unable to retrieve Git commit data: " & commitId)
   else:
-    warn(fNameRef & ": Git ref file for branch '" & info.branch & "' doesnt exist. Most likely its an empty git repo.")
+    warn(fNameRef                      &
+         ": Git ref file for branch '" &
+         info.branch                   &
+         "' doesnt exist. Most likely it's an empty git repo.")
 
 proc calcOrigin(self: RepoInfo, conf: seq[SecInfo]): string =
   # We are generally looking for the remote origin, because we expect
@@ -337,6 +488,14 @@ template setVcsStuff(info: RepoInfo) =
     result["COMMIT_ID"] = pack(info.commitId)
   if info.branch != "":
     result["BRANCH"] = pack(info.branch)
+  if info.author != "":
+    result["AUTHOR"] = pack(info.author)
+  if info.authorDate != "":
+    result["AUTHOR_DATE"] = pack(info.authorDate)
+  if info.committer != "":
+    result["COMMITTER"] = pack(info.committer)
+  if info.commitDate != "":
+    result["COMMIT_DATE"] = pack(info.commitDate)
   break
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
@@ -376,5 +535,5 @@ proc gitGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
 
 proc loadVctlGit*() =
   newPlugin("vctl_git",
-            ctArtCallback  = ChalkTimeArtifactCb(gitGetChalkTimeArtifactInfo),
-            cache          =  RootRef(GitInfo()))
+            ctArtCallback = ChalkTimeArtifactCb(gitGetChalkTimeArtifactInfo),
+            cache         = RootRef(GitInfo()))
