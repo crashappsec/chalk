@@ -87,7 +87,7 @@ func extract_syft_sbom(out: string, code) {
     echo(out)
   }
 
-  validIndicator := "\"components\": "
+  validIndicator := "\"component"
   emptyIndicator := "\"components\": []"
 
   if not contains(out, validIndicator) {
