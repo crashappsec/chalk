@@ -254,9 +254,9 @@ proc readPackedCommit(path: string, offset: uint64): string =
   # size, or that a scenario where compressed size is larger would likely only
   # happen with smaller objects (smaller than our initial read size of 0x1000).
   # It seems particularly unlikely with git commit objects, but if these
-  # assumptions prove wrong, the resulting failure is a signal we report.
+  # assumptions prove wrong the resulting failure is a signal we report.
 
-  # Given the assumption above, we attempt to read up to uncompressedSize
+  # Given the assumptions above, we attempt to read up to uncompressedSize
   currentOffset += 1
   let remaining = initialReadSize - currentOffset
   if uncompressedSize > uint64(remaining):
@@ -316,8 +316,9 @@ proc findPackedGitCommit(vcsDir, commitId: string): string =
       tableOffset64 = tableOffset32 + tableSize32
     offset = uint64(getUint32BE(data, tableOffset32 + (found * 4)))
     if (offset and highBit32) != 0:
+      # the offset is actually an index into the next table
       offset = offset xor highBit32
-      offset = uint64(getUint32BE(data, tableOffset64 + offset))
+      offset = uint64(getUint32BE(data, tableOffset64 + (offset * 8)))
     return readPackedCommit(filename.replace(".idx", ".pack"), offset)
   raise(newException(CatchableError, "failed to parse git index"))
 
@@ -369,14 +370,14 @@ proc loadHead(info: RepoInfo) =
     trace("commit ID: " & info.commitID)
     let
       commitId = info.commitId
-      # assuming the most recent commit this branch refers to was actually
-      # on this branch, we can just read the commit object on the filesystem
-      # git objects are stored as: .git/objects/01/23456789abcdef
       objPath = gitObjects.joinPath(commitId[0 ..< 2], commitId[2 .. ^1])
       objFile = newFileStream(info.vcsDir.joinPath(objPath))
     var objData: string
     try:
       if objFile != nil:
+        # if the most recent commit this branch refers to was actually on this
+        # branch, we can just read the commit object on the filesystem; the git
+        # objects are stored as: .git/objects/01/23456789abcdef<...hash/>
         objData = uncompress(objFile.readAll(), dataFormat=dfZlib)
       else:
         # the most recent commit for this branch did not happen on this branch
@@ -391,8 +392,8 @@ proc loadHead(info: RepoInfo) =
           # only in a Nim try/except block so we don't explicitly check bounds
           info.author     = line[len(gitAuthor) .. ^1]
           info.authorDate = formatCommitObjectTime(line)
-          info.committer  = lines[index+1][len(gitCommitter) .. ^1]
-          info.commitDate = formatCommitObjectTime(lines[index+1])
+          info.committer  = lines[index + 1][len(gitCommitter) .. ^1]
+          info.commitDate = formatCommitObjectTime(lines[index + 1])
           break
     except:
       warn("unable to retrieve Git commit data: " & commitId)
