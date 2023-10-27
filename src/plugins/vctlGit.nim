@@ -8,7 +8,7 @@
 ## The plugin responsible for pulling metadata from the git
 ## repository.
 
-import ../config, ../plugin_api, zippy
+import ../config, ../plugin_api, times, zippy, zippy/inflate
 
 const
   eBadGitConf  = "Git configuration file is invalid"
@@ -16,15 +16,15 @@ const
   fanoutSize   = (256 * 4)
   fNameHead    = "HEAD"
   fNameConfig  = "config"
-  highBit32    = 0x80000000
+  highBit32    = uint64(0x80000000)
   ghRef        = "ref:"
   ghBranch     = "branch"
   ghRemote     = "remote"
   ghUrl        = "url"
   ghOrigin     = "origin"
   ghLocal      = "local"
-  gitAuthor    = "author"
-  gitCommitter = "committer"
+  gitAuthor    = "author "
+  gitCommitter = "committer "
   gitIdxAll    = "*.idx"
   gitIdxExt    = ".idx"
   gitIdxHeader = "\xff\x7f\x4f\x63\x00\x00\x00\x02"
@@ -49,12 +49,6 @@ proc newLine(s: Stream) =
 
 proc comment(s: Stream) =
   while s.readChar() notin ['\n', '\x00']: discard
-
-proc getUint32BE(data: string, whence: int=0): uint32 =
-  result = cast[ref [uint32]](addr data[whence])[]
-  result = (result shl 16) or (result shr 16)
-  result = ((result and uint32(0xff00ff00)) shr 8) or
-           ((result and uint32(0x00ff00ff)) shl 8)
 
 # Comments aren't allowed in between the brackets
 proc header(s: Stream): (string, string) =
@@ -225,6 +219,12 @@ type
     origin:     Option[string]
     vcsDirs:    OrderedTable[string, RepoInfo]
 
+proc getUint32BE(data: string, whence: SomeInteger=0): uint32 =
+  result = cast[ref [uint32]](addr data[whence])[]
+  result = (result shl 16) or (result shr 16)
+  result = ((result and uint32(0xff00ff00)) shr 8) or
+           ((result and uint32(0x00ff00ff)) shl 8)
+
 proc formatCommitObjectTime(line: string): string =
   let parts = line.split(" ")
   return fromUnix(parseInt(parts[^2])).format(gitTimeFmt) & " " & parts[^1]
@@ -233,21 +233,21 @@ proc readPackedCommit(path: string, offset: uint64): string =
   let fileStream = newFileStream(path)
   if fileStream == nil:
     raise(newException(CatchableError, "failed to open " & path))
-  fileStream.setPosition(offset)
+  fileStream.setPosition(int(offset))
   let initialReadSize = 0x1000
   var
     data = fileStream.readStr(initialReadSize)
-    byte = data[offset]
-  if (byte shr 4) and 7 != gitObjCommit:
+    byte = uint8(data[0])
+  if ((byte shr 4) and 7) != gitObjCommit:
     raise(newException(CatchableError, "invalid commit object"))
   var
-    uncompressedSize = byte & 0x0F
+    uncompressedSize = uint64(byte and 0x0F)
     shiftBits        = 4
-    currentOffset    = offset
-  while byte and 0x80 != 0:
+    currentOffset    = 0
+  while (byte and 0x80) != 0:
     currentOffset += 1
-    byte = data[offset]
-    uncompressedSize += ((byte and 0x7F) shr shiftBits)
+    byte = uint8(data[currentOffset])
+    uncompressedSize += uint64((byte and 0x7F) shl shiftBits)
     shiftBits += 8
   # My understanding is that we do not have a way to know the compressed size.
   # We assume that either the uncompressed size is bigger than the compressed
@@ -257,22 +257,22 @@ proc readPackedCommit(path: string, offset: uint64): string =
   # assumptions prove wrong, the resulting failure is a signal we report.
 
   # Given the assumption above, we attempt to read up to uncompressedSize
-  let remaining = initialReadSize - (currentOffset - offset):
-  if uncompressedSize > remaining:
+  currentOffset += 1
+  let remaining = initialReadSize - currentOffset
+  if uncompressedSize > uint64(remaining):
     data &= fileStream.readStr(remaining)
-  return uncompress(data[currentOffset .. ^1], dataFormat=dfZlib)
+  var sourcePointer = cast[ptr UncheckedArray[uint8]](addr data[currentOffset])
+  inflate(result, sourcePointer, len(data)-currentOffset, 2)
 
 proc findPackedGitCommit(vcsDir, commitId: string): string =
   let
     nameBytes       = parseHexStr(commitId)
-    nameLen         = len(nameBytes)
-    firstByte       = nameBytes[0]
+    nameLen         = uint64(len(nameBytes))
+    firstByte       = uint8(nameBytes[0])
   var offset: uint64
-  for file in walkFiles(vcsDir.joinPath(gitPack, gitIdxAll)):
-    if file.kind != pcFile:
-      continue
-    let fileSteam = newFileSteam(file.path)
-    if fileStream == nil:
+  for filename in walkFiles(vcsDir.joinPath(gitPack, gitIdxAll)):
+    let file = newFileStream(filename)
+    if file == nil:
       continue
     let data = file.readAll()
     # Note: this check is both 32bit magic and 32bit version, and they can
@@ -283,43 +283,43 @@ proc findPackedGitCommit(vcsDir, commitId: string): string =
     # version of the git client (even if fetching an old repo, the client
     # only emits v2 .idx and .pack files).
     if data[0 ..< 8] != gitIdxHeader:
-      warn("unsupported .idx file " & file.path)
+      warn("unsupported .idx file " & filename)
       continue
     let
       skipCount  = if firstByte > 0:
-                     getUint32BE(data, fanoutTable + int(firstByte - 1))
+                     getUint32BE(data, fanoutTable + (int(firstByte - 1) * 4))
                    else:
                      0
-      candidates = getUint32BE(data, fanoutTable + int(firstByte)) - skipCount
+      candidates = getUint32BE(data, fanoutTable + (int(firstByte) * 4)) - skipCount
     if candidates == 0:
       continue
     let
-      nameTable   = fanoutTable + fanoutSize
+      nameTable   = uint64(fanoutTable + fanoutSize)
       startOffset = nameTable   + (skipCount        * nameLen)
       lastOffset  = startOffset + ((candidates - 1) * nameLen)
-    var found     = 0
+    var found     = uint64(0)
     for offset in countUp(startOffset, lastOffset, nameLen):
       let currentNameBytes = data[offset ..< offset + nameLen]
       if currentNameBytes == nameBytes:
         found = offset
-      else if currentNameBytes[0] != firstByte:
+      elif uint8(currentNameBytes[0]) != firstByte:
         break
     if found == 0:
       continue
-    found = (found - startOffset) / nameLen
+    # lol nim can't do division of uint64s :(
+    found = uint64(int((found - nameTable)) / int(nameLen))
     let
-      entryCount    = getUint32BE(data, fanoutTable + (0xFF * 4))
-      tableCrc32    = nameTable     + (totalEntries * nameLen)
-      tableSize32   = totalEntries  * 4
+      entryCount    = uint64(getUint32BE(data, fanoutTable + (0xFF * 4)))
+      tableCrc32    = nameTable     + (entryCount * nameLen)
+      tableSize32   = entryCount    * 4
       tableOffset32 = tableCrc32    + tableSize32
       tableOffset64 = tableOffset32 + tableSize32
-    offset = uint64(getUint32BE(data, tableOffset32 + found))
-    if offset & highBit32 != 0:
+    offset = uint64(getUint32BE(data, tableOffset32 + (found * 4)))
+    if (offset and highBit32) != 0:
       offset = offset xor highBit32
-      offset = uint64(getUint32BE(data, tableOffset64, offset))
-    let packFilePath = "pack-" & file.path.replace(".idx", ".pack")
-    return readPackedCommit(path.path.replace(packFilePath, offset)
-  raise(newException(CatchableError, "failed to parse git index")
+      offset = uint64(getUint32BE(data, tableOffset64 + offset))
+    return readPackedCommit(filename.replace(".idx", ".pack"), offset)
+  raise(newException(CatchableError, "failed to parse git index"))
 
 proc loadHead(info: RepoInfo) =
   var
@@ -374,7 +374,7 @@ proc loadHead(info: RepoInfo) =
       # git objects are stored as: .git/objects/01/23456789abcdef
       objPath = gitObjects.joinPath(commitId[0 ..< 2], commitId[2 .. ^1])
       objFile = newFileStream(info.vcsDir.joinPath(objPath))
-    var objData string
+    var objData: string
     try:
       if objFile != nil:
         objData = uncompress(objFile.readAll(), dataFormat=dfZlib)
@@ -389,9 +389,9 @@ proc loadHead(info: RepoInfo) =
           # this makes only the same assumptions as git itself:
           # https://github.com/git/git/blob/master/commit.c#L97 ddcb8fd
           # only in a Nim try/except block so we don't explicitly check bounds
-          info.author     = line
+          info.author     = line[len(gitAuthor) .. ^1]
           info.authorDate = formatCommitObjectTime(line)
-          info.committer  = lines[index+1]
+          info.committer  = lines[index+1][len(gitCommitter) .. ^1]
           info.commitDate = formatCommitObjectTime(lines[index+1])
           break
     except:
