@@ -187,11 +187,8 @@ proc loadAllConfigs*() =
   stack.addConfLoad(ioConfName, toStream(ioConfig), notEvenDefaults).
         addConfLoad(attestConfName, toStream(attestConfig), checkNone)
 
-  let chalkOps = chalkConfig.getValidChalkCommandNames()
-  if commandName in chalkOps or (commandName == "not_supplied" and
-    chalkConfig.defaultCommand.getOrElse("") in chalkOps):
-    stack.addConfLoad(sbomConfName,   toStream(sbomConfig),   checkNone)
-    stack.addConfLoad(sastConfName,   toStream(sastConfig),   checkNone)
+  stack.addConfLoad(sbomConfName,   toStream(sbomConfig),   checkNone)
+  stack.addConfLoad(sastConfName,   toStream(sastConfig),   checkNone)
 
   stack.addCallback(loadLocalStructs)
   doRun()
