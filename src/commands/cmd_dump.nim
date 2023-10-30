@@ -22,7 +22,7 @@ template baseDump(code: untyped) {.dirty.} =
 
   code
 
-  publish("confdump", toDump)
+  echo toDump
   quit(0)
 
 proc dumpToFile*() =

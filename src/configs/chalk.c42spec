@@ -367,13 +367,6 @@ tools that ship with chalk (see `chalk config`) currently respect it
      doc:        "Specifies which kind of tool this is."
    }
 
-   field runs_once {
-     type:       bool
-     default:    true
-     write_lock: true
-     doc:        "Does the tool implementation get invoked per-artifact or per-run?"
-   }
-
    field priority {
      type:     int
      default:  50
