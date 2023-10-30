@@ -2,13 +2,13 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import os
 import re
 import shutil
 from pathlib import Path
 from typing import IO
 from unittest import mock
 
+import os
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
@@ -23,6 +23,7 @@ from .conf import CODEOWNERS, CONFIGS, LS_PATH, DOCKERFILES
 from .utils.git import init
 from .utils.log import get_logger
 from .utils.docker import Docker
+
 
 logger = get_logger()
 
@@ -54,23 +55,6 @@ def test_codeowners(tmp_data_dir: Path, chalk: Chalk):
     )
 
 
-# https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
-@mock.patch.dict(
-    os.environ,
-    {
-        "CI": "true",
-        "GITHUB_SHA": "ffac537e6cbbf934b08745a378932722df287a53",
-        "GITHUB_SERVER_URL": "https://github.com",
-        "GITHUB_REPOSITORY": "octocat/Hello-World",
-        "GITHUB_RUN_ID": "1658821493",
-        "GITHUB_API_URL": "https://api.github.com",
-        "GITHUB_ACTOR": "octocat",
-        # there are a bunch of variations of these
-        # but for now at least we test basic flow
-        "GITHUB_EVENT_NAME": "push",
-        "GITHUB_REF_TYPE": "tag",
-    },
-)
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_github(copy_files: list[Path], chalk: Chalk):
     bin_path = copy_files[0]
@@ -84,7 +68,23 @@ def test_github(copy_files: list[Path], chalk: Chalk):
             "BUILD_API_URI": "https://api.github.com",
         },
     )
-    insert = chalk.insert(bin_path)
+    insert = chalk.insert(
+        bin_path,
+        env={
+            # https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
+            "CI": "true",
+            "GITHUB_SHA": "ffac537e6cbbf934b08745a378932722df287a53",
+            "GITHUB_SERVER_URL": "https://github.com",
+            "GITHUB_REPOSITORY": "octocat/Hello-World",
+            "GITHUB_RUN_ID": "1658821493",
+            "GITHUB_API_URL": "https://api.github.com",
+            "GITHUB_ACTOR": "octocat",
+            # there are a bunch of variations of these
+            # but for now at least we test basic flow
+            "GITHUB_EVENT_NAME": "push",
+            "GITHUB_REF_TYPE": "tag",
+        },
+    )
 
     validate_chalk_report(
         chalk_report=insert.report,
@@ -94,19 +94,6 @@ def test_github(copy_files: list[Path], chalk: Chalk):
     )
 
 
-# https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
-@mock.patch.dict(
-    os.environ,
-    {
-        "CI": "true",
-        "GITLAB_CI": "true",
-        "CI_JOB_URL": "https://gitlab.com/gitlab-org/gitlab/-/jobs/4999820578",
-        "CI_JOB_ID": "4999820578",
-        "CI_API_V4_URL": "https://gitlab.com/api/v4",
-        "GITLAB_USER_LOGIN": "user",
-        "CI_PIPELINE_SOURCE": "push",
-    },
-)
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_gitlab(copy_files: list[Path], chalk: Chalk):
     bin_path = copy_files[0]
@@ -120,7 +107,19 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
             "BUILD_API_URI": "https://gitlab.com/api/v4",
         },
     )
-    insert = chalk.insert(bin_path)
+    insert = chalk.insert(
+        bin_path,
+        env={
+            # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+            "CI": "true",
+            "GITLAB_CI": "true",
+            "CI_JOB_URL": "https://gitlab.com/gitlab-org/gitlab/-/jobs/4999820578",
+            "CI_JOB_ID": "4999820578",
+            "CI_API_V4_URL": "https://gitlab.com/api/v4",
+            "GITLAB_USER_LOGIN": "user",
+            "CI_PIPELINE_SOURCE": "push",
+        },
+    )
     validate_chalk_report(
         chalk_report=insert.report,
         artifact_map=artifact,
@@ -129,6 +128,7 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
     )
 
 
+@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 @pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
 def test_imds(
@@ -249,12 +249,7 @@ def test_imds_ecs(
     )
 
 
-@mock.patch.dict(
-    os.environ,
-    {
-        "KUBERNETES_PORT": "tests",
-    },
-)
+@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 @pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
 def test_imds_eks(
@@ -267,7 +262,13 @@ def test_imds_eks(
     with tmp_file as fid:
         fid.write(b"Amazon")
     bin_path = copy_files[0]
-    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "imds.c4m",
+        env={
+            "KUBERNETES_PORT": "tests",
+        },
+    )
     assert insert.report.contains(
         {
             "_OP_CLOUD_PROVIDER": "aws",
@@ -276,6 +277,7 @@ def test_imds_eks(
     )
 
 
+@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 @pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
 def test_metadata_azure(
@@ -398,6 +400,7 @@ def test_metadata_azure(
     )
 
 
+@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 @pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
 def test_metadata_gcp(
