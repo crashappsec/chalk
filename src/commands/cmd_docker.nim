@@ -503,7 +503,6 @@ proc addBuildCmdMetadataToMark(ctx: DockerInvocation) =
 proc prepareToBuild(state: DockerInvocation) =
   info("Running docker build.")
   setCommandName("build")
-  state.extractCmdlineBuildContext()
   state.loadDockerFile()
   # Sets up our replacement command line to be the same as before but
   # minus things that we change.
@@ -746,10 +745,14 @@ template postDockerActivity() =
 
 proc runCmdDocker*(args: seq[string]) =
   setDockerExeLocation()
-
   var
     exitCode = 0
-    ctx      = args.processDockerCmdLine()
+    ctx: DockerInvocation
+
+  try:
+    ctx = args.processDockerCmdLine()
+  except:
+    ctx.dockerFailSafe()
 
   ctx.originalArgs = args
 

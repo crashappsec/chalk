@@ -449,3 +449,46 @@ template chalkCloseStream*(chalk: ChalkObj) =
   chalk.streamRefCt = 0
 
   delByValue(cachedChalkStreams, chalk)
+
+type Redacted* = ref object
+  raw:      string
+  redacted: string
+
+proc redact*(raw: string): Redacted =
+  return Redacted(raw: raw, redacted: raw)
+
+proc redact*(raw: string, redacted: string): Redacted =
+  return Redacted(raw: raw, redacted: redacted)
+
+proc redact*(data: seq[string]): seq[Redacted] =
+  result = @[]
+  for i in data:
+    result.add(redact(i))
+
+proc redacted*(data: seq[Redacted]): seq[string] =
+  result = @[]
+  for i in data:
+    result.add(i.redacted)
+
+proc raw*(data: seq[Redacted]): seq[string] =
+  result = @[]
+  for i in data:
+    result.add(i.raw)
+
+proc replaceItemWith*(data: seq[string], match: string, sub: string): seq[string] =
+  result = @[]
+  for i in data:
+    if i == match:
+      result.add(sub)
+    else:
+      result.add(i)
+
+template get[T](data: seq[T], i: int, default: T): T =
+  if len(data) > i:
+    data[i]
+  else:
+    default
+
+iterator zipLongest*[T](data1, data2: seq[T], default: T): (T, T) =
+  for i in 0..max(len(data1), len(data2)):
+    yield (get(data1, i, default), get(data2, i, default))

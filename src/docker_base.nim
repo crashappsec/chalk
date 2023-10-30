@@ -8,11 +8,11 @@
 ## Common docker-specific utility bits used in various parts of the
 ## implementation.
 
-import uri, osproc, config, util, reporting
+import uri, osproc, config, util, reporting, semver
 
 var
-  buildXVersion: float  = 0   # Major and minor only
-  dockerVersion: string = ""
+  buildXVersion: Version = parseVersion("0")
+  dockerVersion: Version = parseVersion("0")
 
 const
   hashHeader* = "sha256:"
@@ -46,40 +46,62 @@ proc setDockerExeLocation*() =
     if dockerExeLocation == "":
        warn("No docker command found in path. `chalk docker` not available.")
 
-proc getBuildXVersion*(): float =
+proc getVersionFromLine(line: string): Version =
+  for word in line.splitWhitespace():
+    if '.' in word:
+      try:
+        return parseVersion(word.strip(chars = {'v', ','}))
+      except:
+        # word wasnt a version number
+        discard
+  raise newException(ValueError, "no version found")
+
+proc getBuildXVersion*(): Version =
   # Have to parse the thing to get compares right.
   once:
     if getEnv("DOCKER_BUILDKIT") == "0":
-      return 0
+      return buildXVersion
+
+    # examples:
+    # github.com/docker/buildx v0.10.2 00ed17df6d20f3ca4553d45789264cdb78506e5f
+    # github.com/docker/buildx 0.11.2 9872040b6626fb7d87ef7296fd5b832e8cc2ad17
     let (output, exitcode) = execCmdEx(dockerExeLocation & " buildx version")
     if exitcode == 0:
-      let parts = output.split(' ')
-      if len(parts) >= 2 and len(parts[1]) > 1 and parts[1][0] == 'v':
-        let vparts = parts[1][1 .. ^1].split('.')
-        if len(vparts) > 1:
-          let majorMinorStr = vparts[0] & "." & vparts[1]
-          try:
-            buildXVersion = parseFloat(majorMinorStr)
-          except:
-            dumpExOnDebug()
+      try:
+        buildXVersion = getVersionFromLine(output)
+        trace("Docker buildx version: " & $(buildXVersion))
+      except:
+        dumpExOnDebug()
 
   return buildXVersion
 
-proc getDockerVersion*(): string =
+proc getDockerVersion*(): Version =
   once:
-    let (output, exitcode) = execCmdEx(dockerExeLocation & " version")
+    # examples:
+    # Docker version 1.13.0, build 49bf474
+    # Docker version 23.0.0, build e92dd87
+    # Docker version 24.0.6, build ed223bc820
+    let (output, exitcode) = execCmdEx(dockerExeLocation & " --version")
     if exitcode == 0:
-      let words = output.split(" ")
-
-      for item in words:
-        if '.' in item:
-          dockerVersion = item
-          break
+      try:
+        dockerVersion = getVersionFromLine(output)
+        trace("Docker version: " & $(dockerVersion))
+      except:
+        dumpExOnDebug()
 
   return dockerVersion
 
-template haveBuildContextFlag*(): bool =
-  buildXVersion >= 0.8
+template hasBuildx*(): bool =
+  getBuildXVersion() > parseVersion("0")
+
+template supportsBuildContextFlag*(): bool =
+  getBuildXVersion() >= parseVersion("0.8")
+
+template supportsCopyChmod*(): bool =
+  # > the --chmod option requires BuildKit.
+  # > Refer to https://docs.docker.com/go/buildkit/ to learn how to
+  # > build images with BuildKit enabled
+  hasBuildx()
 
 proc runDockerGetEverything*(args: seq[string], stdin = "", silent = true): ExecOutput =
   if not silent:
@@ -117,33 +139,41 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
                                 chmod:    bool = false,
                                 newName = "") =
   var loc         = inLoc.resolvePath()
-  let (dir, file) = loc.splitPath()
+  let
+    (dir, file)   = loc.splitPath()
+    userDirective = ctx.dfSections[^1].lastUser
+    hasUser       = userDirective != nil
 
   if move:
     trace("Making file available to docker via move: " & loc)
   else:
     trace("Making file available to docker via copy: " & loc)
 
-  if haveBuildContextFlag():
+  if supportsBuildContextFlag():
     once:
       trace("Docker injection method: --build-context")
 
     var chmodstr = ""
 
-    if chmod:
+    if chmod or hasUser:
       chmodstr = "--chmod=0755 "
 
     ctx.newCmdLine.add("--build-context")
-    ctx.newCmdLine.add("chalkexedir" & $(contextCounter) & "=\"" & dir & "\"")
+    ctx.newCmdLine.add("chalkexedir" & $(contextCounter) & "=" & dir & "")
     ctx.addedInstructions.add("COPY " & chmodstr & "--from=chalkexedir" &
       $(contextCounter) & " " & file & " /" & newname)
     contextCounter += 1
     if move:
       registerTempFile(loc)
+
   elif ctx.foundContext == "-":
     warn("Cannot chalk when context is passed to stdin w/o BUILDKIT support")
     raise newException(ValueError, "stdinctx")
+
   else:
+    once:
+      trace("Docker injection method: COPY")
+
     var
       contextDir  = ctx.foundContext.resolvePath()
       dstLoc      = contextDir.joinPath(file)
@@ -155,39 +185,36 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
       raise newException(ValueError, "ctxwrite")
 
     try:
-        if move:
-          moveFile(loc, dstLoc)
-          trace("Moved " & loc & " to " & dstLoc)
-        else:
-          while fileExists(dstLoc):
-            dstLoc &= ".tmp"
-          copyFile(loc, dstLoc)
-          trace("Copied " & loc & " to " & dstLoc)
+      if move:
+        moveFile(loc, dstLoc)
+        trace("Moved " & loc & " to " & dstLoc)
+      else:
+        while fileExists(dstLoc):
+          dstLoc &= ".tmp"
+        copyFile(loc, dstLoc)
+        trace("Copied " & loc & " to " & dstLoc)
 
-        if chmod and getDockerVersion().startswith("2") and
-           getBuildXVersion() > 0:
-          ctx.addedInstructions.add("COPY --chmod=0755 " & file & " " & " /" &
-            newname)
-        elif chmod:
-          let useDirective = ctx.dfSections[^1].lastUser
-
-          # TODO detect user from base image if possible but thats not
-          # trivial as what is a base image is not a trivial question
-          # due to multi-stage build possibilities...
-          if useDirective != nil:
-            ctx.addedInstructions.add("USER root")
-          ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
-          ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
-          if useDirective != nil:
-            ctx.addedInstructions.add("USER " & useDirective.str)
-        else:
-          ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
-        registerTempFile(dstLoc)
+      if chmod and supportsCopyChmod():
+        ctx.addedInstructions.add("COPY --chmod=0755 " &
+                                  file & " " & " /" & newname)
+      elif chmod:
+        # TODO detect user from base image if possible but thats not
+        # trivial as what is a base image is not a trivial question
+        # due to multi-stage build possibilities...
+        if hasUser:
+          ctx.addedInstructions.add("USER root")
+        ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
+        ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
+        if hasUser:
+          ctx.addedInstructions.add("USER " & userDirective.str)
+      else:
+        ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
+      registerTempFile(dstLoc)
 
     except:
-        dumpExOnDebug()
-        warn("Could not write to context directory.")
-        raise newException(ValueError, "ctxcpy")
+      dumpExOnDebug()
+      warn("Could not write to context directory.")
+      raise newException(ValueError, "ctxcpy")
 
 proc chooseNewTag*(): string =
   let
@@ -278,3 +305,12 @@ proc dockerGenerateChalkId*(): string =
     preRes = newStringOfCap(32)
   for ch in b: preRes.add(ch)
   return preRes.idFormat()
+
+proc getValue*(secret: DockerSecret): string =
+  if secret.src != "":
+    return tryToLoadFile(secret.src)
+  return ""
+
+proc getSecret*(state: DockerInvocation, name: string): DockerSecret =
+  let empty = DockerSecret(id: "", src: "")
+  return state.secrets.getOrDefault(name, empty)
