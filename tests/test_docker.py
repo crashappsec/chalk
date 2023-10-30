@@ -138,6 +138,7 @@ def test_composite_build(
         args={"BASE": random_hex},
         config=CONFIGS / "docker_wrap.c4m",
         expecting_report=buildkit,
+        log_level="trace",
     )
     assert second_image_id
 

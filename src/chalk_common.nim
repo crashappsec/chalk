@@ -243,6 +243,22 @@ type
     shell*:       ShellInfo
     lastUser*:    DfUserInfo
 
+  DockerGitContext* = ref object
+    context*:     string
+    # https://docs.docker.com/engine/reference/commandline/build/
+    # context is a combination of remote url + head + subdir within the context
+    remoteUrl*:   string
+    head*:        string
+    subdir*:      string
+    authToken*:   string
+    authHeader*:  string
+    tmpGitDir*:   string
+    tmpWorkTree*: string
+
+  DockerSecret* = ref object
+    id*:   string
+    src*:  string
+
   DockerInvocation* = ref object
     dockerExe*:         string
     opChalkObj*:        ChalkObj
@@ -263,6 +279,8 @@ type
     foundPlatform*:     string
     foundContext*:      string
     otherContexts*:     OrderedTableRef[string, string]
+    gitContext*:        DockerGitContext
+    secrets*:           Table[string, DockerSecret]
     errs*:              seq[string]
     cmdBuild*:          bool
     cmdPush*:           bool
@@ -353,6 +371,7 @@ var
   con4mRuntime*:       ConfigStack
   commandName*:        string
   dockerExeLocation*:  string = ""
+  gitExeLocation*:     string = ""
   cachedChalkStreams*: seq[ChalkObj]
 
 template dumpExOnDebug*() =

@@ -430,6 +430,7 @@ class Chalk:
                     buildx=buildx,
                 ),
                 expected_success=expected_success,
+                ignore_errors=not expecting_report,
                 cwd=cwd,
                 env=Docker.build_env(buildkit=buildkit),
             )
