@@ -85,7 +85,8 @@ proc normalizeChalk*(dict: ChalkDict): string =
 
   # Count how many fields we will write.
   for key, _ in dict:
-    if key notin ignoreList: fieldCount = fieldCount + 1
+    if key notin ignoreList:
+      fieldCount = fieldCount + 1
 
   result = u32ToStr(uint32(fieldCount))
 

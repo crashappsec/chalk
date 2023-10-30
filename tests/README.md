@@ -20,7 +20,7 @@ Note that building the `tests` container will set up the `pytest` framework need
 
 ### Chalk Binary
 
-Upon starting a test run, the script will first look for an up-to-date chalk binary in the root directory of the repo. If there is no chalk binary, or if the chalk binary is not up to date (ie, there are local code changes that have not yet been built), the script will rebuild the chalk binary.
+Upon starting a test run, the script will first look for an up-to-date chalk binary in the root directory of the repo. If there is no chalk binary, or if the chalk binary is not up to date (i.e., there are local code changes that have not yet been built), the script will rebuild the chalk binary.
 
 WARNING: If there is already a chalk binary in the root directory that the script considers "out of date", this binary will be DELETED. If you want to keep this binary, move or rename it.
 
@@ -165,7 +165,7 @@ in number of workers as there are CPU cores on the system:
 make tests args="-nauto"
 ```
 
-If you would like you can also hardcode number of workers like `-n4`.
+If you would like you can also hard-code number of workers like `-n4`.
 Note that parallel tests does not work with various other pytest flags
 such as `--pdb`.
 
@@ -197,7 +197,7 @@ All python tests must follow `pytest` conventions to be picked up by the test ru
 - Individual tests should be added to a test file as a new function as `test_functionname`. Each individual test in a test file should test some aspect of that test file's functionality; if the test you want to add doesn't fit, consider if it would be more appropriate to create a new test file and add it there instead.
 - A new test case for an existing test can be added via the pytest `paramatrize` fixture, if appropriate.
 
-### Datafile Location
+### Data Files Location
 
 All new test files should be added to the `tests/` directory, and any test data should be added to the `tests/data` directory.
 
@@ -225,4 +225,58 @@ To validate the chalk reports, there are some utility functions provided in `tes
 
 ### Docker
 
-Since chalk supports some docker commands, some tests may need to call docker build/run/push. Note that only `test_docker.py` has a fixture to clean up images or containers afterwards, so if you are adding a test that calls docker in a different file, ensure that the test cleans up after ifself (such as by running with `--rm`, or calling `docker prune` afterwards). Otherwise the test images/containers created will persist ON HOST until they are manually removed.
+Since chalk supports some docker commands, some tests may need to call docker build/run/push. Note that only `test_docker.py` has a fixture to clean up images or containers afterwards, so if you are adding a test that calls docker in a different file, ensure that the test cleans up after itself (such as by running with `--rm`, or calling `docker prune` afterwards). Otherwise the test images/containers created will persist ON HOST until they are manually removed.
+
+#### Insecure Registry
+
+Chalk tests use various docker commands throughout tests:
+
+- `docker build`
+- `docker buildx build`
+- `docker buildx build --push`
+- `docker push`
+
+As `buildx` uses its builder nodes for building images, when `--push` flag is used, those nodes are used to push to the registry vs host docker daemon. As such using `localhost` as registry address for `buildx` will not work. Instead machine's IP address needs to be explicitly used so that both `docker push` and `docker buildx build --push` can push to the same address. However by default non-localhost registries need to be secure. Therefore in order to be able to push to an IP address, it needs to be configured as insecure registry. See [docker docs](https://docs.docker.com/registry/insecure/) for more information.
+
+##### Docker Daemon
+
+On Linux you can use the `Makefile` to do so automatically:
+
+```sh
+make /etc/docker/daemon.json
+```
+
+That will:
+
+- create /etc/docker/daemon.json config file
+- add `insecure-registries` config for all:
+  - `localhost`
+  - `registry`
+  - your machine IP address
+- restart `docker` via `systemctl`
+
+##### Platform Emulation
+
+In order to be able to build multi-platform builds, you'll need to enable
+[QEMU](https://docs.docker.com/build/building/multi-platform/#qemu)
+on your host:
+
+```sh
+docker run --privileged --rm tonistiigi/binfmt --install all
+```
+
+##### Buildx
+
+If you run tests using docker, you don't need to configure anything. Tests container will automatically configure `buildx` instances to support insecure registry.
+
+To create runner on your host `buildx` you can use:
+
+```sh
+make docker-builder
+```
+
+Which will:
+
+- create docker contexts for both amd64/arm64 builds
+- create `buildx` node called `insecure_builder` for both amd64/arm64 builds
+- configure the node to support insecure registries

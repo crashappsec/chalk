@@ -1,0 +1,10 @@
+debug = true
+[registry."localhost:5044"]
+  http = true
+  insecure = true
+[registry."registry:5044"]
+  http = true
+  insecure = true
+[registry."${IP}:5044"]
+  http = true
+  insecure = true

@@ -1711,6 +1711,8 @@ running insert commands.
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
   key.METADATA_ID.use                         = true
+  key.SIGNATURE.use                           = true
+  key._SIGNATURE.use                          = true
   key._VIRTUAL.use                            = true
   key._CURRENT_HASH.use                       = true
   key._IMAGE_ID.use                           = true

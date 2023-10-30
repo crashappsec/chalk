@@ -63,14 +63,49 @@ $(addsuffix /%,$(TOOLS)):
 # ----------------------------------------------------------------------------
 # TESTS
 
+# needed for the registry tests
+export IP=$(firstword $(shell hostname -I 2> /dev/null || hostname -i 2> /dev/null))
+
+# normally this is not required to run on a host
+# as it always runs within the test container
+# but is provided as separate make target to provision
+# acceptable builder instance locally for multi-platform builds
+.PHONY: docker-builder
+docker-builder:
+	./tests/entrypoint.sh true
+
+# docker buildx - each builder node has its own config
+# how it handles insecure registries however as chalk
+# splits 'docker buildx --push' into:
+# * docker buildx build
+# * docker push
+# and `docker push` does not honor buildx registry configs
+# we need to adjust docker daemon configs to allow insecure
+# registry which is used in tests
+.PHONY: /etc/docker/daemon.json
+/etc/docker/daemon.json:
+ifneq "$(shell which systemctl 2> /dev/null)" ""
+	sudo -E python3 ./tests/data/templates/docker/daemon.py $@ --write --fail-on-changes \
+		|| sudo systemctl restart docker \
+		|| echo Please restart docker daemon after changing docker config
+endif
+
+.PHONY: docker-setup
+docker-setup: /etc/docker/daemon.json
+
 .PHONY: tests
 tests: DOCKER=$(_DOCKER) # force rebuilds to use docker to match tests
+tests: docker-setup
 tests: $(BINARY) # note this will rebuild chalk if necessary
 	docker compose run --rm tests $(make_args) $(args)
 
 .PHONY: parallel
 tests_parallel: make_args=-nauto
 tests_parallel: tests
+
+.PHONY: tests_bash
+tests_bash:
+	docker compose run --rm --no-deps tests bash
 
 # ----------------------------------------------------------------------------
 # MISC

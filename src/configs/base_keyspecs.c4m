@@ -146,7 +146,7 @@ keyspec DATE_CHALKED {
     normalized_order:  4
     shortdoc:         "Date of Chalk mark insertion"
     doc:              """
-This gives a readable date that the chalk operation occured, in the
+This gives a readable date that the chalk operation occurred, in the
 local time zone set for the machine where the marking happened.
 
 This field does *not* include the time of the marking. For that, you
@@ -167,7 +167,7 @@ keyspec TIME_CHALKED {
     doc:              """
 This is a string indicating the time of the chalk operation, in human
 readable format, given in the local time zone of the machine on which
-the chalk operation occured. This only has one value per run-- when
+the chalk operation occurred. This only has one value per run-- when
 chalking, `TIMESTAMP_WHEN_CHALKED` gives per-chalk time values, if
 desired.
 """
@@ -184,7 +184,7 @@ keyspec TZ_OFFSET_WHEN_CHALKED {
     shortdoc:         "Time Zone for host when Chalk mark was inserted"
     doc:              """
 The time zone offset from UTC of the machine on which the chalk
-operation occured, as collected when the chalk operation occured.
+operation occurred, as collected when the chalk operation occurred.
 """
 }
 
@@ -203,7 +203,7 @@ chalk mark was made, using the local clock of the machine that did the
 chalking. The value is a full ISO-8601 Date-time string, including a
 timezone offset.
 
-For insertion operatins (including docker insertion), the value of
+For insertion operations (including docker insertion), the value of
 this field will represent the same moment in time that the reported
 value of `_TIMESTAMP` would give for the operation.
 """
@@ -231,7 +231,7 @@ keyspec HOSTINFO_WHEN_CHALKED {
     shortdoc:         "Host platform information at Chalk time"
     doc:              """
 This returns information about the host on which the chalk operation
-occured, collected at the the time of that operation. On posix
+occurred, collected at the time of that operation. On posix
 systems, it's taken from the 'version' field obtained from a call to
 the `uname()` system call.
 """
@@ -247,7 +247,7 @@ keyspec PUBLIC_IPV4_ADDR_WHEN_CHALKED {
 This returns the IPv4 address on the local machine used to route
 external traffic. It's determined by setting up a UDP connection to
 Cloudflare's public DNS service, but does not involve sending any data.
-"""    
+"""
 }
 
 keyspec NODENAME_WHEN_CHALKED {
@@ -258,7 +258,7 @@ keyspec NODENAME_WHEN_CHALKED {
     shortdoc:         "Host node name at Chalk time"
     doc:              """
 The node name at the time of the software's chalk mark insertion. On
-posix systems, this will be equivolent to the `uname()` field
+posix systems, this will be equivalent to the `uname()` field
 `nodename`.
 """
 }
@@ -737,7 +737,7 @@ chalked. Generally, this is a free-form field.
 
 In the case where the chalking operation finds a `CODEOWNERS` or
 `AUTHORS` file, it currently captures the entire free-form file. The
-system does NOT currently attempt to extract only relevent parties,
+system does NOT currently attempt to extract only relevant parties,
 based on local file system path.
 """
 }
@@ -796,7 +796,7 @@ keyspec BUILD_API_URI {
     shortdoc: "API endpoint associated with chalk-time CI/CD job"
     doc:                 """
 If, at the time of chalking, the system an identify a CI/CD job, and
-there is a discernable API endpoint, this field will contain the URI
+there is a discernible API endpoint, this field will contain the URI
 for that endpoint.
 
 This field is generally expected to be supplied by the user, and can
@@ -824,7 +824,7 @@ keyspec BUILD_CONTACT {
     shortdoc: "CI/CD contact info"
     doc:              """
 Contact information set at chalk time for the person or people
-asscoiated with the triggered CI/CD job.
+associated with the triggered CI/CD job.
 """
 }
 
@@ -848,11 +848,11 @@ This is intended for those people who want to be able to trace
 specific artifacts to a specific build system.
 
 Certainly, this key should be disabled in chalk marks if attempting
-reproducable builds (in which case, also be sure not to chalk any keys
+reproducible builds (in which case, also be sure not to chalk any keys
 consisting of timestamps).
 
 While there is a config-file callback associated with this metadata
-key, it is set by the system, and cannot be overriden by the user.
+key, it is set by the system, and cannot be overridden by the user.
 """
 }
 
@@ -870,7 +870,7 @@ software artifact that already contains a chalk mark, this field
 represents the value of the `METADATA_HASH` field of the chalk mark
 that is being replaced.
 
-This helps support tracability in multi-stage CI/CD processes, where
+This helps support traceability in multi-stage CI/CD processes, where
 it makes sense to inject (and/or report on) data at different points.
 
 This field assumes that the old chalk mark was previously reported on,
@@ -897,7 +897,7 @@ software artifact that already contains a chalk mark, this field
 represents the value of the `METADATA_ID` field of the chalk mark that
 is being replaced.
 
-This helps support tracability in multi-stage CI/CD processes, where
+This helps support traceability in multi-stage CI/CD processes, where
 it makes sense to inject (and/or report on) data at different points.
 
 This field assumes that the old chalk mark was previously reported on,
@@ -1074,7 +1074,7 @@ keyspec METADATA_HASH {
     shortdoc:         "Hash of normalized Chalk mark metadata"
     doc:            """
 This field is used to help authenticate the rest of the metadata
-placed into the chalk mark. It constiutes a hash of all the metadata
+placed into the chalk mark. It constitutes a hash of all the metadata
 that is in the actual chalk mark.
 
 Again, this is NOT derived from the insertion-time report; instead, it
@@ -1228,7 +1228,7 @@ keyspec DOCKER_CHALK_ADDED_LABELS {
     system:            false
     since:             "0.1.0"
     doc: """
-List of labels programatically added by Chalk.
+List of labels programmatically added by Chalk.
 """
 }
 
@@ -1289,7 +1289,7 @@ operation or a `chalk exec` operation, this value will represent where
 software is at the time, which likely will not match the path captured
 during the build process (which lives in the `PATH_WHEN_CHALKED` key).
 
-However, on insertion operations, this field is redunant with
+However, on insertion operations, this field is redundant with
 `PATH_WHEN_CHALKED`, except that it cannot be added to a chalk mark.
 """
 }
@@ -1394,7 +1394,7 @@ keyspec _OP_ARTIFACT_REPORT_KEYS {
     doc:              """
 Collected for `chalk insert` operations only, a list of all _artifact
 specific_ key names that will reported on in the primary operation
-report. This is primarily intended for auxillary (custom) reports
+report. This is primarily intended for auxiliary (custom) reports
 where the full contents are not being duplicated.
 """
 }
@@ -1654,7 +1654,7 @@ keyspec _PROCESS_ARGV {
     since:            "0.1.0"
     shortdoc: "Exec'd process argv via proc"
     doc: """
-The arv as reported via proc for the exec'd process we are reporting
+The argv as reported via proc for the exec'd process we are reporting
 on.
 
 Currently, this is only available during a `chalk exec` operation,
@@ -1744,7 +1744,7 @@ keyspec _OP_ALL_IMAGE_METADATA {
     shortdoc:         "Reported metadata from image inspect"
     doc: """
 All reported metadata for am image as examined, in JSON format. With
-docker, this is equivolent to running `docker inspect` on the image.
+docker, this is equivalent to running `docker inspect` on the image.
 """
 }
 
@@ -1755,7 +1755,7 @@ keyspec _OP_ALL_CONTAINER_METADATA {
     shortdoc:         "Reported metadata from running container inspect"
     doc: """
 All reported metadata for the running container, as reported by the
-container runtime, in JSON format. With docker, this is equivolent to
+container runtime, in JSON format. With docker, this is equivalent to
 running `docker inspect` on a running container.
 """
 }
@@ -3197,7 +3197,7 @@ identifier, if desired.
 The value is a 64-bit (secure) random value, encoded as hex.
 
 While there is a config-file callback associated with this metadata
-key, it is set by the system, and cannot be overriden by the user.
+key, it is set by the system, and cannot be overridden by the user.
 """
 }
 
@@ -3473,7 +3473,7 @@ keyspec _OP_EXE_NAME {
 The executable name for the current chalk invocation, which is
 approximately argv[0].
 
-This key attemtps to use information from the command-line invocation
+This key attempts to use information from the command-line invocation
 of chalk, instead of system-specific information on running processes
 (see `_PROCESS_COMMAND_NAME`).
 """
@@ -3490,7 +3490,7 @@ keyspec _OP_EXE_PATH {
 The local path to the chalk executable for the current
 invocation. This generally does not include the actual exe name.
 
-This key attemtps to use information from the command-line invocation
+This key attempts to use information from the command-line invocation
 of chalk, instead of system-specific information on running processes
 (see `_PROCESS_EXE_PATH`).
 """
@@ -3598,7 +3598,7 @@ keyspec _OP_HOSTINFO {
     shortdoc:         "Detailed host info from current operation"
     doc:              """
 This returns information about the host on which the urrent operation
-occured, collected at the the time of that operation. On posix
+occurred, collected at the time of that operation. On posix
 systems, it's taken from the 'version' field obtained from a call to
 the `uname()` system call.
 """
@@ -3618,7 +3618,7 @@ data.
 
 There are other keys for reported IPs via other systems, including
 cloud provider APIs, docker, procfs, etc.
-"""    
+"""
 }
 
 
@@ -3629,7 +3629,7 @@ keyspec _OP_NODENAME {
     since:            "0.1.0"
     doc:              """
 The node name at the time of the current operation. On posix systems,
-this should be equivolent to the uname 'nodename' field.
+this should be equivalent to the uname 'nodename' field.
 """
 }
 
@@ -3671,7 +3671,7 @@ keyspec _OP_HOST_REPORT_KEYS {
     doc:             """
 Collected for `chalk insert` operations only, a list of all
 _host-level_ key names that will reported on in the primary operation
-report. This is primarily intended for auxillary (custom) reports
+report. This is primarily intended for auxiliary (custom) reports
 where the full contents are not being duplicated.
 """
 }

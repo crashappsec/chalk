@@ -37,7 +37,7 @@ enum ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
 # a chalk run, thus there are different callbacks a plugin much
 # implement for each type of key.
 #
-# The plugins must declare the keys they delcare for
+# The plugins must declare the keys they declare for
 # each phase, so that the system can decide whether to even to
 # load the plugin and call into it.
 #
@@ -69,7 +69,7 @@ enum ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
 enum CCPreRun, CCArtifact, CCPostChalk, CCPostRun
 
 # Make these available through future configuration stacks.  Enums are
-# automatically avalable.
+# automatically available.
 #
 # At some point, I'm going to change this in con4m to automatically
 # export.
@@ -163,7 +163,7 @@ You can list available templates and see what keys they set by running
 If you wish to switch out the template that is being used for a
 particular chalking operation, you need to reconfigure the operation,
 which is done by setting the `mark_template` field in the operation's
-`outconf` seciton, as shown below.
+`outconf` section, as shown below.
 
 If you don't like any of the existing templates, you can easily edit
 the ones provided, or create your own.
@@ -206,7 +206,7 @@ mark_template.mark_default.key.ARTIFACT_TYPE.use = false
 ```
 
 > ❗ The Chalk config file treats dot assignments and sections the
-  same.  The two notations are 100% interchangable. And, the colon and
+  same.  The two notations are 100% interchangeable. And, the colon and
   the equals sign are the same thing.
 
 
@@ -229,7 +229,7 @@ You can use the exact same syntax as above to define new
 templates. Any key you do not explicitly specify to use will NOT be
 used, unless it's required in chalk marks.
 
-> ❗ There are a few required fields (incluing `MAGIC`, `CHALK_ID` and
+> ❗ There are a few required fields (including `MAGIC`, `CHALK_ID` and
   `METADATA_ID`), that you do not have to specify. Even if you try to
   turn them off, they will still be added to a chalk mark.
 
@@ -1194,7 +1194,7 @@ images to look for marks in the top layer isn't necessarily fast.
 If you have code signing set up, marks will be added locally on build,
 but when you push, we will add a signed attestation using the In Toto
 standard (and the Cosign tool for the moment).  Such marks are MUCH
-faster to accss reliably. and are the preferred method. See the `chalk
+faster to access reliably and are the preferred method. See the `chalk
 setup` command.
 
 """
@@ -1247,7 +1247,7 @@ automatically into the container.
 Additionally, you can automatically *wrap* your containers to enable
 chalk to collect data when the container starts up (or beyond).
 <p>
-The behavior for execution time is configurd in the `exec` section.
+The behavior for execution time is configured in the `exec` section.
 <p>
 Note that if a docker operation that chalk wraps ever fails, Chalk
 will run it again without itself in the way. Such cases are the only
@@ -1433,7 +1433,7 @@ configuration loads successfully.
 
 Otherwise, the passed configuration is treated like a component:
 
-1. If you are not using the component in your embbeded configuration
+1. If you are not using the component in your embedded configuration
    already, it will be added to your config, and if it requires any
    parameters, you will be prompted to configure them.
 
@@ -1491,7 +1491,7 @@ cross-architecture binaries listed in docker.arch_binary_locations.
 Note that, if you source config components from a local directory, you
 currently will need to update them manually, as those directories will
 not be mapped into the container.
-"""    
+"""
   }
 }
 
@@ -1595,7 +1595,7 @@ When running chalk in 'exec' mode, these are the arguments that should, by defau
 
 If command-line arguments are provided, you have three options:
 
-1. Always send these arguments, and have any additional arguments be appeneded to these arguments.  For these semantics, set append_command_line_args to true.
+1. Always send these arguments, and have any additional arguments be appended to these arguments.  For these semantics, set append_command_line_args to true.
 2. Have the command line arguments REPLACE these arguments.  For these semantics, set override_ok to true.  This is chalk's default behavior, absent of any other configuration.
 3. Disallow any command-line argument passing.  For this behavior, set both of the above variables to 'false'.
 
@@ -1608,7 +1608,7 @@ Setting both to 'true' at the same time is not semantically valid, and will give
     default:   false
     shortdoc: "Exec: append command-line args"
     doc: """
-When true, any command-line arguments will be appeneded to exec.default_args instead of replacing them.
+When true, any command-line arguments will be appended to exec.default_args instead of replacing them.
 """
   }
 
@@ -1790,7 +1790,7 @@ be source code.
 If you'd like to have fine-grained control over what source gets
 marked, you can do so by setting a callback.
 
-Your callback will *not* supercede `shebangs_when_no_extension_match`
+Your callback will *not* supersede `shebangs_when_no_extension_match`
 and `only_mark_when_execute_is_set`. Your callback will only get run
 if those checks would lead to the file otherwise being marked.
 
@@ -2168,7 +2168,7 @@ string.
     shortdoc: "Show Colors"
     doc: """
 Whether to output ANSI color. If this is not explicitly set, will respect
-the presense of a NO_ANSI environment variable, but is otherwise on by default.
+the presence of a NO_ANSI environment variable, but is otherwise on by default.
 """
   }
 
@@ -2198,7 +2198,7 @@ Everything else will go to `_ERR_INFO`.
 
 Generally, we recommend setting this to `warn` for docker, and `error`
 for everything else, as docker only reports errors when there is a
-problem where it had to restart the boperation without chalk.
+problem where it had to restart the operation without chalk.
 """
   }
 
@@ -2295,7 +2295,7 @@ This controls where the default audit log goes, if enabled.  If you enable and s
 
 If you provide a file name only, the directories in log_search_path are tried in order.  Failing that, it uses /tmp.
 
-If you provide an absolute path, and the log file cannot be opened, then it falls back on the search path (keeping the file name oprtion).
+If you provide an absolute path, and the log file cannot be opened, then it falls back on the search path (keeping the file name portion).
 
 Defaults to 'chalk-audit.json'
 """
@@ -2315,7 +2315,7 @@ When using the default log file for the built-in audit report (which, by the way
     default: ["/var/log/chalk/", "~/.log/chalk/", "."]
     shortdoc: "Log file location search path"
     doc: """
-Any time you open a log file (for instance, with the output sink configurations, or with the builtin (optional) audit log, relative paths attempt to open a log fle, checking each one of these locations until one succeeds (making any directories necessary).
+Any time you open a log file (for instance, with the output sink configurations, or with the builtin (optional) audit log, relative paths attempt to open a log file, checking each one of these locations until one succeeds (making any directories necessary).
 
 This path is also searched if there is a problem writing log files where an explicit path is given.
 
@@ -2328,7 +2328,7 @@ Note that if nothing in this path works, Chalk tries to create a temporary direc
     default:  ["."]
     shortdoc: "Search Path"
     doc:      """
-Set the default path to search for artifacts, unless overriden by command-line arguments.
+Set the default path to search for artifacts, unless overridden by command-line arguments.
 """
   }
 
@@ -2340,7 +2340,7 @@ Set the default path to search for artifacts, unless overriden by command-line a
 
 Generally, systems use `/tmp` for temporary files, and most modern API
 interfaces to using `/tmp` take mitigation against file-based race
-condtions, for instance, by leveraging per-app directories and
+conditions, for instance, by leveraging per-app directories and
 randomness in selecting file names.
 
 However, there are times when the system default isn't a good option
@@ -2532,7 +2532,7 @@ The syft command line arguments used at invocation (minus the target location) c
     default:  false
     shortdoc: "Run any configured SAST tools"
     doc: """
-When true, this will cause chalk to run any configured static analysis security testing (SAST) tools.  This is off by default, since it could add a noticable delay to build time for large code bases.
+When true, this will cause chalk to run any configured static analysis security testing (SAST) tools.  This is off by default, since it could add a noticeable delay to build time for large code bases.
 
 Currently, the only available tool out of the box is semgrep, and will only work on machines that either already have semgrep installed, or have Python3 installed.
 """
@@ -2769,7 +2769,7 @@ Skip publishing the command report (i.e., the PRIMARY report). NO output sinks w
 
 For most commands, this defeats the purpose of Chalk, so use it sparingly.
 
-Note that this doesn't turn off any custom reports; you have to disable those seprately.
+Note that this doesn't turn off any custom reports; you have to disable those separately.
 """
   }
 

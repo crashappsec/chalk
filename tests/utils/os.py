@@ -40,6 +40,7 @@ class Program:
     stderr: bytes
     stdin: Optional[bytes]
     cwd: str
+    env: dict[str, str]
     shell: bool
     log_level: Literal["info", "debug"] = "info"
 
@@ -109,6 +110,8 @@ class Program:
         text: Optional[str] = None,
         words: int = 0,
         reverse: bool = False,
+        log_level: Optional[Literal["error", "debug"]] = "error",
+        default: Optional[str] = None,
     ) -> str:
         lines = (text or self.text).splitlines()
         if reverse:
@@ -120,7 +123,12 @@ class Program:
                 if words:
                     result = " ".join(result.split()[:words])
                 return result
-        self.logger.error("could not find string in output", needle=needle)
+        if default is not None:
+            return default
+        if log_level:
+            getattr(self.logger, log_level)(
+                "could not find string in output", needle=needle
+            )
         raise ValueError(f"{needle} not found in stdout")
 
     def after(self, *, match: Optional[str] = None, text: Optional[str] = None) -> str:
@@ -299,6 +307,7 @@ def run(
         duration=after - before,
         cwd=cwd,
         shell=shell,
+        env=env_vars,
         log_level=log_level,
     )
 

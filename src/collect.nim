@@ -164,7 +164,8 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
   for plugin in getAllPlugins():
     if plugin == obj.myCodec:
       trace("Filling in codec info")
-      data["CHALK_ID"]      = pack(obj.callGetChalkID())
+      if "CHALK_ID" notin data:
+        data["CHALK_ID"]      = pack(obj.callGetChalkID())
       let preHashOpt = obj.callGetUnchalkedHash()
       if preHashOpt.isSome():
         data["HASH"]          = pack(preHashOpt.get())

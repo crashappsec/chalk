@@ -29,7 +29,7 @@ import posix, unicode, ../config, ../collect, ../reporting,
 
 {.warning[CStringConv]: off.}
 
-proc runMungedDockerInvocation*(ctx: DockerInvocation): int =
+proc runMungedDockerInvocation(ctx: DockerInvocation): int =
   var
     newStdin = "" # Indicated passthrough.
     args     = ctx.newCmdLine
@@ -500,7 +500,7 @@ proc addBuildCmdMetadataToMark(ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_CHALK_ADDED_TO_DOCKERFILE",
                    ctx.addedInstructions.join("\n"))
 
-proc prepareToBuild*(state: DockerInvocation) =
+proc prepareToBuild(state: DockerInvocation) =
   info("Running docker build.")
   setCommandName("build")
   state.extractCmdlineBuildContext()
@@ -515,14 +515,17 @@ proc runBuild(ctx: DockerInvocation): int =
   initCollection()
 
   let chalk       = newChalk(name         = ctx.prefTag,
+                             # multi-platform builds should have same chalk id
+                             chalkId      = ctx.chalkId,
                              resourceType = {ResourceImage},
                              codec        = getPluginByName("docker"))
   ctx.opChalkObj = chalk
 
+  ctx.addBackBuildCommonPushFlags()
   if not ctx.cmdPush:
-    ctx.addBackAllOutputFlags()
+    ctx.addBackBuildWithoutPushFlags()
   else:
-    ctx.addBackOtherOutputFlags()
+    ctx.addBackBuildWithPushFlags()
   if chalkConfig.getChalkContainedItems():
     info("Docker is starting a recursive chalk of context directories.")
     var contexts: seq[string] = @[ctx.foundContext]
@@ -579,10 +582,30 @@ proc runPush(ctx: DockerInvocation): int =
   # Here, if we fail, there's no re-run. Either (in the second branch), we
   # ran their original command line, or we've got nothing to fall back on,
   # because the build already succeeded.
-  let cmdInfo = runDockerGetEverything(ctx.newCmdLine)
+  return runProcNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
 
-  result = cmdInfo.getExit()
-  return result
+proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
+  # not a multi-platform build so manifest should not be used
+  if len(platforms) < 2:
+    return 0
+
+  for tag in ctx.foundTags:
+    var platformTags = @[tag]
+    for platform in platforms:
+      platformTags.add(ctx.getTagForPlatform(tag, platform))
+
+    let exitCode = runProcNoOutputCapture(
+      dockerExeLocation,
+      @["buildx", "imagetools", "create", "-t"] & platformTags,
+    )
+    if exitCode != 0:
+      error(tag & ": Could not push multi-platform manifest")
+      return exitCode
+
+    info(tag & ": Successfully pushed multi-platform manifest")
+
+  # all tags succeded
+  return 0
 
 # TODO: Any other noteworthy commands to wrap (run, etc)
 
@@ -615,11 +638,52 @@ template gotBuildCommand() =
   trace("Collecting post-build runtime data")
   ctx.opChalkObj.collectRunTimeArtifactInfo()
 
+template runBuildForSinglePlatform(platform: string) =
+  trace("Docker building --platform=" & platform)
+  let
+    foundPlatform     = ctx.foundPlatform
+    foundTags         = ctx.foundTags
+    addedInstructions = ctx.addedInstructions
+  ctx.foundPlatform = platform
+  ctx.foundTags     = ctx.getTagsForPlatform(platform)
+  try:
+    gotBuildCommand()
+    if ctx.cmdPush:
+      gotPushCommand()
+    # note this will add global chalk which means
+    # even if later platform builds fail, all successful
+    # builds will still be accounted for
+    ctx.opChalkObj.addToAllChalks()
+    postDockerActivity()
+  finally:
+    ctx.foundPlatform = foundPlatform
+    ctx.foundTags = foundTags
+    ctx.addedInstructions = addedInstructions
+
 template gotPushCommand() =
   try:
     exitCode = ctx.runPush()
     if exitCode != 0:
       error("Docker push operation failed with exit code: " & $(exitCode))
+      if "buildx" in ctx.originalArgs:
+        error("Buildx use detected. Retrying w/o chalk.")
+        # as buildx has independent configuration from docker daemon
+        # there could be different insecure registry configurations.
+        # Therefore buildx might be able to push but docker daemon might not:
+        # * docker buildx build --push
+        # * docker push
+        # Since there is no buildx equivalent command just for pushing
+        # built images, we have to fallback to default docker buildx build
+        # which will build and push at the same time
+        # otherwise chalk might be breaking existing builds
+        ctx.dockerFailSafe()
+      else:
+        # note that if push fails we do not fallback to default docker behavior
+        # as build must of succedded to get to push
+        # and so it must be a registry error vs a chalk bug so we leave it as is
+        # however note that chalk will still exit with non-zero exit code
+        # not to change semantics of docker push or docker build --push commands
+        discard
     else:
       info(ctx.opChalkObj.name & ": Successfully pushed")
       trace("Collecting post-push runtime data")
@@ -637,7 +701,26 @@ template gotPushCommand() =
           ctx.opChalkObj.marked           = true
   except:
     error("Docker push operation failed.")
-  exitCode = 0
+    ctx.dockerFailSafe()
+
+template runMultiPlatformManifest() =
+  try:
+    exitCode = ctx.createAndPushManifest(platforms)
+  except:
+    exitCode = 1
+    dumpExOnDebug()
+
+  if exitCode != 0:
+    # docker manifest features are experimental so we fallback for safety
+    # from docker manifest --help:
+    # > EXPERIMENTAL:
+    # >   docker manifest is an experimental feature.
+    # >   Experimental features provide early access to product functionality. These
+    # >   features may change between releases without warning, or can be removed from a
+    # >   future release. Learn more about experimental features in our documentation:
+    # >   https://docs.docker.com/go/experimental/
+    error("Chalk could not process Docker manifest correctly. Retrying w/o chalk.")
+    ctx.dockerFailSafe()
 
 template postDockerActivity() =
   if exitCode == 0:
@@ -678,20 +761,42 @@ proc runCmdDocker*(args: seq[string]) =
 
   if not ctx.cmdBuild and not ctx.cmdPush:
     passThroughLogic()
-  else:
-      forceReportKeys(["_REPO_TAGS", "_REPO_DIGESTS"])
-      if ctx.cmdBuild:
-        gotBuildCommand()
 
-      if ctx.cmdPush:
-        gotPushCommand()
+  # build --push --platform=X,Y,...
+  elif ctx.cmdBuild and ctx.isMultiPlatform():
+    trace("Detected multi-platform docker build. Splitting into individual platform builds")
 
-      ctx.opChalkObj.addToAllChalks()
+    # force DOCKER_PLATFORM to be included in chalk normalization
+    # which is required to compute unique METADATA_* keys
+    forceChalkKeys(["DOCKER_PLATFORM"])
+    forceReportKeys(["_REPO_TAGS", "_REPO_DIGESTS"])
+    let platforms = ctx.getPlatforms()
 
-      postDockerActivity()
-
+    for platform in platforms:
+      # only execute subsequent builds if all previous builds succeeded
       if exitCode == 0:
-        reporting.doReporting("report")
+        runBuildForSinglePlatform(platform)
+
+    if ctx.cmdPush and exitCode == 0:
+      runMultiPlatformManifest()
+
+    if exitCode == 0:
+      reporting.doReporting("report")
+
+  else:
+    forceReportKeys(["_REPO_TAGS", "_REPO_DIGESTS"])
+    if ctx.cmdBuild:
+      gotBuildCommand()
+
+    if ctx.cmdPush:
+      gotPushCommand()
+
+    ctx.opChalkObj.addToAllChalks()
+
+    postDockerActivity()
+
+    if exitCode == 0:
+      reporting.doReporting("report")
 
   # For paths that didn't call doReporting, which generally cleans these up.
   showConfigValues()

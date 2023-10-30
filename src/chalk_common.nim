@@ -246,6 +246,7 @@ type
   DockerInvocation* = ref object
     dockerExe*:         string
     opChalkObj*:        ChalkObj
+    chalkId*:           string # shared between multi-platform builds
     originalArgs*:      seq[string]
     cmd*:               string
     processedArgs*:     seq[string]

@@ -1,3 +1,4 @@
 cache/*
 results/*
 */test_results
+!data/templates/**
