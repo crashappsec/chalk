@@ -90,13 +90,18 @@ class Program:
         if not self:
             raise self.error
 
+    def _strip_ansi(self, text: str):
+        # strip chalk logs from stdout so we can find just json reports
+        # https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
+        return re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", text)
+
     @property
     def text(self) -> str:
-        return self.stdout.decode().strip()
+        return self._strip_ansi(self.stdout.decode().strip())
 
     @property
     def logs(self) -> str:
-        return self.stderr.decode().strip()
+        return self._strip_ansi(self.stderr.decode().strip())
 
     @property
     def error(self) -> CalledProcessError:
