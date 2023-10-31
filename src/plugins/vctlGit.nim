@@ -306,7 +306,7 @@ proc findPackedGitCommit(vcsDir, commitId: string): string =
         break
     if found == 0:
       continue
-    # lol nim can't do division of uint64s :(
+    # nim doesn't currently support division of uint64s
     found = uint64(int((found - nameTable)) / int(nameLen))
     let
       entryCount    = uint64(getUint32BE(data, fanoutTable + (0xFF * 4)))
@@ -318,7 +318,9 @@ proc findPackedGitCommit(vcsDir, commitId: string): string =
     if (offset and highBit32) != 0:
       # the offset is actually an index into the next table
       offset = offset xor highBit32
-      offset = uint64(getUint32BE(data, tableOffset64 + (offset * 8)))
+      let high32 = uint64(getUint32BE(data, tableOffset64 + (offset * 8)))
+      let low32  = uint64(getUint32BE(data, tableOffset64 + (offset * 8) + 4))
+      offset = (high32 shl 32) or low32
     return readPackedCommit(filename.replace(".idx", ".pack"), offset)
   raise(newException(CatchableError, "failed to parse git index"))
 
