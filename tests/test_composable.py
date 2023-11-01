@@ -2,16 +2,14 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import pytest
-
 from pathlib import Path
 
+import pytest
+
 from .chalk.runner import Chalk
+from .conf import CONFIGS, LS_PATH
 from .utils.log import get_logger
-from .conf import (
-    LS_PATH,
-    CONFIGS,
-)
+
 
 logger = get_logger()
 

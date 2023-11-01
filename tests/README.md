@@ -280,3 +280,27 @@ Which will:
 - create docker contexts for both amd64/arm64 builds
 - create `buildx` node called `insecure_builder` for both amd64/arm64 builds
 - configure the node to support insecure registries
+
+### Permissions
+
+#### Docker Git Context Tests
+
+In order to test docker git context, tests:
+
+- checkout public repo using https
+- checkout private repo using https. This requires valid [PAT]:
+
+  ```sh
+  export GITHUB_TOKEN={PAT}
+  export DOCKER_GIT_CONTEXT_TOKEN_REPO={USER}/{REPO}
+  ```
+
+- checkout repo using SSH. This requires [SSH key]:
+
+  ```sh
+  export SSH_KEY={PRIVATE KEY}
+  export DOCKER_GIT_CONTEXT_SSH_REPO={USER}/{REPO}
+  ```
+
+[SSH key]: https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account
+[PAT]: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens

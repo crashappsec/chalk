@@ -28,6 +28,7 @@ from .conf import (
 )
 from .utils.log import get_logger
 
+
 logger = get_logger()
 
 
@@ -91,7 +92,7 @@ def tmp_file(request):
         "delete": True,
     }
     config.update(getattr(request, "param", {}))
-    path = config.pop("path")
+    path = config.pop("path", None)
     # tempfile does not allow to create file with specific path
     # as it always randomizes the name
     if path:
@@ -99,13 +100,13 @@ def tmp_file(request):
         os.makedirs(path.parent, exist_ok=True)
         try:
             with path.open(config["mode"]) as f:
-                yield f
+                yield path
         finally:
             if config["delete"]:
                 path.unlink(missing_ok=True)
     else:
         with NamedTemporaryFile(**config) as f:
-            yield f
+            yield Path(f.name)
 
 
 @pytest.fixture(scope="function")

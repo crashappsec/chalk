@@ -7,6 +7,7 @@ import json
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 
+
 PREFIX = "/latest"
 TOKEN = "token"
 TAGS = {
