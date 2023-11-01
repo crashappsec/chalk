@@ -347,9 +347,17 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
 
 proc findExePath*(cmdName:    string,
                   extraPaths: seq[string] = @[],
+                  configPath: Option[string],
                   usePath         = true,
                   ignoreChalkExes = false): Option[string] =
-  var foundExes = findAllExePaths(cmdName, extraPaths, usePath)
+  var paths = extraPaths
+  if configPath.isSome():
+    # prepend on purpose so that config path
+    # takes precedence over rest of dirs in PATH
+    paths = @[configPath.get()] & paths
+
+  trace("Searching path for " & cmdName)
+  var foundExes = findAllExePaths(cmdName, paths, usePath)
 
   if ignoreChalkExes:
     var newExes: seq[string]
@@ -492,3 +500,39 @@ template get[T](data: seq[T], i: int, default: T): T =
 iterator zipLongest*[T](data1, data2: seq[T], default: T): (T, T) =
   for i in 0..max(len(data1), len(data2)):
     yield (get(data1, i, default), get(data2, i, default))
+
+type EnvVar* = ref object
+  name:     string
+  value:    string
+  previous: string
+  exists:   bool
+
+proc setEnv*(name: string, value: string): EnvVar =
+  new result
+  result.name     = name
+  result.value    = value
+  result.previous = getEnv(name)
+  result.exists   = existsEnv(name)
+  putEnv(name, value)
+
+proc restore*(env: EnvVar) =
+  if not env.exists:
+    delEnv(env.name)
+  else:
+    putEnv(env.name, env.previous)
+
+proc restore*(vars: seq[EnvVar]) =
+  for env in vars:
+    env.restore()
+
+proc `$`*(vars: seq[EnvVar]): string =
+  result = ""
+  for env in vars:
+    result &= env.name & "=" & env.value & " "
+
+proc isInt*(i: string): bool =
+  try:
+    discard parseInt(i)
+    return true
+  except:
+    return false
