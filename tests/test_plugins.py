@@ -11,16 +11,18 @@ from unittest import mock
 
 import pytest
 
-from .chalk.runner import Chalk
+from .chalk.runner import Chalk, ChalkMark
 from .chalk.validate import (
     ArtifactInfo,
     validate_chalk_report,
     validate_extracted_chalk,
     validate_virtual_chalk,
+    validate_docker_chalk_report,
 )
-from .conf import CODEOWNERS, CONFIGS, LS_PATH
+from .conf import CODEOWNERS, CONFIGS, LS_PATH, DOCKERFILES
 from .utils.git import init
 from .utils.log import get_logger
+from .utils.docker import Docker
 
 logger = get_logger()
 
@@ -521,3 +523,97 @@ def test_metadata_gcp(
             },
         }
     )
+
+
+@pytest.mark.parametrize("test_file", ["valid/sample_1"])
+def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
+    # we need to enable sboms + embed sboms
+    chalk = chalk_copy
+    chalk.load(
+        config=CONFIGS / "composable" / "valid" / "sboms" / "enable_sboms.c4m",
+        replace=False,
+    )
+
+    # expected sbom output
+    # stripped to show basics only in case we change versions
+    sbom_data = {
+        "SBOM": {
+            "syft": {
+                "bomFormat": "CycloneDX",
+                "metadata": {
+                    "component": {
+                        "type": "file",
+                        "name": "/chalk/tests/data/dockerfiles/valid/sample_1",
+                    },
+                },
+            }
+        }
+    }
+
+    tag = f"{test_file}_{random_hex}"
+    image_hash, build = chalk.docker_build(
+        dockerfile=DOCKERFILES / test_file / "Dockerfile",
+        tag=tag,
+    )
+
+    # artifact is the docker image
+    artifact_info = ArtifactInfo(
+        type="Docker Image",
+        # keys to check
+        host_info=sbom_data,
+    )
+    validate_docker_chalk_report(
+        chalk_report=build.report, artifact=artifact_info, virtual=False
+    )
+
+    # check sbom data from running container
+    _, result = Docker.run(
+        image=image_hash,
+        entrypoint="cat",
+        params=["chalk.json"],
+    )
+    chalk_mark = ChalkMark.from_json(result.stdout.decode())
+
+    assert chalk_mark.contains(sbom_data)
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk):
+    bin_path = copy_files[0]
+
+    # we need to enable sboms + embed sboms so load test config
+    chalk = chalk_copy
+    chalk.load(
+        config=CONFIGS / "composable" / "valid" / "sboms" / "enable_sboms.c4m",
+        replace=False,
+    )
+
+    # expected sbom output
+    # stripped to show basics only in case we change versions
+    sbom_data = {
+        "SBOM": {
+            "syft": {
+                "bomFormat": "CycloneDX",
+                "metadata": {
+                    "component": {
+                        "type": "file",
+                        "name": "ls",
+                    },
+                },
+            }
+        }
+    }
+
+    artifact = ArtifactInfo.one_elf(bin_path, chalk_info=sbom_data)
+
+    insert = chalk.insert(bin_path)
+    validate_chalk_report(
+        chalk_report=insert.report,
+        artifact_map=artifact,
+        virtual=False,
+        chalk_action="insert",
+    )
+
+    # check that sbom has been embedded into the artifact
+    chalk_mark = ChalkMark.from_binary(bin_path)
+    assert chalk_mark.contains(sbom_data)
