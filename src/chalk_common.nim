@@ -247,13 +247,14 @@ type
     context*:     string
     # https://docs.docker.com/engine/reference/commandline/build/
     # context is a combination of remote url + head + subdir within the context
-    remoteUrl*:   string
-    head*:        string
-    subdir*:      string
-    authToken*:   string
-    authHeader*:  string
-    tmpGitDir*:   string
-    tmpWorkTree*: string
+    remoteUrl*:    string
+    head*:         string
+    subdir*:       string
+    authToken*:    string
+    authHeader*:   string
+    tmpGitDir*:    string
+    tmpWorkTree*:  string
+    tmpKnownHost*: string
 
   DockerSecret* = ref object
     id*:   string
@@ -358,21 +359,22 @@ let
   artTypeMachO*           = pack("Mach-O executable")
 
 var
-  hostInfo*            = ChalkDict()
-  subscribedKeys*      = Table[string, bool]()
-  systemErrors*        = seq[string](@[])
-  selfChalk*           = ChalkObj(nil)
-  selfID*              = none(string)
-  canSelfInject*       = true
-  doingTestRun*        = false
-  nativeCodecsOnly*    = false
-  passedHelpFlag*      = false
-  chalkConfig*:        ChalkConfig
-  con4mRuntime*:       ConfigStack
-  commandName*:        string
-  dockerExeLocation*:  string = ""
-  gitExeLocation*:     string = ""
-  cachedChalkStreams*: seq[ChalkObj]
+  hostInfo*               = ChalkDict()
+  subscribedKeys*         = Table[string, bool]()
+  systemErrors*           = seq[string](@[])
+  selfChalk*              = ChalkObj(nil)
+  selfID*                 = none(string)
+  canSelfInject*          = true
+  doingTestRun*           = false
+  nativeCodecsOnly*       = false
+  passedHelpFlag*         = false
+  chalkConfig*:           ChalkConfig
+  con4mRuntime*:          ConfigStack
+  commandName*:           string
+  dockerExeLocation*:     string = ""
+  gitExeLocation*:        string = ""
+  sshKeyscanExeLocation*: string = ""
+  cachedChalkStreams*:    seq[ChalkObj]
 
 template dumpExOnDebug*() =
   if chalkConfig != nil and chalkConfig.getChalkDebug():

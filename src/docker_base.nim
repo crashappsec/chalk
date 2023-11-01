@@ -31,17 +31,9 @@ template extractBoxedDockerHash*(value: Box): Box =
 proc setDockerExeLocation*() =
   once:
     trace("Searching path for 'docker'")
-    var
-      userPath: seq[string]
-      exeOpt   = chalkConfig.getDockerExe()
-
-    if exeOpt.isSome():
-      # prepend on purpose so that docker_exe config
-      # takes precedence over rest of dirs in PATH
-      userPath = @[exeOpt.get()] & userPath
-
-    dockerPathOpt     = findExePath("docker", userPath, ignoreChalkExes = true)
-    dockerExeLocation = dockerPathOpt.get("")
+    dockerExeLocation = findExePath("docker",
+                                    configPath = chalkConfig.getDockerExe(),
+                                    ignoreChalkExes = true).get("")
 
     if dockerExeLocation == "":
        warn("No docker command found in path. `chalk docker` not available.")

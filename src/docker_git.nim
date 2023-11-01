@@ -9,26 +9,66 @@ import config, util, docker_base
 
 proc setGitExeLocation() =
   once:
-    trace("Searching path for 'git'")
-    var
-      userPath: seq[string]
-      exeOpt   = chalkConfig.getGitExe()
-
-    if exeOpt.isSome():
-      # prepend on purpose so that git_exe config
-      # takes precedence over rest of dirs in PATH
-      userPath = @[exeOpt.get()] & userPath
-
-    gitExeLocation = findExePath("git", userPath).get()
-
+    gitExeLocation = findExePath("git",
+                                 configPath = chalkConfig.getGitExe()).get("")
     if gitExeLocation == "":
-       error("No git command found in PATH")
+      error("No git command found in PATH")
+      raise newException(ValueError, "No git")
 
-proc isGitContext*(context: string): bool =
+proc setSshKeyscanExeLocation() =
+  once:
+    sshKeyscanExeLocation = findExePath("ssh-keyscan",
+                                        configPath = chalkConfig.getSshKeyscanExe()).get("")
+    if sshKeyscanExeLocation == "":
+      warn("No ssh-keyscan command found in PATH")
+
+proc fetchSshKnownHost(remote: string): string =
+  var
+    url               = remote
+    args: seq[string] = @[]
+  if not url.startsWith("ssh://"):
+    # uri parser requires schema to be present
+    url = "ssh://" & url
+  let
+    uri  = parseUri(url)
+    # ssh root path is delimited by : so we strip it
+    # as its not a port number. for example:
+    # git@github.com:org/repo.git
+    # ssh://git@github.com:22/org/repo.git
+    host = uri.hostname.split(":")[0]
+  if uri.port != "" and isInt(uri.port):
+    args &= @["-p", uri.port]
+  args.add(host)
+  trace("Running " & sshKeyscanExeLocation & " " & args.join(" "))
+  let fetched  = runCmdGetEverything(sshKeyscanExeLocation, args)
+  if fetched.exitCode != 0:
+    return fetched.stdOut
+  return ""
+
+proc createTempKnownHosts(data: string): string =
+  if data == "":
+    return ""
+  let (f, path) = getNewTempFile()
+  f.write(data)
+  f.close()
+  return path
+
+proc isHttpGitContext(context: string): bool =
   if context.startsWith("http://") or context.startsWith("https://"):
     let uri = parseUri(context)
     return uri.path.endsWith(".git")
-  return context.startswith("git@")
+  return false
+
+proc isSSHGitContext(context: string): bool =
+  if context.startsWith("git@"):
+    return true
+  if context.startsWith("ssh://"):
+    let uri = parseUri(context)
+    return uri.path.endsWith(".git")
+  return false
+
+proc isGitContext*(context: string): bool =
+  return isHttpGitContext(context) or isSSHGitContext(context)
 
 proc splitBy(s: string, sep: string, default: string = ""): (string, string) =
   let parts = s.split(sep, maxsplit = 1)
@@ -68,7 +108,9 @@ proc run(git: DockerGitContext,
          args: seq[string],
          dir: bool = true,
          strict: bool = true): ExecOutput =
-  var gitArgs: seq[Redacted] = @[]
+  var
+    gitArgs: seq[Redacted] = @[]
+    envVars: seq[EnvVar]   = @[]
 
   if dir:
     gitArgs.add(redact("--git-dir=" & git.tmpGitDir))
@@ -92,10 +134,23 @@ proc run(git: DockerGitContext,
     gitArgs.add(redact("-c"))
     gitArgs.add(redact(option & header, option & "***"))
 
+  if isSSHGitContext(git.remoteUrl):
+    envVars.add(setEnv("GIT_TERMINAL_PROMPT", "0"))
+    envVars.add(setEnv("GIT_CONFIG_NOSYSTEM", "1"))
+    var sshCmd = "ssh -F /dev/null"
+    if git.tmpKnownHost != "":
+      sshCmd &= " -o UserKnownHostsFile=" & git.tmpKnownHost
+    else:
+      sshCmd &= " -o StrictHostKeyChecking=no"
+    envVars.add(setEnv("GIT_SSH_COMMAND", sshCmd))
+
   let allArgs = gitArgs & redact(args)
 
-  trace("Running git " & allArgs.redacted().join(" "))
-  result = runCmdGetEverything(gitExeLocation, allArgs.raw())
+  trace("Running git " & $(envVars) & allArgs.redacted().join(" "))
+  try:
+    result = runCmdGetEverything(gitExeLocation, allArgs.raw())
+  finally:
+    envVars.restore()
   if strict and result.exitCode != 0:
     error("Failed to run git " & allArgs.redacted().join(" "))
     error(strip(result.stdOut & result.stdErr))
@@ -145,19 +200,22 @@ proc gitContext*(context: string,
                  authTokenSecret: DockerSecret,
                  authHeaderSecret: DockerSecret): DockerGitContext =
   setGitExeLocation()
-  if gitExeLocation == "":
-    raise newException(ValueError, "No git")
 
   let (remoteUrl, head, subdir) = splitContext(context)
 
   new result
-  result.context     = context
-  result.remoteUrl   = remoteUrl
-  result.head        = head
-  result.subdir      = subdir
-  result.authToken   = authTokenSecret.getValue()
-  result.authHeader  = authHeaderSecret.getValue()
-  result.tmpGitDir   = getNewTempDir(tmpFileSuffix = ".git")
+  result.context      = context
+  result.remoteUrl    = remoteUrl
+  result.head         = head
+  result.subdir       = subdir
+  result.authToken    = authTokenSecret.getValue()
+  result.authHeader   = authHeaderSecret.getValue()
+  result.tmpGitDir    = getNewTempDir(tmpFileSuffix = ".git")
+  result.tmpKnownHost = ""
+
+  if isSSHGitContext(context):
+    setSshKeyscanExeLocation()
+    result.tmpKnownHost = createTempKnownHosts(fetchSshKnownHost(remoteUrl))
 
   if result.head == "":
     result.head = result.getDefaultBranch()
