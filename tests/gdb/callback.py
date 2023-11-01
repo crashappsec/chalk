@@ -4,7 +4,6 @@
 # (see https://crashoverride.com/docs/chalk)
 import json
 import struct
-import sys
 from pathlib import Path
 from typing import NamedTuple
 

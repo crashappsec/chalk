@@ -6,6 +6,16 @@ import os
 import shutil
 from pathlib import Path
 
+
+DOCKER_SSH_REPO = (
+    os.environ.get("DOCKER_GIT_CONTEXT_SSH_REPO")
+    or "crashappsec/chalk-docker-git-context"
+)
+DOCKER_TOKEN_REPO = (
+    os.environ.get("DOCKER_GIT_CONTEXT_TOKEN_REPO")
+    or "crashappsec/chalk-docker-git-context-private"
+)
+
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
 GDB = ROOT / "gdb"

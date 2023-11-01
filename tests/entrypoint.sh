@@ -2,6 +2,11 @@
 
 set -e
 
+if [ -z "${SSH_AUTH_SOCK:-}" ] && [ -n "${SSH_KEY}" ]; then
+    eval "$(ssh-agent)"
+    ssh-add <(echo "$SSH_KEY")
+fi
+
 name=insecure_builder
 
 if ! docker buildx inspect $name &> /dev/null; then

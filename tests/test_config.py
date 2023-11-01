@@ -154,7 +154,7 @@ def test_load_url(
     ],
 )
 def test_external_configs(
-    tmp_file: IO,
+    tmp_file: Path,
     chalk_copy: Chalk,
     config_path: str,
     expected_success: bool,
@@ -172,8 +172,7 @@ def test_external_configs(
 
     # test load by putting it in chalk default search locations
     # instead of copying to tmp data dir, we have to copy to someplace chalk looks for it
-    with tmp_file as fid:
-        fid.write((CONFIGS / config_path).read_bytes())
+    tmp_file.write_text((CONFIGS / config_path).read_text())
 
     result_external = chalk_copy.run(
         command="env",

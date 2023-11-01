@@ -137,6 +137,10 @@ services:
         condition: service_healthy
     environment:
       GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      SSH_KEY: ${SSH_KEY:-}
+      DOCKER_GIT_CONTEXT_SSH_REPO: ${DOCKER_GIT_CONTEXT_SSH_REPO:-}
+      DOCKER_GIT_CONTEXT_TOKEN_REPO: ${DOCKER_GIT_CONTEXT_TOKEN_REPO:-}
       IP: ${IP:-} # host IP for docker registry tests
 
   # --------------------------------------------------------------------------

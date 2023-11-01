@@ -5,10 +5,7 @@
 import re
 import shutil
 from pathlib import Path
-from typing import IO
-from unittest import mock
 
-import os
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
@@ -134,12 +131,11 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
 def test_imds(
     copy_files: list[Path],
     chalk: Chalk,
-    tmp_file: IO,
+    tmp_file: Path,
     server_imds: str,
 ):
     # make imds plugin think we are running in EC2
-    with tmp_file as fid:
-        fid.write(b"Amazon")
+    tmp_file.write_text("Amazon")
     bin_path = copy_files[0]
     insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
     assert insert.report.contains(
@@ -221,12 +217,11 @@ def test_imds(
 def test_imds_ecs(
     copy_files: list[Path],
     chalk: Chalk,
-    tmp_file: IO,
+    tmp_file: Path,
     server_imds: str,
 ):
     # make imds plugin think we are running in EC2
-    with tmp_file as fid:
-        fid.write(b"Amazon")
+    tmp_file.write_text("Amazon")
     bin_path = copy_files[0]
     insert = chalk.insert(
         bin_path,
@@ -255,12 +250,11 @@ def test_imds_ecs(
 def test_imds_eks(
     copy_files: list[Path],
     chalk: Chalk,
-    tmp_file: IO,
+    tmp_file: Path,
     server_imds: str,
 ):
     # make imds plugin think we are running in EC2
-    with tmp_file as fid:
-        fid.write(b"Amazon")
+    tmp_file.write_text("Amazon")
     bin_path = copy_files[0]
     insert = chalk.insert(
         bin_path,
@@ -283,12 +277,11 @@ def test_imds_eks(
 def test_metadata_azure(
     copy_files: list[Path],
     chalk: Chalk,
-    tmp_file: IO,
+    tmp_file: Path,
     server_imds: str,
 ):
     # make imds plugin think we are running in EC2
-    with tmp_file as fid:
-        fid.write(b"Microsoft Corporation")
+    tmp_file.write_text("Microsoft Corporation")
     bin_path = copy_files[0]
     insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
     assert insert.report.contains(
@@ -406,12 +399,11 @@ def test_metadata_azure(
 def test_metadata_gcp(
     copy_files: list[Path],
     chalk: Chalk,
-    tmp_file: IO,
+    tmp_file: Path,
     server_imds: str,
 ):
     # make imds plugin think we are running in EC2
-    with tmp_file as fid:
-        fid.write(b"Google")
+    tmp_file.write_text("Google")
     bin_path = copy_files[0]
     insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
     assert insert.report.contains(
