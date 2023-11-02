@@ -55,6 +55,10 @@ or vice versa.
   key.ORIGIN_URI.use                         = true
   key.BRANCH.use                             = true
   key.COMMIT_ID.use                          = true
+  key.AUTHOR.use                             = true
+  key.DATE_AUTHORED.use                      = true
+  key.COMMITTER.use                          = true
+  key.DATE_COMMITTED.use                     = true
   key.ARTIFACT_VERSION.use                   = true
   key.STORE_URI.use                          = true
   key.PACKAGE_URI.use                        = true
@@ -130,6 +134,10 @@ mark_template mark_large {
   key.ORIGIN_URI.use                          = true
   key.BRANCH.use                              = true
   key.COMMIT_ID.use                           = true
+  key.AUTHOR.use                              = true
+  key.DATE_AUTHORED.use                       = true
+  key.COMMITTER.use                           = true
+  key.DATE_COMMITTED.use                      = true
   key.ARTIFACT_VERSION.use                    = true
   key.STORE_URI.use                           = true
   key.PACKAGE_URI.use                         = true
@@ -206,6 +214,10 @@ use the mark template named `reproducable`.
   key.ORIGIN_URI.use                          = true
   key.BRANCH.use                              = true
   key.COMMIT_ID.use                           = true
+  key.AUTHOR.use                              = true
+  key.DATE_AUTHORED.use                       = true
+  key.COMMITTER.use                           = true
+  key.DATE_COMMITTED.use                      = true
   key.ARTIFACT_VERSION.use                    = true
   key.STORE_URI.use                           = true
   key.PACKAGE_URI.use                         = true
@@ -253,6 +265,10 @@ the time and the nonce removed.
   key.ORIGIN_URI.use                          = true
   key.BRANCH.use                              = true
   key.COMMIT_ID.use                           = true
+  key.AUTHOR.use                              = true
+  key.DATE_AUTHORED.use                       = true
+  key.COMMITTER.use                           = true
+  key.DATE_COMMITTED.use                      = true
   key.ARTIFACT_VERSION.use                    = true
   key.STORE_URI.use                           = true
   key.PACKAGE_URI.use                         = true
@@ -310,5 +326,9 @@ mark_template chalk_labels {
 """
   key.COMMIT_ID.use                           = true
   key.ORIGIN_URI.use                          = true
+  key.AUTHOR.use                              = true
+  key.DATE_AUTHORED.use                       = true
+  key.COMMITTER.use                           = true
+  key.DATE_COMMITTED.use                      = true
   key.BRANCH.use                              = true
 }
