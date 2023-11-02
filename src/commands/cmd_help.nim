@@ -305,7 +305,7 @@ proc getHelpTopics(state: ConfigState): string =
 
   result &= "</ul><p></p>"
 
-  result = result.stylize()
+  result = result.stylizeHtml()
 
 proc getSinkHelp(state: ConfigState, docType = CDocConsole): string =
   result = """
@@ -343,16 +343,16 @@ proc getPluginHelp(state: ConfigState): string =
           table=false,
           markdownFields=["doc"])
 
-  result = result.stylize()
+  result = result.stylizeMd()
 
 proc getMarkTemplateDocs(state: ConfigState): string =
-    result = stylize("# Chalk Mark Templates")
+    result = stylizeMd("# Chalk Mark Templates")
 
     result &= state.getAllInstanceDocs("mark_template",["shortdoc"],
                                        ["Template Name", "Description"])
 
 proc getReportTemplateDocs(state: ConfigState): string =
-  result = stylize("# Report Templates")
+  result = stylizeMd("# Report Templates")
   result &= state.getAllInstanceDocs("report_template",["shortdoc"],
                                        ["Template Name", "Description"])
 
@@ -361,18 +361,18 @@ proc formatOneTemplate(state: ConfigState,
   var
     keysToReport: seq[string]
 
-  result &= tmpl.doc.getOrElse("No description available.").stylize()
+  result &= tmpl.doc.getOrElse("No description available.").stylizeMd()
 
   for k, v in tmpl.keys:
     if v.use == true:
       keysToReport.add(k)
 
   if len(keysToReport) == 0:
-    result &= stylize("<h3>This template is empty, and will only " &
-                      "produce default values </h3>")
+    result &= stylizeHtml("<h3>This template is empty, and will only " &
+      "produce default values </h3>")
   else:
-    result &= stylize("<h3>Keys this template produces (beyond " &
-                      "any required defaults): </h3>")
+    result &= stylizeHtml("<h3>Keys this template produces (beyond " &
+      "any required defaults): </h3>")
 
     result &= instantTable(keysToReport)
 
@@ -402,7 +402,8 @@ See `chalk help reporting` for more information on templates.
       for item in args:
         if item notin chalkConfig.markTemplates and
            item notin chalkConfig.reportTemplates:
-          result &= stylize("<h3>No template found named: " & item & "<h3>")
+          result &= stylizeHtml("<h3>No template found named: " & item &
+            "<h3>")
         else:
           if item in chalkConfig.markTemplates:
             markTemplates.add(item)
@@ -410,20 +411,20 @@ See `chalk help reporting` for more information on templates.
             reportTemplates.add(item)
 
     if len(markTemplates) + len(reportTemplates) == 0:
-      result &= stylize("<h1>No matching templates found.</h1><p></p>")
+      result &= stylizeHtml("<h1>No matching templates found.</h1><p></p>")
       return
 
     for markTmplName in markTemplates:
       let theTemplate = chalkConfig.markTemplates[markTmplName]
 
-      result &= stylize("<h2>Mark Template: " & markTmplName & "</h2>")
+      result &= stylizeHtml("<h2>Mark Template: " & markTmplName & "</h2>")
       result &= state.formatOneTemplate(theTemplate)
       result &= "<p></p>"
 
     for repTmplName in reportTemplates:
       let theTemplate = chalkConfig.reportTemplates[repTmplName]
 
-      result &= stylize("<h2>Report Template: " & repTmplName & "</h2>")
+      result &= stylizeHtml("<h2>Report Template: " & repTmplName & "</h2>")
       result &= state.formatOneTemplate(theTemplate)
       result &= "<p></p>"
 
@@ -441,7 +442,7 @@ proc fullTextSearch(state: ConfigState, args: seq[string]): string =
   result &= state.searchConfigVars(args)
   result &= state.searchMetadataKeys(args)
   result &= searchEmbeddedDocs(args)
-  result = result.stylize()
+  result = result.stylizeMd()
 
   # TODO:
   # - Search sinks.
@@ -494,7 +495,7 @@ proc makeColorTable(): string =
       result &= """<tr class=dark><td class=dark><center><bg-""" & color &
         ">" & color & "</bg-" & color & "></center></td></tr>"
   result &= "</tbody></table>"
-  result = result.stylize()
+  result = result.stylizeHtml()
 
 proc runChalkHelp*(cmdName = "help") {.noreturn.} =
   var
@@ -556,7 +557,7 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
 
         for item in toCheck:
           if item in helpFiles:
-            toOut &= helpFiles[arg].markdownToHtml().stylize()
+            toOut &= helpFiles[arg].stylizeMd()
             gotit = true
             break
 
@@ -634,7 +635,7 @@ proc getConfigValues(): string =
     cols          = [CcVarName, CcShort, CcCurValue]
     outConfFields = ["report_template", "mark_template"]
     cReportFields = ["enabled", "report_template", "use_when"]
-    sinkCfgFields = ["sink", "filters"]
+    #sinkCfgFields = ["sink", "filters"]
     plugFields    = ["enabled", "codec", "priority", "ignore", "overrides"]
     confHdrs      = ["Config Variable", "Description", "Current Value"]
     plugHdrs      = ["Name", "Enabled", "Priority", "Ignore", "Overrides"]
@@ -685,7 +686,7 @@ proc showConfigValues*(force = false) =
   once:
     if not (chalkConfig.getShowConfig() or force): return
 
-    let toOut = getConfigValues().stylize()
+    let toOut = getConfigValues().stylizeMd()
 
     if chalkConfig.getUsePager():
       runPager(toOut)
@@ -698,12 +699,12 @@ proc runChalkDocGen*() =
     con4mRuntime = getChalkRuntime()
     opts         = CmdLineDocOpts(docKind: CDocRaw)
 
-  # 1. Dump embedded markdown docs.
   createDir(docDir)
-  for k, v in helpFiles:
-    f = newFileStream(docDir.joinPath(k) & ".md", fmWrite)
-    f.write(v)
-    f.close()
+  # 1. Dump embedded markdown docs.
+  #for k, v in helpFiles:
+  #  f = newFileStream(docDir.joinPath(k) & ".md", fmWrite)
+  #  f.write(v)
+  #  f.close()
 
   # 2. Write out command docs.
   f = newFileStream(cmdline, fmWrite)

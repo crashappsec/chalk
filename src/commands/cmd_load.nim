@@ -13,8 +13,6 @@ proc runCmdConfLoad*() =
   setContextDirectories(@["."])
   initCollection()
 
-  var newCon4m: string
-
   let url = getArgs()[0]
 
   if url == "0cool":
@@ -39,7 +37,11 @@ proc runCmdConfLoad*() =
       cantLoad("Already using the default configuration.")
     else:
       selfChalk.extract.del("$CHALK_CONFIG")
+      selfChalk.extract.del("$CHALK_COMPONENT_CACHE")
+      selfChalk.extract.del("$CHALK_SAVED_COMPONENT_PARAMETERS")
       selfChalk.collectedData.del("$CHALK_CONFIG")
+      selfChalk.collectedData.del("$CHALK_COMPONENT_CACHE")
+      selfChalk.collectedData.del("$CHALK_SAVED_COMPONENT_PARAMETERS")
       info("Installing the default configuration file.")
   else:
     url.handleConfigLoad()

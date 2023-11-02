@@ -1,0 +1,29 @@
+# We use a con4m duration field for the actual `heartbeat_rate` field,
+# But I don't want people to have to worry about that.
+
+func validate_heartbeat_freq(f: float) {
+  if (f <= 0.0) {
+    return "Value must be greater than 0"
+  } else {
+    return ""
+  }
+}
+
+parameter var heartbeat_minute_frequency {
+  default:  30.0
+  validator: func validate_heartbeat_freq(float) -> string
+  shortdoc: "Heartbeat Frequency (minutes)"
+  doc: """
+This value sets how many minutes to wait between heartbeats. Fractions
+of a minute are okay.
+"""  
+}
+var heartbeat_minute_frequency: float
+
+minutes  := int(heartbeat_minute_frequency)
+sec_as_f := (heartbeat_minute_frequency - float(minutes)) * 60.0
+sec      := int(sec_as_f)
+
+duration := Duration($(minutes) + " min " + $(sec) + " sec")
+exec.heartbeat: true
+exec.heartbeat_rate: duration

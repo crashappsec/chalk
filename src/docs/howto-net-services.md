@@ -139,7 +139,7 @@ configured reporting.
 
 You should see some additional JSON output from `chalk` after the
 build finishes, identifying the metadata information for the newly
-chalked contianer:
+chalked container:
 
 ```json
 [
@@ -187,7 +187,7 @@ chalked contianer:
 If you built your container with the commands above, you should now be able to now run it with:
 `docker run --rm -it mychalkedcontainer`
 
-Also, if you kept the the `output_to_screen` sink to be `enabled:
+Also, if you kept the `output_to_screen` sink to be `enabled:
 true`, and set the heartbeat window to 10 seconds, then after 10
 seconds you should see output similar to the following:
 

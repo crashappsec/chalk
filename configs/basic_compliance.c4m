@@ -1,0 +1,2 @@
+use reporting_server from "https://chalkdust.io"
+run_sbom_tools: true

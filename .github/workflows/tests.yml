@@ -94,7 +94,7 @@ jobs:
             !contains(github.event.pull_request.body, 'tests:--slow')
           )
         run: |
-          make tests_parallel
+          make tests_parallel args=""
 
       - name: Run tests (Slow)
         # run slow tests on non-PR builds and when

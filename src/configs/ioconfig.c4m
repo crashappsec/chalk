@@ -38,11 +38,6 @@ if skip_summary_report {
 }
 
 cmd        := command_name()
-exceptions := ["defaults", "dump", "load", "profile", "version"]
-
-if exceptions.contains(cmd) {
-  subscribe("report", "json_console_out")
-}
 
 subscribe("report",   "default_out")
 subscribe("audit",    "default_out")

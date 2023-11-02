@@ -10,7 +10,17 @@
 import ../config
 
 proc runCmdVersion*() =
-  var txt = "<table><tbody>"
+  var s = newStyle(lpad=4, rpad=4, borders = [BorderNone])
+  s.useTopBorder    = some(false)
+  s.useBottomBorder = some(false)
+  s.useLeftBorder   = some(false)
+  s.useRightBorder  = some(false)
+  s.useVerticalSeparator = some(false)
+  s.useHorizontalSeparator = some(false)
+
+  styleMap["table"]   = styleMap["table"].mergeStyles(s)
+  var txt = """<table class=noborder>
+               <colgroup><col width=30><col width=70><tbody>"""
 
   txt &= "<tr><td>Chalk version</td><td>" & getChalkExeVersion() & "</td></tr>"
   txt &= "<tr><td>Commit ID</td><td>" & getChalkCommitID() & "</td></tr>"
@@ -20,4 +30,4 @@ proc runCmdVersion*() =
   txt &= "<tr><td>Build Time</td><td>" & CompileTime & "</td></tr>"
   txt &= "</tbody></table>"
 
-  publish("version", txt.stylize())
+  publish("version", txt.stylizeHtml())

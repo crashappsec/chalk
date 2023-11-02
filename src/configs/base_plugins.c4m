@@ -15,8 +15,8 @@ plugin system {
                      "INJECTOR_COMMIT_ID", "DATE_CHALKED",
                      "TZ_OFFSET_WHEN_CHALKED", "DATETIME_WHEN_CHALKED",
                      "INJECTOR_ENV", "HOSTINFO_WHEN_CHALKED",
-                      "NODENAME_WHEN_CHALKED", "PLATFORM_WHEN_CHALKED",
-                      "INJECTOR_PUBLIC_KEY"]
+                     "PUBLIC_IPV4_ADDR_WHEN_CHALKED", "INJECTOR_PUBLIC_KEY",
+                     "NODENAME_WHEN_CHALKED", "PLATFORM_WHEN_CHALKED"]
 
   artifact_keys:   ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
                     "PRE_CHALK_HASH", "TIMESTAMP_WHEN_CHALKED"]
@@ -27,10 +27,10 @@ plugin system {
                     "_INVALID_SIGNATURE"]
 
   post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
-                    "_OP_HOSTINFO", "_OP_NODENAME", "_OP_PLATFORM",
-		    "_OP_CHALKER_COMMIT_ID", "_OP_CHALKER_VERSION",
-		    "_OP_CHALK_COUNT", "_OP_CMD_FLAGS", "_OP_EXE_NAME",
-		    "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
+                    "_OP_HOSTINFO", "_OP_PUBLIC_IPV4_ADDR", "_OP_NODENAME",
+                    "_OP_PLATFORM", "_OP_CHALKER_COMMIT_ID",
+                    "_OP_CHALKER_VERSION", "_OP_CHALK_COUNT", "_OP_CMD_FLAGS",
+                    "_OP_EXE_NAME", "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
 		    "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
 		    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV"]
 
@@ -57,7 +57,7 @@ are not overridable via other plugins.
 plugin metsys {
     ~enabled: true
     artifact_keys: ["METADATA_HASH", "SIGNATURE", "ERR_INFO", "METADATA_ID"]
-    post_run_keys: ["_CHALK_EXTERNAL_ACTION_AUDIT"]
+    post_run_keys: ["_CHALK_EXTERNAL_ACTION_AUDIT", "_CHALK_RUN_TIME"]
     ~priority:     high()
     doc: """
 Like the `system` module, this module is non-overridable keys added by
@@ -180,6 +180,9 @@ plugin cloudMetadata {
     enabled:         true
     post_run_keys:   ["_GCP_INSTANCE_METADATA", "_AZURE_INSTANCE_METADATA",
     "_OP_CLOUD_PROVIDER", "_OP_CLOUD_PROVIDER_SERVICE_TYPE",
+    "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", "_OP_CLOUD_PROVIDER_REGION",
+    "_OP_CLOUD_PROVIDER_REGION", "_OP_CLOUD_PROVIDER_IP",
+    "_OP_CLOUD_PROVIDER_TAGS", "_OP_CLOUD_PROVIDER_INSTANCE_TYPE",
     "_AWS_AMI_ID", "_AWS_AMI_LAUNCH_INDEX", "_AWS_AMI_MANIFEST_PATH",
     "_AWS_ANCESTOR_AMI_IDS", "_AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE",
     "_AWS_AZ", "_AWS_AZ_ID", "_AWS_BLOCK_DEVICE_MAPPING_AMI",

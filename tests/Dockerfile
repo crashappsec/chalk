@@ -23,23 +23,17 @@ FROM python:$PYTHON_VERSION-slim as ubuntu
 RUN apt-get update -y && \
     apt-get install -y \
         curl \
-        git \
         gdb \
+        gettext-base \
+        git \
         && \
     apt-get clean -y
-
-# ----------------------------------------------------------------------------
-
-FROM gcr.io/projectsigstore/cosign as cosign
 
 # ----------------------------------------------------------------------------
 
 FROM $BASE
 
 ARG POETRY_VERSION=1.5.1
-
-COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
-
 RUN pip install --no-cache-dir poetry==${POETRY_VERSION}
 
 ENV VIRTUAL_ENV=/tests.env
@@ -52,7 +46,10 @@ RUN mkdir -p /.cache/pypoetry \
 COPY pyproject.toml poetry.lock $WORKDIR/
 RUN poetry install --no-plugins
 
+COPY --from=gcr.io/projectsigstore/cosign /ko-app/cosign /usr/local/bin/cosign
 COPY --from=docker:24 /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker/buildx-bin:0.11.2 /buildx /usr/lib/docker/cli-plugins/docker-buildx
 
-ENTRYPOINT ["pytest"]
+RUN docker context create node-amd64
+RUN docker context create node-arm64
+# docker buildx node is created via entrypoint

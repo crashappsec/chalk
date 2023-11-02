@@ -7,15 +7,62 @@
 
 ## The `chalk dump` command.
 
-import ../config, ../selfextract
+import ../config, ../selfextract, posix
 
-proc runCmdConfDump*() =
+const
+  configKey = "$CHALK_CONFIG"
+  paramKey  = "$CHALK_SAVED_COMPONENT_PARAMETERS"
+  cacheKey  = "$CHALK_COMPONENT_CACHE"
+
+template baseDump(code: untyped) {.dirty.} =
   var
-    toDump  = defaultConfig
+    toDump: string
     chalk   = getSelfExtraction().getOrElse(nil)
     extract = if chalk != nil: chalk.extract else: nil
 
-  if chalk != nil and extract != nil and extract.contains("$CHALK_CONFIG"):
-    toDump  = unpack[string](extract["$CHALK_CONFIG"])
+  code
 
   publish("confdump", toDump)
+  quit(0)
+
+proc dumpToFile*() =
+  baseDump:
+    toDump = if extract == nil or configKey notin extract:
+               defaultConfig
+             else:
+               unpack[string](extract[configKey])
+
+proc runCmdConfDump*() =
+  let args = getArgs()
+
+  if len(args) > 0 or isatty(1) == 0:
+    dumpToFile()
+
+  baseDump:
+    var s: string
+    if chalk != nil and extract != nil and configKey in extract:
+      s = unpack[string](extract[configKey])
+    else:
+      s = defaultConfig
+
+    toDump = stylize(s, "blockquote")
+
+proc runCmdConfDumpParams*() =
+  baseDump:
+    if chalk == nil or extract == nil or paramKey notin extract:
+      toDump = "[]"
+    else:
+      toDump = boxToJson(extract[paramKey])
+
+proc runCmdConfDumpCache*() =
+  baseDump:
+    if chalk == nil or extract == nil or cacheKey notin extract:
+      runCmdConfDump()
+
+    let
+      componentInfo = selfChalk.extract[cacheKey]
+      unpackedInfo  = unpack[OrderedTableRef[string, string]](componentInfo)
+
+    for url, contents in unpackedInfo:
+      toDump &= stylizeHtml("<h2> URL: " & url & "</h2>")
+      toDump &= stylize(contents, "blockquote")

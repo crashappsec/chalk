@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/crashappsec/chalk/actions/workflows/tests.yml/badge.svg?branch=main&event=push)](https://github.com/crashappsec/chalk/actions/workflows/tests.yml?query=branch%3Amain)
 
-# Total visibility of your software engineering lifecycle.
+# Telemetry & observability for the software development lifecycle.
 
 ## About Chalk
 
@@ -24,13 +24,9 @@ Many companies and the US Government are now mandating suppliers providing suppl
 
 From a code base, easily understand the environments where code and even particular branches are running. Gather code owners for the applications and code repos. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-create-a-real-time-application-inventory).
 
-#### Create network services visibility reports from containers
+#### How-to deploy Chalk globally using Docker
 
-Understanding which services run in containers can help you build a service map. Use Chalk to automatically create periodic reports on container network tables, or visibility into service availability. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-create-network-services-visibility-reports-from-containers).
-
-#### Create and maintain an SBOM registry
-
-Automatically create SBOMs for every build of every code repo, including auto-deploying and using built-in SBOM generation and collection tools. Send these SBOMs to a central location for further analysis, and to maintain a record across your environment. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-create-and-maintain-an-sbom-registry).
+You can deploy Chalk by setting a global alias for Docker and having it call Chalk, so that every build that runs through your build server using Docker, will automatically be 'chalked'. It's a technique that can be combined with chalks ability to deploy tools and configure monitoring, to automatically add security controls and collect information for every application. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-deploy-chalk-globally-using-docker)]
 
 All documentation for Chalk is available at https://crashoverride.com/docs and is also fully accessible though the command line interface.
 

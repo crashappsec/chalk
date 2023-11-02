@@ -36,3 +36,6 @@ nimble.develop
 nimble.paths
 /chalk-docs
 oss
+__pycache__
+.mypy_cache
+.pytest_cache

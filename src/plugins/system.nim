@@ -274,6 +274,7 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result.setIfNeeded("TZ_OFFSET_WHEN_CHALKED", pack(getOffset()))
   result.setIfNeeded("DATETIME_WHEN_CHALKED", pack(getDateTime()))
   result.setIfNeeded("PLATFORM_WHEN_CHALKED", getChalkPlatform())
+  result.setIfNeeded("PUBLIC_IPV4_ADDR_WHEN_CHALKED", pack(getMyIpV4Addr()))
 
   when defined(posix):
     result.setIfNeeded("HOSTINFO_WHEN_CHALKED", uinfo.version)
@@ -284,7 +285,7 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
     if selfIdOpt.isSome(): result["INJECTOR_CHALK_ID"] = pack(selfIdOpt.get())
 
 proc metsysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
-                                   ChalkDict {.cdecl.} =
+                                     ChalkDict {.cdecl.} =
   result = ChalkDict()
 
   # We add these directly into collectedData so that it can get

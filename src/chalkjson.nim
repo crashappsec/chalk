@@ -38,7 +38,7 @@ const
 type
   ChalkJsonNode*   = ref CJsonNodeObj
   CJSonError*      = ref object of ValueError
-  CJsonNodeKind    = enum
+  CJsonNodeKind*   = enum
     CJNull, CJBool, CJInt, CJFloat, CJString, CJObject, CJArray
 
   CJsonNodeObj* {.acyclic.} = object
@@ -51,7 +51,7 @@ type
     of CJObject: kvpairs*:  OrderedTableRef[string, ChalkJsonNode]
     of CJArray:  items*:    seq[ChalkJsonNode]
 
-proc chalkParseJson(s: Stream): ChalkJSonNode
+proc chalkParseJson*(s: Stream): ChalkJSonNode
 
 proc findJsonStart*(stream: Stream): bool =
   ## Seeks the stream to the start of the JSON blob, when the stream
@@ -149,7 +149,7 @@ proc valueFromJson(jobj: ChalkJsonNode, fname: string): Box =
   of CJObject: return pack(objFromJson(jobj, fname))
   of CJArray:  return pack(arrayFromJson(jobj, fname))
 
-proc jsonNodeToBox(n: ChalkJSonNode): Box =
+proc jsonNodeToBox*(n: ChalkJSonNode): Box =
   case n.kind
   of CJNull:   return nil
   of CJBool:   return pack(n.boolval)
@@ -419,7 +419,7 @@ proc jsonValue(s: Stream): ChalkJSonNode =
   else:
     raise parseError("Bad JSon at position: " & $(s.getPosition()))
 
-proc chalkParseJson(s: Stream): ChalkJSonNode =
+proc chalkParseJson*(s: Stream): ChalkJSonNode =
   s.jsonWS()
   result = s.jSonValue()
   # Per the spec, we should advance the stream white space after the
@@ -503,7 +503,7 @@ proc getChalkMarkAsStr*(obj: ChalkObj): string =
     return obj.cachedMark
   trace("Converting Mark to JSON. Mark template is: " &
     getOutputConfig().markTemplate)
-    
+
   if obj.cachedMark != "":
     return obj.cachedMark
 

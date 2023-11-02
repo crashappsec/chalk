@@ -93,7 +93,7 @@ proc runOneTool(info: PIInfo, path: string, dict: var ChalkDict): bool =
 
   return info.obj.stopOnSuccess
 
-template toolBase(s: untyped, hostScope: static[bool]) {.dirty.} =
+template toolBase(s: untyped) {.dirty.} =
   result = ChalkDict()
 
   var
@@ -104,9 +104,9 @@ template toolBase(s: untyped, hostScope: static[bool]) {.dirty.} =
     runSast = chalkConfig.getRunSastTools()
 
   for k, v in chalkConfig.tools:
-    if not v.enabled or hostScope != v.runs_once: continue
-    if not runSbom and v.kind == "sbom":          continue
-    if not runSast and v.kind == "sast":          continue
+    if not v.enabled:                    continue
+    if not runSbom and v.kind == "sbom": continue
+    if not runSast and v.kind == "sast": continue
     let priority = v.priority
     if v.kind notin toolInfo:
       toolInfo[v.kind] =  @[(priority, PIInfo(name: k, obj: v))]
@@ -123,11 +123,14 @@ template toolBase(s: untyped, hostScope: static[bool]) {.dirty.} =
   return dict
 
 proc toolGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
-  toolBase(getContextDirectories()[0], true)
+  toolBase(getContextDirectories()[0])
 
 proc toolGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
                                  ChalkDict {.cdecl.} =
- toolbase(obj.name, false)
+  if obj.fsRef != "":
+    toolbase(obj.fsRef)
+  else:
+    toolbase(obj.name)
 
 proc loadExternalTool*() =
   newPlugin("tool",

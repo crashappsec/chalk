@@ -11,16 +11,18 @@ from unittest import mock
 
 import pytest
 
-from .chalk.runner import Chalk
+from .chalk.runner import Chalk, ChalkMark
 from .chalk.validate import (
     ArtifactInfo,
     validate_chalk_report,
     validate_extracted_chalk,
     validate_virtual_chalk,
+    validate_docker_chalk_report,
 )
-from .conf import CODEOWNERS, CONFIGS, LS_PATH
+from .conf import CODEOWNERS, CONFIGS, LS_PATH, DOCKERFILES
 from .utils.git import init
 from .utils.log import get_logger
+from .utils.docker import Docker
 
 logger = get_logger()
 
@@ -235,6 +237,14 @@ def test_imds_ecs(
         {
             "_OP_CLOUD_PROVIDER": "aws",
             "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ecs",
+            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "123456789012",
+            "_OP_CLOUD_PROVIDER_IP": "203.0.113.25",
+            "_OP_CLOUD_PROVIDER_REGION": "us-east-1",
+            "_OP_CLOUD_PROVIDER_INSTANCE_TYPE": "t2.medium",
+            "_OP_CLOUD_PROVIDER_TAGS": {
+                "Name": "foobar",
+                "Environment": "staging",
+            },
         }
     )
 
@@ -282,6 +292,14 @@ def test_metadata_azure(
     assert insert.report.contains(
         {
             "_OP_CLOUD_PROVIDER": "azure",
+            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "11111111-1111-1111-1111-111111111111",
+            "_OP_CLOUD_PROVIDER_IP": "20.242.32.12",
+            "_OP_CLOUD_PROVIDER_REGION": "westeurope",
+            "_OP_CLOUD_PROVIDER_INSTANCE_TYPE": "Standard_B1ls",
+            "_OP_CLOUD_PROVIDER_TAGS": [
+                {"name": "testtag", "value": "testvalue"},
+                {"name": "testtag2", "value": "testvalue2"},
+            ],
             "_AZURE_INSTANCE_METADATA": {
                 "compute": {
                     "azEnvironment": "AzurePublicCloud",
@@ -346,8 +364,11 @@ def test_metadata_azure(
                         "resourceDisk": {"size": "34816"},
                     },
                     "subscriptionId": "11111111-1111-1111-1111-111111111111",
-                    "tags": "",
-                    "tagsList": [],
+                    "tags": "testtag:testvalue;testtag2:testvalue2",
+                    "tagsList": [
+                        {"name": "testtag", "value": "testvalue"},
+                        {"name": "testtag2", "value": "testvalue2"},
+                    ],
                     "userData": "",
                     "version": "20.04.202308310",
                     "vmId": "e94f3f7f-6b23-4395-be46-ea363c549f71",
@@ -362,7 +383,7 @@ def test_metadata_azure(
                                 "ipAddress": [
                                     {
                                         "privateIpAddress": "10.0.0.4",
-                                        "publicIpAddress": "",
+                                        "publicIpAddress": "20.242.32.12",
                                     }
                                 ],
                                 "subnet": [{"address": "10.0.0.0", "prefix": "24"}],
@@ -393,6 +414,35 @@ def test_metadata_gcp(
     assert insert.report.contains(
         {
             "_OP_CLOUD_PROVIDER": "gcp",
+            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": {
+                "11111111111-compute@developer.gserviceaccount.com": {
+                    "aliases": ["default"],
+                    "email": "11111111111-compute@developer.gserviceaccount.com",
+                    "scopes": [
+                        "https://www.googleapis.com/auth/devstorage.read_only",
+                        "https://www.googleapis.com/auth/logging.write",
+                        "https://www.googleapis.com/auth/monitoring.write",
+                        "https://www.googleapis.com/auth/servicecontrol",
+                        "https://www.googleapis.com/auth/service.management.readonly",
+                        "https://www.googleapis.com/auth/trace.append",
+                    ],
+                },
+                "default": {
+                    "aliases": ["default"],
+                    "email": "11111111111-compute@developer.gserviceaccount.com",
+                    "scopes": [
+                        "https://www.googleapis.com/auth/devstorage.read_only",
+                        "https://www.googleapis.com/auth/logging.write",
+                        "https://www.googleapis.com/auth/monitoring.write",
+                        "https://www.googleapis.com/auth/servicecontrol",
+                        "https://www.googleapis.com/auth/service.management.readonly",
+                        "https://www.googleapis.com/auth/trace.append",
+                    ],
+                },
+            },
+            "_OP_CLOUD_PROVIDER_IP": "35.205.62.123",
+            "_OP_CLOUD_PROVIDER_REGION": "europe-west1-b",
+            "_OP_CLOUD_PROVIDER_INSTANCE_TYPE": "e2-micro",
             "_GCP_INSTANCE_METADATA": {
                 "attributes": {
                     "ssh-keys": 'test:ecdsa-sha2-nistp256 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKgXTiO1+sSWCEsq/bWaLdY= google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:11:57+0000"}\ntest:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCvddnbJ/XWxMUPXOsDMNoRHJeaCgwqk6g7UYvrXqogwmJ1WpC1QPuG3mhDjmBOcjINi7TYsozDKZilL2BDu2i6CGC1s2Tokq41lsgnCePNdnYmPcA318PmuMmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeT7R92kx google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:12:12+0000"}'
@@ -473,3 +523,97 @@ def test_metadata_gcp(
             },
         }
     )
+
+
+@pytest.mark.parametrize("test_file", ["valid/sample_1"])
+def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
+    # we need to enable sboms + embed sboms
+    chalk = chalk_copy
+    chalk.load(
+        config=CONFIGS / "composable" / "valid" / "sboms" / "enable_sboms.c4m",
+        replace=False,
+    )
+
+    # expected sbom output
+    # stripped to show basics only in case we change versions
+    sbom_data = {
+        "SBOM": {
+            "syft": {
+                "bomFormat": "CycloneDX",
+                "metadata": {
+                    "component": {
+                        "type": "file",
+                        "name": "/chalk/tests/data/dockerfiles/valid/sample_1",
+                    },
+                },
+            }
+        }
+    }
+
+    tag = f"{test_file}_{random_hex}"
+    image_hash, build = chalk.docker_build(
+        dockerfile=DOCKERFILES / test_file / "Dockerfile",
+        tag=tag,
+    )
+
+    # artifact is the docker image
+    artifact_info = ArtifactInfo(
+        type="Docker Image",
+        # keys to check
+        host_info=sbom_data,
+    )
+    validate_docker_chalk_report(
+        chalk_report=build.report, artifact=artifact_info, virtual=False
+    )
+
+    # check sbom data from running container
+    _, result = Docker.run(
+        image=image_hash,
+        entrypoint="cat",
+        params=["chalk.json"],
+    )
+    chalk_mark = ChalkMark.from_json(result.stdout.decode())
+
+    assert chalk_mark.contains(sbom_data)
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk):
+    bin_path = copy_files[0]
+
+    # we need to enable sboms + embed sboms so load test config
+    chalk = chalk_copy
+    chalk.load(
+        config=CONFIGS / "composable" / "valid" / "sboms" / "enable_sboms.c4m",
+        replace=False,
+    )
+
+    # expected sbom output
+    # stripped to show basics only in case we change versions
+    sbom_data = {
+        "SBOM": {
+            "syft": {
+                "bomFormat": "CycloneDX",
+                "metadata": {
+                    "component": {
+                        "type": "file",
+                        "name": "ls",
+                    },
+                },
+            }
+        }
+    }
+
+    artifact = ArtifactInfo.one_elf(bin_path, chalk_info=sbom_data)
+
+    insert = chalk.insert(bin_path)
+    validate_chalk_report(
+        chalk_report=insert.report,
+        artifact_map=artifact,
+        virtual=False,
+        chalk_action="insert",
+    )
+
+    # check that sbom has been embedded into the artifact
+    chalk_mark = ChalkMark.from_binary(bin_path)
+    assert chalk_mark.contains(sbom_data)

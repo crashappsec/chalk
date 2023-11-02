@@ -23,14 +23,21 @@ class Docker:
         dockerfile: Optional[Path] = None,
         args: Optional[dict[str, str]] = None,
         push: bool = False,
+        platforms: Optional[list[str]] = None,
+        buildx: bool = False,
     ):
-        cmd = ["docker", "build"]
+        cmd = ["docker"]
+        if platforms or buildx:
+            cmd += ["buildx"]
+        cmd += ["build"]
         if tag:
             cmd += ["-t", tag]
         if dockerfile:
             cmd += ["-f", str(dockerfile)]
         for name, value in (args or {}).items():
             cmd += [f"--build-arg={name}={value}"]
+        if platforms:
+            cmd += [f"--platform={','.join(platforms)}"]
         if push:
             cmd += ["--push"]
         cmd += [str(context or ".")]
@@ -45,6 +52,8 @@ class Docker:
         args: Optional[dict[str, str]] = None,
         cwd: Optional[Path] = None,
         push: bool = False,
+        platforms: Optional[list[str]] = None,
+        buildx: bool = False,
         expected_success: bool = True,
         buildkit: bool = True,
     ) -> tuple[str, Program]:
@@ -59,6 +68,8 @@ class Docker:
                     dockerfile=dockerfile,
                     args=args,
                     push=push,
+                    platforms=platforms,
+                    buildx=buildx,
                 ),
                 expected_exit_code=int(not expected_success),
                 env=Docker.build_env(buildkit=buildkit),
@@ -76,26 +87,44 @@ class Docker:
     @staticmethod
     def with_image_id(build: ProgramType) -> tuple[str, ProgramType]:
         image_id = ""
-        if build.exit_code == 0:
-            try:
-                # buildx
-                image_id = build.find(
-                    "writing image",
-                    text=build.logs,
-                    words=1,  # there is "done" after hash
-                    reverse=True,
-                ).split(":")[1]
-            except ValueError:
+
+        if build.exit_code == 0:  # and not any(
+            if build.env.get("DOCKER_BUILDKIT", "1") == "1":
+
+                def get_sha256(needle: str) -> str:
+                    return build.find(
+                        needle,
+                        text=build.logs,
+                        words=1,  # there is "done" after hash
+                        reverse=True,
+                        default="",
+                        log_level=None,
+                    ).split(":")[-1]
+
+                image_id = get_sha256("writing image") or get_sha256("exporting config")
+                if not image_id and (
+                    # this is a multi-platform build so image_id is expected to be missing
+                    get_sha256("exporting_manifest_list")
+                    # --load wasnt used so no image id is provided
+                    or "Build result will only remain in the build cache" in build.logs
+                ):
+                    pass
+                elif not image_id:
+                    raise ValueError("No buildx image_id found during docker build")
+
+            else:
                 image_id = build.find(
                     "Successfully built",
                     words=1,
                     reverse=True,
+                    log_level=None,
                 )
                 # legacy builder returns short id so we figure out longer id
                 image_id = run(
                     ["docker", "inspect", image_id, "--format", "{{ .ID }}"],
                     log_level="debug",
                 ).text.split(":")[1]
+
         return image_id, build
 
     @staticmethod

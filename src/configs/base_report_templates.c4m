@@ -29,6 +29,7 @@ report and subtract from it.
   key.DATETIME_WHEN_CHALKED.use              = true
   key.EARLIEST_VERSION.use                   = true
   key.HOSTINFO_WHEN_CHALKED.use              = true
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use      = true  
   key.NODENAME_WHEN_CHALKED.use              = true
   key.INJECTOR_CHALK_ID.use                  = true
   key.INJECTOR_PUBLIC_KEY.use                = true
@@ -307,6 +308,7 @@ report and subtract from it.
   key._OP_CHALKER_VERSION.use                = true
   key._OP_PLATFORM.use                       = true
   key._OP_HOSTNAME.use                       = true
+  key._OP_PUBLIC_IPV4_ADDR.use               = true
   key._OP_HOSTINFO.use                       = true
   key._OP_NODENAME.use                       = true
   key._OP_CLOUD_METADATA.use                 = true
@@ -323,6 +325,11 @@ report and subtract from it.
   key._OP_ALL_PS_INFO.use                    = true
   key._OP_CLOUD_PROVIDER.use                 = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use    = true
+  key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use    = true
+  key._OP_CLOUD_PROVIDER_REGION.use          = true
+  key._OP_CLOUD_PROVIDER_IP.use              = true
+  key._OP_CLOUD_PROVIDER_TAGS.use            = true
+  key._OP_CLOUD_PROVIDER_INSTANCE_TYPE.use   = true
   key._AZURE_INSTANCE_METADATA.use           = true
   key._GCP_INSTANCE_METADATA.use             = true
   key._AWS_INSTANCE_IDENTITY_DOCUMENT.use    = true
@@ -406,6 +413,7 @@ doc: """
   key.DATETIME_WHEN_CHALKED.use               = true
   key.EARLIEST_VERSION.use                    = true
   key.HOSTINFO_WHEN_CHALKED.use               = true
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use       = true  
   key.NODENAME_WHEN_CHALKED.use               = true
   key.INJECTOR_CHALK_ID.use                   = true
   key.INJECTOR_VERSION.use                    = true
@@ -441,6 +449,7 @@ doc: """
   key._OP_CHALKER_VERSION.use                 = true
   key._OP_PLATFORM.use                        = true
   key._OP_HOSTNAME.use                        = true
+  key._OP_PUBLIC_IPV4_ADDR.use                = true  
   key._OP_HOSTINFO.use                        = true
   key._OP_NODENAME.use                        = true
   key._OP_CLOUD_METADATA.use                  = true
@@ -458,6 +467,11 @@ doc: """
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
   key._OP_CLOUD_PROVIDER.use                  = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
+  key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use     = true
+  key._OP_CLOUD_PROVIDER_REGION.use           = true
+  key._OP_CLOUD_PROVIDER_IP.use               = true
+  key._OP_CLOUD_PROVIDER_TAGS.use             = true
+  key._OP_CLOUD_PROVIDER_INSTANCE_TYPE.use    = true
 
   # IMDS keys
   # dynamic
@@ -527,6 +541,7 @@ doc: """
   key.DATETIME_WHEN_CHALKED.use               = true
   key.EARLIEST_VERSION.use                    = true
   key.HOSTINFO_WHEN_CHALKED.use               = true
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use       = true  
   key.NODENAME_WHEN_CHALKED.use               = true
   key.INJECTOR_CHALK_ID.use                   = true
   key.INJECTOR_PUBLIC_KEY.use                 = true
@@ -787,7 +802,7 @@ doc: """
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
-  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true  
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
 
 report_template report_default {
@@ -826,6 +841,7 @@ container.
   key.DATETIME_WHEN_CHALKED.use               = true
   key.EARLIEST_VERSION.use                    = true
   key.HOSTINFO_WHEN_CHALKED.use               = true
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use       = true    
   key.NODENAME_WHEN_CHALKED.use               = true
   key.INJECTOR_CHALK_ID.use                   = true
   key.INJECTOR_VERSION.use                    = true
@@ -863,6 +879,7 @@ container.
   key._OP_CHALKER_VERSION.use                 = true
   key._OP_PLATFORM.use                        = true
   key._OP_HOSTNAME.use                        = true
+  key._OP_PUBLIC_IPV4_ADDR.use                = true    
   key._OP_HOSTINFO.use                        = true
   key._OP_NODENAME.use                        = true
   key._OP_CLOUD_METADATA.use                  = true
@@ -870,6 +887,11 @@ container.
   key._OP_ERRORS.use                          = true
   key._OP_CLOUD_PROVIDER.use                  = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
+  key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use     = true
+  key._OP_CLOUD_PROVIDER_REGION.use           = true
+  key._OP_CLOUD_PROVIDER_IP.use               = true
+  key._OP_CLOUD_PROVIDER_TAGS.use             = true
+  key._OP_CLOUD_PROVIDER_INSTANCE_TYPE.use    = true
 
 
   # IMDS keys
@@ -1186,7 +1208,7 @@ container.
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
-  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true    
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
 report_template insertion_default {
   shortdoc: "The default template for insertion operations"
@@ -1229,6 +1251,7 @@ and keep the run-time key.
   key.DATETIME_WHEN_CHALKED.use               = false
   key.EARLIEST_VERSION.use                    = false
   key.HOSTINFO_WHEN_CHALKED.use               = false
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use       = false    
   key.NODENAME_WHEN_CHALKED.use               = false
   key.INJECTOR_CHALK_ID.use                   = true
   key.INJECTOR_VERSION.use                    = true
@@ -1264,6 +1287,7 @@ and keep the run-time key.
   key._OP_CHALKER_VERSION.use                 = true
   key._OP_PLATFORM.use                        = true
   key._OP_HOSTNAME.use                        = true
+  key._OP_PUBLIC_IPV4_ADDR.use                = true    
   key._OP_HOSTINFO.use                        = true
   key._OP_NODENAME.use                        = true
   key._OP_CLOUD_METADATA.use                  = true
@@ -1271,6 +1295,11 @@ and keep the run-time key.
   key._OP_ERRORS.use                          = true
   key._OP_CLOUD_PROVIDER.use                  = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
+  key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use     = true
+  key._OP_CLOUD_PROVIDER_REGION.use           = true
+  key._OP_CLOUD_PROVIDER_IP.use               = true
+  key._OP_CLOUD_PROVIDER_TAGS.use             = true
+  key._OP_CLOUD_PROVIDER_INSTANCE_TYPE.use    = true
 
 
   # IMDS keys
@@ -1587,7 +1616,7 @@ and keep the run-time key.
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
-  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true  
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
 
 report_template unknown_docker {
@@ -1702,6 +1731,8 @@ running insert commands.
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
   key.METADATA_ID.use                         = true
+  key.SIGNATURE.use                           = true
+  key._SIGNATURE.use                          = true
   key._VIRTUAL.use                            = true
   key._CURRENT_HASH.use                       = true
   key._IMAGE_ID.use                           = true

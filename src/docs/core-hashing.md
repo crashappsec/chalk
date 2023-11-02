@@ -82,7 +82,7 @@ basically anywhere in the binary, but much like the Unix `strip`
 command, for the sake of simplicity and correctness, we move the
 section table to the back of the binary. Moreover, it would take
 significant additional work and require some storage to make this
-operation invertable.
+operation invertible.
 
 As a result, the Chalk Hash (the `HASH` metadata key), is not defined
 based on the file system hash. Instead, it is a _normalized_ hash,
@@ -104,8 +104,8 @@ artifacts must be semantically identical.
 
 ### More on The Chalk ID
 
-Once an artifact has been normalized, and the normalizated data stream
-has been hashed using SHA-256, we programiatically take 100 bits of
+Once an artifact has been normalized, and the normalized data stream
+has been hashed using SHA-256, we programmatically take 100 bits of
 the raw hash output, base-32 encode those bits, and then add some
 hyphens for clarity, to get the `CHALK_ID`.
 

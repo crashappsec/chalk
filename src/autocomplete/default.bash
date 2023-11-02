@@ -39,7 +39,7 @@ function _chalk_delete_completions {
 
 function _chalk_load_completions {
     if [ ${_CHALK_CUR_WORD::1} = "-" ] ; then
-        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --replace --no-replace --validation --no-validation --validation-warning --no-validation-warning" -- ${_CHALK_CUR_WORD}))
+        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --replace --no-replace --update-arch-binaries --no-update-arch-binaries --params --no-params --validation --no-validation --validation-warning --no-validation-warning" -- ${_CHALK_CUR_WORD}))
     fi
 
     if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]] ; then
@@ -55,7 +55,10 @@ function _chalk_load_completions {
 
 function _chalk_dump_completions {
     if [ ${_CHALK_CUR_WORD::1} = "-" ] ; then
-        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --validation --no-validation --validation-warning --no-validation-warning" -- ${_CHALK_CUR_WORD}))
+        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --validation --no-validation --validation-warning --no-validation-warning"-- ${_CHALK_CUR_WORD}))
+    else
+        EXTRA=($(compgen -W "params cache" -- ${_CHALK_CUR_WORD}))
+        COMPREPLY+=(${EXTRA[@]})
     fi
 
     if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]] ; then
@@ -183,4 +186,4 @@ function _chalk_completions {
 }
 
 complete -F _chalk_completions chalk
-# { "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "6WRKEC-HPCM-S6AD-1GC5K3", "CHALK_VERSION" : "0.1.3", "TIMESTAMP_WHEN_CHALKED" : 1697490789233, "DATETIME_WHEN_CHALKED" : "2023-10-16T17:13:09.050-04:00", "ARTIFACT_TYPE" : "bash", "ARTIFACT_VERSION" : "0.1.3", "CHALK_PTR" : "This mark determines when to update the script. If there is no mark, or the mark is invalid it will be replaced.  To customize w/o Chalk disturbing it when it can update, add a valid  mark with a version key higher than the current chalk verison, or  use version 0.0.0 to prevent updates", "HASH" : "71726e2e40af14b1833ce3023a07605fa9c83e2c8098c403950558de34a0f138", "INJECTOR_COMMIT_ID" : "db872eb11801a82587abced82074db7182b72c0a", "ORIGIN_URI" : "git@github.com:crashappsec/chalk.git", "METADATA_ID" : "SB7M3E-3C8G-AG1Z-28J767" }
+# { "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "CRT3AS-HKCM-TK2E-1QC9JP", "CHALK_VERSION" : "0.1.3", "TIMESTAMP_WHEN_CHALKED" : 1697697525533, "DATETIME_WHEN_CHALKED" : "2023-10-19T02:38:42.027-04:00", "ARTIFACT_TYPE" : "bash", "ARTIFACT_VERSION" : "0.1.3", "CHALK_PTR" : "This mark determines when to update the script. If there is no mark, or the mark is invalid it will be replaced.  To customize w/o Chalk disturbing it when it can update, add a valid  mark with a version key higher than the current chalk verison, or  use version 0.0.0 to prevent updates", "HASH" : "f45f3e5187becf34d5f654e94780022a5d41c15bcd03867b7a1c045ec431cf72", "INJECTOR_COMMIT_ID" : "8001314ff4406ee96ee75395320b3b806ab2f068", "ORIGIN_URI" : "git@github.com:crashappsec/chalk.git", "METADATA_ID" : "RBMBE0-C89J-2KPB-Z3JM78" }
