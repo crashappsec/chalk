@@ -642,7 +642,7 @@ The author of the most recent commit in the current branch, which is likely the 
 """
 }
 
-keyspec AUTHOR_DATE {
+keyspec DATE_AUTHORED {
     kind:             ChalkTimeArtifact
     type:             string
     standard:         true
@@ -664,7 +664,7 @@ The committer of the most recent commit in the current branch.
 """
 }
 
-keyspec COMMIT_DATE {
+keyspec DATE_COMMITTED {
     kind:             ChalkTimeArtifact
     type:             string
     standard:         true
