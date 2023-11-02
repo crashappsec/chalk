@@ -8,7 +8,7 @@
 ## The plugin responsible for pulling metadata from the git
 ## repository.
 
-import ../config, ../plugin_api, times, zippy, zippy/inflate
+import ../config, nativesockets, ../plugin_api, times, zippy, zippy/inflate
 
 const
   eBadGitConf  = "Git configuration file is invalid"
@@ -33,6 +33,10 @@ const
   gitPackExt   = ".pack"
   gitTimeFmt   = "ddd MMM dd HH:mm:ss YYYY"
   gitObjCommit = 1
+  keyAuthor     = "AUTHOR"
+  keyAuthorDate = "DATE_AUTHORED"
+  keyCommitter  = "COMMITTER"
+  keyCommitDate = "DATE_COMMITTED"
 
 type
   KVPair*  = (string, string)
@@ -220,10 +224,7 @@ type
     vcsDirs:    OrderedTable[string, RepoInfo]
 
 proc getUint32BE(data: string, whence: SomeInteger=0): uint32 =
-  result = cast[ref [uint32]](addr data[whence])[]
-  result = (result shl 16) or (result shr 16)
-  result = ((result and uint32(0xff00ff00)) shr 8) or
-           ((result and uint32(0x00ff00ff)) shl 8)
+  result = ntohl(cast[ptr [uint32]](addr data[whence])[])
 
 proc formatCommitObjectTime(line: string): string =
   let parts = line.split(" ")
@@ -321,7 +322,7 @@ proc findPackedGitCommit(vcsDir, commitId: string): string =
       let high32 = uint64(getUint32BE(data, tableOffset64 + (offset * 8)))
       let low32  = uint64(getUint32BE(data, tableOffset64 + (offset * 8) + 4))
       offset = (high32 shl 32) or low32
-    return readPackedCommit(filename.replace(".idx", ".pack"), offset)
+    return readPackedCommit(filename.replace(gitIdxExt, gitPackExt), offset)
   raise(newException(CatchableError, "failed to parse git index"))
 
 proc loadHead(info: RepoInfo) =
@@ -372,8 +373,8 @@ proc loadHead(info: RepoInfo) =
     trace("commit ID: " & info.commitID)
     let
       commitId = info.commitId
-      objPath = gitObjects.joinPath(commitId[0 ..< 2], commitId[2 .. ^1])
-      objFile = newFileStream(info.vcsDir.joinPath(objPath))
+      objPath  = gitObjects.joinPath(commitId[0 ..< 2], commitId[2 .. ^1])
+      objFile  = newFileStream(info.vcsDir.joinPath(objPath))
     var objData: string
     try:
       if objFile != nil:
@@ -492,13 +493,13 @@ template setVcsStuff(info: RepoInfo) =
   if info.branch != "":
     result["BRANCH"] = pack(info.branch)
   if info.author != "":
-    result["AUTHOR"] = pack(info.author)
+    result[keyAuthor] = pack(info.author)
   if info.authorDate != "":
-    result["AUTHOR_DATE"] = pack(info.authorDate)
+    result[keyAuthorDate] = pack(info.authorDate)
   if info.committer != "":
-    result["COMMITTER"] = pack(info.committer)
+    result[keyCommitter] = pack(info.committer)
   if info.commitDate != "":
-    result["COMMIT_DATE"] = pack(info.commitDate)
+    result[keyCommitDate] = pack(info.commitDate)
   break
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
