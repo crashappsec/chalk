@@ -75,7 +75,7 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
 proc writeChalkMark(ctx: DockerInvocation, mark: string) =
   # We are going to move this file, so don't autoclean.
   var
-    (f, path) = getNewTempFile(autoClean = false, nestInDir = true)
+    (f, path) = getNewTempFile(autoClean = false)
 
   try:
     info("Creating temporary chalk file: " & path)
@@ -176,7 +176,7 @@ proc writeNewDockerFileIfNeeded(ctx: DockerInvocation) =
   # should properly be using a temporary file, because it's a place
   # we're generally guaranteed to be able to write.
 
-  let (f, path) = getNewTempFile(nestInDir = true)
+  let (f, path) = getNewTempFile()
 
   info("Created temporary Dockerfile at: " & path)
 
@@ -618,6 +618,14 @@ template passThroughLogic() =
     dumpExOnDebug()
     reporting.doReporting("fail")
 
+template prepBuildCommand() =
+  try:
+    ctx.processGitContext()
+  except:
+    dumpExOnDebug()
+    error("Chalk could not process docker git context. Retrying w/o chalk.")
+    ctx.dockerFailSafe()
+
 template gotBuildCommand() =
   try:
     exitCode = ctx.runBuild()
@@ -745,20 +753,18 @@ template postDockerActivity() =
 
 proc runCmdDocker*(args: seq[string]) =
   setDockerExeLocation()
+
   var
     exitCode = 0
-    ctx: DockerInvocation
-
-  try:
-    ctx = args.processDockerCmdLine()
-  except:
-    ctx.dockerFailSafe()
+    ctx      = args.processDockerCmdLine()
 
   ctx.originalArgs = args
 
   if ctx.cmdBuild:
     # Build with --push is still a build operation.
     setCommandName("build")
+    prepBuildCommand()
+
   elif ctx.cmdPush:
     setCommandName("push")
 
