@@ -291,7 +291,7 @@ proc findPackedGitCommit(vcsDir, commitId: string): string =
                      getUint32BE(data, fanoutTable + (int(firstByte - 1) * 4))
                    else:
                      0
-      candidates = getUint32BE(data, fanoutTable + (int(firstByte) * 4)) - skipCount
+      candidates = getUint32BE(data, fanoutTable+(int(firstByte)*4))-skipCount
     if candidates == 0:
       continue
     let
