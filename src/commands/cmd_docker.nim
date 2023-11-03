@@ -75,7 +75,7 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
 proc writeChalkMark(ctx: DockerInvocation, mark: string) =
   # We are going to move this file, so don't autoclean.
   var
-    (f, path) = getNewTempFile(autoClean = false)
+    (f, path) = getNewTempFile(autoClean = false, nestInDir = true)
 
   try:
     info("Creating temporary chalk file: " & path)
@@ -176,7 +176,7 @@ proc writeNewDockerFileIfNeeded(ctx: DockerInvocation) =
   # should properly be using a temporary file, because it's a place
   # we're generally guaranteed to be able to write.
 
-  let (f, path) = getNewTempFile()
+  let (f, path) = getNewTempFile(nestInDir = true)
 
   info("Created temporary Dockerfile at: " & path)
 
