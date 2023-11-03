@@ -318,6 +318,21 @@ proc stripFlagsWeRewrite*(ctx: DockerInvocation) =
   if ctx.gitContext != nil:
     ctx.newCmdLine = ctx.gitContext.replaceContextArg(ctx.newCmdLine)
 
+proc processGitContext*(ctx: DockerInvocation) =
+  if isGitContext(ctx.foundContext):
+    trace("Detected git docker context. Fetching context")
+    ctx.gitContext = gitContext(ctx.foundContext,
+                                authTokenSecret = ctx.getSecret("GIT_AUTH_TOKEN"),
+                                authHeaderSecret = ctx.getSecret("GIT_AUTH_HEADER"))
+    if not supportsBuildContextFlag():
+      trace("No support for additional contexts detected. " &
+            "Checking out git context to disk")
+      # if using git context, and buildx is not used which supports
+      # --build-context args, in order to copy any files into container
+      # we need normalize context to a regular folder and so
+      # we checkout git context into a folder and use that as context
+      ctx.foundContext = ctx.gitContext.checkout()
+
 proc processDockerCmdLine*(args: seq[string]): DockerInvocation =
   ## This does the initial command line parsing, caching the fields we
   ## look at into the DockerInvocation object so that callers don't
@@ -359,19 +374,6 @@ proc processDockerCmdLine*(args: seq[string]): DockerInvocation =
     result.extractPrivs()
     result.extractSecrets()
     result.extractCmdlineBuildContext()
-    if isGitContext(result.foundContext):
-      trace("Detected git docker context. Fetching context")
-      result.gitContext = gitContext(result.foundContext,
-                                     authTokenSecret = result.getSecret("GIT_AUTH_TOKEN"),
-                                     authHeaderSecret = result.getSecret("GIT_AUTH_HEADER"))
-      if not supportsBuildContextFlag():
-        trace("No support for additional contexts detected. " &
-              "Checking out git context to disk")
-        # if using git context, and buildx is not used which supports
-        # --build-context args, in order to copy any files into container
-        # we need normalize context to a regular folder and so
-        # we checkout git context into a folder and use that as context
-        result.foundContext = result.gitContext.checkout()
   of "push":
     result.setPushReference()
     result.extractPushCmdTags()
