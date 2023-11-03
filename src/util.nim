@@ -112,6 +112,12 @@ proc setupManagedTemp*() =
   if customTmpDirOpt.isSome() and not existsEnv("TMPDIR"):
     putenv("TMPDIR", customTmpDirOpt.get())
 
+  # temp folder needs to exist in order to successfully create
+  # tmp files otherwise nim's createTempFile throws segfault
+  # when TMPDIR does not exist
+  if existsEnv("TMPDIR"):
+    discard existsOrCreateDir(getEnv("TMPDIR"))
+
   if chalkConfig.getChalkDebug():
     info("Debug is on; temp files / dirs will be moved, not deleted.")
     setManagedTmpCopyLocation(resolvePath("chalk-tmp"))
