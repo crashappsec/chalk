@@ -700,6 +700,18 @@ of chalk mark insertion.
 """
 }
 
+keyspec TAG {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.2.3"
+    shortdoc:         "Current repo tag at time of marking"
+    doc:              """
+The tag name found in the source code repository found at the time
+of chalk mark insertion.
+"""
+}
+
 keyspec COMMIT_ID {
     kind:             ChalkTimeArtifact
     type:             string

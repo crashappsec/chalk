@@ -194,6 +194,16 @@ proc parseGitConfig(s: Stream): seq[SecInfo] =
 
 proc findGitDir(fullpath: string): string =
   let
+    headExists = fullpath.joinPath(fNameHead).fileExists()
+    configExists = fullpath.joinPath(fNameConfig).fileExists()
+
+  # path is probably itself a .git folder such as
+  # from git init --bare
+  # and so we can return it directly
+  if headExists and configExists:
+    return fullpath
+
+  let
     gitDir       = fullpath.joinPath(".git")
     (head, tail) = fullpath.splitPath()
 
