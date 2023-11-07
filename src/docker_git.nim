@@ -7,6 +7,12 @@
 import base64, strutils, uri
 import config, util, docker_base
 
+const
+  HEADS          = "refs/heads/"
+  TAGS           = "refs/tags/"
+  GIT_USER       = "x-access-token"
+  DEFAULT_BRANCH = "main"
+
 proc setGitExeLocation() =
   once:
     gitExeLocation = findExePath("git",
@@ -81,15 +87,16 @@ proc splitContext(context: string): (string, string, string) =
     (remoteUrl, headSubdir) = context.splitBy("#")
     (head, subdir) = headSubdir.splitBy(":")
   trace("Docker git context:")
-  trace("remote = " & remoteUrl)
-  trace("  head = " & head)
-  if len(subdir) > 0:
-    trace("subdir = " & subdir)
+  trace("  remote = " & remoteUrl)
+  if head != "":
+    trace("    head = " & head)
+  if subdir != "":
+    trace("  subdir = " & subdir)
   return (remoteUrl, head, subdir)
 
 proc isCommitSha(head: string): bool =
   try:
-    return len(head) == 40 and head.parseHexInt() > 0
+    return len(head) == 40 and head.parseHexStr() != ""
   except ValueError:
     return false
 
@@ -121,7 +128,7 @@ proc run(git: DockerGitContext,
     var value = ""
     if git.authToken != "":
       let
-        user  = "x-access-token"
+        user  = GIT_USER
         token = git.authToken.strip()
         creds = user & ":" & token
         encoded = encode(creds)
@@ -156,34 +163,158 @@ proc run(git: DockerGitContext,
     error(strip(result.stdOut & result.stdErr))
     raise newException(ValueError, "Git failed")
 
-proc getDefaultBranch(git: DockerGitContext): string =
-  let output = git.run(@["ls-remote", "--symref", git.remoteUrl, "HEAD"], dir = false)
-  for line in output.stdOut.splitLines():
-    if "refs/heads/" in line:
-      return line.split("refs/heads/")[1].split()[0].strip()
+template parseNameFrom(line: string): string =
+  if HEADS in line:
+    line.split(HEADS)[1].split()[0].strip()
+  elif TAGS in line:
+    line.split(TAGS)[1].split()[0].strip()
+  else:
+    ""
+
+template parseCommitFrom(line: string): string =
+  line.split()[0]
+
+template parseDefaultBranch(git: DockerGitContext, lines: seq[string]): string =
+  if len(lines) > 0 and lines[0].startsWith("ref:"):
+    parseNameFrom(lines[0])
+  else:
+    ""
+
+proc parseCommitForName(name: string, lines: seq[string]): string =
+  for line in lines:
+    if not line.startsWith("ref:") and parseNameFrom(line) == name:
+      return parseCommitFrom(line)
+  error("Git: there is no git reference for " & name)
+  raise newException(ValueError, "Git no commit for reference")
+
+proc parseAllNamesForCommit(commit: string, refs: string, lines: seq[string]): seq[string] =
+  for line in lines:
+    if line.startsWith(commit) and refs in line:
+      let name = parseNameFrom(line)
+      if name != "":
+        result.add(name)
+
+proc getRemoteHead(git: DockerGitContext, head: string): GitHead =
+  # In order for git fetch to be efficient, we do shallow fetch
+  # however shallow fetch only fetches specified ref-spec
+  # which means if the tag is fetched, its remote/origin/tags/<TAG> ref
+  # is fetched however the knowledge about the tag itself is lost on fetch.
+  # That can be solved by either:
+  # * not doing shallow fetch or
+  # * specifying ref-specs during fetch itself such as
+  #   git fetch origin <ref> <ref>:refs/tags/<tag>
+  # That will fetch the remote ref however will also create appropriate
+  # tag reference in local repo all in the same operation.
+  # The trick is that the fetch ref-specs need to be specified in fetch
+  # args which brings to the purpose of this function.
+  # This function parses remote repo ls-remote output to figure out given head's:
+  # * commit SHA
+  # * branches
+  # * tags
+  # This information can then be used during fetch to correctly map
+  # fetched ref to local refs.
+  # As a side bonus, as ls-remote will list all refs, it will ensure
+  # that all metadata for the same head will be synced. For example,
+  # normally git fetch <tag> will only fetch that one specific tag,
+  # regardless if there are other tags pointing to the exact same commit.
+  # This will function will link all relevant tags which point to the same
+  # commit hence allowing fetch to correctly link all tags.
+  # Same applies to branches as multiple branches can have the same head.
+  let
+    output = git.run(@["ls-remote", "--symref", git.remoteUrl], dir = false)
+    lines  = output.stdOut.splitLines()
+  var head = head
+  new result
+
+  if head == "":
+    head = git.parseDefaultBranch(lines)
+    if head == "":
+      error("Git: failed to determine default branch")
+      raise newException(ValueError, "Git failed")
+    trace("Git: default branch for " & git.remoteUrl & " is " & head)
+
+  if isCommitSha(head):
+    result.gitRef    = head
+    result.gitType   = GitHeadType.commit
+    result.commit    = head
+    result.branches  = parseAllNamesForCommit(result.commit, HEADS, lines)
+    result.tags      = parseAllNamesForCommit(result.commit, TAGS,  lines)
+
+  else:
+    result.gitRef    = head
+    result.commit    = parseCommitForName(head, lines)
+    if result.commit == "":
+      error("Git: failed to find git reference " & head & " in " & git.remoteUrl)
+      raise newException(ValueError, "Git failed")
+    result.branches  = parseAllNamesForCommit(result.commit, HEADS, lines)
+    result.tags      = parseAllNamesForCommit(result.commit, TAGS,  lines)
+    if head in result.tags:
+      result.gitType = GitHeadType.tag
+    elif head in result.branches:
+      result.gitType = GitHeadType.branch
+    else:
+      error("Git: failed to find git reference " & head & " in " & git.remoteUrl)
+      raise newException(ValueError, "Git failed")
 
 proc init(git: DockerGitContext) =
-  discard git.run(@["-c", "init.defaultBranch=main", "--bare", "init"])
+  discard git.run(@["-c", "init.defaultBranch=" & DEFAULT_BRANCH, "--bare", "init"])
   discard git.run(@["remote", "add", "origin", git.remoteUrl])
 
+template setGitHEADToCommit() =
+  # there is no git command to detach HEAD to a particular
+  # commit so we have to update the file manually.
+  # Again very annoying not does not seem to be possible with native CLI.
+  # These dont work:
+  # * git reset --soft             <- does not change .git/HEAD
+  # * git update-ref HEAD <COMMIT> <- updates refs/<HEAD> instead
+  # * git symbolic-ref HEAD        <- only supports updating to branches/tags
+  discard tryToWriteFile(git.tmpGitDir.joinPath("HEAD"), git.head.commit)
+
+template setGitHEADToName(refs: string) =
+  discard git.run(@["symbolic-ref", "HEAD", refs & git.head.gitRef])
+
+template setGitHEAD(git: DockerGitContext) =
+  # as git fetch on bare repos does not update `HEAD`,
+  # we need to do that manually as otherwise HEAD will point
+  # to the default branch name which is usually `main`
+  # even if the pulled ref has nothing to do with `main`.
+  # In addition otherwise bare repo is just a collection of loose git refs
+  # and it would be hard to parse the current commit/branch/tag
+  # which is necessary for git metadata reporting
+  case git.head.gitType
+    of GitHeadType.commit:
+      setGitHEADToCommit()
+    of GitHeadType.branch:
+      setGitHEADToName(HEADS)
+    of GitHeadType.tag:
+      # git tags are treated as detached commits on checkout
+      setGitHEADToCommit()
+
 proc fetch(git: DockerGitContext) =
-  var args: seq[string] = @["fetch"]
-  if not isCommitSha(git.head):
-    args.add("--depth=1")
-    args.add("--no-tags")
+  var args: seq[string] = @[
+    "fetch",
+    # bare repo does not seem to update HEAD but we can try
+    "--update-head-ok",
     # allow to fetch both a branch or tags
     # and force update if necessary
-    args.add("--force")
-  args.add("origin")
-  if isCommitSha(git.head):
-    args.add(git.head)
-  else:
-    args.add(git.head & ":tags/" & git.head)
+    "--force",
+    # don't fetch all tags from remote
+    "--no-tags",
+    # shallow fetch for faster operation
+    "--depth=1",
+    "origin",
+    git.head.gitRef,
+  ]
+  for branch in git.head.branches:
+    args.add(branch & ":" & HEADS & branch)
+  for tag in git.head.tags:
+    args.add(tag & ":" & TAGS & tag)
   discard git.run(args)
+  git.setGitHead()
 
 proc checkout*(git: DockerGitContext): string =
   git.tmpWorkTree = getNewTempDir(tmpFileSuffix = ".context")
-  discard git.run(@["checkout", git.head])
+  discard git.run(@["checkout", git.head.gitRef])
   return git.contextPath()
 
 proc show*(git: DockerGitContext, path: string): string =
@@ -193,7 +324,7 @@ proc show*(git: DockerGitContext, path: string): string =
     # and so we normalize it by using resolvePath() + relativePath()
     fullPath = joinPath(root, git.subdir, path).resolvePath()
     relPath  = fullPath.relativePath(root)
-    refSpec  = git.head & ":" & relPath
+    refSpec  = git.head.gitRef & ":" & relPath
   return git.run(@["show", refSpec]).stdOut
 
 proc gitContext*(context: string,
@@ -206,7 +337,6 @@ proc gitContext*(context: string,
   new result
   result.context      = context
   result.remoteUrl    = remoteUrl
-  result.head         = head
   result.subdir       = subdir
   result.authToken    = authTokenSecret.getValue()
   result.authHeader   = authHeaderSecret.getValue()
@@ -217,8 +347,7 @@ proc gitContext*(context: string,
     setSshKeyscanExeLocation()
     result.tmpKnownHost = createTempKnownHosts(fetchSshKnownHost(remoteUrl))
 
-  if result.head == "":
-    result.head = result.getDefaultBranch()
+  result.head = result.getRemoteHead(head)
 
   result.init()
   result.fetch()

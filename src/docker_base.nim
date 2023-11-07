@@ -231,8 +231,11 @@ proc parseTag*(tag: string): (string, string) =
     return (tag, "latest")
 
 proc getAllDockerContexts*(info: DockerInvocation): seq[string] =
-  if info.foundContext != "" and info.foundContext != "-":
-    result.add(resolvePath(info.foundContext))
+  if info.gitContext != nil:
+    result.add(info.gitContext.tmpGitDir)
+  else:
+    if info.foundContext != "" and info.foundContext != "-":
+      result.add(resolvePath(info.foundContext))
 
   for k, v in info.otherContexts:
     result.add(resolvePath(v))

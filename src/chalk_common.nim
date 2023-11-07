@@ -243,12 +243,23 @@ type
     shell*:       ShellInfo
     lastUser*:    DfUserInfo
 
+  GitHeadType* = enum
+    commit, branch, tag
+
+  GitHead* = ref object
+    gitRef*:       string
+    gitType*:      GitHeadType
+    commit*:       string
+    # first matching branch for commit ref, if any
+    branches*:     seq[string]
+    tags*:         seq[string]
+
   DockerGitContext* = ref object
-    context*:     string
+    context*:      string
     # https://docs.docker.com/engine/reference/commandline/build/
     # context is a combination of remote url + head + subdir within the context
     remoteUrl*:    string
-    head*:         string
+    head*:         GitHead
     subdir*:       string
     authToken*:    string
     authHeader*:   string
