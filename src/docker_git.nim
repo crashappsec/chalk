@@ -10,6 +10,7 @@ import config, util, docker_base
 const
   HEADS          = "refs/heads/"
   TAGS           = "refs/tags/"
+  ANNOTATED_TAG  = "^{}"
   GIT_USER       = "x-access-token"
   DEFAULT_BRANCH = "main"
 
@@ -189,7 +190,7 @@ proc parseCommitForName(name: string, lines: seq[string]): string =
 
 proc parseAllNamesForCommit(commit: string, refs: string, lines: seq[string]): seq[string] =
   for line in lines:
-    if line.startsWith(commit) and refs in line:
+    if line.startsWith(commit) and refs in line and ANNOTATED_TAG not in line:
       let name = parseNameFrom(line)
       if name != "":
         result.add(name)
@@ -236,18 +237,18 @@ proc getRemoteHead(git: DockerGitContext, head: string): GitHead =
   if isCommitSha(head):
     result.gitRef    = head
     result.gitType   = GitHeadType.commit
-    result.commit    = head
-    result.branches  = parseAllNamesForCommit(result.commit, HEADS, lines)
-    result.tags      = parseAllNamesForCommit(result.commit, TAGS,  lines)
+    result.commitId  = head
+    result.branches  = parseAllNamesForCommit(result.commitId, HEADS, lines)
+    result.tags      = parseAllNamesForCommit(result.commitId, TAGS,  lines)
 
   else:
     result.gitRef    = head
-    result.commit    = parseCommitForName(head, lines)
-    if result.commit == "":
+    result.commitId  = parseCommitForName(head, lines)
+    if result.commitId == "":
       error("Git: failed to find git reference " & head & " in " & git.remoteUrl)
       raise newException(ValueError, "Git failed")
-    result.branches  = parseAllNamesForCommit(result.commit, HEADS, lines)
-    result.tags      = parseAllNamesForCommit(result.commit, TAGS,  lines)
+    result.branches  = parseAllNamesForCommit(result.commitId, HEADS, lines)
+    result.tags      = parseAllNamesForCommit(result.commitId, TAGS,  lines)
     if head in result.tags:
       result.gitType = GitHeadType.tag
     elif head in result.branches:
@@ -268,7 +269,7 @@ template setGitHEADToCommit() =
   # * git reset --soft             <- does not change .git/HEAD
   # * git update-ref HEAD <COMMIT> <- updates refs/<HEAD> instead
   # * git symbolic-ref HEAD        <- only supports updating to branches/tags
-  discard tryToWriteFile(git.tmpGitDir.joinPath("HEAD"), git.head.commit)
+  discard tryToWriteFile(git.tmpGitDir.joinPath("HEAD"), git.head.commitId)
 
 template setGitHEADToName(refs: string) =
   discard git.run(@["symbolic-ref", "HEAD", refs & git.head.gitRef])
