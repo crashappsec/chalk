@@ -221,6 +221,7 @@ type
     vcsDir:     string
     origin:     string
     branch:     string
+    tag:        string
     commitId:   string
     author:     string
     authorDate: string
@@ -335,86 +336,102 @@ proc findPackedGitCommit(vcsDir, commitId: string): string =
     return readPackedCommit(filename.replace(gitIdxExt, gitPackExt), offset)
   raise(newException(CatchableError, "failed to parse git index"))
 
-proc loadHead(info: RepoInfo) =
-  var
-    fs: FileStream
-    hf: string
-
-  try:
-    fs = newFileStream(info.vcsDir.joinPath(fNameHead))
-    if fs != nil:
-      hf = fs.readAll().strip()
-    else:
-      return
-
-    try:
-      fs.close()
-    except:
-      discard
-  except:
-    error(fNameHead & ": Git HEAD file couldn't be read")
-    dumpExOnDebug()
-    return
-
-  if not hf.startsWith(ghRef):
-    info.commitId = hf
-    return
-
+proc loadAuthor(info: RepoInfo, commitId: string) =
   let
-    fname = hf[4 .. ^1].strip()
-    parts = if DirSep in fname:
-              fname.split(DirSep)
-            else:
-              fname.split("/")
+    objFile     = info.vcsDir.joinPath(commitId[0 ..< 2], commitId[2 .. ^1])
+    objFileData = tryToLoadFile(objFile).strip()
+
+  var objData: string
+  try:
+    if objFileData != "":
+      # if the most recent commit this branch refers to was actually on this
+      # branch, we can just read the commit object on the filesystem; the git
+      # objects are stored as: .git/objects/01/23456789abcdef<...hash/>
+      objData = uncompress(objFileData, dataFormat=dfZlib)
+    else:
+      # the most recent commit for this branch did not happen on this branch
+      # this can happen if users checkout a new branch and haven't committed
+      # anything to it yet; we need to unpack this commit from packed objects
+      objData = findPackedGitCommit(info.vcsDir, commitId)
+    let lines = objData.split("\n")
+    for index, line in lines:
+      if line.startsWith(gitAuthor):
+        # this makes only the same assumptions as git itself:
+        # https://github.com/git/git/blob/master/commit.c#L97 ddcb8fd
+        # only in a Nim try/except block so we don't explicitly check bounds
+        info.author     = line[len(gitAuthor) .. ^1]
+        info.authorDate = formatCommitObjectTime(line)
+        info.committer  = lines[index + 1][len(gitCommitter) .. ^1]
+        info.commitDate = formatCommitObjectTime(lines[index + 1])
+        break
+  except:
+    warn("unable to retrieve Git commit data: " & commitId)
+
+proc loadCommit(info: RepoInfo, commitId: string) =
+  info.commitId = commitId
+  trace("commit ID: " & info.commitID)
+  info.loadAuthor(commitId)
+
+proc loadTag(info: RepoInfo) =
+  if info.tag != "":
+    return
+  # need commit to compare with
+  if info.commitId == "":
+    return
+
+  let tagPath = info.vcsDir.joinPath("refs", "tags")
+
+  for tag in tagPath.walkDirRec(relative = true):
+    let tagCommit = tryToLoadFile(tagPath.joinPath(tag)).strip()
+    if tagCommit == info.commitId:
+      info.tag = tag
+      trace("tag: " & info.tag)
+
+proc loadSymref(info: RepoInfo, gitRef: string) =
+  let
+    fname = gitRef[4 .. ^1].strip()
+    parts = fname.split({ DirSep, '/'}, maxsplit = 3)
 
   if parts.len() < 3:
     error(fNameHead & ": Git HEAD file couldn't be loaded")
     return
 
-  info.branch   = parts[2 .. ^1].join($DirSep)
-  trace("branch: " & info.branch)
+  let name = parts[2]
+  case parts[1]:
+    of "tags":
+      info.tag    = name
+      trace("tag: " & info.tag)
+    of "heads":
+      info.branch = name
+      trace("branch: " & info.branch)
 
   let
     fNameRef = info.vcsDir.joinPath(fname)
-    reffile  = newFileStream(fNameRef)
-  if reffile != nil:
-    info.commitId = reffile.readAll().strip()
-    reffile.close()
-    trace("commit ID: " & info.commitID)
-    let
-      commitId = info.commitId
-      objPath  = gitObjects.joinPath(commitId[0 ..< 2], commitId[2 .. ^1])
-      objFile  = newFileStream(info.vcsDir.joinPath(objPath))
-    var objData: string
-    try:
-      if objFile != nil:
-        # if the most recent commit this branch refers to was actually on this
-        # branch, we can just read the commit object on the filesystem; the git
-        # objects are stored as: .git/objects/01/23456789abcdef<...hash/>
-        objData = uncompress(objFile.readAll(), dataFormat=dfZlib)
-      else:
-        # the most recent commit for this branch did not happen on this branch
-        # this can happen if users checkout a new branch and haven't committed
-        # anything to it yet; we need to unpack this commit from packed objects
-        objData = findPackedGitCommit(info.vcsDir, commitId)
-      let lines = objData.split("\n")
-      for index, line in lines:
-        if line.startsWith(gitAuthor):
-          # this makes only the same assumptions as git itself:
-          # https://github.com/git/git/blob/master/commit.c#L97 ddcb8fd
-          # only in a Nim try/except block so we don't explicitly check bounds
-          info.author     = line[len(gitAuthor) .. ^1]
-          info.authorDate = formatCommitObjectTime(line)
-          info.committer  = lines[index + 1][len(gitCommitter) .. ^1]
-          info.commitDate = formatCommitObjectTime(lines[index + 1])
-          break
-    except:
-      warn("unable to retrieve Git commit data: " & commitId)
-  else:
-    warn(fNameRef                      &
-         ": Git ref file for branch '" &
-         info.branch                   &
+    commitId = tryToLoadFile(fNameRef).strip()
+
+  if commitId == "":
+    warn(fNameRef               &
+         ": Git ref file for '" &
+         name                   &
          "' doesnt exist. Most likely it's an empty git repo.")
+    return
+
+  info.loadCommit(commitId)
+
+proc loadHead(info: RepoInfo) =
+  let
+    hp = info.vcsDir.joinPath(fNameHead)
+    hf = tryToLoadFile(hp).strip()
+  if hf == "":
+    error(hp & ": Git HEAD file couldn't be read")
+    return
+
+  if hf.startsWith(ghRef):
+    info.loadSymref(hf)
+    info.loadTag()
+  else:
+    info.loadCommit(hf)
+    info.loadTag()
 
 proc calcOrigin(self: RepoInfo, conf: seq[SecInfo]): string =
   # We are generally looking for the remote origin, because we expect
@@ -496,20 +513,14 @@ proc findAndLoad(plugin: GitInfo, path: string) =
 
 template setVcsStuff(info: RepoInfo) =
   result["VCS_DIR_WHEN_CHALKED"] = pack(info.vcsDir.splitPath().head)
-  if info.origin != "":
-    result["ORIGIN_URI"] = pack(info.origin)
-  if info.commitId != "":
-    result["COMMIT_ID"] = pack(info.commitId)
-  if info.branch != "":
-    result["BRANCH"] = pack(info.branch)
-  if info.author != "":
-    result[keyAuthor] = pack(info.author)
-  if info.authorDate != "":
-    result[keyAuthorDate] = pack(info.authorDate)
-  if info.committer != "":
-    result[keyCommitter] = pack(info.committer)
-  if info.commitDate != "":
-    result[keyCommitDate] = pack(info.commitDate)
+  result.setIfNeeded("ORIGIN_URL", info.origin)
+  result.setIfNeeded("COMMIT_ID", info.commitId)
+  result.setIfNeeded("BRANCH", info.branch)
+  result.setIfNeeded("TAG", info.tag)
+  result.setIfNeeded(keyAuthor, info.author)
+  result.setIfNeeded(keyAuthorDate, info.authorDate)
+  result.setIfNeeded(keyCommitter, info.committer)
+  result.setIfNeeded(keyCommitDate, info.commitDate)
   break
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
