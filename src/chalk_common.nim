@@ -249,7 +249,7 @@ type
   GitHead* = ref object
     gitRef*:       string
     gitType*:      GitHeadType
-    commit*:       string
+    commitId*:     string
     # first matching branch for commit ref, if any
     branches*:     seq[string]
     tags*:         seq[string]
