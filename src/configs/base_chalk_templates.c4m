@@ -24,7 +24,7 @@ time; that is controlled via a `report_template` object instead.
 
 There is no requirement for things in the chalk mark to be reported,
 or vice versa.
-"""  
+"""
   key.MAGIC.use                              = true
   key.CHALK_VERSION.use                      = true
   key.DATE_CHALKED.use                       = true
@@ -54,6 +54,7 @@ or vice versa.
   key.PRE_CHALK_HASH.use                     = true
   key.ORIGIN_URI.use                         = true
   key.BRANCH.use                             = true
+  key.TAG.use                                = true
   key.COMMIT_ID.use                          = true
   key.AUTHOR.use                             = true
   key.DATE_AUTHORED.use                      = true
@@ -114,7 +115,7 @@ mark_template mark_large {
   key.DATETIME_WHEN_CHALKED.use               = true
   key.EARLIEST_VERSION.use                    = true
   key.HOSTINFO_WHEN_CHALKED.use               = true
-  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use       = true  
+  key.PUBLIC_IPV4_ADDR_WHEN_CHALKED.use       = true
   key.NODENAME_WHEN_CHALKED.use               = true
   key.INJECTOR_CHALK_ID.use                   = true
   key.INJECTOR_VERSION.use                    = true
@@ -133,6 +134,7 @@ mark_template mark_large {
   key.HASH.use                                = true
   key.ORIGIN_URI.use                          = true
   key.BRANCH.use                              = true
+  key.TAG.use                                 = true
   key.COMMIT_ID.use                           = true
   key.AUTHOR.use                              = true
   key.DATE_AUTHORED.use                       = true
@@ -163,7 +165,7 @@ mark_template mark_large {
   # it junking up things.
   key.SIGNING.use                             = false
   key.SIGNATURE.use                           = true
-  key.INJECTOR_PUBLIC_KEY.use                 = true  
+  key.INJECTOR_PUBLIC_KEY.use                 = true
   key.DOCKER_FILE.use                         = true
   key.DOCKERFILE_PATH.use                     = true
   key.DOCKER_PLATFORM.use                     = true
@@ -181,7 +183,7 @@ mark_template mark_large {
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
-  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true  
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
 
 mark_template mark_default {
@@ -193,7 +195,7 @@ The default values for what goes into chalk marks when using the
 The default configuration will also use this template for `setup` and
 `chalk load`.
 
-However, the default is to use the `minimal` template for docker chalks. 
+However, the default is to use the `minimal` template for docker chalks.
 
 This is not a config suitable for a reproducable build. To make it one,
 use the mark template named `reproducable`.
@@ -213,6 +215,7 @@ use the mark template named `reproducable`.
   key.HASH.use                                = true
   key.ORIGIN_URI.use                          = true
   key.BRANCH.use                              = true
+  key.TAG.use                                 = true
   key.COMMIT_ID.use                           = true
   key.AUTHOR.use                              = true
   key.DATE_AUTHORED.use                       = true
@@ -232,7 +235,7 @@ use the mark template named `reproducable`.
   key.EMBEDDED_CHALK.use                      = true
   key.EMBEDDED_TMPDIR.use                     = true
   key.SIGNATURE.use                           = true
-  key.INJECTOR_PUBLIC_KEY.use                 = true  
+  key.INJECTOR_PUBLIC_KEY.use                 = true
   key.$CHALK_CONFIG.use                       = true
   key.$CHALK_IMPLEMENTATION_NAME.use          = true
   key.$CHALK_LOAD_COUNT.use                   = true
@@ -240,7 +243,7 @@ use the mark template named `reproducable`.
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
-  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true    
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
 
 # This is the same as the `default` template, except the first three
@@ -264,6 +267,7 @@ the time and the nonce removed.
   key.HASH.use                                = true
   key.ORIGIN_URI.use                          = true
   key.BRANCH.use                              = true
+  key.TAG.use                                 = true
   key.COMMIT_ID.use                           = true
   key.AUTHOR.use                              = true
   key.DATE_AUTHORED.use                       = true
@@ -283,7 +287,7 @@ the time and the nonce removed.
   key.EMBEDDED_CHALK.use                      = true
   key.EMBEDDED_TMPDIR.use                     = true
   key.SIGNATURE.use                           = true
-  key.INJECTOR_PUBLIC_KEY.use                 = true  
+  key.INJECTOR_PUBLIC_KEY.use                 = true
   key.$CHALK_CONFIG.use                       = true
   key.$CHALK_IMPLEMENTATION_NAME.use          = true
   key.$CHALK_LOAD_COUNT.use                   = true
@@ -291,7 +295,7 @@ the time and the nonce removed.
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
-  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true  
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
 
 mark_template minimal {
@@ -306,7 +310,7 @@ This is the default for `docker` chalk marks.
 """
   key.DATETIME_WHEN_CHALKED.use               = true
   key.CHALK_PTR.use                           = true
-  key.SIGNATURE.use                           = true  
+  key.SIGNATURE.use                           = true
   key.INJECTOR_PUBLIC_KEY.use                 = true
   key.$CHALK_CONFIG.use                       = true
   key.$CHALK_IMPLEMENTATION_NAME.use          = true
@@ -315,7 +319,7 @@ This is the default for `docker` chalk marks.
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
-  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true  
+  key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
 
 mark_template chalk_labels {
@@ -331,4 +335,5 @@ mark_template chalk_labels {
   key.COMMITTER.use                           = true
   key.DATE_COMMITTED.use                      = true
   key.BRANCH.use                              = true
+  key.TAG.use                                 = true
 }
