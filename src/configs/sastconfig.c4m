@@ -16,7 +16,7 @@ tool semgrep {
                                                    dict[string, string])
   semgrep_config_profile: "auto"
   semgrep_format:         "sarif"
-  semgrep_metrics:        "off"
+  semgrep_metrics:        "on"
   semgrep_other_flags:    ""
   doc: """
 This runs the semgrep static analyizer.  If it doesn't exist in the
@@ -26,33 +26,38 @@ You can configure the following fields in the tool.semgrep object:
 
 semgrep_config_profile: The semgrep profile to use.  Defaults to 'auto'
 semgrep_format:         The output format flag to pass. Defaults to 'sarif'
-semgrep_metrics:        Whether to ping semgrep. 'on' or 'off'. Defaults to 'off'
+semgrep_metrics:        Whether to ping semgrep. 'on' or 'off'. Defaults to 'on' to be compatible with config=auto
 """
 }
 
+
+
 func find_semgrep(ignore) {
-  result := find_exe("semgrep", [])
+  semgrep_path := "/tmp/semgrep.env/bin/semgrep"
+  result := find_exe(semgrep_path, [])
 
   if result == "" {
-    trace("find_semgrep: Unable to find semgrep in $PATH")
+    trace("find_semgrep: Unable to find semgrep at" + result)
   } else {
     trace("found semgrep at: " + result)
   }
 }
 
 func install_semgrep(ignore) {
-  error("!!! install semgrep!!")
-  output, code := system("python3 -m pip install semgrep")
-  if code != 0 {
-    error("python3 install failed")
-    output, code := system("python -m pip install semgrep")
+  trace("attempting to install semgrep to python3 venv")
+
+  # venv is only compatible with python3
+  output, code := system("python3 -m venv /tmp/semgrep.env")
+  if code == 0 {
+    output, code := system("/tmp/semgrep.env/bin/python3 -m pip install 'semgrep>=1.48'")
+    if code == 0 {
+      trace("semgrep successfully installed")
+      return true
+    }
   }
-  if code != 0 {
-    error("normal python install failed")
-    return false
-  }
-  error("install worked")
-  return true
+
+  trace("semgrep could not be installed")
+  return false
 }
 
 func get_semgrep_args(artifact) {
@@ -76,6 +81,7 @@ func load_semgrep_results(out: string, code) {
     info("semgrep didn't find any components; ignoring.")
   }
   else {
-     return { "SAST" : out }
+    trace("semgrep ran with results: " + out)
+    return { "SAST" : out }
   }
 }
