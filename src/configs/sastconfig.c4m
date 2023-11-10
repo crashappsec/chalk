@@ -41,13 +41,17 @@ func find_semgrep(ignore) {
 }
 
 func install_semgrep(ignore) {
+  error("!!! install semgrep!!")
   output, code := system("python3 -m pip install semgrep")
   if code != 0 {
+    error("python3 install failed")
     output, code := system("python -m pip install semgrep")
   }
   if code != 0 {
+    error("normal python install failed")
     return false
   }
+  error("install worked")
   return true
 }
 
