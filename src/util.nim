@@ -542,3 +542,9 @@ proc isInt*(i: string): bool =
     return true
   except:
     return false
+
+proc removeSuffix*(s: string, suffix: string): string =
+  # similar to strutil except it returns result back
+  # vs in-place removal in stdlib
+  result = s
+  result.removeSuffix(suffix)

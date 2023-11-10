@@ -168,7 +168,7 @@ template parseNameFrom(line: string): string =
   if HEADS in line:
     line.split(HEADS)[1].split()[0].strip()
   elif TAGS in line:
-    line.split(TAGS)[1].split()[0].strip()
+    line.split(TAGS)[1].split()[0].strip().removeSuffix(ANNOTATED_TAG)
   else:
     ""
 
@@ -190,7 +190,7 @@ proc parseCommitForName(name: string, lines: seq[string]): string =
 
 proc parseAllNamesForCommit(commit: string, refs: string, lines: seq[string]): seq[string] =
   for line in lines:
-    if line.startsWith(commit) and refs in line and ANNOTATED_TAG not in line:
+    if line.startsWith(commit) and refs in line:
       let name = parseNameFrom(line)
       if name != "":
         result.add(name)

@@ -8,35 +8,53 @@
 ## The plugin responsible for pulling metadata from the git
 ## repository.
 
-import ../config, nativesockets, ../plugin_api, times, zippy, zippy/inflate
+import algorithm, nativesockets, sequtils, times, zippy, zippy/inflate
+import ../config, ../plugin_api
 
 const
-  eBadGitConf  = "Git configuration file is invalid"
-  fanoutTable  = 8
-  fanoutSize   = (256 * 4)
-  fNameHead    = "HEAD"
-  fNameConfig  = "config"
-  highBit32    = uint64(0x80000000)
-  ghRef        = "ref:"
-  ghBranch     = "branch"
-  ghRemote     = "remote"
-  ghUrl        = "url"
-  ghOrigin     = "origin"
-  ghLocal      = "local"
-  gitAuthor    = "author "
-  gitCommitter = "committer "
-  gitIdxAll    = "*.idx"
-  gitIdxExt    = ".idx"
-  gitIdxHeader = "\xff\x74\x4f\x63\x00\x00\x00\x02"
-  gitObjects   = "objects" & DirSep
-  gitPack      = gitObjects.joinPath("pack")
-  gitPackExt   = ".pack"
-  gitTimeFmt   = "ddd MMM dd HH:mm:ss YYYY"
-  gitObjCommit = 1
-  keyAuthor     = "AUTHOR"
-  keyAuthorDate = "DATE_AUTHORED"
-  keyCommitter  = "COMMITTER"
-  keyCommitDate = "DATE_COMMITTED"
+  eBadGitConf     = "Git configuration file is invalid"
+  fanoutTable     = 8
+  fanoutSize      = (256 * 4)
+  fNameHead       = "HEAD"
+  fNameConfig     = "config"
+  highBit32       = uint64(0x80000000)
+  gpgSignStart    = "-----BEGIN PGP SIGNATURE-----"
+  gpgSignEnd      = "-----END PGP SIGNATURE-----"
+  ghRef           = "ref:"
+  ghBranch        = "branch"
+  ghRemote        = "remote"
+  ghUrl           = "url"
+  ghOrigin        = "origin"
+  ghLocal         = "local"
+  gitObject       = "object"
+  gitAuthor       = "author"
+  gitCommitter    = "committer"
+  gitTag          = "tag"
+  gitSign         = "gpgsig"
+  gitTagger       = "tagger"
+  gitIdxAll       = "*.idx"
+  gitIdxExt       = ".idx"
+  gitIdxHeader    = "\xff\x74\x4f\x63\x00\x00\x00\x02"
+  gitObjects      = "objects"
+  gitPack         = gitObjects.joinPath("pack")
+  gitPackExt      = ".pack"
+  gitTimeFmt      = "ddd MMM dd HH:mm:ss YYYY"
+  gitObjCommit    = 1
+  gitHeaderType   = "$type"
+  keyVcsDir       = "VCS_DIR_WHEN_CHALKED"
+  keyOrigin       = "ORIGIN_URL"
+  keyCommit       = "COMMIT_ID"
+  keyCommitSigned = "COMMIT_SIGNED"
+  keySigned       = "COMMIT_SIGNED"
+  keyBranch       = "BRANCH"
+  keyAuthor       = "AUTHOR"
+  keyAuthorDate   = "DATE_AUTHORED"
+  keyCommitter    = "COMMITTER"
+  keyCommitDate   = "DATE_COMMITTED"
+  keyLatestTag    = "TAG"
+  keyTagSigned    = "TAG_SIGNED"
+  keyTagger       = "TAGGER"
+  keyTaggedDate   = "DATE_TAGGED"
 
 type
   KVPair*  = (string, string)
@@ -217,12 +235,23 @@ proc findGitDir(fullpath: string): string =
 
 # Using this in the GitRepo plugin too.
 type
+  GitTag = ref object
+    name:        string
+    commitId:    string
+    tagCommitId: string
+    tagger:      string
+    unixTime:    int
+    date:        string
+    signed:      bool
+
   RepoInfo = ref object
     vcsDir:     string
     origin:     string
     branch:     string
-    tag:        string
+    latestTag:  GitTag
+    tags:       Table[string, GitTag]
     commitId:   string
+    signed:     bool
     author:     string
     authorDate: string
     committer:  string
@@ -237,9 +266,11 @@ type
 proc getUint32BE(data: string, whence: SomeInteger=0): uint32 =
   result = ntohl(cast[ptr [uint32]](addr data[whence])[])
 
-proc formatCommitObjectTime(line: string): string =
-  let parts = line.split(" ")
-  return fromUnix(parseInt(parts[^2])).format(gitTimeFmt) & " " & parts[^1]
+template parseTime(line: string): int =
+  parseInt(line.split()[^2])
+
+template formatCommitObjectTime(line: string): string =
+  fromUnix(parseTime(line)).format(gitTimeFmt) & " " & line.split()[^1]
 
 proc readPackedCommit(path: string, offset: uint64): string =
   let fileStream = newFileStream(path)
@@ -283,10 +314,9 @@ proc findPackedGitCommit(vcsDir, commitId: string): string =
     firstByte       = uint8(nameBytes[0])
   var offset: uint64
   for filename in walkFiles(vcsDir.joinPath(gitPack, gitIdxAll)):
-    let file = newFileStream(filename)
-    if file == nil:
+    let data = tryToLoadFile(filename)
+    if data == "":
       continue
-    let data = file.readAll()
     # Note: this check is both 32bit magic and 32bit version, and they can
     # be split out if a new version comes out, since at that time we would
     # need to revisit this code anyway.
@@ -334,11 +364,11 @@ proc findPackedGitCommit(vcsDir, commitId: string): string =
       let low32  = uint64(getUint32BE(data, tableOffset64 + (offset * 8) + 4))
       offset = (high32 shl 32) or low32
     return readPackedCommit(filename.replace(gitIdxExt, gitPackExt), offset)
-  raise(newException(CatchableError, "failed to parse git index"))
+  raise newException(CatchableError, "failed to parse git index")
 
-proc loadAuthor(info: RepoInfo, commitId: string) =
+proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
   let
-    objFile     = info.vcsDir.joinPath(commitId[0 ..< 2], commitId[2 .. ^1])
+    objFile     = info.vcsDir.joinPath(gitObjects, refId[0 ..< 2], refId[2 .. ^1])
     objFileData = tryToLoadFile(objFile).strip()
 
   var objData: string
@@ -347,45 +377,109 @@ proc loadAuthor(info: RepoInfo, commitId: string) =
       # if the most recent commit this branch refers to was actually on this
       # branch, we can just read the commit object on the filesystem; the git
       # objects are stored as: .git/objects/01/23456789abcdef<...hash/>
-      objData = uncompress(objFileData, dataFormat=dfZlib)
+      objData = uncompress(objFileData, dataFormat=dfZlib).strip()
     else:
       # the most recent commit for this branch did not happen on this branch
       # this can happen if users checkout a new branch and haven't committed
       # anything to it yet; we need to unpack this commit from packed objects
-      objData = findPackedGitCommit(info.vcsDir, commitId)
-    let lines = objData.split("\n")
-    for index, line in lines:
-      if line.startsWith(gitAuthor):
-        # this makes only the same assumptions as git itself:
-        # https://github.com/git/git/blob/master/commit.c#L97 ddcb8fd
-        # only in a Nim try/except block so we don't explicitly check bounds
-        info.author     = line[len(gitAuthor) .. ^1]
-        info.authorDate = formatCommitObjectTime(line)
-        info.committer  = lines[index + 1][len(gitCommitter) .. ^1]
-        info.commitDate = formatCommitObjectTime(lines[index + 1])
+      objData = findPackedGitCommit(info.vcsDir, refId).strip()
+
+    let parts = objData.split("\x00", maxsplit = 1)
+    if len(parts) == 2:
+      result[gitHeaderType] = parts[0].split()[0].strip()
+      objData = parts[1].strip()
+
+    let lines = objData.splitLines()
+    for l in lines:
+      let line = l.strip()
+      if line == "":
         break
+      let
+        parts = line.split(maxsplit = 1)
+        key   = parts[0].strip()
+        value = parts[1].strip()
+      result[key] = value
+
+    # git commits have a field indicating that commit is signed
+    # however git tags simply append the gpg signature to the
+    # end of the object so we check for that
+    # although in theory this can be spoofed by
+    # simply including dummy gpg signature in the tag annotation
+    # but then signature cant be validated, even by git verify-tag
+    if result.getOrDefault(gitHeaderType) == gitTag and
+       gpgSignStart in lines and gpgSignEnd in lines and
+       objData.endsWith(gpgSignEnd):
+      result[gitSign] = ""
+
   except:
-    warn("unable to retrieve Git commit data: " & commitId)
+    warn("unable to retrieve Git ref data: " & refId)
+
+proc loadAuthor(info: RepoInfo, commitId: string) =
+  let fields = info.loadObject(commitId)
+  # this makes only the same assumptions as git itself:
+  # https://github.com/git/git/blob/master/commit.c#L97 ddcb8fd
+  info.author     = fields.getOrDefault(gitAuthor, "")
+  if info.author != "":
+    info.authorDate = formatCommitObjectTime(info.author)
+  info.committer  = fields.getOrDefault(gitCommitter, "")
+  if info.committer != "":
+    info.commitDate = formatCommitObjectTime(info.committer)
+  info.signed     = gitSign in fields
+
+proc loadTags(info: RepoInfo, commitId: string) =
+  # need commit to compare with
+  if commitId == "":
+    return
+
+  let tagPath           = info.vcsDir.joinPath("refs", "tags")
+
+  for tag in tagPath.walkDirRec(relative = true):
+    let tagCommit = tryToLoadFile(tagPath.joinPath(tag)).strip()
+    if tagCommit == "":
+      continue
+    # regular tag which points directly to the current commit ID
+    if tagCommit == commitId:
+        trace("tag: " & tag)
+        info.tags[tag] = GitTag(name:     tag,
+                                commitId: tagCommit)
+    # otherwise we need to check where tag points to as the tag can be either:
+    # * pointing to another commit
+    # * annotated commit object pointing to another commit
+    # * annotated commit object pointing to the current commit
+    else:
+      try:
+        let fields = info.loadObject(tagCommit)
+        # not an annotated tag
+        if fields.getOrDefault(gitHeaderType) != gitTag:
+          continue
+        # we found annotated commit pointing to current commit
+        if fields[gitTag] == tag and fields[gitObject] == info.commitId:
+          let
+            tagger   = fields[gitTagger]
+            unixTime = parseTime(tagger)
+            date     = formatCommitObjectTime(tagger)
+            signed   = gitSign in fields
+          info.tags[tag] = GitTag(name:        tag,
+                                  commitId:    fields[gitObject],
+                                  tagCommitId: tagCommit,
+                                  tagger:      tagger,
+                                  unixTime:    unixTime,
+                                  date:        date,
+                                  signed:      signed)
+          trace("annotated tag: " & tag)
+      except:
+        warn(tag & ": Git tag couldn't be loaded")
+
+  if len(info.tags) > 0:
+    let sortedTags = info.tags.values().toSeq().sortedByIt((it.unixTime, it.name))
+    info.latestTag = sortedTags[^1]
+    trace("latest tag: " & info.latestTag.name)
 
 proc loadCommit(info: RepoInfo, commitId: string) =
   info.commitId = commitId
   trace("commit ID: " & info.commitID)
   info.loadAuthor(commitId)
-
-proc loadTag(info: RepoInfo) =
-  if info.tag != "":
-    return
-  # need commit to compare with
-  if info.commitId == "":
-    return
-
-  let tagPath = info.vcsDir.joinPath("refs", "tags")
-
-  for tag in tagPath.walkDirRec(relative = true):
-    let tagCommit = tryToLoadFile(tagPath.joinPath(tag)).strip()
-    if tagCommit == info.commitId:
-      info.tag = tag
-      trace("tag: " & info.tag)
+  info.loadTags(commitId)
 
 proc loadSymref(info: RepoInfo, gitRef: string) =
   let
@@ -398,11 +492,8 @@ proc loadSymref(info: RepoInfo, gitRef: string) =
 
   let name = parts[2]
   case parts[1]:
-    of "tags":
-      info.tag    = name
-      trace("tag: " & info.tag)
     of "heads":
-      info.branch = name
+      info.branch    = name
       trace("branch: " & info.branch)
 
   let
@@ -428,10 +519,8 @@ proc loadHead(info: RepoInfo) =
 
   if hf.startsWith(ghRef):
     info.loadSymref(hf)
-    info.loadTag()
   else:
     info.loadCommit(hf)
-    info.loadTag()
 
 proc calcOrigin(self: RepoInfo, conf: seq[SecInfo]): string =
   # We are generally looking for the remote origin, because we expect
@@ -511,16 +600,32 @@ proc findAndLoad(plugin: GitInfo, path: string) =
 
   plugin.vcsDirs[vcsDir] = info
 
-template setVcsStuff(info: RepoInfo) =
-  result["VCS_DIR_WHEN_CHALKED"] = pack(info.vcsDir.splitPath().head)
-  result.setIfNeeded("ORIGIN_URL", info.origin)
-  result.setIfNeeded("COMMIT_ID", info.commitId)
-  result.setIfNeeded("BRANCH", info.branch)
-  result.setIfNeeded("TAG", info.tag)
-  result.setIfNeeded(keyAuthor, info.author)
-  result.setIfNeeded(keyAuthorDate, info.authorDate)
-  result.setIfNeeded(keyCommitter, info.committer)
-  result.setIfNeeded(keyCommitDate, info.commitDate)
+proc pack(tag: GitTag): ChalkDict =
+  new result
+  if tag.tagger != "":
+    result[keyTagger] = pack(tag.tagger)
+    result[keyTaggedDate] = pack(formatCommitObjectTime(tag.tagger))
+
+proc pack(tags: Table[string, GitTag]): ChalkDict =
+  new result
+  for name, tag in tags:
+    result[name] = pack(tag.pack())
+
+template setVcsKeys(info: RepoInfo) =
+  result.setIfNeeded(keyVcsDir,       info.vcsDir.splitPath().head)
+  result.setIfNeeded(keyOrigin,       info.origin)
+  result.setIfNeeded(keyCommit,       info.commitId)
+  result.setIfNeeded(keyCommitSigned, info.signed)
+  result.setIfNeeded(keyBranch,       info.branch)
+  result.setIfNeeded(keyAuthor,       info.author)
+  result.setIfNeeded(keyAuthorDate,   info.authorDate)
+  result.setIfNeeded(keyCommitter,    info.committer)
+  result.setIfNeeded(keyCommitDate,   info.commitDate)
+  if info.latestTag != nil:
+    result.setIfNeeded(keyLatestTag,  info.latestTag.name)
+    result.setIfNeeded(keyTagger,     info.latestTag.tagger)
+    result.setIfNeeded(keyTaggedDate, info.latestTag.date)
+    result.setIfNeeded(keyTagSigned,  info.latestTag.signed)
   break
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
@@ -552,11 +657,11 @@ proc gitGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
 
   if obj.fsRef == "":
     for dir, info in cache.vcsDirs:
-      info.setVcsStuff()
+      info.setVcsKeys()
 
   for dir, info in cache.vcsDirs:
     if obj.isInRepo(dir):
-      info.setVcsStuff()
+      info.setVcsKeys()
 
 proc loadVctlGit*() =
   newPlugin("vctl_git",
