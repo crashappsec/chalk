@@ -51,6 +51,10 @@ report and subtract from it.
   key.ORIGIN_URI.use                         = true
   key.BRANCH.use                             = true
   key.COMMIT_ID.use                          = true
+  key.AUTHOR.use                             = true
+  key.DATE_AUTHORED.use                      = true
+  key.COMMITTER.use                          = true
+  key.DATE_COMMITTED.use                     = true
   key.ARTIFACT_VERSION.use                   = true
   key.STORE_URI.use                          = true
   key.PACKAGE_URI.use                        = true
@@ -558,6 +562,10 @@ doc: """
   key.ORIGIN_URI.use                          = true
   key.BRANCH.use                              = true
   key.COMMIT_ID.use                           = true
+  key.AUTHOR.use                              = true
+  key.DATE_AUTHORED.use                       = true
+  key.COMMITTER.use                           = true
+  key.DATE_COMMITTED.use                      = true
   key.ARTIFACT_VERSION.use                    = true
   key.STORE_URI.use                           = true
   key.PACKAGE_URI.use                         = true
@@ -963,6 +971,10 @@ container.
   key.ORIGIN_URI.use                          = true
   key.BRANCH.use                              = true
   key.COMMIT_ID.use                           = true
+  key.AUTHOR.use                              = true
+  key.DATE_AUTHORED.use                       = true
+  key.COMMITTER.use                           = true
+  key.DATE_COMMITTED.use                      = true
   key.ARTIFACT_VERSION.use                    = true
   key.STORE_URI.use                           = true
   key.PACKAGE_URI.use                         = true
@@ -1367,6 +1379,10 @@ and keep the run-time key.
   key.ORIGIN_URI.use                          = true
   key.BRANCH.use                              = true
   key.COMMIT_ID.use                           = true
+  key.AUTHOR.use                              = true
+  key.DATE_AUTHORED.use                       = true
+  key.COMMITTER.use                           = true
+  key.DATE_COMMITTED.use                      = true
   key.ARTIFACT_VERSION.use                    = true
   key.STORE_URI.use                           = true
   key.PACKAGE_URI.use                         = true
@@ -1703,6 +1719,10 @@ running insert commands.
   key.ORIGIN_URI.use                          = true
   key.BRANCH.use                              = true
   key.COMMIT_ID.use                           = true
+  key.AUTHOR.use                              = true
+  key.DATE_AUTHORED.use                       = true
+  key.COMMITTER.use                           = true
+  key.DATE_COMMITTED.use                      = true
   key.EMBEDDED_CHALK.use                      = true
   key.ERR_INFO.use                            = true
   key.DOCKER_FILE.use                         = true
@@ -1743,6 +1763,10 @@ running commands that do NOT insert chalk marks.
   key.ORIGIN_URI.use                          = true
   key.BRANCH.use                              = true
   key.COMMIT_ID.use                           = true
+  key.AUTHOR.use                              = true
+  key.DATE_AUTHORED.use                       = true
+  key.COMMITTER.use                           = true
+  key.DATE_COMMITTED.use                      = true
   key.EMBEDDED_CHALK.use                      = true
   key.ERR_INFO.use                            = true
   key.DOCKER_FILE.use                         = true
