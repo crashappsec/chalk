@@ -33,18 +33,27 @@ semgrep_metrics:        Whether to ping semgrep. 'on' or 'off'. Defaults to 'on'
 
 
 func find_semgrep(ignore) {
-  semgrep_path := "/tmp/semgrep.env/bin/semgrep"
-  result := find_exe(semgrep_path, [])
+  result := find_exe("semgrep", ["/tmp/semgrep.env/bin", "$HOME/.local/bin"])
 
   if result == "" {
-    trace("find_semgrep: Unable to find semgrep at" + result)
+    trace("find_semgrep: Unable to find semgrep in $PATH")
   } else {
     trace("found semgrep at: " + result)
   }
 }
 
 func install_semgrep(ignore) {
-  trace("attempting to install semgrep to python3 venv")
+  # perfer pipx for installation
+  trace("attempting to install semgrep via pipx...")
+  output, code := system("pipx install semgrep")
+  if code == 0 {
+    return true
+  } else {
+    trace("pipx installation unsuccessful")
+  }
+
+  # if that didn't work, try python venv
+  trace("attempting to install semgrep to python3 venv...")
 
   # venv is only compatible with python3
   output, code := system("python3 -m venv /tmp/semgrep.env")
@@ -81,7 +90,7 @@ func load_semgrep_results(out: string, code) {
     info("semgrep didn't find any components; ignoring.")
   }
   else {
-    trace("semgrep ran with results: " + out)
+    trace("semgrep ran with results")
     return { "SAST" : out }
   }
 }
