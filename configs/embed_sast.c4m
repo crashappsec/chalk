@@ -1,5 +1,3 @@
-run_sast_tools: true
-
 # Embed sast reports in chalk marks.
 
 # `chalk insert` uses the mark_default template.
