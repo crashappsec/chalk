@@ -492,7 +492,6 @@ def test_git_context(
         tag=random_hex,
         secrets={"GIT_AUTH_TOKEN": tmp_file} if private else {},
         buildkit=buildkit,
-        log_level="trace",
     )
     assert build.mark
 

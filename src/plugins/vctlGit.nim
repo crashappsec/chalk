@@ -42,7 +42,7 @@ const
   gitObjCommit    = 1
   gitHeaderType   = "$type"
   keyVcsDir       = "VCS_DIR_WHEN_CHALKED"
-  keyOrigin       = "ORIGIN_URL"
+  keyOrigin       = "ORIGIN_URI"
   keyCommit       = "COMMIT_ID"
   keyCommitSigned = "COMMIT_SIGNED"
   keySigned       = "COMMIT_SIGNED"
