@@ -6,6 +6,7 @@ import re
 import datetime
 import json
 import os
+import itertools
 from pathlib import Path
 from typing import Any, Literal, Optional, cast
 
@@ -127,18 +128,18 @@ class ChalkProgram(Program):
 
     @property
     def errors(self):
-        errors = [i for i in self.logs.splitlines() if i.startswith("error:")]
-        return errors
+        errors = itertools.takewhile(
+            lambda i: "--debug" not in i,
+            [i for i in self.logs.splitlines() if i.startswith("error:")],
+        )
+        return list(errors)
 
     @property
     def reports(self):
-        # strip chalk logs from stdout so we can find just json reports
-        # https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
-        text = re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", self.text)
         text = "\n".join(
             [
                 i
-                for i in text.splitlines()
+                for i in self.text.splitlines()
                 if not any(i.startswith(j) for j in {"info:", "trace:", "error:"})
             ]
         )
