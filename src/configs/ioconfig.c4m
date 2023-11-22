@@ -45,7 +45,7 @@ subscribe("version",  "console_out")
 subscribe("virtual",  "virtual_chalk_log")
 subscribe("help",     "console_out")
 
-if cmd == "dump" {
+if cmd.starts_with("dump") {
   args := command_argv()
   if len(args) == 0 {
     subscribe("confdump", "console_out")

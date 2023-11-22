@@ -67,7 +67,7 @@ proc runCmdConfDumpCache*() =
       unpackedInfo  = unpack[OrderedTableRef[string, string]](componentInfo)
 
     for url, contents in unpackedInfo:
-      cells = @[@[pre(contents)]]
-      r += cells.quickTable(title = atom("URL: " & url))
+      cells = @[@[pre(code(contents))]]
+      r += cells.quickTable(noheaders = true, title = atom("URL: " & url))
 
     toDump = $r
