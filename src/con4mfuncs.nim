@@ -17,7 +17,7 @@ import config, reporting, sinks
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
 
-proc getArgv(args: seq[Box], unused: ConfigState): Option[Box] =
+proc getArgvLocal(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getArgs()))
 
 proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
@@ -120,7 +120,7 @@ Generally, these can get very noisy, and are intended more for testing,
 """,
      @["chalk"]),
     ("command_argv() -> list[string]",
-     BuiltInFn(getArgv),
+     BuiltInFn(getArgvLocal),
      """
 Returns the arguments being passed to the command, such as the path
 parameters.  This is not the same as the underlying process's argv; it

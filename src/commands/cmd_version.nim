@@ -10,24 +10,19 @@
 import ../config
 
 proc runCmdVersion*() =
-  var s = newStyle(lpad=4, rpad=4, borders = [BorderNone])
-  s.useTopBorder    = some(false)
-  s.useBottomBorder = some(false)
-  s.useLeftBorder   = some(false)
-  s.useRightBorder  = some(false)
-  s.useVerticalSeparator = some(false)
-  s.useHorizontalSeparator = some(false)
+  var cells: seq[seq[string]]
+  
+  cells.add(@["Chalk Version", getChalkExeVersion()])
+  cells.add(@["Commit ID", getChalkCommitId()])
+  cells.add(@["Build OS", hostOS])
+  cells.add(@["Build CPU", hostCPU])
+  cells.add(@["Build Data", CompileDate])
+  cells.add(@["Build Time", CompileTime])
 
-  styleMap["table"]   = styleMap["table"].mergeStyles(s)
-  var txt = """<table class=noborder>
-               <colgroup><col width=30><col width=70><tbody>"""
+  var table = cells.quickTable(verticalHeaders = true, borders = BorderTypical)
 
-  txt &= "<tr><td>Chalk version</td><td>" & getChalkExeVersion() & "</td></tr>"
-  txt &= "<tr><td>Commit ID</td><td>" & getChalkCommitID() & "</td></tr>"
-  txt &= "<tr><td>Build OS</td><td>" & hostOS & "</td></tr>"
-  txt &= "<tr><td>Build CPU</td><td>" & hostCPU & "</td></tr>"
-  txt &= "<tr><td>Build Date</td><td>" & CompileDate & "</td></tr>"
-  txt &= "<tr><td>Build Time</td><td>" & CompileTime & "</td></tr>"
-  txt &= "</tbody></table>"
+  table = table.setWidth(66)
+  for item in table.search("th"):
+    item.tpad(0).casing(CasingAsIs).left()
 
-  publish("version", txt.stylizeHtml())
+  publish("version", $table)

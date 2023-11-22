@@ -1216,11 +1216,11 @@ By default we skip unsigned images, because the process (necessarily) involves d
     shortdoc: "Extract marks from containers"
     doc: """
 When extracting from images when `ignore_unsigned_images = false`, Chalk will start by checking for a digital signature containing the Chalk mark in the repo, when available.
-<p>
+
 But if there's no signature, assuming `ignore_unsigned_images` is true, Chalk looks in the top layer of the file system.
-<p>
+
 When no Chalk can be found in either place, if this attribute is set to true, we'll look at the other layers in the image and report the `CHALK_ID` and `METADATA_ID` of the topmost layer with a mark, using the `_FOUND_BASE_MARK` key (the image itself is said to be unchalked; it's more about being able to use knowledge of a chalked base image).
-<p>
+
 Note that this does nothing unless `ignore_unsigned_images` is false.
 """
   }
@@ -1234,21 +1234,21 @@ singleton docker {
   doc: """
 These are configuration options specific to how Chalk will behave when
 running the `chalk docker` command.
-<p>
+
 We recommend having `chalk` be installed in such a manner as to *wrap*
 `docker`. This means nobody doing a build or push will need to worry
 about any sort of setup or configuration.
-<p>
+
 In such a scenario, `chalk` will automatically and transparently call
 `docker` for you. With these options, you can configure what data gets
 captured, but you can also add labels or environment variables
 automatically into the container.
-<p>
+
 Additionally, you can automatically *wrap* your containers to enable
 chalk to collect data when the container starts up (or beyond).
-<p>
+
 The behavior for execution time is configured in the `exec` section.
-<p>
+
 Note that if a docker operation that chalk wraps ever fails, Chalk
 will run it again without itself in the way. Such cases are the only
 times in the default configuration where error messages are logged to
@@ -1507,12 +1507,12 @@ in the runtime environment. Although we do this by replacing the
 docker entry point, the default behaves as if your workload was still
 the entry point. It's called the same way, and stays PID 1, so when it
 dies, the whole container dies.
-<p>
+
 The 'exec' command works by forking, and having the child do the chalk
 reporting.  The wrapping process automatically calls chalk properly to
 run the true entrypoint.  However, you can manually configure wrapping
 in this section.
-<p>
+
 The `exec` command is the one used by automatic wrapping to spawn your
 entry point, and begin runtime reporting. You can report a fixed
 amount of time after startup, or you can configure periodic reports as
@@ -1707,20 +1707,20 @@ singleton source_marks {
   doc: """
 These options control whether and how source-code based artifacts are
 marked, particularly executable scripting content.
-<p>
+
 Generally, the marking occurs by sticking the mark in a comment.
-<p>
+
 Currently, the intent for source marking is to mark content that will
 be shipped and run in source code form. While you *can* mark every
 source file, we don't really encourage it. For that reason, by
 default, our database only contains reasonably well used scripting
 languages, and is configured to only mark things with unix Shebangs
 (extraction doesn't consider the shebang).
-<p>
+
 We also definitely do **not** recommend marking code while it is in a
 repository. Git does that job well, and no tooling exists to help
 recalculate every time you make an edit.
-<p>
+
 Ideally, you might wish to mark both a file and any
 dependencies. Currently, with the exception of container images /
 containers, Chalk doesn't handle that, as it's significantly difficult
