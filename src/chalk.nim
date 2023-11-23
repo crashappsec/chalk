@@ -11,8 +11,8 @@ import config, confload, commands, norecurse, sinks, docker_base,
        attestation, util
 
 when isMainModule:
-
   setupSignalHandlers() # util.nim
+  setupTerminal()       # util.nim
   ioSetup()             # sinks.nim
   loadAllConfigs()      # confload.nim
   recursionCheck()      # norecurse.nim

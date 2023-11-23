@@ -21,8 +21,6 @@ const allCommandSections = ["", "insert", "docker", "extract", "extract.images",
                             "setup", "setup.gen", "setup.load", "env",
                             "config", "dump", "load", "delete", "version"]
 
-# template dbug(a, b) = print("<jazzberry>" & a & ": </jazzberry>" & b)
-
 proc kindEnumToString(s, v: string): string =
   case v
   of "0":
@@ -35,17 +33,6 @@ proc kindEnumToString(s, v: string): string =
     "Run-Time, Host"
   else:
     "Unknown"
-
-proc displayPluginKeys(s, v: string): string =
-  let
-    asJson = parseJson(v)
-    asArr  = to(asJson, seq[string])
-
-  if asArr.len() == 0:
-    return "None"
-  elif asArr.len() == 1 and asArr[0] == "*":
-    return "Any"
-  return asArr.join(", ")
 
 var transformers  = TransformTableRef()
 
@@ -205,6 +192,8 @@ proc searchConfigVars(state: ConfigState, args: seq[string]): Rope =
       var 
         caption: string
         tdCells = match.search(@["td"])
+      if len(tdCells) == 0:
+        continue
       if sec == "":
         caption = "Match in global configuration variable"
       else:
@@ -303,26 +292,36 @@ report, or """, pre = false)
   result += em("subscribe()") + text("it to a topic.")
 
   result += state.getInstanceDocs("sink", ["shortdoc", "doc"],
-                               ["Overview", "Detail"], asList = true)
+                               ["Overview", "Detail"])
 
 proc getPluginHelp(state: ConfigState): Rope =
-  var
-    transformers = TransformTableRef()
-    arrayXfm     = FieldTransformer(displayPluginKeys)
-  transformers["pre_run_keys"]    = arrayXfm
-  transformers["artifact_keys"]   = arrayXfm
-  transformers["post_chalk_keys"] = arrayXfm
-  transformers["post_run_keys"]   = arrayXfm
+  let 
+    keyFields = ["pre_run_keys", "artifact_keys", "post_chalk_keys",
+                 "post_run_keys"]
+    kfNames   = ["Chalk-time host metadata",
+                 "Chalk-time artifact metadata",
+                 "Post-chalk host metadata",
+                 "Post-chalk artifact metadata"]
 
-  result = state.getInstanceDocs("plugin",
-          ["doc", "pre_run_keys", "artifact_keys", "post_chalk_keys",
-           "post_run_keys"],
-          headings = ["Overview", "Chalk-time host metadata",
-                      "Chalk-time artifact metadata",
-                      "Post-chalk host metadata",
-                      "Post-chalk artifact metadata"],
-          transformers=transformers,
-          asList = true)
+    allDocs = state.getAllInstanceRawDocs("plugin")
+
+  for plugin, docs in allDocs:
+    result += h2(text("Plugin: ") + em(plugin))
+    result += h3("Overview")
+    if "doc" in docs:
+      result += markdown(docs["doc"]["value"])
+    else:
+      result += text("No documentation.")
+
+    for i, item in keyFields:
+      if item in docs:
+        let 
+          asJson = docs[item]["value"].parseJson()
+          asArr  = asJson.to(seq[string])
+
+        if len(asArr) != 0:
+          result += asArr.instantTable(kfNames[i])
+
 
 proc getMarkTemplateDocs(state: ConfigState): Rope =
   result = state.getInstanceDocs("mark_template", ["shortdoc"],
@@ -568,7 +567,7 @@ proc filterFmt(flist: seq[MsgFilter]): string =
 
   return parts.join(", ")
 
-proc buildSinkConfigData(): seq[seq[string]] =
+proc buildSinkConfigData(): seq[seq[Rope]] =
   var
     sinkConfigs = getSinkConfigs()
     subLists:     Table[SinkConfig, seq[string]]
@@ -583,8 +582,10 @@ proc buildSinkConfigData(): seq[seq[string]] =
   for key, config in sinkConfigs:
     if config notin sublists:
       sublists[config] = @[]
-    result.add(@[key, config.mySink.getName(), paramFmt(config.params),
-                filterFmt(config.filters), sublists[config].join(", ")])
+    result.add(@[text(key), text(config.mySink.getName()), 
+                 text(paramFmt(config.params)),
+                text(filterFmt(config.filters)), 
+                text(sublists[config].join(", "))])
 
 proc getConfigValues(): Rope =
 
@@ -596,19 +597,20 @@ proc getConfigValues(): Rope =
     sinkCfgFields  = ["sink", "filters"]
     plugFields     = ["enabled", "priority", "ignore", "overrides"]
     confHdrs       = ["Config Variable", "Description", "Current Value"]
-    outConfData    = @[@["Operation", "Reporting Template",
-                         "Chalk Mark Template"]]
-    custRepData    = @[@["Name", "Enabled", "Template",
-                        "Operations where applied"]]
-    codecData      = @[@["Name", "Enabled", "Priority", "Ignore", "Overrides"]]
-    pluginData     = @[@["Name", "Enabled", "Priority", "Ignore", "Overrides"]]
-    sinkCfgData    = @[@["Config Name", "Sink", "Parameters", "Filters", 
-                        "Topics"]]
+    outConfData    = @[@[atom("Operation"), atom("Reporting Template"),
+                         atom("Chalk Mark Template")]]
+    custRepData    = @[@[atom("Name"), atom("Enabled"), atom("Template"),
+                        atom("Operations where applied")]]
+    codecData      = @[@[atom("Name"), atom("Enabled"), atom("Priority"), 
+                         atom("Ignore"), atom("Overrides")]]
+    pluginData     = @[@[atom("Name"), atom("Enabled"), atom("Priority"), 
+                         atom("Ignore"), atom("Overrides")]]
+    sinkCfgData    = @[@[atom("Config Name"), atom("Sink"), atom("Parameters"),
+                         atom("Filters"), atom("Topics")]]
     fn             = getValuesForAllObjects
 
-
-  outConfData    &= fn(state, "outconf",       outConfFields, asLit = false)
-  custRepData    &= fn(state, "custom_report", cReportFields, asLit = false)
+  outConfData    &= fn(state, "outconf",       outConfFields)
+  custRepData    &= fn(state, "custom_report", cReportFields)
   sinkCfgData    &= buildSinkConfigData()
   codecData      &= fn(state, "plugin", plugFields, false, ["true"],
                        ["codec"])
@@ -620,8 +622,8 @@ proc getConfigValues(): Rope =
                 "Global configuration variables"
               else:
                 "Configuration variables in the '" & item & "' section"
-    result += state.getMatchingConfigOptions(item, cols = cols, heading = hdr,
-                                             sectionPath = item)
+    result += state.getMatchingConfigOptions(item, cols = cols, title = hdr,
+                            headings = confHdrs, sectionPath = item)
 
 
   result += outconfData.quickTable("Metadata template configuration", 

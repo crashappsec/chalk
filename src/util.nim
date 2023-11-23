@@ -40,6 +40,13 @@ let sigNameMap = { 1: "SIGHUP", 2: "SIGINT", 3: "SIGQUIT", 4: "SIGILL",
                    6: "SIGABRT",7: "SIGBUS", 9: "SIGKILL", 11: "SIGSEGV",
                    15: "SIGTERM" }.toTable()
 
+var
+  LC_ALL {.importc, header: "<locale.h>".}: cint
+  savedTermState: Termcap
+
+proc restoreTerminal() {.noconv.} =
+  tcSetAttr(cint(1), TcsaConst.TCSAFLUSH, savedTermState)
+
 proc regularTerminationSignal(signal: cint) {.noconv.} =
   try:
     error("Aborting due to signal: " & sigNameMap[signal] & "(" & $(signal) &
@@ -62,7 +69,16 @@ proc regularTerminationSignal(signal: cint) {.noconv.} =
 
 
   tmpfile_on_exit()
+
   exitnow(signal + 128)
+
+proc setlocale(category: cint, locale: cstring): cstring {. importc, cdecl,
+                                nodecl, header: "<locale.h>", discardable .}
+
+proc setupTerminal*() =
+  setlocale(LC_ALL, cstring(""))
+  tcGetAttr(cint(1), savedTermState)
+  addQuitProc(restoreTerminal)
 
 proc setupSignalHandlers*() =
   var handler: SigAction
@@ -89,7 +105,6 @@ proc reportTmpFileExitState*(files, dirs, errs: seq[string]) =
     echo "Total run time: " & $(int(getMonoTime().ticks() - startTime) /
                                 1000000000) &
       " seconds"
-
 
 proc setupManagedTemp*() =
   let customTmpDirOpt = chalkConfig.getDefaultTmpDir()

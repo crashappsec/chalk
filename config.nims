@@ -8,6 +8,8 @@ import nimutils/nimscript, os
 when not defined(debug):
     switch("d", "release")
     switch("opt", "speed")
+    switch("warning", "Deprecated:off")
+    switch("warning", "User:off")
 
 applyCommonLinkOptions()
     
