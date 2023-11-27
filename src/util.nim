@@ -511,15 +511,21 @@ proc setEnv*(name: string, value: string): EnvVar =
   result.exists   = existsEnv(name)
   putEnv(name, value)
 
-proc restore*(env: EnvVar) =
+proc restore(env: EnvVar) =
   if not env.exists:
     delEnv(env.name)
   else:
     putEnv(env.name, env.previous)
 
-proc restore*(vars: seq[EnvVar]) =
+proc restore(vars: seq[EnvVar]) =
   for env in vars:
     env.restore()
+
+template withEnvRestore*(vars: seq[EnvVar], code: untyped) =
+  try:
+    code
+  finally:
+    vars.restore()
 
 proc `$`*(vars: seq[EnvVar]): string =
   result = ""
