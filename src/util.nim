@@ -353,7 +353,7 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
 
 proc findExePath*(cmdName:    string,
                   extraPaths: seq[string] = @[],
-                  configPath: Option[string],
+                  configPath: Option[string] = none(string),
                   usePath         = true,
                   ignoreChalkExes = false): Option[string] =
   var paths = extraPaths

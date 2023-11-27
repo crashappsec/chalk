@@ -16,16 +16,14 @@ const
 
 proc setGitExeLocation() =
   once:
-    gitExeLocation = findExePath("git",
-                                 configPath = chalkConfig.getGitExe()).get("")
+    gitExeLocation = findExePath("git").get("")
     if gitExeLocation == "":
       error("No git command found in PATH")
       raise newException(ValueError, "No git")
 
 proc setSshKeyscanExeLocation() =
   once:
-    sshKeyscanExeLocation = findExePath("ssh-keyscan",
-                                        configPath = chalkConfig.getSshKeyscanExe()).get("")
+    sshKeyscanExeLocation = findExePath("ssh-keyscan").get("")
     if sshKeyscanExeLocation == "":
       warn("No ssh-keyscan command found in PATH")
 
@@ -112,9 +110,9 @@ proc replaceContextArg*(git: DockerGitContext, args: seq[string]): seq[string] =
     return args.replaceItemWith(git.context, git.contextPath())
   return args
 
-proc run(git: DockerGitContext,
-         args: seq[string],
-         dir: bool = true,
+proc run(git:    DockerGitContext,
+         args:   seq[string],
+         dir:    bool = true,
          strict: bool = true): ExecOutput =
   var
     gitArgs: seq[Redacted] = @[]
@@ -129,9 +127,9 @@ proc run(git: DockerGitContext,
     var value = ""
     if git.authToken != "":
       let
-        user  = GIT_USER
-        token = git.authToken.strip()
-        creds = user & ":" & token
+        user    = GIT_USER
+        token   = git.authToken.strip()
+        creds   = user & ":" & token
         encoded = encode(creds)
       value = "basic " & encoded
     else:

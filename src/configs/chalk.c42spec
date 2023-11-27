@@ -2561,28 +2561,6 @@ Note that, when chalk is invoked with 'docker' as its EXE name, the default IO c
 """
   }
 
-  field git_exe {
-    type:     string
-    require:  false
-    shortdoc: "Git command location"
-    doc: """
-When running the 'git' command, this tells chalk where to look for the git executable to exec.
-
-If this is not provided, or if the file is not found, chalk will search the PATH for the first instance of 'git'.
-"""
-  }
-
-  field ssh_keyscan_exe {
-    type:     string
-    require:  false
-    shortdoc: "SSH keyscan command location"
-    doc: """
-When running the 'ssh-keyscan' command, this tells chalk where to look for the ssh-keyscan executable to exec.
-
-If this is not provided, or if the file is not found, chalk will search the PATH for the first instance of 'ssh-keyscan'.
-"""
-  }
-
   field chalk_contained_items {
     type:    bool
     default: false

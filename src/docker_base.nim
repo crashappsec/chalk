@@ -30,13 +30,15 @@ template extractBoxedDockerHash*(value: Box): Box =
 
 proc setDockerExeLocation*() =
   once:
-    trace("Searching path for 'docker'")
-    dockerExeLocation = findExePath("docker",
-                                    configPath = chalkConfig.getDockerExe(),
-                                    ignoreChalkExes = true).get("")
-
+    trace("Searching PATH for 'docker'")
+    let
+      dockerConfigPath = chalkConfig.getDockerExe()
+      dockerExeOpt     = findExePath("docker",
+                                     configPath = dockerConfigPath,
+                                     ignoreChalkExes = true)
+    dockerExeLocation = dockerExeOpt.get("")
     if dockerExeLocation == "":
-       warn("No docker command found in path. `chalk docker` not available.")
+       warn("No docker command found in PATH. `chalk docker` not available.")
 
 proc getVersionFromLine(line: string): Version =
   for word in line.splitWhitespace():
