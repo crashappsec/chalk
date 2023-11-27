@@ -11,44 +11,53 @@ import strutils, util
 # it only handles basic dot-separated version format
 
 type Version* = ref object
-    parts: seq[int]
+  parts: tuple[major: int, minor: int, patch: int]
+  name:  string
 
 proc parseVersion*(version: string): Version =
+  var
+    major = 0
+    minor = 0
+    patch = 0
+  let
+    name  = version.strip(chars={'v', ',', '.'})
+    parts = name.split('.')
+  case len(parts):
+    of 1:
+      major = parseInt(parts[0])
+    of 2:
+      major = parseInt(parts[0])
+      minor = parseInt(parts[1])
+    of 3:
+      major = parseInt(parts[0])
+      minor = parseInt(parts[1])
+      patch = parseInt(parts[2])
+    else:
+      raise newException(ValueError, "Invalid or unsupported version format")
   new result
-  result.parts = @[]
-  for i in version.strip(chars={'v', ',', '.'}).split('.'):
-    result.parts.add(parseInt(i))
+  result.name = name
+  result.parts = (major, minor, patch)
 
 proc `==`*(self: Version, other: Version): bool =
-  for (a, b) in zipLongest(self.parts, other.parts, 0):
-    if a != b:
-      return false
-  return true
+  return self.parts == other.parts
 
 proc `!=`*(self: Version, other: Version): bool =
-  return not (self == other)
+  return self.parts != other.parts
 
 proc `>`*(self: Version, other: Version): bool =
-  for (a, b) in zipLongest(self.parts, other.parts, 0):
-    # allow == here as some digits could be be ==
-    # as long as eventually there is one which is >
-    if a < b:
-      return false
-    elif a > b:
-      return true
-  return false
+  return self.parts > other.parts
 
 proc `>=`*(self: Version, other: Version): bool =
-  return self == other or self > other
+  return self.parts >= other.parts
 
 proc `<`*(self: Version, other: Version): bool =
-  return not (self >= other)
+  return self.parts < other.parts
 
 proc `<=`*(self: Version, other: Version): bool =
-  return self == other or self < other
+  return self.parts <= other.parts
 
 proc `$`*(self: Version): string =
-  return self.parts.join(".")
+  return self.name
 
 when isMainModule:
   assert($(parseVersion("0.1")) == "0.1")

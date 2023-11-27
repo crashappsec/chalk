@@ -497,16 +497,6 @@ proc replaceItemWith*(data: seq[string], match: string, sub: string): seq[string
     else:
       result.add(i)
 
-template get[T](data: seq[T], i: int, default: T): T =
-  if len(data) > i:
-    data[i]
-  else:
-    default
-
-iterator zipLongest*[T](data1, data2: seq[T], default: T): (T, T) =
-  for i in 0..max(len(data1), len(data2)):
-    yield (get(data1, i, default), get(data2, i, default))
-
 type EnvVar* = ref object
   name:     string
   value:    string
