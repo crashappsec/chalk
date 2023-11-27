@@ -152,13 +152,21 @@ proc run(git: DockerGitContext,
       sshCmd &= " -o StrictHostKeyChecking=no"
     envVars.add(setEnv("GIT_SSH_COMMAND", sshCmd))
 
-  let allArgs = gitArgs & redact(args)
+  let
+    allArgs = gitArgs & redact(args)
+    cwd     = getCurrentDir()
 
   trace("Running git " & $(envVars) & allArgs.redacted().join(" "))
   try:
+    # git does not have an option to ignore local .git
+    # and therefore will honor its configs
+    # therefore the cd here is required so that git operations
+    # are isolated in their own directory
+    setCurrentDir(git.tmpGitDir)
     result = runCmdGetEverything(gitExeLocation, allArgs.raw())
   finally:
     envVars.restore()
+    setCurrentDir(cwd)
   if strict and result.exitCode != 0:
     error("Failed to run git " & allArgs.redacted().join(" "))
     error(strip(result.stdOut & result.stdErr))
