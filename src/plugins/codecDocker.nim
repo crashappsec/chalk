@@ -46,12 +46,30 @@ proc extractImageMark(chalk: ChalkObj): ChalkDict =
     imageId = chalk.imageId
     dir     = getNewTempDir()
 
+  let catMark = runDockerGetEverything(@["run", "--rm", "--entrypoint=cat",
+                                         imageId, markLocation])
+
+  # cat is present and we found chalk mark
+  if catMark.exitCode == 0:
+    chalk.cachedMark = catMark.stdOut
+    result           = extractOneChalkjson(catMark.stdOut, imageId)
+    return
+
+  # cat is present but no chalk mark found
+  elif catMark.exitCode == 1:
+    return
+
+  # any other exitcode like 127 probably means:
+  # * cat was not found as entrypoint
+  # * architecture of image doesnt match host
+  # and so we manually inspect image layers via tar archive
+
   try:
     withWorkingDir(dir):
 
       trace("Image " & imageId & ": Saving to tar file for extraction of metadata")
-      let procInfo = runDockerGetEverything(@["save", imageId, "-o", "image.tar"])
-      if procInfo.getExit() != 0:
+      let saving = runDockerGetEverything(@["save", imageId, "-o", "image.tar"])
+      if saving.getExit() != 0:
         error("Image " & imageId & ": error extracting chalk mark")
         return
 
