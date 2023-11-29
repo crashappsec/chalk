@@ -22,6 +22,13 @@ custom_report terminal_other_op {
   use_when:        ["extract", "delete", "exec", "env", "heartbeat", "push"]
 }
 
+custom_report github_group_chalk_time {
+  enabled:         false
+  report_template: "terminal_insert"
+  sink_configs:    ["github_json_group"]
+  use_when:        ["insert", "build"]
+}
+
 if not using_tty() {
   color: false
   custom_report.terminal_chalk_time.enabled: false
@@ -35,6 +42,10 @@ if not using_tty() {
 if skip_summary_report {
   custom_report.terminal_chalk_time.enabled: false
   custom_report.terminal_other_op.enabled: false
+}
+
+if env_exists("CI") and env_exists("GITHUB_SHA") {
+  custom_report.github_group_chalk_time.enabled: true
 }
 
 cmd        := command_name()
