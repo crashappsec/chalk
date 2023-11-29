@@ -42,7 +42,7 @@ proc runMungedDockerInvocation(ctx: DockerInvocation): int =
     newStdin = ctx.inDockerFile & ctx.addedInstructions.join("\n")
     trace("Passing on stdin: \n" & newStdin)
 
-  result = runProcNoOutputCapture(dockerExeLocation, args, newStdin)
+  result = runCmdNoOutputCapture(dockerExeLocation, args, newStdin)
 
 proc doReporting*(topic: string){.importc.}
 
@@ -581,7 +581,7 @@ proc runPush(ctx: DockerInvocation): int =
   # Here, if we fail, there's no re-run. Either (in the second branch), we
   # ran their original command line, or we've got nothing to fall back on,
   # because the build already succeeded.
-  return runProcNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
+  return runCmdNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
 
 proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
   # not a multi-platform build so manifest should not be used
@@ -593,7 +593,7 @@ proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
     for platform in platforms:
       platformTags.add(ctx.getTagForPlatform(tag, platform))
 
-    let exitCode = runProcNoOutputCapture(
+    let exitCode = runCmdNoOutputCapture(
       dockerExeLocation,
       @["buildx", "imagetools", "create", "-t"] & platformTags,
     )
@@ -611,7 +611,7 @@ proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
 template passThroughLogic() =
   try:
     # Silently pass through other docker commands right now.
-    exitCode = runProcNoOutputCapture(dockerExeLocation, args)
+    exitCode = runCmdNoOutputCapture(dockerExeLocation, args)
     if chalkConfig.dockerConfig.getReportUnwrappedCommands():
       reporting.doReporting("report")
   except:

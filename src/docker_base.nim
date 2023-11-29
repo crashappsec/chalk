@@ -40,11 +40,21 @@ proc setDockerExeLocation*() =
     if dockerExeLocation == "":
        warn("No docker command found in PATH. `chalk docker` not available.")
 
+proc runDockerGetEverything*(args: seq[string], stdin = "", silent = true): ExecOutput =
+  if not silent:
+    trace("Running docker: " & dockerExeLocation & " " & args.join(" "))
+    if stdin != "":
+      trace("Passing on stdin: \n" & stdin)
+  result = runCmdGetEverything(dockerExeLocation, args, stdin)
+  if not silent and result.exitCode > 0:
+    trace(strutils.strip(result.stderr & result.stdout))
+  return result
+
 proc getVersionFromLine(line: string): Version =
   for word in line.splitWhitespace():
     if '.' in word:
       try:
-        return parseVersion(word.strip(chars = {'v', ','}))
+        return parseVersion(word)
       except:
         # word wasnt a version number
         discard
@@ -59,10 +69,10 @@ proc getBuildXVersion*(): Version =
     # examples:
     # github.com/docker/buildx v0.10.2 00ed17df6d20f3ca4553d45789264cdb78506e5f
     # github.com/docker/buildx 0.11.2 9872040b6626fb7d87ef7296fd5b832e8cc2ad17
-    let (output, exitcode) = execCmdEx(dockerExeLocation & " buildx version")
-    if exitcode == 0:
+    let version = runDockerGetEverything(@["buildx", "version"])
+    if version.exitCode == 0:
       try:
-        buildXVersion = getVersionFromLine(output)
+        buildXVersion = getVersionFromLine(version.stdOut)
         trace("Docker buildx version: " & $(buildXVersion))
       except:
         dumpExOnDebug()
@@ -75,10 +85,10 @@ proc getDockerVersion*(): Version =
     # Docker version 1.13.0, build 49bf474
     # Docker version 23.0.0, build e92dd87
     # Docker version 24.0.6, build ed223bc820
-    let (output, exitcode) = execCmdEx(dockerExeLocation & " --version")
-    if exitcode == 0:
+    let version = runDockerGetEverything(@["--version"])
+    if version.exitCode == 0:
       try:
-        dockerVersion = getVersionFromLine(output)
+        dockerVersion = getVersionFromLine(version.stdOut)
         trace("Docker version: " & $(dockerVersion))
       except:
         dumpExOnDebug()
@@ -97,16 +107,6 @@ template supportsCopyChmod*(): bool =
   # > build images with BuildKit enabled
   hasBuildx()
 
-proc runDockerGetEverything*(args: seq[string], stdin = "", silent = true): ExecOutput =
-  if not silent:
-    trace("Running docker: " & dockerExeLocation & " " & args.join(" "))
-    if stdin != "":
-      trace("Passing on stdin: \n" & stdin)
-  result = runCmdGetEverything(dockerExeLocation, args, stdin)
-  if not silent and result.exitCode > 0:
-    trace(strutils.strip(result.stderr & result.stdout))
-  return result
-
 proc dockerFailsafe*(info: DockerInvocation) {.cdecl, exportc.} =
   # If our mundged docker invocation fails, then we conservatively
   # assume we made some big mistake, and run Docker the way it
@@ -119,7 +119,7 @@ proc dockerFailsafe*(info: DockerInvocation) {.cdecl, exportc.} =
   if info.dockerFileLoc == ":stdin:":
     newStdin = info.inDockerFile
 
-  let exitCode = runProcNoOutputCapture(dockerExeLocation,
+  let exitCode = runCmdNoOutputCapture(dockerExeLocation,
                                         info.originalArgs,
                                         newStdin)
   doReporting("fail")

@@ -322,11 +322,12 @@ class Chalk:
         artifact: Path | str,
         expected_success: bool = True,
         ignore_errors: bool = False,
+        log_level: ChalkLogLevel = "error",
     ) -> ChalkProgram:
         return self.run(
             command="extract",
             target=artifact,
-            log_level="error",
+            log_level=log_level,
             expected_success=expected_success,
             ignore_errors=ignore_errors,
         )

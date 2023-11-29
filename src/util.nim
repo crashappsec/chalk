@@ -395,7 +395,6 @@ proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
   if len(prioritizedExes) != 0:
     let cargs = allocCStringArray(@[prioritizedExes[0].splitPath.tail] & args)
 
-
     for path in prioritizedExes:
       trace("execve: " & path & " " & args.join(" "))
       discard execv(cstring(path), cargs)
@@ -406,15 +405,19 @@ proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
   error("Chalk: exec could not find a working executable to run.")
   quitChalk(1)
 
-proc runProcNoOutputCapture*(exe:      string,
-                             args:     seq[string],
-                             newStdin = ""): int {.discardable.} =
-
+proc runCmdNoOutputCapture*(exe:       string,
+                            args:      seq[string],
+                            newStdin = ""): int {.discardable.} =
   let execOutput = runCmdGetEverything(exe, args, newStdIn,
                                        passthrough = true,
                                        timeoutUsec = 0) # No timeout
   result = execOutput.getExit()
 
+proc runCmdExitCode*(exe: string, args: seq[string]): int {.discardable } =
+  let execOutput = runCmdGetEverything(exe, args,
+                                       passthrough = false,
+                                       timeoutUsec = 0) # No timeout
+  result = execOutput.getExit()
 
 template chalkUseStream*(chalk: ChalkObj, code: untyped) {.dirty.} =
   var
