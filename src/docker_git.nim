@@ -84,7 +84,7 @@ proc splitBy(s: string, sep: string, default: string = ""): (string, string) =
 proc splitContext(context: string): (string, string, string) =
   let
     (remoteUrl, headSubdir) = context.splitBy("#")
-    (head, subdir) = headSubdir.splitBy(":")
+    (head, subdir)          = headSubdir.splitBy(":")
   trace("Docker git context:")
   trace("  remote = " & remoteUrl)
   if head != "":
