@@ -127,16 +127,25 @@ proc dockerFailsafe*(info: DockerInvocation) {.cdecl, exportc.} =
 
 var contextCounter = 0
 
-proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
-                                inLoc:    string,
-                                move:     bool,
-                                chmod:    bool = false,
-                                newName = "") =
-  var loc         = inLoc.resolvePath()
+proc makeFileAvailableToDocker*(ctx:     DockerInvocation,
+                                inLoc:   string,
+                                move:    bool,
+                                chmod:   string = "",
+                                newName: string) =
+  var
+    loc           = inLoc.resolvePath()
+    chmod         = chmod
+
   let
     (dir, file)   = loc.splitPath()
     userDirective = ctx.dfSections[^1].lastUser
     hasUser       = userDirective != nil
+
+  # if USER directive is present and --chmod is not requested
+  # default container user will not have access to the copied file
+  # hence we default permission to read-only for all users
+  if hasUser and chmod == "":
+    chmod = "0444"
 
   if move:
     trace("Making file available to docker via move: " & loc)
@@ -148,9 +157,8 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
       trace("Docker injection method: --build-context")
 
     var chmodstr = ""
-
-    if chmod or hasUser:
-      chmodstr = "--chmod=0755 "
+    if chmod != "":
+      chmodstr = "--chmod=" & chmod & " "
 
     ctx.newCmdLine.add("--build-context")
     ctx.newCmdLine.add("chalkexedir" & $(contextCounter) & "=" & dir & "")
@@ -188,17 +196,17 @@ proc makeFileAvailableToDocker*(ctx:      DockerInvocation,
         copyFile(loc, dstLoc)
         trace("Copied " & loc & " to " & dstLoc)
 
-      if chmod and supportsCopyChmod():
-        ctx.addedInstructions.add("COPY --chmod=0755 " &
+      if chmod != "" and supportsCopyChmod():
+        ctx.addedInstructions.add("COPY --chmod= " & chmod &
                                   file & " " & " /" & newname)
-      elif chmod:
+      elif chmod != "":
         # TODO detect user from base image if possible but thats not
         # trivial as what is a base image is not a trivial question
         # due to multi-stage build possibilities...
         if hasUser:
           ctx.addedInstructions.add("USER root")
         ctx.addedInstructions.add("COPY " & file & " " & " /" & newname)
-        ctx.addedInstructions.add("RUN chmod 0755 /" & newname)
+        ctx.addedInstructions.add("RUN chmod " & chmod & " /" & newname)
         if hasUser:
           ctx.addedInstructions.add("USER " & userDirective.str)
       else:

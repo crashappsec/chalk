@@ -4,14 +4,16 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import strutils, util
+import strutils
 
 # very simple semver implementation
 # it this does NOT handle full semver spec
 # it only handles basic dot-separated version format
 
 type Version* = ref object
-  parts: tuple[major: int, minor: int, patch: int]
+  major: int
+  minor: int
+  patch: int
   name:  string
 
 proc parseVersion*(version: string): Version =
@@ -36,25 +38,31 @@ proc parseVersion*(version: string): Version =
       raise newException(ValueError, "Invalid or unsupported version format")
   new result
   result.name = name
-  result.parts = (major, minor, patch)
+  result.major = major
+  result.minor = minor
+  result.patch = patch
+
+# version parts tuple used for comparison
+proc parts(self: Version): (int, int, int) =
+  return (self.major, self.minor, self.patch)
 
 proc `==`*(self: Version, other: Version): bool =
-  return self.parts == other.parts
+  return self.parts() == other.parts()
 
 proc `!=`*(self: Version, other: Version): bool =
-  return self.parts != other.parts
+  return self.parts() != other.parts()
 
 proc `>`*(self: Version, other: Version): bool =
-  return self.parts > other.parts
+  return self.parts() > other.parts()
 
 proc `>=`*(self: Version, other: Version): bool =
-  return self.parts >= other.parts
+  return self.parts() >= other.parts()
 
 proc `<`*(self: Version, other: Version): bool =
-  return self.parts < other.parts
+  return self.parts() < other.parts()
 
 proc `<=`*(self: Version, other: Version): bool =
-  return self.parts <= other.parts
+  return self.parts() <= other.parts()
 
 proc `$`*(self: Version): string =
   return self.name
