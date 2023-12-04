@@ -84,7 +84,7 @@ template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
 
   if chalkconfig.getLogLevel() == "trace":
     case cfg.mySink.name
-    of "post":
+    of "post", "presign":
       let
         timeout = if "timeout" in cfg.params:
                     cfg.params["timeout"] & " ms"
@@ -284,7 +284,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
         error("Sink config '" & name & "' has an invalid URI.")
         dumpExOnDebug()
         return none(SinkConfig)
-  of "post":
+  of "post", "presign":
     if "content_type" notin opts:
       opts["content_type"] = "application/json"
   of "file":

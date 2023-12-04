@@ -43,13 +43,12 @@ def _validate_chalk(
 
 
 # TODO add a test for the file not being present
-@mock.patch.dict(os.environ, {"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"})
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_file_present(tmp_data_dir: Path, chalk: Chalk, copy_files: list[Path]):
     artifact = copy_files[0]
 
     # prep config file
-    file_output_path = Path(os.environ["SINK_TEST_OUTPUT_FILE"])
+    file_output_path = Path("/tmp/sink_file.json")
     if not file_output_path.is_file():
         # touch the file
         open(file_output_path, "a").close()
@@ -57,7 +56,11 @@ def test_file_present(tmp_data_dir: Path, chalk: Chalk, copy_files: list[Path]):
     assert file_output_path.is_file(), "file sink path must be a valid path"
 
     config = SINK_CONFIGS / "file.c4m"
-    chalk.insert(config=config, artifact=artifact)
+    chalk.insert(
+        config=config,
+        artifact=artifact,
+        env={"SINK_TEST_OUTPUT_FILE": str(file_output_path)},
+    )
 
     # check that file output is correct
     assert file_output_path.is_file(), "file sink should exist after chalk operation"
@@ -69,21 +72,19 @@ def test_file_present(tmp_data_dir: Path, chalk: Chalk, copy_files: list[Path]):
     _validate_chalk(chalks[0], tmp_data_dir)
 
 
-@mock.patch.dict(
-    os.environ, {"SINK_TEST_OUTPUT_ROTATING_LOG": "/tmp/sink_rotating.json"}
-)
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_rotating_log(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
     artifact = copy_files[0]
 
-    assert (
-        os.environ["SINK_TEST_OUTPUT_ROTATING_LOG"] != ""
-    ), "rotating log output not set"
-    rotating_log_output_path = Path(os.environ["SINK_TEST_OUTPUT_ROTATING_LOG"])
+    rotating_log_output_path = Path("/tmp/sink_rotating.json")
     rotating_log_output_path.unlink(missing_ok=True)
 
     config = SINK_CONFIGS / "rotating_log.c4m"
-    chalk.insert(config=config, artifact=artifact)
+    chalk.insert(
+        config=config,
+        artifact=artifact,
+        env={"SINK_TEST_OUTPUT_ROTATING_LOG": str(rotating_log_output_path)},
+    )
 
     # check that file output is correct
     if not rotating_log_output_path or not rotating_log_output_path.is_file():
@@ -100,9 +101,6 @@ def test_rotating_log(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
 
 @pytest.mark.skipif(not aws_secrets_configured(), reason="AWS secrets not configured")
 # FIXME add some tests for the different options of `/` in S3 URIs
-@mock.patch.dict(
-    os.environ, {"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/sink-test.json"}
-)
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_s3(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
     artifact = copy_files[0]
@@ -110,11 +108,14 @@ def test_s3(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
     os.environ.pop("AWS_PROFILE")
 
     s3 = boto3.client("s3")
-    # basic validation of s3 env vars
-    assert os.environ["AWS_S3_BUCKET_URI"], "s3 bucket uri must not be empty"
 
     config = SINK_CONFIGS / "s3.c4m"
-    proc = chalk.insert(config=config, artifact=artifact, log_level="info")
+    proc = chalk.insert(
+        config=config,
+        artifact=artifact,
+        log_level="info",
+        env={"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/sink-test.json"},
+    )
 
     # expecting log line from chalk of form
     # info: Post to: 1686605005558-CSP9AXH5CMXKAE3D9BN8G25K0G-sink-test; response = 200 OK (sink conf='my_s3_config')
@@ -135,14 +136,6 @@ def test_s3(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
     _validate_chalk(chalks[0], tmp_data_dir)
 
 
-@mock.patch.dict(
-    os.environ,
-    {
-        "CHALK_POST_URL": f"{SERVER_HTTP}/report",
-        # testing if chalk at least parses headers correctly
-        "CHALK_POST_HEADERS": "x-test-header: test-header",
-    },
-)
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_post_http_fastapi(
     copy_files: list[Path],
@@ -157,18 +150,14 @@ def test_post_http_fastapi(
         url=server_http,
         server_sql=server_sql,
         verify=None,
+        env={
+            "CHALK_POST_URL": f"{SERVER_HTTP}/report",
+            # testing if chalk at least parses headers correctly
+            "CHALK_POST_HEADERS": "x-test-header: test-header",
+        },
     )
 
 
-@mock.patch.dict(
-    os.environ,
-    {
-        "CHALK_POST_URL": f"{SERVER_HTTPS}/report",
-        # testing if chalk at least parses headers correctly
-        "CHALK_POST_HEADERS": "x-test-header: test-header",
-        "TLS_CERT_FILE": str(SERVER_CERT),
-    },
-)
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_post_https_fastapi(
     copy_files: list[Path],
@@ -184,6 +173,34 @@ def test_post_https_fastapi(
         url=server_https,
         server_sql=server_sql,
         verify=server_cert,
+        env={
+            "CHALK_POST_URL": f"{SERVER_HTTPS}/report",
+            # testing if chalk at least parses headers correctly
+            "CHALK_POST_HEADERS": "x-test-header: test-header",
+            "TLS_CERT_FILE": str(SERVER_CERT),
+        },
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
+def test_presign_http_fastapi(
+    copy_files: list[Path],
+    chalk: Chalk,
+    server_sql: Callable[[str], str | None],
+    server_http: str,
+):
+    _test_server(
+        artifact=copy_files[0],
+        chalk=chalk,
+        conf="presign_http_local.c4m",
+        url=server_http,
+        server_sql=server_sql,
+        verify=None,
+        env={
+            "CHALK_POST_URL": f"{SERVER_HTTP}/report/presign",
+            # testing if chalk at least parses headers correctly
+            "CHALK_POST_HEADERS": "x-test-header: test-header",
+        },
     )
 
 
@@ -194,11 +211,12 @@ def _test_server(
     url: str,
     server_sql: Callable[[str], str | None],
     verify: str | None,
+    env: dict[str, str],
 ):
     initial_chalks_count = int(server_sql("SELECT count(*) FROM chalks") or 0)
 
     # post url must be set
-    assert os.environ["CHALK_POST_URL"] != "", "post url is not set"
+    assert env["CHALK_POST_URL"] != "", "post url is not set"
 
     config = SINK_CONFIGS / conf
     proc = chalk.run(
@@ -207,6 +225,7 @@ def _test_server(
         config=config,
         use_embedded=False,
         log_level="trace",
+        env=env,
     )
 
     metadata_id = proc.mark["METADATA_ID"]

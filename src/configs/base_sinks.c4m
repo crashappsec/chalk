@@ -182,6 +182,31 @@ sink_config my_https_config {
 
 }
 
+sink presign {
+  ~uri:              true
+  ~headers:          false
+  ~content_type:     false
+  ~disallow_http:    false
+  ~timeout:          false
+  ~pinned_cert_file: false
+  ~on_write_msg:     false
+  shortdoc:          "HTTP/HTTPS Presign PUT"
+  doc:               """
+Sink which allows to upload reports to pre-signed URL.
+
+All parameters are identical as `post` sink.
+
+Pre-sign flow is as follows:
+
+1. Send PUT to URI (without report)
+2. Receive 302/307 redirect with pre-signed URI in Location header
+3. Send full report to that URI by using HTTP PUT
+
+This allows chalk to send reports to otherwise forbidden endpoints
+such as AWS S3 without any hard-coded credentials baked into chalk.
+"""
+}
+
 sink stdout {
   shortdoc:  "Write to stdout"
   doc:             """
