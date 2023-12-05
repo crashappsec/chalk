@@ -524,7 +524,7 @@ proc attemptToLoadKeys*(silent=false): bool =
 
   acquirePassword(priKey)
   if cosignPw == "":
-    cosignPw = getPasswordViaTty()
+    cosignPw = getPassword("Password: ")
     if cosignPw == "":
       return false
 

@@ -21,8 +21,6 @@ const allCommandSections = ["", "insert", "docker", "extract", "extract.images",
                             "setup", "setup.gen", "setup.load", "env",
                             "config", "dump", "load", "delete", "version"]
 
-# template dbug(a, b) = print("<jazzberry>" & a & ": </jazzberry>" & b)
-
 proc kindEnumToString(s, v: string): string =
   case v
   of "0":
@@ -36,42 +34,35 @@ proc kindEnumToString(s, v: string): string =
   else:
     "Unknown"
 
-proc displayPluginKeys(s, v: string): string =
-  let
-    asJson = parseJson(v)
-    asArr  = to(asJson, seq[string])
+var transformers  = TransformTableRef()
 
-  if asArr.len() == 0:
-    return "<i>None</i>"
-  elif asArr.len() == 1 and asArr[0] == "*":
-    return "Any"
-  return asArr.join(", ")
+proc getKeyspecTable(state:          ConfigState, 
+                     filterValueStr: string,
+                     fieldsToUse:    openarray[string]): Rope =
 
-template getKeyspecTable(state: ConfigState, filterValueStr: string,
-                         colwidths: seq[int]): string =
-  let caption = "See <em>help key &lt;term&gt;</em> to search the table only"
+  const headingsToUse = ["Key", "Collection Type", "Value Type", "Description"]
 
-  state.getAllInstanceDocs("keyspec",
-                           fieldsToUse    = fieldsToUse,
-                           filterField    = "kind",
-                           filterValue    = filterValueStr,
-                           headings       = headingsToUse,
-                           transformers   = transformers,
-                           docKind        = docKind,
-                           colwidths      = colwidths,
-                           caption        = caption,
-                           markdownFields = mdFields)
 
-proc keyHelp(state: ConfigState, args: seq[string] = @[],
-             summary = false,
-             docKind = CDocConsole) :string =
-  var
-    transformers  = TransformTableRef()
+
+  let caption = atom("See ") + em("help key <term>") + 
+                atom(" to search the table only")
+
+  result = state.getInstanceDocs("keyspec",
+                                 fieldsToUse    = fieldsToUse,
+                                 searchFields   = ["kind"],
+                                 searchTerms    = [filterValueStr],
+                                 headings       = headingsToUse,
+                                 transformers   = transformers,
+                                 caption        = caption)
+
+  result.colPcts([25, 15, 25, 35])
+  
+
+proc keyHelp(state: ConfigState, args: seq[string] = @[], summary = false):
+            Rope =
+  var 
     filter: bool  = false
-    mdFields      = @["doc"]
     fieldsToUse   = @["kind", "type"]
-    headingsToUse = @["Key", "Collection Type", "Value Type", "Description"]
-    colwidths     = @[20, 20, 20, 40]
 
   if summary:
     fieldsToUse.add("shortdoc")
@@ -82,11 +73,11 @@ proc keyHelp(state: ConfigState, args: seq[string] = @[],
 
   case len(args)
   of 0, 1:
-    result = state.getKeyspecTable("", colwidths = colwidths)
+    result = state.getKeyspecTable("", fieldsToUse)
   of 2:
     case args[1].toLowerAscii()
     of "help", "--help":
-      result = """
+      result = markdown("""
 `chalk help keys` gives a table with all metadata keys.
 
 `chalk help keys <<filter>>` will filter the list by category.  Valid
@@ -100,34 +91,34 @@ values for the filter are:
 Additionally, you can search for any text within metadata help via
 `chalk help keys <<search terms>>`. When multiple words are provided,
 any word that matches is returned.
-"""
+""")
     of "chalk", "chalk-time", "chalktime":
-      result = "# Chalk-Time Host Metadata Keys"
-      result &= state.getKeyspecTable("0", colwidths = colwidths)
-      result = "# Chalk-Time Artifact Metadata Keys"
-      result &= state.getKeyspecTable("1", colwidths = colwidths)
+      result = h1("Chalk-Time Host Metadata Keys")
+      result += state.getKeyspecTable("0", fieldsToUse)
+      result += h1("Chalk-Time Artifact Metadata Keys")
+      result += state.getKeyspecTable("1", fieldsToUse)
     of "runtime", "run-time":
-      result = "# Run-Time Artifact Metadata Keys"
-      result &= state.getKeyspecTable("2", colwidths = colwidths)
-      result = "# Run-Time Host Metadata Keys"
-      result &= state.getKeyspecTable("3", colwidths = colwidths)
+      result = h1("Run-Time Artifact Metadata Keys")
+      result += state.getKeyspecTable("2", fieldsToUse)
+      result += h1("Run-Time Host Metadata Keys")
+      result += state.getKeyspecTable("3", fieldsToUse)
     of "host":
-      result = "# Chalk-Time Host Metadata Keys"
-      result &= state.getKeyspecTable("0", colwidths = colwidths)
-      result = "# Run-Time Host Metadata Keys"
-      result &= state.getKeyspecTable("3", colwidths = colwidths)
+      result += h1("Chalk-Time Host Metadata Keys")
+      result += state.getKeyspecTable("0", fieldsToUse)
+      result += h1("Run-Time Host Metadata Keys")
+      result += state.getKeyspecTable("3", fieldsToUse)
     of "artifact":
-      result = "# Chalk-Time Artifact Metadata Keys"
-      result &= state.getKeyspecTable("1", colwidths = colwidths)
-      result = "# Run-Time Artifact Metadata Keys"
-      result &= state.getKeyspecTable("2", colwidths = colwidths)
+      result = h1("Chalk-Time Artifact Metadata Keys")
+      result += state.getKeyspecTable("1", fieldsToUse)
+      result += h1("Run-Time Artifact Metadata Keys")
+      result += state.getKeyspecTable("2", fieldsToUse)
     else:
       filter = true
   else:
     filter = true
 
   if filter:
-    result = state.searchInstanceDocs("keyspec",
+    result = state.getInstanceDocs("keyspec",
                                   ["kind", "type", "doc"],
                                   searchFields = ["doc", "shortdoc"],
                                   searchTerms = args[1 .. ^1],
@@ -135,14 +126,7 @@ any word that matches is returned.
                                               "Collection Type",
                                               "Value Type",
                                               "Description"],
-                                  colwidths = colwidths,
-                                  transformers = transformers,
-                                  markdownFields=["shortdoc", "doc"])
-
-proc highlightMatches(s: string, terms: seq[string]): string =
-  result = s
-  for term in terms:
-    result = result.replace(term, "<strong><em>" & term & "</em></strong>")
+                                  transformers = transformers)
 
 proc resolveHelpFileName(docName: string): string =
   if docName.startsWith("core-"):
@@ -152,7 +136,7 @@ proc resolveHelpFileName(docName: string): string =
   else:
     result = docName
 
-proc searchEmbeddedDocs(terms: seq[string]): string =
+proc searchEmbeddedDocs(terms: seq[string]): Rope =
   # Terminal only.
   for key, doc in helpfiles:
     var matchedTerms: seq[string] = @[]
@@ -164,21 +148,20 @@ proc searchEmbeddedDocs(terms: seq[string]): string =
     if len(matchedTerms) != 0:
       let docName = resolveHelpFileName(key)
 
-      result &= "<h2>Match on document: " & docName & "</h2>"
-      result &= doc.highlightMatches(matchedTerms)
-      result &= "<p></p>"
+      result += h4("Match on document: " & docName)
+      result += text(doc).highlightMatches(matchedTerms)
 
-  if result == "":
-    result = "<h2>No matches in other documents.</h2><p></p>"
+  if result == Rope(nil):
+    result = h4("No matches in other documents.")
 
-proc searchMetadataKeys(state: ConfigState, terms: seq[string]): string =
+proc searchMetadataKeys(state: ConfigState, terms: seq[string]): Rope =
   var transformers     = TransformTableRef()
   transformers["kind"] = FieldTransformer(kindEnumToString)
 
   var
-    matches: seq[seq[string]]
-    baseDocs  = state.getAllInstanceDocsAsArray("keyspec",
-                                                ["kind", "type", "doc"],
+    matches: seq[seq[string]] 
+    baseDocs = state.getAllInstanceDocsAsArray("keyspec",
+                                               ["kind", "type", "doc"],
                                                 transformers)
   for doc in baseDocs:
     var addIt = false
@@ -192,36 +175,38 @@ proc searchMetadataKeys(state: ConfigState, terms: seq[string]): string =
       matches.add(doc)
 
   if len(matches) == 0:
-    result = "<h2>No matches in found metadata key docs</h2>"
+    result = h4("No matches in found metadata key docs")
   else:
-    let
-      preHighlight = matches.formatCellsAsHtmlTable(
-           ["Key", "Collection Type", "Value Type", "Description"])
-      toShow       = preHighlight.highlightMatches(terms)
+    matches = @[@["Key", "Collection Type", "Value Type", "Description"]] & 
+      matches
+    result = quickTable(matches, title = "Metadata documentation matches",
+                        class = "help")
+    result = result.highlightMatches(terms)
 
-    result = "<h2>Metadata documentation matches</h2>" & toShow
-
-proc searchConfigVars(state: ConfigState, args: seq[string]): string =
+proc searchConfigVars(state: ConfigState, args: seq[string]): Rope =
   for sec in allConfigVarSections:
     let matches = state.getMatchingConfigOptions(sec, filterTerms = args)
-    if len(matches) == 0:
+    if matches == Rope(nil):
       continue
-    for match in matches:
+    for match in matches.searchOne(@["table"]).get().tbody.cells:
+      var 
+        caption: string
+        tdCells = match.search(@["td"])
+      if len(tdCells) == 0:
+        continue
       if sec == "":
-        result &= "<h2>Match in global configuration variable: "
+        caption = "Match in global configuration variable"
       else:
-        result &= "<h2>Match in configuration section " & sec &
-          " for variable: "
-      result &= match[0] & "</h2>"
-      result &= "<table><tbody><tr><th>Description</th><td>" & match[3]
-      result &= "</td></tr>"
-      result &= "<tr><th>Config value type</th><td>" & match[1]
-      result &=  "</td></tr>"
-      result &= "<tr><th>Default value</th></td><td>" & match[2]
-      result &= "</td></tr></tbody></table><p></p>"
+        caption = "Match in configuration section " & sec &
+                  " for variable: " &  tdCells[0].asUtf8()
+      result += quickTable(@[
+          @[atom("Description"), tdCells[3].contained],
+          @[atom("Config value type"), tdCells[1].contained],
+          @[atom("Default value"), tdCells[2].contained]],
+              class = "help", title = caption, verticalHeaders = true)
 
-  if result == "":
-    result = "<h2>No matches in configuration variables</h2><p></p>"
+  if result == Rope(nil):
+    result = h4("No matches in configuration variables")
 
 proc formatCommandName(dotted: string): string =
   let parts = dotted.split(".")
@@ -231,7 +216,7 @@ proc formatCommandName(dotted: string): string =
   else:
     return "Command " & parts[0] & "'s sub-command " & parts[1]
 
-proc searchFlags(state: ConfigState, args: seq[string]): string =
+proc searchFlags(state: ConfigState, args: seq[string]): Rope =
   for command in allCommandSections:
     let objs = state.getCommandFlagInfo(command, args)
 
@@ -239,154 +224,143 @@ proc searchFlags(state: ConfigState, args: seq[string]): string =
       continue
 
     for match in objs:
-      result &= "<h2>Match for "
+      var 
+        cells:    seq[seq[string]]
+        heading = "Match for "
+        ftStr: string
+
       if command == "":
-        result &= "global flag " & match.flagName
+        heading &= "global flag " & match.flagName
       else:
-        result &= "flag " & match.flagName & " from " & command.formatCommandName()
-      result &= "</h2>"
-
-      result &= "<table><tbody>"
-      result &= "<tr><th>Flag</th><td>" & match.flagName & "</td></tr>"
-      result &= "<tr><th>Flag Type</th><td>"
-
+        heading &= "flag " & match.flagName & " from " & 
+                    command.formatCommandName()
+      result += h4(heading)
+      
       case match.kind
-      of "boolean":      result &= "Yes / No (boolean)"
-      of "arg":          result &= "Required Argument"
-      of "multi-arg":    result &= "Multiple Arguments"
-      of "choice":       result &= "Choice"
-      of "multi-choice": result &= "Multiple Choice"
-      else:              result &= "Unknown"
+      of "boolean":      ftStr = "Yes / No (boolean)"
+      of "arg":          ftStr = "Required Argument"
+      of "multi-arg":    ftStr = "Multiple Arguments"
+      of "choice":       ftStr = "Choice"
+      of "multi-choice": ftStr = "Multiple Choice"
+      else:              ftStr = "Unknown"
 
-      result &= "</td></tr>"
-
+      cells = @[@["Flag", match.flagName],
+                @["Flag Type", ftStr]]
+                 
       if match.sets != "":
-        result &= "<tr><th>Config variable set</th><td>" & match.sets & "</td></tr>"
+        cells.add(@["Config variable set", match.sets])
 
       if match.choices.len() != 0:
-        result &= "<tr><th>Valid choices</th></td>" & match.choices.join(", ") & "</td></tr>"
+        cells.add(@["Valid choices", match.choices.join(", ")])
         if match.autoFlags:
-          result &= "<tr><th>Choices are also valid flags:</th><td>Yes</td></tr>"
+          cells.add(@["Choices are also valid flags", "(Yup!)"])
 
-      result &= "</tbody></table><p></p>"
+      result += quickTable(cells, verticalHeaders = true, class = "help")
 
-      result &= match.doc
+  if result == Rope(nil):
+    result = h4("No matches found in command-line flag documentation")
 
-  if result == "":
-    result = "<h2>No matches found in command-line flag documentation</h2><p></p>"
-
-proc searchCommandDescriptions(state: ConfigState, args: seq[string]): string =
+proc searchCommandDescriptions(state: ConfigState, args: seq[string]): Rope =
   let matches = state.getCommandNonFlagData(allCommandSections, args)
 
-  if len(matches) == 0:
-    result &= "<h2>No matches in command descriptions</h2><p></p>"
+  if matches == nil:
+    result = h4("No matches in command descriptions")
 
-  else:
-    for match in matches:
-      var aliases = match[3].highlightMatches(args)
+  result = matches.highlightMatches(args)
 
-      if aliases == "": aliases = "<em>None</em>"
 
-      result &= "<h2>Match for " & formatCommandName(match[0]) & "</h2>"
-      result &= "<table><tbody>"
-      result &= "<tr><th>Overview</th><td>" & match[1].highlightMatches(args) & "</td></tr>"
-      result &= "<tr><th>Aliases</th><td>" & aliases & "</td></tr>"
-      result &= "<tr><th>Arguments</th><td>" & match[4].highlightMatches(args) & "</td></tr>"
-      result &= "</tbody></table>"
-      result &= match[2]
-
-proc getHelpTopics(state: ConfigState): string =
-  result &= "<h1>Additional help topics </h1>"
-  result &= "<h2>Use `chalk help <topicname>` to read</h2>"
-  result &= "<ul>"
-
+proc getHelpTopics(state: ConfigState): Rope =
+  result  = h1("Additional help topics")
+  result += h2(atom("Use ") + em("chalk help <topicname>") + atom(" to read"))
+  
+  var items: seq[string]
   for k, _ in helpFiles:
-    result &= "<li>" & resolveHelpFileName(k) & "</li>"
+    items.add(resolveHelpFileName(k))
 
-  result &= "</ul><p></p>"
+  result += ul(items)
 
-  result = result.stylizeHtml()
-
-proc getSinkHelp(state: ConfigState, docType = CDocConsole): string =
-  result = """
-
-## Available output sinks
-
+proc getSinkHelp(state: ConfigState): Rope =
+  result = h2("Available output sinks")
+  result += text("""
 As mentioned above, if you wish to control where to send reporting
 data, you can create a `sink_config` object that configures one of the
 below sink types. The descriptions for each sink type describe what
-fields are required or allowed for each kind of sink.
+fields are required or allowed for each kind of sink.""
 
 Remember that to use a sink, you need to either assign it to a custom
-report, or `subscribe()` it to a topic.
-"""
-  result &= "\n\n" & state.getAllInstanceDocs("sink",
-          ["shortdoc", "doc"], ["Overview", "Detail"],
-          docKind = docType, table = false)
+report, or """, pre = false)
+  result += em("subscribe()") + text("it to a topic.")
 
-proc getPluginHelp(state: ConfigState): string =
-  var
-    transformers = TransformTableRef()
-    arrayXfm     = FieldTransformer(displayPluginKeys)
-  transformers["pre_run_keys"]    = arrayXfm
-  transformers["artifact_keys"]   = arrayXfm
-  transformers["post_chalk_keys"] = arrayXfm
-  transformers["post_run_keys"]   = arrayXfm
-  result = state.getAllInstanceDocs("plugin",
-          ["doc", "pre_run_keys", "artifact_keys", "post_chalk_keys",
-           "post_run_keys"],
-          ["Overview", "Chalk-time host metadata",
-                      "Chalk-time artifact metadata",
-                      "Post-chalk host metadata",
-                      "Post-chalk artifact metadata"],
-          transformers=transformers,
-          table=false,
-          markdownFields=["doc"])
+  result += state.getInstanceDocs("sink", ["shortdoc", "doc"],
+                               ["Overview", "Detail"])
 
-  result = result.stylizeMd()
+proc getPluginHelp(state: ConfigState): Rope =
+  let 
+    keyFields = ["pre_run_keys", "artifact_keys", "post_chalk_keys",
+                 "post_run_keys"]
+    kfNames   = ["Chalk-time host metadata",
+                 "Chalk-time artifact metadata",
+                 "Post-chalk host metadata",
+                 "Post-chalk artifact metadata"]
 
-proc getMarkTemplateDocs(state: ConfigState): string =
-    result = stylizeMd("# Chalk Mark Templates")
+    allDocs = state.getAllInstanceRawDocs("plugin")
 
-    result &= state.getAllInstanceDocs("mark_template",["shortdoc"],
-                                       ["Template Name", "Description"])
+  for plugin, docs in allDocs:
+    result += h2(text("Plugin: ") + em(plugin))
+    result += h3("Overview")
+    if "doc" in docs:
+      result += markdown(docs["doc"]["value"])
+    else:
+      result += text("No documentation.")
 
-proc getReportTemplateDocs(state: ConfigState): string =
-  result = stylizeMd("# Report Templates")
-  result &= state.getAllInstanceDocs("report_template",["shortdoc"],
-                                       ["Template Name", "Description"])
+    for i, item in keyFields:
+      if item in docs:
+        let 
+          asJson = docs[item]["value"].parseJson()
+          asArr  = asJson.to(seq[string])
+
+        if len(asArr) != 0:
+          result += asArr.instantTable(kfNames[i])
+
+
+proc getMarkTemplateDocs(state: ConfigState): Rope =
+  result = state.getInstanceDocs("mark_template", ["shortdoc"],
+                                 headings = ["Template Name", "Description"],
+                                 title = atom("Chalk Mark Templates"))
+
+proc getReportTemplateDocs(state: ConfigState): Rope =
+  result = state.getInstanceDocs("report_template", ["shortdoc"],
+                                 headings = ["Template Name", "Description"],
+                                 title = atom("Report Templates"))
 
 proc formatOneTemplate(state: ConfigState,
-                     tmpl: MarkTemplate | ReportTemplate): string =
+                     tmpl: MarkTemplate | ReportTemplate): Rope =
   var
     keysToReport: seq[string]
 
-  result &= tmpl.doc.getOrElse("No description available.").stylizeMd()
+  result = markdown(tmpl.doc.getOrElse("No description available."))
 
   for k, v in tmpl.keys:
     if v.use == true:
       keysToReport.add(k)
 
   if len(keysToReport) == 0:
-    result &= stylizeHtml("<h3>This template is empty, and will only " &
-      "produce default values </h3>")
+    result += h3("This template is empty, and will only produce default values")
   else:
-    result &= stylizeHtml("<h3>Keys this template produces (beyond " &
-      "any required defaults): </h3>")
+    result += instantTable(keysToReport,
+              "Keys this template produces (beyond any required defaults)")
 
-    result &= instantTable(keysToReport)
-
-proc getTemplateHelp(state: ConfigState, args: seq[string]): string =
-    result &= state.getReportTemplateDocs()
-    result &= state.getMarkTemplateDocs()
+proc getTemplateHelp(state: ConfigState, args: seq[string]): Rope =
+    result  = state.getReportTemplateDocs()
+    result += state.getMarkTemplateDocs()
 
     if len(args) == 0:
-      result &= instantTable(@["""To see details on a template's contents,
+      result += callout("""To see details on a template's contents,
 do `chalk help template [name]`
 or `chalk help template all` to see all templates.
 
 See `chalk help reporting` for more information on templates.
-"""])
+""")
       return
 
     var
@@ -402,8 +376,7 @@ See `chalk help reporting` for more information on templates.
       for item in args:
         if item notin chalkConfig.markTemplates and
            item notin chalkConfig.reportTemplates:
-          result &= stylizeHtml("<h3>No template found named: " & item &
-            "<h3>")
+          result += h3("No template found named: " & item )
         else:
           if item in chalkConfig.markTemplates:
             markTemplates.add(item)
@@ -411,38 +384,36 @@ See `chalk help reporting` for more information on templates.
             reportTemplates.add(item)
 
     if len(markTemplates) + len(reportTemplates) == 0:
-      result &= stylizeHtml("<h1>No matching templates found.</h1><p></p>")
+      result += h1("No matching templates found.")
       return
 
     for markTmplName in markTemplates:
       let theTemplate = chalkConfig.markTemplates[markTmplName]
 
-      result &= stylizeHtml("<h2>Mark Template: " & markTmplName & "</h2>")
-      result &= state.formatOneTemplate(theTemplate)
-      result &= "<p></p>"
+      result += h2("Mark Template: " & markTmplName)
+      result += state.formatOneTemplate(theTemplate)
 
     for repTmplName in reportTemplates:
       let theTemplate = chalkConfig.reportTemplates[repTmplName]
 
-      result &= stylizeHtml("<h2>Report Template: " & repTmplName & "</h2>")
-      result &= state.formatOneTemplate(theTemplate)
-      result &= "<p></p>"
+      result += h2("Report Template: " & repTmplName)
+      result += state.formatOneTemplate(theTemplate)
 
-proc fullTextSearch(state: ConfigState, args: seq[string]): string =
-  result &= "<h1>Searching documentation for term"
+proc fullTextSearch(state: ConfigState, args: seq[string]): Rope =
+  var txt = "Searching documentation for term"
 
   if len(args) == 1:
-    result &= ": " & args[0] & "</h1>"
-
+    txt &= ": " & args[0]
   else:
-    result &= "s: " & args.join(", ") & "</h1>"
+    txt &= "s: " & args.join(", ") 
 
-  result &= state.searchCommandDescriptions(args)
-  result &= state.searchFlags(args)
-  result &= state.searchConfigVars(args)
-  result &= state.searchMetadataKeys(args)
-  result &= searchEmbeddedDocs(args)
-  result = result.stylizeMd()
+  result = h4(txt)
+
+  result += state.searchCommandDescriptions(args)
+  result += state.searchFlags(args)
+  result += state.searchConfigVars(args)
+  result += state.searchMetadataKeys(args)
+  result += searchEmbeddedDocs(args)
 
   # TODO:
   # - Search sinks.
@@ -450,21 +421,21 @@ proc fullTextSearch(state: ConfigState, args: seq[string]): string =
   # - Search templates.
   # - Search developer docs.
 
-proc getOutputHelp(state: ConfigState, kind = CDocConsole): string =
+proc getOutputHelp(state: ConfigState): Rope =
   let
-    (_, mtlong)     = state.getSectionDocs("mark_template", kind)
-    (_, rtlong)     = state.getSectionDocs("report_template", kind)
-    (_, oclong)     = state.getSectionDocs("outconf", kind)
-    (_, sconflong)  = state.getSectionDocs("sink_config", kind)
-    (_, custlong)   = state.getSectionDocs("custom_report", kind)
+    (_, mtlong)     = state.getSectionDocs("mark_template")
+    (_, rtlong)     = state.getSectionDocs("report_template")
+    (_, oclong)     = state.getSectionDocs("outconf")
+    (_, sconflong)  = state.getSectionDocs("sink_config")
+    (_, custlong)   = state.getSectionDocs("custom_report")
 
   result  = mtlong
-  result &= rtlong
-  result &= oclong
-  result &= sconflong
-  result &= custlong
+  result += rtlong
+  result += oclong
+  result += sconflong
+  result += custlong
 
-  result &= state.getSinkHelp(kind)
+  result += state.getSinkHelp()
 
 proc hasHelpFlag(args: seq[string]): bool =
   for item in args:
@@ -477,31 +448,29 @@ proc hasHelpFlag(args: seq[string]): bool =
     if s in ["help", "h"]:
       return true
 
-proc makeColorTable(): string =
+proc makeColorTable(): Rope =
   perClassStyles["light"] = newStyle(fgColor = "white")
-  perClassStyles["dark"]  = newStyle(fgColor = "black")
+  perClassStyles["dark"]  = newStyle(fgColor = "black" )
   styleMap.del("tr.even")
   styleMap.del("tr.odd")
   styleMap["tr"] = newStyle(bgColor = "default")
+  var cells: seq[seq[Rope]]
 
-
-
-  result  = "<table class=light><tbody>"
   for color, v in colorTable:
+    let cell = center(td(atom(color)).bgColor(color).tpad(1).bpad(1))
     if v < 0x400000:
-      result &= """<tr class=light><td class=light><center><bg-""" &
-        color & ">" & color & "</bg-" & color & "></center></td></tr>"
+      cell.setClass("light")
     else:
-      result &= """<tr class=dark><td class=dark><center><bg-""" & color &
-        ">" & color & "</bg-" & color & "></center></td></tr>"
-  result &= "</tbody></table>"
-  result = result.stylizeHtml()
+      cell.setClass("dark")
+    cells.add(@[cell])
+
+  return quickTable(cells, "Named colors", noHeaders = true, borders = HorizontalInterior)
 
 proc runChalkHelp*(cmdName = "help") {.noreturn.} =
   var
     args         = getArgs()
-    toOut        = ""
     con4mRuntime = getChalkRuntime()
+    toOut: Rope
 
   if cmdName != "help":
     # In this branch, the --help flag got passed, and we will check to
@@ -520,35 +489,35 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
   elif args[0] == "search":
     toOut = con4mRuntime.fullTextSearch(args[1 .. ^1])
   elif args[0] in ["template", "templates"]:
-    toOut &= con4mRuntime.getTemplateHelp(args[1 .. ^1])
+    toOut += con4mRuntime.getTemplateHelp(args[1 .. ^1])
   else:
     for arg in args:
       case arg
       of "nikon":
-        toOut &= makeColorTable()
+        toOut += makeColorTable()
       of "output", "reports", "reporting":
-        toOut &= con4mRuntime.getOutputHelp()
+        toOut += con4mRuntime.getOutputHelp()
       of "plugins":
-        toOut &= con4mRuntime.getPluginHelp()
+        toOut += con4mRuntime.getPluginHelp()
       of "insert", "delete", "env", "dump", "load", "config",
          "version", "docker", "exec":
-        toOut &= con4mRuntime.getCommandDocs(arg)
+        toOut += con4mRuntime.getCommandDocs(arg)
       of "extract":
-        toOut &= con4mRuntime.getCommandDocs("extract")
-        toOut &= con4mRuntime.getCommandDocs("extract.containers")
-        toOut &= con4mRuntime.getCommandDocs("extract.images")
-        toOut &= con4mRuntime.getCommandDocs("extract.all")
+        toOut += con4mRuntime.getCommandDocs("extract")
+        toOut += con4mRuntime.getCommandDocs("extract.containers")
+        toOut += con4mRuntime.getCommandDocs("extract.images")
+        toOut += con4mRuntime.getCommandDocs("extract.all")
       of "setup":
-        toOut &= con4mRuntime.getCommandDocs("setup")
-        toOut &= con4mRuntime.getCommandDocs("setup.gen")
-        toOut &= con4mRuntime.getCommandDocs("setup.load")
+        toOut += con4mRuntime.getCommandDocs("setup")
+        toOut += con4mRuntime.getCommandDocs("setup.gen")
+        toOut += con4mRuntime.getCommandDocs("setup.load")
       of "commands":
-        toOut &= con4mRuntime.getCommandDocs("")
+        toOut += con4mRuntime.getCommandDocs("")
       of "configuration", "configurations", "conffile", "configs", "conf":
         for section in allConfigVarSections:
-          toOut &= con4mRuntime.getConfigOptionDocs(section)
+          toOut += con4mRuntime.getConfigOptionDocs(section)
       of "topics":
-        toOut &= con4mRuntime.getHelpTopics()
+        toOut += con4mRuntime.getHelpTopics()
       of "builtins":
         toOut = con4mRuntime.getBuiltinsTableDoc()
       else:
@@ -557,7 +526,7 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
 
         for item in toCheck:
           if item in helpFiles:
-            toOut &= helpFiles[arg].stylizeMd()
+            toOut += text(helpFiles[item])
             gotit = true
             break
 
@@ -569,9 +538,9 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
           break
 
   if chalkConfig.getUsePager():
-    runPager(toOut)
+    runPager($(toOut))
   else:
-    echo toOut
+    print(toOut)
   quit(0)
 
 const
@@ -581,16 +550,6 @@ const
   outconf  = docDir.joinPath("output-config.md")
   keyinfo  = docDir.joinPath("metadata.md")
   builtins = docDir.joinPath("builtins.md")
-
-proc filterForCodecs(inarr: seq[seq[string]]): seq[seq[string]] =
-  for row in inarr:
-    if row[2] == "true":
-      result.add(@[row[0], row[1], row[3], row[4], row[5]])
-
-proc filterForPlugins(inarr: seq[seq[string]]): seq[seq[string]] =
-  for row in inarr:
-    if row[2] == "false":
-      result.add(@[row[0], row[1], row[3], row[4], row[5]])
 
 proc paramFmt(t: StringTable): string =
   var parts: seq[string] = @[]
@@ -608,7 +567,7 @@ proc filterFmt(flist: seq[MsgFilter]): string =
 
   return parts.join(", ")
 
-proc buildSinkConfigData(): seq[seq[string]] =
+proc buildSinkConfigData(): seq[seq[Rope]] =
   var
     sinkConfigs = getSinkConfigs()
     subLists:     Table[SinkConfig, seq[string]]
@@ -623,113 +582,100 @@ proc buildSinkConfigData(): seq[seq[string]] =
   for key, config in sinkConfigs:
     if config notin sublists:
       sublists[config] = @[]
-    result.add(@[key, config.mySink.getName(), paramFmt(config.params),
-                   filterFmt(config.filters), sublists[config].join(", ")])
+    result.add(@[text(key), text(config.mySink.getName()), 
+                 text(paramFmt(config.params)),
+                text(filterFmt(config.filters)), 
+                text(sublists[config].join(", "))])
 
-proc getConfigValues(): string =
+proc getConfigValues(): Rope =
 
   var
-    configTables: OrderedTable[string, seq[seq[string]]]
-  let
-    state         = getChalkRuntime()
-    cols          = [CcVarName, CcShort, CcCurValue]
-    outConfFields = ["report_template", "mark_template"]
-    cReportFields = ["enabled", "report_template", "use_when"]
-    #sinkCfgFields = ["sink", "filters"]
-    plugFields    = ["enabled", "codec", "priority", "ignore", "overrides"]
-    confHdrs      = ["Config Variable", "Description", "Current Value"]
-    plugHdrs      = ["Name", "Enabled", "Priority", "Ignore", "Overrides"]
-    outConHdrs    = ["Operation", "Reporting Template", "Chalk Mark Template"]
-    custRepHdrs   = ["Name", "Enabled", "Template", "Operations where applied"]
-    sinkHdrs      = ["Config Name", "Sink", "Parameters", "filters", "Topics"]
+    state          = getChalkRuntime()
+    cols           = [CcVarName, CcShort, CcCurValue]
+    outConfFields  = ["report_template", "mark_template"]
+    cReportFields  = ["enabled", "report_template", "use_when"]
+    sinkCfgFields  = ["sink", "filters"]
+    plugFields     = ["enabled", "priority", "ignore", "overrides"]
+    confHdrs       = ["Config Variable", "Description", "Current Value"]
+    outConfData    = @[@[atom("Operation"), atom("Reporting Template"),
+                         atom("Chalk Mark Template")]]
+    custRepData    = @[@[atom("Name"), atom("Enabled"), atom("Template"),
+                        atom("Operations where applied")]]
+    codecData      = @[@[atom("Name"), atom("Enabled"), atom("Priority"), 
+                         atom("Ignore"), atom("Overrides")]]
+    pluginData     = @[@[atom("Name"), atom("Enabled"), atom("Priority"), 
+                         atom("Ignore"), atom("Overrides")]]
+    sinkCfgData    = @[@[atom("Config Name"), atom("Sink"), atom("Parameters"),
+                         atom("Filters"), atom("Topics")]]
+    fn             = getValuesForAllObjects
 
-    fn            = getValuesForAllObjects
-    outConfData   = fn(state, "outconf",       outConfFields, asLit = false)
-    custRepData   = fn(state, "custom_report", cReportFields, asLit = false)
-    allPluginData = fn(state, "plugin",        plugFields,    asLit = false)
-    sinkCfgData   = buildSinkConfigData()
-    codecData     = filterForCodecs(allPluginData)
-    pluginData    = filterForPlugins(allPluginData)
-    (coRows, coHdr) = codecData.filterEmptyColumns(plugHdrs)
-    (piRows, piHdr) = pluginData.filterEmptyColumns(plugHdrs)
+  outConfData    &= fn(state, "outconf",       outConfFields)
+  custRepData    &= fn(state, "custom_report", cReportFields)
+  sinkCfgData    &= buildSinkConfigData()
+  codecData      &= fn(state, "plugin", plugFields, false, ["true"],
+                       ["codec"])
+  pluginData     &= fn(state, "plugin", plugFields, false, ["false"],
+                         ["codec"])
 
   for item in allConfigVarSections:
-    configTables[item] = state.getMatchingConfigOptions(item, cols = cols,
-                                                        sectionPath = item)
-  for k, v in configTables:
-    if len(v) == 0 or len(v[0]) == 0:
-      continue
+    let hdr = if item == "": 
+                "Global configuration variables"
+              else:
+                "Configuration variables in the '" & item & "' section"
+    result += state.getMatchingConfigOptions(item, cols = cols, title = hdr,
+                            headings = confHdrs, sectionPath = item)
 
-    if k == "":
-      result &= "<h1>Global configuration variables</h1>"
-    else:
-      result &= "<h1>Config variables in the '" & k & "' section</h1>"
 
-    result &= v.formatCellsAsHtmlTable(confHdrs)
-
-  result &= "<h1>Metadata template configuration</h1>"
-  result &= outConfData.formatCellsAsHtmlTable(outConHdrs)
-
-  result &= "<h1>Additional reports configured</h1>"
-  result &= custRepData.formatCellsAsHtmlTable(custRepHdrs)
-
-  result &= "<h1>I/O configuration</h1>"
-  result &= sinkCfgData.formatCellsAsHtmlTable(sinkHdrs)
-
-  result &= "<h1>Codecs</h1>"
-  result &= coRows.formatCellsAsHtmlTable(coHdr)
-
-  result &= "<h1>Additional Data Collectors</h1>"
-  result &= piRows.formatCellsAsHtmlTable(piHdr)
+  result += outconfData.quickTable("Metadata template configuration", 
+                                   class = "help")
+  result += custRepData.quickTable("Additional reports configured",
+                                   class = "help")
+  result += sinkCfgData.quickTable("I/O configuration", class = "help")
+  result += codecData.quickTable("Codecs", class = "help")
+  result += pluginData.quickTable("Additional Data Collectors",
+                                   class = "help")
 
 proc showConfigValues*(force = false) =
   once:
     if not (chalkConfig.getShowConfig() or force): return
 
-    let toOut = getConfigValues().stylizeMd()
+    let toOut = getConfigValues()
 
     if chalkConfig.getUsePager():
-      runPager(toOut)
+      runPager($(toOut))
     else:
-      echo toOut
+      print(toOut)
 
 proc runChalkDocGen*() =
   var
     f: FileStream
     con4mRuntime = getChalkRuntime()
-    opts         = CmdLineDocOpts(docKind: CDocRaw)
 
   createDir(docDir)
-  # 1. Dump embedded markdown docs.
-  #for k, v in helpFiles:
-  #  f = newFileStream(docDir.joinPath(k) & ".md", fmWrite)
-  #  f.write(v)
-  #  f.close()
-
-  # 2. Write out command docs.
+  # 1. Write out command docs.
   f = newFileStream(cmdline, fmWrite)
   for item in allCommandSections:
-    f.write(con4mRuntime.getCommandDocs(item, opts))
+    f.write(con4mRuntime.getCommandDocs(item).toHtml())
   f.close()
 
-  # 3. Write out the configuration file docs.
+  # 2. Write out the configuration file docs.
   f = newFileStream(conffile, fmWrite)
   for section in allConfigVarSections:
-    f.write(con4mRuntime.getConfigOptionDocs(section, CDocRaw,
-                                             expandDocField = false))
+    f.write(con4mRuntime.getConfigOptionDocs(expandDocField = false).
+                                                       toHtml())
   f.close()
 
-  # 4. Write out the output config doc.
+  # 3. Write out the output config doc.
   f = newFileStream(outconf, fmWrite)
-  f.write(con4mRuntime.getOutputHelp(CDocRaw))
+  f.write(con4mRuntime.getOutputHelp().toHtml())
   f.close()
 
-  # 5. The metadata reference
+  # 4. The metadata reference
   f = newFileStream(keyinfo, fmWrite)
-  f.write(con4mRuntime.keyHelp(docKind = CDocRaw))
+  f.write(con4mRuntime.keyHelp().toHtml())
   f.close()
 
-  # 6. Output the reference on config builtins.
+  # 5. Output the reference on config builtins.
   f = newFileStream(builtins, fmWrite)
-  f.write(con4mRuntime.getBuiltinsTableDoc(docKind = CDocRaw))
+  f.write(con4mRuntime.getBuiltinsTableDoc().toHtml())
   f.close()

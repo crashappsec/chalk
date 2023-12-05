@@ -139,7 +139,7 @@ proc loadReportCache(fname: string) =
     try:
       let
         retries = chalkConfig.getReportCacheLockTimeoutSec()
-        lines   = readViaLockFile(fname, false, retries).strip().split("\n")
+        lines   = readViaLockFile(fname).strip().split("\n")
       for line in lines:
         let
           parse = parseJson(line.strip())
@@ -405,8 +405,3 @@ proc writeReportCache*() =
         getCurrentExceptionMsg())
       error("Please remove it manually to avoid unnecessary double reporting")
       dumpExOnDebug()
-  try:
-    releaseLockFile(fname)
-    trace(fname & ": file lock for report cache released")
-  except:
-    discard

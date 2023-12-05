@@ -45,7 +45,7 @@ proc runCmdConfDump*() =
     else:
       s = defaultConfig
 
-    toDump = stylize(s, "blockquote")
+    toDump = $code(s)
 
 proc runCmdConfDumpParams*() =
   baseDump:
@@ -56,6 +56,9 @@ proc runCmdConfDumpParams*() =
 
 proc runCmdConfDumpCache*() =
   baseDump:
+    var 
+      r: Rope
+      cells: seq[seq[Rope]]
     if chalk == nil or extract == nil or cacheKey notin extract:
       runCmdConfDump()
 
@@ -64,5 +67,7 @@ proc runCmdConfDumpCache*() =
       unpackedInfo  = unpack[OrderedTableRef[string, string]](componentInfo)
 
     for url, contents in unpackedInfo:
-      toDump &= stylizeHtml("<h2> URL: " & url & "</h2>")
-      toDump &= stylize(contents, "blockquote")
+      cells = @[@[pre(code(contents))]]
+      r += cells.quickTable(noheaders = true, title = atom("URL: " & url))
+
+    toDump = $r
