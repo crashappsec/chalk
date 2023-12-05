@@ -99,6 +99,7 @@ template hasBuildx*(): bool =
   getBuildXVersion() > parseVersion("0")
 
 template supportsBuildContextFlag*(): bool =
+  # https://github.com/docker/buildx/releases/tag/v0.8.0
   getBuildXVersion() >= parseVersion("0.8")
 
 template supportsCopyChmod*(): bool =
