@@ -16,14 +16,14 @@ const
 
 proc setGitExeLocation() =
   once:
-    gitExeLocation = findExePath("git").get("")
+    gitExeLocation = util.findExePath("git").get("")
     if gitExeLocation == "":
       error("No git command found in PATH")
       raise newException(ValueError, "No git")
 
 proc setSshKeyscanExeLocation() =
   once:
-    sshKeyscanExeLocation = findExePath("ssh-keyscan").get("")
+    sshKeyscanExeLocation = util.findExePath("ssh-keyscan").get("")
     if sshKeyscanExeLocation == "":
       warn("No ssh-keyscan command found in PATH")
 
