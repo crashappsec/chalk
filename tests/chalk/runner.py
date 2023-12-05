@@ -219,6 +219,7 @@ class Chalk:
         no_api_login: bool = False,
         params: Optional[list[str]] = None,
         expected_success: bool = True,
+        expecting_report: bool = True,
         ignore_errors: bool = False,
         cwd: Optional[Path] = None,
         env: Optional[dict[str, str]] = None,
@@ -278,22 +279,23 @@ class Chalk:
             raise result.error
 
         # if chalk outputs report, sanity check its operation matches chalk_cmd
-        try:
-            report = result.report
-        except Exception:
-            pass
-        else:
-            # report could be silenced on the profile level
-            if report:
-                operation = cast(str, command)
-                # when calling docker, the arg after docker is the operation
-                if not operation and "docker" in params:
-                    try:
-                        operation = params[params.index("buildx") + 1]
-                    except ValueError:
-                        operation = params[params.index("docker") + 1]
-                if operation:
-                    assert report.has(_OPERATION=operation)
+        if expecting_report:
+            try:
+                report = result.report
+            except Exception:
+                pass
+            else:
+                # report could be silenced on the profile level
+                if report:
+                    operation = cast(str, command)
+                    # when calling docker, the arg after docker is the operation
+                    if not operation and "docker" in params:
+                        try:
+                            operation = params[params.index("buildx") + 1]
+                        except ValueError:
+                            operation = params[params.index("docker") + 1]
+                    if operation:
+                        assert report.has(_OPERATION=operation)
 
         return result
 
@@ -370,6 +372,7 @@ class Chalk:
             replace=replace,
             use_embedded=use_embedded,
             expected_success=expected_success,
+            expecting_report=False,
             ignore_errors=ignore_errors,
             stdin=stdin,
         )
