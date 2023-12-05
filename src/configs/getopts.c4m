@@ -19,9 +19,7 @@ getopts {
   default_no_prefixes: ["no"]
   show_doc_on_err: true
   add_help_commands: true
-  shortdoc: """Chalk
-Collect and report software and host metadata
-"""
+  shortdoc: "Collect and report software and host metadata"
   doc: """
 Chalk's core purpose is to map production software with its
 development, and to provide information about those artifacts in CI/CD
@@ -710,30 +708,26 @@ lifecycle, helping developers get visibility into where and how their
 software is deployed, and helping Ops people get visibility on who
 owns the software and what it does. It's kind of like GPS for your
 software.
-<p>
+
 Chalk generally drops into CI/CD to collect information about the
 source and build, then adds a **chalk mark** to software to make it
 easy to identify in the real world. It can also **wrap** the software,
 which basically means chalk will follow the software into production
 to collect telemetry about the deployment environment.
-<p>
+
 Chalk is meant to be 'easy' in that you can just drop it into a CI/CD
 pipeline and never have to think about it. However, it is tremendously
 flexible in what it can collect and how it reports.
-<p>
-There's a graphical configuration tool in progress. There is also
-plenty of in-command help. Currently, the interface is being redone,
-but for the moment:
-<p>
 
-- <jazzberry>chalk help commands</jazzberry> shows the overview help for the command line.
-- <jazzberry>chalk help "cmdname" </jazzberry> shows the help for an individual command, as does <em>chalk "cmdname" --help</em>
-- <jazzberry>chalk help config</jazzberry> shows the overview help for configuration options you can set via the <em>chalk load</em> command.
-- <jazzberry>chalk help metadata</jazzberry> shows information about the many types of metadata that you can choose to collect.
-- <jazzberry>chalk help builtins</jazzberry> shows information about built-in functions that you can use in a custom configuration to do your own data collection or customization.
-- <jazzberry>chalk help topics</jazzberry> will show a list of long-form help documents that
+## For additional help
+- `chalk help commands` shows the overview help for the command line.
+- `chalk help "cmdname"` shows the help for an individual command, as does <em>chalk "cmdname" --help</em>
+- `chalk help configs` shows the overview help for configuration options you can set via the <em>chalk load</em> command (this is different than <em>chalk help config</em>, which shows help on the config command).
+- `chalk help metadata` shows information about the many types of metadata that you can choose to collect.
+- `chalk help builtins` shows information about built-in functions that you can use in a custom configuration to do your own data collection or customization.
+- `chalk help topics` will show a list of long-form help documents that
   can be read from the command line.
-- <jazzberry>chalk help search "term"</jazzberry> will search all help documents (as will help
+- `chalk help search "term"` will search all help documents (as will help
 commands that do not match known topics)
 """
   }
