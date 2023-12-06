@@ -27,7 +27,7 @@ const
   gitCommitter = "committer "
   gitIdxAll    = "*.idx"
   gitIdxExt    = ".idx"
-  gitIdxHeader = "\xff\x7f\x4f\x63\x00\x00\x00\x02"
+  gitIdxHeader = "\xff\x74\x4f\x63\x00\x00\x00\x02"
   gitObjects   = "objects" & DirSep
   gitPack      = gitObjects.joinPath("pack")
   gitPackExt   = ".pack"
