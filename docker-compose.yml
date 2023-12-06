@@ -16,11 +16,11 @@ services:
       context: .
       target: deps
     command: nimble ${CHALK_BUILD:-release}
-    working_dir: /chalk
+    working_dir: $PWD
     volumes:
-      - .:/chalk/
-      - ../nimutils:/nimutils
-      - ../con4m:/con4m
+      - $PWD:$PWD
+      - $PWD/../nimutils:$PWD/../nimutils
+      - $PWD/../con4m:$PWD/../con4m
     # environment:
     # CON4M_DEV is conditionally set in Makefile
 
