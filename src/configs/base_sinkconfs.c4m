@@ -28,6 +28,12 @@ sink_config json_console_err {
   filters: ["pretty_json", "fix_new_line"]
 }
 
+# https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#example-grouping-log-lines
+sink_config github_json_group {
+  sink: "stdout"
+  filters: ["pretty_json", "github_log_group", "fix_new_line"]
+}
+
 # This is the default sink for virtual chalking.
 sink_config virtual_chalk_log {
   enabled:  true

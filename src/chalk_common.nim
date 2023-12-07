@@ -243,6 +243,34 @@ type
     shell*:       ShellInfo
     lastUser*:    DfUserInfo
 
+  GitHeadType* = enum
+    commit, branch, tag
+
+  GitHead* = ref object
+    gitRef*:       string
+    gitType*:      GitHeadType
+    commitId*:     string
+    # first matching branch for commit ref, if any
+    branches*:     seq[string]
+    tags*:         seq[string]
+
+  DockerGitContext* = ref object
+    context*:      string
+    # https://docs.docker.com/engine/reference/commandline/build/
+    # context is a combination of remote url + head + subdir within the context
+    remoteUrl*:    string
+    head*:         GitHead
+    subdir*:       string
+    authToken*:    string
+    authHeader*:   string
+    tmpGitDir*:    string
+    tmpWorkTree*:  string
+    tmpKnownHost*: string
+
+  DockerSecret* = ref object
+    id*:   string
+    src*:  string
+
   DockerInvocation* = ref object
     dockerExe*:         string
     opChalkObj*:        ChalkObj
@@ -263,6 +291,8 @@ type
     foundPlatform*:     string
     foundContext*:      string
     otherContexts*:     OrderedTableRef[string, string]
+    gitContext*:        DockerGitContext
+    secrets*:           Table[string, DockerSecret]
     errs*:              seq[string]
     cmdBuild*:          bool
     cmdPush*:           bool
@@ -340,20 +370,22 @@ let
   artTypeMachO*           = pack("Mach-O executable")
 
 var
-  hostInfo*            = ChalkDict()
-  subscribedKeys*      = Table[string, bool]()
-  systemErrors*        = seq[string](@[])
-  selfChalk*           = ChalkObj(nil)
-  selfID*              = none(string)
-  canSelfInject*       = true
-  doingTestRun*        = false
-  nativeCodecsOnly*    = false
-  passedHelpFlag*      = false
-  chalkConfig*:        ChalkConfig
-  con4mRuntime*:       ConfigStack
-  commandName*:        string
-  dockerExeLocation*:  string = ""
-  cachedChalkStreams*: seq[ChalkObj]
+  hostInfo*               = ChalkDict()
+  subscribedKeys*         = Table[string, bool]()
+  systemErrors*           = seq[string](@[])
+  selfChalk*              = ChalkObj(nil)
+  selfID*                 = none(string)
+  canSelfInject*          = true
+  doingTestRun*           = false
+  nativeCodecsOnly*       = false
+  passedHelpFlag*         = false
+  chalkConfig*:           ChalkConfig
+  con4mRuntime*:          ConfigStack
+  commandName*:           string
+  dockerExeLocation*:     string = ""
+  gitExeLocation*:        string = ""
+  sshKeyscanExeLocation*: string = ""
+  cachedChalkStreams*:    seq[ChalkObj]
 
 template dumpExOnDebug*() =
   if chalkConfig != nil and chalkConfig.getChalkDebug():

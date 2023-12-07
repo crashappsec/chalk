@@ -2,7 +2,6 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import re
 import datetime
 import json
 import os
@@ -323,11 +322,12 @@ class Chalk:
         artifact: Path | str,
         expected_success: bool = True,
         ignore_errors: bool = False,
+        log_level: ChalkLogLevel = "error",
     ) -> ChalkProgram:
         return self.run(
             command="extract",
             target=artifact,
-            log_level="error",
+            log_level=log_level,
             expected_success=expected_success,
             ignore_errors=ignore_errors,
         )
@@ -386,7 +386,7 @@ class Chalk:
         *,
         dockerfile: Optional[Path] = None,
         tag: Optional[str] = None,
-        context: Optional[Path] = None,
+        context: Optional[Path | str] = None,
         expected_success: bool = True,
         expecting_report: bool = True,
         virtual: bool = False,
@@ -397,6 +397,7 @@ class Chalk:
         buildx: bool = False,
         config: Optional[Path] = None,
         buildkit: bool = True,
+        secrets: Optional[dict[str, Path]] = None,
         log_level: ChalkLogLevel = "none",
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
@@ -414,6 +415,7 @@ class Chalk:
             expected_success=expected_success,
             buildkit=buildkit,
             buildx=buildx,
+            secrets=secrets,
         )
 
         image_hash, result = Docker.with_image_id(
@@ -432,14 +434,14 @@ class Chalk:
                     push=push,
                     platforms=platforms,
                     buildx=buildx,
+                    secrets=secrets,
+                    buildkit=buildkit,
                 ),
                 expected_success=expected_success,
+                ignore_errors=not expecting_report,
                 cwd=cwd,
                 env=Docker.build_env(buildkit=buildkit),
             )
-        )
-        dockerfile = dockerfile or (
-            (cwd or context or Path(os.getcwd())) / "Dockerfile"
         )
         if expecting_report and expected_success and image_hash:
             if platforms:
@@ -449,7 +451,11 @@ class Chalk:
             # sanity check that chalk mark includes basic chalk keys
             assert image_hash == result.marks[-1]["_CURRENT_HASH"]
             assert image_hash == result.marks[-1]["_IMAGE_ID"]
-            assert str(dockerfile) == result.marks[-1]["DOCKERFILE_PATH"]
+            if isinstance(context, Path):
+                dockerfile = dockerfile or (
+                    (cwd or context or Path(os.getcwd())) / "Dockerfile"
+                )
+                assert str(dockerfile) == result.marks[-1]["DOCKERFILE_PATH"]
         elif not expecting_report:
             try:
                 assert not result.reports

@@ -11,7 +11,7 @@
 ## is in configs/dockercmd.c4m), so we really just need to look at
 ## the command and flag info returned.
 
-import config, docker_base
+import config, docker_base, docker_git
 
 proc getPlatforms*(state: DockerInvocation): seq[string] =
   if "platform" in state.flags:
@@ -133,14 +133,21 @@ proc extractDockerFileFlag(state: DockerInvocation) =
       state.dockerFileLoc = resolvePath(state.foundFileArg)
 
 proc loadDockerFile*(state: DockerInvocation) =
-  if state.dockerFileLoc == "":
-    let toResolve = joinPath(state.foundcontext, "Dockerfile")
-    state.dockerFileLoc = resolvePath(toResolve)
-
-  if state.dockerFileLoc[0] == ':':
+  if state.dockerFileLoc == ":stdin:":
     state.inDockerFile = stdin.readAll()
     trace("Read Dockerfile from stdin")
+
+  elif state.gitContext != nil and supportsBuildContextFlag():
+    if state.dockerFileLoc == "":
+      state.dockerFileLoc = "Dockerfile"
+    state.inDockerFile = state.gitContext.show(state.dockerFileLoc)
+    state.dockerFileLoc = ":stdin:"
+
   else:
+    if state.dockerFileLoc == "":
+      let toResolve = joinPath(state.foundcontext, "Dockerfile")
+      state.dockerFileLoc = resolvePath(toResolve)
+
     let s = newFileStream(state.dockerFileLoc)
 
     try:
@@ -189,7 +196,34 @@ proc extractPushCmdTags(state: DockerInvocation) =
   else:
     state.extractTags()
 
-proc extractCmdlineBuildContext*(state: DockerInvocation) =
+proc extractSecrets(state: DockerInvocation) =
+  var
+    id = ""
+    src = ""
+  # secrets are passed as:
+  # --secret id=<id>,src=<src>
+  # however the argument parsing splits the id/src
+  # therefore we need to combine them back
+  # however as order might not be guaranteed
+  # we try our best to group them when both
+  # values have been encountered
+  if "secret" in state.flags:
+    for kv in unpack[seq[string]](state.flags["secret"].getValue()):
+      let
+        parts = kv.split("=", maxsplit = 1)
+        name  = parts[0]
+        value = parts[1]
+      case name:
+        of "id":
+          id = value
+        of "src":
+          src = value
+      if id != "" and src != "":
+        state.secrets[id] = DockerSecret(id: id, src: src)
+        id = ""
+        src = ""
+
+proc extractCmdlineBuildContext(state: DockerInvocation) =
   # Con4m "ignoring unknown flags" jams them into the command line.
   # We try to spec every flag, but there may be new flags, or
   # undocumented flags. Or, the arguments might change for existing
@@ -281,6 +315,24 @@ proc stripFlagsWeRewrite*(ctx: DockerInvocation) =
 
   ctx.newCmdLine = reparse.parse(ctx.originalArgs).args[""]
 
+  if ctx.gitContext != nil:
+    ctx.newCmdLine = ctx.gitContext.replaceContextArg(ctx.newCmdLine)
+
+proc processGitContext*(ctx: DockerInvocation) =
+  if isGitContext(ctx.foundContext):
+    trace("Detected git docker context. Fetching context")
+    ctx.gitContext = gitContext(ctx.foundContext,
+                                authTokenSecret = ctx.getSecret("GIT_AUTH_TOKEN"),
+                                authHeaderSecret = ctx.getSecret("GIT_AUTH_HEADER"))
+    if not supportsBuildContextFlag():
+      trace("No support for additional contexts detected. " &
+            "Checking out git context to disk")
+      # if using git context, and buildx is not used which supports
+      # --build-context args, in order to copy any files into container
+      # we need normalize context to a regular folder and so
+      # we checkout git context into a folder and use that as context
+      ctx.foundContext = ctx.gitContext.checkout()
+
 proc processDockerCmdLine*(args: seq[string]): DockerInvocation =
   ## This does the initial command line parsing, caching the fields we
   ## look at into the DockerInvocation object so that callers don't
@@ -320,6 +372,8 @@ proc processDockerCmdLine*(args: seq[string]): DockerInvocation =
     result.extractTags()
     result.extractTarget()
     result.extractPrivs()
+    result.extractSecrets()
+    result.extractCmdlineBuildContext()
   of "push":
     result.setPushReference()
     result.extractPushCmdTags()

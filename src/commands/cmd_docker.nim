@@ -42,7 +42,7 @@ proc runMungedDockerInvocation(ctx: DockerInvocation): int =
     newStdin = ctx.inDockerFile & ctx.addedInstructions.join("\n")
     trace("Passing on stdin: \n" & newStdin)
 
-  result = runProcNoOutputCapture(dockerExeLocation, args, newStdin)
+  result = runCmdNoOutputCapture(dockerExeLocation, args, newStdin)
 
 proc doReporting*(topic: string){.importc.}
 
@@ -349,8 +349,8 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
 
   info("Wrapping entry point with this chalk binary: " & binaryToCopy)
   try:
-    ctx.makeFileAvailableToDocker(binaryToCopy, move=false, chmod=true,
-                                                     newname="chalk")
+    ctx.makeFileAvailableToDocker(binaryToCopy, move=false, chmod="0755",
+                                  newname="chalk")
   except:
     warn("Wrapping canceled; no available method to wrap entry point.")
     return
@@ -503,7 +503,6 @@ proc addBuildCmdMetadataToMark(ctx: DockerInvocation) =
 proc prepareToBuild(state: DockerInvocation) =
   info("Running docker build.")
   setCommandName("build")
-  state.extractCmdlineBuildContext()
   state.loadDockerFile()
   # Sets up our replacement command line to be the same as before but
   # minus things that we change.
@@ -582,7 +581,7 @@ proc runPush(ctx: DockerInvocation): int =
   # Here, if we fail, there's no re-run. Either (in the second branch), we
   # ran their original command line, or we've got nothing to fall back on,
   # because the build already succeeded.
-  return runProcNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
+  return runCmdNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
 
 proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
   # not a multi-platform build so manifest should not be used
@@ -594,7 +593,7 @@ proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
     for platform in platforms:
       platformTags.add(ctx.getTagForPlatform(tag, platform))
 
-    let exitCode = runProcNoOutputCapture(
+    let exitCode = runCmdNoOutputCapture(
       dockerExeLocation,
       @["buildx", "imagetools", "create", "-t"] & platformTags,
     )
@@ -612,12 +611,20 @@ proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
 template passThroughLogic() =
   try:
     # Silently pass through other docker commands right now.
-    exitCode = runProcNoOutputCapture(dockerExeLocation, args)
+    exitCode = runCmdNoOutputCapture(dockerExeLocation, args)
     if chalkConfig.dockerConfig.getReportUnwrappedCommands():
       reporting.doReporting("report")
   except:
     dumpExOnDebug()
     reporting.doReporting("fail")
+
+template prepBuildCommand() =
+  try:
+    ctx.processGitContext()
+  except:
+    dumpExOnDebug()
+    error("Chalk could not process docker git context. Retrying w/o chalk.")
+    ctx.dockerFailSafe()
 
 template gotBuildCommand() =
   try:
@@ -756,6 +763,8 @@ proc runCmdDocker*(args: seq[string]) =
   if ctx.cmdBuild:
     # Build with --push is still a build operation.
     setCommandName("build")
+    prepBuildCommand()
+
   elif ctx.cmdPush:
     setCommandName("push")
 

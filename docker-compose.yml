@@ -136,8 +136,15 @@ services:
       imds:
         condition: service_healthy
     environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_PROFILE: ${AWS_PROFILE:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      DOCKER_GIT_CONTEXT_SSH_REPO: ${DOCKER_GIT_CONTEXT_SSH_REPO:-}
+      DOCKER_GIT_CONTEXT_TOKEN_REPO: ${DOCKER_GIT_CONTEXT_TOKEN_REPO:-}
       GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       IP: ${IP:-} # host IP for docker registry tests
+      SSH_KEY: ${SSH_KEY:-}
 
   # --------------------------------------------------------------------------
   # MISC DEPS

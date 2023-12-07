@@ -10,16 +10,26 @@
 import uri, config
 
 proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
-
   return (msg, true)
 
+proc githubLogGroup(msg: string, extra: StringTable): (string, bool) =
+  # https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#example-grouping-log-lines
+  let
+    header = "::group::Chalk Report"
+    footer = "::endgroup::"
+  var
+    message = msg
+  message.stripLineEnd() # in-place strip
+  return (@[header, message, footer].join("\n"), true)
+
 const
-  availableFilters = { "log_level"     : MsgFilter(logLevelFilter),
-                       "log_prefix"    : MsgFilter(logPrefixFilter),
-                       "pretty_json"   : MsgFilter(prettyJson),
-                       "fix_new_line"  : MsgFilter(fixNewline),
-                       "show_topic"     : MsgFilter(showTopic),
-                       "wrap"          : MsgFilter(chalkLogWrap)
+  availableFilters = { "log_level"       : MsgFilter(logLevelFilter),
+                       "log_prefix"      : MsgFilter(logPrefixFilter),
+                       "pretty_json"     : MsgFilter(prettyJson),
+                       "fix_new_line"    : MsgFilter(fixNewline),
+                       "show_topic"      : MsgFilter(showTopic),
+                       "wrap"            : MsgFilter(chalkLogWrap),
+                       "github_log_group": MsgFilter(githubLogGroup),
                      }.toTable()
 
 proc chalkErrSink*(msg: string, cfg: SinkConfig, t: Topic, arg: StringTable) =

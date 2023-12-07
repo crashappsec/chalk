@@ -4,8 +4,8 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import osproc, ../config, ../docker_base, ../chalkjson, ../attestation,
-       ../plugin_api
+import ../config, ../docker_base, ../chalkjson, ../attestation,
+       ../plugin_api, ../util
 
 const
   markFile     = "chalk.json"
@@ -16,96 +16,112 @@ proc dockerGetChalkId*(self: Plugin, chalk: ChalkObj): string {.cdecl.} =
     return unpack[string](chalk.extract["CHALK_ID"])
   return dockerGenerateChalkId()
 
-template extractFinish(res: bool = false) =
-  setCurrentDir(cwd)
-  return
+proc extractChalkMarkFromLayer(imageId: string,
+                               layerPath: string,
+                               layerDescription: string): Option[(string, ChalkDict)] =
+  let layerId = layerPath.split(DirSep)[0]
+
+  trace("Image " & imageId & ": extracting layer " & layerId)
+  if runCmdExitCode("tar", @["-xf", "image.tar", layerPath]) != 0:
+    error("Image " & imageId & ": error extracting layer " & layerId & " from image tar archive")
+    return none((string, ChalkDict))
+
+  trace("Image " & imageId & ": extracting chalk.json from layer " & layerId)
+  if runCmdExitCode("tar", @["-xf", layerPath, "chalk.json"]) == 0:
+    let cachedMark = tryToLoadFile("chalk.json")
+    if cachedMark == "":
+      error("Image " & imageId & ": could not read chalk.json from layer " & layerId)
+    else:
+      return some((cachedMark, extractOneChalkjson(cachedMark, imageId)))
+  else:
+    warn("Image " & imageId & ": could not extract chalk.json from " &
+         layerDescription & " layer " & layerId)
+
+  return none((string, ChalkDict))
 
 proc extractImageMark(chalk: ChalkObj): ChalkDict =
   result = ChalkDict(nil)
 
   let
     imageId = chalk.imageId
-    cwd     = getCurrentDir()
     dir     = getNewTempDir()
 
+  let catMark = runDockerGetEverything(@["run", "--rm", "--entrypoint=cat",
+                                         imageId, markLocation])
+
+  # cat is present and we found chalk mark
+  if catMark.exitCode == 0:
+    chalk.cachedMark = catMark.stdOut
+    result           = extractOneChalkjson(catMark.stdOut, imageId)
+    return
+
+  # cat is present but no chalk mark found
+  elif catMark.exitCode == 1:
+    return
+
+  # any other exitcode like 127 probably means:
+  # * cat was not found as entrypoint
+  # * architecture of image doesnt match host
+  # and so we manually inspect image layers via tar archive
+
   try:
-    setCurrentDir(dir)
+    withWorkingDir(dir):
 
-    let procInfo = runDockerGetEverything(@["save", imageId, "-o", "image.tar"])
+      trace("Image " & imageId & ": Saving to tar file for extraction of metadata")
+      let saving = runDockerGetEverything(@["save", imageId, "-o", "image.tar"])
+      if saving.getExit() != 0:
+        error("Image " & imageId & ": error extracting chalk mark")
+        return
 
-    if procInfo.getExit() != 0:
-      error("Image " & imageId & ": error extracting chalk mark")
-      extractFinish()
-    if execCmd("tar -xf image.tar manifest.json") != 0:
-      error("Image " & imageId & ": could not extract manifest (no tar cmd?)")
-      extractFinish()
+      if runCmdExitCode("tar", @["-xf", "image.tar", "manifest.json"]) != 0:
+        error("Image " & imageId & ": could not extract manifest (no tar cmd?)")
+        return
 
-    let
-      file = newFileStream("manifest.json")
+      trace("Image " & imageId & ": Extracting manifest.json from image tar archive")
+      let manifest = tryToLoadFile("manifest.json")
+      if manifest == "":
+        error("Image " & imageId & ": could not extract manifest (permissions?)")
+        return
 
-    if file == nil:
-      error("Image " & imageId & ": could not extract manifest (permissions?)")
-      extractFinish()
-    let
-      str    = file.readAll()
-      json   = str.parseJson()
-      layers = json.getElems()[0]["Layers"]
+      let
+        manifestJson = manifest.parseJson()
+        layers       = manifestJson.getElems()[0]["Layers"]
+        topLayerMark = extractChalkMarkFromLayer(imageId, layers[^1].getStr(), "top")
 
-    file.close()
+      if topLayerMark.isSome():
+        let (cachedMark, mark) = topLayerMark.get()
+        chalk.cachedMark       = cachedMark
+        result                 = mark
+        return
 
-    if execCmd("tar -xf image.tar " & layers[^1].getStr()) != 0:
-      error("Image " & imageId & ": error extracting chalk mark")
-      extractFinish()
+      else:
+        if not chalkConfig.extractConfig.getSearchBaseLayersForMarks():
+          return
 
-    if execCmd("tar -xf " & layers[^1].getStr() &
-      " chalk.json 2>/dev/null") == 0:
-      let file = newFileStream(markFile)
-
-      if file == nil:
-        error("Image " & imageId & " has a chalk file but we can't read it?")
-        extractFinish()
-
-      chalk.cachedMark = file.readAll()
-      file.close()
-
-      let mark = newStringStream(chalk.cachedMark)
-      result   = extractOneChalkJson(mark, imageId)
-
-      mark.close()
-      extractFinish(true)
-    else:
-      warn("Image " & imageId & " has no chalk mark in the top layer.")
-      if not chalkConfig.extractConfig.getSearchBaseLayersForMarks():
-        extractFinish()
-      # We're only going to go deeper if there's no chalk mark found.
-      var
-        n = len(layers) - 1
-
-      while n != 0:
-        n = n - 1
-        if execCmd("tar -xf " & layers[n].getStr() &
-          " chalk.json 2>/dev/null") == 0:
-          let file = newFileStream("chalk.json")
-          if file == nil:
-            continue
+        # We're only going to go deeper if there's no chalk mark found.
+        var n = len(layers) - 1
+        while n != 0:
+          n = n - 1
           try:
+            let layerMark = extractChalkMarkFromLayer(imageId, layers[n].getStr(), $(n))
+            if layerMark.isNone():
+              continue
             let
-              extract = extractOneChalkJson(file, imageId)
-              cid     = extract["CHALK_ID"]
-              mdid    = extract["METADATA_ID"]
+              (_, mark) = layerMark.get()
+              cid       = mark["CHALK_ID"]
+              mdid      = mark["METADATA_ID"]
 
             info("In layer " & $(n) & " (of " & $(len(layers)) & "), found " &
               "Chalk mark reporting CHALK_ID = " & $(cid) &
               " and METADATA_ID = " & $(mdid))
             chalk.collectedData["_FOUND_BASE_MARK"] = pack(@[cid, mdid])
-            extractFinish()
+            return
           except:
             continue
-      extractFinish()
+
   except:
     dumpExOnDebug()
     trace(imageId & ": Could not complete mark extraction")
-    extractFinish()
 
 proc extractMarkFromStdin(s: string): string =
   var raw = s
