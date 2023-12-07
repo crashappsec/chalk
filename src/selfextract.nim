@@ -28,7 +28,7 @@ proc getSelfExtraction*(): Option[ChalkObj] =
   # have a codec for this type of executable, avoid dupe errors.
   once:
     var
-      myPath = @[resolvePath(getMyAppPath())]
+      myPath = resolvePath(getMyAppPath())
       cmd    = getCommandName()
 
     setCommandName("extract")
@@ -42,13 +42,44 @@ proc getSelfExtraction*(): Option[ChalkObj] =
     # see if the mark is there, and reports whether it's found or not.
     # This trace happens here mainly because we easily have the
     # resolved path here.
-    trace("Checking chalk binary '" & myPath[0] & "' for embedded config")
+    trace("Checking chalk binary '" & myPath & "' for embedded config")
+
+    # Codecs by design fail gracefully as self config can be
+    # encoded using any codec (e.g. elf on linux but shell script on mac).
+    # Therefore if none of the codecs reads/parses config
+    # from the chalk binary, chalk will proceed running
+    # using default configs.
+    # There are 2 cases however where there are no embedded configs:
+    # * chalk binary was just compiled (before chalk load)
+    # * codecs could not read the chalk binary
+    #   due to missing permissions but graceful error handling
+    #   does not raise an exception
+    # In the case of missing permission, chalk using default
+    # configs is incorrect behavior therefore we explicitly
+    # check permission by opening a file stream.
+    # If that works, world is amazing and llamas have lots
+    # of lettus to enjoy ;D
+    # If not, we immediately exit with hopefully useful error message
+    # :fingerscrossed:
+    var canOpen = false
+    try:
+      let stream = newFileStream(myPath)
+      if stream != nil:
+        canOpen = true
+        stream.close()
+    except:
+      dumpExOnDebug()
+      error(getCurrentExceptionMsg())
+    if not canOpen:
+      cantLoad("Chalk is unable to read self-config. " &
+               "Ensure chalk has both read and execute permissions. " &
+               "To add permissions run: 'chmod +rx " & myPath & "'\n")
 
     for codec in getAllCodecs():
       if hostOS notin codec.nativeObjPlatforms:
         continue
       let
-        ai     = ArtifactIterationInfo(filePaths: myPath)
+        ai     = ArtifactIterationInfo(filePaths: @[myPath])
         chalks = codec.scanArtifactLocations(ai)
 
       if len(chalks) == 0:
