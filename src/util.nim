@@ -112,6 +112,12 @@ proc setupManagedTemp*() =
   if customTmpDirOpt.isSome() and not existsEnv("TMPDIR"):
     putenv("TMPDIR", customTmpDirOpt.get())
 
+  # temp folder needs to exist in order to successfully create
+  # tmp files otherwise nim's createTempFile throws segfault
+  # when TMPDIR does not exist
+  if existsEnv("TMPDIR"):
+    discard existsOrCreateDir(getEnv("TMPDIR"))
+
   if chalkConfig.getChalkDebug():
     info("Debug is on; temp files / dirs will be moved, not deleted.")
     setManagedTmpCopyLocation(resolvePath("chalk-tmp"))
@@ -347,9 +353,17 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
 
 proc findExePath*(cmdName:    string,
                   extraPaths: seq[string] = @[],
+                  configPath: Option[string] = none(string),
                   usePath         = true,
                   ignoreChalkExes = false): Option[string] =
-  var foundExes = findAllExePaths(cmdName, extraPaths, usePath)
+  var paths = extraPaths
+  if configPath.isSome():
+    # prepend on purpose so that config path
+    # takes precedence over rest of dirs in PATH
+    paths = @[configPath.get()] & paths
+
+  trace("Searching path for " & cmdName)
+  var foundExes = findAllExePaths(cmdName, paths, usePath)
 
   if ignoreChalkExes:
     var newExes: seq[string]
@@ -381,7 +395,6 @@ proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
   if len(prioritizedExes) != 0:
     let cargs = allocCStringArray(@[prioritizedExes[0].splitPath.tail] & args)
 
-
     for path in prioritizedExes:
       trace("execve: " & path & " " & args.join(" "))
       discard execv(cstring(path), cargs)
@@ -392,15 +405,19 @@ proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
   error("Chalk: exec could not find a working executable to run.")
   quitChalk(1)
 
-proc runProcNoOutputCapture*(exe:      string,
-                             args:     seq[string],
-                             newStdin = ""): int {.discardable.} =
-
+proc runCmdNoOutputCapture*(exe:       string,
+                            args:      seq[string],
+                            newStdin = ""): int {.discardable.} =
   let execOutput = runCmdGetEverything(exe, args, newStdIn,
                                        passthrough = true,
                                        timeoutUsec = 0) # No timeout
   result = execOutput.getExit()
 
+proc runCmdExitCode*(exe: string, args: seq[string]): int {.discardable } =
+  let execOutput = runCmdGetEverything(exe, args,
+                                       passthrough = false,
+                                       timeoutUsec = 0) # No timeout
+  result = execOutput.getExit()
 
 template chalkUseStream*(chalk: ChalkObj, code: untyped) {.dirty.} =
   var
@@ -449,3 +466,84 @@ template chalkCloseStream*(chalk: ChalkObj) =
   chalk.streamRefCt = 0
 
   delByValue(cachedChalkStreams, chalk)
+
+type Redacted* = ref object
+  raw:      string
+  redacted: string
+
+proc redact*(raw: string): Redacted =
+  return Redacted(raw: raw, redacted: raw)
+
+proc redact*(raw: string, redacted: string): Redacted =
+  return Redacted(raw: raw, redacted: redacted)
+
+proc redact*(data: seq[string]): seq[Redacted] =
+  result = @[]
+  for i in data:
+    result.add(redact(i))
+
+proc redacted*(data: seq[Redacted]): seq[string] =
+  result = @[]
+  for i in data:
+    result.add(i.redacted)
+
+proc raw*(data: seq[Redacted]): seq[string] =
+  result = @[]
+  for i in data:
+    result.add(i.raw)
+
+proc replaceItemWith*(data: seq[string], match: string, sub: string): seq[string] =
+  result = @[]
+  for i in data:
+    if i == match:
+      result.add(sub)
+    else:
+      result.add(i)
+
+type EnvVar* = ref object
+  name:     string
+  value:    string
+  previous: string
+  exists:   bool
+
+proc setEnv*(name: string, value: string): EnvVar =
+  new result
+  result.name     = name
+  result.value    = value
+  result.previous = getEnv(name)
+  result.exists   = existsEnv(name)
+  putEnv(name, value)
+
+proc restore(env: EnvVar) =
+  if not env.exists:
+    delEnv(env.name)
+  else:
+    putEnv(env.name, env.previous)
+
+proc restore(vars: seq[EnvVar]) =
+  for env in vars:
+    env.restore()
+
+template withEnvRestore*(vars: seq[EnvVar], code: untyped) =
+  try:
+    code
+  finally:
+    vars.restore()
+
+proc `$`*(vars: seq[EnvVar]): string =
+  result = ""
+  for env in vars:
+    result &= env.name & "=" & env.value & " "
+
+proc isInt*(i: string): bool =
+  try:
+    discard parseInt(i)
+    return true
+  except:
+    return false
+
+proc removeSuffix*(s: string, suffix: string): string =
+  # similar to strutil except it returns result back
+  # vs in-place removal in stdlib
+  result = s
+  result.removeSuffix(suffix)

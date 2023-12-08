@@ -7,7 +7,11 @@ ARG PYTHON_VERSION=3.11.3
 FROM python:$PYTHON_VERSION-alpine3.17 as alpine
 
 # install chalk runtime deps
-RUN apk add --no-cache curl git
+RUN apk add --no-cache \
+    curl \
+    gdb \
+    git \
+    gpg
 
 RUN if uname -m | grep -Ei "arm|aarch"; then \
     apk add --no-cache \
@@ -26,6 +30,7 @@ RUN apt-get update -y && \
         gdb \
         gettext-base \
         git \
+        gpg \
         && \
     apt-get clean -y
 

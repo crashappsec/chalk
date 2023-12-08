@@ -20,7 +20,13 @@ from .chalk.validate import (
     validate_docker_chalk_report,
     validate_virtual_chalk,
 )
-from .conf import CONFIGS, DOCKERFILES, REGISTRY
+from .conf import (
+    CONFIGS,
+    DOCKERFILES,
+    DOCKER_SSH_REPO,
+    DOCKER_TOKEN_REPO,
+    REGISTRY,
+)
 from .utils.docker import Docker
 from .utils.log import get_logger
 
@@ -405,6 +411,89 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
         assert t != tag
         assert t.startswith(tag)
         assert any(t.endswith(i.replace("/", "-")) for i in platforms)
+
+
+@pytest.mark.slow()
+@pytest.mark.parametrize(
+    "context, private, buildkit",
+    [
+        # without buildkit
+        # note legacy builder defaults to "master" branch so needs to be overwritten
+        (
+            "https://github.com/crashappsec/chalk-docker-git-context.git#main",
+            False,
+            False,
+        ),
+        # git scheme
+        pytest.param(
+            f"git@github.com:{DOCKER_SSH_REPO}.git",
+            False,
+            True,
+            marks=pytest.mark.skipif(
+                not os.environ.get("SSH_KEY"), reason="SSH_KEY is required"
+            ),
+        ),
+        # ssh with port number
+        pytest.param(
+            f"ssh://git@github.com:22/{DOCKER_SSH_REPO}.git",
+            False,
+            True,
+            marks=pytest.mark.skipif(
+                not os.environ.get("SSH_KEY"), reason="SSH_KEY is required"
+            ),
+        ),
+        # https
+        (
+            "https://github.com/crashappsec/chalk-docker-git-context.git",
+            False,
+            True,
+        ),
+        # with commit
+        (
+            "https://github.com/crashappsec/chalk-docker-git-context.git#e488e0f9eaad7eb08c05334454787a7966c39f84",
+            False,
+            True,
+        ),
+        # with branch
+        (
+            "https://github.com/crashappsec/chalk-docker-git-context.git#main",
+            False,
+            True,
+        ),
+        # with branch and nested folder for context
+        (
+            "https://github.com/crashappsec/chalk-docker-git-context.git#main:nested",
+            False,
+            True,
+        ),
+        # private repo
+        (
+            f"https://github.com/{DOCKER_TOKEN_REPO}.git",
+            True,
+            True,
+        ),
+    ],
+)
+@pytest.mark.skipif(
+    not os.environ.get("GITHUB_TOKEN"), reason="GITHUB_TOKEN is required"
+)
+def test_git_context(
+    chalk: Chalk,
+    context: str,
+    private: bool,
+    buildkit: bool,
+    tmp_file: Path,
+    random_hex: str,
+):
+    tmp_file.write_text(os.environ["GITHUB_TOKEN"])
+
+    image_id, build = chalk.docker_build(
+        context=context,
+        tag=random_hex,
+        secrets={"GIT_AUTH_TOKEN": tmp_file} if private else {},
+        buildkit=buildkit,
+    )
+    assert build.mark
 
 
 # extract on image id, and image name, running container id + container name, exited container id + container name

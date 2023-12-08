@@ -19,12 +19,14 @@ class Docker:
     def build_cmd(
         *,
         tag: Optional[str],
-        context: Optional[Path] = None,
+        context: Optional[Path | str] = None,
         dockerfile: Optional[Path] = None,
         args: Optional[dict[str, str]] = None,
         push: bool = False,
         platforms: Optional[list[str]] = None,
         buildx: bool = False,
+        secrets: Optional[dict[str, Path]] = None,
+        buildkit: bool = True,
     ):
         cmd = ["docker"]
         if platforms or buildx:
@@ -40,6 +42,8 @@ class Docker:
             cmd += [f"--platform={','.join(platforms)}"]
         if push:
             cmd += ["--push"]
+        if secrets and buildkit:
+            cmd += [f"--secret=id={k},src={v}" for k, v in secrets.items()]
         cmd += [str(context or ".")]
         return cmd
 
@@ -47,7 +51,7 @@ class Docker:
     def build(
         *,
         tag: Optional[str] = None,
-        context: Optional[Path] = None,
+        context: Optional[Path | str] = None,
         dockerfile: Optional[Path] = None,
         args: Optional[dict[str, str]] = None,
         cwd: Optional[Path] = None,
@@ -56,6 +60,7 @@ class Docker:
         buildx: bool = False,
         expected_success: bool = True,
         buildkit: bool = True,
+        secrets: Optional[dict[str, Path]] = None,
     ) -> tuple[str, Program]:
         """
         run docker build with parameters
@@ -70,6 +75,8 @@ class Docker:
                     push=push,
                     platforms=platforms,
                     buildx=buildx,
+                    secrets=secrets,
+                    buildkit=buildkit,
                 ),
                 expected_exit_code=int(not expected_success),
                 env=Docker.build_env(buildkit=buildkit),

@@ -430,6 +430,13 @@ proc chalkParseJson*(s: Stream): ChalkJSonNode =
 proc extractOneChalkJson*(stream: Stream, path: string): ChalkDict =
   return unpack[ChalkDict](valueFromJson(stream.chalkParseJson(), path))
 
+proc extractOneChalkJson*(chalkData: string, path: string): ChalkDict =
+  let mark = newStringStream(chalkData)
+  try:
+    result = extractOneChalkJson(mark, path)
+  finally:
+    mark.close()
+
 # Output ordering for keys.
 proc orderKeys*(dict: ChalkDict,
                 tplate: MarkTemplate | ReportTemplate): seq[string] =
