@@ -7,7 +7,7 @@ import logging.config
 from typing import Any, Optional
 
 import sqlalchemy
-from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -75,6 +75,17 @@ async def ping(stats: list[schemas.Stat], db: Session = Depends(get_db)):
         logger.exception(f"beacon {e}", exc_info=True)
     finally:
         return {"ping": "pong"}
+
+
+@app.put("/report/presign", status_code=200)
+async def presign_report_url(
+    request: Request,
+    response: Response,
+):
+    return RedirectResponse(
+        request.url_for("accept_report"),
+        status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+    )
 
 
 @app.post("/report", status_code=200)

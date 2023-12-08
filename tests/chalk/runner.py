@@ -399,6 +399,7 @@ class Chalk:
         buildkit: bool = True,
         secrets: Optional[dict[str, Path]] = None,
         log_level: ChalkLogLevel = "none",
+        env: Optional[dict[str, str]] = None,
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
         context = context or getattr(dockerfile, "parent", cwd)
@@ -440,7 +441,10 @@ class Chalk:
                 expected_success=expected_success,
                 ignore_errors=not expecting_report,
                 cwd=cwd,
-                env=Docker.build_env(buildkit=buildkit),
+                env={
+                    **Docker.build_env(buildkit=buildkit),
+                    **(env or {}),
+                },
             )
         )
         if expecting_report and expected_success and image_hash:

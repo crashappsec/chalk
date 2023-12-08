@@ -1,6 +1,6 @@
 SHELL=bash
 BINARY=chalk
-CHALK_BUILD?=release
+CHALK_BUILD?=build
 
 # if CON4M_DEV exists, pass that to docker-compose
 # as docker-compose does not allow conditional env vars
@@ -27,13 +27,14 @@ export PATH:=$(HOME)/.nimble/bin:$(PATH)
 # when any of the nim sources change
 # (a.k.a what Makefile is good at :D)
 $(BINARY): $(SOURCES)
-	-rm -f $@
 	$(DOCKER) nimble -y $(CHALK_BUILD)
 
 .PHONY: debug release
+debug: CHALK_BUILD=build --define:debug
+release: CHALK_BUILD=build
 debug release:
 	-rm -f $(BINARY)
-	$(DOCKER) nimble -y $@
+	$(MAKE) $(BINARY)
 
 .PHONY: version
 version:
@@ -41,12 +42,32 @@ version:
 
 .PHONY: clean
 clean:
-	-rm -f $(BINARY) src/c4autoconf.nim dist
+	-rm -rf $(BINARY) src/c4autoconf.nim dist nimutils con4m nimble.develop
 
 .PHONY: chalk-docs
 chalk-docs: $(BINARY)
 	rm -rf $@
 	$(DOCKER) ./$(BINARY) docgen
+
+# devmode for local deps
+# this allows to dev againt local versions of nimutils/con4m
+# this works for both docker/host builds
+
+nimutils con4m::
+	# If you simply symlink folder nimble does not like it
+	# but checking out repo via `nimble develop` kind of works
+	# It does not like dep structure but it does create the folder
+	# and nimble build does honor it :shrug:
+	-$(DOCKER) nimble develop --add https://github.com/crashappsec/$@
+	cp -r ../$@/* $@
+
+nimutils::
+	rm -rf $@/nimutils
+	cd $@ && ln -fs ../../$@/nimutils .
+
+con4m::
+	rm -rf $@/files
+	cd $@ && ln -fs ../../$@/files .
 
 # ----------------------------------------------------------------------------
 # TOOL MAKEFILES

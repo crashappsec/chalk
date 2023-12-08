@@ -7,6 +7,7 @@
 tags
 .DS_Store
 .vscode
+chalk.bck
 chalk.conf
 chalk.dSYM
 chalk-tmp
@@ -41,3 +42,7 @@ oss
 __pycache__
 .mypy_cache
 .pytest_cache
+nimutils
+con4m
+/*.c4m
+/ls

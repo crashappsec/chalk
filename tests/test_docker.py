@@ -148,7 +148,6 @@ def test_composite_build(
     assert second_image_id
 
 
-@mock.patch.dict(os.environ, {"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"})
 @pytest.mark.parametrize(
     "test_file",
     [
@@ -166,6 +165,7 @@ def test_virtual_valid(
         dockerfile=dockerfile,
         tag=tag,
         virtual=True,
+        env={"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"},
     )
 
     # artifact is the docker image
@@ -182,7 +182,9 @@ def test_virtual_valid(
         },
     )
     validate_docker_chalk_report(
-        chalk_report=build.report, artifact=artifact_info, virtual=True
+        chalk_report=build.report,
+        artifact=artifact_info,
+        virtual=True,
     )
 
     chalk_version = build.mark["CHALK_VERSION"]
