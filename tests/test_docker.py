@@ -417,18 +417,20 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
 
 @pytest.mark.slow()
 @pytest.mark.parametrize(
-    "context, private, buildkit",
+    "context, dockerfile, private, buildkit",
     [
         # without buildkit
         # note legacy builder defaults to "master" branch so needs to be overwritten
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#main",
+            None,
             False,
             False,
         ),
         # git scheme
         pytest.param(
             f"git@github.com:{DOCKER_SSH_REPO}.git",
+            None,
             False,
             True,
             marks=pytest.mark.skipif(
@@ -438,6 +440,7 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
         # ssh with port number
         pytest.param(
             f"ssh://git@github.com:22/{DOCKER_SSH_REPO}.git",
+            None,
             False,
             True,
             marks=pytest.mark.skipif(
@@ -447,30 +450,42 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
         # https
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git",
+            None,
+            False,
+            True,
+        ),
+        # with dockerfile path within context
+        (
+            "https://github.com/crashappsec/chalk-docker-git-context.git",
+            "./Dockerfile",
             False,
             True,
         ),
         # with commit
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#e488e0f9eaad7eb08c05334454787a7966c39f84",
+            None,
             False,
             True,
         ),
         # with branch
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#main",
+            None,
             False,
             True,
         ),
         # with branch and nested folder for context
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#main:nested",
+            None,
             False,
             True,
         ),
         # private repo
         (
             f"https://github.com/{DOCKER_TOKEN_REPO}.git",
+            None,
             True,
             True,
         ),
@@ -482,6 +497,7 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
 def test_git_context(
     chalk: Chalk,
     context: str,
+    dockerfile: Optional[str],
     private: bool,
     buildkit: bool,
     tmp_file: Path,
@@ -491,9 +507,11 @@ def test_git_context(
 
     image_id, build = chalk.docker_build(
         context=context,
+        dockerfile=dockerfile,
         tag=random_hex,
         secrets={"GIT_AUTH_TOKEN": tmp_file} if private else {},
         buildkit=buildkit,
+        log_level="trace",
     )
     assert build.mark
 

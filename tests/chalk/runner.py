@@ -384,7 +384,7 @@ class Chalk:
     def docker_build(
         self,
         *,
-        dockerfile: Optional[Path] = None,
+        dockerfile: Optional[Path | str] = None,
         tag: Optional[str] = None,
         context: Optional[Path | str] = None,
         expected_success: bool = True,

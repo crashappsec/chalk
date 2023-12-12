@@ -138,9 +138,12 @@ proc loadDockerFile*(state: DockerInvocation) =
     trace("Read Dockerfile from stdin")
 
   elif state.gitContext != nil and supportsBuildContextFlag():
-    if state.dockerFileLoc == "":
-      state.dockerFileLoc = "Dockerfile"
-    state.inDockerFile = state.gitContext.show(state.dockerFileLoc)
+    # state.dockerFileLoc is resolvedPath which is invalid
+    # in git context as we need raw path passed in the CLI
+    var dockerFileLoc = state.foundFileArg
+    if dockerFileLoc == "":
+      dockerFileLoc = "Dockerfile"
+    state.inDockerFile = state.gitContext.show(dockerFileLoc)
     state.dockerFileLoc = ":stdin:"
 
   else:
