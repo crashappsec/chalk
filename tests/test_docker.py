@@ -107,6 +107,34 @@ def test_build(
     assert image_id
 
 
+@pytest.mark.parametrize("dockerfile", [DOCKERFILES / "valid" / "sample_1"])
+def test_multiple_tags(
+    chalk: Chalk,
+    dockerfile: Path,
+    random_hex: str,
+):
+    tags = [
+        f"{REGISTRY}/{random_hex}-1",
+        f"{REGISTRY}/{random_hex}-2",
+    ]
+    image_id, build = chalk.docker_build(
+        dockerfile=dockerfile / "Dockerfile",
+        tags=tags,
+        config=CONFIGS / "docker_wrap.c4m",
+        push=True,
+        log_level="trace",
+        # docker sanity check will push to registry
+        # whereas we want to ensure chalk does the pushing
+        run_docker=False,
+    )
+    assert image_id
+    assert len(build.mark["_REPO_TAGS"]) == 2
+
+    # ensure all tags are pushed
+    for tag in tags:
+        assert Docker.pull(tag)
+
+
 @pytest.mark.parametrize("buildkit", [True, False])
 @pytest.mark.parametrize(
     "base, test",

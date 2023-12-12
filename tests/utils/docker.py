@@ -19,6 +19,7 @@ class Docker:
     def build_cmd(
         *,
         tag: Optional[str],
+        tags: Optional[list[str]] = None,
         context: Optional[Path | str] = None,
         dockerfile: Optional[Path | str] = None,
         args: Optional[dict[str, str]] = None,
@@ -28,12 +29,15 @@ class Docker:
         secrets: Optional[dict[str, Path]] = None,
         buildkit: bool = True,
     ):
+        tags = tags or []
+        if tag:
+            tags = [tag] + tags
         cmd = ["docker"]
         if platforms or buildx:
             cmd += ["buildx"]
         cmd += ["build"]
-        if tag:
-            cmd += ["-t", tag]
+        for t in tags:
+            cmd += ["-t", t]
         if dockerfile:
             cmd += ["-f", str(dockerfile)]
         for name, value in (args or {}).items():
@@ -51,6 +55,7 @@ class Docker:
     def build(
         *,
         tag: Optional[str] = None,
+        tags: Optional[list[str]] = None,
         context: Optional[Path | str] = None,
         dockerfile: Optional[Path | str] = None,
         args: Optional[dict[str, str]] = None,
@@ -69,6 +74,7 @@ class Docker:
             run(
                 Docker.build_cmd(
                     tag=tag,
+                    tags=tags,
                     context=context,
                     dockerfile=dockerfile,
                     args=args,
@@ -169,6 +175,14 @@ class Docker:
             expected_exit_code=int(not expected_success),
             timeout=timeout,
         )
+
+    @staticmethod
+    def pull(tag: str) -> Program:
+        return run(["docker", "pull", tag])
+
+    @staticmethod
+    def imagetools_inspect(tag: str) -> Program:
+        return run(["docker", "buildx", "imagetools", "inspect", tag])
 
     @staticmethod
     def inspect(name: str) -> list[dict[str, Any]]:
