@@ -386,6 +386,7 @@ class Chalk:
         *,
         dockerfile: Optional[Path | str] = None,
         tag: Optional[str] = None,
+        tags: Optional[list[str]] = None,
         context: Optional[Path | str] = None,
         expected_success: bool = True,
         expecting_report: bool = True,
@@ -400,24 +401,27 @@ class Chalk:
         secrets: Optional[dict[str, Path]] = None,
         log_level: ChalkLogLevel = "none",
         env: Optional[dict[str, str]] = None,
+        run_docker: bool = True,
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
         context = context or getattr(dockerfile, "parent", cwd)
 
         # run vanilla docker build to ensure it works without chalk
-        Docker.build(
-            tag=tag,
-            context=context,
-            dockerfile=dockerfile,
-            args=args,
-            cwd=cwd,
-            push=push,
-            platforms=platforms,
-            expected_success=expected_success,
-            buildkit=buildkit,
-            buildx=buildx,
-            secrets=secrets,
-        )
+        if run_docker:
+            Docker.build(
+                tag=tag,
+                tags=tags,
+                context=context,
+                dockerfile=dockerfile,
+                args=args,
+                cwd=cwd,
+                push=push,
+                platforms=platforms,
+                expected_success=expected_success,
+                buildkit=buildkit,
+                buildx=buildx,
+                secrets=secrets,
+            )
 
         image_hash, result = Docker.with_image_id(
             self.run(
@@ -429,6 +433,7 @@ class Chalk:
                 config=config,
                 params=Docker.build_cmd(
                     tag=tag,
+                    tags=tags,
                     context=context,
                     dockerfile=dockerfile,
                     args=args,

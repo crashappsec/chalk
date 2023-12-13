@@ -566,10 +566,20 @@ proc runBuild(ctx: DockerInvocation): int =
 
 proc runPush(ctx: DockerInvocation): int =
   if ctx.cmdBuild:
-    ctx.newCmdLine = @["push", ctx.prefTag]
-    # Need to get imageID from the docker inspect.
-    #handleExec(@[getMyAppPath()], @["docker", "push"]) # TODO from here
-    # We're going to re-exec ourselves with an appropriate docker push command.
+    var tags = ctx.foundTags
+    if len(tags) == 0:
+      tags = @[ctx.prefTag]
+
+    for tag in tags:
+      trace("docker pushing: " & tag)
+      ctx.newCmdLine = @["push", tag]
+      result = runCmdNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
+      if result != 0:
+        break
+
+    # Here, if we fail, there's no re-run.
+    # We've got nothing to fall back on, because the build already succeeded.
+
   else:
     initCollection()
 
@@ -578,10 +588,9 @@ proc runPush(ctx: DockerInvocation): int =
     ctx.opChalkObj = chalk
     chalk.userRef  = ctx.prefTag
 
-  # Here, if we fail, there's no re-run. Either (in the second branch), we
-  # ran their original command line, or we've got nothing to fall back on,
-  # because the build already succeeded.
-  return runCmdNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
+    # Here, if we fail, there's no re-run.
+    # We ran their original command line so there is nothing to fall back on.
+    return runCmdNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
 
 proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
   # not a multi-platform build so manifest should not be used
