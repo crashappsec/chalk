@@ -1,0 +1,65 @@
+##
+## Copyright (c) 2023, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+auth basic {
+  ~auth:          true
+  ~username:      true
+  ~password:      true
+  shortdoc:       "HTTP Basic Auth"
+  doc:            """
+| Parameter  | Type     | Required | Description             |
+|------------|----------|----------|-------------------------|
+| `username` | `string` | yes      | Username for basic auth |
+| `password` | `string` | yes      | Password for basic auth |
+
+This auth method allows to define basic auth which can be used by sinks.
+
+For example:
+
+```
+auth_config my_api {
+  auth:     "basic"
+  username: env("USERNAME")
+  password: env("PASSWORD")
+}
+sink_config my_https_config {
+  enabled: true
+  sink:    "post"
+  uri:     env("CHALK_POST_URL")
+  auth:    "my_api"
+}
+```
+"""
+}
+
+auth jwt {
+  ~auth:          true
+  ~token:         true
+  shortdoc:       "JWT Bearer Auth"
+  doc:            """
+| Parameter | Type     | Required | Description                                                    |
+|-----------|----------|----------|----------------------------------------------------------------|
+| `token`   | `string` | yes      | JWT Token to be sent as Bearer token. Token cannot be expired. |
+
+This auth method allows to define JWT auth which can be used by sinks.
+
+For example:
+
+```
+auth_config my_api {
+  auth:  "jwt"
+  token: env("TOKEN")
+}
+sink_config my_https_config {
+  enabled: true
+  sink:    "post"
+  uri:     env("CHALK_POST_URL")
+  auth:    "my_api"
+}
+```
+"""
+}

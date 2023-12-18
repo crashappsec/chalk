@@ -130,6 +130,7 @@ sink post {
   ~timeout:          false
   ~pinned_cert_file: false
   ~on_write_msg:     false
+  ~auth:             false
   shortdoc:          "HTTP/HTTPS POST"
   doc:       """
 
@@ -141,6 +142,7 @@ sink post {
 | `disallow_http` | false | Do not allow HTTP connections, only HTTPS |
 | `timeout` | false | Connection timeout in ms |
 | `pinned_cert_file` | false | TLS certificate file |
+| `auth` | false | Auth configuration for the API |
 
 The post will always be a single JSON object, and the default
 content-type field will be `application/json`. Changing this value
@@ -190,6 +192,7 @@ sink presign {
   ~timeout:          false
   ~pinned_cert_file: false
   ~on_write_msg:     false
+  ~auth:             false
   shortdoc:          "HTTP/HTTPS Presign PUT"
   doc:               """
 Sink which allows to upload reports to pre-signed URL.

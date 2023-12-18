@@ -18,6 +18,7 @@
 ## - base_keyspecs.c4m
 ## - base_plugins.c4m
 ## - base_sinks.c4m
+## - base_auths.c4m
 ## - base_chalk_templates.c4m
 ## - base_report_templates.c4m
 ## - base_outconf.c4m

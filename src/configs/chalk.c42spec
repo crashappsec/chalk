@@ -924,6 +924,74 @@ field.
   }
 }
 
+object auth {
+  gen_fieldname: "auths"
+  gen_typename:  "AuthSpec"
+  gen_setters:   false
+  user_def_ok:   true
+  validator:     func auth_object_check
+  doc:           """
+This object type is needed to add new auth methods to chalk.
+Various sinks can use that auth method for interacting with
+protected external APIs as well as any other components
+needing external auth functionality.
+
+The `auth` object defines which fields should be required
+for that auth configuration.
+
+For example:
+
+```
+auth my_auth {
+  ~foo: true
+}
+```
+
+This will require any auth configurations to set `foo` parameter:
+
+```
+auth_config my_auth_config {
+  auth: "my_auth"
+  foo:  "bar"
+}
+```
+"""
+
+  field doc {
+    type:    string
+    require: false
+    hidden:  true
+  }
+
+  field shortdoc {
+    type:    string
+    require: false
+    hidden:  true
+  }
+}
+
+object auth_config {
+  gen_fieldname: "authConfs"
+  gen_typename:  "AuthConfigObj"
+  gen_setters:   false
+  user_def_ok:   true
+  validator:     func auth_config_check
+  doc:           """
+This object type allows chalk configuration to define auth configurations.
+Each auth configuration must define its auth type as defined by `auth`
+objects elsewhere. In addition each auth config must set all required
+fields as defined by that auth type. For example for basic auth:
+
+```
+auth_config my_auth_config {
+  auth:     "basic"
+  username: env("USERNAME")
+  password: env("USERNAME")
+}
+```
+"""
+}
+
 object outconf {
   gen_fieldname: "outputConfigs"
   gen_typename:  "OutputConfig"
@@ -2059,6 +2127,8 @@ root {
   allow plugin
   allow sink
   allow sink_config
+  allow auth
+  allow auth_config
   allow mark_template
   allow report_template
   allow outconf
@@ -2874,7 +2944,7 @@ func key_callback_check(keyname, callback: func (string) -> `x) {
   if not typecmp(expected, actual) {
     return ("In: '" + keyname + "' callback is of type '" + $(actual) +
             "', but the key specification requires the type: '" +
-  	    $(expected) + "'")
+            $(expected) + "'")
   }
 
   return ""
@@ -2922,8 +2992,8 @@ func plugin_keyspec_check(keyname, val: list[string], context) {
       elif kind == ChalkTimeArtifact {
         never_early_field := base + "never_early"
         if attr_get(never_early_field, bool) == false {
-  	  continue
-	}
+          continue
+        }
       }
       return (keyname + ": specified key '" + item + "' cannot appear in " +
              "the 'Pre-Run' collection context")
@@ -2931,11 +3001,11 @@ func plugin_keyspec_check(keyname, val: list[string], context) {
     elif context == CCArtifact or context == CCPostChalk {
       if kind == RunTimeHost or (kind == ChalkTimeHost and context == CCPostChalk) {
         return (keyname + ": specified key '" + item + "' is a host-level " +
-	        "key that cannot appear at artifact collection time")
+                "key that cannot appear at artifact collection time")
       }
       if context == CCPostChalk and kind == ChalkTimeArtifact {
         return (keyname + ": specified key '" + item + "' must be available " +
-	       "during artifact collection")
+                "during artifact collection")
       }
     }
     else {  # context == CCPostRun
@@ -3169,9 +3239,9 @@ func use_when_check(name, value: list[string]) {
     }
     return ("'use_when' must be a valid chalk report type, or a '*' " +
            " to indicate all of them. '" + value[i] +
-	   "' isn't a chalk command.  Valid report types are: " +
-	   valid_chalk_cmds.join(", ") + ", " + other_report_ops.join(", ")
-	   )
+           "' isn't a chalk command.  Valid report types are: " +
+           valid_chalk_cmds.join(", ") + ", " + other_report_ops.join(", ")
+           )
   }
 }
 
@@ -3243,7 +3313,7 @@ func default_command_check(keyname, value) {
   }
   return ("The attribute 'default_command' is set to '" + value +
           "', which is not a valid chalk command. Must be one of: " +
-	  join(valid_chalk_cmds, ", "))
+          join(valid_chalk_cmds, ", "))
 }
 
 # Run any checks across fields that we haven't yet done...
@@ -3287,7 +3357,7 @@ func sink_object_check(path) {
     }
     return ("All sink fields must be a bool indicating whether a field is " +
             "required, or a string specifying a default value " +
-	    "(offending field: '" + f[i] + "' has type: " + $(fieldtype))
+            "(offending field: '" + f[i] + "' has type: " + $(fieldtype))
   }
 }
 
@@ -3315,7 +3385,7 @@ func sink_config_check(path) {
     if not sinkfields.contains(conffield) {
       return ("sink config provides field '" + conffield +
               "', but the specified sink '" + sinkname +
-	      "' does not use that field.")
+              "' does not use that field.")
     }
 
     if contains(["timeout", "truncation_amount", "max"], conffield) {
@@ -3366,6 +3436,62 @@ func sink_config_check(path) {
      if not conffields.contains(sinkfields[i]) {
        return "sink config is missing required field: '" + sinkfields[i] + "'"
      }
+  }
+}
+
+func auth_object_check(path) {
+  result := ""
+  f := fields(path)
+  for i from 0 to len(f) {
+    fieldname := path + "." + f[i]
+    fieldtype := attr_type(fieldname)
+    if typecmp(fieldtype, bool) or typecmp(fieldtype, string) {
+      continue
+    }
+    return ("All auth fields must be a bool indicating whether a field is " +
+            "required, or a string specifying a default value " +
+            "(offending field: '" + f[i] + "' has type: " + $(fieldtype))
+  }
+}
+
+func auth_config_check(path) {
+  result   := ""
+  authname := attr_get(path + ".auth", string)
+  if authname == "" {
+    return # Unconfigured.
+  }
+  if not attr_exists("auth." + authname) {
+    return "No such auth configured: '" + authname + "'"
+  }
+  authfields := fields("auth." + authname)
+  conffields := fields(path)
+
+  # ensure config has all required fields are present as defined in auth
+  for i from 0 to len(authfields) {
+    fullname := "auth." + authname + "." + authfields[i]
+    t := attr_type(fullname)
+    if not typecmp(t, bool) {   # TODO-- short circuit didn't work??
+      continue
+    }
+    if not attr_get(fullname, bool) {
+      continue
+    }
+    if not conffields.contains(authfields[i]) {
+      return "auth config is missing required field: '" + authfields[i] + "'"
+    }
+  }
+
+  # check config field fields
+  for i from 0 to len(conffields) {
+    conffield := conffields[i]
+    if not authfields.contains(conffield) {
+      return ("auth config provides field '" + conffield +
+              "', but the specified auth '" + authname +
+              "' does not use that field.")
+    }
+    if not typecmp(attr_type(path + "." + conffield), string) {
+      return "This field must be a string."
+    }
   }
 }
 

@@ -339,6 +339,7 @@ const
                         staticRead("configs/base_keyspecs.c4m") &
                         staticRead("configs/base_plugins.c4m") &
                         staticRead("configs/base_sinks.c4m") &
+                        staticRead("configs/base_auths.c4m") &
                         staticRead("configs/base_chalk_templates.c4m") &
                         staticRead("configs/base_report_templates.c4m") &
                         staticRead("configs/base_outconf.c4m") &

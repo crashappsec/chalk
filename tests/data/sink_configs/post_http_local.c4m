@@ -1,10 +1,20 @@
 crashoverride_usage_reporting_url = "http://chalk.crashoverride.local:8585/ping"
 log_level = "trace"
 
+auth_config my_basic_config {
+  auth:     "basic"
+  username: "foo"
+  password: "bar"
+}
+
 sink_config my_http_config {
   enabled: true
   sink:    "post"
   uri:     env("CHALK_POST_URL")
+
+  # nothing actually checks the header but it does
+  # exercise auth implementations
+  auth:    "my_basic_config"
 
   if env_exists("CHALK_POST_HEADERS") {
     headers: mime_to_dict(env("CHALK_POST_HEADERS"))
