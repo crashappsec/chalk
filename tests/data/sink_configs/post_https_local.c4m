@@ -1,10 +1,19 @@
 crashoverride_usage_reporting_url = "https://chalk.crashoverride.local:8585/ping"
 log_level = "trace"
 
+auth_config my_jwt_config {
+  auth:     "jwt"
+  token:    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+}
+
 sink_config my_https_config {
   enabled: true
   sink:    "post"
   uri:     env("CHALK_POST_URL")
+
+  # nothing actually checks the header but it does
+  # exercise auth implementations
+  auth:    "my_jwt_config"
 
   if env_exists("TLS_CERT_FILE") {
     pinned_cert_file: env("TLS_CERT_FILE")

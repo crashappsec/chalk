@@ -62,6 +62,8 @@ var availableSinkConfigs = { "log_hook"     : defaultLogHook,
 when not defined(release):
   availableSinkConfigs["debug_hook"] = defaultDebugHook
 
+var availableAuthConfigs: Table[string, AuthConfig]
+
 # These are used by reportcache.nim
 var   sinkErrors*: seq[SinkConfig] = @[]
 const quietTopics* = ["chalk_usage_stats"]
@@ -170,12 +172,56 @@ proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
     else:
       info(toOut)
 
+proc getAuthConfigByName*(name: string): Option[AuthConfig] =
+  if name == "":
+    return none(AuthConfig)
 
+  if name in availableAuthConfigs:
+    return some(availableAuthConfigs[name])
+
+  let
+    attrRoot = chalkConfig.`@@attrscope@@`
+    attrs    = attrRoot.getObjectOpt("auth_config." & name).getOrElse(nil)
+    opts     = OrderedTableRef[string, string]()
+
+  if attrs == nil:
+    error("auth_config." & name & " is referenced but its missing in the config")
+    return none(AuthConfig)
+
+  let authType = getOpt[string](attrs, "auth").getOrElse("")
+  if authType == "":
+    error("auth_config." & name & ".auth is required")
+    return none(AuthConfig)
+
+  let implementationOpt = getAuthImplementation(authType)
+  if implementationOpt.isNone():
+    error("there is no implementation for " & authType & " auth")
+    return none(AuthConfig)
+
+  for k, _ in attrs.contents:
+    case k
+    of "auth":
+      continue
+    else:
+      let boxOpt = getOpt[Box](attrs, k)
+      if boxOpt.isSome():
+        opts[k]  = unpack[string](boxOpt.get())
+      else:
+        error("auth_config." & name & "." & k & " is missing")
+        return none(AuthConfig)
+
+  try:
+    result = configAuth(implementationOpt.get(), name, some(opts))
+  except:
+    error("auth_config." & name & " is misconfigured: " & getCurrentExceptionMsg())
+    return none(AuthConfig)
+
+  if result.isSome():
+    availableAuthConfigs[name] = result.get()
 
 var
   errCbOpt = some(FailCallback(ioErrorHandler))
   okCbOpt  = some(LogCallback(successHandler))
-
 
 proc getSinkConfigByName*(name: string): Option[SinkConfig] =
   if name in availableSinkConfigs:
@@ -190,6 +236,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
 
   var
     sinkName:    string
+    authName:    string
     filterNames: seq[string]
     filters:     seq[MsgFilter] = @[]
     opts                        = OrderedTableRef[string, string]()
@@ -205,6 +252,8 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       filterNames = getOpt[seq[string]](attrs, k).getOrElse(@[])
     of "sink":
       sinkName    = getOpt[string](attrs, k).getOrElse("")
+    of "auth":
+      authName    = getOpt[string](attrs, k).getOrElse("")
     of "use_search_path", "disallow_http":
       let boxOpt = getOpt[Box](attrs, k)
       if boxOpt.isSome():
@@ -308,8 +357,13 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     else:
      filters.add(availableFilters[item])
 
+  let authOpt = getAuthConfigByName(authName)
+  if authName != "" and authOpt.isNone():
+    error("Sink " & sinkName & " requires auth " & authName & " which could not be loaded")
+    return none(SinkConfig)
+
   result = configSink(theSinkOpt.get(), name, some(opts), filters,
-                      errCbOpt, okCbOpt)
+                      errCbOpt, okCbOpt, authOpt)
 
   if result.isSome():
     availableSinkConfigs[name] = result.get()
@@ -353,3 +407,4 @@ proc ioSetup*(bgColor = "darkslategray") =
   once:
     useCrashTheme()
     addDefaultSinks()
+    addDefaultAuths()
