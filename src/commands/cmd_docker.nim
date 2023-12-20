@@ -319,21 +319,21 @@ proc formatExecArray(args: JsonNode): string =
 proc rewriteEntryPoint*(ctx: DockerInvocation) =
   var
     lastEntryPoint = EntryPointInfo(nil)
-    lastCmd        = CmdInfo(nil)
     newInstruction: string
 
   for section in ctx.dfSections:
+    # Note that we only search for ENTRYPOINT in Dockerfile
+    # and we do not search for CMD.
+    # This is because ENTRYPOINT (which might be defined in base image)
+    # might expect a specific format for CMD and therefore
+    # we cannot adjust CMD without knowing 100% ENTRYPOINT will not break
     if section.entryPoint != nil:
       section.entryPoint.noBadJson()
       lastEntryPoint = section.entryPoint
 
-    if section.cmd != nil:
-      section.cmd.noBadJson()
-      lastCmd = section.cmd
-
   info("Attempting to wrap container entry point.")
 
-  if lastCmd == nil and lastEntryPoint == nil:
+  if lastEntryPoint == nil:
     # TODO: probably could wrap a /bin/sh -c invocation, but
     # we would need to worry about how to get access to any
     # inherited CMD params.
@@ -355,30 +355,15 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
     warn("Wrapping canceled; no available method to wrap entry point.")
     return
 
-  if lastEntryPoint != nil:
-    # When they specify ENTRYPOINT, we can safely ignore CMD, because
-    # either ENTRYPOINT is in JSON (in which case CMD will get used but
-    # will stay the same) or it will be a string, in which case CMD
-    # will get ignored, as long as we keep ENTRYPOINT in string form.
-    if lastEntryPoint.str != "":
-      # In shell form, be a good citizen and exec so that `sh` isn't pid 1
-      newInstruction =  "ENTRYPOINT " & formatExecString(lastEntryPoint.str)
-    else:
-      newInstruction = "ENTRYPOINT " & formatExecArray(lastEntryPoint.json)
+  # When they specify ENTRYPOINT, we can safely ignore CMD, because
+  # either ENTRYPOINT is in JSON (in which case CMD will get used but
+  # will stay the same) or it will be a string, in which case CMD
+  # will get ignored, as long as we keep ENTRYPOINT in string form.
+  if lastEntryPoint.str != "":
+    # In shell form, be a good citizen and exec so that `sh` isn't pid 1
+    newInstruction = "ENTRYPOINT " & formatExecString(lastEntryPoint.str)
   else:
-      # If we only have a CMD:
-      # 1. shell form executes the full thing.
-      # 2. exec form I *think* the args are always passed and it could
-      #    be lifted to a ENTRYPOINT; I need to validate. If I'm wrong,
-      #    then we have to chop off the first item in the CMD .
-      #
-      # Right now, we add in a new CMD, which should override the old one.
-      # If not, we'll have to explicitly skip it.
-
-    if lastCmd.str != "":
-      newInstruction = "CMD " & formatExecString(lastCmd.str)
-    else:
-      newInstruction = "CMD " & formatExecArray(lastCmd.json)
+    newInstruction = "ENTRYPOINT " & formatExecArray(lastEntryPoint.json)
 
   ctx.addedInstructions.add(newInstruction)
   info("Entry point wrapped.")

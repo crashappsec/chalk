@@ -176,6 +176,24 @@ def test_composite_build(
     assert second_image_id
 
 
+def test_base_image(chalk: Chalk, random_hex: str):
+    base_id, _ = Docker.build(
+        dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile.base",
+        context=DOCKERFILES / "valid" / "base",
+        tag=random_hex,
+    )
+    assert base_id
+
+    image_id, result = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile",
+        context=DOCKERFILES / "valid" / "base",
+        args={"BASE": random_hex},
+        config=CONFIGS / "docker_wrap.c4m",
+        log_level="trace",
+    )
+    assert Docker.run(image_id)
+
+
 @pytest.mark.parametrize(
     "test_file",
     [
