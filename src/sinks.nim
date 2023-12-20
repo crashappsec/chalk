@@ -73,7 +73,8 @@ template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
 
   case cfg.mySink.name
   of "rotating_log", "file":
-    line &= cfg.params["actual_file"] & ": "
+    if "actual_file" in cfg.params:
+      line &= cfg.params["actual_file"] & ": "
   else:
     discard
 

@@ -90,7 +90,14 @@ proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
     path     = unpack[seq[string]](state.attrLookup("config_path").get())
     filename = unpack[string](state.attrLookup("config_filename").get())
   for dir in path:
-    let fname = resolvePath(dir.joinPath(filename))
+    var fname = ""
+    try:
+      fname = resolvePath(dir.joinPath(filename))
+    except:
+      # resolvePath can fail in some cases such as ~ might not resolve
+      # if uid does not have home folder
+      trace(filename & ": Cannot resolve configuration file path.")
+      continue
     trace("Looking for config file at: " & fname)
     if fname.fileExists():
       info(fname & ": Found config file")
@@ -107,8 +114,17 @@ proc loadLocalStructs*(state: ConfigState) =
   chalkConfig = state.attrs.loadChalkConfig()
   if chalkConfig.color.isSome(): setShowColor(chalkConfig.color.get())
   setLogLevel(chalkConfig.logLevel)
-  for i in 0 ..< len(chalkConfig.configPath):
-    chalkConfig.configPath[i] = chalkConfig.configPath[i].resolvePath()
+  var configPath: seq[string] = @[]
+  for path in chalkConfig.configPath:
+    try:
+      configPath.add(path.resolvePath())
+    except:
+      # resolvePath can fail in some cases such as ~ might not resolve
+      # if uid does not have home folder
+      # no log as this function is called multiple times
+      # and any logs are very verbose
+      continue
+  chalkConfig.configPath = configPath
   var c4errLevel =  if chalkConfig.con4mPinpoint: c4vShowLoc else: c4vBasic
 
   if chalkConfig.chalkDebug:

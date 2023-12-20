@@ -678,3 +678,14 @@ def test_extract(chalk: Chalk, random_hex: str):
         virtual=False,
         chalk_action="extract",
     )
+
+
+def test_docker_diff_user(chalk_default: Chalk):
+    assert Docker.run(
+        "alpine",
+        entrypoint="/chalk",
+        params=["version"],
+        volumes={chalk_default.binary: "/chalk"},
+        cwd=chalk_default.binary.parent,
+        user="1000:1000",
+    )
