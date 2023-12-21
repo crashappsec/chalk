@@ -37,7 +37,7 @@ proc readECSMetadata*(): Option[JsonNode] =
 template reportECSData(key: string) =
   result      = ChalkDict()
   if readECSMetadata().isSome():
-    result[key] = pack($(ecsMetadata.get()))
+    result[key] = pack(ecsMetadata.get())
 
 proc ecsGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   reportECSData("CLOUD_METADATA_WHEN_CHALKED")
