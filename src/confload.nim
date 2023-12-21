@@ -90,13 +90,14 @@ proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
     path     = unpack[seq[string]](state.attrLookup("config_path").get())
     filename = unpack[string](state.attrLookup("config_filename").get())
   for dir in path:
+    let fullPath = dir.joinPath(filename)
     var fname = ""
     try:
-      fname = resolvePath(dir.joinPath(filename))
+      fname = resolvePath(fullPath)
     except:
       # resolvePath can fail in some cases such as ~ might not resolve
       # if uid does not have home folder
-      trace(filename & ": Cannot resolve configuration file path.")
+      trace(fullPath & ": Cannot resolve configuration file path.")
       continue
     trace("Looking for config file at: " & fname)
     if fname.fileExists():

@@ -213,6 +213,32 @@ def test_imds(
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_ecs(
+    copy_files: list[Path],
+    chalk: Chalk,
+):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        env={"ECS_CONTAINER_METADATA_URI": "foobar"},
+    )
+    assert insert.report.contains(
+        {
+            "_OP_CLOUD_PROVIDER": "aws",
+            "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ecs",
+            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "123456789012",
+            "_OP_CLOUD_PROVIDER_IP": "203.0.113.25",
+            "_OP_CLOUD_PROVIDER_REGION": "us-east-1",
+            "_OP_CLOUD_PROVIDER_INSTANCE_TYPE": "t2.medium",
+            "_OP_CLOUD_PROVIDER_TAGS": {
+                "Name": "foobar",
+                "Environment": "staging",
+            },
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 @pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
 def test_imds_ecs(
     copy_files: list[Path],

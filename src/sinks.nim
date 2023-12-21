@@ -241,6 +241,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     filterNames: seq[string]
     filters:     seq[MsgFilter] = @[]
     opts                        = OrderedTableRef[string, string]()
+    enabled:     bool           = true
     deleteList:  seq[string]
 
   for k, _ in attrs.contents:
@@ -248,7 +249,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     of "enabled":
       if not get[bool](attrs, k):
         error("Sink configuration '" & name & " is disabled.")
-        return none(SinkConfig)
+        enabled = false
     of "filters":
       filterNames = getOpt[seq[string]](attrs, k).getOrElse(@[])
     of "sink":
@@ -312,6 +313,13 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       except:
         error(k & " (sink config key) must be a size specification")
         continue
+    of "filename":
+      opts[k] = getOpt[string](attrs, k).getOrElse("")
+      try:
+        opts[k] = resolvePath(opts[k])
+      except:
+        warn(opts[k] & ": could not resolve sink filename. disabling sink")
+        enabled = false
     else:
       opts[k] = getOpt[string](attrs, k).getOrElse("")
 
@@ -363,8 +371,14 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     error("Sink " & sinkName & " requires auth " & authName & " which could not be loaded")
     return none(SinkConfig)
 
-  result = configSink(theSinkOpt.get(), name, some(opts), filters,
-                      errCbOpt, okCbOpt, authOpt)
+  result = configSink(theSinkOpt.get(),
+                      name,
+                      some(opts),
+                      filters = filters,
+                      handler = errCbOpt,
+                      logger  = okCbOpt,
+                      auth    = authOpt,
+                      enabled = enabled)
 
   if result.isSome():
     availableSinkConfigs[name] = result.get()

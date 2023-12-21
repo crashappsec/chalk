@@ -81,7 +81,7 @@ proc writeChalkMark(ctx: DockerInvocation, mark: string) =
     info("Creating temporary chalk file: " & path)
     f.writeLine(mark)
     f.close()
-    ctx.makeFileAvailableToDocker(path, move=true, newName="chalk.json")
+    ctx.makeFileAvailableToDocker(path, move=true, newName="chalk.json", chmod="0444")
   except:
     error("Unable to write to open tmp file (disk space?)")
     raise newException(ValueError, "fs write")

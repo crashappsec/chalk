@@ -25,6 +25,7 @@ from .conf import (
     DOCKERFILES,
     DOCKER_SSH_REPO,
     DOCKER_TOKEN_REPO,
+    MARKS,
     REGISTRY,
 )
 from .utils.docker import Docker
@@ -103,6 +104,7 @@ def test_build(
         tag=random_hex if tag else None,
         buildkit=buildkit,
         config=CONFIGS / "docker_wrap.c4m",
+        log_level="trace",
     )
     assert image_id
 
@@ -681,11 +683,17 @@ def test_extract(chalk: Chalk, random_hex: str):
 
 
 def test_docker_diff_user(chalk_default: Chalk):
-    assert Docker.run(
+    _, program = Docker.run(
         "alpine",
         entrypoint="/chalk",
-        params=["version"],
-        volumes={chalk_default.binary: "/chalk"},
+        params=["exec", "--trace", "--exec-command-name=sleep", "1"],
+        volumes={
+            chalk_default.binary: "/chalk",
+            MARKS / "object.json": "/chalk.json",
+        },
         cwd=chalk_default.binary.parent,
         user="1000:1000",
     )
+    result = ChalkProgram.from_program(program)
+    assert result
+    assert not result.errors

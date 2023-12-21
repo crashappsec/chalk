@@ -55,19 +55,27 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
     info("Found chalk mark in " & chalkPath)
 
     let
-      cidOpt = getContainerName()
-      cid    = cidOpt.getOrElse("<<in-container>")
+      cidOpt      = getContainerName()
+      cid         = cidOpt.getOrElse("<<in-container>")
+      exeStream   = newFileStream(exe1path)
+      chalkStream = newFileStream(chalkPath)
 
-    var  stream   = newFileStream(chalkPath)
+    if chalkStream == nil:
+      error(chalkPath & ": Could not read chalkmark")
+      return none(ChalkObj)
+
+    if exeStream == nil:
+      error(exe1path & ": Could not read executable for chalk extraction")
+      return none(ChalkObj)
+
     chalk         = newChalk(name         = exe1path,
                              fsRef        = exe1path,
-                             stream       = newFileStream(exe1path),
+                             stream       = exeStream,
                              containerId  = cidOpt.getOrElse(""),
                              pid          = some(pid),
                              resourceType = {ResourcePid, ResourceFile},
-                             extract      = stream.extractOneChalkJson(cid),
+                             extract      = chalkStream.extractOneChalkJson(cid),
                              codec        = getPluginByName("docker"))
-
 
     for k, v in chalk.extract:
       chalk.collectedData[k] = v
