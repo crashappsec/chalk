@@ -216,26 +216,15 @@ def test_imds(
 def test_ecs(
     copy_files: list[Path],
     chalk: Chalk,
+    server_imds: str,
 ):
     bin_path = copy_files[0]
     insert = chalk.insert(
         bin_path,
-        env={"ECS_CONTAINER_METADATA_URI": "foobar"},
+        env={"ECS_CONTAINER_METADATA_URI": f"{server_imds}/ecs"},
+        log_level="trace",
     )
-    assert insert.report.contains(
-        {
-            "_OP_CLOUD_PROVIDER": "aws",
-            "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ecs",
-            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "123456789012",
-            "_OP_CLOUD_PROVIDER_IP": "203.0.113.25",
-            "_OP_CLOUD_PROVIDER_REGION": "us-east-1",
-            "_OP_CLOUD_PROVIDER_INSTANCE_TYPE": "t2.medium",
-            "_OP_CLOUD_PROVIDER_TAGS": {
-                "Name": "foobar",
-                "Environment": "staging",
-            },
-        }
-    )
+    assert insert.report.contains({"_OP_CLOUD_METADATA": dict})
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
@@ -564,7 +553,7 @@ def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
                 "metadata": {
                     "component": {
                         "type": "file",
-                        "name": "/chalk/tests/data/dockerfiles/valid/sample_1",
+                        "name": re.compile(r"tests/data/dockerfiles/valid/sample_1$"),
                     },
                 },
             }

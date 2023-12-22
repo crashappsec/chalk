@@ -7,7 +7,7 @@
 
 ## This plugin collects data from the AWS ECS Metadata IP.
 
-import httpclient, ../config, ../plugin_api
+import httpclient, ../config, ../chalkjson, ../plugin_api
 
 
 var cloudMetadataUrl = os.getEnv("ECS_CONTAINER_METADATA_URI")
@@ -37,7 +37,7 @@ proc readECSMetadata*(): Option[JsonNode] =
 template reportECSData(key: string) =
   result      = ChalkDict()
   if readECSMetadata().isSome():
-    result[key] = pack(ecsMetadata.get())
+    result.setIfNeeded(key, ecsMetadata.get().nimJsonToBox())
 
 proc ecsGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   reportECSData("CLOUD_METADATA_WHEN_CHALKED")
