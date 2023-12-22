@@ -84,8 +84,9 @@ need 2x the value of `max` available in terms of disk space.
 }
 
 sink s3 {
-  ~secret:        true
   ~uid:           true
+  ~secret:        true
+  ~token:         false
   ~uri:           true
   ~region:        false
   ~extra:         false
@@ -95,8 +96,9 @@ sink s3 {
 
 | Parameter | Type | Required | Description |
 |-----------|------|---------|--------------|
-| `secret` | `string` | true | A valid AWS auth token |
 | `uid` | `string` | true | A valid AWS access identifier |
+| `secret` | `string` | true | A valid AWS auth token |
+| `token` | `string` | false | AWS session token |
 | `uri` | `string` | true | The URI for the bucket in `s3:` format; see below |
 | `region` | `string` | false | The region (defaults to "us-east-1") |
 | `extra` | `string` | false | A prefix added to the object path within the bucket |

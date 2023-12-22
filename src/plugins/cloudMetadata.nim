@@ -9,7 +9,6 @@
 
 import httpclient, net, uri
 import std/strutils, std/json
-import nimutils/sinks
 import ../config, ../plugin_api, ../chalkjson, ./procfs
 
 const

@@ -224,7 +224,17 @@ def test_ecs(
         env={"ECS_CONTAINER_METADATA_URI": f"{server_imds}/ecs"},
         log_level="trace",
     )
-    assert insert.report.contains({"_OP_CLOUD_METADATA": dict})
+    assert insert.report.contains(
+        {
+            "_OP_CLOUD_METADATA": {
+                "aws_ecs": {
+                    "container": dict,
+                    "task": dict,
+                    "task/stats": dict,
+                },
+            }
+        }
+    )
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
