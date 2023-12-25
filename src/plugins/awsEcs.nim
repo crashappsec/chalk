@@ -80,7 +80,7 @@ proc ecsGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
                           ChalkDict {.cdecl.} =
   reportECSData("_OP_CLOUD_METADATA")
 
-proc loadEcs*() =
+proc loadAwsEcs*() =
   newPlugin("aws_ecs",
             ctHostCallback = ChalkTimeHostCb(ecsGetChalkTimeHostInfo),
             rtHostCallback = RunTimeHostCb(ecsGetRunTimeHostInfo))

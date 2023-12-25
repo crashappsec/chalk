@@ -6,6 +6,7 @@ import re
 import shutil
 from pathlib import Path
 
+import os
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
@@ -231,6 +232,48 @@ def test_ecs(
                     "container": dict,
                     "task": dict,
                     "task/stats": dict,
+                },
+            }
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_lambda(
+    copy_files: list[Path],
+    chalk: Chalk,
+    server_imds: str,
+):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        env={
+            "AWS_LAMBDA_FUNCTION_NAME": "dummy",
+            "AWS_LAMBDA_FUNCTION_VERSION": "2",
+            "AWS_LAMBDA_LOG_GROUP_NAME": "/aws/logs",
+            "AWS_LAMBDA_LOG_STREAM_NAME": "2023/12/25/[$LATEST]f42d28eb350e42a1b840ad55fd5232fe",
+            "AWS_DEFAULT_REGION": "us-east-1",
+        },
+        log_level="trace",
+    )
+    arns = (
+        {
+            "AWS_LAMBDA_FUNCTION_ARN": re.compile(r"^arn:"),
+            "AWS_LAMBDA_LOG_STREAM_ARN": re.compile(r"^arn:"),
+        }
+        if os.environ.get("AWS_ACCESS_KEY_ID")
+        else {}
+    )
+    assert insert.report.contains(
+        {
+            "_OP_CLOUD_METADATA": {
+                "aws_lambda": {
+                    "AWS_LAMBDA_FUNCTION_NAME": "dummy",
+                    "AWS_LAMBDA_FUNCTION_VERSION": "2",
+                    "AWS_LAMBDA_LOG_GROUP_NAME": "/aws/logs",
+                    "AWS_LAMBDA_LOG_STREAM_NAME": "2023/12/25/[$LATEST]f42d28eb350e42a1b840ad55fd5232fe",
+                    "AWS_REGION": "us-east-1",
+                    **arns,
                 },
             }
         }

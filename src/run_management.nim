@@ -127,6 +127,9 @@ template setIfNotEmpty*[T](dict: ChalkDict, key: string, val: seq[T]) =
   if len(val) > 0:
     dict[key] = pack[seq[T]](val)
 
+template setFromEnvVar*(dict: ChalkDict, key: string, default: string = "") =
+  dict.setIfNotEmpty(key, os.getEnv(key, default))
+
 proc idFormat*(rawHash: string): string =
   let s = base32vEncode(rawHash)
   s[0 ..< 6] & "-" & s[6 ..< 10] & "-" & s[10 ..< 14] & "-" & s[14 ..< 20]
@@ -139,7 +142,10 @@ template isSubscribedKey*(key: string): bool =
 
 template setIfSubscribed[T](d: ChalkDict, k: string, v: T) =
   if isSubscribedKey(k):
-    d[k] = pack[T](v)
+    when T is Box:
+      d[k] = v
+    else:
+      d[k] = pack[T](v)
 
 template setIfNeeded*[T](o: ChalkDict, k: string, v: T) =
   when T is string:
@@ -153,6 +159,10 @@ template setIfNeeded*[T](o: ChalkDict, k: string, v: T) =
 
 template setIfNeeded*[T](o: ChalkObj, k: string, v: T) =
   setIfNeeded(o.collectedData, k, v)
+
+template setFromDict*(dict: ChalkDict, key: string, source: ChalkDict, property: string) =
+  if property in source:
+    dict.setIfNeeded(key, source[property])
 
 proc isChalkingOp*(): bool =
   return commandName in chalkConfig.getValidChalkCommandNames()
