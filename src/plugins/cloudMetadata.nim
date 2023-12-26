@@ -9,7 +9,7 @@
 
 import httpclient, net, uri
 import std/strutils, std/json
-import ../config, ../plugin_api, ../chalkjson, ./procfs
+import ../config, ../plugin_api, ../chalkjson
 
 const
   awsBaseUri     = "http://169.254.169.254/latest/"
@@ -127,36 +127,36 @@ template getTags(keyname: string, url: string) =
           tags[name] = pack(tagOpt.get())
         setIfNeeded(result, keyname, tags)
 
-proc isAwsEc2Host(vendor: Option[string]): bool =
+proc isAwsEc2Host(vendor: string): bool =
   # ref: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
 
   # older Xen instances
-  let uuid = readOneFile(chalkConfig.cloudProviderConfig.cloudInstanceHwConfig.getSysHypervisorPath())
-  if uuid.isSome() and strutils.toLowerAscii(uuid.get())[0..2] == "ec2":
+  let uuid = tryToLoadFile(chalkConfig.cloudProviderConfig.cloudInstanceHwConfig.getSysHypervisorPath())
+  if strutils.toLowerAscii(uuid)[0..2] == "ec2":
       return true
 
   # nitro instances
-  if vendor.isSome() and contains(strutils.toLowerAscii(vendor.get()), "amazon"):
+  if contains(strutils.toLowerAscii(vendor), "amazon"):
       return true
 
   # this will only work if we have root, normally sudo dmidecode  --string system-uuid
   # gives the same output
-  let product_uuid = readOneFile(chalkConfig.cloudProviderConfig.cloudInstanceHwConfig.getSysProductPath())
-  if product_uuid.isSome() and strutils.toLowerAscii(product_uuid.get())[0..2] == "ec2":
+  let product_uuid = tryToLoadFile(chalkConfig.cloudProviderConfig.cloudInstanceHwConfig.getSysProductPath())
+  if strutils.toLowerAscii(product_uuid)[0..2] == "ec2":
       return true
 
   return false
 
-proc isGoogleHost(vendor: Option[string]): bool =
-  return vendor.isSome() and contains(strutils.toLowerAscii(vendor.get()), "google")
+proc isGoogleHost(vendor: string): bool =
+  return contains(strutils.toLowerAscii(vendor), "google")
 
-proc isAzureHost(vendor: Option[string]): bool =
-  return vendor.isSome() and contains(strutils.toLowerAscii(vendor.get()), "microsoft")
+proc isAzureHost(vendor: string): bool =
+  return contains(strutils.toLowerAscii(vendor), "microsoft")
 
 proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
                                ChalkDict {.cdecl.} =
   result = ChalkDict()
-  let vendor = readOneFile(chalkConfig.cloudProviderConfig.cloudInstanceHwConfig.getSysVendorPath())
+  let vendor = tryToLoadFile(chalkConfig.cloudProviderConfig.cloudInstanceHwConfig.getSysVendorPath())
 
   #
   # GCP
