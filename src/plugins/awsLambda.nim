@@ -7,7 +7,7 @@
 
 ## This plugin collects data from the AWS Lambda env vars
 
-import httpclient, ../config, ../chalkjson, ../plugin_api, nimutils/stsclient
+import ../config, ../plugin_api, nimutils/stsclient
 
 var lambdaMetadata: ChalkDict = ChalkDict()
 
@@ -44,17 +44,32 @@ proc collectLambdaMetadata(): ChalkDict =
       try:
         var
           client   = newStsClient((accessKey, secretKey, sessionToken), region)
+          roleArn: Arn
         let
-          identity  = client.getCallerIdentity()
-          roleArn   = identity.arn
-          resource  = "function:" & functionName & ":" & functionVersion
-          stream    = "log-group:" & logGroup & ":log-stream:" & logStream
+          lambdaResource  = "function:" & functionName
+          versionResource = lambdaResource & ":" & functionVersion
+          streamResource  = "log-group:" & logGroup & ":log-stream:" & logStream
+          identity        = client.getCallerIdentity()
+          credsArn        = identity.arn
+        if credsArn.resource.startsWith("assumed-role"):
+          let roleName    = credsArn.resource.split("/")[1]
+          roleArn         = credsArn.with(service="iam", resource="role/" & roleName)
+        else:
+          # creds are already fully formed IAM user
+          roleArn         = credsArn
+        let
           # roles dont have region as they are global so add region back
-          lambdaArn = roleArn.with(region=region, service="lambda", resource=resource)
-          streamArn = lambdaArn.with(service="logs", resource=stream)
-        lambdaMetadata.setIfNotEmpty("AWS_LAMBDA_FUNCTION_ARN", $(lambdaArn))
+          lambdaArn       = roleArn.with(resource=lambdaResource, service="lambda", region=region)
+          versionArn      = lambdaArn.with(resource=versionResource)
+          streamArn       = lambdaArn.with(resource=streamResource, service="logs")
+
+        lambdaMetadata.setIfNotEmpty("AWS_ACCOUNT_ID",              roleArn.account)
+        lambdaMetadata.setIfNotEmpty("AWS_ROLE_ARN",                $(roleArn))
+        lambdaMetadata.setIfNotEmpty("AWS_LAMBDA_FUNCTION_ARN",     $(lambdaArn))
+        lambdaMetadata.setIfNotEmpty("AWS_LAMBDA_VERSION_ARN",      $(versionArn))
         if logGroup != "" and logStream != "":
           lambdaMetadata.setIfNotEmpty("AWS_LAMBDA_LOG_STREAM_ARN", $(streamArn))
+
       except:
         error("lambda: could not fetch information about AWS account")
     else:
@@ -70,8 +85,11 @@ proc lambdaCallback*(self: Plugin, objs: seq[ChalkObj]):
     var cloudData = ChalkDict()
     cloudData["aws_lambda"] = pack(data)
     result.setIfNeeded("_OP_CLOUD_METADATA",              cloudData)
+    result.setIfNeeded("_OP_CLOUD_PROVIDER",              "aws")
     result.setIfNeeded("_OP_CLOUD_PROVIDER_SERVICE_TYPE", "aws_lambda")
-    result.setFromDict("_OP_CLOUD_PROVIDER_REGION", data, "AWS_REGION")
+    result.setIfNeeded("_OP_CLOUD_PROVIDER_ACCOUNT_INFO", data.lookupByPath("AWS_ACCOUNT_ID"))
+    result.setIfNeeded("_OP_CLOUD_PROVIDER_REGION",       data.lookupByPath("AWS_REGION"))
+    result.setIfNeeded("_AWS_REGION",                     data.lookupByPath("AWS_REGION"))
 
 proc loadAwsLambda*() =
   newPlugin("aws_lambda",

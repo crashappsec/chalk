@@ -138,7 +138,7 @@ def test_imds(
     # make imds plugin think we are running in EC2
     tmp_file.write_text("Amazon")
     bin_path = copy_files[0]
-    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
+    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m", log_level="trace")
     assert insert.report.contains(
         {
             "_OP_CLOUD_PROVIDER": "aws",
@@ -227,13 +227,18 @@ def test_ecs(
     )
     assert insert.report.contains(
         {
+            "_OP_CLOUD_PROVIDER": "aws",
+            "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ecs",
+            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "111122223333",
+            "_OP_CLOUD_PROVIDER_REGION": "us-west-2",
+            "_AWS_REGION": "us-west-2",
             "_OP_CLOUD_METADATA": {
                 "aws_ecs": {
                     "container": dict,
                     "task": dict,
                     "task/stats": dict,
                 },
-            }
+            },
         }
     )
 
@@ -256,16 +261,28 @@ def test_lambda(
         },
         log_level="trace",
     )
-    arns = (
-        {
-            "AWS_LAMBDA_FUNCTION_ARN": re.compile(r"^arn:"),
-            "AWS_LAMBDA_LOG_STREAM_ARN": re.compile(r"^arn:"),
-        }
+    top, meta = (
+        (
+            {
+                "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": re.compile(r"[\d]+"),
+            },
+            {
+                "AWS_LAMBDA_FUNCTION_ARN": re.compile(r"^arn:"),
+                "AWS_LAMBDA_VERSION_ARN": re.compile(r"^arn:"),
+                "AWS_LAMBDA_LOG_STREAM_ARN": re.compile(r"^arn:"),
+                "AWS_ROLE_ARN": re.compile(r"^arn:"),
+                "AWS_ACCOUNT_ID": re.compile(r"[\d]+"),
+            },
+        )
         if os.environ.get("AWS_ACCESS_KEY_ID")
-        else {}
+        else ({}, {})
     )
     assert insert.report.contains(
         {
+            "_OP_CLOUD_PROVIDER": "aws",
+            "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_lambda",
+            "_OP_CLOUD_PROVIDER_REGION": "us-east-1",
+            "_AWS_REGION": "us-east-1",
             "_OP_CLOUD_METADATA": {
                 "aws_lambda": {
                     "AWS_LAMBDA_FUNCTION_NAME": "dummy",
@@ -273,9 +290,10 @@ def test_lambda(
                     "AWS_LAMBDA_LOG_GROUP_NAME": "/aws/logs",
                     "AWS_LAMBDA_LOG_STREAM_NAME": "2023/12/25/[$LATEST]f42d28eb350e42a1b840ad55fd5232fe",
                     "AWS_REGION": "us-east-1",
-                    **arns,
+                    **meta,
                 },
-            }
+            },
+            **top,
         }
     )
 

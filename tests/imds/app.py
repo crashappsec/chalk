@@ -17,6 +17,8 @@ TAGS = {
 ACCOUNT_ID = "123456789012"
 MAC = "00:25:96:FF:FE:12:34:56"
 # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
+# https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v4.html
+# https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v4-fargate.html
 # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v3-fargate.html
 RESPONSES = {
     # "/latest/meta-data/ancestor-ami-ids": "",
@@ -131,63 +133,46 @@ RESPONSES = {
     ),
     "/ecs": json.dumps(
         {
-            "Cluster": "default",
-            "TaskARN": f"arn:aws:ecs:us-east-2:012345678910:task/9781c248-0edd-4cdb-9a93-f63cb662a5d3",
-            "Family": "nginx",
-            "Revision": "5",
+            "DockerId": "cd189a933e5849daa93386466019ab50-2495160603",
+            "Name": "curl",
+            "DockerName": "curl",
+            "Image": "111122223333.dkr.ecr.us-west-2.amazonaws.com/curltest:latest",
+            "ImageID": "sha256:25f3695bedfb454a50f12d127839a68ad3caf91e451c1da073db34c542c4d2cb",
+            "Labels": {
+                "com.amazonaws.ecs.cluster": "arn:aws:ecs:us-west-2:111122223333:cluster/default",
+                "com.amazonaws.ecs.container-name": "curl",
+                "com.amazonaws.ecs.task-arn": "arn:aws:ecs:us-west-2:111122223333:task/default/cd189a933e5849daa93386466019ab50",
+                "com.amazonaws.ecs.task-definition-family": "curltest",
+                "com.amazonaws.ecs.task-definition-version": "2",
+            },
             "DesiredStatus": "RUNNING",
             "KnownStatus": "RUNNING",
-            "Containers": [
+            "Limits": {"CPU": 10, "Memory": 128},
+            "CreatedAt": "2020-10-08T20:09:11.44527186Z",
+            "StartedAt": "2020-10-08T20:09:11.44527186Z",
+            "Type": "NORMAL",
+            "Networks": [
                 {
-                    "DockerId": "731a0d6a3b4210e2448339bc7015aaa79bfe4fa256384f4102db86ef94cbbc4c",
-                    "Name": "~internal~ecs~pause",
-                    "DockerName": "ecs-nginx-5-internalecspause-acc699c0cbf2d6d11700",
-                    "Image": "amazon/amazon-ecs-pause:0.1.0",
-                    "ImageID": "",
-                    "Labels": {
-                        "com.amazonaws.ecs.cluster": "default",
-                        "com.amazonaws.ecs.container-name": "~internal~ecs~pause",
-                        "com.amazonaws.ecs.task-arn": "arn:aws:ecs:us-east-2:012345678910:task/9781c248-0edd-4cdb-9a93-f63cb662a5d3",
-                        "com.amazonaws.ecs.task-definition-family": "nginx",
-                        "com.amazonaws.ecs.task-definition-version": "5",
-                    },
-                    "DesiredStatus": "RESOURCES_PROVISIONED",
-                    "KnownStatus": "RESOURCES_PROVISIONED",
-                    "Limits": {"CPU": 0, "Memory": 0},
-                    "CreatedAt": "2018-02-01T20:55:08.366329616Z",
-                    "StartedAt": "2018-02-01T20:55:09.058354915Z",
-                    "Type": "CNI_PAUSE",
-                    "Networks": [
-                        {"NetworkMode": "awsvpc", "IPv4Addresses": ["10.0.2.106"]}
-                    ],
-                },
-                {
-                    "DockerId": "43481a6ce4842eec8fe72fc28500c6b52edcc0917f105b83379f88cac1ff3946",
-                    "Name": "nginx-curl",
-                    "DockerName": "ecs-nginx-5-nginx-curl-ccccb9f49db0dfe0d901",
-                    "Image": "nrdlngr/nginx-curl",
-                    "ImageID": "sha256:2e00ae64383cfc865ba0a2ba37f61b50a120d2d9378559dcd458dc0de47bc165",
-                    "Labels": {
-                        "com.amazonaws.ecs.cluster": "default",
-                        "com.amazonaws.ecs.container-name": "nginx-curl",
-                        "com.amazonaws.ecs.task-arn": "arn:aws:ecs:us-east-2:012345678910:task/9781c248-0edd-4cdb-9a93-f63cb662a5d3",
-                        "com.amazonaws.ecs.task-definition-family": "nginx",
-                        "com.amazonaws.ecs.task-definition-version": "5",
-                    },
-                    "DesiredStatus": "RUNNING",
-                    "KnownStatus": "RUNNING",
-                    "Limits": {"CPU": 512, "Memory": 512},
-                    "CreatedAt": "2018-02-01T20:55:10.554941919Z",
-                    "StartedAt": "2018-02-01T20:55:11.064236631Z",
-                    "Type": "NORMAL",
-                    "Networks": [
-                        {"NetworkMode": "awsvpc", "IPv4Addresses": ["10.0.2.106"]}
-                    ],
-                },
+                    "NetworkMode": "awsvpc",
+                    "IPv4Addresses": ["192.0.2.3"],
+                    "AttachmentIndex": 0,
+                    "MACAddress": "0a:de:f6:10:51:e5",
+                    "IPv4SubnetCIDRBlock": "192.0.2.0/24",
+                    "DomainNameServers": ["192.0.2.2"],
+                    "DomainNameSearchList": ["us-west-2.compute.internal"],
+                    "PrivateDNSName": "ip-10-0-0-222.us-west-2.compute.internal",
+                    "SubnetGatewayIpv4Address": "192.0.2.0/24",
+                }
             ],
-            "PullStartedAt": "2018-02-01T20:55:09.372495529Z",
-            "PullStoppedAt": "2018-02-01T20:55:10.552018345Z",
-            "AvailabilityZone": "us-east-2b",
+            "ContainerARN": "arn:aws:ecs:us-west-2:111122223333:container/05966557-f16c-49cb-9352-24b3a0dcd0e1",
+            "LogOptions": {
+                "awslogs-create-group": "true",
+                "awslogs-group": "/ecs/containerlogs",
+                "awslogs-region": "us-west-2",
+                "awslogs-stream": "ecs/curl/cd189a933e5849daa93386466019ab50",
+            },
+            "LogDriver": "awslogs",
+            "Snapshotter": "overlayfs",
         }
     ),
     "/ecs/task": json.dumps(

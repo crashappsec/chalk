@@ -215,7 +215,12 @@ Captures metadata from cloud instances.
 plugin aws_ecs {
     enabled:         true
     pre_run_keys:    ["CLOUD_METADATA_WHEN_CHALKED"]
-    post_run_keys:   ["_OP_CLOUD_METADATA"]
+    post_run_keys:   ["_OP_CLOUD_METADATA",
+                      "_OP_CLOUD_PROVIDER",
+                      "_OP_CLOUD_PROVIDER_ACCOUNT_INFO",
+                      "_OP_CLOUD_PROVIDER_SERVICE_TYPE",
+                      "_OP_CLOUD_PROVIDER_REGION",
+                      "_AWS_REGION"]
     doc: """
 Captures metadata from the primary endpoint for the original ECS
 metdata interface.
@@ -224,8 +229,12 @@ metdata interface.
 
 plugin aws_lambda {
     enabled:         true
-    post_run_keys:   ["_OP_CLOUD_METADATA", "_OP_CLOUD_PROVIDER_SERVICE_TYPE",
-                      "_OP_CLOUD_PROVIDER_REGION"]
+    post_run_keys:   ["_OP_CLOUD_METADATA",
+                      "_OP_CLOUD_PROVIDER",
+                      "_OP_CLOUD_PROVIDER_ACCOUNT_INFO",
+                      "_OP_CLOUD_PROVIDER_SERVICE_TYPE",
+                      "_OP_CLOUD_PROVIDER_REGION",
+                      "_AWS_REGION"]
     doc: """
 Captures metadata from the environment variables in AWS Lambda function.
 """

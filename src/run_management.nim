@@ -9,7 +9,7 @@
 ## setting, status stuff, and the core scan state ("collection
 ## contexts"), that the subscan module pushes and pops.
 
-import chalk_common, posix, std/monotimes
+import chalk_common, posix, std/[monotimes, enumerate]
 export chalk_common
 
 var
@@ -154,18 +154,34 @@ template setIfNeeded*[T](o: ChalkDict, k: string, v: T) =
   elif T is seq or T is ChalkDict:
     if len(v) != 0:
       setIfSubscribed(o, k, v)
+  elif T is Option:
+    if v.isSome():
+      setIfSubscribed(o, k, v.get())
   else:
     setIfSubscribed(o, k, v)
 
 template setIfNeeded*[T](o: ChalkObj, k: string, v: T) =
   setIfNeeded(o.collectedData, k, v)
 
-template setFromDict*(dict: ChalkDict, key: string, source: ChalkDict, property: string) =
-  if property in source:
-    dict.setIfNeeded(key, source[property])
-
 proc isChalkingOp*(): bool =
   return commandName in chalkConfig.getValidChalkCommandNames()
+
+proc lookupByPath*(obj: ChalkDict, path: string): Option[Box] =
+  let
+    parts    = path.split(".")
+    chalkKey = parts[0]
+  if chalkKey notin obj:
+    return none(Box)
+  var value = obj
+  for (i, p) in enumerate(parts[0..^1]):
+    try:
+      if i == len(parts) - 1:
+        return some(value[p])
+      else:
+        value = unpack[ChalkDict](value[p])
+    except:
+      return none(Box)
+  return none(Box)
 
 proc lookupCollectedKey*(obj: ChalkObj, k: string): Option[Box] =
   if k in hostInfo:          return some(hostInfo[k])

@@ -25,7 +25,7 @@ proc getAwsToken(): Option[string] =
     client   = newHttpClient(timeout = 250) # 1/4 of a second
     response = client.safeRequest(url = uri, httpMethod = HttpPut, headers = hdrs)
 
-  if response.status[0] != '2':
+  if not response.code.is2xx():
     trace("Could not retrieve IMDSv2 token from: " & $uri)
     return none(string)
 
@@ -38,7 +38,7 @@ proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
     client   = newHttpClient(timeout = 250) # 1/4 of a second
     response = client.safeRequest(url = uri, httpMethod = HttpGet, headers = hdrs)
 
-  if response.status[0] != '2':
+  if not response.code.is2xx():
     trace("Could not retrieve metadata from: " & $uri)
     return none(string)
 
@@ -132,7 +132,7 @@ proc isAwsEc2Host(vendor: string): bool =
 
   # older Xen instances
   let uuid = tryToLoadFile(chalkConfig.cloudProviderConfig.cloudInstanceHwConfig.getSysHypervisorPath())
-  if strutils.toLowerAscii(uuid)[0..2] == "ec2":
+  if strutils.toLowerAscii(uuid).startswith("ec2"):
       return true
 
   # nitro instances
@@ -142,7 +142,7 @@ proc isAwsEc2Host(vendor: string): bool =
   # this will only work if we have root, normally sudo dmidecode  --string system-uuid
   # gives the same output
   let product_uuid = tryToLoadFile(chalkConfig.cloudProviderConfig.cloudInstanceHwConfig.getSysProductPath())
-  if strutils.toLowerAscii(product_uuid)[0..2] == "ec2":
+  if strutils.toLowerAscii(product_uuid).startsWith("ec2"):
       return true
 
   return false

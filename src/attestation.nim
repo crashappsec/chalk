@@ -161,9 +161,9 @@ proc saveToSecretManager*(content: string, prkey: string, apiToken: string): boo
   response = callTheSecretService(base, prkey, apiToken, body, HttpPut)
 
   trace("Sending encrypted secret: " & body)
-  if response.status.startswith("405"):
+  if response.code == Http405:
     info("This secret is already saved.")
-  elif response.status[0] != '2':
+  elif not response.code.is2xx():
     error("When attempting to save signing secret: " & response.status)
     trace(response.body())
     return false
@@ -184,9 +184,9 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
 
   let response = callTheSecretService(base, prKey, apikey, "", HttpGet)
 
-  if response.status[0] != '2':
+  if not response.code.is2xx():
     # authentication issue / token expiration - begin reauth
-    if response.status.startswith("401"):
+    if response.code == Http401:
       # parse json response and save / return values()
       let jsonNodeReason = parseJson(response.body())
       let reasonCode     = jsonNodeReason["Message"].getStr()
@@ -214,7 +214,7 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
             return loadFromSecretManager(prkey, $newApiToken)
     else:
       warn("Could not retrieve signing secret: " & response.status & "\n" &
-        "Will not be able to sign / verify.")
+           "Will not be able to sign / verify.")
       return false
 
   var
@@ -231,7 +231,7 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
       raise newException(ValueError, "Nice hex, but wrong size.")
   except:
     error("When loading the signing secret, received an invalid " &
-      "response from server: " & response.status)
+          "response from server: " & response.status)
     return false
 
   trace("Successfully retrieved secret from secret manager.")

@@ -7,7 +7,7 @@
 
 ## This plugin collects data from the AWS ECS Metadata IP.
 
-import httpclient, ../config, ../chalkjson, ../plugin_api
+import httpclient, ../config, ../chalkjson, ../plugin_api, nimutils/awsclient
 
 let
   cloudMetadataUrl3 = os.getEnv("ECS_CONTAINER_METADATA_URI")
@@ -54,31 +54,42 @@ proc readECSMetadata*(): ChalkDict =
     if container.isNone():
       return ecsMetadata
 
-    var ecs = ChalkDict()
-    ecs["container"] = container.get()
+    ecsMetadata["container"] = container.get()
 
     let task = requestECSMetadata("/task")
     if task.isSome():
-      ecs["task"] = task.get()
+      ecsMetadata["task"] = task.get()
 
     let stats = requestECSMetadata("/task/stats")
     if stats.isSome():
-      ecs["task/stats"] = stats.get()
-
-    ecsMetadata["aws_ecs"] = pack(ecs)
+      ecsMetadata["task/stats"] = stats.get()
 
   return ecsMetadata
 
-template reportECSData(key: string) =
-  result = ChalkDict()
-  result.setIfNeeded(key, readECSMetadata())
-
 proc ecsGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
-  reportECSData("CLOUD_METADATA_WHEN_CHALKED")
+  let data = readECSMetadata()
+  result = ChalkDict()
+  if len(data) > 0:
+    var cloudData = ChalkDict()
+    cloudData["aws_ecs"] = pack(data)
+    result.setIfNeeded("CLOUD_METADATA_WHEN_CHALKED", cloudData)
 
 proc ecsGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
                           ChalkDict {.cdecl.} =
-  reportECSData("_OP_CLOUD_METADATA")
+  let data = readECSMetadata()
+  result = ChalkDict()
+  if len(data) > 0:
+    var cloudData = ChalkDict()
+    cloudData["aws_ecs"] = pack(data)
+    result.setIfNeeded("_OP_CLOUD_METADATA",               cloudData)
+    result.setIfNeeded("_OP_CLOUD_PROVIDER",               "aws")
+    result.setIfNeeded("_OP_CLOUD_PROVIDER_SERVICE_TYPE",  "aws_ecs")
+    let containerArnOpt = data.lookupByPath("container.ContainerARN")
+    if containerArnOpt.isSome():
+      let containerArn = parseArn($(containerArnOpt.get()))
+      result.setIfNeeded("_OP_CLOUD_PROVIDER_ACCOUNT_INFO", containerArn.account)
+      result.setIfNeeded("_OP_CLOUD_PROVIDER_REGION",       containerArn.region)
+      result.setIfNeeded("_AWS_REGION",                     containerArn.region)
 
 proc loadAwsEcs*() =
   newPlugin("aws_ecs",
