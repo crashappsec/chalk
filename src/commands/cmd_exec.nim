@@ -242,8 +242,11 @@ proc runCmdExec*(args: seq[string]) =
   if execConfig.getChalkAsParent():
     if pid == 0:
       handleExec(allOpts, argsToPass)
+    elif pid == -1:
+      error("Chalk could not fork child process to exec " & cmdName)
+      setExitCode(1)
     else:
-      trace("Chalk is parent process.")
+      trace("Chalk is parent process. Child pid: " & $(pid))
       # add some sleep so that the child process has a chance to exec before
       # we try to collect data from it otherwise the process data collected
       # might be about the chalk binary instead of the target binary, which
@@ -257,6 +260,7 @@ proc runCmdExec*(args: seq[string]) =
       sleep(initialSleep)
 
       initCollection()
+      trace("Host collection finished.")
       let chalkOpt = doExecCollection(allOpts, pid)
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
@@ -270,7 +274,11 @@ proc runCmdExec*(args: seq[string]) =
         discard waitpid(pid, stat_loc, 0)
         setExitCode(WEXITSTATUS(stat_loc))
   else:
-    if pid != 0:
+    if pid == -1:
+      error("Chalk could not fork process for metadata collection. " &
+            "No chalk reports will be sent.")
+    elif pid != 0:
+      trace("Chalk is forking itself for metadata collection. Child pid: " & $(pid))
       handleExec(allOpts, argsToPass)
     else:
       trace("Chalk is child process.")
