@@ -38,15 +38,10 @@ when isMainModule:
   of "dump.params":        runCmdConfDumpParams()
   of "dump.cache":         runCmdConfDumpCache()
   of "load":               runCmdConfLoad()
-  of "logout":             runCmdLogout()
-  of "login":              runCmdLogin()
   of "config":             showConfigValues(force = true)
   of "version":            runCmdVersion()
   of "docker":             runCmdDocker(getArgs())
   of "exec":               runCmdExec(getArgs())
-  of "setup":              runCmdSetup(gen=true, load=true)
-  of "setup.gen":          runCmdSetup(gen=true, load=false)
-  of "setup.load":         runCmdSetup(gen=false, load=true)
   of "docgen":             runChalkDocGen() # in cmd_help
   else:
     runChalkHelp(getCommandName()) # noreturn, will not show config.

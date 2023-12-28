@@ -13,9 +13,9 @@ default_key_priority := 4611686018427387904  # 2^62.
 # These are the valid command-line commands.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "config",
                          "load", "dump", "docker", "version", "env", "exec",
-                         "setup", "login", "logout", "docgen"]
+                         "docgen"]
 
-all_cmds_that_insert := ["insert", "build", "load", "setup", "login", "logout"]
+all_cmds_that_insert := ["insert", "build", "load"]
 
 
 
@@ -2540,15 +2540,6 @@ generated.
 Chalk will also embed the keypairs internally, for future operations.
 """
 }
-
-  field api_login {
-    type:     bool
-    default:  true
-    shortdoc: "Use CrashOverride API"
-    doc: """
-Enable the use of the Crash Override API for secret management.
-"""
-  }
 
   field ignore_patterns {
     type:     list[string]

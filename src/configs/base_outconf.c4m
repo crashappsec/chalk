@@ -68,11 +68,6 @@ outconf docker {
   report_template:        "unknown_docker"
 }
 
-outconf login {
-  mark_template:          "mark_default"
-  report_template:        "insertion_default"
-}
-
 custom_report chalk_usage_stats {
   sink_configs:     []
   ~report_template: "usage"

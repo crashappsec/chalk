@@ -4980,7 +4980,7 @@ Also necessary for attestations.
 """
 }
 
-keyspec $CHALK_API_KEY {
+keyspec $CHALK_DATA_API_KEY {
    required_in_self_mark:  true
    kind:                   ChalkTimeArtifact
    type:                   string
