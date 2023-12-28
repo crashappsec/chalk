@@ -242,6 +242,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     filters:     seq[MsgFilter] = @[]
     opts                        = OrderedTableRef[string, string]()
     enabled:     bool           = true
+    priority:    int
     deleteList:  seq[string]
 
   for k, _ in attrs.contents:
@@ -250,6 +251,8 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       if not get[bool](attrs, k):
         error("Sink configuration '" & name & " is disabled.")
         enabled = false
+    of "priority":
+      priority    = getOpt[int](attrs, k).getOrElse(0)
     of "filters":
       filterNames = getOpt[seq[string]](attrs, k).getOrElse(@[])
     of "sink":
@@ -374,11 +377,12 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
   result = configSink(theSinkOpt.get(),
                       name,
                       some(opts),
-                      filters = filters,
-                      handler = errCbOpt,
-                      logger  = okCbOpt,
-                      auth    = authOpt,
-                      enabled = enabled)
+                      filters  = filters,
+                      handler  = errCbOpt,
+                      logger   = okCbOpt,
+                      auth     = authOpt,
+                      enabled  = enabled,
+                      priority = priority)
 
   if result.isSome():
     availableSinkConfigs[name] = result.get()
