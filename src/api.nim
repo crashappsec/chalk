@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import base64, config, httpclient, net, os, QRgen, terminal, uri
+import base64, config, httpclient, net, os, terminal, uri
 
 template jwtSplitAndDecode(jwtString: string, doDecode: bool): string =
   # this is pretty crude in terms of JWT structure validation to say the least
@@ -19,34 +19,34 @@ template jwtSplitAndDecode(jwtString: string, doDecode: bool): string =
   else:
     $(parts[1]) #apiJwtPayload
 
-proc refreshAccessToken*(refresh_token: string): string =
+# proc refreshAccessToken*(refresh_token: string): string =
 
-  # Mechanism to support access_token refresh via OIDC
-  let timeout:   int = cast[int](chalkConfig.getSecretManagerTimeout())
-  var
-      refresh_url = uri.parseUri(chalkConfig.getSecretManagerUrl())
-      context:           SslContext
-      client:            HttpClient
+#   # Mechanism to support access_token refresh via OIDC
+#   let timeout:   int = cast[int](chalkConfig.getSecretManagerTimeout())
+#   var
+#       refresh_url = uri.parseUri(chalkConfig.getSecretManagerUrl())
+#       context:           SslContext
+#       client:            HttpClient
 
-  refresh_url.path = "/api/refresh"
+#   refresh_url.path = "/api/refresh"
 
-  # request new access_token via refresh
-  info("Refreshing API access token....")
-  if refresh_url.scheme == "https":
-    context = newContext(verifyMode = CVerifyPeer)
-    client  = newHttpClient(sslContext = context, timeout = timeout)
-  else:
-    client  = newHttpClient(timeout = timeout)
-  let response  = client.safeRequest(url = refresh_url, httpMethod = HttpPost, body = $refresh_token)
-  client.close()
+#   # request new access_token via refresh
+#   info("Refreshing API access token....")
+#   if refresh_url.scheme == "https":
+#     context = newContext(verifyMode = CVerifyPeer)
+#     client  = newHttpClient(sslContext = context, timeout = timeout)
+#   else:
+#     client  = newHttpClient(timeout = timeout)
+#   let response  = client.safeRequest(url = refresh_url, httpMethod = HttpPost, body = $refresh_token)
+#   client.close()
 
-  if response.status.startswith("200"):
-    # parse json response and save / return values
-    let
-      jsonNode         = parseJson(response.body())
-      new_access_token = jsonNode["access_token"].getStr()
+#   if response.status.startswith("200"):
+#     # parse json response and save / return values
+#     let
+#       jsonNode         = parseJson(response.body())
+#       new_access_token = jsonNode["access_token"].getStr()
 
-    return new_access_token
+#     return new_access_token
 
 proc getChalkApiToken*(): (string, string) =
 
