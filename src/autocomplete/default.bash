@@ -143,6 +143,10 @@ function _chalk_toplevel_completions {
             _chalk_shift_one
             _chalk_docker_completions
             ;;
+        setup)
+            _chalk_shift_one
+            _chalk_setup_completions
+            ;;
         help)
             _chalk_shift_one
             _chalk_help_completions

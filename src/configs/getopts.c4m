@@ -651,6 +651,11 @@ with `.pub` as the file extension.
 """
   }
 
+  flag_yn api_login {
+    field_to_set: "api_login"
+    doc: """Enable/disable the use of the Crash Override API for secret management."""
+  }
+
   command gen {
     shortdoc: "Force generation of new signing key"
     doc: """

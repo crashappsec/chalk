@@ -6,7 +6,7 @@
 ##
 
 import base64, chalkjson, config, httpclient, net, os, selfextract, 
-       uri, nimutils/sinks
+       sinks, uri, nimutils/sinks
 
 const
   attestationObfuscator = staticExec(
@@ -100,7 +100,7 @@ generate_keypair(char **s1, char **s2) {
 ## not finished enough to replace what we already have.
 
 
-template callTheSecretService(base: string, prKey: string, apiToken: string, bodytxt: untyped,
+template callTheSecretService(base: string, prKey: string, bodytxt: untyped,
                               mth: untyped): Response =
   let
     timeout:  int    = cast[int](chalkConfig.getSecretManagerTimeout())
@@ -124,28 +124,45 @@ template callTheSecretService(base: string, prKey: string, apiToken: string, bod
   else:
     url = base & "/" & signingID
 
-  uri = parseUri(url)
+  #uri = parseUri(url)
 
-  if uri.scheme == "https":
-    context = newContext(verifyMode = CVerifyPeer)
-    client  = newHttpClient(sslContext = context, timeout = timeout)
-  else:
-    client  = newHttpClient(timeout = timeout)
+  # if uri.scheme == "https":
+  #   context = newContext(verifyMode = CVerifyPeer)
+  #   client  = newHttpClient(sslContext = context, timeout = timeout)
+  # else:
+  #   client  = newHttpClient(timeout = timeout)
 
   # add in API token obtained via user login process if set
-  if apiToken != "":
-    client.headers = newHttpHeaders(
-                                    {
-                                     "Authorization": "Bearer " & $apiToken
-                                    }
-                                    )
+  # if apiToken != "":
+  #   client.headers = newHttpHeaders(
+  #                                   {
+  #                                    "Authorization": "Bearer " & $apiToken
+  #                                   }
+  #                                   )
 
-  response  = client.safeRequest(url = uri, httpMethod = mth, body = bodytxt)
+  #response  = client.safeRequest(url = uri, httpMethod = mth, body = bodytxt)
 
+  # ToDo Rich - - Unhardcode the auth config name
+  let authOpt = getAuthConfigByName("crashoverride_test")
+  if authOpt.isNone():
+    error("Could not retrieve Chalk Data API token from config")
+    return false
+  var
+    auth = authOpt.get()
+    headers = newHttpHeaders()
+    authHeaders = auth.implementation.injectHeaders(auth, headers)
+
+  context = newContext(verifyMode = CVerifyPeer)
+  client  = newHttpClient(sslContext = context, timeout = timeout)
+  
+  uri = parseUri(url)
+  response = client.safeRequest(url = uri, headers = authHeaders)
+
+  # Cleanup & return from template
   client.close()
   response
 
-proc saveToSecretManager*(content: string, prkey: string, apiToken: string): bool =
+proc saveToSecretManager*(content: string, prkey: string): bool =
   var
     nonce:    string
     response: Response
@@ -159,7 +176,7 @@ proc saveToSecretManager*(content: string, prkey: string, apiToken: string): boo
     return false
 
   let body = nonce.hex() & ct.hex()
-  response = callTheSecretService(base, prkey, apiToken, body, HttpPut)
+  response = callTheSecretService(base, prkey, body, HttpPut)
 
   trace("Sending encrypted secret: " & body)
   if response.status.startswith("405"):
@@ -173,17 +190,20 @@ proc saveToSecretManager*(content: string, prkey: string, apiToken: string): boo
     warn("Please Note: Secrets that have not been READ in the previous 30 days will be deleted!")
   return true
 
-proc loadFromSecretManager*(prkey: string, apikey: string): bool =
+proc loadFromSecretManager*(prkey: string): bool =
 
   if cosignPw != "":
     return true
 
   let base: string = chalkConfig.getSecretManagerUrl()
 
-  if len(base) == 0 or prkey == "" or apikey == "":
+  #let apikey = authOpt.get()
+  #let apikey = "foobar"
+
+  if len(base) == 0 or prkey == "": # or authOpt.isNone(): # apikey == "":
     return false
 
-  let response = callTheSecretService(base, prKey, apikey, "", HttpGet)
+  let response = callTheSecretService(base, prKey, "", HttpGet)
 
   # Check for error conditions in response
   if response.status[0] != '2':
@@ -309,14 +329,14 @@ proc generateKeyMaterial*(cosign: string): bool =
   else:
     return true
 
-proc commitPassword(pri, apiToken: string, gen: bool) =
+proc commitPassword(pri: string, gen: bool) =
   var
     storeIt = chalkConfig.getUseSecretManager()
     printIt = not storeIt
 
   if storeIt:
     # If the manager doesn't work, then we need to fall back.
-    if not cosignPw.saveToSecretManager(pri, apiToken):
+    if not cosignPw.saveToSecretManager(pri):
       error("Could not store password. Either try again later, or " &
         "use the below password with the CHALK_PASSWORD environment " &
         "variable. We attempt to store as long as use_secret_manager is " &
@@ -373,20 +393,23 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
   #   trace("Chalk Data API token retrieved from chalk mark: " & $apikey)
 
   # TODO - dynamically work out what auth config we need to grab?
-  let authOpt = getAuthConfigByName("crashoverride_test")
-  if authOpt.isNone():
-    error("Could not retrieve Chalk Data API token from config")
-    return false
-  let
-    apikey = authOpt.get()
+  # let authOpt = getAuthConfigByName("crashoverride_test")
+  # if authOpt.isNone():
+  #   error("Could not retrieve Chalk Data API token from config")
+  #   return false
+  # let
+  #   apikey = authOpt.get()
     #headers = newHttpHeaders()
     #authHeaders = auth.implementation.injectHeaders(headers)
     #client = newHttpClient(...)
     #client.safeRequest(url, headers = authHeaders)
 
+
+  #let apikey = "asdfghj"
+
   # Use Chalk Data API key to retrieve previously saved encrypted secret 
   #  from API, then use retrieved private key to decrypt
-  if loadFromSecretManager(prikey, apikey):
+  if loadFromSecretManager(prikey):
     return true
   else:
     error("Could not retrieve secret from API")
@@ -439,7 +462,7 @@ proc testSigningSetup(pubKey, priKey: string): bool =
 
 proc writeSelfConfig(selfChalk: ChalkObj): bool {.importc, discardable.}
 
-proc saveSigningSetup(pubKey, priKey, apiToken, refreshToken: string, gen: bool): bool =
+proc saveSigningSetup(pubKey, priKey: string, gen: bool): bool =
   let selfChalk = getSelfExtraction().get()
 
   selfChalk.extract["$CHALK_ENCRYPTED_PRIVATE_KEY"] = pack(priKey)
@@ -448,7 +471,7 @@ proc saveSigningSetup(pubKey, priKey, apiToken, refreshToken: string, gen: bool)
     # selfChalk.extract["$CHALK_DATA_API_KEY"]             = pack(apiToken)
     # selfChalk.extract["$CHALK_API_REFRESH_TOKEN"]   = pack(refreshToken)
 
-  commitPassword(prikey, apiToken, gen)
+  commitPassword(priKey, gen)
 
   when false:
     # This is old code, but it might make a comeback at some point,
@@ -565,7 +588,7 @@ proc attemptToGenKeys*(): bool =
   let use_api    = chalkConfig.getApiLogin()
 
   # get Chalk Data API token
-  if use_api:
+  #if use_api:
     # Possible we already have API keys chalked into ourself
     # refresh token 
     # let boxedOptRefresh = selfChalkGetKey("$CHALK_API_REFRESH_TOKEN")
@@ -584,12 +607,14 @@ proc attemptToGenKeys*(): bool =
     #   trace("empty access token")
     
     # TODO - dynamically work out what auth config we need to grab?
-    let authOpt = getAuthConfigByName("crashoverride_test")
-    if authOpt.isNone():
-      error("Could not retrieve Chalk Data API token from config")
-      return false
-    let
-      apiToken = authOpt.get()
+    # let authOpt = getAuthConfigByName("crashoverride_test")
+    # if authOpt.isNone():
+    #   error("Could not retrieve Chalk Data API token from config")
+    #   return false
+    # let
+    #   apiToken = authOpt.get()
+    #let
+    #  apiToken = "foobar"
 
     # else:
     #   trace("empty refresh token")
@@ -601,11 +626,11 @@ proc attemptToGenKeys*(): bool =
     #   if apiToken == "" or refreshToken == "":
     #     trace("Unable to retrieve API access token.")
     #     return false
-    if apiToken == "":
-        trace("Unable to retrieve API access token.")
-        return false
-    else:
-      trace("API Token received: " & apiToken)
+    #if apiToken == "":
+    #    trace("Unable to retrieve API access token.")
+    #    return false
+    #else:
+    #  trace("API Token received: " & apiToken)
       # trace("Refresh Token received: " & refreshToken)
 
 
@@ -640,9 +665,9 @@ proc attemptToGenKeys*(): bool =
     cosignLoaded = true
 
     if use_api:
-      result = saveSigningSetup(pubKey, priKey, apiToken, refreshToken, true)
+      result = saveSigningSetup(pubKey, priKey, true)
     else:
-      result = saveSigningSetup(pubKey, priKey, "", "", true)
+      result = saveSigningSetup(pubKey, priKey, true)
 
 proc canAttest*(): bool =
   if getCosignLocation() == "":
