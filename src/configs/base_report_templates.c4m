@@ -1667,6 +1667,9 @@ report_template push_default {
   You can certainly collect a lot more data here, but we expect it
   should usually be redundant w/ the info you collected during a build.
 """
+  key._ACTION_ID.use                          = true
+  key._TIMESTAMP.use                          = true
+  key._DATETIME.use                           = true
   key._OPERATION.use                          = true
   ~key._CURRENT_HASH.use                      = true
   key._STORE_URI.use                          = true
