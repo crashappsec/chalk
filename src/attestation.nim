@@ -509,9 +509,7 @@ proc attemptToLoadKeys*(silent=false): bool =
   return true
 
 proc attemptToGenKeys*(): bool =
-  var 
-    apiToken     = ""
-    # refreshToken = ""
+  var apiToken     = ""
   let use_api    = chalkConfig.getApiLogin()
 
   if getCosignLocation() == "":
@@ -544,11 +542,8 @@ proc attemptToGenKeys*(): bool =
     copyGeneratedKeys(pubKey, priKey, keyOutLoc)
     cosignLoaded = true
 
-    if use_api:
-      result = saveSigningSetup(pubKey, priKey, true)
-    else:
-      result = saveSigningSetup(pubKey, priKey, true)
-
+    result = saveSigningSetup(pubKey, priKey, true)
+    
 proc canAttest*(): bool =
   if getCosignLocation() == "":
     return false
