@@ -179,7 +179,7 @@ proc loadFromSecretManager*(prkey: string): bool =
 
   let base: string = chalkConfig.getSecretManagerUrl()
 
-  if len(base) == 0 or prkey == "": # or authOpt.isNone(): # apikey == "":
+  if len(base) == 0 or prkey == "":
     return false
 
   let response = callTheSecretService(base, prKey, "", HttpGet)
@@ -515,11 +515,8 @@ proc attemptToGenKeys*(): bool =
   if getCosignLocation() == "":
     return false
 
-  let
-    keyOutLoc = getKeyFileLoc()
-    # Any relative path needs to be resolved before we push the temp
-    # dir.
-
+  let keyOutLoc = getKeyFileLoc()
+  
   if keyOutLoc == "":
     return false
 
