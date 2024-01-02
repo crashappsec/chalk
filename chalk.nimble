@@ -10,7 +10,6 @@ bin           = @["chalk"]
 requires "nim >= 2.0.0"
 requires "https://github.com/crashappsec/con4m#a067d04cd7c5e11b633c8d1a284c42076939637c"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
-# requires "https://github.com/aruZeta/QRgen == 3.0.0" # MIT
 
 import std/strformat, strutils
 
