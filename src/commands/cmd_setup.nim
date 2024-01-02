@@ -49,3 +49,4 @@ proc runCmdSetup*(gen, load: bool) =
   else:
     error("Failed to generate signing keys. Aborting.")
     quitChalk(1)
+    

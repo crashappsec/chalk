@@ -100,7 +100,7 @@ generate_keypair(char **s1, char **s2) {
 ## not finished enough to replace what we already have.
 
 
-template callTheSecretService(base: string, prKey: string, bodytxt: untyped,
+template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: untyped,
                               mth: untyped): Response =
   let
     timeout:  int    = cast[int](chalkConfig.getSecretManagerTimeout())
@@ -115,9 +115,9 @@ template callTheSecretService(base: string, prKey: string, bodytxt: untyped,
   signingID = sha256Hex(attestationObfuscator & prkey)
 
   if mth == HttPGet:
-    trace("Calling secret manager to retrieve key with id: " & signingID)
+    trace("Calling Signing Key Backup Service to retrieve key with ID: " & signingID)
   else:
-    trace("Calling secret manager to store key with id: " & signingID)
+    trace("Calling Signing Key Backup Service to store key with iD: " & signingID)
 
   if base[^1] == '/':
     url = base & signingID
@@ -127,24 +127,29 @@ template callTheSecretService(base: string, prKey: string, bodytxt: untyped,
   # ToDo Rich - - Unhardcode the auth config name
   let authOpt = getAuthConfigByName("crashoverride_test")
   if authOpt.isNone():
-    error("Could not retrieve Chalk Data API token from config")
+    error("Could not retrieve Chalk Data API token from configuration profile. Unable to use Signing Key Backup Service.")
     return false
   var
     auth = authOpt.get()
     headers = newHttpHeaders()
     authHeaders = auth.implementation.injectHeaders(auth, headers)
 
-  context = newContext(verifyMode = CVerifyPeer)
-  client  = newHttpClient(sslContext = context, timeout = timeout)
-  
-  uri = parseUri(url)
-  response = client.safeRequest(url = uri, headers = authHeaders)
+  # Call the API with authz header
+  uri       = parseUri(url)
+  context   = newContext(verifyMode = CVerifyPeer)
+  client    = newHttpClient(sslContext = context, timeout = timeout)
+  response  = client.safeRequest(url = uri, httpMethod = mth, headers = authHeaders, body = bodytxt)
+
+  trace("Signing Key Backup Service URL: " & $uri)  
+  trace("Signing Key Backup Service HTTP headers: " & $authHeaders)
+  trace("Signing Key Backup Service status code: " & response.status)
+  trace("Signing Key Backup Service response: " & response.body)
 
   # Cleanup & return from template
   client.close()
   response
 
-proc saveToSecretManager*(content: string, prkey: string): bool =
+proc backupSigningKeyToService*(content: string, prkey: string): bool =
   var
     nonce:    string
     response: Response
@@ -154,25 +159,25 @@ proc saveToSecretManager*(content: string, prkey: string): bool =
     ct    = prp(attestationObfuscator, cosignPw, nonce)
 
   if len(base) == 0:
-    error("Cannot save secret; no secret manager URL configured.")
+    error("Cannot backup signing key; no Signing Key Backup Service URL configured.")
     return false
 
   let body = nonce.hex() & ct.hex()
-  response = callTheSecretService(base, prkey, body, HttpPut)
+  response = callTheSigningKeyBackupService(base, prkey, body, HttpPut)
 
-  trace("Sending encrypted secret: " & body)
+  trace("Sending encrypted signing key: " & body)
   if response.status.startswith("405"):
-    info("This secret is already saved.")
+    info("This encrypted signing key is already backed up.")
   elif response.status[0] != '2':
-    error("When attempting to save signing secret: " & response.status)
+    error("When attempting to save envcrypted signing key: " & response.status)
     trace(response.body())
     return false
   else:
-    info("Successfully stored secret.")
-    warn("Please Note: Secrets that have not been READ in the previous 30 days will be deleted!")
+    info("Successfully stored encrypted signing key.")
+    warn("Please Note: Encrypted signing keys that have not been READ in the previous 30 days will be deleted!")
   return true
 
-proc loadFromSecretManager*(prkey: string): bool =
+proc restoreSigningKeyFromService*(prkey: string): bool =
 
   if cosignPw != "":
     return true
@@ -182,7 +187,7 @@ proc loadFromSecretManager*(prkey: string): bool =
   if len(base) == 0 or prkey == "":
     return false
 
-  let response = callTheSecretService(base, prKey, "", HttpGet)
+  let response = callTheSigningKeyBackupService(base, prKey, "", HttpGet)
 
   # Check for error conditions in response
   if response.status[0] != '2':
@@ -190,11 +195,9 @@ proc loadFromSecretManager*(prkey: string): bool =
     if response.status.startswith("401"):
       # parse json response and save / return values()
       let jsonNodeReason = parseJson(response.body())
-      let reasonCode     = jsonNodeReason["Message"].getStr()
-
+      trace("JSON body of response from Signing key Backup Service: " & $jsonNodeReason)
     else:
-      warn("Could not retrieve signing secret: " & response.status & "\n" &
-        "Will not be able to sign / verify.")
+      warn("Could not retrieve encrypted signing key: " & response.status & "\n" & "Will not be able to sign / verify.")
       return false
 
   var
@@ -292,7 +295,7 @@ proc commitPassword(pri: string, gen: bool) =
 
   if storeIt:
     # If the manager doesn't work, then we need to fall back.
-    if not cosignPw.saveToSecretManager(pri):
+    if not cosignPw.backupSigningKeyToService(pri):
       error("Could not store password. Either try again later, or " &
         "use the below password with the CHALK_PASSWORD environment " &
         "variable. We attempt to store as long as use_secret_manager is " &
@@ -342,10 +345,10 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
 
   # Use Chalk Data API key to retrieve previously saved encrypted secret 
   #  from API, then use retrieved private key to decrypt
-  if loadFromSecretManager(prikey):
+  if restoreSigningKeyFromService(prikey):
     return true
   else:
-    error("Could not retrieve secret from API")
+    error("Could not retrieve encrypted signing key from API")
     return false
 
 proc testSigningSetup(pubKey, priKey: string): bool =
@@ -509,8 +512,6 @@ proc attemptToLoadKeys*(silent=false): bool =
   return true
 
 proc attemptToGenKeys*(): bool =
-  var apiToken     = ""
-  let use_api    = chalkConfig.getApiLogin()
 
   if getCosignLocation() == "":
     return false
