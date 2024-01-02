@@ -124,24 +124,6 @@ template callTheSecretService(base: string, prKey: string, bodytxt: untyped,
   else:
     url = base & "/" & signingID
 
-  #uri = parseUri(url)
-
-  # if uri.scheme == "https":
-  #   context = newContext(verifyMode = CVerifyPeer)
-  #   client  = newHttpClient(sslContext = context, timeout = timeout)
-  # else:
-  #   client  = newHttpClient(timeout = timeout)
-
-  # add in API token obtained via user login process if set
-  # if apiToken != "":
-  #   client.headers = newHttpHeaders(
-  #                                   {
-  #                                    "Authorization": "Bearer " & $apiToken
-  #                                   }
-  #                                   )
-
-  #response  = client.safeRequest(url = uri, httpMethod = mth, body = bodytxt)
-
   # ToDo Rich - - Unhardcode the auth config name
   let authOpt = getAuthConfigByName("crashoverride_test")
   if authOpt.isNone():
@@ -197,9 +179,6 @@ proc loadFromSecretManager*(prkey: string): bool =
 
   let base: string = chalkConfig.getSecretManagerUrl()
 
-  #let apikey = authOpt.get()
-  #let apikey = "foobar"
-
   if len(base) == 0 or prkey == "": # or authOpt.isNone(): # apikey == "":
     return false
 
@@ -213,29 +192,6 @@ proc loadFromSecretManager*(prkey: string): bool =
       let jsonNodeReason = parseJson(response.body())
       let reasonCode     = jsonNodeReason["Message"].getStr()
 
-      # Refresh token support removed for now
-      #
-      # if reasonCode.startswith("token_expired"):
-      #   info("API access token expired, refreshing ...")
-      #   # Remove current API token from self chalk mark
-      #   selfChalk.extract["$CHALK_DATA_API_KEY"] = pack("")
-
-      #   # refresh access_token 
-      #   let boxedOptRefresh = selfChalkGetKey("$CHALK_API_REFRESH_TOKEN")
-      #   if boxedOptRefresh.isSome():
-      #     let
-      #       boxedRefresh  = boxedOptRefresh.get()
-      #       refreshToken = unpack[string](boxedRefresh)
-      #     trace("Refresh token retrieved from chalk mark: " & $refreshToken)
-
-      #     let newApiToken = refreshAccessToken($refreshToken)
-      #     if newApiToken == "":
-      #       return false
-      #     else:
-      #       trace("API Token refreshed: " & newApiToken)
-      #       #save new api token to self chalk mark
-      #       selfChalk.extract["$CHALK_DATA_API_KEY"] = pack($newApiToken)
-      #       return loadFromSecretManager(prkey, $newApiToken)
     else:
       warn("Could not retrieve signing secret: " & response.status & "\n" &
         "Will not be able to sign / verify.")
@@ -384,29 +340,6 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
     if prikey == "":
       return false
 
-  # get Chalk Data API key to pass to secret manager for access
-  # let boxedOptApi = selfChalkGetKey("$CHALK_DATA_API_KEY")
-  # if boxedOptApi.isSome():
-  #   let
-  #      boxedApi = boxedOptApi.get()
-  #      apikey   = unpack[string](boxedApi)
-  #   trace("Chalk Data API token retrieved from chalk mark: " & $apikey)
-
-  # TODO - dynamically work out what auth config we need to grab?
-  # let authOpt = getAuthConfigByName("crashoverride_test")
-  # if authOpt.isNone():
-  #   error("Could not retrieve Chalk Data API token from config")
-  #   return false
-  # let
-  #   apikey = authOpt.get()
-    #headers = newHttpHeaders()
-    #authHeaders = auth.implementation.injectHeaders(headers)
-    #client = newHttpClient(...)
-    #client.safeRequest(url, headers = authHeaders)
-
-
-  #let apikey = "asdfghj"
-
   # Use Chalk Data API key to retrieve previously saved encrypted secret 
   #  from API, then use retrieved private key to decrypt
   if loadFromSecretManager(prikey):
@@ -414,9 +347,6 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
   else:
     error("Could not retrieve secret from API")
     return false
-
-  # error("Could not retrieve API token from chalk mark")
-  # return false
 
 proc testSigningSetup(pubKey, priKey: string): bool =
   cosignTempDir = getNewTempDir()
@@ -467,9 +397,6 @@ proc saveSigningSetup(pubKey, priKey: string, gen: bool): bool =
 
   selfChalk.extract["$CHALK_ENCRYPTED_PRIVATE_KEY"] = pack(priKey)
   selfChalk.extract["$CHALK_PUBLIC_KEY"]            = pack(pubKey)
-  #if apiToken != "":
-    # selfChalk.extract["$CHALK_DATA_API_KEY"]             = pack(apiToken)
-    # selfChalk.extract["$CHALK_API_REFRESH_TOKEN"]   = pack(refreshToken)
 
   commitPassword(priKey, gen)
 
@@ -586,53 +513,6 @@ proc attemptToGenKeys*(): bool =
     apiToken     = ""
     # refreshToken = ""
   let use_api    = chalkConfig.getApiLogin()
-
-  # get Chalk Data API token
-  #if use_api:
-    # Possible we already have API keys chalked into ourself
-    # refresh token 
-    # let boxedOptRefresh = selfChalkGetKey("$CHALK_API_REFRESH_TOKEN")
-    # if boxedOptRefresh.isSome():
-    #   let boxedRefresh  = boxedOptRefresh.get()
-    #   refreshToken = unpack[string](boxedRefresh)
-    #   trace("Refresh token retrieved from chalk mark: " & $refreshToken)
-    
-    # get chalk data api access_token
-    # let boxedOptAccess = selfChalkGetKey("$CHALK_DATA_API_KEY")
-    # if boxedOptAccess.isSome():
-    #   let boxedAccess  = boxedOptAccess.get()
-    #   apiToken = unpack[string](boxedAccess)
-    #   trace("Access token retrieved from chalk mark: " & $apiToken)
-    # else:
-    #   trace("empty access token")
-    
-    # TODO - dynamically work out what auth config we need to grab?
-    # let authOpt = getAuthConfigByName("crashoverride_test")
-    # if authOpt.isNone():
-    #   error("Could not retrieve Chalk Data API token from config")
-    #   return false
-    # let
-    #   apiToken = authOpt.get()
-    #let
-    #  apiToken = "foobar"
-
-    # else:
-    #   trace("empty refresh token")
-    
-    # if apiToken == "" or refreshToken == "":
-    #   # could not retreive so requesting new
-    #   trace("Missing token, starting new login..." & apiToken)
-    #   (apiToken, refreshToken) = getChalkApiToken()
-    #   if apiToken == "" or refreshToken == "":
-    #     trace("Unable to retrieve API access token.")
-    #     return false
-    #if apiToken == "":
-    #    trace("Unable to retrieve API access token.")
-    #    return false
-    #else:
-    #  trace("API Token received: " & apiToken)
-      # trace("Refresh Token received: " & refreshToken)
-
 
   if getCosignLocation() == "":
     return false
