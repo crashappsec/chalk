@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -48,15 +48,16 @@ proc restoreTerminal() {.noconv.} =
   tcSetAttr(cint(1), TcsaConst.TCSAFLUSH, savedTermState)
 
 proc regularTerminationSignal(signal: cint) {.noconv.} =
+  let pid = getpid()
   try:
-    error("Aborting due to signal: " & sigNameMap[signal] & "(" & $(signal) &
-      ")")
+    error("pid: " & $(pid) & " - Aborting due to signal: " &
+          sigNameMap[signal] & "(" & $(signal) & ")")
     if chalkConfig.getChalkDebug():
       publish("debug", "Stack trace: \n" & getStackTrace())
 
   except:
-    echo "Aborting due to signal: " & sigNameMap[signal]  & "(" & $(signal) &
-      ")"
+    echo("pid: " & $(pid) & " - Aborting due to signal: " &
+         sigNameMap[signal]  & "(" & $(signal) & ")")
     dumpExOnDebug()
   var sigset:  SigSet
 

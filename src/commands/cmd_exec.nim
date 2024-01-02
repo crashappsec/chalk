@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -9,6 +9,9 @@
 
 import posix, ../config, ../collect, ../util, ../reporting, ../chalkjson,
        ../plugin_api
+
+# this const is not available in nim stdlib hence manual c import
+var TIOCNOTTY {.importc, header: "sys/ioctl.h"}: cuint
 
 when hostOs == "macosx":
   proc proc_pidpath(pid: Pid, pathbuf: pointer, len: uint32): cint
@@ -246,7 +249,7 @@ proc runCmdExec*(args: seq[string]) =
       error("Chalk could not fork child process to exec " & cmdName)
       setExitCode(1)
     else:
-      trace("Chalk is parent process. Child pid: " & $(pid))
+      trace("Chalk is parent process: " & $(ppid) & ". Child pid: " & $(pid))
       # add some sleep so that the child process has a chance to exec before
       # we try to collect data from it otherwise the process data collected
       # might be about the chalk binary instead of the target binary, which
@@ -278,10 +281,13 @@ proc runCmdExec*(args: seq[string]) =
       error("Chalk could not fork process for metadata collection. " &
             "No chalk reports will be sent.")
     elif pid != 0:
-      trace("Chalk is forking itself for metadata collection. Child pid: " & $(pid))
+      trace("Chalk is forking itself for metadata collection. " &
+            "Exec pid: " & $(ppid) & " " &
+            "Child pid: " & $(pid))
       handleExec(allOpts, argsToPass)
     else:
-      trace("Chalk is child process.")
+      let cpid = getpid() # get pid after fork of child process
+      trace("Chalk is child process: " & $(cpid))
 
       let
         inMicroSec   = int(execConfig.getInitialSleepTime())
@@ -293,6 +299,11 @@ proc runCmdExec*(args: seq[string]) =
       trace("Host collection finished.")
       let chalkOpt = doExecCollection(allOpts, ppid)
       discard setpgid(0, 0) # Detach from the process group.
+      if isatty(0) != 0:
+        # if stdin is TTY, detach from it in child process
+        # otherwise child process will receive HUP signal
+        # on exit which is not expected
+        discard ioctl(0, TIOCNOTTY) # Detach TTY for stdin
       # On some platforms we don't support
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
