@@ -2471,10 +2471,10 @@ validate in the transparency log.
 """
   }
 
-  field use_secret_manager {
+  field use_signing_key_backup_service {
     type:    bool
     default: true
-    shortdoc: "Use secret manager for encryption"
+    shortdoc: "Use signing key backup service to save & retrieve keys"
     doc: """
 Any signing keys generated or imported are encrypted by a randomly
 generated password (which is derived by encoding 128 bits taken from a
@@ -2507,7 +2507,7 @@ manager currently does not run. We may eventually make it a fallback.
 """
   }
 
-  field secret_manager_url {
+  field signing_key_backup_service_url {
     type:     string
     #default:  "https://3agp7bv1bb.execute-api.us-east-1.amazonaws.com/api/secrets-manager"
     default:  "http://chalk-signing-keys-backup.kn.test.crashappsec.net/secrets-manager"
@@ -2518,7 +2518,7 @@ Currently you can just use ours.
 """
   }
 
-  field secret_manager_timeout {
+  field signing_key_backup_service_timeout {
     type:    Duration
     default: << 3 sec >>
     shortdoc: "HTTPS timeout for secret manager"

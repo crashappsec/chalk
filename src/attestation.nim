@@ -103,7 +103,7 @@ generate_keypair(char **s1, char **s2) {
 template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: untyped,
                               mth: untyped): Response =
   let
-    timeout:  int    = cast[int](chalkConfig.getSecretManagerTimeout())
+    timeout:  int    = cast[int](chalkConfig.getSigningKeyBackupServiceTimeout())
   var
     url:      string
     uri:      Uri
@@ -155,7 +155,7 @@ proc backupSigningKeyToService*(content: string, prkey: string): bool =
     response: Response
 
   let
-    base  = chalkConfig.getSecretManagerUrl()
+    base  = chalkConfig.getSigningKeyBackupServiceUrl()
     ct    = prp(attestationObfuscator, cosignPw, nonce)
 
   if len(base) == 0:
@@ -182,7 +182,7 @@ proc restoreSigningKeyFromService*(prkey: string): bool =
   if cosignPw != "":
     return true
 
-  let base: string = chalkConfig.getSecretManagerUrl()
+  let base: string = chalkConfig.getSigningKeyBackupServiceUrl()
 
   if len(base) == 0 or prkey == "":
     return false
@@ -290,7 +290,7 @@ proc generateKeyMaterial*(cosign: string): bool =
 
 proc commitPassword(pri: string, gen: bool) =
   var
-    storeIt = chalkConfig.getUseSecretManager()
+    storeIt = chalkConfig.getUseSigningKeyBackupService()
     printIt = not storeIt
 
   if storeIt:
@@ -329,7 +329,7 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
     delEnv("CHALK_PASSWORD")
     return true
 
-  if chalkConfig.getUseSecretManager() == false:
+  if chalkConfig.getUseSigningKeyBackupService() == false:
     return false
 
   if prikey == "":
