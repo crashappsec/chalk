@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -1361,6 +1361,22 @@ If, when wrapping, your chalk binary is using an external
 configuration file, that file will NOT get used inside the
 container. The wrapped binary currently only uses the embedded
 configuration present in the binary in the time of the wrapping.
+"""
+  }
+
+  field wrap_cmd {
+    type:    bool
+    default: false
+    shortdoc: "Wrap image CMD, when ENTRYPOINT is missing"
+    doc:     """
+Similar to `wrap_entrypoint` except when Dockerfile does not have `ENTRYPOINT`,
+whether to wrap `CMD` instead.
+
+Note that enabling this option can potentially break image functionality
+as base images can define `ENTRYPOINT` which might expect specific format for `CMD`.
+This config should only be enabled when `ENTRYPOINT` is able to execute arbitrary
+scripts which is usually default docker `ENTRYPOINT` in most cases.
+Example where this might not be the case are docker images for AWS lambda functions.
 """
   }
 
