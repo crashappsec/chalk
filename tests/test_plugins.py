@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Crash Override, Inc.
+# Copyright (c) 2023-2024, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -126,9 +126,8 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
     )
 
 
-@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_imds(
     copy_files: list[Path],
     chalk: Chalk,
@@ -138,7 +137,12 @@ def test_imds(
     # make imds plugin think we are running in EC2
     tmp_file.write_text("Amazon")
     bin_path = copy_files[0]
-    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m", log_level="trace")
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "imds.c4m",
+        log_level="trace",
+        env={"VENDOR": str(tmp_file)},
+    )
     assert insert.report.contains(
         {
             "_OP_CLOUD_PROVIDER": "aws",
@@ -247,7 +251,6 @@ def test_ecs(
 def test_lambda(
     copy_files: list[Path],
     chalk: Chalk,
-    server_imds: str,
 ):
     bin_path = copy_files[0]
     insert = chalk.insert(
@@ -299,7 +302,7 @@ def test_lambda(
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_imds_ecs(
     copy_files: list[Path],
     chalk: Chalk,
@@ -312,7 +315,10 @@ def test_imds_ecs(
     insert = chalk.insert(
         bin_path,
         config=CONFIGS / "imds.c4m",
-        env={"ECS_CONTAINER_METADATA_URI": "foobar"},
+        env={
+            "ECS_CONTAINER_METADATA_URI": "foobar",
+            "VENDOR": str(tmp_file),
+        },
     )
     assert insert.report.contains(
         {
@@ -330,9 +336,8 @@ def test_imds_ecs(
     )
 
 
-@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_imds_eks(
     copy_files: list[Path],
     chalk: Chalk,
@@ -347,6 +352,7 @@ def test_imds_eks(
         config=CONFIGS / "imds.c4m",
         env={
             "KUBERNETES_PORT": "tests",
+            "VENDOR": str(tmp_file),
         },
     )
     assert insert.report.contains(
@@ -357,9 +363,8 @@ def test_imds_eks(
     )
 
 
-@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_metadata_azure(
     copy_files: list[Path],
     chalk: Chalk,
@@ -369,7 +374,13 @@ def test_metadata_azure(
     # make imds plugin think we are running in EC2
     tmp_file.write_text("Microsoft Corporation")
     bin_path = copy_files[0]
-    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "imds.c4m",
+        env={
+            "VENDOR": str(tmp_file),
+        },
+    )
     assert insert.report.contains(
         {
             "_OP_CLOUD_PROVIDER": "azure",
@@ -479,9 +490,8 @@ def test_metadata_azure(
     )
 
 
-@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_metadata_gcp(
     copy_files: list[Path],
     chalk: Chalk,
@@ -491,7 +501,11 @@ def test_metadata_gcp(
     # make imds plugin think we are running in EC2
     tmp_file.write_text("Google")
     bin_path = copy_files[0]
-    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "imds.c4m",
+        env={"VENDOR": str(tmp_file)},
+    )
     assert insert.report.contains(
         {
             "_OP_CLOUD_PROVIDER": "gcp",
