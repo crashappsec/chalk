@@ -298,8 +298,8 @@ proc commitPassword(pri: string, gen: bool) =
     if not cosignPw.backupSigningKeyToService(pri):
       error("Could not store password. Either try again later, or " &
         "use the below password with the CHALK_PASSWORD environment " &
-        "variable. We attempt to store as long as use_secret_manager is " &
-        "true.\nIf you forget the password, delete chalk.key and " &
+        "variable. We attempt to store as long as use_signing_key_backup_service " &
+        "is true.\nIf you forget the password, delete chalk.key and " &
         "chalk.pub before rerunning.")
 
       if gen:
