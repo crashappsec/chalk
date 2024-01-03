@@ -2509,8 +2509,7 @@ manager currently does not run. We may eventually make it a fallback.
 
   field signing_key_backup_service_url {
     type:     string
-    #default:  "https://3agp7bv1bb.execute-api.us-east-1.amazonaws.com/api/secrets-manager"
-    default:  "http://chalk-signing-keys-backup.kn.test.crashappsec.net/secrets-manager"
+    default:  "http://chalk-signing-keys-backup.kn.test.crashappsec.net/signing-key-backup"
     hidden:   true
     shortdoc: "URL for secret manager API"
     doc: """
