@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from .chalk.runner import Chalk
-from .conf import CONFIGS, LS_PATH
+from .conf import LS_PATH
 from .utils.log import get_logger
 
 
@@ -37,6 +37,7 @@ def get_current_config(tmp_data_dir: Path, chalk: Chalk) -> str:
     ],
 )
 def test_composable_valid(
+    configs: Path,
     tmp_data_dir: Path,
     copy_files: list[Path],
     chalk_copy: Chalk,
@@ -45,7 +46,7 @@ def test_composable_valid(
 ):
     # load the composable config
     _load = chalk_copy.load(
-        config=(CONFIGS / test_config_file).absolute(),
+        config=(configs / test_config_file).absolute(),
         replace=replace,
         stdin=b"\n" * 2**15,
     )
@@ -59,13 +60,13 @@ def test_composable_valid(
 
     if replace:
         # replaces current config with content of incoming
-        original_config = (CONFIGS / test_config_file).read_text()
+        original_config = (configs / test_config_file).read_text()
         assert current_config == original_config
     else:
         # adds incoming as component
         # expecting output config has `use xxx from yyy`
-        config_name = (CONFIGS / test_config_file).stem
-        config_path = str((CONFIGS / test_config_file).parent)
+        config_name = (configs / test_config_file).stem
+        config_path = str((configs / test_config_file).parent)
         use_output = f'use {config_name} from "{config_path}"'
         assert use_output in current_config
 
@@ -82,6 +83,7 @@ def test_composable_valid(
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_composable_multiple(
+    configs: Path,
     tmp_data_dir: Path,
     copy_files: list[Path],
     chalk_copy: Chalk,
@@ -89,9 +91,9 @@ def test_composable_multiple(
     # if we load multiple valid configs in a row
     # they should all show up in chalk dump
     sample_configs = [
-        CONFIGS / "composable/valid/multiple/sample_1.c4m",
-        CONFIGS / "composable/valid/multiple/sample_2.c4m",
-        CONFIGS / "composable/valid/multiple/sample_3.c4m",
+        configs / "composable/valid/multiple/sample_1.c4m",
+        configs / "composable/valid/multiple/sample_2.c4m",
+        configs / "composable/valid/multiple/sample_3.c4m",
     ]
 
     # successively load all of them
@@ -154,6 +156,7 @@ def test_composable_multiple(
     ],
 )
 def test_composable_invalid(
+    configs: Path,
     test_config_file: str,
     expected_error: str,
     chalk_copy: Chalk,
@@ -161,7 +164,7 @@ def test_composable_invalid(
 ):
     # load the composable config
     _load = chalk_copy.load(
-        config=(CONFIGS / test_config_file).absolute(),
+        config=(configs / test_config_file).absolute(),
         replace=replace,
         stdin=b"\n" * 2**15,
         log_level="error",
@@ -184,10 +187,14 @@ def test_composable_invalid(
     ],
 )
 def test_composable_reload(
-    tmp_data_dir: Path, chalk_copy: Chalk, test_config_file: str, replace: bool
+    configs: Path,
+    tmp_data_dir: Path,
+    chalk_copy: Chalk,
+    test_config_file: str,
+    replace: bool,
 ):
     # load sample valid config
-    config = CONFIGS / test_config_file
+    config = configs / test_config_file
     chalk_copy.load(
         config=config.absolute(),
         replace=replace,

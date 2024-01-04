@@ -36,6 +36,6 @@ macro loadPlugins(list: static[openarray[string]]): untyped =
 
 loadPlugins(["codecDocker", "codecElf", "codecMacOs", "codecPythonPyc",
              "codecSource", "codecZip", "codecFallbackElf",
-             "ciGithub", "ciGitlab", "ciJenkins", "conffile", "ecs",
+             "ciGithub", "ciGitlab", "ciJenkins", "conffile", "awsEcs", "awsLambda",
              "externalTool", "cloudMetadata", "ownerAuthors", "ownerGithub",
              "procfs", "system", "vctlGit"])

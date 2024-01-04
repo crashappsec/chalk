@@ -129,7 +129,11 @@ class ChalkProgram(Program):
     def errors(self):
         errors = itertools.takewhile(
             lambda i: "--debug" not in i,
-            [i for i in self.logs.splitlines() if i.startswith("error:")],
+            [
+                i
+                for i in self.logs.splitlines() + self.text.splitlines()
+                if i.lower().startswith("error:")
+            ],
         )
         return list(errors)
 

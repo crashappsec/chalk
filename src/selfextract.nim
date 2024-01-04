@@ -28,8 +28,16 @@ proc getSelfExtraction*(): Option[ChalkObj] =
   # have a codec for this type of executable, avoid dupe errors.
   once:
     var
-      myPath = resolvePath(getMyAppPath())
+      myPath = getMyAppPath()
       cmd    = getCommandName()
+
+    try:
+      myPath = myPath.resolvePath()
+    except:
+      # should not happen as getMyAppPath should return absolute path
+      # however resolvePath can fail in some cases such as when
+      # path contains ~ but uid does not have home directory
+      discard
 
     setCommandName("extract")
 
@@ -61,16 +69,7 @@ proc getSelfExtraction*(): Option[ChalkObj] =
     # of lettus to enjoy ;D
     # If not, we immediately exit with hopefully useful error message
     # :fingerscrossed:
-    var canOpen = false
-    try:
-      let stream = newFileStream(myPath)
-      if stream != nil:
-        canOpen = true
-        stream.close()
-    except:
-      dumpExOnDebug()
-      error(getCurrentExceptionMsg())
-    if not canOpen:
+    if not canOpenFile(myPath):
       cantLoad("Chalk is unable to read self-config. " &
                "Ensure chalk has both read and execute permissions. " &
                "To add permissions run: 'chmod +rx " & myPath & "'\n")

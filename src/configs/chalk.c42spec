@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -890,6 +890,15 @@ Set to false to leave in the config but disable it.
 """
   }
 
+  field priority {
+    type:    int
+    default: 0
+    range:   (0, high())
+    doc:     """
+Priority of the sink. Higher priority will be processed first.
+"""
+  }
+
   field filters {
     type:    list[string]
     default: []
@@ -1352,6 +1361,22 @@ If, when wrapping, your chalk binary is using an external
 configuration file, that file will NOT get used inside the
 container. The wrapped binary currently only uses the embedded
 configuration present in the binary in the time of the wrapping.
+"""
+  }
+
+  field wrap_cmd {
+    type:    bool
+    default: true
+    shortdoc: "Wrap image CMD, when ENTRYPOINT is missing"
+    doc:     """
+Similar to `wrap_entrypoint` except when Dockerfile does not have `ENTRYPOINT`,
+whether to wrap `CMD` instead.
+
+Note that enabling this option can potentially break image functionality
+as base images can define `ENTRYPOINT` which might expect specific format for `CMD`.
+This config should only be enabled when `ENTRYPOINT` is able to execute arbitrary
+scripts which is usually default docker `ENTRYPOINT` in most cases.
+Example where this might not be the case are docker images for AWS lambda functions.
 """
   }
 
@@ -3361,7 +3386,7 @@ func sink_object_check(path) {
   }
 }
 
-sink_config_skip_fields := ["enabled", "loaded", "sink", "filters"]
+sink_config_skip_fields := ["enabled", "priority", "loaded", "sink", "filters"]
 export sink_config_skip_fields
 
 func sink_config_check(path) {
@@ -3391,13 +3416,19 @@ func sink_config_check(path) {
     if contains(["timeout", "truncation_amount", "max"], conffield) {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, Size) and not typecmp(t, int) {
-          return "max: This field must be a con4m Size, or an int (in bytes)"
+          return conffield + ": This field must be a con4m Size, or an int (in bytes)"
       }
     }
     elif conffield == "headers" {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, dict[string, string]) {
           return conffield + ": Field must be a dict[string, string]"
+      }
+    }
+    elif contains(["priority"], conffield) {
+      t := attr_type(path + "." + conffield)
+      if not typecmp(t, int) {
+          return conffield + ": This field must be int"
       }
     }
     elif contains(["enabled", "use_search_path", "disallow_http"], conffield) {
@@ -3413,7 +3444,7 @@ func sink_config_check(path) {
       }
     }
     elif not typecmp(attr_type(path + "." + conffield), string) {
-      return "This field must be a string."
+      return conffield + ": Field must be a string."
     }
     elif conffield == "pinned_cert_file" {
       if attr_exists(path + ".pinned_cert") {

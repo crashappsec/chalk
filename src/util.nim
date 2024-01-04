@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -48,15 +48,16 @@ proc restoreTerminal() {.noconv.} =
   tcSetAttr(cint(1), TcsaConst.TCSAFLUSH, savedTermState)
 
 proc regularTerminationSignal(signal: cint) {.noconv.} =
+  let pid = getpid()
   try:
-    error("Aborting due to signal: " & sigNameMap[signal] & "(" & $(signal) &
-      ")")
+    error("pid: " & $(pid) & " - Aborting due to signal: " &
+          sigNameMap[signal] & "(" & $(signal) & ")")
     if chalkConfig.getChalkDebug():
       publish("debug", "Stack trace: \n" & getStackTrace())
 
   except:
-    echo "Aborting due to signal: " & sigNameMap[signal]  & "(" & $(signal) &
-      ")"
+    echo("pid: " & $(pid) & " - Aborting due to signal: " &
+         sigNameMap[signal]  & "(" & $(signal) & ")")
     dumpExOnDebug()
   var sigset:  SigSet
 
@@ -106,6 +107,24 @@ proc reportTmpFileExitState*(files, dirs, errs: seq[string]) =
                                 1000000000) &
       " seconds"
 
+proc canOpenFile*(path: string, mode: FileMode = FileMode.fmRead): bool =
+  var canOpen = false
+  try:
+    let stream = openFileStream(path, mode = mode)
+    if stream != nil:
+      canOpen = true
+      stream.close()
+  except:
+    dumpExOnDebug()
+    error(getCurrentExceptionMsg())
+  finally:
+    if mode != FileMode.fmRead:
+      try:
+        discard tryRemoveFile(path)
+      except:
+        discard
+  return canOpen
+
 proc setupManagedTemp*() =
   let customTmpDirOpt = chalkConfig.getDefaultTmpDir()
 
@@ -119,13 +138,18 @@ proc setupManagedTemp*() =
     discard existsOrCreateDir(getEnv("TMPDIR"))
 
   if chalkConfig.getChalkDebug():
-    info("Debug is on; temp files / dirs will be moved, not deleted.")
-    setManagedTmpCopyLocation(resolvePath("chalk-tmp"))
+    let
+      tmpPath = resolvePath("chalk-tmp")
+      tmpCheck = resolvePath(".chalk-tmp-check")
+    if canOpenFile(tmpCheck, mode = FileMode.fmWrite):
+      info("Debug is on; temp files / dirs will be moved to " & tmpPath & ", not deleted.")
+      setManagedTmpCopyLocation(tmpPath)
+    else:
+      warn("Debug is on however chalk is unable to move temp files to " & tmpPath)
 
   setManagedTmpExitCallback(reportTmpFileExitState)
   setDefaultTmpFilePrefix(tmpFilePrefix)
   setDefaultTmpFileSuffix(tmpFileSuffix)
-
 
 when hostOs == "macosx":
   const staticScriptLoc = "autocomplete/mac.bash"
@@ -230,10 +254,15 @@ proc validateMetadata*(obj: ChalkObj): ValidateResult {.importc.}
 proc autocompleteFileCheck*() =
   if isatty(0) == 0 or chalkConfig.getInstallCompletionScript() == false:
     return
-  let
-    dst           = resolvePath(autoCompleteLoc)
-    alreadyExists = fileExists(dst)
 
+  var dst = ""
+  try:
+    dst = resolvePath(autoCompleteLoc)
+  except:
+    # resolvePath can fail on ~ when uid doesnt have home dir
+    return
+
+  let alreadyExists = fileExists(dst)
   if alreadyExists:
     var invalidMark = true
 

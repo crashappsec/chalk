@@ -1,2 +1,8 @@
 subscribe("report", "json_console_out")
 custom_report.github_group_chalk_time.enabled: false
+
+# ignore any cloud metadata by default
+# as github actions use azure runners
+if not env_exists("VENDOR") {
+  cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path: "/tmp/nonexisting"
+}

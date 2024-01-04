@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Crash Override, Inc.
+# Copyright (c) 2023-2024, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -6,6 +6,7 @@ import re
 import shutil
 from pathlib import Path
 
+import os
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
@@ -125,9 +126,8 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
     )
 
 
-@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_imds(
     copy_files: list[Path],
     chalk: Chalk,
@@ -137,7 +137,12 @@ def test_imds(
     # make imds plugin think we are running in EC2
     tmp_file.write_text("Amazon")
     bin_path = copy_files[0]
-    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "imds.c4m",
+        log_level="trace",
+        env={"VENDOR": str(tmp_file)},
+    )
     assert insert.report.contains(
         {
             "_OP_CLOUD_PROVIDER": "aws",
@@ -213,7 +218,91 @@ def test_imds(
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+def test_ecs(
+    copy_files: list[Path],
+    chalk: Chalk,
+    server_imds: str,
+):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        env={"ECS_CONTAINER_METADATA_URI": f"{server_imds}/ecs"},
+        log_level="trace",
+    )
+    assert insert.report.contains(
+        {
+            "_OP_CLOUD_PROVIDER": "aws",
+            "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ecs",
+            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "111122223333",
+            "_OP_CLOUD_PROVIDER_REGION": "us-west-2",
+            "_AWS_REGION": "us-west-2",
+            "_OP_CLOUD_METADATA": {
+                "aws_ecs": {
+                    "container": dict,
+                    "task": dict,
+                    "task/stats": dict,
+                },
+            },
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_lambda(
+    copy_files: list[Path],
+    chalk: Chalk,
+):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        env={
+            "AWS_LAMBDA_FUNCTION_NAME": "dummy",
+            "AWS_LAMBDA_FUNCTION_VERSION": "2",
+            "AWS_LAMBDA_LOG_GROUP_NAME": "/aws/logs",
+            "AWS_LAMBDA_LOG_STREAM_NAME": "2023/12/25/[$LATEST]f42d28eb350e42a1b840ad55fd5232fe",
+            "AWS_DEFAULT_REGION": "us-east-1",
+        },
+        log_level="trace",
+    )
+    top, meta = (
+        (
+            {
+                "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": re.compile(r"[\d]+"),
+            },
+            {
+                "AWS_LAMBDA_FUNCTION_ARN": re.compile(r"^arn:"),
+                "AWS_LAMBDA_VERSION_ARN": re.compile(r"^arn:"),
+                "AWS_LAMBDA_LOG_STREAM_ARN": re.compile(r"^arn:"),
+                "AWS_ROLE_ARN": re.compile(r"^arn:"),
+                "AWS_ACCOUNT_ID": re.compile(r"[\d]+"),
+            },
+        )
+        if os.environ.get("AWS_ACCESS_KEY_ID")
+        else ({}, {})
+    )
+    assert insert.report.contains(
+        {
+            "_OP_CLOUD_PROVIDER": "aws",
+            "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_lambda",
+            "_OP_CLOUD_PROVIDER_REGION": "us-east-1",
+            "_AWS_REGION": "us-east-1",
+            "_OP_CLOUD_METADATA": {
+                "aws_lambda": {
+                    "AWS_LAMBDA_FUNCTION_NAME": "dummy",
+                    "AWS_LAMBDA_FUNCTION_VERSION": "2",
+                    "AWS_LAMBDA_LOG_GROUP_NAME": "/aws/logs",
+                    "AWS_LAMBDA_LOG_STREAM_NAME": "2023/12/25/[$LATEST]f42d28eb350e42a1b840ad55fd5232fe",
+                    "AWS_REGION": "us-east-1",
+                    **meta,
+                },
+            },
+            **top,
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_imds_ecs(
     copy_files: list[Path],
     chalk: Chalk,
@@ -226,7 +315,10 @@ def test_imds_ecs(
     insert = chalk.insert(
         bin_path,
         config=CONFIGS / "imds.c4m",
-        env={"ECS_CONTAINER_METADATA_URI": "foobar"},
+        env={
+            "ECS_CONTAINER_METADATA_URI": "foobar",
+            "VENDOR": str(tmp_file),
+        },
     )
     assert insert.report.contains(
         {
@@ -244,9 +336,8 @@ def test_imds_ecs(
     )
 
 
-@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_imds_eks(
     copy_files: list[Path],
     chalk: Chalk,
@@ -261,6 +352,7 @@ def test_imds_eks(
         config=CONFIGS / "imds.c4m",
         env={
             "KUBERNETES_PORT": "tests",
+            "VENDOR": str(tmp_file),
         },
     )
     assert insert.report.contains(
@@ -271,9 +363,8 @@ def test_imds_eks(
     )
 
 
-@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_metadata_azure(
     copy_files: list[Path],
     chalk: Chalk,
@@ -283,7 +374,13 @@ def test_metadata_azure(
     # make imds plugin think we are running in EC2
     tmp_file.write_text("Microsoft Corporation")
     bin_path = copy_files[0]
-    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "imds.c4m",
+        env={
+            "VENDOR": str(tmp_file),
+        },
+    )
     assert insert.report.contains(
         {
             "_OP_CLOUD_PROVIDER": "azure",
@@ -393,9 +490,8 @@ def test_metadata_azure(
     )
 
 
-@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{"path": "/tmp/vendor"}], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_metadata_gcp(
     copy_files: list[Path],
     chalk: Chalk,
@@ -405,7 +501,11 @@ def test_metadata_gcp(
     # make imds plugin think we are running in EC2
     tmp_file.write_text("Google")
     bin_path = copy_files[0]
-    insert = chalk.insert(bin_path, config=CONFIGS / "imds.c4m")
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "imds.c4m",
+        env={"VENDOR": str(tmp_file)},
+    )
     assert insert.report.contains(
         {
             "_OP_CLOUD_PROVIDER": "gcp",
@@ -538,7 +638,7 @@ def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
                 "metadata": {
                     "component": {
                         "type": "file",
-                        "name": "/chalk/tests/data/dockerfiles/valid/sample_1",
+                        "name": re.compile(r"tests/data/dockerfiles/valid/sample_1$"),
                     },
                 },
             }
