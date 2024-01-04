@@ -93,7 +93,7 @@ proc runOneTool(info: PIInfo, path: string, dict: var ChalkDict): bool =
 
   return info.obj.stopOnSuccess
 
-template toolBase(s: untyped) {.dirty.} =
+template toolBase(s: string) {.dirty.} =
   result = ChalkDict()
 
   var
@@ -122,16 +122,19 @@ template toolBase(s: untyped) {.dirty.} =
     sortArr.sort()
     for (ignore, info) in sortArr:
       trace("Running tool: " & info.name)
-      if info.runOneTool(resolvePath(s), result): break
+      if info.runOneTool(s, result): break
 
 proc toolGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
-  toolBase(getContextDirectories()[0])
+  toolBase(resolvePath(getContextDirectories()[0]))
 
 proc toolGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
                                  ChalkDict {.cdecl.} =
   if obj.fsRef != "":
-    toolbase(obj.fsRef)
+    toolbase(resolvePath(obj.fsRef))
   else:
+    if getCommandName() == "build":
+      trace("Cannot run external tools on docker image before it is built")
+      return
     toolbase(obj.name)
 
 proc loadExternalTool*() =
