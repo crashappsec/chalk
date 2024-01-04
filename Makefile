@@ -17,6 +17,9 @@ SOURCES+=$(shell find src/ -name '*.nim')
 SOURCES+=$(shell find src/ -name '*.c4m')
 SOURCES+=$(shell find src/ -name '*.c42spec')
 SOURCES+=$(shell find src/ -name '*.md')
+SOURCES+=$(shell find ../con4m -name '*.nim' 2> /dev/null)
+SOURCES+=$(shell find ../con4m -name '*.c4m' 2> /dev/null)
+SOURCES+=$(shell find ../nimutils -name '*.nim' 2> /dev/null)
 
 VERSION=$(shell cat *.nimble | grep -E "version\s+=" | cut -d'"' -f2 | head -n1)
 
@@ -26,14 +29,23 @@ export PATH:=$(HOME)/.nimble/bin:$(PATH)
 # not PHONY jobs on purpose but instead rebuilds chalk
 # when any of the nim sources change
 # (a.k.a what Makefile is good at :D)
-$(BINARY): $(SOURCES)
+$(BINARY): $(BINARY).bck
+	cp $^ $@
+
+# as chalk load modifies existing binary,
+# when no source files change, recopy the backup
+# to get back to original compiled binary
+$(BINARY).bck: $(SOURCES)
 	$(DOCKER) nimble -y $(CHALK_BUILD)
+	mv $(BINARY) $@
+	cp $@ $(BINARY)
+	ls -la $(BINARY) $@
 
 .PHONY: debug release
 debug: CHALK_BUILD=build --define:debug
 release: CHALK_BUILD=build
 debug release:
-	-rm -f $(BINARY)
+	-rm -f $(BINARY) $(BINARY).bck
 	$(MAKE) $(BINARY)
 
 .PHONY: version
@@ -42,7 +54,7 @@ version:
 
 .PHONY: clean
 clean:
-	-rm -rf $(BINARY) src/c4autoconf.nim dist nimutils con4m nimble.develop
+	-rm -rf $(BINARY) $(BINARY).bck src/c4autoconf.nim dist nimutils con4m nimble.develop
 
 .PHONY: chalk-docs
 chalk-docs: $(BINARY)

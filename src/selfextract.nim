@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -214,16 +214,18 @@ proc testConfigFile*(uri: string, newCon4m: string, params: seq[Box]):
 
   let
     toStream = newStringStream
-    stack    = newConfigStack().addSystemBuiltins().
+    stack    = newConfigStack().
+               addSystemBuiltins().
                addCustomBuiltins(chalkCon4mBuiltins).
                addGetoptSpecLoad().
-               addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
-               addConfLoad(baseConfName, toStream(baseConfig)).
+               addSpecLoad(chalkSpecName,  toStream(chalkC42Spec)).
+               addConfLoad(baseConfName,   toStream(baseConfig)).
                setErrorHandler(newConfFileError).
-               addConfLoad(ioConfName,   toStream(ioConfig)).
+               addConfLoad(ioConfName,     toStream(ioConfig)).
                addConfLoad(attestConfName, toStream(attestConfig)).
-               addConfLoad(sbomConfName, toStream(sbomConfig)).
-               addConfLoad(sastConfName, toStream(sastConfig))
+               addConfLoad(sbomConfName,   toStream(sbomConfig)).
+               addConfLoad(sastConfName,   toStream(sastConfig)).
+               addConfLoad(coConfName,     toStream(coConfig))
   try:
     # Test Run will cause (un)subscribe() to ignore subscriptions, and
     # will suppress log messages, etc.
@@ -253,17 +255,35 @@ proc testConfigFile*(uri: string, newCon4m: string, params: seq[Box]):
     dumpExOnDebug()
     cantLoad(getCurrentExceptionMsg() & "\n")
 
-proc paramsToBox(a: bool, b, c: string, d: Con4mType, e: Box): Box =
+proc toBox(param: ParameterInfo, component: ComponentInfo): Box =
   # Though you can pack / unpack con4m types, we don't have a JSON
   # mapping for them, so it's best for now to just pack the string
   # repr and re-parse it on the other end.
-  var arr = @[ pack(a), pack(b), pack(c), pack($(d)), e ]
+  var arr = @[pack(param.name in component.attrParams),
+              pack(component.url),
+              pack(param.name),
+              pack($(param.defaultType)),
+              param.value.get()]
   return pack(arr)
 
-const nocache = ["configs/ioconfig.c4m", "configs/sastconfig.c4m",
-                 "[embedded config]", "configs/base_*.c4m",
-                 "configs/sbomconfig.c4m", "configs/attestation.c4m",
-                 "configs/getopts.c4m"]
+proc addParam(params: var seq[Box], param: ParameterInfo, component: ComponentInfo) =
+  params.add(param.toBox(component))
+
+proc addParams(params: var seq[Box], component: ComponentInfo) =
+  for _, v in component.varParams:
+    params.addParam(v, component)
+  for _, v in component.attrParams:
+    params.addParam(v, component)
+
+const nocache = [getoptConfName,
+                 baseConfName,
+                 sbomConfName,
+                 sastConfName,
+                 ioConfName,
+                 attestConfName,
+                 defCfgFname,
+                 coConfName,
+                 embeddedConfName]
 
 proc updateArchBinaries*(newConfig: string, newParams: seq[Box],
                          bins: TableRef[string, string] = nil) =
@@ -322,48 +342,51 @@ proc handleConfigLoad*(inpath: string) =
     path = inpath.resolvePath()
   else:
     path = inpath
+
   let
-    runtime          = getChalkRuntime()
-    alreadyCached    = haveComponentFromUrl(runtime, path).isSome()
-    (uri, module, _) = path.fullUrlToParts()
-    curConfOpt       = selfChalkGetKey("$CHALK_CONFIG")
-    validate         = chalkConfig.loadConfig.getValidateConfigsOnLoad()
+    validate          = chalkConfig.loadConfig.getValidateConfigsOnLoad()
+    replace           = chalkConfig.loadConfig.getReplaceConf()
+    confPaths         = chalkConfig.getConfigPath()
+    confFilename      = chalkConfig.getConfigFilename()
+
+  if replace:
+    info("Replacing base configuration with module from: " & path)
+    selfChalkDelKey("$CHALK_CONFIG")
+    selfChalkDelKey("$CHALK_COMPONENT_CACHE")
+    selfChalkDelKey("$CHALK_SAVED_COMPONENT_PARAMETERS")
+  else:
+    info("Attempting to load module from: " & path)
+
+  let
+    runtime           = getChalkRuntime()
+    alreadyCached     = haveComponentFromUrl(runtime, path).isSome()
+    (base, module, _) = path.fullUrlToParts()
+    curConfOpt        = selfChalkGetKey("$CHALK_CONFIG")
 
   var
     component: ComponentInfo
-    replace:   bool
     testState: ConfigState
 
   try:
     component  = runtime.loadComponentFromUrl(path)
-    replace    = chalkConfig.loadConfig.getReplaceConf()
-
   except:
     dumpExOnDebug()
     cantLoad(getCurrentExceptionMsg() & "\n")
 
   var
-    toConfigure = component.getUsedComponents(paramOnly = true)
-    newEmbedded: string
+    newComponents = component.getUsedComponents()
+    newEmbedded:    string
 
   if replace or curConfOpt.isNone():
     newEmbedded = ""
   else:
     newEmbedded = unpack[string](curConfOpt.get())
 
-  if not alreadyCached:
-    if not replace:
-      if not newEmbedded.endswith("\n"):
-        newEmbedded.add("\n")
-
-      newEmbedded.add("use " & module & " from \"" & uri & "\"\n")
-    else:
-      newEmbedded = component.source
-
-  if replace:
-    info("Attempting to replace base configuration from: " & path)
-  else:
-    info("Attempting to load module from: " & path)
+  if not alreadyCached or replace:
+    let
+      useLine = "use " & module  & " from \"" & base & "\""
+      withUse = newEmbedded & "\n" & useLine
+    newEmbedded = withUse.strip()
 
   if chalkConfig.loadConfig.getParamsViaStdin():
     try:
@@ -392,57 +415,72 @@ proc handleConfigLoad*(inpath: string) =
       quit(1)
   elif validate:
     let prompt = "Press [enter] to check your configuration for conflicts."
-    runtime.basicConfigureParameters(component, toConfigure, prompt)
+    runtime.basicConfigureParameters(component, newComponents, prompt)
   else:
-    runtime.basicConfigureParameters(component, toConfigure)
+    runtime.basicConfigureParameters(component, newComponents)
 
-  # Load any saved parameters; we will pass them off to any
-  # testing, plus we will need to save them!
+  # Load any saved parameters; we will pass them off to any testing
   var
-    allComponents = runtime.programRoot.getUsedComponents()
-    params: seq[Box]
+    componentsToTest = runtime.programRoot.getUsedComponents(paramOnly = true)
+    paramsToTest:    seq[Box]
 
-  for item in toConfigure:
-    if item notin allComponents:
-      allComponents.add(item)
+  for item in newComponents:
+    if item notin componentsToTest:
+      componentsToTest.add(item)
 
-  for component in allComponents:
-    for _, v in component.varParams:
-      params.add(paramsToBox(false, component.url, v.name, v.defaultType,
-                             v.value.get()))
-
-    for _, v in component.attrParams:
-      params.add(paramsToBox(true, component.url, v.name, v.defaultType,
-                             v.value.get()))
+  for item in componentsToTest:
+    paramsToTest.addParams(item)
 
   if validate:
-    testState = testConfigFile(path, newEmbedded, params)
+    # need to test with another top-level config name
+    # otherwise cycle is bound to be detected
+    testState = testConfigFile("[testing config]", newEmbedded, paramsToTest)
     assert testState != nil
   else:
     warn("Skipping configuration validation. This could break chalk.")
 
+  # Now, load the code cache/params.
+  var
+    cachedCode =      OrderedTableRef[string, string]()
+    paramsToSave:     seq[Box]
+    componentsToSave: seq[ComponentInfo]
+
+  if replace:
+    # when replacing only honor used tested components
+    # as that will only include loaded component+its deps
+    componentsToSave = componentsToTest
+  else:
+    # save all params across all components, if any
+    # as previous configuration could have existing params
+    # which we cannot delete if we only save params used for testing
+    for _, item in runtime.components:
+      componentsToSave.add(item)
+
+  for _, item in componentsToSave:
+    paramsToSave.addParams(item)
+    if item.url in nocache:
+      continue
+    if item.source == "":
+      continue
+    try:
+      let (head, tail) = item.url.splitPath()
+      # dont cache external configs
+      if head in confPaths and tail == confFilename:
+        continue
+    except:
+      # in case splitPath fails for some obscure urls?
+      discard
+    cachedCode[item.url] = item.source
+
   selfChalkSetKey("$CHALK_CONFIG", pack(newEmbedded))
-
-  # Now, load the code cache.
-  var cachedCode = OrderedTableRef[string, string]()
-
-  for _, onecomp in runtime.components:
-    if onecomp.url in nocache:
-      continue
-    if replace and onecomp == component:
-      continue
-    if onecomp.source != "":
-      cachedCode[onecomp.url] = onecomp.source
-
-
   selfChalkSetKey("$CHALK_COMPONENT_CACHE", pack(cachedCode))
-  selfChalkSetKey("$CHALK_SAVED_COMPONENT_PARAMETERS", pack(params))
+  selfChalkSetKey("$CHALK_SAVED_COMPONENT_PARAMETERS", pack(paramsToSave))
 
   if testState != nil:
     let archOpt: Option[TableRef[string, string]] =
       getOpt[TableRef[string, string]](testState, "docker.arch_binary_locations")
     if archOpt.isSome():
-      updateArchBinaries(newEmbedded, params, archOpt.get())
+      updateArchBinaries(newEmbedded, paramsToSave, archOpt.get())
       return
 
-  updateArchBinaries(newEmbedded, params)
+  updateArchBinaries(newEmbedded, paramsToSave)
