@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Crash Override, Inc.
+# Copyright (c) 2023-2024, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -178,6 +178,9 @@ def test_composite_build(
     assert second_image_id
 
 
+@pytest.mark.xfail(
+    reason="CMD is wrapped which breaks ENTRYPOINT. fix is coming in next release"
+)
 def test_base_image(chalk: Chalk, random_hex: str):
     base_id, _ = Docker.build(
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile.base",

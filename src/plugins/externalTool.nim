@@ -131,11 +131,10 @@ proc toolGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
                                  ChalkDict {.cdecl.} =
   if obj.fsRef != "":
     toolbase(resolvePath(obj.fsRef))
+  elif getCommandName() == "build":
+    toolbase(resolvePath(getContextDirectories()[0]))
   else:
-    if getCommandName() == "build":
-      trace("Cannot run external tools on docker image before it is built")
-      return
-    toolbase(obj.name)
+    toolbase(resolvePath(obj.name))
 
 proc loadExternalTool*() =
   newPlugin("tool",

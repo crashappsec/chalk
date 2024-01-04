@@ -1366,7 +1366,7 @@ configuration present in the binary in the time of the wrapping.
 
   field wrap_cmd {
     type:    bool
-    default: false
+    default: true
     shortdoc: "Wrap image CMD, when ENTRYPOINT is missing"
     doc:     """
 Similar to `wrap_entrypoint` except when Dockerfile does not have `ENTRYPOINT`,
