@@ -1,1 +1,1 @@
-use circular_1 from "/chalk/tests/data/configs/composable/invalid/circular"
+use circular_1 from "[[configs]]/composable/invalid/circular"

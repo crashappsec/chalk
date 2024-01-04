@@ -110,7 +110,7 @@ template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: un
     client:   HttpClient
     context:  SslContext
     response: Response
-  
+
   # This is the id that will be used to identify the secret in the API
   signingID = sha256Hex(attestationObfuscator & prkey)
 
@@ -170,10 +170,10 @@ proc backupSigningKeyToService*(content: string, prkey: string): bool =
   let body = nonce.hex() & ct.hex()
   response = callTheSigningKeyBackupService(base, prkey, body, HttpPut)
 
-  trace("Sending encrypted signing key: " & body)
-  if response.status.startswith("405"):
+  trace("Sending encrypted secret: " & body)
+  if response.code == Http405:
     info("This encrypted signing key is already backed up.")
-  elif response.status[0] != '2':
+  elif not response.code.is2xx():
     error("When attempting to save envcrypted signing key: " & response.status)
     trace(response.body())
     return false
@@ -194,10 +194,9 @@ proc restoreSigningKeyFromService*(prkey: string): bool =
 
   let response = callTheSigningKeyBackupService(base, prKey, "", HttpGet)
 
-  # Check for error conditions in response
-  if response.status[0] != '2':
+  if not response.code.is2xx():
     # authentication issue / token expiration - begin reauth
-    if response.status.startswith("401"):
+    if response.code == Http401:
       # parse json response and save / return values()
       let jsonNodeReason = parseJson(response.body())
       trace("JSON body of response from Signing key Backup Service: " & $jsonNodeReason)
@@ -217,7 +216,7 @@ proc restoreSigningKeyFromService*(prkey: string): bool =
       raise newException(ValueError, "Nice hex, but wrong size.")
   except:
     error("When loading the signing secret, received an invalid " &
-      "response from server: " & response.status)
+          "response from server: " & response.status)
     return false
 
   trace("Successfully retrieved secret from secret manager.")
@@ -309,7 +308,7 @@ proc commitPassword(pri: string, gen: bool) =
 
       if gen:
         printIt = true
-    
+
     else:
       let idString = "The ID of the backed up key is: " & $signingID
       info(idString)

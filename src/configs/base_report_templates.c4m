@@ -1225,6 +1225,7 @@ container.
   key.$CHALK_COMPONENT_CACHE.use              = false
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
+
 report_template insertion_default {
   shortdoc: "The default template for insertion operations"
   doc: """

@@ -92,7 +92,7 @@ proc collectChalkTimeHostInfo*() =
           hostInfo[k] = v
     except:
       warn("When collecting chalk-time host info, plugin implementation " &
-        plugin.name & " threw an exception it didn't handle.")
+           plugin.name & " threw an exception it didn't handle: " & getCurrentExceptionMsg())
       dumpExOnDebug()
 
 proc initCollection*() =
@@ -143,8 +143,8 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
       trace(plugin.name & ": Plugin called.")
     except:
       warn("When collecting run-time artifact data, plugin implementation " &
-        plugin.name & " threw an exception it didn't handle (artifact = " &
-        artifact.name & ".")
+           plugin.name & " threw an exception it didn't handle (artifact = " &
+           artifact.name & "): " & getCurrentExceptionMsg())
       dumpExOnDebug()
 
   let hashOpt = artifact.callGetEndingHash()
@@ -196,8 +196,8 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
       trace(plugin.name & ": Plugin called.")
     except:
       warn("When collecting chalk-time artifact data, plugin implementation " &
-        plugin.name & " threw an exception it didn't handle (artifact = " &
-        obj.name & ".")
+           plugin.name & " threw an exception it didn't handle (artifact = " &
+           obj.name & "): " & getCurrentExceptionMsg())
       dumpExOnDebug()
 
 proc collectRunTimeHostInfo*() =
@@ -218,7 +218,8 @@ proc collectRunTimeHostInfo*() =
           hostInfo[k] = v
     except:
       warn("When collecting run-time host info, plugin implementation " &
-        plugin.name & " threw an exception it didn't handle.")
+           plugin.name & " threw an exception it didn't handle: " &
+           getCurrentExceptionMsg())
       dumpExOnDebug()
 
 

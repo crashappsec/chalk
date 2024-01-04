@@ -28,18 +28,6 @@ type
     udpSockInfoCache: Option[ProcTable]
     psInfoCache:      Option[ProcFdSet]
 
-template readOneFile*(fname: string): Option[string] =
-  let stream = newFileStream(fname, fmRead)
-  if stream == nil:
-    none(string)
-  else:
-    let contents = stream.readAll().strip()
-    if len(contents) == 0:
-       none(string)
-    else:
-      stream.close()
-      some(contents)
-
 const PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
 let
   clockSpeed = float(sysconf(SC_CLK_TCK))
@@ -84,23 +72,23 @@ template filterDirForInts(dir: string): seq[string] =
   res
 
 proc tableFileSplit(path: string): ProcTable =
-  let contentsOpt = readOneFile(path)
+  let contents = tryToLoadFile(path)
 
-  if contentsOpt.isNone(): return
+  if contents == "": return
 
-  let lines = contentsOpt.get().split("\n")[1 .. ^1]
+  let lines = contents.split("\n")[1 .. ^1]
 
   for line in lines:
     result.add(re.split(line, re"[\s]+"))
 
 proc kvFileToProcDict(path: string): Option[ProcDict] =
   ## Read proc files that are in key/value pair format, one per line.
-  let contentsOpt = readOneFile(path)
+  let contents = tryToLoadFile(path)
 
-  if contentsOpt.isNone():
+  if contents == "":
     return none(ProcDict)
 
-  let lines = contentsOpt.get().split("\n")
+  let lines = contents.split("\n")
   var res   = ProcDict()
 
   for line in lines:
@@ -139,12 +127,8 @@ proc getFdInfo(n: string): ProcFdSet =
       dumpExOnDebug()
 
 proc getPidArgv(pid: string): string =
-  let contentOpt = readOneFile("/proc/" & pid & "/cmdline")
-  if contentOpt.isNone():
-    return
-
-  let contents = contentOpt.get()
-  if len(contents) == 0:
+  let contents = tryToLoadFile("/proc/" & pid & "/cmdline")
+  if contents == "":
     return
 
   var allArgs = contents.split('\x00')
@@ -155,7 +139,7 @@ proc getPidArgv(pid: string): string =
   return $(`%*`(allargs))
 
 proc getPidCommandName(pid: string): string =
-  return readOneFile("/proc/" & pid & "/comm").get("").strip()
+  return tryToLoadFile("/proc/" & pid & "/comm").strip()
 
 proc getPidCwd(pid: string): string =
   return procReadLink("/proc/" & pid & "/cwd").get("")
@@ -165,7 +149,7 @@ proc getPidExePath(pid: string): string =
 
 proc getPidExe(pid: string): string =
   # This currently isn't being used.
-  return encode(readOneFile("/proc/" & pid & "/exe").get(""))
+  return encode(tryToLoadFile("/proc/" & pid & "/exe"))
 
 proc clockConvert(input: string): string =
   # For this one, if anything in /proc changes, the parsing
@@ -173,13 +157,11 @@ proc clockConvert(input: string): string =
   return $(float(parseBiggestUint(input)) / clockSpeed)
 
 proc getPidStatInfo(pid: string, res: var ProcDict) =
-  let statFieldOpt = readOneFile("/proc/" & pid & "/stat")
-
-  if statFieldOpt.isNone():
+  let contents = tryToLoadFile("/proc/" & pid & "/stat")
+  if contents == "":
     return
 
   let
-    contents = statFieldOpt.get()
     lparen   = contents.find('(')
     rparen   = contents.rfind(')')
 
@@ -266,7 +248,7 @@ proc getFullProcessInfo(pid: string): ProcDict =
   setIfNotEmptyString(result["path"], pid.getPidExePath())
 
 proc getMountInfo(pid: string): seq[ProcDict] =
-  let mountinfo = readOneFile("/proc/" & pid & "/mountinfo").get("")
+  let mountinfo = tryToLoadFile("/proc/" & pid & "/mountinfo")
 
   if mountinfo == "": return
 
@@ -296,7 +278,7 @@ proc getMountInfo(pid: string): seq[ProcDict] =
 proc getLoadInfo(): ProcDict =
   new result
 
-  let info = readOneFile("/proc/loadavg").get("").strip().split(' ')
+  let info = tryToLoadFile("/proc/loadavg").strip().split(' ')
 
   if len(info) != 5: return
 
@@ -313,11 +295,11 @@ template getArpTable(): ProcTable =
   tableFileSplit("/proc/net/arp")
 
 proc getIPv4Interfaces(): ProcTable =
-  let contentsOpt = readOneFile("/proc/net/dev")
+  let contents = tryToLoadFile("/proc/net/dev")
+  if contents == "":
+    return
 
-  if contentsOpt.isNone(): return
-
-  var lines = contentsOpt.get().split("\n")
+  var lines = contents.split("\n")
 
   if len(lines) < 3: return
 
@@ -340,11 +322,11 @@ template getRawIPv4Routes(): ProcTable =
 template getRawIPv6Routes(): ProcTable =
   tableFileSplit("/proc/net/ipv6_route")
 
-template getRawTCPSockInfo(): Option[string] =
-  readOneFile("/proc/net/tcp")
+template getRawTCPSockInfo(): string =
+  tryToLoadFile("/proc/net/tcp")
 
-template getRawUDPSockInfo(): Option[string] =
-  readOneFile("/proc/net/udp")
+template getRawUDPSockInfo(): string =
+  tryToLoadFile("/proc/net/udp")
 
 template procIPv6(s: string): string =
   if len(s) < 32:
@@ -497,10 +479,10 @@ proc getSockInfo(raw: string, mapStatus: (string) -> string): ProcTable =
                   mapStatus(status), uid, inode ])
 
 template getTCPSockInfo(): ProcTable =
-    getSockInfo(getRawTCPSockInfo().get(""), sockStatusMap)
+    getSockInfo(getRawTCPSockInfo(), sockStatusMap)
 
 template getUDPSockInfo(): ProcTable =
-    getSockInfo(getRawUDPSockInfo().get(""), udpStatusMap)
+    getSockInfo(getRawUDPSockInfo(), udpStatusMap)
 
 proc getProcSockInfo(allSockInfo: ProcTable, myFdInfo: ProcFdSet):
                     ProcTable  =

@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Crash Override, Inc.
+# Copyright (c) 2023-2024, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -25,6 +25,7 @@ from .conf import (
     DOCKERFILES,
     DOCKER_SSH_REPO,
     DOCKER_TOKEN_REPO,
+    MARKS,
     REGISTRY,
 )
 from .utils.docker import Docker
@@ -103,6 +104,7 @@ def test_build(
         tag=random_hex if tag else None,
         buildkit=buildkit,
         config=CONFIGS / "docker_wrap.c4m",
+        log_level="trace",
     )
     assert image_id
 
@@ -174,6 +176,27 @@ def test_composite_build(
         expecting_report=buildkit,
     )
     assert second_image_id
+
+
+@pytest.mark.xfail(
+    reason="CMD is wrapped which breaks ENTRYPOINT. fix is coming in next release"
+)
+def test_base_image(chalk: Chalk, random_hex: str):
+    base_id, _ = Docker.build(
+        dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile.base",
+        context=DOCKERFILES / "valid" / "base",
+        tag=random_hex,
+    )
+    assert base_id
+
+    image_id, result = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile",
+        context=DOCKERFILES / "valid" / "base",
+        args={"BASE": random_hex},
+        config=CONFIGS / "docker_wrap.c4m",
+        log_level="trace",
+    )
+    assert Docker.run(image_id)
 
 
 @pytest.mark.parametrize(
@@ -660,3 +683,20 @@ def test_extract(chalk: Chalk, random_hex: str):
         virtual=False,
         chalk_action="extract",
     )
+
+
+def test_docker_diff_user(chalk_default: Chalk):
+    _, program = Docker.run(
+        "alpine",
+        entrypoint="/chalk",
+        params=["exec", "--trace", "--exec-command-name=sleep", "1"],
+        volumes={
+            chalk_default.binary: "/chalk",
+            MARKS / "object.json": "/chalk.json",
+        },
+        cwd=chalk_default.binary.parent,
+        user="1000:1000",
+    )
+    result = ChalkProgram.from_program(program)
+    assert result
+    assert not result.errors

@@ -2,7 +2,7 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import os
+import re
 import shutil
 import sqlite3
 from contextlib import ExitStack, chdir, closing
@@ -11,12 +11,15 @@ from pathlib import Path
 from secrets import token_bytes
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
+import os
 import pytest
 import requests
 from filelock import FileLock
 
+from . import conf
 from .chalk.runner import Chalk
 from .conf import (
+    CONFIGS,
     GDB_PATH,
     SERVER_CERT,
     SERVER_CHALKDUST,
@@ -226,3 +229,32 @@ def server_static():
 @pytest.fixture()
 def server_chalkdust():
     return SERVER_CHALKDUST
+
+
+@pytest.fixture(scope="session")
+def configs():
+    """
+    Renders all configs into a temporary folder
+
+    Rendering is done via python string formatting however
+    as '{' and '}' are often used in con4m configs, [[ and ]]
+    are used instead for string formatting delimiters.
+    """
+    with TemporaryDirectory() as tmp_dir:
+        tmp = Path(tmp_dir)
+        for root, dirs, files in os.walk(CONFIGS):
+            for f in files:
+                config = Path(root) / f
+                tmp_config = tmp / config.relative_to(CONFIGS)
+                template = (
+                    config.read_text()
+                    .replace("{", "{{")
+                    .replace("}", "}}")
+                    .replace("[[", "{")
+                    .replace("]]", "}")
+                )
+                context = {"configs": tmp, **vars(conf)}
+                data = template.format(**context)
+                tmp_config.parent.mkdir(parents=True, exist_ok=True)
+                tmp_config.write_text(data)
+        yield tmp

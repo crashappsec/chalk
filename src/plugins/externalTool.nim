@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -93,20 +93,24 @@ proc runOneTool(info: PIInfo, path: string, dict: var ChalkDict): bool =
 
   return info.obj.stopOnSuccess
 
-template toolBase(s: untyped) {.dirty.} =
+template toolBase(s: string) {.dirty.} =
   result = ChalkDict()
 
   var
     toolInfo: Table[string, seq[(int, PIInfo)]]
-    dict:     ChalkDict = ChalkDict()
   let
     runSbom = chalkConfig.getRunSbomTools()
     runSast = chalkConfig.getRunSastTools()
+
+  # tools should only run during insert operations
+  if getCommandName() notin @["build", "insert"]:
+    return result
 
   for k, v in chalkConfig.tools:
     if not v.enabled:                    continue
     if not runSbom and v.kind == "sbom": continue
     if not runSast and v.kind == "sast": continue
+
     let priority = v.priority
     if v.kind notin toolInfo:
       toolInfo[v.kind] =  @[(priority, PIInfo(name: k, obj: v))]
@@ -118,19 +122,19 @@ template toolBase(s: untyped) {.dirty.} =
     sortArr.sort()
     for (ignore, info) in sortArr:
       trace("Running tool: " & info.name)
-      if info.runOneTool(resolvePath(s), dict): break
-
-  return dict
+      if info.runOneTool(s, result): break
 
 proc toolGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
-  toolBase(getContextDirectories()[0])
+  toolBase(resolvePath(getContextDirectories()[0]))
 
 proc toolGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
                                  ChalkDict {.cdecl.} =
   if obj.fsRef != "":
-    toolbase(obj.fsRef)
+    toolbase(resolvePath(obj.fsRef))
+  elif getCommandName() == "build":
+    toolbase(resolvePath(getContextDirectories()[0]))
   else:
-    toolbase(obj.name)
+    toolbase(resolvePath(obj.name))
 
 proc loadExternalTool*() =
   newPlugin("tool",
