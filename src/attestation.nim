@@ -134,11 +134,16 @@ template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: un
     headers = newHttpHeaders()
     authHeaders = auth.implementation.injectHeaders(auth, headers)
 
-  # Call the API with authz header
+  # Call the API with authz header - rety twice with backoff
   uri       = parseUri(url)
   context   = newContext(verifyMode = CVerifyPeer)
   client    = newHttpClient(sslContext = context, timeout = timeout)
-  response  = client.safeRequest(url = uri, httpMethod = mth, headers = authHeaders, body = bodytxt)
+  response  = client.safeRequest(url = uri,
+                                 httpMethod        = mth,
+                                 headers           = authHeaders,
+                                 body              = bodytxt,
+                                 retries           = 2,
+                                 firstRetryDelayMs = 100)
 
   trace("Signing Key Backup Service URL: " & $uri)  
   trace("Signing Key Backup Service HTTP headers: " & $authHeaders)
