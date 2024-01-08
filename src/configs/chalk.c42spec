@@ -2534,11 +2534,22 @@ manager currently does not run. We may eventually make it a fallback.
 
   field signing_key_backup_service_url {
     type:     string
-    default:  "http://chalk-signing-keys-backup.kn.test.crashappsec.net/signing-key-backup"
+    default:  "https://chalk-signing-keys-backup.kn.prod.crashappsec.net/signing-key-backup"
     hidden:   true
-    shortdoc: "URL for secret manager API"
+    shortdoc: "URL of the signing key backup API service"
     doc: """
-Currently you can just use ours.
+This is the URL of the default signing key backup service provide by
+Crashoverride.
+"""
+  }
+
+field signing_key_backup_service_auth_config_name {
+    type:     string
+    default:  "crashoverride"
+    hidden:   true
+    shortdoc: "Authentication config to use for the signing key backup service"
+    doc: """
+
 """
   }
 
