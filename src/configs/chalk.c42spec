@@ -2534,7 +2534,7 @@ manager currently does not run. We may eventually make it a fallback.
 
   field signing_key_backup_service_url {
     type:     string
-    default:  "https://chalk-signing-keys-backup.kn.prod.crashappsec.net/signing-key-backup"
+    default:  "http://chalk-signing-keys-backup.kn.prod.crashappsec.net/signing-key-backup"
     hidden:   true
     shortdoc: "URL of the signing key backup API service"
     doc: """
