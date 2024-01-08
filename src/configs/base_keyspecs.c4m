@@ -3747,7 +3747,7 @@ this should be equivalent to the uname 'nodename' field.
 
 keyspec _OP_CLOUD_METADATA {
     kind:             RunTimeHost
-    type:             string
+    type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
     shortdoc:         "Cloud metadata during current operation"

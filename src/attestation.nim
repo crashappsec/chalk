@@ -5,8 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import api, base64, chalkjson, config, httpclient, net, os, selfextract, 
-       uri, nimutils/sinks
+import api, base64, chalkjson, config, httpclient, net, os, selfextract, uri
 
 const
   attestationObfuscator = staticExec(
@@ -110,7 +109,7 @@ template callTheSecretService(base: string, prKey: string, apiToken: string, bod
     client:   HttpClient
     context:  SslContext
     response: Response
-  
+
   # This is the id that will be used to identify the secret in the API
   signingID = sha256Hex(attestationObfuscator & prkey)
 
@@ -162,9 +161,9 @@ proc saveToSecretManager*(content: string, prkey: string, apiToken: string): boo
   response = callTheSecretService(base, prkey, apiToken, body, HttpPut)
 
   trace("Sending encrypted secret: " & body)
-  if response.status.startswith("405"):
+  if response.code == Http405:
     info("This secret is already saved.")
-  elif response.status[0] != '2':
+  elif not response.code.is2xx():
     error("When attempting to save signing secret: " & response.status)
     trace(response.body())
     return false
@@ -185,9 +184,9 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
 
   let response = callTheSecretService(base, prKey, apikey, "", HttpGet)
 
-  if response.status[0] != '2':
+  if not response.code.is2xx():
     # authentication issue / token expiration - begin reauth
-    if response.status.startswith("401"):
+    if response.code == Http401:
       # parse json response and save / return values()
       let jsonNodeReason = parseJson(response.body())
       let reasonCode     = jsonNodeReason["Message"].getStr()
@@ -197,7 +196,7 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
         # Remove current API token from self chalk mark
         selfChalk.extract["$CHALK_API_KEY"] = pack("")
 
-        # refresh access_token 
+        # refresh access_token
         let boxedOptRefresh = selfChalkGetKey("$CHALK_API_REFRESH_TOKEN")
         if boxedOptRefresh.isSome():
           let
@@ -215,7 +214,7 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
             return loadFromSecretManager(prkey, $newApiToken)
     else:
       warn("Could not retrieve signing secret: " & response.status & "\n" &
-        "Will not be able to sign / verify.")
+           "Will not be able to sign / verify.")
       return false
 
   var
@@ -232,7 +231,7 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
       raise newException(ValueError, "Nice hex, but wrong size.")
   except:
     error("When loading the signing secret, received an invalid " &
-      "response from server: " & response.status)
+          "response from server: " & response.status)
     return false
 
   trace("Successfully retrieved secret from secret manager.")
@@ -324,7 +323,7 @@ proc commitPassword(pri, apiToken: string, gen: bool) =
 
       if gen:
         printIt = true
-    
+
     else:
       let idString = "The ID of the backed up key is: " & $signingID
       info(idString)
@@ -542,20 +541,20 @@ proc attemptToLoadKeys*(silent=false): bool =
   return true
 
 proc attemptToGenKeys*(): bool =
-  var 
+  var
     apiToken     = ""
     refreshToken = ""
   let use_api    = chalkConfig.getApiLogin()
 
   if use_api:
     # Possible we already have API keys chalked into ourself
-    # refresh token 
+    # refresh token
     let boxedOptRefresh = selfChalkGetKey("$CHALK_API_REFRESH_TOKEN")
     if boxedOptRefresh.isSome():
       let boxedRefresh  = boxedOptRefresh.get()
       refreshToken = unpack[string](boxedRefresh)
       trace("Refresh token retrieved from chalk mark: " & $refreshToken)
-    
+
       # access_token
       let boxedOptAccess = selfChalkGetKey("$CHALK_API_KEY")
       if boxedOptAccess.isSome():
@@ -564,10 +563,10 @@ proc attemptToGenKeys*(): bool =
         trace("Access token retrieved from chalk mark: " & $apiToken)
       else:
         trace("empty access token")
-    
+
     else:
       trace("empty refresh token")
-    
+
     if apiToken == "" or refreshToken == "":
       # could not retreive so requesting new
       trace("Missing token, starting new login..." & apiToken & refreshToken)

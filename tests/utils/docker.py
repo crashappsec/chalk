@@ -151,6 +151,9 @@ class Docker:
         tty: bool = True,
         check: bool = True,
         attach: bool = True,
+        user: Optional[str] = None,
+        volumes: Optional[dict[Path, Path | str]] = None,
+        cwd: Optional[Path] = None,
     ):
         cmd = ["docker", "create"]
         if name:
@@ -161,6 +164,12 @@ class Docker:
             cmd += ["--entrypoint", entrypoint]
         if tty:
             cmd += ["-t"]
+        if user:
+            cmd += ["-u", user]
+        for host, container in (volumes or {}).items():
+            cmd += ["-v", f"{host}:{container}"]
+        if cwd:
+            cmd += ["-w", str(cwd)]
         cmd += [image]
         cmd += params or []
         container_id = run(cmd).text
