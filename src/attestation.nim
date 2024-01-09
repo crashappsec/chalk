@@ -215,13 +215,15 @@ proc restoreSigningKeyFromService*(prkey: string): bool =
     body    = parseHexStr($hexBits)
 
     if len(body) != 40:
-      raise newException(ValueError, "Nice hex, but wrong size.")
+      error(f"Encrypted key returned from server is incorrect size. Received {len(body)} bytes, exected 40 bytes.")
+      return false
+
   except:
-    error("When loading the signing secret, received an invalid " &
-          "response from server: " & response.status)
+    error("When retrieving encrypted key, received an invalid " &
+          "response from service: " & response.status)
     return false
 
-  trace("Successfully retrieved secret from secret manager.")
+  trace("Successfully retrieved encrypted key from backup service.")
 
   var
     nonce = body[0 ..< 16]
