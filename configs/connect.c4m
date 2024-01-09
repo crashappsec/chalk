@@ -1,0 +1,27 @@
+func validate_jwt(token) {
+  # result := ""
+  info("in validator token: " + token)
+  if not is_jwt_valid(token) {
+    return "Invalid JWT token"
+  }
+  return ""
+}
+
+auth_config crashoverride {
+  auth:  "jwt"
+}
+
+parameter auth_config.crashoverride.token {
+  shortdoc:  "foo"
+  doc: "foo"
+  default: ""
+  validator: func validate_jwt(string) -> string
+}
+
+sink_config crashoverride {
+  sink:  "presign"
+  priority: 999999
+  uri:   "https://chalk-test.crashoverride.run/v0.1/report"
+  auth:  "crashoverride"
+}
+subscribe("report", "crashoverride")

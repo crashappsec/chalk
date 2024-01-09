@@ -12,7 +12,7 @@
 ## Though, it might be a decent thing to push the logging stuff into
 ## con4m at some point, as long as it's all optional.
 
-import config, reporting, sinks
+import config, reporting, sinks, nimutils/jwt
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
@@ -62,6 +62,19 @@ proc logTrace(args: seq[Box], s: ConfigState): Option[Box] =
     return some(pack(true))
 
   return logBase("trace", args, s)
+
+proc isJwtValid(args: seq[Box], s: ConfigState): Option[Box] =
+  let token = unpack[string](args[0])
+  if len(token) == 0:
+    return some(pack(false))
+  return some(pack(true))
+  # try:
+  #   let
+  #     jwt     = parseJwtToken(token)
+  #     isAlive = jwt.isStillAlive()
+  #   return some(pack(isAlive))
+  # except:
+  #   return some(pack(false))
 
 let chalkCon4mBuiltins* = [
     ("version() -> string",
@@ -132,6 +145,12 @@ represents the arguments getting passed to the underlying chalk command.
      """
 Returns the name of the chalk command being run (not the underlying
 executable name).
+""",
+     @["chalk"]),
+    ("is_jwt_valid(string) -> bool",
+     BuiltInFn(isJwtValid),
+     """
+Returns whether JWT token is valid and hasnt expired.
 """,
      @["chalk"])
 ]

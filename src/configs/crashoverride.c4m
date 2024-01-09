@@ -22,9 +22,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._OP_IPV6_INTERFACES.use                        = false
   ~key._OP_UDP_SOCKET_INFO.use                        = false
   ~key._OP_TCP_SOCKET_INFO.use                        = false
-  if not in_container() {
-    ~key._OP_ALL_PS_INFO.use                          = false
-  }
+  ~key._OP_ALL_PS_INFO.use                            = false
   ~key.CHALK_VERSION.use                              = true
   ~key.DATE_CHALKED.use                               = false
   ~key.TIME_CHALKED.use                               = false
@@ -41,13 +39,11 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.INJECTOR_COMMIT_ID.use                         = true
   ~key.INJECTOR_ARGV.use                              = true
   ~key.INJECTOR_ENV.use                               = true
-  ~key.TENANT_ID_WHEN_CHALKED.use                     = true
 
   # Runtime host keys.
   ~key._ACTION_ID.use                                 = true
   ~key._ARGV.use                                      = true
   ~key._ENV.use                                       = true
-  ~key._TENANT_ID.use                                 = true
   ~key._OPERATION.use                                 = true
   ~key._TIMESTAMP.use                                 = true
   ~key._DATE.use                                      = false # Go with _DATETIME
@@ -404,47 +400,3 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.$CHALK_COMPONENT_CACHE.use              = false
   ~key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
 }
-
-auth_config crashoverride {
-  ~auth:            "jwt"
-  token:            ""
-}
-
-sink_config crashoverride {
-  enabled:          false
-  ~sink:            "presign"
-  ~priority:        999999
-  ~uri:             "https://chalk-test.crashoverride.run/v0.1/report"
-  ~auth:            "crashoverride"
-}
-
-custom_report crashoverride {
-  enabled:          false
-  ~report_template: "crashoverride"
-  ~sink_configs:    ["crashoverride"]
-  ~use_when:        ["insert", "build", "exec"]
-}
-
-func use_crashoverride(token: string) {
-  info("Enabling chalk CrashOverride console integration - https://crashoverride.run")
-
-  docker.wrap_entrypoint               = true
-  run_sbom_tools                       = true
-  run_sast_tools                       = true
-  ~auth_config.crashoverride.token     = token
-  ~sink_config.crashoverride.enabled   = true
-  ~custom_report.crashoverride.enabled = true
-  ~env_always_show                     = [
-    "AWS_ROLE_ARN",
-    "KUBERNETES_PORT_443_TCP_ADDR",
-    "KUBERNETES_SERVICE_HOST",
-    "K_SERVICE",
-    "PATH",
-    "PWD",
-    "SSH_TTY",
-    "USER",
-    "XDG_SESSION_TYPE",
-  ]
-}
-
-error("!!!! CRASHOVERRIDE CONFIG")

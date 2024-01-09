@@ -333,7 +333,6 @@ const
   ioConfName*         = "configs/ioconfig.c4m"
   attestConfName*     = "configs/attestation.c4m"
   defCfgFname*        = "configs/defaultconfig.c4m"  # Default embedded config.
-  coConfName*         = "configs/crashoverride.c4m"  # config for commercial offering
   chalkC42Spec*       = staticRead(chalkSpecName)
   getoptConfig*       = staticRead(getoptConfName)
   baseConfig*         = staticRead("configs/base_init.c4m") &
@@ -345,13 +344,13 @@ const
                         staticRead("configs/base_report_templates.c4m") &
                         staticRead("configs/base_outconf.c4m") &
                         staticRead("configs/base_sinkconfs.c4m") &
-                        staticRead("configs/dockercmd.c4m")
+                        staticRead("configs/dockercmd.c4m") &
+                        staticRead("configs/crashoverride.c4m")
   sbomConfig*         = staticRead(sbomConfName)
   sastConfig*         = staticRead(sastConfName)
   ioConfig*           = staticRead(ioConfName)
   defaultConfig*      = staticRead(defCfgFname) #& commentC4mCode(ioConfig)
   attestConfig*       = staticRead(attestConfName)
-  coConfig*           = staticRead(coConfName)
   versionStr*         = staticexec("cat ../*.nimble | grep ^version")
   commitID*           = staticexec("git rev-parse HEAD")
   archStr*            = staticexec("uname -m")
