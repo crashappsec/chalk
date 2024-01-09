@@ -2507,7 +2507,7 @@ cryptographically secure source).
 
 The password is NOT stored in the binary. You can choose to provide
 the password via the CHALK_PASSWORD environment variable, or you may
-escrow it in our secret manager.
+escrow it in our backup service.
 
 If this is true, when you set up signing, the password will get
 encrypted by another randomly generated value, stored in your
@@ -2524,11 +2524,11 @@ password from the CHALK_PASSWORD environment variable. If the
 environment variable doesn't exist, what happens next is dependant on
 this variable.
 
-If it's true, then we attempt to query the secret manager before
+If it's true, then we attempt to query the key backup service before
 giving up. If it's false, we immediately move on without signing.
 
-Note that if you provide the environment variable, then the secret
-manager currently does not run. We may eventually make it a fallback.
+Note that if you provide the environment variable, then the key backup
+service currently is not queried. We may eventually make it a fallback.
 """
   }
 
@@ -2556,7 +2556,7 @@ field signing_key_backup_service_auth_config_name {
   field signing_key_backup_service_timeout {
     type:    Duration
     default: << 3 sec >>
-    shortdoc: "HTTPS timeout for secret manager"
+    shortdoc: "HTTPS timeout for request to the key backup service"
     doc: """
 If the timeout is exceeded and the operation fails, chalk will proceed,
 just without doing any signing / verifying.
@@ -2582,7 +2582,7 @@ Chalk will also embed the keypairs internally, for future operations.
     default:  true
     shortdoc: "Use CrashOverride API"
     doc: """
-Enable the use of the Crash Override API for secret management.
+Enable the use of the Crash Override API.
 """
   }
 
