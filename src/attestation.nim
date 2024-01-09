@@ -214,8 +214,8 @@ proc restoreSigningKeyFromService*(prkey: string): bool =
     hexBits = response.body()
     body    = parseHexStr($hexBits)
 
-    if len(body) != 40:
-      error(f"Encrypted key returned from server is incorrect size. Received {len(body)} bytes, exected 40 bytes.")
+    if len(body) != 40: 
+      error("Encrypted key returned from server is incorrect size. Received" & $len(body) & "bytes, exected 40 bytes.")
       return false
 
   except:
