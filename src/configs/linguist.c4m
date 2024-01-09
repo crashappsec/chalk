@@ -1,0 +1,948 @@
+# Ported from https://gitlab.com/gitlab-org/linguist/blob/master/lib/linguist/languages.yml
+# extensions are guaranteed to not have conflicts across languages but alternate extensions
+# might be shared across stacks
+linguist_language ABAP {
+  type: "programming"
+  extension: ".abap"
+}
+
+linguist_language ASP {
+  type: "programming"
+  extension: ".asp"
+  altextensions: [".asax", ".ascx", ".ashx", ".asmx", ".aspx", ".axd"]
+}
+
+linguist_language ActionScript {
+  type: "programming"
+  extension: ".as"
+}
+
+linguist_language Ada {
+  type: "programming"
+  extension: ".adb"
+  altextensions: [".ads"]
+}
+
+linguist_language ApacheConf {
+  type: "markup"
+  extension: ".apacheconf"
+}
+
+linguist_language Apex {
+  type: "programming"
+  extension: ".cls"
+}
+
+linguist_language AppleScript {
+  type: "programming"
+  extension: ".applescript"
+}
+
+linguist_language Arc {
+  type: "programming"
+  extension: ".arc"
+}
+
+linguist_language Arduino {
+  type: "programming"
+  extension: ".ino"
+}
+
+linguist_language AsciiDoc {
+  type: "markup"
+  extension: ".asciidoc"
+  altextensions: [".adoc", ".asc"]
+}
+
+linguist_language Assembly {
+  type: "programming"
+  extension: ".asm"
+}
+
+linguist_language Augeas {
+  type: "programming"
+  extension: ".aug"
+}
+
+linguist_language AutoHotkey {
+  type: "programming"
+  extension: ".ahk"
+}
+
+linguist_language Awk {
+  type: "programming"
+  extension: ".awk"
+  altextensions: [".gawk", ".mawk", ".nawk"]
+}
+
+linguist_language Batchfile {
+  type: "programming"
+  extension: ".bat"
+  altextensions: [".cmd"]
+}
+
+linguist_language Boo {
+  type: "programming"
+  extension: ".boo"
+}
+
+linguist_language Bro {
+  type: "programming"
+  extension: ".bro"
+}
+
+linguist_language C {
+  type: "programming"
+  extension: ".c"
+  altextensions: [".w"]
+}
+
+linguist_language CSharp {
+  type: "programming"
+  extension: ".cs"
+  altextensions: [".csx"]
+}
+
+linguist_language Cpp {
+  type: "programming"
+  extension: ".cpp"
+  altextensions: [".C", ".c++", ".cxx", ".H", ".h++", ".hh", ".hxx", ".tcc"]
+}
+
+linguist_language CObjDump {
+  type: "data"
+  extension: ".c-objdump"
+}
+
+linguist_language C2hsHaskell {
+  type: "programming"
+  extension: ".chs"
+}
+
+linguist_language CLIPS {
+  type: "programming"
+  extension: ".clp"
+}
+
+linguist_language COBOL {
+  type: "programming"
+  extension: ".cob"
+  altextensions: [".cbl", ".ccp", ".cobol", ".cpy"]
+}
+
+linguist_language Ceylon {
+  type: "programming"
+  extension: ".ceylon"
+}
+
+linguist_language Clojure {
+  type: "programming"
+  extension: ".clj"
+  altextensions: [".cljs", ".cljx"]
+}
+
+linguist_language CoffeeScript {
+  type: "programming"
+  extension: ".coffee"
+  altextensions: ["._coffee", ".cson", ".iced"]
+}
+
+linguist_language ColdFusion {
+  type: "programming"
+  extension: ".cfm"
+  altextensions: [".cfc"]
+}
+
+linguist_language CommonLisp {
+  type: "programming"
+  extension: ".lisp"
+  altextensions: [".asd", ".lsp", ".ny", ".podsl"]
+}
+
+linguist_language Con4m {
+  type: "programming"
+  extension: ".c4m"
+  altextensions: [".c42spec", ".con4m"]
+}
+
+linguist_language Coq {
+  type: "programming"
+  extension: ".coq"
+}
+
+linguist_language CppObjDump {
+  type: "data"
+  extension: ".cppobjdump"
+  altextensions: [".c++objdump", ".cxx-objdump"]
+}
+
+linguist_language Creole {
+  type: "markup"
+  extension: ".creole"
+}
+
+linguist_language Cython {
+  type: "programming"
+  extension: ".pyx"
+  altextensions: [".pxd", ".pxi"]
+}
+
+linguist_language D {
+  type: "programming"
+  extension: ".d"
+  altextensions: [".di"]
+}
+
+linguist_language DObjDump {
+  type: "data"
+  extension: ".d-objdump"
+}
+
+linguist_language DOT {
+  type: "programming"
+  extension: ".dot"
+  altextensions: [".gv"]
+}
+
+linguist_language Dart {
+  type: "programming"
+  extension: ".dart"
+}
+
+linguist_language DCPU16ASM {
+  type: "programming"
+  extension: ".dasm16"
+  altextensions: [".dasm"]
+}
+
+linguist_language Dylan {
+  type: "programming"
+  extension: ".dylan"
+}
+
+linguist_language EcereProjects {
+  type: "data"
+  extension: ".epj"
+}
+
+linguist_language Ecl {
+  type: "programming"
+  extension: ".ecl"
+  altextensions: [".eclxml"]
+}
+
+linguist_language Eiffel {
+  type: "programming"
+  extension: ".e"
+}
+
+linguist_language Elixir {
+  type: "programming"
+  extension: ".ex"
+  altextensions: [".exs"]
+}
+
+linguist_language Elm {
+  type: "programming"
+  extension: ".elm"
+}
+
+linguist_language EmacsLisp {
+  type: "programming"
+  extension: ".el"
+  altextensions: [".emacs"]
+}
+
+linguist_language Erlang {
+  type: "programming"
+  extension: ".erl"
+  altextensions: [".hrl"]
+}
+
+linguist_language FSharp {
+  type: "programming"
+  extension: ".fs"
+  altextensions: [".fsi", ".fsx"]
+}
+
+linguist_language FORTRAN {
+  type: "programming"
+  extension: ".f90"
+  altextensions: [".F", ".F03", ".F08", ".F77", ".F90", ".F95", ".FOR", ".FPP", ".f", ".f03", ".f08", ".f77", ".f95", ".for", ".fpp"]
+}
+
+linguist_language Factor {
+  type: "programming"
+  extension: ".factor"
+}
+
+linguist_language Fancy {
+  type: "programming"
+  extension: ".fy"
+  altextensions: [".fancypack"]
+}
+
+linguist_language Fantom {
+  type: "programming"
+  extension: ".fan"
+}
+
+linguist_language Forth {
+  type: "programming"
+  extension: ".fth"
+  altextensions: [".4th"]
+}
+
+linguist_language GAS {
+  type: "programming"
+  extension: ".s"
+  altextensions: [".S"]
+}
+
+linguist_language GLSL {
+  type: "programming"
+  extension: ".glsl"
+  altextensions: [".fp", ".frag", ".geom", ".glslv", ".shader", ".vert"]
+}
+
+linguist_language Go {
+  type: "programming"
+  extension: ".go"
+}
+
+linguist_language Gosu {
+  type: "programming"
+  extension: ".gs"
+}
+
+linguist_language Groovy {
+  type: "programming"
+  extension: ".groovy"
+}
+
+linguist_language HTML {
+  type: "markup"
+  extension: ".html"
+  altextensions: [".htm", ".xhtml"]
+}
+
+linguist_language HTMLDjango {
+  type: "markup"
+  extension: ".mustache"
+  altextensions: [".jinja", ".mustache"]
+}
+
+linguist_language HTMLERB {
+  type: "markup"
+  extension: ".erb"
+  altextensions: [".erb.deface", ".html.erb", ".html.erb.deface"]
+}
+
+linguist_language HTMLPHP {
+  type: "markup"
+  extension: ".phtml"
+}
+
+linguist_language HTTP {
+  type: "data"
+  extension: ".http"
+}
+
+linguist_language Haml {
+  type: "markup"
+  extension: ".haml"
+  altextensions: [".haml.deface", ".html.haml.deface"]
+}
+
+linguist_language Handlebars {
+  type: "markup"
+  extension: ".handlebars"
+}
+
+linguist_language Haskell {
+  type: "programming"
+  extension: ".hs"
+  altextensions: [".hsc"]
+}
+
+linguist_language Haxe {
+  type: "programming"
+  extension: ".hx"
+  altextensions: [".hxsl"]
+}
+
+linguist_language INI {
+  type: "data"
+  extension: ".ini"
+  altextensions: [".ini", ".prefs", ".properties"]
+}
+
+linguist_language Io {
+  type: "programming"
+  extension: ".io"
+}
+
+linguist_language Ioke {
+  type: "programming"
+  extension: ".ik"
+}
+
+linguist_language J {
+  type: "programming"
+  extension: ".ijs"
+}
+
+linguist_language JSON {
+  type: "data"
+  extension: ".json"
+}
+
+linguist_language Java {
+  type: "programming"
+  extension: ".java"
+}
+
+linguist_language JavaScript {
+  type: "programming"
+  extension: ".js"
+  altextensions: ["._js", ".bones", ".jake", ".jsfl", ".jsm", ".jss", ".jsx", ".pac", ".sjs", ".ssjs"]
+}
+
+linguist_language Julia {
+  type: "programming"
+  extension: ".jl"
+}
+
+linguist_language Kotlin {
+  type: "programming"
+  extension: ".kt"
+  altextensions: [".ktm", ".kts"]
+}
+
+linguist_language LFE {
+  type: "programming"
+  extension: ".lfe"
+}
+
+linguist_language Lasso {
+  type: "programming"
+  extension: ".lasso"
+}
+
+linguist_language Less {
+  type: "markup"
+  extension: ".less"
+}
+
+linguist_language LiterateCoffeeScript {
+  type: "programming"
+  extension: ".litcoffee"
+}
+
+linguist_language LiterateHaskell {
+  type: "programming"
+  extension: ".lhs"
+}
+
+linguist_language LiveScript {
+  type: "programming"
+  extension: ".ls"
+  altextensions: ["._ls"]
+}
+
+linguist_language Logos {
+  type: "programming"
+  extension: ".xm"
+  altextensions: [".x", ".xi", ".xmi"]
+}
+
+linguist_language Logtalk {
+  type: "programming"
+  extension: ".lgt"
+  altextensions: [".logtalk"]
+}
+
+linguist_language Lua {
+  type: "programming"
+  extension: ".lua"
+  altextensions: [".nse", ".rbxs"]
+}
+
+linguist_language M {
+  type: "programming"
+  extension: ".mumps"
+  altextensions: [".m"]
+}
+
+linguist_language Markdown {
+  type: "markup"
+  extension: ".md"
+  altextensions: [".markdown", ".mkd", ".mkdown", ".ron"]
+}
+
+linguist_language Matlab {
+  type: "programming"
+  extension: ".matlab"
+}
+
+linguist_language Max {
+  type: "programming"
+  extension: ".mxt"
+  altextensions: [".maxhelp", ".maxpat"]
+}
+
+linguist_language MediaWiki {
+  type: "markup"
+  extension: ".mediawiki"
+}
+
+linguist_language Mirah {
+  type: "programming"
+  extension: ".druby"
+  altextensions: [".duby", ".mir", ".mirah"]
+}
+
+linguist_language Monkey {
+  type: "programming"
+  extension: ".monkey"
+}
+
+linguist_language MoonScript {
+  type: "programming"
+  extension: ".moon"
+}
+
+linguist_language Nemerle {
+  type: "programming"
+  extension: ".n"
+}
+
+linguist_language Nginx {
+  type: "markup"
+  extension: ".nginxconf"
+}
+
+linguist_language Nim {
+  type: "programming"
+  extension: ".nim"
+  altextensions: [".nimrod"]
+}
+
+linguist_language Nu {
+  type: "programming"
+  extension: ".nu"
+}
+
+linguist_language OCaml {
+  type: "programming"
+  extension: ".ml"
+  altextensions: [".eliomi", ".mli", ".mll", ".mly"]
+}
+
+linguist_language ObjDump {
+  type: "data"
+  extension: ".objdump"
+}
+
+linguist_language ObjectiveC {
+  type: "programming"
+  extension: ".m"
+  altextensions: [".mm"]
+}
+
+linguist_language ObjectiveJ {
+  type: "programming"
+  extension: ".j"
+  altextensions: [".sj"]
+}
+
+linguist_language Omgrofl {
+  type: "programming"
+  extension: ".omgrofl"
+}
+
+linguist_language Opa {
+  type: "programming"
+  extension: ".opa"
+}
+
+linguist_language OpenCL {
+  type: "programming"
+  extension: ".cl"
+  altextensions: [".opencl"]
+}
+
+linguist_language OpenEdgeABL {
+  type: "programming"
+  extension: ".p"
+}
+
+linguist_language Org {
+  type: "markup"
+  extension: ".org"
+}
+
+linguist_language PHP {
+  type: "programming"
+  extension: ".php"
+  altextensions: [".aw", ".ctp", ".php3", ".php4", ".php5", ".phpt"]
+}
+
+linguist_language Parrot {
+  type: "programming"
+  extension: ".parrot"
+}
+
+linguist_language ParrotInternalRepresentation {
+  type: "programming"
+  extension: ".pir"
+}
+
+linguist_language ParrotAssembly {
+  type: "programming"
+  extension: ".pasm"
+}
+
+linguist_language Pascal {
+  type: "programming"
+  extension: ".pas"
+  altextensions: [".dfm", ".lpr"]
+}
+
+linguist_language Perl {
+  type: "programming"
+  extension: ".pl"
+  altextensions: [".PL", ".nqp", ".perl", ".ph", ".plx", ".pm6", ".pod", ".psgi"]
+}
+
+linguist_language Pike {
+  type: "programming"
+  extension: ".pike"
+  altextensions: [".pmod"]
+}
+
+linguist_language PogoScript {
+  type: "programming"
+  extension: ".pogo"
+}
+
+linguist_language PowerShell {
+  type: "programming"
+  extension: ".ps1"
+}
+
+linguist_language Processing {
+  type: "programming"
+  extension: ".pde"
+}
+
+linguist_language Prolog {
+  type: "programming"
+  extension: ".prolog"
+  altextensions: [".pro"]
+}
+
+linguist_language Puppet {
+  type: "programming"
+  extension: ".pp"
+  altextensions: [".pp"]
+}
+
+linguist_language PureData {
+  type: "programming"
+  extension: ".pd"
+}
+
+linguist_language Python {
+  type: "programming"
+  extension: ".py"
+  altextensions: [".gyp", ".pyt", ".pyw", ".wsgi", ".xpy"]
+}
+
+linguist_language Pythontraceback {
+  type: "data"
+  extension: ".pytb"
+}
+
+linguist_language R {
+  type: "programming"
+  extension: ".r"
+}
+
+linguist_language RDoc {
+  type: "markup"
+  extension: ".rdoc"
+}
+
+linguist_language RHTML {
+  type: "markup"
+  extension: ".rhtml"
+}
+
+linguist_language Racket {
+  type: "programming"
+  extension: ".rkt"
+  altextensions: [".rktd", ".rktl"]
+}
+
+linguist_language RagelinRubyHost {
+  type: "programming"
+  extension: ".rl"
+}
+
+linguist_language Rebol {
+  type: "programming"
+  extension: ".rebol"
+  altextensions: [".r2", ".r3"]
+}
+
+linguist_language Rouge {
+  type: "programming"
+  extension: ".rg"
+}
+
+linguist_language Ruby {
+  type: "programming"
+  extension: ".rb"
+  altextensions: [".builder", ".gemspec", ".god", ".irbrc", ".podspec", ".rbuild", ".rbw", ".rbx", ".ru", ".thor", ".watchr"]
+}
+
+linguist_language Rust {
+  type: "programming"
+  extension: ".rs"
+}
+
+linguist_language SCSS {
+  type: "markup"
+  extension: ".scss"
+}
+
+linguist_language SQL {
+  type: "data"
+  extension: ".sql"
+}
+
+linguist_language Sage {
+  type: "programming"
+  extension: ".sage"
+}
+
+linguist_language Sass {
+  type: "markup"
+  extension: ".sass"
+}
+
+linguist_language Scala {
+  type: "programming"
+  extension: ".scala"
+}
+
+linguist_language Scheme {
+  type: "programming"
+  extension: ".scm"
+  altextensions: [".sls", ".ss"]
+}
+
+linguist_language Scilab {
+  type: "programming"
+  extension: ".sci"
+}
+
+linguist_language Self {
+  type: "programming"
+  extension: ".self"
+}
+
+linguist_language Shell {
+  type: "programming"
+  extension: ".sh"
+  altextensions: [".tmux"]
+}
+
+linguist_language Slash {
+  type: "programming"
+  extension: ".sl"
+}
+
+linguist_language Smalltalk {
+  type: "programming"
+  extension: ".st"
+}
+
+linguist_language Squirrel {
+  type: "programming"
+  extension: ".nut"
+}
+
+linguist_language StandardML {
+  type: "programming"
+  extension: ".sml"
+}
+
+linguist_language SuperCollider {
+  type: "programming"
+  extension: ".sc"
+}
+
+linguist_language TOML {
+  type: "data"
+  extension: ".toml"
+}
+
+linguist_language TXL {
+  type: "programming"
+  extension: ".txl"
+}
+
+linguist_language Tcl {
+  type: "programming"
+  extension: ".tcl"
+}
+
+linguist_language Tcsh {
+  type: "programming"
+  extension: ".tcsh"
+  altextensions: [".csh"]
+}
+
+linguist_language TeX {
+  type: "markup"
+  extension: ".tex"
+  altextensions: [".aux", ".dtx", ".ins", ".ltx", ".sty", ".toc"]
+}
+
+linguist_language Tea {
+  type: "markup"
+  extension: ".tea"
+}
+
+linguist_language Textile {
+  type: "markup"
+  extension: ".textile"
+}
+
+linguist_language Turing {
+  type: "programming"
+  extension: ".t"
+  altextensions: [".tu"]
+}
+
+linguist_language Twig {
+  type: "markup"
+  extension: ".twig"
+}
+
+linguist_language TypeScript {
+  type: "programming"
+  extension: ".ts"
+}
+
+linguist_language UnifiedParallelC {
+  type: "programming"
+  extension: ".upc"
+}
+
+linguist_language VHDL {
+  type: "programming"
+  extension: ".vhdl"
+}
+
+linguist_language Vala {
+  type: "programming"
+  extension: ".vala"
+  altextensions: [".vapi"]
+}
+
+linguist_language Verilog {
+  type: "programming"
+  extension: ".v"
+  altextensions: [".sv", ".svh", ".vh"]
+}
+
+linguist_language VimL {
+  type: "programming"
+  extension: ".vim"
+}
+
+linguist_language VisualBasic {
+  type: "programming"
+  extension: ".vb"
+  altextensions: [".bas", ".frx", ".vba", ".vbs"]
+}
+
+linguist_language Volt {
+  type: "programming"
+  extension: ".volt"
+}
+
+linguist_language XC {
+  type: "programming"
+  extension: ".xc"
+}
+
+linguist_language XML {
+  type: "markup"
+  extension: ".xml"
+  altextensions: [".axml", ".ccxml", ".dita", ".ditamap", ".ditaval", ".glade", ".grxml", ".kml", ".mxml", ".plist", ".pt", ".rdf", ".rss", ".scxml", ".svg", ".tmCommand", ".tmLanguage", ".tmPreferences", ".tmSnippet", ".tmTheme", ".tml", ".ui", ".vxml", ".wsdl", ".wxi", ".wxl", ".wxs", ".x3d", ".xaml", ".xlf", ".xliff", ".xmi", ".xsd", ".xul", ".zcml"]
+}
+
+linguist_language XProc {
+  type: "programming"
+  extension: ".xpl"
+  altextensions: [".xproc"]
+}
+
+linguist_language XQuery {
+  type: "programming"
+  extension: ".xquery"
+  altextensions: [".xq", ".xqy"]
+}
+
+linguist_language XSLT {
+  type: "programming"
+  extension: ".xslt"
+  altextensions: [".xsl"]
+}
+
+linguist_language Xtend {
+  type: "programming"
+  extension: ".xtend"
+}
+
+linguist_language YAML {
+  type: "data"
+  extension: ".yml"
+  altextensions: [".reek", ".yaml"]
+}
+
+linguist_language eC {
+  type: "programming"
+  extension: ".ec"
+  altextensions: [".eh"]
+}
+
+linguist_language edn {
+  type: "data"
+  extension: ".edn"
+}
+
+linguist_language fish {
+  type: "programming"
+  extension: ".fish"
+}
+
+linguist_language ooc {
+  type: "programming"
+  extension: ".ooc"
+}
+
+linguist_language reStructuredText {
+  type: "markup"
+  extension: ".rst"
+  altextensions: [".rest"]
+}
+
+linguist_language wisp {
+  type: "programming"
+  extension: ".wisp"
+}

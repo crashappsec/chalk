@@ -1,0 +1,261 @@
+common_excluded_filetypes := [".pyc", ".yml", ".yaml", ".json", ".tmp", ".md", ".txt", ".c4m", ".lock"]
+head_limit := 50
+
+tech_stack_rule sqlite_generic {
+  regex: "sqlite:\/\/"
+  category: "database"
+  subcategory: "sqlite"
+  description: "sqlite uris"
+  file_scope {
+    excluded_filetypes: common_excluded_filetypes
+  }
+}
+
+tech_stack_rule postgresql_generic {
+  regex: "\b(postgresql|pgclient|pgsql|pgdatabase)\b"
+  category: "database"
+  subcategory: "postgreSQL"
+  description: "postgresSQL common regex"
+  file_scope {
+    excluded_filetypes: common_excluded_filetypes
+  }
+}
+
+tech_stack_rule postgresql_php {
+  regex: "(->.*(postgres|pgsql)|(pgsql|postgres).*->)"
+  category: "database"
+  subcategory: "postgreSQL"
+  description: "postgresql expressions used in php"
+  file_scope {
+    filetypes: [".php"]
+  }
+}
+
+tech_stack_rule oracle_generic {
+  regex: "(oracledb|oraclient|oradatabase)"
+  category: "database"
+  subcategory: "oracle"
+  description: "oracle common regex"
+  file_scope {
+    excluded_filetypes: common_excluded_filetypes
+  }
+}
+
+tech_stack_rule mongodb_generic {
+  regex: "\b(mongodb|mongoclient|mongodbdriver|mongodatabase)\b"
+  category: "database"
+  subcategory: "mongoDB"
+  description: "mongoDB common regex"
+  file_scope {
+    excluded_filetypes: common_excluded_filetypes
+  }
+}
+
+tech_stack_rule mysql_python {
+  regex: "^import\s+(mysql.connector|pymysql|MySQLdb)\b"
+  category: "database"
+  subcategory: "mySQL"
+  description: "Import of common packages related to mysql in Python"
+  file_scope {
+    filetypes: [".py"]
+    head: head_limit
+  }
+}
+
+tech_stack_rule mysql_generic {
+  regex: "mysql:\/\/[a-zA-Z0-9_]+:[a-zA-Z0-9_]+@[\w\.]+\/[a-zA-Z0-9_]+"
+  category: "database"
+  subcategory: "mySQL"
+  description: "generic mysql uri"
+  file_scope {
+    excluded_filetypes: common_excluded_filetypes
+  }
+}
+
+tech_stack_rule mysql_php {
+  regex: "(mysqli|mysql\_.*|PDO::MYSQL|pdo::mysql|pdo.mysql|->mysql)"
+  category: "database"
+  subcategory: "mySQL"
+  description: "mysql expressions related to php"
+  file_scope {
+    filetypes: [".php"]
+  }
+}
+
+tech_stack_rule mysql_go {
+  regex: "^import\s+.*/mysql"
+  category: "database"
+  subcategory: "mySQL"
+  description: "mysql expressions related to golang"
+  file_scope {
+    filetypes: [".go"]
+    head: head_limit
+  }
+}
+
+tech_stack_rule mysql_js {
+  regex: "^\s*require\(.mysql.+\);"
+  category: "database"
+  subcategory: "mySQL"
+  description: "mysql require statements in JS / TS"
+  file_scope {
+    filetypes: [".js", ".ts"]
+    head: head_limit
+  }
+}
+
+tech_stack_rule mysql_java {
+  regex: "jdbc:mysql:"
+  category: "database"
+  subcategory: "mySQL"
+  description: "Java jdbc and misc mysql-related statements"
+  file_scope {
+    filetypes: [".java"]
+  }
+}
+
+tech_stack_rule ms_sql {
+  regex: "\b(?:mssql|sqlserver|ms_sql)\b"
+  category: "database"
+  subcategory: "microsoftSQLServer"
+  description: "MS SQL"
+  file_scope {
+    excluded_filetypes: common_excluded_filetypes
+  }
+}
+
+tech_stack_rule ms_access_java {
+  regex: "\b(jdbc:odbc:|ucanaccess|msaccess|jackcess)\b"
+  category: "database"
+  subcategory: "microsoftAccess"
+  description: "MS Access Generic"
+  file_scope {
+    filetypes: [".java"]
+  }
+}
+
+tech_stack_rule firebase_python {
+  regex: "^import\s+fdb\b"
+  category: "database"
+  subcategory: "firebird"
+  description: "Firebird python related packages"
+  file_scope {
+    filetypes: [".py"]
+    head: head_limit
+  }
+}
+
+tech_stack_rule firebase_generic {
+  regex: "(using\s+FirebirdSql.Data.FirebirdClient|^include\s+.ibpp.h.|^require\(.node-firebird.\)|^require\s+.fb.\b)"
+  category: "database"
+  subcategory: "firebird"
+  description: "Firebird python related packages"
+  file_scope {
+    excluded_filetypes: common_excluded_filetypes
+  }
+}
+
+tech_stack_rule hypersonicsql_generic {
+  regex: "\b(hsqldb|HyperSQL|.*org.hsqldb.jdbc.*)\b"
+  category: "database"
+  subcategory: "hypersonicSQL"
+  description: "HSQLDB related"
+  file_scope {
+    excluded_filetypes: common_excluded_filetypes
+  }
+}
+
+tech_stack_rule ibmdb2_generic {
+  regex: "(db2jcc|com\.ibm\.db2\.jdbc|ibm_db|ibm_db_dbi)"
+  category: "database"
+  subcategory: "ibmDb2"
+  description: "IBM DB2 related"
+  file_scope {
+    excluded_filetypes: common_excluded_filetypes
+  }
+}
+
+tech_stack_rule ibmdb2_java {
+  regex: "import\s+com.ibm.db2.jcc.DB2Driver"
+  category: "database"
+  subcategory: "ibmDb2"
+  description: "IBM DB2 related"
+  file_scope {
+    filetypes: [".java"]
+    head: head_limit
+  }
+}
+
+
+tech_stack_rule nginx_conf {
+  regex: "^\s*(server_name|listen|location|proxy_pass|root|try_files)\s"
+  category: "webServer"
+  subcategory: "nginx"
+  description: "common directives in nginx configurations"
+  file_scope {
+    filetypes: [".conf"]
+  }
+}
+
+tech_stack_rule nginx_host {
+  regex: "."
+  category: "webServer"
+  subcategory: "nginx"
+  description: "nginx config path"
+  rule_scope: "HOST"
+  file_scope {
+    filepaths: ["/etc/nginx/nginx.conf"]
+  }
+}
+
+tech_stack_rule apache_conf {
+  regex: "^\s*(DocumentRoot|ServerName|ProxyPass|RewriteEngine|DirectoryIndex)\s"
+  category: "webServer"
+  subcategory: "apache"
+  description: "common directives in apache configurations"
+  file_scope {
+    filetypes: [".conf"]
+  }
+}
+
+tech_stack_rule apache_host {
+  regex: "."
+  category: "webServer"
+  subcategory: "apache"
+  description: "apache config path"
+  rule_scope: "HOST"
+  file_scope {
+    filepaths: ["/etc/apache2/httpd.conf", "/etc/httpd/httpd.conf"]
+  }
+
+}
+
+tech_stack_rule iis_conf {
+  regex: "<system.webServer|<iis"
+  category: "webServer"
+  subcategory: "iis"
+  description: "common directives in IIS configurations"
+  file_scope {
+    filetypes: [".xml", ".config"]
+  }
+}
+
+tech_stack_rule ldap_generic {
+  regex: "ldap:\/\/"
+  category: "protocol"
+  subcategory: "ldap"
+  description: "use of ldap uris"
+  file_scope {
+    excluded_filetypes: common_excluded_filetypes
+  }
+}
+
+tech_stack_rule java_spring_generic {
+  regex: "(?:@Component|@Repository|@Service|@Controller|@Configuration|@Autowired|@Qualifier|@Value|@RequestMapping|@PathVariable|@RequestParam|@ResponseBody|@ResponseStatus|@ExceptionHandler|@Transactional|@PostConstruct|@PreDestroy)\b"
+  category: "framework"
+  subcategory: "javaSpring"
+  description: "common directives in the Java Spring framework"
+  file_scope {
+    filetypes: [".java"]
+  }
+}

@@ -453,6 +453,148 @@ failure, and no other keys will be checked.
   }
 }
 
+linguist_types := ["programming", "data", "markup"]
+object linguist_language {
+  user_def_ok:   false
+  gen_fieldname: "linguist_languages"
+  gen_typename:  "LinguistLanguage"
+  gen_setters:   false
+
+  field type {
+    type:    string
+    require: true
+    choice: linguist_types
+  }
+
+  field extension {
+    type:    string
+    require: true
+  }
+
+  field altextensions {
+    type:    list[string]
+    require: false
+  }
+
+}
+
+
+valid_tech_stack_categories := ["database", "webServer", "protocol", "framework"]
+valid_tech_stack_database_types := ["firebird", "hypersonicSQL",
+    "ibmDb2", "microsoftAccess", "microsoftSQLServer",
+     "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other"]
+
+valid_tech_stack_web_server_types := ["apache", "nginx", "iis"]
+valid_tech_stack_protocol_types := ["ldap"]
+valid_tech_stack_framework_types := ["javaSpring"]
+
+valid_subcategory_types := ["firebird", "hypersonicSQL",
+    "ibmDb2", "microsoftAccess", "microsoftSQLServer",
+     "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other",
+     "apache", "nginx", "iis", "ldap", "javaSpring"]
+
+
+valid_tech_stack_scope := ["HOST", "DIR"]
+
+object tech_stack_rule {
+  user_def_ok:   false
+  gen_fieldname: "techStackRules"
+  gen_typename:  "TechStackRule"
+  gen_setters:   false
+
+  field regex {
+    type:    string
+    require: true
+  }
+
+  field description {
+    type:    string
+    default: ""
+  }
+
+  field category {
+    type: string
+    require: true
+    choice:   valid_tech_stack_categories
+  }
+
+  field subcategory {
+    type: string
+    require: true
+    choice: valid_subcategory_types
+  }
+
+  field rule_scope {
+    type: string
+    default: "DIR"
+    choice:   valid_tech_stack_scope
+  }
+
+  allow file_scope
+}
+
+scope_head_max := 500
+
+singleton file_scope {
+  user_def_ok: false
+  gen_fieldname: "fileScope"
+  gen_typename:  "FileScope"
+  gen_setters: false
+
+  # TODO add support for include_regex, exclude_regex. This generic regex
+  # could replace most directives here but it will probably be more expensive
+  # and error prone
+  field filepaths {
+    type:    list[string]
+    require: false
+    doc: """
+Exact (full) paths of files to which this scope applies. A path set in this field
+will override any excluded filetype, and those filepaths will be getting examined
+regardless of whether they are part of the working directory.
+"""
+  }
+
+  # TODO add a validation that a file that is included in this is list cannot
+  # be part of a passed filepaths list
+  field excluded_filepaths {
+    type:    list[string]
+    require: false
+    doc: """
+Exact (full) paths of files to which this scope does not apply. A path set in this field
+will override any filetype directive, and those filepaths will not be getting examined
+regardless of whether they are part of the working directory.
+"""
+  }
+
+  # TODO constrain to list of known filetypes via validation
+  field filetypes {
+    type:    list[string]
+    require: false
+    doc: """
+File extensions that should be considered for a given rule.
+"""
+  }
+
+  exclusions {
+    filetypes: "excluded_filetypes"
+  }
+
+  field excluded_filetypes {
+    type:    list[string]
+    require: false
+    doc: """
+File extensions that should be ignored for a given rule. Any files that are
+defined in the filepaths directive will be getting considered regardless.
+"""
+  }
+
+  # TODO use warn function returning an empty string for large values
+  field head {
+    type:    int
+    default: scope_head_max
+  }
+}
+
 object keyspec {
   user_def_ok:   false
   gen_fieldname: "keyspecs"
@@ -2166,6 +2308,8 @@ root {
   allow env_config
   allow source_marks
   allow cloud_provider
+  allow tech_stack_rule
+  allow linguist_language
 
   shortdoc: "Chalk Configuration Options"
 
@@ -2945,6 +3089,15 @@ To skip the pager on the command line, use the `--no-pager` flag.
     hidden:     true
     doc:        "The default value is the one used for anonymous users."
   }
+
+  field use_tech_stack_detection {
+    type:    bool
+    default: false
+    shortdoc: "Try to infer tech stacks used"
+    doc: """
+Enable experimental tech stack detection via regexes
+"""
+}
 }
 
 func keyspec_exists(name) {
