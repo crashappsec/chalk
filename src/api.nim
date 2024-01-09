@@ -40,7 +40,7 @@ proc refreshAccessToken*(refresh_token: string): string =
   let response  = client.safeRequest(url = refresh_url, httpMethod = HttpPost, body = $refresh_token)
   client.close()
 
-  if response.status.startswith("200"):
+  if response.code.is2xx():
     # parse json response and save / return values
     let
       jsonNode         = parseJson(response.body())
@@ -107,7 +107,7 @@ proc getChalkApiToken*(): (string, string) =
   response  = client.safeRequest(url = login_url, httpMethod = HttpPost, body = "")
   client.close()
 
-  if response.status.startswith("200"):
+  if response.code.is2xx():
     # parse json response and save / return values
     let jsonNode = parseJson(response.body())
     authId       = jsonNode["id"].getStr()
@@ -139,7 +139,7 @@ proc getChalkApiToken*(): (string, string) =
         clientPoll.close()
 
         # check response - HTTP 200 = yes, HTTP 428 = Not yet
-        if responsePoll.status.startswith("200"):
+        if responsePoll.code.is2xx():
           authnSuccess = true
           eraseLine()
           stdout.write(succFr)
@@ -155,7 +155,7 @@ proc getChalkApiToken*(): (string, string) =
           pollPayloadBase64  = jwtSplitAndDecode($accessToken, true)
           ret = ($accessToken, $refreshToken)
 
-        elif responsePoll.status.startswith("428") or responsePoll.status.startswith("403"):
+        elif responsePoll.code in [Http428, Http403]:
           # sleep for requested polling period while showing spinner before polling again
 
           # restart spinner animation - reset vars

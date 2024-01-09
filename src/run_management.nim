@@ -9,7 +9,7 @@
 ## setting, status stuff, and the core scan state ("collection
 ## contexts"), that the subscan module pushes and pops.
 
-import chalk_common, posix, std/monotimes
+import chalk_common, posix, std/[monotimes, enumerate]
 export chalk_common
 
 var
@@ -127,6 +127,9 @@ template setIfNotEmpty*[T](dict: ChalkDict, key: string, val: seq[T]) =
   if len(val) > 0:
     dict[key] = pack[seq[T]](val)
 
+template setFromEnvVar*(dict: ChalkDict, key: string, default: string = "") =
+  dict.setIfNotEmpty(key, os.getEnv(key, default))
+
 proc idFormat*(rawHash: string): string =
   let s = base32vEncode(rawHash)
   s[0 ..< 6] & "-" & s[6 ..< 10] & "-" & s[10 ..< 14] & "-" & s[14 ..< 20]
@@ -139,7 +142,10 @@ template isSubscribedKey*(key: string): bool =
 
 template setIfSubscribed[T](d: ChalkDict, k: string, v: T) =
   if isSubscribedKey(k):
-    d[k] = pack[T](v)
+    when T is Box:
+      d[k] = v
+    else:
+      d[k] = pack[T](v)
 
 template setIfNeeded*[T](o: ChalkDict, k: string, v: T) =
   when T is string:
@@ -148,6 +154,9 @@ template setIfNeeded*[T](o: ChalkDict, k: string, v: T) =
   elif T is seq or T is ChalkDict:
     if len(v) != 0:
       setIfSubscribed(o, k, v)
+  elif T is Option:
+    if v.isSome():
+      setIfSubscribed(o, k, v.get())
   else:
     setIfSubscribed(o, k, v)
 
@@ -156,6 +165,23 @@ template setIfNeeded*[T](o: ChalkObj, k: string, v: T) =
 
 proc isChalkingOp*(): bool =
   return commandName in chalkConfig.getValidChalkCommandNames()
+
+proc lookupByPath*(obj: ChalkDict, path: string): Option[Box] =
+  let
+    parts    = path.split(".")
+    chalkKey = parts[0]
+  if chalkKey notin obj:
+    return none(Box)
+  var value = obj
+  for (i, p) in enumerate(parts[0..^1]):
+    try:
+      if i == len(parts) - 1:
+        return some(value[p])
+      else:
+        value = unpack[ChalkDict](value[p])
+    except:
+      return none(Box)
+  return none(Box)
 
 proc lookupCollectedKey*(obj: ChalkObj, k: string): Option[Box] =
   if k in hostInfo:          return some(hostInfo[k])

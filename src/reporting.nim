@@ -10,7 +10,6 @@
 import config, chalkjson, reportcache, sinks, collect
 
 proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
-
   if doingTestRun:
     return some(pack(true))
 
@@ -20,13 +19,15 @@ proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
     `rec?` = getSinkConfigByName(config)
 
   if `rec?`.isNone():
-    error(config & ": unknown sink configuration")
+    error(config & ": unknown sink configuration while subscribing for topic " & topic)
     return some(pack(false))
 
-  let
-    record   = `rec?`.get()
-    `topic?` = subscribe(topic, record)
+  let record = `rec?`.get()
+  if not record.enabled:
+    warn(config & ": sink is not enabled and cannot be subscribed for topic " & topic)
+    return some(pack(false))
 
+  let `topic?` = subscribe(topic, record)
   if `topic?`.isNone():
     error(topic & ": unknown topic")
     return some(pack(false))

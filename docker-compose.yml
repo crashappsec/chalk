@@ -119,9 +119,9 @@ services:
     security_opt:
       - seccomp=unconfined # for gdb
     volumes:
-      - .:/chalk
+      - $PWD:$PWD
       - /var/run/docker.sock:/var/run/docker.sock
-    working_dir: /chalk/tests
+    working_dir: $PWD/tests
     networks:
       - chalk
       - imds

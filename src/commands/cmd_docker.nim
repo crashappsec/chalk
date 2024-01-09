@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -81,7 +81,7 @@ proc writeChalkMark(ctx: DockerInvocation, mark: string) =
     info("Creating temporary chalk file: " & path)
     f.writeLine(mark)
     f.close()
-    ctx.makeFileAvailableToDocker(path, move=true, newName="chalk.json")
+    ctx.makeFileAvailableToDocker(path, move=true, newName="chalk.json", chmod="0444")
   except:
     error("Unable to write to open tmp file (disk space?)")
     raise newException(ValueError, "fs write")
@@ -303,8 +303,9 @@ proc formatExecString(command: string): string =
               " -- " & parts[1]
             else:
               ""
+  # In shell form, be a good citizen and exec so that `sh` isn't pid 1
   return strutils.strip("exec /chalk exec --exec-command-name " &
-    name & args)
+                        name & args)
 
 proc formatExecArray(args: JsonNode): string =
   let arr = `%*`(["/chalk", "exec", "--exec-command-name"])
@@ -316,29 +317,44 @@ proc formatExecArray(args: JsonNode): string =
     i.inc()
   return $(arr)
 
+template formatExec(command: string, args: JsonNode): string =
+  if command != "":
+    formatExecString(command)
+  else:
+    formatExecArray(args)
+
 proc rewriteEntryPoint*(ctx: DockerInvocation) =
+  let
+    wrapCmd        = chalkConfig.dockerConfig.getWrapCmd()
   var
     lastEntryPoint = EntryPointInfo(nil)
     lastCmd        = CmdInfo(nil)
-    newInstruction: string
+    newInstruction:  string
+    wrapping:        string
 
   for section in ctx.dfSections:
     if section.entryPoint != nil:
       section.entryPoint.noBadJson()
       lastEntryPoint = section.entryPoint
-
     if section.cmd != nil:
       section.cmd.noBadJson()
       lastCmd = section.cmd
 
-  info("Attempting to wrap container entry point.")
-
-  if lastCmd == nil and lastEntryPoint == nil:
-    # TODO: probably could wrap a /bin/sh -c invocation, but
-    # we would need to worry about how to get access to any
-    # inherited CMD params.
-    warn("Cannot wrap; no entry information found in Dockerfile")
-    return
+  if lastEntryPoint == nil:
+    if wrapCmd:
+      if lastCmd == nil:
+        warn("Cannot wrap; no ENTRYPOINT or CMD found in Dockerfile")
+        return
+      else:
+        trace("No ENTRYPOINT; Wrapping image CMD")
+    else:
+      if lastCmd != nil:
+        warn("Cannot wrap; no ENTRYPOINT in Dockerfile but there is CMD. " &
+             "To wrap CMD enable 'docker.wrap_cmd' config option")
+        return
+      else:
+        warn("Cannot wrap; no ENTRYPOINT found in Dockerfile")
+        return
 
   let
     binaryToCopy = ctx.findProperBinaryToCopyIntoContainer()
@@ -347,7 +363,7 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
     # Already got a warning.
     return
 
-  info("Wrapping entry point with this chalk binary: " & binaryToCopy)
+  info("Wrapping docker image with this chalk binary: " & binaryToCopy)
   try:
     ctx.makeFileAvailableToDocker(binaryToCopy, move=false, chmod="0755",
                                   newname="chalk")
@@ -356,32 +372,27 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
     return
 
   if lastEntryPoint != nil:
+    wrapping = "ENTRYPOINT"
     # When they specify ENTRYPOINT, we can safely ignore CMD, because
     # either ENTRYPOINT is in JSON (in which case CMD will get used but
     # will stay the same) or it will be a string, in which case CMD
     # will get ignored, as long as we keep ENTRYPOINT in string form.
-    if lastEntryPoint.str != "":
-      # In shell form, be a good citizen and exec so that `sh` isn't pid 1
-      newInstruction =  "ENTRYPOINT " & formatExecString(lastEntryPoint.str)
-    else:
-      newInstruction = "ENTRYPOINT " & formatExecArray(lastEntryPoint.json)
+    newInstruction = formatExec(lastEntrypoint.str, lastEntryPoint.json)
+
   else:
-      # If we only have a CMD:
-      # 1. shell form executes the full thing.
-      # 2. exec form I *think* the args are always passed and it could
-      #    be lifted to a ENTRYPOINT; I need to validate. If I'm wrong,
-      #    then we have to chop off the first item in the CMD .
-      #
-      # Right now, we add in a new CMD, which should override the old one.
-      # If not, we'll have to explicitly skip it.
+    wrapping = "CMD"
+    # If we only have a CMD:
+    # 1. shell form executes the full thing.
+    # 2. exec form I *think* the args are always passed and it could
+    #    be lifted to a ENTRYPOINT; I need to validate. If I'm wrong,
+    #    then we have to chop off the first item in the CMD .
+    #
+    # Right now, we add in a new CMD, which should override the old one.
+    # If not, we'll have to explicitly skip it.
+    newInstruction = formatExec(lastCmd.str, lastCmd.json)
 
-    if lastCmd.str != "":
-      newInstruction = "CMD " & formatExecString(lastCmd.str)
-    else:
-      newInstruction = "CMD " & formatExecArray(lastCmd.json)
-
-  ctx.addedInstructions.add(newInstruction)
-  info("Entry point wrapped.")
+  ctx.addedInstructions.add(wrapping & " " & newInstruction)
+  info("docker: " & wrapping & " wrapped.")
   trace("Added instructions: \n" & ctx.addedInstructions.join("\n"))
 
 proc isValidEnvVarName(s: string): bool =

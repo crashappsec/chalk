@@ -1,1 +1,3 @@
-cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path: "/tmp/vendor"
+if env_exists("VENDOR") {
+  cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path: env("VENDOR")
+}

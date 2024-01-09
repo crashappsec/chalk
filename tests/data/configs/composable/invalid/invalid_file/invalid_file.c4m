@@ -1,1 +1,1 @@
-use aaa from "/chalk/tests/data/configs/composable/invalid/invalid_file"
+use aaa from "[[configs]]/composable/invalid/invalid_file"

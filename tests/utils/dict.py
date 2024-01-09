@@ -126,6 +126,8 @@ class ContainsMixin(dict):
             message = f"{{{key!r}: {value!r}}} != {{{key!r}: {expected!r}}}"
             if expected is ANY:
                 pass  # dont assert anything about the value
+            elif isinstance(expected, type):
+                assert isinstance(value, expected), message
             elif isinstance(expected, dict):
                 assert isinstance(value, dict), message
                 assert self.__class__(value).contains(expected)
