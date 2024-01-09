@@ -103,7 +103,9 @@ generate_keypair(char **s1, char **s2) {
 template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: untyped,
                               mth: untyped): Response =
   let
+    # Timeout asssociated with the signing key backup service
     timeout:      int    = cast[int](chalkConfig.getSigningKeyBackupServiceTimeout())
+    # Name of the auth config section to load from the config which contains the jwt
     auth_config:  string = chalkConfig.getSigningKeyBackupServiceAuthConfigName()
   var
     url:      string
@@ -125,8 +127,6 @@ template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: un
   else:
     url = base & "/" & signingID
 
-  # ToDo Rich - - Unhardcode the auth config name - get from 'signing_key_backup_auth_config_name' field 
-  #let authOpt = getAuthConfigByName("crashoverride")
   let authOpt = getAuthConfigByName(auth_config)
   if authOpt.isNone():
     error("Could not retrieve Chalk Data API token from configuration profile. Unable to use Signing Key Backup Service.")
