@@ -245,8 +245,6 @@ outconf = {
     "dump",
     "setup",
     "docker",
-    "login",
-    "logout",
 }
 
 

@@ -17,7 +17,7 @@ const allConfigVarSections = ["", "docker", "exec", "extract", "env_config",
 
 # Same here, should generate via API.
 const allCommandSections = ["", "insert", "docker", "extract", "extract.images",
-                            "extract.containers", "extract.all", "exec",
+                            "extract.containers", "extract.all", "exec", 
                             "setup", "setup.gen", "setup.load", "env",
                             "config", "dump", "load", "delete", "version"]
 

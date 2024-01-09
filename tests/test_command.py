@@ -186,7 +186,7 @@ def test_setup(chalk_copy: Chalk):
         command="setup",
         no_api_login=True,
         log_level="error",
-        config=CONFIGS / "nosecretmanager.c4m",
+        config=CONFIGS / "nosigningkeybackup.c4m",
     )
 
     report = result.report

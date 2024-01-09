@@ -151,14 +151,6 @@ function _chalk_toplevel_completions {
             _chalk_shift_one
             _chalk_help_completions
             ;;
-        login)
-            _chalk_shift_one
-            _chalk_login_completions
-            ;;
-        logout)
-            _chalk_shift_one
-            _chalk_logout_completions
-            ;;
         *)
             if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]] ; then
                 _chalk_shift_one

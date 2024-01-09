@@ -53,12 +53,7 @@ outconf dump {
 
 outconf setup {
   mark_template:          "mark_default"
-  report_template:        "insertion_default"      
-}
-
-outconf logout {
-  mark_template:          "mark_default"
-  report_template:        "report_default"
+  report_template:        "insertion_default"
 }
 
 # This is only used when the 'docker' command is run for an unknown
@@ -66,11 +61,6 @@ outconf logout {
 
 outconf docker {
   report_template:        "unknown_docker"
-}
-
-outconf login {
-  mark_template:          "mark_default"
-  report_template:        "insertion_default"
 }
 
 custom_report chalk_usage_stats {
