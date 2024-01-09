@@ -12,7 +12,7 @@ packages = [{include = "server"}]
 chalkserver = "server.__main__:main"
 
 [tool.poetry.dependencies]
-cryptography = "^41.0.4"
+cryptography = "^41.0.6"
 fastapi = "^0.100.1"
 pydantic = ">=2.0.0"
 python = "^3.11"
