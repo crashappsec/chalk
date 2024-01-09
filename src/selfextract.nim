@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -214,16 +214,17 @@ proc testConfigFile*(uri: string, newCon4m: string, params: seq[Box]):
 
   let
     toStream = newStringStream
-    stack    = newConfigStack().addSystemBuiltins().
+    stack    = newConfigStack().
+               addSystemBuiltins().
                addCustomBuiltins(chalkCon4mBuiltins).
                addGetoptSpecLoad().
-               addSpecLoad(chalkSpecName, toStream(chalkC42Spec)).
-               addConfLoad(baseConfName, toStream(baseConfig)).
+               addSpecLoad(chalkSpecName,  toStream(chalkC42Spec)).
+               addConfLoad(baseConfName,   toStream(baseConfig)).
                setErrorHandler(newConfFileError).
-               addConfLoad(ioConfName,   toStream(ioConfig)).
+               addConfLoad(ioConfName,     toStream(ioConfig)).
                addConfLoad(attestConfName, toStream(attestConfig)).
-               addConfLoad(sbomConfName, toStream(sbomConfig)).
-               addConfLoad(sastConfName, toStream(sastConfig))
+               addConfLoad(sbomConfName,   toStream(sbomConfig)).
+               addConfLoad(sastConfName,   toStream(sastConfig))
   try:
     # Test Run will cause (un)subscribe() to ignore subscriptions, and
     # will suppress log messages, etc.
@@ -253,11 +254,11 @@ proc testConfigFile*(uri: string, newCon4m: string, params: seq[Box]):
     dumpExOnDebug()
     cantLoad(getCurrentExceptionMsg() & "\n")
 
-proc paramsToBox(a: bool, b, c: string, d: Con4mType, e: Box): Box =
+proc paramsToBox(attr: bool, url, sym: string, c4mType: Con4mType, value: Box): Box =
   # Though you can pack / unpack con4m types, we don't have a JSON
   # mapping for them, so it's best for now to just pack the string
   # repr and re-parse it on the other end.
-  var arr = @[ pack(a), pack(b), pack(c), pack($(d)), e ]
+  var arr = @[ pack(attr), pack(url), pack(sym), pack($(c4mType)), value ]
   return pack(arr)
 
 const nocache = ["configs/ioconfig.c4m", "configs/sastconfig.c4m",
@@ -313,6 +314,7 @@ proc handleConfigLoad*(inpath: string) =
 
   var path: string
 
+  echo("***** loading" & inpath)
   if inpath.endswith(".c4m"):
     path = inpath
   else:
@@ -400,23 +402,37 @@ proc handleConfigLoad*(inpath: string) =
   # testing, plus we will need to save them!
   var
     allComponents = runtime.programRoot.getUsedComponents()
-    params: seq[Box]
+    params:         seq[Box]
+    testParams:     seq[Box]
 
   for item in toConfigure:
     if item notin allComponents:
       allComponents.add(item)
 
   for component in allComponents:
+    let url = if replace and false:
+                "[embedded config]"
+              else:
+                component.url
+    echo("!!!! ConfigLoad " & component.url)
     for _, v in component.varParams:
-      params.add(paramsToBox(false, component.url, v.name, v.defaultType,
+      params.add(paramsToBox(false, url, v.name, v.defaultType,
                              v.value.get()))
+      testParams.add(paramsToBox(false, component.url, v.name, v.defaultType,
+                                 v.value.get()))
 
     for _, v in component.attrParams:
-      params.add(paramsToBox(true, component.url, v.name, v.defaultType,
+      params.add(paramsToBox(true, url, v.name, v.defaultType,
                              v.value.get()))
+      testParams.add(paramsToBox(true, component.url, v.name, v.defaultType,
+                                 v.value.get()))
 
   if validate:
-    testState = testConfigFile(path, newEmbedded, params)
+    let
+      (base, module, ext) = path.fullUrlToParts()
+      uri                 = module.fullComponentSpec(base)
+    echo("!!! TESTING " & uri)
+    testState = testConfigFile(uri, newEmbedded, testParams)
     assert testState != nil
   else:
     warn("Skipping configuration validation. This could break chalk.")
@@ -437,6 +453,7 @@ proc handleConfigLoad*(inpath: string) =
 
   selfChalkSetKey("$CHALK_COMPONENT_CACHE", pack(cachedCode))
   selfChalkSetKey("$CHALK_SAVED_COMPONENT_PARAMETERS", pack(params))
+  echo("SAVED_PARAMS " & $(pack(params)))
 
   if testState != nil:
     let archOpt: Option[TableRef[string, string]] =

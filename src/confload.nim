@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -72,7 +72,9 @@ proc getEmbeddedConfig(): string =
         trace("Using the default user config.  See 'chalk dump' to view.")
       if selfChalk.extract.contains("$CHALK_SAVED_COMPONENT_PARAMETERS"):
         let params = selfChalk.extract["$CHALK_SAVED_COMPONENT_PARAMETERS"]
+        echo("***** installing params")
         installComponentParams(unpack[seq[Box]](params))
+        echo("***** installed params")
       else:
         trace("No saved component parameters; skipping install.")
       if selfChalk.extract.contains("$CHALK_COMPONENT_CACHE"):
@@ -80,7 +82,9 @@ proc getEmbeddedConfig(): string =
           componentInfo = selfChalk.extract["$CHALK_COMPONENT_CACHE"]
           unpackedInfo  = unpack[OrderedTableRef[string, string]](componentInfo)
 
+        echo("***** loading cached components")
         loadCachedComponents(unpackedInfo)
+        echo("***** loaded cached components")
   else:
     trace("Since this binary can't be marked, using the default config.")
 
@@ -191,8 +195,8 @@ proc loadAllConfigs*() =
       addCustomBuiltins(chalkCon4mBuiltins).
       setErrorHandler(handleCon4mErrors).
       addGetoptSpecLoad().
-      addSpecLoad(chalkSpecName, toStream(chalkC42Spec), notEvenDefaults).
-      addConfLoad(baseConfName, toStream(baseConfig), checkNone).
+      addSpecLoad(chalkSpecName,  toStream(chalkC42Spec), notEvenDefaults).
+      addConfLoad(baseConfName,   toStream(baseConfig),   checkNone).
       addCallback(loadLocalStructs).
       addConfLoad(getoptConfName, toStream(getoptConfig), checkNone).
       setErrorHandler(handleOtherErrors).
@@ -201,11 +205,11 @@ proc loadAllConfigs*() =
       setErrorHandler(handleCon4mErrors)
   doRun()
 
-  stack.addConfLoad(ioConfName, toStream(ioConfig), notEvenDefaults).
-        addConfLoad(attestConfName, toStream(attestConfig), checkNone)
-
-  stack.addConfLoad(sbomConfName,   toStream(sbomConfig),   checkNone)
-  stack.addConfLoad(sastConfName,   toStream(sastConfig),   checkNone)
+  stack.
+    addConfLoad(ioConfName,     toStream(ioConfig),     notEvenDefaults).
+    addConfLoad(attestConfName, toStream(attestConfig), checkNone).
+    addConfLoad(sbomConfName,   toStream(sbomConfig),   checkNone).
+    addConfLoad(sastConfName,   toStream(sastConfig),   checkNone)
 
   stack.addCallback(loadLocalStructs)
   doRun()
@@ -218,6 +222,9 @@ proc loadAllConfigs*() =
   let configFile = getEmbeddedConfig()
 
   if chalkConfig.getLoadEmbeddedConfig():
+    echo("EMBEDDED:")
+    echo(configFile)
+    echo("====")
     stack.addConfLoad("[embedded config]", toStream(configFile)).
           addCallback(loadLocalStructs)
     doRun()
