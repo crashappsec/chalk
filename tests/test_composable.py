@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Crash Override, Inc.
+# Copyright (c) 2023-2024, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -58,17 +58,10 @@ def test_composable_valid(
     chalk_copy.dump(current_config_path)
     current_config = current_config_path.read_text()
 
-    if replace:
-        # replaces current config with content of incoming
-        original_config = (configs / test_config_file).read_text()
-        assert current_config == original_config
-    else:
-        # adds incoming as component
-        # expecting output config has `use xxx from yyy`
-        config_name = (configs / test_config_file).stem
-        config_path = str((configs / test_config_file).parent)
-        use_output = f'use {config_name} from "{config_path}"'
-        assert use_output in current_config
+    config_name = (configs / test_config_file).stem
+    config_path = str((configs / test_config_file).parent)
+    use_output = f'use {config_name} from "{config_path}"'
+    assert use_output in current_config
 
     # basic check insert operation
     bin_path = copy_files[0]
