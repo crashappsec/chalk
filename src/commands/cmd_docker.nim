@@ -303,8 +303,11 @@ proc formatExecString(command: string): string =
               " -- " & parts[1]
             else:
               ""
-  # In shell form, be a good citizen and exec so that `sh` isn't pid 1
-  return strutils.strip("exec /chalk exec --exec-command-name " &
+  # In shell form, prefix args with chalk exec
+  # note we cant use shell's exec (e.g. 'exec /chalk')
+  # as that will exec within the shell process and therefore
+  # will not honor any other shell things such as && in the args
+  return strutils.strip("/chalk exec --exec-command-name " &
                         name & args)
 
 proc formatExecArray(args: JsonNode): string =
