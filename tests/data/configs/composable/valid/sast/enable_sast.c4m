@@ -1,0 +1,14 @@
+run_sast_tools: true
+
+# `chalk insert` and `chalk docker build` output sast to terminal
+report_template.terminal_insert.key.SAST.use: true
+
+# Embed sast reports in chalk marks.
+
+# `chalk insert` uses the mark_default template.
+mark_template.mark_default.key.SAST.use: true
+
+# `chalk docker build` uses the `minimal` template.
+mark_template.minimal.key.SAST.use: true
+
+tool.semgrep.semgrep_config_profile: "rule.yaml"
