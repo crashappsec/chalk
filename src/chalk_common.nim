@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -332,7 +332,9 @@ const
   sastConfName*       = "configs/sastconfig.c4m"
   ioConfName*         = "configs/ioconfig.c4m"
   attestConfName*     = "configs/attestation.c4m"
+  coConfName*         = "configs/crashoverride.c4m"
   defCfgFname*        = "configs/defaultconfig.c4m"  # Default embedded config.
+  embeddedConfName*   = "[embedded config]"
   chalkC42Spec*       = staticRead(chalkSpecName)
   getoptConfig*       = staticRead(getoptConfName)
   baseConfig*         = staticRead("configs/base_init.c4m") &
@@ -350,6 +352,7 @@ const
   ioConfig*           = staticRead(ioConfName)
   defaultConfig*      = staticRead(defCfgFname) #& commentC4mCode(ioConfig)
   attestConfig*       = staticRead(attestConfName)
+  coConfig*           = staticRead(coConfName)
   versionStr*         = staticexec("cat ../*.nimble | grep ^version")
   commitID*           = staticexec("git rev-parse HEAD")
   archStr*            = staticexec("uname -m")
