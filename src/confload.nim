@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -191,8 +191,8 @@ proc loadAllConfigs*() =
       addCustomBuiltins(chalkCon4mBuiltins).
       setErrorHandler(handleCon4mErrors).
       addGetoptSpecLoad().
-      addSpecLoad(chalkSpecName, toStream(chalkC42Spec), notEvenDefaults).
-      addConfLoad(baseConfName, toStream(baseConfig), checkNone).
+      addSpecLoad(chalkSpecName,  toStream(chalkC42Spec), notEvenDefaults).
+      addConfLoad(baseConfName,   toStream(baseConfig),   checkNone).
       addCallback(loadLocalStructs).
       addConfLoad(getoptConfName, toStream(getoptConfig), checkNone).
       setErrorHandler(handleOtherErrors).
@@ -201,11 +201,12 @@ proc loadAllConfigs*() =
       setErrorHandler(handleCon4mErrors)
   doRun()
 
-  stack.addConfLoad(ioConfName, toStream(ioConfig), notEvenDefaults).
-        addConfLoad(attestConfName, toStream(attestConfig), checkNone)
-
-  stack.addConfLoad(sbomConfName,   toStream(sbomConfig),   checkNone)
-  stack.addConfLoad(sastConfName,   toStream(sastConfig),   checkNone)
+  stack.
+    addConfLoad(ioConfName,     toStream(ioConfig),     notEvenDefaults).
+    addConfLoad(attestConfName, toStream(attestConfig), checkNone).
+    addConfLoad(sbomConfName,   toStream(sbomConfig),   checkNone).
+    addConfLoad(sastConfName,   toStream(sastConfig),   checkNone).
+    addConfLoad(coConfName,     toStream(coConfig),     checkNone)
 
   stack.addCallback(loadLocalStructs)
   doRun()
@@ -218,7 +219,7 @@ proc loadAllConfigs*() =
   let configFile = getEmbeddedConfig()
 
   if chalkConfig.getLoadEmbeddedConfig():
-    stack.addConfLoad("[embedded config]", toStream(configFile)).
+    stack.addConfLoad(embeddedConfName, toStream(configFile)).
           addCallback(loadLocalStructs)
     doRun()
 

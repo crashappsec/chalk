@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Crash Override, Inc.
+# Copyright (c) 2023-2024, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -126,8 +126,8 @@ def test_valid_load(
 @pytest.mark.parametrize(
     "path, expected_success",
     [
-        ("demo-http.c4m", True),
-        ("nonexisting", False),
+        ("embed_sboms.c4m", True),
+        ("nonexisting.c4m", False),
     ],
 )
 def test_load_url(
