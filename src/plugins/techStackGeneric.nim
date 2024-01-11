@@ -5,13 +5,8 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/re
-import std/tables
-import std/hashes
-import std/sets
-import std/sequtils
+import std/[hashes, re, sequtils, sets, tables]
 import ../config, ../plugin_api
-import typetraits
 
 const FT_ANY = "*"
 var
@@ -42,22 +37,19 @@ var
   # key: rule, vals: filetypes for which this rules does not applies
   ruleExcludeFiletypes = newTable[string, seq[string]]()
 
-proc scanFile(filePath: string, category: string, subcategory: string) =
-  var strm = newFileStream(filePath, fmRead)
-  if isNil(strm):
-    return
-
-  let splFile = splitFile(filePath)
-  let rule_names = categories[category][subcategory]
+template scanFileStream(strm: FileStream) =
+  let
+    splFile    = splitFile(filePath)
+    rule_names = categories[category][subcategory]
   var applicable_rules: seq[string]
   # applicable rules are eithr rules that apply to all filetypes (FT_ANY)
   # or to the filetype matching the given extension
   for rule_name in categories[category][subcategory]:
-    if contains(excludePthRules, filePath) and contains(excludePthRules[filePath], rule_name):
+    if filePath in excludePthRules and rule_name in excludePthRules[filePath]:
       continue
 
     # first check if the rule should always be added for this exact file path
-    if contains(pthRules, filePath) and contains(pthRules[filePath], rule_name):
+    if filePath in pthRules and rule_name in pthRules[filePath]:
       applicable_rules.add(rule_name)
       continue
 
@@ -67,22 +59,22 @@ proc scanFile(filePath: string, category: string, subcategory: string) =
     # first check if the rule applies to all file types (FT_ANY). In this
     # case we may only have excluded filetypes, so make a pass for those,
     # otherwise add it
-    if not contains(tsRules, rule_name):
+    if rule_name notin tsRules:
       continue
 
     let tsRule = tsRules[rule_name]
-    if contains(ftRules, FT_ANY) and contains(ftRules[FT_ANY], rule_name):
+    if FT_ANY in ftRules and rule_name in ftRules[FT_ANY]:
 
       # make a pass and check if we should exclude the rule
       var exclude = false
-      if contains(ruleExcludeFiletypes, rule_name):
+      if rule_name in ruleExcludeFiletypes:
         for ft in ruleExcludeFiletypes[rule_name]:
           # if the filetype does not match the current extension proceed
           if ft != splFile.ext and ft != "":
               continue
           # if we have a matching extension and a rule for that extenion,
           # append the rule in the rule to be run
-          if contains(excludeFtRules, ft) and contains(excludeFtRules[ft], rule_name):
+          if ft in excludeFtRules and rule_name in excludeFtRules[ft]:
               exclude = true
               break
       # add the rule only if its explicitly added and not excluded
@@ -94,7 +86,7 @@ proc scanFile(filePath: string, category: string, subcategory: string) =
 
     # if the rule does not apply to all filetypes, check the ones for which
     # it actually does apply.
-    if contains(ruleFiletypes, rule_name):
+    if rule_name in ruleFiletypes:
       for ft in ruleFiletypes[rule_name]:
         # if the filetype does not match the current extension proceed
         if ft != splFile.ext and ft != "":
@@ -102,13 +94,14 @@ proc scanFile(filePath: string, category: string, subcategory: string) =
 
         # if we have a matching extension and a rule for that extenion,
         # append the rule in the rule to be run
-        if contains(ftRules, ft) and contains(ftRules[ft], rule_name):
+        if ft in ftRules and rule_name in ftRules[ft]:
           applicable_rules.add(rule_name)
           break
 
-  var line = ""
-  var i = 0
-  var abort = false
+  var
+    line  = ""
+    i     = 0
+    abort = false
   while strm.readLine(line):
     i += 1
     if inFileScope[category][subcategory] or abort:
@@ -122,10 +115,18 @@ proc scanFile(filePath: string, category: string, subcategory: string) =
       if find(line, regexes[rule_name]) != -1:
         inFileScope[category][subcategory] = true
         break
-  strm.close()
+
+proc scanFile(filePath: string, category: string, subcategory: string) =
+  var strm = newFileStream(filePath, fmRead)
+  if strm == nil:
+    return
+  try:
+    scanFileStream(strm)
+  finally:
+    strm.close()
 
 proc getProcNames(): HashSet[string] =
-  var names: seq[string]
+  result = initHashSet[string]()
   for kind, path in walkDir("/proc/"):
     for ch in path.splitPath().tail:
       try:
@@ -136,10 +137,9 @@ proc getProcNames(): HashSet[string] =
         for line in data.split("\n"):
           if "Name:" in line:
             var name = line.split("Name:")[1].strip()
-            names.add(name)
+            result.incl(name)
       except:
          continue
-  result = toHashSet(names)
 
 # The current host based detection simply checks for the
 # presence of configuration files, therefore we don't need
@@ -162,8 +162,9 @@ proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string]): bool =
 
   let names = scope.getProcessNames()
   if names.isSome():
-    let rule_names = toHashSet(names.get())
-    let intersection = proc_names * rule_names
+    let
+      rule_names   = toHashSet(names.get())
+      intersection = proc_names * rule_names
     if len(intersection) > 0:
       return true
 
@@ -189,7 +190,7 @@ proc getLanguages(directory: string, langs: var HashSet[string]) =
       let splFile = splitFile(filePath.path)
       if splFile.ext == "":
         continue
-      if not contains(languages, splFile.ext):
+      if splFile.ext notin languages:
         continue
       langs.incl(languages[splFile.ext])
       continue
@@ -198,29 +199,27 @@ proc getLanguages(directory: string, langs: var HashSet[string]) =
       continue
 
 proc detectLanguages(): HashSet[string] =
+  result = initHashSet[string]()
+
   let canLoad = chalkConfig.getUseTechStackDetection()
   if not canLoad:
-    return
+    return result
 
-  var langs: HashSet[string]
   for item in getContextDirectories():
     let fpath = expandFilename(item)
     if fpath.dirExists():
-      getLanguages(fpath, langs)
+      getLanguages(fpath, result)
     else:
       let (head, _) = splitPath(fPath)
       if head.dirExists():
-          getLanguages(head, langs)
-  return langs
+          getLanguages(head, result)
 
 proc detectTechCwd(): TableRef[string, seq[string]] =
-  var final = newTable[string, seq[string]]()
-
+  result = newTable[string, seq[string]]()
   var hasResults = false
   for category, subcategories in categories:
     for subcategory, _ in subcategories:
-      if (not (contains(inFileScope, category) and
-          contains(inFileScope[category], subcategory))):
+      if not (category in inFileScope and subcategory in inFileScope[category]):
         continue
       # re-initialize to false again
       # XXX check the diff between load time and invocation state
@@ -242,28 +241,19 @@ proc detectTechCwd(): TableRef[string, seq[string]] =
   if hasResults:
     for category, subcategories in categories:
       for subcategory, _ in subcategories:
-        if not (contains(inFileScope, category) and
-          contains(inFileScope[category], subcategory)):
+        if not (category in inFileScope and subcategory in inFileScope[category]):
           continue
         if inFileScope[category][subcategory]:
-          if contains(final, category):
-            final[category].add(subcategory)
-          else:
-            final[category] = @[subcategory]
-  return final
+          result.mgetOrPut(category, @[]).add(subcategory)
 
 proc detectTechHostStatic(): TableRef[string, seq[string]] =
-  var final_host = newTable[string, seq[string]]()
+  result = newTable[string, seq[string]]()
   for category, subcategories in categories:
     for subcategory, _ in subcategories:
-      if (contains(inHostScope, category) and
-          contains(inHostScope[category], subcategory) and
+      if (category in inHostScope and
+          subcategory in inHostScope[category] and
           inHostScope[category][subcategory]):
-        if contains(final_host, category):
-          final_host[category].add(subcategory)
-        else:
-          final_host[category] = @[subcategory]
-  return final_host
+        result.mgetOrPut(category, @[]).add(subcategory)
 
 proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]):
   ChalkDict {.cdecl.} =
@@ -281,21 +271,18 @@ proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]):
       continue
     for category, subcategories in categories:
       for subcategory, _ in subcategories:
-        if (contains(inHostScope, category) and
-            contains(inHostScope[category], subcategory) and
-            (not inHostScope[category][subcategory])):
+        if (category in inHostScope and
+            subcategory in inHostScope[category] and
+            not inHostScope[category][subcategory]):
           inHostScope[category][subcategory] = hostHasTechStack(val.hostScope, procNames)
 
   var final_host = newTable[string, seq[string]]()
   for category, subcategories in categories:
     for subcategory, _ in subcategories:
-      if (contains(inHostScope, category) and
-          contains(inHostScope[category], subcategory) and
+      if (category in inHostScope and
+          subcategory in inHostScope[category] and
           inHostScope[category][subcategory]):
-        if contains(final_host, category):
-            final_host[category].add(subcategory)
-        else:
-            final_host[category] = @[subcategory]
+        final_host.mgetOrPut(category, @[]).add(subcategory)
   if len(final_host) > 0:
     result["_INFERRED_TECH_STACKS_HOST"] = pack[TableRef[string, seq[string]]](final_host)
 
@@ -308,12 +295,11 @@ proc techStackArtifact*(self: Plugin, objs: ChalkObj):
     trace("Skipping tech stack detection plugin for artifacts")
     return
 
-  var final = detectTechCwd()
-  var final_host = detectTechHostStatic()
-  let langs = detectLanguages()
+  var
+    final      = detectTechCwd()
+    final_host = detectTechHostStatic()
+  let langs    = detectLanguages()
   if len(langs) > 0:
-    if len(final) == 0:
-      var final = newTable[string, seq[string]]()
     final["language"] = toSeq(langs)
 
   if len(final) > 0:
@@ -326,27 +312,24 @@ proc loadtechStackGeneric*() =
     languages[val.getExtension()] = langName
 
   for key, val in chalkConfig.techStackRules:
-    let category = val.getCategory()
-    let subcategory = val.getSubcategory()
+    let
+      category    = val.getCategory()
+      subcategory = val.getSubcategory()
 
-    if contains(categories, category):
-      if contains(categories[category], subcategory):
-        categories[category][subcategory].add(key)
-      else:
-        categories[category][subcategory] = @[key]
-    else:
-      categories[category] = newTable[string, seq[string]]()
-      categories[category][subcategory] = @[key]
+    categories.
+      mgetOrPut(category, newTable[string, seq[string]]()).
+      mgetOrPut(subcategory, @[]).
+      add(key)
 
     if val.hostScope != nil:
-      if not contains(inHostScope, category):
+      if category notin inHostScope:
         inHostScope[category] = newTable[string, bool]()
         inHostScope[category][subcategory] = false
     else:
       if val.fileScope == nil:
         error("One of file_scope, host_scope must be defined for rule " & key & ". Skipping")
         continue
-      if not contains(inFileScope, category):
+      if category notin inFileScope:
         inFileScope[category] = newTable[string, bool]()
       inFileScope[category][subcategory] = false
 
@@ -358,46 +341,31 @@ proc loadtechStackGeneric*() =
         let ftypes = filetypes.get()
         ruleFiletypes[key] = ftypes
         for ft in ftypes:
-          if contains(ftRules, ft):
-            ftRules[ft].incl(key)
-          else:
-            ftRules[ft] = toHashSet([key])
+          ftRules.mgetOrPut(ft, initHashSet[string]()).incl(key)
       else:
         # we only have exclude rules therefore we match by default
         # XXX move to a template for looking things up and adding if
         # they don't exist
-        if contains(ftRules, FT_ANY):
-          ftRules[FT_ANY].incl(key)
-        else:
-          ftRules[FT_ANY] = toHashSet([key])
+        ftRules.mgetOrPut(FT_ANY, initHashSet[string]()).incl(key)
         let excludeFiletypes = val.fileScope.getExcludedFiletypes()
         if excludeFiletypes.isSome():
           let exclFtps = excludeFiletypes.get()
           ruleExcludeFiletypes[key] = exclFtps
           for ft in exclFtps:
-            if contains(excludeFtRules, ft):
-              excludeFtRules[ft].incl(key)
-            else:
-              excludeFtRules[ft] = toHashSet([key])
+            excludeFtRules.mgetOrPut(ft, initHashSet[string]()).incl(key)
 
       # get paths and excluded paths that need to always be considered
       let filepaths = val.fileScope.getFilepaths()
       if filepaths.isSome():
         let fpaths = filepaths.get()
         for path in fpaths:
-          if contains(pthRules, path):
-            pthRules[path].incl(key)
-          else:
-            pthRules[path] = toHashSet([key])
+          pthRules.mgetOrPut(path, initHashSet[string]()).incl(key)
 
       let excludeFilepaths = val.fileScope.getExcludedFilepaths()
       if excludeFilepaths.isSome():
         let excfpaths = excludeFilepaths.get()
         for path in excfpaths:
-          if contains(excludePthRules, path):
-            excludePthRules[path].incl(key)
-          else:
-            excludePthRules[path] = toHashSet([key])
+          excludePthRules.mgetOrPut(path, initHashSet[string]()).incl(key)
 
   newPlugin("techStackGeneric",
             ctArtCallback  = ChalkTimeArtifactCb(techStackArtifact),
