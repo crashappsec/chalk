@@ -1,3 +1,87 @@
+# Release Notes for Chalk version ? (Jan ??, 2024
+
+## Breaking Changes
+
+- `_OP_CLOUD_METADATA` is now a JSON object vs a string
+  containing JSON data. In addition cloud metadata is now
+  nested to allow to include more metadata about running
+  cloud instances.
+  [112](https://github.com/crashappsec/chalk/pull/112)
+
+## New Features
+
+- Adding support for git context for docker build commands.
+  [86](https://github.com/crashappsec/chalk/pull/86)
+- Adding new git metadata fields about:
+
+  - authored commit
+  - committer
+  - tag
+
+  [86](https://github.com/crashappsec/chalk/pull/86)
+  [89](https://github.com/crashappsec/chalk/pull/89)
+
+- Improved pretty printing for various commands
+  [99](https://github.com/crashappsec/chalk/pull/99]
+- Added `github_json_group` for printing chalk marks
+  in GitHub Actions.
+  [86](https://github.com/crashappsec/chalk/pull/86)
+- Adding `presign` sink to allow uploads to S3 without
+  hardcoded creds in the chalk config.
+  [103](https://github.com/crashappsec/chalk/pull/103)
+- Adding JWT/Basic auth authentication options to sinks.
+  [111](https://github.com/crashappsec/chalk/pull/111)
+- Adding `docker.wrap_cmd` to allow to customize whether
+  `CMD` should be wrapped when `ENTRYPOINT` is missing
+  in `Dockerfile`.
+  [112](https://github.com/crashappsec/chalk/pull/112)
+- Adding minimal AWS lambda metadata collection.
+  It includes only basic information about lambda function
+  such as its ARN and its runtime environment.
+  [112](https://github.com/crashappsec/chalk/pull/112)
+
+## Fixes
+
+- Fixes docker version comparison checks.
+  As a result buildx is correctly detected now for >=0.10.
+  [86](https://github.com/crashappsec/chalk/pull/86)
+- Subprocess command output was not reliable being captured.
+  [93](https://github.com/crashappsec/chalk/pull/93)
+- Fixes automatic installation of `semgrep` when SAST is enabled.
+  [94](https://github.com/crashappsec/chalk/pull/94)
+- Ensuring chalk executable has correct permissions.
+  Otherwise reading embedded configuration would fail in some cases.
+  [104](https://github.com/crashappsec/chalk/pull/104)
+- Pushing all tags during `docker build --push -t one -t two ...`.
+  [110](https://github.com/crashappsec/chalk/pull/110)
+- Sending `_ACTION_ID` during `push` command.
+  [116](https://github.com/crashappsec/chalk/pull/116)
+- All component parameters are saved in the chalk mark.
+  [126](https://github.com/crashappsec/chalk/pull/126)
+- Gracefully handling permission issues when chalk is running
+  as non-existing user. This is most common in lambda
+  which runs as user `993`.
+  [112](https://github.com/crashappsec/chalk/pull/112)
+
+# Release Notes for Chalk version 0.2.2 (Oct 30, 2023)
+
+## New Features
+
+- Adding support for docker multi-platform builds.
+  [54](https://github.com/crashappsec/chalk/pull/54)
+
+## Fixes
+
+- Honoring Syft/SBOM configs during docker builds.
+  [84](https://github.com/crashappsec/chalk/pull/84)
+
+# Release Notes for Chalk version 0.2.1 (Oct 25, 2023)
+
+## Fixes
+
+- Component parameters can set config attributes.
+  [75](https://github.com/crashappsec/chalk/issues/75)
+
 # Release Notes for Chalk version 0.2.0 (Oct 20, 2023)
 
 ## New Features
