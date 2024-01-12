@@ -823,10 +823,3 @@ def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
     # check that sbom has been embedded into the artifact
     chalk_mark = ChalkMark.from_binary(tmp_data_dir / "helloworld.py")
     assert chalk_mark.contains(sast_data)
-
-    # logger.info("after insert")
-
-    # text = (tmp_data_dir / "helloworld.py").read_text()
-    # logger.info(text)
-
-    # time.sleep(1000)
