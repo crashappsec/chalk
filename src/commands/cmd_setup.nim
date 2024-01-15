@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -49,3 +49,4 @@ proc runCmdSetup*(gen, load: bool) =
   else:
     error("Failed to generate signing keys. Aborting.")
     quitChalk(1)
+    

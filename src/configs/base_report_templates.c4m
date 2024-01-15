@@ -397,8 +397,8 @@ report and subtract from it.
   key.$CHALK_LOAD_COUNT.use                  = true
   key.$CHALK_PUBLIC_KEY.use                  = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use       = true
-  key.$CHALK_API_KEY.use                     = true
-  key.$CHALK_API_REFRESH_TOKEN.use           = true
+  key.$CHALK_DATA_API_KEY.use                = true
+  key.$CHALK_API_REFRESH_TOKEN.use           = false
   key.$CHALK_ATTESTATION_TOKEN.use           = true
   key.$CHALK_SECRET_ENDPOINT_URI.use         = true
   key.$CHALK_COMPONENT_CACHE.use             = false

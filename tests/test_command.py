@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Crash Override, Inc.
+# Copyright (c) 2023-2024, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -186,7 +186,7 @@ def test_setup(chalk_copy: Chalk):
         command="setup",
         no_api_login=True,
         log_level="error",
-        config=CONFIGS / "nosecretmanager.c4m",
+        config=CONFIGS / "nosigningkeybackup.c4m",
     )
 
     report = result.report
