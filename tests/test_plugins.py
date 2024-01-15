@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 
 import os
+import time
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
@@ -17,7 +18,7 @@ from .chalk.validate import (
     validate_extracted_chalk,
     validate_virtual_chalk,
 )
-from .conf import CODEOWNERS, CONFIGS, DOCKERFILES, LS_PATH
+from .conf import CODEOWNERS, CONFIGS, DOCKERFILES, LS_PATH, PYS, DATA
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
@@ -712,3 +713,113 @@ def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk):
     # check that sbom has been embedded into the artifact
     chalk_mark = ChalkMark.from_binary(bin_path)
     assert chalk_mark.contains(sbom_data)
+
+
+@pytest.mark.parametrize(
+    "test_file",
+    [
+        "sample_1",
+    ],
+)
+def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
+    shutil.copytree(PYS / test_file, tmp_data_dir, dirs_exist_ok=True)
+    # copy rule.yaml also
+    shutil.copy(DATA / "semgrep" / "rule.yaml", tmp_data_dir)
+
+    # we need to enable sast + embed sast so load test config
+    chalk = chalk_copy
+    chalk.load(
+        config=CONFIGS / "composable" / "valid" / "sast" / "enable_sast.c4m",
+        replace=False,
+    )
+
+    # expected sast output with custom rule
+    sast_data = {
+        "SAST": {
+            "semgrep": {
+                "runs": [
+                    {
+                        "invocations": [
+                            {
+                                "executionSuccessful": True,
+                                "toolExecutionNotifications": [],
+                            }
+                        ],
+                        "results": [
+                            {
+                                "fingerprints": {
+                                    "matchBasedId/v1": "b147a8e435e3b378b6b829961717857db5d274cf888e28bc45284a0c2575262259819ce9640ff6eb0e85ca886316fc59339610727ef2a52f6f9d239213a63958_0"
+                                },
+                                "locations": [
+                                    {
+                                        "physicalLocation": {
+                                            "artifactLocation": {
+                                                "uri": "helloworld.py",
+                                                "uriBaseId": "%SRCROOT%",
+                                            },
+                                            "region": {
+                                                "endColumn": 25,
+                                                "endLine": 7,
+                                                "snippet": {
+                                                    "text": '    if test_var is "bbb":'
+                                                },
+                                                "startColumn": 8,
+                                                "startLine": 7,
+                                            },
+                                        }
+                                    }
+                                ],
+                                "message": {
+                                    "text": "The operator 'is' is for reference equality, not value equality! Use `==` instead!"
+                                },
+                                "properties": {},
+                                "ruleId": "is-comparison",
+                            }
+                        ],
+                        "tool": {
+                            "driver": {
+                                "name": "Semgrep OSS",
+                                "rules": [
+                                    {
+                                        "defaultConfiguration": {"level": "error"},
+                                        "fullDescription": {
+                                            "text": "The operator 'is' is for reference equality, not value equality! Use `==` instead!"
+                                        },
+                                        "help": {
+                                            "markdown": "The operator 'is' is for reference equality, not value equality! Use `==` instead!",
+                                            "text": "The operator 'is' is for reference equality, not value equality! Use `==` instead!",
+                                        },
+                                        "id": "is-comparison",
+                                        "name": "is-comparison",
+                                        "properties": {
+                                            "precision": "very-high",
+                                            "tags": [],
+                                        },
+                                        "shortDescription": {
+                                            "text": "Semgrep Finding: is-comparison"
+                                        },
+                                    }
+                                ],
+                                "semanticVersion": "1.56.0",
+                            }
+                        },
+                    }
+                ],
+            }
+        }
+    }
+    artifact = ArtifactInfo.one_elf(
+        tmp_data_dir / "helloworld.py", chalk_info=sast_data
+    )
+
+    insert = chalk.insert(artifact=tmp_data_dir)
+    validate_chalk_report(
+        chalk_report=insert.report,
+        artifact_map=artifact,
+        virtual=False,
+        chalk_action="insert",
+    )
+
+    # check that sbom has been embedded into the artifact
+    chalk_mark = ChalkMark.from_binary(tmp_data_dir / "helloworld.py")
+    assert chalk_mark.contains(sast_data)
