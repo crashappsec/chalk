@@ -98,5 +98,5 @@ mark_template.mark_default.key.PLATFORM_WHEN_CHALKED.use = false
 EOF
 """.replace("REPLACE_ME", completion_script_version)
 
-  exec "chalk --use-external-config --config-file=./tmpcfg.c4m --no-use-embedded-config --skip-command-report insert src/autocomplete"
+  exec "./chalk --use-external-config --config-file=./tmpcfg.c4m --no-use-embedded-config --skip-command-report insert src/autocomplete"
   exec "rm ./tmpcfg.c4m"
