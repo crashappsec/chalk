@@ -13,9 +13,9 @@ default_key_priority := 4611686018427387904  # 2^62.
 # These are the valid command-line commands.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "config",
                          "load", "dump", "docker", "version", "env", "exec",
-                         "setup", "login", "logout", "docgen"]
+                         "setup", "docgen"]
 
-all_cmds_that_insert := ["insert", "build", "load", "setup", "login", "logout"]
+all_cmds_that_insert := ["insert", "build", "load", "setup"]
 
 
 
@@ -450,6 +450,182 @@ failure, and no other keys will be checked.
     type:     string
     require:  false
     hidden:   true
+  }
+}
+
+linguist_types := ["programming", "data", "markup"]
+object linguist_language {
+  user_def_ok:   false
+  gen_fieldname: "linguist_languages"
+  gen_typename:  "LinguistLanguage"
+  gen_setters:   false
+
+  field type {
+    type:    string
+    require: true
+    choice: linguist_types
+  }
+
+  field extension {
+    type:    string
+    require: true
+  }
+
+  field altextensions {
+    type:    list[string]
+    require: false
+  }
+
+}
+
+
+valid_tech_stack_categories := ["database", "webServer", "protocol", "framework"]
+valid_tech_stack_database_types := ["firebird", "hypersonicSQL",
+    "ibmDb2", "microsoftAccess", "microsoftSQLServer",
+     "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other"]
+
+valid_tech_stack_web_server_types := ["apache", "nginx", "iis"]
+valid_tech_stack_protocol_types := ["ldap"]
+valid_tech_stack_framework_types := ["javaSpring"]
+
+valid_subcategory_types := ["firebird", "hypersonicSQL",
+    "ibmDb2", "microsoftAccess", "microsoftSQLServer",
+     "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other",
+     "apache", "nginx", "iis", "ldap", "javaSpring"]
+
+
+object tech_stack_rule {
+  user_def_ok:   false
+  gen_fieldname: "techStackRules"
+  gen_typename:  "TechStackRule"
+  gen_setters:   false
+
+  field description {
+    type:    string
+    default: ""
+  }
+
+  field category {
+    type: string
+    require: true
+    choice:   valid_tech_stack_categories
+  }
+
+  field subcategory {
+    type: string
+    require: true
+    choice: valid_subcategory_types
+  }
+
+  allow file_scope
+  allow host_scope
+
+}
+
+
+singleton file_scope {
+  user_def_ok: false
+  gen_fieldname: "fileScope"
+  gen_typename:  "FileScope"
+  gen_setters: false
+
+  field regex {
+    type:    string
+    require: true
+  }
+
+  # TODO add support for include_regex, exclude_regex. This generic regex
+  # could replace most directives here but it will probably be more expensive
+  # and error prone
+  field filepaths {
+    type:    list[string]
+    require: false
+    doc: """
+Exact (full) paths of files to which this scope applies. A path set in this field
+will override any excluded filetype, and those filepaths will be getting examined
+regardless of whether they are part of the working directory.
+"""
+  }
+
+  # TODO add a validation that a file that is included in this is list cannot
+  # be part of a passed filepaths list
+  field excluded_filepaths {
+    type:    list[string]
+    require: false
+    doc: """
+Exact (full) paths of files to which this scope does not apply. A path set in this field
+will override any filetype directive, and those filepaths will not be getting examined
+regardless of whether they are part of the working directory.
+"""
+  }
+
+  # TODO constrain to list of known filetypes via validation
+  field filetypes {
+    type:    list[string]
+    require: false
+    doc: """
+File extensions that should be considered for a given rule.
+"""
+  }
+
+  exclusions {
+    filetypes: "excluded_filetypes"
+  }
+
+  field excluded_filetypes {
+    type:    list[string]
+    require: false
+    doc: """
+File extensions that should be ignored for a given rule. Any files that are
+defined in the filepaths directive will be getting considered regardless.
+"""
+  }
+
+  # TODO use warn function returning an empty string for large values
+  field head {
+    type:    int
+    default: 500
+  }
+}
+
+singleton host_scope {
+  user_def_ok: false
+  gen_fieldname: "hostScope"
+  gen_typename:  "hostScope"
+  gen_setters: false
+
+  field filepaths {
+    type:    list[string]
+    require: false
+    doc: """
+Exact (full) paths of files whose mere presence denotes that the technology must be
+installed on the host
+"""
+  }
+  field directories {
+    type:    list[string]
+    require: false
+    doc: """
+Exact (full) paths of directories whose mere presence denotes that the technology must be
+installed on the host
+"""
+  }
+
+  field process_names {
+    type:    list[string]
+    require: false
+    doc: """
+Candidates process by its name as it appears on /proc/<pid>/status
+"""
+  }
+
+  field strict {
+    type:    bool
+    default: true
+    doc: """
+Require a running process to be found and also at least one of the [filepaths, directories].
+If set to false, the mere presence of a directory or filepath will mark a detection.
+"""
   }
 }
 
@@ -2166,6 +2342,8 @@ root {
   allow env_config
   allow source_marks
   allow cloud_provider
+  allow tech_stack_rule
+  allow linguist_language
 
   shortdoc: "Chalk Configuration Options"
 
@@ -2496,10 +2674,10 @@ validate in the transparency log.
 """
   }
 
-  field use_secret_manager {
+  field use_signing_key_backup_service {
     type:    bool
     default: true
-    shortdoc: "Use secret manager for encryption"
+    shortdoc: "Use signing key backup service to save & retrieve keys"
     doc: """
 Any signing keys generated or imported are encrypted by a randomly
 generated password (which is derived by encoding 128 bits taken from a
@@ -2507,7 +2685,7 @@ cryptographically secure source).
 
 The password is NOT stored in the binary. You can choose to provide
 the password via the CHALK_PASSWORD environment variable, or you may
-escrow it in our secret manager.
+escrow it in our backup service.
 
 If this is true, when you set up signing, the password will get
 encrypted by another randomly generated value, stored in your
@@ -2524,28 +2702,39 @@ password from the CHALK_PASSWORD environment variable. If the
 environment variable doesn't exist, what happens next is dependant on
 this variable.
 
-If it's true, then we attempt to query the secret manager before
+If it's true, then we attempt to query the key backup service before
 giving up. If it's false, we immediately move on without signing.
 
-Note that if you provide the environment variable, then the secret
-manager currently does not run. We may eventually make it a fallback.
+Note that if you provide the environment variable, then the key backup
+service currently is not queried. We may eventually make it a fallback.
 """
   }
 
-  field secret_manager_url {
+  field signing_key_backup_service_url {
     type:     string
-    default:  "https://3agp7bv1bb.execute-api.us-east-1.amazonaws.com/api/secrets-manager"
+    default:  "https://chalk.crashoverride.run/v0.1/key-backup"
     hidden:   true
-    shortdoc: "URL for secret manager API"
+    shortdoc: "URL of the signing key backup API service"
     doc: """
-Currently you can just use ours.
+This is the URL of the default signing key backup service provide by
+Crashoverride.
 """
   }
 
-  field secret_manager_timeout {
+field signing_key_backup_service_auth_config_name {
+    type:     string
+    default:  "crashoverride"
+    hidden:   true
+    shortdoc: "Authentication config to use for the signing key backup service"
+    doc: """
+
+"""
+  }
+
+  field signing_key_backup_service_timeout {
     type:    Duration
     default: << 3 sec >>
-    shortdoc: "HTTPS timeout for secret manager"
+    shortdoc: "HTTPS timeout for request to the key backup service"
     doc: """
 If the timeout is exceeded and the operation fails, chalk will proceed,
 just without doing any signing / verifying.
@@ -2571,7 +2760,7 @@ Chalk will also embed the keypairs internally, for future operations.
     default:  true
     shortdoc: "Use CrashOverride API"
     doc: """
-Enable the use of the Crash Override API for secret management.
+Enable the use of the Crash Override API.
 """
   }
 
@@ -2932,19 +3121,28 @@ To skip the pager on the command line, use the `--no-pager` flag.
 """
  }
 
-  field crashoverride_usage_reporting_url {
+ field crashoverride_usage_reporting_url {
     type:       string
     default:    "https://chalk.crashoverride.run/v0.1/usage"
     hidden:     true
     doc:        "Used to approximate overall chalk usage. See the usage report"
   }
 
-  field crashoverride_workspace_id {
+ field crashoverride_workspace_id {
     type:       string
     default:    "470f1ff7-8b26-43a5-a31d-45c2fcecfaa2"
     hidden:     true
     doc:        "The default value is the one used for anonymous users."
   }
+
+ field use_tech_stack_detection {
+    type:    bool
+    default: false
+    shortdoc: "Try to infer tech stacks used"
+    doc: """
+  Enable experimental tech stack detection via regexes
+  """
+ }
 }
 
 func keyspec_exists(name) {

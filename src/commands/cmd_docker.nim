@@ -25,7 +25,7 @@
 import posix, unicode, ../config, ../collect, ../reporting,
        ../chalkjson, ../docker_cmdline, ../docker_base, ../subscan,
        ../dockerfile, ../util, ../attestation, ../commands/cmd_help,
-       ../plugin_api
+       ../plugin_api, std/[enumerate]
 
 {.warning[CStringConv]: off.}
 
@@ -295,34 +295,25 @@ proc findProperBinaryToCopyIntoContainer(ctx: DockerInvocation): string =
          ")")
     return ""
 
-proc formatExecString(command: string): string =
-  let
-    parts = strutils.split(command, maxsplit = 1)
-    name  = parts[0]
-    args  = if len(parts) > 1:
-              " -- " & parts[1]
-            else:
-              ""
-  # In shell form, prefix args with chalk exec
-  # note we cant use shell's exec (e.g. 'exec /chalk')
-  # as that will exec within the shell process and therefore
-  # will not honor any other shell things such as && in the args
-  return strutils.strip("/chalk exec --exec-command-name " &
-                        name & args)
-
 proc formatExecArray(args: JsonNode): string =
-  let arr = `%*`(["/chalk", "exec", "--exec-command-name"])
-  var i = 0
-  for item in args.items():
-    if i == 1:
-      arr.add(`%`("--"))
-    arr.add(item)
-    i.inc()
+  var arr = `%*`(["/chalk", "exec", "--exec-command-name"])
+  arr.add(args[0])
+  arr.add(`%`("--"))
+  if len(args) > 1:
+    arr = arr & args[1..^1]
   return $(arr)
 
-template formatExec(command: string, args: JsonNode): string =
+proc formatExecString(command: string, shell: JsonNode): string =
+  # string form implies shell form and therefore to be
+  # compatible with original command, we need to explicitly start
+  # shell and then execute original command as shell script.
+  # This will handle cases when the script is not an executable
+  # but calls some shell functions such as "set -x && ..."
+  return formatExecArray(shell & `%*`([command]))
+
+template formatExec(command: string, args: JsonNode, shell: JsonNode): string =
   if command != "":
-    formatExecString(command)
+    formatExecString(command, shell)
   else:
     formatExecArray(args)
 
@@ -332,8 +323,9 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
   var
     lastEntryPoint = EntryPointInfo(nil)
     lastCmd        = CmdInfo(nil)
-    newInstruction:  string
-    wrapping:        string
+    shell          = ShellInfo()
+
+  shell.json = `%*`(["/bin/sh", "-c"])
 
   for section in ctx.dfSections:
     if section.entryPoint != nil:
@@ -341,7 +333,10 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
       lastEntryPoint = section.entryPoint
     if section.cmd != nil:
       section.cmd.noBadJson()
-      lastCmd = section.cmd
+      lastCmd        = section.cmd
+    if section.shell != nil:
+      section.shell.noBadJson()
+      shell          = section.shell
 
   if lastEntryPoint == nil:
     if wrapCmd:
@@ -375,28 +370,49 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
     return
 
   if lastEntryPoint != nil:
-    wrapping = "ENTRYPOINT"
-    # When they specify ENTRYPOINT, we can safely ignore CMD, because
-    # either ENTRYPOINT is in JSON (in which case CMD will get used but
-    # will stay the same) or it will be a string, in which case CMD
-    # will get ignored, as long as we keep ENTRYPOINT in string form.
-    newInstruction = formatExec(lastEntrypoint.str, lastEntryPoint.json)
+    # When ENTRYPOINT is JSON, we wrap JSON with /chalk
+    # When ENTRYPOINT is string, it is a shell script
+    #   and so to correctly pass the script, we convert ENTRYPOINT
+    #   to JSON and pass existing script as an argument to a shell
+    #   /chalk will exec
+    #   Note in when ENTRYPOINT is string, CMD is normally ignored
+    #   however as we convert ENTRYPOINT to JSON, well need to
+    #   explicitly ignore CMD
+    let newInstruction = formatExec(lastEntrypoint.str, lastEntryPoint.json, shell.json)
+    ctx.addedInstructions.add("ENTRYPOINT " & newInstruction)
+    if lastEntrypoint.str != "":
+      ctx.addedInstructions.add("CMD []")
+    info("docker: ENTRYPOINT wrapped.")
 
   else:
-    wrapping = "CMD"
-    # If we only have a CMD:
-    # 1. shell form executes the full thing.
-    # 2. exec form I *think* the args are always passed and it could
-    #    be lifted to a ENTRYPOINT; I need to validate. If I'm wrong,
-    #    then we have to chop off the first item in the CMD .
-    #
-    # Right now, we add in a new CMD, which should override the old one.
-    # If not, we'll have to explicitly skip it.
-    newInstruction = formatExec(lastCmd.str, lastCmd.json)
+    # When ENTRYPOINT is missing in Dockerfile, wrapping CMD directly
+    # is error-prone as CMD will be passed as args to ENTRYPOINT
+    # if it exists in base image. Otherwise CMD will be directly executed.
+    # Until we have base image inspection, well overwrite ENTRYPOING
+    # with chalk will execute existing CMD.
+    # When CMD is string,
+    #   ENTRYPOINT should start shell and should directly execute CMD
+    #   string as is provided
+    #   Note this will require changing CMD to JSON form so that shell
+    #   is not double wrapped
+    # WHEN CMD is JSON,
+    #   ENTRYPOINT should directly execute CMD[0]
+    #   and CMD should be adjusted to only have args.
+    if lastCmd.str != "":
+      ctx.addedInstructions.add("ENTRYPOINT " & formatExecArray(shell.json))
+      ctx.addedInstructions.add("CMD " & $(`%*`([lastCmd.str])))
+    else:
+      let
+        cmd  = lastCmd.json[0]
+        args = if len(lastCmd.json) > 1:
+                 lastCmd.json[1..^1]
+               else:
+                 `%*`([])
+      ctx.addedInstructions.add("ENTRYPOINT " & formatExecArray(`%`([cmd])))
+      ctx.addedInstructions.add("CMD " & $(args))
+    info("docker: CMD wrapped with ENTRYPOINT.")
 
-  ctx.addedInstructions.add(wrapping & " " & newInstruction)
-  info("docker: " & wrapping & " wrapped.")
-  trace("Added instructions: \n" & ctx.addedInstructions.join("\n"))
+  trace("Added instructions:\n" & ctx.addedInstructions.join("\n"))
 
 proc isValidEnvVarName(s: string): bool =
   if len(s) == 0 or (s[0] >= '0' and s[0] <= '9'):

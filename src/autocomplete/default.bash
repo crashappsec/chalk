@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -150,14 +150,6 @@ function _chalk_toplevel_completions {
         help)
             _chalk_shift_one
             _chalk_help_completions
-            ;;
-        login)
-            _chalk_shift_one
-            _chalk_login_completions
-            ;;
-        logout)
-            _chalk_shift_one
-            _chalk_logout_completions
             ;;
         *)
             if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]] ; then

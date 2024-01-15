@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -38,8 +38,6 @@ when isMainModule:
   of "dump.params":        runCmdConfDumpParams()
   of "dump.cache":         runCmdConfDumpCache()
   of "load":               runCmdConfLoad()
-  of "logout":             runCmdLogout()
-  of "login":              runCmdLogin()
   of "config":             showConfigValues(force = true)
   of "version":            runCmdVersion()
   of "docker":             runCmdDocker(getArgs())

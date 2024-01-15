@@ -218,14 +218,18 @@ proc testConfigFile*(uri: string, newCon4m: string, params: seq[Box]):
                addSystemBuiltins().
                addCustomBuiltins(chalkCon4mBuiltins).
                addGetoptSpecLoad().
-               addSpecLoad(chalkSpecName,  toStream(chalkC42Spec)).
-               addConfLoad(baseConfName,   toStream(baseConfig)).
+               addSpecLoad(chalkSpecName,     toStream(chalkC42Spec)).
+               addConfLoad(baseConfName,      toStream(baseConfig)).
                setErrorHandler(newConfFileError).
-               addConfLoad(ioConfName,     toStream(ioConfig)).
-               addConfLoad(attestConfName, toStream(attestConfig)).
-               addConfLoad(sbomConfName,   toStream(sbomConfig)).
-               addConfLoad(sastConfName,   toStream(sastConfig)).
-               addConfLoad(coConfName,     toStream(coConfig))
+               addConfLoad(ioConfName,        toStream(ioConfig)).
+               addConfLoad(attestConfName,    toStream(attestConfig)).
+               addConfLoad(sbomConfName,      toStream(sbomConfig)).
+               addConfLoad(sastConfName,      toStream(sastConfig)).
+               # TODO for Theo: load the internal config file for rules
+               addConfLoad(linguistConfName,  toStream(linguistConfig)).
+               addConfLoad(techStackConfName, toStream(techStackConfig)).
+               addConfLoad(coConfName,        toStream(coConfig))
+
   try:
     # Test Run will cause (un)subscribe() to ignore subscriptions, and
     # will suppress log messages, etc.
@@ -282,6 +286,8 @@ const nocache = [getoptConfName,
                  ioConfName,
                  attestConfName,
                  defCfgFname,
+                 linguistConfName,
+                 techStackConfName,
                  coConfName,
                  embeddedConfName]
 

@@ -576,3 +576,10 @@ proc removeSuffix*(s: string, suffix: string): string =
   # vs in-place removal in stdlib
   result = s
   result.removeSuffix(suffix)
+
+proc `&`*(a: JsonNode, b: JsonNode): JsonNode =
+  result = newJArray()
+  for i in a.items():
+    result.add(i)
+  for i in b.items():
+    result.add(i)

@@ -197,6 +197,16 @@ causes them to not get deleted.  Specifically, docker temporary files
 """
   }
 
+  flag_yn use_tech_stack_detection {
+    field_to_set: "use_tech_stack_detection"
+    yes_aliases: []
+    no_aliases:  []
+
+    doc: """
+  Enable experimental tech stack detection via regexes
+"""
+  }
+
   flag_yn skip_command_report {
     field_to_set: "skip_command_report"
     yes_aliases: []
@@ -732,19 +742,7 @@ commands that do not match known topics)
 """
   }
 
-command logout {
-    shortdoc: "Logout of API"
-    doc: """
-Logs out of the API by deleting the saved API tokens.
-"""
-}
 
-command login {
-    shortdoc: "Start API login process"
-    doc: """
-Starts the API login process and will provide a URL to follow in a browser to complete authentication.
-"""
-  }
 command docgen {
     shortdoc: "Generate technical documentation"
     doc: """
