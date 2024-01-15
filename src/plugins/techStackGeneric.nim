@@ -146,7 +146,7 @@ proc getProcNames(): HashSet[string] =
 # to do more thatn check if the file paths exist. However we could
 # expand with proper plugins per category looking for things like
 # ps output etc in upcoming revisions
-proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string], strict: bool): bool =
+proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string]): bool =
   # first check directories and filepaths, then processes
   let scopedDirs = scope.getDirectories()
   var fExists = false
@@ -171,8 +171,8 @@ proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string], strict: boo
       rule_names   = toHashSet(names.get())
       intersection = proc_names * rule_names
     if len(intersection) > 0:
-      if strict:
-        return (fExists or dExists)
+      if scope.getStrict():
+        return fExists or dExists
       return true
 
   return false
@@ -334,7 +334,7 @@ proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
     if (category in inHostScope and
         subcategory in inHostScope[category] and
         not inHostScope[category][subcategory]):
-      let isTechStack = hostHasTechStack(val.hostScope, procNames, val.hostScope.getStrict())
+      let isTechStack = hostHasTechStack(val.hostScope, procNames)
       inHostScope[category][subcategory] = isTechStack
       if isTechStack:
         finalHost.mgetOrPut(category, @[]).add(subcategory)
