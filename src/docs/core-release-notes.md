@@ -92,6 +92,12 @@
   `docker.wrap_cmd` will break it as it overwrites
   its own `ENTRYPOINT`. Next release will correctly
   inspect all base images and wrap `ENTRYPOINT` correctly.
+- This release does not support:
+
+  - Mac x86_64 builds
+  - Linux aarch64 builds
+
+  Support for these platforms will be added back in the future.
 
 # Release Notes for Chalk version 0.2.2 (Oct 30, 2023)
 
