@@ -178,7 +178,7 @@ Can capture data both during build and during process run time.
 """
 }
 
-plugin cloudMetadata {
+plugin cloud_metadata {
     enabled:         true
     post_run_keys:   ["_GCP_INSTANCE_METADATA", "_AZURE_INSTANCE_METADATA",
     "_OP_CLOUD_PROVIDER", "_OP_CLOUD_PROVIDER_SERVICE_TYPE",
@@ -212,11 +212,11 @@ Captures metadata from cloud instances.
 """
 }
 
-plugin techStackGeneric {
+plugin tech_stack_generic {
     enabled:         true
-    post_run_keys:   ["_INFERRED_TECH_STACKS", "_INFERRED_TECH_STACKS_HOST"]
+    artifact_keys:   ["INFERRED_TECH_STACKS"]
+    post_run_keys:   ["_INFERRED_TECH_STACKS_HOST"]
     doc: """
-
 Captures metadata on the kinds of technologies used in the active directory or host
 machine in which chalk is being run.
 """
@@ -232,7 +232,6 @@ plugin aws_ecs {
                       "_OP_CLOUD_PROVIDER_REGION",
                       "_AWS_REGION"]
     doc: """
-
 Captures metadata from the primary endpoint for the original ECS
 metdata interface.
 """

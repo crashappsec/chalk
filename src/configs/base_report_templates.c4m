@@ -164,7 +164,7 @@ report and subtract from it.
   key._IMAGE_LAST_TAG_TIME.use               = true
   key._IMAGE_STORAGE_METADATA.use            = true
   key._STORE_URI.use                         = true
-  key._INFERRED_TECH_STACKS.use              = true
+  key.INFERRED_TECH_STACKS.use               = true
   key._INFERRED_TECH_STACKS_HOST.use         = true
   key._INSTANCE_CONTAINER_ID.use             = true
   key._INSTANCE_CREATION_DATETIME.use        = true
@@ -640,7 +640,7 @@ doc: """
   key._PROCESS_MOUNT_INFO.use                 = true
   key._OP_ALL_IMAGE_METADATA.use              = false
   key._OP_ALL_CONTAINER_METADATA.use          = false
-  key._INFERRED_TECH_STACKS.use               = true
+  key.INFERRED_TECH_STACKS.use                = true
   key._INFERRED_TECH_STACKS_HOST.use          = true
   key._IMAGE_ID.use                           = true
   key._IMAGE_COMMENT.use                      = true
@@ -1093,7 +1093,7 @@ container.
   key._IMAGE_VIRTUAL_SIZE.use                 = true
   key._IMAGE_LAST_TAG_TIME.use                = true
   key._IMAGE_STORAGE_METADATA.use             = true
-  key._INFERRED_TECH_STACKS.use               = true
+  key.INFERRED_TECH_STACKS.use                = true
   key._INFERRED_TECH_STACKS_HOST.use          = true
   key._INSTANCE_CONTAINER_ID.use              = true
   key._INSTANCE_CREATION_DATETIME.use         = true
@@ -1509,7 +1509,7 @@ and keep the run-time key.
   key._IMAGE_VIRTUAL_SIZE.use                 = true
   key._IMAGE_LAST_TAG_TIME.use                = true
   key._IMAGE_STORAGE_METADATA.use             = true
-  key._INFERRED_TECH_STACKS.use               = true
+  key.INFERRED_TECH_STACKS.use                = true
   key._INFERRED_TECH_STACKS_HOST.use          = true
   key._INSTANCE_CONTAINER_ID.use              = true
   key._INSTANCE_CREATION_DATETIME.use         = true
@@ -1767,7 +1767,8 @@ running insert commands.
   key.DOCKER_PLATFORM.use                     = true
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
-  key._INFERRED_TECH_STACKS.use               = true
+  key.INFERRED_TECH_STACKS.use                = true
+  key._INFERRED_TECH_STACKS_HOST.use          = true
   key.METADATA_ID.use                         = true
   key.SIGNATURE.use                           = true
   key._SIGNATURE.use                          = true

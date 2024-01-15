@@ -405,4 +405,4 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     listKey("_AWS_SECURITY_GROUP_IDS",               awsMdUri & "network/interfaces/macs/" & mac & "/security-group-ids")
 
 proc loadCloudMetadata*() =
-  newPlugin("cloudMetadata", rtHostCallback = RunTimeHostCb(cloudMetadataGetrunTimeHostInfo))
+  newPlugin("cloud_metadata", rtHostCallback = RunTimeHostCb(cloudMetadataGetrunTimeHostInfo))

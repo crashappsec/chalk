@@ -1104,8 +1104,8 @@ collecting this information.
 """
 }
 
-keyspec _INFERRED_TECH_STACKS {
-    kind:             RunTimeHost
+keyspec INFERRED_TECH_STACKS {
+    kind:             ChalkTimeArtifact
     type:             `x
     standard:         true
     since:            "0.2.2"

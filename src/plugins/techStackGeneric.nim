@@ -149,20 +149,21 @@ proc getProcNames(): HashSet[string] =
 proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string], strict: bool): bool =
   # first check directories and filepaths, then processes
   let scopedDirs = scope.getDirectories()
-  var fileExists = false
-  var dirExists = false
+  var fExists = false
+  var dExists = false
 
   if scopedDirs.isSome():
     for path in scopedDirs.get():
       if dirExists(path):
-        dirExists = true
+        dExists = true
         break
 
   let filepaths = scope.getFilepaths()
   if filepaths.isSome():
     for path in filepaths.get():
       if fileExists(path):
-        fileExists = true
+        fExists = true
+        break
 
   let names = scope.getProcessNames()
   if names.isSome():
@@ -171,7 +172,7 @@ proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string], strict: boo
       intersection = proc_names * rule_names
     if len(intersection) > 0:
       if strict:
-        return (fileExists or dirExists)
+        return (fExists or dExists)
       return true
 
   return false
@@ -252,128 +253,113 @@ proc detectTechCwd(): TableRef[string, seq[string]] =
         if inFileScope[category][subcategory]:
           result.mgetOrPut(category, @[]).add(subcategory)
 
-proc detectTechHostStatic(): TableRef[string, seq[string]] =
-  result = newTable[string, seq[string]]()
-  for category, subcategories in categories:
-    for subcategory, _ in subcategories:
-      if (category in inHostScope and
-          subcategory in inHostScope[category] and
-          inHostScope[category][subcategory]):
-        result.mgetOrPut(category, @[]).add(subcategory)
+proc loadState() =
+  once:
+    for langName, val in chalkConfig.linguistLanguages:
+      languages[val.getExtension()] = langName
 
-proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]):
-  ChalkDict {.cdecl.} =
+    for key, val in chalkConfig.techStackRules:
+      let
+        category    = val.getCategory()
+        subcategory = val.getSubcategory()
 
+      categories.
+        mgetOrPut(category, newTable[string, seq[string]]()).
+        mgetOrPut(subcategory, @[]).
+        add(key)
+
+      if val.hostScope != nil:
+        if category notin inHostScope:
+          inHostScope[category] = newTable[string, bool]()
+          inHostScope[category][subcategory] = false
+      else:
+        if val.fileScope == nil:
+          error("One of file_scope, host_scope must be defined for rule " & key & ". Skipping")
+          continue
+        if category notin inFileScope:
+          inFileScope[category] = newTable[string, bool]()
+        inFileScope[category][subcategory] = false
+
+        tsRules[key] = val
+        regexes[key] = re(val.fileScope.getRegex())
+        headLimits[key] = val.fileScope.getHead()
+        let filetypes = val.fileScope.getFiletypes()
+        if filetypes.isSome():
+          let ftypes = filetypes.get()
+          ruleFiletypes[key] = ftypes
+          for ft in ftypes:
+            ftRules.mgetOrPut(ft, initHashSet[string]()).incl(key)
+        else:
+          # we only have exclude rules therefore we match by default
+          # XXX move to a template for looking things up and adding if
+          # they don't exist
+          ftRules.mgetOrPut(FT_ANY, initHashSet[string]()).incl(key)
+          let excludeFiletypes = val.fileScope.getExcludedFiletypes()
+          if excludeFiletypes.isSome():
+            let exclFtps = excludeFiletypes.get()
+            ruleExcludeFiletypes[key] = exclFtps
+            for ft in exclFtps:
+              excludeFtRules.mgetOrPut(ft, initHashSet[string]()).incl(key)
+
+        # get paths and excluded paths that need to always be considered
+        let filepaths = val.fileScope.getFilepaths()
+        if filepaths.isSome():
+          let fpaths = filepaths.get()
+          for path in fpaths:
+            pthRules.mgetOrPut(path, initHashSet[string]()).incl(key)
+
+        let excludeFilepaths = val.fileScope.getExcludedFilepaths()
+        if excludeFilepaths.isSome():
+          let excfpaths = excludeFilepaths.get()
+          for path in excfpaths:
+            excludePthRules.mgetOrPut(path, initHashSet[string]()).incl(key)
+
+proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
   result = ChalkDict()
   let canLoad = chalkConfig.getUseTechStackDetection()
   if not canLoad:
     trace("Skipping tech stack runtime detection plugin")
-    return
+    return result
 
+  loadState()
   let procNames = getProcNames()
+  var finalHost = newTable[string, seq[string]]()
 
   for key, val in chalkConfig.techStackRules:
     if val.hostScope == nil:
       continue
-    for category, subcategories in categories:
-      for subcategory, _ in subcategories:
-        if (category in inHostScope and
-            subcategory in inHostScope[category] and
-            not inHostScope[category][subcategory]):
-          inHostScope[category][subcategory] = hostHasTechStack(val.hostScope, procNames, val.hostScope.getStrict())
+    let
+      category    = val.getCategory()
+      subcategory = val.getSubcategory()
+    if (category in inHostScope and
+        subcategory in inHostScope[category] and
+        not inHostScope[category][subcategory]):
+      let isTechStack = hostHasTechStack(val.hostScope, procNames, val.hostScope.getStrict())
+      inHostScope[category][subcategory] = isTechStack
+      if isTechStack:
+        finalHost.mgetOrPut(category, @[]).add(subcategory)
 
-  var final_host = newTable[string, seq[string]]()
-  for category, subcategories in categories:
-    for subcategory, _ in subcategories:
-      if (category in inHostScope and
-          subcategory in inHostScope[category] and
-          inHostScope[category][subcategory]):
-        final_host.mgetOrPut(category, @[]).add(subcategory)
-  if len(final_host) > 0:
-    result["_INFERRED_TECH_STACKS_HOST"] = pack[TableRef[string, seq[string]]](final_host)
+  if len(finalHost) > 0:
+    result["_INFERRED_TECH_STACKS_HOST"] = pack[TableRef[string, seq[string]]](finalHost)
 
-proc techStackArtifact*(self: Plugin, objs: ChalkObj):
-  ChalkDict {.cdecl.} =
-
+proc techStackArtifact*(self: Plugin, objs: ChalkObj): ChalkDict {.cdecl.} =
   result = ChalkDict()
   let canLoad = chalkConfig.getUseTechStackDetection()
   if not canLoad:
     trace("Skipping tech stack detection plugin for artifacts")
-    return
+    return result
 
-  var
+  loadState()
+  let
     final      = detectTechCwd()
-    final_host = detectTechHostStatic()
-  let langs    = detectLanguages()
+    langs      = detectLanguages()
   if len(langs) > 0:
     final["language"] = toSeq(langs)
 
   if len(final) > 0:
-    result["_INFERRED_TECH_STACKS"]      = pack[TableRef[string, seq[string]]](final)
-  if len(final_host) > 0:
-    result["_INFERRED_TECH_STACKS_HOST"] = pack[TableRef[string, seq[string]]](final_host)
+    result["INFERRED_TECH_STACKS"]      = pack[TableRef[string, seq[string]]](final)
 
 proc loadtechStackGeneric*() =
-  for langName, val in chalkConfig.linguistLanguages:
-    languages[val.getExtension()] = langName
-
-  let procNames = getProcNames()
-  for key, val in chalkConfig.techStackRules:
-    let
-      category    = val.getCategory()
-      subcategory = val.getSubcategory()
-
-    categories.
-      mgetOrPut(category, newTable[string, seq[string]]()).
-      mgetOrPut(subcategory, @[]).
-      add(key)
-
-    if val.hostScope != nil:
-      if category notin inHostScope:
-        inHostScope[category] = newTable[string, bool]()
-        inHostScope[category][subcategory] = hostHasTechStack(val.hostScope, procNames, val.hostScope.getStrict())
-    else:
-      if val.fileScope == nil:
-        error("One of file_scope, host_scope must be defined for rule " & key & ". Skipping")
-        continue
-      if category notin inFileScope:
-        inFileScope[category] = newTable[string, bool]()
-      inFileScope[category][subcategory] = false
-
-      tsRules[key] = val
-      regexes[key] = re(val.fileScope.getRegex())
-      headLimits[key] = val.fileScope.getHead()
-      let filetypes = val.fileScope.getFiletypes()
-      if filetypes.isSome():
-        let ftypes = filetypes.get()
-        ruleFiletypes[key] = ftypes
-        for ft in ftypes:
-          ftRules.mgetOrPut(ft, initHashSet[string]()).incl(key)
-      else:
-        # we only have exclude rules therefore we match by default
-        # XXX move to a template for looking things up and adding if
-        # they don't exist
-        ftRules.mgetOrPut(FT_ANY, initHashSet[string]()).incl(key)
-        let excludeFiletypes = val.fileScope.getExcludedFiletypes()
-        if excludeFiletypes.isSome():
-          let exclFtps = excludeFiletypes.get()
-          ruleExcludeFiletypes[key] = exclFtps
-          for ft in exclFtps:
-            excludeFtRules.mgetOrPut(ft, initHashSet[string]()).incl(key)
-
-      # get paths and excluded paths that need to always be considered
-      let filepaths = val.fileScope.getFilepaths()
-      if filepaths.isSome():
-        let fpaths = filepaths.get()
-        for path in fpaths:
-          pthRules.mgetOrPut(path, initHashSet[string]()).incl(key)
-
-      let excludeFilepaths = val.fileScope.getExcludedFilepaths()
-      if excludeFilepaths.isSome():
-        let excfpaths = excludeFilepaths.get()
-        for path in excfpaths:
-          excludePthRules.mgetOrPut(path, initHashSet[string]()).incl(key)
-
-  newPlugin("techStackGeneric",
+  newPlugin("tech_stack_generic",
             ctArtCallback  = ChalkTimeArtifactCb(techStackArtifact),
             rtHostCallback = RunTimeHostCb(techStackRuntime))

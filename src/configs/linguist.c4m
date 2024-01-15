@@ -525,7 +525,7 @@ linguist_language Nginx {
 linguist_language Nim {
   type: "programming"
   extension: ".nim"
-  altextensions: [".nimrod"]
+  altextensions: [".nims", ".nimrod"]
 }
 
 linguist_language Nu {
