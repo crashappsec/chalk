@@ -202,11 +202,13 @@ proc loadAllConfigs*() =
   doRun()
 
   stack.
-    addConfLoad(ioConfName,     toStream(ioConfig),     notEvenDefaults).
-    addConfLoad(attestConfName, toStream(attestConfig), checkNone).
-    addConfLoad(sbomConfName,   toStream(sbomConfig),   checkNone).
-    addConfLoad(sastConfName,   toStream(sastConfig),   checkNone).
-    addConfLoad(coConfName,     toStream(coConfig),     checkNone)
+    addConfLoad(ioConfName,        toStream(ioConfig),        notEvenDefaults).
+    addConfLoad(attestConfName,    toStream(attestConfig),    checkNone).
+    addConfLoad(sbomConfName,      toStream(sbomConfig),      checkNone).
+    addConfLoad(sastConfName,      toStream(sastConfig),      checkNone).
+    addConfLoad(techStackConfName, toStream(techStackConfig), checkNone).
+    addConfLoad(linguistConfName,  toStream(linguistConfig),  checkNone).
+    addConfLoad(coConfName,        toStream(coConfig),        checkNone)
 
   stack.addCallback(loadLocalStructs)
   doRun()

@@ -7,7 +7,6 @@ import shutil
 from pathlib import Path
 
 import os
-import time
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
@@ -18,7 +17,7 @@ from .chalk.validate import (
     validate_extracted_chalk,
     validate_virtual_chalk,
 )
-from .conf import CODEOWNERS, CONFIGS, DOCKERFILES, LS_PATH, PYS, DATA
+from .conf import CODEOWNERS, CONFIGS, DATA, DOCKERFILES, LS_PATH, PYS
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
@@ -617,6 +616,29 @@ def test_metadata_gcp(
                 "virtualClock": {"driftToken": "0"},
                 "zone": "projects/11111111111/zones/europe-west1-b",
             },
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_tech_stack(chalk_copy: Chalk, copy_files: list[Path]):
+    bin_path = copy_files[0]
+    parent = bin_path.parent
+    (parent / "test.nim").write_text("")
+    (parent / "test.php").write_text("")
+    result = chalk_copy.insert(
+        bin_path,
+        config=CONFIGS / "techstack.c4m",
+        log_level="trace",
+    )
+    assert result.mark.has(
+        INFERRED_TECH_STACKS={"language": {"PHP", "Nim"}},
+    )
+    assert result.report.has(
+        _INFERRED_TECH_STACKS_HOST={
+            "framework": {
+                "other",
+            }
         }
     )
 

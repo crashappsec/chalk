@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -18,28 +18,48 @@ import re, config, chalkjson, util, algorithm
 # get called when plugins declare stuff in the config file, so this
 # should all be pre-checked.
 
-template callGetChalkTimeHostInfo*(plugin: Plugin): ChalkDict =
+proc callGetChalkTimeHostInfo*(plugin: Plugin): ChalkDict =
   let cb = plugin.getChalkTimeHostInfo
 
-  cb(plugin)
+  # explicit callback check - otherwise it results in segfault
+  if cb == nil:
+    error("Plugin " & plugin.name & ": getChalkTimeHostInfo callback is missing")
+    result = ChalkDict()
+  else:
+    result = cb(plugin)
 
-template callGetChalkTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj):
+proc callGetChalkTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj):
          ChalkDict =
   let cb = plugin.getChalkTimeArtifactInfo
 
-  cb(plugin, obj)
+  # explicit callback check - otherwise it results in segfault
+  if cb == nil:
+    error("Plugin " & plugin.name & ": getChalkTimeArtifactInfo callback is missing")
+    result = ChalkDict()
+  else:
+    result = cb(plugin, obj)
 
-template callGetRunTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj, b: bool):
+proc callGetRunTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj, b: bool):
          ChalkDict =
   let cb = plugin.getRunTimeArtifactInfo
 
-  cb(plugin, obj, b)
+  # explicit callback check - otherwise it results in segfault
+  if cb == nil:
+    error("Plugin " & plugin.name & ": getRunTimeArtifactInfo callback is missing")
+    result = ChalkDict()
+  else:
+    result = cb(plugin, obj, b)
 
-template callGetRunTimeHostInfo*(plugin: Plugin, objs: seq[ChalkObj]):
+proc callGetRunTimeHostInfo*(plugin: Plugin, objs: seq[ChalkObj]):
          ChalkDict =
   let cb = plugin.getRunTimeHostInfo
 
-  cb(plugin, objs)
+  # explicit callback check - otherwise it results in segfault
+  if cb == nil:
+    error("Plugin " & plugin.name & ": getRunTimeHostInfo callback is missing")
+    result = ChalkDict()
+  else:
+    result = cb(plugin, objs)
 
 template callScan*(plugin: Plugin, s: string):
          Option[ChalkObj] =
