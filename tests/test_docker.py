@@ -202,6 +202,24 @@ def test_base_image(chalk: Chalk, random_hex: str):
 @pytest.mark.parametrize(
     "test_file",
     [
+        "string.Dockerfile",
+        "json.Dockerfile",
+    ],
+)
+def test_cmd_wrap(chalk: Chalk, random_hex: str, test_file: str):
+    image_id, result = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "cmd" / test_file,
+        context=DOCKERFILES / "valid" / "cmd",
+        config=CONFIGS / "docker_wrap.c4m",
+        log_level="trace",
+    )
+    _, output = Docker.run(image_id)
+    assert "hello" in output.text
+
+
+@pytest.mark.parametrize(
+    "test_file",
+    [
         "valid/sample_1",
         "valid/sample_2",
         "valid/sample_3",
