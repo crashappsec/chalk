@@ -39,6 +39,9 @@
   It includes only basic information about lambda function
   such as its ARN and its runtime environment.
   [112](https://github.com/crashappsec/chalk/pull/112)
+- Adding experimental support for detection of technologies used at chalk and
+  runtime (programming languages, databases, servers, etc.)
+  [128](https://github.com/crashappsec/chalk/pull/128)
 
 ## Fixes
 
