@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.2.2"
+chalk_version :=   "0.3.0"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -705,7 +705,7 @@ keyspec TAG {
     kind:             ChalkTimeArtifact
     type:             string
     standard:         true
-    since:            "0.2.3"
+    since:            "0.3.0"
     shortdoc:         "Current repo tag at time of marking"
     doc:              """
 The latest tag name found in the source code repository found at the time
@@ -719,7 +719,7 @@ keyspec TAG_SIGNED {
     kind:             ChalkTimeArtifact
     type:             bool
     standard:         true
-    since:            "0.2.3"
+    since:            "0.3.0"
     shortdoc:         "Whether the tag is signed"
     doc:              """
 If the most recent tag was signed.
@@ -733,7 +733,7 @@ keyspec TAGGER {
     kind:             ChalkTimeArtifact
     type:             string
     standard:         true
-    since:            "0.2.3"
+    since:            "0.3.0"
     shortdoc:         "Tagger of most recent tag"
     doc:              """
 The tagger of the most recent annotated tag.
@@ -746,7 +746,7 @@ keyspec DATE_TAGGED {
     kind:             ChalkTimeArtifact
     type:             string
     standard:         true
-    since:            "0.2.3"
+    since:            "0.3.0"
     shortdoc:         "Human readable timestamp of most recent tag"
     doc:              """
 The date of the annotated tag in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
@@ -771,7 +771,7 @@ keyspec COMMIT_SIGNED {
     kind:             ChalkTimeArtifact
     type:             bool
     standard:         true
-    since:            "0.2.3"
+    since:            "0.3.0"
     shortdoc:         "Whether the commit is signed"
     doc:              """
 If the most recent commit was signed.
@@ -5012,7 +5012,7 @@ keyspec $CHALK_DATA_API_KEY {
    type:                   string
    standard:               true
    system:                 true
-   since:                  "0.2.3"
+   since:                  "0.3.0"
    doc:                    """
 API key used to optionally save/load attestation keys to cloud.
 """
