@@ -5,7 +5,8 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import api, base64, chalkjson, config, httpclient, net, os, selfextract, uri
+import base64, chalkjson, config, httpclient, net, os, selfextract, 
+       sinks, uri, nimutils/sinks
 
 const
   attestationObfuscator = staticExec(
@@ -99,10 +100,13 @@ generate_keypair(char **s1, char **s2) {
 ## not finished enough to replace what we already have.
 
 
-template callTheSecretService(base: string, prKey: string, apiToken: string, bodytxt: untyped,
+template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: untyped,
                               mth: untyped): Response =
   let
-    timeout:  int    = cast[int](chalkConfig.getSecretManagerTimeout())
+    # Timeout asssociated with the signing key backup service
+    timeout:      int    = cast[int](chalkConfig.getSigningKeyBackupServiceTimeout())
+    # Name of the auth config section to load from the config which contains the jwt
+    auth_config:  string = chalkConfig.getSigningKeyBackupServiceAuthConfigName()
   var
     url:      string
     uri:      Uri
@@ -114,107 +118,92 @@ template callTheSecretService(base: string, prKey: string, apiToken: string, bod
   signingID = sha256Hex(attestationObfuscator & prkey)
 
   if mth == HttPGet:
-    trace("Calling secret manager to retrieve key with id: " & signingID)
+    trace("Calling Signing Key Backup Service to retrieve key with ID: " & signingID)
   else:
-    trace("Calling secret manager to store key with id: " & signingID)
+    trace("Calling Signing Key Backup Service to store key with iD: " & signingID)
 
   if base[^1] == '/':
     url = base & signingID
   else:
     url = base & "/" & signingID
 
-  uri = parseUri(url)
+  let authOpt = getAuthConfigByName(auth_config)
+  if authOpt.isNone():
+    error("Could not retrieve Chalk Data API token from configuration profile. Unable to use Signing Key Backup Service.")
+    return false
+  var
+    auth = authOpt.get()
+    headers = newHttpHeaders()
+    authHeaders = auth.implementation.injectHeaders(auth, headers)
 
-  if uri.scheme == "https":
-    context = newContext(verifyMode = CVerifyPeer)
-    client  = newHttpClient(sslContext = context, timeout = timeout)
-  else:
-    client  = newHttpClient(timeout = timeout)
+  # Call the API with authz header - rety twice with backoff
+  uri       = parseUri(url)
+  context   = newContext(verifyMode = CVerifyPeer)
+  client    = newHttpClient(sslContext = context, timeout = timeout)
+  response  = client.safeRequest(url = uri,
+                                 httpMethod        = mth,
+                                 headers           = authHeaders,
+                                 body              = bodytxt,
+                                 retries           = 2,
+                                 firstRetryDelayMs = 100)
 
-  # add in API token obtained via user login process if set
-  if apiToken != "":
-    client.headers = newHttpHeaders(
-                                    {
-                                     "Authorization": "Bearer " & $apiToken
-                                    }
-                                    )
+  trace("Signing Key Backup Service URL: " & $uri)  
+  trace("Signing Key Backup Service HTTP headers: " & $authHeaders)
+  trace("Signing Key Backup Service status code: " & response.status)
+  trace("Signing Key Backup Service response: " & response.body)
 
-  response  = client.safeRequest(url = uri, httpMethod = mth, body = bodytxt)
-
+  # Cleanup & return from template
   client.close()
   response
 
-proc saveToSecretManager*(content: string, prkey: string, apiToken: string): bool =
+proc backupSigningKeyToService*(content: string, prkey: string): bool =
   var
     nonce:    string
     response: Response
 
   let
-    base  = chalkConfig.getSecretManagerUrl()
+    base  = chalkConfig.getSigningKeyBackupServiceUrl()
     ct    = prp(attestationObfuscator, cosignPw, nonce)
 
   if len(base) == 0:
-    error("Cannot save secret; no secret manager URL configured.")
+    error("Cannot backup signing key; no Signing Key Backup Service URL configured.")
     return false
 
   let body = nonce.hex() & ct.hex()
-  response = callTheSecretService(base, prkey, apiToken, body, HttpPut)
+  response = callTheSigningKeyBackupService(base, prkey, body, HttpPut)
 
   trace("Sending encrypted secret: " & body)
   if response.code == Http405:
-    info("This secret is already saved.")
+    info("This encrypted signing key is already backed up.")
   elif not response.code.is2xx():
-    error("When attempting to save signing secret: " & response.status)
+    error("When attempting to save envcrypted signing key: " & response.status)
     trace(response.body())
     return false
   else:
-    info("Successfully stored secret.")
-    warn("Please Note: Secrets that have not been READ in the previous 30 days will be deleted!")
+    info("Successfully stored encrypted signing key.")
+    warn("Please Note: Encrypted signing keys that have not been READ in the previous 30 days will be deleted!")
   return true
 
-proc loadFromSecretManager*(prkey: string, apikey: string): bool =
+proc restoreSigningKeyFromService*(prkey: string): bool =
 
   if cosignPw != "":
     return true
 
-  let base: string = chalkConfig.getSecretManagerUrl()
+  let base: string = chalkConfig.getSigningKeyBackupServiceUrl()
 
-  if len(base) == 0 or prkey == "" or apikey == "":
+  if len(base) == 0 or prkey == "":
     return false
 
-  let response = callTheSecretService(base, prKey, apikey, "", HttpGet)
+  let response = callTheSigningKeyBackupService(base, prKey, "", HttpGet)
 
   if not response.code.is2xx():
     # authentication issue / token expiration - begin reauth
     if response.code == Http401:
       # parse json response and save / return values()
       let jsonNodeReason = parseJson(response.body())
-      let reasonCode     = jsonNodeReason["Message"].getStr()
-
-      if reasonCode.startswith("token_expired"):
-        info("API access token expired, refreshing ...")
-        # Remove current API token from self chalk mark
-        selfChalk.extract["$CHALK_API_KEY"] = pack("")
-
-        # refresh access_token
-        let boxedOptRefresh = selfChalkGetKey("$CHALK_API_REFRESH_TOKEN")
-        if boxedOptRefresh.isSome():
-          let
-            boxedRefresh  = boxedOptRefresh.get()
-            refreshToken = unpack[string](boxedRefresh)
-          trace("Refresh token retrieved from chalk mark: " & $refreshToken)
-
-          let newApiToken = refreshAccessToken($refreshToken)
-          if newApiToken == "":
-            return false
-          else:
-            trace("API Token refreshed: " & newApiToken)
-            #save new api token to self chalk mark
-            selfChalk.extract["$CHALK_API_KEY"] = pack($newApiToken)
-            return loadFromSecretManager(prkey, $newApiToken)
+      trace("JSON body of response from Signing key Backup Service: " & $jsonNodeReason)
     else:
-      warn("Could not retrieve signing secret: " & response.status & "\n" &
-           "Will not be able to sign / verify.")
+      warn("Could not retrieve encrypted signing key: " & response.status & "\n" & "Will not be able to sign / verify.")
       return false
 
   var
@@ -222,19 +211,19 @@ proc loadFromSecretManager*(prkey: string, apikey: string): bool =
     hexBits: string
 
   try:
-    #hexBits = response.bodyStream.readAll().strip()
-    #body    = hexBits.parseHexStr()
     hexBits = response.body()
     body    = parseHexStr($hexBits)
 
-    if len(body) != 40:
-      raise newException(ValueError, "Nice hex, but wrong size.")
+    if len(body) != 40: 
+      error("Encrypted key returned from server is incorrect size. Received" & $len(body) & "bytes, exected 40 bytes.")
+      return false
+
   except:
-    error("When loading the signing secret, received an invalid " &
-          "response from server: " & response.status)
+    error("When retrieving encrypted key, received an invalid " &
+          "response from service: " & response.status)
     return false
 
-  trace("Successfully retrieved secret from secret manager.")
+  trace("Successfully retrieved encrypted key from backup service.")
 
   var
     nonce = body[0 ..< 16]
@@ -307,18 +296,18 @@ proc generateKeyMaterial*(cosign: string): bool =
   else:
     return true
 
-proc commitPassword(pri, apiToken: string, gen: bool) =
+proc commitPassword(pri: string, gen: bool) =
   var
-    storeIt = chalkConfig.getUseSecretManager()
+    storeIt = chalkConfig.getUseSigningKeyBackupService()
     printIt = not storeIt
 
   if storeIt:
     # If the manager doesn't work, then we need to fall back.
-    if not cosignPw.saveToSecretManager(pri, apiToken):
+    if not cosignPw.backupSigningKeyToService(pri):
       error("Could not store password. Either try again later, or " &
         "use the below password with the CHALK_PASSWORD environment " &
-        "variable. We attempt to store as long as use_secret_manager is " &
-        "true.\nIf you forget the password, delete chalk.key and " &
+        "variable. We attempt to store as long as use_signing_key_backup_service " &
+        "is true.\nIf you forget the password, delete chalk.key and " &
         "chalk.pub before rerunning.")
 
       if gen:
@@ -342,15 +331,17 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
   var
     prikey = optfile
 
+  # If Env var with signing password is set use that
   if existsEnv("CHALK_PASSWORD"):
     cosignPw = getEnv("CHALK_PASSWORD")
     delEnv("CHALK_PASSWORD")
     return true
 
-  if chalkConfig.getUseSecretManager() == false:
+  if chalkConfig.getUseSigningKeyBackupService() == false:
     return false
 
   if prikey == "":
+
     let
       boxedOpt = selfChalkGetKey("$CHALK_ENCRYPTED_PRIVATE_KEY")
       boxed    = boxedOpt.getOrElse(pack(""))
@@ -360,22 +351,13 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
     if prikey == "":
       return false
 
-  # get API key to pass to secret manager
-  let boxedOptApi = selfChalkGetKey("$CHALK_API_KEY")
-  if boxedOptApi.isSome():
-    let
-       boxedApi = boxedOptApi.get()
-       apikey   = unpack[string](boxedApi)
-    trace("API token retrieved from chalk mark: " & $apikey)
-
-    if loadFromSecretManager(prikey, apikey):
-      return true
-    else:
-      error("Could not retrieve secret from API")
-      return false
-
-  error("Could not retrieve API token from chalk mark")
-  return false
+  # Use Chalk Data API key to retrieve previously saved encrypted secret 
+  #  from API, then use retrieved private key to decrypt
+  if restoreSigningKeyFromService(prikey):
+    return true
+  else:
+    error("Could not retrieve encrypted signing key from API")
+    return false
 
 proc testSigningSetup(pubKey, priKey: string): bool =
   cosignTempDir = getNewTempDir()
@@ -421,16 +403,13 @@ proc testSigningSetup(pubKey, priKey: string): bool =
 
 proc writeSelfConfig(selfChalk: ChalkObj): bool {.importc, discardable.}
 
-proc saveSigningSetup(pubKey, priKey, apiToken, refreshToken: string, gen: bool): bool =
+proc saveSigningSetup(pubKey, priKey: string, gen: bool): bool =
   let selfChalk = getSelfExtraction().get()
 
   selfChalk.extract["$CHALK_ENCRYPTED_PRIVATE_KEY"] = pack(priKey)
   selfChalk.extract["$CHALK_PUBLIC_KEY"]            = pack(pubKey)
-  if apiToken != "":
-    selfChalk.extract["$CHALK_API_KEY"]             = pack(apiToken)
-    selfChalk.extract["$CHALK_API_REFRESH_TOKEN"]   = pack(refreshToken)
 
-  commitPassword(prikey, apiToken, gen)
+  commitPassword(priKey, gen)
 
   when false:
     # This is old code, but it might make a comeback at some point,
@@ -541,52 +520,12 @@ proc attemptToLoadKeys*(silent=false): bool =
   return true
 
 proc attemptToGenKeys*(): bool =
-  var
-    apiToken     = ""
-    refreshToken = ""
-  let use_api    = chalkConfig.getApiLogin()
-
-  if use_api:
-    # Possible we already have API keys chalked into ourself
-    # refresh token
-    let boxedOptRefresh = selfChalkGetKey("$CHALK_API_REFRESH_TOKEN")
-    if boxedOptRefresh.isSome():
-      let boxedRefresh  = boxedOptRefresh.get()
-      refreshToken = unpack[string](boxedRefresh)
-      trace("Refresh token retrieved from chalk mark: " & $refreshToken)
-
-      # access_token
-      let boxedOptAccess = selfChalkGetKey("$CHALK_API_KEY")
-      if boxedOptAccess.isSome():
-        let boxedAccess  = boxedOptAccess.get()
-        apiToken = unpack[string](boxedAccess)
-        trace("Access token retrieved from chalk mark: " & $apiToken)
-      else:
-        trace("empty access token")
-
-    else:
-      trace("empty refresh token")
-
-    if apiToken == "" or refreshToken == "":
-      # could not retreive so requesting new
-      trace("Missing token, starting new login..." & apiToken & refreshToken)
-      (apiToken, refreshToken) = getChalkApiToken()
-      if apiToken == "" or refreshToken == "":
-        trace("Unable to retrieve API access and refresh tokens.")
-        return false
-    else:
-      trace("API Token received: " & apiToken)
-      trace("Refresh Token received: " & refreshToken)
-
 
   if getCosignLocation() == "":
     return false
 
-  let
-    keyOutLoc = getKeyFileLoc()
-    # Any relative path needs to be resolved before we push the temp
-    # dir.
-
+  let keyOutLoc = getKeyFileLoc()
+  
   if keyOutLoc == "":
     return false
 
@@ -609,11 +548,8 @@ proc attemptToGenKeys*(): bool =
     copyGeneratedKeys(pubKey, priKey, keyOutLoc)
     cosignLoaded = true
 
-    if use_api:
-      result = saveSigningSetup(pubKey, priKey, apiToken, refreshToken, true)
-    else:
-      result = saveSigningSetup(pubKey, priKey, "", "", true)
-
+    result = saveSigningSetup(pubKey, priKey, true)
+    
 proc canAttest*(): bool =
   if getCosignLocation() == "":
     return false

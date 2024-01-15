@@ -107,12 +107,7 @@ docker {
     command load {
       args: (0, high())
     }
-    command login {
-      args: (0, high())
-    }
-    command logout {
-      args: (0, high())
-    }
+    
     command logs {
       args: (0, high())
     }

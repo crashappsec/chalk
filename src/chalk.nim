@@ -38,8 +38,6 @@ when isMainModule:
   of "dump.params":        runCmdConfDumpParams()
   of "dump.cache":         runCmdConfDumpCache()
   of "load":               runCmdConfLoad()
-  of "logout":             runCmdLogout()
-  of "login":              runCmdLogin()
   of "config":             showConfigValues(force = true)
   of "version":            runCmdVersion()
   of "docker":             runCmdDocker(getArgs())

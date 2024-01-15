@@ -7,7 +7,7 @@
 ##
 
 function _chalk_setup_either {
-            COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --skip-command-report --no-skip-command-report --symlink-behavior --store-password --no-store-password --key-file --api-login --no-api-login" -- ${_CHALK_CUR_WORD}))
+            COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --skip-command-report --no-skip-command-report --symlink-behavior --store-password --no-store-password --key-file" -- ${_CHALK_CUR_WORD}))
 }
 
 function _chalk_setup_completions {
@@ -130,14 +130,6 @@ function _chalk_toplevel_completions {
         help)
             _chalk_shift_one
             _chalk_help_completions
-            ;;
-        login)
-            _chalk_shift_one
-            _chalk_login_completions
-            ;;
-        logout)
-            _chalk_shift_one
-            _chalk_logout_completions
             ;;
         *)
             if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]] ; then
