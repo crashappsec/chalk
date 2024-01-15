@@ -8,6 +8,23 @@
   cloud instances.
   [112](https://github.com/crashappsec/chalk/pull/112)
 
+- The signing key backup service has been completely overhauled and
+  no longer uses the OIDC Device Code Flow to authenticate to the API.
+  Instead a pre-generated API access token is passed in chalk profile
+  and that value is used as the bearer token. The `setup` command 
+  still generates keys for signing but will no longer prompt with a
+  QR code to authenticate to the API.
+
+- As a result of the above the `login` and `logout` commands have been
+  removed.
+
+- A number of signing key backup related configuration values and variables
+  have had their names changed to be more description:
+  - `CHALK_API_KEY` -> `CHALK_DATA_API_KEY`
+  - `use_secret_manager` -> `use_signing_key_backup_service`
+  - `secret_manager_url` -> `signing_key_backup_service_url`
+  - `secret_manager_timeout` -> `signing_key_backup_service_timeout`
+
 ## New Features
 
 - Adding support for git context for docker build commands.
