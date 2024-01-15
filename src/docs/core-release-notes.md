@@ -88,7 +88,7 @@
 
 ## Known Issues
 
-- If docker base image has `ENTRYPOINT` defined,
+- If a docker base image has `ENTRYPOINT` defined,
   `docker.wrap_cmd` will break it as it overwrites
   its own `ENTRYPOINT`. Next release will correctly
   inspect all base images and wrap `ENTRYPOINT` correctly.
