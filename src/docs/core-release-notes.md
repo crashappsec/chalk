@@ -11,7 +11,7 @@
 - The signing key backup service has been completely overhauled and
   no longer uses the OIDC Device Code Flow to authenticate to the API.
   Instead a pre-generated API access token is passed in chalk profile
-  and that value is used as the bearer token. The `setup` command 
+  and that value is used as the bearer token. The `setup` command
   still generates keys for signing but will no longer prompt with a
   QR code to authenticate to the API.
 
@@ -44,7 +44,7 @@
   in GitHub Actions.
   [86](https://github.com/crashappsec/chalk/pull/86)
 - Adding `presign` sink to allow uploads to S3 without
-  hardcoded creds in the chalk config.
+  hard-coded credentials in the chalk configuration.
   [103](https://github.com/crashappsec/chalk/pull/103)
 - Adding JWT/Basic auth authentication options to sinks.
   [111](https://github.com/crashappsec/chalk/pull/111)
@@ -82,6 +82,16 @@
   as non-existing user. This is most common in lambda
   which runs as user `993`.
   [112](https://github.com/crashappsec/chalk/pull/112)
+- `CMD` wrapping supports wrapping shell scripts
+  (e.g. `CMD set -x && echo hello`).
+  [132](https://github.com/crashappsec/chalk/pull/132)
+
+## Known Issues
+
+- If docker base image has `ENTRYPOINT` defined,
+  `docker.wrap_cmd` will break it as it overwrites
+  its own `ENTRYPOINT`. Next release will correctly
+  inspect all base images and wrap `ENTRYPOINT` correctly.
 
 # Release Notes for Chalk version 0.2.2 (Oct 30, 2023)
 
