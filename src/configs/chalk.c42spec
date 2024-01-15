@@ -618,6 +618,15 @@ installed on the host
 Candidates process by its name as it appears on /proc/<pid>/status
 """
   }
+
+  field strict {
+    type:    bool
+    default: true
+    doc: """
+Require a running process to be found and also at least one of the [filepaths, directories].
+If set to false, the mere presence of a directory or filepath will mark a detection.
+"""
+  }
 }
 
 object keyspec {

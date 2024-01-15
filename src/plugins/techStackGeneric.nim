@@ -146,19 +146,23 @@ proc getProcNames(): HashSet[string] =
 # to do more thatn check if the file paths exist. However we could
 # expand with proper plugins per category looking for things like
 # ps output etc in upcoming revisions
-proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string]): bool =
+proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string], strict: bool): bool =
   # first check directories and filepaths, then processes
   let scopedDirs = scope.getDirectories()
+  var fileExists = false
+  var dirExists = false
+
   if scopedDirs.isSome():
     for path in scopedDirs.get():
       if dirExists(path):
-        return true
+        dirExists = true
+        break
 
   let filepaths = scope.getFilepaths()
   if filepaths.isSome():
     for path in filepaths.get():
       if fileExists(path):
-        return true
+        fileExists = true
 
   let names = scope.getProcessNames()
   if names.isSome():
@@ -166,6 +170,8 @@ proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string]): bool =
       rule_names   = toHashSet(names.get())
       intersection = proc_names * rule_names
     if len(intersection) > 0:
+      if strict:
+        return (fileExists or dirExists)
       return true
 
   return false
@@ -274,7 +280,7 @@ proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]):
         if (category in inHostScope and
             subcategory in inHostScope[category] and
             not inHostScope[category][subcategory]):
-          inHostScope[category][subcategory] = hostHasTechStack(val.hostScope, procNames)
+          inHostScope[category][subcategory] = hostHasTechStack(val.hostScope, procNames, val.hostScope.getStrict())
 
   var final_host = newTable[string, seq[string]]()
   for category, subcategories in categories:
@@ -311,6 +317,7 @@ proc loadtechStackGeneric*() =
   for langName, val in chalkConfig.linguistLanguages:
     languages[val.getExtension()] = langName
 
+  let procNames = getProcNames()
   for key, val in chalkConfig.techStackRules:
     let
       category    = val.getCategory()
@@ -324,7 +331,7 @@ proc loadtechStackGeneric*() =
     if val.hostScope != nil:
       if category notin inHostScope:
         inHostScope[category] = newTable[string, bool]()
-        inHostScope[category][subcategory] = false
+        inHostScope[category][subcategory] = hostHasTechStack(val.hostScope, procNames, val.hostScope.getStrict())
     else:
       if val.fileScope == nil:
         error("One of file_scope, host_scope must be defined for rule " & key & ". Skipping")
