@@ -83,6 +83,11 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
+      - name: Prep PWD
+        run: |
+          mkdir -p ../con4m
+          mkdir -p ../nimutils
+
       - name: Bake Images
         run: |
           docker buildx bake chalk server tests --load
