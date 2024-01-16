@@ -1,33 +1,64 @@
-# Chalk Secret Manager API
+# Chalk Signing Key Backup Service
 
-Chalk can make use of the Crash Override Secret Manager API to
-securely backup the secret used by chalk for a variety of
-signing and attestation operations.
+Chalk can make use of the Crash Override Signing Key Backup Service
+to securely backup encrypted forms of the values used by chalk for a
+variety of signing and attestation operations.
 
 All secrets and keying material are locally generated on the
 system running chalk, with the secret itself being encrypted
-locally prior to being sent to the API.
+locally prior to being sent to the service.
 
-This document provides an overview of the Secret Manager API, how
-data is stored securely, and how chalk interacts with the API as a
+This document provides an overview of the Signing Key Backup Service,
+how data is stored securely, and how chalk interacts with the API as a
 client.
 
-## Using the Chalk Secret Manager
+## Using the Chalk Signing Key Backup Service
 
-Use of the Secret Manager API is simple and chalk provides a builtin
-command to help get things setup, and backed up, securely.
+Use of the Signing Key Backup Service is simple and chalk provides
+builtin commands to help get things setup, and backed up, securely.
 
-To generate new keys and secrets, and have them securely backed up:
+The service requires that a chalk profile with the pre-generated
+API key is loaded into chalk prior to initiating a backup. The chalk
+profile should contain an `auth_config` section in the following format:
+
+```
+auth_config crashoverride {
+  auth:     "jwt"
+  token:    "API_TOKEN_AS_STRING"
+}
+```
+
+A valid authentication profile can be downloaded from the Crash Override
+Platform and saved locally to your system. You can then load the 
+profile into chalk using the following command:
+
+```
+chalk load <path_to_the_saved_config>
+```
+
+Now that chalk has a valid API token loaded it is able to use the Chalk
+Signing Key Backup Service. To generate new keys and secrets, and have 
+them securely backed up use the following command:
 
 ```
 chalk setup
 ```
 
-You will then prompted to authenticate to the API, the encrypted secret
-being backed up will only be retrievable by the same user who saved it.
+You will then see a number of lines of output in the terminal similar to
+the below:
 
-Once you have successfully authenticated chalk will upload the encrypted
-secret to the API under your account.
+```
+info:  Ensuring cosign is present to setup attestation.
+info:  Public key written to: /path/to/your/chalk/install/chalk.pub
+info:  Public key (encrypted) written to: /path/to/your/chalk/install/chalk.key
+info:  Successfully stored encrypted signing key.
+warn:  Please Note: Encrypted signing keys that have not been READ in the previous 30 days will be deleted!
+info:  The ID of the backed up key is: AABBCCDDEEFFG11223344556677889900
+info:  Configuration replaced in binary: /path/to/your/chalk/install/chalk
+info:  Presign 200 OK (sink conf='crashoverride')
+info:  ~/.local/chalk/chalk.log: Open (sink conf='default_out')
+info:  Full chalk report appended to: ~/.local/chalk/chalk.log
+```
 
 To test the retrieval of the encrypted secret simply re-run the command:
 
@@ -37,7 +68,18 @@ chalk setup
 
 Chalk will detect that keys have already been generated and instead
 retrieve the encrypted secret and use it to perform test sign and
-verify operations.
+verify operations. When this is done successfully you will see terminal
+output similar to the below:
+
+```
+info:  Ensuring cosign is present to setup attestation.
+info:  Test sign successful.
+info:  Test verify successful.
+info:  Configuration replaced in binary: /path/to/your/chalk/install/chalk
+info:  Presign 200 OK (sink conf='crashoverride')
+info:  ~/.local/chalk/chalk.log: Open (sink conf='default_out')
+info:  Full chalk report appended to: ~/.local/chalk/chalk.log
+```
 
 The encrypted secret will be automatically retrieved by chalk as needed
 as should not be something you have to worry about further.
@@ -51,28 +93,20 @@ chalk setup gen
 
 **NOTE** This command will replace previously generated local keys
 
-If you would like to run the key generation and setup process but do
-**not** want to backup the encrypted secret to the API then the
-`--no-api-login` switch can be passed to chalk:
-
-```
-chalk setup --no-api-login
-```
-
 If you chose to not use the API and self-manage your secrets please ensure
 make a copy of the randomly generated password that will be displayed and
 save it somewhere securely.
 
 ## FAQ
 
-### What exactly is saved to the Chalk Secret Manager API?
+### What exactly is saved to the Chalk Signing Key Backup Service?
 
-Chalk saves the minimum required to backup your secret. All key
+Chalk saves the minimum required to backup your signing key. All key
 materials are generated and handled locally, with only an encrypted
 form of the secret ever leaving your system.
 
-Specifically the Chalk Secret Manager API stores the following data
-for each secret that is backed up to it:
+Specifically the Chalk Signing Key Backup Service stores the following
+data for each secret that is backed up to it:
 
 - `secret_id` - This is the unique identifier of each backed up secret.
   It is generated by chalk locally using the following scheme:
@@ -103,16 +137,16 @@ sha256(salt + authenticated_user_id)
 
 ### How long will stored data be saved for?
 
-Backed up encrypted secrets will be saved for 30 days from the last
-time they were accessed. Simply invoking chalk after you have
+Backed up encrypted signing keys will be saved for 30 days from the 
+last time they were accessed. Simply invoking chalk after you have
 backed up keys will cause the backed up keys to be read and ensure
 they continue to be fresh.
 
-### How does the Chalk Secret Manager API backup its own data?
+### How does the Chalk Signing Key Backup Service backup its own data?
 
-The Chalk Secret Manager API makes use of the AWS Backup service to
-periodically snapshot all application state. Backups are encrypted
-at rest and are kept for 1 year.
+The Chalk Signing Key Backup Service  makes use of the AWS Backup 
+service to periodically snapshot all application state. Backups are
+encrypted at rest and are kept for 1 year.
 
 ### Are there more specifics on the encryption scheme used?
 
