@@ -1,3 +1,123 @@
+# Release Notes for Chalk version 0.3.0 (Jan 15, 2024
+
+## Breaking Changes
+
+- `_OP_CLOUD_METADATA` is now a JSON object vs a string
+  containing JSON data. In addition cloud metadata is now
+  nested to allow to include more metadata about running
+  cloud instances.
+  [112](https://github.com/crashappsec/chalk/pull/112)
+
+- The signing key backup service has been completely overhauled and
+  no longer uses the OIDC Device Code Flow to authenticate to the API.
+  Instead a pre-generated API access token is passed in chalk profile
+  and that value is used as the bearer token. The `setup` command
+  still generates keys for signing but will no longer prompt with a
+  QR code to authenticate to the API.
+
+- As a result of the above the `login` and `logout` commands have been
+  removed.
+
+- A number of signing key backup related configuration values and variables
+  have had their names changed to be more description:
+  - `CHALK_API_KEY` -> `CHALK_DATA_API_KEY`
+  - `use_secret_manager` -> `use_signing_key_backup_service`
+  - `secret_manager_url` -> `signing_key_backup_service_url`
+  - `secret_manager_timeout` -> `signing_key_backup_service_timeout`
+
+## New Features
+
+- Adding support for git context for docker build commands.
+  [86](https://github.com/crashappsec/chalk/pull/86)
+- Adding new git metadata fields about:
+
+  - authored commit
+  - committer
+  - tag
+
+  [86](https://github.com/crashappsec/chalk/pull/86)
+  [89](https://github.com/crashappsec/chalk/pull/89)
+
+- Improved pretty printing for various commands
+  [99](https://github.com/crashappsec/chalk/pull/99)
+- Added `github_json_group` for printing chalk marks
+  in GitHub Actions.
+  [86](https://github.com/crashappsec/chalk/pull/86)
+- Adding `presign` sink to allow uploads to S3 without
+  hard-coded credentials in the chalk configuration.
+  [103](https://github.com/crashappsec/chalk/pull/103)
+- Adding JWT/Basic auth authentication options to sinks.
+  [111](https://github.com/crashappsec/chalk/pull/111)
+- Adding `docker.wrap_cmd` to allow to customize whether
+  `CMD` should be wrapped when `ENTRYPOINT` is missing
+  in `Dockerfile`.
+  [112](https://github.com/crashappsec/chalk/pull/112)
+- Adding minimal AWS lambda metadata collection.
+  It includes only basic information about lambda function
+  such as its ARN and its runtime environment.
+  [112](https://github.com/crashappsec/chalk/pull/112)
+- Adding experimental support for detection of technologies used at chalk and
+  runtime (programming languages, databases, servers, etc.)
+  [128](https://github.com/crashappsec/chalk/pull/128)
+
+## Fixes
+
+- Fixes docker version comparison checks.
+  As a result buildx is correctly detected now for >=0.10.
+  [86](https://github.com/crashappsec/chalk/pull/86)
+- Subprocess command output was not reliable being captured.
+  [93](https://github.com/crashappsec/chalk/pull/93)
+- Fixes automatic installation of `semgrep` when SAST is enabled.
+  [94](https://github.com/crashappsec/chalk/pull/94)
+- Ensuring chalk executable has correct permissions.
+  Otherwise reading embedded configuration would fail in some cases.
+  [104](https://github.com/crashappsec/chalk/pull/104)
+- Pushing all tags during `docker build --push -t one -t two ...`.
+  [110](https://github.com/crashappsec/chalk/pull/110)
+- Sending `_ACTION_ID` during `push` command.
+  [116](https://github.com/crashappsec/chalk/pull/116)
+- All component parameters are saved in the chalk mark.
+  [126](https://github.com/crashappsec/chalk/pull/126)
+- Gracefully handling permission issues when chalk is running
+  as non-existing user. This is most common in lambda
+  which runs as user `993`.
+  [112](https://github.com/crashappsec/chalk/pull/112)
+- `CMD` wrapping supports wrapping shell scripts
+  (e.g. `CMD set -x && echo hello`).
+  [132](https://github.com/crashappsec/chalk/pull/132)
+
+## Known Issues
+
+- If a docker base image has `ENTRYPOINT` defined,
+  `docker.wrap_cmd` will break it as it overwrites
+  its own `ENTRYPOINT`. Next release will correctly
+  inspect all base images and wrap `ENTRYPOINT` correctly.
+- This release does not support:
+
+  - Mac x86_64 builds
+  - Linux aarch64 builds
+
+  Support for these platforms will be added back in the future.
+
+# Release Notes for Chalk version 0.2.2 (Oct 30, 2023)
+
+## New Features
+
+- Adding support for docker multi-platform builds.
+  [54](https://github.com/crashappsec/chalk/pull/54)
+
+## Fixes
+
+- Honoring Syft/SBOM configs during docker builds.
+  [84](https://github.com/crashappsec/chalk/pull/84)
+
+# Release Notes for Chalk version 0.2.1 (Oct 25, 2023)
+
+## Fixes
+
+- Component parameters can set config attributes.
+  [75](https://github.com/crashappsec/chalk/issues/75)
+
 # Release Notes for Chalk version 0.2.0 (Oct 20, 2023)
 
 ## New Features
