@@ -39,7 +39,7 @@
   [89](https://github.com/crashappsec/chalk/pull/89)
 
 - Improved pretty printing for various commands
-  [99](https://github.com/crashappsec/chalk/pull/99]
+  [99](https://github.com/crashappsec/chalk/pull/99)
 - Added `github_json_group` for printing chalk marks
   in GitHub Actions.
   [86](https://github.com/crashappsec/chalk/pull/86)
