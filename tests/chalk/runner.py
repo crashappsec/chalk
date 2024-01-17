@@ -219,7 +219,6 @@ class Chalk:
         exec_command: Optional[str | Path] = None,
         as_parent: Optional[bool] = None,
         no_color: bool = False,
-        no_api_login: bool = False,
         params: Optional[list[str]] = None,
         expected_success: bool = True,
         expecting_report: bool = True,
@@ -256,8 +255,6 @@ class Chalk:
             cmd += ["--debug"]
         if no_color:
             cmd += ["--no-color"]
-        if no_api_login:
-            cmd += ["--no-api-login"]
         if params:
             cmd += params
 
