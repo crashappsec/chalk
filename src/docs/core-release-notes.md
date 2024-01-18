@@ -1,4 +1,4 @@
-# Release Notes for Chalk version 0.3.0 (Jan 15, 2024
+# Release Notes for Chalk version 0.3.0 (Jan 15, 2024)
 
 ## Breaking Changes
 
