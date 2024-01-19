@@ -16,7 +16,7 @@ keyspec_version=$(
 )
 
 if [ "$current_version" != "$keyspec_version" ]; then
-    echo $KEYSPEC chalk_version does not match nimble chalk version
+    echo "$KEYSPEC chalk_version does not match 'make version' output"
     echo "$keyspec_version != $current_version"
     exit 1
 fi

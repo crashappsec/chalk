@@ -1,4 +1,7 @@
-version       = "0.3.1"
+import std/[strformat, strutils]
+from src/config import getChalkExeVersion
+
+version       = getChalkExeVersion()
 author        = "John Viega"
 description   = "Software artifact metadata to make it easy to tie " &
                 "deployments to source code and collect metadata."
@@ -11,9 +14,7 @@ requires "nim >= 2.0.0"
 requires "https://github.com/crashappsec/con4m#904639b9f51e655b908e221db26fbdd9fff382b3"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
 
-import std/strformat, strutils
-
-# this allows us to get version externally without grepping for it in the file
+# this allows us to get version externally
 task version, "Show current version":
   echo version
 

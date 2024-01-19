@@ -7,9 +7,9 @@
 
 ## Wrappers for more abstracted accessing of configuration information
 
+import std/[os, strscans, strutils]
 import run_management
 export run_management
-from macros import parseStmt
 
 proc filterByTemplate*(dict: ChalkDict, p: MarkTemplate | ReportTemplate): ChalkDict =
   result = ChalkDict()
@@ -58,10 +58,21 @@ proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
 proc runCallback*(s: string, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.scall(s, args)
 
-macro declareChalkExeVersion(): untyped = parseStmt("const " & versionStr)
-declareChalkExeVersion()
+proc getChalkVersion(): string =
+  ## Returns the value of `chalk_version` in `base_keyspecs.c4m`.
+  result = ""
+  const path = currentSourcePath().parentDir() / "configs" / "base_keyspecs.c4m"
+  for line in path.staticRead().splitLines():
+    const pattern = """chalk_version$s:=$s"$i.$i.$i$*"$."""
+    let (isMatch, major, minor, patch, suffix) = line.scanTuple(pattern)
+    if isMatch and major == 0 and minor in 0..100 and patch in 0..100 and suffix == "":
+      return $major & '.' & $minor & '.' & $patch
+  raise newException(ValueError, "Couldn't get `chalk_version` value from " & path)
 
-proc getChalkExeVersion*(): string   = version
+proc getChalkExeVersion*(): string =
+  const version = getChalkVersion()
+  version
+
 proc getChalkCommitId*(): string     = commitID
 proc getChalkPlatform*(): string     = osStr & " " & archStr
 proc getCommandName*(): string       = commandName

@@ -357,7 +357,6 @@ const
   defaultConfig*      = staticRead(defCfgFname) #& commentC4mCode(ioConfig)
   attestConfig*       = staticRead(attestConfName)
   coConfig*           = staticRead(coConfName)
-  versionStr*         = staticexec("cat ../*.nimble | grep ^version")
   commitID*           = staticexec("git rev-parse HEAD")
   archStr*            = staticexec("uname -m")
   osStr*              = staticexec("uname -o")
