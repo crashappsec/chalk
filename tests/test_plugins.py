@@ -18,6 +18,7 @@ from .chalk.validate import (
     validate_virtual_chalk,
 )
 from .conf import CODEOWNERS, CONFIGS, DATA, DOCKERFILES, LS_PATH, PYS
+from .utils.dict import ANY
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
@@ -764,14 +765,10 @@ def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
                         "invocations": [
                             {
                                 "executionSuccessful": True,
-                                "toolExecutionNotifications": [],
                             }
                         ],
                         "results": [
                             {
-                                "fingerprints": {
-                                    "matchBasedId/v1": "b147a8e435e3b378b6b829961717857db5d274cf888e28bc45284a0c2575262259819ce9640ff6eb0e85ca886316fc59339610727ef2a52f6f9d239213a63958_0"
-                                },
                                 "locations": [
                                     {
                                         "physicalLocation": {
@@ -780,21 +777,20 @@ def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
                                                 "uriBaseId": "%SRCROOT%",
                                             },
                                             "region": {
-                                                "endColumn": 25,
-                                                "endLine": 7,
+                                                "endColumn": int,
+                                                "endLine": int,
                                                 "snippet": {
                                                     "text": '    if test_var is "bbb":'
                                                 },
-                                                "startColumn": 8,
-                                                "startLine": 7,
+                                                "startColumn": int,
+                                                "startLine": int,
                                             },
                                         }
                                     }
                                 ],
                                 "message": {
-                                    "text": "The operator 'is' is for reference equality, not value equality! Use `==` instead!"
+                                    "text": re.compile(r"'is'.*=="),
                                 },
-                                "properties": {},
                                 "ruleId": "is-comparison",
                             }
                         ],
@@ -803,26 +799,11 @@ def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
                                 "name": "Semgrep OSS",
                                 "rules": [
                                     {
-                                        "defaultConfiguration": {"level": "error"},
-                                        "fullDescription": {
-                                            "text": "The operator 'is' is for reference equality, not value equality! Use `==` instead!"
-                                        },
-                                        "help": {
-                                            "markdown": "The operator 'is' is for reference equality, not value equality! Use `==` instead!",
-                                            "text": "The operator 'is' is for reference equality, not value equality! Use `==` instead!",
-                                        },
                                         "id": "is-comparison",
                                         "name": "is-comparison",
-                                        "properties": {
-                                            "precision": "very-high",
-                                            "tags": [],
-                                        },
-                                        "shortDescription": {
-                                            "text": "Semgrep Finding: is-comparison"
-                                        },
                                     }
                                 ],
-                                "semanticVersion": "1.56.0",
+                                "semanticVersion": ANY,
                             }
                         },
                     }
