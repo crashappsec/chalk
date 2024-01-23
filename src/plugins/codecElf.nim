@@ -103,11 +103,6 @@ proc elfScan*(codec: Plugin, location: string): Option[ChalkObj] {.cdecl.} =
       stream.close()
     return none(ChalkObj)
 
-  if stream != nil:
-    stream.close()
-
-  return none(ChalkObj)
-
 proc elfGetUnchalkedHash*(codec: Plugin, chalk: ChalkObj):
                             Option[string] {.cdecl.} =
   if chalk.cache of ElfCodecCache:
