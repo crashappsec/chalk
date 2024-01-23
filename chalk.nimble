@@ -8,7 +8,7 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 2.0.0"
-requires "https://github.com/crashappsec/con4m#3ae9237eaf951571e0e0132d9033729cdd5d719a"
+requires "https://github.com/crashappsec/con4m#9bc76daaaa15b6285c54b046e69bc75ed51038a9"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
 
 import std/strformat, strutils
