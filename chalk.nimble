@@ -1,4 +1,4 @@
-version       = "0.3.0"
+version       = "0.3.1"
 author        = "John Viega"
 description   = "Software artifact metadata to make it easy to tie " &
                 "deployments to source code and collect metadata."

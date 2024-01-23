@@ -38,6 +38,8 @@ logger = get_logger()
 
 
 class ChalkReport(ContainsMixin, dict):
+    name = "report"
+
     def __init__(self, report: dict[str, Any]):
         super().__init__(**report)
 
@@ -69,6 +71,8 @@ class ChalkReport(ContainsMixin, dict):
 
 
 class ChalkMark(ContainsMixin, dict):
+    name = "mark"
+
     @classmethod
     def from_binary(cls, path: Path):
         text = path.read_text(errors="ignore")
