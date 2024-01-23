@@ -2755,15 +2755,6 @@ Chalk will also embed the keypairs internally, for future operations.
 """
 }
 
-  field api_login {
-    type:     bool
-    default:  true
-    shortdoc: "Use CrashOverride API"
-    doc: """
-Enable the use of the Crash Override API.
-"""
-  }
-
   field ignore_patterns {
     type:     list[string]
     default:  [".*/\\..*", ".*\\.txt", ".*\\.json"]
