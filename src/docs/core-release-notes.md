@@ -1,4 +1,29 @@
-# Release Notes for next Chalk version
+# Release Notes for Chalk version 0.3.1 (Jan 23, 2024)
+
+## Breaking Changes
+
+- Remove the `--no-api-login` option.
+  [137](https://github.com/crashappsec/chalk/pull/137)
+
+## New Features
+
+- Add support for arm64 Linux once again.
+  It was omitted from the Chalk 0.3.0 release.
+
+## Fixes
+
+- Fix some rendering bugs.
+
+## Known Issues
+
+- If a docker base image has `ENTRYPOINT` defined,
+  `docker.wrap_cmd` will break it as it overwrites
+  its own `ENTRYPOINT`. Next release will correctly
+  its own `ENTRYPOINT`. A later release will correctly
+  inspect all base images and wrap `ENTRYPOINT` correctly.
+
+- This release does not support x86_64 macOS.
+  It will be supported once again in a later release.
 
 # Release Notes for Chalk version 0.3.0 (Jan 15, 2024)
 
@@ -92,7 +117,7 @@
 
 - If a docker base image has `ENTRYPOINT` defined,
   `docker.wrap_cmd` will break it as it overwrites
-  its own `ENTRYPOINT`. Next release will correctly
+  its own `ENTRYPOINT`. A later release will correctly
   inspect all base images and wrap `ENTRYPOINT` correctly.
 - This release does not support:
 
