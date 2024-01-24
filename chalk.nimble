@@ -1,7 +1,7 @@
 import std/[strformat, strutils]
-from src/config import getChalkExeVersion
+from src/config_version import getChalkVersion
 
-version       = getChalkExeVersion()
+version       = getChalkVersion()
 author        = "John Viega"
 description   = "Software artifact metadata to make it easy to tie " &
                 "deployments to source code and collect metadata."
