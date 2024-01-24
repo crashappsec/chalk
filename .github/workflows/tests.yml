@@ -41,7 +41,6 @@ jobs:
     if: |
       (
         github.event_name == 'pull_request' &&
-        !github.event.pull_request.draft &&
         !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
       ) || (
         github.event_name == 'push' &&

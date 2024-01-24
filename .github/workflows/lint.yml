@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
 
     if: |
-      !github.event.pull_request.draft &&
       !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
 
     concurrency:
