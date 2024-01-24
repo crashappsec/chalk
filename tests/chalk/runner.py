@@ -310,8 +310,9 @@ class Chalk:
         virtual: bool = False,
         config: Optional[Path] = None,
         # suppress output since all we want is the chalk report
-        log_level: ChalkLogLevel = "none",
+        log_level: ChalkLogLevel = "trace",
         env: Optional[dict[str, str]] = None,
+        ignore_errors: bool = False,
     ) -> ChalkProgram:
         return self.run(
             command="insert",
@@ -320,6 +321,7 @@ class Chalk:
             virtual=virtual,
             log_level=log_level,
             env=env,
+            ignore_errors=ignore_errors,
         )
 
     def extract(
@@ -328,7 +330,7 @@ class Chalk:
         expected_success: bool = True,
         ignore_errors: bool = False,
         config: Optional[Path] = None,
-        log_level: ChalkLogLevel = "error",
+        log_level: ChalkLogLevel = "trace",
         env: Optional[dict[str, str]] = None,
     ) -> ChalkProgram:
         return self.run(
@@ -345,7 +347,7 @@ class Chalk:
         return self.run(
             command="exec",
             exec_command=artifact,
-            log_level="error",
+            log_level="trace",
             as_parent=as_parent,
         )
 
@@ -353,7 +355,7 @@ class Chalk:
         return self.run(
             command="delete",
             target=artifact,
-            log_level="error",
+            log_level="trace",
         )
 
     def dump(self, path: Optional[Path] = None) -> ChalkProgram:
@@ -374,7 +376,7 @@ class Chalk:
         use_embedded: bool = False,
         expected_success: bool = True,
         ignore_errors: bool = False,
-        log_level: ChalkLogLevel = "error",
+        log_level: ChalkLogLevel = "trace",
         stdin: Optional[bytes] = None,
     ) -> ChalkProgram:
         hash = sha256(self.binary)
@@ -412,7 +414,7 @@ class Chalk:
         config: Optional[Path] = None,
         buildkit: bool = True,
         secrets: Optional[dict[str, Path]] = None,
-        log_level: ChalkLogLevel = "none",
+        log_level: ChalkLogLevel = "trace",
         env: Optional[dict[str, str]] = None,
         run_docker: bool = True,
     ) -> tuple[str, ChalkProgram]:

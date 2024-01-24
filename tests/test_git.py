@@ -60,7 +60,7 @@ def test_repo(
         .tag(f"{random_hex}-2", tag_message if set_tag_message else None)
     )
     artifact = copy_files[0]
-    result = chalk_copy.insert(artifact, log_level="trace")
+    result = chalk_copy.insert(artifact)
     author = re.compile(rf"^{git.author} \d+ [+-]\d+$")
     committer = re.compile(rf"^{git.committer} \d+ [+-]\d+$")
     assert result.mark.has(
@@ -90,7 +90,7 @@ def test_empty_repo(
 ):
     Git(tmp_data_dir).init()
     artifact = copy_files[0]
-    result = chalk_copy.insert(artifact, log_level="trace")
+    result = chalk_copy.insert(artifact)
     assert result.mark.has(
         BRANCH=MISSING,
         COMMIT_ID=MISSING,

@@ -141,7 +141,6 @@ def test_imds(
     insert = chalk.insert(
         bin_path,
         config=CONFIGS / "imds.c4m",
-        log_level="trace",
         env={"VENDOR": str(tmp_file)},
     )
     assert insert.report.contains(
@@ -228,7 +227,6 @@ def test_ecs(
     insert = chalk.insert(
         bin_path,
         env={"ECS_CONTAINER_METADATA_URI": f"{server_imds}/ecs"},
-        log_level="trace",
     )
     assert insert.report.contains(
         {
@@ -263,7 +261,6 @@ def test_lambda(
             "AWS_LAMBDA_LOG_STREAM_NAME": "2023/12/25/[$LATEST]f42d28eb350e42a1b840ad55fd5232fe",
             "AWS_DEFAULT_REGION": "us-east-1",
         },
-        log_level="trace",
     )
     top, meta = (
         (
@@ -317,7 +314,7 @@ def test_imds_ecs(
         bin_path,
         config=CONFIGS / "imds.c4m",
         env={
-            "ECS_CONTAINER_METADATA_URI": "foobar",
+            "ECS_CONTAINER_METADATA_URI": f"{server_imds}/ecs",
             "VENDOR": str(tmp_file),
         },
     )
@@ -325,9 +322,9 @@ def test_imds_ecs(
         {
             "_OP_CLOUD_PROVIDER": "aws",
             "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ecs",
-            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "123456789012",
+            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "111122223333",
             "_OP_CLOUD_PROVIDER_IP": "203.0.113.25",
-            "_OP_CLOUD_PROVIDER_REGION": "us-east-1",
+            "_OP_CLOUD_PROVIDER_REGION": "us-west-2",
             "_OP_CLOUD_PROVIDER_INSTANCE_TYPE": "t2.medium",
             "_OP_CLOUD_PROVIDER_TAGS": {
                 "Name": "foobar",
@@ -630,7 +627,6 @@ def test_tech_stack(chalk_copy: Chalk, copy_files: list[Path]):
     result = chalk_copy.insert(
         bin_path,
         config=CONFIGS / "techstack.c4m",
-        log_level="trace",
     )
     assert result.mark.has(
         INFERRED_TECH_STACKS={"language": {"PHP", "Nim"}},

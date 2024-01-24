@@ -66,6 +66,12 @@ import "."/config
 
 const validDockerDirectives = ["syntax", "escape"]
 
+proc fromJson*[T](json: JsonNode): T =
+  if json == nil or json == newJNull():
+    nil
+  else:
+    T(json: json)
+
 proc evalOneVarSub(ctx:    DockerParse,
                    sub:    VarSub,
                    errors: var seq[string]): string
@@ -772,8 +778,6 @@ proc parseAndEval*(s:      Stream,
     gotFirstFrom = false
     res: seq[InfoBase] = @[]
 
-  parse.inArgs = args
-
   for tok in parse.tokens:
     if len(tok.errors) != 0:
       errors &= tok.errors
@@ -821,9 +825,14 @@ proc parseAndEval*(s:      Stream,
     else:
       firstFromCheck()
 
+  # input args take precedence over any ARG params
+  parse.inArgs = args
+  for k, v in args:
+    parse.args[k] = v
+
   return (parse, res)
 
-proc evalAndExtractDockerfile*(ctx: DockerInvocation) =
+proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string]) =
   var errors: seq[string]
 
   if ctx.inDockerFile == "":
@@ -832,7 +841,7 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation) =
 
   let
     stream        = newStringStream(ctx.inDockerFile)
-    (parse, cmds) = stream.parseAndEval(ctx.buildArgs, errors)
+    (parse, cmds) = stream.parseAndEval(args, errors)
 
   var
     labels:     OrderedTable[string, string]
@@ -844,30 +853,30 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation) =
   for obj in cmds:
     if obj of FromInfo:
       let item = FromInfo(obj)
+
       # We're entering a new section, so finalize the old one first.
-      if ctx.targetBuildStage != "" and item.asArg.isSome():
-        let stage = parse.evalSubstitutions(item.asArg.get(), errors)
-
-        if stage == ctx.targetBuildStage:
-          # If we end up transforming the docker file, then we do not want
-          # to go past here, so save the info for later.
-          item.stopHere = true
-          return # Don't keep going!!!
-
-      # wrap up previous section
       if section != nil:
         # last section ends when new one begins
         section.endLine = item.startLine - 1
 
       section = DockerFileSection(startLine: item.startLine, endLine: item.endLine)
       section.image = parse.evalOrReturnEmptyString(item.image, errors)
+      if section.image == "":
+          raise newException(ValueError, "Could not eval image name")
       if item.tag.isSome():
-        section.image &= ":" & parse.evalSubstitutions(item.tag.get(), errors)
-      section.alias = parse.evalOrReturnEmptyString(item.asArg, errors)
+        let tag = parse.evalSubstitutions(item.tag.get(), errors)
+        if tag == "":
+          raise newException(ValueError, "Could not eval image tag")
+        section.image &= ":" & tag
+      if item.asArg.isSome():
+        section.alias = parse.evalOrReturnEmptyString(item.asArg, errors)
+        if section.alias == "":
+          raise newException(ValueError, "Could not eval image alias")
 
       ctx.dfSections.add(section)
       if section.alias != "":
           ctx.dfSectionAliases[section.alias] = section
+
     elif obj of EntryPointInfo:
       section.entryPoint = EntryPointInfo(obj)
     elif obj of CmdInfo:

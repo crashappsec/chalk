@@ -213,7 +213,6 @@ type
 
   InfoBase* = ref object of RootRef
     error*:     string
-    stopHere*:  bool
     startLine*: int
     endLine*:   int
 
@@ -311,6 +310,7 @@ type
     foundFileArg*:      string
     dockerfileLoc*:     string
     inDockerFile*:      string
+    defaultPlatforms*:  Table[string, string]
     foundPlatform*:     string
     foundContext*:      string
     otherContexts*:     OrderedTableRef[string, string]

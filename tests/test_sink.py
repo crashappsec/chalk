@@ -112,7 +112,6 @@ def test_s3(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
     proc = chalk.insert(
         config=config,
         artifact=artifact,
-        log_level="info",
         env={"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/sink-test.json"},
     )
 
@@ -257,7 +256,6 @@ def _test_server(
         target=artifact,
         config=config,
         use_embedded=False,
-        log_level="trace",
         env=env,
     )
 
