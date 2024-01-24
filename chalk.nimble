@@ -11,7 +11,7 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 2.0.0"
-requires "https://github.com/crashappsec/con4m#904639b9f51e655b908e221db26fbdd9fff382b3"
+requires "https://github.com/crashappsec/con4m#9bc76daaaa15b6285c54b046e69bc75ed51038a9"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
 
 # this allows us to get version externally

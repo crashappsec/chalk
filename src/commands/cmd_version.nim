@@ -16,7 +16,7 @@ proc runCmdVersion*() =
   cells.add(@["Commit ID", getChalkCommitId()])
   cells.add(@["Build OS", hostOS])
   cells.add(@["Build CPU", hostCPU])
-  cells.add(@["Build Data", CompileDate])
+  cells.add(@["Build Date", CompileDate])
   cells.add(@["Build Time", CompileTime])
 
   var table = cells.quickTable(verticalHeaders = true, borders = BorderTypical)
