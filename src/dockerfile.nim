@@ -643,6 +643,12 @@ proc `$`*(p: TopLevelToken): string =
 proc `$`*(p: DockerParse): string =
   for token in p.tokens: result &= $token & "\n"
 
+proc `$`*(c: CmdInfo): string =
+  if c.str != "":
+    return c.str
+  else:
+    return $(c.json)
+
 proc newTok(ctx: DockerParse, kind: TopLevelTokenType): TopLevelToken =
   result = TopLevelToken(kind: kind, startLine: ctx.curLine, errors: @[])
   ctx.tokens.add(result)

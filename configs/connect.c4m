@@ -51,6 +51,7 @@ attestation.key_provider             = "get"
 docker.wrap_entrypoint               = true
 run_sbom_tools                       = true
 run_sast_tools                       = true
+~exec.command_name_from_args         = true
 ~env_always_show                     = [
   "AWS_ROLE_ARN",
   "KUBERNETES_PORT_443_TCP_ADDR",

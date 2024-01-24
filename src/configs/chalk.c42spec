@@ -2022,7 +2022,27 @@ well.
     doc: """
 This is the name of the program to run, when running the 'exec' command.  This command will end up being the process you directly spawned; chalking happens in a forked-off process.
 
-You must set a value for this variable or pass the --exec-command-name flag to be able to use the 'exec' command.
+To use `exec` command you must either:
+
+* set a value for this variable
+* pass `--exec-command-name` flag
+* when `command_name_from_arg` is enabled, first arg will be used as command name
+"""
+  }
+
+  field command_name_from_args {
+    type:     bool
+    default:  true
+    shortdoc: "Exec: when empty extract command name from first arg"
+    doc: """
+Allow command name to be extracted from args
+
+```
+chalk exec -- <cmd> <args>
+```
+
+This is especially useful when wrapping other commands by simply
+adding `chalk exec --` prefix.
 """
   }
 
