@@ -6,8 +6,8 @@ repos:
       - id: check-added-large-files
         args: ["--maxkb=128"]
 
-  - repo: local
-    hooks:
+  # - repo: local
+  #   hooks:
       # - id: licenseheaders
       #   name: licenseheaders
       #   language: python
@@ -36,14 +36,6 @@ repos:
       #       tests/.*.c4m|
       #       data/.*
       #     )$
-
-      - id: chalkversion
-        name: chalkversion
-        description: verify chalk version matches across all chalk files
-        entry: ./.github/check_version.sh
-        language: system
-        always_run: true
-        pass_filenames: false
 
   # add back once docs are sorted
   # - repo: https://github.com/tcort/markdown-link-check

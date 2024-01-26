@@ -21,7 +21,8 @@ SOURCES+=$(shell find ../con4m -name '*.nim' 2> /dev/null)
 SOURCES+=$(shell find ../con4m -name '*.c4m' 2> /dev/null)
 SOURCES+=$(shell find ../nimutils -name '*.nim' 2> /dev/null)
 
-VERSION=$(shell cat *.nimble | grep -E "version\s+=" | cut -d'"' -f2 | head -n1)
+VERSION=$(shell cat src/configs/base_keyspecs.c4m \
+          | grep -E "chalk_version\s+:=" | cut -d'"' -f2 | head -n1)
 
 # in case nimble bin is not in PATH - e.g. vanilla shell
 export PATH:=$(HOME)/.nimble/bin:$(PATH)
