@@ -136,6 +136,7 @@ services:
       imds:
         condition: service_healthy
     environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_PROFILE: ${AWS_PROFILE:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}

@@ -1,6 +1,7 @@
 sink_config my_s3_config {
   enabled: true
   sink:    "s3"
+  region:  env("AWS_REGION")
   uri:     env("AWS_S3_BUCKET_URI")
   secret:  env("AWS_SECRET_ACCESS_KEY")
   uid:     env("AWS_ACCESS_KEY_ID")
