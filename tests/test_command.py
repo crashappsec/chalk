@@ -156,7 +156,7 @@ def test_version(chalk: Chalk):
     result = chalk.run(command="version", no_color=True, expecting_report=False)
     printed_version = result.find("Chalk Version", words=2).split()[-1]
 
-    nimble = Path(__file__).parent.parent / "src" / "base_keyspecs.c4m"
+    nimble = Path(__file__).parent.parent / "src" / "configs" / "base_keyspecs.c4m"
     # version output should match the version in base_keyspecs.c4m
     internal_version = next(
         i.split("=")[1].strip().strip('"')
