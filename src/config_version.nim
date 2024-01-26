@@ -1,4 +1,7 @@
-# At the time of writing, `nimble build` fails when this proc is in `src/config.nim`
+## `chalk.nimble` imports this file to set its `version` value.
+## It'd be better for the below proc to be in `src/config.nim`, but
+## `nimble build` currently fails when the nimble file imports that module.
+## So we have this separate file for now.
 import std/[os, strscans, strutils]
 
 proc getChalkVersion*(): string =
