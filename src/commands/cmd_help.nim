@@ -18,7 +18,7 @@ const allConfigVarSections = ["", "docker", "exec", "extract", "env_config",
 # Same here, should generate via API.
 const allCommandSections = ["", "insert", "docker", "extract", "extract.images",
                             "extract.containers", "extract.all", "exec", 
-                            "setup", "setup.gen", "setup.load", "env",
+                            "setup", "setup.gen", "setup.load", "env", "docgen",
                             "config", "dump", "load", "delete", "version"]
 
 proc kindEnumToString(s, v: string): string =
@@ -500,7 +500,7 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
       of "plugins":
         toOut += con4mRuntime.getPluginHelp()
       of "insert", "delete", "env", "dump", "load", "config",
-         "version", "docker", "exec":
+         "version", "docker", "exec", "docgen":
         toOut += con4mRuntime.getCommandDocs(arg)
       of "extract":
         toOut += con4mRuntime.getCommandDocs("extract")
