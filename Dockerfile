@@ -21,10 +21,13 @@ WORKDIR /chalk
 
 COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
 COPY *.nimble /chalk/
+COPY src/config_version.nim /chalk/src/
 
 # build chalk so that all deps are installed
 # this requires creating dummy source file
-RUN mkdir src && \
+# as well as keyspec with dummy chalk version
+RUN mkdir -p src/configs && \
+    echo 'chalk_version := "0.0.0"' > src/configs/base_keyspecs.c4m && \
     touch src/chalk.nim && \
     nimble build
 

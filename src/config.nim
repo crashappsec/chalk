@@ -7,9 +7,8 @@
 
 ## Wrappers for more abstracted accessing of configuration information
 
-import run_management
+import run_management, config_version
 export run_management
-from macros import parseStmt
 
 proc filterByTemplate*(dict: ChalkDict, p: MarkTemplate | ReportTemplate): ChalkDict =
   result = ChalkDict()
@@ -58,10 +57,10 @@ proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
 proc runCallback*(s: string, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.scall(s, args)
 
-macro declareChalkExeVersion(): untyped = parseStmt("const " & versionStr)
-declareChalkExeVersion()
+proc getChalkExeVersion*(): string =
+  const version = getChalkVersion()
+  version
 
-proc getChalkExeVersion*(): string   = version
 proc getChalkCommitId*(): string     = commitID
 proc getChalkPlatform*(): string     = osStr & " " & archStr
 proc getCommandName*(): string       = commandName
