@@ -390,8 +390,12 @@ proc handleConfigLoad*(inpath: string) =
 
   if not alreadyCached or replace:
     let
+      lines   = newEmbedded.splitLines()
       useLine = "use " & module  & " from \"" & base & "\""
-      withUse = newEmbedded & "\n" & useLine
+      withUse = if useLine in lines:
+                  newEmbedded
+                else:
+                  newEmbedded & "\n" & useLine
     newEmbedded = withUse.strip()
 
   if chalkConfig.loadConfig.getParamsViaStdin():
