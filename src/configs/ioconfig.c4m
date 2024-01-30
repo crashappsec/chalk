@@ -35,6 +35,8 @@ if not using_tty() {
   custom_report.terminal_other_op.enabled: false
 } elif env_exists("NO_COLOR") {
   color: false
+} elif env("TERM") == "dumb" {
+  color: false
 } else {
   color: true
 }
