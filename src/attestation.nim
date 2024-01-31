@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import base64, chalkjson, config, httpclient, net, os, selfextract, 
+import base64, chalkjson, config, httpclient, net, os, selfextract,
        sinks, uri, nimutils/sinks
 
 const
@@ -147,7 +147,7 @@ template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: un
                                  retries           = 2,
                                  firstRetryDelayMs = 100)
 
-  trace("Signing Key Backup Service URL: " & $uri)  
+  trace("Signing Key Backup Service URL: " & $uri)
   trace("Signing Key Backup Service HTTP headers: " & $authHeaders)
   trace("Signing Key Backup Service status code: " & response.status)
   trace("Signing Key Backup Service response: " & response.body)
@@ -214,7 +214,7 @@ proc restoreSigningKeyFromService*(prkey: string): bool =
     hexBits = response.body()
     body    = parseHexStr($hexBits)
 
-    if len(body) != 40: 
+    if len(body) != 40:
       error("Encrypted key returned from server is incorrect size. Received" & $len(body) & "bytes, exected 40 bytes.")
       return false
 
@@ -326,15 +326,21 @@ Write this down. Even if you embedded it in the Chalk binary, you
 will need it to load the key pair into another chalk binary.
 """
 
-  # Right now we are not using the result.
+proc acquirePasswordFromEnv(): bool {.discardable.} =
+  # If Env var with signing password is set use that
+  if cosignPw == "" and existsEnv("CHALK_PASSWORD"):
+    cosignPw = getEnv("CHALK_PASSWORD")
+    delEnv("CHALK_PASSWORD")
+    return true
+  return false
+
+# Right now we are not using the result.
 proc acquirePassword(optfile = ""): bool {.discardable.} =
   var
     prikey = optfile
 
   # If Env var with signing password is set use that
-  if existsEnv("CHALK_PASSWORD"):
-    cosignPw = getEnv("CHALK_PASSWORD")
-    delEnv("CHALK_PASSWORD")
+  if acquirePasswordFromEnv():
     return true
 
   if chalkConfig.getUseSigningKeyBackupService() == false:
@@ -351,7 +357,7 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
     if prikey == "":
       return false
 
-  # Use Chalk Data API key to retrieve previously saved encrypted secret 
+  # Use Chalk Data API key to retrieve previously saved encrypted secret
   #  from API, then use retrieved private key to decrypt
   if restoreSigningKeyFromService(prikey):
     return true
@@ -525,7 +531,7 @@ proc attemptToGenKeys*(): bool =
     return false
 
   let keyOutLoc = getKeyFileLoc()
-  
+
   if keyOutLoc == "":
     return false
 
@@ -533,7 +539,9 @@ proc attemptToGenKeys*(): bool =
     cosignTempDir = getNewTempDir()
 
   withWorkingDir(cosignTempDir):
-    cosignPw = randString(16).encode(safe = true)
+    acquirePasswordFromEnv()
+    if cosignPw == "":
+      cosignPw = randString(16).encode(safe = true)
 
     withCosignPassword:
       if not generateKeyMaterial(getCosignLocation()):
@@ -549,7 +557,7 @@ proc attemptToGenKeys*(): bool =
     cosignLoaded = true
 
     result = saveSigningSetup(pubKey, priKey, true)
-    
+
 proc canAttest*(): bool =
   if getCosignLocation() == "":
     return false

@@ -31,6 +31,7 @@ custom_report crashoverride {
   ~use_when:        ["insert", "build", "exec"]
 }
 
+use_signing_key_backup_service       = true
 docker.wrap_entrypoint               = true
 run_sbom_tools                       = true
 run_sast_tools                       = true
