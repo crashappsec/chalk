@@ -140,6 +140,21 @@ def test_load_url(
     )
 
 
+def test_load_duplicate(
+    chalk_copy: Chalk,
+    server_chalkdust: str,
+):
+    """
+    even if same component is loaded multiple times, it should be referenced once
+    """
+    for _ in range(4):
+        chalk_copy.load(
+            f"{server_chalkdust}/debug.c4m",
+        )
+    config = chalk_copy.dump()
+    assert len(config.text.splitlines()) == 1
+
+
 # tests for configs that are found in the chalk search path
 # these configs are NOT loaded directly into the binary
 # as these configs are global across the system,

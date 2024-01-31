@@ -352,10 +352,14 @@ class Chalk:
             log_level="error",
         )
 
-    def dump(self, path: Path) -> ChalkProgram:
-        assert not path.is_file()
-        result = self.run(command="dump", params=[str(path)])
-        assert path.is_file()
+    def dump(self, path: Optional[Path] = None) -> ChalkProgram:
+        args: list[str] = []
+        if path is not None:
+            assert not path.is_file()
+            args = [str(path)]
+        result = self.run(command="dump", params=args)
+        if path is not None:
+            assert path.is_file()
         return result
 
     def load(
