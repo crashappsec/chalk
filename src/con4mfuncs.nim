@@ -12,7 +12,8 @@
 ## Though, it might be a decent thing to push the logging stuff into
 ## con4m at some point, as long as it's all optional.
 
-import config, reporting, sinks, nimutils/jwt
+import pkg/[nimutils/jwt]
+import "."/[config, reporting, sinks]
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))

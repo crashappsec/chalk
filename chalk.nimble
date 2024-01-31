@@ -1,5 +1,5 @@
 import std/[strformat, strutils]
-from src/config_version import getChalkVersion
+from "src/config_version" import getChalkVersion
 
 version       = getChalkVersion()
 author        = "John Viega"

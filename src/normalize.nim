@@ -12,7 +12,8 @@
 ## for that, because it'd be too easy to lose interoperability if
 ## people whiff on whatever we decide for how to handle spaces, etc.
 
-import algorithm, config
+import std/algorithm
+import "."/config
 
 proc u32ToStr(i: uint32): string =
   result = newStringOfCap(sizeof(uint32)+1)

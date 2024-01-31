@@ -4,8 +4,8 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import base64, strutils, uri
-import config, util, docker_base
+import std/[base64, strutils, uri]
+import "."/[config, util, docker_base]
 
 const
   HEADS          = "refs/heads/"

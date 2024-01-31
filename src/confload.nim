@@ -16,8 +16,8 @@
 ## For instance, we collect some information about the build
 ## environment here.
 
-import config, selfextract, con4mfuncs, plugin_load
-import macros except error
+import std/macros except error
+import "."/[config, selfextract, con4mfuncs, plugin_load]
 
 # Since these are system keys, we are the only one able to write them,
 # and it's easier to do it directly here than in the system plugin.

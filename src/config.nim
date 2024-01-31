@@ -7,7 +7,7 @@
 
 ## Wrappers for more abstracted accessing of configuration information
 
-import run_management, config_version
+import "."/[run_management, config_version]
 export run_management
 
 proc filterByTemplate*(dict: ChalkDict, p: MarkTemplate | ReportTemplate): ChalkDict =

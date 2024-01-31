@@ -6,7 +6,7 @@
 ##
 
 import std/[hashes, re, sequtils, sets, tables]
-import ../config, ../plugin_api
+import ".."/[config, plugin_api]
 
 const FT_ANY = "*"
 var

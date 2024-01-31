@@ -8,8 +8,9 @@
 ## The plugin responsible for pulling metadata from the git
 ## repository.
 
-import algorithm, nativesockets, sequtils, times, zippy, zippy/inflate
-import ../config, ../plugin_api
+import std/[algorithm, nativesockets, sequtils, times]
+import pkg/[zippy, zippy/inflate]
+import ".."/[config, plugin_api]
 
 const
   eBadGitConf     = "Git configuration file is invalid"

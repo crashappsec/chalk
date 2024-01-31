@@ -9,7 +9,7 @@
 ##
 ## We only need to load plugins that aren't loaded by anything else.
 
-import macros
+import std/macros
 
 macro loadPlugins(list: static[openarray[string]]): untyped =
   var

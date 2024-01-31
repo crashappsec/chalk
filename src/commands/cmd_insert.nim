@@ -7,7 +7,7 @@
 
 ## The `chalk insert` command.
 
-import ../config, ../collect, ../reporting, ../chalkjson, ../plugin_api, ../util
+import ".."/[config, collect, reporting, chalkjson, plugin_api, util]
 
 
 proc runCmdInsert*(path: seq[string]) {.exportc,cdecl.} =

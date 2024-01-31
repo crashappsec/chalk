@@ -8,7 +8,7 @@
 ## This plugin uses information from the config file to set metadata
 ## keys.
 
-import ../config, ../plugin_api
+import ".."/[config, plugin_api]
 
 proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
   result = ChalkDict()

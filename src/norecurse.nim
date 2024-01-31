@@ -8,7 +8,7 @@
 ## Make sure multiple chalk exes don't invoke each other in a
 ## recursive loop.
 
-import config
+import "."/config
 
 const recursionEnvVar = "__CHALK_INVOCATIONS__"
 const recursionLimit  = 3

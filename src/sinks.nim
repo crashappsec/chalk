@@ -7,7 +7,8 @@
 
 ## Chalk-specific setup and APIs around nimtuils' IO sinks.
 
-import uri, config
+import std/uri
+import "."/config
 
 proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
   return (msg, true)

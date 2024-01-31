@@ -4,8 +4,7 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import ../config, ../docker_base, ../chalkjson, ../attestation,
-       ../plugin_api, ../util
+import ".."/[config, docker_base, chalkjson, attestation, plugin_api, util]
 
 const
   markFile     = "chalk.json"

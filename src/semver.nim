@@ -4,7 +4,7 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import strutils
+import std/strutils
 
 # very simple semver implementation
 # it this does NOT handle full semver spec

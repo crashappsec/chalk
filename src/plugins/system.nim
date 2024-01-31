@@ -8,11 +8,12 @@
 ## The system plugin that runs FIRST.  Though, there's not really much
 ## that HAD to happen first.
 
-import std/monotimes, nativesockets, sequtils, times, ../config,
-       ../plugin_api, ../normalize, ../chalkjson, ../selfextract,
-       ../attestation, ../util
+when defined(posix):
+  import std/posix_utils
 
-when defined(posix): import posix_utils
+import std/[monotimes, nativesockets, sequtils, times]
+import ".."/[config, plugin_api, normalize, chalkjson, selfextract, attestation,
+             util]
 
 var
   externalActions: seq[seq[string]] = @[]

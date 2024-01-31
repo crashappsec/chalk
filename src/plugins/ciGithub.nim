@@ -9,7 +9,7 @@
 ## github CI environment.
 
 
-import ../config, ../plugin_api
+import ".."/[config, plugin_api]
 
 proc githubGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result = ChalkDict()

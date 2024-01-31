@@ -8,7 +8,7 @@
 ## The `chalk env` command.
 ## Yes, this is all it (currently) does.
 
-import ../collect, ../reporting
+import ".."/[collect, reporting]
 
 proc runCmdEnv*() =
   initCollection()

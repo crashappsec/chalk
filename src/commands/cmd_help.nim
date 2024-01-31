@@ -7,7 +7,7 @@
 
 ## The `chalk help` command.
 
-import ../config, ../sinks
+import ".."/[config, sinks]
 
 const helpFiles = newFileTable("../docs/")
 

@@ -8,8 +8,9 @@
 ## This is for any common code for system stuff, such as executing
 ## code.
 
-import  std/tempfiles, osproc, posix, config, subscan, nimutils/managedtmp,
-        std/monotimes, parseutils
+import std/[tempfiles, osproc, posix, monotimes, parseutils]
+import pkg/[nimutils/managedtmp]
+import "."/[config, subscan]
 
 proc increfStream*(chalk: ChalkObj) {.exportc.} =
   if chalk.streamRefCt != 0:

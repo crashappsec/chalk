@@ -7,7 +7,7 @@
 
 ## The `chalk version` command.
 
-import ../config
+import ".."/config
 
 proc runCmdVersion*() =
   var cells: seq[seq[string]]

@@ -12,7 +12,8 @@
 ## All of the data collection these plugins do is orchestrated in
 ## collect.nim
 
-import re, config, chalkjson, util, algorithm
+import std/[re, algorithm]
+import "."/[config, chalkjson, util]
 
 # These things don't check for null pointers, because they should only
 # get called when plugins declare stuff in the config file, so this

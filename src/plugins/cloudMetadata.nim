@@ -7,9 +7,8 @@
 
 ## Query common AWS metadata va IMDSv2
 
-import httpclient, net, uri
-import std/strutils, std/json
-import ../config, ../plugin_api, ../chalkjson
+import std/[httpclient, net, uri, strutils, json]
+import ".."/[config, plugin_api, chalkjson]
 
 const
   awsBaseUri     = "http://169.254.169.254/latest/"
