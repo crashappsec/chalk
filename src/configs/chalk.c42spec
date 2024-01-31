@@ -2676,7 +2676,7 @@ validate in the transparency log.
 
   field use_signing_key_backup_service {
     type:    bool
-    default: true
+    default: false
     shortdoc: "Use signing key backup service to save & retrieve keys"
     doc: """
 Any signing keys generated or imported are encrypted by a randomly
