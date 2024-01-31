@@ -9,7 +9,7 @@ dump + load tested in test_config.py
 docker commands are not tested here but as part of the docker codec tests in test_docker.py
 exec commands are tested in test_exec.py as they are more involved
 """
-import glob
+import re
 from pathlib import Path
 
 import pytest
@@ -22,6 +22,7 @@ from .chalk.validate import (
     validate_virtual_chalk,
 )
 from .conf import CONFIGS, DATE_PATH, LS_PATH
+from .utils.dict import ANY
 from .utils.log import get_logger
 from .utils.os import run
 
@@ -183,17 +184,43 @@ def test_setup(chalk_copy: Chalk):
     """
     result = chalk_copy.run(
         command="setup",
-        log_level="error",
         config=CONFIGS / "nosigningkeybackup.c4m",
     )
 
-    report = result.report
-    assert report["_OPERATION"] == "setup"
+    assert result.mark.contains(
+        {
+            "$CHALK_PUBLIC_KEY": re.compile(r"^-----BEGIN PUBLIC KEY"),
+            "$CHALK_ENCRYPTED_PRIVATE_KEY": re.compile(
+                r"^-----BEGIN ENCRYPTED SIGSTORE PRIVATE KEY"
+            ),
+            "SIGNATURE": ANY,
+            "INJECTOR_PUBLIC_KEY": result.mark["$CHALK_PUBLIC_KEY"],
+        }
+    )
 
-    # check key info
-    chalkmark = result.mark
-    assert "PUBLIC KEY" in chalkmark["$CHALK_PUBLIC_KEY"]
-    assert "SIGSTORE PRIVATE KEY" in chalkmark["$CHALK_ENCRYPTED_PRIVATE_KEY"]
-    assert "SIGNATURE" in chalkmark
 
-    assert report["INJECTOR_PUBLIC_KEY"] == chalkmark["$CHALK_PUBLIC_KEY"]
+def test_setup_existing_keys(tmp_data_dir: Path, chalk_copy: Chalk, random_hex: str):
+    """
+    needs to display password, and public and private key info in chalk
+    """
+    assert run(
+        ["cosign", "generate-key-pair", "--output-key-prefix", "chalk"],
+        env={"COSIGN_PASSWORD": random_hex},
+    )
+    public = (tmp_data_dir / "chalk.pub").read_text()
+    private = (tmp_data_dir / "chalk.key").read_text()
+
+    result = chalk_copy.run(
+        command="setup",
+        config=CONFIGS / "nosigningkeybackup.c4m",
+        env={"CHALK_PASSWORD": random_hex},
+    )
+
+    assert result.mark.contains(
+        {
+            "$CHALK_PUBLIC_KEY": public,
+            "$CHALK_ENCRYPTED_PRIVATE_KEY": private,
+            "SIGNATURE": ANY,
+            "INJECTOR_PUBLIC_KEY": public,
+        }
+    )

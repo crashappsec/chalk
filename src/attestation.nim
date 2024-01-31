@@ -512,10 +512,7 @@ proc attemptToLoadKeys*(silent=false): bool =
   cosignLoaded = true
 
   # Ensure any changed chalk keys are saved to self
-  let savedCommandName = getCommandName()
-  setCommandName("setup")
-  result = selfChalk.writeSelfConfig()
-  setCommandName(savedCommandName)
+  result = saveSigningSetup(pubKey, priKey, true)
 
   return true
 
