@@ -1,20 +1,44 @@
-# Release Notes for Chalk version 0.3.1 (Jan 23, 2024)
+# Chalk Release Notes
 
-## Breaking Changes
+## Main
+
+### Fixes
+
+- Fixes a typo in `chalk version` for the build date.
+  [#148](https://github.com/crashappsec/chalk/pull/148)
+- `TERM=dump` renders without colors
+  [#163](https://github.com/crashappsec/chalk/pull/163)
+- `AWS_REGION` env var is honored in `s3` sinks
+  [#164](https://github.com/crashappsec/chalk/pull/164)
+- Show GitHub chalk report on `chalk extract`
+  [#166](https://github.com/crashappsec/chalk/pull/166)
+- `chalk help docgen` shows help for `docgen` command
+  [#173](https://github.com/crashappsec/chalk/pull/173)
+- `chalk load` would duplicate already loaded components
+  in the config
+  [#176](https://github.com/crashappsec/chalk/pull/176)
+- `chalk setup` would not honor existing keys, if present
+  [#184](https://github.com/crashappsec/chalk/pull/184)
+
+## 0.3.1
+
+**Jan 23, 2024**
+
+### Breaking Changes
 
 - Remove the `--no-api-login` option.
   [137](https://github.com/crashappsec/chalk/pull/137)
 
-## New Features
+### New Features
 
 - Add support for arm64 Linux once again.
   It was omitted from the Chalk 0.3.0 release.
 
-## Fixes
+### Fixes
 
 - Fix some rendering bugs.
 
-## Known Issues
+### Known Issues
 
 - If a docker base image has `ENTRYPOINT` defined,
   `docker.wrap_cmd` will break it as it overwrites
@@ -25,9 +49,11 @@
 - This release does not support x86_64 macOS.
   It will be supported once again in a later release.
 
-# Release Notes for Chalk version 0.3.0 (Jan 15, 2024)
+## 0.3.0
 
-## Breaking Changes
+**Jan 15, 2024**
+
+### Breaking Changes
 
 - `_OP_CLOUD_METADATA` is now a JSON object vs a string
   containing JSON data. In addition cloud metadata is now
@@ -52,7 +78,7 @@
   - `secret_manager_url` -> `signing_key_backup_service_url`
   - `secret_manager_timeout` -> `signing_key_backup_service_timeout`
 
-## New Features
+### New Features
 
 - Adding support for git context for docker build commands.
   [86](https://github.com/crashappsec/chalk/pull/86)
@@ -87,7 +113,7 @@
   runtime (programming languages, databases, servers, etc.)
   [128](https://github.com/crashappsec/chalk/pull/128)
 
-## Fixes
+### Fixes
 
 - Fixes docker version comparison checks.
   As a result buildx is correctly detected now for >=0.10.
@@ -113,7 +139,7 @@
   (e.g. `CMD set -x && echo hello`).
   [132](https://github.com/crashappsec/chalk/pull/132)
 
-## Known Issues
+### Known Issues
 
 - If a docker base image has `ENTRYPOINT` defined,
   `docker.wrap_cmd` will break it as it overwrites
@@ -126,28 +152,34 @@
 
   Support for these platforms will be added back in the future.
 
-# Release Notes for Chalk version 0.2.2 (Oct 30, 2023)
+## 0.2.2
 
-## New Features
+**Oct 30, 2023**
+
+### New Features
 
 - Adding support for docker multi-platform builds.
   [54](https://github.com/crashappsec/chalk/pull/54)
 
-## Fixes
+### Fixes
 
 - Honoring Syft/SBOM configs during docker builds.
   [84](https://github.com/crashappsec/chalk/pull/84)
 
-# Release Notes for Chalk version 0.2.1 (Oct 25, 2023)
+## 0.2.1
 
-## Fixes
+**Oct 25, 2023**
+
+### Fixes
 
 - Component parameters can set config attributes.
   [75](https://github.com/crashappsec/chalk/issues/75)
 
-# Release Notes for Chalk version 0.2.0 (Oct 20, 2023)
+## 0.2.0
 
-## New Features
+**Oct 20, 2023**
+
+### New Features
 
 - Added a module so that most users can easily install complex
   configurations without editing any configuration information
@@ -191,7 +223,7 @@
   currently re-install modules, so the original module locations need
   to be available.
 
-## Fixes
+### Fixes
 
 - Docker support when installed via `Snap`.
   [9](https://github.com/crashappsec/chalk/pull/9)
@@ -214,7 +246,7 @@
   (e.g. `ENTRYPOINT ["ls", "-la"]`)
   [70](https://github.com/crashappsec/chalk/issues/70)
 
-## Known Issues
+### Known Issues
 
 - There are still embedded docs that need to be fixed now that the
   entire rendering engine is working well enough.
@@ -224,18 +256,20 @@
   it on legacy Docker builder (not buildx) as it will fail to `chmod`
   permissions of chalk during the build.
 
-# Release Notes for Chalk version 0.1.2 (Sept 26, 2023)
+## 0.1.2
+
+**Sept 26, 2023**
 
 This is the first open source release of Chalk. For those who
 participated in the public preview, there have been massive changes
 from those releases, based on your excellent feedback. There's a
 summary of those changes below.
 
-## Known Issues
+### Known Issues
 
 At release time, here are known issues:
 
-### Documentation
+#### Documentation
 
 - We have not yet produced any developer documentation. We will do so
   soon.
@@ -246,7 +280,7 @@ At release time, here are known issues:
   it's insufficient, use the online docs, which use the same core
   source material.
 
-### Containers
+#### Containers
 
 - Our support for container marking is currently limited to Docker.
 
@@ -265,7 +299,7 @@ At release time, here are known issues:
   multi-architecture builds. It still will produce the desired
   container with a chalk mark, however.
 
-### OS / Hardware support
+#### OS / Hardware support
 
 - We are not supporting running chalk on Windows at this time (even
   under WSL2).
@@ -274,7 +308,7 @@ At release time, here are known issues:
   the only platforms we are currently supporting. More Posix platforms
   _may_ work, but we are making no effort there at this point.
 
-### Data collection and Marking
+#### Data collection and Marking
 
 - We currently do not handle any form of PE binaries, so do not chalk
   .NET or other Windows applications.
@@ -282,7 +316,7 @@ At release time, here are known issues:
 - There are other platforms we hope to mark that we don't yet support;
   see the roadmap section below.
 
-### Other
+#### Other
 
 - The bash autocomplete script installation a Mac, but because it's not
   a zsh script, it will not autocomplete file arguments, etc.
@@ -297,7 +331,7 @@ At release time, here are known issues:
   obtaining the lock if you run multiple instances in the same
   environment at once.
 
-## Major changes since the preview releases
+### Major changes since the preview releases
 
 - We've added automatic signing; run `chalk setup`; if you create a
   free account for our secret service, it'll generate a keypair for
@@ -340,7 +374,7 @@ At release time, here are known issues:
   MUSL-built shared libraries. On the Mac, `libc` is still dynamically
   loaded.
 
-## Roadmap Items
+### Roadmap Items
 
 We are actively developing Chalk, and listening closely to the people
 already using it. Below are a number of key items in our backlog that

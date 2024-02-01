@@ -8,41 +8,40 @@ repos:
 
   # - repo: local
   #   hooks:
-      # - id: licenseheaders
-      #   name: licenseheaders
-      #   language: python
-      #   additional_dependencies:
-      #     - https://github.com/johann-petrak/licenseheaders/archive/8e2d6f944aea639d62c8d26cd99dab4003c3904d.zip
-      #   entry: ./.github/check_license.sh
-      #   files: \.(nim|c4m|c42spec|bash|py)$
-      #   args:
-      #     - --tmpl=.github/copyright.tmpl
-      #     # - --current-year
-      #     # - --years=2022,2023
-      #     - --projname=Chalk
-      #     - --projurl=https://crashoverride.com/docs/chalk
-      #     - --additional-extensions
-      #     - script=.nim,.c4m,.c42spec,.bash
-      #     - robot=.py # native python each run adds another newline
-      #     - --files
-      #     - --
-      #   # selfsigned is not our copyright
-      #   # data has test data for python encoding so we leave it alone
-      #   exclude: |
-      #     (?x)(
-      #       selfsigned.py|
-      #       defaultconfig.c4m|
-      #       configs/.*.c4m|
-      #       tests/.*.c4m|
-      #       data/.*
-      #     )$
+  # - id: licenseheaders
+  #   name: licenseheaders
+  #   language: python
+  #   additional_dependencies:
+  #     - https://github.com/johann-petrak/licenseheaders/archive/8e2d6f944aea639d62c8d26cd99dab4003c3904d.zip
+  #   entry: ./.github/check_license.sh
+  #   files: \.(nim|c4m|c42spec|bash|py)$
+  #   args:
+  #     - --tmpl=.github/copyright.tmpl
+  #     # - --current-year
+  #     # - --years=2022,2023
+  #     - --projname=Chalk
+  #     - --projurl=https://crashoverride.com/docs/chalk
+  #     - --additional-extensions
+  #     - script=.nim,.c4m,.c42spec,.bash
+  #     - robot=.py # native python each run adds another newline
+  #     - --files
+  #     - --
+  #   # selfsigned is not our copyright
+  #   # data has test data for python encoding so we leave it alone
+  #   exclude: |
+  #     (?x)(
+  #       selfsigned.py|
+  #       defaultconfig.c4m|
+  #       configs/.*.c4m|
+  #       tests/.*.c4m|
+  #       data/.*
+  #     )$
 
-  # add back once docs are sorted
-  # - repo: https://github.com/tcort/markdown-link-check
-  #   rev: v3.11.2
-  #   hooks:
-  #     - id: markdown-link-check
-  #       args:
-  #         - -q
-  #         - -c
-  #         - .github/.md-link-check.json
+  - repo: https://github.com/tcort/markdown-link-check
+    rev: v3.11.2
+    hooks:
+      - id: markdown-link-check
+        args:
+          - -q
+          - -c
+          - .github/.md-link-check.json
