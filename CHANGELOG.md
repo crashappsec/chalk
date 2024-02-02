@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## Main
+## 0.3.2
+
+**Feb 2, 2024**
 
 ### Fixes
 
