@@ -12,8 +12,10 @@
 ## This file should never import other chalk modules; it's at the root
 ## of the dependency tree.
 
-import os, json, streams, tables, options, strutils, nimutils, sugar, posix,
-       nimutils/logging, nimutils/managedtmp, con4m, c4autoconf, unicode, re
+import std/[os, json, streams, tables, options, strutils, sugar, posix,
+            unicode, re]
+import pkg/[nimutils, nimutils/logging, nimutils/managedtmp, con4m]
+import "."/c4autoconf
 export os, json, options, tables, strutils, streams, sugar, nimutils, logging,
        managedtmp, con4m, c4autoconf
 

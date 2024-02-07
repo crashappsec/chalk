@@ -9,9 +9,8 @@
 ## source code, including shell scripts. It considers the shebang line
 ## if any, and the file extension.
 
-import ../config, ../plugin_api
-
-from unicode import validateUtf8
+from std/unicode import validateUtf8
+import ".."/[config, plugin_api]
 
 template seemsToBeUtf8(stream: FileStream): bool =
   try:

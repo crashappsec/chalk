@@ -16,7 +16,8 @@
 when (NimMinor, NimPatch) >= (6, 14):
   {.warning[CastSizes]: off.}
 
-import unicode, parseutils, algorithm, config
+import std/[unicode, parseutils, algorithm]
+import "."/config
 
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']

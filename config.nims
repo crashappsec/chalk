@@ -1,4 +1,5 @@
-import nimutils/nimscript, os
+import std/os
+import pkg/[nimutils/nimscript]
 
 # This will end up yielding lto warnings. Uncomment if you want to load in gdb
 # switch("debugger", "native")

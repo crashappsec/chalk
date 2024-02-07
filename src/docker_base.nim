@@ -8,7 +8,8 @@
 ## Common docker-specific utility bits used in various parts of the
 ## implementation.
 
-import uri, config, util, reporting, semver
+import std/uri
+import "."/[config, util, reporting, semver]
 
 var
   buildXVersion: Version = parseVersion("0")

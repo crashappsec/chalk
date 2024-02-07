@@ -4,7 +4,8 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import elf, ../config, ../plugin_api, ../util
+import "."/elf
+import ".."/[config, plugin_api, util]
 
 const
   CHALK_MAGIC_JSON_KEY = "MAGIC\""

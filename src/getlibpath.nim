@@ -7,7 +7,7 @@
 
 ## Helper used in jtiso
 
-import os, strutils
+import std/[os, strutils]
 
 {. emit: """
 #include <dlfcn.h>

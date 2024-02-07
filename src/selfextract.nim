@@ -7,8 +7,9 @@
 
 ## Code specific to reading and writing Chalk's own chalk mark.
 
-import config, plugin_api, posix, collect, con4mfuncs, chalkjson, util,
-       docker_base
+import std/posix
+import "."/[config, plugin_api, collect, con4mfuncs, chalkjson, util,
+            docker_base]
 
 proc handleSelfChalkWarnings*() =
   if not canSelfInject:

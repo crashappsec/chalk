@@ -7,8 +7,7 @@
 
 ## The `chalk setup` command.
 
-import ../config, ../attestation, ../reporting, ../selfextract, ../util,
-       ../collect
+import ".."/[config, attestation, reporting, selfextract, util, collect]
 
 proc runCmdSetup*(gen, load: bool) =
   setCommandName("setup")

@@ -22,10 +22,10 @@
 ## But when wrapping docker, this module does the bulk of the work and
 ## is responsible for all of the collection logic.
 
-import posix, unicode, ../config, ../collect, ../reporting,
-       ../chalkjson, ../docker_cmdline, ../docker_base, ../subscan,
-       ../dockerfile, ../util, ../attestation, ../commands/cmd_help,
-       ../plugin_api, std/[enumerate]
+import std/[posix, unicode, enumerate]
+import ".."/[config, collect, reporting, chalkjson, docker_cmdline, docker_base,
+             subscan, dockerfile, util, attestation, commands/cmd_help,
+             plugin_api]
 
 {.warning[CStringConv]: off.}
 

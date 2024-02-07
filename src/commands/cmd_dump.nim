@@ -7,7 +7,8 @@
 
 ## The `chalk dump` command.
 
-import ../config, ../selfextract, posix
+import std/posix
+import ".."/[config, selfextract]
 
 const
   configKey = "$CHALK_CONFIG"

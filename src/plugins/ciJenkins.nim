@@ -9,7 +9,7 @@
 ## Jenkins CI environment.
 
 
-import ../config, ../plugin_api
+import ".."/[config, plugin_api]
 
 proc jenkinsGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result = ChalkDict()

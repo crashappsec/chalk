@@ -7,8 +7,8 @@
 
 ## The `chalk extract` command.
 
-import ../config, ../collect, ../reporting, ../plugins/codecDocker,
-       ../plugin_api, ../docker_base
+import ".."/[config, collect, reporting, plugins/codecDocker, plugin_api,
+             docker_base]
 
 template processDockerChalkList(chalkList: seq[ChalkObj]) =
   for item in chalkList:

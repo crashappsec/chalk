@@ -9,7 +9,8 @@
 ## setting, status stuff, and the core scan state ("collection
 ## contexts"), that the subscan module pushes and pops.
 
-import chalk_common, posix, std/[monotimes, enumerate]
+import std/[posix, monotimes, enumerate]
+import "."/chalk_common
 export chalk_common
 
 var

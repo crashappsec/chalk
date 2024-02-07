@@ -22,7 +22,8 @@
 ## 'current' sinks need to catch up.  If so, we UNSUBSCRIBE them from
 ## the current topic, and re-subscribe them to a topic just for them.
 
-import std/tempfiles, config, sinks, util
+import std/tempfiles
+import "."/[config, sinks, util]
 
 # These string constants are only used if there's a catastrophic
 # problem w/ the reporting cache; see `panicPublish` below.

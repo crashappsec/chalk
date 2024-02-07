@@ -8,7 +8,7 @@
 ## Implements recursive scanning, for instance, used to process
 ## contents of zip files.
 
-import config
+import "."/config
 
 # For the moment, this seems to be breaking our external dependency?!!!
 proc runCmdInsert*(path: seq[string]) {.importc.}

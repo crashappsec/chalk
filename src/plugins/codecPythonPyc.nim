@@ -8,7 +8,7 @@
 ## This is a simple codec for dealing with python bytecode files;
 ##  i.e., currently ones that have the extensions .pyc, .pyo, .pyd
 
-import ../config, ../plugin_api, ../util
+import ".."/[config, plugin_api, util]
 
 proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
   var

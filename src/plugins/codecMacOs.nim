@@ -9,7 +9,8 @@
 
 # We use slightly different magic for our heredoc. It's uppercase and longer.
 
-import base64, ../config, ../chalkjson, ../util, ../plugin_api
+import std/base64
+import ".."/[config, chalkjson, util, plugin_api]
 
 var prefix = """
 #!/bin/bash

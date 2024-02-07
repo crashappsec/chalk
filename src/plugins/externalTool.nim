@@ -8,7 +8,8 @@
 ## This plugin uses information from the config file to set metadata
 ## keys.
 
-import algorithm, ../config, ../chalkjson, ../plugin_api
+import std/algorithm
+import ".."/[config, chalkjson, plugin_api]
 
 type
   PIInfo      = ref object

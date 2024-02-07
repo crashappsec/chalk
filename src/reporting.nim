@@ -7,7 +7,7 @@
 
 ## Chalk reporting logic.
 
-import config, chalkjson, reportcache, sinks, collect
+import "."/[config, chalkjson, reportcache, sinks, collect]
 
 proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   if doingTestRun:

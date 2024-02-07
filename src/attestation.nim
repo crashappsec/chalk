@@ -5,8 +5,9 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import base64, chalkjson, config, httpclient, net, os, selfextract,
-       sinks, uri, nimutils/sinks
+import std/[base64, httpclient, net, os, uri]
+import pkg/[nimutils/sinks]
+import "."/[chalkjson, config, selfextract, sinks]
 
 const
   attestationObfuscator = staticExec(
