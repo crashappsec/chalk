@@ -7,6 +7,12 @@
 - Fixes possible exception when signing backup service
   would return non-json response
   [#189](https://github.com/crashappsec/chalk/pull/189)
+- Signing key backup service is only called for chalk
+  commands which require cosign private key -
+  insert/build/push.
+  As a result other commands such as `exec` do not interact
+  with the backup service.
+  [#191](https://github.com/crashappsec/chalk/pull/191)
 
 ## 0.3.2
 
