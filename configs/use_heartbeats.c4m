@@ -16,7 +16,7 @@ parameter var heartbeat_minute_frequency {
   doc: """
 This value sets how many minutes to wait between heartbeats. Fractions
 of a minute are okay.
-"""  
+"""
 }
 var heartbeat_minute_frequency: float
 

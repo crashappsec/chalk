@@ -107,7 +107,7 @@ docker {
     command load {
       args: (0, high())
     }
-    
+
     command logs {
       args: (0, high())
     }
