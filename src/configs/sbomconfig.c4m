@@ -49,7 +49,7 @@ func install_syft(ignore) {
   if not starts_with(contents, "#!") {
     error("Unable to install syft into: " + tool.syft.syft_exe_dir + ": " +
     contents)
-    
+
     return false
   }
 
@@ -57,9 +57,9 @@ func install_syft(ignore) {
 
   installer := to_tmp_file(contents, ".sh")
   cmdline   := "sh " + installer + " -b " + tool.syft.syft_exe_dir
-  
+
   trace("Running: " + cmdline)
-  
+
   sout, code := system(cmdline)
 
   info(sout)

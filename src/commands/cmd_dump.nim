@@ -56,7 +56,7 @@ proc runCmdConfDumpParams*() =
 
 proc runCmdConfDumpCache*() =
   baseDump:
-    var 
+    var
       r: Rope
       cells: seq[seq[Rope]]
     if chalk == nil or extract == nil or cacheKey notin extract:

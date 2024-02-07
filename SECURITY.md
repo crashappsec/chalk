@@ -11,7 +11,7 @@ We currently support the following versions in terms of security updates:
 
 ## Reporting a Vulnerability
 
-If you have found a security bug or flaw please reach out to us at 
+If you have found a security bug or flaw please reach out to us at
 [security@crashoverride.com](mailto:security@crashoverride.com) as
 we would love to work with you to understand the problem and develop
 a solution.

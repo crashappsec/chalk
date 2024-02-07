@@ -3,7 +3,7 @@ report_template minimal_report_template {
     key.MAGIC.use         = true
     key._CHALKS.use      = true
     key.CHALK_ID.use      = true
-    key.CHALK_VERSION.use = true 
+    key.CHALK_VERSION.use = true
 }
 
 outconf insert {
