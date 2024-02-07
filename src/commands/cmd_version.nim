@@ -11,7 +11,7 @@ import ../config
 
 proc runCmdVersion*() =
   var cells: seq[seq[string]]
-  
+
   cells.add(@["Chalk Version", getChalkExeVersion()])
   cells.add(@["Commit ID", getChalkCommitId()])
   cells.add(@["Build OS", hostOS])

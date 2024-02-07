@@ -5,6 +5,8 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ["--maxkb=128"]
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
 
   # - repo: local
   #   hooks:

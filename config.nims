@@ -12,7 +12,7 @@ when not defined(debug):
     switch("warning", "User:off")
 
 applyCommonLinkOptions()
-    
+
 var
   default  = getEnv("HOME").joinPath(".local/c0")
   localDir = getEnv("LOCAL_INSTALL_DIR", default)

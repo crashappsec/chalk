@@ -1,7 +1,7 @@
 # Todo: the default should switch to true when using a docker recipe
 
 parameter var disable_terminal_reports {
-    default: false  
+    default: false
     shortdoc: "Disable terminal summary reports"
     doc: """
 Controls whether to force off the default summary reports that get
