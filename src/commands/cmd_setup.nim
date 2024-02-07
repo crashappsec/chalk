@@ -27,12 +27,11 @@ proc runCmdSetup*(gen, load: bool) =
   if load:
     # If we fall back to 'gen' we don't want attemptToLoadKeys
     # to give an error when we don't find keys.
-    if attemptToLoadKeys(silent=gen):
+    if attemptToLoadKeys(withPrivateKey=true, silent=gen):
       doReporting()
       return
     let
       base = getKeyFileLoc()
-
 
     if not gen:
       error("Failed to load signing keys. Aborting.")
