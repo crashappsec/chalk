@@ -315,7 +315,7 @@ proc commitPassword(pri: string, gen: bool) =
     printIt = not storeIt
 
   if storeIt:
-    # If the manager doesn't work, then we need to fall back.
+    # If the backup service doesn't work, then we need to fall back.
     if not cosignPw.backupSigningKeyToService(pri):
       error("Could not store password. Either try again later, or " &
         "use the below password with the CHALK_PASSWORD environment " &
@@ -491,23 +491,25 @@ proc loadSigningSetup(): bool =
   cosignLoaded = true
   return cosignLoaded
 
-proc attemptToLoadKeys*(silent=false): bool =
+proc attemptToLoadKeys*(withPrivateKey=false, silent=false): bool =
   if getCosignLocation() == "":
     return false
 
   let withoutExtension = getKeyFileLoc()
-
   if withoutExtension == "":
       return false
 
-  var
-    pubKey = tryToLoadFile(withoutExtension & ".pub")
-    priKey = tryToLoadFile(withoutExtension & ".key")
-
+  var pubKey = tryToLoadFile(withoutExtension & ".pub")
   if pubKey == "":
     if not silent:
       error("Could not read public key.")
     return false
+
+  if not withPrivateKey:
+    cosignLoaded = true
+    return true
+
+  var priKey = tryToLoadFile(withoutExtension & ".key")
   if priKey == "":
     if not silent:
       error("Could not read public key.")
@@ -570,11 +572,14 @@ proc checkSetupStatus*() =
   # Beyond that, call canAttest()
 
   once:
-    acquirePassword()
-
-    let cmd = getBaseCommandName()
+    let
+      cmd = getBaseCommandName()
+      withPrivateKey = cmd in ["build", "push", "insert"]
     if cmd in ["setup", "help", "load", "dump", "version", "env", "exec"]:
       return
+
+    if withPrivateKey:
+      acquirePassword()
 
     if loadSigningSetup():
       # loadSigningSetup checks for the info we need to sign. If it's true,
@@ -591,7 +596,7 @@ proc checkSetupStatus*() =
 
     if cosignPw != "":
       warn("Found CHALK_PASSWORD; looking for code signing keys.")
-      if not attemptToLoadKeys(silent=true):
+      if not attemptToLoadKeys(withPrivateKey=withPrivateKey, silent=true):
         warn("Could not load code signing keys. Run `chalk setup` to generate")
       return
 
@@ -603,8 +608,8 @@ proc checkSetupStatus*() =
            "get rid of this warning, run:\n" &
            "      `chalk setup --store-password`.")
       warn("The better way is to generate a keypair with `chalk setup` " &
-           "and store the generated password in a secret manager. See " &
-           "`chalk help setup` for more information.")
+           "and store the generated password in a signing key backup service. " &
+           "See chalk help setup` for more information.")
 
 proc writeInToto(info:      DockerInvocation,
                  tag:       string,
