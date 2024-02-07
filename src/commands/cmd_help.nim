@@ -17,7 +17,7 @@ const allConfigVarSections = ["", "docker", "exec", "extract", "env_config",
 
 # Same here, should generate via API.
 const allCommandSections = ["", "insert", "docker", "extract", "extract.images",
-                            "extract.containers", "extract.all", "exec", 
+                            "extract.containers", "extract.all", "exec",
                             "setup", "setup.gen", "setup.load", "env", "docgen",
                             "config", "dump", "load", "delete", "version"]
 
@@ -36,7 +36,7 @@ proc kindEnumToString(s, v: string): string =
 
 var transformers  = TransformTableRef()
 
-proc getKeyspecTable(state:          ConfigState, 
+proc getKeyspecTable(state:          ConfigState,
                      filterValueStr: string,
                      fieldsToUse:    openarray[string]): Rope =
 
@@ -44,7 +44,7 @@ proc getKeyspecTable(state:          ConfigState,
 
 
 
-  let caption = atom("See ") + em("help key <term>") + 
+  let caption = atom("See ") + em("help key <term>") +
                 atom(" to search the table only")
 
   result = state.getInstanceDocs("keyspec",
@@ -56,11 +56,11 @@ proc getKeyspecTable(state:          ConfigState,
                                  caption        = caption)
 
   result.colPcts([25, 15, 25, 35])
-  
+
 
 proc keyHelp(state: ConfigState, args: seq[string] = @[], summary = false):
             Rope =
-  var 
+  var
     filter: bool  = false
     fieldsToUse   = @["kind", "type"]
 
@@ -154,12 +154,18 @@ proc searchEmbeddedDocs(terms: seq[string]): Rope =
   if result == Rope(nil):
     result = h4("No matches in other documents.")
 
+proc getEmbeddedDoc(key: string): Rope =
+  if key in helpfiles:
+    result += text(helpfiles[key])
+  if result == Rope(nil):
+    result = h4("No document " & key & ".")
+
 proc searchMetadataKeys(state: ConfigState, terms: seq[string]): Rope =
   var transformers     = TransformTableRef()
   transformers["kind"] = FieldTransformer(kindEnumToString)
 
   var
-    matches: seq[seq[string]] 
+    matches: seq[seq[string]]
     baseDocs = state.getAllInstanceDocsAsArray("keyspec",
                                                ["kind", "type", "doc"],
                                                 transformers)
@@ -177,7 +183,7 @@ proc searchMetadataKeys(state: ConfigState, terms: seq[string]): Rope =
   if len(matches) == 0:
     result = h4("No matches in found metadata key docs")
   else:
-    matches = @[@["Key", "Collection Type", "Value Type", "Description"]] & 
+    matches = @[@["Key", "Collection Type", "Value Type", "Description"]] &
       matches
     result = quickTable(matches, title = "Metadata documentation matches",
                         class = "help")
@@ -189,7 +195,7 @@ proc searchConfigVars(state: ConfigState, args: seq[string]): Rope =
     if matches == Rope(nil):
       continue
     for match in matches.searchOne(@["table"]).get().tbody.cells:
-      var 
+      var
         caption: string
         tdCells = match.search(@["td"])
       if len(tdCells) == 0:
@@ -224,7 +230,7 @@ proc searchFlags(state: ConfigState, args: seq[string]): Rope =
       continue
 
     for match in objs:
-      var 
+      var
         cells:    seq[seq[string]]
         heading = "Match for "
         ftStr: string
@@ -232,10 +238,10 @@ proc searchFlags(state: ConfigState, args: seq[string]): Rope =
       if command == "":
         heading &= "global flag " & match.flagName
       else:
-        heading &= "flag " & match.flagName & " from " & 
+        heading &= "flag " & match.flagName & " from " &
                     command.formatCommandName()
       result += h4(heading)
-      
+
       case match.kind
       of "boolean":      ftStr = "Yes / No (boolean)"
       of "arg":          ftStr = "Required Argument"
@@ -246,7 +252,7 @@ proc searchFlags(state: ConfigState, args: seq[string]): Rope =
 
       cells = @[@["Flag", match.flagName],
                 @["Flag Type", ftStr]]
-                 
+
       if match.sets != "":
         cells.add(@["Config variable set", match.sets])
 
@@ -272,7 +278,7 @@ proc searchCommandDescriptions(state: ConfigState, args: seq[string]): Rope =
 proc getHelpTopics(state: ConfigState): Rope =
   result  = h1("Additional help topics")
   result += h2(atom("Use ") + em("chalk help <topicname>") + atom(" to read"))
-  
+
   var items: seq[string]
   for k, _ in helpFiles:
     items.add(resolveHelpFileName(k))
@@ -295,7 +301,7 @@ report, or """, pre = false)
                                ["Overview", "Detail"])
 
 proc getPluginHelp(state: ConfigState): Rope =
-  let 
+  let
     keyFields = ["pre_run_keys", "artifact_keys", "post_chalk_keys",
                  "post_run_keys"]
     kfNames   = ["Chalk-time host metadata",
@@ -315,7 +321,7 @@ proc getPluginHelp(state: ConfigState): Rope =
 
     for i, item in keyFields:
       if item in docs:
-        let 
+        let
           asJson = docs[item]["value"].parseJson()
           asArr  = asJson.to(seq[string])
 
@@ -405,7 +411,7 @@ proc fullTextSearch(state: ConfigState, args: seq[string]): Rope =
   if len(args) == 1:
     txt &= ": " & args[0]
   else:
-    txt &= "s: " & args.join(", ") 
+    txt &= "s: " & args.join(", ")
 
   result = h4(txt)
 
@@ -520,8 +526,10 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
         toOut += con4mRuntime.getHelpTopics()
       of "builtins":
         toOut = con4mRuntime.getBuiltinsTableDoc()
+      of "changelog", "release", "releases":
+        toOut += getEmbeddedDoc("changelog")
       else:
-        let toCheck = [arg, "core-" & arg, "howto-" & arg, "guide" & arg]
+        let toCheck = [arg, arg & ".md", "core-" & arg, "howto-" & arg, "guide" & arg]
         var gotIt = false
 
         for item in toCheck:
@@ -582,10 +590,10 @@ proc buildSinkConfigData(): seq[seq[Rope]] =
   for key, config in sinkConfigs:
     if config notin sublists:
       sublists[config] = @[]
-    result.add(@[text(key), text(config.mySink.getName()), 
+    result.add(@[text(key), text(config.mySink.getName()),
                  text(paramFmt(config.params)),
-                text(filterFmt(config.filters)), 
-                text(sublists[config].join(", "))])
+                 text(filterFmt(config.filters)),
+                 text(sublists[config].join(", "))])
 
 proc getConfigValues(): Rope =
 
@@ -601,9 +609,9 @@ proc getConfigValues(): Rope =
                          atom("Chalk Mark Template")]]
     custRepData    = @[@[atom("Name"), atom("Enabled"), atom("Template"),
                         atom("Operations where applied")]]
-    codecData      = @[@[atom("Name"), atom("Enabled"), atom("Priority"), 
+    codecData      = @[@[atom("Name"), atom("Enabled"), atom("Priority"),
                          atom("Ignore"), atom("Overrides")]]
-    pluginData     = @[@[atom("Name"), atom("Enabled"), atom("Priority"), 
+    pluginData     = @[@[atom("Name"), atom("Enabled"), atom("Priority"),
                          atom("Ignore"), atom("Overrides")]]
     sinkCfgData    = @[@[atom("Config Name"), atom("Sink"), atom("Parameters"),
                          atom("Filters"), atom("Topics")]]
@@ -618,7 +626,7 @@ proc getConfigValues(): Rope =
                          ["codec"])
 
   for item in allConfigVarSections:
-    let hdr = if item == "": 
+    let hdr = if item == "":
                 "Global configuration variables"
               else:
                 "Configuration variables in the '" & item & "' section"
@@ -626,7 +634,7 @@ proc getConfigValues(): Rope =
                             headings = confHdrs, sectionPath = item)
 
 
-  result += outconfData.quickTable("Metadata template configuration", 
+  result += outconfData.quickTable("Metadata template configuration",
                                    class = "help")
   result += custRepData.quickTable("Additional reports configured",
                                    class = "help")

@@ -148,7 +148,7 @@ template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: un
                                  retries           = 2,
                                  firstRetryDelayMs = 100)
 
-  trace("Signing Key Backup Service URL: " & $uri)  
+  trace("Signing Key Backup Service URL: " & $uri)
   trace("Signing Key Backup Service HTTP headers: " & $authHeaders)
   trace("Signing Key Backup Service status code: " & response.status)
   trace("Signing Key Backup Service response: " & response.body)
@@ -197,15 +197,13 @@ proc restoreSigningKeyFromService*(prkey: string): bool =
 
   let response = callTheSigningKeyBackupService(base, prKey, "", HttpGet)
 
-  if not response.code.is2xx():
-    # authentication issue / token expiration - begin reauth
-    if response.code == Http401:
-      # parse json response and save / return values()
-      let jsonNodeReason = parseJson(response.body())
-      trace("JSON body of response from Signing key Backup Service: " & $jsonNodeReason)
-    else:
-      warn("Could not retrieve encrypted signing key: " & response.status & "\n" & "Will not be able to sign / verify.")
-      return false
+  if response.code == Http401:
+    # authentication issue / token expiration
+    trace("JSON body of response from Signing key Backup Service: " & response.body())
+    return false
+  elif not response.code.is2xx():
+    warn("Could not retrieve encrypted signing key: " & response.status & "\n" & "Will not be able to sign / verify.")
+    return false
 
   var
     body:    string
@@ -215,7 +213,7 @@ proc restoreSigningKeyFromService*(prkey: string): bool =
     hexBits = response.body()
     body    = parseHexStr($hexBits)
 
-    if len(body) != 40: 
+    if len(body) != 40:
       error("Encrypted key returned from server is incorrect size. Received" & $len(body) & "bytes, exected 40 bytes.")
       return false
 
@@ -352,7 +350,7 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
     if prikey == "":
       return false
 
-  # Use Chalk Data API key to retrieve previously saved encrypted secret 
+  # Use Chalk Data API key to retrieve previously saved encrypted secret
   #  from API, then use retrieved private key to decrypt
   if restoreSigningKeyFromService(prikey):
     return true
@@ -513,10 +511,7 @@ proc attemptToLoadKeys*(silent=false): bool =
   cosignLoaded = true
 
   # Ensure any changed chalk keys are saved to self
-  let savedCommandName = getCommandName()
-  setCommandName("setup")
-  result = selfChalk.writeSelfConfig()
-  setCommandName(savedCommandName)
+  result = saveSigningSetup(pubKey, priKey, true)
 
   return true
 
@@ -526,7 +521,7 @@ proc attemptToGenKeys*(): bool =
     return false
 
   let keyOutLoc = getKeyFileLoc()
-  
+
   if keyOutLoc == "":
     return false
 
@@ -550,7 +545,7 @@ proc attemptToGenKeys*(): bool =
     cosignLoaded = true
 
     result = saveSigningSetup(pubKey, priKey, true)
-    
+
 proc canAttest*(): bool =
   if getCosignLocation() == "":
     return false
