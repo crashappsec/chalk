@@ -101,8 +101,10 @@ generate_keypair(char **s1, char **s2) {
 ## not finished enough to replace what we already have.
 
 
-template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: untyped,
-                              mth: untyped): Response =
+proc callTheSigningKeyBackupService(base:    string,
+                                    prKey:   string,
+                                    bodytxt: string,
+                                    mth:     HttpMethod): Option[Response] =
   let
     # Timeout asssociated with the signing key backup service
     timeout:      int    = cast[int](chalkConfig.getSigningKeyBackupServiceTimeout())
@@ -121,7 +123,7 @@ template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: un
   if mth == HttPGet:
     trace("Calling Signing Key Backup Service to retrieve key with ID: " & signingID)
   else:
-    trace("Calling Signing Key Backup Service to store key with iD: " & signingID)
+    trace("Calling Signing Key Backup Service to store key with ID: " & signingID)
 
   if base[^1] == '/':
     url = base & signingID
@@ -131,7 +133,8 @@ template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: un
   let authOpt = getAuthConfigByName(auth_config)
   if authOpt.isNone():
     error("Could not retrieve Chalk Data API token from configuration profile. Unable to use Signing Key Backup Service.")
-    return false
+    return none(Response)
+
   var
     auth = authOpt.get()
     headers = newHttpHeaders()
@@ -141,26 +144,29 @@ template callTheSigningKeyBackupService(base: string, prKey: string, bodytxt: un
   uri       = parseUri(url)
   context   = newContext(verifyMode = CVerifyPeer)
   client    = newHttpClient(sslContext = context, timeout = timeout)
-  response  = client.safeRequest(url = uri,
-                                 httpMethod        = mth,
-                                 headers           = authHeaders,
-                                 body              = bodytxt,
-                                 retries           = 2,
-                                 firstRetryDelayMs = 100)
+  try:
+    response = client.safeRequest(url = uri,
+                                  httpMethod        = mth,
+                                  headers           = authHeaders,
+                                  body              = bodytxt,
+                                  retries           = 2,
+                                  firstRetryDelayMs = 100)
 
-  trace("Signing Key Backup Service URL: " & $uri)
-  trace("Signing Key Backup Service HTTP headers: " & $authHeaders)
-  trace("Signing Key Backup Service status code: " & response.status)
-  trace("Signing Key Backup Service response: " & response.body)
-
-  # Cleanup & return from template
-  client.close()
-  response
+    trace("Signing Key Backup Service URL: " & $uri)
+    trace("Signing Key Backup Service HTTP headers: " & $authHeaders)
+    trace("Signing Key Backup Service status code: " & response.status)
+    trace("Signing Key Backup Service response: " & response.body)
+    return some(response)
+  except:
+    error("Could not call Signing Key Backup Service: " & getCurrentExceptionMsg())
+    return none(Response)
+  finally:
+    # Cleanup & return from template
+    client.close()
 
 proc backupSigningKeyToService*(content: string, prkey: string): bool =
   var
     nonce:    string
-    response: Response
 
   let
     base  = chalkConfig.getSigningKeyBackupServiceUrl()
@@ -170,9 +176,14 @@ proc backupSigningKeyToService*(content: string, prkey: string): bool =
     error("Cannot backup signing key; no Signing Key Backup Service URL configured.")
     return false
 
-  let body = nonce.hex() & ct.hex()
-  response = callTheSigningKeyBackupService(base, prkey, body, HttpPut)
+  let
+    body = nonce.hex() & ct.hex()
+    responseOpt = callTheSigningKeyBackupService(base, prkey, body, HttpPut)
 
+  if responseOpt.isNone():
+    return false
+
+  let response = responseOpt.get()
   trace("Sending encrypted secret: " & body)
   if response.code == Http405:
     info("This encrypted signing key is already backed up.")
@@ -195,7 +206,10 @@ proc restoreSigningKeyFromService*(prkey: string): bool =
   if len(base) == 0 or prkey == "":
     return false
 
-  let response = callTheSigningKeyBackupService(base, prKey, "", HttpGet)
+  let responseOpt = callTheSigningKeyBackupService(base, prKey, "", HttpGet)
+  if responseOpt.isNone():
+    return false
+  let response = responseOpt.get()
 
   if response.code == Http401:
     # authentication issue / token expiration
