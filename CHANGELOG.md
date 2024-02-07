@@ -1,5 +1,13 @@
 # Chalk Release Notes
 
+## Main
+
+### Fixes
+
+- Fixes possible exception when signing backup service
+  would return non-json response
+  [#189](https://github.com/crashappsec/chalk/pull/189)
+
 ## 0.3.2
 
 **Feb 2, 2024**
