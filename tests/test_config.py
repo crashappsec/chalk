@@ -4,12 +4,13 @@
 # (see https://crashoverride.com/docs/chalk)
 import itertools
 from pathlib import Path
-from typing import Any, IO, Iterator, Callable, Optional
+from typing import Any, Iterator, Callable, Optional
 
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark, ChalkReport
 from .utils.log import get_logger
+from .utils.docker import Docker
 from .conf import (
     BASE_OUTCONF,
     LS_PATH,
@@ -484,3 +485,21 @@ def test_profiles(
     # delete
     delete = chalk_copy.delete(bin_path)
     validate_chalk_report_keys(delete.report, configs["delete"])
+
+
+def test_no_certs(chalk_default: Chalk, server_chalkdust: str):
+    """
+    chalk should be able to connect to chalkdust even when system has no system certs
+    by using bundled mozilla root CA store
+    """
+    assert Docker.run(
+        # busybox does not ship with any system certs vs for example alpine
+        image="busybox",
+        entrypoint="/bin/sh",
+        params=[
+            "-c",
+            f"cp /chalk /chalk.test && /chalk.test load {server_chalkdust}/debug.c4m",
+        ],
+        tty=False,
+        volumes={chalk_default.binary: "/chalk"},
+    )

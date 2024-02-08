@@ -5,7 +5,6 @@
 import json
 from pathlib import Path
 from typing import Any, Callable
-from unittest import mock
 
 import boto3
 import os
