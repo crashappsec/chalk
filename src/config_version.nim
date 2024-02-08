@@ -4,13 +4,17 @@
 ## So we have this separate file for now.
 import std/[os, strscans, strutils]
 
-proc getChalkVersion*(): string =
+proc getChalkVersion*(withSuffix = true): string =
   ## Returns the value of `chalk_version` in `base_keyspecs.c4m`.
   result = ""
   const path = currentSourcePath().parentDir() / "configs" / "base_keyspecs.c4m"
   for line in path.staticRead().splitLines():
     const pattern = """chalk_version$s:=$s"$i.$i.$i$*"$."""
     let (isMatch, major, minor, patch, suffix) = line.scanTuple(pattern)
-    if isMatch and major == 0 and minor in 0..100 and patch in 0..100 and suffix == "":
-      return $major & '.' & $minor & '.' & $patch
+    if isMatch and major >= 0 and minor >= 0 and patch >= 0:
+      let version = $major & '.' & $minor & '.' & $patch
+      if withSuffix:
+        return version & suffix
+      else:
+        return version
   raise newException(ValueError, "Couldn't get `chalk_version` value from " & path)
