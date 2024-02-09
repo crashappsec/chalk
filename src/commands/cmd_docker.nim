@@ -22,7 +22,7 @@
 ## But when wrapping docker, this module does the bulk of the work and
 ## is responsible for all of the collection logic.
 
-import std/[posix, unicode, enumerate]
+import std/[posix, unicode]
 import ".."/[config, collect, reporting, chalkjson, docker_cmdline, docker_base,
              subscan, dockerfile, util, attestation, commands/cmd_help,
              plugin_api]
