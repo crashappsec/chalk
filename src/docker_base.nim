@@ -252,7 +252,7 @@ proc getAllDockerContexts*(info: DockerInvocation): seq[string] =
   for k, v in info.otherContexts:
     result.add(resolvePath(v))
 
-proc populateBasicImageInfo*(chalk: ChalkObj, info: JSonNode) =
+proc populateBasicImageInfo*(chalk: ChalkObj, info: JsonNode) =
   let
     repo  = info["Repository"].getStr()
     tag   = info["Tag"].getStr.replace("\u003cnone\u003e", "").strip()
@@ -262,7 +262,7 @@ proc populateBasicImageInfo*(chalk: ChalkObj, info: JSonNode) =
   chalk.tag     = tag
   chalk.shortId = short
 
-proc getBasicImageInfo*(refName: string): Option[JSonNode] =
+proc getBasicImageInfo*(refName: string): Option[JsonNode] =
   let
     allInfo = runDockerGetEverything(@["images", "--format", "{{json . }}"])
     stdout  = allInfo.getStdout().strip()

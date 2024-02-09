@@ -38,7 +38,7 @@ const
 
 type
   ChalkJsonNode*   = ref CJsonNodeObj
-  CJSonError*      = ref object of ValueError
+  CJsonError*      = ref object of ValueError
   CJsonNodeKind*   = enum
     CJNull, CJBool, CJInt, CJFloat, CJString, CJObject, CJArray
 
@@ -52,7 +52,7 @@ type
     of CJObject: kvpairs*:  OrderedTableRef[string, ChalkJsonNode]
     of CJArray:  items*:    seq[ChalkJsonNode]
 
-proc chalkParseJson*(s: Stream): ChalkJSonNode
+proc chalkParseJson*(s: Stream): ChalkJsonNode
 
 proc findJsonStart*(stream: Stream): bool =
   ## Seeks the stream to the start of the JSON blob, when the stream
@@ -150,7 +150,7 @@ proc valueFromJson(jobj: ChalkJsonNode, fname: string): Box =
   of CJObject: return pack(objFromJson(jobj, fname))
   of CJArray:  return pack(arrayFromJson(jobj, fname))
 
-proc jsonNodeToBox*(n: ChalkJSonNode): Box =
+proc jsonNodeToBox*(n: ChalkJsonNode): Box =
   case n.kind
   of CJNull:   return nil
   of CJBool:   return pack(n.boolval)
@@ -179,7 +179,7 @@ proc nimJsonToBox*(node: JsonNode): Box =
   #
   # Since we're using this to convert Docker inspect output, we can
   # expect to see values come back as 'null' that we might want to
-  # represent in the final JSon; thankfully, Box automatically turns
+  # represent in the final JSON; thankfully, Box automatically turns
   # MkObj types to 'null' when it encounters them.
   case node.kind
   of JString:
@@ -209,7 +209,7 @@ proc readOne(s: Stream): char {.inline.} = return s.readChar()
 proc peekOne(s: Stream): char {.inline.} = return s.peekChar()
 proc jsonWS(s: Stream) =
   while s.peekOne() in jsonWSChars: discard s.readChar()
-proc jsonValue(s: Stream): ChalkJSonNode
+proc jsonValue(s: Stream): ChalkJsonNode
 
 template literalCheck(s: Stream, lit: static string) =
   const msg: string = eBadLiteral & lit
@@ -221,7 +221,7 @@ template literalCheck(s: Stream, lit: static string) =
 
 let
   jNullLit: ChalkJsonNode = ChalkJsonNode(kind: CJNull)
-  jFalse:   ChalkJSonNode = ChalkJsonNode(kind: CJBool, boolval: false)
+  jFalse:   ChalkJsonNode = ChalkJsonNode(kind: CJBool, boolval: false)
   jTrue:    ChalkJsonNode = ChalkJsonNode(kind: CJBool, boolval: true)
 
 proc jSonNull(s: Stream): ChalkJsonNode =
@@ -307,7 +307,7 @@ proc jsonNumber(s: Stream): ChalkJsonNode =
 
   var f: BiggestFloat
   discard parseBiggestFloat(buf, f)
-  return ChalkJSonNode(kind: CJFloat, floatval: f)
+  return ChalkJsonNode(kind: CJFloat, floatval: f)
 
 when (NimMajor, NimMinor) >= (1, 7):
   {.warning[CastSizes]: off.}
@@ -355,13 +355,13 @@ proc jsonStringRaw(s: Stream): string =
 
   return str
 
-proc jsonString(s: Stream): ChalkJSonNode =
+proc jsonString(s: Stream): ChalkJsonNode =
   result = ChalkJsonNode(kind: CJString, strval: s.jsonStringRaw())
 
-proc jsonArray(s: Stream): ChalkJSonNode =
+proc jsonArray(s: Stream): ChalkJsonNode =
   discard s.readOne()
   s.jsonWS()
-  result = ChalkJSonNode(kind: CJArray)
+  result = ChalkJsonNode(kind: CJArray)
   if s.peekOne() == ']':
     discard s.readOne()
     return
@@ -397,7 +397,7 @@ proc jsonMembers(s: Stream): OrderedTableRef[string, ChalkJsonNode] =
     else:
       raise parseError("Invalid JSON obj, expected ',' or }, got: '" & $c & "'")
 
-proc jsonObject(s: Stream): ChalkJSonNode =
+proc jsonObject(s: Stream): ChalkJsonNode =
   discard s.readOne()
   s.jsonWS()
   case s.peekOne()
@@ -405,10 +405,10 @@ proc jsonObject(s: Stream): ChalkJSonNode =
     discard s.readOne()
     let empty = OrderedTableRef[string, ChalkJsonNode]()
     return ChalkJsonNode(kind: CJObject, kvPairs: empty)
-  of '"': return ChalkJSonNode(kind: CJObject, kvpairs: s.jsonMembers())
+  of '"': return ChalkJsonNode(kind: CJObject, kvpairs: s.jsonMembers())
   else:   raise parseError(eBadObject)
 
-proc jsonValue(s: Stream): ChalkJSonNode =
+proc jsonValue(s: Stream): ChalkJsonNode =
   case s.peekOne()
   of '{':           return s.jsonObject()
   of '[':           return s.jsonArray()
@@ -418,9 +418,9 @@ proc jsonValue(s: Stream): ChalkJSonNode =
   of 'f':           return s.jsonFalse()
   of 'n':           return s.jsonNull()
   else:
-    raise parseError("Bad JSon at position: " & $(s.getPosition()))
+    raise parseError("Bad JSON at position: " & $(s.getPosition()))
 
-proc chalkParseJson*(s: Stream): ChalkJSonNode =
+proc chalkParseJson*(s: Stream): ChalkJsonNode =
   s.jsonWS()
   result = s.jSonValue()
   # Per the spec, we should advance the stream white space after the
