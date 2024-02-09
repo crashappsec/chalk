@@ -219,7 +219,7 @@ proc getContainerChalks*(codec: Plugin): seq[ChalkObj] {.exportc,cdecl.} =
     trace("Could not run docker.")
 
 # These are the keys we can auto-convert without any special-casing.
-# Types of the JSon will be checked against the key's declared type.
+# Types of the JSON will be checked against the key's declared type.
 let dockerImageAutoMap = {
   "RepoTags":                           "_REPO_TAGS",
   "RepoDigests":                        "_REPO_DIGESTS",
@@ -456,13 +456,13 @@ proc jsonOneAutoKey(node:        JsonNode,
 
   dict[chalkKey] = value
 
-proc getPartialJsonObject(top: JSonNode, key: string): Option[JSonNode] =
+proc getPartialJsonObject(top: JsonNode, key: string): Option[JsonNode] =
   var cur = top
 
   let keyParts = key.split('.')
   for item in keyParts:
     if item notin cur:
-      return none(JSonNode)
+      return none(JsonNode)
     cur = cur[item]
 
   return some(cur)
