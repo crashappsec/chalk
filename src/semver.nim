@@ -54,9 +54,9 @@ proc parts(self: Version): (int, int, int, string) =
   # assumping any suffix is for pre-releases which is not ideal
   # correct but it is fine for chalk versions
   # this handles things like 1-dev < 1.0
-  # no suffix is normalized to highest ascii char code \u7f
+  # no suffix is normalized to highest ascii char code \x7f
   # hence it is always greater then any legitimate ascii string
-  let suffix = if self.suffix == "": "\u7f" else: self.suffix
+  let suffix = if self.suffix == "": "\x7f" else: self.suffix
   return (self.major, self.minor, self.patch, suffix)
 
 proc `==`*(self: Version, other: Version): bool =

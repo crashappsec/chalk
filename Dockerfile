@@ -44,7 +44,6 @@ WORKDIR /chalk
 # vs COPY . /chalk/
 # as repo has other tools and copying only necessary files
 # optimizes docker build cache
-COPY --chmod=755 bin/devmode /chalk/bin/
 COPY config.nims /chalk/
 COPY ./src/ /chalk/src/
 # for chalk commit id
@@ -54,37 +53,11 @@ COPY ./.git/ /chalk/.git/
 RUN yes | nimble $CHALK_BUILD
 
 # -------------------------------------------------------------------
-# published as ghcr.io/crashappsec/chalk:alpine
+# official image with chalk binary for easy copy
+# in other docker builds via:
+# COPY --from=chalk /chalk /chalk
 
-FROM alpine:latest as alpine
-
-# curl     - chalk downloads some things directly with curl for the moment
-# ca-certs - even though chalk is a static binary, in order to do external
-#            calls openssl requires ca-certificates to be installed
-#            on the system
-RUN apk add --no-cache \
-    ca-certificates \
-    curl
-
-COPY --from=build /chalk/chalk /chalk
-
-ENTRYPOINT ["/chalk"]
-
-# -------------------------------------------------------------------
-# published as ghcr.io/crashappsec/chalk:ubuntu
-
-FROM ubuntu:jammy-20230126 as ubuntu
-
-# curl     - chalk downloads some things directly with curl for the moment
-# ca-certs - even though chalk is a static binary, in order to do external
-#            calls openssl requires ca-certificates to be installed
-#            on the system
-RUN apt-get update -y && \
-    apt-get install -y \
-        ca-certificates \
-        curl \
-        && \
-    apt-get clean -y
+FROM scratch
 
 COPY --from=build /chalk/chalk /chalk
 
