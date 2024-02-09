@@ -6,7 +6,6 @@
 ##
 
 import std/[base64, httpclient, net, os, uri]
-import pkg/[nimutils/sinks]
 import "."/[chalkjson, config, selfextract, sinks]
 
 const
