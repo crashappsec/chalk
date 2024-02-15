@@ -20,6 +20,7 @@ SOURCES+=$(shell find src/ -name '*.md')
 SOURCES+=$(shell find ../con4m -name '*.nim' 2> /dev/null)
 SOURCES+=$(shell find ../con4m -name '*.c4m' 2> /dev/null)
 SOURCES+=$(shell find ../nimutils -name '*.nim' 2> /dev/null)
+SOURCES+=$(shell find ../nimutils -name '*.c' 2> /dev/null)
 SOURCES+=src/docs/CHANGELOG.md
 
 VERSION=$(shell cat src/configs/base_keyspecs.c4m \
