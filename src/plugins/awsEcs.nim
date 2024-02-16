@@ -25,11 +25,9 @@ if ecsUrl == "":
 proc requestECSMetadata(path: string): Option[Box] =
   let url = ecsUrl & path
   var body = ""
-  info(url)
   try:
     var
-      client = newHttpClient()
-      resp   = client.safeRequest(url)
+      resp   = safeRequest(url)
     if resp.code != Http200:
       error("ecs: " & url & " returned " & resp.status)
       return none(Box)

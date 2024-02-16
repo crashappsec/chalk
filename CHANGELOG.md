@@ -2,6 +2,12 @@
 
 ## Main
 
+### New Features
+
+- Chalk falls back to bundled Mozilla CA Store when there
+  are no system TLS certs to use (e.g. busybox container).
+  [#196](https://github.com/crashappsec/chalk/pull/196)
+
 ### Fixes
 
 - Fixes possible exception when signing backup service

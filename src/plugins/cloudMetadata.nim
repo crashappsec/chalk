@@ -7,7 +7,7 @@
 
 ## Query common AWS metadata va IMDSv2
 
-import std/[httpclient, net, uri, strutils, json]
+import std/[httpclient, net, strutils, json]
 import ".."/[config, plugin_api, chalkjson]
 
 const
@@ -19,13 +19,15 @@ const
 
 proc getAwsToken(): Option[string] =
   let
-    uri      = parseURI(awsBaseUri & "api/token")
+    url      = awsBaseUri & "api/token"
     hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
-    client   = newHttpClient(timeout = 250) # 1/4 of a second
-    response = client.safeRequest(url = uri, httpMethod = HttpPut, headers = hdrs)
+    response = safeRequest(url        = url,
+                           httpMethod = HttpPut,
+                           timeout    = 250, # 1/4 of a second
+                           headers    = hdrs)
 
   if not response.code.is2xx():
-    trace("Could not retrieve IMDSv2 token from: " & $uri)
+    trace("Could not retrieve IMDSv2 token from: " & url)
     return none(string)
 
   trace("Retrieved AWS metadata token")
@@ -33,19 +35,20 @@ proc getAwsToken(): Option[string] =
 
 proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
   let
-    uri      = parseUri(path)
-    client   = newHttpClient(timeout = 250) # 1/4 of a second
-    response = client.safeRequest(url = uri, httpMethod = HttpGet, headers = hdrs)
+    response = safeRequest(url        = path,
+                           httpMethod = HttpGet,
+                           timeout    = 250, # 1/4 of a second
+                           headers    = hdrs)
 
   if not response.code.is2xx():
-    trace("Could not retrieve metadata from: " & $uri)
+    trace("Could not retrieve metadata from: " & path)
     return none(string)
 
-  trace("Retrieved metadata from: " & uri.path)
+  trace("Retrieved metadata from: " & path)
   result = some(response.bodyStream.readAll().strip())
   if not result.isSome():
     # log failing keys in trace mode only as some are expected to be absent
-    trace("Got empty metadata from: " & uri.path)
+    trace("Got empty metadata from: " & path)
 
 template oneItem(keyname: string, url: string) =
   if isSubscribedKey(keyname):
