@@ -13,6 +13,9 @@
   As a result other commands such as `exec` do not interact
   with the backup service.
   [#191](https://github.com/crashappsec/chalk/pull/191)
+- Fixing docker build attempting to use `--build-context`
+  on older docker versions which did not support that flag.
+  [#207](https://github.com/crashappsec/chalk/pull/207)
 
 ## 0.3.2
 

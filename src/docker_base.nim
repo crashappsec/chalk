@@ -101,7 +101,7 @@ template hasBuildx*(): bool =
 
 template supportsBuildContextFlag*(): bool =
   # https://github.com/docker/buildx/releases/tag/v0.8.0
-  getBuildXVersion() >= parseVersion("0.8")
+  getDockerVersion() >= parseVersion("21") and getBuildXVersion() >= parseVersion("0.8")
 
 template supportsCopyChmod*(): bool =
   # > the --chmod option requires BuildKit.
