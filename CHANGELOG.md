@@ -22,6 +22,10 @@
 - Fixing docker build attempting to use `--build-context`
   on older docker versions which did not support that flag.
   [#207](https://github.com/crashappsec/chalk/pull/207)
+- Fixes `echo foo | chalk docker login --password-stdin`
+  as `stdin` was not being closed in the pipe to docker
+  process.
+  [#209](https://github.com/crashappsec/chalk/pull/209)
 
 ## 0.3.2
 
