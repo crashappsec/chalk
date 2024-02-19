@@ -101,7 +101,7 @@ template hasBuildx*(): bool =
 
 template supportsBuildContextFlag*(): bool =
   # https://github.com/docker/buildx/releases/tag/v0.8.0
-  getBuildXVersion() >= parseVersion("0.8")
+  getDockerVersion() >= parseVersion("21") and getBuildXVersion() >= parseVersion("0.8")
 
 template supportsCopyChmod*(): bool =
   # > the --chmod option requires BuildKit.
@@ -149,6 +149,8 @@ proc makeFileAvailableToDocker*(ctx:     DockerInvocation,
   if hasUser and chmod == "":
     chmod = "0444"
 
+  let chmodstr = if chmod == "": "" else: "--chmod=" & chmod & " "
+
   if move:
     trace("Making file available to docker via move: " & loc)
   else:
@@ -157,10 +159,6 @@ proc makeFileAvailableToDocker*(ctx:     DockerInvocation,
   if supportsBuildContextFlag():
     once:
       trace("Docker injection method: --build-context")
-
-    var chmodstr = ""
-    if chmod != "":
-      chmodstr = "--chmod=" & chmod & " "
 
     ctx.newCmdLine.add("--build-context")
     ctx.newCmdLine.add("chalkexedir" & $(contextCounter) & "=" & dir & "")
@@ -198,8 +196,8 @@ proc makeFileAvailableToDocker*(ctx:     DockerInvocation,
         copyFile(loc, dstLoc)
         trace("Copied " & loc & " to " & dstLoc)
 
-      if chmod != "" and supportsCopyChmod():
-        ctx.addedInstructions.add("COPY --chmod= " & chmod &
+      if chmodstr != "" and supportsCopyChmod():
+        ctx.addedInstructions.add("COPY " & chmodstr &
                                   file & " " & " /" & newname)
       elif chmod != "":
         # TODO detect user from base image if possible but thats not
