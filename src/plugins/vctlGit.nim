@@ -30,6 +30,7 @@ const
   gitObject       = "object"
   gitAuthor       = "author"
   gitCommitter    = "committer"
+  gitCommitMessage = "commitMessage"
   gitTag          = "tag"
   gitSign         = "gpgsig"
   gitTagger       = "tagger"
@@ -52,6 +53,7 @@ const
   keyAuthorDate   = "DATE_AUTHORED"
   keyCommitter    = "COMMITTER"
   keyCommitDate   = "DATE_COMMITTED"
+  keyCommitMessage = "COMMIT_MESSAGE"
   keyLatestTag    = "TAG"
   keyTagSigned    = "TAG_SIGNED"
   keyTagger       = "TAGGER"
@@ -257,6 +259,7 @@ type
     authorDate: string
     committer:  string
     commitDate: string
+    commitMessage: string
 
   GitInfo = ref object of RootRef
     branchName: Option[string]
@@ -412,6 +415,18 @@ proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
        objData.endsWith(gpgSignEnd):
       result[gitSign] = ""
 
+    # Set the git commit message.
+    # If the commit is signed, the commit message appears after the
+    # end of the signature.
+    result[gitCommitMessage] = block:
+      let iGpgSignEnd = objData.find(gpgSignEnd)
+      let iMessageStart =
+        if iGpgSignEnd != -1:
+          iGpgSignEnd + gpgSignEnd.len
+        else:
+          objData.find("\n\n")
+      objData[iMessageStart ..< objData.len].strip()
+
   except:
     warn("unable to retrieve Git ref data: " & refId)
 
@@ -425,6 +440,7 @@ proc loadAuthor(info: RepoInfo, commitId: string) =
   info.committer  = fields.getOrDefault(gitCommitter, "")
   if info.committer != "":
     info.commitDate = formatCommitObjectTime(info.committer)
+  info.commitMessage = fields.getOrDefault(gitCommitMessage, "")
   info.signed     = gitSign in fields
 
 proc loadTags(info: RepoInfo, commitId: string) =
@@ -622,6 +638,8 @@ template setVcsKeys(info: RepoInfo) =
   result.setIfNeeded(keyAuthorDate,   info.authorDate)
   result.setIfNeeded(keyCommitter,    info.committer)
   result.setIfNeeded(keyCommitDate,   info.commitDate)
+  result.setIfNeeded(keyCommitMessage, info.commitMessage)
+
   if info.latestTag != nil:
     result.setIfNeeded(keyLatestTag,  info.latestTag.name)
     result.setIfNeeded(keyTagger,     info.latestTag.tagger)

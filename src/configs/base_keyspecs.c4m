@@ -689,6 +689,17 @@ The date of the authored commit in the same format as `git log`: 3-letter week-d
 """
 }
 
+keyspec COMMIT_MESSAGE {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.3.3"
+    shortdoc:         "Commit message of most recent commit"
+    doc:              """
+The commit message of the most recent commit in the current branch.
+"""
+}
+
 keyspec BRANCH {
     kind:             ChalkTimeArtifact
     type:             string

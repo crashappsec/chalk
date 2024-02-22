@@ -62,6 +62,7 @@ or vice versa.
   key.DATE_AUTHORED.use                      = true
   key.COMMITTER.use                          = true
   key.DATE_COMMITTED.use                     = true
+  key.COMMIT_MESSAGE.use                     = true
   key.TAGGER.use                             = true
   key.DATE_TAGGED.use                        = true
   key.ARTIFACT_VERSION.use                   = true
@@ -147,6 +148,7 @@ mark_template mark_large {
   key.DATE_AUTHORED.use                       = true
   key.COMMITTER.use                           = true
   key.DATE_COMMITTED.use                      = true
+  key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
   key.ARTIFACT_VERSION.use                    = true
@@ -233,6 +235,7 @@ use the mark template named `reproducable`.
   key.DATE_AUTHORED.use                       = true
   key.COMMITTER.use                           = true
   key.DATE_COMMITTED.use                      = true
+  key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
   key.ARTIFACT_VERSION.use                    = true
@@ -290,6 +293,7 @@ the time and the nonce removed.
   key.DATE_AUTHORED.use                       = true
   key.COMMITTER.use                           = true
   key.DATE_COMMITTED.use                      = true
+  key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
   key.ARTIFACT_VERSION.use                    = true
@@ -355,6 +359,7 @@ mark_template chalk_labels {
   key.DATE_AUTHORED.use                       = true
   key.COMMITTER.use                           = true
   key.DATE_COMMITTED.use                      = true
+  key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
   key.BRANCH.use                              = true

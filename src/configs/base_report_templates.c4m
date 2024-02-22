@@ -58,6 +58,7 @@ report and subtract from it.
   key.DATE_AUTHORED.use                      = true
   key.COMMITTER.use                          = true
   key.DATE_COMMITTED.use                     = true
+  key.COMMIT_MESSAGE.use                     = true
   key.TAGGER.use                             = true
   key.DATE_TAGGED.use                        = true
   key.ARTIFACT_VERSION.use                   = true
@@ -576,6 +577,7 @@ doc: """
   key.DATE_AUTHORED.use                       = true
   key.COMMITTER.use                           = true
   key.DATE_COMMITTED.use                      = true
+  key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
   key.ARTIFACT_VERSION.use                    = true
@@ -992,6 +994,7 @@ container.
   key.DATE_AUTHORED.use                       = true
   key.COMMITTER.use                           = true
   key.DATE_COMMITTED.use                      = true
+  key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
   key.ARTIFACT_VERSION.use                    = true
@@ -1408,6 +1411,7 @@ and keep the run-time key.
   key.DATE_AUTHORED.use                       = true
   key.COMMITTER.use                           = true
   key.DATE_COMMITTED.use                      = true
+  key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
   key.ARTIFACT_VERSION.use                    = true
@@ -1758,6 +1762,7 @@ running insert commands.
   key.DATE_AUTHORED.use                       = true
   key.COMMITTER.use                           = true
   key.DATE_COMMITTED.use                      = true
+  key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
   key.EMBEDDED_CHALK.use                      = true
@@ -1809,6 +1814,7 @@ running commands that do NOT insert chalk marks.
   key.DATE_AUTHORED.use                       = true
   key.COMMITTER.use                           = true
   key.DATE_COMMITTED.use                      = true
+  key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
   key.EMBEDDED_CHALK.use                      = true

@@ -74,7 +74,7 @@ plugin vctl_git {
     artifact_keys:   ["COMMIT_ID", "COMMIT_SIGNED",
                       "BRANCH", "ORIGIN_URI",
                       "AUTHOR", "DATE_AUTHORED",
-                      "COMMITTER", "DATE_COMMITTED",
+                      "COMMITTER", "DATE_COMMITTED", "COMMIT_MESSAGE",
                       "TAG", "TAG_SIGNED", "TAGGER", "DATE_TAGGED",
                       "VCS_DIR_WHEN_CHALKED"]
     doc: """

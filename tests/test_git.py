@@ -59,6 +59,7 @@ def test_repo(
         DATE_AUTHORED=DATE_FORMAT,
         COMMITTER=committer,
         DATE_COMMITTED=DATE_FORMAT,
+        COMMIT_MESSAGE=ANY,
         TAG=f"{random_hex}-2",
         TAG_SIGNED=sign,
         TAGGER=committer if sign else MISSING,
