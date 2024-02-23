@@ -4,6 +4,11 @@
 
 ### New Features
 
+- Chalk can now write a `COMMIT_MESSAGE` key to chalk marks
+  and reports. The value is the entire commit message of
+  the most recent commit.
+  [#211](https://github.com/crashappsec/chalk/pull/211)
+
 - Chalk falls back to bundled Mozilla CA Store when there
   are no system TLS certs to use (e.g. busybox container).
   [#196](https://github.com/crashappsec/chalk/pull/196)
