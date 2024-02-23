@@ -641,10 +641,10 @@ template setVcsKeys(info: RepoInfo) =
   result.setIfNeeded(keyCommitMessage, info.commitMessage)
 
   if info.latestTag != nil:
-    result.setIfNeeded(keyLatestTag,  info.latestTag.name)
-    result.setIfNeeded(keyTagger,     info.latestTag.tagger)
-    result.setIfNeeded(keyTaggedDate, info.latestTag.date)
-    result.setIfNeeded(keyTagSigned,  info.latestTag.signed)
+    result.setIfNeeded(keyLatestTag,   info.latestTag.name)
+    result.setIfNeeded(keyTagger,      info.latestTag.tagger)
+    result.setIfNeeded(keyTaggedDate,  info.latestTag.date)
+    result.setIfNeeded(keyTagSigned,   info.latestTag.signed)
   break
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
