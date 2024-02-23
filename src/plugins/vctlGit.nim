@@ -13,51 +13,51 @@ import pkg/[zippy, zippy/inflate]
 import ".."/[config, plugin_api]
 
 const
-  eBadGitConf     = "Git configuration file is invalid"
-  fanoutTable     = 8
-  fanoutSize      = (256 * 4)
-  fNameHead       = "HEAD"
-  fNameConfig     = "config"
-  highBit32       = uint64(0x80000000)
-  gpgSignStart    = "-----BEGIN PGP SIGNATURE-----"
-  gpgSignEnd      = "-----END PGP SIGNATURE-----"
-  ghRef           = "ref:"
-  ghBranch        = "branch"
-  ghRemote        = "remote"
-  ghUrl           = "url"
-  ghOrigin        = "origin"
-  ghLocal         = "local"
-  gitObject       = "object"
-  gitAuthor       = "author"
-  gitCommitter    = "committer"
+  eBadGitConf      = "Git configuration file is invalid"
+  fanoutTable      = 8
+  fanoutSize       = (256 * 4)
+  fNameHead        = "HEAD"
+  fNameConfig      = "config"
+  highBit32        = uint64(0x80000000)
+  gpgSignStart     = "-----BEGIN PGP SIGNATURE-----"
+  gpgSignEnd       = "-----END PGP SIGNATURE-----"
+  ghRef            = "ref:"
+  ghBranch         = "branch"
+  ghRemote         = "remote"
+  ghUrl            = "url"
+  ghOrigin         = "origin"
+  ghLocal          = "local"
+  gitObject        = "object"
+  gitAuthor        = "author"
+  gitCommitter     = "committer"
   gitCommitMessage = "commitMessage"
-  gitTag          = "tag"
-  gitSign         = "gpgsig"
-  gitTagger       = "tagger"
-  gitIdxAll       = "*.idx"
-  gitIdxExt       = ".idx"
-  gitIdxHeader    = "\xff\x74\x4f\x63\x00\x00\x00\x02"
-  gitObjects      = "objects"
-  gitPack         = gitObjects.joinPath("pack")
-  gitPackExt      = ".pack"
-  gitTimeFmt      = "ddd MMM dd HH:mm:ss YYYY"
-  gitObjCommit    = 1
-  gitHeaderType   = "$type"
-  keyVcsDir       = "VCS_DIR_WHEN_CHALKED"
-  keyOrigin       = "ORIGIN_URI"
-  keyCommit       = "COMMIT_ID"
-  keyCommitSigned = "COMMIT_SIGNED"
-  keySigned       = "COMMIT_SIGNED"
-  keyBranch       = "BRANCH"
-  keyAuthor       = "AUTHOR"
-  keyAuthorDate   = "DATE_AUTHORED"
-  keyCommitter    = "COMMITTER"
-  keyCommitDate   = "DATE_COMMITTED"
+  gitTag           = "tag"
+  gitSign          = "gpgsig"
+  gitTagger        = "tagger"
+  gitIdxAll        = "*.idx"
+  gitIdxExt        = ".idx"
+  gitIdxHeader     = "\xff\x74\x4f\x63\x00\x00\x00\x02"
+  gitObjects       = "objects"
+  gitPack          = gitObjects.joinPath("pack")
+  gitPackExt       = ".pack"
+  gitTimeFmt       = "ddd MMM dd HH:mm:ss YYYY"
+  gitObjCommit     = 1
+  gitHeaderType    = "$type"
+  keyVcsDir        = "VCS_DIR_WHEN_CHALKED"
+  keyOrigin        = "ORIGIN_URI"
+  keyCommit        = "COMMIT_ID"
+  keyCommitSigned  = "COMMIT_SIGNED"
+  keySigned        = "COMMIT_SIGNED"
+  keyBranch        = "BRANCH"
+  keyAuthor        = "AUTHOR"
+  keyAuthorDate    = "DATE_AUTHORED"
+  keyCommitter     = "COMMITTER"
+  keyCommitDate    = "DATE_COMMITTED"
   keyCommitMessage = "COMMIT_MESSAGE"
-  keyLatestTag    = "TAG"
-  keyTagSigned    = "TAG_SIGNED"
-  keyTagger       = "TAGGER"
-  keyTaggedDate   = "DATE_TAGGED"
+  keyLatestTag     = "TAG"
+  keyTagSigned     = "TAG_SIGNED"
+  keyTagger        = "TAGGER"
+  keyTaggedDate    = "DATE_TAGGED"
 
 type
   KVPair*  = (string, string)
@@ -248,17 +248,17 @@ type
     signed:      bool
 
   RepoInfo = ref object
-    vcsDir:     string
-    origin:     string
-    branch:     string
-    latestTag:  GitTag
-    tags:       Table[string, GitTag]
-    commitId:   string
-    signed:     bool
-    author:     string
-    authorDate: string
-    committer:  string
-    commitDate: string
+    vcsDir:        string
+    origin:        string
+    branch:        string
+    latestTag:     GitTag
+    tags:          Table[string, GitTag]
+    commitId:      string
+    signed:        bool
+    author:        string
+    authorDate:    string
+    committer:     string
+    commitDate:    string
     commitMessage: string
 
   GitInfo = ref object of RootRef
@@ -629,15 +629,15 @@ proc pack(tags: Table[string, GitTag]): ChalkDict =
     result[name] = pack(tag.pack())
 
 template setVcsKeys(info: RepoInfo) =
-  result.setIfNeeded(keyVcsDir,       info.vcsDir.splitPath().head)
-  result.setIfNeeded(keyOrigin,       info.origin)
-  result.setIfNeeded(keyCommit,       info.commitId)
-  result.setIfNeeded(keyCommitSigned, info.signed)
-  result.setIfNeeded(keyBranch,       info.branch)
-  result.setIfNeeded(keyAuthor,       info.author)
-  result.setIfNeeded(keyAuthorDate,   info.authorDate)
-  result.setIfNeeded(keyCommitter,    info.committer)
-  result.setIfNeeded(keyCommitDate,   info.commitDate)
+  result.setIfNeeded(keyVcsDir,        info.vcsDir.splitPath().head)
+  result.setIfNeeded(keyOrigin,        info.origin)
+  result.setIfNeeded(keyCommit,        info.commitId)
+  result.setIfNeeded(keyCommitSigned,  info.signed)
+  result.setIfNeeded(keyBranch,        info.branch)
+  result.setIfNeeded(keyAuthor,        info.author)
+  result.setIfNeeded(keyAuthorDate,    info.authorDate)
+  result.setIfNeeded(keyCommitter,     info.committer)
+  result.setIfNeeded(keyCommitDate,    info.commitDate)
   result.setIfNeeded(keyCommitMessage, info.commitMessage)
 
   if info.latestTag != nil:
