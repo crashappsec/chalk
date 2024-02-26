@@ -697,6 +697,7 @@ keyspec COMMIT_MESSAGE {
     shortdoc:         "Commit message of most recent commit"
     doc:              """
 The commit message of the most recent commit in the current branch.
+If the commit is signed, the COMMIT_MESSAGE value does not contain the signature.
 """
 }
 
@@ -774,6 +775,7 @@ keyspec TAG_MESSAGE {
     shortdoc:         "Tag message of the most recent annotated tag"
     doc:              """
 The tag message of the most recent annotated tag on the current branch.
+If the tag is signed, the TAG_MESSAGE value does not contain the signature.
 
 Annotated tags are created with `git tag -a -m "comment"`.
 """
