@@ -34,8 +34,8 @@ from .utils.git import DATE_FORMAT, Git
 @pytest.mark.parametrize(
     "set_tag_message",
     [
-        (False),
-        (True),
+        False,
+        True,
     ],
 )
 def test_repo(
