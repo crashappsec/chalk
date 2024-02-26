@@ -40,6 +40,9 @@
 
 ### Fixes
 
+- Docker build correctly wraps `ENTRYPOINT` when base
+  image has it defined.
+  [#147](https://github.com/crashappsec/chalk/pull/147)
 - Fixes a segfault when using secrets backup service
   during `chalk setup`
   [#220](https://github.com/crashappsec/chalk/pull/220)
@@ -91,9 +94,6 @@
 
 ### Fixes
 
-- Docker build correctly wraps `ENTRYPOINT` when base
-  image has it defined.
-  [#147](https://github.com/crashappsec/chalk/pull/147)
 - Fixes possible exception when signing backup service
   would return non-json response
   [#189](https://github.com/crashappsec/chalk/pull/189)
