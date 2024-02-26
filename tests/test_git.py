@@ -31,11 +31,12 @@ from .utils.git import DATE_FORMAT, Git
     ],
 )
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("set_tag_message",
+@pytest.mark.parametrize(
+    "set_tag_message",
     [
         (False),
         (True),
-    ]
+    ],
 )
 def test_repo(
     tmp_data_dir: Path,
@@ -46,7 +47,9 @@ def test_repo(
     random_hex: str,
     set_tag_message: bool,
 ):
-    commit_message = "fix widget\n\nBefore this commit, the widget behaved incorrectly when foo."
+    commit_message = (
+        "fix widget\n\nBefore this commit, the widget behaved incorrectly when foo."
+    )
     tag_message = "Changes since the previous tag:\n\n- Fix widget\n- Improve performance of bar by 42%"
     git = (
         Git(tmp_data_dir, sign=sign)
