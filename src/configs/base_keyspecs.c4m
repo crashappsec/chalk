@@ -774,7 +774,9 @@ keyspec TAG_MESSAGE {
     since:            "0.3.3"
     shortdoc:         "Tag message of the most recent annotated tag"
     doc:              """
-The tag message of the most recent annotated tag on the current branch.
+The tag message of the most recent annotated tag found in the source code
+repository at the time of chalk mark insertion.
+
 If the tag is signed, the TAG_MESSAGE value does not contain the signature.
 
 Annotated tags are created with `git tag -a -m "comment"`.
