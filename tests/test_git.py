@@ -39,11 +39,12 @@ def test_repo(
     sign: bool,
     random_hex: str,
 ):
+    commit_message = "fix widget\n\nBefore this commit, the widget behaved incorrectly when foo."
     git = (
         Git(tmp_data_dir, sign=sign)
         .init(remote=remote)
         .add()
-        .commit()
+        .commit(commit_message)
         .tag(f"{random_hex}-1")
         .tag(f"{random_hex}-2")
     )
@@ -59,7 +60,7 @@ def test_repo(
         DATE_AUTHORED=DATE_FORMAT,
         COMMITTER=committer,
         DATE_COMMITTED=DATE_FORMAT,
-        COMMIT_MESSAGE=ANY,
+        COMMIT_MESSAGE=commit_message,
         TAG=f"{random_hex}-2",
         TAG_SIGNED=sign,
         TAGGER=committer if sign else MISSING,
