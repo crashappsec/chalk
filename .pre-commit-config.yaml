@@ -17,6 +17,13 @@ repos:
     hooks:
       - id: black
 
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types:
+          - markdown
+
   - repo: https://github.com/crashappsec/pre-commit-sync
     rev: 0.1.0.a3
     hooks:
