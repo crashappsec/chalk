@@ -766,6 +766,19 @@ Annotated tags are created with `git tag -a -m "comment"`.
 """
 }
 
+keyspec TAG_MESSAGE {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.3.3"
+    shortdoc:         "Tag message of the most recent annotated tag"
+    doc:              """
+The tag message of the most recent annotated tag on the current branch.
+
+Annotated tags are created with `git tag -a -m "comment"`.
+"""
+}
+
 keyspec COMMIT_ID {
     kind:             ChalkTimeArtifact
     type:             string

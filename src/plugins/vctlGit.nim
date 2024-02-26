@@ -58,6 +58,7 @@ const
   keyTagSigned     = "TAG_SIGNED"
   keyTagger        = "TAGGER"
   keyTaggedDate    = "DATE_TAGGED"
+  keyTagMessage    = "TAG_MESSAGE"
 
 type
   KVPair*  = (string, string)
@@ -246,6 +247,7 @@ type
     unixTime:    int
     date:        string
     signed:      bool
+    message:     string
 
   RepoInfo = ref object
     vcsDir:        string
@@ -490,13 +492,15 @@ proc loadTags(info: RepoInfo, commitId: string) =
             unixTime = parseTime(tagger)
             date     = formatCommitObjectTime(tagger)
             signed   = gitSign in fields
+            message  = fields[gitMessage]
           info.tags[tag] = GitTag(name:        tag,
                                   commitId:    fields[gitObject],
                                   tagCommitId: tagCommit,
                                   tagger:      tagger,
                                   unixTime:    unixTime,
                                   date:        date,
-                                  signed:      signed)
+                                  signed:      signed,
+                                  message:     message)
           trace("annotated tag: " & tag)
       except:
         warn(tag & ": Git tag couldn't be loaded")
@@ -659,6 +663,7 @@ template setVcsKeys(info: RepoInfo) =
     result.setIfNeeded(keyTagger,      info.latestTag.tagger)
     result.setIfNeeded(keyTaggedDate,  info.latestTag.date)
     result.setIfNeeded(keyTagSigned,   info.latestTag.signed)
+    result.setIfNeeded(keyTagMessage,  info.latestTag.message)
   break
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =

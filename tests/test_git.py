@@ -40,13 +40,14 @@ def test_repo(
     random_hex: str,
 ):
     commit_message = "fix widget\n\nBefore this commit, the widget behaved incorrectly when foo."
+    tag_message = "Changes since the previous tag:\n\n- Fix widget\n- Improve performance of bar by 42%"
     git = (
         Git(tmp_data_dir, sign=sign)
         .init(remote=remote)
         .add()
         .commit(commit_message)
         .tag(f"{random_hex}-1")
-        .tag(f"{random_hex}-2")
+        .tag(f"{random_hex}-2", tag_message)
     )
     artifact = copy_files[0]
     result = chalk_copy.insert(artifact, log_level="trace")
@@ -63,8 +64,9 @@ def test_repo(
         COMMIT_MESSAGE=commit_message,
         TAG=f"{random_hex}-2",
         TAG_SIGNED=sign,
-        TAGGER=committer if sign else MISSING,
-        DATE_TAGGED=DATE_FORMAT if sign else MISSING,
+        TAGGER=committer,
+        DATE_TAGGED=DATE_FORMAT,
+        TAG_MESSAGE=tag_message,
         ORIGIN_URI=remote or "local",
         VCS_DIR_WHEN_CHALKED=str(tmp_data_dir),
     )

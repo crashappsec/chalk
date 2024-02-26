@@ -166,6 +166,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.COMMIT_MESSAGE.use                      = true
   ~key.TAGGER.use                              = true
   ~key.DATE_TAGGED.use                         = true
+  ~key.TAG_MESSAGE.use                         = true
   ~key.ARTIFACT_VERSION.use                    = true
   ~key.STORE_URI.use                           = true
   ~key.PACKAGE_URI.use                         = true

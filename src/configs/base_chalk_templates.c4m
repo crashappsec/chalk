@@ -65,6 +65,7 @@ or vice versa.
   key.COMMIT_MESSAGE.use                     = true
   key.TAGGER.use                             = true
   key.DATE_TAGGED.use                        = true
+  key.TAG_MESSAGE.use                        = true
   key.ARTIFACT_VERSION.use                   = true
   key.STORE_URI.use                          = true
   key.PACKAGE_URI.use                        = true
@@ -151,6 +152,7 @@ mark_template mark_large {
   key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
+  key.TAG_MESSAGE.use                         = true
   key.ARTIFACT_VERSION.use                    = true
   key.STORE_URI.use                           = true
   key.PACKAGE_URI.use                         = true
@@ -238,6 +240,7 @@ use the mark template named `reproducable`.
   key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
+  key.TAG_MESSAGE.use                         = true
   key.ARTIFACT_VERSION.use                    = true
   key.STORE_URI.use                           = true
   key.PACKAGE_URI.use                         = true
@@ -296,6 +299,7 @@ the time and the nonce removed.
   key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
+  key.TAG_MESSAGE.use                         = true
   key.ARTIFACT_VERSION.use                    = true
   key.STORE_URI.use                           = true
   key.PACKAGE_URI.use                         = true
@@ -362,6 +366,7 @@ mark_template chalk_labels {
   key.COMMIT_MESSAGE.use                      = true
   key.TAGGER.use                              = true
   key.DATE_TAGGED.use                         = true
+  key.TAG_MESSAGE.use                         = true
   key.BRANCH.use                              = true
   key.TAG.use                                 = true
   key.TAG_SIGNED.use                          = true
