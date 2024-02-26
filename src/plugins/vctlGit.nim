@@ -30,7 +30,7 @@ const
   gitObject        = "object"
   gitAuthor        = "author"
   gitCommitter     = "committer"
-  gitCommitMessage = "commitMessage"
+  gitMessage       = "message" ## Either a commit message or a tag message.
   gitTag           = "tag"
   gitSign          = "gpgsig"
   gitTagger        = "tagger"
@@ -259,7 +259,7 @@ type
     authorDate:    string
     committer:     string
     commitDate:    string
-    commitMessage: string
+    message:       string
 
   GitInfo = ref object of RootRef
     branchName: Option[string]
@@ -415,17 +415,31 @@ proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
        objData.endsWith(gpgSignEnd):
       result[gitSign] = ""
 
-    # Set the git commit message.
-    # If the commit is signed, the commit message appears after the
+    # Get the git commit message or tag message.
+    # If the object is a signed tag, the tag message appears before the start of
+    # the signature.
+    # If the object is a signed commit, the commit message appears after the
     # end of the signature.
-    result[gitCommitMessage] = block:
-      let iGpgSignEnd = objData.find(gpgSignEnd)
+    result[gitMessage] = block:
       let iMessageStart =
-        if iGpgSignEnd != -1:
-          iGpgSignEnd + gpgSignEnd.len
-        else:
+        if result.getOrDefault(gitHeaderType) == gitTag:
           objData.find("\n\n")
-      objData[iMessageStart ..< objData.len].strip()
+        else:
+          let iGpgSignEnd = objData.find(gpgSignEnd)
+          if iGpgSignEnd != -1:
+            iGpgSignEnd + gpgSignEnd.len
+          else:
+            objData.find("\n\n")
+      let iMessageEnd =
+        if result.getOrDefault(gitHeaderType) == gitTag:
+          let iGpgSignStart = objData.find(gpgSignStart)
+          if iGpgSignStart != -1:
+            iGpgSignStart
+          else:
+            objData.len
+        else:
+          objData.len
+      objData[iMessageStart ..< iMessageEnd].strip()
 
   except:
     warn("unable to retrieve Git ref data: " & refId)
@@ -440,7 +454,7 @@ proc loadAuthor(info: RepoInfo, commitId: string) =
   info.committer  = fields.getOrDefault(gitCommitter, "")
   if info.committer != "":
     info.commitDate = formatCommitObjectTime(info.committer)
-  info.commitMessage = fields.getOrDefault(gitCommitMessage, "")
+  info.message    = fields.getOrDefault(gitMessage, "")
   info.signed     = gitSign in fields
 
 proc loadTags(info: RepoInfo, commitId: string) =
@@ -638,7 +652,7 @@ template setVcsKeys(info: RepoInfo) =
   result.setIfNeeded(keyAuthorDate,    info.authorDate)
   result.setIfNeeded(keyCommitter,     info.committer)
   result.setIfNeeded(keyCommitDate,    info.commitDate)
-  result.setIfNeeded(keyCommitMessage, info.commitMessage)
+  result.setIfNeeded(keyCommitMessage, info.message)
 
   if info.latestTag != nil:
     result.setIfNeeded(keyLatestTag,   info.latestTag.name)
