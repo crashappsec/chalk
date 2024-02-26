@@ -186,6 +186,10 @@ class Docker:
         )
 
     @staticmethod
+    def version() -> Program:
+        return run(["docker", "--version"])
+
+    @staticmethod
     def pull(tag: str) -> Program:
         return run(["docker", "pull", tag])
 

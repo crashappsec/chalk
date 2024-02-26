@@ -4,6 +4,7 @@
 # (see https://crashoverride.com/docs/chalk)
 import itertools
 import platform
+import shutil
 import time
 from contextlib import ExitStack
 from pathlib import Path
@@ -30,6 +31,7 @@ from .conf import (
 )
 from .utils.docker import Docker
 from .utils.log import get_logger
+from .utils.os import run
 
 
 logger = get_logger()
@@ -717,4 +719,13 @@ def test_docker_diff_user(chalk_default: Chalk):
     )
     result = ChalkProgram.from_program(program)
     assert result
-    assert not result.errors
+
+
+def test_docker_default_command(chalk_copy: Chalk, tmp_data_dir: Path):
+    assert chalk_copy.load(CONFIGS / "docker_cmd.c4m")
+    expected = Docker.version()
+    docker = tmp_data_dir / "docker"
+    shutil.copy(chalk_copy.binary, docker)
+    actual = run([str(docker), "--version"])
+    assert actual
+    assert actual.text == expected.text
