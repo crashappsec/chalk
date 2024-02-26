@@ -4,9 +4,11 @@
 
 ### New Features
 
-- Chalk can now write a `COMMIT_MESSAGE` key to chalk marks
-  and reports. The value is the entire commit message of
-  the most recent commit.
+- Chalk can now write two new keys to chalk marks and reports:
+  - `COMMIT_MESSAGE`: the entire commit message of the most
+    recent commit.
+  - `TAG_MESSAGE`: the entire tag message of an annotated tag,
+    if the current repo state has such a tag.
   [#211](https://github.com/crashappsec/chalk/pull/211)
 
 - Chalk falls back to bundled Mozilla CA Store when there
