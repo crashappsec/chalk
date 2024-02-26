@@ -646,25 +646,24 @@ proc pack(tags: Table[string, GitTag]): ChalkDict =
   for name, tag in tags:
     result[name] = pack(tag.pack())
 
-template setVcsKeys(info: RepoInfo) =
-  result.setIfNeeded(keyVcsDir,        info.vcsDir.splitPath().head)
-  result.setIfNeeded(keyOrigin,        info.origin)
-  result.setIfNeeded(keyCommit,        info.commitId)
-  result.setIfNeeded(keyCommitSigned,  info.signed)
-  result.setIfNeeded(keyBranch,        info.branch)
-  result.setIfNeeded(keyAuthor,        info.author)
-  result.setIfNeeded(keyAuthorDate,    info.authorDate)
-  result.setIfNeeded(keyCommitter,     info.committer)
-  result.setIfNeeded(keyCommitDate,    info.commitDate)
-  result.setIfNeeded(keyCommitMessage, info.message)
+proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo) =
+  chalkDict.setIfNeeded(keyVcsDir,        info.vcsDir.splitPath().head)
+  chalkDict.setIfNeeded(keyOrigin,        info.origin)
+  chalkDict.setIfNeeded(keyCommit,        info.commitId)
+  chalkDict.setIfNeeded(keyCommitSigned,  info.signed)
+  chalkDict.setIfNeeded(keyBranch,        info.branch)
+  chalkDict.setIfNeeded(keyAuthor,        info.author)
+  chalkDict.setIfNeeded(keyAuthorDate,    info.authorDate)
+  chalkDict.setIfNeeded(keyCommitter,     info.committer)
+  chalkDict.setIfNeeded(keyCommitDate,    info.commitDate)
+  chalkDict.setIfNeeded(keyCommitMessage, info.message)
 
   if info.latestTag != nil:
-    result.setIfNeeded(keyLatestTag,   info.latestTag.name)
-    result.setIfNeeded(keyTagger,      info.latestTag.tagger)
-    result.setIfNeeded(keyTaggedDate,  info.latestTag.date)
-    result.setIfNeeded(keyTagSigned,   info.latestTag.signed)
-    result.setIfNeeded(keyTagMessage,  info.latestTag.message)
-  break
+    chalkDict.setIfNeeded(keyLatestTag,   info.latestTag.name)
+    chalkDict.setIfNeeded(keyTagger,      info.latestTag.tagger)
+    chalkDict.setIfNeeded(keyTaggedDate,  info.latestTag.date)
+    chalkDict.setIfNeeded(keyTagSigned,   info.latestTag.signed)
+    chalkDict.setIfNeeded(keyTagMessage,  info.latestTag.message)
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
   if obj.fsRef == "":
@@ -695,11 +694,13 @@ proc gitGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
 
   if obj.fsRef == "":
     for dir, info in cache.vcsDirs:
-      info.setVcsKeys()
+      result.setVcsKeys(info)
+      break
 
   for dir, info in cache.vcsDirs:
     if obj.isInRepo(dir):
-      info.setVcsKeys()
+      result.setVcsKeys(info)
+      break
 
 proc loadVctlGit*() =
   newPlugin("vctl_git",
