@@ -13,49 +13,52 @@ import pkg/[zippy, zippy/inflate]
 import ".."/[config, plugin_api]
 
 const
-  eBadGitConf     = "Git configuration file is invalid"
-  fanoutTable     = 8
-  fanoutSize      = (256 * 4)
-  fNameHead       = "HEAD"
-  fNameConfig     = "config"
-  highBit32       = uint64(0x80000000)
-  gpgSignStart    = "-----BEGIN PGP SIGNATURE-----"
-  gpgSignEnd      = "-----END PGP SIGNATURE-----"
-  ghRef           = "ref:"
-  ghBranch        = "branch"
-  ghRemote        = "remote"
-  ghUrl           = "url"
-  ghOrigin        = "origin"
-  ghLocal         = "local"
-  gitObject       = "object"
-  gitAuthor       = "author"
-  gitCommitter    = "committer"
-  gitTag          = "tag"
-  gitSign         = "gpgsig"
-  gitTagger       = "tagger"
-  gitIdxAll       = "*.idx"
-  gitIdxExt       = ".idx"
-  gitIdxHeader    = "\xff\x74\x4f\x63\x00\x00\x00\x02"
-  gitObjects      = "objects"
-  gitPack         = gitObjects.joinPath("pack")
-  gitPackExt      = ".pack"
-  gitTimeFmt      = "ddd MMM dd HH:mm:ss YYYY"
-  gitObjCommit    = 1
-  gitHeaderType   = "$type"
-  keyVcsDir       = "VCS_DIR_WHEN_CHALKED"
-  keyOrigin       = "ORIGIN_URI"
-  keyCommit       = "COMMIT_ID"
-  keyCommitSigned = "COMMIT_SIGNED"
-  keySigned       = "COMMIT_SIGNED"
-  keyBranch       = "BRANCH"
-  keyAuthor       = "AUTHOR"
-  keyAuthorDate   = "DATE_AUTHORED"
-  keyCommitter    = "COMMITTER"
-  keyCommitDate   = "DATE_COMMITTED"
-  keyLatestTag    = "TAG"
-  keyTagSigned    = "TAG_SIGNED"
-  keyTagger       = "TAGGER"
-  keyTaggedDate   = "DATE_TAGGED"
+  eBadGitConf      = "Git configuration file is invalid"
+  fanoutTable      = 8
+  fanoutSize       = (256 * 4)
+  fNameHead        = "HEAD"
+  fNameConfig      = "config"
+  highBit32        = uint64(0x80000000)
+  gpgSignStart     = "-----BEGIN PGP SIGNATURE-----"
+  gpgSignEnd       = "-----END PGP SIGNATURE-----"
+  ghRef            = "ref:"
+  ghBranch         = "branch"
+  ghRemote         = "remote"
+  ghUrl            = "url"
+  ghOrigin         = "origin"
+  ghLocal          = "local"
+  gitObject        = "object"
+  gitAuthor        = "author"
+  gitCommitter     = "committer"
+  gitMessage       = "message" ## Either a commit message or a tag message.
+  gitTag           = "tag"
+  gitSign          = "gpgsig"
+  gitTagger        = "tagger"
+  gitIdxAll        = "*.idx"
+  gitIdxExt        = ".idx"
+  gitIdxHeader     = "\xff\x74\x4f\x63\x00\x00\x00\x02"
+  gitObjects       = "objects"
+  gitPack          = gitObjects.joinPath("pack")
+  gitPackExt       = ".pack"
+  gitTimeFmt       = "ddd MMM dd HH:mm:ss YYYY"
+  gitObjCommit     = 1
+  gitHeaderType    = "$type"
+  keyVcsDir        = "VCS_DIR_WHEN_CHALKED"
+  keyOrigin        = "ORIGIN_URI"
+  keyCommit        = "COMMIT_ID"
+  keyCommitSigned  = "COMMIT_SIGNED"
+  keySigned        = "COMMIT_SIGNED"
+  keyBranch        = "BRANCH"
+  keyAuthor        = "AUTHOR"
+  keyAuthorDate    = "DATE_AUTHORED"
+  keyCommitter     = "COMMITTER"
+  keyCommitDate    = "DATE_COMMITTED"
+  keyCommitMessage = "COMMIT_MESSAGE"
+  keyLatestTag     = "TAG"
+  keyTagSigned     = "TAG_SIGNED"
+  keyTagger        = "TAGGER"
+  keyTaggedDate    = "DATE_TAGGED"
+  keyTagMessage    = "TAG_MESSAGE"
 
 type
   KVPair*  = (string, string)
@@ -244,6 +247,7 @@ type
     unixTime:    int
     date:        string
     signed:      bool
+    message:     string
 
   RepoInfo = ref object
     vcsDir:     string
@@ -257,6 +261,7 @@ type
     authorDate: string
     committer:  string
     commitDate: string
+    message:    string
 
   GitInfo = ref object of RootRef
     branchName: Option[string]
@@ -412,6 +417,32 @@ proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
        objData.endsWith(gpgSignEnd):
       result[gitSign] = ""
 
+    # Get the git commit message or tag message.
+    # If the object is a signed tag, the tag message appears before the start of
+    # the signature.
+    # If the object is a signed commit, the commit message appears after the
+    # end of the signature.
+    block:
+      let iMessageStart =
+        if result.getOrDefault(gitHeaderType) == gitTag:
+          objData.find("\n\n")
+        else:
+          let iGpgSignEnd = objData.find(gpgSignEnd)
+          if iGpgSignEnd != -1:
+            iGpgSignEnd + gpgSignEnd.len
+          else:
+            objData.find("\n\n")
+      let iMessageEnd =
+        if result.getOrDefault(gitHeaderType) == gitTag:
+          let iGpgSignStart = objData.find(gpgSignStart)
+          if iGpgSignStart != -1:
+            iGpgSignStart
+          else:
+            objData.len
+        else:
+          objData.len
+      result[gitMessage] = objData[iMessageStart ..< iMessageEnd].strip()
+
   except:
     warn("unable to retrieve Git ref data: " & refId)
 
@@ -425,6 +456,7 @@ proc loadAuthor(info: RepoInfo, commitId: string) =
   info.committer  = fields.getOrDefault(gitCommitter, "")
   if info.committer != "":
     info.commitDate = formatCommitObjectTime(info.committer)
+  info.message    = fields.getOrDefault(gitMessage, "")
   info.signed     = gitSign in fields
 
 proc loadTags(info: RepoInfo, commitId: string) =
@@ -460,13 +492,15 @@ proc loadTags(info: RepoInfo, commitId: string) =
             unixTime = parseTime(tagger)
             date     = formatCommitObjectTime(tagger)
             signed   = gitSign in fields
+            message  = fields[gitMessage]
           info.tags[tag] = GitTag(name:        tag,
                                   commitId:    fields[gitObject],
                                   tagCommitId: tagCommit,
                                   tagger:      tagger,
                                   unixTime:    unixTime,
                                   date:        date,
-                                  signed:      signed)
+                                  signed:      signed,
+                                  message:     message)
           trace("annotated tag: " & tag)
       except:
         warn(tag & ": Git tag couldn't be loaded")
@@ -613,20 +647,23 @@ proc pack(tags: Table[string, GitTag]): ChalkDict =
     result[name] = pack(tag.pack())
 
 template setVcsKeys(info: RepoInfo) =
-  result.setIfNeeded(keyVcsDir,       info.vcsDir.splitPath().head)
-  result.setIfNeeded(keyOrigin,       info.origin)
-  result.setIfNeeded(keyCommit,       info.commitId)
-  result.setIfNeeded(keyCommitSigned, info.signed)
-  result.setIfNeeded(keyBranch,       info.branch)
-  result.setIfNeeded(keyAuthor,       info.author)
-  result.setIfNeeded(keyAuthorDate,   info.authorDate)
-  result.setIfNeeded(keyCommitter,    info.committer)
-  result.setIfNeeded(keyCommitDate,   info.commitDate)
+  result.setIfNeeded(keyVcsDir,        info.vcsDir.splitPath().head)
+  result.setIfNeeded(keyOrigin,        info.origin)
+  result.setIfNeeded(keyCommit,        info.commitId)
+  result.setIfNeeded(keyCommitSigned,  info.signed)
+  result.setIfNeeded(keyBranch,        info.branch)
+  result.setIfNeeded(keyAuthor,        info.author)
+  result.setIfNeeded(keyAuthorDate,    info.authorDate)
+  result.setIfNeeded(keyCommitter,     info.committer)
+  result.setIfNeeded(keyCommitDate,    info.commitDate)
+  result.setIfNeeded(keyCommitMessage, info.message)
+
   if info.latestTag != nil:
-    result.setIfNeeded(keyLatestTag,  info.latestTag.name)
-    result.setIfNeeded(keyTagger,     info.latestTag.tagger)
-    result.setIfNeeded(keyTaggedDate, info.latestTag.date)
-    result.setIfNeeded(keyTagSigned,  info.latestTag.signed)
+    result.setIfNeeded(keyLatestTag,   info.latestTag.name)
+    result.setIfNeeded(keyTagger,      info.latestTag.tagger)
+    result.setIfNeeded(keyTaggedDate,  info.latestTag.date)
+    result.setIfNeeded(keyTagSigned,   info.latestTag.signed)
+    result.setIfNeeded(keyTagMessage,  info.latestTag.message)
   break
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =

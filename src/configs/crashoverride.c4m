@@ -163,8 +163,10 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.DATE_AUTHORED.use                       = true
   ~key.COMMITTER.use                           = true
   ~key.DATE_COMMITTED.use                      = true
+  ~key.COMMIT_MESSAGE.use                      = true
   ~key.TAGGER.use                              = true
   ~key.DATE_TAGGED.use                         = true
+  ~key.TAG_MESSAGE.use                         = true
   ~key.ARTIFACT_VERSION.use                    = true
   ~key.STORE_URI.use                           = true
   ~key.PACKAGE_URI.use                         = true

@@ -689,6 +689,18 @@ The date of the authored commit in the same format as `git log`: 3-letter week-d
 """
 }
 
+keyspec COMMIT_MESSAGE {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.3.3"
+    shortdoc:         "Commit message of most recent commit"
+    doc:              """
+The commit message of the most recent commit in the current branch.
+If the commit is signed, the COMMIT_MESSAGE value does not contain the signature.
+"""
+}
+
 keyspec BRANCH {
     kind:             ChalkTimeArtifact
     type:             string
@@ -750,6 +762,22 @@ keyspec DATE_TAGGED {
     shortdoc:         "Human readable timestamp of most recent tag"
     doc:              """
 The date of the annotated tag in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+
+Annotated tags are created with `git tag -a -m "comment"`.
+"""
+}
+
+keyspec TAG_MESSAGE {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.3.3"
+    shortdoc:         "Tag message of the most recent annotated tag"
+    doc:              """
+The tag message of the most recent annotated tag found in the source code
+repository at the time of chalk mark insertion.
+
+If the tag is signed, the TAG_MESSAGE value does not contain the signature.
 
 Annotated tags are created with `git tag -a -m "comment"`.
 """
