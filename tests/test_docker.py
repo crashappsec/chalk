@@ -721,11 +721,11 @@ def test_docker_diff_user(chalk_default: Chalk):
     assert result
 
 
-def test_docker_default_command(chalk: Chalk, tmp_data_dir: Path):
-    assert chalk.load(CONFIGS / "docker_cmd.c4m")
+def test_docker_default_command(chalk_copy: Chalk, tmp_data_dir: Path):
+    assert chalk_copy.load(CONFIGS / "docker_cmd.c4m")
     expected = Docker.version()
     docker = tmp_data_dir / "docker"
-    shutil.copy(chalk.binary, docker)
+    shutil.copy(chalk_copy.binary, docker)
     actual = run([str(docker), "--version"])
     assert actual
     assert actual.text == expected.text
