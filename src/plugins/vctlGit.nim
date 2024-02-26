@@ -422,7 +422,7 @@ proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
     # the signature.
     # If the object is a signed commit, the commit message appears after the
     # end of the signature.
-    result[gitMessage] = block:
+    block:
       let iMessageStart =
         if result.getOrDefault(gitHeaderType) == gitTag:
           objData.find("\n\n")
@@ -441,7 +441,7 @@ proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
             objData.len
         else:
           objData.len
-      objData[iMessageStart ..< iMessageEnd].strip()
+      result[gitMessage] = objData[iMessageStart ..< iMessageEnd].strip()
 
   except:
     warn("unable to retrieve Git ref data: " & refId)
