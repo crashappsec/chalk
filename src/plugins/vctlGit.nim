@@ -250,18 +250,18 @@ type
     message:     string
 
   RepoInfo = ref object
-    vcsDir:        string
-    origin:        string
-    branch:        string
-    latestTag:     GitTag
-    tags:          Table[string, GitTag]
-    commitId:      string
-    signed:        bool
-    author:        string
-    authorDate:    string
-    committer:     string
-    commitDate:    string
-    message:       string
+    vcsDir:     string
+    origin:     string
+    branch:     string
+    latestTag:  GitTag
+    tags:       Table[string, GitTag]
+    commitId:   string
+    signed:     bool
+    author:     string
+    authorDate: string
+    committer:  string
+    commitDate: string
+    message:    string
 
   GitInfo = ref object of RootRef
     branchName: Option[string]
