@@ -5,10 +5,12 @@
 ### New Features
 
 - Chalk can now write two new keys to chalk marks and reports:
+
   - `COMMIT_MESSAGE`: the entire commit message of the most
     recent commit.
   - `TAG_MESSAGE`: the entire tag message of an annotated tag,
     if the current repo state has such a tag.
+
   If the commit or tag is signed, the `COMMIT_MESSAGE` or
   `TAG_MESSAGE` value does not contain the signature.
   [#211](https://github.com/crashappsec/chalk/pull/211)
