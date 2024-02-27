@@ -2,6 +2,12 @@
 
 ## Main
 
+### Fixes
+
+- Fixes a segfault when using secrets backup service
+  during `chalk setup`
+  [#220](https://github.com/crashappsec/chalk/pull/220)
+
 ## 0.3.3
 
 ### New Features
