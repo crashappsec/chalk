@@ -7,6 +7,8 @@
 - Fixes a segfault when using secrets backup service
   during `chalk setup`
   [#220](https://github.com/crashappsec/chalk/pull/220)
+- Honoring cache component cache on chalk conf load
+  [#222](https://github.com/crashappsec/chalk/pull/222)
 
 ## 0.3.3
 
