@@ -5,8 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[base64, httpclient, net, os, uri]
-import pkg/[nimutils/sinks]
+import std/[base64, httpclient, net, os]
 import "."/[chalkjson, config, selfextract, sinks]
 
 const
@@ -110,12 +109,6 @@ proc callTheSigningKeyBackupService(base:    string,
     timeout:      int    = cast[int](chalkConfig.getSigningKeyBackupServiceTimeout())
     # Name of the auth config section to load from the config which contains the jwt
     auth_config:  string = chalkConfig.getSigningKeyBackupServiceAuthConfigName()
-  var
-    url:      string
-    uri:      Uri
-    client:   HttpClient
-    context:  SslContext
-    response: Response
 
   # This is the id that will be used to identify the secret in the API
   signingID = sha256Hex(attestationObfuscator & prkey)
@@ -125,6 +118,7 @@ proc callTheSigningKeyBackupService(base:    string,
   else:
     trace("Calling Signing Key Backup Service to store key with ID: " & signingID)
 
+  var url: string
   if base[^1] == '/':
     url = base & signingID
   else:
@@ -142,25 +136,22 @@ proc callTheSigningKeyBackupService(base:    string,
 
   # Call the API with authz header - rety twice with backoff
   try:
-    response = safeRequest(url = url,
-                           httpMethod        = mth,
-                           headers           = authHeaders,
-                           body              = bodytxt,
-                           timeout           = timeout,
-                           retries           = 2,
-                           firstRetryDelayMs = 100)
+    let response = safeRequest(url               = url,
+                               httpMethod        = mth,
+                               headers           = authHeaders,
+                               body              = bodytxt,
+                               timeout           = timeout,
+                               retries           = 2,
+                               firstRetryDelayMs = 100)
 
-    trace("Signing Key Backup Service URL: " & $uri)
+    trace("Signing Key Backup Service URL: " & url)
     trace("Signing Key Backup Service HTTP headers: " & $authHeaders)
     trace("Signing Key Backup Service status code: " & response.status)
-    trace("Signing Key Backup Service response: " & response.body)
+    trace("Signing Key Backup Service response: " & response.body())
     return some(response)
   except:
     error("Could not call Signing Key Backup Service: " & getCurrentExceptionMsg())
     return none(Response)
-  finally:
-    # Cleanup & return from template
-    client.close()
 
 proc backupSigningKeyToService*(content: string, prkey: string): bool =
   var
