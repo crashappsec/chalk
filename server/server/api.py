@@ -6,6 +6,7 @@ import dataclasses
 import logging.config
 from typing import Any, Optional
 
+import os
 import sqlalchemy
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
@@ -63,6 +64,17 @@ async def redirect_to_docs():
 @app.get("/version")
 async def version():
     return {"version": __version__}
+
+
+if os.environ.get("REDIRECT"):
+
+    @app.post("/redirect")
+    async def redirect():
+        redirect = os.environ.get("REDIRECT")
+        return RedirectResponse(
+            f"{redirect}/report",
+            status_code=status.HTTP_301_MOVED_PERMANENTLY,
+        )
 
 
 @app.post("/ping")

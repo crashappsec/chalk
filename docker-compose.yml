@@ -40,6 +40,8 @@ services:
     working_dir: /chalk/server
     volumes:
       - .:/chalk
+    environment:
+      REDIRECT: https://tls.chalk.local:5858
     healthcheck:
       test:
         - CMD-SHELL

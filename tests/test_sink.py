@@ -136,6 +136,38 @@ def test_s3(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
 
 
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
+def test_post_wrong_method(
+    copy_files: list[Path],
+    chalk: Chalk,
+    server_http: str,
+    server_https: str,
+):
+    """
+    even if server scheme is invalid chalk should not segfault but simply should not send report
+    """
+    server = SERVER_HTTPS.replace("https", "http")
+    result = chalk.insert(
+        copy_files[0],
+        config=SINK_CONFIGS / "post_https_local.c4m",
+        env={
+            # this server needs to return http->https redirect
+            # e.g. such as nginx redirecting all http traffic to https
+            "CHALK_USAGE_URL": f"{server_http}/redirect",
+            "CHALK_POST_URL": f"{server}/report",
+        },
+    )
+    assert result
+    metadata_id = result.mark["METADATA_ID"]
+    response = requests.get(
+        f"{server_https}/chalks/{metadata_id}",
+        allow_redirects=True,
+        timeout=5,
+        verify=False,
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_post_http_fastapi(
     copy_files: list[Path],
     chalk: Chalk,
@@ -150,6 +182,7 @@ def test_post_http_fastapi(
         server_sql=server_sql,
         verify=None,
         env={
+            "CHALK_USAGE_URL": f"{SERVER_HTTP}/ping",
             "CHALK_POST_URL": f"{SERVER_HTTP}/report",
             # testing if chalk at least parses headers correctly
             "CHALK_POST_HEADERS": "x-test-header: test-header",
@@ -173,6 +206,7 @@ def test_post_https_fastapi(
         server_sql=server_sql,
         verify=server_cert,
         env={
+            "CHALK_USAGE_URL": f"{SERVER_HTTPS}/ping",
             "CHALK_POST_URL": f"{SERVER_HTTPS}/report",
             # testing if chalk at least parses headers correctly
             "CHALK_POST_HEADERS": "x-test-header: test-header",
