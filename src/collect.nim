@@ -163,6 +163,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
 
   trace("Collecting chalk-time data.")
   for plugin in getAllPlugins():
+    trace("Running plugin: " & plugin.name)
     if plugin == obj.myCodec:
       trace("Filling in codec info")
       if "CHALK_ID" notin data:
