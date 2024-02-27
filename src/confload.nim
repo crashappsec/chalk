@@ -70,17 +70,19 @@ proc getEmbeddedConfig(): string =
         else:
           trace("No embedded chalk mark.")
         trace("Using the default user config.  See 'chalk dump' to view.")
+      # component must be loaded before parameters
+      # otherwise loading params initializes the component first (if not present yet)
+      # which will attempt to fetch the component from source (e.g. url)
+      if selfChalk.extract.contains("$CHALK_COMPONENT_CACHE"):
+        let
+          componentInfo = selfChalk.extract["$CHALK_COMPONENT_CACHE"]
+          unpackedInfo  = unpack[OrderedTableRef[string, string]](componentInfo)
+        loadCachedComponents(unpackedInfo)
       if selfChalk.extract.contains("$CHALK_SAVED_COMPONENT_PARAMETERS"):
         let params = selfChalk.extract["$CHALK_SAVED_COMPONENT_PARAMETERS"]
         installComponentParams(unpack[seq[Box]](params))
       else:
         trace("No saved component parameters; skipping install.")
-      if selfChalk.extract.contains("$CHALK_COMPONENT_CACHE"):
-        let
-          componentInfo = selfChalk.extract["$CHALK_COMPONENT_CACHE"]
-          unpackedInfo  = unpack[OrderedTableRef[string, string]](componentInfo)
-
-        loadCachedComponents(unpackedInfo)
   else:
     trace("Since this binary can't be marked, using the default config.")
 
