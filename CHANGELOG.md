@@ -9,6 +9,9 @@
   [#220](https://github.com/crashappsec/chalk/pull/220)
 - Honoring cache component cache on chalk conf load
   [#222](https://github.com/crashappsec/chalk/pull/222)
+- Fixes a segfault when accidentally providing `http://`
+  URL to a sink instead of `https://`
+  [#223](https://github.com/crashappsec/chalk/pull/223)
 
 ## 0.3.3
 

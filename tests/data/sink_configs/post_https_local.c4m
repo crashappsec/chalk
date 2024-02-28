@@ -1,4 +1,4 @@
-crashoverride_usage_reporting_url = "https://chalk.crashoverride.local:8585/ping"
+crashoverride_usage_reporting_url = env("CHALK_USAGE_URL")
 log_level = "trace"
 
 auth_config my_jwt_config {

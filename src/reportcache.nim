@@ -100,7 +100,7 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
   if startSubscriptions == 0 and prevSuccesses:
     discard
   else:
-    var n = publish(topic, msg)
+    let n = publish(topic, msg)
 
     if topic in quietTopics:
       # Here we DO Will not get added to the report cache.
