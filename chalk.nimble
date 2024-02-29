@@ -18,6 +18,9 @@ requires "https://github.com/viega/zippy == 0.10.7" # MIT
 task version, "Show current version":
   echo version
 
+task test, "Run the unit tests":
+  exec "nim r tests-nim/all_nim_tests.nim"
+
 proc con4mDevMode() =
   let script = "bin/devmode"
   # only missing in Dockerfile compile step
