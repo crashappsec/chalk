@@ -42,4 +42,6 @@ proc main() =
   assert(parseVersion("0.1") >= parseVersion("0.1"))
   assert(parseVersion("0.1.0") >= parseVersion("0.1"))
 
+static:
+  main()
 main()
