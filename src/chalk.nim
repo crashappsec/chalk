@@ -7,10 +7,11 @@
 
 # Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
-import "."/[config, confload, commands, norecurse, sinks, docker_base,
+import "."/[bypass, config, confload, commands, norecurse, sinks, docker_base,
             attestation, util]
 
 when isMainModule:
+  handleBypass()        # bypass.nim
   setupSignalHandlers() # util.nim
   setupTerminal()       # util.nim
   ioSetup()             # sinks.nim
