@@ -10,7 +10,8 @@
 
 import std/[tempfiles, osproc, posix, monotimes, parseutils]
 import pkg/[nimutils/managedtmp]
-import "."/[config, subscan]
+import "."/[config, subscan, fd_cache]
+export fd_cache
 
 proc increfStream*(chalk: ChalkObj) {.exportc.} =
   if chalk.streamRefCt != 0:

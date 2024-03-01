@@ -7,7 +7,7 @@
 
 ## Looks for and parses github CODEOWNERS files.
 
-import std/[os, streams]
+import std/[os]
 import ".."/[config, plugin_api]
 
 
@@ -70,21 +70,15 @@ proc ghOwnerChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
 
   var fname = obj.fsRef.findCOFile()
   if fname == "": return
-  var ctx: FileStream
 
   try:
-    ctx = newFileStream(fname, fmRead)
-    if ctx == nil: error(fname & ": Could not open file.")
-    else:
-      let m = ctx.readAll()
-
-      if m != "": result["CODE_OWNERS"] = pack(m)
+    let m = tryToLoadFile(fname)
+    if m != "":
+      result["CODE_OWNERS"] = pack(m)
   except:
     error(fname & ": File found, but could not be read: " &
                                            getCurrentExceptionMsg())
     dumpExOnDebug()
-  finally:
-    if ctx != nil: ctx.close()
 
 proc loadOwnerGithub*() =
   newPlugin("github_codeowners",

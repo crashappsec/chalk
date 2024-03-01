@@ -58,51 +58,40 @@ proc verifyChalkStart(data: string): int =
   return index
 
 proc elfScan*(codec: Plugin, location: string): Option[ChalkObj] {.cdecl.} =
-  var stream: FileStream
+  withFileStream(location, strict = true):
+    try:
+      var magicBuffer: array[4, char]
+      stream.read(magicBuffer)
+      if magicBuffer != ELF_MAGIC_BYTES:
+        return none(ChalkObj)
+      stream.setPosition(0)
+      let fileData = stream.readAll()
+      let elf      = newElfFileFromData(fileData)
+      if not elf.parse():
+        for err in elf.errors:
+          error(location & ": " & err)
+        return none(ChalkObj)
 
-  try:
-    stream = newFileStream(location)
+      var chalkObject: ChalkObj
+      if elf.chalkSectionHeader != nil and not elf.hasBeenUnchalked:
+        let sectionOffset   = elf.chalkSectionHeader.offset.value
+        var chalkMagicIndex = verifyChalkStart(elf.fileData[sectionOffset .. ^1])
+        if chalkMagicIndex != -1:
+          chalkMagicIndex += int(sectionOffset)
+          stream.setPosition(chalkMagicIndex)
+          chalkObject = codec.loadChalkFromFStream(stream, location)
 
-    if stream == nil:
+      if chalkObject == nil:
+        chalkObject = newChalk(name         = location,
+                               fsRef        = location,
+                               stream       = stream,
+                               codec        = codec,
+                               resourceType = {ResourceFile})
+
+      chalkObject.cache = ElfCodecCache(fileData: fileData)
+      return some(chalkObject)
+    except:
       return none(ChalkObj)
-
-    var magicBuffer: array[4, char]
-    stream.read(magicBuffer)
-    if magicBuffer != ELF_MAGIC_BYTES:
-      stream.close()
-      return none(ChalkObj)
-    stream.setPosition(0)
-    let fileData = stream.readAll()
-    let elf      = newElfFileFromData(fileData)
-    if not elf.parse():
-      for err in elf.errors:
-        error(location & ": " & err)
-
-      stream.close()
-      return none(ChalkObj)
-
-    var chalkObject: ChalkObj
-    if elf.chalkSectionHeader != nil and not elf.hasBeenUnchalked:
-      let sectionOffset   = elf.chalkSectionHeader.offset.value
-      var chalkMagicIndex = verifyChalkStart(elf.fileData[sectionOffset .. ^1])
-      if chalkMagicIndex != -1:
-        chalkMagicIndex += int(sectionOffset)
-        stream.setPosition(chalkMagicIndex)
-        chalkObject = codec.loadChalkFromFStream(stream, location)
-
-    if chalkObject == nil:
-      chalkObject = newChalk(name         = location,
-                             fsRef        = location,
-                             stream       = stream,
-                             codec        = codec,
-                             resourceType = {ResourceFile})
-
-    chalkObject.cache = ElfCodecCache(fileData: fileData)
-    return some(chalkObject)
-  except:
-    if stream != nil:
-      stream.close()
-    return none(ChalkObj)
 
 proc elfGetUnchalkedHash*(codec: Plugin, chalk: ChalkObj):
                             Option[string] {.cdecl.} =

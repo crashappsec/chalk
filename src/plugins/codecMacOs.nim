@@ -46,7 +46,6 @@ var postfixLines = [
 
 type
   ExeCache    = ref object of RootRef
-    binStream: FileStream
     binFName:  string
     b64:       Option[string]
     contents:  string
@@ -55,135 +54,131 @@ template hasMachMagic(s: string): bool =
   s in ["\xca\xfe\xba\xbe", "\xfe\xed\xfa\xce", "\xce\xfa\xed\xfe",
         "\xfe\xed\xfa\xcf", "\xcf\xfa\xed\xfe"]
 
-template scanFail() =
-  if wrapStream != nil:
-    wrapStream.close()
-  if cache.binStream != nil:
-    cache.binStream.close()
-  return none(ChalkObj)
-
 proc macScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
-  var
-    stream     = newFileStream(path)
-    header:      string
-    fullpath   = path.resolvePath()
-    cache      = ExeCache()
-    wrapStream: FileStream
-    chalk:      ChalkObj
+  # chalked mac binary is a macho binary wrapped as shell script
+  # and as such to correctly scan for chalk, we might need to open
+  # multiple file strams - 1) wrapping script and 2) macho binary itself
+  # using a single file stream context manager is non-trivial and so
+  # explicit block is used which allows to use defer statements to guarantee
+  # file streams are released back to the cache at the end of the function
+  block:
+    var
+      header:      string
+      fullpath   = path.resolvePath()
+      cache      = ExeCache()
+      wrapStream: FileStream
+      chalk:      ChalkObj
 
-  if stream == FileStream(nil):
-    warn(path & ": could not open.")
-    return none(ChalkObj)
+    let stream   = yieldFileStream(fullpath)
+    defer: stream.releaseFileStream()
+    if stream == FileStream(nil):
+      warn(path & ": could not open.")
+      return none(ChalkObj)
 
-  try:
-    header = stream.peekStr(4)
-  except:
-    warn(path & ": could not read.")
-    dumpExOnDebug()
-    scanFail()
+    try:
+      header = stream.peekStr(4)
+    except:
+      warn(path & ": could not read.")
+      dumpExOnDebug()
+      return none(ChalkObj)
 
-  if header.hasMachMagic():
-    trace("Found MACH binary @ " & fullpath)
+    if header.hasMachMagic():
+      trace("Found MACH binary @ " & fullpath)
 
-    cache.binStream = newFileStream(fullPath)
-    cache.binFName  = fullpath
+      cache.binFName  = fullpath
 
-    let ix = fullpath.find("_CHALK")
-    if ix != -1:
-      fullpath   = fullpath[ix .. ^1]
-      fullpath   = fullpath.replace("_CHALKDA_", "-")
-      fullpath   = fullpath.replace("_CHALKSL_", "/")
-      fullpath   = fullpath.replace("_CHALKSP_", " ")
-      trace("Will look for chalk mark in wrapper script: " & fullpath)
-      wrapStream = newFileStream(fullpath)
+      let ix = fullpath.find("_CHALK")
+      if ix != -1:
+        fullpath   = fullpath[ix .. ^1]
+        fullpath   = fullpath.replace("_CHALKDA_", "-")
+        fullpath   = fullpath.replace("_CHALKSL_", "/")
+        fullpath   = fullpath.replace("_CHALKSP_", " ")
 
-      if wrapStream == nil:
-        warn("Previously chalked binary is missing its script. " &
-          "Replace the script or rename the executable")
-        scanFail()
-      # Drop down below for the chalk mark.
+        trace("Will look for chalk mark in wrapper script: " & fullpath)
+        wrapStream = yieldFileStream(fullpath)
+        defer: wrapStream.releaseFileStream()
+
+        if wrapStream == nil:
+          warn("Previously chalked binary is missing its script. " &
+            "Replace the script or rename the executable")
+          return none(ChalkObj)
+        # Drop down below for the chalk mark.
+
+      else:
+        # It's an unmarked Mach-O binary of some kind.
+        chalk = newChalk(name         = fullpath,
+                         fsRef        = fullpath,
+                         resourceType = {ResourceFile},
+                         cache        = cache,
+                         codec        = self)
+
+        return some(chalk)
     else:
-      # It's an unmarked Mach-O binary of some kind.
-      chalk = newChalk(name         = fullpath,
-                       fsRef        = fullpath,
-                       resourceType = {ResourceFile},
-                       cache        = cache,
-                       codec        = self)
+      wrapStream = stream
 
-      stream.close()
+    try:
+      wrapStream.setPosition(0)
+      let start = wrapStream.readStr(len(prefix))
+      if start != prefix:
+        return none(ChalkObj)
+    except:
+      dumpExOnDebug()
+      return none(ChalkObj)
 
-      return some(chalk)
-  else:
-    wrapStream = stream
+    # Validation.
+    trace("Testing MacOS Chalk wrapper at: "  & fullpath)
 
-  try:
-    wrapStream.setPosition(0)
-    let start = wrapStream.readStr(len(prefix))
-    if start != prefix:
-      scanFail()
-  except:
-    dumpExOnDebug()
-    scanFail()
+    # It's *probably* marked, but it might have been tampered with,
+    # in which case we're going to let it get treated like a Unix
+    # script.  So let's validate everything we expect to see.
+    #
+    # Since we've got out the prefix before splitting: line[0] should
+    # be a base64 blob that decodes to our binary.  We should then see
+    # exactly the lines in postfixLines.  Finally, there should be a
+    # one-line SHA256 hash, then a one-line chalk mark.  Note that we
+    # don't stick these in a comment; there's an 'exec' above it, so
+    # bash will never get to it.
 
-  # Validation.
-  trace("Testing MacOS Chalk wrapper at: "  & fullpath)
+    # Generally here, I'd want an option to seek to the end and not be
+    # forced to validate everything, but can't easily use fseek().
 
-  # It's *probably* marked, but it might have been tampered with,
-  # in which case we're going to let it get treated like a Unix
-  # script.  So let's validate everything we expect to see.
-  #
-  # Since we've got out the prefix before splitting: line[0] should
-  # be a base64 blob that decodes to our binary.  We should then see
-  # exactly the lines in postfixLines.  Finally, there should be a
-  # one-line SHA256 hash, then a one-line chalk mark.  Note that we
-  # don't stick these in a comment; there's an 'exec' above it, so
-  # bash will never get to it.
+    let lines = wrapStream.readAll().strip().split("\n")
+    if len(lines) != 3 + len(postfixLines):
+      trace("Wrapper not valid: # lines is wrong.")
+      return none(ChalkObj)
 
-  # Generally here, I'd want an option to seek to the end and not be
-  # forced to validate everything, but can't easily use fseek().
+    for i, line in postfixLines:
+      if lines[i+1] != line:
+        trace("Postfix lines don't match")
+        return none(ChalkObj)
 
-  let lines = wrapStream.readAll().strip().split("\n")
-  if len(lines) != 3 + len(postfixLines):
-    trace("Wrapper not valid: # lines is wrong.")
-    scanFail()
+    let
+      s     = lines[^1]
+      sstrm = newStringStream(s)
 
-  for i, line in postfixLines:
-    if lines[i+1] != line:
-      trace("Postfix lines don't match")
-      scanFail()
+    var dict: ChalkDict
 
-  let
-    s     = lines[^1]
-    sstrm = newStringStream(s)
+    if s.find(magicUTF8) == -1:
+      warn("Wrapper not valid; no chalk magic.")
+      dict = ChalkDict(nil)
+    else:
+      dict = sstrm.extractOneChalkJson(fullpath)
+      if sstrm.getPosition() != len(s):
+        trace("Wrapper not valid; extra bits after mark")
+        return none(ChalkObj)
 
-  var dict: ChalkDict
+    # At this point, the marked object is well formed.
+    chalk = newChalk(name         = fullpath,
+                     fsRef        = fullpath,
+                     resourceType = {ResourceFile},
+                     cache        = cache,
+                     codec        = self,
+                     extract      = dict,
+                     marked       = true)
 
-  if s.find(magicUTF8) == -1:
-    warn("Wrapper not valid; no chalk magic.")
-    dict = ChalkDict(nil)
-  else:
-    dict = sstrm.extractOneChalkJson(fullpath)
-    if sstrm.getPosition() != len(s):
-      trace("Wrapper not valid; extra bits after mark")
-      scanFail()
+    cache.b64 = some(lines[0])
 
-  # At this point, the marked object is well formed.
-  chalk = newChalk(name         = fullpath,
-                   fsRef        = fullpath,
-                   resourceType = {ResourceFile},
-                   cache        = cache,
-                   codec        = self,
-                   extract      = dict,
-                   marked       = true)
-
-  cache.b64 = some(lines[0])
-
-  if wrapStream != stream:
-    stream.close()
-
-  wrapStream.close()
-
-  return some(chalk)
+    return some(chalk)
 
 proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
                         Option[string] {.cdecl.} =
@@ -194,13 +189,11 @@ proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
 
     if cache.b64.isSome():
        contents = decode(cache.b64.get())
-    elif cache.binStream != nil:
+    elif cache.binFName != "":
       try:
-        cache.binStream.setPosition(0)
-        contents       = cache.binStream.readAll()
-        cache.contents = contents
-        if cache.binStream != chalk.stream:
-          cache.binStream.close()
+        withFileStream(cache.binFName, strict = true):
+          contents       = stream.readAll()
+          cache.contents = contents
       except:
         discard
 

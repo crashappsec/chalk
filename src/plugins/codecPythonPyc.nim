@@ -11,11 +11,8 @@
 import ".."/[config, plugin_api, util]
 
 proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
-  var
-    chalk: ChalkObj
-
-  let
-    ext = loc.splitFile().ext.strip()
+  var chalk: ChalkObj
+  let ext = loc.splitFile().ext.strip()
 
   #Does this artifact have a python source file extension?
   # if so chalk it, else skip
@@ -24,28 +21,24 @@ proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
   if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.getPycExtensions():
     return none(ChalkObj)
 
-  let stream = newFileStream(loc)
+  withFileStream(loc, strict = true):
+    let
+      byte_blob = stream.readAll()
+      ix        = byte_blob.find(magicUTF8)
 
-  if stream == nil:
-    return none(ChalkObj)
+    if ix == -1:
+      #No magic == no existing chalk, new chalk created
+      let chalk         = newChalk(name   = loc,
+                                   fsRef  = loc,
+                                   stream = stream,
+                                   codec  =  self)
+      chalk.startOffset = len(byte_blob)
 
-  let
-    byte_blob = stream.readAll()
-    ix        = byte_blob.find(magicUTF8)
+    else: # Existing chalk, just reflect whats found
+      stream.setPosition(ix)
+      chalk = self.loadChalkFromFStream(stream, loc)
 
-  if ix == -1:
-    #No magic == no existing chalk, new chalk created
-    chalk             = newChalk(name   = loc,
-                                 fsRef  = loc,
-                                 stream = stream,
-                                 codec  =  self)
-    chalk.startOffset = len(byte_blob)
-
-  else: # Existing chalk, just reflect whats found
-    stream.setPosition(ix)
-    chalk = self.loadChalkFromFStream(stream, loc)
-
-  return some(chalk)
+    return some(chalk)
 
 proc pycHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
                      {.cdecl.} =
