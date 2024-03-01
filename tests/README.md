@@ -1,8 +1,10 @@
 # Chalk Testing
 
-This directory contains all the basic functionality tests for chalk. Tests are run via `make tests`, which uses `docker compose` to run the `tests` container which internally uses the `pytest` framework.
+This directory contains basic functionality tests for chalk. These tests are run via `make tests`, which uses `docker compose` to run the `tests` container which internally uses the `pytest` framework.
 
 While `pytest` can be used to run the tests directly, it is recommended to use the makefile script instead, as that provides a more consistent developer experience.
+
+Additionally, there are unit tests in the `tests-nim` directory. To run those tests, run `nimble test` in this repository's root directory.
 
 ## Setup
 
