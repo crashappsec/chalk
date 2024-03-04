@@ -8,35 +8,10 @@
 ## This is for any common code for system stuff, such as executing
 ## code.
 
-import std/[tempfiles, osproc, posix, monotimes, parseutils]
+import std/[tempfiles, posix, monotimes, parseutils]
 import pkg/[nimutils/managedtmp]
 import "."/[config, subscan, fd_cache]
 export fd_cache
-
-proc increfStream*(chalk: ChalkObj) {.exportc.} =
-  if chalk.streamRefCt != 0:
-    chalk.streamRefCt += 1
-    return
-
-  chalk.streamRefCt = 1
-
-  if len(cachedChalkStreams) >= chalkConfig.getCacheFdLimit():
-    let removing = cachedChalkStreams[0]
-
-    trace("Too many cached file descriptors. Closing fd for: " & chalk.name)
-    try:
-      removing.stream.close()
-    except:
-      discard
-
-    removing.stream      = FileStream(nil)
-    removing.streamRefCt = 0
-    cachedChalkStreams = cachedChalkStreams[1 .. ^1]
-
-  cachedChalkStreams.add(chalk)
-
-proc decrefStream*(chalk: ChalkObj) =
-  chalk.streamRefCt -= 1
 
 let sigNameMap = { 1: "SIGHUP", 2: "SIGINT", 3: "SIGQUIT", 4: "SIGILL",
                    6: "SIGABRT",7: "SIGBUS", 9: "SIGKILL", 11: "SIGSEGV",
@@ -164,87 +139,84 @@ const
 
 when hostOs == "linux":
   template makeCompletionAutoSource() =
-    var
+    let
       acpath  = resolvePath("~/.bash_completion")
-      f       = newFileStream(acpath, fmReadWriteExisting)
       toWrite = ". " & dst & "\n"
+      stream  = yieldFileStream(acpath, mode = fmReadWrite, strict = false)
 
-    if f == nil:
-      f = newFileStream(acpath, fmWrite)
-      if f == nil:
-        warn("Cannot write to " & acpath & " to turn on autocomplete.")
-        return
-    else:
+    if stream == nil:
+      warn("Cannot write to " & acpath & " to turn on autocomplete.")
+      return
+    try:
       try:
         let
-          contents = f.readAll()
+          contents = stream.readAll()
         if toWrite in contents:
-          f.close()
           return
         if len(contents) != 0 and contents[^1] != '\n':
-          f.write("\n")
+          stream.write("\n")
       except:
         warn("Cannot write to ~/.bash_completion to turn on autocomplete.")
         dumpExOnDebug()
-        f.close()
         return
-    f.write(toWrite)
-    f.close()
-    info("Added sourcing of autocomplete to ~/.bash_completion file")
+      stream.write(toWrite)
+      info("Added sourcing of autocomplete to ~/.bash_completion file")
+    finally:
+      closeFileStream(stream)
+
 elif hostOs == "macosx":
   template makeCompletionAutoSource() =
-    var
+    let
       acpath = resolvePath("~/.zshrc")
-      f      = newFileStream(acpath, fmReadWriteExisting)
+      stream = yieldFileStream(acpath, mode = fmReadWrite, strict = false)
 
-    if f == nil:
-      f = newFileStream(acPath, fmWrite)
-      if f == nil:
-        warn("Cannot write to " & acpath & " to turn on autocomplete.")
+    if stream == nil:
+      warn("Cannot write to " & acpath & " to turn on autocomplete.")
+      return
+    try:
+      var
+        contents: string
+        foundbci = false
+        foundci  = false
+        foundsrc = false
+      try:
+        contents = stream.readAll()
+      except:
+        discard
+      let
+        lines   = contents.split("\n")
+        srcLine = "source " & dst
+
+      for line in lines:
+        # This is not even a little precise but should be ok
+        let words = line.split(" ")
+        if "bashcompinit" in words:
+          foundbci = true
+        elif "compinit" in words:
+          foundci = true
+        elif line == srcLine and foundci and foundbci:
+          foundsrc = true
+
+      if foundbci and foundci and foundsrc:
         return
 
-    var
-      contents: string
-      foundbci = false
-      foundci  = false
-      foundsrc = false
-    try:
-      contents = f.readAll()
-    except:
-      discard
-    let
-      lines   = contents.split("\n")
-      srcLine = "source " & dst
+      if len(contents) != 0 and contents[^1] != '\n':
+        stream.write("\n")
 
-    for line in lines:
-      # This is not even a little precise but should be ok
-      let words = line.split(" ")
-      if "bashcompinit" in words:
-        foundbci = true
-      elif "compinit" in words:
-        foundci = true
-      elif line == srcLine and foundci and foundbci:
-        foundsrc = true
+      if not foundbci:
+        stream.writeLine("autoload bashcompinit")
+        stream.writeLine("bashcompinit")
 
-    if foundbci and foundci and foundsrc:
-      return
+      if not foundci:
+        stream.writeLine("autoload -Uz compinit")
+        stream.writeLine("compinit")
 
-    if len(contents) != 0 and contents[^1] != '\n':
-      f.write("\n")
+      if not foundsrc:
+        stream.writeLine(srcLine)
 
-    if not foundbci:
-      f.writeLine("autoload bashcompinit")
-      f.writeLine("bashcompinit")
-
-    if not foundci:
-      f.writeLine("autoload -Uz compinit")
-      f.writeLine("compinit")
-
-    if not foundsrc:
-      f.writeLine(srcLine)
-
-    f.close()
-    info("Set up sourcing of basic autocomplete in ~/.zshrc")
+      info("Set up sourcing of basic autocomplete in ~/.zshrc")
+    finally:
+      closeFileStrem(stream)
 
 else:
     template makeCompletionAutoSource() = discard
@@ -332,6 +304,7 @@ template otherSetupTasks*() =
   autocompleteFileCheck()
   if isatty(1) == 0:
     setShowColor(false)
+  limitFDCacheSize(chalkConfig.getCacheFdLimit())
 
 var exitCode = 0
 
@@ -346,6 +319,9 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
     error(chalk.name & ": replaceFileContents() called on an artifact that " &
           "isn't associated with a file.")
     return false
+
+  # Need to close in order to successfully replace.
+  closeFileStream(chalk.fsRef)
 
   result = true
 
@@ -449,54 +425,6 @@ proc runCmdExitCode*(exe: string, args: seq[string]): int {.discardable } =
                                        passthrough = false,
                                        timeoutUsec = 0) # No timeout
   result = execOutput.getExit()
-
-template chalkUseStream*(chalk: ChalkObj, code: untyped) {.dirty.} =
-  var
-    stream:  FileStream
-    noRead:  bool
-    noWrite: bool
-
-  if chalk.fsRef == "":
-    noRead  = true
-    noWrite = true
-  else:
-    if chalk.stream == nil:
-      chalk.stream = newFileStream(chalk.fsRef, fmReadWriteExisting)
-
-      if chalk.stream == nil:
-        trace(chalk.fsRef & ": Cannot open for writing.")
-        noWrite = true
-        chalk.stream = newFileStream(chalk.fsRef, fmRead)
-
-        if chalk.stream == nil:
-          error(chalk.fsRef & ": Cannot open for reading either.")
-          noRead = true
-        else:
-          chalk.increfStream()
-          trace(chalk.fsRef & ": File stream opened for reading.")
-      else:
-        chalk.increfStream()
-        trace(chalk.fsRef & ": File stream opened for writing.")
-    else:
-      chalk.increfStream()
-      trace(chalk.fsRef & ": File stream is cached.")
-
-    if chalk.stream != nil:
-      try:
-        stream = chalk.stream
-        stream.setPosition(0)
-        code
-      finally:
-        chalk.decrefStream()
-
-template chalkCloseStream*(chalk: ChalkObj) =
-  if chalk.stream != nil:
-    chalk.stream.close()
-
-  chalk.stream      = nil
-  chalk.streamRefCt = 0
-
-  delByValue(cachedChalkStreams, chalk)
 
 type Redacted* = ref object
   raw:      string

@@ -189,32 +189,37 @@ proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
 
     if cache.b64.isSome():
        contents = decode(cache.b64.get())
+
+    elif cache.contents != "":
+      contents = cache.contents
+
     elif cache.binFName != "":
       try:
-        withFileStream(cache.binFName, strict = true):
-          contents       = stream.readAll()
-          cache.contents = contents
+        withFileStream(cache.binFName, strict = false):
+          if stream != nil:
+            contents       = stream.readAll()
+            cache.contents = contents
       except:
         discard
 
     if contents == "":
       if cache.binFName != "":
-        let f = newFileStream(cache.binFName)
-        if f != nil:
-          try:
-            contents       = f.readAll()
-            cache.contents = contents
-            f.close()
-          except:
-            discard
-      if contents == "":
-        error("MacOS binary contents could not be properly read.")
-        return none(string)
+        withFileStream(cache.binFName, strict = false):
+          if stream != nil:
+            try:
+              contents       = stream.readAll()
+              cache.contents = contents
+            except:
+              discard
+
+    if contents == "":
+      error("MacOS binary contents could not be properly read.")
+      return none(string)
 
     chalk.cachedPreHash = contents.sha256Hex()
     if not isChalkingOp():
       # the ending hash will be the hash of the script file as on disk.
-      chalkUseStream(chalk):
+      withFileStream(chalk.fsRef, strict = true):
         let contents     = stream.readAll()
         chalk.cachedHash = contents.sha256Hex()
 
@@ -247,9 +252,7 @@ proc macHandleWrite*(self: Plugin, chalk: ChalkObj, enc: Option[string])
     toWrite &= chalk.cachedPreHash & "\n"
     toWrite &= enc.get() & "\n"
 
-  chalk.chalkCloseStream()
-
-  if not chalk.replaceFilecontents(toWrite):
+  if not chalk.replaceFileContents(toWrite):
     chalk.opFailed = true
 
 proc macGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):

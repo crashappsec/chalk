@@ -19,8 +19,6 @@ var
   startTime*          = getMonoTime().ticks()
 
 
-proc increfStream(chalk: ChalkObj) {.importc.}
-
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
 proc startTestRun*() =
@@ -82,7 +80,6 @@ proc newChalk*(name:         string            = "",
                imageId:      string            = "",
                containerId:  string            = "",
                marked:       bool              = false,
-               stream:       FileStream        = FileStream(nil),
                resourceType: set[ResourceType] = {ResourceFile},
                extract:      ChalkDict         = ChalkDict(nil),
                cache:        RootRef           = RootRef(nil),
@@ -92,7 +89,6 @@ proc newChalk*(name:         string            = "",
   result = ChalkObj(name:          name,
                     pid:           pid,
                     fsRef:         fsRef,
-                    stream:        stream,
                     userRef:       tag,
                     repo:          repo,
                     marked:        marked,
@@ -110,10 +106,6 @@ proc newChalk*(name:         string            = "",
 
   if extract != nil and len(extract) > 1:
     result.marked = true
-
-
-  if stream != FileStream(nil):
-    result.increfStream()
 
   if addToAllChalks:
     result.addToAllChalks()

@@ -6,7 +6,7 @@
 ##
 
 import std/re
-import "."/[config, util, plugin_api]
+import "."/[config, plugin_api]
 
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we
@@ -369,14 +369,12 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
         if getCommandName() in ["insert", "docker"]:
           obj.persistInternalValues()
-        obj.chalkCloseStream()
         yield obj
 
         clearErrorObject()
         if not inSubscan() and not obj.forceIgnore and
            obj.name notin getUnmarked():
           obj.collectRuntimeArtifactInfo()
-        obj.chalkCloseStream()
 
   if not inSubscan():
     if getCommandName() != "extract":

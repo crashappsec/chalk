@@ -17,7 +17,7 @@
 ## environment here.
 
 import std/macros except error
-import "."/[config, selfextract, con4mfuncs, plugin_load]
+import "."/[config, selfextract, con4mfuncs, plugin_load, util]
 
 # Since these are system keys, we are the only one able to write them,
 # and it's easier to do it directly here than in the system plugin.
@@ -86,8 +86,8 @@ proc getEmbeddedConfig(): string =
   else:
     trace("Since this binary can't be marked, using the default config.")
 
-proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
-  result = none((string, FileStream))
+proc findOptionalConf(state: ConfigState): Option[string] =
+  result = none(string)
   let
     path     = unpack[seq[string]](state.attrLookup("config_path").get())
     filename = unpack[string](state.attrLookup("config_filename").get())
@@ -105,7 +105,7 @@ proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
     if fname.fileExists():
       info(fname & ": Found config file")
       try:
-        return some((fname, newFileStream(fname)))
+        return some(fname)
       except:
         error(fname & ": Could not read configuration file")
         dumpExOnDebug()
@@ -230,10 +230,12 @@ proc loadAllConfigs*() =
   if chalkConfig.getLoadExternalConfig():
     let optConf = stack.configState.findOptionalConf()
     if optConf.isSome():
-      let (fName, stream) = optConf.get()
-      var embed = stream.readAll()
-      stack.addConfLoad(fName, toStream(embed)).addCallback(loadLocalStructs)
-      doRun()
+      let fName = optConf.get()
+      withFileStream(fname, strict = true):
+        stack.
+          addConfLoad(fName, stream).
+          addCallback(loadLocalStructs)
+        doRun()
       hostInfo["_OP_CONFIG"] = pack(configFile)
 
   if commandName == "not_supplied" and chalkConfig.defaultCommand.isSome():

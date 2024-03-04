@@ -94,7 +94,6 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
       chalk    = newChalk(name   = loc,
                           cache  = cache,
                           fsRef  = loc,
-                          stream = stream,
                           codec  = self)
 
     cache.onDisk  = ZipArchive()
@@ -170,7 +169,8 @@ proc doZipWrite(chalk: ChalkObj, encoded: Option[string], virtual: bool) =
 
   var dirToUse: string
 
-  chalkCloseStream(chalk)
+  # need to close FD to be able to overwite the file
+  closeFileStream(chalk.fsRef)
   try:
     if encoded.isSome():
       if not tryToWriteFile(chalkfile, encoded.get()):

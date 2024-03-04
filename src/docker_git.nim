@@ -54,8 +54,10 @@ proc createTempKnownHosts(data: string): string =
   if data == "":
     return ""
   let (f, path) = getNewTempFile()
-  f.write(data)
-  f.close()
+  try:
+    f.write(data)
+  finally:
+    f.close()
   return path
 
 proc isHttpGitContext(context: string): bool =

@@ -38,7 +38,7 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
     exe1path: string = ""
     info:     Stat
     chalk:    ChalkObj
-
+    extract:  ChalkDict
 
   when hostOs == "macosx":
     if proc_pidpath(pid, addr n[0], PATH_MAX) > 0:
@@ -60,24 +60,19 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
     let
       cidOpt      = getContainerName()
       cid         = cidOpt.getOrElse("<<in-container>")
-      exeStream   = newFileStream(exe1path)
-      chalkStream = newFileStream(chalkPath)
 
-    if chalkStream == nil:
-      error(chalkPath & ": Could not read chalkmark")
-      return none(ChalkObj)
-
-    if exeStream == nil:
-      error(exe1path & ": Could not read executable for chalk extraction")
-      return none(ChalkObj)
+    withFileStream(chalkPath, strict = false):
+      if stream == nil:
+        error(chalkPath & ": Could not read chalkmark")
+        return none(ChalkObj)
+      extract = stream.extractOneChalkJson(cid)
 
     chalk         = newChalk(name         = exe1path,
                              fsRef        = exe1path,
-                             stream       = exeStream,
                              containerId  = cidOpt.getOrElse(""),
                              pid          = some(pid),
                              resourceType = {ResourcePid, ResourceFile},
-                             extract      = chalkStream.extractOneChalkJson(cid),
+                             extract      = extract,
                              codec        = getPluginByName("docker"))
 
     for k, v in chalk.extract:
@@ -121,7 +116,6 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
 
       chalk = newChalk(name         = exe1path,
                        fsRef        = exe1path,
-                       stream       = newFileStream(exe1path),
                        resourceType = {ResourceFile},
                        codec        = getPluginByName("docker"))
 

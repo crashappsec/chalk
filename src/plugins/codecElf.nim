@@ -84,7 +84,6 @@ proc elfScan*(codec: Plugin, location: string): Option[ChalkObj] {.cdecl.} =
       if chalkObject == nil:
         chalkObject = newChalk(name         = location,
                                fsRef        = location,
-                               stream       = stream,
                                codec        = codec,
                                resourceType = {ResourceFile})
 

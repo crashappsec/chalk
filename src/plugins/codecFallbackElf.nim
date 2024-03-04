@@ -81,7 +81,6 @@ proc extractKeyMetadata(codec: Plugin, stream: FileStream, loc: string):
   else:
     result = newChalk(name         = loc,
                       fsRef        = loc,
-                      stream       = stream,
                       codec        = codec,
                       resourceType = {ResourceFile})
     result.startOffset = stream.getPosition()
@@ -100,7 +99,7 @@ proc fbScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
 
 proc fbGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
                         Option[string] {.cdecl.} =
-  chalk.chalkUseStream():
+  withFileStream(chalk.fsRef, strict = true):
     let toHash = stream.readStr(chalk.startOffset)
     return some(toHash.sha256Hex())
 

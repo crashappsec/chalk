@@ -183,7 +183,6 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
          actual)
     selfChalk.opFailed = false
     selfChalk.fsRef    = actual
-    selfChalk.chalkCloseStream()
 
     selfChalk.callHandleWrite(toWrite)
     if selfChalk.opFailed:
@@ -192,8 +191,10 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
     else:
       when defined(posix):
         let f = open(selfChalk.fsRef)
-        f.makeExecutable()
-        f.close()
+        try:
+          f.makeExecutable()
+        finally:
+          f.close()
 
   info("Configuration replaced in binary: " & selfChalk.fsRef)
   selfChalk.makeNewValuesAvailable()

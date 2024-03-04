@@ -11,7 +11,7 @@
 ## is in configs/dockercmd.c4m), so we really just need to look at
 ## the command and flag info returned.
 
-import "."/[config, docker_base, docker_git]
+import "."/[config, docker_base, docker_git, util]
 
 proc getPlatforms*(state: DockerInvocation): seq[string] =
   if "platform" in state.flags:
@@ -151,16 +151,14 @@ proc loadDockerFile*(state: DockerInvocation) =
       let toResolve = joinPath(state.foundcontext, "Dockerfile")
       state.dockerFileLoc = resolvePath(toResolve)
 
-    let s = newFileStream(state.dockerFileLoc)
-
     try:
-      if s != nil:
-        state.inDockerFile = s.readAll()
-        s.close()
-        trace("Read Dockerfile at: " & state.dockerFileLoc)
-      else:
-        error(state.foundFileArg & ": Dockerfile not found")
-        raise newException(ValueError, "No Dockerfile")
+      withFileStream(state.dockerFileLoc, strict = false):
+        if stream != nil:
+          state.inDockerFile = stream.readAll()
+          trace("Read Dockerfile at: " & state.dockerFileLoc)
+        else:
+          error(state.foundFileArg & ": Dockerfile not found")
+          raise newException(ValueError, "No Dockerfile")
 
     except:
       dumpExOnDebug()

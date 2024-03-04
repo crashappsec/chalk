@@ -30,7 +30,6 @@ proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
       #No magic == no existing chalk, new chalk created
       let chalk         = newChalk(name   = loc,
                                    fsRef  = loc,
-                                   stream = stream,
                                    codec  =  self)
       chalk.startOffset = len(byte_blob)
 
@@ -47,7 +46,7 @@ proc pycHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
     post:    string
     toWrite: string
 
-  chalkUseStream(chalk):
+  withFileStream(chalk.fsRef, strict = true):
     #Read up to previously set offset indicating where magic began
     pre  = stream.readStr(chalk.startOffset)
     #Move past
@@ -63,14 +62,14 @@ proc pycHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
   else:
     toWrite = pre
 
-  if not chalk.replaceFilecontents(toWrite):
+  if not chalk.replaceFileContents(toWrite):
     chalk.opFailed = true
 
 
 proc pycGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
                         Option[string] {.cdecl.} =
-  chalkUseStream(chalk):
-    let toHash = $(chalk.stream.readStr(chalk.startOffset))
+  withFileStream(chalk.fsRef, strict = true):
+    let toHash = $(stream.readStr(chalk.startOffset))
     return some(toHash.sha256Hex())
 
 proc pycGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):

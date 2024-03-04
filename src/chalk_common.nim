@@ -52,12 +52,11 @@ type
                                 ## process this, set this bool.
     pid*:           Option[Pid] ## If an exec() or eval() and we know
                                 ## the pid, this will be set.
-    stream*:        FileStream  ## Plugins by default use file streams; we
-    startOffset*:   int         ## keep state fields for that to bridge between
-    endOffset*:     int         ## extract and write. If the plugin needs to do
+    startOffset*:   int         ## Plugins by default use file streams; we
+    endOffset*:     int         ## keep state fields for that to bridge between
+                                ## extract and write. If the plugin needs to do
                                 ## something else, use the cache field
                                 ## below, instead.
-    streamRefCt*:   int         ## Ref count for recursive acquires.
     fsRef*:         string      ## Reference for this artifact on a fs
     userRef*:       string      ## Reference the user gave for the artifact.
     repo*:          string      ## The docker repo.
@@ -394,7 +393,6 @@ var
   dockerExeLocation*:     string = ""
   gitExeLocation*:        string = ""
   sshKeyscanExeLocation*: string = ""
-  cachedChalkStreams*:    seq[ChalkObj]
 
 template dumpExOnDebug*() =
   if chalkConfig != nil and chalkConfig.getChalkDebug():

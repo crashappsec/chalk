@@ -87,12 +87,10 @@ generate_keypair(char **s1, char **s2) {
     let
       prikey: cstring
       pubkey: cstring
-      fpPri = newFileStream("chalk.pem", fmWrite)
 
     generateKeypair(addr prikey, addr pubkey)
-
-    fpPri.write($(prikey))
-    fpPri.close()
+    if not tryToWriteFile("chalk.pem", $(prikey)):
+      raise newException(OSError, "could not write private key to chalk.pem: " & getCurrentExceptionMsg())
 
     discard execProcess(cosign, args = importFlags, options={})
 
@@ -609,7 +607,6 @@ proc writeInToto(info:      DockerInvocation,
     randint = secureRand[uint]()
     hexval  = toHex(randint and 0xffffffffffff'u).toLowerAscii()
     path    = "chalk-toto-" & hexval & ".json"
-    f       = newFileStream(path, fmWrite)
     tagStr  = escapeJson(tag)
     hashStr = escapeJson(info.opChalkObj.cachedHash)
     toto    = """ {
@@ -630,8 +627,8 @@ proc writeInToto(info:      DockerInvocation,
       }
   }
 """
-  f.write(toto)
-  f.close()
+  if not tryToWriteFile(path, toto):
+    raise newException(OSError, "could not write toto to file: " & getCurrentExceptionMsg())
 
   #let
   #  args = @[pack(path), pack(digestStr), pack(cosign)]
