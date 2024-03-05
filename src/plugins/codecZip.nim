@@ -77,7 +77,7 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
   if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.getZipExtensions():
     return none(ChalkObj)
 
-  withFileStream(loc, strict = true):
+  withFileStream(loc, mode = fmRead, strict = true):
     tryOrBail:
       # Make sure the file seems to be a valid ZIP file.
       var buf: array[4, char]

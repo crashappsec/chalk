@@ -61,7 +61,7 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
       cidOpt      = getContainerName()
       cid         = cidOpt.getOrElse("<<in-container>")
 
-    withFileStream(chalkPath, strict = false):
+    withFileStream(chalkPath, mode = fmRead, strict = false):
       if stream == nil:
         error(chalkPath & ": Could not read chalkmark")
         return none(ChalkObj)

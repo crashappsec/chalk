@@ -378,7 +378,9 @@ proc testSigningSetup(pubKey, priKey: string): bool =
         toSign   = "Test string for signing"
         signArgs = @["sign-blob", "--tlog-upload=false", "--yes",
                      "--key=chalk.key", "-"]
-        signOut  = getCosignLocation().runCmdGetEverything(signArgs, tosign)
+
+      let
+        signOut  = runCmdGetEverything(cosign, signArgs, tosign)
         sig      = signOut.getStdout()
 
       if signOut.getExit() != 0 or sig == "":
@@ -703,8 +705,9 @@ proc coreVerify(pk: string, chalk: ChalkObj): bool =
       args   = @["verify-attestation", "--key", fName,
                  "--insecure-ignore-tlog=" & $(noTlog), "--type", "custom",
                  chalk.repo & "@sha256:" & chalk.repoHash]
+      cosign = getCosignLocation()
     let
-      allOut = runCmdGetEverything(getCosignLocation(), args)
+      allOut = runCmdGetEverything(cosign, args)
       res    = allout.getStdout()
       code   = allout.getExit()
 
@@ -838,7 +841,8 @@ proc signNonContainer*(chalk: ChalkObj, unchalkedMD, metadataMD : string):
   trace("signing blob: " & blob )
   withWorkingDir(getCosignTempDir()):
     withCosignPassword:
-      let allOutput = getCosignLocation().runCmdGetEverything(args, blob & "\n")
+      let cosign = getCosignLocation()
+      let allOutput = runCmdGetEverything(cosign, args, blob & "\n")
 
       result = allOutput.getStdout().strip()
 
@@ -863,7 +867,8 @@ proc cosignNonContainerVerify*(chalk: ChalkObj,
       return vNoCosign
 
     withCosignPassword:
-      let allOutput = getCosignLocation().runCmdGetEverything(args, blob & "\n")
+      let cosign = getCosignLocation()
+      let allOutput = runCmdGetEverything(cosign, args, blob & "\n")
 
       if allOutput.getExit() == 0:
         info(chalk.name & ": Signature successfully validated.")

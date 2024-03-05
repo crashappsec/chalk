@@ -88,7 +88,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       lang = chalkConfig.srcConfig.extensionsToLanguagesMap[ext]
       trace(path & ": By file type, language is: " & lang)
 
-  withFileStream(path, strict = true):
+  withFileStream(path, mode = fmRead, strict = true):
     try:
       let bytes = stream.peekStr(2)
 

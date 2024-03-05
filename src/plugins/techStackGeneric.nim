@@ -117,7 +117,7 @@ template scanFileStream(strm: FileStream) =
         break
 
 proc scanFile(filePath: string, category: string, subcategory: string) =
-  withFileStream(filePath, strict = true):
+  withFileStream(filePath, mode = fmRead, strict = true):
     scanFileStream(stream)
 
 proc getProcNames(): HashSet[string] =

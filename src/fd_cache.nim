@@ -32,6 +32,7 @@
 # TODO move this to nimutils
 
 import std/[enumerate, posix, streams, tables]
+import nimutils/file
 
 # ----------------------------------------------------------------------------
 
@@ -42,12 +43,10 @@ proc getOpenLimit(): int =
     raise newException(OSError, "Could not determine open file limit")
   return limit.rlim_cur
 
-proc openFileStream(path: string, mode = fmReadWriteExisting): FileStream =
+proc openFileStream(path: string, mode = fmRead): FileStream =
   var stream = newFileStream(path, mode = mode)
   if stream == nil:
-    stream = newFileStream(path, fmRead)
-  if stream == nil:
-    raise newException(OSError, path & ": cannot open for either reading/reading+writing")
+    raise newException(OSError, path & ": cannot open for FD cache")
   return stream
 
 # ----------------------------------------------------------------------------
@@ -55,12 +54,16 @@ proc openFileStream(path: string, mode = fmReadWriteExisting): FileStream =
 type FDStream = ref object
     path:     string
     stream:   FileStream
+    mode:     FileMode
     refCount: int
 
-proc newStream(path: string, mode = fmReadWriteExisting): FDStream =
+proc newStream(path: string, mode = fmRead): FDStream =
+  var path = path.resolvePath()
   return FDStream(
-    path:   path,
-    stream: openFileStream(path, mode = mode),
+    path:     path,
+    stream:   openFileStream(path, mode = mode),
+    mode:     mode,
+    refCount: 0,
   )
 
 proc yieldStream(self: FDStream, seek = 0): FileStream =
@@ -83,11 +86,12 @@ proc isUsed(self: FDStream): bool =
 # ----------------------------------------------------------------------------
 
 type FDCache = ref object
-    size: int
-    byPath: OrderedTable[string, FDStream]
+    size:     int
+    byPath:   OrderedTable[string, FDStream]
     byStream: Table[FileStream, string]
 
 proc `[]`(self: FDCache, path: string): FDStream =
+  var path = path.resolvePath()
   if path notin self.byPath:
     raise newException(KeyError, path & ": not in FD cache")
   return self.byPath[path]
@@ -99,11 +103,12 @@ proc `[]`(self: FDCache, fs: FileStream): FDStream =
   return self[path]
 
 proc `[]=`(self: FDCache, path: string, stream: FDStream) =
+  var path = path.resolvePath()
   self.byPath[path] = stream
   self.byStream[stream.stream] = path
 
 proc contains(self: FDCache, path: string): bool =
-  return path in self.byPath
+  return path.resolvePath() in self.byPath
 
 proc contains(self: FDCache, stream: FileStream): bool =
   return stream in self.byStream
@@ -138,7 +143,7 @@ proc closeFileStream(self: FDCache, path: string) =
 
 proc evictStream(self: FDCache, stream: FDStream) =
   if stream.isUsed():
-    raise newException(OSError, stream.path & ": is still being used and cannot be released from FD cache.")
+    raise newException(OSError, stream.path & ": is still being used and cannot be evicted from FD cache.")
   self.closeStream(stream)
 
 proc maybeEvictLRUStreams(self: FDCache, n: int) =
@@ -162,27 +167,35 @@ proc maybeEvictLRUStreams(self: FDCache, n: int) =
 proc limitSize(self: FDCache, size: int) =
   self.size = size
   # if current size is already bigger, prune it
-  self.maybeEvictLRUStreams(0)
+  self.maybeEvictLRUStreams(n = 0)
 
 proc yieldFileStream(self:  FDCache,
                      path:  string,
                      seek   = 0,
+                     mode   = fmRead,
                      strict = false,
-                     mode   = fmReadWriteExisting,
                      ):     FileStream =
   self.maybeEvictLRUStreams(n = 1)
   var stream: FDStream
-  if path in self:
+
+  if path in self and self[path].mode == mode:
     stream = self[path]
     # re-add to maintain LRU order
     self.del(stream)
-  else:
+
+  elif path in self:
+    # requested mode doesnt match mode in cache
+    # so close existing FD and create new one
+    self.evictStream(self[path])
+
+  if stream == nil:
     try:
       stream = newStream(path, mode = mode)
     except:
       if strict:
         raise
       return nil
+
   self[path] = stream
   result = stream.yieldStream(seek = seek)
 
@@ -192,10 +205,14 @@ proc releaseFileStream(self: FDCache, fs: FileStream) =
     stream.releaseStream()
     stream.stream.setPosition(0)
 
-template withFileStream(self: FDCache, path: string, strict: bool, code: untyped) =
+template withFileStream(self:   FDCache,
+                        path:   string,
+                        mode:   FileMode,
+                        strict: bool,
+                        code:   untyped) =
   var stream {.inject.}: FileStream
   try:
-    stream = self.yieldFileStream(path, 0, strict)
+    stream = self.yieldFileStream(path, 0, mode, strict)
     code
   finally:
     self.releaseFileStream(stream)
@@ -219,7 +236,7 @@ proc limitFDCacheSize*(size: int) =
 proc yieldFileStream*(path:  string,
                       seek   = 0,
                       strict = false,
-                      mode   = fmReadWriteExisting,
+                      mode   = fmRead,
                       ):     FileStream =
   return fdCache.yieldFileStream(path   = path,
                                  seek   = seek,
@@ -235,8 +252,11 @@ proc closeFileStream*(fs: FileStream) =
 proc closeFileStream*(path: string) =
   fdCache.closeFileStream(path)
 
-template withFileStream*(path: string, strict: bool, code: untyped) =
-  fdCache.withFileStream(path, strict):
+template withFileStream*(path: string,
+                         mode: FileMode,
+                         strict: bool,
+                         code: untyped) =
+  fdCache.withFileStream(path, mode, strict):
     code
 
 # ----------------------------------------------------------------------------
@@ -276,14 +296,14 @@ when isMainModule:
 
     testCache.releaseFileStream(three)
 
-    testCache.withFileStream("one", strict = true):
+    testCache.withFileStream("one", mode = fmRead, strict = true):
       assert(stream != nil)
     assert(stream == nil)
 
   withCache()
 
   proc global() =
-    withFileStream("one", strict = true):
+    withFileStream("one", mode = fmRead, strict = true):
       assert(stream != nil)
     assert(stream == nil)
 

@@ -343,7 +343,7 @@ proc scriptHandleWrite*(plugin:  Plugin,
   ## that should work for most scripting languages.
   var contents: string
 
-  withFileStream(chalk.fsRef, strict = true):
+  withFileStream(chalk.fsRef, mode = fmRead, strict = true):
     contents = stream.readAll()
 
   if encoded.isNone():
@@ -465,7 +465,7 @@ proc simpleHash(self: Plugin, chalk: ChalkObj): Option[string] =
   # The default if the stream can't be acquired.
   result = none(string)
 
-  withFileStream(chalk.fsRef, strict = true):
+  withFileStream(chalk.fsRef, mode = fmRead, strict = true):
     result = some(stream.readAll().sha256Hex())
 
 proc defUnchalkedHash*(self: Plugin, obj: ChalkObj): Option[string] {.cdecl.} =
@@ -520,7 +520,7 @@ proc defaultCodecWrite*(s:     Plugin,
     pre:  string
     post: string
 
-  withFileStream(chalk.fsRef, strict = true):
+  withFileStream(chalk.fsRef, mode = fmRead, strict = true):
     pre = stream.readStr(chalk.startOffset)
 
     if chalk.endOffset > chalk.startOffset:

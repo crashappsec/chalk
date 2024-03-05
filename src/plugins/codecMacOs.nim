@@ -195,7 +195,7 @@ proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
 
     elif cache.binFName != "":
       try:
-        withFileStream(cache.binFName, strict = false):
+        withFileStream(cache.binFName, mode = fmRead, strict = false):
           if stream != nil:
             contents       = stream.readAll()
             cache.contents = contents
@@ -204,7 +204,7 @@ proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
 
     if contents == "":
       if cache.binFName != "":
-        withFileStream(cache.binFName, strict = false):
+        withFileStream(cache.binFName, mode = fmRead, strict = false):
           if stream != nil:
             try:
               contents       = stream.readAll()
@@ -219,7 +219,7 @@ proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
     chalk.cachedPreHash = contents.sha256Hex()
     if not isChalkingOp():
       # the ending hash will be the hash of the script file as on disk.
-      withFileStream(chalk.fsRef, strict = true):
+      withFileStream(chalk.fsRef, mode = fmRead, strict = true):
         let contents     = stream.readAll()
         chalk.cachedHash = contents.sha256Hex()
 

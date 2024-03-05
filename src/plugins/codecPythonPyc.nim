@@ -21,7 +21,7 @@ proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
   if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.getPycExtensions():
     return none(ChalkObj)
 
-  withFileStream(loc, strict = true):
+  withFileStream(loc, mode = fmRead, strict = true):
     let
       byte_blob = stream.readAll()
       ix        = byte_blob.find(magicUTF8)
@@ -46,7 +46,7 @@ proc pycHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
     post:    string
     toWrite: string
 
-  withFileStream(chalk.fsRef, strict = true):
+  withFileStream(chalk.fsRef, mode = fmRead, strict = true):
     #Read up to previously set offset indicating where magic began
     pre  = stream.readStr(chalk.startOffset)
     #Move past
@@ -68,7 +68,7 @@ proc pycHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
 
 proc pycGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
                         Option[string] {.cdecl.} =
-  withFileStream(chalk.fsRef, strict = true):
+  withFileStream(chalk.fsRef, mode = fmRead, strict = true):
     let toHash = $(stream.readStr(chalk.startOffset))
     return some(toHash.sha256Hex())
 

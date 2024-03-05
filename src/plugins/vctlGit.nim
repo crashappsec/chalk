@@ -279,7 +279,7 @@ template formatCommitObjectTime(line: string): string =
   fromUnix(parseTime(line)).format(gitTimeFmt) & " " & line.split()[^1]
 
 proc readPackedCommit(path: string, offset: uint64): string =
-  withFileStream(path, strict = true):
+  withFileStream(path, mode = fmRead, strict = true):
     stream.setPosition(int(offset))
     let initialReadSize = 0x1000
     var
@@ -622,7 +622,7 @@ proc findAndLoad(plugin: GitInfo, path: string) =
   if info.commitId == "":
     return
 
-  withFileStream(confFileName, strict = false):
+  withFileStream(confFileName, mode = fmRead, strict = false):
     try:
       if stream != nil:
         let config = stream.parseGitConfig()

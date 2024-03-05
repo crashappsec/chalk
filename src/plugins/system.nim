@@ -98,7 +98,7 @@ proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   result["TIMESTAMP_WHEN_CHALKED"] = pack(unixTimeInMS())
 
   if isSubscribedKey("PRE_CHALK_HASH") and obj.fsRef != "":
-    withFilesTream(obj.fsRef, strict = true):
+    withFilesTream(obj.fsRef, mode = fmRead, strict = true):
       result["PRE_CHALK_HASH"] = pack(stream.readAll().sha256Hex())
 
   if obj.isMarked() and "METADATA_HASH" in obj.extract:

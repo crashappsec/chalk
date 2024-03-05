@@ -142,12 +142,11 @@ when hostOs == "linux":
     let
       acpath  = resolvePath("~/.bash_completion")
       toWrite = ". " & dst & "\n"
-      stream  = yieldFileStream(acpath, mode = fmReadWrite, strict = false)
 
-    if stream == nil:
-      warn("Cannot write to " & acpath & " to turn on autocomplete.")
-      return
-    try:
+    withFileStream(acpath, mode = fmReadWrite, strict = false):
+      if stream == nil:
+        warn("Cannot write to " & acpath & " to turn on autocomplete.")
+        return
       try:
         let
           contents = stream.readAll()
@@ -161,19 +160,16 @@ when hostOs == "linux":
         return
       stream.write(toWrite)
       info("Added sourcing of autocomplete to ~/.bash_completion file")
-    finally:
-      closeFileStream(stream)
 
 elif hostOs == "macosx":
   template makeCompletionAutoSource() =
     let
       acpath = resolvePath("~/.zshrc")
-      stream = yieldFileStream(acpath, mode = fmReadWrite, strict = false)
 
-    if stream == nil:
-      warn("Cannot write to " & acpath & " to turn on autocomplete.")
-      return
-    try:
+    withFileStream(acpath, mode = fmReadWrite, strict = false):
+      if stream == nil:
+        warn("Cannot write to " & acpath & " to turn on autocomplete.")
+        return
       var
         contents: string
         foundbci = false
@@ -215,8 +211,6 @@ elif hostOs == "macosx":
         stream.writeLine(srcLine)
 
       info("Set up sourcing of basic autocomplete in ~/.zshrc")
-    finally:
-      closeFileStrem(stream)
 
 else:
     template makeCompletionAutoSource() = discard

@@ -58,7 +58,7 @@ proc verifyChalkStart(data: string): int =
   return index
 
 proc elfScan*(codec: Plugin, location: string): Option[ChalkObj] {.cdecl.} =
-  withFileStream(location, strict = true):
+  withFileStream(location, mode = fmRead, strict = true):
     try:
       var magicBuffer: array[4, char]
       stream.read(magicBuffer)

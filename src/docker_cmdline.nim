@@ -152,7 +152,7 @@ proc loadDockerFile*(state: DockerInvocation) =
       state.dockerFileLoc = resolvePath(toResolve)
 
     try:
-      withFileStream(state.dockerFileLoc, strict = false):
+      withFileStream(state.dockerFileLoc, mode = fmRead, strict = false):
         if stream != nil:
           state.inDockerFile = stream.readAll()
           trace("Read Dockerfile at: " & state.dockerFileLoc)
