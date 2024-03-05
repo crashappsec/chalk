@@ -118,6 +118,8 @@ template scanFileStream(strm: FileStream) =
 
 proc scanFile(filePath: string, category: string, subcategory: string) =
   withFileStream(filePath, mode = fmRead, strict = true):
+    if stream == nil:
+      return
     scanFileStream(stream)
 
 proc getProcNames(): HashSet[string] =

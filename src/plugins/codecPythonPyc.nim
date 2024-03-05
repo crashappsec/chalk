@@ -21,7 +21,10 @@ proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
   if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.getPycExtensions():
     return none(ChalkObj)
 
-  withFileStream(loc, mode = fmRead, strict = true):
+  withFileStream(loc, mode = fmRead, strict = false):
+    if stream == nil:
+      return none(ChalkObj)
+
     let
       byte_blob = stream.readAll()
       ix        = byte_blob.find(magicUTF8)

@@ -219,9 +219,10 @@ proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
     chalk.cachedPreHash = contents.sha256Hex()
     if not isChalkingOp():
       # the ending hash will be the hash of the script file as on disk.
-      withFileStream(chalk.fsRef, mode = fmRead, strict = true):
-        let contents     = stream.readAll()
-        chalk.cachedHash = contents.sha256Hex()
+      withFileStream(chalk.fsRef, mode = fmRead, strict = false):
+        if stream != nil:
+          let contents     = stream.readAll()
+          chalk.cachedHash = contents.sha256Hex()
 
   if chalk.cachedPreHash == "":
     return none(string)

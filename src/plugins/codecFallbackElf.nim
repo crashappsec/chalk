@@ -86,7 +86,9 @@ proc extractKeyMetadata(codec: Plugin, stream: FileStream, loc: string):
     result.startOffset = stream.getPosition()
 
 proc fbScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
-  withFileStream(loc, mode = fmRead, strict = true):
+  withFileStream(loc, mode = fmRead, strict = false):
+    if stream == nil:
+      return none(ChalkObj)
     try:
       let magic = stream.readUint32()
       if magic != elfMagic and magic != elfSwapped:
