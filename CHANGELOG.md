@@ -12,6 +12,11 @@
 - Fixes a segfault when accidentally providing `http://`
   URL to a sink instead of `https://`
   [#223](https://github.com/crashappsec/chalk/pull/223)
+- Fixes leaking FDs which didnt allow to chalk large
+  zip files such as large Java jar file
+  [#229](https://github.com/crashappsec/chalk/pull/229)
+- Fixes chalking zip file reporting git-repo keys
+  [#230](https://github.com/crashappsec/chalk/issues/230)
 
 ## 0.3.3
 
