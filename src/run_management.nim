@@ -17,7 +17,7 @@ var
   ctxStack            = seq[CollectionCtx](@[])
   collectionCtx       = CollectionCtx()
   startTime*          = getMonoTime().ticks()
-
+  contextDirectories: seq[string]
 
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
@@ -30,7 +30,11 @@ proc startNativeCodecsOnly*() =
 proc endNativeCodecsOnly*() =
   nativeCodecsOnly = false
 
-template getNativeCodecsOnly*(): bool = nativeCodecsOnly
+template getNativeCodecsOnly*(): bool =
+  nativeCodecsOnly
+
+proc inSubscan*(): bool =
+  return len(ctxStack) != 0
 
 proc clearReportingState*() =
   startTime      = getMonoTime().ticks()
@@ -46,18 +50,40 @@ proc pushCollectionCtx*(): CollectionCtx =
   result        = collectionCtx
 
 proc popCollectionCtx*() =
-  if len(ctxStack) != 0: collectionCtx = ctxStack.pop()
+  if len(ctxStack) != 0:
+    # pop from stack last item
+    discard ctxStack.pop()
+  # if there is previous item on stack
+  # make it current collection context
+  if len(ctxStack) != 0:
+    collectionCtx = ctxStack[^1]
+  else:
+    collectionCtx = CollectionCtx()
 
-proc inSubscan*(): bool =
-  return len(ctxStack) != 0
-proc getCurrentCollectionCtx*(): CollectionCtx = collectionCtx
-proc getErrorObject*(): Option[ChalkObj] = collectionCtx.currentErrorObject
+proc setContextDirectories*(l: seq[string]) =
+  # Used for 'where to look for stuff' plugins, particularly version control.
+  if inSubscan():
+    collectionCtx.contextDirectories = l
+  else:
+    contextDirectories = l
+
+proc getContextDirectories*(): seq[string] =
+  if inSubscan():
+    return collectionCtx.contextDirectories
+  return contextDirectories
+
+proc getCurrentCollectionCtx*(): CollectionCtx =
+  collectionCtx
+proc getErrorObject*(): Option[ChalkObj] =
+  collectionCtx.currentErrorObject
 proc setErrorObject*(o: ChalkObj) =
   collectionCtx.currentErrorObject = some(o)
 proc clearErrorObject*() =
   collectionCtx.currentErrorObject = none(ChalkObj)
-proc getAllChalks*(): seq[ChalkObj] = collectionCtx.allChalks
-proc getAllChalks*(cc: CollectionCtx): seq[ChalkObj] = cc.allChalks
+proc getAllChalks*(): seq[ChalkObj] =
+  collectionCtx.allChalks
+proc getAllChalks*(cc: CollectionCtx): seq[ChalkObj] =
+  cc.allChalks
 proc addToAllChalks*(o: ChalkObj) =
   collectionCtx.allChalks.add(o)
 proc setAllChalks*(s: seq[ChalkObj]) =
@@ -66,10 +92,12 @@ proc removeFromAllChalks*(o: ChalkObj) =
   if o in collectionCtx.allChalks:
     # Note that this is NOT an order-preserving delete; it's O(1)
     collectionCtx.allChalks.del(collectionCtx.allChalks.find(o))
-proc getUnmarked*(): seq[string] = collectionCtx.unmarked
+proc getUnmarked*(): seq[string] =
+  collectionCtx.unmarked
 proc addUnmarked*(s: string) =
   collectionCtx.unmarked.add(s)
-proc isMarked*(chalk: ChalkObj): bool {.inline.} = return chalk.marked
+proc isMarked*(chalk: ChalkObj): bool {.inline.} =
+  return chalk.marked
 
 proc newChalk*(name:         string            = "",
                chalkId:      string            = "",
@@ -187,15 +215,6 @@ proc getArgs*(): seq[string] = collectionCtx.args
 
 var cmdSpec*: CommandSpec = nil
 proc getArgCmdSpec*(): CommandSpec = cmdSpec
-
-var contextDirectories: seq[string]
-
-template setContextDirectories*(l: seq[string]) =
-  # Used for 'where to look for stuff' plugins, particularly version control.
-  contextDirectories = l
-
-template getContextDirectories*(): seq[string] =
-  contextDirectories
 
 var hostCollectionSuspends = 0
 template suspendHostCollection*() =         hostCollectionSuspends += 1

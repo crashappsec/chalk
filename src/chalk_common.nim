@@ -110,6 +110,7 @@ type
     unmarked*:                 seq[string]
     report*:                   Box
     args*:                     seq[string]
+    contextDirectories*:       seq[string]
 
   ArtifactIterationInfo* = ref object
     filePaths*:       seq[string]
