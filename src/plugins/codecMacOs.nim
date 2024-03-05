@@ -55,9 +55,9 @@ template hasMachMagic(s: string): bool =
         "\xfe\xed\xfa\xcf", "\xcf\xfa\xed\xfe"]
 
 proc macScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
-  # chalked mac binary is a macho binary wrapped as shell script
+  # chalked mac binary is a Mach-O binary wrapped as shell script
   # and as such to correctly scan for chalk, we might need to open
-  # multiple file strams - 1) wrapping script and 2) macho binary itself
+  # multiple file strams - 1) wrapping script and 2) Mach-O binary itself
   # using a single file stream context manager is non-trivial and so
   # explicit block is used which allows to use defer statements to guarantee
   # file streams are released back to the cache at the end of the function
@@ -69,7 +69,7 @@ proc macScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       wrapStream: FileStream
       chalk:      ChalkObj
 
-    let stream   = yieldFileStream(fullpath)
+    let stream   = acquireFileStream(fullpath)
     defer: stream.releaseFileStream()
     if stream == FileStream(nil):
       warn(path & ": could not open.")
@@ -95,7 +95,7 @@ proc macScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
         fullpath   = fullpath.replace("_CHALKSP_", " ")
 
         trace("Will look for chalk mark in wrapper script: " & fullpath)
-        wrapStream = yieldFileStream(fullpath)
+        wrapStream = acquireFileStream(fullpath)
         defer: wrapStream.releaseFileStream()
 
         if wrapStream == nil:

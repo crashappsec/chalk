@@ -13,7 +13,7 @@
 ## for all opened file streams.
 ##
 ## Some things you can do:
-## * yield   - create or get existing file stream from cache.
+## * acquire - create or get existing file stream from cache.
 ##             Analogy is getting connection from pool.
 ## * release - release file stream back into the cache.
 ##             Analogy is release connection back into pool.
@@ -66,7 +66,7 @@ proc newStream(path: string, mode = fmRead): FDStream =
     refCount: 0,
   )
 
-proc yieldStream(self: FDStream, seek = 0): FileStream =
+proc acquireStream(self: FDStream, seek = 0): FileStream =
   if seek >= 0:
     self.stream.setPosition(seek)
   self.refCount += 1
@@ -75,7 +75,7 @@ proc yieldStream(self: FDStream, seek = 0): FileStream =
 proc releaseStream(self: FDStream) =
   self.refCount -= 1
   if self.refCount < 0:
-    raise newException(ValueError, self.path & ": FD was released more times than yielded")
+    raise newException(ValueError, self.path & ": FD was released more times than acquired")
 
 proc closeStream(self: FDStream) =
   self.stream.close()
@@ -169,12 +169,12 @@ proc limitSize(self: FDCache, size: int) =
   # if current size is already bigger, prune it
   self.maybeEvictLRUStreams(n = 0)
 
-proc yieldFileStream(self:  FDCache,
-                     path:  string,
-                     seek   = 0,
-                     mode   = fmRead,
-                     strict = false,
-                     ):     FileStream =
+proc acquireFileStream(self:  FDCache,
+                       path:  string,
+                       seek   = 0,
+                       mode   = fmRead,
+                       strict = false,
+                       ):     FileStream =
   self.maybeEvictLRUStreams(n = 1)
   var stream: FDStream
 
@@ -197,7 +197,7 @@ proc yieldFileStream(self:  FDCache,
       return nil
 
   self[path] = stream
-  result = stream.yieldStream(seek = seek)
+  result = stream.acquireStream(seek = seek)
 
 proc releaseFileStream(self: FDCache, fs: FileStream) =
   if fs != nil:
@@ -212,7 +212,7 @@ template withFileStream(self:   FDCache,
                         code:   untyped) =
   var stream {.inject.}: FileStream
   try:
-    stream = self.yieldFileStream(path, 0, mode, strict)
+    stream = self.acquireFileStream(path, 0, mode, strict)
     code
   finally:
     self.releaseFileStream(stream)
@@ -233,12 +233,12 @@ proc limitFDCacheSize*(size: int) =
                        " which is too large given system limit of " & $fdLimit)
   fdCache.limitSize(size)
 
-proc yieldFileStream*(path:  string,
-                      seek   = 0,
-                      strict = false,
-                      mode   = fmRead,
-                      ):     FileStream =
-  return fdCache.yieldFileStream(path   = path,
+proc acquireFileStream*(path:  string,
+                        seek   = 0,
+                        strict = false,
+                        mode   = fmRead,
+                        ):     FileStream =
+  return fdCache.acquireFileStream(path   = path,
                                  seek   = seek,
                                  strict = strict,
                                  mode   = mode)
@@ -265,33 +265,33 @@ when isMainModule:
   proc withCache() =
     let
       testCache = newFDCache(size = 2)
-      one1       = testCache.yieldFileStream("one")
-      one2       = testCache.yieldFileStream("one")
-      two        = testCache.yieldFileStream("two")
+      one1       = testCache.acquireFileStream("one")
+      one2       = testCache.acquireFileStream("one")
+      two        = testCache.acquireFileStream("two")
     assert(one1 == one2)
     assert(one1 != two)
 
     try:
-      # should not be allowed to yield file as one is not released
-      discard testCache.yieldFileStream("three")
+      # should not be allowed to acquire file as one is not released
+      discard testCache.acquireFileStream("three")
       assert(false)
     except:
       assert(true)
 
     testCache.releaseFileStream(one1)
     try:
-      # should still not be allowed to yield file as one is not released
-      discard testCache.yieldFileStream("three")
+      # should still not be allowed to acquire file as one is not released
+      discard testCache.acquireFileStream("three")
       assert(false)
     except:
       assert(true)
 
     testCache.releaseFileStream(one2)
     # we can finally get three as all ones have been released
-    let three      = testCache.yieldFileStream("three")
+    let three      = testCache.acquireFileStream("three")
 
     testCache.releaseFileStream(two)
-    let one3       = testCache.yieldFileStream("one")
+    let one3       = testCache.acquireFileStream("one")
     assert(one1 != one3)
 
     testCache.releaseFileStream(three)

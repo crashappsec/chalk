@@ -53,11 +53,7 @@ proc fetchSshKnownHost(remote: string): string =
 proc createTempKnownHosts(data: string): string =
   if data == "":
     return ""
-  let (f, path) = getNewTempFile()
-  try:
-    f.write(data)
-  finally:
-    f.close()
+  let path = writeNewTempFile(data)
   return path
 
 proc isHttpGitContext(context: string): bool =

@@ -73,19 +73,14 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   trace("Docker subscan complete.")
 
 proc writeChalkMark(ctx: DockerInvocation, mark: string) =
-  # We are going to move this file, so don't autoclean.
-  var
-    (f, path) = getNewTempFile(autoClean = false)
-
   try:
-    info("Creating temporary chalk file: " & path)
-    f.writeLine(mark)
+    # We are going to move this file, so don't autoclean.
+    let path = writeNewTempFile(mark, autoClean = false)
+    info("Created temporary chalk file: " & path)
     ctx.makeFileAvailableToDocker(path, move=true, newName="chalk.json", chmod="0444")
   except:
     error("Unable to write to open tmp file (disk space?)")
     raise newException(ValueError, "fs write")
-  finally:
-    f.close()
 
 var labelPrefix: string
 
@@ -182,13 +177,9 @@ proc writeNewDockerFileIfNeeded(ctx: DockerInvocation) =
     ctx.inDockerFile &= "\n"
   let newcontents = ctx.inDockerFile & ctx.addedInstructions.join("\n")
 
-  let (f, path) = getNewTempFile()
-  try:
-    info("Created temporary Dockerfile at: " & path)
-    trace("New docker file:\n" & newcontents)
-    f.write(newcontents)
-  finally:
-    f.close()
+  let path = writeNewTempFile(newcontents)
+  info("Created temporary Dockerfile at: " & path)
+  trace("New docker file:\n" & newcontents)
 
   ctx.newCmdLine.add("-f")
   ctx.newCmdLine.add(path)
