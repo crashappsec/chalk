@@ -442,7 +442,7 @@ proc copyGeneratedKeys(pubKey, priKey, baseLoc: string) =
   else:
     info("Public key (encrypted) written to: " & priLoc)
 
-proc loadSigningSetup(): bool =
+proc loadSigningSetup(withPrivateKey = false): bool =
   let
     selfOpt = getSelfExtraction()
 
@@ -456,31 +456,33 @@ proc loadSigningSetup(): bool =
 
   let extract = selfChalk.extract
 
-  if "$CHALK_ENCRYPTED_PRIVATE_KEY" notin extract:
-    return false
-
   if "$CHALK_PUBLIC_KEY" notin extract:
     return false
 
-  if cosignPw == "":
-    error("Cannot attest; no password is available for the private key. " &
-      "Note that the private key *must* be encrypted.")
-    return false
-
-  let
-    priKey = unpack[string](extract["$CHALK_ENCRYPTED_PRIVATE_KEY"])
-    pubKey = unpack[string](extract["$CHALK_PUBLIC_KEY"])
-
   withWorkingDir(getCosignTempDir()):
-      if not tryToWriteFile("chalk.key", priKey):
-        return false
-      if not tryToWriteFile("chalk.pub", pubKey):
-        return false
+    let pubKey = unpack[string](extract["$CHALK_PUBLIC_KEY"])
+    if not tryToWriteFile("chalk.pub", pubKey):
+      return false
+
+  if withPrivateKey:
+    if "$CHALK_ENCRYPTED_PRIVATE_KEY" notin extract:
+      return false
+
+    if cosignPw == "":
+      error("Cannot attest; no password is available for the private key. " &
+        "Note that the private key *must* be encrypted.")
+      return false
+
+    let priKey = unpack[string](extract["$CHALK_ENCRYPTED_PRIVATE_KEY"])
+
+    withWorkingDir(getCosignTempDir()):
+        if not tryToWriteFile("chalk.key", priKey):
+          return false
 
   cosignLoaded = true
   return cosignLoaded
 
-proc attemptToLoadKeys*(withPrivateKey=false, silent=false): bool =
+proc attemptToLoadKeys*(withPrivateKey = false, silent=false): bool =
   if getCosignLocation() == "":
     return false
 
@@ -563,17 +565,21 @@ proc checkSetupStatus*() =
   once:
     let
       cmd = getBaseCommandName()
-      withPrivateKey = cmd in ["build", "push", "insert"]
+      # TODO this will require private key for all
+      # docker commands which is not ideal
+      # but there is no easy mechanism to determine docker command here
+      withPrivateKey = cmd in ["insert", "docker"]
     if cmd in ["setup", "help", "load", "dump", "version", "env", "exec"]:
       return
 
     if withPrivateKey:
       acquirePassword()
 
-    if loadSigningSetup():
+    if loadSigningSetup(withPrivateKey = withPrivateKey):
       # loadSigningSetup checks for the info we need to sign. If it's true,
       # we are good.
       return
+
     let
       countOpt = selfChalkGetKey("$CHALK_LOAD_COUNT")
       countBox = countOpt.getOrElse(pack(0))
@@ -585,7 +591,7 @@ proc checkSetupStatus*() =
 
     if cosignPw != "":
       warn("Found CHALK_PASSWORD; looking for code signing keys.")
-      if not attemptToLoadKeys(withPrivateKey=withPrivateKey, silent=true):
+      if not attemptToLoadKeys(withPrivateKey = withPrivateKey, silent = true):
         warn("Could not load code signing keys. Run `chalk setup` to generate")
       return
 
