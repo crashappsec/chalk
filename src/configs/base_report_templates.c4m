@@ -1782,6 +1782,7 @@ running insert commands.
   key.METADATA_ID.use                         = true
   key.SIGNATURE.use                           = true
   key._SIGNATURE.use                          = true
+  key._VALIDATED_SIGNATURE.use                = true
   key._VIRTUAL.use                            = true
   key._CURRENT_HASH.use                       = true
   key._IMAGE_ID.use                           = true

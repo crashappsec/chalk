@@ -182,24 +182,29 @@ def test_setup(chalk_copy: Chalk):
     """
     needs to display password, and public and private key info in chalk
     """
-    result = chalk_copy.run(
+    setup = chalk_copy.run(
         command="setup",
         config=CONFIGS / "nosigningkeybackup.c4m",
     )
-
-    assert result.mark.contains(
+    assert setup.mark.contains(
         {
             "$CHALK_PUBLIC_KEY": re.compile(r"^-----BEGIN PUBLIC KEY"),
             "$CHALK_ENCRYPTED_PRIVATE_KEY": re.compile(
                 r"^-----BEGIN ENCRYPTED SIGSTORE PRIVATE KEY"
             ),
             "SIGNATURE": ANY,
-            "INJECTOR_PUBLIC_KEY": result.mark["$CHALK_PUBLIC_KEY"],
+            "INJECTOR_PUBLIC_KEY": setup.mark["$CHALK_PUBLIC_KEY"],
         }
     )
 
 
-def test_setup_existing_keys(tmp_data_dir: Path, chalk_copy: Chalk, random_hex: str):
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_setup_existing_keys(
+    tmp_data_dir: Path,
+    chalk_copy: Chalk,
+    random_hex: str,
+    copy_files: list[Path],
+):
     """
     needs to display password, and public and private key info in chalk
     """
@@ -210,17 +215,30 @@ def test_setup_existing_keys(tmp_data_dir: Path, chalk_copy: Chalk, random_hex: 
     public = (tmp_data_dir / "chalk.pub").read_text()
     private = (tmp_data_dir / "chalk.key").read_text()
 
-    result = chalk_copy.run(
+    setup = chalk_copy.run(
         command="setup",
         config=CONFIGS / "nosigningkeybackup.c4m",
         env={"CHALK_PASSWORD": random_hex},
     )
 
-    assert result.mark.contains(
+    assert setup.mark.contains(
         {
             "$CHALK_PUBLIC_KEY": public,
             "$CHALK_ENCRYPTED_PRIVATE_KEY": private,
             "SIGNATURE": ANY,
             "INJECTOR_PUBLIC_KEY": public,
         }
+    )
+
+    insert = chalk_copy.insert(
+        copy_files[0],
+        env={"CHALK_PASSWORD": random_hex},
+    )
+    assert insert.mark.has(
+        SIGNATURE=ANY,
+    )
+
+    extract = chalk_copy.extract(copy_files[0])
+    assert extract.mark.has(
+        _VALIDATED_SIGNATURE=True,
     )
