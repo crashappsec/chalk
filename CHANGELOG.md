@@ -17,6 +17,8 @@
   [#229](https://github.com/crashappsec/chalk/pull/229)
 - Fixes chalking zip file reporting git-repo keys
   [#230](https://github.com/crashappsec/chalk/issues/230)
+- Fixes cosign not honoring `CHALK_PASSWORD` in all operations
+  [#232](https://github.com/crashappsec/chalk/pull/232)
 
 ## 0.3.3
 
