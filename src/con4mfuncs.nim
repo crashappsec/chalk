@@ -15,7 +15,7 @@
 import pkg/[nimutils/jwt]
 import std/[httpclient]
 import con4m/st
-import "."/[config, reporting, sinks]
+import "."/[config, reporting, sinks, chalkjson]
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
@@ -110,6 +110,18 @@ proc memoizeInChalkmark(args: seq[Box], s: ConfigState): Option[Box] =
   selfChalkSetSubKey("$CHALK_MEMOIZE", name, value)
   return valueOpt
 
+proc c4mParseJson*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
+  let
+    data = unpack[string](args[0])
+  try:
+    let
+      json = parseJson(data)
+      box  = nimJsonToBox(json)
+    return some(box)
+  except:
+    error("Could not parse json: " & getCurrentExceptionMsg())
+    return none(Box)
+
 let chalkCon4mBuiltins* = [
     ("version() -> string",
      BuiltinFn(getExeVersion),
@@ -200,7 +212,16 @@ Memoizes function callback value in chalkmark for future lookups.
 
 This way the function is only computed once.
 """,
-     @["chalk"])
+     @["chalk"]),
+
+    ("parse_json(string) -> `x",
+     BuiltInFn(c4mParseJson),
+     """
+Same as `url_post()`, but takes a certificate file location in the final
+parameter, with which HTTPS connections must authenticate against.
+""",
+     @["parsing"]),
+
 ]
 
 let errSinkObj = SinkImplementation(outputFunction: chalkErrSink)
