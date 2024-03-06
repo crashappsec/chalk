@@ -87,12 +87,10 @@ generate_keypair(char **s1, char **s2) {
     let
       prikey: cstring
       pubkey: cstring
-      fpPri = newFileStream("chalk.pem", fmWrite)
 
     generateKeypair(addr prikey, addr pubkey)
-
-    fpPri.write($(prikey))
-    fpPri.close()
+    if not tryToWriteFile("chalk.pem", $(prikey)):
+      raise newException(OSError, "could not write private key to chalk.pem: " & getCurrentExceptionMsg())
 
     discard execProcess(cosign, args = importFlags, options={})
 
@@ -380,7 +378,9 @@ proc testSigningSetup(pubKey, priKey: string): bool =
         toSign   = "Test string for signing"
         signArgs = @["sign-blob", "--tlog-upload=false", "--yes",
                      "--key=chalk.key", "-"]
-        signOut  = getCosignLocation().runCmdGetEverything(signArgs, tosign)
+
+      let
+        signOut  = runCmdGetEverything(cosign, signArgs, tosign)
         sig      = signOut.getStdout()
 
       if signOut.getExit() != 0 or sig == "":
@@ -609,7 +609,6 @@ proc writeInToto(info:      DockerInvocation,
     randint = secureRand[uint]()
     hexval  = toHex(randint and 0xffffffffffff'u).toLowerAscii()
     path    = "chalk-toto-" & hexval & ".json"
-    f       = newFileStream(path, fmWrite)
     tagStr  = escapeJson(tag)
     hashStr = escapeJson(info.opChalkObj.cachedHash)
     toto    = """ {
@@ -630,8 +629,8 @@ proc writeInToto(info:      DockerInvocation,
       }
   }
 """
-  f.write(toto)
-  f.close()
+  if not tryToWriteFile(path, toto):
+    raise newException(OSError, "could not write toto to file: " & getCurrentExceptionMsg())
 
   #let
   #  args = @[pack(path), pack(digestStr), pack(cosign)]
@@ -706,8 +705,9 @@ proc coreVerify(pk: string, chalk: ChalkObj): bool =
       args   = @["verify-attestation", "--key", fName,
                  "--insecure-ignore-tlog=" & $(noTlog), "--type", "custom",
                  chalk.repo & "@sha256:" & chalk.repoHash]
+      cosign = getCosignLocation()
     let
-      allOut = runCmdGetEverything(getCosignLocation(), args)
+      allOut = runCmdGetEverything(cosign, args)
       res    = allout.getStdout()
       code   = allout.getExit()
 
@@ -841,7 +841,8 @@ proc signNonContainer*(chalk: ChalkObj, unchalkedMD, metadataMD : string):
   trace("signing blob: " & blob )
   withWorkingDir(getCosignTempDir()):
     withCosignPassword:
-      let allOutput = getCosignLocation().runCmdGetEverything(args, blob & "\n")
+      let cosign = getCosignLocation()
+      let allOutput = runCmdGetEverything(cosign, args, blob & "\n")
 
       result = allOutput.getStdout().strip()
 
@@ -866,7 +867,8 @@ proc cosignNonContainerVerify*(chalk: ChalkObj,
       return vNoCosign
 
     withCosignPassword:
-      let allOutput = getCosignLocation().runCmdGetEverything(args, blob & "\n")
+      let cosign = getCosignLocation()
+      let allOutput = runCmdGetEverything(cosign, args, blob & "\n")
 
       if allOutput.getExit() == 0:
         info(chalk.name & ": Signature successfully validated.")

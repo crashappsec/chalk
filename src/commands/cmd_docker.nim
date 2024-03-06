@@ -22,7 +22,7 @@
 ## But when wrapping docker, this module does the bulk of the work and
 ## is responsible for all of the collection logic.
 
-import std/[posix, unicode, enumerate]
+import std/[posix, unicode]
 import ".."/[config, collect, reporting, chalkjson, docker_cmdline, docker_base,
              subscan, dockerfile, util, attestation, commands/cmd_help,
              plugin_api]
@@ -73,14 +73,10 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   trace("Docker subscan complete.")
 
 proc writeChalkMark(ctx: DockerInvocation, mark: string) =
-  # We are going to move this file, so don't autoclean.
-  var
-    (f, path) = getNewTempFile(autoClean = false)
-
   try:
-    info("Creating temporary chalk file: " & path)
-    f.writeLine(mark)
-    f.close()
+    # We are going to move this file, so don't autoclean.
+    let path = writeNewTempFile(mark, autoClean = false)
+    info("Created temporary chalk file: " & path)
     ctx.makeFileAvailableToDocker(path, move=true, newName="chalk.json", chmod="0444")
   except:
     error("Unable to write to open tmp file (disk space?)")
@@ -176,18 +172,14 @@ proc writeNewDockerFileIfNeeded(ctx: DockerInvocation) =
   # should properly be using a temporary file, because it's a place
   # we're generally guaranteed to be able to write.
 
-  let (f, path) = getNewTempFile()
-
-  info("Created temporary Dockerfile at: " & path)
-
+  # add last blank line
   if ctx.inDockerFile.len() != 0 and ctx.inDockerFile[^1] != '\n':
     ctx.inDockerFile &= "\n"
-
   let newcontents = ctx.inDockerFile & ctx.addedInstructions.join("\n")
 
-  trace("New docker file: \n" & newcontents)
-  f.write(newcontents)
-  f.close()
+  let path = writeNewTempFile(newcontents)
+  info("Created temporary Dockerfile at: " & path)
+  trace("New docker file:\n" & newcontents)
 
   ctx.newCmdLine.add("-f")
   ctx.newCmdLine.add(path)

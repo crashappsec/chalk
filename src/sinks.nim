@@ -269,11 +269,8 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
           opts[k] = $(unpack[bool](boxOpt.get()))
     of "pinned_cert":
       let
-        (stream, path) = getNewTempFile("pinned", ".pem")
-        certContents   = getOpt[string](attrs, k).getOrElse("")
-
-      stream.write(certContents)
-      stream.close()
+        certContents = getOpt[string](attrs, k).getOrElse("")
+        path         = writeNewTempFile(certContents, "pinned", ".pem")
       discard attrs.setOverride("pinned_cert_file", some(pack(path)))
       # Can't delete from a dict while we're iterating over it.
       deleteList.add(k)

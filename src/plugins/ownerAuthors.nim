@@ -57,19 +57,13 @@ proc authorsGetChalkTimeArtifactInfo*(self: Plugin, ignore: ChalkObj): ChalkDict
 
   if fname == "": return
 
-  var ctx: FileStream
-
   try:
-    ctx = newFileStream(fname, fmRead)
-    if ctx == nil: error(fname & ": Could not open file")
-    else:
-      let s = ctx.readAll()
-      if s != "": result["CODE_OWNERS"] = pack(s)
+    let s = tryToLoadFile(fname)
+    if s != "":
+      result["CODE_OWNERS"] = pack(s)
   except:
     error(fname & ": File found, but could not be read")
     dumpExOnDebug()
-  finally:
-    if ctx != nil: ctx.close()
 
 proc loadOwnerAuthors*() =
   newPlugin("authors",

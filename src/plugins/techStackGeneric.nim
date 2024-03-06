@@ -6,7 +6,7 @@
 ##
 
 import std/[hashes, re, sequtils, sets, tables]
-import ".."/[config, plugin_api]
+import ".."/[config, plugin_api, util]
 
 const FT_ANY = "*"
 var
@@ -117,13 +117,10 @@ template scanFileStream(strm: FileStream) =
         break
 
 proc scanFile(filePath: string, category: string, subcategory: string) =
-  var strm = newFileStream(filePath, fmRead)
-  if strm == nil:
-    return
-  try:
-    scanFileStream(strm)
-  finally:
-    strm.close()
+  withFileStream(filePath, mode = fmRead, strict = true):
+    if stream == nil:
+      return
+    scanFileStream(stream)
 
 proc getProcNames(): HashSet[string] =
   result = initHashSet[string]()

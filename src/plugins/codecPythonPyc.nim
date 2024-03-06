@@ -11,11 +11,8 @@
 import ".."/[config, plugin_api, util]
 
 proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
-  var
-    chalk: ChalkObj
-
-  let
-    ext = loc.splitFile().ext.strip()
+  var chalk: ChalkObj
+  let ext = loc.splitFile().ext.strip()
 
   #Does this artifact have a python source file extension?
   # if so chalk it, else skip
@@ -24,28 +21,26 @@ proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
   if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.getPycExtensions():
     return none(ChalkObj)
 
-  let stream = newFileStream(loc)
+  withFileStream(loc, mode = fmRead, strict = false):
+    if stream == nil:
+      return none(ChalkObj)
 
-  if stream == nil:
-    return none(ChalkObj)
+    let
+      byte_blob = stream.readAll()
+      ix        = byte_blob.find(magicUTF8)
 
-  let
-    byte_blob = stream.readAll()
-    ix        = byte_blob.find(magicUTF8)
+    if ix == -1:
+      #No magic == no existing chalk, new chalk created
+      let chalk         = newChalk(name   = loc,
+                                   fsRef  = loc,
+                                   codec  =  self)
+      chalk.startOffset = len(byte_blob)
 
-  if ix == -1:
-    #No magic == no existing chalk, new chalk created
-    chalk             = newChalk(name   = loc,
-                                 fsRef  = loc,
-                                 stream = stream,
-                                 codec  =  self)
-    chalk.startOffset = len(byte_blob)
+    else: # Existing chalk, just reflect whats found
+      stream.setPosition(ix)
+      chalk = self.loadChalkFromFStream(stream, loc)
 
-  else: # Existing chalk, just reflect whats found
-    stream.setPosition(ix)
-    chalk = self.loadChalkFromFStream(stream, loc)
-
-  return some(chalk)
+    return some(chalk)
 
 proc pycHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
                      {.cdecl.} =
@@ -54,7 +49,7 @@ proc pycHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
     post:    string
     toWrite: string
 
-  chalkUseStream(chalk):
+  withFileStream(chalk.fsRef, mode = fmRead, strict = true):
     #Read up to previously set offset indicating where magic began
     pre  = stream.readStr(chalk.startOffset)
     #Move past
@@ -70,14 +65,14 @@ proc pycHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
   else:
     toWrite = pre
 
-  if not chalk.replaceFilecontents(toWrite):
+  if not chalk.replaceFileContents(toWrite):
     chalk.opFailed = true
 
 
 proc pycGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
                         Option[string] {.cdecl.} =
-  chalkUseStream(chalk):
-    let toHash = $(chalk.stream.readStr(chalk.startOffset))
+  withFileStream(chalk.fsRef, mode = fmRead, strict = true):
+    let toHash = $(stream.readStr(chalk.startOffset))
     return some(toHash.sha256Hex())
 
 proc pycGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):

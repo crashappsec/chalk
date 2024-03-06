@@ -81,38 +81,27 @@ proc extractKeyMetadata(codec: Plugin, stream: FileStream, loc: string):
   else:
     result = newChalk(name         = loc,
                       fsRef        = loc,
-                      stream       = stream,
                       codec        = codec,
                       resourceType = {ResourceFile})
     result.startOffset = stream.getPosition()
 
 proc fbScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
-  var
-    stream: FileStream
-
-  try:
-    stream    = newFileStream(loc)
-
+  withFileStream(loc, mode = fmRead, strict = false):
     if stream == nil:
       return none(ChalkObj)
+    try:
+      let magic = stream.readUint32()
+      if magic != elfMagic and magic != elfSwapped:
+        return none(ChalkObj)
 
-    let magic = stream.readUint32()
-
-    if magic != elfMagic and magic != elfSwapped:
-      stream.close()
+      return some(self.extractKeyMetadata(stream, loc))
+    except:
+      # This is usally a 0-length file and not worth a stack-trace.
       return none(ChalkObj)
-
-    result = some(self.extractKeyMetadata(stream, loc))
-  except:
-    if stream != nil:
-      stream.close()
-
-    return none(ChalkObj)
-  # This is usally a 0-length file and not worth a stack-trace.
 
 proc fbGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
                         Option[string] {.cdecl.} =
-  chalk.chalkUseStream():
+  withFileStream(chalk.fsRef, mode = fmRead, strict = true):
     let toHash = stream.readStr(chalk.startOffset)
     return some(toHash.sha256Hex())
 

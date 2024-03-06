@@ -10,7 +10,7 @@
 ## if any, and the file extension.
 
 from std/unicode import validateUtf8
-import ".."/[config, plugin_api]
+import ".."/[config, plugin_api, util]
 
 template seemsToBeUtf8(stream: FileStream): bool =
   try:
@@ -87,66 +87,60 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       # We might revise this if there's a shebang line; it takes precidence.
       lang = chalkConfig.srcConfig.extensionsToLanguagesMap[ext]
       trace(path & ": By file type, language is: " & lang)
-  let
-    stream = newFileStream(path)
 
-  if stream == nil:
-    warn(path & ": source codec was unable to open file for reading")
-    return none(ChalkObj)
-
-  try:
-    let bytes = stream.peekStr(2)
-
-    if bytes != "#!":
-      if isChalkingOp() and chalkConfig.srcConfig.getOnlyMarkShebangs():
-        stream.close()
-        return none(ChalkObj)
-      elif not stream.seemsToBeUtf8():
-        stream.close()
-        return none(ChalkObj)
-    else:
-      lang    = stream.extractSheblanguage(path)
-      trace(path & ": After shebang is processed, language is: " & lang)
-      hasBang = if lang == "": false else: true
-  except:
-    warn(path & ": source codec could not read from open file.")
-
-  # While we already checked this above, if the shebang was there,
-  # but was invalid, we'll behave as if it wasn't there at all.
-  if not hasBang and isChalkingOp() and
-     chalkConfig.srcConfig.getOnlyMarkShebangs():
-    stream.close()
-    return none(ChalkObj)
-
-  if lang == "":
-    # Assume shell script.
-    lang = "sh"
-
-  # At this point, *if* there's a custom_logic callback, we need to
-  # call it, otherwise we are done.
-
-  let opt = chalkConfig.srcConfig.getCustomLogic()
-
-  if opt.isSome():
-    let
-      args    = @[pack(path), pack(lang), pack(ext), pack(hasBang), pack(isExe)]
-      proceed = unpack[bool](runCallback(opt.get(), args).get())
-
-    if not proceed:
-      stream.close()
+  withFileStream(path, mode = fmRead, strict = false):
+    if stream == nil:
       return none(ChalkObj)
 
-  if lang in chalkConfig.srcConfig.languageToCommentMap:
-    commentPrefix = chalkConfig.srcConfig.languageToCommentMap[lang]
-  else:
-    commentPrefix = "#"
+    try:
+      let bytes = stream.peekStr(2)
 
-  result = self.scriptLoadMark(stream, path, commentPrefix)
+      if bytes != "#!":
+        if isChalkingOp() and chalkConfig.srcConfig.getOnlyMarkShebangs():
+          return none(ChalkObj)
+        elif not stream.seemsToBeUtf8():
+          return none(ChalkObj)
+      else:
+        lang    = stream.extractSheblanguage(path)
+        trace(path & ": After shebang is processed, language is: " & lang)
+        hasBang = if lang == "": false else: true
+    except:
+      warn(path & ": source codec could not read from open file.")
 
-  if result.isSome():
-    let chalk = result.get()
-    chalk.detectedLang  = lang
-    chalk.commentPrefix = commentPrefix
+    # While we already checked this above, if the shebang was there,
+    # but was invalid, we'll behave as if it wasn't there at all.
+    if not hasBang and isChalkingOp() and
+       chalkConfig.srcConfig.getOnlyMarkShebangs():
+      return none(ChalkObj)
+
+    if lang == "":
+      # Assume shell script.
+      lang = "sh"
+
+    # At this point, *if* there's a custom_logic callback, we need to
+    # call it, otherwise we are done.
+
+    let opt = chalkConfig.srcConfig.getCustomLogic()
+
+    if opt.isSome():
+      let
+        args    = @[pack(path), pack(lang), pack(ext), pack(hasBang), pack(isExe)]
+        proceed = unpack[bool](runCallback(opt.get(), args).get())
+
+      if not proceed:
+        return none(ChalkObj)
+
+    if lang in chalkConfig.srcConfig.languageToCommentMap:
+      commentPrefix = chalkConfig.srcConfig.languageToCommentMap[lang]
+    else:
+      commentPrefix = "#"
+
+    result = self.scriptLoadMark(stream, path, commentPrefix)
+
+    if result.isSome():
+      let chalk = result.get()
+      chalk.detectedLang  = lang
+      chalk.commentPrefix = commentPrefix
 
 
 proc sourceGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):

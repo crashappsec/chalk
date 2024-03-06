@@ -10,7 +10,7 @@
 
 import std/[algorithm, nativesockets, sequtils, times]
 import pkg/[zippy, zippy/inflate]
-import ".."/[config, plugin_api]
+import ".."/[config, plugin_api, util]
 
 const
   eBadGitConf      = "Git configuration file is invalid"
@@ -279,39 +279,37 @@ template formatCommitObjectTime(line: string): string =
   fromUnix(parseTime(line)).format(gitTimeFmt) & " " & line.split()[^1]
 
 proc readPackedCommit(path: string, offset: uint64): string =
-  let fileStream = newFileStream(path)
-  if fileStream == nil:
-    raise(newException(CatchableError, "failed to open " & path))
-  fileStream.setPosition(int(offset))
-  let initialReadSize = 0x1000
-  var
-    data = fileStream.readStr(initialReadSize)
-    byte = uint8(data[0])
-  if ((byte shr 4) and 7) != gitObjCommit:
-    raise(newException(CatchableError, "invalid commit object"))
-  var
-    uncompressedSize = uint64(byte and 0x0F)
-    shiftBits        = 4
-    currentOffset    = 0
-  while (byte and 0x80) != 0:
-    currentOffset += 1
-    byte = uint8(data[currentOffset])
-    uncompressedSize += uint64((byte and 0x7F) shl shiftBits)
-    shiftBits += 8
-  # My understanding is that we do not have a way to know the compressed size.
-  # We assume that either the uncompressed size is bigger than the compressed
-  # size, or that a scenario where compressed size is larger would likely only
-  # happen with smaller objects (smaller than our initial read size of 0x1000).
-  # It seems particularly unlikely with git commit objects, but if these
-  # assumptions prove wrong the resulting failure is a signal we report.
+  withFileStream(path, mode = fmRead, strict = true):
+    stream.setPosition(int(offset))
+    let initialReadSize = 0x1000
+    var
+      data = stream.readStr(initialReadSize)
+      byte = uint8(data[0])
+    if ((byte shr 4) and 7) != gitObjCommit:
+      raise(newException(CatchableError, "invalid commit object"))
+    var
+      uncompressedSize = uint64(byte and 0x0F)
+      shiftBits        = 4
+      currentOffset    = 0
+    while (byte and 0x80) != 0:
+      currentOffset += 1
+      byte = uint8(data[currentOffset])
+      uncompressedSize += uint64((byte and 0x7F) shl shiftBits)
+      shiftBits += 8
+    # My understanding is that we do not have a way to know the compressed size.
+    # We assume that either the uncompressed size is bigger than the compressed
+    # size, or that a scenario where compressed size is larger would likely only
+    # happen with smaller objects (smaller than our initial read size of 0x1000).
+    # It seems particularly unlikely with git commit objects, but if these
+    # assumptions prove wrong the resulting failure is a signal we report.
 
-  # Given the assumptions above, we attempt to read up to uncompressedSize
-  currentOffset += 1
-  let remaining = initialReadSize - currentOffset
-  if uncompressedSize > uint64(remaining):
-    data &= fileStream.readStr(remaining)
-  var sourcePointer = cast[ptr UncheckedArray[uint8]](addr data[currentOffset])
-  inflate(result, sourcePointer, len(data)-currentOffset, 2)
+    # Given the assumptions above, we attempt to read up to uncompressedSize
+    currentOffset += 1
+    let remaining = initialReadSize - currentOffset
+    if uncompressedSize > uint64(remaining):
+      data &= stream.readStr(remaining)
+    var sourcePointer = cast[ptr UncheckedArray[uint8]](addr data[currentOffset])
+    inflate(result, sourcePointer, len(data)-currentOffset, 2)
 
 proc findPackedGitCommit(vcsDir, commitId: string): string =
   let
@@ -618,20 +616,20 @@ proc findAndLoad(plugin: GitInfo, path: string) =
   let
     confFileName = vcsDir.joinPath(fNameConfig)
     info         = RepoInfo(vcsDir: vcsDir)
-    f            = newFileStream(confFileName)
+
   trace("Found version control dir: " & vcsDir)
   info.loadHead()
-
-  try:
-    if f != nil:
-      let config = f.parseGitConfig()
-      info.origin = info.calcOrigin(config)
-  except:
-    error(confFileName & ": Git configuration file not parsed.")
-    dumpExOnDebug()
-
   if info.commitId == "":
     return
+
+  withFileStream(confFileName, mode = fmRead, strict = false):
+    try:
+      if stream != nil:
+        let config = stream.parseGitConfig()
+        info.origin = info.calcOrigin(config)
+    except:
+      error(confFileName & ": Git configuration file not parsed.")
+      dumpExOnDebug()
 
   plugin.vcsDirs[vcsDir] = info
 

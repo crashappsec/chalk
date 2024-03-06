@@ -67,8 +67,10 @@ template doPanicWrite(s: string) =
     # TODO: This is Posix specific. Someday should make Chalk work on Windows.
     let f = newFileStream("/dev/tty", fmWrite)
     if f != nil:
-      f.write(s)
-      f.close()
+      try:
+        f.write(s)
+      finally:
+        f.close()
   except:
     try:
       stderr.write(s)
@@ -386,9 +388,13 @@ proc writeReportCache*() =
       panicPublish(newCacheContents, "", fname, getCurrentExceptionMsg())
       dumpExOnDebug()
       return
+    finally:
+      try:
+        tmpfile.close()
+      except:
+        discard
 
     try:
-      tmpfile.close()
       removeFile(fname)
       moveFile(tmpname, fname)
       warn("Some reports failed to publish, and are cached in: " & fname)
