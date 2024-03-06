@@ -189,18 +189,19 @@ proc loadAllConfigs*() =
 
   con4mRuntime = stack
 
-  stack.addSystemBuiltins().
-      addCustomBuiltins(chalkCon4mBuiltins).
-      setErrorHandler(handleCon4mErrors).
-      addGetoptSpecLoad().
-      addSpecLoad(chalkSpecName,  toStream(chalkC42Spec), notEvenDefaults).
-      addConfLoad(baseConfName,   toStream(baseConfig),   checkNone).
-      addCallback(loadLocalStructs).
-      addConfLoad(getoptConfName, toStream(getoptConfig), checkNone).
-      setErrorHandler(handleOtherErrors).
-      addStartGetOpts(printAutoHelp = false, args=params).
-      addCallback(loadLocalStructs).
-      setErrorHandler(handleCon4mErrors)
+  stack.
+    addSystemBuiltins().
+    addCustomBuiltins(chalkCon4mBuiltins).
+    setErrorHandler(handleCon4mErrors).
+    addGetoptSpecLoad().
+    addSpecLoad(chalkSpecName,  toStream(chalkC42Spec), notEvenDefaults).
+    addConfLoad(baseConfName,   toStream(baseConfig),   checkNone).
+    addCallback(loadLocalStructs).
+    addConfLoad(getoptConfName, toStream(getoptConfig), checkNone).
+    setErrorHandler(handleOtherErrors).
+    addStartGetOpts(printAutoHelp = false, args=params).
+    addCallback(loadLocalStructs).
+    setErrorHandler(handleCon4mErrors)
   doRun()
 
   stack.

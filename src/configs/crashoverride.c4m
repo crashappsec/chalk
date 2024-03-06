@@ -399,8 +399,9 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.$CHALK_IMPLEMENTATION_NAME.use          = true
   ~key.$CHALK_LOAD_COUNT.use                   = true
   ~key.$CHALK_PUBLIC_KEY.use                   = true
-  ~key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
+  ~key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = false
   ~key.$CHALK_ATTESTATION_TOKEN.use            = true
   ~key.$CHALK_COMPONENT_CACHE.use              = false
-  ~key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
+  ~key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = false
+  ~key.$CHALK_MEMOIZE.use                      = false
 }

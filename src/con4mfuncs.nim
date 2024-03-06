@@ -13,6 +13,8 @@
 ## con4m at some point, as long as it's all optional.
 
 import pkg/[nimutils/jwt]
+import std/[httpclient]
+import con4m/st
 import "."/[config, reporting, sinks]
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
@@ -76,6 +78,37 @@ proc isJwtValid(args: seq[Box], s: ConfigState): Option[Box] =
     return some(pack(isAlive))
   except:
     return some(pack(false))
+
+proc authHeaders(args: seq[Box], s: ConfigState): Option[Box] =
+  let
+    name    = unpack[string](args[0])
+    authOpt = getAuthConfigByName(name, attr=s.attrs)
+    c4mHeaders  = newTable[string, string]()
+  if authOpt.isNone():
+    error("there is no auth config for: " & name)
+  else:
+    let
+      auth        = authOpt.get()
+      headers     = newHttpHeaders()
+      authHeaders = auth.implementation.injectHeaders(auth, headers)
+    for key, value in authHeaders.pairs():
+      c4mHeaders[key] = value
+  return some(pack(c4mHeaders))
+
+proc memoizeInChalkmark(args: seq[Box], s: ConfigState): Option[Box] =
+  let
+    name     = unpack[string](args[0])
+    fn       = unpack[CallbackObj](args[1])
+    existing = selfChalkGetSubKey("$CHALK_MEMOIZE", name)
+  if existing.isSome():
+    return existing
+  let valueOpt = s.sCall(fn, @[])
+  if valueOpt.isNone():
+    error("In memoize(\"" & name & "\", fn), fn didnt return any value")
+    return none(Box)
+  let value = valueOpt.get()
+  selfChalkSetSubKey("$CHALK_MEMOIZE", name, value)
+  return valueOpt
 
 let chalkCon4mBuiltins* = [
     ("version() -> string",
@@ -153,6 +186,20 @@ executable name).
      """
 Returns whether JWT token is valid and hasnt expired.
 """,
+     @["chalk"]),
+    ("auth_headers(string) -> dict[string, string]",
+     BuiltInFn(authHeaders),
+     """
+Returns auth headers for provided auth config.
+""",
+     @["chalk"]),
+    ("memoize(string, func () -> string) -> string",
+     BuiltInFn(memoizeInChalkmark),
+     """
+Memoizes function callback value in chalkmark for future lookups.
+
+This way the function is only computed once.
+""",
      @["chalk"])
 ]
 
@@ -175,5 +222,5 @@ discard registerTopic("fail")      # This gets aborted reports that we
                                    # good telemetry for some people.
 discard registerTopic("chalk_usage_stats")
 
-
-when not defined(release): discard subscribe("debug", defaultDebugHook)
+when not defined(release):
+  discard subscribe("debug", defaultDebugHook)

@@ -10,6 +10,43 @@
 import "."/[run_management, config_version]
 export run_management
 
+proc selfChalkGetKey*(keyName: string): Option[Box] =
+  if selfChalk == nil or selfChalk.extract == nil or
+     keyName notin selfChalk.extract:
+    return none(Box)
+  else:
+    return some(selfChalk.extract[keyName])
+
+proc selfChalkSetKey*(keyName: string, val: Box) =
+  if selfChalk.extract != nil:
+    # Overwrite what we extracted, as it'll get "preserved" when
+    # writing out the chalk file.
+    selfChalk.extract[keyName] = val
+  selfChalk.collectedData[keyName] = val
+
+proc selfChalkDelKey*(keyName: string) =
+  if selfChalk.extract != nil and keyName in selfChalk.extract:
+     selfChalk.extract.del(keyName)
+  if keyName in selfChalk.collectedData:
+    selfChalk.collectedData.del(keyName)
+
+proc selfChalkGetSubKey*(key: string, subKey: string): Option[Box] =
+  var valueOpt = selfChalkGetKey(key)
+  if valueOpt.isNone():
+    valueOpt = some(pack(ChalkDict()))
+  let value = unpack[ChalkDict](valueOpt.get())
+  if subKey notin value:
+    return none(Box)
+  return some(value[subKey])
+
+proc selfChalkSetSubKey*(key: string, subKey: string, subValue: Box) =
+  var valueOpt = selfChalkGetKey(key)
+  if valueOpt.isNone():
+    valueOpt = some(pack(ChalkDict()))
+  let value = unpack[ChalkDict](valueOpt.get())
+  value[subKey] = subValue
+  selfChalkSetKey(key, pack(value))
+
 proc filterByTemplate*(dict: ChalkDict, p: MarkTemplate | ReportTemplate): ChalkDict =
   result = ChalkDict()
   for k, v in dict:

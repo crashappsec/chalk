@@ -106,26 +106,6 @@ proc getSelfExtraction*(): Option[ChalkObj] =
   else:
     result = none(ChalkObj)
 
-proc selfChalkGetKey*(keyName: string): Option[Box] =
-  if selfChalk == nil or selfChalk.extract == nil or
-     keyName notin selfChalk.extract:
-    return none(Box)
-  else:
-    return some(selfChalk.extract[keyName])
-
-proc selfChalkSetKey*(keyName: string, val: Box) =
-  if selfChalk.extract != nil:
-    # Overwrite what we extracted, as it'll get "preserved" when
-    # writing out the chalk file.
-    selfChalk.extract[keyName] = val
-  selfChalk.collectedData[keyName] = val
-
-proc selfChalkDelKey*(keyName: string) =
-  if selfChalk.extract != nil and keyName in selfChalk.extract:
-     selfChalk.extract.del(keyName)
-  if keyName in selfChalk.collectedData:
-    selfChalk.collectedData.del(keyName)
-
 # The rest of this is specific to writing the self-config.
 
 proc newConfFileError(err, tb: string): bool =

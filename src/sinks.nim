@@ -174,7 +174,7 @@ proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
     else:
       info(toOut)
 
-proc getAuthConfigByName*(name: string): Option[AuthConfig] =
+proc getAuthConfigByName*(name: string, attr: AttrScope = AttrScope(nil)): Option[AuthConfig] =
   if name == "":
     return none(AuthConfig)
 
@@ -182,7 +182,7 @@ proc getAuthConfigByName*(name: string): Option[AuthConfig] =
     return some(availableAuthConfigs[name])
 
   let
-    attrRoot = chalkConfig.`@@attrscope@@`
+    attrRoot = if attr != nil: attr else: chalkConfig.`@@attrscope@@`
     attrs    = attrRoot.getObjectOpt("auth_config." & name).getOrElse(nil)
     opts     = OrderedTableRef[string, string]()
 
