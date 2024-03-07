@@ -470,7 +470,7 @@ proc getPartialJsonObject(top: JsonNode, key: string): Option[JsonNode] =
 proc jsonAutoKey(map:  OrderedTable[string, string],
                  top:  JsonNode,
                  dict: ChalkDict) =
-  let reportEmpty = chalkConfig.dockerConfig.getReportEmptyFields()
+  let reportEmpty = chalkConfig.get[:bool]("docker.report_empty_fields")
 
   for jsonKey, chalkKey in map:
     let subJsonOpt = top.getPartialJsonObject(jsonKey)
