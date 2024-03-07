@@ -94,7 +94,7 @@ proc extractImageMark(chalk: ChalkObj): ChalkDict =
         return
 
       else:
-        if not chalkConfig.extractConfig.getSearchBaseLayersForMarks():
+        if not chalkConfig.get[:bool]("extract.search_base_layers_for_marks"):
           return
 
         # We're only going to go deeper if there's no chalk mark found.
