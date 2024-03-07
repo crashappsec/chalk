@@ -83,9 +83,10 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     if ext in chalkConfig.get[:seq[string]]("source_marks.text_only_extensions"):
       return none(ChalkObj)
 
-    if ext in chalkConfig.srcConfig.extensionsToLanguagesMap:
+    let exts = chalkConfig.get[:TableRef[string, string]]("source_marks.extensions_to_languages_map")
+    if ext in exts:
       # We might revise this if there's a shebang line; it takes precidence.
-      lang = chalkConfig.srcConfig.extensionsToLanguagesMap[ext]
+      lang = exts[ext]
       trace(path & ": By file type, language is: " & lang)
 
   withFileStream(path, mode = fmRead, strict = false):
@@ -130,8 +131,9 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       if not proceed:
         return none(ChalkObj)
 
-    if lang in chalkConfig.srcConfig.languageToCommentMap:
-      commentPrefix = chalkConfig.srcConfig.languageToCommentMap[lang]
+    let langs = chalkConfig.get[:TableRef[string, string]]("source_marks.language_to_comment_map")
+    if lang in langs:
+      commentPrefix = langs[lang]
     else:
       commentPrefix = "#"
 
