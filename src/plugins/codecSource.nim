@@ -69,7 +69,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     hasBang = false
 
   if not isExe and isChalkingOp() and
-     chalkConfig.srcConfig.getOnlyMarkWhenExecuteSet():
+     chalkConfig.get[:bool]("source_marks.only_mark_when_execute_set"):
     return none(ChalkObj)
 
   var
@@ -80,7 +80,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
 
   if ext != "":
     ext  = ext[1 .. ^1] # No need for the period.
-    if ext in chalkConfig.srcConfig.getTextOnlyExtensions():
+    if ext in chalkConfig.get[:seq[string]]("source_marks.text_only_extensions"):
       return none(ChalkObj)
 
     if ext in chalkConfig.srcConfig.extensionsToLanguagesMap:
@@ -96,7 +96,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       let bytes = stream.peekStr(2)
 
       if bytes != "#!":
-        if isChalkingOp() and chalkConfig.srcConfig.getOnlyMarkShebangs():
+        if isChalkingOp() and chalkConfig.get[:bool]("source_marks.only_mark_shebangs"):
           return none(ChalkObj)
         elif not stream.seemsToBeUtf8():
           return none(ChalkObj)
@@ -110,7 +110,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     # While we already checked this above, if the shebang was there,
     # but was invalid, we'll behave as if it wasn't there at all.
     if not hasBang and isChalkingOp() and
-       chalkConfig.srcConfig.getOnlyMarkShebangs():
+       chalkConfig.get[:bool]("source_marks.only_mark_shebangs"):
       return none(ChalkObj)
 
     if lang == "":
@@ -120,7 +120,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     # At this point, *if* there's a custom_logic callback, we need to
     # call it, otherwise we are done.
 
-    let opt = chalkConfig.srcConfig.getCustomLogic()
+    let opt = chalkConfig.getOpt[:CallbackObj]("source_marks.custom_logic")
 
     if opt.isSome():
       let
