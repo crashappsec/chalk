@@ -302,7 +302,7 @@ proc updateArchBinaries*(newConfig: string, newParams: seq[Box],
   elif not chalkConfig.get[:bool]("load.update_arch_binaries"):
     return
   else:
-    binInfo = unpack[typeof(binInfo)](chalkConfig.getAttrScope().attrLookup("docker.arch_binary_locations").getOrElse(nil))
+    binInfo = chalkConfig.getOpt[:typeof(binInfo)]("docker.arch_binary_locations").get(nil)
 
   if binInfo == nil or len(binInfo) == 0:
     trace("No multi-arch binaries to load.")
