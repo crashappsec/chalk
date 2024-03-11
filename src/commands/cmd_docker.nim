@@ -86,7 +86,7 @@ var labelPrefix: string
 
 proc processLabelKey(s: string): string =
   once:
-    labelPrefix = chalkConfig.get[:string]("docker.label_prefix")
+    labelPrefix = get[string](chalkConfig, "docker.label_prefix")
 
   result = labelPrefix
 
@@ -111,13 +111,13 @@ proc formatLabel(name: string, value: string, addLabel: bool): string =
 
 proc addNewLabelsToDockerFile(ctx: DockerInvocation) =
   # First, add totally custom labels.
-  let labelOps = chalkConfig.getOpt[:TableRef[string, string]]("docker.custom_labels")
+  let labelOps = getOpt[TableRef[string, string]](chalkConfig, "docker.custom_labels")
 
   if labelOps.isSome():
     for k, v in labelOps.get():
       ctx.addedInstructions.add(formatLabel(k, v, true))
 
-  let labelTemplName = chalkConfig.get[:string]("docker.label_template")
+  let labelTemplName = get[string](chalkConfig, "docker.label_template")
   if labelTemplName == "":
     return
 
@@ -269,7 +269,7 @@ proc findProperBinaryToCopyIntoContainer(ctx: DockerInvocation): string =
   if targetPlatform == buildPlatform:
     return getMyAppPath()
 
-  let locOpt = chalkConfig.getOpt[:TableRef[string, string]]("docker.arch_binary_locations")
+  let locOpt = getOpt[TableRef[string, string]](chalkConfig, "docker.arch_binary_locations")
 
   if locOpt.isNone():
     return noBinaryForPlatform()
@@ -311,7 +311,7 @@ template formatExec(command: string, args: JsonNode, shell: JsonNode): string =
 
 proc rewriteEntryPoint*(ctx: DockerInvocation) =
   let
-    wrapCmd        = chalkConfig.get[:bool]("docker.wrap_cmd")
+    wrapCmd        = get[bool](chalkConfig, "docker.wrap_cmd")
   var
     lastEntryPoint = EntryPointInfo(nil)
     lastCmd        = CmdInfo(nil)
@@ -440,7 +440,7 @@ proc pullValueFromKey(ctx: DockerInvocation, k: string): string =
 proc addAnyExtraEnvVars(ctx: DockerInvocation) =
   var
     toAdd: seq[string] = @[]
-    map                = chalkConfig.get[:TableRef[string, string]]("docker.additional_env_vars")
+    map                = get[TableRef[string, string]](chalkConfig, "docker.additional_env_vars")
     value: string
 
   for k, v in map:
@@ -462,7 +462,7 @@ proc addAnyExtraEnvVars(ctx: DockerInvocation) =
     info("Added to Dockerfile: " & newEnvLine)
 
 proc handleTrueInsertion(ctx: DockerInvocation, mark: string) =
-  if chalkConfig.get[:bool]("docker.wrap_entrypoint"):
+  if get[bool](chalkConfig, "docker.wrap_entrypoint"):
     ctx.rewriteEntryPoint()
   ctx.addAnyExtraEnvVars()
   ctx.writeChalkMark(mark)
@@ -481,10 +481,10 @@ proc prepVirtualInsertion(ctx: DockerInvocation) =
   # Virtual insertion for Docker does not rewrite the entry point
   # either.
 
-  if chalkConfig.get[:bool]("docker.wrap_entrypoint"):
+  if get[bool](chalkConfig, "docker.wrap_entrypoint"):
     warn("Cannot wrap entry point in virtual chalking mode.")
 
-  let labelOps = chalkConfig.getOpt[:TableRef[string, string]]("docker.custom_labels")
+  let labelOps = getOpt[TableRef[string, string]](chalkConfig, "docker.custom_labels")
 
   if labelOps.isSome():
     for k, v in labelOps.get():
@@ -494,7 +494,7 @@ proc prepVirtualInsertion(ctx: DockerInvocation) =
       ctx.newCmdLine.add("--label")
       ctx.newCmdline.add(k & "=" & escapeJson(v))
 
-  let labelTemplName = chalkConfig.get[:string]("docker.label_template")
+  let labelTemplName = get[string](chalkConfig, "docker.label_template")
   if labelTemplName == "":
     return
 
@@ -643,7 +643,7 @@ template passThroughLogic() =
   try:
     # Silently pass through other docker commands right now.
     exitCode = runCmdNoOutputCapture(dockerExeLocation, args)
-    if chalkConfig.get[:bool]("docker.report_unwrapped_commands"):
+    if get[bool](chalkConfig, "docker.report_unwrapped_commands"):
       reporting.doReporting("report")
   except:
     dumpExOnDebug()
