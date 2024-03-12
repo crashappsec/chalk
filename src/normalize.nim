@@ -82,7 +82,7 @@ proc normalizeChalk*(dict: ChalkDict): string =
   # and SIGN_PARAMS.
 
   var fieldCount = 0
-  let ignoreList = chalkConfig.getIgnoreWhenNormalizing()
+  let ignoreList = chalkConfig.get[:seq[string]]("ignore_when_normalizing")
 
   # Count how many fields we will write.
   for key, _ in dict:

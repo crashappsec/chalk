@@ -244,7 +244,7 @@ proc ignoreArtifact(path: string, regexps: seq[Regex]): bool {.inline.} =
   for i, item in regexps:
     if path.match(item):
       trace(path & ": returned artifact ignored due to matching: " &
-        chalkConfig.getIgnorePatterns()[i])
+        chalkConfig.get[:seq[string]]("ignore_patterns")[i])
       trace("Developers: codecs should not be returning ignored artifacts.")
       return true
 
@@ -256,7 +256,7 @@ proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
   let selfPath = resolvePath(getMyAppPath())
 
   result.fileExclusions = @[selfPath]
-  result.recurse        = chalkConfig.getRecursive()
+  result.recurse        = chalkConfig.get[:bool]("recursive")
 
   for item in argv:
     let maybe = resolvePath(item)
@@ -273,10 +273,10 @@ proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
 
   let
     selfPath = resolvePath(getMyAppPath())
-    skipList = chalkConfig.getIgnorePatterns()
+    skipList = chalkConfig.get[:seq[string]]("ignore_patterns")
 
   result.fileExclusions = @[selfPath]
-  result.recurse        = chalkConfig.getRecursive()
+  result.recurse        = chalkConfig.get[:bool]("recursive")
 
   for item in skipList:
     result.skips.add(re(item))

@@ -18,7 +18,7 @@ proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
   # if so chalk it, else skip
   #TODO validate PYC header / magic ?
 
-  if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.getPycExtensions():
+  if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.get[:seq[string]]("pyc_extensions"):
     return none(ChalkObj)
 
   withFileStream(loc, mode = fmRead, strict = false):
