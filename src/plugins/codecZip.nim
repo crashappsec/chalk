@@ -74,7 +74,7 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
     ext = loc.splitFile().ext.strip()
     extractCtx: CollectionCtx
 
-  if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.getZipExtensions():
+  if not ext.startsWith(".") or ext[1..^1] notin get[seq[string]](chalkConfig, "zip_extensions"):
     return none(ChalkObj)
 
   withFileStream(loc, mode = fmRead, strict = false):
@@ -93,7 +93,7 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
       cache    = ZipCache()
       origD    = tmpDir.joinPath("contents")
       hashD    = tmpDir.joinPath("hash")
-      subscans = chalkConfig.getChalkContainedItems()
+      subscans = get[bool](chalkConfig, "chalk_contained_items")
       chalk    = newChalk(name   = loc,
                           cache  = cache,
                           fsRef  = loc,
@@ -109,10 +109,10 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
         cache.onDisk.extractAll(hashD)
 
     # Even if subscans are off, we do this delete for the purposes of hashing.
-    if not chalkConfig.getChalkDebug():
+    if not get[bool](chalkConfig, "chalk_debug"):
       toggleLoggingEnabled()
     discard runChalkSubScan(hashD, "delete")
-    if not chalkConfig.getChalkDebug():
+    if not get[bool](chalkConfig, "chalk_debug"):
       toggleLoggingEnabled()
 
     if zipChalkFile in cache.onDisk.contents:
@@ -215,7 +215,7 @@ proc zipGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   let cache = ZipCache(obj.cache)
   result    = ChalkDict()
 
-  if chalkConfig.getChalkContainedItems() and cache.embeddedChalk.kind != MkObj:
+  if get[bool](chalkConfig, "chalk_contained_items") and cache.embeddedChalk.kind != MkObj:
     result["EMBEDDED_CHALK"]  = cache.embeddedChalk
     result["EMBEDDED_TMPDIR"] = pack(cache.tmpDir)
 
