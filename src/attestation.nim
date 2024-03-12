@@ -104,9 +104,9 @@ proc callTheSigningKeyBackupService(base:    string,
                                     mth:     HttpMethod): Option[Response] =
   let
     # Timeout asssociated with the signing key backup service
-    timeout:      int    = cast[int](chalkConfig.get[:Con4mDuration]("signing_key_backup_service_timeout"))
+    timeout:      int    = cast[int](get[Con4mDuration](chalkConfig, "signing_key_backup_service_timeout"))
     # Name of the auth config section to load from the config which contains the jwt
-    auth_config:  string = chalkConfig.get[:string]("signing_key_backup_service_auth_config_name")
+    auth_config:  string = get[string](chalkConfig, "signing_key_backup_service_auth_config_name")
 
   # This is the id that will be used to identify the secret in the API
   signingID = sha256Hex(attestationObfuscator & prkey)
@@ -156,7 +156,7 @@ proc backupSigningKeyToService*(content: string, prkey: string): bool =
     nonce:    string
 
   let
-    base  = chalkConfig.get[:string]("signing_key_backup_service_url")
+    base  = get[string](chalkConfig, "signing_key_backup_service_url")
     ct    = prp(attestationObfuscator, cosignPw, nonce)
 
   if len(base) == 0:
@@ -188,7 +188,7 @@ proc restoreSigningKeyFromService*(prkey: string): bool =
   if cosignPw != "":
     return true
 
-  let base: string = chalkConfig.get[:string]("signing_key_backup_service_url")
+  let base: string = get[string](chalkConfig, "signing_key_backup_service_url")
 
   if len(base) == 0 or prkey == "":
     return false
@@ -263,7 +263,7 @@ proc getCosignTempDir(): string =
 
 proc getKeyFileLoc*(): string =
   let
-    confLoc = chalkConfig.get[:string]("signing_key_location")
+    confLoc = get[string](chalkConfig, "signing_key_location")
 
   if confLoc.endswith(".key") or confLoc.endswith(".pub"):
     result = resolvePath(confLoc[0 ..< ^4])
@@ -298,7 +298,7 @@ proc generateKeyMaterial*(cosign: string): bool =
 
 proc commitPassword(pri: string, gen: bool) =
   var
-    storeIt = chalkConfig.get[:bool]("use_signing_key_backup_service")
+    storeIt = get[bool](chalkConfig, "use_signing_key_backup_service")
     printIt = not storeIt
 
   if storeIt:
@@ -337,7 +337,7 @@ proc acquirePassword(optfile = ""): bool {.discardable.} =
     delEnv("CHALK_PASSWORD")
     return true
 
-  if chalkConfig.get[:bool]("use_signing_key_backup_service") == false:
+  if get[bool](chalkConfig, "use_signing_key_backup_service") == false:
     return false
 
   if prikey == "":
@@ -416,7 +416,7 @@ proc saveSigningSetup(pubKey, priKey: string, gen: bool): bool =
   when false:
     # This is old code, but it might make a comeback at some point,
     # so I'm not removing it.
-    if chalkConfig.get[:bool]("use_internal_password"):
+    if get[bool](chalkConfig, "use_internal_password"):
       let pw = pack(encryptPassword(cosignPw))
       selfChalk.extract["$CHALK_ATTESTATION_TOKEN"] = pw
     else:
@@ -646,7 +646,7 @@ proc writeInToto(info:      DockerInvocation,
   #result  = unpack[bool](box)
 
   let
-    log  = $(chalkConfig.get[:bool]("use_transparency_log"))
+    log  = $(get[bool](chalkConfig, "use_transparency_log"))
     args = @["attest", ("--tlog-upload=" & log), "--yes", "--key",
              "chalk.key", "--type", "custom", "--predicate", path,
               digestStr]
@@ -698,7 +698,7 @@ proc coreVerify(pk: string, chalk: ChalkObj): bool =
   ## Used both for validation, and for downloading just the signature
   ## after we've signed.
   let
-    noTlog = not chalkConfig.get[:bool]("use_transparency_log")
+    noTlog = not get[bool](chalkConfig, "use_transparency_log")
     fName  = "chalk.pub"
 
   withWorkingDir(getNewTempDir()):
@@ -821,7 +821,7 @@ proc willSignNonContainer*(chalk: ChalkObj): string =
     return ""
 
   # We sign non-container artifacts if either condition is true.
-  if not (isSubscribedKey("SIGNATURE") or chalkConfig.get[:bool]("always_try_to_sign")):
+  if not (isSubscribedKey("SIGNATURE") or get[bool](chalkConfig, "always_try_to_sign")):
     trace("File artifact signing not configured.")
     return ""
 
@@ -839,7 +839,7 @@ proc willSignNonContainer*(chalk: ChalkObj): string =
 proc signNonContainer*(chalk: ChalkObj, unchalkedMD, metadataMD : string):
                      string =
   let
-    log    = $(chalkConfig.get[:bool]("use_transparency_log"))
+    log    = $(get[bool](chalkConfig, "use_transparency_log"))
     args   = @["sign-blob", ("--tlog-upload=" & log), "--yes", "--key",
                "chalk.key", "-"]
     blob   = unchalkedMD & metadataMD
@@ -860,7 +860,7 @@ proc cosignNonContainerVerify*(chalk: ChalkObj,
                                artHash, mdHash, sig, pk: string):
                              ValidateResult =
   let
-    log    = $(not chalkConfig.get[:bool]("use_transparency_log"))
+    log    = $(not get[bool](chalkConfig, "use_transparency_log"))
     args   = @["verify-blob", ("--insecure-ignore-tlog=" & log),
                "--key=chalk.pub", ("--signature=" & sig),
                "--insecure-ignore-sct=true", "-"]

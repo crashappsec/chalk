@@ -205,7 +205,7 @@ proc getLanguages(directory: string, langs: var HashSet[string]) =
 proc detectLanguages(): HashSet[string] =
   result = initHashSet[string]()
 
-  let canLoad = chalkConfig.get[:bool]("use_tech_stack_detection")
+  let canLoad = get[bool](chalkConfig, "use_tech_stack_detection")
   if not canLoad:
     return result
 
@@ -313,7 +313,7 @@ proc loadState() =
 
 proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
   result = ChalkDict()
-  let canLoad = chalkConfig.get[:bool]("use_tech_stack_detection")
+  let canLoad = get[bool](chalkConfig, "use_tech_stack_detection")
   if not canLoad:
     trace("Skipping tech stack runtime detection plugin")
     return result
@@ -341,7 +341,7 @@ proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
 
 proc techStackArtifact*(self: Plugin, objs: ChalkObj): ChalkDict {.cdecl.} =
   result = ChalkDict()
-  let canLoad = chalkConfig.get[:bool]("use_tech_stack_detection")
+  let canLoad = get[bool](chalkConfig, "use_tech_stack_detection")
   if not canLoad:
     trace("Skipping tech stack detection plugin for artifacts")
     return result

@@ -129,7 +129,7 @@ proc selfChalkDelKey*(keyName: string) =
 # The rest of this is specific to writing the self-config.
 
 proc newConfFileError(err, tb: string): bool =
-  if chalkConfig != nil and chalkConfig.get[:bool]("chalk_debug"):
+  if chalkConfig != nil and get[bool](chalkConfig, "chalk_debug"):
     cantLoad(err & "\n" & tb)
   else:
     cantLoad(err)
@@ -354,8 +354,8 @@ proc handleConfigLoad*(inpath: string) =
   let
     validate          = get[bool](chalkConfig, "load.validate_configs_on_load")
     replace           = get[bool](chalkConfig, "load.replace_conf")
-    confPaths         = chalkConfig.get[:seq[string]]("config_path")
-    confFilename      = chalkConfig.get[:string]("config_filename")
+    confPaths         = get[seq[string]](chalkConfig, "config_path")
+    confFilename      = get[string](chalkConfig, "config_filename")
 
   if replace:
     info("Replacing base configuration with module from: " & path)

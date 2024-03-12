@@ -33,7 +33,7 @@ proc setDockerExeLocation*() =
   once:
     trace("Searching PATH for 'docker'")
     let
-      dockerConfigPath = chalkConfig.getOpt[:string]("docker_exe")
+      dockerConfigPath = getOpt[string](chalkConfig, "docker_exe")
       dockerExeOpt     = findExePath("docker",
                                      configPath = dockerConfigPath,
                                      ignoreChalkExes = true)
