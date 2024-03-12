@@ -19,6 +19,12 @@ var
   startTime*          = getMonoTime().ticks()
   contextDirectories: seq[string]
 
+proc get*[T](chalkConfig: ChalkConfig, fqn: string): T =
+  get[T](chalkConfig.`@@attrscope@@`, fqn)
+
+proc getOpt*[T](chalkConfig: ChalkConfig, fqn: string): Option[T] =
+  getOpt[T](chalkConfig.`@@attrscope@@`, fqn)
+
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
 proc startTestRun*() =
