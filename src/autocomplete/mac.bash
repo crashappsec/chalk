@@ -6,20 +6,10 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-function _chalk_setup_either {
-            COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --skip-command-report --no-skip-command-report --symlink-behavior --store-password --no-store-password --key-file" -- ${_CHALK_CUR_WORD}))
-}
-
 function _chalk_setup_completions {
     case ${COMP_WORDS[${_CHALK_CUR_IX}]} in
-        gen)
-            _chalk_setup_either
-            ;;
-        load)
-            _chalk_setup_either
-            ;;
         *)
-            COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --skip-command-report --no-skip-command-report --symlink-behavior --store-password --key-file gen load" -- ${_CHALK_CUR_WORD}))
+            COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --skip-command-report --no-skip-command-report --symlink-behavior" -- ${_CHALK_CUR_WORD}))
             ;;
         esac
 }
@@ -156,4 +146,4 @@ function _chalk_completions {
 }
 
 complete -F _chalk_completions chalk
-# { "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "6MRP2S-HJCC-V3GS-HSC4RK", "CHALK_VERSION" : "0.2.2", "TIMESTAMP_WHEN_CHALKED" : 1705362980499, "DATETIME_WHEN_CHALKED" : "2024-01-15T18:56:19.596-05:00", "ARTIFACT_TYPE" : "bash", "ARTIFACT_VERSION" : "0.2.2", "AUTHOR" : "Miroslav Shubernetskiy <miroslav@miki725.com> 1705362897 -0500", "CHALK_PTR" : "This mark determines when to update the script. If there is no mark, or the mark is invalid it will be replaced.  To customize w/o Chalk disturbing it when it can update, add a valid  mark with a version key higher than the current chalk verison, or  use version 0.0.0 to prevent updates", "COMMITTER" : "Miroslav Shubernetskiy <miroslav@miki725.com> 1705362897 -0500", "COMMIT_SIGNED" : false, "DATE_AUTHORED" : "Mon Jan 15 18:54:57 2024 -0500", "DATE_COMMITTED" : "Mon Jan 15 18:54:57 2024 -0500", "HASH" : "51af2c68f9a19659ab9810cc804d75aa75bb0dc1a2e18f5fb0f1e2083ae1e2da", "INJECTOR_COMMIT_ID" : "0f92a1fbdf2a72fac7d7be162aa926d71c9dcbf5", "ORIGIN_URI" : "git@github.com:crashappsec/chalk.git", "METADATA_ID" : "RYWB7G-8KQT-CAGX-DKDTBK" }
+# { "MAGIC" : "dadfedabbadabbed", "CHALK_ID" : "CCVP2S-HSCR-VK6C-3569H3", "CHALK_VERSION" : "0.3.3", "TIMESTAMP_WHEN_CHALKED" : 1710356599979, "DATETIME_WHEN_CHALKED" : "2024-03-13T15:03:18.901-04:00", "ARTIFACT_TYPE" : "bash", "AUTHOR" : "Miroslav Shubernetskiy <miroslav@miki725.com> 1710352293 -0400", "BRANCH" : "ms", "CHALK_RAND" : "63b2eb8e1ecca0bc", "CODE_OWNERS" : "* @viega\n", "COMMITTER" : "Miroslav Shubernetskiy <miroslav@miki725.com> 1710352893 -0400", "COMMIT_ID" : "5f95367b955256bb92254a5bddaea6e5285a29f6", "COMMIT_MESSAGE" : "build: bumping con4m to include get(dict, \"key\")\n\nits used in connect.c4m", "COMMIT_SIGNED" : true, "DATE_AUTHORED" : "Wed Mar 13 13:51:33 2024 -0400", "DATE_COMMITTED" : "Wed Mar 13 14:01:33 2024 -0400", "HASH" : "c7af9f730e2b519880efe4be912469fa3bf7276a13a8dc84f2b4b6d4abad2ac7", "INJECTOR_COMMIT_ID" : "e96746336a5dd6618d4a8d5eae7a5542d048f301", "ORIGIN_URI" : "git@github.com:crashappsec/chalk.git", "PLATFORM_WHEN_CHALKED" : "GNU/Linux x86_64", "METADATA_ID" : "2BNPPM-H38H-SWDQ-19XTT8" }

@@ -11,25 +11,9 @@
 # installs attestation and returns true if it succeeded.
 
 func install_cosign() {
-  # Follow https://docs.sigstore.dev/attestation/installation/
+  # Follow https://docs.sigstore.dev/system_config/installation/
   # to install attestation
-  #
-  # First attempt to install the go version
 
-  go_path := find_exe("go", [])
-
-  if go_path != "" {
-    info("Go-install'ing cosign.....")
-    install_out, ok := system("go install github.com/sigstore/cosign/v2/cmd/cosign@latest")
-    if ok != 0 {
-      warn("unable to install attestation into $GOPATH/bin/cosign; " +
-            "attempting curl install")
-    } else {
-      return true
-    }
-  }
-
-  # go was not present (or errored) - attempt to install via curl in /tmp
   host_arch := arch()
   host_os := osname()
   if host_os == "macosx" {

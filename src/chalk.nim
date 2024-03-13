@@ -8,7 +8,7 @@
 # Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
 import "."/[config, confload, commands, norecurse, sinks, docker_base,
-            attestation, util]
+            attestation_api, util]
 
 when isMainModule:
   setupSignalHandlers() # util.nim
@@ -25,7 +25,7 @@ when isMainModule:
     runChalkHelp(getCommandName()) # no return; in cmd_help.nim
 
   setupDefaultLogConfigs() # src/sinks.nim
-  checkSetupStatus()       # attestation.nim
+  loadAttestation()        # attestation.nim
   case getCommandName()    # config.nim
   of "extract":            runCmdExtract(chalkConfig.getArtifactSearchPath())
   of "extract.containers": runCmdExtractContainers()
@@ -42,9 +42,7 @@ when isMainModule:
   of "version":            runCmdVersion()
   of "docker":             runCmdDocker(getArgs())
   of "exec":               runCmdExec(getArgs())
-  of "setup":              runCmdSetup(gen=true, load=true)
-  of "setup.gen":          runCmdSetup(gen=true, load=false)
-  of "setup.load":         runCmdSetup(gen=false, load=true)
+  of "setup":              runCmdSetup()
   of "docgen":             runChalkDocGen() # in cmd_help
   else:
     runChalkHelp(getCommandName()) # noreturn, will not show config.

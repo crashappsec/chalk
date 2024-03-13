@@ -12,7 +12,7 @@ when defined(posix):
   import std/posix_utils
 
 import std/[monotimes, nativesockets, sequtils, times]
-import ".."/[config, plugin_api, normalize, chalkjson, selfextract, attestation,
+import ".."/[config, plugin_api, normalize, chalkjson, attestation_api,
              util]
 
 var

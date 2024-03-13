@@ -1,0 +1,12 @@
+auth_config test {
+  auth:  "jwt"
+  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+}
+
+attestation {
+  key_provider: "get"
+  attestation_key_get {
+    uri:  env("CHALK_GET_URL")
+    auth: "test"
+  }
+}

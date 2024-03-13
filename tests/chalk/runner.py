@@ -327,7 +327,9 @@ class Chalk:
         artifact: Path | str,
         expected_success: bool = True,
         ignore_errors: bool = False,
+        config: Optional[Path] = None,
         log_level: ChalkLogLevel = "error",
+        env: Optional[dict[str, str]] = None,
     ) -> ChalkProgram:
         return self.run(
             command="extract",
@@ -335,6 +337,8 @@ class Chalk:
             log_level=log_level,
             expected_success=expected_success,
             ignore_errors=ignore_errors,
+            config=config,
+            env=env,
         )
 
     def exec(self, artifact: Path, as_parent: bool = False) -> ChalkProgram:

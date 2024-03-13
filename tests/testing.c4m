@@ -1,5 +1,7 @@
 subscribe("report", "json_console_out")
 custom_report.github_group_chalk_time.enabled: false
+custom_report.terminal_chalk_time.enabled: false
+custom_report.terminal_other_op.enabled: false
 
 # ignore any cloud metadata by default
 # as github actions use azure runners

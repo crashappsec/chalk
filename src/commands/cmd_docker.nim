@@ -24,7 +24,7 @@
 
 import std/[posix, unicode]
 import ".."/[config, collect, reporting, chalkjson, docker_cmdline, docker_base,
-             subscan, dockerfile, util, attestation, commands/cmd_help,
+             subscan, dockerfile, util, attestation_api, commands/cmd_help,
              plugin_api]
 
 {.warning[CStringConv]: off.}
@@ -772,7 +772,7 @@ template postDockerActivity() =
           info("Collecting post-push runtime data")
           ctx.opChalkObj.collectRunTimeArtifactInfo()
           trace("About to call into validate.")
-          attestation.extractAndValidateSignature(ctx.opChalkObj)
+          attestation_api.extractAndValidateSignature(ctx.opChalkObj)
         except:
           dumpExOnDebug()
           error("Docker attestation failed.")
