@@ -13,9 +13,9 @@ export getCosignLocation # from utils
 proc writeSelfConfig(selfChalk: ChalkObj): bool {.importc, discardable.}
 
 let keyProviders = {
-  "embed":  embedProvider,
-  "backup": backupProvider,
-  "get":    getProvider,
+  embedProvider.name:  AttestationKeyProvider(embedProvider),
+  backupProvider.name: AttestationKeyProvider(backupProvider),
+  getProvider.name:    AttestationKeyProvider(getProvider),
 }.toTable()
 
 var cosignKey = AttestationKey(nil)

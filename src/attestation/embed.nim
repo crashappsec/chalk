@@ -8,14 +8,19 @@
 import ".."/[chalk_common, config]
 import "."/utils
 
-proc init(self: AttestationKeyProvider) =
+type Embed = ref object of AttestationKeyProvider
+  location: string
+
+proc initCallback(this: AttestationKeyProvider) =
   let
+    self        = Embed(this)
     embedConfig = chalkConfig.attestationConfig.attestationKeyEmbedConfig
     location    = embedConfig.getLocation()
-  self.embedLocation = location
+  self.location = location
 
-proc generateKey(self: AttestationKeyProvider): AttestationKey =
-  result = mintCosignKey(self.embedLocation)
+proc generateKeyCallback(this: AttestationKeyProvider): AttestationKey =
+  let self = Embed(this)
+  result = mintCosignKey(self.location)
   echo()
   echo("------------------------------------------")
   echo("CHALK_PASSWORD=", result.password)
@@ -24,18 +29,18 @@ Write this down. In future chalk commands, you will need
 to provide it via CHALK_PASSWORD environment variable.
 """)
 
-proc retrieveKey(self: AttestationKeyProvider): AttestationKey =
-  result = getCosignKeyFromDisk(self.embedLocation)
-  info("Loaded existing attestation keys from: " & self.embedLocation)
+proc retrieveKeyCallback(this: AttestationKeyProvider): AttestationKey =
+  let self = Embed(this)
+  result = getCosignKeyFromDisk(self.location)
+  info("Loaded existing attestation keys from: " & self.location)
 
-proc retrievePassword(self: AttestationKeyProvider, key: AttestationKey): string =
+proc retrievePasswordCallback(this: AttestationKeyProvider, key: AttestationKey): string =
   return getChalkPassword()
 
-let embedProvider* = AttestationKeyProvider(
+let embedProvider* = Embed(
   name:             "embed",
-  kind:             embed,
-  init:             init,
-  generateKey:      generateKey,
-  retrieveKey:      retrieveKey,
-  retrievePassword: retrievePassword,
+  init:             initCallback,
+  generateKey:      generateKeyCallback,
+  retrieveKey:      retrieveKeyCallback,
+  retrievePassword: retrievePasswordCallback,
 )

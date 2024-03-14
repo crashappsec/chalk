@@ -108,29 +108,12 @@ type
     privateKey*: string
     tmpPath*:    string
 
-  AttestationKeyProviderType* = enum
-    embed
-    backup
-    get
-
-  AttestationKeyProvider* = ref object
+  AttestationKeyProvider* = ref object of RootRef
+    name*:             string
     init*:             proc (self: AttestationKeyProvider)
     generateKey*:      proc (self: AttestationKeyProvider): AttestationKey
     retrieveKey*:      proc (self: AttestationKeyProvider): AttestationKey
     retrievePassword*: proc (self: AttestationKeyProvider, key: AttestationKey): string
-    name*:             string
-    case kind*:        AttestationKeyProviderType
-    of embed:
-      embedlocation*:  string
-    of backup:
-      backupLocation*: string
-      backupUrl*:      string
-      backupTimeout*:  int
-      backupAuth*:     AuthConfig
-    of get:
-      getUrl*:         string
-      getTimeout*:     int
-      getAuth*:        AuthConfig
 
   KeyType* = enum KtChalkableHost, KtChalk, KtNonChalk, KtHostOnly
 

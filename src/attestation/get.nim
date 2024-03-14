@@ -8,19 +8,24 @@
 import std/[httpclient, net]
 import ".."/[chalk_common, config, sinks, util]
 
-proc request(self: AttestationKeyProvider, query = ""): JsonNode =
-  let
-    url         = self.getUrl & query
+type Get = ref object of AttestationKeyProvider
+  location: string
+  url:      string
+  timeout:  int
+  auth:     AuthConfig
+
+proc request(self: Get, query = ""): JsonNode =
+  let url       = self.url & query
   var
     headers     = newHttpHeaders()
-    authHeaders = self.getAuth.implementation.injectHeaders(self.getAuth, headers)
+    authHeaders = self.auth.implementation.injectHeaders(self.auth, headers)
     response:   Response
 
   try:
     response = safeRequest(url               = url,
                            httpMethod        = HttpGet,
                            headers           = authHeaders,
-                           timeout           = self.getTimeout,
+                           timeout           = self.timeout,
                            retries           = 2,
                            firstRetryDelayMs = 100)
 
@@ -41,8 +46,9 @@ proc request(self: AttestationKeyProvider, query = ""): JsonNode =
     error("Signing Key Provider Service returned invalid response: " & getCurrentExceptionMsg())
     raise
 
-proc init(self: AttestationKeyProvider) =
+proc initCallback(this: AttestationKeyProvider) =
   let
+    self      = Get(this)
     getConfig = chalkConfig.attestationConfig.attestationKeyGetConfig
     authName  = getConfig.getAuth()
     authOpt   = getAuthConfigByName(authName)
@@ -59,12 +65,13 @@ proc init(self: AttestationKeyProvider) =
                        "attestation.attestation_key_get.uri " &
                        " is required to use signing key retrieval service")
 
-  self.getAuth     = authOpt.get()
-  self.getUrl      = url
-  self.getTimeout  = timeout
+  self.auth     = authOpt.get()
+  self.url      = url
+  self.timeout  = timeout
 
-proc retrieveKey(self: AttestationKeyProvider): AttestationKey =
+proc retrieveKeyCallback(this: AttestationKeyProvider): AttestationKey =
   let
+    self = Get(this)
     data = self.request()
     key  = AttestationKey(
       privateKey: data{"privateKey"}.getStr(""),
@@ -76,8 +83,9 @@ proc retrieveKey(self: AttestationKeyProvider): AttestationKey =
   info("Retrieved attestion key from Signing Key Provider Service")
   return key
 
-proc retrievePassword(self: AttestationKeyProvider, key: AttestationKey): string =
+proc retrievePasswordCallback(this: AttestationKeyProvider, key: AttestationKey): string =
   let
+    self     = Get(this)
     data     = self.request(query = "?only=password")
     password = data{"password"}.getStr("")
   if password == "":
@@ -85,10 +93,9 @@ proc retrievePassword(self: AttestationKeyProvider, key: AttestationKey): string
   info("Retrieved attestation key password from Signing Key Provider Service")
   return password
 
-let getProvider* = AttestationKeyProvider(
+let getProvider* = Get(
   name:             "get",
-  kind:             get,
-  init:             init,
-  retrieveKey:      retrieveKey,
-  retrievePassword: retrievePassword,
+  init:             initCallback,
+  retrieveKey:      retrieveKeyCallback,
+  retrievePassword: retrievePasswordCallback,
 )

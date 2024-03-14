@@ -13,10 +13,16 @@ const
   obfuscatorCmd         = "dd status=none if=/dev/random bs=1 count=16 | base64"
   attestationObfuscator = staticExec(obfuscatorCmd).decode()
 
+type Backup = ref object of AttestationKeyProvider
+  location: string
+  url:      string
+  timeout:  int
+  auth:     AuthConfig
+
 proc id(self: AttestationKey): string =
   return sha256Hex(attestationObfuscator & self.privateKey)
 
-proc request(self: AttestationKeyProvider,
+proc request(self: Backup,
              key:  AttestationKey,
              body: string,
              mth:  HttpMethod): Response =
@@ -28,11 +34,11 @@ proc request(self: AttestationKeyProvider,
   else:
     trace("Calling Signing Key Backup Service to store key with ID: " & signingID)
 
-  let url = self.backupUrl & "/" & signingId
+  let url = self.url & "/" & signingId
 
   var
     headers     = newHttpHeaders()
-    authHeaders = self.backupAuth.implementation.injectHeaders(self.backupAuth, headers)
+    authHeaders = self.auth.implementation.injectHeaders(self.auth, headers)
 
   # Call the API with authz header - rety twice with backoff
   try:
@@ -40,7 +46,7 @@ proc request(self: AttestationKeyProvider,
                                httpMethod        = mth,
                                headers           = authHeaders,
                                body              = body,
-                               timeout           = self.backupTimeout,
+                               timeout           = self.timeout,
                                retries           = 2,
                                firstRetryDelayMs = 100)
 
@@ -52,7 +58,7 @@ proc request(self: AttestationKeyProvider,
     error("Could not call Signing Key Backup Service: " & getCurrentExceptionMsg())
     raise
 
-proc backup(self: AttestationKeyProvider,
+proc backup(self: Backup,
             key:  AttestationKey) =
   var nonce: string
   let
@@ -71,7 +77,7 @@ proc backup(self: AttestationKeyProvider,
     info("Successfully stored encrypted signing key.")
     warn("Please Note: Encrypted signing keys that have not been READ in the previous 30 days will be deleted!")
 
-proc restore(self: AttestationKeyProvider,
+proc restore(self: Backup,
              key:  AttestationKey): string =
   let response = self.request(key, "", HttpGet)
   if not response.code.is2xx():
@@ -108,8 +114,9 @@ proc restore(self: AttestationKeyProvider,
 
   return brb(attestationObfuscator, ct, nonce)
 
-proc init(self: AttestationKeyProvider) =
+proc initCallback(this: AttestationKeyProvider) =
   let
+    self         = Backup(this)
     backupConfig = chalkConfig.attestationConfig.attestationKeyBackupConfig
     authName     = backupConfig.getAuth()
     location     = backupConfig.getLocation()
@@ -127,13 +134,14 @@ proc init(self: AttestationKeyProvider) =
                        "attestation.attestation_key_backup.uri " &
                        " is required to use signing key backup service")
 
-  self.backupAuth     = authOpt.get()
-  self.backupUrl      = url
-  self.backupTimeout  = timeout
-  self.backupLocation = location
+  self.auth     = authOpt.get()
+  self.url      = url
+  self.timeout  = timeout
+  self.location = location
 
-proc generateKey(self: AttestationKeyProvider): AttestationKey =
-  result = mintCosignKey(self.backupLocation)
+proc generateKeyCallback(this: AttestationKeyProvider): AttestationKey =
+  let self = Backup(this)
+  result = mintCosignKey(self.location)
   try:
     self.backup(key = result)
     info("The ID of the backed up key is: " & result.id())
@@ -153,9 +161,10 @@ to provide it via CHALK_PASSWORD environment variable.
 """)
 
 
-proc retrieveKey(self: AttestationKeyProvider): AttestationKey =
-  result = getCosignKeyFromDisk(self.backupLocation)
-  info("Loaded existing attestation keys from: " & self.backupLocation)
+proc retrieveKeyCallback(this: AttestationKeyProvider): AttestationKey =
+  let self = Backup(this)
+  result = getCosignKeyFromDisk(self.location)
+  info("Loaded existing attestation keys from: " & self.location)
   try:
     self.backup(key = result)
   except:
@@ -163,18 +172,18 @@ proc retrieveKey(self: AttestationKeyProvider): AttestationKey =
     error("Could not backup password. You will need to provide " &
           "CHALK_PASSWORD environment variable to keep using attestation.")
 
-proc retrievePassword(self: AttestationKeyProvider, key: AttestationKey): string =
+proc retrievePasswordCallback(this: AttestationKeyProvider, key: AttestationKey): string =
+  let self = Backup(this)
   try:
     result = getChalkPassword()
   except:
     result = self.restore(key)
     info("Retrieved attestation key password from Signing Key Backup Service")
 
-let backupProvider* = AttestationKeyProvider(
+let backupProvider* = Backup(
   name:             "backup",
-  kind:             backup,
-  init:             init,
-  generateKey:      generateKey,
-  retrieveKey:      retrieveKey,
-  retrievePassword: retrievePassword,
+  init:             initCallback,
+  generateKey:      generateKeyCallback,
+  retrieveKey:      retrieveKeyCallback,
+  retrievePassword: retrievePasswordCallback,
 )
