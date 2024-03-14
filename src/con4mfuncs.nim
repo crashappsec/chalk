@@ -12,9 +12,8 @@
 ## Though, it might be a decent thing to push the logging stuff into
 ## con4m at some point, as long as it's all optional.
 
-import pkg/[nimutils/jwt]
 import std/[httpclient]
-import con4m/st
+import pkg/[con4m/st, nimutils/jwt]
 import "."/[config, reporting, sinks, chalkjson]
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
@@ -119,7 +118,7 @@ proc c4mParseJson*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
       box  = nimJsonToBox(json)
     return some(box)
   except:
-    error("Could not parse json: " & getCurrentExceptionMsg())
+    error("Could not parse JSON: " & getCurrentExceptionMsg())
     return none(Box)
 
 let chalkCon4mBuiltins* = [
@@ -208,7 +207,7 @@ Returns auth headers for provided auth config.
     ("memoize(string, func () -> string) -> string",
      BuiltInFn(memoizeInChalkmark),
      """
-Memoizes function callback value in chalkmark for future lookups.
+Memoizes function callback value in chalk mark for future lookups.
 
 This way the function is only computed once.
 """,

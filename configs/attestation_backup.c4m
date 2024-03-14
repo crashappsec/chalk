@@ -6,8 +6,8 @@ func validate_jwt(token) {
 }
 
 parameter auth_config.crashoverride.token {
-  shortdoc:  "CrashOverride API token"
-  doc:       "Get your API token at CrashOverride: https://crashoverride.run"
+  shortdoc:  "Crash Override API token"
+  doc:       "Get your API token at Crash  Override: https://crashoverride.run"
   default:   ""
   validator: func validate_jwt(string) -> string
 }

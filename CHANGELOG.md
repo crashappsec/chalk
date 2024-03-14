@@ -5,7 +5,7 @@
 ### Breaking Changes
 
 - Attestation key generation/retrieval was refactored
-  to use key providers. As such all previous config
+  to use key providers. As such, all previous config
   values related to signing backup service have changed.
 
   Removed attributes:
@@ -58,13 +58,13 @@
 
 ### New Features
 
-- `memoize` con4m function which allows to cache function
-  callback result into chalkmark for future lookups.
+- `memoize` con4m function which allows caching function
+  callback result into chalk mark for future lookups.
   [#239](https://github.com/crashappsec/chalk/pull/239)
-- `auth_headers` con4m function which allows to get auth
+- `auth_headers` con4m function which allows getting auth
   headers for a specific auth config.
   [#239](https://github.com/crashappsec/chalk/pull/239)
-- `parse_json` con4m function which parses json string
+- `parse_json` con4m function which parses JSON string
   [#239](https://github.com/crashappsec/chalk/pull/239)
 - `get` attestation key provider which allows to retrieve
   key-material over API.

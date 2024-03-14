@@ -124,7 +124,7 @@ proc setupAttestation*() =
     raise newException(ValueError, "Attestation key provider is misconfigured: " & getCurrentExceptionMsg())
 
   # a bit of nesting of exceptions to propagate appropriate error
-  # to the user as key providers can optionally implmenet
+  # to the user as key providers can optionally implement
   # retrieval/generation
   try:
     if provider.retrieveKey != nil:
@@ -132,7 +132,7 @@ proc setupAttestation*() =
       if cosignKey == nil:
         raise newException(ValueError, "no key returned")
     else:
-        raise newException(ValueError, "key retrieval not supported")
+      raise newException(ValueError, "key retrieval not supported")
   except:
     let retrieveError = getCurrentExceptionMsg()
     if provider.generateKey == nil:

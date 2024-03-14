@@ -6,9 +6,9 @@
 ##
 
 report_template crashoverride {
-  shortdoc: "Template for reports sent to CrashOverride"
+  shortdoc: "Template for reports sent to Crash Override"
   doc: """
-Template for sending reports to CrashOverride commercial offering.
+Template for sending reports to Crash Override commercial offering.
 
 This is mostly a copy of insert template however all keys are immutable.
 """
