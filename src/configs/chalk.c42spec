@@ -1363,10 +1363,10 @@ custom_report mdlog {
 }
 ```
 
-We can test this configuration by putting it in `test.cfg` then:
+We can test this configuration by putting it in `test.c4m` then:
 
 ```
-chalk load test.cfg
+chalk load test.c4m
 echo "#!/bin/bash" > test_mark
 chalk test_mark
 cat mdlog.jsonl
