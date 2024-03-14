@@ -130,18 +130,25 @@ proc setupAttestation*() =
     if provider.retrieveKey != nil:
       cosignKey = provider.retrieveKey(provider)
       if cosignKey == nil:
-        raise newException(ValueError, "Retrieved invalid key")
+        raise newException(ValueError, "no key returned")
     else:
-        raise newException(ValueError, "Existing key retrieval not supported")
+        raise newException(ValueError, "key retrieval not supported")
   except:
+    let retrieveError = getCurrentExceptionMsg()
     if provider.generateKey == nil:
-      raise newException(ValueError, "Provider '" & provider.name & "': " & getCurrentExceptionMsg())
+      raise newException(ValueError,
+                        "Provider '" & provider.name & "' " &
+                        "failed to retrieve existing key due to: " & retrieveError)
     try:
       cosignKey = provider.generateKey(provider)
       if cosignKey == nil:
-        raise newException(ValueError, "Generated invalid key")
+        raise newException(ValueError, "no key generated")
     except:
-      raise newException(ValueError, "Provider '" & provider.name & "': " & getCurrentExceptionMsg())
+      let generateError = getCurrentExceptionMsg()
+      raise newException(ValueError,
+                         "Provider '" & provider.name & "' " &
+                         "failed to retrieve existing key due to: " & retrieveError & "; " &
+                         "and failed to generate new key due to: " & generateError)
 
   try:
     if not cosignKey.saveKeyToSelf():
