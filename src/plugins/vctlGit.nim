@@ -41,7 +41,9 @@ const
   gitPack          = gitObjects.joinPath("pack")
   gitPackExt       = ".pack"
   gitTimeFmt       = "ddd MMM dd HH:mm:ss YYYY"
+  # https://git-scm.com/docs/pack-format
   gitObjCommit     = 1
+  gitObjTag        = 4
   gitHeaderType    = "$type"
   keyVcsDir        = "VCS_DIR_WHEN_CHALKED"
   keyOrigin        = "ORIGIN_URI"
@@ -278,15 +280,18 @@ template parseTime(line: string): int =
 template formatCommitObjectTime(line: string): string =
   fromUnix(parseTime(line)).format(gitTimeFmt) & " " & line.split()[^1]
 
-proc readPackedCommit(path: string, offset: uint64): string =
+proc readPackedObject(path: string, offset: uint64): string =
+  ## read packaged git object
+  ## supports reading git commit and tag objects
   withFileStream(path, mode = fmRead, strict = true):
     stream.setPosition(int(offset))
     let initialReadSize = 0x1000
     var
-      data = stream.readStr(initialReadSize)
-      byte = uint8(data[0])
-    if ((byte shr 4) and 7) != gitObjCommit:
-      raise(newException(CatchableError, "invalid commit object"))
+      data    = stream.readStr(initialReadSize)
+      byte    = uint8(data[0])
+      objType = ((byte shr 4) and 7)
+    if not (objType == gitObjCommit or objType == gitObjTag):
+      raise(newException(CatchableError, "not a commit or tag object - unsupported git object type: " & $objType))
     var
       uncompressedSize = uint64(byte and 0x0F)
       shiftBits        = 4
@@ -300,7 +305,7 @@ proc readPackedCommit(path: string, offset: uint64): string =
     # We assume that either the uncompressed size is bigger than the compressed
     # size, or that a scenario where compressed size is larger would likely only
     # happen with smaller objects (smaller than our initial read size of 0x1000).
-    # It seems particularly unlikely with git commit objects, but if these
+    # It seems particularly unlikely with git objects, but if these
     # assumptions prove wrong the resulting failure is a signal we report.
 
     # Given the assumptions above, we attempt to read up to uncompressedSize
@@ -311,9 +316,9 @@ proc readPackedCommit(path: string, offset: uint64): string =
     var sourcePointer = cast[ptr UncheckedArray[uint8]](addr data[currentOffset])
     inflate(result, sourcePointer, len(data)-currentOffset, 2)
 
-proc findPackedGitCommit(vcsDir, commitId: string): string =
+proc findPackedGitObject(vcsDir, refId: string): string =
   let
-    nameBytes       = parseHexStr(commitId)
+    nameBytes       = parseHexStr(refId)
     nameLen         = uint64(len(nameBytes))
     firstByte       = uint8(nameBytes[0])
   var offset: uint64
@@ -367,7 +372,7 @@ proc findPackedGitCommit(vcsDir, commitId: string): string =
       let high32 = uint64(getUint32BE(data, tableOffset64 + (offset * 8)))
       let low32  = uint64(getUint32BE(data, tableOffset64 + (offset * 8) + 4))
       offset = (high32 shl 32) or low32
-    return readPackedCommit(filename.replace(gitIdxExt, gitPackExt), offset)
+    return readPackedObject(filename.replace(gitIdxExt, gitPackExt), offset)
   raise newException(CatchableError, "failed to parse git index")
 
 proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
@@ -386,7 +391,7 @@ proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
       # the most recent commit for this branch did not happen on this branch
       # this can happen if users checkout a new branch and haven't committed
       # anything to it yet; we need to unpack this commit from packed objects
-      objData = findPackedGitCommit(info.vcsDir, refId).strip()
+      objData = findPackedGitObject(info.vcsDir, refId).strip()
 
     let parts = objData.split("\x00", maxsplit = 1)
     if len(parts) == 2:
