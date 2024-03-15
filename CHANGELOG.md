@@ -44,20 +44,26 @@
   image has it defined.
   [#147](https://github.com/crashappsec/chalk/pull/147)
 - Fixes a segfault when using secrets backup service
-  during `chalk setup`
+  during `chalk setup`.
   [#220](https://github.com/crashappsec/chalk/pull/220)
-- Honoring cache component cache on chalk conf load
+- Honoring cache component cache on chalk conf load.
   [#222](https://github.com/crashappsec/chalk/pull/222)
 - Fixes a segfault when accidentally providing `http://`
-  URL to a sink instead of `https://`
+  URL to a sink instead of `https://`.
   [#223](https://github.com/crashappsec/chalk/pull/223)
 - Fixes leaking FDs which didnt allow to chalk large
-  zip files such as large Java jar file
+  zip files such as large Java jar file.
   [#229](https://github.com/crashappsec/chalk/pull/229)
-- Fixes chalking zip file reporting git-repo keys
+- Fixes chalking zip file reporting git-repo keys.
   [#230](https://github.com/crashappsec/chalk/issues/230)
-- Fixes cosign not honoring `CHALK_PASSWORD` in all operations
+- Fixes cosign not honoring `CHALK_PASSWORD` in all operations.
   [#232](https://github.com/crashappsec/chalk/pull/232)
+- Git plugin did not parse some git objects correctly
+  which in some cases misreported git keys.
+  [#241](https://github.com/crashappsec/chalk/pull/241)
+- Fixes `chalk load` not honoring default parameter
+  value after any incorrect previous value was provided
+  [#242](https://github.com/crashappsec/chalk/pull/242)
 
 ### New Features
 
@@ -67,11 +73,19 @@
 - `auth_headers` con4m function which allows getting auth
   headers for a specific auth config.
   [#239](https://github.com/crashappsec/chalk/pull/239)
-- `parse_json` con4m function which parses JSON string
+- `parse_json` con4m function which parses JSON string.
   [#239](https://github.com/crashappsec/chalk/pull/239)
 - `get` attestation key provider which allows to retrieve
   key-material over API.
   [#239](https://github.com/crashappsec/chalk/pull/239)
+- `chalk exec` does not require `--exec-command-name`
+  and can get command name to exec directly from args:
+
+  ```bash
+  chalk exec -- echo hello
+  ```
+
+  [#155](https://github.com/crashappsec/chalk/pull/155)
 
 ## 0.3.3
 
