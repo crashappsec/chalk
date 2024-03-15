@@ -507,3 +507,7 @@ proc `&`*(a: JsonNode, b: JsonNode): JsonNode =
     result.add(i)
   for i in b.items():
     result.add(i)
+
+proc `&=`*(a: var JsonNode, b: JsonNode) =
+  for i in b.items():
+    a.add(i)

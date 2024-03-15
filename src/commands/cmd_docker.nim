@@ -248,33 +248,25 @@ proc findProperBinaryToCopyIntoContainer(ctx: DockerInvocation): string =
          ")")
     return ""
 
-proc formatExecArray(args: JsonNode): string =
-  var arr = `%*`(["/chalk", "exec", "--exec-command-name"])
-  arr.add(args[0])
+proc formatChalkExec(args: JsonNode = newJArray()): string =
+  var arr = `%*`(["/chalk", "exec"])
+  if len(args) > 0:
+    arr.add(`%`("--exec-command-name"))
+    arr.add(args[0])
   arr.add(`%`("--"))
   if len(args) > 1:
-    arr = arr & args[1..^1]
+    arr &= args[1..^1]
   return $(arr)
-
-proc formatExecString(command: string, shell: JsonNode): string =
-  # string form implies shell form and therefore to be
-  # compatible with original command, we need to explicitly start
-  # shell and then execute original command as shell script.
-  # This will handle cases when the script is not an executable
-  # but calls some shell functions such as "set -x && ..."
-  return formatExecArray(shell & `%*`([command]))
-
-template formatExec(command: string, args: JsonNode, shell: JsonNode): string =
-  if command != "":
-    formatExecString(command, shell)
-  else:
-    formatExecArray(args)
-
 
 proc rewriteEntryPoint*(ctx: DockerInvocation) =
   let
-    wrapCmd                  = chalkConfig.dockerConfig.getWrapCmd()
-    (entryPoint, cmd, shell) = ctx.getTargetEntrypoints()
+    fromArgs             = chalkConfig.execConfig.getCommandNameFromArgs()
+    wrapCmd              = chalkConfig.dockerConfig.getWrapCmd()
+    (entryPoint, cmd, _) = ctx.getTargetEntrypoints()
+
+  if not fromArgs:
+    warn("Docker wrapping requires exec.command_name_from_args config to be enabled")
+    return
 
   if entryPoint == nil:
     if wrapCmd:
@@ -308,46 +300,29 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
     return
 
   if entryPoint != nil:
-    # When ENTRYPOINT is JSON, we wrap JSON with /chalk
     # When ENTRYPOINT is string, it is a shell script
-    #   and so to correctly pass the script, we convert ENTRYPOINT
-    #   to JSON and pass existing script as an argument to a shell
-    #   /chalk will exec
-    #   Note in when ENTRYPOINT is string, CMD is normally ignored
-    #   however as we convert ENTRYPOINT to JSON, well need to
-    #   explicitly ignore CMD
-    let newInstruction = formatExec(entrypoint.str, entryPoint.json, shell.json)
-    ctx.addedInstructions.add("ENTRYPOINT " & newInstruction)
+    # in which case docker ignores CMD which means we can
+    # change it without changing container semantics so we:
+    # * convert ENTRYPOINT to JSON
+    # * pass existing ENTRYPOINT as CMD string
+    # this will then call chalk as entrypoint and
+    # will pass SHELL + CMD as args to chalk
     if entrypoint.str != "":
-      ctx.addedInstructions.add("CMD []")
+      ctx.addedInstructions.add("ENTRYPOINT " & formatChalkExec())
+      ctx.addedInstructions.add("CMD " & entrypoint.str)
+    # When ENTRYPOINT is JSON, we wrap JSON with /chalk command
+    else:
+      ctx.addedInstructions.add("ENTRYPOINT " & formatChalkExec(entrypoint.json))
     info("docker: ENTRYPOINT wrapped.")
 
   else:
-    # When ENTRYPOINT is missing in Dockerfile, wrapping CMD directly
-    # is error-prone as CMD will be passed as args to ENTRYPOINT
-    # if it exists in base image. Otherwise CMD will be directly executed.
-    # Until we have base image inspection, well overwrite ENTRYPOINT
-    # with chalk will execute existing CMD.
-    # When CMD is string,
-    #   ENTRYPOINT should start shell and should directly execute CMD
-    #   string as is provided
-    #   Note this will require changing CMD to JSON form so that shell
-    #   is not double wrapped
-    # WHEN CMD is JSON,
-    #   ENTRYPOINT should directly execute CMD[0]
-    #   and CMD should be adjusted to only have args.
-    if cmd.str != "":
-      ctx.addedInstructions.add("ENTRYPOINT " & formatExecArray(shell.json))
-      ctx.addedInstructions.add("CMD " & $(`%*`([cmd.str])))
-    else:
-      let
-        exe  = cmd.json[0]
-        args = if len(cmd.json) > 1:
-                 cmd.json[1..^1]
-               else:
-                 `%*`([])
-      ctx.addedInstructions.add("ENTRYPOINT " & formatExecArray(`%`([exe])))
-      ctx.addedInstructions.add("CMD " & $(args))
+    # When ENTRYPOINT is missing, we can use /chalk as ENTRYPOINT
+    # which will then execute existing CMD whether it is in shell or json form
+    # only nuance is that if CMD is not directly defined in target
+    # Dockerfile section, defining ENTRYPOINT resets CMD to null
+    # so to be safe we redefine CMD to the same value
+    ctx.addedInstructions.add("ENTRYPOINT " & formatChalkExec())
+    ctx.addedInstructions.add("CMD " & $(cmd))
     info("docker: CMD wrapped with ENTRYPOINT.")
 
   trace("Added instructions:\n" & ctx.addedInstructions.join("\n"))
