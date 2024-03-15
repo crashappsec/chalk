@@ -154,6 +154,7 @@ def test_post_wrong_method(
             "CHALK_USAGE_URL": f"{server_http}/redirect",
             "CHALK_POST_URL": f"{server}/report",
         },
+        ignore_errors=True,
     )
     assert result
     metadata_id = result.mark["METADATA_ID"]
