@@ -49,7 +49,6 @@ const
   keyOrigin        = "ORIGIN_URI"
   keyCommit        = "COMMIT_ID"
   keyCommitSigned  = "COMMIT_SIGNED"
-  keySigned        = "COMMIT_SIGNED"
   keyBranch        = "BRANCH"
   keyAuthor        = "AUTHOR"
   keyAuthorDate    = "DATE_AUTHORED"
