@@ -9,7 +9,7 @@
 ## implementation.
 
 import std/uri
-import "."/[config, util, reporting, semver]
+import "."/[config, dockerfile, util, reporting, semver]
 
 var
   buildXVersion: Version = parseVersion("0")
@@ -249,6 +249,245 @@ proc getAllDockerContexts*(info: DockerInvocation): seq[string] =
 
   for k, v in info.otherContexts:
     result.add(resolvePath(v))
+
+proc getDefaultBuildPlatforms*(ctx: DockerInvocation): Table[string, string] =
+  ## probe for default build target/build platforms
+  ## this is needed to be able to correctly eval Dockerfile as these
+  ## platforms will be prepopulated in buildx
+  ## or we can use this to figure out default system target platform
+  ## as this uses docker build to probe.
+  ## Without probe well need to account for all the docker configs/env vars
+  ## to correctly guage default build platform.
+  if len(ctx.defaultPlatforms) > 0:
+    return ctx.defaultPlatforms
+
+  result = initTable[string, string]()
+
+  let
+    tmpTag     = chooseNewTag()
+    envVars    = @[setEnv("DOCKER_BUILDKIT", "1")]
+    probeFile  = """
+FROM busybox
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+RUN echo "{\"BUILDPLATFORM\": \"$BUILDPLATFORM\", \"TARGETPLATFORM\": \"$TARGETPLATFORM\"}" > /platforms.json
+CMD cat /platforms.json
+"""
+
+  var data = ""
+
+  try:
+    withEnvRestore(envVars):
+      let build  = runDockerGetEverything(@["build", "-t", tmpTag, "-f", "-", "."],
+                                          probeFile)
+      if build.getExit() != 0:
+        warn("Could not probe docker build platforms: " & build.stdErr)
+        return result
+
+    let probe = runDockerGetEverything(@["run", "--rm", tmpTag])
+    if probe.getExit() != 0:
+      warn("Could not probe docker build platforms: " & probe.stdErr)
+      return result
+
+    data = probe.stdOut
+    trace("Probing for docker build platforms: " & data)
+
+  finally:
+    discard runDockerGetEverything(@["rmi", tmpTag])
+
+  if data == "":
+    warn("Could not probe docker build platforms. Got empty output")
+    return result
+
+  let json = parseJson(data)
+  for k, v in json.pairs():
+    let value = v.getStr()
+    if value == "":
+      warn("Could not probe docker build platforms. Got empty value for: " & k)
+      return result
+    else:
+      result[k] = value
+
+  ctx.defaultPlatforms = result
+
+proc getBuildTargetPlatform*(ctx: DockerInvocation): string =
+  ## get target build platform for the specific build
+  if ctx.foundPlatform != "":
+    return ctx.foundPlatform
+  let platforms = ctx.getDefaultBuildPlatforms()
+  return platforms.getOrDefault("TARGETPLATFORM", "")
+
+proc getAllBuildArgs*(ctx: DockerInvocation): Table[string, string] =
+  ## get all build args (manually passed ones and system defaults)
+  ## docker automatically assings some args for buildx build
+  ## so we add them to the manually passed args which is necessary
+  ## to correctly eval dockerfile to potentially resolve base image
+  result = initTable[string, string]()
+  for k, v in ctx.buildArgs:
+    result[k] = v
+  for k, v in ctx.getDefaultBuildPlatforms():
+    result[k] = v
+  let platform = ctx.getBuildTargetPlatform()
+  if platform != "":
+    result["TARGETPLATFORM"] = platform
+
+proc inspectImageConfig*(image: string, platform: string = ""): JsonNode =
+  ## fetch image config from local docker cache (if present)
+  ## image config will include information about image cmd/entrypoint/etc
+  trace("docker: inspecting image " & image)
+  let output = runDockerGetEverything(@["inspect", image, "--format", "json"])
+  if output.getExit() != 0:
+    return nil
+  let
+    stdout     = output.getStdout().strip()
+    json       = parseJson(stdout)
+  if len(json) == 0:
+    return nil
+  let
+    data     = json[0]
+    os       = data{"Os"}.getStr()
+    arch     = data{"Architecture"}.getStr()
+    together = os & "/" & arch
+    config   = data{"Config"}
+  if platform != "" and platform != together:
+    trace("docker: local image " & image & " doesn't match targeted platform: " &
+          together & " != " & platform)
+    return nil
+  return config
+
+proc fetchImageRawManifest*(image: string): JsonNode =
+  ## fetch raw json manifest from registry
+  trace("docker: fetching image manifest for " & image)
+  let output = runDockerGetEverything(@["buildx", "imagetools", "inspect", image, "--raw"])
+  if output.getExit() != 0:
+    return nil
+  let
+    stdout = output.getStdout().strip()
+    json   = parseJson(stdout)
+  return json
+
+proc fetchImageConfig*(image: string, platform: string): JsonNode =
+  ## fetch image config directly from the registry
+  ## image config will include information about image cmd/entrypoint/etc
+  let name = image.split(":")[0].split("@")[0]
+  # keep in mind that image can be of multiple formats
+  # foo                   # image manifest name
+  # foo:tag               # manifest for specific tag
+  # foo@sha256:<checksum> # pinned to specific digest
+  # therefore we gracefully handle each possibility
+  var json = fetchImageRawManifest(image)
+  if json == nil:
+    return nil
+  # when its a manifest list, find the image within the manifest
+  if "manifests" in json:
+    trace("docker: " & image & " is a manifest list. looking for image manifest for " & platform)
+    for manifest in json["manifests"].items():
+      if "platform" in manifest:
+        let
+          digest    = manifest{"digest"}.getStr()
+          mPlatform = manifest["platform"]
+          os        = mPlatform{"os"}.getStr()
+          arch      = mPlatform{"architecture"}.getStr()
+          together  = os & "/" & arch
+        if platform == together:
+          json = fetchImageRawManifest(name & "@" & digest)
+          if json == nil:
+            return
+          break
+  if "layers" in json:
+    trace("docker: found image manifest. looking for image config")
+    let
+      config = json{"config"}
+      digest = config{"digest"}.getStr()
+    json = fetchImageRawManifest(name & "@" & digest)
+    if json == nil:
+      return nil
+  if "config" notin json or "architecture" notin json or "os" notin json:
+    return nil
+  let
+    config   = json{"config"}
+    os       = json{"os"}.getStr()
+    arch     = json{"architecture"}.getStr()
+    together = os & "/" & arch
+  if platform != together:
+    error("docker: remote image " & image & " doesn't match targeted platform: " &
+          together & " != " & platform)
+    return nil
+  return config
+
+proc fetchImageEntrypoint*(info: DockerInvocation, image: string):
+    tuple[entrypoint: EntrypointInfo, cmd: CmdInfo, shell: ShellInfo] =
+  ## fetch image entrypoints (entrypoint/cmd/shell)
+  ## fetches from local docker cache (if present),
+  ## else will directly query registry
+  let platform  = info.getBuildTargetPlatform()
+  var imageInfo = inspectImageConfig(image, platform)
+  if imageInfo == nil:
+    imageInfo = fetchImageConfig(image, platform)
+  if imageInfo == nil:
+    raise newException(ValueError, "Could not inspect base image: " & image)
+  let
+    entrypoint = fromJson[EntrypointInfo](imageInfo{"Entrypoint"})
+    cmd        = fromJson[CmdInfo](imageInfo{"Cmd"})
+    shell      = fromJson[ShellInfo](imageInfo{"Shell"})
+  return (entrypoint, cmd, shell)
+
+proc getTargetDockerSection*(info: DockerInvocation): DockerFileSection =
+  ## get the target docker section which is to be built
+  ## will either be the last section if no target is specified
+  ## appropriate section by its alias otherwise
+  if info.targetBuildStage == "":
+    if len(info.dfSections) == 0:
+      raise newException(ValueError, "there are no docker sections")
+    return info.dfSections[^1]
+  else:
+    if info.targetBuildStage notin info.dfSectionAliases:
+      raise newException(KeyError, info.targetBuildStage & ": is not found in Dockerfile")
+    return info.dfSectionAliases[info.targetBuildStage]
+
+proc getTargetEntrypoints*(info: DockerInvocation):
+    tuple[entrypoint: EntrypointInfo, cmd: CmdInfo, shell: ShellInfo] =
+  ## get entrypoints (entrypoint/cmd/shell) from the target section
+  ## this recursively looks up parent sections in dockerfile
+  ## and eventually looks up entrypoints in base image
+  var
+    section    = info.getTargetDockerSection()
+    entrypoint = section.entryPoint
+    cmd        = section.cmd
+    shell      = section.shell
+  while entrypoint == nil or cmd == nil or shell == nil:
+    if section.image in info.dfSectionAliases:
+      section = info.dfSectionAliases[section.image]
+      if entrypoint == nil:
+        entrypoint = section.entryPoint
+        if entrypoint != nil:
+          # defining entrypoint in image wipes any previous CMD
+          # and it needs to be redefined again in Dockerfile
+          cmd      = nil
+      if cmd == nil:
+        cmd        = section.cmd
+      if shell == nil:
+        shell      = section.shell
+    else:
+      # no more sections in Dockerfile and instead we need to
+      # inspect the base image
+      let info = info.fetchImageEntrypoint(section.image)
+      if entrypoint == nil:
+        entrypoint = info.entrypoint
+        if entrypoint != nil:
+          # defining entrypoint in image wipes any previous CMD
+          # and it needs to be redefined again in Dockerfile
+          cmd      = nil
+      if cmd == nil:
+        cmd        = info.cmd
+      if shell == nil:
+        shell      = info.shell
+      break
+  # default shell to /bin/sh so that we can wrap CMD shell-form correctly
+  if shell == nil:
+    shell = ShellInfo()
+    shell.json = `%*`(["/bin/sh", "-c"])
+  return (entrypoint, cmd, shell)
 
 proc populateBasicImageInfo*(chalk: ChalkObj, info: JsonNode) =
   let

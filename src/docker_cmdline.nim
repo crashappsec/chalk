@@ -56,7 +56,10 @@ proc addBackBuildCommonPushFlags*(state: DockerInvocation) =
 
 proc addBackBuildWithoutPushFlags*(state: DockerInvocation) =
   # Here, we know 'push' isn't in the list.
-  if "load" in state.flags:
+  # add --load if it was already there or buildx is used
+  # as in buildx --load is not the default
+  # however we need to load image to inspect built image
+  if "load" in state.flags or "buildx" in state.originalArgs:
     state.newCmdLine.add("--load")
   if "output" notin state.flags:
     return
@@ -64,9 +67,10 @@ proc addBackBuildWithoutPushFlags*(state: DockerInvocation) =
     state.newCmdLine.add("--output=" & item)
 
 proc addBackBuildWithPushFlags*(state: DockerInvocation) =
-  # If this was a buildx build command that had a push in there too,
-  # we add a --load for good measure.
-  if "output" in state.flags or "load" in state.flags or "push" in state.flags:
+  # add --load if it was already there or buildx is used
+  # as in buildx --load is not the default
+  # however we need to load image to inspect built image
+  if "load" in state.flags or "buildx" in state.originalArgs:
     state.newCmdLine.add("--load")
   if "output" notin state.flags:
     return

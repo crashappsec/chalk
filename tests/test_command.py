@@ -137,7 +137,7 @@ def test_insert_extract_delete(copy_files: list[Path], chalk: Chalk):
     )
 
     # delete
-    delete = chalk.run(command="delete", target=artifact, log_level="none")
+    delete = chalk.run(command="delete", target=artifact)
     assert delete.report["_OPERATION"] == "delete"
 
     for key in ["HASH", "_OP_ARTIFACT_PATH", "_OP_ARTIFACT_TYPE"]:
@@ -169,7 +169,7 @@ def test_version(chalk: Chalk):
 
 
 def test_env(chalk: Chalk):
-    result = chalk.run(command="env", log_level="error")
+    result = chalk.run(command="env")
     report = result.report
 
     # fields to check: platform, hostinfo, nodename

@@ -65,7 +65,12 @@ def test_composable_valid(
 
     # basic check insert operation
     bin_path = copy_files[0]
-    _insert = chalk_copy.insert(artifact=bin_path)
+    _insert = chalk_copy.insert(
+        artifact=bin_path,
+        # compliance by default sends reports to localhost
+        # which will error here
+        ignore_errors=True,
+    )
     for report in _insert.reports:
         assert report["_OPERATION"] == "insert"
 
@@ -160,7 +165,6 @@ def test_composable_invalid(
         config=(configs / test_config_file).absolute(),
         replace=replace,
         stdin=b"\n" * 2**15,
-        log_level="error",
         expected_success=False,
     )
     assert expected_error in _load.stderr.decode()

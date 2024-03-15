@@ -29,7 +29,6 @@ def test_exec_unchalked(
     exec_proc = chalk.run(
         command="exec",
         exec_command=bin_path,
-        log_level="none",
         as_parent=as_parent,
     )
     # first line must be linux
@@ -71,7 +70,6 @@ def test_exec_chalked(
     exec_proc = chalk.run(
         command="exec",
         exec_command=bin_path,
-        log_level="none",
         as_parent=as_parent,
     )
     # first line must be linux

@@ -66,9 +66,16 @@ import "."/config
 
 const validDockerDirectives = ["syntax", "escape"]
 
+proc fromJson*[T](json: JsonNode): T =
+  if json == nil or json == newJNull():
+    nil
+  else:
+    T(json: json)
+
 proc evalOneVarSub(ctx:    DockerParse,
                    sub:    VarSub,
                    errors: var seq[string]): string
+
 proc evalSubstitutions*(ctx:    DockerParse,
                         t:      LineToken,
                         errors: var seq[string]): string =
@@ -83,8 +90,8 @@ proc evalSubstitutions*(ctx:    DockerParse,
   for item in list:
     result &= ctx.evalSubstitutions(item, errors)
 
-proc evalOrReturnEmptyString*(ctx: DockerParse,
-                              field: Option[LineToken],
+proc evalOrReturnEmptyString*(ctx:    DockerParse,
+                              field:  Option[LineToken],
                               errors: var seq[string]): string =
     if not field.isSome():
         return ""
@@ -138,7 +145,7 @@ method repr*(x: EntryPointInfo, ctx: DockerParse): string =
     result &= "ERRORS:\n" & x.error & "\n"
 
 method repr*(x: OnBuildInfo, ctx: DockerParse): string =
-  result = "ONBUILD: " & x.rawContents & "\n"
+  result = "ONBUILD: " & x.raw & "\n"
 
 method repr*(x: AddInfo, ctx: DockerParse): string =
   result = "ADD " & $(x.rawSrc) & " to " & x.rawDst
@@ -152,9 +159,9 @@ method repr*(x: CopyInfo, ctx: DockerParse): string =
     result &= " (error: " & x.error & ")"
   result &= "\n"
 
-proc lexOneLineTok(ctx: DockerParse, s: seq[Rune], i: var int): LineToken
+proc lexOneLineTok(ctx: DockerParse, d: DockerStatement, s: seq[Rune], i: var int): LineToken
 
-proc lexVarSub(ctx: DockerParse, s: seq[Rune], i: var int): VarSub =
+proc lexVarSub(ctx: DockerParse, d: DockerStatement, s: seq[Rune], i: var int): VarSub =
   result = VarSub(startix: i)
 
   i += 1
@@ -198,15 +205,18 @@ proc lexVarSub(ctx: DockerParse, s: seq[Rune], i: var int): VarSub =
     return
 
   i += 1
-  result.default = some(ctx.lexOneLineTok(s, i))
+  result.default = some(ctx.lexOneLineTok(d, s, i))
   if s[i] != Rune('}'):
     result.error = "Unterminated ${"
   else:
     i += 1
 
-proc lexQuoted(ctx: DockerParse, s: seq[Rune], q: Rune, i: var int):
+proc lexQuoted(ctx: DockerParse, d: DockerStatement, s: seq[Rune], q: Rune, i: var int):
               LineToken =
-  result = LineToken(kind: ltQuoted, quoteType: some(q), startix: i)
+  result = LineToken(kind:      ltQuoted,
+                     quoteType: some(q),
+                     startix:   i,
+                     line:      d.startLine)
   var val = ""
   while i < s.len():
     if s[i] == ctx.currentEscape:
@@ -229,7 +239,7 @@ proc lexQuoted(ctx: DockerParse, s: seq[Rune], q: Rune, i: var int):
     if s[i] == Rune('$'):
       result.contents.add(val)
       val = ""
-      result.varSubs.add(ctx.lexVarsub(s, i))
+      result.varSubs.add(ctx.lexVarsub(d, s, i))
       continue
     val &= $(s[i])
     i += 1
@@ -241,8 +251,10 @@ proc lexQuoted(ctx: DockerParse, s: seq[Rune], q: Rune, i: var int):
 const nonWordRunes = [Rune('$'), Rune('"'), Rune('\''), Rune('#'), Rune('='),
                       Rune('{'), Rune('}')]
 
-proc lexWord(ctx: DockerParse, s: seq[Rune], i: var int): LineToken =
-  result = LineToken(kind: ltWord, startix: i)
+proc lexWord(ctx: DockerParse, d: DockerStatement, s: seq[Rune], i: var int): LineToken =
+  result = LineToken(kind:      ltWord,
+                     startix:   i,
+                     line:      d.startLine)
   var val = ""
 
   while i < s.len():
@@ -252,7 +264,7 @@ proc lexWord(ctx: DockerParse, s: seq[Rune], i: var int): LineToken =
       i += 1
       continue
     if s[i] == Rune('$'):
-      let varsub = ctx.lexVarSub(s, i)
+      let varsub = ctx.lexVarSub(d, s, i)
       result.contents.add(val)
       val = ""
       result.varSubs.add(varsub)
@@ -271,34 +283,38 @@ proc lexWord(ctx: DockerParse, s: seq[Rune], i: var int): LineToken =
   result.endix = i
   return
 
-proc lexWhiteSpace(ctx: DockerParse, s: seq[Rune], i: var int): LineToken =
-  result = LineToken(kind: ltSpace, startix: i)
+proc lexWhiteSpace(ctx: DockerParse, d: DockerStatement, s: seq[Rune], i: var int): LineToken =
+  result = LineToken(kind:      ltSpace,
+                     startix:   i,
+                     line:      d.startLine)
 
   while i < s.len() and s[i].isWhiteSpace():  i += 1
   result.endix    = i
   result.contents = @[$(s[result.startix ..< result.endix])]
 
-proc lexOneLineTok(ctx: DockerParse, s: seq[Rune], i: var int): LineToken =
+proc lexOneLineTok(ctx: DockerParse, d: DockerStatement, s: seq[Rune], i: var int): LineToken =
   let c = s[i]
   case c
   of Rune('"'), Rune('\''):
     i += 1
-    return ctx.lexQuoted(s, c, i)
+    return ctx.lexQuoted(d, s, c, i)
   of Rune('$'):
-    return ctx.lexWord(s, i)
+    return ctx.lexWord(d, s, i)
   else:
     if c.isWhiteSpace():
-      return ctx.lexWhiteSpace(s, i)
+      return ctx.lexWhiteSpace(d, s, i)
     if c == ctx.currentEscape or c notin nonWordRunes:
-      return ctx.lexWord(s, i)
+      return ctx.lexWord(d, s, i)
     i += 1
-    result = LineToken(kind: ltOther, contents: @[$(c)])
+    result = LineToken(kind:      ltOther,
+                       contents:  @[$(c)],
+                       line:      d.startLine)
 
-proc lexSubableLine(ctx: DockerParse, s: string): seq[LineToken] =
+proc lexSubableLine(ctx: DockerParse, d: DockerStatement, s: string): seq[LineToken] =
   let all = s.toRunes()
   var i   = 0
-
-  while i < len(all): result.add(ctx.lexOneLineTok(all, i))
+  while i < len(all):
+    result.add(ctx.lexOneLineTok(d, all, i))
 
 proc parseOneFlag(ctx: DockerParse, toks: seq[LineToken], i: var int):
                  Option[DfFlag] =
@@ -345,7 +361,7 @@ proc nestedSubstitution(ctx:    DockerParse,
   if "$" notin val: return val
   let
     starterrlen = len(errors)
-    toks        = ctx.lexSubableLine(val)
+    toks        = ctx.lexSubableLine(DockerStatement(), val)
 
   result = ctx.evalSubstitutions(toks, errors)
 
@@ -433,7 +449,7 @@ proc parseEnvWithEq(ctx: DockerParse, toks: seq[LineToken]): seq[string] =
 
 # Returns any errors.
 proc parseEnv*(ctx: DockerParse, t: DockerCommand): seq[string] =
-  let toks = ctx.lexSubableLine(t.rawArg)
+  let toks = ctx.lexSubableLine(t, t.rawArg)
 
   if len(toks) == 0:
     return @["No argument to ENV given."]
@@ -451,12 +467,12 @@ proc parseEnv*(ctx: DockerParse, t: DockerCommand): seq[string] =
     return @["Expected the 3rd token to be a = or a space"]
 
 proc parseAddOrCopy*[T: InfoBase](ctx: DockerParse, t: DockerCommand): T =
-  let toks = ctx.lexSubableLine(t.rawArg)
+  let toks = ctx.lexSubableLine(t, t.rawArg)
   var i    = 0
   var args: seq[string]
   var errs: seq[string]
 
-  result       = T()
+  result       = T(startLine: t.startLine, endLine: t.endLine)
   result.flags = ctx.basicParseAllFlags(toks, i)
 
   skipWhiteSpace(toks, i)
@@ -480,10 +496,10 @@ proc parseAddOrCopy*[T: InfoBase](ctx: DockerParse, t: DockerCommand): T =
     result.error = errs.join("\n")
 
 proc parseFrom*(ctx: DockerParse, t: DockerCommand): FromInfo =
-  let toks = ctx.lexSubableLine(t.rawArg)
+  let toks = ctx.lexSubableLine(t, t.rawArg)
   var i    = 0
 
-  result       = FromInfo()
+  result       = FromInfo(startLine: t.startLine, endLine: t.endLine)
   result.flags = ctx.basicParseAllFlags(toks, i)
 
   skipWhiteSpace(toks, i)
@@ -542,8 +558,8 @@ proc parseFrom*(ctx: DockerParse, t: DockerCommand): FromInfo =
     result.error = "Expected end of command but got extra crap"
 
 proc parseLabel*(ctx: DockerParse, t: DockerCommand): LabelInfo =
-  result   = LabelInfo()
-  let toks = ctx.lexSubableLine(t.rawArg)
+  result   = LabelInfo(startLine: t.startLine, endLine: t.endLine)
+  let toks = ctx.lexSubableLine(t, t.rawArg)
   var
     i      = 0
     errs: seq[string]
@@ -571,7 +587,7 @@ proc parseLabel*(ctx: DockerParse, t: DockerCommand): LabelInfo =
     skipWhiteSpace(toks, i)
 
 proc parseShell*(ctx: DockerParse, t: DockerCommand): ShellInfo =
-  result = ShellInfo()
+  result = ShellInfo(startLine: t.startLine, endLine: t.endLine)
   try:
     let json = parseJson(t.rawArg)
     if json.getElems().len() == 0:
@@ -584,7 +600,7 @@ proc parseShell*(ctx: DockerParse, t: DockerCommand): ShellInfo =
 
 proc parseEntryPoint*(ctx: DockerParse, t: DockerCommand): EntryPointInfo =
   let s  = unicode.strip(t.rawArg)
-  result = EntryPointInfo(raw: s)
+  result = EntryPointInfo(raw: s, startLine: t.startLine, endLine: t.endLine)
 
   if s.startsWith("["):
     try:
@@ -596,7 +612,7 @@ proc parseEntryPoint*(ctx: DockerParse, t: DockerCommand): EntryPointInfo =
 
 proc parseCmd*(ctx: DockerParse, t: DockerCommand): CmdInfo =
   let s = unicode.strip(t.rawArg)
-  result = CmdInfo(raw: s)
+  result = CmdInfo(raw: s, startLine: t.startLine, endLine: t.endLine)
 
   if s.startsWith("["):
     try:
@@ -607,8 +623,11 @@ proc parseCmd*(ctx: DockerParse, t: DockerCommand): CmdInfo =
   else:
     result.str = s
 
+proc parseUserInfo*(ctx: DockerParse, t: DockerCommand): DfUserInfo =
+  return DfUserInfo(str: unicode.strip(t.rawArg), startLine: t.startLine, endLine: t.endLine)
+
 proc parseOnBuild*(ctx: DockerParse, t: DockerCommand): OnBuildInfo =
-  return OnBuildInfo(rawContents: t.rawArg)
+  return OnBuildInfo(raw: t.rawArg, startLine: t.startLine, endLine: t.endLine)
 
 proc `$`*(p: TopLevelToken): string =
   result = "[" & $(p.kind) & " @" & $(p.startLine)
@@ -642,7 +661,10 @@ proc parseHashLine(ctx: DockerParse, line: string) =
     arg  = unicode.strip(line[eqLoc + 1 .. ^1])
     tok  = ctx.newTok(tltDirective)
 
-  tok.directive = DockerDirective(name: name, rawArg: arg)
+  tok.directive = DockerDirective(name:      name,
+                                  rawArg:    arg,
+                                  startLine: ctx.curLine,
+                                  endLine:   ctx.curLine)
   if name == "escape":
     case arg.runeLen()
     of 1:
@@ -695,10 +717,11 @@ proc parseCommandLine(ctx: DockerParse) =
     cmd = ctx.cachedCommand
     cmd.rawArg &= line
     cmd.continuationLines.add(ctx.curLine)
+    cmd.endLine = ctx.curLine
   else:
     let tok = ctx.newTok(tltCommand)
     # Not parsing the command until after we read the joined lines
-    cmd = DockerCommand(rawArg: line)
+    cmd = DockerCommand(rawArg: line, startLine: ctx.curLine, endLine: ctx.curLine)
     ctx.commands.add(cmd)
     tok.cmd = cmd
 
@@ -730,10 +753,10 @@ proc topLevelLex(ctx: DockerParse) =
       ctx.parseHashLine(line)
 
 proc baseDockerParse*(s: Stream): DockerParse =
-  result = DockerParse(stream: s, sourceLines: s.readAll().split("\n"),
+  result = DockerParse(stream: s, sourceLines: s.readAll().splitLines(),
                        currentEscape: Rune('\\'))
-
-  for k, v in envPairs(): result.envs[k] = v
+  for k, v in envPairs():
+    result.envs[k] = v
   result.topLevelLex()
 
 template firstFromCheck() =
@@ -754,8 +777,6 @@ proc parseAndEval*(s:      Stream,
     parse        = s.baseDockerParse()
     gotFirstFrom = false
     res: seq[InfoBase] = @[]
-
-  parse.inArgs = args
 
   for tok in parse.tokens:
     if len(tok.errors) != 0:
@@ -790,7 +811,8 @@ proc parseAndEval*(s:      Stream,
       firstFromCheck()
       res.add(parse.parseCmd(cmd))
     of "USER":
-      res.add(DfUserInfo(str: unicode.strip(cmd.rawArg)))
+      firstFromCheck()
+      res.add(parse.parseUserInfo(cmd))
     of "ONBUILD":
       firstFromCheck()
       res.add(parse.parseOnBuild(cmd))
@@ -803,9 +825,14 @@ proc parseAndEval*(s:      Stream,
     else:
       firstFromCheck()
 
+  # input args take precedence over any ARG params
+  parse.inArgs = args
+  for k, v in args:
+    parse.args[k] = v
+
   return (parse, res)
 
-proc evalAndExtractDockerfile*(ctx: DockerInvocation) =
+proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string]) =
   var errors: seq[string]
 
   if ctx.inDockerFile == "":
@@ -814,12 +841,11 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation) =
 
   let
     stream        = newStringStream(ctx.inDockerFile)
-    (parse, cmds) = stream.parseAndEval(ctx.buildArgs, errors)
+    (parse, cmds) = stream.parseAndEval(args, errors)
 
   var
     labels:     OrderedTable[string, string]
     section:    DockerFileSection
-    itemFrom:   FromInfo
 
   # Note: we currently aren't using this rn.
   ctx.dfSectionAliases = OrderedTable[string, DockerFileSection]()
@@ -827,31 +853,30 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation) =
   for obj in cmds:
     if obj of FromInfo:
       let item = FromInfo(obj)
+
       # We're entering a new section, so finalize the old one first.
-      if ctx.targetBuildStage != "" and item.asArg.isSome():
-        let stage = parse.evalSubstitutions(item.asArg.get(), errors)
-
-        if stage == ctx.targetBuildStage:
-          # If we end up transforming the docker file, then we do not want
-          # to go past here, so save the info for later.
-          item.stopHere = true
-          return # Don't keep going!!!
-
       if section != nil:
-        # For the section we were previously processing, if it has an alias,
-        # then add it to a cache so we can look up if needed.
-        if section.alias != "":
-          ctx.dfSectionAliases[section.alias] = section
-        else:
-          discard # No alias.
-      section = DockerFileSection()
+        # last section ends when new one begins
+        section.endLine = item.startLine - 1
+
+      section = DockerFileSection(startLine: item.startLine, endLine: item.endLine)
+      section.image = parse.evalOrReturnEmptyString(item.image, errors)
+      if section.image == "":
+          raise newException(ValueError, "Could not eval image name")
+      if item.tag.isSome():
+        let tag = parse.evalSubstitutions(item.tag.get(), errors)
+        if tag == "":
+          raise newException(ValueError, "Could not eval image tag")
+        section.image &= ":" & tag
+      if item.asArg.isSome():
+        section.alias = parse.evalOrReturnEmptyString(item.asArg, errors)
+        if section.alias == "":
+          raise newException(ValueError, "Could not eval image alias")
+
       ctx.dfSections.add(section)
-      itemFrom = item
-      section.image = parse.evalOrReturnEmptyString(itemFrom.image, errors)
-      if itemFrom.tag.isSome():
-        section.image &= ":" &
-                 parse.evalSubstitutions(itemFrom.tag.get(), errors)
-      section.alias = parse.evalOrReturnEmptyString(itemFrom.asArg, errors)
+      if section.alias != "":
+          ctx.dfSectionAliases[section.alias] = section
+
     elif obj of EntryPointInfo:
       section.entryPoint = EntryPointInfo(obj)
     elif obj of CmdInfo:
@@ -865,6 +890,10 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation) =
         labels[k] = v
     # TODO: when we support CopyInfo, we need to add a case for it here
     # to save the source location as a hint for where to look for git info
+
+  if section != nil:
+    # last section endLine is the last line
+    section.endLine = len(parse.sourceLines) - 1
 
   # might have had errors walking the Dockerfile commands
   for err in errors:

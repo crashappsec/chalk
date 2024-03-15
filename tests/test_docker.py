@@ -106,7 +106,6 @@ def test_build(
         tag=random_hex if tag else None,
         buildkit=buildkit,
         config=CONFIGS / "docker_wrap.c4m",
-        log_level="trace",
     )
     assert image_id
 
@@ -126,7 +125,6 @@ def test_multiple_tags(
         tags=tags,
         config=CONFIGS / "docker_wrap.c4m",
         push=True,
-        log_level="trace",
         # docker sanity check will push to registry
         # whereas we want to ensure chalk does the pushing
         run_docker=False,
@@ -180,9 +178,6 @@ def test_composite_build(
     assert second_image_id
 
 
-@pytest.mark.xfail(
-    reason="CMD is wrapped which breaks ENTRYPOINT. fix is coming in next release"
-)
 def test_base_image(chalk: Chalk, random_hex: str):
     base_id, _ = Docker.build(
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile.base",
@@ -196,11 +191,11 @@ def test_base_image(chalk: Chalk, random_hex: str):
         context=DOCKERFILES / "valid" / "base",
         args={"BASE": random_hex},
         config=CONFIGS / "docker_wrap.c4m",
-        log_level="trace",
     )
     assert Docker.run(image_id)
 
 
+@pytest.mark.parametrize("cmd", ["cmd", "entrypoint"])
 @pytest.mark.parametrize(
     "test_file",
     [
@@ -208,12 +203,11 @@ def test_base_image(chalk: Chalk, random_hex: str):
         "json.Dockerfile",
     ],
 )
-def test_cmd_wrap(chalk: Chalk, random_hex: str, test_file: str):
+def test_wrap(chalk: Chalk, random_hex: str, test_file: str, cmd: str):
     image_id, result = chalk.docker_build(
-        dockerfile=DOCKERFILES / "valid" / "cmd" / test_file,
-        context=DOCKERFILES / "valid" / "cmd",
+        dockerfile=DOCKERFILES / "valid" / cmd / test_file,
+        context=DOCKERFILES / "valid" / cmd,
         config=CONFIGS / "docker_wrap.c4m",
-        log_level="trace",
     )
     _, output = Docker.run(image_id)
     assert "hello" in output.text
@@ -582,7 +576,6 @@ def test_git_context(
         tag=random_hex,
         secrets={"GIT_AUTH_TOKEN": tmp_file} if private else {},
         buildkit=buildkit,
-        log_level="trace",
     )
     assert build.mark
 
