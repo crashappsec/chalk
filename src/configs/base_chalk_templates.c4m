@@ -198,6 +198,7 @@ mark_template mark_large {
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
+  key.$CHALK_MEMOIZE.use                      = true
 }
 
 mark_template mark_default {
@@ -265,6 +266,7 @@ use the mark template named `reproducable`.
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
+  key.$CHALK_MEMOIZE.use                      = true
 }
 
 # This is the same as the `default` template, except the first three
@@ -324,6 +326,7 @@ the time and the nonce removed.
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
+  key.$CHALK_MEMOIZE.use                      = true
 }
 
 mark_template minimal {
@@ -348,6 +351,7 @@ This is the default for `docker` chalk marks.
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
+  key.$CHALK_MEMOIZE.use                      = true
 }
 
 mark_template chalk_labels {

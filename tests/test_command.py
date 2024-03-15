@@ -178,14 +178,30 @@ def test_env(chalk: Chalk):
     assert run(["uname", "-n"]).text in report["_OP_NODENAME"]
 
 
-def test_setup(chalk_copy: Chalk):
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+@pytest.mark.parametrize(
+    "config",
+    [
+        CONFIGS / "attestation" / "embed.c4m",
+        CONFIGS / "attestation" / "backup.c4m",
+        CONFIGS / "attestation" / "get.c4m",
+    ],
+)
+def test_setup(
+    copy_files: list[Path],
+    chalk_copy: Chalk,
+    config: Path,
+    server_http: str,
+):
     """
-    needs to display password, and public and private key info in chalk
+    check that after setup attestion works for all key providers
     """
-    setup = chalk_copy.run(
-        command="setup",
-        config=CONFIGS / "nosigningkeybackup.c4m",
-    )
+    env = {
+        "CHALK_BACKUP_URL": f"{server_http}/backup",
+        "CHALK_GET_URL": f"{server_http}/cosign",
+    }
+    chalk_copy.load(config, replace=False)
+    setup = chalk_copy.run(command="setup", env=env)
     assert setup.mark.contains(
         {
             "$CHALK_PUBLIC_KEY": re.compile(r"^-----BEGIN PUBLIC KEY"),
@@ -197,30 +213,62 @@ def test_setup(chalk_copy: Chalk):
         }
     )
 
+    if "CHALK_PASSWORD" in setup.text:
+        env["CHALK_PASSWORD"] = setup.find("CHALK_PASSWORD").split("=", 1)[1]
 
+    insert = chalk_copy.insert(copy_files[0], env=env)
+    assert insert.mark.contains(
+        {
+            "INJECTOR_PUBLIC_KEY": setup.mark["$CHALK_PUBLIC_KEY"],
+            "SIGNATURE": ANY,
+        }
+    )
+
+    extract = chalk_copy.extract(copy_files[0], env=env)
+    assert extract.mark.contains(
+        {
+            "INJECTOR_PUBLIC_KEY": setup.mark["$CHALK_PUBLIC_KEY"],
+            "SIGNATURE": insert.mark["SIGNATURE"],
+            "_VALIDATED_SIGNATURE": True,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "config, require_password",
+    [
+        (CONFIGS / "attestation" / "embed.c4m", True),
+        (CONFIGS / "attestation" / "backup.c4m", False),
+        # note get provider does not support reading existing key
+    ],
+)
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_setup_existing_keys(
     tmp_data_dir: Path,
     chalk_copy: Chalk,
     random_hex: str,
     copy_files: list[Path],
+    config: Path,
+    server_http: str,
+    require_password: bool,
 ):
     """
     needs to display password, and public and private key info in chalk
     """
+    password = (random_hex * 3)[:24]  # at least 24 bytes are required for PRP
     assert run(
         ["cosign", "generate-key-pair", "--output-key-prefix", "chalk"],
-        env={"COSIGN_PASSWORD": random_hex},
+        env={"COSIGN_PASSWORD": password},
     )
     public = (tmp_data_dir / "chalk.pub").read_text()
     private = (tmp_data_dir / "chalk.key").read_text()
+    env = {
+        "CHALK_PASSWORD": password,
+        "CHALK_BACKUP_URL": f"{server_http}/backup",
+    }
 
-    setup = chalk_copy.run(
-        command="setup",
-        config=CONFIGS / "nosigningkeybackup.c4m",
-        env={"CHALK_PASSWORD": random_hex},
-    )
-
+    chalk_copy.load(config, replace=False)
+    setup = chalk_copy.run(command="setup", env=env)
     assert setup.mark.contains(
         {
             "$CHALK_PUBLIC_KEY": public,
@@ -230,15 +278,22 @@ def test_setup_existing_keys(
         }
     )
 
-    insert = chalk_copy.insert(
-        copy_files[0],
-        env={"CHALK_PASSWORD": random_hex},
-    )
-    assert insert.mark.has(
-        SIGNATURE=ANY,
+    if not require_password:
+        del env["CHALK_PASSWORD"]
+
+    insert = chalk_copy.insert(copy_files[0], env=env)
+    assert insert.mark.contains(
+        {
+            "INJECTOR_PUBLIC_KEY": setup.mark["$CHALK_PUBLIC_KEY"],
+            "SIGNATURE": ANY,
+        }
     )
 
-    extract = chalk_copy.extract(copy_files[0])
-    assert extract.mark.has(
-        _VALIDATED_SIGNATURE=True,
+    extract = chalk_copy.extract(copy_files[0], env=env)
+    assert extract.mark.contains(
+        {
+            "INJECTOR_PUBLIC_KEY": setup.mark["$CHALK_PUBLIC_KEY"],
+            "SIGNATURE": insert.mark["SIGNATURE"],
+            "_VALIDATED_SIGNATURE": True,
+        }
     )

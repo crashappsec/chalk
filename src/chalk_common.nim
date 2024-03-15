@@ -102,6 +102,19 @@ type
     # This is only used when using the default script chalking.
     commentStart*:             string
 
+  AttestationKey* = ref object
+    password*:   string
+    publicKey*:  string
+    privateKey*: string
+    tmpPath*:    string
+
+  AttestationKeyProvider* = ref object of RootRef
+    name*:             string
+    init*:             proc (self: AttestationKeyProvider)
+    generateKey*:      proc (self: AttestationKeyProvider): AttestationKey
+    retrieveKey*:      proc (self: AttestationKeyProvider): AttestationKey
+    retrievePassword*: proc (self: AttestationKeyProvider, key: AttestationKey): string
+
   KeyType* = enum KtChalkableHost, KtChalk, KtNonChalk, KtHostOnly
 
   CollectionCtx* = ref object

@@ -5131,3 +5131,15 @@ for components.
 """
 
 }
+
+keyspec $CHALK_MEMOIZE {
+   required_in_self_mark:  true
+   kind:                   ChalkTimeArtifact
+   type:                   dict[string, string]
+   standard:               true
+   system:                 true
+   since:                  "0.3.4" # TODO
+   doc: """
+Dictionary of `memoize()` function results.
+"""
+}

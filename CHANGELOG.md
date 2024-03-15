@@ -2,6 +2,42 @@
 
 ## Main
 
+### Breaking Changes
+
+- Attestation key generation/retrieval was refactored
+  to use key providers. As such, all previous config
+  values related to signing backup service have changed.
+
+  Removed attributes:
+
+  - `use_signing_key_backup_service`
+  - `signing_key_backup_service_url`
+  - `signing_key_backup_service_auth_config_name`
+  - `signing_key_backup_service_timeout`
+  - `signing_key_location`
+
+  Instead now each individual key provider can be separately
+  configured:
+
+  ```
+  attestation {
+    key_provider: "embed" # or "backup" which enables key backup provider
+                          # as previously configured by
+                          # `use_signing_key_backup_service`
+    attestation_key_embed {
+      location: "./chalk." # used to be `signing_key_location`
+    }
+    attestation_key_backup {
+      location: "./chalk."    # used to be `signing_key_location`
+      uri:      "https://..." # used to be `signing_key_backup_service_url`
+      auth:     "..."         # used to be `signing_key_backup_service_auth_config_name`
+      timeout:  << 1 sec >>   # used to be `signing_key_backup_service_timeout`
+    }
+  }
+  ```
+
+  [#239](https://github.com/crashappsec/chalk/pull/239)
+
 ### Fixes
 
 - Fixes a segfault when using secrets backup service
@@ -19,6 +55,20 @@
   [#230](https://github.com/crashappsec/chalk/issues/230)
 - Fixes cosign not honoring `CHALK_PASSWORD` in all operations
   [#232](https://github.com/crashappsec/chalk/pull/232)
+
+### New Features
+
+- `memoize` con4m function which allows caching function
+  callback result into chalk mark for future lookups.
+  [#239](https://github.com/crashappsec/chalk/pull/239)
+- `auth_headers` con4m function which allows getting auth
+  headers for a specific auth config.
+  [#239](https://github.com/crashappsec/chalk/pull/239)
+- `parse_json` con4m function which parses JSON string
+  [#239](https://github.com/crashappsec/chalk/pull/239)
+- `get` attestation key provider which allows to retrieve
+  key-material over API.
+  [#239](https://github.com/crashappsec/chalk/pull/239)
 
 ## 0.3.3
 

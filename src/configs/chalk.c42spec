@@ -1177,6 +1177,232 @@ auth_config my_auth_config {
 """
 }
 
+singleton attestation_key_embed {
+  gen_fieldname: "attestationKeyEmbedConfig"
+  gen_typename:  "AttestationKeyEmbedConfig"
+  gen_setters:   false
+  user_def_ok:   true
+  doc:           """
+Attestation key provider which embeds the signing keys into chalk binary.
+
+When generating the key, the password will be written to stdout a single time.
+Store that value appropriately as it will need to be provided back to
+chalk as `CHALK_PASSWORD` environment variable in subsequent operations.
+"""
+
+  field location {
+    type:      string
+    default:   "./chalk.key"
+    validator: func validate_key_path
+    shortdoc:  "Signing key location"
+    doc: """
+This is only used for the `chalk setup` command; it dictates where to either
+find a key pair to load, or where to write a keypair being generated. If
+loading an existing key, the `CHALK_PASSWORD` environment variable is required.
+
+Chalk will also embed the key-pairs internally, for future operations.
+"""
+  }
+}
+
+singleton attestation_key_backup {
+  gen_fieldname: "attestationKeyBackupConfig"
+  gen_typename:  "AttestationKeyBackupConfig"
+  gen_setters:   false
+  user_def_ok:   true
+  doc:           """
+Attestation key provider which embeds the signing keys into chalk binary.
+For easy signing, however, the password is retrieved on-demand
+from the backup service when needing to sign artifacts.
+
+Any signing keys generated or imported are encrypted by a randomly generated
+password (which is derived by encoding 128 bits taken from a cryptographically
+secure source).
+
+When using the backup service, the password is encrypted by another randomly
+generated value, stored in your binary. The result is posted to our free
+service over TLS; the service will then be queried as it is needed.
+"""
+
+  field location {
+    type:      string
+    default:   "./chalk.key"
+    validator: func validate_key_path
+    shortdoc:  "Signing key location"
+    doc: """
+This is only used for the `chalk setup` command; it dictates where to
+either find a key pair to load, or where to write a keypair being
+generated.
+
+Chalk will also embed the keypairs internally, for future operations.
+"""
+  }
+
+  field uri {
+    type:     string
+    default:  "https://chalk.crashoverride.run/v0.1/key-backup"
+    shortdoc: "URL of the signing key backup API service"
+    doc: """
+This is the URL of the default signing key backup service provided by Crash Override.
+"""
+  }
+
+  field auth {
+    type:     string
+    default:  "crashoverride"
+    shortdoc: "Authentication config to use for the signing key backup service"
+    doc: """
+Authentication config as configured via `auth_config` to use for
+making requests to fetch the password.
+"""
+  }
+
+  field timeout {
+    type:    Duration
+    default: << 3 sec >>
+    shortdoc: "HTTPS timeout for request to the key backup service"
+    doc: """
+If the timeout is exceeded and the operation fails, chalk will proceed,
+just without doing any signing / verifying.
+"""
+  }
+
+}
+
+singleton attestation_key_get {
+  gen_fieldname: "attestationKeyGetConfig"
+  gen_typename:  "AttestationKeyGetConfig"
+  gen_setters:   false
+  user_def_ok:   true
+  doc:           """
+Attestation key provider which gets the keys via HTTP GET request.
+Service must return a JSON response of the form:
+
+```
+{
+  "password": "...",
+  "publicKey": "...",
+  "privateKey": "..."
+}
+```
+
+Normally during `chalk setup` it requires all 3 fields to be returned
+by the API in order to embed the keys into chalk binary.
+After that point, as only the password is necessary, in order to avoid
+sending full keys on the wire, the endpoint can support `?only=password`
+query string which can return only the `password` JSON field.
+"""
+
+  field uri {
+    type:     string
+    default:  "https://chalk.crashoverride.run/v0.1/key-provider/keys"
+    hidden:   true
+    shortdoc: "URL of the signing key provider API service"
+    doc: """
+By default signing key provider service provide by Crash Override is used.
+"""
+  }
+
+  field auth {
+    type:     string
+    default:  "crashoverride"
+    hidden:   true
+    shortdoc: "Authentication config to use for the signing key provider service"
+    doc: """
+Authentication config as configured via `auth_config` to use for
+making requests to fetch the key.
+"""
+  }
+
+  field timeout {
+    type:    Duration
+    default: << 3 sec >>
+    shortdoc: "HTTPS timeout for request to the key provider service"
+    doc: """
+If the timeout is exceeded and the operation fails, chalk will proceed,
+just without doing any signing / verifying.
+"""
+  }
+}
+
+attestation_key_types := ["embed", "backup", "get"]
+
+singleton attestation {
+  gen_fieldname: "attestationConfig"
+  gen_typename:  "AttestationConfig"
+  gen_setters:   false
+  user_def_ok:   true
+  doc:           """
+Attestation allows chalk to sign artifacts (via cosign) which embeds the
+signature into the chalk mark, which allows validation of the signature by
+extracting the chalk mark later.
+
+For attestation to work it requires chalk to be setup for attestation first
+via:
+
+```
+chalk setup
+```
+
+That will provision:
+
+* signing public keys
+* signing encrypted private key
+* password to decrypt private key
+
+Public and encrypted private keys are embedded into chalk binary. The password
+is NEVER embedded into the chalk binary and is always retrieved on chalk
+operations requiring signing artifacts.
+
+To make provisioning as generic as possible attestation provisions above
+key material via key providers. Key provider choice can be configured as:
+
+```
+attestation {
+  key_provider: "embed"
+}
+```
+
+Supported key providers are:
+
+* `embed` - embeds keys into chalk and retrieves password via `CHALK_PASSWORD`
+  environment variable
+* `backup` - embeds keys into chalk, backups password to signing key backup
+  compatible service. When requiring password it attempts to use the
+  `CHALK_PASSWORD` environment variable. If missing, retrieves password from
+  the backup service.
+  By default, the Crash Override signing key backup service is used.
+* `get` - embeds retrieved keys via API endpoint (with auth) into chalk.
+  When requiring password it is retrieved from the same API endpoint.
+  By default, the Crash Override signing key provider service is used.
+
+Default provider is `embed`.
+
+Each provider can be configured separately:
+
+```
+attestation {
+  attestation_key_embed {...}
+  attestation_key_backup {...}
+  attestation_key_get {...}
+}
+```
+
+See individual key provider objects for all supported configuration fields.
+"""
+  allow attestation_key_embed
+  allow attestation_key_backup
+  allow attestation_key_get
+
+  field key_provider {
+    type:    string
+    choice:  attestation_key_types
+    default: "embed"
+    doc:     "What provider to use for fetching signing key"
+  }
+
+}
+
 object outconf {
   gen_fieldname: "outputConfigs"
   gen_typename:  "OutputConfig"
@@ -2330,6 +2556,7 @@ root {
   allow sink_config
   allow auth
   allow auth_config
+  allow attestation
   allow mark_template
   allow report_template
   allow outconf
@@ -2673,87 +2900,6 @@ transparency log, and extracts from container images will attempt to
 validate in the transparency log.
 """
   }
-
-  field use_signing_key_backup_service {
-    type:    bool
-    default: false
-    shortdoc: "Use signing key backup service to save & retrieve keys"
-    doc: """
-Any signing keys generated or imported are encrypted by a randomly
-generated password (which is derived by encoding 128 bits taken from a
-cryptographically secure source).
-
-The password is NOT stored in the binary. You can choose to provide
-the password via the CHALK_PASSWORD environment variable, or you may
-escrow it in our backup service.
-
-If this is true, when you set up signing, the password will get
-encrypted by another randomly generated value, stored in your
-binary. The result will posted to our free service over TLS; the
-service will then be queried as it is needed.
-
-If you do not select this when setting up signing, the password will
-be written to stdout a single time. Or, you can set the password
-manually via the CHALK_PASSWORD environment variable (if using the
-manager, the env variable is ignored during setup).
-
-Once you have configured signing, Chalk will first try to read the
-password from the CHALK_PASSWORD environment variable. If the
-environment variable doesn't exist, what happens next is dependant on
-this variable.
-
-If it's true, then we attempt to query the key backup service before
-giving up. If it's false, we immediately move on without signing.
-
-Note that if you provide the environment variable, then the key backup
-service currently is not queried. We may eventually make it a fallback.
-"""
-  }
-
-  field signing_key_backup_service_url {
-    type:     string
-    default:  "https://chalk.crashoverride.run/v0.1/key-backup"
-    hidden:   true
-    shortdoc: "URL of the signing key backup API service"
-    doc: """
-This is the URL of the default signing key backup service provide by
-Crashoverride.
-"""
-  }
-
-field signing_key_backup_service_auth_config_name {
-    type:     string
-    default:  "crashoverride"
-    hidden:   true
-    shortdoc: "Authentication config to use for the signing key backup service"
-    doc: """
-
-"""
-  }
-
-  field signing_key_backup_service_timeout {
-    type:    Duration
-    default: << 3 sec >>
-    shortdoc: "HTTPS timeout for request to the key backup service"
-    doc: """
-If the timeout is exceeded and the operation fails, chalk will proceed,
-just without doing any signing / verifying.
-"""
-  }
-
-  field signing_key_location {
-  type:     string
-  default:  "./chalk.key"
-  shortdoc: "Signing key location"
-  doc: """
-
-This is only used for the `chalk setup` command; it dictates where to
-either find a key pair to load, or where to write a keypair being
-generated.
-
-Chalk will also embed the keypairs internally, for future operations.
-"""
-}
 
   field ignore_patterns {
     type:     list[string]
@@ -3139,6 +3285,17 @@ To skip the pager on the command line, use the `--no-pager` flag.
 func keyspec_exists(name) {
   if sections("keyspec").contains(name) { return true; }
   return false
+}
+
+func validate_key_path(path, template_name) {
+  if not ends_with(path, ".key") or not ends_with(path, ".pub") {
+    return "Key path must use either .key or .pub extension"
+  }
+  parts := path_split(path)
+  if len(parts[1]) <= 5 {
+    return "Key path must define a filename"
+  }
+  return ""
 }
 
 func validate_probability(name, value) {

@@ -12,8 +12,9 @@
 ## Though, it might be a decent thing to push the logging stuff into
 ## con4m at some point, as long as it's all optional.
 
-import pkg/[nimutils/jwt]
-import "."/[config, reporting, sinks]
+import std/[httpclient]
+import pkg/[con4m/st, nimutils/jwt]
+import "."/[config, reporting, sinks, chalkjson]
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
@@ -76,6 +77,49 @@ proc isJwtValid(args: seq[Box], s: ConfigState): Option[Box] =
     return some(pack(isAlive))
   except:
     return some(pack(false))
+
+proc authHeaders(args: seq[Box], s: ConfigState): Option[Box] =
+  let
+    name    = unpack[string](args[0])
+    authOpt = getAuthConfigByName(name, attr=s.attrs)
+    c4mHeaders  = newTable[string, string]()
+  if authOpt.isNone():
+    error("there is no auth config for: " & name)
+  else:
+    let
+      auth        = authOpt.get()
+      headers     = newHttpHeaders()
+      authHeaders = auth.implementation.injectHeaders(auth, headers)
+    for key, value in authHeaders.pairs():
+      c4mHeaders[key] = value
+  return some(pack(c4mHeaders))
+
+proc memoizeInChalkmark(args: seq[Box], s: ConfigState): Option[Box] =
+  let
+    name     = unpack[string](args[0])
+    fn       = unpack[CallbackObj](args[1])
+    existing = selfChalkGetSubKey("$CHALK_MEMOIZE", name)
+  if existing.isSome():
+    return existing
+  let valueOpt = s.sCall(fn, @[])
+  if valueOpt.isNone():
+    error("In memoize(\"" & name & "\", fn), fn didnt return any value")
+    return none(Box)
+  let value = valueOpt.get()
+  selfChalkSetSubKey("$CHALK_MEMOIZE", name, value)
+  return valueOpt
+
+proc c4mParseJson*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
+  let
+    data = unpack[string](args[0])
+  try:
+    let
+      json = parseJson(data)
+      box  = nimJsonToBox(json)
+    return some(box)
+  except:
+    error("Could not parse JSON: " & getCurrentExceptionMsg())
+    return none(Box)
 
 let chalkCon4mBuiltins* = [
     ("version() -> string",
@@ -153,7 +197,30 @@ executable name).
      """
 Returns whether JWT token is valid and hasnt expired.
 """,
-     @["chalk"])
+     @["chalk"]),
+    ("auth_headers(string) -> dict[string, string]",
+     BuiltInFn(authHeaders),
+     """
+Returns auth headers for provided auth config.
+""",
+     @["chalk"]),
+    ("memoize(string, func () -> string) -> string",
+     BuiltInFn(memoizeInChalkmark),
+     """
+Memoizes function callback value in chalk mark for future lookups.
+
+This way the function is only computed once.
+""",
+     @["chalk"]),
+
+    ("parse_json(string) -> `x",
+     BuiltInFn(c4mParseJson),
+     """
+Same as `url_post()`, but takes a certificate file location in the final
+parameter, with which HTTPS connections must authenticate against.
+""",
+     @["parsing"]),
+
 ]
 
 let errSinkObj = SinkImplementation(outputFunction: chalkErrSink)
@@ -175,5 +242,5 @@ discard registerTopic("fail")      # This gets aborted reports that we
                                    # good telemetry for some people.
 discard registerTopic("chalk_usage_stats")
 
-
-when not defined(release): discard subscribe("debug", defaultDebugHook)
+when not defined(release):
+  discard subscribe("debug", defaultDebugHook)
