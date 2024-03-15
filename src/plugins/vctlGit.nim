@@ -373,7 +373,7 @@ proc findPackedGitCommit(vcsDir, commitId: string): string =
 proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
   let
     objFile     = info.vcsDir.joinPath(gitObjects, refId[0 ..< 2], refId[2 .. ^1])
-    objFileData = tryToLoadFile(objFile).strip()
+    objFileData = tryToLoadFile(objFile)
 
   var objData: string
   try:
@@ -442,7 +442,7 @@ proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
       result[gitMessage] = objData[iMessageStart ..< iMessageEnd].strip()
 
   except:
-    warn("unable to retrieve Git ref data: " & refId)
+    warn("unable to retrieve Git ref data: " & refId & " due to: " & getCurrentExceptionMsg())
 
 proc loadAuthor(info: RepoInfo, commitId: string) =
   let fields = info.loadObject(commitId)
