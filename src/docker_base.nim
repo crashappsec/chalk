@@ -9,7 +9,7 @@
 ## implementation.
 
 import std/[httpclient, uri]
-import "."/[config, dockerfile, util, reporting, semver, wwwAuthenticate]
+import "."/[config, dockerfile, util, reporting, semver, www_authenticate]
 
 var
   buildXVersion: Version = parseVersion("0")
