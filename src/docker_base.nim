@@ -8,8 +8,8 @@
 ## Common docker-specific utility bits used in various parts of the
 ## implementation.
 
-import std/uri
-import "."/[config, dockerfile, util, reporting, semver]
+import std/[httpclient, uri]
+import "."/[config, dockerfile, util, reporting, semver, wwwAuthenticate]
 
 var
   buildXVersion: Version = parseVersion("0")
@@ -355,16 +355,67 @@ proc inspectImageConfig*(image: string, platform: string = ""): JsonNode =
     return nil
   return config
 
+proc fetchImageRawManifestData*(image: string): string =
+  ## fetch raw json manifest via docker imagetools
+  ## however if that fails withs 401 error, attept to manually
+  ## fetch the manifest via the URL from the error message
+  ## as the error could be due to www-authenticate chellenge
+  let msg = "docker: fetching image manifest for " & image
+  trace(msg)
+  let
+    output = runDockerGetEverything(@["buildx", "imagetools", "inspect", image, "--raw"])
+    stdout = output.getStdout()
+    stderr = output.getStderr()
+    text   = stdout & stderr
+  if output.getExit() == 0:
+    return stdout
+  # sample output:
+  # ERROR: unexpected status from HEAD request to https://<registry>: 401 Unauthorized
+  if "401 Unauthorized" notin stderr:
+    error(msg & " failed with: " & text)
+    return ""
+  if not ("http://" in stderr or "https://" in stderr):
+    error(msg & " auth failed without an URL: " & text)
+    return ""
+  let words = stderr.split()
+  var url   = ""
+  for word in words:
+    if word.startsWith("http://") or word.startsWith("https://"):
+      url = word.strip(leading = false, chars = {':'})
+      break
+  if url == "":
+    error(msg & " failed to find auth chellenge URL: " & text)
+    return ""
+  trace(msg & " requires auth. fetching www-authenticate chellenge from: " & url)
+  let headChellenge = safeRequest(url, httpMethod = HttpHead)
+  if headChellenge.code() != Http401:
+    error(msg & " failed to get 401 for: " & url)
+    return ""
+  if not headChellenge.headers.hasKey("www-authenticate"):
+    error(msg & " www-authenticate header is not returned by: " & url)
+    return ""
+  try:
+    let
+      wwwAuthenticate = headChellenge.headers["www-authenticate"]
+      chellenges      = parseAuthChellenges(wwwAuthenticate)
+      headers         = chellenges.elicitHeaders()
+    trace(msg & " from URL: " & url)
+    let response      = safeRequest(url, headers = headers)
+    if not response.code().is2xx():
+      error(msg & " manifest was not returned from URL: " & response.status)
+      return ""
+    return response.body()
+  except:
+    error(msg & " failed to fetch manifest via www-authenticate chellenge: " &
+          getCurrentExceptionMsg())
+    return ""
+
 proc fetchImageRawManifest*(image: string): JsonNode =
   ## fetch raw json manifest from registry
-  trace("docker: fetching image manifest for " & image)
-  let output = runDockerGetEverything(@["buildx", "imagetools", "inspect", image, "--raw"])
-  if output.getExit() != 0:
+  let manifest = fetchImageRawManifestData(image)
+  if manifest == "":
     return nil
-  let
-    stdout = output.getStdout().strip()
-    json   = parseJson(stdout)
-  return json
+  result = parseJson(manifest)
 
 proc fetchImageConfig*(image: string, platform: string): JsonNode =
   ## fetch image config directly from the registry

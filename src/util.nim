@@ -511,3 +511,8 @@ proc `&`*(a: JsonNode, b: JsonNode): JsonNode =
 proc `&=`*(a: var JsonNode, b: JsonNode) =
   for i in b.items():
     a.add(i)
+
+proc items*[A, B](data: OrderedTable[A, B]): seq[(A, B)] =
+  result = @[]
+  for a, b in data.pairs():
+    result.add((a, b))
