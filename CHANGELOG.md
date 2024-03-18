@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## Main
+## 0.3.4
+
+**Mar 18, 2024**
 
 ### Breaking Changes
 
@@ -51,7 +53,7 @@
 - Fixes a segfault when accidentally providing `http://`
   URL to a sink instead of `https://`.
   [#223](https://github.com/crashappsec/chalk/pull/223)
-- Fixes leaking FDs which didnt allow to chalk large
+- Fixes leaking FDs which didn't allow to chalk large
   zip files such as large Java jar file.
   [#229](https://github.com/crashappsec/chalk/pull/229)
 - Fixes chalking zip file reporting git-repo keys.
@@ -88,6 +90,8 @@
   [#155](https://github.com/crashappsec/chalk/pull/155)
 
 ## 0.3.3
+
+**Feb 26, 2024**
 
 ### New Features
 
