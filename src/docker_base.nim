@@ -359,7 +359,7 @@ proc fetchImageRawManifestData*(image: string): string =
   ## fetch raw json manifest via docker imagetools
   ## however if that fails withs 401 error, attept to manually
   ## fetch the manifest via the URL from the error message
-  ## as the error could be due to www-authenticate chellenge
+  ## as the error could be due to www-authenticate challenge
   let msg = "docker: fetching image manifest for " & image
   trace(msg)
   let
@@ -377,28 +377,27 @@ proc fetchImageRawManifestData*(image: string): string =
   if not ("http://" in stderr or "https://" in stderr):
     error(msg & " auth failed without an URL: " & text)
     return ""
-  let words = stderr.split()
-  var url   = ""
-  for word in words:
+  var url = ""
+  for word in stderr.split():
     if word.startsWith("http://") or word.startsWith("https://"):
       url = word.strip(leading = false, chars = {':'})
       break
   if url == "":
-    error(msg & " failed to find auth chellenge URL: " & text)
+    error(msg & " failed to find auth challenge URL: " & text)
     return ""
-  trace(msg & " requires auth. fetching www-authenticate chellenge from: " & url)
-  let headChellenge = safeRequest(url, httpMethod = HttpHead)
-  if headChellenge.code() != Http401:
+  trace(msg & " requires auth. fetching www-authenticate challenge from: " & url)
+  let headChallenge = safeRequest(url, httpMethod = HttpHead)
+  if headChallenge.code() != Http401:
     error(msg & " failed to get 401 for: " & url)
     return ""
-  if not headChellenge.headers.hasKey("www-authenticate"):
+  if not headChallenge.headers.hasKey("www-authenticate"):
     error(msg & " www-authenticate header is not returned by: " & url)
     return ""
   try:
     let
-      wwwAuthenticate = headChellenge.headers["www-authenticate"]
-      chellenges      = parseAuthChellenges(wwwAuthenticate)
-      headers         = chellenges.elicitHeaders()
+      wwwAuthenticate = headChallenge.headers["www-authenticate"]
+      challenges      = parseAuthChallenges(wwwAuthenticate)
+      headers         = challenges.elicitHeaders()
     trace(msg & " from URL: " & url)
     let response      = safeRequest(url, headers = headers)
     if not response.code().is2xx():
@@ -406,7 +405,7 @@ proc fetchImageRawManifestData*(image: string): string =
       return ""
     return response.body()
   except:
-    error(msg & " failed to fetch manifest via www-authenticate chellenge: " &
+    error(msg & " failed to fetch manifest via www-authenticate challenge: " &
           getCurrentExceptionMsg())
     return ""
 
