@@ -1,5 +1,7 @@
 # Chalk Release Notes
 
+## Main
+
 ## 0.3.4
 
 **Mar 18, 2024**
