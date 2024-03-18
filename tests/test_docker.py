@@ -178,6 +178,26 @@ def test_composite_build(
     assert second_image_id
 
 
+def test_base_ecr(chalk: Chalk):
+    """
+    ecr some manifest endpoints require additional auth even for public registries
+    """
+    _, build = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "ecr" / "Dockerfile",
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    assert build
+    assert build.mark.has(
+        _IMAGE_ENTRYPOINT=[
+            "/chalk",
+            "exec",
+            "--exec-command-name",
+            "/lambda-entrypoint.sh",
+            "--",
+        ],
+    )
+
+
 def test_base_image(chalk: Chalk, random_hex: str):
     base_id, _ = Docker.build(
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile.base",
