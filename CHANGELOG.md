@@ -2,6 +2,11 @@
 
 ## Main
 
+## Breaking Changes
+
+- S3 sinks must specify bucket region
+  [#246](https://github.com/crashappsec/chalk/pull/246)
+
 ## 0.3.4
 
 **Mar 18, 2024**
