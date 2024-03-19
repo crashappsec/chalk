@@ -2,6 +2,13 @@
 
 ## Main
 
+## Breaking Changes
+
+- S3 sinks must now specify the bucket region. Previously
+  it defaulted to `us-east-1` if the `AWS_REGION` or
+  `AWS_DEFAULT_REGION` environment variables were not set
+  [#246](https://github.com/crashappsec/chalk/pull/246)
+
 ## 0.3.4
 
 **Mar 18, 2024**
