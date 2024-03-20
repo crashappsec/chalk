@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[hashes, re, sequtils, sets, tables]
+import std/[hashes, re, sequtils, sets, strscans, tables]
 import ".."/[config, plugin_api, util]
 
 const FT_ANY = "*"
@@ -136,8 +136,8 @@ proc getProcNames(): HashSet[string] =
       except:
         continue
     for line in data.split("\n"):
-      if "Name:" in line:
-        let name = line.split("Name:")[1].strip()
+      let (isMatch, name) = line.scanTuple("Name:$s$+")
+      if isMatch:
         result.incl(name)
 
 # The current host based detection simply checks for the
