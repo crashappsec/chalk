@@ -125,6 +125,8 @@ proc scanFile(filePath: string, category: string, subcategory: string) =
 proc getProcNames(): HashSet[string] =
   result = initHashSet[string]()
   for kind, path in walkDir("/proc/"):
+    if kind == pcFile:
+      continue
     for ch in path.splitPath().tail:
       if ch notin "0123456789":
         continue
