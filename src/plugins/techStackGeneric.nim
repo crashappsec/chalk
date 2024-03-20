@@ -139,6 +139,7 @@ proc getProcNames(): HashSet[string] =
       let (isMatch, name) = line.scanTuple("Name:$s$+")
       if isMatch:
         result.incl(name)
+        break
 
 # The current host based detection simply checks for the
 # presence of configuration files, therefore we don't need
