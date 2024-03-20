@@ -184,21 +184,15 @@ proc scanDirectory(directory: string, category: string, subcategory: string) =
       break
     if filePath.kind == pcFile:
       scanFile(filePath.path, category, subcategory)
-      continue
-    if filePath.kind == pcDir:
+    elif filePath.kind == pcDir:
       scanDirectory(filePath.path, category, subcategory)
-      continue
 
 proc getLanguages(directory: string, langs: var HashSet[string]) =
   for filePath in walkDir(directory):
     if filePath.kind == pcFile:
       let splFile = splitFile(filePath.path)
-      if splFile.ext == "":
-        continue
-      if splFile.ext notin languages:
-        continue
-      langs.incl(languages[splFile.ext])
-      continue
+      if splFile.ext != "" and splFile.ext in languages:
+        langs.incl(languages[splFile.ext])
     if filePath.kind == pcDir:
       getLanguages(filePath.path, langs)
 
