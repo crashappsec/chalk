@@ -131,14 +131,14 @@ proc getProcNames(): HashSet[string] =
       if ch notin {'0'..'9'}:
         continue
     let p_path = path / "status"
-    var data =
+    let data =
       try:
         p_path.readFile()
       except:
         continue
     for line in data.split("\n"):
       if "Name:" in line:
-        var name = line.split("Name:")[1].strip()
+        let name = line.split("Name:")[1].strip()
         result.incl(name)
 
 # The current host based detection simply checks for the
