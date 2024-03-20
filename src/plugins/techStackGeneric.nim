@@ -127,21 +127,17 @@ proc getProcNames(): HashSet[string] =
   ## This is the filename of each executable, truncated to 15 characters.
   result = initHashSet[string]()
   for kind, path in walkDir("/proc/"):
-    if kind == pcFile:
-      continue
-    for ch in path.lastPathPart():
-      if ch notin {'0'..'9'}:
-        continue
-    let data =
-      try:
-        readFile(path / "status")
-      except:
-        continue
-    for line in data.split("\n"):
-      let (isMatch, name) = line.scanTuple("Name:$s$+")
-      if isMatch:
-        result.incl(name)
-        break
+    if kind == pcDir and path.lastPathPart().allIt(it in {'0'..'9'}):
+      let data =
+        try:
+          readFile(path / "status")
+        except:
+          continue
+      for line in data.split("\n"):
+        let (isMatch, name) = line.scanTuple("Name:$s$+")
+        if isMatch:
+          result.incl(name)
+          break
 
 # The current host based detection simply checks for the
 # presence of configuration files, therefore we don't need
