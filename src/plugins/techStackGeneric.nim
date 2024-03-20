@@ -127,7 +127,7 @@ proc getProcNames(): HashSet[string] =
   for kind, path in walkDir("/proc/"):
     if kind == pcFile:
       continue
-    for ch in path.splitPath().tail:
+    for ch in path.lastPathPart():
       if ch notin {'0'..'9'}:
         continue
     let data =
