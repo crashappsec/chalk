@@ -205,7 +205,6 @@ proc getLanguages(directory: string, langs: var HashSet[string]) =
       continue
     if filePath.kind == pcDir:
       getLanguages(filePath.path, langs)
-      continue
 
 proc detectLanguages(): HashSet[string] =
   result = initHashSet[string]()
