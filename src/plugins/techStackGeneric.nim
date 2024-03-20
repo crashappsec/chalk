@@ -130,10 +130,9 @@ proc getProcNames(): HashSet[string] =
     for ch in path.splitPath().tail:
       if ch notin {'0'..'9'}:
         continue
-    let p_path = path / "status"
     let data =
       try:
-        p_path.readFile()
+        readFile(path / "status")
       except:
         continue
     for line in data.split("\n"):
