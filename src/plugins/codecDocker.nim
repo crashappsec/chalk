@@ -512,7 +512,7 @@ proc inspectImage(chalk: ChalkObj): bool {.discardable.} =
     cmdOut = runDockerGetEverything(@["inspect", chalk.name])
 
   if cmdOut.getExit() != 0:
-    info(chalk.name & ": Docker inspect image failed: " & cmdOut.getStdErr())
+    trace(chalk.name & ": Docker inspect image failed: " & cmdOut.getStdErr())
     return false
 
   let contents = cmdOut.getStdOut().parseJson().getElems()[0]
@@ -530,7 +530,7 @@ proc inspectContainer(chalk: ChalkObj) =
     cmdOut = runDockerGetEverything(@["container", "inspect", id])
 
   if cmdout.getExit() != 0:
-    warn(chalk.userRef & ": Container inspection failed (no longer running?)")
+    warn(chalk.userRef & ": Could not perform container inspection (no longer running?)")
     return
 
   let
