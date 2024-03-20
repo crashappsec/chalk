@@ -123,6 +123,8 @@ proc scanFile(filePath: string, category: string, subcategory: string) =
     scanFileStream(stream)
 
 proc getProcNames(): HashSet[string] =
+  ## Returns every Name value in files at `/proc/[0-9]+/status`.
+  ## This is the filename of each executable, truncated to 15 characters.
   result = initHashSet[string]()
   for kind, path in walkDir("/proc/"):
     if kind == pcFile:
