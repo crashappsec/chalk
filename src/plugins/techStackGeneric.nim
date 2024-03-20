@@ -128,7 +128,7 @@ proc getProcNames(): HashSet[string] =
     if kind == pcFile:
       continue
     for ch in path.splitPath().tail:
-      if ch notin "0123456789":
+      if ch notin {'0'..'9'}:
         continue
     try:
       let p_path = path / "status"
