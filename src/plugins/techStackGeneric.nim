@@ -126,17 +126,17 @@ proc getProcNames(): HashSet[string] =
   result = initHashSet[string]()
   for kind, path in walkDir("/proc/"):
     for ch in path.splitPath().tail:
-      try:
-        if ch notin "0123456789":
-          continue
-        let p_path = path / "status"
-        var data = p_path.readFile()
-        for line in data.split("\n"):
-          if "Name:" in line:
-            var name = line.split("Name:")[1].strip()
-            result.incl(name)
-      except:
-         continue
+      if ch notin "0123456789":
+        continue
+    try:
+      let p_path = path / "status"
+      var data = p_path.readFile()
+      for line in data.split("\n"):
+        if "Name:" in line:
+          var name = line.split("Name:")[1].strip()
+          result.incl(name)
+    except:
+      continue
 
 # The current host based detection simply checks for the
 # presence of configuration files, therefore we don't need
