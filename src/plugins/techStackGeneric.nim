@@ -179,7 +179,7 @@ proc scanDirectory(directory: string, category: string, subcategory: string) =
       break
     if kind == pcFile:
       scanFile(path, category, subcategory)
-    elif kind == pcDir:
+    elif kind == pcDir and not path.endsWith(".git"):
       scanDirectory(path, category, subcategory)
 
 proc getLanguages(directory: string, langs: var HashSet[string]) =
@@ -188,7 +188,7 @@ proc getLanguages(directory: string, langs: var HashSet[string]) =
       let ext = path.splitFile().ext
       if ext != "" and ext in languages:
         langs.incl(languages[ext])
-    elif kind == pcDir:
+    elif kind == pcDir and not path.endsWith(".git"):
       getLanguages(path, langs)
 
 proc detectLanguages(): HashSet[string] =
