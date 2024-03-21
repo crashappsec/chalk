@@ -6,6 +6,7 @@
 ##
 
 import std/[hashes, re, sequtils, sets, strscans, tables]
+import pkg/nimutils
 import ".."/[config, plugin_api, util]
 
 const FT_ANY = "*"
@@ -128,11 +129,7 @@ proc getProcNames(): HashSet[string] =
   result = initHashSet[string]()
   for kind, path in walkDir("/proc/"):
     if kind == pcDir and path.lastPathPart().allIt(it in {'0'..'9'}):
-      let data =
-        try:
-          readFile(path / "status")
-        except:
-          continue
+      let data = tryToLoadFile(path / "status")
       for line in data.split("\n"):
         let (isMatch, name) = line.scanTuple("Name:$s$+")
         if isMatch:
