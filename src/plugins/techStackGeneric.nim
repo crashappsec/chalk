@@ -70,12 +70,12 @@ proc scanFileStream(strm: FileStream, filePath: string, category: string, subcat
         for ft in ruleExcludeFiletypes[rule_name]:
           # if the filetype does not match the current extension proceed
           if ft != splFile.ext and ft != "":
-              continue
+            continue
           # if we have a matching extension and a rule for that extenion,
           # append the rule in the rule to be run
           if ft in excludeFtRules and rule_name in excludeFtRules[ft]:
-              exclude = true
-              break
+            exclude = true
+            break
       # add the rule only if its explicitly added and not excluded
       if not exclude:
         applicable_rules.add(rule_name)
@@ -205,7 +205,7 @@ proc detectLanguages(): HashSet[string] =
     else:
       let (head, _) = splitPath(fPath)
       if head.dirExists():
-          getLanguages(head, result)
+        getLanguages(head, result)
 
 proc detectTechCwd(): TableRef[string, seq[string]] =
   result = newTable[string, seq[string]]()
