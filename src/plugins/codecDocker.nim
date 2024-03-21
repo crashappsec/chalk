@@ -510,7 +510,7 @@ proc inspectImage(chalk: ChalkObj): bool {.discardable.} =
     cmdOut = runDockerGetEverything(@["inspect", chalk.name])
 
   if cmdOut.getExit() != 0:
-    trace(chalk.name & ": Docker inspect image failed: " & cmdOut.getStdErr())
+    info(chalk.name & ": Docker inspect image failed: " & cmdOut.getStdErr())
     return false
 
   let contents = cmdOut.getStdOut().parseJson().getElems()[0]
