@@ -130,7 +130,7 @@ proc getProcNames(): HashSet[string] =
   for kind, path in walkDir("/proc/"):
     if kind == pcDir and path.lastPathPart().allIt(it in {'0'..'9'}):
       let data = tryToLoadFile(path / "status")
-      for line in data.split("\n"):
+      for line in data.splitLines():
         let (isMatch, name) = line.scanTuple("Name:$s$+")
         if isMatch:
           result.incl(name)
