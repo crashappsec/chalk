@@ -41,7 +41,6 @@ var
 proc scanFileStream(strm: FileStream, filePath: string, category: string, subcategory: string) =
   let
     splFile    = splitFile(filePath)
-    rule_names = categories[category][subcategory]
   var applicable_rules: seq[string]
   # applicable rules are eithr rules that apply to all filetypes (FT_ANY)
   # or to the filetype matching the given extension
@@ -63,7 +62,6 @@ proc scanFileStream(strm: FileStream, filePath: string, category: string, subcat
     if rule_name notin tsRules:
       continue
 
-    let tsRule = tsRules[rule_name]
     if FT_ANY in ftRules and rule_name in ftRules[FT_ANY]:
 
       # make a pass and check if we should exclude the rule
