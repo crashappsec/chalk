@@ -38,7 +38,7 @@ var
   # key: rule, vals: filetypes for which this rules does not applies
   ruleExcludeFiletypes = newTable[string, seq[string]]()
 
-template scanFileStream(strm: FileStream) =
+proc scanFileStream(strm: FileStream, filePath: string, category: string, subcategory: string) =
   let
     splFile    = splitFile(filePath)
     rule_names = categories[category][subcategory]
@@ -121,7 +121,7 @@ proc scanFile(filePath: string, category: string, subcategory: string) =
   withFileStream(filePath, mode = fmRead, strict = true):
     if stream == nil:
       return
-    scanFileStream(stream)
+    scanFileStream(stream, filePath, category, subcategory)
 
 proc getProcNames(): HashSet[string] =
   ## Returns every Name value in files at `/proc/[0-9]+/status`.
