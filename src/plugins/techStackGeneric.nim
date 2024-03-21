@@ -5,7 +5,8 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[hashes, re, sequtils, sets, tables]
+import std/[hashes, re, sequtils, sets, strscans, tables]
+import pkg/nimutils
 import ".."/[config, plugin_api, util]
 
 const FT_ANY = "*"
@@ -123,20 +124,17 @@ proc scanFile(filePath: string, category: string, subcategory: string) =
     scanFileStream(stream)
 
 proc getProcNames(): HashSet[string] =
+  ## Returns every Name value in files at `/proc/[0-9]+/status`.
+  ## This is the filename of each executable, truncated to 15 characters.
   result = initHashSet[string]()
   for kind, path in walkDir("/proc/"):
-    for ch in path.splitPath().tail:
-      try:
-        if ch notin "0123456789":
-          continue
-        let p_path = path / "status"
-        var data = p_path.readFile()
-        for line in data.split("\n"):
-          if "Name:" in line:
-            var name = line.split("Name:")[1].strip()
-            result.incl(name)
-      except:
-         continue
+    if kind == pcDir and path.lastPathPart().allIt(it in {'0'..'9'}):
+      let data = tryToLoadFile(path / "status")
+      for line in data.splitLines():
+        let (isMatch, name) = line.scanTuple("Name:$s$+")
+        if isMatch:
+          result.incl(name)
+          break
 
 # The current host based detection simply checks for the
 # presence of configuration files, therefore we don't need
