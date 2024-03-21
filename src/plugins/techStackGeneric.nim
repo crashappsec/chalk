@@ -176,22 +176,29 @@ proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string]): bool =
 proc scanDirectory(directory: string, category: string, subcategory: string) =
   if inFileScope[category][subcategory]:
     return
-  for kind, path in walkDir(directory):
+  for filePath in walkDir(directory):
     if inFileScope[category][subcategory]:
       break
-    if kind == pcFile:
-      scanFile(path, category, subcategory)
-    elif kind == pcDir:
-      scanDirectory(path, category, subcategory)
+    if filePath.kind == pcFile:
+      scanFile(filePath.path, category, subcategory)
+      continue
+    if filePath.kind == pcDir:
+      scanDirectory(filePath.path, category, subcategory)
+      continue
 
 proc getLanguages(directory: string, langs: var HashSet[string]) =
-  for kind, path in walkDir(directory):
-    if kind == pcFile:
-      let ext = path.splitFile().ext
-      if ext != "" and ext in languages:
-        langs.incl(languages[ext])
-    elif kind == pcDir:
-      getLanguages(path, langs)
+  for filePath in walkDir(directory):
+    if filePath.kind == pcFile:
+      let splFile = splitFile(filePath.path)
+      if splFile.ext == "":
+        continue
+      if splFile.ext notin languages:
+        continue
+      langs.incl(languages[splFile.ext])
+      continue
+    if filePath.kind == pcDir:
+      getLanguages(filePath.path, langs)
+      continue
 
 proc detectLanguages(): HashSet[string] =
   result = initHashSet[string]()
