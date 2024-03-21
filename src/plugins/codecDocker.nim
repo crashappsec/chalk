@@ -6,9 +6,7 @@
 ##
 import ".."/[config, docker_base, chalkjson, attestation_api, plugin_api, util]
 
-const
-  markFile     = "chalk.json"
-  markLocation = "/chalk.json"
+const markLocation = "/chalk.json"
 
 proc dockerGetChalkId*(self: Plugin, chalk: ChalkObj): string {.cdecl.} =
   if chalk.extract != nil and "CHALK_ID" in chalk.extract:
@@ -601,6 +599,9 @@ proc dockerExtractChalkMark*(chalk: ChalkObj): ChalkDict {.exportc, cdecl.} =
   addUnmarked(chalk.name)
 
 proc loadCodecDocker*() =
-  newCodec("docker",
-           rtArtCallback = RunTimeArtifactCb(dockerGetRunTimeArtifactInfo),
-           getChalkId    = ChalkIdCb(dockerGetChalkId))
+  if getDockerExeLocation() == "":
+    warn("Disabling docker codec as docker command is not available")
+  else:
+    newCodec("docker",
+             rtArtCallback = RunTimeArtifactCb(dockerGetRunTimeArtifactInfo),
+             getChalkId    = ChalkIdCb(dockerGetChalkId))

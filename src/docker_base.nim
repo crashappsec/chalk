@@ -12,13 +12,12 @@ import std/[httpclient, uri]
 import "."/[config, dockerfile, util, reporting, semver, www_authenticate]
 
 var
-  buildXVersion: Version = parseVersion("0")
-  dockerVersion: Version = parseVersion("0")
+  buildXVersion     = parseVersion("0")
+  dockerVersion     = parseVersion("0")
+  dockerExeLocation = ""
 
 const
   hashHeader* = "sha256:"
-
-var dockerPathOpt: Option[string] = none(string)
 
 template extractDockerHash*(value: string): string =
   if not value.startsWith(hashHeader):
@@ -29,7 +28,7 @@ template extractDockerHash*(value: string): string =
 template extractBoxedDockerHash*(value: Box): Box =
   pack(extractDockerHash(unpack[string](value)))
 
-proc setDockerExeLocation*() =
+proc getDockerExeLocation*(): string =
   once:
     trace("Searching PATH for 'docker'")
     let
@@ -40,13 +39,15 @@ proc setDockerExeLocation*() =
     dockerExeLocation = dockerExeOpt.get("")
     if dockerExeLocation == "":
        warn("No docker command found in PATH. `chalk docker` not available.")
+  return dockerExeLocation
 
 proc runDockerGetEverything*(args: seq[string], stdin = "", silent = true): ExecOutput =
+  let exe = getDockerExeLocation()
   if not silent:
-    trace("Running docker: " & dockerExeLocation & " " & args.join(" "))
+    trace("Running docker: " & exe & " " & args.join(" "))
     if stdin != "":
       trace("Passing on stdin: \n" & stdin)
-  result = runCmdGetEverything(dockerExeLocation, args, stdin)
+  result = runCmdGetEverything(exe, args, stdin)
   if not silent and result.exitCode > 0:
     trace(strutils.strip(result.stderr & result.stdout))
   return result
@@ -121,9 +122,14 @@ proc dockerFailsafe*(info: DockerInvocation) {.cdecl, exportc.} =
   if info.dockerFileLoc == ":stdin:":
     newStdin = info.inDockerFile
 
-  let exitCode = runCmdNoOutputCapture(dockerExeLocation,
-                                        info.originalArgs,
-                                        newStdin)
+  let
+    exe      = getDockerExeLocation()
+    # even if docker is not found call subprocess with valid command name
+    # so that we can bubble up error from subprocess
+    docker   = if exe != "": exe else: "docker"
+    exitCode = runCmdNoOutputCapture(docker,
+                                     info.originalArgs,
+                                     newStdin)
   doReporting("fail")
   quitChalk(exitCode)
 

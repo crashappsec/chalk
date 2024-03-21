@@ -412,7 +412,6 @@ var
   chalkConfig*:           ChalkConfig
   con4mRuntime*:          ConfigStack
   commandName*:           string
-  dockerExeLocation*:     string = ""
   gitExeLocation*:        string = ""
   sshKeyscanExeLocation*: string = ""
 
