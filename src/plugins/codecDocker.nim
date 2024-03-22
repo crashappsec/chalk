@@ -599,7 +599,9 @@ proc dockerExtractChalkMark*(chalk: ChalkObj): ChalkDict {.exportc, cdecl.} =
   addUnmarked(chalk.name)
 
 proc loadCodecDocker*() =
-  if getDockerExeLocation() == "":
+  # cant use getDockerExePath as that uses codecs to ignore chalk
+  # wrappings hence we just check if anything docker is on PATH here
+  if nimutils.findExePath("docker") == "":
     warn("Disabling docker codec as docker command is not available")
   else:
     newCodec("docker",
