@@ -20,6 +20,9 @@ import "."/[config, chalkjson, util]
 # should all be pre-checked.
 
 proc callGetChalkTimeHostInfo*(plugin: Plugin): ChalkDict =
+  if not plugin.enabled:
+    return ChalkDict()
+
   let cb = plugin.getChalkTimeHostInfo
 
   # explicit callback check - otherwise it results in segfault
@@ -31,6 +34,9 @@ proc callGetChalkTimeHostInfo*(plugin: Plugin): ChalkDict =
 
 proc callGetChalkTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj):
          ChalkDict =
+  if not plugin.enabled:
+    return ChalkDict()
+
   let cb = plugin.getChalkTimeArtifactInfo
 
   # explicit callback check - otherwise it results in segfault
@@ -42,6 +48,9 @@ proc callGetChalkTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj):
 
 proc callGetRunTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj, b: bool):
          ChalkDict =
+  if not plugin.enabled:
+    return ChalkDict()
+
   let cb = plugin.getRunTimeArtifactInfo
 
   # explicit callback check - otherwise it results in segfault
@@ -53,6 +62,9 @@ proc callGetRunTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj, b: bool):
 
 proc callGetRunTimeHostInfo*(plugin: Plugin, objs: seq[ChalkObj]):
          ChalkDict =
+  if not plugin.enabled:
+    return ChalkDict()
+
   let cb = plugin.getRunTimeHostInfo
 
   # explicit callback check - otherwise it results in segfault
@@ -594,7 +606,8 @@ proc newPlugin*(
                   getChalkTimeArtifactInfo: ctArtCallback,
                   getRunTimeArtifactInfo:   rtArtCallback,
                   getRunTimeHostInfo:       rtHostCallback,
-                  internalState:            cache)
+                  internalState:            cache,
+                  enabled:                  true)
 
   if not result.checkPlugin(codec = false):
     result = Plugin(nil)
@@ -612,7 +625,8 @@ proc newCodec*(
   handleWrite:        HandleWriteCb       = HandleWritecb(defaultCodecWrite),
   nativeObjPlatforms: seq[string]         =  @[],
   cache:              RootRef             = RootRef(nil),
-  commentStart:       string              = "#"):
+  commentStart:       string              = "#",
+  enabled:            bool                = true):
     Plugin {.discardable, cdecl.} =
 
   result = Plugin(name:                     name,
@@ -627,7 +641,8 @@ proc newCodec*(
                   handleWrite:              handleWrite,
                   nativeObjPlatforms:       nativeObjPlatforms,
                   internalState:            cache,
-                  commentStart:             commentStart)
+                  commentStart:             commentStart,
+                  enabled:                  enabled)
 
   if not result.checkPlugin(codec = true):
     result = Plugin(nil)
