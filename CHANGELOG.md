@@ -11,7 +11,7 @@
 
 ### Fixes
 
-- The Docker codec is now bypassed when "docker" is not
+- The Docker codec is now bypassed when `docker` is not
   installed. Previously, any chalk sub-scan such as
   during `chalk exec` had misleading error logs.
   [#248](https://github.com/crashappsec/chalk/pull/248)
