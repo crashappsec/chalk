@@ -9,6 +9,13 @@
   `AWS_DEFAULT_REGION` environment variables were not set
   [#246](https://github.com/crashappsec/chalk/pull/246)
 
+### Fixes
+
+- The Docker codec is now bypassed when `docker` is not
+  installed. Previously, any chalk sub-scan such as
+  during `chalk exec` had misleading error logs.
+  [#248](https://github.com/crashappsec/chalk/pull/248)
+
 ## 0.3.4
 
 **Mar 18, 2024**
