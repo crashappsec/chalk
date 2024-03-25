@@ -2,14 +2,27 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import asyncio
 import dataclasses
 import logging.config
-from typing import Any, Optional
+import pathlib
+import secrets
+import shutil
+import tempfile
+from typing import Annotated, Any, Optional
 
 import os
 import sqlalchemy
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
-from fastapi.responses import RedirectResponse
+from fastapi import (
+    Body,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from .__version__ import __version__
@@ -183,3 +196,47 @@ async def list_reports(
 async def list_stats(db: Session = Depends(get_db)) -> list[schemas.Stat]:
     chalk_stats = db.query(models.Stat).all()
     return [schemas.Stat.model_validate(vars(c)) for c in chalk_stats]
+
+
+cosign = {}
+
+
+@app.get("/cosign")
+async def get_cosign():
+    global cosign
+    if not cosign:
+        with tempfile.TemporaryDirectory() as _tmp:
+            password = secrets.token_bytes(16).hex()
+            tmp = pathlib.Path(_tmp)
+            process = await asyncio.subprocess.create_subprocess_exec(
+                shutil.which("cosign"),
+                "generate-key-pair",
+                "--output-key-prefix",
+                "chalk",
+                env={"COSIGN_PASSWORD": password},
+                cwd=tmp,
+            )
+            await process.wait()
+            cosign = {
+                "privateKey": (tmp / "chalk.key").read_text(),
+                "publicKey": (tmp / "chalk.pub").read_text(),
+                "password": password,
+            }
+    return cosign
+
+
+backup = {}
+
+
+@app.get("/backup/{key_id}", response_class=PlainTextResponse)
+async def get_backup(key_id: str):
+    try:
+        return backup[key_id]
+    except KeyError:
+        raise HTTPException(status_code=404)
+
+
+@app.put("/backup/{key_id}")
+async def put_backup(key_id: str, request: Request):
+    password = await request.body()
+    backup[key_id] = password

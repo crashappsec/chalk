@@ -7,7 +7,7 @@
 
 ## The `chalk exec` command.
 
-import std/posix
+import std/[posix, sequtils]
 import ".."/[config, collect, util, reporting, chalkjson, plugin_api]
 
 # this const is not available in nim stdlib hence manual c import
@@ -186,33 +186,17 @@ proc runCmdExec*(args: seq[string]) =
     setExitCode(1)
     return
 
-
   let
-    cmdName    = get[string](chalkConfig, "exec.command_name")
+    fromArgs   = get[bool](chalkConfig, "exec.command_name_from_args")
     cmdPath    = get[seq[string]](chalkConfig, "exec.search_path")
     defaults   = get[seq[string]](chalkConfig, "exec.default_args")
     appendArgs = get[bool](chalkConfig, "exec.append_command_line_args")
     overrideOk = get[bool](chalkConfig, "exec.override_ok")
     usePath    = get[bool](chalkConfig, "exec.use_path")
     pct        = get[int](chalkConfig, "exec.reporting_probability")
-    allOpts    = findAllExePaths(cmdName, cmdPath, usePath)
     ppid       = getpid()   # Get the current pid before we fork.
-
-
-  if cmdName == "":
-    error("This chalk instance has no configured process to exec.")
-    error("At the command line, you can pass --exec-command-name to " &
-      "set the program name (PATH is searched).")
-    error("Add extra directories to search with --exec-search-path.")
-    error("In a config file, set exec.command_name and/or exec.search_path")
-    setExitCode(1)
-    return
-
-
-  if len(allOpts) == 0:
-    error("No executable named '" & cmdName & "' found in your path.")
-    setExitCode(1)
-    return
+  var
+    cmdName    = get[string](chalkConfig, "exec.command_name")
 
   var argsToPass = defaults
 
@@ -224,6 +208,25 @@ proc runCmdExec*(args: seq[string]) =
     return
   elif len(args) != 0:
     argsToPass = args
+
+  if cmdName == "" and fromArgs and len(argsToPass) > 0:
+    cmdName = argsToPass[0]
+    argsToPass.delete(0, 0)
+
+  if cmdName == "":
+    error("This chalk instance has no configured process to exec.")
+    error("At the command line, you can pass --exec-command-name to " &
+          "set the program name (PATH is searched).")
+    error("Add extra directories to search with --exec-search-path.")
+    error("In a config file, set exec.command_name and/or exec.search_path")
+    setExitCode(1)
+    return
+
+  let allOpts = findAllExePaths(cmdName, cmdPath, usePath)
+  if len(allOpts) == 0:
+    error("No executable named '" & cmdName & "' found in your path.")
+    setExitCode(1)
+    return
 
   if pct != 100:
     let

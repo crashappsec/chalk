@@ -112,7 +112,6 @@ def test_s3(tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk):
     proc = chalk.insert(
         config=config,
         artifact=artifact,
-        log_level="info",
         env={"AWS_S3_BUCKET_URI": "s3://crashoverride-chalk-tests/sink-test.json"},
     )
 
@@ -155,6 +154,7 @@ def test_post_wrong_method(
             "CHALK_USAGE_URL": f"{server_http}/redirect",
             "CHALK_POST_URL": f"{server}/report",
         },
+        ignore_errors=True,
     )
     assert result
     metadata_id = result.mark["METADATA_ID"]
@@ -257,7 +257,6 @@ def _test_server(
         target=artifact,
         config=config,
         use_embedded=False,
-        log_level="trace",
         env=env,
     )
 

@@ -84,6 +84,7 @@ type
                                c: Option[string]) {.cdecl.}
   Plugin* = ref object
     name*:                     string
+    enabled*:                  bool
     configInfo*:               PluginSpec
     getChalkTimeHostInfo*:     ChalkTimeHostCb
     getChalkTimeArtifactInfo*: ChalkTimeArtifactCb
@@ -101,6 +102,19 @@ type
     internalState*:            RootRef
     # This is only used when using the default script chalking.
     commentStart*:             string
+
+  AttestationKey* = ref object
+    password*:   string
+    publicKey*:  string
+    privateKey*: string
+    tmpPath*:    string
+
+  AttestationKeyProvider* = ref object of RootRef
+    name*:             string
+    init*:             proc (self: AttestationKeyProvider)
+    generateKey*:      proc (self: AttestationKeyProvider): AttestationKey
+    retrieveKey*:      proc (self: AttestationKeyProvider): AttestationKey
+    retrievePassword*: proc (self: AttestationKeyProvider, key: AttestationKey): string
 
   KeyType* = enum KtChalkableHost, KtChalk, KtNonChalk, KtHostOnly
 
@@ -120,16 +134,18 @@ type
     chalks*:          seq[ChalkObj]
     recurse*:         bool
 
-  DockerDirective* = ref object
+  DockerStatement* = ref object of RootRef
+    startLine*:  int
+    endLine*:    int
     name*:       string
     rawArg*:     string
+
+  DockerDirective* = ref object of DockerStatement
     escapeChar*: Option[Rune]
 
-  DockerCommand* = ref object
-    name*:   string
-    rawArg*: string
+  DockerCommand* = ref object of DockerStatement
     continuationLines*: seq[int]  # line 's we continue onto.
-    errors*: seq[string]
+    errors*:            seq[string]
 
   VarSub* = ref object
     brace*:   bool
@@ -140,6 +156,7 @@ type
     error*:   string
     plus*:    bool
     minus*:   bool  #
+
   LineTokenType* = enum ltOther, ltWord, ltQuoted, ltSpace
 
   LineToken* = ref object
@@ -152,6 +169,7 @@ type
     #
     # The individual pieces in the 'contents' field will be de-quoted
     # already, with escapes processed.
+    line*:       int
     startix*:    int
     endix*:      int
     kind*:       LineTokenType
@@ -195,8 +213,9 @@ type
     inArgs*:             Table[string, string]
 
   InfoBase* = ref object of RootRef
-    error*:    string
-    stopHere*: bool
+    error*:     string
+    startLine*: int
+    endLine*:   int
 
   FromInfo* = ref object of InfoBase
     flags*:  seq[DfFlag]
@@ -219,7 +238,7 @@ type
     str*:          string
 
   OnBuildInfo* = ref object of InfoBase
-    rawContents*:  string
+    raw*:  string
 
   AddInfo* = ref object of InfoBase
     flags*:  seq[DfFlag]
@@ -238,6 +257,8 @@ type
     labels*: OrderedTable[string, string]
 
   DockerFileSection* = ref object
+    startLine*:   int
+    endLine*:     int
     image*:       string
     alias*:       string
     entryPoint*:  EntryPointInfo
@@ -290,6 +311,7 @@ type
     foundFileArg*:      string
     dockerfileLoc*:     string
     inDockerFile*:      string
+    defaultPlatforms*:  Table[string, string]
     foundPlatform*:     string
     foundContext*:      string
     otherContexts*:     OrderedTableRef[string, string]
@@ -391,7 +413,6 @@ var
   chalkConfig*:           ChalkConfig
   con4mRuntime*:          ConfigStack
   commandName*:           string
-  dockerExeLocation*:     string = ""
   gitExeLocation*:        string = ""
   sshKeyscanExeLocation*: string = ""
 

@@ -7,43 +7,23 @@
 
 ## The `chalk setup` command.
 
-import ".."/[config, attestation, reporting, selfextract, util, collect]
+import ".."/[config, attestation_api, reporting, selfextract, util, collect]
 
-proc runCmdSetup*(gen, load: bool) =
+proc runCmdSetup*() =
   setCommandName("setup")
   initCollection()
 
   let selfChalk = getSelfExtraction().getOrElse(nil)
-
   if selfChalk == nil:
     error("Platform does not support self-chalking.")
     return
 
   selfChalk.addToAllChalks()
-  info("Ensuring cosign is present to setup attestation.")
 
-  if getCosignLocation(downloadCosign = true) == "":
-    quitChalk(1)
-  if load:
-    # If we fall back to 'gen' we don't want attemptToLoadKeys
-    # to give an error when we don't find keys.
-    if attemptToLoadKeys(withPrivateKey=true, silent=gen):
-      doReporting()
-      return
-    let
-      base = getKeyFileLoc()
-
-    if not gen:
-      error("Failed to load signing keys. Aborting.")
-      quitChalk(1)
-    elif fileExists(base & ".pub") or fileExists(base & ".key"):
-      error("Keypair failed to load, but key file(s) are present. Move or " &
-            "remove in order to regenerate.")
-      quitChalk(1)
-
-  if attemptToGenKeys():
+  try:
+    setupAttestation()
     doReporting()
-    return
-  else:
-    error("Failed to generate signing keys. Aborting.")
+    quitChalk(0)
+  except:
+    error(getCurrentExceptionMsg())
     quitChalk(1)

@@ -88,7 +88,7 @@ sink s3 {
   ~secret:        true
   ~token:         false
   ~uri:           true
-  ~region:        false
+  ~region:        true
   ~extra:         false
   ~on_write_msg:  false
   shortdoc:       "S3 object storage"
@@ -100,7 +100,7 @@ sink s3 {
 | `secret` | `string` | true | A valid AWS auth token |
 | `token` | `string` | false | AWS session token |
 | `uri` | `string` | true | The URI for the bucket in `s3:` format; see below |
-| `region` | `string` | false | The region (defaults to "us-east-1") |
+| `region` | `string` | true | The region |
 | `extra` | `string` | false | A prefix added to the object path within the bucket |
 
 To ensure uniqueness, each run of chalk constructs a unique object

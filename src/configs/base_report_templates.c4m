@@ -405,6 +405,7 @@ report and subtract from it.
   key.$CHALK_SECRET_ENDPOINT_URI.use         = true
   key.$CHALK_COMPONENT_CACHE.use             = false
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use  = true
+  key.$CHALK_MEMOIZE.use                     = true
 }
 
 report_template report_large {
@@ -821,6 +822,7 @@ doc: """
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
+  key.$CHALK_MEMOIZE.use                      = true
 }
 
 report_template report_default {
@@ -1236,6 +1238,7 @@ container.
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
+  key.$CHALK_MEMOIZE.use                      = true
 }
 
 report_template insertion_default {
@@ -1654,6 +1657,7 @@ and keep the run-time key.
   key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
+  key.$CHALK_MEMOIZE.use                      = true
 }
 
 report_template unknown_docker {
@@ -1832,6 +1836,9 @@ running commands that do NOT insert chalk marks.
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
   key.METADATA_ID.use                         = true
+  key.SIGNATURE.use                           = true
+  key._SIGNATURE.use                          = true
+  key._VALIDATED_SIGNATURE.use                = true
   key._CURRENT_HASH.use                       = true
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_PATH.use                   = true

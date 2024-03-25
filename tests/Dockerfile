@@ -51,7 +51,7 @@ RUN mkdir -p /.cache/pypoetry \
 COPY pyproject.toml poetry.lock $WORKDIR/
 RUN poetry install --no-plugins
 
-COPY --from=gcr.io/projectsigstore/cosign /ko-app/cosign /usr/local/bin/cosign
+COPY --from=gcr.io/projectsigstore/cosign:v2.2.3 /ko-app/cosign /usr/local/bin/cosign
 COPY --from=docker:24 /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker/buildx-bin:0.11.2 /buildx /usr/lib/docker/cli-plugins/docker-buildx
 
