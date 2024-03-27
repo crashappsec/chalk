@@ -110,6 +110,25 @@ def test_build(
     assert image_id
 
 
+def test_docker_context(chalk: Chalk, tmp_data_dir: Path):
+    """
+    Test docker can build when a context is "docker"
+    """
+    shutil.copy(chalk.binary, tmp_data_dir / "docker")
+    cwd = tmp_data_dir / "cwd"
+    context = cwd / "docker"
+    context.mkdir(parents=True)
+    path = os.environ["PATH"]
+
+    _, build = Docker.build(
+        cwd=cwd,
+        dockerfile=DOCKERFILES / "valid" / "sample_2" / "Dockerfile",
+        context="docker",
+        env={"PATH": f"{tmp_data_dir}:{path}"},
+    )
+    assert ChalkProgram.from_program(build)
+
+
 @pytest.mark.parametrize("dockerfile", [DOCKERFILES / "valid" / "sample_1"])
 def test_multiple_tags(
     chalk: Chalk,

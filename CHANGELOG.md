@@ -15,6 +15,10 @@
   installed. Previously, any chalk sub-scan such as
   during `chalk exec` had misleading error logs.
   [#248](https://github.com/crashappsec/chalk/pull/248)
+- Fixed parsing CLI params when wrapping `docker`
+  (rename `chalk` exe to `docker`) and a docker command
+  had a "docker" param.
+  [#257](https://github.com/crashappsec/chalk/pull/257)
 
 ## 0.3.4
 

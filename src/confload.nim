@@ -177,14 +177,11 @@ proc loadAllConfigs*() =
   let
     toStream = newStringStream
     stack    = newConfigStack()
+    exeName  = getMyAppPath().splitPath().tail
 
-  case getMyAppPath().splitPath().tail
+  case exeName
   of "docker":
-    if "docker" notin params:
-      if len(params) != 0 and params[0] == "chalk":
-        params = params[1 .. ^1]
-      else:
-        params = @["docker"] & params
+    params = @[exeName] & params
   else: discard
 
   con4mRuntime = stack
