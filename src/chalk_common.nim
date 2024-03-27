@@ -84,6 +84,7 @@ type
                                c: Option[string]) {.cdecl.}
   Plugin* = ref object
     name*:                     string
+    enabled*:                  bool
     configInfo*:               PluginSpec
     getChalkTimeHostInfo*:     ChalkTimeHostCb
     getChalkTimeArtifactInfo*: ChalkTimeArtifactCb
@@ -412,7 +413,6 @@ var
   chalkConfig*:           ChalkConfig
   con4mRuntime*:          ConfigStack
   commandName*:           string
-  dockerExeLocation*:     string = ""
   gitExeLocation*:        string = ""
   sshKeyscanExeLocation*: string = ""
 

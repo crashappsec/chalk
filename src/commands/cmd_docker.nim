@@ -44,8 +44,9 @@ proc runMungedDockerInvocation(ctx: DockerInvocation): int =
   var
     newStdin = "" # Indicated passthrough.
     args     = ctx.newCmdLine
+    exe      = getDockerExeLocation()
 
-  trace("Running docker: " & dockerExeLocation & " " & args.join(" "))
+  trace("Running docker: " & exe & " " & args.join(" "))
 
   if ctx.dfPassOnStdin:
     if not ctx.inDockerFile.endswith("\n"):
@@ -53,7 +54,7 @@ proc runMungedDockerInvocation(ctx: DockerInvocation): int =
     newStdin = ctx.addInstructions(ctx.inDockerFile)
     trace("Passing on stdin: \n" & newStdin)
 
-  result = runCmdNoOutputCapture(dockerExeLocation, args, newStdin)
+  result = runCmdNoOutputCapture(exe, args, newStdin)
 
 proc doReporting*(topic: string){.importc.}
 
@@ -508,6 +509,7 @@ proc runBuild(ctx: DockerInvocation): int =
   chalk.marked = true
 
 proc runPush(ctx: DockerInvocation): int =
+  let exe = getDockerExeLocation()
   if ctx.cmdBuild:
     var tags = ctx.foundTags
     if len(tags) == 0:
@@ -516,7 +518,7 @@ proc runPush(ctx: DockerInvocation): int =
     for tag in tags:
       trace("docker pushing: " & tag)
       ctx.newCmdLine = @["push", tag]
-      result = runCmdNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
+      result = runCmdNoOutputCapture(exe, ctx.newCmdLine)
       if result != 0:
         break
 
@@ -533,9 +535,10 @@ proc runPush(ctx: DockerInvocation): int =
 
     # Here, if we fail, there's no re-run.
     # We ran their original command line so there is nothing to fall back on.
-    return runCmdNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
+    return runCmdNoOutputCapture(exe, ctx.newCmdLine)
 
 proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
+  let exe = getDockerExeLocation()
   # not a multi-platform build so manifest should not be used
   if len(platforms) < 2:
     return 0
@@ -546,7 +549,7 @@ proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
       platformTags.add(ctx.getTagForPlatform(tag, platform))
 
     let exitCode = runCmdNoOutputCapture(
-      dockerExeLocation,
+      exe,
       @["buildx", "imagetools", "create", "-t"] & platformTags,
     )
     if exitCode != 0:
@@ -561,9 +564,10 @@ proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
 # TODO: Any other noteworthy commands to wrap (run, etc)
 
 template passThroughLogic() =
+  let exe = getDockerExeLocation()
   try:
     # Silently pass through other docker commands right now.
-    exitCode = runCmdNoOutputCapture(dockerExeLocation, args)
+    exitCode = runCmdNoOutputCapture(exe, args)
     if chalkConfig.dockerConfig.getReportUnwrappedCommands():
       reporting.doReporting("report")
   except:
@@ -707,13 +711,15 @@ template postDockerActivity() =
         exitCode = 0
 
 proc runCmdDocker*(args: seq[string]) =
-  setDockerExeLocation()
-
   var
     exitCode = 0
     ctx      = args.processDockerCmdLine()
 
   ctx.originalArgs = args
+
+  if getDockerExeLocation() == "":
+    error("docker command is missing. chalk requires docker binary installed to wrap docker commands.")
+    ctx.dockerFailSafe()
 
   if ctx.cmdBuild:
     # Build with --push is still a build operation.

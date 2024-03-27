@@ -363,7 +363,7 @@ proc findExePath*(cmdName:    string,
     # takes precedence over rest of dirs in PATH
     paths = @[configPath.get()] & paths
 
-  trace("Searching path for " & cmdName)
+  trace("Searching PATH for " & cmdName)
   var foundExes = findAllExePaths(cmdName, paths, usePath)
 
   if ignoreChalkExes:
@@ -386,10 +386,10 @@ proc findExePath*(cmdName:    string,
     foundExes = newExes
 
   if foundExes.len() == 0:
-    trace("Could not find '" & cmdName & "' in path.")
+    trace("Could not find '" & cmdName & "' in PATH.")
     return none(string)
 
-  trace("Found '" & cmdName & "' in path: " & foundExes[0])
+  trace("Found '" & cmdName & "' in PATH: " & foundExes[0])
   return some(foundExes[0])
 
 proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
