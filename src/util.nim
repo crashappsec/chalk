@@ -375,11 +375,14 @@ proc findExePath*(cmdName:    string,
       let
         subscan   = runChalkSubScan(location, "extract")
         allchalks = subscan.getAllChalks()
-      if len(allChalks) != 0 and allChalks[0].extract != nil and
-         "$CHALK_IMPLEMENTATION_NAME" in allChalks[0].extract:
-        continue
-      else:
+        isChalk   = (
+          len(allChalks) != 0 and
+          allChalks[0].extract != nil and
+         "$CHALK_IMPLEMENTATION_NAME" in allChalks[0].extract
+        )
+      if not isChalk:
         newExes.add(location)
+        break
 
     endNativeCodecsOnly()
 
