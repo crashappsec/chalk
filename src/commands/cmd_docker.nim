@@ -261,7 +261,7 @@ proc formatChalkExec(args: JsonNode = newJArray()): string =
 
 proc rewriteEntryPoint*(ctx: DockerInvocation) =
   let
-    fromArgs             = get[bool](chalkConfig, "exec.get_command_name_from_args")
+    fromArgs             = get[bool](chalkConfig, "exec.command_name_from_args")
     wrapCmd              = get[bool](chalkConfig, "docker.wrap_cmd")
     (entryPoint, cmd, _) = ctx.getTargetEntrypoints()
 
