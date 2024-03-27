@@ -15,6 +15,9 @@
   installed. Previously, any chalk sub-scan such as
   during `chalk exec` had misleading error logs.
   [#248](https://github.com/crashappsec/chalk/pull/248)
+- `chalk docker ...` did not exit with non-zero exit code
+  when `docker` is not installed.
+  [#256](https://github.com/crashappsec/chalk/pull/256)
 - Fixed parsing CLI params when wrapping `docker`
   (rename `chalk` exe to `docker`) and a docker command
   had a "docker" param.

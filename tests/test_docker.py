@@ -71,6 +71,17 @@ def do_docker_cleanup() -> Iterator[None]:
                 Docker.remove_images(list(images))
 
 
+def test_no_docker(chalk: Chalk):
+    _, build = chalk.docker_build(
+        context=DOCKERFILES / "valid" / "sample_1",
+        env={"PATH": ""},
+        expected_success=False,
+        # dont run sanity docker subcommand
+        run_docker=False,
+    )
+    assert build.exit_code > 0
+
+
 @pytest.mark.parametrize("buildkit", [True, False])
 @pytest.mark.parametrize(
     "cwd, dockerfile, tag",
