@@ -49,11 +49,10 @@ proc request(self: Get, query = ""): JsonNode =
 proc initCallback(this: AttestationKeyProvider) =
   let
     self      = Get(this)
-    getConfig = chalkConfig.attestationConfig.attestationKeyGetConfig
-    authName  = getConfig.getAuth()
+    authName  = get[string](chalkConfig, "attestation.attestation_key_get.auth")
     authOpt   = getAuthConfigByName(authName)
-    url       = getConfig.getUri().removeSuffix("/")
-    timeout   = cast[int](getConfig.getTimeout())
+    url       = get[string](chalkConfig, "attestation.attestation_key_get.uri").removeSuffix("/")
+    timeout   = cast[int](get[Con4mDuration](chalkConfig, "attestation.attestation_key_get.timeout"))
 
   if authOpt.isNone():
     raise newException(ValueError,

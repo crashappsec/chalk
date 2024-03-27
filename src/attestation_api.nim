@@ -24,7 +24,7 @@ proc canAttest*(): bool =
   return cosignKey.canAttest()
 
 proc getProvider(): AttestationKeyProvider =
-  let name = chalk_common.chalkConfig.attestationConfig.getKeyProvider()
+  let name = get[string](chalkConfig, "attestation.key_provider")
   if name notin keyProviders:
     raise newException(KeyError, "Unsupported attestation key provider: " & name)
   return keyProviders[name]
