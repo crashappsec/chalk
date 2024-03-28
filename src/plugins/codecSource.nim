@@ -69,7 +69,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     hasBang = false
 
   if not isExe and isChalkingOp() and
-     chalkConfig.srcConfig.getOnlyMarkWhenExecuteSet():
+     get[bool](chalkConfig, "source_marks.only_mark_when_execute_set"):
     return none(ChalkObj)
 
   var
@@ -80,12 +80,13 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
 
   if ext != "":
     ext  = ext[1 .. ^1] # No need for the period.
-    if ext in chalkConfig.srcConfig.getTextOnlyExtensions():
+    if ext in get[seq[string]](chalkConfig, "source_marks.text_only_extensions"):
       return none(ChalkObj)
 
-    if ext in chalkConfig.srcConfig.extensionsToLanguagesMap:
+    let exts = get[TableRef[string, string]](chalkConfig, "source_marks.extensions_to_languages_map")
+    if ext in exts:
       # We might revise this if there's a shebang line; it takes precidence.
-      lang = chalkConfig.srcConfig.extensionsToLanguagesMap[ext]
+      lang = exts[ext]
       trace(path & ": By file type, language is: " & lang)
 
   withFileStream(path, mode = fmRead, strict = false):
@@ -96,7 +97,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       let bytes = stream.peekStr(2)
 
       if bytes != "#!":
-        if isChalkingOp() and chalkConfig.srcConfig.getOnlyMarkShebangs():
+        if isChalkingOp() and get[bool](chalkConfig, "source_marks.only_mark_shebangs"):
           return none(ChalkObj)
         elif not stream.seemsToBeUtf8():
           return none(ChalkObj)
@@ -110,7 +111,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     # While we already checked this above, if the shebang was there,
     # but was invalid, we'll behave as if it wasn't there at all.
     if not hasBang and isChalkingOp() and
-       chalkConfig.srcConfig.getOnlyMarkShebangs():
+       get[bool](chalkConfig, "source_marks.only_mark_shebangs"):
       return none(ChalkObj)
 
     if lang == "":
@@ -120,7 +121,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     # At this point, *if* there's a custom_logic callback, we need to
     # call it, otherwise we are done.
 
-    let opt = chalkConfig.srcConfig.getCustomLogic()
+    let opt = getOpt[CallbackObj](chalkConfig, "source_marks.custom_logic")
 
     if opt.isSome():
       let
@@ -130,8 +131,9 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       if not proceed:
         return none(ChalkObj)
 
-    if lang in chalkConfig.srcConfig.languageToCommentMap:
-      commentPrefix = chalkConfig.srcConfig.languageToCommentMap[lang]
+    let langs = get[TableRef[string, string]](chalkConfig, "source_marks.language_to_comment_map")
+    if lang in langs:
+      commentPrefix = langs[lang]
     else:
       commentPrefix = "#"
 
