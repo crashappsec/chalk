@@ -417,7 +417,7 @@ var
   sshKeyscanExeLocation*: string = ""
 
 template dumpExOnDebug*() =
-  if chalkConfig != nil and chalkConfig.getChalkDebug():
+  if chalkConfig != nil and get[bool](chalkConfig, "chalk_debug"):
     let
       msg = "" # "Handling exception (msg = " & getCurrentExceptionMsg() & ")\n"
       tb  = "Traceback (most recent call last)\n" &

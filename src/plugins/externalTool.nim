@@ -100,8 +100,8 @@ template toolBase(s: string) {.dirty.} =
   var
     toolInfo: Table[string, seq[(int, PIInfo)]]
   let
-    runSbom = chalkConfig.getRunSbomTools()
-    runSast = chalkConfig.getRunSastTools()
+    runSbom = get[bool](chalkConfig, "run_sbom_tools")
+    runSast = get[bool](chalkConfig, "run_sast_tools")
 
   # tools should only run during insert operations
   if getCommandName() notin @["build", "insert"]:

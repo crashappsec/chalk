@@ -31,7 +31,7 @@ template extractBoxedDockerHash*(value: Box): Box =
 proc getDockerExeLocation*(): string =
   once:
     let
-      dockerConfigPath = chalkConfig.getDockerExe()
+      dockerConfigPath = getOpt[string](chalkConfig, "docker_exe")
       dockerExeOpt     = findExePath("docker",
                                      configPath      = dockerConfigPath,
                                      ignoreChalkExes = true)

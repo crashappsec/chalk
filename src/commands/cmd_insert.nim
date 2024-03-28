@@ -13,7 +13,7 @@ import ".."/[config, collect, reporting, chalkjson, plugin_api]
 proc runCmdInsert*(path: seq[string]) {.exportc,cdecl.} =
   setContextDirectories(path)
   initCollection()
-  let virtual = chalkConfig.getVirtualChalk()
+  let virtual = get[bool](chalkConfig, "virtual_chalk")
 
   for item in artifacts(path):
     trace(item.name & ": begin chalking")

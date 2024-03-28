@@ -120,9 +120,3 @@ proc getPluginConfig*(name: string): Option[PluginSpec] =
 
 var autoHelp*:       string = ""
 proc getAutoHelp*(): string = autoHelp
-
-proc get*[T](chalkConfig: ChalkConfig, fqn: string): T =
-  get[T](chalkConfig.`@@attrscope@@`, fqn)
-
-proc getOpt*[T](chalkConfig: ChalkConfig, fqn: string): Option[T] =
-  getOpt[T](chalkConfig.`@@attrscope@@`, fqn)

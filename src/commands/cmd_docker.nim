@@ -469,7 +469,7 @@ proc runBuild(ctx: DockerInvocation): int =
     ctx.addBackBuildWithoutPushFlags()
   else:
     ctx.addBackBuildWithPushFlags()
-  if chalkConfig.getChalkContainedItems():
+  if get[bool](chalkConfig, "chalk_contained_items"):
     info("Docker is starting a recursive chalk of context directories.")
     var contexts: seq[string] = @[ctx.foundContext]
 
@@ -494,7 +494,7 @@ proc runBuild(ctx: DockerInvocation): int =
   trace("Creating chalk mark.")
   let chalkMark = chalk.getChalkMarkAsStr()
 
-  if chalkConfig.getVirtualChalk():
+  if get[bool](chalkConfig, "virtual_chalk"):
     ctx.prepVirtualInsertion()
   else:
     ctx.handleTrueInsertion(chalkMark)
@@ -503,7 +503,7 @@ proc runBuild(ctx: DockerInvocation): int =
 
   result = ctx.runMungedDockerInvocation()
 
-  if chalkConfig.getVirtualChalk() and result == 0:
+  if get[bool](chalkConfig, "virtual_chalk") and result == 0:
     publish("virtual", chalkMark)
 
   chalk.marked = true

@@ -78,7 +78,7 @@ proc doCommandReport(): string {.inline.} =
     reportTemplate = getReportTemplate()
     # The above goes from the string name to the object.
 
-  if chalkConfig.getSkipCommandReport():
+  if get[bool](chalkConfig, "skip_command_report"):
     info("Skipping the command report as per the `skip_command_report` directive")
     result = ""
   else:
@@ -115,7 +115,7 @@ template doCustomReporting() =
 
     if getCommandName() notin spec.useWhen and "*" notin spec.useWhen:
       continue
-    if topic == "audit" and not chalkConfig.getPublishAudit():
+    if topic == "audit" and not get[bool](chalkConfig, "publish_audit"):
       continue
     if len(sinkConfs) == 0 and topic notin ["audit", "chalk_usage_stats"]:
       warn("Report '" & topic & "' has no configured sinks.  Skipping.")
