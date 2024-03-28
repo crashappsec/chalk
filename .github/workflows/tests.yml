@@ -35,7 +35,7 @@ env:
 
 jobs:
   pytest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     if: |
       (
