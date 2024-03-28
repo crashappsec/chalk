@@ -242,7 +242,7 @@ proc coreVerify(key: AttestationKey, chalk: ChalkObj): bool =
   ## Used both for validation, and for downloading just the signature
   ## after we've signed.
   const fName = "chalk.pub"
-  let noTlog = not get[bool](chalkConfig, "use_transparency_log")
+  let noTlog  = not get[bool](chalkConfig, "use_transparency_log")
 
   key.withCosignKey:
     let
