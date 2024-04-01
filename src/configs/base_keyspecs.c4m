@@ -1942,7 +1942,9 @@ keyspec _IMAGE_COMMENT {
     standard: true
     shortdoc: "Comment reported for a container image"
     doc: """
-Any comment explicitly set for the image.
+Optional comment that was set when committing or importing the image locally.
+
+This does not apply for remote images.
 """
 }
 
@@ -2029,7 +2031,17 @@ keyspec _IMAGE_SIZE {
     standard: true
     shortdoc: "Size of container image"
     doc: """
-The size in bytes of the image. This field exists so that a client will have an expected size for the content before validating. If the length of the retrieved content does not match the specified length, the content should not be trusted.
+The size in bytes of the image as it is stored locally. This field exists so that a client will have an expected size for the content before validating. If the length of the retrieved content does not match the specified length, the content should not be trusted.
+"""
+}
+
+keyspec _IMAGE_COMPRESSED_SIZE {
+    kind:     RunTimeArtifact
+    type:     int
+    standard: true
+    shortdoc: "Size of compressed container image in a registry"
+    doc: """
+The size in bytes of the compressed image as it is stored in the registry.
 """
 }
 
@@ -2267,34 +2279,6 @@ keyspec _IMAGE_SHELL {
 The shell used within an image (e.g., `/bin/sh`) used to execute ENTRYPOINT, RUN and/or CMD commands
 """
 }
-
-keyspec _IMAGE_VIRTUAL_SIZE {
-    kind:     RunTimeArtifact
-    type:     int
-    standard: true
-    doc: """
-The amount of data used for the read-only image data used by the container plus the container's writable layer size.
-"""
-}
-
-keyspec _IMAGE_LAST_TAG_TIME {
-    kind:     RunTimeArtifact
-    type:     string
-    standard: true
-    doc: """
-Last time an image was tagged.
-"""
-}
-
-keyspec _IMAGE_STORAGE_METADATA {
-    kind:     RunTimeArtifact
-    type:     dict[string, string]
-    standard: true
-    doc: """
-Storage metadata (key value pairs) associated with an image.
-"""
-}
-
 
 keyspec _STORE_URI {
     kind:                RunTimeArtifact

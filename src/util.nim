@@ -514,3 +514,26 @@ proc `&`*(a: JsonNode, b: JsonNode): JsonNode =
 proc `&=`*(a: var JsonNode, b: JsonNode) =
   for i in b.items():
     a.add(i)
+
+proc toLowerKeysJsonNode*(node: JsonNode): JsonNode =
+  ## convert json node to lower case keys string json node
+  ## (similar to strtabs but for json nodes)
+  case node.kind:
+  of JString:
+    return node
+  of JInt:
+    return node
+  of JFloat:
+    return node
+  of JBool:
+    return node
+  of JNull:
+    return node
+  of JObject:
+    result = newJObject()
+    for k, v in node.pairs():
+      result[k.toLower()] = v.toLowerKeysJsonNode()
+  of JArray:
+    result = newJArray()
+    for i in node.items():
+      result.add(i.toLowerKeysJsonNode())

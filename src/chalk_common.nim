@@ -277,6 +277,36 @@ type
     branches*:     seq[string]
     tags*:         seq[string]
 
+  DockerManifestType* = enum
+    list, image, config, layer
+
+  DockerPlatform* = tuple[
+    os:           string,
+    architecture: string,
+  ]
+
+  DockerManifest* = ref object
+    imageName*:        string
+    digest*:           string
+    mediaType*:        string
+    size*:             int
+    json*:             JsonNode
+    isFetched*:        bool # whether json is fetched or only stub is filled
+    case kind*:        DockerManifestType
+    of list:
+      manifests*:      seq[DockerManifest]
+    of image:
+      list*:           DockerManifest # can be null if there is manifest list
+      platform*:       DockerPlatform
+      config*:         DockerManifest
+      layers*:         seq[DockerManifest]
+    of config:
+      image*:          DockerManifest
+      configPlatform*: DockerPlatform
+      imageConfig*:    JsonNode # only the config from the json
+    of layer:
+      discard
+
   DockerGitContext* = ref object
     context*:      string
     # https://docs.docker.com/engine/reference/commandline/build/

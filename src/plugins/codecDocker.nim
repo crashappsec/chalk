@@ -4,7 +4,9 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import ".."/[config, docker_base, chalkjson, attestation_api, plugin_api, util]
+
+import "../docker"/[base, exe]
+import ".."/[config, chalkjson, attestation_api, plugin_api, util]
 
 const markLocation = "/chalk.json"
 
@@ -216,28 +218,37 @@ proc getContainerChalks*(codec: Plugin): seq[ChalkObj] {.exportc,cdecl.} =
     dumpExOnDebug()
     trace("Could not run docker.")
 
+# https://docs.docker.com/engine/api/v1.44/#tag/Image/operation/ImageInspect
+# https://github.com/opencontainers/image-spec/blob/main/config.md
+#
 # These are the keys we can auto-convert without any special-casing.
 # Types of the JSON will be checked against the key's declared type.
 let dockerImageAutoMap = {
   "RepoTags":                           "_REPO_TAGS",
   "RepoDigests":                        "_REPO_DIGESTS",
-  "Comment":                            "_IMAGE_COMMENT",
+  "Comment":                            "_IMAGE_COMMENT", # local-only
   "Created":                            "_IMAGE_CREATION_DATETIME",
-  "DockerVersion":                      "_IMAGE_DOCKER_VERSION",
+  "DockerVersion":                      "_IMAGE_DOCKER_VERSION", # most of the time empty string
   "Author":                             "_IMAGE_AUTHOR",
   "Architecture":                       "_IMAGE_ARCHITECTURE",
   "Variant":                            "_IMAGE_VARIANT",
-  "OS":                                 "_IMAGE_OS",
-  "OsVersion":                          "_IMAGE_OS_VERSION",
+  "Os":                                 "_IMAGE_OS",
+  "OsVersion":                          "_IMAGE_OS_VERSION", # local-only
+  "os.version":                         "_IMAGE_OS_VERSION", # remote-only
   "Size":                               "_IMAGE_SIZE",
+  "CompressedSize":                     "_IMAGE_COMPRESSED_SIZE", # injected in remote manifest processing
   "RootFS.Type":                        "_IMAGE_ROOT_FS_TYPE",
   "RootFS.Layers",                      "_IMAGE_ROOT_FS_LAYERS",
+
+  "Config.Shell":                       "_IMAGE_SHELL",
+  "Config.Entrypoint":                  "_IMAGE_ENTRYPOINT",
+  "Config.Cmd":                         "_IMAGE_CMD",
+
   "Config.Hostname":                    "_IMAGE_HOSTNAMES",
   "Config.Domainname":                  "_IMAGE_DOMAINNAME",
   "Config.User":                        "_IMAGE_USER",
   "Config.ExposedPorts":                "_IMAGE_EXPOSEDPORTS",
   "Config.Env":                         "_IMAGE_ENV",
-  "Config.Cmd":                         "_IMAGE_CMD",
   "Config.Image":                       "_IMAGE_NAME",
   "Config.Healthcheck.Test":            "_IMAGE_HEALTHCHECK_TEST",
   "Config.Healthcheck.Interval":        "_IMAGE_HEALTHCHECK_INTERVAL",
@@ -247,17 +258,12 @@ let dockerImageAutoMap = {
   "Config.Healthcheck.Retries":         "_IMAGE_HEALTHCHECK_RETRIES",
   "Config.Volumes":                     "_IMAGE_MOUNTS",
   "Config.WorkingDir":                  "_IMAGE_WORKINGDIR",
-  "Config.Entrypoint":                  "_IMAGE_ENTRYPOINT",
   "Config.NetworkDisabled":             "_IMAGE_NETWORK_DISABLED",
   "Config.MacAddress":                  "_IMAGE_MAC_ADDR",
   "Config.OnBuild":                     "_IMAGE_ONBUILD",
   "Config.Labels":                      "_IMAGE_LABELS",
   "Config.StopSignal":                  "_IMAGE_STOP_SIGNAL",
   "Config.StopTimeout":                 "_IMAGE_STOP_TIMEOUT",
-  "Config.Shell":                       "_IMAGE_SHELL",
-  "VirtualSize":                        "_IMAGE_VIRTUAL_SIZE",
-  "Metadata.LastTagTime":               "_IMAGE_LAST_TAG_TIME",
-  "GraphDriver":                        "_IMAGE_STORAGE_METADATA"
   }.toOrderedTable()
 
 let dockerContainerAutoMap = {
@@ -388,7 +394,7 @@ template extractDockerHashMap(value: Box): Box =
   var outTable = OrderedTableRef[string, string]()
 
   for item in list:
-    let ix = item.find(hashHeader) # defined in docker_base.nim
+    let ix = item.find(hashHeader) # defined in docker/base.nim
     if ix == -1:
       warn("Unrecognized item in _REPO_DIGEST array: " & item)
       continue
@@ -455,9 +461,15 @@ proc jsonOneAutoKey(node:        JsonNode,
   dict[chalkKey] = value
 
 proc getPartialJsonObject(top: JsonNode, key: string): Option[JsonNode] =
+  # if the key in json has dots hence split below will not find the key
+  let lowerKey = key.toLower()
+
+  if lowerKey in top:
+    return some(top[key])
+
   var cur = top
 
-  let keyParts = key.split('.')
+  let keyParts = lowerKey.split('.')
   for item in keyParts:
     if item notin cur:
       return none(JsonNode)
@@ -468,10 +480,12 @@ proc getPartialJsonObject(top: JsonNode, key: string): Option[JsonNode] =
 proc jsonAutoKey(map:  OrderedTable[string, string],
                  top:  JsonNode,
                  dict: ChalkDict) =
-  let reportEmpty = get[bool](chalkConfig, "docker.report_empty_fields")
+  let
+    reportEmpty = get[bool](chalkConfig, "docker.report_empty_fields")
+    lowerJson   = top.toLowerKeysJsonNode()
 
   for jsonKey, chalkKey in map:
-    let subJsonOpt = top.getPartialJsonObject(jsonKey)
+    let subJsonOpt = lowerJson.getPartialJsonObject(jsonKey)
 
     if subJsonOpt.isNone():
       continue

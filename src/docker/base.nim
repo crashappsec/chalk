@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -9,12 +9,8 @@
 ## implementation.
 
 import std/[httpclient, uri]
-import "."/[config, dockerfile, util, reporting, semver, www_authenticate]
-
-var
-  buildXVersion     = parseVersion("0")
-  dockerVersion     = parseVersion("0")
-  dockerExeLocation = ""
+import ".."/[config, util, reporting, semver]
+import "."/[dockerfile, exe, manifest]
 
 const
   hashHeader* = "sha256:"
@@ -27,87 +23,6 @@ template extractDockerHash*(value: string): string =
 
 template extractBoxedDockerHash*(value: Box): Box =
   pack(extractDockerHash(unpack[string](value)))
-
-proc getDockerExeLocation*(): string =
-  once:
-    let
-      dockerConfigPath = getOpt[string](chalkConfig, "docker_exe")
-      dockerExeOpt     = findExePath("docker",
-                                     configPath      = dockerConfigPath,
-                                     ignoreChalkExes = true)
-    dockerExeLocation = dockerExeOpt.get("")
-    if dockerExeLocation == "":
-       warn("No docker command found in PATH. `chalk docker` not available.")
-  return dockerExeLocation
-
-proc runDockerGetEverything*(args: seq[string], stdin = "", silent = true): ExecOutput =
-  let exe = getDockerExeLocation()
-  if not silent:
-    trace("Running docker: " & exe & " " & args.join(" "))
-    if stdin != "":
-      trace("Passing on stdin: \n" & stdin)
-  result = runCmdGetEverything(exe, args, stdin)
-  if not silent and result.exitCode > 0:
-    trace(strutils.strip(result.stderr & result.stdout))
-  return result
-
-proc getVersionFromLine(line: string): Version =
-  for word in line.splitWhitespace():
-    if '.' in word:
-      try:
-        return parseVersion(word)
-      except:
-        # word wasnt a version number
-        discard
-  raise newException(ValueError, "no version found")
-
-proc getBuildXVersion*(): Version =
-  # Have to parse the thing to get compares right.
-  once:
-    if getEnv("DOCKER_BUILDKIT") == "0":
-      return buildXVersion
-
-    # examples:
-    # github.com/docker/buildx v0.10.2 00ed17df6d20f3ca4553d45789264cdb78506e5f
-    # github.com/docker/buildx 0.11.2 9872040b6626fb7d87ef7296fd5b832e8cc2ad17
-    let version = runDockerGetEverything(@["buildx", "version"])
-    if version.exitCode == 0:
-      try:
-        buildXVersion = getVersionFromLine(version.stdOut)
-        trace("Docker buildx version: " & $(buildXVersion))
-      except:
-        dumpExOnDebug()
-
-  return buildXVersion
-
-proc getDockerVersion*(): Version =
-  once:
-    # examples:
-    # Docker version 1.13.0, build 49bf474
-    # Docker version 23.0.0, build e92dd87
-    # Docker version 24.0.6, build ed223bc820
-    let version = runDockerGetEverything(@["--version"])
-    if version.exitCode == 0:
-      try:
-        dockerVersion = getVersionFromLine(version.stdOut)
-        trace("Docker version: " & $(dockerVersion))
-      except:
-        dumpExOnDebug()
-
-  return dockerVersion
-
-template hasBuildx*(): bool =
-  getBuildXVersion() > parseVersion("0")
-
-template supportsBuildContextFlag*(): bool =
-  # https://github.com/docker/buildx/releases/tag/v0.8.0
-  getDockerVersion() >= parseVersion("21") and getBuildXVersion() >= parseVersion("0.8")
-
-template supportsCopyChmod*(): bool =
-  # > the --chmod option requires BuildKit.
-  # > Refer to https://docs.docker.com/go/buildkit/ to learn how to
-  # > build images with BuildKit enabled
-  hasBuildx()
 
 proc dockerFailsafe*(info: DockerInvocation) {.cdecl, exportc.} =
   # If our mundged docker invocation fails, then we conservatively
@@ -360,116 +275,6 @@ proc inspectImageConfig*(image: string, platform: string = ""): JsonNode =
     return nil
   return config
 
-proc fetchImageRawManifestData*(image: string): string =
-  ## fetch raw json manifest via docker imagetools
-  ## however if that fails withs 401 error, attept to manually
-  ## fetch the manifest via the URL from the error message
-  ## as the error could be due to www-authenticate challenge
-  let msg = "docker: fetching image manifest for " & image
-  trace(msg)
-  let
-    output = runDockerGetEverything(@["buildx", "imagetools", "inspect", image, "--raw"])
-    stdout = output.getStdout()
-    stderr = output.getStderr()
-    text   = stdout & stderr
-  if output.getExit() == 0:
-    return stdout
-  # sample output:
-  # ERROR: unexpected status from HEAD request to https://<registry>: 401 Unauthorized
-  if "401 Unauthorized" notin stderr:
-    error(msg & " failed with: " & text)
-    return ""
-  if not ("http://" in stderr or "https://" in stderr):
-    error(msg & " auth failed without an URL: " & text)
-    return ""
-  var url = ""
-  for word in stderr.split():
-    if word.startsWith("http://") or word.startsWith("https://"):
-      url = word.strip(leading = false, chars = {':'})
-      break
-  if url == "":
-    error(msg & " failed to find auth challenge URL: " & text)
-    return ""
-  trace(msg & " requires auth. fetching www-authenticate challenge from: " & url)
-  let headChallenge = safeRequest(url, httpMethod = HttpHead)
-  if headChallenge.code() != Http401:
-    error(msg & " failed to get 401 for: " & url)
-    return ""
-  if not headChallenge.headers.hasKey("www-authenticate"):
-    error(msg & " www-authenticate header is not returned by: " & url)
-    return ""
-  try:
-    let
-      wwwAuthenticate = headChallenge.headers["www-authenticate"]
-      challenges      = parseAuthChallenges(wwwAuthenticate)
-      headers         = challenges.elicitHeaders()
-    trace(msg & " from URL: " & url)
-    let response      = safeRequest(url, headers = headers)
-    if not response.code().is2xx():
-      error(msg & " manifest was not returned from URL: " & response.status)
-      return ""
-    return response.body()
-  except:
-    error(msg & " failed to fetch manifest via www-authenticate challenge: " &
-          getCurrentExceptionMsg())
-    return ""
-
-proc fetchImageRawManifest*(image: string): JsonNode =
-  ## fetch raw json manifest from registry
-  let manifest = fetchImageRawManifestData(image)
-  if manifest == "":
-    return nil
-  result = parseJson(manifest)
-
-proc fetchImageConfig*(image: string, platform: string): JsonNode =
-  ## fetch image config directly from the registry
-  ## image config will include information about image cmd/entrypoint/etc
-  let name = image.split(":")[0].split("@")[0]
-  # keep in mind that image can be of multiple formats
-  # foo                   # image manifest name
-  # foo:tag               # manifest for specific tag
-  # foo@sha256:<checksum> # pinned to specific digest
-  # therefore we gracefully handle each possibility
-  var json = fetchImageRawManifest(image)
-  if json == nil:
-    return nil
-  # when its a manifest list, find the image within the manifest
-  if "manifests" in json:
-    trace("docker: " & image & " is a manifest list. looking for image manifest for " & platform)
-    for manifest in json["manifests"].items():
-      if "platform" in manifest:
-        let
-          digest    = manifest{"digest"}.getStr()
-          mPlatform = manifest["platform"]
-          os        = mPlatform{"os"}.getStr()
-          arch      = mPlatform{"architecture"}.getStr()
-          together  = os & "/" & arch
-        if platform == together:
-          json = fetchImageRawManifest(name & "@" & digest)
-          if json == nil:
-            return
-          break
-  if "layers" in json:
-    trace("docker: found image manifest. looking for image config")
-    let
-      config = json{"config"}
-      digest = config{"digest"}.getStr()
-    json = fetchImageRawManifest(name & "@" & digest)
-    if json == nil:
-      return nil
-  if "config" notin json or "architecture" notin json or "os" notin json:
-    return nil
-  let
-    config   = json{"config"}
-    os       = json{"os"}.getStr()
-    arch     = json{"architecture"}.getStr()
-    together = os & "/" & arch
-  if platform != together:
-    error("docker: remote image " & image & " doesn't match targeted platform: " &
-          together & " != " & platform)
-    return nil
-  return config
-
 proc fetchImageEntrypoint*(info: DockerInvocation, image: string):
     tuple[entrypoint: EntrypointInfo, cmd: CmdInfo, shell: ShellInfo] =
   ## fetch image entrypoints (entrypoint/cmd/shell)
@@ -478,9 +283,12 @@ proc fetchImageEntrypoint*(info: DockerInvocation, image: string):
   let platform  = info.getBuildTargetPlatform()
   var imageInfo = inspectImageConfig(image, platform)
   if imageInfo == nil:
-    imageInfo = fetchImageConfig(image, platform)
-  if imageInfo == nil:
-    raise newException(ValueError, "Could not inspect base image: " & image)
+    try:
+      imageInfo = fetchImageManifest(image, platform).config.json{"config"}
+    except:
+      raise newException(ValueError,
+                         "Could not inspect base image: " & image &
+                         " due to: " & getCurrentExceptionMsg())
   let
     entrypoint = fromJson[EntrypointInfo](imageInfo{"Entrypoint"})
     cmd        = fromJson[CmdInfo](imageInfo{"Cmd"})
