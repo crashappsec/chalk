@@ -23,8 +23,9 @@
 ## is responsible for all of the collection logic.
 
 import std/[posix, unicode]
-import ".."/[config, collect, reporting, chalkjson, docker_cmdline, docker_base,
-             subscan, dockerfile, util, attestation_api, commands/cmd_help,
+import "../docker"/[base, exe, cmdline, dockerfile]
+import ".."/[config, collect, reporting, chalkjson,
+             subscan, util, attestation_api, commands/cmd_help,
              plugin_api]
 
 {.warning[CStringConv]: off.}

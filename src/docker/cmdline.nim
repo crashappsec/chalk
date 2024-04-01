@@ -11,7 +11,8 @@
 ## is in configs/dockercmd.c4m), so we really just need to look at
 ## the command and flag info returned.
 
-import "."/[config, docker_base, docker_git, util]
+import ".."/[config, util]
+import "."/[base, git, exe]
 
 proc getPlatforms*(state: DockerInvocation): seq[string] =
   if "platform" in state.flags:
