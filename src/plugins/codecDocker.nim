@@ -92,7 +92,7 @@ proc extractImageMark(chalk: ChalkObj): ChalkDict =
         return
 
       else:
-        if not chalkConfig.extractConfig.getSearchBaseLayersForMarks():
+        if not get[bool](chalkConfig, "extract.search_base_layers_for_marks"):
           return
 
         # We're only going to go deeper if there's no chalk mark found.
@@ -468,7 +468,7 @@ proc getPartialJsonObject(top: JsonNode, key: string): Option[JsonNode] =
 proc jsonAutoKey(map:  OrderedTable[string, string],
                  top:  JsonNode,
                  dict: ChalkDict) =
-  let reportEmpty = chalkConfig.dockerConfig.getReportEmptyFields()
+  let reportEmpty = get[bool](chalkConfig, "docker.report_empty_fields")
 
   for jsonKey, chalkKey in map:
     let subJsonOpt = top.getPartialJsonObject(jsonKey)

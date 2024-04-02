@@ -183,7 +183,7 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
 proc testConfigFile*(uri: string, newCon4m: string, params: seq[Box]):
                    ConfigState =
   info(uri & ": Validating configuration.")
-  if chalkConfig.loadConfig.getValidationWarning():
+  if get[bool](chalkConfig, "load.validation_warning"):
     warn("Note: validation involves creating a new configuration context"  &
          " and evaluating your code to make sure it at least evaluates "   &
          "fine on a default path.  subscribe() and unsubscribe() will "    &
@@ -279,10 +279,10 @@ proc updateArchBinaries*(newConfig: string, newParams: seq[Box],
 
   if bins != nil:
     binInfo = bins
-  elif not chalkConfig.loadConfig.getUpdateArchBinaries():
+  elif not get[bool](chalkConfig, "load.update_arch_binaries"):
     return
   else:
-    binInfo = chalkConfig.dockerConfig.getArchBinaryLocations().getOrElse(nil)
+    binInfo = getOpt[typeof(binInfo)](chalkConfig, "docker.arch_binary_locations").get(nil)
 
   if binInfo == nil or len(binInfo) == 0:
     trace("No multi-arch binaries to load.")
@@ -332,8 +332,8 @@ proc handleConfigLoad*(inpath: string) =
     path = inpath
 
   let
-    validate          = chalkConfig.loadConfig.getValidateConfigsOnLoad()
-    replace           = chalkConfig.loadConfig.getReplaceConf()
+    validate          = get[bool](chalkConfig, "load.validate_configs_on_load")
+    replace           = get[bool](chalkConfig, "load.replace_conf")
     confPaths         = chalkConfig.getConfigPath()
     confFilename      = chalkConfig.getConfigFilename()
 
@@ -380,7 +380,7 @@ proc handleConfigLoad*(inpath: string) =
                   newEmbedded & "\n" & useLine
     newEmbedded = withUse.strip()
 
-  if chalkConfig.loadConfig.getParamsViaStdin():
+  if get[bool](chalkConfig, "load.params_via_stdin"):
     try:
       let
         chalkJsonTree = newStringStream(stdin.readLine()).chalkParseJson()
