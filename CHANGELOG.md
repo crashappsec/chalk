@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## Main
+## 0.3.5
+
+**Apr 05, 2024**
 
 ## Breaking Changes
 
@@ -15,7 +17,7 @@
   installed. Previously, any chalk sub-scan such as
   during `chalk exec` had misleading error logs.
   [#248](https://github.com/crashappsec/chalk/pull/248)
-- `chalk docker ...` did not exit with non-zero exit code
+- `chalk docker ...` now exits with a non-zero exit code
   when `docker` is not installed.
   [#256](https://github.com/crashappsec/chalk/pull/256)
 - Fixed parsing CLI params when wrapping `docker`
