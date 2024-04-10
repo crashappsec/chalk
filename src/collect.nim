@@ -6,6 +6,7 @@
 ##
 
 import std/re
+import "./docker"/[scan]
 import "."/[config, plugin_api]
 
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
@@ -303,8 +304,6 @@ proc artSetupForExecAndEnv(argv: seq[string]): ArtifactIterationInfo =
 proc dockerExtractChalkMark*(chalk: ChalkObj): ChalkDict {.importc.}
 proc extractAndValidateSignature*(chalk: ChalkObj) {.importc.}
 
-proc scanOne(codec: Plugin, item: string): Option[ChalkObj] {.importc.}
-
 proc resolveAll(argv: seq[string]): seq[string] =
   for item in argv:
     result.add(resolvePath(item))
@@ -390,7 +389,7 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
       let docker = getPluginByName("docker")
       var chalks: seq[ChalkObj]
       for item in iterInfo.otherPaths:
-        let objOpt = docker.scanOne(item)
+        let objOpt = docker.scanImageOrContainer(item)
         if objOpt.isNone():
           if len(iterInfo.filePaths) > 0:
             error(item & ": No file, image or container found with this name")
@@ -415,18 +414,3 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
           item.extractAndValidateSignature()
         yield item
         clearErrorObject()
-
-proc dockerFailsafe(info: DockerInvocation) {.importc.}
-
-proc getPushChalkObj*(info: DockerInvocation): ChalkObj =
-    let chalkOpt = scanOne(getPluginByName("docker"), info.prefTag)
-
-    if chalkOpt.isNone():
-      warn("Cannot find image; running docker normally.")
-      info.dockerFailSafe()
-
-    if chalkOpt.get().containerId != "":
-      warn("Push references a container; giving up & running docker normally.")
-      info.dockerFailSafe()
-
-    return chalkOpt.get()

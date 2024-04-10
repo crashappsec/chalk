@@ -74,12 +74,6 @@ proc isSSHGitContext(context: string): bool =
 proc isGitContext*(context: string): bool =
   return isHttpGitContext(context) or isSSHGitContext(context)
 
-proc splitBy(s: string, sep: string, default: string = ""): (string, string) =
-  let parts = s.split(sep, maxsplit = 1)
-  if len(parts) == 2:
-    return (parts[0], parts[1])
-  return (s, default)
-
 proc splitContext(context: string): (string, string, string) =
   let
     (remoteUrl, headSubdir) = context.splitBy("#")
