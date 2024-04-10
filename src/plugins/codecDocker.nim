@@ -160,9 +160,12 @@ proc extractContainerMark(chalk: ChalkObj): ChalkDict =
 proc dockerGetRunTimeArtifactInfo(self: Plugin, chalk: ChalkObj, ins: bool):
                                  ChalkDict {.exportc, cdecl.} =
   result = ChalkDict()
-  # If a container name / id was passed, it got inspected during scan,
-  # but images did not.
-  if ResourceImage in chalk.resourceType:
+  # docker chalks are collected while scanning however some
+  # metadata can change since the scan such as for docker push
+  # with repo digests and so we need to collect updated image metdata.
+  # Note this only applies to images and not containers and so we only
+  # recollect image metadata
+  if ResourceContainer notin chalk.resourceType:
     chalk.collectImage()
 
 proc dockerExtractChalkMark*(chalk: ChalkObj): ChalkDict {.exportc, cdecl.} =

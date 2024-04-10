@@ -229,6 +229,8 @@ proc collectImage*(chalk: ChalkObj, name: string) =
       break
 
 proc collectImage*(chalk: ChalkObj) =
+  if chalk.imageId == "":
+    raise newException(ValueError, "docker: no image name/id to inspect")
   chalk.collectImage(chalk.imageId)
 
 proc collectContainer*(chalk: ChalkObj, name: string) =
