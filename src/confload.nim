@@ -220,12 +220,12 @@ proc loadAllConfigs*() =
   # The embedded config has already been validated.
   let configFile = getEmbeddedConfig()
 
-  if chalkConfig.getLoadEmbeddedConfig():
+  if get[bool](chalkConfig, "load_embedded_config"):
     stack.addConfLoad(embeddedConfName, toStream(configFile)).
           addCallback(loadLocalStructs)
     doRun()
 
-  if chalkConfig.getLoadExternalConfig():
+  if get[bool](chalkConfig, "load_external_config"):
     let optConf = stack.configState.findOptionalConf()
     if optConf.isSome():
       let fName = optConf.get()

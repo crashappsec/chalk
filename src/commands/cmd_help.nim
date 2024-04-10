@@ -483,7 +483,7 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
     # see if the command was explicitly passed, or if it was implicit.
     # If it was implicit, give the help overview instead of the command
     # overview.
-    let defaultCmd = chalkConfig.getDefaultCommand().getOrElse("")
+    let defaultCmd = getOpt[string](chalkConfig, "default_command").get("")
     if defaultCmd != "" and defaultCmd notin commandLineParams():
       toOut = con4mRuntime.getHelpOverview()
     else:
@@ -543,7 +543,7 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
           toOut = con4mRuntime.fullTextSearch(args)
           break
 
-  if chalkConfig.getUsePager():
+  if get[bool](chalkConfig, "use_pager"):
     runPager($(toOut))
   else:
     print(toOut)
@@ -643,11 +643,11 @@ proc getConfigValues(): Rope =
 
 proc showConfigValues*(force = false) =
   once:
-    if not (chalkConfig.getShowConfig() or force): return
+    if not (get[bool](chalkConfig, "show_config") or force): return
 
     let toOut = getConfigValues()
 
-    if chalkConfig.getUsePager():
+    if get[bool](chalkConfig, "use_pager"):
       runPager($(toOut))
     else:
       print(toOut)

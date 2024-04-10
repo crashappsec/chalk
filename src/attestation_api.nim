@@ -192,7 +192,7 @@ proc writeInToto(info:      DockerInvocation,
     raise newException(OSError, "could not write toto to file: " & getCurrentExceptionMsg())
 
   let
-    log  = $(chalkConfig.getUseTransparencyLog())
+    log  = $(get[bool](chalkConfig, "use_transparency_log"))
     args = @["attest", ("--tlog-upload=" & log), "--yes", "--key",
              "chalk.key", "--type", "custom", "--predicate", path,
               digestStr]
@@ -242,7 +242,7 @@ proc coreVerify(key: AttestationKey, chalk: ChalkObj): bool =
   ## Used both for validation, and for downloading just the signature
   ## after we've signed.
   const fName = "chalk.pub"
-  let noTlog  = not chalkConfig.getUseTransparencyLog()
+  let noTlog  = not get[bool](chalkConfig, "use_transparency_log")
 
   key.withCosignKey:
     let
@@ -356,7 +356,7 @@ proc willSignNonContainer*(chalk: ChalkObj): string =
     return ""
 
   # We sign non-container artifacts if either condition is true.
-  if not (isSubscribedKey("SIGNATURE") or chalkConfig.getAlwaysTryToSign()):
+  if not (isSubscribedKey("SIGNATURE") or get[bool](chalkConfig, "always_try_to_sign")):
     trace("File artifact signing not configured.")
     return ""
 
@@ -374,7 +374,7 @@ proc willSignNonContainer*(chalk: ChalkObj): string =
 proc signNonContainer*(chalk: ChalkObj, unchalkedMD, metadataMD : string):
                      string =
   let
-    log    = $(chalkConfig.getUseTransparencyLog())
+    log    = $(get[bool](chalkConfig, "use_transparency_log"))
     args   = @["sign-blob", ("--tlog-upload=" & log), "--yes", "--key",
                "chalk.key", "-"]
     blob   = unchalkedMD & metadataMD
@@ -394,7 +394,7 @@ proc cosignNonContainerVerify*(chalk: ChalkObj,
                                artHash, mdHash, sig, pk: string):
                               ValidateResult =
   let
-    log    = $(not chalkConfig.getUseTransparencyLog())
+    log    = $(not get[bool](chalkConfig, "use_transparency_log"))
     args   = @["verify-blob",
                "--insecure-ignore-tlog=" & log,
                "--key=chalk.pub",

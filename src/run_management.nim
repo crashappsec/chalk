@@ -19,6 +19,12 @@ var
   startTime*          = getMonoTime().ticks()
   contextDirectories: seq[string]
 
+proc get*[T](chalkConfig: ChalkConfig, fqn: string): T =
+  get[T](chalkConfig.`@@attrscope@@`, fqn)
+
+proc getOpt*[T](chalkConfig: ChalkConfig, fqn: string): Option[T] =
+  getOpt[T](chalkConfig.`@@attrscope@@`, fqn)
+
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
 proc startTestRun*() =
@@ -185,7 +191,7 @@ template setIfNeeded*[T](o: ChalkObj, k: string, v: T) =
   setIfNeeded(o.collectedData, k, v)
 
 proc isChalkingOp*(): bool =
-  return commandName in chalkConfig.getValidChalkCommandNames()
+  return commandName in get[seq[string]](chalkConfig, "valid_chalk_command_names")
 
 proc lookupByPath*(obj: ChalkDict, path: string): Option[Box] =
   let
