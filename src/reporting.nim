@@ -129,7 +129,6 @@ template doCustomReporting() =
 
     safePublish(topic, buildHostReport(templateToUse))
 
-
 proc doReporting*(topic="report") {.exportc, cdecl.} =
   if inSubscan():
     let ctx = getCurrentCollectionCtx()

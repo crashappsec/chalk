@@ -8,21 +8,9 @@
 ## Common docker-specific utility bits used in various parts of the
 ## implementation.
 
-import std/[httpclient, uri]
+import std/[uri]
 import ".."/[config, util, reporting, semver]
-import "."/[dockerfile, exe, manifest]
-
-const
-  hashHeader* = "sha256:"
-
-template extractDockerHash*(value: string): string =
-  if not value.startsWith(hashHeader):
-    value
-  else:
-    value[len(hashHeader) .. ^1]
-
-template extractBoxedDockerHash*(value: Box): Box =
-  pack(extractDockerHash(unpack[string](value)))
+import "."/[dockerfile, exe, inspect, manifest]
 
 proc dockerFailsafe*(info: DockerInvocation) {.cdecl, exportc.} =
   # If our mundged docker invocation fails, then we conservatively
@@ -251,45 +239,26 @@ proc getAllBuildArgs*(ctx: DockerInvocation): Table[string, string] =
   if platform != "":
     result["TARGETPLATFORM"] = platform
 
-proc inspectImageConfig*(image: string, platform: string = ""): JsonNode =
-  ## fetch image config from local docker cache (if present)
-  ## image config will include information about image cmd/entrypoint/etc
-  trace("docker: inspecting image " & image)
-  let output = runDockerGetEverything(@["inspect", image, "--format", "json"])
-  if output.getExit() != 0:
-    return nil
-  let
-    stdout     = output.getStdout().strip()
-    json       = parseJson(stdout)
-  if len(json) == 0:
-    return nil
-  let
-    data     = json[0]
-    os       = data{"Os"}.getStr()
-    arch     = data{"Architecture"}.getStr()
-    together = os & "/" & arch
-    config   = data{"Config"}
-  if platform != "" and platform != together:
-    trace("docker: local image " & image & " doesn't match targeted platform: " &
-          together & " != " & platform)
-    return nil
-  return config
-
 proc fetchImageEntrypoint*(info: DockerInvocation, image: string):
     tuple[entrypoint: EntrypointInfo, cmd: CmdInfo, shell: ShellInfo] =
   ## fetch image entrypoints (entrypoint/cmd/shell)
   ## fetches from local docker cache (if present),
   ## else will directly query registry
-  let platform  = info.getBuildTargetPlatform()
-  var imageInfo = inspectImageConfig(image, platform)
-  if imageInfo == nil:
-    try:
-      imageInfo = fetchImageManifest(image, platform).config.json{"config"}
-    except:
-      raise newException(ValueError,
-                         "Could not inspect base image: " & image &
-                         " due to: " & getCurrentExceptionMsg())
+  # scrach image is a special image without any entrypoint config
+  if image == "scratch":
+    return (nil, nil, nil)
   let
+    platform  = info.getBuildTargetPlatform()
+    imageInfo = block:
+      try:
+        inspectImageJson(image, platform){"Config"}
+      except:
+        try:
+          fetchImageManifest(image, platform).config.json{"config"}
+        except:
+          raise newException(ValueError,
+                             "Could not inspect base image: " & image &
+                             " due to: " & getCurrentExceptionMsg())
     entrypoint = fromJson[EntrypointInfo](imageInfo{"Entrypoint"})
     cmd        = fromJson[CmdInfo](imageInfo{"Cmd"})
     shell      = fromJson[ShellInfo](imageInfo{"Shell"})
@@ -351,60 +320,6 @@ proc getTargetEntrypoints*(info: DockerInvocation):
     shell = ShellInfo()
     shell.json = `%*`(["/bin/sh", "-c"])
   return (entrypoint, cmd, shell)
-
-proc populateBasicImageInfo*(chalk: ChalkObj, info: JsonNode) =
-  let
-    repo  = info["Repository"].getStr()
-    tag   = info["Tag"].getStr.replace("\u003cnone\u003e", "").strip()
-    short = info["ID"].getStr()
-
-  chalk.repo    = repo
-  chalk.tag     = tag
-  chalk.shortId = short
-
-proc getBasicImageInfo*(refName: string): Option[JsonNode] =
-  let
-    allInfo = runDockerGetEverything(@["images", "--format", "{{json . }}"])
-    stdout  = allInfo.getStdout().strip()
-
-  if allInfo.getExit() != 0 or stdout == "":
-    return none(JsonNode)
-
-  let
-    lines = stdout.split("\n")
-    name  = refName.toLowerAscii()
-
-  for line in lines:
-    # Comparing line.strip() to "" or checking the length didn't work??
-    # There might be some unprintable character before EOF in stdin.
-    if not line.strip().startswith("{"):
-      break
-    let
-      json = parseJson(line)
-      repo = json["Repository"].getStr()
-      tag  = json["Tag"].getStr().replace("\u003cnone\u003e", "")
-      id   = json["ID"].getStr()
-
-    if name.toLowerAscii() == id:
-      return some(json)
-    if name == repo:
-      return some(json)
-    if name == repo & ":" & tag:
-      return some(json)
-
-  return none(JsonNode)
-
-proc extractBasicImageInfo*(chalk: ChalkObj): bool =
-  # usreRef should always be what was passed on the command line, and
-  # if nothing was passed on the command line, it will be our
-  # temporary tag.
-  let info = getBasicImageInfo(chalk.userRef)
-
-  if info.isNone():
-    return false
-
-  chalk.populateBasicImageInfo(info.get())
-  return true
 
 proc dockerGenerateChalkId*(): string =
   var

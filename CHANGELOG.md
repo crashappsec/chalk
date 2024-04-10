@@ -2,6 +2,25 @@
 
 ## On the `main` branch
 
+## Breaking Changes
+
+- Removed chalk keys:
+
+  - `_IMAGE_VIRTUAL_SIZE` - deprecated by docker
+  - `_IMAGE_LAST_TAG_TIME` - scoped to local daemon and is
+    not shared with buildx. Many images report as
+    `0001-01-01T00:00:00Z`
+  - `_IMAGE_STORAGE_METADATA` - metadata of a docker storage
+    driver and is not directly related to docker image
+
+  [#266](https://github.com/crashappsec/chalk/pull/266)
+
+### Fixes
+
+- Fixed not being able to wrap docker builds when using
+  `scratch` as base image.
+  [#266](https://github.com/crashappsec/chalk/pull/266)
+
 ## 0.3.5
 
 **Apr 05, 2024**
@@ -12,13 +31,6 @@
   it defaulted to `us-east-1` if the `AWS_REGION` or
   `AWS_DEFAULT_REGION` environment variables were not set
   [#246](https://github.com/crashappsec/chalk/pull/246)
-- Removed chalk keys:
-  - `_IMAGE_VIRTUAL_SIZE` - deprecated by docker
-  - `_IMAGE_LAST_TAG_TIME` - scoped to local daemon and is
-    not shared with buildx. Many images report as
-    `0001-01-01T00:00:00Z`
-  - `_IMAGE_STORAGE_METADATA` - metadata of a docker storage
-    driver and is not directly related to docker image
 
 ### Fixes
 

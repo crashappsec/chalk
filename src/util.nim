@@ -498,11 +498,23 @@ proc isInt*(i: string): bool =
   except:
     return false
 
+proc splitBy*(s: string, sep: string, default: string = ""): (string, string) =
+  let parts = s.split(sep, maxsplit = 1)
+  if len(parts) == 2:
+    return (parts[0], parts[1])
+  return (s, default)
+
 proc removeSuffix*(s: string, suffix: string): string =
   # similar to strutil except it returns result back
   # vs in-place removal in stdlib
   result = s
   result.removeSuffix(suffix)
+
+proc removePrefix*(s: string, suffix: string): string =
+  # similar to strutil except it returns result back
+  # vs in-place removal in stdlib
+  result = s
+  result.removePrefix(suffix)
 
 proc `&`*(a: JsonNode, b: JsonNode): JsonNode =
   result = newJArray()
@@ -514,6 +526,10 @@ proc `&`*(a: JsonNode, b: JsonNode): JsonNode =
 proc `&=`*(a: var JsonNode, b: JsonNode) =
   for i in b.items():
     a.add(i)
+
+proc getStrElems*(node: JsonNode): seq[string] =
+  for i in node.getElems():
+    result.add(i.getStr())
 
 proc toLowerKeysJsonNode*(node: JsonNode): JsonNode =
   ## convert json node to lower case keys string json node

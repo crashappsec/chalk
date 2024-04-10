@@ -5,6 +5,8 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
+## module for interacting with remote registry docker manifests
+
 import std/[httpclient]
 import ".."/[chalk_common, config, www_authenticate]
 import "."/[exe]
