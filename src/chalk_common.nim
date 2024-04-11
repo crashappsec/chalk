@@ -279,10 +279,9 @@ type
   DockerManifestType* = enum
     list, image, config, layer
 
-  DockerPlatform* = tuple[
-    os:           string,
-    architecture: string,
-  ]
+  DockerPlatform* = object
+    os*:           string
+    architecture*: string
 
   DockerManifest* = ref object
     imageName*:        string

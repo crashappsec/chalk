@@ -23,7 +23,7 @@ proc parseDockerPlatform(platform: string): DockerPlatform =
   let items = platform.split('/', maxsplit = 1)
   if len(items) != 2:
     raise newException(ValueError, "Invalid docker platform: " & platform)
-  return (os: items[0], architecture: items[1])
+  return DockerPlatform(os: items[0], architecture: items[1])
 
 proc parseAndDigestJson(data: string): DigestedJson =
   return DigestedJson(
@@ -175,7 +175,7 @@ proc fetch(self: DockerManifest) =
     # for easier metadata collection
     self.json["compressedSize"] = %(self.image.getCompressedSize())
     self.imageConfig = self.json{"config"}
-    self.configPlatform = (
+    self.configPlatform = DockerPlatform(
       os:           data.json{"os"}.getStr(),
       architecture: data.json{"architecture"}.getStr(),
     )
@@ -205,7 +205,7 @@ proc newManifest(image: string, data: DigestedJson): DockerManifest =
         digest:    item{"digest"}.getStr(),
         size:      item{"size"}.getInt(),
         isFetched: false,
-        platform:  (
+        platform:  DockerPlatform(
           os:           platform{"os"}.getStr(),
           architecture: platform{"architecture"}.getStr(),
         ),
@@ -245,11 +245,11 @@ proc fetchManifest(image: string): DockerManifest =
   result.fetch()
 
 proc fetchImageManifest*(image: string, platform: string): DockerManifest =
-  let platformTuple = parseDockerPlatform(platform)
+  let dockerPlatform = parseDockerPlatform(platform)
   var manifest = fetchManifest(image)
   if manifest.kind == DockerManifestType.list:
-    manifest = manifest.findPlatformManifest(platformTuple)
+    manifest = manifest.findPlatformManifest(dockerPlatform)
     manifest.fetch()
-  if manifest.platform != platformTuple:
+  if manifest.platform != dockerPlatform:
     raise newException(ValueError, "Could not find manifest for: " & platform)
   return manifest
