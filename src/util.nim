@@ -528,6 +528,7 @@ proc `&=`*(a: var JsonNode, b: JsonNode) =
     a.add(i)
 
 proc getStrElems*(node: JsonNode): seq[string] =
+  result = @[]
   for i in node.getElems():
     result.add(i.getStr())
 
