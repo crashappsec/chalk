@@ -532,8 +532,8 @@ proc getStrElems*(node: JsonNode): seq[string] =
     result.add(i.getStr())
 
 proc toLowerKeysJsonNode*(node: JsonNode): JsonNode =
-  ## convert json node to lower case keys string json node
-  ## (similar to strtabs but for json nodes)
+  ## Returns a new `JsonNode` that is identical to the given `node`
+  ## except that every `JObject` key is lowercased.
   case node.kind:
   of JString:
     return node
