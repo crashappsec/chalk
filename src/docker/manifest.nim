@@ -98,7 +98,7 @@ proc requestManifestJson(image: string): DigestedJson =
                        msg & " failed to fetch manifest via www-authenticate challenge: " &
                        getCurrentExceptionMsg())
 
-template imageName(image: string): string =
+proc getImageName(image: string): string =
   image.split(":")[0].split("@")[0]
 
 proc setJson(self: DockerManifest, data: DigestedJson) =
@@ -184,7 +184,7 @@ proc fetch(self: DockerManifest) =
 
 proc newManifest(image: string, data: DigestedJson): DockerManifest =
   let
-    name = imageName(image)
+    name = getImageName(image)
     json = data.json
 
   if "manifests" in json:
