@@ -6,7 +6,7 @@
 
 Chalk™ captures metadata at build time, and can add a small 'chalk mark' (metadata) to any artifacts, so they can be identified in production. Chalk can also extract chalk marks and collect additional metadata about the operating environment when it does this.
 
-Using Chalk, you can build a graph connecting people, development, builds and production, so that devops engineers understand what is happening in the development process, and so that developers can understand what is happening in the infrastructure. 
+Using Chalk, you can build a graph connecting people, development, builds and production, so that devops engineers understand what is happening in the development process, and so that developers can understand what is happening in the infrastructure.
 
 ## How-tos
 
