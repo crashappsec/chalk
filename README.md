@@ -2,15 +2,11 @@
 
 [![tests](https://github.com/crashappsec/chalk/actions/workflows/tests.yml/badge.svg?branch=main&event=push)](https://github.com/crashappsec/chalk/actions/workflows/tests.yml?query=branch%3Amain)
 
-# Telemetry & observability for the software development lifecycle.
-
 ## About Chalk
 
 Chalk™ captures metadata at build time, and can add a small 'chalk mark' (metadata) to any artifacts, so they can be identified in production. Chalk can also extract chalk marks and collect additional metadata about the operating environment when it does this.
 
-Using Chalk, you can build a graph connecting development and production, so that devops engineers understand what is happening in the development process, and so that developers can understand what is happening in the infrastructure. With this information, they can work better together.
-
-Visibility into development and production also enables security engineers to better manage risk.
+Using Chalk, you can build a graph connecting people, development, builds and production, so that devops engineers understand what is happening in the development process, and so that developers can understand what is happening in the infrastructure. 
 
 ## How-tos
 
@@ -57,8 +53,8 @@ If you need additional help including a demo of the cloud platform, please conta
 
 Chalk is licensed under the GPL version 3 license.
 
-## Join the waiting list for our cloud platform.
+## Try our cloud platform.
 
-Our cloud hosted platform is built using Chalk. It makes enterprise deployments easy, and provides additional functionality including prebuilt integrations to enrich your data, an in-built query editor, an API and more.
+Our cloud hosted platform is built using Chalk. It makes enterprise deployments easy, and provides additional functionality including prebuilt integrations to enrich your data.
 
-There are both free and paid plans. You can [join the waiting list](https://crashoverride.com/join-the-waiting-list) for early access.
+You can learn more at [crashoverride.com](https://crashoverride.com/).
