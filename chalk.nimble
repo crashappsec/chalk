@@ -19,7 +19,21 @@ task version, "Show current version":
   echo version
 
 task test, "Run the unit tests":
-  exec "testament --verbose pattern 'tests-nim/*.nim'"
+  var found = false
+  var args = ""
+  for i in countup(0, paramCount(), 1):
+      if "args=" in paramStr(i):
+        args = paramstr(i)
+        args.removePrefix("args=")
+        echo args
+        found = true
+  
+  if found:
+    var cmd = "testament " & args
+    # echo cmd
+    exec cmd
+  else:
+    exec "testament --verbose pattern 'tests-nim/*.nim'"
 
 proc con4mDevMode() =
   let script = "bin/devmode"
