@@ -22,27 +22,39 @@
 ## But when wrapping docker, this module does the bulk of the work and
 ## is responsible for all of the collection logic.
 
-import std/[posix, unicode, enumerate]
+import std/[posix, unicode]
 import ".."/[config, collect, reporting, chalkjson, docker_cmdline, docker_base,
-             subscan, dockerfile, util, attestation, commands/cmd_help,
+             subscan, dockerfile, util, attestation_api, commands/cmd_help,
              plugin_api]
 
 {.warning[CStringConv]: off.}
+
+proc addInstructions(ctx: DockerInvocation, content: string): string =
+  ## add instructions in correct location in Dockerfile
+  ## this accounts for section boundaries
+  let
+    section = ctx.getTargetDockerSection()
+    lines   = content.splitLines()
+    before  = lines[0 .. section.endLine]
+    after   = lines[section.endLine + 1 .. ^1]
+    updated = before & ctx.addedInstructions & after
+  return updated.join("\n")
 
 proc runMungedDockerInvocation(ctx: DockerInvocation): int =
   var
     newStdin = "" # Indicated passthrough.
     args     = ctx.newCmdLine
+    exe      = getDockerExeLocation()
 
-  trace("Running docker: " & dockerExeLocation & " " & args.join(" "))
+  trace("Running docker: " & exe & " " & args.join(" "))
 
   if ctx.dfPassOnStdin:
     if not ctx.inDockerFile.endswith("\n"):
       ctx.inDockerFile &= "\n"
-    newStdin = ctx.inDockerFile & ctx.addedInstructions.join("\n")
+    newStdin = ctx.addInstructions(ctx.inDockerFile)
     trace("Passing on stdin: \n" & newStdin)
 
-  result = runCmdNoOutputCapture(dockerExeLocation, args, newStdin)
+  result = runCmdNoOutputCapture(exe, args, newStdin)
 
 proc doReporting*(topic: string){.importc.}
 
@@ -73,14 +85,10 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   trace("Docker subscan complete.")
 
 proc writeChalkMark(ctx: DockerInvocation, mark: string) =
-  # We are going to move this file, so don't autoclean.
-  var
-    (f, path) = getNewTempFile(autoClean = false)
-
   try:
-    info("Creating temporary chalk file: " & path)
-    f.writeLine(mark)
-    f.close()
+    # We are going to move this file, so don't autoclean.
+    let path = writeNewTempFile(mark, autoClean = false)
+    info("Created temporary chalk file: " & path)
     ctx.makeFileAvailableToDocker(path, move=true, newName="chalk.json", chmod="0444")
   except:
     error("Unable to write to open tmp file (disk space?)")
@@ -90,7 +98,7 @@ var labelPrefix: string
 
 proc processLabelKey(s: string): string =
   once:
-    labelPrefix = chalkConfig.dockerConfig.getLabelPrefix()
+    labelPrefix = get[string](chalkConfig, "docker.label_prefix")
 
   result = labelPrefix
 
@@ -115,13 +123,13 @@ proc formatLabel(name: string, value: string, addLabel: bool): string =
 
 proc addNewLabelsToDockerFile(ctx: DockerInvocation) =
   # First, add totally custom labels.
-  let labelOps = chalkConfig.dockerConfig.getCustomLabels()
+  let labelOps = getOpt[TableRef[string, string]](chalkConfig, "docker.custom_labels")
 
   if labelOps.isSome():
     for k, v in labelOps.get():
       ctx.addedInstructions.add(formatLabel(k, v, true))
 
-  let labelTemplName = chalkConfig.dockerConfig.getLabelTemplate()
+  let labelTemplName = get[string](chalkConfig, "docker.label_template")
   if labelTemplName == "":
     return
 
@@ -176,18 +184,15 @@ proc writeNewDockerFileIfNeeded(ctx: DockerInvocation) =
   # should properly be using a temporary file, because it's a place
   # we're generally guaranteed to be able to write.
 
-  let (f, path) = getNewTempFile()
-
-  info("Created temporary Dockerfile at: " & path)
-
+  # add last blank line
   if ctx.inDockerFile.len() != 0 and ctx.inDockerFile[^1] != '\n':
     ctx.inDockerFile &= "\n"
 
-  let newcontents = ctx.inDockerFile & ctx.addedInstructions.join("\n")
-
-  trace("New docker file: \n" & newcontents)
-  f.write(newcontents)
-  f.close()
+  let
+    newcontents = ctx.addInstructions(ctx.inDockerFile)
+    path        = writeNewTempFile(newcontents)
+  info("Created temporary Dockerfile at: " & path)
+  trace("New docker file:\n" & newcontents)
 
   ctx.newCmdLine.add("-f")
   ctx.newCmdLine.add(path)
@@ -197,61 +202,11 @@ template noBadJson(item: InfoBase) =
     warn("Cannot wrap due to dockerfile JSON parse error.")
     return
 
-proc getDefaultPlatformInfo(ctx: DockerInvocation): string =
-  if ctx.foundPlatform != "":
-    return ctx.foundPlatform
-
-  let
-    probeFile      = """
-FROM alpine
-ARG TARGETPLATFORM
-RUN echo "CHALK_TARGET_PLATFORM=$TARGETPLATFORM"
-"""
-    tmpTag         = chooseNewTag()
-    buildKitKey    = "DOCKER_BUILDKIT"
-    buildKitKeySet = existsEnv(buildKitKey)
-  var buildKitValue: string
-  if buildKitKeySet:
-    buildKitValue  = getEnv(buildKitKey)
-  putEnv(buildKitKey, "1")
-  let
-    allOut = runDockerGetEverything(@["build", "-t", tmpTag, "-f",
-                                          "-", "."], probeFile)
-    stdErr = allOut.getStderr()
-    parts  = stdErr.split("CHALK_TARGET_PLATFORM=")
-
-  trace("Probing for current docker build platform:\n" & stdErr)
-
-  if buildKitKeySet:
-    # key was set before us, so restore whatever the value was
-    putEnv(buildKitKey, buildKitValue)
-  else:
-    # key was not set, restore that state
-    delEnv(buildKitKey)
-
-  discard runDockerGetEverything(@["rmi", tmpTag])
-
-  # This could fail if docker is borked or somesuch.
-  if len(parts) < 2:
-    warn("Could not find `CHALK_TARGET_PLATFORM=` in the output.")
-    return ""
-
-  # From here, we'll assume docker is reliable, so we can just look
-  #  for the quote.
-  let
-    base = parts[1]
-    ix   = base.find('"')
-
-  if base[0] == '$':
-    # ARG didn't get substituted, so this build arg isn't supported.
-    return ""
-
-  return base[0 ..< ix]
-
 template noBinaryForPlatform(): string =
     warn("Cannot wrap; no chalk binary found for target platform: " &
       targetPlatform & "(build platform = " & buildPlatform & ")")
     ""
+
 proc findProperBinaryToCopyIntoContainer(ctx: DockerInvocation): string =
   # Mapping nim platform names to docker ones is a PITA. We need to
   # know the default target platform whenever --platform isn't
@@ -265,19 +220,18 @@ proc findProperBinaryToCopyIntoContainer(ctx: DockerInvocation): string =
   # `arch_binary_locations` field.
 
   var
-   targetPlatform = ctx.getDefaultPlatformInfo()
+   targetPlatform = ctx.getBuildTargetPlatform()
    buildPlatform  = hostOs & "/" & hostCPU
 
   if targetPlatform == "":
-
     warn("Cannot wrap; container platform doesn't support the TARGETPLATFORM " &
-      "build arg.")
+         "build arg.")
     return ""
 
   if targetPlatform == buildPlatform:
     return getMyAppPath()
 
-  let locOpt = chalkConfig.dockerConfig.getArchBinaryLocations()
+  let locOpt = getOpt[TableRef[string, string]](chalkConfig, "docker.arch_binary_locations")
 
   if locOpt.isNone():
     return noBinaryForPlatform()
@@ -295,58 +249,35 @@ proc findProperBinaryToCopyIntoContainer(ctx: DockerInvocation): string =
          ")")
     return ""
 
-proc formatExecArray(args: JsonNode): string =
-  var arr = `%*`(["/chalk", "exec", "--exec-command-name"])
-  arr.add(args[0])
+proc formatChalkExec(args: JsonNode = newJArray()): string =
+  var arr = `%*`(["/chalk", "exec"])
+  if len(args) > 0:
+    arr.add(`%`("--exec-command-name"))
+    arr.add(args[0])
   arr.add(`%`("--"))
   if len(args) > 1:
-    arr = arr & args[1..^1]
+    arr &= args[1..^1]
   return $(arr)
-
-proc formatExecString(command: string, shell: JsonNode): string =
-  # string form implies shell form and therefore to be
-  # compatible with original command, we need to explicitly start
-  # shell and then execute original command as shell script.
-  # This will handle cases when the script is not an executable
-  # but calls some shell functions such as "set -x && ..."
-  return formatExecArray(shell & `%*`([command]))
-
-template formatExec(command: string, args: JsonNode, shell: JsonNode): string =
-  if command != "":
-    formatExecString(command, shell)
-  else:
-    formatExecArray(args)
 
 proc rewriteEntryPoint*(ctx: DockerInvocation) =
   let
-    wrapCmd        = chalkConfig.dockerConfig.getWrapCmd()
-  var
-    lastEntryPoint = EntryPointInfo(nil)
-    lastCmd        = CmdInfo(nil)
-    shell          = ShellInfo()
+    fromArgs             = get[bool](chalkConfig, "exec.command_name_from_args")
+    wrapCmd              = get[bool](chalkConfig, "docker.wrap_cmd")
+    (entryPoint, cmd, _) = ctx.getTargetEntrypoints()
 
-  shell.json = `%*`(["/bin/sh", "-c"])
+  if not fromArgs:
+    warn("Docker wrapping requires exec.command_name_from_args config to be enabled")
+    return
 
-  for section in ctx.dfSections:
-    if section.entryPoint != nil:
-      section.entryPoint.noBadJson()
-      lastEntryPoint = section.entryPoint
-    if section.cmd != nil:
-      section.cmd.noBadJson()
-      lastCmd        = section.cmd
-    if section.shell != nil:
-      section.shell.noBadJson()
-      shell          = section.shell
-
-  if lastEntryPoint == nil:
+  if entryPoint == nil:
     if wrapCmd:
-      if lastCmd == nil:
+      if cmd == nil:
         warn("Cannot wrap; no ENTRYPOINT or CMD found in Dockerfile")
         return
       else:
         trace("No ENTRYPOINT; Wrapping image CMD")
     else:
-      if lastCmd != nil:
+      if cmd != nil:
         warn("Cannot wrap; no ENTRYPOINT in Dockerfile but there is CMD. " &
              "To wrap CMD enable 'docker.wrap_cmd' config option")
         return
@@ -369,47 +300,30 @@ proc rewriteEntryPoint*(ctx: DockerInvocation) =
     warn("Wrapping canceled; no available method to wrap entry point.")
     return
 
-  if lastEntryPoint != nil:
-    # When ENTRYPOINT is JSON, we wrap JSON with /chalk
+  if entryPoint != nil:
     # When ENTRYPOINT is string, it is a shell script
-    #   and so to correctly pass the script, we convert ENTRYPOINT
-    #   to JSON and pass existing script as an argument to a shell
-    #   /chalk will exec
-    #   Note in when ENTRYPOINT is string, CMD is normally ignored
-    #   however as we convert ENTRYPOINT to JSON, well need to
-    #   explicitly ignore CMD
-    let newInstruction = formatExec(lastEntrypoint.str, lastEntryPoint.json, shell.json)
-    ctx.addedInstructions.add("ENTRYPOINT " & newInstruction)
-    if lastEntrypoint.str != "":
-      ctx.addedInstructions.add("CMD []")
+    # in which case docker ignores CMD which means we can
+    # change it without changing container semantics so we:
+    # * convert ENTRYPOINT to JSON
+    # * pass existing ENTRYPOINT as CMD string
+    # this will then call chalk as entrypoint and
+    # will pass SHELL + CMD as args to chalk
+    if entrypoint.str != "":
+      ctx.addedInstructions.add("ENTRYPOINT " & formatChalkExec())
+      ctx.addedInstructions.add("CMD " & entrypoint.str)
+    # When ENTRYPOINT is JSON, we wrap JSON with /chalk command
+    else:
+      ctx.addedInstructions.add("ENTRYPOINT " & formatChalkExec(entrypoint.json))
     info("docker: ENTRYPOINT wrapped.")
 
   else:
-    # When ENTRYPOINT is missing in Dockerfile, wrapping CMD directly
-    # is error-prone as CMD will be passed as args to ENTRYPOINT
-    # if it exists in base image. Otherwise CMD will be directly executed.
-    # Until we have base image inspection, well overwrite ENTRYPOING
-    # with chalk will execute existing CMD.
-    # When CMD is string,
-    #   ENTRYPOINT should start shell and should directly execute CMD
-    #   string as is provided
-    #   Note this will require changing CMD to JSON form so that shell
-    #   is not double wrapped
-    # WHEN CMD is JSON,
-    #   ENTRYPOINT should directly execute CMD[0]
-    #   and CMD should be adjusted to only have args.
-    if lastCmd.str != "":
-      ctx.addedInstructions.add("ENTRYPOINT " & formatExecArray(shell.json))
-      ctx.addedInstructions.add("CMD " & $(`%*`([lastCmd.str])))
-    else:
-      let
-        cmd  = lastCmd.json[0]
-        args = if len(lastCmd.json) > 1:
-                 lastCmd.json[1..^1]
-               else:
-                 `%*`([])
-      ctx.addedInstructions.add("ENTRYPOINT " & formatExecArray(`%`([cmd])))
-      ctx.addedInstructions.add("CMD " & $(args))
+    # When ENTRYPOINT is missing, we can use /chalk as ENTRYPOINT
+    # which will then execute existing CMD whether it is in shell or json form
+    # only nuance is that if CMD is not directly defined in target
+    # Dockerfile section, defining ENTRYPOINT resets CMD to null
+    # so to be safe we redefine CMD to the same value
+    ctx.addedInstructions.add("ENTRYPOINT " & formatChalkExec())
+    ctx.addedInstructions.add("CMD " & $(cmd))
     info("docker: CMD wrapped with ENTRYPOINT.")
 
   trace("Added instructions:\n" & ctx.addedInstructions.join("\n"))
@@ -448,7 +362,7 @@ proc pullValueFromKey(ctx: DockerInvocation, k: string): string =
 proc addAnyExtraEnvVars(ctx: DockerInvocation) =
   var
     toAdd: seq[string] = @[]
-    map                = chalkConfig.dockerConfig.getAdditionalEnvVars()
+    map                = get[TableRef[string, string]](chalkConfig, "docker.additional_env_vars")
     value: string
 
   for k, v in map:
@@ -470,7 +384,7 @@ proc addAnyExtraEnvVars(ctx: DockerInvocation) =
     info("Added to Dockerfile: " & newEnvLine)
 
 proc handleTrueInsertion(ctx: DockerInvocation, mark: string) =
-  if chalkConfig.dockerConfig.getWrapEntryPoint():
+  if get[bool](chalkConfig, "docker.wrap_entrypoint"):
     ctx.rewriteEntryPoint()
   ctx.addAnyExtraEnvVars()
   ctx.writeChalkMark(mark)
@@ -489,10 +403,10 @@ proc prepVirtualInsertion(ctx: DockerInvocation) =
   # Virtual insertion for Docker does not rewrite the entry point
   # either.
 
-  if chalkConfig.dockerConfig.getWrapEntryPoint():
+  if get[bool](chalkConfig, "docker.wrap_entrypoint"):
     warn("Cannot wrap entry point in virtual chalking mode.")
 
-  let labelOps = chalkConfig.dockerConfig.getCustomLabels()
+  let labelOps = getOpt[TableRef[string, string]](chalkConfig, "docker.custom_labels")
 
   if labelOps.isSome():
     for k, v in labelOps.get():
@@ -502,7 +416,7 @@ proc prepVirtualInsertion(ctx: DockerInvocation) =
       ctx.newCmdLine.add("--label")
       ctx.newCmdline.add(k & "=" & escapeJson(v))
 
-  let labelTemplName = chalkConfig.dockerConfig.getLabelTemplate()
+  let labelTemplName = get[string](chalkConfig, "docker.label_template")
   if labelTemplName == "":
     return
 
@@ -555,7 +469,7 @@ proc runBuild(ctx: DockerInvocation): int =
     ctx.addBackBuildWithoutPushFlags()
   else:
     ctx.addBackBuildWithPushFlags()
-  if chalkConfig.getChalkContainedItems():
+  if get[bool](chalkConfig, "chalk_contained_items"):
     info("Docker is starting a recursive chalk of context directories.")
     var contexts: seq[string] = @[ctx.foundContext]
 
@@ -570,8 +484,8 @@ proc runBuild(ctx: DockerInvocation): int =
       chalk.collectedData["EMBEDDED_CHALK"] = subscanBox
     info("Docker subscan finished.")
 
-  ctx.evalAndExtractDockerfile()
   ctx.setPreferredTag()
+  ctx.evalAndExtractDockerfile(ctx.getAllBuildArgs())
 
   trace("Collecting chalkable artifact data")
   ctx.addBuildCmdMetadataToMark()
@@ -580,7 +494,7 @@ proc runBuild(ctx: DockerInvocation): int =
   trace("Creating chalk mark.")
   let chalkMark = chalk.getChalkMarkAsStr()
 
-  if chalkConfig.getVirtualChalk():
+  if get[bool](chalkConfig, "virtual_chalk"):
     ctx.prepVirtualInsertion()
   else:
     ctx.handleTrueInsertion(chalkMark)
@@ -589,12 +503,13 @@ proc runBuild(ctx: DockerInvocation): int =
 
   result = ctx.runMungedDockerInvocation()
 
-  if chalkConfig.getVirtualChalk() and result == 0:
+  if get[bool](chalkConfig, "virtual_chalk") and result == 0:
     publish("virtual", chalkMark)
 
   chalk.marked = true
 
 proc runPush(ctx: DockerInvocation): int =
+  let exe = getDockerExeLocation()
   if ctx.cmdBuild:
     var tags = ctx.foundTags
     if len(tags) == 0:
@@ -603,7 +518,7 @@ proc runPush(ctx: DockerInvocation): int =
     for tag in tags:
       trace("docker pushing: " & tag)
       ctx.newCmdLine = @["push", tag]
-      result = runCmdNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
+      result = runCmdNoOutputCapture(exe, ctx.newCmdLine)
       if result != 0:
         break
 
@@ -620,9 +535,10 @@ proc runPush(ctx: DockerInvocation): int =
 
     # Here, if we fail, there's no re-run.
     # We ran their original command line so there is nothing to fall back on.
-    return runCmdNoOutputCapture(dockerExeLocation, ctx.newCmdLine)
+    return runCmdNoOutputCapture(exe, ctx.newCmdLine)
 
 proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
+  let exe = getDockerExeLocation()
   # not a multi-platform build so manifest should not be used
   if len(platforms) < 2:
     return 0
@@ -633,7 +549,7 @@ proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
       platformTags.add(ctx.getTagForPlatform(tag, platform))
 
     let exitCode = runCmdNoOutputCapture(
-      dockerExeLocation,
+      exe,
       @["buildx", "imagetools", "create", "-t"] & platformTags,
     )
     if exitCode != 0:
@@ -648,10 +564,11 @@ proc createAndPushManifest(ctx: DockerInvocation, platforms: seq[string]): int =
 # TODO: Any other noteworthy commands to wrap (run, etc)
 
 template passThroughLogic() =
+  let exe = getDockerExeLocation()
   try:
     # Silently pass through other docker commands right now.
-    exitCode = runCmdNoOutputCapture(dockerExeLocation, args)
-    if chalkConfig.dockerConfig.getReportUnwrappedCommands():
+    exitCode = runCmdNoOutputCapture(exe, args)
+    if get[bool](chalkConfig, "docker.report_unwrapped_commands"):
       reporting.doReporting("report")
   except:
     dumpExOnDebug()
@@ -662,7 +579,8 @@ template prepBuildCommand() =
     ctx.processGitContext()
   except:
     dumpExOnDebug()
-    error("Chalk could not process docker git context. Retrying w/o chalk.")
+    error("Chalk could not process docker git context: " & getCurrentExceptionMsg() &
+          ". Retrying w/o chalk.")
     ctx.dockerFailSafe()
 
 template gotBuildCommand() =
@@ -678,7 +596,8 @@ template gotBuildCommand() =
           "Chalk reporting will be limited.")
   except:
     dumpExOnDebug()
-    error("Chalk could not process Docker correctly. Retrying w/o chalk.")
+    error("Chalk could not process Docker correctly: " & getCurrentExceptionMsg() &
+          ". Retrying w/o chalk.")
     ctx.dockerFailSafe()
 
   trace("Collecting post-build runtime data")
@@ -765,7 +684,8 @@ template runMultiPlatformManifest() =
     # >   features may change between releases without warning, or can be removed from a
     # >   future release. Learn more about experimental features in our documentation:
     # >   https://docs.docker.com/go/experimental/
-    error("Chalk could not process Docker manifest correctly. Retrying w/o chalk.")
+    error("Chalk could not process Docker manifest correctly: " & getCurrentExceptionMsg() &
+          ". Retrying w/o chalk.")
     ctx.dockerFailSafe()
 
 template postDockerActivity() =
@@ -780,7 +700,7 @@ template postDockerActivity() =
           info("Collecting post-push runtime data")
           ctx.opChalkObj.collectRunTimeArtifactInfo()
           trace("About to call into validate.")
-          attestation.extractAndValidateSignature(ctx.opChalkObj)
+          attestation_api.extractAndValidateSignature(ctx.opChalkObj)
         except:
           dumpExOnDebug()
           error("Docker attestation failed.")
@@ -791,13 +711,15 @@ template postDockerActivity() =
         exitCode = 0
 
 proc runCmdDocker*(args: seq[string]) =
-  setDockerExeLocation()
-
   var
     exitCode = 0
     ctx      = args.processDockerCmdLine()
 
   ctx.originalArgs = args
+
+  if getDockerExeLocation() == "":
+    error("docker command is missing. chalk requires docker binary installed to wrap docker commands.")
+    ctx.dockerFailSafe()
 
   if ctx.cmdBuild:
     # Build with --push is still a build operation.

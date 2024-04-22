@@ -67,8 +67,10 @@ template doPanicWrite(s: string) =
     # TODO: This is Posix specific. Someday should make Chalk work on Windows.
     let f = newFileStream("/dev/tty", fmWrite)
     if f != nil:
-      f.write(s)
-      f.close()
+      try:
+        f.write(s)
+      finally:
+        f.close()
   except:
     try:
       stderr.write(s)
@@ -110,7 +112,7 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
       " subscribers)")
 
     if n == 0 and startSubscriptions != 0:
-      if chalkConfig.getUseReportCache():
+      if get[bool](chalkConfig, "use_report_cache"):
         error("For topic '" & topic & "': No output config is working, but " &
               "failures will be stored in the report cache")
       else:
@@ -118,7 +120,7 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
         error("No output configuration is working for this report, and there " &
           "is no report cache configured, so no metadata was recorded.")
 
-        if chalkConfig.getForceOutputOnReportingFails():
+        if get[bool](chalkConfig, "force_output_on_reporting_fails"):
           error("Here is the orphaned report:")
           doPanicWrite(msg)
           error("Run with --use-report-cache to automatically buffer failures " &
@@ -127,7 +129,7 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
           error("Re-run with --force-output to try again, getting a report " &
             "on the console if io config fails again.")
     elif n != startSubscriptions:
-      if chalkConfig.getUseReportCache():
+      if get[bool](chalkConfig, "use_report_cache"):
         error("For topic '" & topic & "': publish failures will be cached.")
       else:
         error("No report cache is enabled; sink configs with failures will " &
@@ -139,7 +141,7 @@ proc loadReportCache(fname: string) =
   once:
     try:
       let
-        retries = chalkConfig.getReportCacheLockTimeoutSec()
+        retries = get[int](chalkConfig, "report_cache_lock_timeout_sec")
         lines   = readViaLockFile(fname).strip().split("\n")
       for line in lines:
         let
@@ -317,7 +319,7 @@ proc panicPublish(contents, tmpfilename, targetname, err: string) =
   doPanicWrite(s)
 
 proc safePublish*(topic, msg: string) =
-  if not chalkConfig.getUseReportCache():
+  if not get[bool](chalkConfig, "use_report_cache"):
     tracePublish(topic, msg)
     return
 
@@ -330,7 +332,7 @@ proc safePublish*(topic, msg: string) =
 
   sinkErrors = @[]
 
-  let fname = resolvePath(chalkConfig.getReportCacheLocation())
+  let fname = resolvePath(get[string](chalkConfig, "report_cache_location"))
   loadReportCache(fname)
 
   if reportCache.len() != 0:
@@ -355,7 +357,7 @@ proc writeReportCache*() =
   # Everything else we might have published was probably mainly intended
   # for the console.
 
-  if not chalkConfig.getUseReportCache():
+  if not get[bool](chalkConfig, "use_report_cache"):
     return
 
   # If nothing published, the reporting cache may not have been loaded, in
@@ -363,7 +365,7 @@ proc writeReportCache*() =
   if cacheOpenFailed and len(reportCache) != 0:
     error(msgPossibleLoss)
 
-  let fname = resolvePath(chalkConfig.getReportCacheLocation())
+  let fname = resolvePath(get[string](chalkConfig, "report_cache_location"))
 
   if not dirtyCache and len(reportCache) != 0:
     warn("Report cache contains unreported message(s); Cached entries " &
@@ -386,9 +388,13 @@ proc writeReportCache*() =
       panicPublish(newCacheContents, "", fname, getCurrentExceptionMsg())
       dumpExOnDebug()
       return
+    finally:
+      try:
+        tmpfile.close()
+      except:
+        discard
 
     try:
-      tmpfile.close()
       removeFile(fname)
       moveFile(tmpname, fname)
       warn("Some reports failed to publish, and are cached in: " & fname)

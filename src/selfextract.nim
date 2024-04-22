@@ -106,30 +106,10 @@ proc getSelfExtraction*(): Option[ChalkObj] =
   else:
     result = none(ChalkObj)
 
-proc selfChalkGetKey*(keyName: string): Option[Box] =
-  if selfChalk == nil or selfChalk.extract == nil or
-     keyName notin selfChalk.extract:
-    return none(Box)
-  else:
-    return some(selfChalk.extract[keyName])
-
-proc selfChalkSetKey*(keyName: string, val: Box) =
-  if selfChalk.extract != nil:
-    # Overwrite what we extracted, as it'll get "preserved" when
-    # writing out the chalk file.
-    selfChalk.extract[keyName] = val
-  selfChalk.collectedData[keyName] = val
-
-proc selfChalkDelKey*(keyName: string) =
-  if selfChalk.extract != nil and keyName in selfChalk.extract:
-     selfChalk.extract.del(keyName)
-  if keyName in selfChalk.collectedData:
-    selfChalk.collectedData.del(keyName)
-
 # The rest of this is specific to writing the self-config.
 
 proc newConfFileError(err, tb: string): bool =
-  if chalkConfig != nil and chalkConfig.getChalkDebug():
+  if chalkConfig != nil and get[bool](chalkConfig, "chalk_debug"):
     cantLoad(err & "\n" & tb)
   else:
     cantLoad(err)
@@ -183,7 +163,6 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
          actual)
     selfChalk.opFailed = false
     selfChalk.fsRef    = actual
-    selfChalk.chalkCloseStream()
 
     selfChalk.callHandleWrite(toWrite)
     if selfChalk.opFailed:
@@ -192,8 +171,10 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
     else:
       when defined(posix):
         let f = open(selfChalk.fsRef)
-        f.makeExecutable()
-        f.close()
+        try:
+          f.makeExecutable()
+        finally:
+          f.close()
 
   info("Configuration replaced in binary: " & selfChalk.fsRef)
   selfChalk.makeNewValuesAvailable()
@@ -202,7 +183,7 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
 proc testConfigFile*(uri: string, newCon4m: string, params: seq[Box]):
                    ConfigState =
   info(uri & ": Validating configuration.")
-  if chalkConfig.loadConfig.getValidationWarning():
+  if get[bool](chalkConfig, "load.validation_warning"):
     warn("Note: validation involves creating a new configuration context"  &
          " and evaluating your code to make sure it at least evaluates "   &
          "fine on a default path.  subscribe() and unsubscribe() will "    &
@@ -298,10 +279,10 @@ proc updateArchBinaries*(newConfig: string, newParams: seq[Box],
 
   if bins != nil:
     binInfo = bins
-  elif not chalkConfig.loadConfig.getUpdateArchBinaries():
+  elif not get[bool](chalkConfig, "load.update_arch_binaries"):
     return
   else:
-    binInfo = chalkConfig.dockerConfig.getArchBinaryLocations().getOrElse(nil)
+    binInfo = getOpt[typeof(binInfo)](chalkConfig, "docker.arch_binary_locations").get(nil)
 
   if binInfo == nil or len(binInfo) == 0:
     trace("No multi-arch binaries to load.")
@@ -351,10 +332,10 @@ proc handleConfigLoad*(inpath: string) =
     path = inpath
 
   let
-    validate          = chalkConfig.loadConfig.getValidateConfigsOnLoad()
-    replace           = chalkConfig.loadConfig.getReplaceConf()
-    confPaths         = chalkConfig.getConfigPath()
-    confFilename      = chalkConfig.getConfigFilename()
+    validate          = get[bool](chalkConfig, "load.validate_configs_on_load")
+    replace           = get[bool](chalkConfig, "load.replace_conf")
+    confPaths         = get[seq[string]](chalkConfig, "config_path")
+    confFilename      = get[string](chalkConfig, "config_filename")
 
   if replace:
     info("Replacing base configuration with module from: " & path)
@@ -399,7 +380,7 @@ proc handleConfigLoad*(inpath: string) =
                   newEmbedded & "\n" & useLine
     newEmbedded = withUse.strip()
 
-  if chalkConfig.loadConfig.getParamsViaStdin():
+  if get[bool](chalkConfig, "load.params_via_stdin"):
     try:
       let
         chalkJsonTree = newStringStream(stdin.readLine()).chalkParseJson()

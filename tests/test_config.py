@@ -136,7 +136,6 @@ def test_load_url(
 ):
     chalk_copy.load(
         f"{server_chalkdust}/{path}",
-        log_level="trace",
         expected_success=expected_success,
     )
 
@@ -178,7 +177,6 @@ def test_external_configs(
 ):
     result_config = chalk_copy.run(
         command="env",
-        log_level="error",
         config=CONFIGS / config_path,
         expected_success=expected_success,
         ignore_errors=True,
@@ -192,7 +190,6 @@ def test_external_configs(
 
     result_external = chalk_copy.run(
         command="env",
-        log_level="error",
         expected_success=expected_success,
         ignore_errors=True,
     )

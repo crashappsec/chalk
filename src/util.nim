@@ -8,34 +8,10 @@
 ## This is for any common code for system stuff, such as executing
 ## code.
 
-import std/[tempfiles, osproc, posix, monotimes, parseutils]
+import std/[tempfiles, posix, monotimes, parseutils]
 import pkg/[nimutils/managedtmp]
-import "."/[config, subscan]
-
-proc increfStream*(chalk: ChalkObj) {.exportc.} =
-  if chalk.streamRefCt != 0:
-    chalk.streamRefCt += 1
-    return
-
-  chalk.streamRefCt = 1
-
-  if len(cachedChalkStreams) >= chalkConfig.getCacheFdLimit():
-    let removing = cachedChalkStreams[0]
-
-    trace("Too many cached file descriptors. Closing fd for: " & chalk.name)
-    try:
-      removing.stream.close()
-    except:
-      discard
-
-    removing.stream      = FileStream(nil)
-    removing.streamRefCt = 0
-    cachedChalkStreams = cachedChalkStreams[1 .. ^1]
-
-  cachedChalkStreams.add(chalk)
-
-proc decrefStream*(chalk: ChalkObj) =
-  chalk.streamRefCt -= 1
+import "."/[config, subscan, fd_cache]
+export fd_cache
 
 let sigNameMap = { 1: "SIGHUP", 2: "SIGINT", 3: "SIGQUIT", 4: "SIGILL",
                    6: "SIGABRT",7: "SIGBUS", 9: "SIGKILL", 11: "SIGSEGV",
@@ -53,7 +29,7 @@ proc regularTerminationSignal(signal: cint) {.noconv.} =
   try:
     error("pid: " & $(pid) & " - Aborting due to signal: " &
           sigNameMap[signal] & "(" & $(signal) & ")")
-    if chalkConfig.getChalkDebug():
+    if get[bool](chalkConfig, "chalk_debug"):
       publish("debug", "Stack trace: \n" & getStackTrace())
 
   except:
@@ -97,13 +73,13 @@ proc reportTmpFileExitState*(files, dirs, errs: seq[string]) =
   for err in errs:
     error(err)
 
-  if chalkConfig.getChalkDebug() and len(dirs) + len(files) != 0:
+  if get[bool](chalkConfig, "chalk_debug") and len(dirs) + len(files) != 0:
     error("Due to --debug flag, skipping cleanup; moving the " &
           "following to ./chalk-tmp:")
     for item in files & dirs:
       error(item)
 
-  if chalkConfig.getReportTotalTime():
+  if get[bool](chalkConfig, "report_total_time"):
     echo "Total run time: " & $(int(getMonoTime().ticks() - startTime) /
                                 1000000000) &
       " seconds"
@@ -127,7 +103,7 @@ proc canOpenFile*(path: string, mode: FileMode = FileMode.fmRead): bool =
   return canOpen
 
 proc setupManagedTemp*() =
-  let customTmpDirOpt = chalkConfig.getDefaultTmpDir()
+  let customTmpDirOpt = getOpt[string](chalkConfig, "default_tmp_dir")
 
   if customTmpDirOpt.isSome() and not existsEnv("TMPDIR"):
     putenv("TMPDIR", customTmpDirOpt.get())
@@ -138,7 +114,7 @@ proc setupManagedTemp*() =
   if existsEnv("TMPDIR"):
     discard existsOrCreateDir(getEnv("TMPDIR"))
 
-  if chalkConfig.getChalkDebug():
+  if get[bool](chalkConfig, "chalk_debug"):
     let
       tmpPath = resolvePath("chalk-tmp")
       tmpCheck = resolvePath(".chalk-tmp-check")
@@ -163,87 +139,78 @@ const
 
 when hostOs == "linux":
   template makeCompletionAutoSource() =
-    var
+    let
       acpath  = resolvePath("~/.bash_completion")
-      f       = newFileStream(acpath, fmReadWriteExisting)
       toWrite = ". " & dst & "\n"
 
-    if f == nil:
-      f = newFileStream(acpath, fmWrite)
-      if f == nil:
+    withFileStream(acpath, mode = fmReadWrite, strict = false):
+      if stream == nil:
         warn("Cannot write to " & acpath & " to turn on autocomplete.")
         return
-    else:
       try:
         let
-          contents = f.readAll()
+          contents = stream.readAll()
         if toWrite in contents:
-          f.close()
           return
         if len(contents) != 0 and contents[^1] != '\n':
-          f.write("\n")
+          stream.write("\n")
       except:
         warn("Cannot write to ~/.bash_completion to turn on autocomplete.")
         dumpExOnDebug()
-        f.close()
         return
-    f.write(toWrite)
-    f.close()
-    info("Added sourcing of autocomplete to ~/.bash_completion file")
+      stream.write(toWrite)
+      info("Added sourcing of autocomplete to ~/.bash_completion file")
+
 elif hostOs == "macosx":
   template makeCompletionAutoSource() =
-    var
+    let
       acpath = resolvePath("~/.zshrc")
-      f      = newFileStream(acpath, fmReadWriteExisting)
 
-    if f == nil:
-      f = newFileStream(acPath, fmWrite)
-      if f == nil:
+    withFileStream(acpath, mode = fmReadWrite, strict = false):
+      if stream == nil:
         warn("Cannot write to " & acpath & " to turn on autocomplete.")
         return
+      var
+        contents: string
+        foundbci = false
+        foundci  = false
+        foundsrc = false
+      try:
+        contents = stream.readAll()
+      except:
+        discard
+      let
+        lines   = contents.split("\n")
+        srcLine = "source " & dst
 
-    var
-      contents: string
-      foundbci = false
-      foundci  = false
-      foundsrc = false
-    try:
-      contents = f.readAll()
-    except:
-      discard
-    let
-      lines   = contents.split("\n")
-      srcLine = "source " & dst
+      for line in lines:
+        # This is not even a little precise but should be ok
+        let words = line.split(" ")
+        if "bashcompinit" in words:
+          foundbci = true
+        elif "compinit" in words:
+          foundci = true
+        elif line == srcLine and foundci and foundbci:
+          foundsrc = true
 
-    for line in lines:
-      # This is not even a little precise but should be ok
-      let words = line.split(" ")
-      if "bashcompinit" in words:
-        foundbci = true
-      elif "compinit" in words:
-        foundci = true
-      elif line == srcLine and foundci and foundbci:
-        foundsrc = true
+      if foundbci and foundci and foundsrc:
+        return
 
-    if foundbci and foundci and foundsrc:
-      return
+      if len(contents) != 0 and contents[^1] != '\n':
+        stream.write("\n")
 
-    if len(contents) != 0 and contents[^1] != '\n':
-      f.write("\n")
+      if not foundbci:
+        stream.writeLine("autoload bashcompinit")
+        stream.writeLine("bashcompinit")
 
-    if not foundbci:
-      f.writeLine("autoload bashcompinit")
-      f.writeLine("bashcompinit")
+      if not foundci:
+        stream.writeLine("autoload -Uz compinit")
+        stream.writeLine("compinit")
 
-    if not foundci:
-      f.writeLine("autoload -Uz compinit")
-      f.writeLine("compinit")
+      if not foundsrc:
+        stream.writeLine(srcLine)
 
-    if not foundsrc:
-      f.writeLine(srcLine)
-
-    f.close()
-    info("Set up sourcing of basic autocomplete in ~/.zshrc")
+      info("Set up sourcing of basic autocomplete in ~/.zshrc")
 
 else:
     template makeCompletionAutoSource() = discard
@@ -253,7 +220,7 @@ const currentAutocompleteVersion = (0, 1, 3)
 proc validateMetadata*(obj: ChalkObj): ValidateResult {.importc.}
 
 proc autocompleteFileCheck*() =
-  if isatty(0) == 0 or chalkConfig.getInstallCompletionScript() == false:
+  if isatty(0) == 0 or get[bool](chalkConfig, "install_completion_script") == false:
     return
 
   var dst = ""
@@ -331,6 +298,7 @@ template otherSetupTasks*() =
   autocompleteFileCheck()
   if isatty(1) == 0:
     setShowColor(false)
+  limitFDCacheSize(get[int](chalkConfig, "cache_fd_limit"))
 
 var exitCode = 0
 
@@ -345,6 +313,9 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
     error(chalk.name & ": replaceFileContents() called on an artifact that " &
           "isn't associated with a file.")
     return false
+
+  # Need to close in order to successfully replace.
+  closeFileStream(chalk.fsRef)
 
   result = true
 
@@ -392,7 +363,7 @@ proc findExePath*(cmdName:    string,
     # takes precedence over rest of dirs in PATH
     paths = @[configPath.get()] & paths
 
-  trace("Searching path for " & cmdName)
+  trace("Searching PATH for " & cmdName)
   var foundExes = findAllExePaths(cmdName, paths, usePath)
 
   if ignoreChalkExes:
@@ -404,21 +375,24 @@ proc findExePath*(cmdName:    string,
       let
         subscan   = runChalkSubScan(location, "extract")
         allchalks = subscan.getAllChalks()
-      if len(allChalks) != 0 and allChalks[0].extract != nil and
-         "$CHALK_IMPLEMENTATION_NAME" in allChalks[0].extract:
-        continue
-      else:
+        isChalk   = (
+          len(allChalks) != 0 and
+          allChalks[0].extract != nil and
+         "$CHALK_IMPLEMENTATION_NAME" in allChalks[0].extract
+        )
+      if not isChalk:
         newExes.add(location)
+        break
 
     endNativeCodecsOnly()
 
     foundExes = newExes
 
   if foundExes.len() == 0:
-    trace("Could not find '" & cmdName & "' in path.")
+    trace("Could not find '" & cmdName & "' in PATH.")
     return none(string)
 
-  trace("Found '" & cmdName & "' in path: " & foundExes[0])
+  trace("Found '" & cmdName & "' in PATH: " & foundExes[0])
   return some(foundExes[0])
 
 proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
@@ -448,54 +422,6 @@ proc runCmdExitCode*(exe: string, args: seq[string]): int {.discardable } =
                                        passthrough = false,
                                        timeoutUsec = 0) # No timeout
   result = execOutput.getExit()
-
-template chalkUseStream*(chalk: ChalkObj, code: untyped) {.dirty.} =
-  var
-    stream:  FileStream
-    noRead:  bool
-    noWrite: bool
-
-  if chalk.fsRef == "":
-    noRead  = true
-    noWrite = true
-  else:
-    if chalk.stream == nil:
-      chalk.stream = newFileStream(chalk.fsRef, fmReadWriteExisting)
-
-      if chalk.stream == nil:
-        trace(chalk.fsRef & ": Cannot open for writing.")
-        noWrite = true
-        chalk.stream = newFileStream(chalk.fsRef, fmRead)
-
-        if chalk.stream == nil:
-          error(chalk.fsRef & ": Cannot open for reading either.")
-          noRead = true
-        else:
-          chalk.increfStream()
-          trace(chalk.fsRef & ": File stream opened for reading.")
-      else:
-        chalk.increfStream()
-        trace(chalk.fsRef & ": File stream opened for writing.")
-    else:
-      chalk.increfStream()
-      trace(chalk.fsRef & ": File stream is cached.")
-
-    if chalk.stream != nil:
-      try:
-        stream = chalk.stream
-        stream.setPosition(0)
-        code
-      finally:
-        chalk.decrefStream()
-
-template chalkCloseStream*(chalk: ChalkObj) =
-  if chalk.stream != nil:
-    chalk.stream.close()
-
-  chalk.stream      = nil
-  chalk.streamRefCt = 0
-
-  delByValue(cachedChalkStreams, chalk)
 
 type Redacted* = ref object
   raw:      string
@@ -584,3 +510,7 @@ proc `&`*(a: JsonNode, b: JsonNode): JsonNode =
     result.add(i)
   for i in b.items():
     result.add(i)
+
+proc `&=`*(a: var JsonNode, b: JsonNode) =
+  for i in b.items():
+    a.add(i)

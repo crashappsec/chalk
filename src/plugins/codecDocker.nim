@@ -4,11 +4,9 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import ".."/[config, docker_base, chalkjson, attestation, plugin_api, util]
+import ".."/[config, docker_base, chalkjson, attestation_api, plugin_api, util]
 
-const
-  markFile     = "chalk.json"
-  markLocation = "/chalk.json"
+const markLocation = "/chalk.json"
 
 proc dockerGetChalkId*(self: Plugin, chalk: ChalkObj): string {.cdecl.} =
   if chalk.extract != nil and "CHALK_ID" in chalk.extract:
@@ -94,7 +92,7 @@ proc extractImageMark(chalk: ChalkObj): ChalkDict =
         return
 
       else:
-        if not chalkConfig.extractConfig.getSearchBaseLayersForMarks():
+        if not get[bool](chalkConfig, "extract.search_base_layers_for_marks"):
           return
 
         # We're only going to go deeper if there's no chalk mark found.
@@ -470,7 +468,7 @@ proc getPartialJsonObject(top: JsonNode, key: string): Option[JsonNode] =
 proc jsonAutoKey(map:  OrderedTable[string, string],
                  top:  JsonNode,
                  dict: ChalkDict) =
-  let reportEmpty = chalkConfig.dockerConfig.getReportEmptyFields()
+  let reportEmpty = get[bool](chalkConfig, "docker.report_empty_fields")
 
   for jsonKey, chalkKey in map:
     let subJsonOpt = top.getPartialJsonObject(jsonKey)
@@ -530,7 +528,7 @@ proc inspectContainer(chalk: ChalkObj) =
     cmdOut = runDockerGetEverything(@["container", "inspect", id])
 
   if cmdout.getExit() != 0:
-    warn(chalk.userRef & ": Container inspection failed (no longer running?)")
+    warn(chalk.userRef & ": Could not perform container inspection (no longer running?)")
     return
 
   let
@@ -601,6 +599,12 @@ proc dockerExtractChalkMark*(chalk: ChalkObj): ChalkDict {.exportc, cdecl.} =
   addUnmarked(chalk.name)
 
 proc loadCodecDocker*() =
+  # cant use getDockerExePath as that uses codecs to ignore chalk
+  # wrappings hence we just check if anything docker is on PATH here
+  let enabled = nimutils.findExePath("docker") != ""
+  if not enabled:
+    warn("Disabling docker codec as docker command is not available")
   newCodec("docker",
            rtArtCallback = RunTimeArtifactCb(dockerGetRunTimeArtifactInfo),
-           getChalkId    = ChalkIdCb(dockerGetChalkId))
+           getChalkId    = ChalkIdCb(dockerGetChalkId),
+           enabled       = enabled)

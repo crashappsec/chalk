@@ -17,7 +17,7 @@
 ## environment here.
 
 import std/macros except error
-import "."/[config, selfextract, con4mfuncs, plugin_load]
+import "."/[config, selfextract, con4mfuncs, plugin_load, util]
 
 # Since these are system keys, we are the only one able to write them,
 # and it's easier to do it directly here than in the system plugin.
@@ -86,8 +86,8 @@ proc getEmbeddedConfig(): string =
   else:
     trace("Since this binary can't be marked, using the default config.")
 
-proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
-  result = none((string, FileStream))
+proc findOptionalConf(state: ConfigState): Option[string] =
+  result = none(string)
   let
     path     = unpack[seq[string]](state.attrLookup("config_path").get())
     filename = unpack[string](state.attrLookup("config_filename").get())
@@ -105,7 +105,7 @@ proc findOptionalConf(state: ConfigState): Option[(string, FileStream)] =
     if fname.fileExists():
       info(fname & ": Found config file")
       try:
-        return some((fname, newFileStream(fname)))
+        return some(fname)
       except:
         error(fname & ": Could not read configuration file")
         dumpExOnDebug()
@@ -177,30 +177,28 @@ proc loadAllConfigs*() =
   let
     toStream = newStringStream
     stack    = newConfigStack()
+    exeName  = getMyAppPath().splitPath().tail
 
-  case getMyAppPath().splitPath().tail
+  case exeName
   of "docker":
-    if "docker" notin params:
-      if len(params) != 0 and params[0] == "chalk":
-        params = params[1 .. ^1]
-      else:
-        params = @["docker"] & params
+    params = @[exeName] & params
   else: discard
 
   con4mRuntime = stack
 
-  stack.addSystemBuiltins().
-      addCustomBuiltins(chalkCon4mBuiltins).
-      setErrorHandler(handleCon4mErrors).
-      addGetoptSpecLoad().
-      addSpecLoad(chalkSpecName,  toStream(chalkC42Spec), notEvenDefaults).
-      addConfLoad(baseConfName,   toStream(baseConfig),   checkNone).
-      addCallback(loadLocalStructs).
-      addConfLoad(getoptConfName, toStream(getoptConfig), checkNone).
-      setErrorHandler(handleOtherErrors).
-      addStartGetOpts(printAutoHelp = false, args=params).
-      addCallback(loadLocalStructs).
-      setErrorHandler(handleCon4mErrors)
+  stack.
+    addSystemBuiltins().
+    addCustomBuiltins(chalkCon4mBuiltins).
+    setErrorHandler(handleCon4mErrors).
+    addGetoptSpecLoad().
+    addSpecLoad(chalkSpecName,  toStream(chalkC42Spec), notEvenDefaults).
+    addConfLoad(baseConfName,   toStream(baseConfig),   checkNone).
+    addCallback(loadLocalStructs).
+    addConfLoad(getoptConfName, toStream(getoptConfig), checkNone).
+    setErrorHandler(handleOtherErrors).
+    addStartGetOpts(printAutoHelp = false, args=params).
+    addCallback(loadLocalStructs).
+    setErrorHandler(handleCon4mErrors)
   doRun()
 
   stack.
@@ -222,18 +220,20 @@ proc loadAllConfigs*() =
   # The embedded config has already been validated.
   let configFile = getEmbeddedConfig()
 
-  if chalkConfig.getLoadEmbeddedConfig():
+  if get[bool](chalkConfig, "load_embedded_config"):
     stack.addConfLoad(embeddedConfName, toStream(configFile)).
           addCallback(loadLocalStructs)
     doRun()
 
-  if chalkConfig.getLoadExternalConfig():
+  if get[bool](chalkConfig, "load_external_config"):
     let optConf = stack.configState.findOptionalConf()
     if optConf.isSome():
-      let (fName, stream) = optConf.get()
-      var embed = stream.readAll()
-      stack.addConfLoad(fName, toStream(embed)).addCallback(loadLocalStructs)
-      doRun()
+      let fName = optConf.get()
+      withFileStream(fname, mode = fmRead, strict = true):
+        stack.
+          addConfLoad(fName, stream).
+          addCallback(loadLocalStructs)
+        doRun()
       hostInfo["_OP_CONFIG"] = pack(configFile)
 
   if commandName == "not_supplied" and chalkConfig.defaultCommand.isSome():

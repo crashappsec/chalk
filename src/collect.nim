@@ -6,7 +6,7 @@
 ##
 
 import std/re
-import "."/[config, util, plugin_api]
+import "."/[config, plugin_api]
 
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we
@@ -77,11 +77,13 @@ proc collectChalkTimeHostInfo*() =
   if hostCollectionSuspended():
     return
 
+  trace("Collecting chalk time artifact info")
   for plugin in getAllPlugins():
     let subscribed = plugin.configInfo.preRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo):
       continue
     try:
+      trace("Running plugin: " & plugin.name)
       let dict = plugin.callGetChalkTimeHostInfo()
       if dict == nil or len(dict) == 0:
         continue
@@ -125,6 +127,7 @@ proc initCollection*() =
       collectChalkTimeHostInfo()
 
 proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
+  trace("Collecting run time artifact info")
   for plugin in getAllPlugins():
     let
       data       = artifact.collectedData
@@ -133,7 +136,7 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
     if not plugin.hasSubscribedKey(subscribed, data):          continue
     if plugin.configInfo.codec and plugin != artifact.myCodec: continue
 
-
+    trace("Running plugin: " & plugin.name)
     try:
       let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
       if dict == nil or len(dict) == 0: continue
@@ -163,7 +166,6 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
 
   trace("Collecting chalk-time data.")
   for plugin in getAllPlugins():
-    trace("Running plugin: " & plugin.name)
     if plugin == obj.myCodec:
       trace("Filling in codec info")
       if "CHALK_ID" notin data:
@@ -185,6 +187,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
     if plugin.getChalkTimeArtifactInfo == nil:
       continue
 
+    trace("Running plugin: " & plugin.name)
     try:
       let dict = plugin.callGetChalkTimeArtifactInfo(obj)
       if dict == nil or len(dict) == 0:
@@ -206,10 +209,12 @@ proc collectRunTimeHostInfo*() =
   if hostCollectionSuspended(): return
   ## Called from report generation in commands.nim, not the main
   ## artifact loop below.
+  trace("Collecting run time host info")
   for plugin in getAllPlugins():
     let subscribed = plugin.configInfo.postRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
 
+    trace("Running plugin: " & plugin.name)
     try:
       let dict = plugin.callGetRunTimeHostInfo(getAllChalks())
       if dict == nil or len(dict) == 0: continue
@@ -239,7 +244,7 @@ proc ignoreArtifact(path: string, regexps: seq[Regex]): bool {.inline.} =
   for i, item in regexps:
     if path.match(item):
       trace(path & ": returned artifact ignored due to matching: " &
-        chalkConfig.getIgnorePatterns()[i])
+        get[seq[string]](chalkConfig, "ignore_patterns")[i])
       trace("Developers: codecs should not be returning ignored artifacts.")
       return true
 
@@ -251,7 +256,7 @@ proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
   let selfPath = resolvePath(getMyAppPath())
 
   result.fileExclusions = @[selfPath]
-  result.recurse        = chalkConfig.getRecursive()
+  result.recurse        = get[bool](chalkConfig, "recursive")
 
   for item in argv:
     let maybe = resolvePath(item)
@@ -268,10 +273,10 @@ proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
 
   let
     selfPath = resolvePath(getMyAppPath())
-    skipList = chalkConfig.getIgnorePatterns()
+    skipList = get[seq[string]](chalkConfig, "ignore_patterns")
 
   result.fileExclusions = @[selfPath]
-  result.recurse        = chalkConfig.getRecursive()
+  result.recurse        = get[bool](chalkConfig, "recursive")
 
   for item in skipList:
     result.skips.add(re(item))
@@ -369,14 +374,12 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
         if getCommandName() in ["insert", "docker"]:
           obj.persistInternalValues()
-        obj.chalkCloseStream()
         yield obj
 
         clearErrorObject()
         if not inSubscan() and not obj.forceIgnore and
            obj.name notin getUnmarked():
           obj.collectRuntimeArtifactInfo()
-        obj.chalkCloseStream()
 
   if not inSubscan():
     if getCommandName() != "extract":

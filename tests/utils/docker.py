@@ -66,6 +66,7 @@ class Docker:
         expected_success: bool = True,
         buildkit: bool = True,
         secrets: Optional[dict[str, Path]] = None,
+        env: Optional[dict[str, str]] = None,
     ) -> tuple[str, Program]:
         """
         run docker build with parameters
@@ -85,7 +86,7 @@ class Docker:
                     buildkit=buildkit,
                 ),
                 expected_exit_code=int(not expected_success),
-                env=Docker.build_env(buildkit=buildkit),
+                env={**Docker.build_env(buildkit=buildkit), **(env or {})},
                 cwd=cwd,
             )
         )

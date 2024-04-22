@@ -5,8 +5,9 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[hashes, re, sequtils, sets, tables]
-import ".."/[config, plugin_api]
+import std/[hashes, re, sequtils, sets, strscans, tables]
+import pkg/nimutils
+import ".."/[config, plugin_api, util]
 
 const FT_ANY = "*"
 var
@@ -37,10 +38,9 @@ var
   # key: rule, vals: filetypes for which this rules does not applies
   ruleExcludeFiletypes = newTable[string, seq[string]]()
 
-template scanFileStream(strm: FileStream) =
+proc scanFileStream(strm: FileStream, filePath: string, category: string, subcategory: string) =
   let
     splFile    = splitFile(filePath)
-    rule_names = categories[category][subcategory]
   var applicable_rules: seq[string]
   # applicable rules are eithr rules that apply to all filetypes (FT_ANY)
   # or to the filetype matching the given extension
@@ -62,7 +62,6 @@ template scanFileStream(strm: FileStream) =
     if rule_name notin tsRules:
       continue
 
-    let tsRule = tsRules[rule_name]
     if FT_ANY in ftRules and rule_name in ftRules[FT_ANY]:
 
       # make a pass and check if we should exclude the rule
@@ -71,12 +70,12 @@ template scanFileStream(strm: FileStream) =
         for ft in ruleExcludeFiletypes[rule_name]:
           # if the filetype does not match the current extension proceed
           if ft != splFile.ext and ft != "":
-              continue
+            continue
           # if we have a matching extension and a rule for that extenion,
           # append the rule in the rule to be run
           if ft in excludeFtRules and rule_name in excludeFtRules[ft]:
-              exclude = true
-              break
+            exclude = true
+            break
       # add the rule only if its explicitly added and not excluded
       if not exclude:
         applicable_rules.add(rule_name)
@@ -117,29 +116,23 @@ template scanFileStream(strm: FileStream) =
         break
 
 proc scanFile(filePath: string, category: string, subcategory: string) =
-  var strm = newFileStream(filePath, fmRead)
-  if strm == nil:
-    return
-  try:
-    scanFileStream(strm)
-  finally:
-    strm.close()
+  withFileStream(filePath, mode = fmRead, strict = true):
+    if stream == nil:
+      return
+    scanFileStream(stream, filePath, category, subcategory)
 
 proc getProcNames(): HashSet[string] =
+  ## Returns every Name value in files at `/proc/[0-9]+/status`.
+  ## This is the filename of each executable, truncated to 15 characters.
   result = initHashSet[string]()
   for kind, path in walkDir("/proc/"):
-    for ch in path.splitPath().tail:
-      try:
-        if ch notin "0123456789":
-          continue
-        let p_path = path / "status"
-        var data = p_path.readFile()
-        for line in data.split("\n"):
-          if "Name:" in line:
-            var name = line.split("Name:")[1].strip()
-            result.incl(name)
-      except:
-         continue
+    if kind == pcDir and path.lastPathPart().allIt(it in {'0'..'9'}):
+      let data = tryToLoadFile(path / "status")
+      for line in data.splitLines():
+        let (isMatch, name) = line.scanTuple("Name:$s$+")
+        if isMatch:
+          result.incl(name)
+          break
 
 # The current host based detection simply checks for the
 # presence of configuration files, therefore we don't need
@@ -181,34 +174,27 @@ proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string]): bool =
 proc scanDirectory(directory: string, category: string, subcategory: string) =
   if inFileScope[category][subcategory]:
     return
-  for filePath in walkDir(directory):
+  for kind, path in walkDir(directory):
     if inFileScope[category][subcategory]:
       break
-    if filePath.kind == pcFile:
-      scanFile(filePath.path, category, subcategory)
-      continue
-    if filePath.kind == pcDir:
-      scanDirectory(filePath.path, category, subcategory)
-      continue
+    if kind == pcFile:
+      scanFile(path, category, subcategory)
+    elif kind == pcDir and not path.endsWith(".git"):
+      scanDirectory(path, category, subcategory)
 
 proc getLanguages(directory: string, langs: var HashSet[string]) =
-  for filePath in walkDir(directory):
-    if filePath.kind == pcFile:
-      let splFile = splitFile(filePath.path)
-      if splFile.ext == "":
-        continue
-      if splFile.ext notin languages:
-        continue
-      langs.incl(languages[splFile.ext])
-      continue
-    if filePath.kind == pcDir:
-      getLanguages(filePath.path, langs)
-      continue
+  for kind, path in walkDir(directory):
+    if kind == pcFile:
+      let ext = path.splitFile().ext
+      if ext != "" and ext in languages:
+        langs.incl(languages[ext])
+    elif kind == pcDir and not path.endsWith(".git"):
+      getLanguages(path, langs)
 
 proc detectLanguages(): HashSet[string] =
   result = initHashSet[string]()
 
-  let canLoad = chalkConfig.getUseTechStackDetection()
+  let canLoad = get[bool](chalkConfig, "use_tech_stack_detection")
   if not canLoad:
     return result
 
@@ -219,7 +205,7 @@ proc detectLanguages(): HashSet[string] =
     else:
       let (head, _) = splitPath(fPath)
       if head.dirExists():
-          getLanguages(head, result)
+        getLanguages(head, result)
 
 proc detectTechCwd(): TableRef[string, seq[string]] =
   result = newTable[string, seq[string]]()
@@ -316,7 +302,7 @@ proc loadState() =
 
 proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
   result = ChalkDict()
-  let canLoad = chalkConfig.getUseTechStackDetection()
+  let canLoad = get[bool](chalkConfig, "use_tech_stack_detection")
   if not canLoad:
     trace("Skipping tech stack runtime detection plugin")
     return result
@@ -344,7 +330,7 @@ proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
 
 proc techStackArtifact*(self: Plugin, objs: ChalkObj): ChalkDict {.cdecl.} =
   result = ChalkDict()
-  let canLoad = chalkConfig.getUseTechStackDetection()
+  let canLoad = get[bool](chalkConfig, "use_tech_stack_detection")
   if not canLoad:
     trace("Skipping tech stack detection plugin for artifacts")
     return result

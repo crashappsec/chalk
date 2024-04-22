@@ -12,7 +12,7 @@ when defined(posix):
   import std/posix_utils
 
 import std/[monotimes, nativesockets, sequtils, times]
-import ".."/[config, plugin_api, normalize, chalkjson, selfextract, attestation,
+import ".."/[config, plugin_api, normalize, chalkjson, attestation_api,
              util]
 
 var
@@ -98,8 +98,8 @@ proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   result["TIMESTAMP_WHEN_CHALKED"] = pack(unixTimeInMS())
 
   if isSubscribedKey("PRE_CHALK_HASH") and obj.fsRef != "":
-    chalkUseStream(obj):
-      result["PRE_CHALK_HASH"] = pack(obj.stream.readAll().sha256Hex())
+    withFilesTream(obj.fsRef, mode = fmRead, strict = true):
+      result["PRE_CHALK_HASH"] = pack(stream.readAll().sha256Hex())
 
   if obj.isMarked() and "METADATA_HASH" in obj.extract:
     let h = unpack[string](obj.extract["METADATA_HASH"]).strip().parseHexStr()
@@ -143,7 +143,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, ins: bool):
   if isChalkingOp():
     obj.applySubstitutions()
     result.setIfNeeded("_OP_CHALKED_KEYS", toSeq(obj.getChalkMark().keys))
-    result.setIfNeeded("_VIRTUAL", chalkConfig.getVirtualChalk())
+    result.setIfNeeded("_VIRTUAL", get[bool](chalkConfig, "virtual_chalk"))
   else:
     case obj.validateMetaData()
     of vOk:
@@ -196,10 +196,10 @@ proc getEnvDict(): Box =
   once:
     envdict = Con4mDict[string, string]()
     let
-      always = chalkConfig.getEnvAlwaysShow()
-      never  = chalkConfig.getEnvNeverShow()
-      redact = chalkConfig.getEnvRedact()
-      def    = chalkConfig.getEnvDefaultAction()[0]
+      always = get[seq[string]](chalkConfig, "env_always_show")
+      never  = get[seq[string]](chalkConfig, "env_never_show")
+      redact = get[seq[string]](chalkConfig, "env_redact")
+      def    = get[string](chalkConfig, "env_default_action")[0]
 
     for (k, v) in envPairs():
       # TODO: could add some con4m to warn on overlap across these 3. For now,

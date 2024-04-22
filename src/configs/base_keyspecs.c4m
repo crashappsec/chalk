@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.3.4-dev"
+chalk_version :=   "0.3.6-dev"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -5130,4 +5130,16 @@ This consists of URLs (minus the file extension) mapped to source code
 for components.
 """
 
+}
+
+keyspec $CHALK_MEMOIZE {
+   required_in_self_mark:  true
+   kind:                   ChalkTimeArtifact
+   type:                   dict[string, string]
+   standard:               true
+   system:                 true
+   since:                  "0.3.4"
+   doc: """
+Dictionary of `memoize()` function results.
+"""
 }

@@ -3,6 +3,8 @@ FROM python:3.11.3-alpine as base
 ENV VIRTUAL_ENV=/server.env
 ENV PATH=$VIRTUAL_ENV/bin:$PATH
 
+COPY --from=gcr.io/projectsigstore/cosign:v2.1.1 /ko-app/cosign /usr/local/bin/cosign
+
 # -------------------------------------------------------------------
 
 FROM base as deps

@@ -2,7 +2,6 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import re
 import shutil
 import sqlite3
 from contextlib import ExitStack, chdir, closing

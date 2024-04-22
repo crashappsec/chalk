@@ -59,8 +59,6 @@ proc hashExtractedZip(dir: string): string =
   return toHash.hashZip()
 
 template giveUp() =
-  if stream != nil:
-    stream.close()
   error(loc & ": " & getCurrentExceptionMsg())
   dumpExOnDebug()
   return none(ChalkObj)
@@ -76,102 +74,96 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
     ext = loc.splitFile().ext.strip()
     extractCtx: CollectionCtx
 
-  if not ext.startsWith(".") or ext[1..^1] notin chalkConfig.getZipExtensions():
+  if not ext.startsWith(".") or ext[1..^1] notin get[seq[string]](chalkConfig, "zip_extensions"):
     return none(ChalkObj)
 
-  let
-    stream = newFileStream(loc)
-
-  if stream == nil:
-    return none(ChalkObj)
-
-  tryOrBail:
-    # Make sure the file seems to be a valid ZIP file.
-    var buf: array[4, char]
-    discard stream.peekData(addr(buf), 4)
-    if buf[0] != 'P' or buf[1] != 'K':
+  withFileStream(loc, mode = fmRead, strict = false):
+    if stream == nil:
       return none(ChalkObj)
 
-  let
-    tmpDir   = getNewTempDir()
-    cache    = ZipCache()
-    origD    = tmpDir.joinPath("contents")
-    hashD    = tmpDir.joinPath("hash")
-    subscans = chalkConfig.getChalkContainedItems()
-    chalk    = newChalk(name   = loc,
-                        cache  = cache,
-                        fsRef  = loc,
-                        stream = stream,
-                        codec  = self)
-
-  cache.onDisk  = ZipArchive()
-  cache.tmpDir  = tmpDir
-
-  cache.onDisk.open(stream)
-  info(chalk.fsRef & ": temporarily extracting into " & tmpDir)
-  tryOrBail:
-      cache.onDisk.extractAll(origD)
-      cache.onDisk.extractAll(hashD)
-
-  # Even if subscans are off, we do this delete for the purposes of hashing.
-  if not chalkConfig.getChalkDebug():
-    toggleLoggingEnabled()
-  discard runChalkSubScan(hashD, "delete")
-  if not chalkConfig.getChalkDebug():
-    toggleLoggingEnabled()
-
-  if zipChalkFile in cache.onDisk.contents:
     tryOrBail:
-      removeFile(joinPath(hashD, zipChalkFile))
+      # Make sure the file seems to be a valid ZIP file.
+      var buf: array[4, char]
+      discard stream.peekData(addr(buf), 4)
+      if buf[0] != 'P' or buf[1] != 'K':
+        return none(ChalkObj)
 
-    let contents = cache.onDisk.contents[zipChalkFile].contents
-    if contents.contains(magicUTF8):
-      let
-        s           = newStringStream(contents)
+    let
+      tmpDir   = getNewTempDir()
+      cache    = ZipCache()
+      origD    = tmpDir.joinPath("contents")
+      hashD    = tmpDir.joinPath("hash")
+      subscans = get[bool](chalkConfig, "chalk_contained_items")
+      chalk    = newChalk(name   = loc,
+                          cache  = cache,
+                          fsRef  = loc,
+                          codec  = self)
 
-      try:
-        chalk.extract = s.extractOneChalkJson(chalk.fsRef)
-        chalk.marked  = true
-        s.close()
-      except:
-        discard
-    else:
-      chalk.marked  = false
+    cache.onDisk  = ZipArchive()
+    cache.tmpDir  = tmpDir
 
-  chalk.cachedPreHash = hashExtractedZip(hashD)
+    cache.onDisk.open(stream)
+    info(chalk.fsRef & ": temporarily extracting into " & tmpDir)
+    tryOrBail:
+        cache.onDisk.extractAll(origD)
+        cache.onDisk.extractAll(hashD)
 
-  if subscans:
-    extractCtx = runChalkSubScan(origD, "extract")
-    if extractCtx.report.kind == MkSeq:
-      if len(unpack[seq[Box]](extractCtx.report)) != 0:
-        if chalk.extract == nil:
-          warn(chalk.fsRef & ": contains chalked contents, but is not " &
-               "itself chalked.")
-          chalk.extract = ChalkDict()
-        chalk.extract["EMBEDDED_CHALK"] = extractCtx.report
-    if getCommandName() != "extract":
-      pushZipDir(tmpDir)
-      pushChalkId(chalk.cachedPreHash.idFormat())
-      let collectionCtx = runChalkSubScan(origD, getCommandName())
-      popChalkId()
-      popZipDir()
+    # Even if subscans are off, we do this delete for the purposes of hashing.
+    if not get[bool](chalkConfig, "chalk_debug"):
+      toggleLoggingEnabled()
+    discard runChalkSubScan(hashD, "delete")
+    if not get[bool](chalkConfig, "chalk_debug"):
+      toggleLoggingEnabled()
 
-      # Update the internal accounting for the sake of the post-op hash
-      for k, v in cache.onDisk.contents:
-        let tmpPath = os.joinPath(origD, k)
-        if not tmpPath.fileExists():
-          continue
+    if zipChalkFile in cache.onDisk.contents:
+      tryOrBail:
+        removeFile(joinPath(hashD, zipChalkFile))
 
-        var newv = v
+      let contents = cache.onDisk.contents[zipChalkFile].contents
+      if contents.contains(magicUTF8):
         let
-          f = open(tmpPath, fmRead)
-          c = f.readAll()
-        f.close()
-        newv.contents             = c
-        cache.onDisk.contents[k]  = newV
-      cache.embeddedChalk = collectionCtx.report
+          s           = newStringStream(contents)
 
-  return some(chalk)
+        try:
+          chalk.extract = s.extractOneChalkJson(chalk.fsRef)
+          chalk.marked  = true
+          s.close()
+        except:
+          discard
+      else:
+        chalk.marked  = false
+
+    chalk.cachedPreHash = hashExtractedZip(hashD)
+
+    if subscans:
+      extractCtx = runChalkSubScan(origD, "extract")
+      if extractCtx.report.kind == MkSeq:
+        if len(unpack[seq[Box]](extractCtx.report)) != 0:
+          if chalk.extract == nil:
+            warn(chalk.fsRef & ": contains chalked contents, but is not " &
+                 "itself chalked.")
+            chalk.extract = ChalkDict()
+          chalk.extract["EMBEDDED_CHALK"] = extractCtx.report
+      if getCommandName() != "extract":
+        pushZipDir(tmpDir)
+        pushChalkId(chalk.cachedPreHash.idFormat())
+        let collectionCtx = runChalkSubScan(origD, getCommandName())
+        popChalkId()
+        popZipDir()
+
+        # Update the internal accounting for the sake of the post-op hash
+        for k, v in cache.onDisk.contents:
+          let tmpPath = os.joinPath(origD, k)
+          if not tmpPath.fileExists():
+            continue
+
+          var newv = v
+          let c = tryToLoadFile(tmpPath)
+          newv.contents             = c
+          cache.onDisk.contents[k]  = newV
+        cache.embeddedChalk = collectionCtx.report
+
+    return some(chalk)
 
 proc doZipWrite(chalk: ChalkObj, encoded: Option[string], virtual: bool) =
   let
@@ -180,12 +172,12 @@ proc doZipWrite(chalk: ChalkObj, encoded: Option[string], virtual: bool) =
 
   var dirToUse: string
 
-  chalkCloseStream(chalk)
+  # need to close FD to be able to overwite the file
+  closeFileStream(chalk.fsRef)
   try:
     if encoded.isSome():
-      let f = open(chalkfile, fmWrite)
-      f.write(encoded.get())
-      f.close()
+      if not tryToWriteFile(chalkfile, encoded.get()):
+        raise newException(OSError, chalkfile & ": could not write file")
       dirToUse = joinPath(cache.tmpDir, "contents")
     else:
       dirToUse = joinPath(cache.tmpDir, "hash")
@@ -223,7 +215,7 @@ proc zipGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   let cache = ZipCache(obj.cache)
   result    = ChalkDict()
 
-  if chalkConfig.getChalkContainedItems() and cache.embeddedChalk.kind != MkObj:
+  if get[bool](chalkConfig, "chalk_contained_items") and cache.embeddedChalk.kind != MkObj:
     result["EMBEDDED_CHALK"]  = cache.embeddedChalk
     result["EMBEDDED_TMPDIR"] = pack(cache.tmpDir)
 

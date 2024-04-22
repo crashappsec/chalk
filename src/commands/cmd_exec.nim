@@ -7,7 +7,7 @@
 
 ## The `chalk exec` command.
 
-import std/posix
+import std/[posix, sequtils]
 import ".."/[config, collect, util, reporting, chalkjson, plugin_api]
 
 # this const is not available in nim stdlib hence manual c import
@@ -38,7 +38,7 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
     exe1path: string = ""
     info:     Stat
     chalk:    ChalkObj
-
+    extract:  ChalkDict
 
   when hostOs == "macosx":
     if proc_pidpath(pid, addr n[0], PATH_MAX) > 0:
@@ -60,24 +60,19 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
     let
       cidOpt      = getContainerName()
       cid         = cidOpt.getOrElse("<<in-container>")
-      exeStream   = newFileStream(exe1path)
-      chalkStream = newFileStream(chalkPath)
 
-    if chalkStream == nil:
-      error(chalkPath & ": Could not read chalkmark")
-      return none(ChalkObj)
-
-    if exeStream == nil:
-      error(exe1path & ": Could not read executable for chalk extraction")
-      return none(ChalkObj)
+    withFileStream(chalkPath, mode = fmRead, strict = false):
+      if stream == nil:
+        error(chalkPath & ": Could not read chalkmark")
+        return none(ChalkObj)
+      extract = stream.extractOneChalkJson(cid)
 
     chalk         = newChalk(name         = exe1path,
                              fsRef        = exe1path,
-                             stream       = exeStream,
                              containerId  = cidOpt.getOrElse(""),
                              pid          = some(pid),
                              resourceType = {ResourcePid, ResourceFile},
-                             extract      = chalkStream.extractOneChalkJson(cid),
+                             extract      = extract,
                              codec        = getPluginByName("docker"))
 
     for k, v in chalk.extract:
@@ -121,7 +116,6 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
 
       chalk = newChalk(name         = exe1path,
                        fsRef        = exe1path,
-                       stream       = newFileStream(exe1path),
                        resourceType = {ResourceFile},
                        codec        = getPluginByName("docker"))
 
@@ -169,7 +163,7 @@ proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
 
 template doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: untyped) =
   let
-    inMicroSec    = int(chalkConfig.execConfig.getHeartbeatRate())
+    inMicroSec    = int(get[Con4mDuration](chalkConfig, "exec.heartbeat_rate"))
     sleepInterval = int(inMicroSec / 1000)
 
   setCommandName("heartbeat")
@@ -192,34 +186,17 @@ proc runCmdExec*(args: seq[string]) =
     setExitCode(1)
     return
 
-
   let
-    execConfig = chalkConfig.execConfig
-    cmdName    = execConfig.getCommandName()
-    cmdPath    = execConfig.getSearchPath()
-    defaults   = execConfig.getDefaultArgs()
-    appendArgs = execConfig.getAppendCommandLineArgs()
-    overrideOk = execConfig.getOverrideOk()
-    usePath    = execConfig.getUsePath()
-    pct        = execConfig.getReportingProbability()
-    allOpts    = findAllExePaths(cmdName, cmdPath, usePath)
+    fromArgs   = get[bool](chalkConfig, "exec.command_name_from_args")
+    cmdPath    = get[seq[string]](chalkConfig, "exec.search_path")
+    defaults   = get[seq[string]](chalkConfig, "exec.default_args")
+    appendArgs = get[bool](chalkConfig, "exec.append_command_line_args")
+    overrideOk = get[bool](chalkConfig, "exec.override_ok")
+    usePath    = get[bool](chalkConfig, "exec.use_path")
+    pct        = get[int](chalkConfig, "exec.reporting_probability")
     ppid       = getpid()   # Get the current pid before we fork.
-
-
-  if cmdName == "":
-    error("This chalk instance has no configured process to exec.")
-    error("At the command line, you can pass --exec-command-name to " &
-      "set the program name (PATH is searched).")
-    error("Add extra directories to search with --exec-search-path.")
-    error("In a config file, set exec.command_name and/or exec.search_path")
-    setExitCode(1)
-    return
-
-
-  if len(allOpts) == 0:
-    error("No executable named '" & cmdName & "' found in your path.")
-    setExitCode(1)
-    return
+  var
+    cmdName    = get[string](chalkConfig, "exec.command_name")
 
   var argsToPass = defaults
 
@@ -232,6 +209,25 @@ proc runCmdExec*(args: seq[string]) =
   elif len(args) != 0:
     argsToPass = args
 
+  if cmdName == "" and fromArgs and len(argsToPass) > 0:
+    cmdName = argsToPass[0]
+    argsToPass.delete(0, 0)
+
+  if cmdName == "":
+    error("This chalk instance has no configured process to exec.")
+    error("At the command line, you can pass --exec-command-name to " &
+          "set the program name (PATH is searched).")
+    error("Add extra directories to search with --exec-search-path.")
+    error("In a config file, set exec.command_name and/or exec.search_path")
+    setExitCode(1)
+    return
+
+  let allOpts = findAllExePaths(cmdName, cmdPath, usePath)
+  if len(allOpts) == 0:
+    error("No executable named '" & cmdName & "' found in your path.")
+    setExitCode(1)
+    return
+
   if pct != 100:
     let
       inRange = pct/100
@@ -242,7 +238,7 @@ proc runCmdExec*(args: seq[string]) =
 
   let pid  = fork()
 
-  if execConfig.getChalkAsParent():
+  if get[bool](chalkConfig, "exec.chalk_as_parent"):
     if pid == 0:
       handleExec(allOpts, argsToPass)
     elif pid == -1:
@@ -257,7 +253,7 @@ proc runCmdExec*(args: seq[string]) =
       #
       # Yes this is also racy but a proper fix will be more complicated.
       let
-        inMicroSec   = int(execConfig.getInitialSleepTime())
+        inMicroSec   = int(get[Con4mDuration](chalkConfig, "exec.initial_sleep_time"))
         initialSleep = int(inMicroSec / 1000)
 
       sleep(initialSleep)
@@ -269,7 +265,7 @@ proc runCmdExec*(args: seq[string]) =
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting()
 
-      if execConfig.getHeartbeat():
+      if get[bool](chalkConfig, "exec.heartbeat"):
         chalkOpt.doHeartbeatAsParent(pid)
       else:
         trace("Waiting for spawned process to exit.")
@@ -290,7 +286,7 @@ proc runCmdExec*(args: seq[string]) =
       trace("Chalk is child process: " & $(cpid))
 
       let
-        inMicroSec   = int(execConfig.getInitialSleepTime())
+        inMicroSec   = int(get[Con4mDuration](chalkConfig, "exec.initial_sleep_time"))
         initialSleep = int(inMicroSec / 1000)
 
       sleep(initialSleep)
@@ -309,5 +305,5 @@ proc runCmdExec*(args: seq[string]) =
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting()
 
-      if execConfig.getHeartbeat():
+      if get[bool](chalkConfig, "exec.heartbeat"):
         chalkOpt.doHeartbeatAsChild(ppid)

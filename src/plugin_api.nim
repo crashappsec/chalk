@@ -20,6 +20,9 @@ import "."/[config, chalkjson, util]
 # should all be pre-checked.
 
 proc callGetChalkTimeHostInfo*(plugin: Plugin): ChalkDict =
+  if not plugin.enabled:
+    return ChalkDict()
+
   let cb = plugin.getChalkTimeHostInfo
 
   # explicit callback check - otherwise it results in segfault
@@ -31,6 +34,9 @@ proc callGetChalkTimeHostInfo*(plugin: Plugin): ChalkDict =
 
 proc callGetChalkTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj):
          ChalkDict =
+  if not plugin.enabled:
+    return ChalkDict()
+
   let cb = plugin.getChalkTimeArtifactInfo
 
   # explicit callback check - otherwise it results in segfault
@@ -42,6 +48,9 @@ proc callGetChalkTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj):
 
 proc callGetRunTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj, b: bool):
          ChalkDict =
+  if not plugin.enabled:
+    return ChalkDict()
+
   let cb = plugin.getRunTimeArtifactInfo
 
   # explicit callback check - otherwise it results in segfault
@@ -53,6 +62,9 @@ proc callGetRunTimeArtifactInfo*(plugin: Plugin, obj: ChalkObj, b: bool):
 
 proc callGetRunTimeHostInfo*(plugin: Plugin, objs: seq[ChalkObj]):
          ChalkDict =
+  if not plugin.enabled:
+    return ChalkDict()
+
   let cb = plugin.getRunTimeHostInfo
 
   # explicit callback check - otherwise it results in segfault
@@ -90,12 +102,11 @@ template callGetChalkId*(obj: ChalkObj): string =
   cb(plugin, obj)
 
 template callHandleWrite*(obj: ChalkObj, toWrite: Option[string]) =
-  obj.chalkUseStream():
-    let
-      plugin = obj.myCodec
-      cb     = plugin.handleWrite
+  let
+    plugin = obj.myCodec
+    cb     = plugin.handleWrite
 
-    cb(plugin, obj, toWrite)
+  cb(plugin, obj, toWrite)
 
 proc findFirstValidChalkMark*(s:            string,
                               artifactPath: string,
@@ -325,8 +336,6 @@ proc scriptLoadMark*(codec:  Plugin, stream: Stream,
                               resourceType = {ResourceFile})
     (toHash, dict) = contents.getUnmarkedScriptContent(chalk, comment)
 
-  stream.close()
-
   result = some(chalk)
 
   if toHash == "" and dict == nil:
@@ -346,9 +355,8 @@ proc scriptHandleWrite*(plugin:  Plugin,
   ## that should work for most scripting languages.
   var contents: string
 
-  chalkUseStream(chalk):
-    contents = chalk.stream.readAll()
-  chalkCloseStream(chalk)
+  withFileStream(chalk.fsRef, mode = fmRead, strict = true):
+    contents = stream.readAll()
 
   if encoded.isNone():
     if not chalk.marked:  # Unmarked, so nothing to do.
@@ -377,7 +385,6 @@ proc loadChalkFromFStream*(codec:  Plugin,
   result = newChalk(name         = loc,
                     fsRef        = loc,
                     codec        = codec,
-                    stream       = stream,
                     resourceType = {ResourceFile})
 
   trace(result.name & ": chalk mark magic @ " & $(stream.getPosition()))
@@ -387,9 +394,9 @@ proc loadChalkFromFStream*(codec:  Plugin,
     return
 
   try:
-    result.startOffset   = result.stream.getPosition()
-    result.extract       = result.stream.extractOneChalkJson(result.name)
-    result.endOffset     = result.stream.getPosition()
+    result.startOffset   = stream.getPosition()
+    result.extract       = stream.extractOneChalkJson(result.name)
+    result.endOffset     = stream.getPosition()
 
   except:
     error(loc & ": Invalid JSON: " & getCurrentExceptionMsg())
@@ -409,7 +416,7 @@ proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
     if path.match(item):
       once:
         trace(path & ": ignored due to matching ignore pattern: " &
-          chalkConfig.getIgnorePatterns()[i])
+          get[seq[string]](chalkConfig, "ignore_patterns")[i])
         trace("We will NOT report additional path skips.")
       return true
 
@@ -434,7 +441,7 @@ proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
     followFLinks = false
 
   if isChalkingOp():
-    let symLinkBehavior = chalkConfig.getSymlinkBehavior()
+    let symLinkBehavior = get[string](chalkConfig, "symlink_behavior")
     if symLinkBehavior == "skip":
       skipLinks = true
     elif symLinkBehavior == "clobber":
@@ -465,13 +472,14 @@ or --copy to copy the file and replace the symlink.""")
       if opt.isSome():
         let chalk = opt.get()
         result.add(chalk)
-        chalk.chalkCloseStream()
+
 proc simpleHash(self: Plugin, chalk: ChalkObj): Option[string] =
   # The default if the stream can't be acquired.
   result = none(string)
 
-  chalkUseStream(chalk):
-    result = some(stream.readAll().sha256Hex())
+  withFileStream(chalk.fsRef, mode = fmRead, strict = false):
+    if stream != nil:
+      result = some(stream.readAll().sha256Hex())
 
 proc defUnchalkedHash*(self: Plugin, obj: ChalkObj): Option[string] {.cdecl.} =
   ## This is called in computing the CHALK_ID. If the artifact already
@@ -525,15 +533,12 @@ proc defaultCodecWrite*(s:     Plugin,
     pre:  string
     post: string
 
-  chalkUseStream(chalk):
+  withFileStream(chalk.fsRef, mode = fmRead, strict = true):
     pre = stream.readStr(chalk.startOffset)
 
     if chalk.endOffset > chalk.startOffset:
       stream.setPosition(chalk.endOffset)
-      post = chalk.stream.readAll()
-
-  # Need to close in order to successfully replace.
-  chalkCloseStream(chalk)
+      post = stream.readAll()
 
   let contents = pre & enc.getOrElse("") & post
   if not chalk.replaceFileContents(contents):
@@ -601,7 +606,8 @@ proc newPlugin*(
                   getChalkTimeArtifactInfo: ctArtCallback,
                   getRunTimeArtifactInfo:   rtArtCallback,
                   getRunTimeHostInfo:       rtHostCallback,
-                  internalState:            cache)
+                  internalState:            cache,
+                  enabled:                  true)
 
   if not result.checkPlugin(codec = false):
     result = Plugin(nil)
@@ -619,7 +625,8 @@ proc newCodec*(
   handleWrite:        HandleWriteCb       = HandleWritecb(defaultCodecWrite),
   nativeObjPlatforms: seq[string]         =  @[],
   cache:              RootRef             = RootRef(nil),
-  commentStart:       string              = "#"):
+  commentStart:       string              = "#",
+  enabled:            bool                = true):
     Plugin {.discardable, cdecl.} =
 
   result = Plugin(name:                     name,
@@ -634,7 +641,8 @@ proc newCodec*(
                   handleWrite:              handleWrite,
                   nativeObjPlatforms:       nativeObjPlatforms,
                   internalState:            cache,
-                  commentStart:             commentStart)
+                  commentStart:             commentStart,
+                  enabled:                  enabled)
 
   if not result.checkPlugin(codec = true):
     result = Plugin(nil)

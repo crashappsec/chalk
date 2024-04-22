@@ -6,8 +6,8 @@ func validate_jwt(token) {
 }
 
 parameter auth_config.crashoverride.token {
-  shortdoc:  "CrashOverride API token"
-  doc:       "Get your API token at CrashOverride: https://crashoverride.run"
+  shortdoc:  "Crash Override API token"
+  doc:       "Get your API token at Crash Override: https://crashoverride.run"
   default:   ""
   validator: func validate_jwt(string) -> string
 }
@@ -16,12 +16,28 @@ auth_config crashoverride {
   ~auth:  "jwt"
 }
 
+func get_crashoverride_reporting_jwt() {
+  headers := auth_headers("crashoverride")
+  if contains(headers, "authorization") {
+    response := url_post("https://chalk.crashoverride.run/v0.1/key-provider/jwt", "", headers)
+    json     := parse_json(response)
+    token    := get(json, "jwt")
+    return token
+  }
+  return ""
+}
+
+auth_config crashoverride_reporting {
+  ~auth:  "jwt"
+  ~token: memoize("crashoverride_jwt", func get_crashoverride_reporting_jwt() -> string)
+}
+
 sink_config crashoverride {
   ~enabled:         true
   ~sink:            "presign"
   ~priority:        999999
   ~uri:             "https://chalk.crashoverride.run/v0.1/report"
-  ~auth:            "crashoverride"
+  ~auth:            "crashoverride_reporting"
 }
 
 custom_report crashoverride {
@@ -31,10 +47,11 @@ custom_report crashoverride {
   ~use_when:        ["insert", "build", "exec"]
 }
 
-use_signing_key_backup_service       = true
+attestation.key_provider             = "get"
 docker.wrap_entrypoint               = true
 run_sbom_tools                       = true
 run_sast_tools                       = true
+~exec.command_name_from_args         = true
 ~env_always_show                     = [
   "AWS_ROLE_ARN",
   "KUBERNETES_PORT_443_TCP_ADDR",
@@ -48,4 +65,4 @@ run_sast_tools                       = true
   "XDG_SESSION_TYPE"
 ]
 
-info("CrashOverride integration is enabled and chalk reports will be sent to https://crashoverride.run")
+info("Crash Override integration is enabled and chalk reports will be sent to https://crashoverride.run")

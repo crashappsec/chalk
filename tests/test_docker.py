@@ -71,6 +71,17 @@ def do_docker_cleanup() -> Iterator[None]:
                 Docker.remove_images(list(images))
 
 
+def test_no_docker(chalk: Chalk):
+    _, build = chalk.docker_build(
+        context=DOCKERFILES / "valid" / "sample_1",
+        env={"PATH": ""},
+        expected_success=False,
+        # dont run sanity docker subcommand
+        run_docker=False,
+    )
+    assert build.exit_code > 0
+
+
 @pytest.mark.parametrize("buildkit", [True, False])
 @pytest.mark.parametrize(
     "cwd, dockerfile, tag",
@@ -106,9 +117,27 @@ def test_build(
         tag=random_hex if tag else None,
         buildkit=buildkit,
         config=CONFIGS / "docker_wrap.c4m",
-        log_level="trace",
     )
     assert image_id
+
+
+def test_docker_context(chalk: Chalk, tmp_data_dir: Path):
+    """
+    Test docker can build when a context is "docker"
+    """
+    shutil.copy(chalk.binary, tmp_data_dir / "docker")
+    cwd = tmp_data_dir / "cwd"
+    context = cwd / "docker"
+    context.mkdir(parents=True)
+    path = os.environ["PATH"]
+
+    _, build = Docker.build(
+        cwd=cwd,
+        dockerfile=DOCKERFILES / "valid" / "sample_2" / "Dockerfile",
+        context="docker",
+        env={"PATH": f"{tmp_data_dir}:{path}"},
+    )
+    assert ChalkProgram.from_program(build)
 
 
 @pytest.mark.parametrize("dockerfile", [DOCKERFILES / "valid" / "sample_1"])
@@ -126,7 +155,6 @@ def test_multiple_tags(
         tags=tags,
         config=CONFIGS / "docker_wrap.c4m",
         push=True,
-        log_level="trace",
         # docker sanity check will push to registry
         # whereas we want to ensure chalk does the pushing
         run_docker=False,
@@ -180,9 +208,26 @@ def test_composite_build(
     assert second_image_id
 
 
-@pytest.mark.xfail(
-    reason="CMD is wrapped which breaks ENTRYPOINT. fix is coming in next release"
-)
+def test_base_ecr(chalk: Chalk):
+    """
+    ecr some manifest endpoints require additional auth even for public registries
+    """
+    _, build = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "ecr" / "Dockerfile",
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    assert build
+    assert build.mark.has(
+        _IMAGE_ENTRYPOINT=[
+            "/chalk",
+            "exec",
+            "--exec-command-name",
+            "/lambda-entrypoint.sh",
+            "--",
+        ],
+    )
+
+
 def test_base_image(chalk: Chalk, random_hex: str):
     base_id, _ = Docker.build(
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile.base",
@@ -196,11 +241,11 @@ def test_base_image(chalk: Chalk, random_hex: str):
         context=DOCKERFILES / "valid" / "base",
         args={"BASE": random_hex},
         config=CONFIGS / "docker_wrap.c4m",
-        log_level="trace",
     )
     assert Docker.run(image_id)
 
 
+@pytest.mark.parametrize("cmd", ["cmd", "entrypoint"])
 @pytest.mark.parametrize(
     "test_file",
     [
@@ -208,12 +253,11 @@ def test_base_image(chalk: Chalk, random_hex: str):
         "json.Dockerfile",
     ],
 )
-def test_cmd_wrap(chalk: Chalk, random_hex: str, test_file: str):
+def test_wrap(chalk: Chalk, random_hex: str, test_file: str, cmd: str):
     image_id, result = chalk.docker_build(
-        dockerfile=DOCKERFILES / "valid" / "cmd" / test_file,
-        context=DOCKERFILES / "valid" / "cmd",
+        dockerfile=DOCKERFILES / "valid" / cmd / test_file,
+        context=DOCKERFILES / "valid" / cmd,
         config=CONFIGS / "docker_wrap.c4m",
-        log_level="trace",
     )
     _, output = Docker.run(image_id)
     assert "hello" in output.text
@@ -582,7 +626,6 @@ def test_git_context(
         tag=random_hex,
         secrets={"GIT_AUTH_TOKEN": tmp_file} if private else {},
         buildkit=buildkit,
-        log_level="trace",
     )
     assert build.mark
 

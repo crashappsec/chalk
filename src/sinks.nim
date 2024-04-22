@@ -43,7 +43,7 @@ proc chalkErrFilter*(msg: string, info: StringTable): (string, bool) =
     let llStr = info[keyLogLevel]
 
     if (llStr in toLogLevelMap) and chalkConfig != nil and
-     (toLogLevelMap[llStr] <= toLogLevelMap[chalkConfig.getChalkLogLevel()]):
+     (toLogLevelMap[llStr] <= toLogLevelMap[get[string](chalkConfig, "chalk_log_level")]):
       return (msg, true)
 
   return ("", false)
@@ -86,7 +86,7 @@ template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
 
   line &= " (sink conf='" & cfg.name & "')"
 
-  if chalkconfig.getLogLevel() == "trace":
+  if get[string](chalkConfig, "log_level") == "trace":
     case cfg.mySink.name
     of "post", "presign":
       let
@@ -144,22 +144,22 @@ proc ioErrorHandler(cfg: SinkConfig, t: Topic, msg, err, tb: string) =
   let
     toOut = formatIo(cfg, t, err, msg)
 
-  if not quiet or chalkConfig.getChalkDebug():
+  if not quiet or get[bool](chalkConfig, "chalk_debug"):
     error(toOut)
   else:
     trace(toOut)
-  if chalkConfig != nil and chalkConfig.getChalkDebug():
+  if chalkConfig != nil and get[bool](chalkConfig, "chalk_debug"):
     publish("debug", tb)
 
 proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
   let quiet = t.name in quietTopics
 
-  if quiet and not chalkConfig.getChalkDebug():
+  if quiet and not get[bool](chalkConfig, "chalk_debug"):
     return
 
   let toOut = formatIo(cfg, t, errmsg, "")
 
-  if chalkconfig.getLogLevel() in ["trace", "info"]:
+  if get[string](chalkConfig, "log_level") in ["trace", "info"]:
     let
       attrRoot = chalkConfig.`@@attrscope@@`
       attrOpt  = attrRoot.getObjectOpt("sink_config." & cfg.name)
@@ -174,7 +174,7 @@ proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
     else:
       info(toOut)
 
-proc getAuthConfigByName*(name: string): Option[AuthConfig] =
+proc getAuthConfigByName*(name: string, attr: AttrScope = AttrScope(nil)): Option[AuthConfig] =
   if name == "":
     return none(AuthConfig)
 
@@ -182,7 +182,7 @@ proc getAuthConfigByName*(name: string): Option[AuthConfig] =
     return some(availableAuthConfigs[name])
 
   let
-    attrRoot = chalkConfig.`@@attrscope@@`
+    attrRoot = if attr != nil: attr else: chalkConfig.`@@attrscope@@`
     attrs    = attrRoot.getObjectOpt("auth_config." & name).getOrElse(nil)
     opts     = OrderedTableRef[string, string]()
 
@@ -269,11 +269,8 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
           opts[k] = $(unpack[bool](boxOpt.get()))
     of "pinned_cert":
       let
-        (stream, path) = getNewTempFile("pinned", ".pem")
-        certContents   = getOpt[string](attrs, k).getOrElse("")
-
-      stream.write(certContents)
-      stream.close()
+        certContents = getOpt[string](attrs, k).getOrElse("")
+        path         = writeNewTempFile(certContents, "pinned", ".pem")
       discard attrs.setOverride("pinned_cert_file", some(pack(path)))
       # Can't delete from a dict while we're iterating over it.
       deleteList.add(k)
@@ -351,10 +348,10 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       opts["content_type"] = "application/json"
   of "file":
     if "log_search_path" notin opts:
-      opts["log_search_path"] = chalkConfig.getLogSearchPath().join(":")
+      opts["log_search_path"] = get[seq[string]](chalkConfig, "log_search_path").join(":")
   of "rotating_log":
     if "log_search_path" notin opts:
-      opts["log_search_path"] = chalkConfig.getLogSearchPath().join(":")
+      opts["log_search_path"] = get[seq[string]](chalkConfig, "log_search_path").join(":")
   else:
     discard
 
@@ -396,14 +393,14 @@ proc getSinkConfigs*(): Table[string, SinkConfig] = return availableSinkConfigs
 
 proc setupDefaultLogConfigs*() =
   let
-    auditFile = chalkConfig.getAuditLocation()
-    doAudit   = chalkConfig.getPublishAudit()
+    auditFile = get[string](chalkConfig, "audit_location")
+    doAudit   = get[bool](chalkConfig, "publish_audit")
 
   if doAudit and auditFile != "":
     let
       f         = some(newOrderedTable({ "filename" : auditFile,
                                          "max" :
-                                         $(chalkConfig.getAuditFileSize())}))
+                                         $(get[Con4mSize](chalkConfig, "audit_file_size"))}))
       sink      = getSinkImplementation("rotating_log").get()
       auditConf = configSink(sink, "audit", f, handler=errCbOpt,
                              logger=okCbOpt).get()
@@ -414,7 +411,7 @@ proc setupDefaultLogConfigs*() =
     else:
       trace("Audit log subscription enabled")
   let
-    uri     = chalkConfig.getCrashOverrideUsageReportingUrl()
+    uri     = get[string](chalkConfig, "crashoverride_usage_reporting_url")
     params  = some(newOrderedTable({ "uri":          uri,
                                      "content_type": "application/json" }))
     sink    = getSinkImplementation("post").get()
