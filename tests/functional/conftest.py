@@ -127,7 +127,7 @@ def chalk_default():
     Returns bare chalk binary (for some testing case
     where we don't need stdout enabled in config)
     """
-    binary = Path(__file__).parent.parent / "chalk"
+    binary = Path(__file__).parent.parent.parent / "chalk"
     chalk = Chalk(binary=binary)
     assert chalk.binary and chalk.binary.is_file()
     yield chalk
