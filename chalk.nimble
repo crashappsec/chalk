@@ -27,7 +27,7 @@ task test, "Run the unit tests":
         args.removePrefix("args=")
         if len(args) != 0:
           found = true
-  
+
   if found:
     var cmd = "testament " & args
     exec cmd
