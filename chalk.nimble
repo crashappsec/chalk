@@ -25,15 +25,14 @@ task test, "Run the unit tests":
       if "args=" in paramStr(i):
         args = paramstr(i)
         args.removePrefix("args=")
-        echo args
-        found = true
+        if len(args) != 0:
+          found = true
   
   if found:
     var cmd = "testament " & args
-    # echo cmd
     exec cmd
   else:
-    exec "testament --verbose pattern 'tests-nim/*.nim'"
+    exec "testament --verbose pattern 'tests/unit/*.nim'"
 
 proc con4mDevMode() =
   let script = "bin/devmode"

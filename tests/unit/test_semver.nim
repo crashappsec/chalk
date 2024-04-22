@@ -1,4 +1,4 @@
-import ../src/semver
+import ../../src/semver
 
 proc main() =
   doAssert $(parseVersion("0.1")) == "0.1"

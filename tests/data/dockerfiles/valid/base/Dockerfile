@@ -1,3 +1,0 @@
-ARG BASE
-FROM $BASE
-CMD ["true"]

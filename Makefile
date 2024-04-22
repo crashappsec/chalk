@@ -140,7 +140,7 @@ tests: $(BINARY) # note this will rebuild chalk if necessary
 
 .PHONY: unit-tests
 unit-tests:
-	docker compose run --rm chalk nimble test args='$(make_args) $(args)'
+	docker compose run --rm chalk nimble test args='$(args)'
 
 .PHONY: parallel
 tests_parallel: make_args=-nauto
