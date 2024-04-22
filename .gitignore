@@ -1,8 +1,11 @@
 .TODO
+/bin
 /bin/chalk
 /chalk
 /src/getlibpath
 /deps
+/nimcache
+/pkg
 # universal tags
 tags
 .DS_Store
