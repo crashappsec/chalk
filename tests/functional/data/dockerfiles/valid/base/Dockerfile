@@ -1,3 +1,3 @@
 ARG BASE
 FROM $BASE
-CMD ["sleep", "5000"]
+CMD ["true"]
