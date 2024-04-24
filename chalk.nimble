@@ -19,16 +19,13 @@ task version, "Show current version":
   echo version
 
 task test, "Run the unit tests":
-  var found = false
   var args = ""
   for i in countup(0, paramCount(), 1):
     if "args=" in paramStr(i):
       args = paramStr(i)
       args.removePrefix("args=")
-      if len(args) != 0:
-        found = true
 
-  if found:
+  if len(args) != 0:
     let cmd = "testament " & args
     exec cmd
   else:
