@@ -1,4 +1,4 @@
-import std/[strformat, strutils]
+import std/[cmdline, strformat, strutils]
 from src/config_version import getChalkVersion
 
 version       = getChalkVersion(withSuffix = false)
@@ -20,9 +20,9 @@ task version, "Show current version":
 
 task test, "Run the unit tests":
   var args = ""
-  for i in countup(0, paramCount(), 1):
-    if paramStr(i).startsWith("args="):
-      args = paramStr(i)
+  for s in commandLineParams():
+    if s.startsWith("args="):
+      args = s
       args.removePrefix("args=")
 
   if len(args) != 0:
