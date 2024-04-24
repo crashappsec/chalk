@@ -70,5 +70,7 @@ jobs:
           docker buildx bake chalk --load
 
       - name: Run unit tests
+        env:
+          GITHUB_TOKEN: ${{ steps.org-token.outputs.token }}
         run: |
           make unit-tests
