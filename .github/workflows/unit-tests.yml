@@ -46,4 +46,6 @@ jobs:
         run: nimble --accept install --depsOnly
 
       - name: Run unit tests
-        run: make unit-tests
+        run: |
+          docker buildx bake chalk --load
+          make unit-tests
