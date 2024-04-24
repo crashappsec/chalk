@@ -1,4 +1,4 @@
-import std/[cmdline, strformat, strutils]
+import std/[cmdline, strformat, strscans, strutils]
 from src/config_version import getChalkVersion
 
 version       = getChalkVersion(withSuffix = false)
@@ -21,17 +21,10 @@ task version, "Show current version":
 task test, "Run the unit tests":
   var args = ""
   for s in commandLineParams():
-    const prefix = "args="
-    if s.startsWith(prefix) and s.len > prefix.len:
-      args = s[prefix.len .. ^1]
-
-  let testamentArgs =
-    if args.len > 0:
-      args
-    else:
-      "--verbose pattern 'tests/unit/*.nim'"
-
-  exec "testament " & testamentArgs
+    discard s.scanf("args=$+", args) # Sets `args` to any user-provided value.
+  if args == "":
+    args = "--verbose pattern 'tests/unit/*.nim'" # By default, run all unit tests.
+  exec "testament " & args
 
 proc con4mDevMode() =
   let script = "bin/devmode"
