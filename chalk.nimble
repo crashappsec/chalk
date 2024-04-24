@@ -21,9 +21,9 @@ task version, "Show current version":
 task test, "Run the unit tests":
   var args = ""
   for s in commandLineParams():
-    if s.startsWith("args="):
-      args = s
-      args.removePrefix("args=")
+    const prefix = "args="
+    if s.startsWith(prefix) and s.len > prefix.len:
+      args = s[prefix.len .. ^1]
 
   if len(args) != 0:
     let cmd = "testament " & args
