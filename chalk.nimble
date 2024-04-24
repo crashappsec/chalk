@@ -25,11 +25,13 @@ task test, "Run the unit tests":
     if s.startsWith(prefix) and s.len > prefix.len:
       args = s[prefix.len .. ^1]
 
-  if len(args) != 0:
-    let cmd = "testament " & args
-    exec cmd
-  else:
-    exec "testament --verbose pattern 'tests/unit/*.nim'"
+  let testamentArgs =
+    if args.len > 0:
+      args
+    else:
+      "--verbose pattern 'tests/unit/*.nim'"
+
+  exec "testament " & testamentArgs
 
 proc con4mDevMode() =
   let script = "bin/devmode"
