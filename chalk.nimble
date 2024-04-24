@@ -23,7 +23,7 @@ task test, "Run the unit tests":
   var args = ""
   for i in countup(0, paramCount(), 1):
     if "args=" in paramStr(i):
-      args = paramstr(i)
+      args = paramStr(i)
       args.removePrefix("args=")
       if len(args) != 0:
         found = true
