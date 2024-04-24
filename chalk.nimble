@@ -29,7 +29,7 @@ task test, "Run the unit tests":
         found = true
 
   if found:
-    var cmd = "testament " & args
+    let cmd = "testament " & args
     exec cmd
   else:
     exec "testament --verbose pattern 'tests/unit/*.nim'"
