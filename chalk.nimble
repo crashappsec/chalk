@@ -22,11 +22,11 @@ task test, "Run the unit tests":
   var found = false
   var args = ""
   for i in countup(0, paramCount(), 1):
-      if "args=" in paramStr(i):
-        args = paramstr(i)
-        args.removePrefix("args=")
-        if len(args) != 0:
-          found = true
+    if "args=" in paramStr(i):
+      args = paramstr(i)
+      args.removePrefix("args=")
+      if len(args) != 0:
+        found = true
 
   if found:
     var cmd = "testament " & args
