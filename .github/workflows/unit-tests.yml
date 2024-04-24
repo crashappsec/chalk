@@ -65,7 +65,10 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
-      - name: Run unit tests
+      - name: Bake images
         run: |
           docker buildx bake chalk --load
+
+      - name: Run unit tests
+        run: |
           make unit-tests
