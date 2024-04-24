@@ -21,7 +21,7 @@ task version, "Show current version":
 task test, "Run the unit tests":
   var args = ""
   for i in countup(0, paramCount(), 1):
-    if "args=" in paramStr(i):
+    if paramStr(i).startsWith("args="):
       args = paramStr(i)
       args.removePrefix("args=")
 
