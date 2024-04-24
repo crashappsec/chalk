@@ -36,16 +36,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
 
-      - name: Install Nim
-        uses: iffy/install-nim@0ed218de08059d18507144e6aee70e6bad0bc148 # v5.0.3
-        with:
-          version: "binary:2.0.0"
-        env:
-          GITHUB_TOKEN: ${{ github.token }} # Avoid rate limiting.
-
-      - name: Install Nimble dependencies
-        run: nimble --accept install --depsOnly
-
       # for tests to checkout dummy private repo
       - name: Get GitHub Token
         id: org-token
