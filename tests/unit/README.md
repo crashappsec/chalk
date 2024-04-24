@@ -4,16 +4,16 @@ This directory contains unit tests for chalk. These tests are run via `make unit
 
 The unit tests also be run directly via `nimble test` in the chalk repository root.
 
-Both of these options will run all tests in the `tests-nim` directory.
+Both of these options will run all tests in the `tests/unit` directory.
 
-(Note that the (Python-based) integration tests are in the `tests` directory instead.)
+(Note that the (Python-based) integration tests are in the `tests/functional` directory instead.)
 
 ## Running A Single Test
 
 Following the pattern for integration tests, arguments can be passed to `make` to run a single unit test, ex:
 
 ```
-make unit-tests args="pattern 'tests-nim/test_semver.nim'"
+make unit-tests args="pattern 'tests/unit/test_semver.nim'"
 ```
 
 This will run the `test_semver.nim` file and only this file.
@@ -21,7 +21,7 @@ This will run the `test_semver.nim` file and only this file.
 Similarly, args can be passed to `nimble test:
 
 ```
-nimble test args="pattern 'tests-nim/test_semver.nim'"
+nimble test args="pattern 'tests/unit/test_semver.nim'"
 ```
 
 which will accomplish the same as above.
