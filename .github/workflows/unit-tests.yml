@@ -7,12 +7,12 @@ on:
     paths-ignore:
       - '**.md'
       - 'server/**'
-      - 'tests/**'
+      - 'tests/functional/**'
   pull_request:
     paths-ignore:
       - '**.md'
       - 'server/**'
-      - 'tests/**'
+      - 'tests/functional/**'
   workflow_dispatch:
 
 permissions:
