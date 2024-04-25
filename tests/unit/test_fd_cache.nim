@@ -1,4 +1,5 @@
-import ../../src/fd_cache
+# Import non-exported `newFDCache`, which is currently used only in these tests.
+import ../../src/fd_cache {.all.}
 
 proc withCache() =
   let
