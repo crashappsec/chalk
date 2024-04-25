@@ -48,6 +48,5 @@ proc main =
   withCache()
   global()
 
-static:
-  main()
+# Omit testing at compile time, which errors due to `getcwd`.
 main()
