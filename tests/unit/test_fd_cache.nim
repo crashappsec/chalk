@@ -1,3 +1,4 @@
+import std/os
 # Import non-exported `newFDCache`, which is currently used only in these tests.
 import ../../src/fd_cache {.all.}
 
@@ -45,8 +46,17 @@ proc global() =
   doAssert(stream == nil)
 
 proc main =
-  withCache()
-  global()
+  const files = ["one", "two", "three"]
+
+  for f in files:
+    writeFile(f, "")
+
+  try:
+    withCache()
+    global()
+  finally:
+    for f in files:
+      removeFile(f)
 
 # Omit testing at compile time, which errors due to `getcwd`.
 main()
