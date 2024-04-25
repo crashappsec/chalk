@@ -7,23 +7,23 @@ proc withCache() =
     one1       = testCache.acquireFileStream("one")
     one2       = testCache.acquireFileStream("one")
     two        = testCache.acquireFileStream("two")
-  assert(one1 == one2)
-  assert(one1 != two)
+  doAssert(one1 == one2)
+  doAssert(one1 != two)
 
   try:
     # should not be allowed to acquire file as one is not released
     discard testCache.acquireFileStream("three")
-    assert(false)
+    doAssert(false)
   except:
-    assert(true)
+    doAssert(true)
 
   testCache.releaseFileStream(one1)
   try:
     # should still not be allowed to acquire file as one is not released
     discard testCache.acquireFileStream("three")
-    assert(false)
+    doAssert(false)
   except:
-    assert(true)
+    doAssert(true)
 
   testCache.releaseFileStream(one2)
   # we can finally get three as all ones have been released
@@ -31,18 +31,18 @@ proc withCache() =
 
   testCache.releaseFileStream(two)
   let one3       = testCache.acquireFileStream("one")
-  assert(one1 != one3)
+  doAssert(one1 != one3)
 
   testCache.releaseFileStream(three)
 
   testCache.withFileStream("one", mode = fmRead, strict = true):
-    assert(stream != nil)
-  assert(stream == nil)
+    doAssert(stream != nil)
+  doAssert(stream == nil)
 
 proc global() =
   withFileStream("one", mode = fmRead, strict = true):
-    assert(stream != nil)
-  assert(stream == nil)
+    doAssert(stream != nil)
+  doAssert(stream == nil)
 
 proc main =
   withCache()
