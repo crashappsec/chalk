@@ -658,7 +658,9 @@ def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
                 "metadata": {
                     "component": {
                         "type": "file",
-                        "name": re.compile(r"tests/data/dockerfiles/valid/sample_1$"),
+                        "name": re.compile(
+                            r"tests/functional/data/dockerfiles/valid/sample_1$"
+                        ),
                     },
                 },
             }

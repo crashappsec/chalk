@@ -1,0 +1,5 @@
+# ignore anything that doesn't have a .* extension
+# as it will be a test binary
+*
+!/**/
+!*.*

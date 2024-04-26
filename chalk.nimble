@@ -1,4 +1,4 @@
-import std/[strformat, strutils]
+import std/[cmdline, strformat, strscans, strutils]
 from src/config_version import getChalkVersion
 
 version       = getChalkVersion(withSuffix = false)
@@ -17,6 +17,14 @@ requires "https://github.com/viega/zippy == 0.10.7" # MIT
 # this allows us to get version externally
 task version, "Show current version":
   echo version
+
+task test, "Run the unit tests":
+  var args = ""
+  for s in commandLineParams():
+    discard s.scanf("args=$+", args) # Sets `args` to any user-provided value.
+  if args == "":
+    args = "--verbose pattern 'tests/unit/*.nim'" # By default, run all unit tests.
+  exec "testament " & args
 
 proc con4mDevMode() =
   let script = "bin/devmode"

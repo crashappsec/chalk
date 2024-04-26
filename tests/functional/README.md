@@ -1,6 +1,6 @@
-# Chalk Testing
+# Chalk Functional Testing
 
-This directory contains all the basic functionality tests for chalk. Tests are run via `make tests`, which uses `docker compose` to run the `tests` container which internally uses the `pytest` framework.
+This directory contains basic functionality tests for chalk. These tests are run via `make tests` from chalk the repository root, which uses `docker compose` to run the `tests` container which internally uses the `pytest` framework. (Note that the nim unit tests are NOT included here.)
 
 While `pytest` can be used to run the tests directly, it is recommended to use the makefile script instead, as that provides a more consistent developer experience.
 
@@ -76,7 +76,7 @@ make tests args="[TESTFILE]"
 
 where `TESTFILE` is the path of the test file (ex: `test_command.py`, `test_zip.py`).
 
-Note: the path **MUST** be relative to `tests/` folder (NOT the repo root).
+Note: the path **MUST** be relative to `tests/functional/` folder (NOT the repo root).
 
 To run a single test within a test file:
 
@@ -119,7 +119,7 @@ To set up the testing framework:
 
 1. Install poetry with `pipx install poetry`
 2. From the repository root: `cd ./tests`
-3. Install dependencies with `poetry install` (the list of dependencies to be installed is located at `tests/pyproject.toml`)
+3. Install dependencies with `poetry install` (the list of dependencies to be installed is located at `tests/functional/pyproject.toml`)
 
 To run the tests:
 
@@ -193,15 +193,15 @@ Currently, all tests in the `tests` directory are functional tests for the chalk
 
 All python tests must follow `pytest` conventions to be picked up by the test runner:
 
-- New test files should be added to the `tests/` directory as `test_filename.py`. A new test file should be created to test new functionality, for example if support has been added for a new codec.
+- New test files should be added to the `tests/functional/` directory as `test_filename.py`. A new test file should be created to test new functionality, for example if support has been added for a new codec.
 - Individual tests should be added to a test file as a new function as `test_functionname`. Each individual test in a test file should test some aspect of that test file's functionality; if the test you want to add doesn't fit, consider if it would be more appropriate to create a new test file and add it there instead.
 - A new test case for an existing test can be added via the pytest `paramatrize` fixture, if appropriate.
 
 ### Data Files Location
 
-All new test files should be added to the `tests/` directory, and any test data should be added to the `tests/data` directory.
+All new test files should be added to the `tests/functional/` directory, and any test data should be added to the `tests/functional/data` directory.
 
-WARNING: Any files (including test files and data files) that are NOT in the root directory of the reporistory will not be accessible from within the `tests` container. Any data files that need to be in a specific path for testing (ex: config files loaded from `/etc/chalk`) must be stored in `tests/data`, and then as part of test setup which happens inside the container after startup, copied to the target path. A config file located in `/etc/chalk` on host WILL NOT be available from inside the testing container.
+WARNING: Any files (including test files and data files) that are NOT in the root directory of the reporistory will not be accessible from within the `tests` container. Any data files that need to be in a specific path for testing (ex: config files loaded from `/etc/chalk`) must be stored in `tests/functional/data`, and then as part of test setup which happens inside the container after startup, copied to the target path. A config file located in `/etc/chalk` on host WILL NOT be available from inside the testing container.
 
 ### Test Fixtures
 
@@ -219,9 +219,9 @@ The following is a summary of the most commonly used fixtures in chalk testing:
 
 ### Running Chalk Within A Test
 
-`tests/chalk` contains `runner.py` which provides some utility functions for the `chalk` object returned by the fixture, including calling `chalk insert` and `chalk extract` and returning the resulting chalk report in json format.
+`tests/functional/chalk` contains `runner.py` which provides some utility functions for the `chalk` object returned by the fixture, including calling `chalk insert` and `chalk extract` and returning the resulting chalk report in json format.
 
-To validate the chalk reports, there are some utility functions provided in `tests/chalk/validate.py`.
+To validate the chalk reports, there are some utility functions provided in `tests/functional/chalk/validate.py`.
 
 ### Docker
 

@@ -29,9 +29,13 @@ SINK_CONFIGS = DATA / "sink_configs"
 ZIPS = DATA / "zip"
 
 # base profiles and outconf
-BASE_REPORT_TEMPLATES = ROOT.parent / "src" / "configs" / "base_report_templates.c4m"
-BASE_MARK_TEMPLATES = ROOT.parent / "src" / "configs" / "base_chalk_templates.c4m"
-BASE_OUTCONF = ROOT.parent / "src" / "configs" / "base_outconf.c4m"
+BASE_REPORT_TEMPLATES = (
+    ROOT.parent.parent / "src" / "configs" / "base_report_templates.c4m"
+)
+BASE_MARK_TEMPLATES = (
+    ROOT.parent.parent / "src" / "configs" / "base_chalk_templates.c4m"
+)
+BASE_OUTCONF = ROOT.parent.parent / "src" / "configs" / "base_outconf.c4m"
 
 # pushing to a registry is orchestrated over the docker socket
 # which means that the push comes from the host
@@ -45,8 +49,10 @@ SERVER_IMDS = "http://169.254.169.254"
 SERVER_STATIC = "http://static:8000"
 SERVER_HTTP = "http://chalk.local:8585"
 SERVER_HTTPS = "https://tls.chalk.local:5858"
-SERVER_DB = (Path(__file__).parent.parent / "server" / "chalkdb.sqlite").resolve()
-SERVER_CERT = (Path(__file__).parent.parent / "server" / "cert.pem").resolve()
+SERVER_DB = (
+    Path(__file__).parent.parent.parent / "server" / "chalkdb.sqlite"
+).resolve()
+SERVER_CERT = (Path(__file__).parent.parent.parent / "server" / "cert.pem").resolve()
 
 IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") or False
 

@@ -71,12 +71,12 @@ services:
   # there is no official imds test container so we have very simple wrapper
   imds:
     build:
-      context: ./tests
+      context: ./tests/functional
     entrypoint: uvicorn
     command: app:app --host=0.0.0.0 --port=80 --reload
     working_dir: /imds
     volumes:
-      - ./tests/imds:/imds
+      - ./tests/functional/imds:/imds
     healthcheck:
       test:
         - CMD-SHELL
@@ -95,10 +95,10 @@ services:
   # simple server for serving static files
   static:
     build:
-      context: ./tests
+      context: ./tests/functional
     entrypoint: python
     command: -m http.server 8000
-    working_dir: /chalk/tests
+    working_dir: /chalk/tests/functional
     volumes:
       - .:/chalk
     healthcheck:
@@ -112,7 +112,7 @@ services:
 
   tests:
     build:
-      context: ./tests
+      context: ./tests/functional
       args:
         BASE: ${BASE:-ubuntu}
     entrypoint: ./entrypoint.sh
@@ -123,7 +123,7 @@ services:
     volumes:
       - $PWD:$PWD
       - /var/run/docker.sock:/var/run/docker.sock
-    working_dir: $PWD/tests
+    working_dir: $PWD/tests/functional
     networks:
       - chalk
       - imds

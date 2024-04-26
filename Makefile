@@ -111,7 +111,7 @@ export IP=$(firstword $(shell hostname -I 2> /dev/null || hostname -i 2> /dev/nu
 # acceptable builder instance locally for multi-platform builds
 .PHONY: docker-builder
 docker-builder:
-	./tests/entrypoint.sh true
+	./tests/functional/entrypoint.sh true
 
 # docker buildx - each builder node has its own config
 # how it handles insecure registries however as chalk
@@ -124,7 +124,7 @@ docker-builder:
 .PHONY: /etc/docker/daemon.json
 /etc/docker/daemon.json:
 ifneq "$(shell which systemctl 2> /dev/null)" ""
-	sudo -E python3 ./tests/data/templates/docker/daemon.py $@ --write --fail-on-changes \
+	sudo -E python3 ./tests/functional/data/templates/docker/daemon.py $@ --write --fail-on-changes \
 		|| sudo systemctl restart docker \
 		|| echo Please restart docker daemon after changing docker config
 endif
@@ -137,6 +137,10 @@ tests: DOCKER=$(_DOCKER) # force rebuilds to use docker to match tests
 tests: docker-setup
 tests: $(BINARY) # note this will rebuild chalk if necessary
 	docker compose run --rm tests $(make_args) $(args)
+
+.PHONY: unit-tests
+unit-tests:
+	$(DOCKER) nimble test args='$(args)'
 
 .PHONY: parallel
 tests_parallel: make_args=-nauto
