@@ -86,10 +86,10 @@ proc findOptionalConf(state: ConfigState): Option[string] =
 
 proc loadLocalStructs*(state: ConfigState) =
   chalkConfig = state.attrs.loadChalkConfig()
-  if chalkConfig.color.isSome(): setShowColor(chalkConfig.color.get())
-  setLogLevel(chalkConfig.logLevel)
+  if getOpt[bool](chalkConfig, "color").isSome(): setShowColor(get[bool](chalkConfig, "color"))
+  setLogLevel(get[string](chalkConfig, "log_level"))
   var configPath: seq[string] = @[]
-  for path in chalkConfig.configPath:
+  for path in get[seq[string]](chalkConfig, "config_path"):
     try:
       configPath.add(path.resolvePath())
     except:
@@ -98,16 +98,16 @@ proc loadLocalStructs*(state: ConfigState) =
       # no log as this function is called multiple times
       # and any logs are very verbose
       continue
-  chalkConfig.configPath = configPath
-  var c4errLevel =  if chalkConfig.con4mPinpoint: c4vShowLoc else: c4vBasic
+  doAssert state.attrSet("config_path", pack(configPath)).code == errOk
+  var c4errLevel =  if get[bool](chalkConfig, "con4m_pinpoint"): c4vShowLoc else: c4vBasic
 
-  if chalkConfig.chalkDebug:
+  if get[bool](chalkConfig, "chalk_debug"):
     c4errLevel = if c4errLevel == c4vBasic: c4vTrace else: c4vMax
 
   setCon4mVerbosity(c4errLevel)
 
 proc handleCon4mErrors(err, tb: string): bool =
-  if tb != "" and chalkConfig == nil or chalkConfig.chalkDebug:
+  if tb != "" and chalkConfig == nil or get[bool](chalkConfig, "chalk_debug"):
      echo(formatCompilerError(err, nil, tb, default(InstInfo)))
   else:
     error(err)
@@ -207,7 +207,7 @@ proc loadAllConfigs*() =
         doRun()
       hostInfo["_OP_CONFIG"] = pack(configFile)
 
-  if commandName == "not_supplied" and chalkConfig.defaultCommand.isSome():
+  if commandName == "not_supplied" and getOpt[string](chalkConfig, "default_command").isSome():
     setErrorHandler(stack, handleOtherErrors)
     addFinalizeGetOpts(stack, printAutoHelp = false)
     addCallback(stack, loadLocalStructs)
