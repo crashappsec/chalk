@@ -211,7 +211,7 @@ proc runCmdExec*(args: seq[string]) =
 
   if cmdName == "" and fromArgs and len(argsToPass) > 0:
     cmdName = argsToPass[0]
-    argsToPass.delete(0, 0)
+    argsToPass.delete(0..0)
 
   if cmdName == "":
     error("This chalk instance has no configured process to exec.")
