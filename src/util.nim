@@ -8,7 +8,7 @@
 ## This is for any common code for system stuff, such as executing
 ## code.
 
-import std/[tempfiles, posix, monotimes, parseutils]
+import std/[tempfiles, posix, monotimes, parseutils, exitprocs]
 import pkg/[nimutils/managedtmp]
 import "."/[config, subscan, fd_cache]
 export fd_cache
@@ -56,7 +56,7 @@ proc setlocale(category: cint, locale: cstring): cstring {. importc, cdecl,
 proc setupTerminal*() =
   setlocale(LC_ALL, cstring(""))
   tcGetAttr(cint(1), savedTermState)
-  addQuitProc(restoreTerminal)
+  addExitProc(restoreTerminal)
 
 proc setupSignalHandlers*() =
   var handler: SigAction
