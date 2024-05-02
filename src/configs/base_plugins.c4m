@@ -18,7 +18,7 @@ plugin system {
                      "PUBLIC_IPV4_ADDR_WHEN_CHALKED", "INJECTOR_PUBLIC_KEY",
                      "NODENAME_WHEN_CHALKED", "PLATFORM_WHEN_CHALKED"]
 
-  artifact_keys:   ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
+  pre_chalk_keys:  ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
                     "PRE_CHALK_HASH", "TIMESTAMP_WHEN_CHALKED"]
 
   post_chalk_keys: ["_OP_ARTIFACT_PATH", "_CURRENT_HASH",
@@ -31,8 +31,8 @@ plugin system {
                     "_OP_PLATFORM", "_OP_CHALKER_COMMIT_ID",
                     "_OP_CHALKER_VERSION", "_OP_CHALK_COUNT", "_OP_CMD_FLAGS",
                     "_OP_EXE_NAME", "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
-		    "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
-		    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV"]
+                    "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
+                    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV"]
 
   ~priority:       0
   doc: """
@@ -56,9 +56,11 @@ are not overridable via other plugins.
 
 plugin metsys {
     ~enabled: true
-    artifact_keys: ["METADATA_HASH", "SIGNATURE", "ERR_INFO", "METADATA_ID"]
-    post_run_keys: ["_CHALK_EXTERNAL_ACTION_AUDIT", "_CHALK_RUN_TIME"]
-    ~priority:     high()
+    pre_chalk_keys:  ["METADATA_HASH", "ERR_INFO", "METADATA_ID",
+                      "SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"]
+    post_chalk_keys: ["_SIGNATURE"]
+    post_run_keys:   ["_CHALK_EXTERNAL_ACTION_AUDIT", "_CHALK_RUN_TIME"]
+    ~priority:       high()
     doc: """
 Like the `system` module, this module is non-overridable keys added by
 Chalk. It's just the ones that need to be computed at the very end of
@@ -71,7 +73,7 @@ a data collection phase, so integrity / signing and audit.
 # and any tag associated.
 plugin vctl_git {
     enabled:         true
-    artifact_keys:   ["COMMIT_ID", "COMMIT_SIGNED",
+    pre_chalk_keys:  ["COMMIT_ID", "COMMIT_SIGNED",
                       "BRANCH", "ORIGIN_URI",
                       "AUTHOR", "DATE_AUTHORED",
                       "COMMITTER", "DATE_COMMITTED", "COMMIT_MESSAGE",
@@ -132,7 +134,7 @@ This only collects data when adding chalk marks.
 
 plugin github_codeowners {
     enabled:         true
-    artifact_keys:   ["CODE_OWNERS"]
+    pre_chalk_keys:  ["CODE_OWNERS"]
     doc: """
 Captures the contents of a github-style CODEOWNERS file.
 
@@ -144,7 +146,7 @@ plugin authors {
     # Since there's only one key it might export, go ahead and
     # lock it; if you want to disable that key, turn off the whole plugin.
     enabled:         true
-    artifact_keys:   ["CODE_OWNERS"]
+    pre_chalk_keys:  ["CODE_OWNERS"]
     doc: """
 Captures the value of old school AUTHOR(S) files.
 
@@ -214,7 +216,7 @@ Captures metadata from cloud instances.
 
 plugin tech_stack_generic {
     enabled:         true
-    artifact_keys:   ["INFERRED_TECH_STACKS"]
+    pre_chalk_keys:  ["INFERRED_TECH_STACKS"]
     post_run_keys:   ["_INFERRED_TECH_STACKS_HOST"]
     doc: """
 Captures metadata on the kinds of technologies used in the active directory or host
@@ -279,7 +281,7 @@ Captures metadata from the environment variables in AWS Lambda function.
 
 plugin conffile {
     pre_run_keys:     ["*"]  # Host-only keys are evaluated here.
-    artifact_keys:    ["*"]  # Chalk-only keys are evaluated here.
+    pre_chalk_keys:   ["*"]  # Chalk-only keys are evaluated here.
     post_chalk_keys:  ["*"]  # Non-chalkable artifact keys here.
     post_run_keys:    ["*"]  # Post-run keys here.
     priority:         high() - 1
@@ -311,7 +313,7 @@ For instance, if you really wanted, you could set:
 
 plugin zippeditem {
     enabled:         true
-    artifact_keys:   ["CONTAINING_ARTIFACT_WHEN_CHALKED", "PATH_WITHIN_ZIP"]
+    pre_chalk_keys:  ["CONTAINING_ARTIFACT_WHEN_CHALKED", "PATH_WITHIN_ZIP"]
     doc: """
 Adds additional information to artifacts embedded in ZIP files about
 the ZIP file they're stored in.
@@ -321,7 +323,7 @@ the ZIP file they're stored in.
 plugin tool {
     enabled:         true
     pre_run_keys:    ["*"]
-    artifact_keys:   ["*"]
+    pre_chalk_keys:  ["*"]
     doc: """
 Allows running multiple external SAST or SBOM tools. Out of the box, only
 one example tool in each category is supported, `semgrep` and `syft`.
@@ -335,7 +337,7 @@ Note that associated metadata keys must also be enabled in a report.
 plugin elf {
     ~enabled:        true
     codec:           true
-    artifact_keys:   ["ARTIFACT_TYPE"]
+    pre_chalk_keys:  ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     ~priority:       45
     doc: """
@@ -359,7 +361,7 @@ happens, the plugin will refuse to operate on the executable, and the
 
 plugin elf_last_resort {
     codec:           true
-    artifact_keys:   ["ARTIFACT_TYPE"]
+    pre_chalk_keys:  ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     ~priority: high() - 1
     doc: """
@@ -376,7 +378,7 @@ plugin. Ideally though, it will never ever get used anyway.
 plugin source {
     ~enabled:        true
     codec:           true
-    artifact_keys:   ["ARTIFACT_TYPE"]
+    pre_chalk_keys:  ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     priority: 1000
     doc: """
@@ -412,7 +414,7 @@ This codec currently only processes files that seem to be valid UTF-8.
 plugin macos {
     ~enabled:        true
     codec:           true
-    artifact_keys:   ["ARTIFACT_TYPE"]
+    pre_chalk_keys:  ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     priority:        2  # Should come before shebang for sure.
     doc: """
@@ -440,7 +442,7 @@ plugin zip {
     codec:           true
     priority:        1
     enabled:         true
-    artifact_keys:   ["EMBEDDED_CHALK", "EMBEDDED_TMPDIR", "ARTIFACT_TYPE"]
+    pre_chalk_keys:  ["EMBEDDED_CHALK", "EMBEDDED_TMPDIR", "ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     doc: """
 The `zip` codec is responsible for manipulating Chalk marks in any
@@ -473,7 +475,7 @@ plugin python_pyc {
     codec:           true
     priority:        1
     enabled:         true
-    artifact_keys:   ["ARTIFACT_TYPE"]
+    pre_chalk_keys:  ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     doc: """
 This codec allows chalking of Python programs that are not distributed
@@ -489,11 +491,12 @@ plugin docker {
     codec:    true
     priority: 1
     enabled:  true
-    artifact_keys: ["ARTIFACT_TYPE", "DOCKER_FILE", "DOCKERFILE_PATH",
-                    "DOCKER_PLATFORM", "DOCKER_LABELS", "DOCKER_TAGS",
-                    "DOCKER_CONTEXT", "DOCKER_ADDITIONAL_CONTEXTS",
-                    "DOCKER_CHALK_ADDED_LABELS", "DOCKER_CHALK_TEMPORARY_TAG",
-                    "DOCKER_CHALK_ADDED_TO_DOCKERFILE" ]
+    pre_chalk_keys: ["ARTIFACT_TYPE", "DOCKER_FILE", "DOCKERFILE_PATH",
+                     "DOCKER_PLATFORM", "DOCKER_PLATFORMS",
+                     "DOCKER_LABELS", "DOCKER_TAGS",
+                     "DOCKER_CONTEXT", "DOCKER_ADDITIONAL_CONTEXTS",
+                     "DOCKER_CHALK_ADDED_LABELS",
+                     "DOCKER_CHALK_ADDED_TO_DOCKERFILE" ]
 
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE", "_REPO_TAGS",
         "_REPO_DIGESTS", "_IMAGE_COMMENT", "_IMAGE_CREATION_DATETIME",

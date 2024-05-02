@@ -51,7 +51,8 @@ proc selfChalkSetSubKey*(key: string, subKey: string, subValue: Box) =
 proc filterByTemplate*(dict: ChalkDict, p: MarkTemplate | ReportTemplate): ChalkDict =
   result = ChalkDict()
   for k, v in dict:
-    if k in p.keys and p.keys[k].use: result[k] = v
+    if k in p.keys and p.keys[k].use:
+      result[k] = v
 
 proc getOutputConfig*(): OutputConfig =
   return chalkConfig.outputConfigs[getBaseCommandName()]

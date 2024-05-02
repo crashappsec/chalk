@@ -473,8 +473,8 @@ class Chalk:
             else:
                 assert len(result.marks) == 1
             # sanity check that chalk mark includes basic chalk keys
-            assert image_hash == result.marks[-1]["_CURRENT_HASH"]
-            assert image_hash == result.marks[-1]["_IMAGE_ID"]
+            assert image_hash in [i["_CURRENT_HASH"] for i in result.marks]
+            assert image_hash in [i["_IMAGE_ID"] for i in result.marks]
             if isinstance(context, Path):
                 dockerfile = dockerfile or (
                     (cwd or context or Path(os.getcwd())) / "Dockerfile"

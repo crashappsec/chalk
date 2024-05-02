@@ -173,7 +173,7 @@ type
 
   ElfHeader*                 = ref object of RootRef
     elfType*:                ElfIntValue[uint16]
-    entryPoint*:             ElfIntValue[uint64]
+    entrypoint*:             ElfIntValue[uint64]
     programTable*:           ElfIntValue[uint64]
     sectionTable*:           ElfIntValue[uint64]
     programHeaderSize*:      ElfIntValue[uint16]
@@ -400,7 +400,7 @@ proc parseHeader*(self: ElfFile): bool =
     return false
   self.header           = ElfHeader(
     elfType:            getValue[uint16](data, ELF_TYPE_16),
-    entryPoint:         getValue[uint64](data, ELF64_ENTRY_64),
+    entrypoint:         getValue[uint64](data, ELF64_ENTRY_64),
     programTable:       getValue[uint64](data, ELF64_PH_TABLE_64),
     sectionTable:       getValue[uint64](data, ELF64_SH_TABLE_64),
     programHeaderSize:  getValue[uint16](data, ELF64_PH_SIZE_16),

@@ -1336,7 +1336,20 @@ keyspec DOCKER_PLATFORM {
     system:           false
     since:            "0.1.0"
     doc: """
-Platform passed when performing 'docker build', if any.
+Platform for the built image. For multi-platform builds, each platform
+will report its own separate chalkmark which will have appropriate
+`DOCKER_PLATFORM`.
+"""
+}
+
+keyspec DOCKER_PLATFORMS {
+    kind:             ChalkTimeArtifact
+    type:             list[string]
+    standard:         true
+    system:           false
+    since:            "0.3.7"
+    doc: """
+All platforms passed when performing 'docker build', if any.
 """
 }
 
@@ -1400,24 +1413,12 @@ List of labels programmatically added by Chalk.
 
 keyspec DOCKER_CHALK_ADDED_TO_DOCKERFILE {
     kind:              ChalkTimeArtifact
-    type:              string
+    type:              list[string]
     standard:          true
     system:            false
     since:             "0.1.0"
     doc: """
 Additional instructions added to the passed dockerfile.
-"""
-}
-
-keyspec DOCKER_CHALK_TEMPORARY_TAG {
-    kind:              ChalkTimeArtifact
-    type:              string
-    standard:          true
-    system:            false
-    since:             "0.1.0"
-    doc: """
-If there was no tag when the build command is run, we use a temporary
-tag so we can reliably inspect it after the build.
 """
 }
 

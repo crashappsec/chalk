@@ -134,6 +134,7 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
       data       = artifact.collectedData
       subscribed = plugin.configInfo.postChalkKeys
 
+    if chalkCollectionSuspendedFor(plugin.name):               continue
     if not plugin.hasSubscribedKey(subscribed, data):          continue
     if plugin.configInfo.codec and plugin != artifact.myCodec: continue
 
@@ -167,6 +168,8 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
 
   trace("Collecting chalk-time data.")
   for plugin in getAllPlugins():
+    if chalkCollectionSuspendedFor(plugin.name): continue
+
     if plugin == obj.myCodec:
       trace("Filling in codec info")
       if "CHALK_ID" notin data:
@@ -179,7 +182,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
 
     if plugin.configInfo.codec and plugin != obj.myCodec: continue
 
-    let subscribed = plugin.configInfo.artifactKeys
+    let subscribed = plugin.configInfo.preChalkKeys
     if not plugin.hasSubscribedKey(subscribed, data) and
        plugin.name notin ["system", "metsys"]:
       trace(plugin.name & ": Skipping plugin; its metadata wouldn't be used.")
@@ -196,7 +199,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
         continue
 
       for k, v in dict:
-        if not plugin.canWrite(k, plugin.configInfo.artifactKeys): continue
+        if not plugin.canWrite(k, plugin.configInfo.preChalkKeys): continue
         if k notin obj.collectedData or k in plugin.configInfo.overrides:
           obj.collectedData[k] = v
       trace(plugin.name & ": Plugin called.")
@@ -301,9 +304,6 @@ proc artSetupForExecAndEnv(argv: seq[string]): ArtifactIterationInfo =
 
   result.filePaths = argv
 
-proc dockerExtractChalkMark*(chalk: ChalkObj): ChalkDict {.importc.}
-proc extractAndValidateSignature*(chalk: ChalkObj) {.importc.}
-
 proc resolveAll(argv: seq[string]): seq[string] =
   for item in argv:
     result.add(resolvePath(item))
@@ -323,7 +323,7 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
       iterInfo = ArtifactIterationInfo(filePaths: resolveAll(argv))
 
   trace("Called artifacts() -- filepaths = " & $(iterInfo.filePaths) &
-    "; otherPaths = " & $(iterInfo.otherPaths))
+        "; otherPaths = " & $(iterInfo.otherPaths))
 
   # First, iterate over all our file system entries.
   if iterInfo.filePaths.len() != 0:
@@ -387,8 +387,8 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
     else:
       trace("Processing docker artifacts.")
       let docker = getPluginByName("docker")
-      var chalks: seq[ChalkObj]
       for item in iterInfo.otherPaths:
+        trace("Processing artifact: " & item)
         let objOpt = docker.scanImageOrContainer(item)
         if objOpt.isNone():
           if len(iterInfo.filePaths) > 0:
@@ -396,21 +396,11 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
           else:
             error(item & ": No image or container found")
         else:
-          chalks.add(objOpt.get())
-
-      for item in chalks:
-        trace("Processing artifact: " & item.name)
-        item.addToAllChalks()
-        trace("Collecting artifact runtime info")
-        item.collectRuntimeArtifactInfo()
-        let mark = item.dockerExtractChalkMark()
-        if mark == nil:
-          info(item.name & ": Artifact is unchalked.")
-        else:
-          for k, v in mark:
-            item.collectedData[k] = v
-          item.extract = mark
-          item.marked = true
-          item.extractAndValidateSignature()
-        yield item
-        clearErrorObject()
+          let chalk = objOpt.get()
+          chalk.addToAllChalks()
+          if chalk.extract == nil:
+            info(chalk.name & ": Artifact is unchalked.")
+          trace("Collecting artifact runtime info")
+          chalk.collectRuntimeArtifactInfo()
+          yield chalk
+          clearErrorObject()

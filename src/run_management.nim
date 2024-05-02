@@ -109,9 +109,8 @@ proc newChalk*(name:         string            = "",
                chalkId:      string            = "",
                pid:          Option[Pid]       = none(Pid),
                fsRef:        string            = "",
-               tag:          string            = "",
-               repo:         string            = "",
                imageId:      string            = "",
+               imageDigest:  string            = "",
                containerId:  string            = "",
                marked:       bool              = false,
                resourceType: set[ResourceType] = {ResourceFile},
@@ -123,10 +122,8 @@ proc newChalk*(name:         string            = "",
   result = ChalkObj(name:          name,
                     pid:           pid,
                     fsRef:         fsRef,
-                    userRef:       tag,
-                    repo:          repo,
-                    marked:        marked,
                     imageId:       imageId,
+                    imageDigest:   imageDigest,
                     containerId:   containerId,
                     collectedData: ChalkDict(),
                     opFailed:      false,
@@ -227,6 +224,16 @@ template suspendHostCollection*() =         hostCollectionSuspends += 1
 template restoreHostCollection*() =         hostCollectionSuspends -= 1
 template hostCollectionSuspended*(): bool = hostCollectionSuspends != 0
 
+var chalkCollectionSuspendedByPlugin = initTable[string, int]()
+template suspendChalkCollectionFor*(p: string) =
+  if p notin chalkCollectionSuspendedByPlugin:
+    chalkCollectionSuspendedByPlugin[p] = 0
+  chalkCollectionSuspendedByPlugin[p] += 1
+template restoreChalkCollectionFor*(p: string) =
+  chalkCollectionSuspendedByPlugin[p] -= 1
+template chalkCollectionSuspendedFor*(p: string): bool =
+  chalkCollectionSuspendedByPlugin.getOrDefault(p, 0) != 0
+
 proc persistInternalValues*(chalk: ChalkObj) =
   if chalk.extract == nil:
     return
@@ -241,8 +248,5 @@ proc makeNewValuesAvailable*(chalk: ChalkObj) =
     if item.startsWith("$"):
       chalk.extract[item] = value
 
-proc dockerTag*(chalk: ChalkObj, default = ""): string =
-  if chalk.repo != "":
-    let tag = if chalk.tag == "": "latest" else: chalk.tag
-    return chalk.repo & ":" & tag
-  return default
+proc isChalked*(chalk: ChalkObj): bool =
+  return chalk.extract != nil

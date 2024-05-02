@@ -79,3 +79,23 @@ proc `<=`*(self: Version, other: Version): bool =
 
 proc `$`*(self: Version): string =
   return self.name
+
+proc getVersionFromLine*(line: string): Version =
+  for word in line.splitWhitespace():
+    if '.' in word:
+      try:
+        return parseVersion(word)
+      except:
+        # word wasnt a version number
+        discard
+  raise newException(ValueError, "no version found")
+
+proc getVersionFromLineWhich*(lines: seq[string], startsWith = ""): Version =
+  for line in lines:
+    if startsWith != "" and not line.startsWith(startsWith):
+      continue
+    try:
+      return getVersionFromLine(line)
+    except:
+      discard
+  raise newException(ValueError, "no version found")

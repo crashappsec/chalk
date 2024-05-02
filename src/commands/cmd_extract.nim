@@ -8,22 +8,15 @@
 ## The `chalk extract` command.
 
 import "../docker"/[scan]
-import ".."/[config, collect, reporting, plugins/codecDocker, plugin_api]
+import ".."/[config, collect, reporting, plugin_api]
 
 proc processDockerChalk(item: ChalkObj) =
   trace("Processing artifact: " & item.name)
   item.addToAllChalks()
   trace("Collecting artifact runtime info")
   item.collectRuntimeArtifactInfo()
-  let mark = codecDocker.dockerExtractChalkMark(item)
-  if mark == nil:
+  if item.extract == nil:
     info(item.name & ": Artifact is unchalked.")
-  else:
-    for k, v in mark:
-      item.collectedData[k] = v
-    item.extract = mark
-    item.marked = true
-    item.extractAndValidateSignature()
   clearErrorObject()
 
 proc coreExtractFiles(path: seq[string]) =

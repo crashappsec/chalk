@@ -9,28 +9,21 @@
 
 import std/[httpclient]
 import ".."/[chalk_common, config, www_authenticate]
-import "."/[exe]
+import "."/[exe, json, ids]
 
-type DigestedJson = ref object
-  json:   JsonNode
-  digest: string
-  size:   int
+# cache is by repo ref as its normalized in buildx imagetools command
+var manifestCache = initTable[string, DockerManifest]()
 
-proc `$`(self: DockerPlatform): string =
-  return self.os & "/" & self.architecture
-
-proc parseDockerPlatform(platform: string): DockerPlatform =
-  let items = platform.split('/', maxsplit = 1)
-  if len(items) != 2:
-    raise newException(ValueError, "Invalid docker platform: " & platform)
-  return (os: items[0], architecture: items[1])
-
-proc parseAndDigestJson(data: string): DigestedJson =
-  return DigestedJson(
-    json:   parseJson(data),
-    digest: "sha256:" & sha256(data).hex(),
-    size:   len(data),
-  )
+proc findAllPlatformsManifests(self: DockerManifest): seq[DockerManifest] =
+  ## find all valid platform images from the manifest list
+  ## as manifest could have additional things in the list which are
+  ## not images such as provenance/sbom blobs
+  if self.kind != DockerManifestType.list:
+    raise newException(AssertionDefect, "can only find platform images from manifest list")
+  result = @[]
+  for manifest in self.manifests:
+    if manifest.platform.isKnown():
+      result.add(manifest)
 
 proc findPlatformManifest(self: DockerManifest, platform: DockerPlatform): DockerManifest =
   if self.kind != DockerManifestType.list:
@@ -38,7 +31,7 @@ proc findPlatformManifest(self: DockerManifest, platform: DockerPlatform): Docke
   for manifest in self.manifests:
     if manifest.platform == platform:
       return manifest
-  raise newException(KeyError, "Could not find manifest for: " & $platform)
+  raise newException(KeyError, "Could not find manifest for: " & $self.name & " " & $platform)
 
 proc getCompressedSize(self: DockerManifest): int =
   if self.kind != DockerManifestType.image:
@@ -47,15 +40,17 @@ proc getCompressedSize(self: DockerManifest): int =
   for layer in self.layers:
     result += layer.size
 
-proc requestManifestJson(image: string): DigestedJson =
+proc requestManifestJson(name: DockerImage): DigestedJson =
   ## fetch raw json manifest via docker imagetools
   ## however if that fails withs 401 error, attept to manually
   ## fetch the manifest via the URL from the error message
   ## as the error could be due to www-authenticate challenge
-  let msg = "docker: fetching manifest for " & image
-  trace(msg)
   let
-    output = runDockerGetEverything(@["buildx", "imagetools", "inspect", image, "--raw"])
+    msg = "docker: requesting manifest for: " & $name
+    args   = @["buildx", "imagetools", "inspect", name.asRepoDigest(), "--raw"]
+  trace("docker: docker " & args.join(" "))
+  let
+    output = runDockerGetEverything(args)
     stdout = output.getStdout()
     stderr = output.getStderr()
     text   = stdout & stderr
@@ -98,24 +93,34 @@ proc requestManifestJson(image: string): DigestedJson =
                        msg & " failed to fetch manifest via www-authenticate challenge: " &
                        getCurrentExceptionMsg())
 
-template imageName(image: string): string =
-  image.split(":")[0].split("@")[0]
-
 proc setJson(self: DockerManifest, data: DigestedJson) =
   if self.digest != "" and self.digest != data.digest:
     raise newException(
       ValueError,
-      "Fetched mismatched digest vs digest whats in parent manifest for: " & self.imageName,
+      "Fetched mismatched digest vs digest whats in parent manifest for: " & $self.name,
     )
   if self.size > 0 and self.size != data.size:
     raise newException(
       ValueError,
-      "Fetched mismatched json size vs whats in parent manifest for: " & self.imageName,
+      "Fetched mismatched json size vs whats in parent manifest for: " & $self.name,
     )
   self.digest    = data.digest
   self.size      = data.size
   self.json      = data.json
-  self.isFetched = true
+
+proc mimickLocalConfig(self: DockerManifest) =
+  ## set additional json fields for easier metadata collection
+  ## to match local docker inspect json output
+  if self.kind != DockerManifestType.config:
+    raise newException(AssertionDefect, "can only mimick config json on config manifest")
+  self.json["id"] = %(self.digest.extractDockerHash())
+  # <repo>:<tag>
+  self.json["repotags"] = %*(self.otherNames.asRepoTag())
+  # <repo>:<tag>@sha256:<digest>
+  self.json["repodigests"] = %*($(self.otherNames.withDigest(self.image.digest)))
+  # config object does not contain size so we add compressed size
+  # for easier metadata collection
+  self.json["compressedSize"] = %(self.image.getCompressedSize())
 
 proc setImageConfig(self: DockerManifest, data: DigestedJson) =
   if self.kind != DockerManifestType.image:
@@ -123,89 +128,87 @@ proc setImageConfig(self: DockerManifest, data: DigestedJson) =
   let
     configJson = data.json{"config"}
     config     = DockerManifest(
-      kind:      DockerManifestType.config,
-      imageName: self.imageName,
-      mediaType: configJson{"mediaType"}.getStr(),
-      digest:    configJson{"digest"}.getStr(),
-      size:      configJson{"size"}.getInt(),
-      isFetched: false,
-      image:     self,
+      kind:       DockerManifestType.config,
+      name:       self.name,
+      otherNames: self.otherNames,
+      mediaType:  configJson{"mediaType"}.getStr(),
+      digest:     configJson{"digest"}.getStr(),
+      size:       configJson{"size"}.getInt(),
+      image:      self,
     )
   self.config = config
 
 proc setImagePlatform(self: DockerManifest, platform: DockerPlatform) =
   if self.kind != DockerManifestType.image:
     raise newException(AssertionDefect, "can only set image platform on image manifests")
-  if self.platform.os != "" and self.platform.architecture != "" and self.platform != platform:
+  if self.platform.isKnown() and self.platform != platform:
     raise newException(
       ValueError,
       "Received mismatching docker image platforms from manifest and its config",
     )
-  self.platform = self.config.configPlatform
+  self.platform = platform
 
 proc setImageLayers(self: DockerManifest, data: DigestedJson) =
   if self.kind != DockerManifestType.image:
     raise newException(AssertionDefect, "can only set image layers on image manifests")
   for layer in data.json{"layers"}.items():
     self.layers.add(DockerManifest(
-      kind:         DockerManifestType.layer,
-      imageName:    self.imageName,
-      mediaType:    layer{"mediaType"}.getStr(),
-      digest:       layer{"digest"}.getStr(),
-      size:         layer{"size"}.getInt(),
-      isFetched:    true,
+      kind:          DockerManifestType.layer,
+      name:          self.name,
+      otherNames:    self.otherNames,
+      mediaType:     layer{"mediaType"}.getStr(),
+      digest:        layer{"digest"}.getStr(),
+      size:          layer{"size"}.getInt(),
     ))
 
 proc fetch(self: DockerManifest) =
   if self.isFetched:
     return
-  let manifestRef = self.imageName & "@" & self.digest
+  let name = self.name.withDigest(self.digest)
   case self.kind
   of DockerManifestType.image:
-    let data = requestManifestJson(manifestRef)
+    let data = requestManifestJson(name)
     self.setJson(data)
     self.setImageConfig(data)
     self.setImageLayers(data)
     self.config.fetch()
     self.setImagePlatform(self.config.configPlatform)
   of DockerManifestType.config:
-    let data = requestManifestJson(manifestRef)
+    let data = requestManifestJson(name)
     self.setJson(data)
-    # config object does not contain size so we add compressed size
-    # for easier metadata collection
-    self.json["compressedSize"] = %(self.image.getCompressedSize())
+    self.mimickLocalConfig()
     self.imageConfig = self.json{"config"}
-    self.configPlatform = (
+    self.configPlatform = DockerPlatform(
       os:           data.json{"os"}.getStr(),
       architecture: data.json{"architecture"}.getStr(),
     )
   else:
     discard
+  self.isFetched = true
 
-proc newManifest(image: string, data: DigestedJson): DockerManifest =
-  let
-    name = imageName(image)
-    json = data.json
+proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerImage] = @[]): DockerManifest =
+  let json = data.json
 
   if "manifests" in json:
-    trace("docker: " & image & " is a manifest list")
+    trace("docker: " & $name & " is a manifest list")
     let list = DockerManifest(
-      kind:      DockerManifestType.list,
-      imageName: name,
-      mediaType: json{"mediaType"}.getStr(),
-      manifests: @[],
+      kind:       DockerManifestType.list,
+      name:       name,
+      otherNames: otherNames,
+      mediaType:  json{"mediaType"}.getStr(),
+      manifests:  @[],
     )
     list.setJson(data)
     for item in json["manifests"].items():
       let platform = item{"platform"}
       list.manifests.add(DockerManifest(
-        kind:      DockerManifestType.image,
-        imageName: name,
-        mediaType: item{"mediaType"}.getStr(),
-        digest:    item{"digest"}.getStr(),
-        size:      item{"size"}.getInt(),
-        isFetched: false,
-        platform:  (
+        kind:       DockerManifestType.image,
+        name:       name,
+        otherNames: otherNames,
+        mediaType:  item{"mediaType"}.getStr(),
+        digest:     item{"digest"}.getStr(),
+        size:       item{"size"}.getInt(),
+        platform:   DockerPlatform(
           os:           platform{"os"}.getStr(),
           architecture: platform{"architecture"}.getStr(),
         ),
@@ -213,10 +216,11 @@ proc newManifest(image: string, data: DigestedJson): DockerManifest =
     return list
 
   elif "config" in json and "layers" in json:
-    trace("docker: " & image & " is an image manifest")
+    trace("docker: " & $name & " is an image manifest")
     let image = DockerManifest(
       kind:           DockerManifestType.image,
-      imageName:      name,
+      name:           name,
+      otherNames:     otherNames,
       mediaType:      json{"mediaType"}.getStr(),
     )
     image.setJson(data)
@@ -233,23 +237,47 @@ proc newManifest(image: string, data: DigestedJson): DockerManifest =
   else:
     raise newException(ValueError, "Unsupported docker manifest json")
 
-proc fetchManifest(image: string): DockerManifest =
+proc fetchManifest(name: DockerImage, otherNames: seq[DockerImage] = @[]): DockerManifest =
   ## request either manifest list or image manifest for specified image
   # keep in mind that image can be of multiple formats
   # foo                   # image manifest name
   # foo:tag               # manifest for specific tag
   # foo@sha256:<checksum> # pinned to specific digest
   # therefore we gracefully handle each possibility
-  let data = requestManifestJson(image)
-  result = newManifest(image, data)
+  if name.asRepoDigest() in manifestCache:
+    return manifestCache[name.asRepoDigest()]
+  let data = requestManifestJson(name)
+  result = newManifest(name, data, otherNames = otherNames)
   result.fetch()
+  manifestCache[name.asRepoDigest()] = result
 
-proc fetchImageManifest*(image: string, platform: string): DockerManifest =
-  let platformTuple = parseDockerPlatform(platform)
-  var manifest = fetchManifest(image)
+proc fetchOnlyImageManifest*(name: DockerImage): DockerManifest =
+  var manifest = fetchManifest(name)
   if manifest.kind == DockerManifestType.list:
-    manifest = manifest.findPlatformManifest(platformTuple)
+    let manifests = manifest.findAllPlatformsManifests()
+    if len(manifests) == 1:
+      manifest = manifests[0]
+      manifest.fetch()
+    else:
+      raise newException(KeyError, "There are multiple platform images for: " & $name)
+  if manifest.kind != DockerManifestType.image:
+    raise newException(ValueError, "Could not find image manifest for: " & $name)
+  return manifest
+
+proc fetchImageManifest*(name: DockerImage,
+                         platform: DockerPlatform,
+                         otherNames: seq[DockerImage] = @[]): DockerManifest =
+  trace("docker: fetching manifest for: " & $name)
+  var manifest = fetchManifest(name, otherNames = otherNames)
+  if manifest.kind == DockerManifestType.list:
+    manifest = manifest.findPlatformManifest(platform)
     manifest.fetch()
-  if manifest.platform != platformTuple:
-    raise newException(ValueError, "Could not find manifest for: " & platform)
+  if manifest.kind != DockerManifestType.image:
+    raise newException(ValueError, "Could not find image manifest for: " & $name)
+  if manifest.platform != platform:
+    raise newException(
+      ValueError,
+      "Could not fetch manifest for: " & $name & " " &
+      $platform & " != " & "" & $manifest.platform
+    )
   return manifest

@@ -92,13 +92,13 @@ or vice versa.
   key.DOCKER_FILE.use                        = true
   key.DOCKERFILE_PATH.use                    = true
   key.DOCKER_PLATFORM.use                    = true
+  key.DOCKER_PLATFORMS.use                   = true
   key.DOCKER_LABELS.use                      = true
   key.DOCKER_TAGS.use                        = true
   key.DOCKER_CONTEXT.use                     = true
   key.DOCKER_ADDITIONAL_CONTEXTS.use         = true
   key.DOCKER_CHALK_ADDED_LABELS.use          = true
   key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use   = true
-  key.DOCKER_CHALK_TEMPORARY_TAG.use         = true
   key.INFERRED_TECH_STACKS.use               = true
 }
 
@@ -182,13 +182,13 @@ mark_template mark_large {
   key.DOCKER_FILE.use                         = true
   key.DOCKERFILE_PATH.use                     = true
   key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
   key.DOCKER_CONTEXT.use                      = true
   key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
   key.DOCKER_CHALK_ADDED_LABELS.use           = true
   key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use    = true
-  key.DOCKER_CHALK_TEMPORARY_TAG.use          = true
   key.INFERRED_TECH_STACKS.use                = true
   key.$CHALK_CONFIG.use                       = true
   key.$CHALK_IMPLEMENTATION_NAME.use          = true
@@ -360,18 +360,14 @@ mark_template chalk_labels {
   This template is for chalkable keys that are automatically added as
   labels to a container when running `docker build`.
 """
-  key.COMMIT_ID.use                           = true
-  key.COMMIT_SIGNED.use                       = true
-  key.ORIGIN_URI.use                          = true
   key.AUTHOR.use                              = true
-  key.DATE_AUTHORED.use                       = true
-  key.COMMITTER.use                           = true
-  key.DATE_COMMITTED.use                      = true
-  key.COMMIT_MESSAGE.use                      = true
-  key.TAGGER.use                              = true
-  key.DATE_TAGGED.use                         = true
-  key.TAG_MESSAGE.use                         = true
   key.BRANCH.use                              = true
+  key.COMMITTER.use                           = true
+  key.COMMIT_ID.use                           = true
+  key.DATE_AUTHORED.use                       = true
+  key.DATE_COMMITTED.use                      = true
+  key.DATE_TAGGED.use                         = true
+  key.ORIGIN_URI.use                          = true
   key.TAG.use                                 = true
-  key.TAG_SIGNED.use                          = true
+  key.TAGGER.use                              = true
 }

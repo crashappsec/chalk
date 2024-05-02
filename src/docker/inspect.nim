@@ -10,30 +10,56 @@
 ## inspect - return raw json as provided by docker CLI without any chalk context
 
 import std/[json]
-import ".."/[config]
-import "."/[exe, hash]
+import ".."/[config, semver]
+import "."/[exe, ids]
 
-proc inspectJson(name: string, what: string): JsonNode =
-  ## utility function for getting docker inspect json
-  trace("docker: inspecting " & what & " " & name)
+proc inspectHistoryCommands*(name: string): seq[string] =
+  ## utility function for getting docker image history
+  trace("docker: getting history for " & name)
   let
-    args   = @[what, "inspect", name, "--format", "json"]
+    args   = @["history", name, "--format", "{{.CreatedBy}}", "--no-trunc"]
     output = runDockerGetEverything(args)
     stdout = output.getStdOut().strip()
     stderr = output.getStdErr().strip()
   if output.getExit() != 0:
     raise newException(
       ValueError,
-      "docker: cannot inspect " & what & " " & name & " due to: " &
+      "cannot get history for " & name & " due to: " &
+      stdout & " " & stderr,
+    )
+  result = stdout.splitLines()
+  if len(result) == 0:
+    raise newException(
+      ValueError,
+      "image has no layers in its history " & name &
+      "\n" & stdout & " " & stderr
+    )
+
+proc inspectJson(name: string, what: string): JsonNode =
+  ## utility function for getting docker inspect json
+  trace("docker: inspecting " & what & " " & name)
+  var
+    args   = @[what, "inspect", name]
+  # https://github.com/docker/cli/pull/2936
+  if getDockerVersion() >= parseVersion("22"):
+    args &= @["--format", "json"]
+  let
+    output = runDockerGetEverything(args)
+    stdout = output.getStdOut().strip()
+    stderr = output.getStdErr().strip()
+  if output.getExit() != 0:
+    raise newException(
+      ValueError,
+      "cannot inspect " & what & " " & name & " due to: " &
       stdout & " " & stderr,
     )
   let json = parseJson(stdout)
   if len(json) != 1:
     raise newException(
       ValueError,
-      "docker: " & what & " " & name & " was not found to be inspected.",
+      "" & what & " " & name & " was not found to be inspected.",
     )
-  return json[0]
+  result = json[0]
 
 proc exists(name: string, what: string): bool =
   try:
@@ -48,18 +74,18 @@ proc dockerImageExists*(name: string): bool =
 proc dockerContainerExists*(name: string): bool =
   return exists(name, "container")
 
-proc inspectImageJson*(name: string, platform: string = ""): JsonNode =
+proc inspectImageJson*(name: string, platform = DockerPlatform(nil)): JsonNode =
   ## fetch image json from local docker daemon (if present)
   let
-    data     = inspectJson(name, "image")
-    os       = data{"Os"}.getStr()
-    arch     = data{"Architecture"}.getStr()
-    together = os & "/" & arch
-  if platform != "" and platform != together:
+    data          = inspectJson(name, "image")
+    os            = data{"Os"}.getStr()
+    arch          = data{"Architecture"}.getStr()
+    foundPlatform = DockerPlatform(os: os, architecture: arch)
+  if platform != nil and platform != foundPlatform:
     raise newException(
       ValueError,
       "docker: local image " & name & " doesn't match targeted platform: " &
-      together & " != " & platform,
+      $foundPlatform & " != " & $platform,
     )
   return data
 
@@ -78,7 +104,7 @@ iterator allIDs(what: string, cmd: string): string =
     error("docker: could not find any " & what & ": " & stdout & " " & stderr)
   else:
     for line in stdout.splitLines():
-      yield line.extractDockerHash()
+      yield line
 
 iterator allImageIDs*(): string =
   for id in allIDs("images", "images"):

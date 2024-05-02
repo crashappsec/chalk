@@ -21,29 +21,19 @@ proc getDockerExeLocation*(): string =
                                      ignoreChalkExes = true)
     dockerExeLocation = dockerExeOpt.get("")
     if dockerExeLocation == "":
-       warn("No docker command found in PATH. `chalk docker` not available.")
+      warn("docker: no command found in PATH. `chalk docker` not available.")
   return dockerExeLocation
 
 proc runDockerGetEverything*(args: seq[string], stdin = "", silent = true): ExecOutput =
   let exe = getDockerExeLocation()
   if not silent:
-    trace("Running docker: " & exe & " " & args.join(" "))
+    trace("docker: " & exe & " " & args.join(" "))
     if stdin != "":
-      trace("Passing on stdin: \n" & stdin)
+      trace("docker: stdin: \n" & stdin)
   result = runCmdGetEverything(exe, args, stdin)
   if not silent and result.exitCode > 0:
     trace(strutils.strip(result.stderr & result.stdout))
   return result
-
-proc getVersionFromLine(line: string): Version =
-  for word in line.splitWhitespace():
-    if '.' in word:
-      try:
-        return parseVersion(word)
-      except:
-        # word wasnt a version number
-        discard
-  raise newException(ValueError, "no version found")
 
 proc getBuildXVersion*(): Version =
   # Have to parse the thing to get compares right.
@@ -58,7 +48,7 @@ proc getBuildXVersion*(): Version =
     if version.exitCode == 0:
       try:
         buildXVersion = getVersionFromLine(version.stdOut)
-        trace("Docker buildx version: " & $(buildXVersion))
+        trace("docker: buildx version: " & $(buildXVersion))
       except:
         dumpExOnDebug()
 
@@ -74,7 +64,7 @@ proc getDockerVersion*(): Version =
     if version.exitCode == 0:
       try:
         dockerVersion = getVersionFromLine(version.stdOut)
-        trace("Docker version: " & $(dockerVersion))
+        trace("docker: version: " & $(dockerVersion))
       except:
         dumpExOnDebug()
 

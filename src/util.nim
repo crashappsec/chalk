@@ -217,7 +217,7 @@ else:
 
 const currentAutocompleteVersion = (0, 1, 3)
 
-proc validateMetadata*(obj: ChalkObj): ValidateResult {.importc.}
+proc validateMetaData*(obj: ChalkObj): ValidateResult {.importc.}
 
 proc autocompleteFileCheck*() =
   if isatty(0) == 0 or get[bool](chalkConfig, "install_completion_script") == false:
@@ -240,7 +240,7 @@ proc autocompleteFileCheck*() =
 
     if len(allChalks) != 0 and allChalks[0].extract != nil:
       if "ARTIFACT_VERSION" in allChalks[0].extract and
-         allChalks[0].validateMetadata() == vOk:
+         allChalks[0].validateMetaData() == vOk:
         let
           boxedVers    = allChalks[0].extract["ARTIFACT_VERSION"]
           foundRawVers = unpack[string](boxedVers)
@@ -504,17 +504,23 @@ proc splitBy*(s: string, sep: string, default: string = ""): (string, string) =
     return (parts[0], parts[1])
   return (s, default)
 
+proc rSplitBy*(s: string, sep: string, default: string = ""): (string, string) =
+  let parts = s.rsplit(sep, maxsplit = 1)
+  if len(parts) == 2:
+    return (parts[0], parts[1])
+  return (s, default)
+
 proc removeSuffix*(s: string, suffix: string): string =
   # similar to strutil except it returns result back
   # vs in-place removal in stdlib
   result = s
   result.removeSuffix(suffix)
 
-proc removePrefix*(s: string, suffix: string): string =
+proc removePrefix*(s: string, prefix: string): string =
   # similar to strutil except it returns result back
   # vs in-place removal in stdlib
   result = s
-  result.removePrefix(suffix)
+  result.removePrefix(prefix)
 
 proc `&`*(a: JsonNode, b: JsonNode): JsonNode =
   result = newJArray()
@@ -527,13 +533,16 @@ proc `&=`*(a: var JsonNode, b: JsonNode) =
   for i in b.items():
     a.add(i)
 
-proc getStrElems*(node: JsonNode): seq[string] =
+proc getStrElems*(node: JsonNode, default: seq[string] = @[]): seq[string] =
+  result = @[]
   for i in node.getElems():
     result.add(i.getStr())
+  if len(result) == 0:
+    return default
 
 proc toLowerKeysJsonNode*(node: JsonNode): JsonNode =
-  ## convert json node to lower case keys string json node
-  ## (similar to strtabs but for json nodes)
+  ## Returns a new `JsonNode` that is identical to the given `node`
+  ## except that every `JObject` key is lowercased.
   case node.kind:
   of JString:
     return node
@@ -553,3 +562,17 @@ proc toLowerKeysJsonNode*(node: JsonNode): JsonNode =
     result = newJArray()
     for i in node.items():
       result.add(i.toLowerKeysJsonNode())
+
+template withAtomicVar*[T](x: var T, code: untyped) =
+  let copy = x.deepCopy()
+  try:
+    code
+  except:
+    # restore variable to original value
+    x = copy
+    raise
+
+proc update*(self: ChalkDict, other: ChalkDict): ChalkDict {.discardable.} =
+  result = self
+  for k, v in other:
+    self[k] = v
