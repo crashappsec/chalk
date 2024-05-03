@@ -77,7 +77,7 @@ proc canVerifyBySigStore*(chalk: ChalkObj): bool =
     isCosignInstalled() and
     ResourceImage     in    chalk.resourceType and
     ResourceContainer notin chalk.resourceType and
-    chalk.image.repo  !=    "" and
+    len(chalk.images) >     0 and
     chalk.imageDigest !=    ""
   )
 

@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[uri]
+import std/[sets, sequtils, uri]
 import ".."/[config, util]
 
 const hashHeader = "sha256:"
@@ -191,6 +191,14 @@ proc `$`*(items: seq[DockerImage]): seq[string] =
   result = @[]
   for i in items:
     result.add($i)
+
+proc uniq*(items: seq[DockerImage]): seq[DockerImage] =
+  return items.asRepoDigest().toSet().toSeq().parseImages()
+
+proc getImageName*(self: ChalkObj): string =
+  if len(self.images) > 0:
+    return $(self.images[0])
+  return self.name
 
 # ----------------------------------------------------------------------------
 

@@ -386,7 +386,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._REPO_TAGS.use                          = true
   ~key._REPO_DIGESTS.use                       = true
   ~key._FOUND_BASE_MARK.use                    = true
-  ~key._SIGNATURE.use                          = true
+  ~key._SIGNATURES.use                         = true
   ~key._INVALID_SIGNATURE.use                  = true
   ~key._VALIDATED_SIGNATURE.use                = true
   ~key._VALIDATED_METADATA.use                 = true

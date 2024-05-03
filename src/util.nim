@@ -576,3 +576,11 @@ proc update*(self: ChalkDict, other: ChalkDict): ChalkDict {.discardable.} =
   result = self
   for k, v in other:
     self[k] = v
+
+proc merge*(self: ChalkDict, other: ChalkDict): ChalkDict {.discardable.} =
+  result = self
+  for k, v in other:
+    if k in self and self[k].kind == MkSeq and v.kind == MkSeq:
+      self[k] &= v
+    else:
+      self[k] = v

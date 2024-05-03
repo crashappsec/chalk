@@ -6,7 +6,7 @@
 ##
 
 import ".."/[config, collect, plugin_api]
-import "."/[base, ids, collect, scan]
+import "."/[base, collect, scan]
 
 proc dockerPush*(ctx: DockerInvocation): int =
   ctx.newCmdLine = ctx.originalArgs
@@ -21,7 +21,7 @@ proc dockerPush*(ctx: DockerInvocation): int =
 
   let chalk = chalkOpt.get()
   if not chalk.isChalked():
-    warn("docker: " & $(chalk.image) & " is not chalked. reporting will be limited")
+    warn("docker: " & chalk.name & " is not chalked. reporting will be limited")
     # these plugins are responsible for "inserting" new chalks
     # so they create things like CHALK_ID, METADATA_ID
     # but we just want to report keys about the artifact

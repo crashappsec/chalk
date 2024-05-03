@@ -14,9 +14,12 @@
     driver and is not directly related to docker image
   - `DOCKER_CHALK_TEMPORARY_TAG` - chalk no longer adds
     temporary tag to docker builds
+  - `_SIGNATURE` - cosign generates uniquer signature
+    per registry. New key is `_SIGNATURES`.
 
   [#266](https://github.com/crashappsec/chalk/pull/266)
   [#282](https://github.com/crashappsec/chalk/pull/282)
+  [#284](https://github.com/crashappsec/chalk/pull/284)
 
 - Changed chalk keys:
 
@@ -58,8 +61,10 @@
 - New Chalk keys:
 
   - `DOCKER_PLATFORMS` - all platforms used in docker build
+  - `_SIGNATURES` - all docker registry cosign signatures
 
   [#282](https://github.com/crashappsec/chalk/pull/282)
+  [#284](https://github.com/crashappsec/chalk/pull/284)
 
 - `docker`/`buildx`/`cosign` versions are now printed
   in `chalk version` command.
