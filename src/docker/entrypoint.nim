@@ -8,33 +8,7 @@
 ## Utilities for inspecting/fetching/wrapping dockerfile entrypoints
 
 import ".."/[config]
-import "."/[base, dockerfile, exe, ids, image, inspect, manifest, util]
-
-proc fetchImageOrManifestConfig(image: DockerImage, platform: DockerPlatform): JsonNode =
-  trace("docker: fetching config for: " & $image & " " & $platform)
-  try:
-    return inspectImageJson(image.asRepoRef(), platform){"Config"}
-  except:
-    if hasBuildX():
-      return fetchImageManifest(image, platform).config.json{"config"}
-    else:
-      trace("docker: buildx is missing. pulling image locally for inspection")
-      pullImage(image.asRepoRef())
-      return inspectImageJson(image.asRepoRef(), platform){"Config"}
-
-proc fetchImageEntrypoint(ctx: DockerInvocation, image: DockerImage, platform: DockerPlatform): DockerEntrypoint =
-  ## fetch image entrypoints (entrypoint/cmd/shell)
-  ## fetches from local docker cache (if present),
-  ## else will directly query registry
-  # scrach image is a special image without any entrypoint config
-  if $image == "scratch":
-    return (nil, nil, nil)
-  let
-    imageInfo  = fetchImageOrManifestConfig(image, platform)
-    entrypoint = fromJson[EntrypointInfo](imageInfo{"Entrypoint"})
-    cmd        = fromJson[CmdInfo](imageInfo{"Cmd"})
-    shell      = fromJson[ShellInfo](imageInfo{"Shell"})
-  return (entrypoint, cmd, shell)
+import "."/[dockerfile, ids, image, wrap, util]
 
 proc getTargetEntrypoints(ctx: DockerInvocation, platform: DockerPlatform): DockerEntrypoint =
   ## get entrypoints (entrypoint/cmd/shell) from the target section
@@ -61,7 +35,7 @@ proc getTargetEntrypoints(ctx: DockerInvocation, platform: DockerPlatform): Dock
     else:
       # no more sections in Dockerfile and instead we need to
       # inspect the base image
-      let info = ctx.fetchImageEntrypoint(section.image, platform)
+      let info = fetchImageEntrypoint(section.image, platform)
       if entrypoint == nil:
         entrypoint = info.entrypoint
         if entrypoint != nil:
@@ -97,7 +71,8 @@ proc getCommonTargetEntrypoints*(ctx: DockerInvocation, platforms: seq[DockerPla
 
 proc rewriteEntryPoint*(ctx:        DockerInvocation,
                         entrypoint: DockerEntrypoint,
-                        binaries:   TableRef[DockerPlatform, string]) =
+                        binaries:   TableRef[DockerPlatform, string],
+                        user:       string) =
   let
     fromArgs             = get[bool](chalkConfig, "exec.command_name_from_args")
     wrapCmd              = get[bool](chalkConfig, "docker.wrap_cmd")
@@ -136,6 +111,7 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
     ctx.makeFileAvailableToDocker(
       path       = binary,
       newPath    = "/chalk",
+      user       = user,
       move       = false,
       chmod      = "0755",
       byPlatform = len(binaries) > 1,

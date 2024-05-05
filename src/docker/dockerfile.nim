@@ -632,8 +632,8 @@ proc parseCmd(ctx: DockerParse, t: DockerCommand): CmdInfo =
   else:
     result.str = s
 
-proc parseUserInfo(ctx: DockerParse, t: DockerCommand): DfUserInfo =
-  return DfUserInfo(str: unicode.strip(t.rawArg), startLine: t.startLine, endLine: t.endLine)
+proc parseUserInfo(ctx: DockerParse, t: DockerCommand): UserInfo =
+  return UserInfo(str: unicode.strip(t.rawArg), startLine: t.startLine, endLine: t.endLine)
 
 proc parseOnBuild(ctx: DockerParse, t: DockerCommand): OnBuildInfo =
   return OnBuildInfo(raw: t.rawArg, startLine: t.startLine, endLine: t.endLine)
@@ -924,8 +924,8 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
       section.cmd = CmdInfo(obj)
     elif obj of ShellInfo:
       section.shell = ShellInfo(obj)
-    elif obj of DfUserInfo:
-      section.lastUser = DfUserInfo(obj)
+    elif obj of UserInfo:
+      section.lastUser = UserInfo(obj)
     elif obj of LabelInfo:
       for k, v in LabelInfo(obj).labels:
         labels[k] = v
