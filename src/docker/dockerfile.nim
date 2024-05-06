@@ -960,6 +960,11 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
       "Did not find any build sections in Dockerfile (no FROM directive)"
     )
 
+proc getFirstDockerSection*(ctx: DockerInvocation): DockerFileSection =
+  if len(ctx.dfSections) == 0:
+    raise newException(ValueError, "there are no docker sections")
+  return ctx.dfSections[0]
+
 proc getTargetDockerSection*(ctx: DockerInvocation): DockerFileSection =
   ## get the target docker section which is to be built
   ## will either be the last section if no target is specified

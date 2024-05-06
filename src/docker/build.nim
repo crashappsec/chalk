@@ -161,12 +161,13 @@ proc getUpdatedDockerfile(ctx: DockerInvocation): string =
   if len(ctx.addedInstructions) == 0:
     return ctx.inDockerFile
   let
+    first   = ctx.getFirstDockerSection()
     section = ctx.getTargetDockerSection()
     lines   = ctx.inDockerFile.splitLines()
-  var updated: seq[string] = @[]
+  var updated: seq[string] = lines[0 ..< first.startLine] & @[""]
   for _, base in ctx.addedPlatform:
     updated &= base & @[""]
-  updated &= lines[0 .. section.endLine].join("\n").strip().splitLines() & @[""]
+  updated &= lines[first.startLine .. section.endLine].join("\n").strip().splitLines() & @[""]
   updated &= ctx.addedInstructions & @[""]
   updated &= lines[section.endLine + 1 .. ^1].join("\n").strip().splitLines()
   return updated.join("\n").strip() & "\n"
