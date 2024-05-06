@@ -185,6 +185,7 @@ Can capture data both during build and during process run time.
 
 plugin cloud_metadata {
     enabled:         true
+    priority:        1000
     post_run_keys:   ["_GCP_INSTANCE_METADATA", "_AZURE_INSTANCE_METADATA",
     "_OP_CLOUD_PROVIDER", "_OP_CLOUD_PROVIDER_SERVICE_TYPE",
     "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", "_OP_CLOUD_PROVIDER_REGION",
@@ -229,6 +230,7 @@ machine in which chalk is being run.
 
 plugin aws_ecs {
     enabled:         true
+    priority:        2000 # have precedence over cloud metadata
     pre_run_keys:    ["CLOUD_METADATA_WHEN_CHALKED"]
     post_run_keys:   ["_OP_CLOUD_METADATA",
                       "_OP_CLOUD_PROVIDER",
@@ -244,6 +246,7 @@ metdata interface.
 
 plugin aws_lambda {
     enabled:         true
+    priority:        2000 # have precedence over cloud metadata
     post_run_keys:   ["_OP_CLOUD_METADATA",
                       "_OP_CLOUD_PROVIDER",
                       "_OP_CLOUD_PROVIDER_ACCOUNT_INFO",
