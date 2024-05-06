@@ -71,6 +71,8 @@
   [#282](https://github.com/crashappsec/chalk/pull/282)
 - New Chalk keys:
 
+  - `_IMAGE_COMPRESSED_SIZE` - compressed docker image size
+    when collecting image metadata directly from the registry
   - `DOCKER_PLATFORMS` - all platforms used in docker build
   - `_SIGNATURES` - all docker registry cosign signatures
   - All `uname()` fields have dedicated fields:
@@ -85,6 +87,7 @@
     - `_OP_HOST_VERSION`
     - `_OP_HOST_MACHINE`
 
+  [#266](https://github.com/crashappsec/chalk/pull/266)
   [#282](https://github.com/crashappsec/chalk/pull/282)
   [#284](https://github.com/crashappsec/chalk/pull/284)
   [#286](https://github.com/crashappsec/chalk/pull/286)

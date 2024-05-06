@@ -166,11 +166,13 @@ proc makeFileAvailableToDocker*(ctx:        DockerInvocation,
       platformPath = "/" & $platform
       platformEnv  = "/$TARGETPLATFORM"
       platformArg  = "ARG TARGETPLATFORM"
+      platformCopy = "COPY --from=" & platformBase & " " & platformEnv & " " & newPath
     if platformBase notin ctx.addedPlatform:
       ctx.addedPlatform[platformBase] = @["FROM scratch AS " & platformBase]
     if platformArg notin ctx.addedInstructions:
-      ctx.addedInstructions.add("ARG TARGETPLATFORM")
-    ctx.addedInstructions.add("COPY --from=" & platformBase & " " & platformEnv & " " & newPath)
+      ctx.addedInstructions.add(platformArg)
+    if platformCopy notin ctx.addedInstructions:
+      ctx.addedInstructions.add(platformCopy)
     ctx.makeFileAvailableToDocker(
       path    = path,
       newPath = platformPath,
