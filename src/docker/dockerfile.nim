@@ -241,7 +241,7 @@ proc lexQuoted(ctx: DockerParse, d: DockerStatement, s: seq[Rune], q: Rune, i: v
   result.contents.add(val)
 
 const nonWordRunes = [Rune('$'), Rune('"'), Rune('\''), Rune('#'), Rune('='),
-                      Rune('{'), Rune('}')]
+                      Rune('{'), Rune('}'), Rune(':'), Rune('@')]
 
 proc lexWord(ctx: DockerParse, d: DockerStatement, s: seq[Rune], i: var int): LineToken =
   result = LineToken(kind:      ltWord,
@@ -513,34 +513,39 @@ proc parseFrom(ctx: DockerParse, t: DockerCommand): FromInfo =
 
   skipWhiteSpace(toks, i)
 
-  if len(toks) == i or toks[i].kind == ltOther:
+  let spec = takeUntilWhiteSpace(toks, i)
+  if len(spec) == 0 or toks[i].kind != ltWord:
     result.error = "No image name provided."
     return
 
-  result.repo = some(toks[i])
-
-  i += 1
-  if len(toks) <= i: return
-
-  if toks[i].kind == ltOther and i + 1 != len(toks):
-    case toks[i].contents[0]
+  result.repo = some(spec[0])
+  var s = 1
+  while s < len(spec):
+    case spec[s].contents[0]
     of ":":
-      i += 1
-      if toks[i].kind == ltSpace:
+      s += 1
+      if spec[s].kind != ltWord:
         result.error = "Missing image tag after ':'"
         return
-      result.tag = some(toks[i])
-      i += 1
+      result.tag = some(spec[s])
     of "@":
-      i += 1
-      if toks[i].kind == ltSpace:
+      s += 1
+      if spec[s].kind != ltWord or spec[s].contents != @["sha256"]:
         result.error = "Missing image digest after '@'"
         return
-      result.digest = some(toks[i])
-      i += 1
+      s += 1
+      if spec[s].kind != ltOther or spec[s].contents != @[":"]:
+        result.error = "Missing ':' delimiter after digest '@sha256'"
+        return
+      s += 1
+      if spec[s].kind != ltWord:
+        result.error = "Missing digest value"
+        return
+      result.digest = some(spec[s])
     else:
-      result.error = "Unrecognized value after image: '" & toks[i].contents[0]
+      result.error = "Unrecognized value after image: '" & spec[s].contents[0] & "'"
       return
+    s += 1
 
   skipWhiteSpace(toks, i)
   if i == len(toks): return

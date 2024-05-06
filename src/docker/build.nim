@@ -278,6 +278,10 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_LABELS",                    ctx.foundLabels)
   dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.foundPlatforms))
   dict.setIfNeeded("DOCKER_TAGS",                      ctx.foundTags.asRepoTag())
+  dict.setIfNeeded("DOCKER_BASE_IMAGE",                $(ctx.getBaseDockerSection.image))
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",           ctx.getBaseDockerSection.image.repo)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_TAG",            ctx.getBaseDockerSection.image.tag)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST",         ctx.getBaseDockerSection.image.digest)
 
 proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerPlatform, ChalkObj]) =
   if dockerImageExists(ctx.iidFile):

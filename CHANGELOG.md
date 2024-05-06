@@ -74,6 +74,11 @@
   - `_IMAGE_COMPRESSED_SIZE` - compressed docker image size
     when collecting image metadata directly from the registry
   - `DOCKER_PLATFORMS` - all platforms used in docker build
+  - Docker base image fields:
+    - `DOCKER_BASE_IMAGE` - base image used in Dockerfile
+    - `DOCKER_BASE_IMAGE_REPO` - just the repo name
+    - `DOCKER_BASE_IMAGE_TAG` - just the tag
+    - `DOCKER_BASE_IMAGE_DIGEST` - just the digest
   - `_SIGNATURES` - all docker registry cosign signatures
   - All `uname()` fields have dedicated fields:
     - `HOST_SYSNAME_WHEN_CHALKED`

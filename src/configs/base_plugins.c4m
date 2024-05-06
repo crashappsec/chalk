@@ -497,6 +497,8 @@ plugin docker {
     pre_chalk_keys: ["ARTIFACT_TYPE", "DOCKER_FILE", "DOCKERFILE_PATH",
                      "DOCKER_PLATFORM", "DOCKER_PLATFORMS",
                      "DOCKER_LABELS", "DOCKER_TAGS",
+                     "DOCKER_BASE_IMAGE", "DOCKER_BASE_IMAGE_REPO",
+                     "DOCKER_BASE_IMAGE_TAG", "DOCKER_BASE_IMAGE_DIGEST",
                      "DOCKER_CONTEXT", "DOCKER_ADDITIONAL_CONTEXTS",
                      "DOCKER_CHALK_ADDED_LABELS",
                      "DOCKER_CHALK_ADDED_TO_DOCKERFILE" ]

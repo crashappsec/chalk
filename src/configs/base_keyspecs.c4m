@@ -1455,6 +1455,54 @@ Additional instructions added to the passed dockerfile.
 """
 }
 
+keyspec DOCKER_BASE_IMAGE {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.3.6-dev"
+    doc: """
+Name of the base image specified in Dockerfile used to build docker image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_REPO {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.3.6-dev"
+    doc: """
+Only registry repository of the base image specified in Dockerfile used to build docker image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_TAG {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.3.6-dev"
+    doc: """
+Only registry tag of the base image if specified in Dockerfile used to build docker image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_DIGEST {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.3.6-dev"
+    doc: """
+Only registry digest of the base image if specified in Dockerfile used to build docker image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
 keyspec _OP_ARTIFACT_TYPE {
     kind:             RunTimeArtifact
     type:             string

@@ -68,7 +68,7 @@ proc parseDockerPlatform*(platform: string): DockerPlatform =
 proc parseDigest*(digest: string): DockerImage =
   return ("", "", digest.extractDockerHash())
 
-proc parseImage*(name: string): DockerImage =
+proc parseImage*(name: string, defaultTag = "latest"): DockerImage =
   # parseUri requires some scheme to parse url correctly so we add dummy https
   # parsed uri will allow us to figure out if tag contains version
   # (note that tag can be full registry path which can include
@@ -96,11 +96,11 @@ proc parseImage*(name: string): DockerImage =
 
     # there is no tag
     else:
-      return (image, "latest", digest)
+      return (image, defaultTag, digest)
 
   # image is regular foo[:tag] format
   else:
-    let (repo, tag) = image.splitBy(":", "latest")
+    let (repo, tag) = image.splitBy(":", defaultTag)
     return (repo, tag, digest)
 
 proc parseImages*(names: seq[string]): seq[DockerImage] =
