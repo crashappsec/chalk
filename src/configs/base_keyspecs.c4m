@@ -224,17 +224,63 @@ This key is reserved for future use; it is not currently used in any capacity.
 """
 }
 
-keyspec HOSTINFO_WHEN_CHALKED {
+keyspec HOST_SYSNAME_WHEN_CHALKED {
     kind:             ChalkTimeHost
     type:             string
     standard:         true
-    since:            "0.1.0"
-    shortdoc:         "Host platform information at Chalk time"
+    since:            "0.3.6-dev"
+    shortdoc:         "Host sysname at Chalk time"
     doc:              """
-This returns information about the host on which the chalk operation
-occurred, collected at the time of that operation. On posix
-systems, it's taken from the 'version' field obtained from a call to
-the `uname()` system call.
+On posix systems, value of `uname().sysname` syscall,
+collected when chalk mark was created.
+"""
+}
+
+keyspec HOST_NODENAME_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host node name at Chalk time"
+    doc:              """
+On posix systems, value of `uname().nodename` syscall,
+collected when chalk mark was created.
+"""
+}
+
+keyspec HOST_RELEASE_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host kernel release at Chalk time"
+    doc:              """
+On posix systems, value of `uname().release` syscall,
+collected when chalk mark was created.
+"""
+}
+
+keyspec HOST_VERSION_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host kernel version at Chalk time"
+    doc:              """
+On posix systems, value of `uname().version` syscall,
+collected when chalk mark was created.
+"""
+}
+
+keyspec HOST_MACHINE_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host machine at Chalk time"
+    doc:              """
+On posix systems, value of `uname().machine` syscall,
+collected when chalk mark was created.
 """
 }
 
@@ -248,19 +294,6 @@ keyspec PUBLIC_IPV4_ADDR_WHEN_CHALKED {
 This returns the IPv4 address on the local machine used to route
 external traffic. It's determined by setting up a UDP connection to
 Cloudflare's public DNS service, but does not involve sending any data.
-"""
-}
-
-keyspec NODENAME_WHEN_CHALKED {
-    kind:             ChalkTimeHost
-    type:             string
-    standard:         true
-    since:            "0.1.0"
-    shortdoc:         "Host node name at Chalk time"
-    doc:              """
-The node name at the time of the software's chalk mark insertion. On
-posix systems, this will be equivalent to the `uname()` field
-`nodename`.
 """
 }
 
@@ -1347,7 +1380,7 @@ keyspec DOCKER_PLATFORMS {
     type:             list[string]
     standard:         true
     system:           false
-    since:            "0.3.7"
+    since:            "0.3.6-dev"
     doc: """
 All platforms passed when performing 'docker build', if any.
 """
@@ -2256,7 +2289,7 @@ Key-value pairs adding metadata to images
 
 keyspec _IMAGE_STOP_SIGNAL {
     kind:     RunTimeArtifact
-    type:     int
+    type:     string
     standard: true
     doc: """
 The signal to be sent to the main process inside the container, which by default is SIGTERM
@@ -3308,7 +3341,7 @@ keyspec _SIGNATURES {
     type:             list[dict[string, string]]
     standard:         true
     system:           true
-    since:            "0.1.0"
+    since:            "0.3.6-dev"
     doc:              """
 Digital signatures for artifact.  For build/push operations, this will
 generally represent the digital signatures added as part of the
@@ -3745,17 +3778,63 @@ keyspec _OP_HOSTNAME {
 """
 }
 
-keyspec _OP_HOSTINFO {
+keyspec _OP_HOST_SYSNAME {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.1.0"
-    shortdoc:         "Detailed host info from current operation"
+    since:            "0.3.6-dev"
+    shortdoc:         "Host sysname during chalk operation"
     doc:              """
-This returns information about the host on which the urrent operation
-occurred, collected at the time of that operation. On posix
-systems, it's taken from the 'version' field obtained from a call to
-the `uname()` system call.
+On posix systems, value of `uname().sysname` syscall,
+collected during current chalk operation.
+"""
+}
+
+keyspec _OP_HOST_NODENAME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host node during chalk operation"
+    doc:              """
+On posix systems, value of `uname().nodename` syscall,
+collected during current chalk operation.
+"""
+}
+
+keyspec _OP_HOST_RELEASE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host kernel during chalk operation"
+    doc:              """
+On posix systems, value of `uname().release` syscall,
+collected during current chalk operation.
+"""
+}
+
+keyspec _OP_HOST_VERSION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host kernel during chalk operation"
+    doc:              """
+On posix systems, value of `uname().version` syscall,
+collected during current chalk operation.
+"""
+}
+
+keyspec _OP_HOST_MACHINE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host machine during chalk operation"
+    doc:              """
+On posix systems, value of `uname().machine` syscall,
+collected during current chalk operation.
 """
 }
 
@@ -3776,17 +3855,6 @@ cloud provider APIs, docker, procfs, etc.
 """
 }
 
-
-keyspec _OP_NODENAME {
-    kind:             RunTimeHost
-    type:             string
-    standard:         true
-    since:            "0.1.0"
-    doc:              """
-The node name at the time of the current operation. On posix systems,
-this should be equivalent to the uname 'nodename' field.
-"""
-}
 
 keyspec _OP_CLOUD_METADATA {
     kind:             RunTimeHost

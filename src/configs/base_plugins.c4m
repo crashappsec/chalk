@@ -14,9 +14,11 @@ plugin system {
   pre_run_keys:     ["INJECTOR_CHALK_ID", "INJECTOR_VERSION", "TIME_CHALKED",
                      "INJECTOR_COMMIT_ID", "DATE_CHALKED",
                      "TZ_OFFSET_WHEN_CHALKED", "DATETIME_WHEN_CHALKED",
-                     "INJECTOR_ENV", "HOSTINFO_WHEN_CHALKED",
+                     "HOST_SYSNAME_WHEN_CHALKED", "HOST_NODENAME_WHEN_CHALKED",
+                     "HOST_RELEASE_WHEN_CHALKED", "HOST_VERSION_WHEN_CHALKED",
+                     "HOST_MACHINE_WHEN_CHALKED", "INJECTOR_ENV",
                      "PUBLIC_IPV4_ADDR_WHEN_CHALKED", "INJECTOR_PUBLIC_KEY",
-                     "NODENAME_WHEN_CHALKED", "PLATFORM_WHEN_CHALKED"]
+                     "PLATFORM_WHEN_CHALKED"]
 
   pre_chalk_keys:  ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
                     "PRE_CHALK_HASH", "TIMESTAMP_WHEN_CHALKED"]
@@ -27,7 +29,8 @@ plugin system {
                     "_INVALID_SIGNATURE"]
 
   post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
-                    "_OP_HOSTINFO", "_OP_PUBLIC_IPV4_ADDR", "_OP_NODENAME",
+                    "_OP_HOST_SYSNAME", "_OP_HOST_NODENAME", "_OP_HOST_RELEASE",
+                    "_OP_HOST_VERSION", "_OP_HOST_MACHINE", "_OP_PUBLIC_IPV4_ADDR",
                     "_OP_PLATFORM", "_OP_CHALKER_COMMIT_ID",
                     "_OP_CHALKER_VERSION", "_OP_CHALK_COUNT", "_OP_CMD_FLAGS",
                     "_OP_EXE_NAME", "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",

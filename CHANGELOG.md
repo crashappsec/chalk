@@ -16,15 +16,23 @@
     temporary tag to docker builds
   - `_SIGNATURE` - cosign generates uniquer signature
     per registry. New key is `_SIGNATURES`.
+  - `_OP_HOSTINFO` - renamed to `_OP_HOST_VERSION`
+  - `_OP_NODENAME` - renamed to `_OP_HOST_NODENAME`
+  - `HOSTINFO_WHEN_CHALKED` - renamed to `HOST_VERSION_WHEN_CHALKED`
+  - `NODENAME_WHEN_CHALKED` - renamed to `HOST_NODENAME_WHEN_CHALKED`
 
   [#266](https://github.com/crashappsec/chalk/pull/266)
   [#282](https://github.com/crashappsec/chalk/pull/282)
   [#284](https://github.com/crashappsec/chalk/pull/284)
+  [#286](https://github.com/crashappsec/chalk/pull/286)
 
 - Changed chalk keys:
 
   - `DOCKER_CHALK_ADDED_TO_DOCKERFILE` - is now a list
     vs a single string
+  - `_IMAGE_STOP_SIGNAL` - is now a string vs an int.
+    Docker always reported stop signal as string.
+    This was a mistake in field definition.
 
   [#282](https://github.com/crashappsec/chalk/pull/282)
 
@@ -65,10 +73,26 @@
 
   - `DOCKER_PLATFORMS` - all platforms used in docker build
   - `_SIGNATURES` - all docker registry cosign signatures
+  - All `uname()` fields have dedicated fields:
+    - `HOST_SYSNAME_WHEN_CHALKED`
+    - `HOST_NODENAME_WHEN_CHALKED`
+    - `HOST_RELEASE_WHEN_CHALKED`
+    - `HOST_VERSION_WHEN_CHALKED`
+    - `HOST_MACHINE_WHEN_CHALKED`
+    - `_OP_HOST_SYSNAME`
+    - `_OP_HOST_NODENAME`
+    - `_OP_HOST_RELEASE`
+    - `_OP_HOST_VERSION`
+    - `_OP_HOST_MACHINE`
 
   [#282](https://github.com/crashappsec/chalk/pull/282)
   [#284](https://github.com/crashappsec/chalk/pull/284)
+  [#286](https://github.com/crashappsec/chalk/pull/286)
 
+- Docker build `cosign` attestation is pushed to each tagged
+  registry. As a result attestations can be validated from any
+  registry when pulling images.
+  [#284](https://github.com/crashappsec/chalk/pull/284)
 - `docker`/`buildx`/`cosign` versions are now printed
   in `chalk version` command.
   [#282](https://github.com/crashappsec/chalk/pull/282)
