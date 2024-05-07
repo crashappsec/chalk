@@ -135,6 +135,8 @@ report and subtract from it.
   key._OP_ALL_IMAGE_METADATA.use             = true
   key._OP_ALL_CONTAINER_METADATA.use         = true
   key._IMAGE_ID.use                          = true
+  key._IMAGE_DIGEST.use                      = true
+  key._IMAGE_LIST_DIGEST.use                 = true
   key._IMAGE_COMMENT.use                     = true
   key._IMAGE_CREATION_DATETIME.use           = true
   key._IMAGE_DOCKER_VERSION.use              = true
@@ -668,6 +670,8 @@ doc: """
   key.INFERRED_TECH_STACKS.use                = true
   key._INFERRED_TECH_STACKS_HOST.use          = true
   key._IMAGE_ID.use                           = true
+  key._IMAGE_DIGEST.use                       = true
+  key._IMAGE_LIST_DIGEST.use                  = true
   key._IMAGE_COMMENT.use                      = true
   key._IMAGE_CREATION_DATETIME.use            = true
   key._IMAGE_DOCKER_VERSION.use               = true
@@ -1091,6 +1095,8 @@ container.
   key._OP_ALL_IMAGE_METADATA.use              = false
   key._OP_ALL_CONTAINER_METADATA.use          = false
   key._IMAGE_ID.use                           = true
+  key._IMAGE_DIGEST.use                       = true
+  key._IMAGE_LIST_DIGEST.use                  = true
   key._IMAGE_COMMENT.use                      = true
   key._IMAGE_CREATION_DATETIME.use            = true
   key._IMAGE_DOCKER_VERSION.use               = true
@@ -1517,6 +1523,8 @@ and keep the run-time key.
   key._OP_ALL_IMAGE_METADATA.use              = false
   key._OP_ALL_CONTAINER_METADATA.use          = false
   key._IMAGE_ID.use                           = true
+  key._IMAGE_DIGEST.use                       = true
+  key._IMAGE_LIST_DIGEST.use                  = true
   key._IMAGE_COMMENT.use                      = true
   key._IMAGE_CREATION_DATETIME.use            = true
   key._IMAGE_DOCKER_VERSION.use               = true
@@ -1805,6 +1813,8 @@ running insert commands.
   key._VIRTUAL.use                            = true
   key._CURRENT_HASH.use                       = true
   key._IMAGE_ID.use                           = true
+  key._IMAGE_DIGEST.use                       = true
+  key._IMAGE_LIST_DIGEST.use                  = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
 }
@@ -1864,6 +1874,8 @@ running commands that do NOT insert chalk marks.
   key._OP_ARTIFACT_PATH.use                   = true
   key._CURRENT_HASH.use                       = true
   key._IMAGE_ID.use                           = true
+  key._IMAGE_DIGEST.use                       = true
+  key._IMAGE_LIST_DIGEST.use                  = true
   key._INSTANCE_CONTAINER_ID.use              = true
   key._INSTANCE_NAME.use                      = true
   key._REPO_TAGS.use                          = true

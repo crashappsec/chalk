@@ -512,7 +512,7 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
     chalk_ids = {i["CHALK_ID"] for i in build.marks}
     metadata_ids = {i["METADATA_ID"] for i in build.marks}
     hashes = {i["_CURRENT_HASH"] for i in build.marks}
-    digests = {i["_REPO_DIGESTS"][tag] for i in build.marks}
+    digests = {i["_REPO_DIGESTS"][tag_base] for i in build.marks}
     tags = set(itertools.chain(*[i["DOCKER_TAGS"] for i in build.marks]))
 
     assert len(chalk_ids) == 1

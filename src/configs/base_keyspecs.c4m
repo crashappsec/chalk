@@ -2012,9 +2012,43 @@ keyspec _IMAGE_ID {
     kind:     RunTimeArtifact
     type:     string
     standard: true
-    shortdoc: "Reported image ID for a container"
+    shortdoc: "Reported image ID for the image or container"
     doc: """
-The image ID reported by docker for a container image.
+The image ID reported by docker for an image or a container.
+Image ID is the digest of the image config json object.
+"""
+}
+
+keyspec _IMAGE_DIGEST {
+    kind:     RunTimeArtifact
+    type:     string
+    standard: true
+    shortdoc: "Reported digest of the image manifest"
+    doc: """
+The image digest reported by docker for an image.
+This is the digest of the image manifest as its referenced in
+the registry.
+
+This key assumes registry v2 spec which guarantees digest is
+the same across different registries.
+"""
+}
+
+keyspec _IMAGE_LIST_DIGEST {
+    kind:     RunTimeArtifact
+    type:     string
+    standard: true
+    shortdoc: "Reported digest of the image manifest"
+    doc: """
+The manifest list digest for an image.
+This is only reported for images which built manifest list
+such as multi-platform builds or buildx builds which pushed
+additional metadata to the registry such as `--provenance`.
+This digest can be used to lookup that metdata back from the
+registry.
+
+This key assumes registry v2 spec which guarantees digest is
+the same across different registries.
 """
 }
 

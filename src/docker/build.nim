@@ -298,7 +298,7 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
     # iidfile can be one of in order of precedence:
     # 1. manifest list digest
     # 2. image config digest
-    # and so we attempt to get digest id from metdata file first
+    # and so we attempt to get digest id from metadata file first
     let
       digest = ctx.metadataFile{"containerimage.digest"}.getStr(ctx.iidFile)
       names  = parseImages(ctx.metadataFile{"image.name"}.getStr().split(","))

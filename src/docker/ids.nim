@@ -18,21 +18,6 @@ proc extractDockerHash*(value: string): string =
 proc extractDockerHash*(value: Box): Box =
   return pack(extractDockerHash(unpack[string](value)))
 
-proc extractDockerHashList*(value: seq[string]): seq[string] =
-  for item in value:
-    result.add(item.extractDockerHash())
-
-proc extractDockerHashMap*(value: seq[string]): OrderedTable[string, string] =
-  result = initOrderedTable[string, string]()
-  for item in value:
-    if '@' notin item:
-      raise newException(
-        ValueError,
-        "Invalid docker repo name. Expecting <repo>@sha256:<digest> but got: " & item
-      )
-    let (repo, hash) = item.splitBy("@")
-    result[repo] = hash.extractDockerHash()
-
 # ----------------------------------------------------------------------------
 
 proc `$`*(self: DockerPlatform): string =
@@ -199,6 +184,24 @@ proc getImageName*(self: ChalkObj): string =
   if len(self.images) > 0:
     return $(self.images[0])
   return self.name
+
+# ----------------------------------------------------------------------------
+
+proc extractDockerHashList*(value: seq[string]): seq[string] =
+  for item in value:
+    result.add(item.extractDockerHash())
+
+proc extractDockerHashMap*(value: seq[string]): OrderedTableRef[string, string] =
+  result = newOrderedTable[string, string]()
+  for image in parseImages(value).uniq():
+    if image.digest == "":
+      raise newException(
+        ValueError,
+        "Invalid docker repo name. Expecting <repo>@sha256:<digest> but got: " & $image
+      )
+    # specifically omitting tag as digest is more precise to reference
+    # something from the registry
+    result[image.repo] = image.digest
 
 # ----------------------------------------------------------------------------
 

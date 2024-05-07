@@ -177,7 +177,6 @@ proc fetch(self: DockerManifest) =
     let data = requestManifestJson(name)
     self.setJson(data)
     self.mimickLocalConfig()
-    self.imageConfig = self.json{"config"}
     self.configPlatform = DockerPlatform(
       os:           data.json{"os"}.getStr(),
       architecture: data.json{"architecture"}.getStr(),
@@ -204,6 +203,7 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
       list.manifests.add(DockerManifest(
         kind:       DockerManifestType.image,
         name:       name,
+        list:       list,
         otherNames: otherNames,
         mediaType:  item{"mediaType"}.getStr(),
         digest:     item{"digest"}.getStr(),
@@ -237,7 +237,7 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
   else:
     raise newException(ValueError, "Unsupported docker manifest json")
 
-proc fetchManifest(name: DockerImage, otherNames: seq[DockerImage] = @[]): DockerManifest =
+proc fetchManifest*(name: DockerImage, otherNames: seq[DockerImage] = @[]): DockerManifest =
   ## request either manifest list or image manifest for specified image
   # keep in mind that image can be of multiple formats
   # foo                   # image manifest name

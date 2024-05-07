@@ -239,6 +239,8 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._OP_ALL_IMAGE_METADATA.use              = false
   ~key._OP_ALL_CONTAINER_METADATA.use          = false
   ~key._IMAGE_ID.use                           = true
+  ~key._IMAGE_DIGEST.use                       = true
+  ~key._IMAGE_LIST_DIGEST.use                  = true
   ~key._IMAGE_COMMENT.use                      = true
   ~key._IMAGE_CREATION_DATETIME.use            = true
   ~key._IMAGE_DOCKER_VERSION.use               = true
