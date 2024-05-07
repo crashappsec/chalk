@@ -171,6 +171,8 @@ report and subtract from it.
   key._IMAGE_STOP_SIGNAL.use                 = true
   key._IMAGE_STOP_TIMEOUT.use                = true
   key._IMAGE_SHELL.use                       = true
+  key._IMAGE_PROVENANCE.use                  = true
+  key._IMAGE_SBOM.use                        = true
   key._STORE_URI.use                         = true
   key.INFERRED_TECH_STACKS.use               = true
   key._INFERRED_TECH_STACKS_HOST.use         = true
@@ -706,6 +708,8 @@ doc: """
   key._IMAGE_STOP_SIGNAL.use                  = true
   key._IMAGE_STOP_TIMEOUT.use                 = true
   key._IMAGE_SHELL.use                        = true
+  key._IMAGE_PROVENANCE.use                   = true
+  key._IMAGE_SBOM.use                         = true
   key._INSTANCE_CONTAINER_ID.use              = true
   key._INSTANCE_CREATION_DATETIME.use         = true
   key._INSTANCE_ENTRYPOINT_PATH.use           = true
@@ -1131,6 +1135,8 @@ container.
   key._IMAGE_STOP_SIGNAL.use                  = true
   key._IMAGE_STOP_TIMEOUT.use                 = true
   key._IMAGE_SHELL.use                        = true
+  key._IMAGE_PROVENANCE.use                   = true
+  key._IMAGE_SBOM.use                         = true
   key.INFERRED_TECH_STACKS.use                = true
   key._INFERRED_TECH_STACKS_HOST.use          = true
   key._INSTANCE_CONTAINER_ID.use              = true
@@ -1559,6 +1565,8 @@ and keep the run-time key.
   key._IMAGE_STOP_SIGNAL.use                  = true
   key._IMAGE_STOP_TIMEOUT.use                 = true
   key._IMAGE_SHELL.use                        = true
+  key._IMAGE_PROVENANCE.use                   = true
+  key._IMAGE_SBOM.use                         = true
   key.INFERRED_TECH_STACKS.use                = true
   key._INFERRED_TECH_STACKS_HOST.use          = true
   key._INSTANCE_CONTAINER_ID.use              = true

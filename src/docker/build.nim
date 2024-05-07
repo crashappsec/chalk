@@ -304,7 +304,7 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
       names  = parseImages(ctx.metadataFile{"image.name"}.getStr().split(","))
     for platform, chalk in chalksByPlatform:
       let name = ctx.foundTags[0].withDigest(digest)
-      chalk.collectImageManifest(name, platform, otherNames = names)
+      chalk.collectImageManifest(name, otherNames = names)
   else:
     # this case in theory should never happen
     # as iid file when present should always be either locally loaded image

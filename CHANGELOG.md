@@ -81,6 +81,10 @@
     - `DOCKER_BASE_IMAGE_DIGEST` - just the digest
   - `_IMAGE_DIGEST` - docker registry v2 image manifest digest
   - `_IMAGE_LIST_DIGEST` - docker registry v2 image list manifest digest
+  - `_IMAGE_PROVENANCE` - provenance JSON when image was built with
+    `--provenance=true`
+  - `_IMAGE_SBOM` - SBOM JSON when image was built with
+    `--sbom=true`
   - `_SIGNATURES` - all docker registry cosign signatures
   - All `uname()` fields have dedicated fields:
     - `HOST_SYSNAME_WHEN_CHALKED`

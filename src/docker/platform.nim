@@ -155,6 +155,7 @@ proc copyPerPlatform*(self: ChalkObj, platforms: seq[DockerPlatform]): TableRef[
   for platform in platforms:
     let copy = self.deepCopy()
     copy.collectedData.setIfNeeded("DOCKER_PLATFORM", $platform)
+    copy.platform = platform
     result[platform] = copy
 
 proc getAllPlatforms*(ctx: DockerInvocation): seq[DockerPlatform] =

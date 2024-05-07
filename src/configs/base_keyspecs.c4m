@@ -2012,6 +2012,7 @@ keyspec _IMAGE_ID {
     kind:     RunTimeArtifact
     type:     string
     standard: true
+    since:    "0.1.0"
     shortdoc: "Reported image ID for the image or container"
     doc: """
 The image ID reported by docker for an image or a container.
@@ -2023,6 +2024,7 @@ keyspec _IMAGE_DIGEST {
     kind:     RunTimeArtifact
     type:     string
     standard: true
+    since:    "0.3.6-dev"
     shortdoc: "Reported digest of the image manifest"
     doc: """
 The image digest reported by docker for an image.
@@ -2038,6 +2040,7 @@ keyspec _IMAGE_LIST_DIGEST {
     kind:     RunTimeArtifact
     type:     string
     standard: true
+    since:    "0.3.6-dev"
     shortdoc: "Reported digest of the image manifest"
     doc: """
 The manifest list digest for an image.
@@ -2393,6 +2396,28 @@ keyspec _IMAGE_SHELL {
     standard: true
     doc: """
 The shell used within an image (e.g., `/bin/sh`) used to execute ENTRYPOINT, RUN and/or CMD commands
+"""
+}
+
+keyspec _IMAGE_PROVENANCE {
+    kind:     RunTimeArtifact
+    type:     `x
+    standard: true
+    since:    "0.3.6-dev"
+    shortdoc: "Docker image provenance information"
+    doc: """
+Docker SLSA provenance information created with `docker build --provenance=true`.
+"""
+}
+
+keyspec _IMAGE_SBOM {
+    kind:     RunTimeArtifact
+    type:     `x
+    standard: true
+    since:    "0.3.6-dev"
+    shortdoc: "Docker image SBOM information"
+    doc: """
+Docker SPDX SBOM information created with `docker build --sbom=true`.
 """
 }
 

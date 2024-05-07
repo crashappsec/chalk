@@ -10,8 +10,8 @@
 ## collect - use inspection result to load info into chalk
 
 import std/[json]
-import ".."/[config, chalkjson, util]
-import "."/[inspect, manifest, json, ids]
+import ".."/[config, chalkjson, util, semver]
+import "."/[inspect, exe, manifest, json, ids]
 
 # https://docs.docker.com/engine/api/v1.44/#tag/Image/operation/ImageInspect
 # https://github.com/opencontainers/image-spec/blob/main/config.md
@@ -239,6 +239,38 @@ proc normalizeDigestsFromManifest(chalk: ChalkObj, manifest: Dockermanifest) =
     chalk.listDigest = manifest.list.digest.extractDockerHash()
     chalk.setIfNeeded("_IMAGE_LIST_DIGEST", chalk.listDigest)
 
+proc collectProvenance(chalk: ChalkObj) =
+  # https://github.com/docker/buildx/releases/tag/v0.13.0
+  if getBuildXVersion() < parseVersion("0.13"):
+    return
+  if chalk.listDigest == "":
+    return
+  if not isSubscribedKey("_IMAGE_PROVENANCE"):
+    return
+  for image in chalk.images:
+    try:
+      let json = fetchProvenance(image.withDigest(chalk.listDigest), chalk.platform)
+      chalk.setIfNeeded("_IMAGE_PROVENANCE", pack(json.nimJsonToBox()))
+      break
+    except:
+      continue
+
+proc collectSBOM(chalk: ChalkObj) =
+  # https://github.com/docker/buildx/releases/tag/v0.13.0
+  if getBuildXVersion() < parseVersion("0.13"):
+    return
+  if chalk.listDigest == "":
+    return
+  if not isSubscribedKey("_IMAGE_SBOM"):
+    return
+  for image in chalk.images:
+    try:
+      let json = fetchSBOM(image.withDigest(chalk.listDigest), chalk.platform)
+      chalk.setIfNeeded("_IMAGE_SBOM", pack(json.nimJsonToBox()))
+      break
+    except:
+      continue
+
 proc normalizeDigests(chalk: ChalkObj) =
   ## docker inspect can return repo digests field with digests
   ## for either manifest list (if exists) or a specific image digest
@@ -262,7 +294,10 @@ proc normalizeDigests(chalk: ChalkObj) =
 proc collectImage*(chalk: ChalkObj, name: string, digest = "") =
   let contents = inspectImageJson(name)
   chalk.collectImageFrom(contents, name, digest = digest)
-  chalk.normalizeDigests()
+  if hasBuildX():
+    chalk.normalizeDigests()
+    chalk.collectProvenance()
+    chalk.collectSBOM()
 
 proc collectImage*(chalk: ChalkObj) =
   if chalk.imageId == "":
@@ -271,13 +306,14 @@ proc collectImage*(chalk: ChalkObj) =
 
 proc collectImageManifest*(chalk: ChalkObj,
                            name: DockerImage,
-                           platform: DockerPlatform,
                            otherNames: seq[DockerImage] = @[]) =
   let
-    manifest = fetchImageManifest(name, platform, otherNames = otherNames)
+    manifest = fetchImageManifest(name, chalk.platform, otherNames = otherNames)
     contents = manifest.config.json
   chalk.collectImageFrom(contents, $name)
   chalk.normalizeDigestsFromManifest(manifest)
+  chalk.collectProvenance()
+  chalk.collectSBOM()
 
 proc collectContainer*(chalk: ChalkObj, name: string) =
   let
