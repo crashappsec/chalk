@@ -9,19 +9,11 @@ import pathlib
 import secrets
 import shutil
 import tempfile
-from typing import Annotated, Any, Optional
+from typing import Any, Optional
 
 import os
 import sqlalchemy
-from fastapi import (
-    Body,
-    Depends,
-    FastAPI,
-    HTTPException,
-    Request,
-    Response,
-    status,
-)
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -240,3 +232,12 @@ async def get_backup(key_id: str):
 async def put_backup(key_id: str, request: Request):
     password = await request.body()
     backup[key_id] = password
+
+
+@app.get("/dummy/{platform}", response_class=PlainTextResponse)
+async def get_dummy_chalk(platform: str):
+    return """
+#!/bin/sh
+echo $@
+exit 0
+""".strip()

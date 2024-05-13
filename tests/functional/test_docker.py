@@ -112,7 +112,7 @@ def test_build(
     """
     Test various variants of docker build command
     """
-    image_id, _ = chalk.docker_build(
+    image_id, build = chalk.docker_build(
         dockerfile=dockerfile,
         cwd=cwd,
         tag=random_hex if tag else None,
@@ -120,6 +120,7 @@ def test_build(
         config=CONFIGS / "docker_wrap.c4m",
     )
     assert image_id
+    assert build.mark.has(_IMAGE_ENTRYPOINT=["/chalk", "exec", "--"])
 
 
 def test_docker_context(chalk: Chalk, tmp_data_dir: Path):
@@ -487,7 +488,13 @@ def test_build_and_push(chalk: Chalk, test_file: str, random_hex: str, push: boo
     platform.system() == "Darwin",
     reason="Skipping local docker push on mac due to issues https://github.com/docker/for-mac/issues/6704",
 )
-def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push: bool):
+def test_multiplatform_build(
+    chalk: Chalk,
+    test_file: str,
+    random_hex: str,
+    push: bool,
+    server_http: str,
+):
     tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
     tag = f"{tag_base}:latest"
     platforms = {"linux/amd64", "linux/arm64"}
@@ -497,6 +504,13 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
         tag=tag_base,
         push=push,
         platforms=list(platforms),
+        config=CONFIGS / "docker_wrap.c4m",
+        env={
+            # for downloading arm chalk binary
+            "CHALK_SERVER": server_http,
+            # to isolate downloaded binaries
+            "CHALK_TMP": f"/tmp/{random_hex}",
+        },
     )
 
     if not push:
@@ -514,6 +528,7 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
     hashes = {i["_CURRENT_HASH"] for i in build.marks}
     digests = {i["_REPO_DIGESTS"][tag_base] for i in build.marks}
     tags = set(itertools.chain(*[i["DOCKER_TAGS"] for i in build.marks]))
+    entrypoints = {tuple(i["_IMAGE_ENTRYPOINT"]) for i in build.marks}
 
     assert len(chalk_ids) == 1
     assert len(metadata_ids) == len(platforms)
@@ -522,6 +537,7 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
     assert len(digests) == len(platforms)
     assert len(tags) == 1
     assert tags == {tag}
+    assert entrypoints == {("/chalk", "exec", "--")}
 
 
 @pytest.mark.slow()

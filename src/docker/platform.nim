@@ -5,8 +5,8 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[tables]
-import ".."/[config, util]
+import std/[tables, httpclient]
+import ".."/[config, selfextract, util]
 import "."/[dockerfile, exe, image, ids, inspect, manifest]
 
 var defaultPlatforms = initTable[string, DockerPlatform]()
@@ -113,6 +113,67 @@ proc findBaseImagePlatform*(ctx: DockerInvocation,
       let config = inspectImageJson(image)
       return DockerPlatform(os: config["Os"].getStr(), architecture: config["Architecture"].getStr())
 
+proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
+  let
+    config   = get[string](chalkConfig, "docker.download_arch_binary_url")
+    url      = (config
+                .replace("{version}",      getChalkExeVersion())
+                .replace("{os}",           targetPlatform.os)
+                .replace("{architecture}", targetPlatform.architecture))
+  trace("docker: downloading chalk binary from: " & url)
+  let response = safeRequest(url)
+  if response.code != Http200:
+    trace("docker: while downloading chalk binary recieved: " & response.status)
+    raise newException(
+      ValueError,
+      "Could not fetch chalk binary from '" & url & "' " &
+      "due to " & response.status
+    )
+
+  let
+    base = get[string](chalkConfig, "docker.arch_binary_locations_path")
+    folder =
+      if base == "":
+        writeNewTempFile("")
+      else:
+        base.resolvePath().joinPath($targetPlatform)
+
+  folder.createDir()
+  result = folder.joinPath("chalk")
+
+  if not result.tryToWriteFile(response.body()):
+    raise newException(
+      ValueError,
+      "Could not save fetched chalk binary to: " & result
+    )
+
+  trace("docker: saved downloaded chalk binary for " & $targetPlatform & " to " & result)
+  result.makeExecutable()
+
+proc findPlatformBinaries(): TableRef[DockerPlatform, string] =
+  result = newTable[DockerPlatform, string]()
+
+  let
+    basePath = get[string](chalkConfig, "docker.arch_binary_locations_path")
+    locOpt   = getOpt[TableRef[string, string]](chalkConfig, "docker.arch_binary_locations")
+
+  if basePath != "":
+    let base = basePath.resolvePath()
+    for path in walkDirRec(base, relative = true):
+      let (platform, tail) = path.splitPath()
+      if tail != "chalk":
+        continue
+      result[parseDockerPlatform(platform)] = base.joinPath(path)
+
+  if locOpt.isNone():
+    return
+
+  # user-provided configs always take precedence of any auto discovered
+  # platforms on disk
+  let loc = locOpt.get()
+  for platform, path in locOpt.get():
+    result[parseDockerPlatform(platform)] = path.resolvePath()
+
 proc findPlatformBinary(ctx: DockerInvocation, targetPlatform: DockerPlatform): string =
   # Mapping nim platform names to docker ones is a PITA. We need to
   # know the default target platform whenever --platform isn't
@@ -128,22 +189,40 @@ proc findPlatformBinary(ctx: DockerInvocation, targetPlatform: DockerPlatform): 
   if targetPlatform == buildPlatform:
     return getMyAppPath()
 
-  let locOpt = getOpt[TableRef[string, string]](chalkConfig, "docker.arch_binary_locations")
-  if locOpt.isNone():
-    raise newException(ValueError, "docker.arch_binary_locations is not configured")
+  var path = ""
 
-  let locInfo = locOpt.get()
-  if $targetPlatform notin locInfo:
-    raise newException(ValueError, "No chalk binary for " & $targetPlatform)
+  let pathByPlatform = findPlatformBinaries()
+  if targetPlatform in pathByPlatform:
+    path = pathByPlatform[targetPlatform]
 
-  result = locInfo[$targetPlatform].resolvePath()
-  if not result.isExecutable():
+  if path == "" and get[bool](chalkConfig, "docker.download_arch_binary"):
+    trace("docker: no chalk binary found for " &
+          "TARGETPLATFORM (" & $targetPlatform & "). " &
+          "Attempting to download chalk binary.")
+    path = downloadPlatformBinary(targetPlatform)
+
+  if path == "":
     raise newException(
       ValueError,
-      "Specified Chalk binary (" & result & ") for " &
+      "no chalk binary found for " &
+      "TARGETPLATFORM (" & $targetPlatform & ")."
+    )
+
+  if not path.isExecutable():
+    raise newException(
+      ValueError,
+      "chalk binary (" & path & ") for " &
       "TARGETPLATFORM (" & $targetPlatform & ") " &
       "is not executable."
     )
+
+  result = writeNewTempFile(data = "",
+                            prefix = "chalk-",
+                            suffix = "-" & replace($targetPlatform, '/', '-'))
+  copyFileWithPermissions(path, result)
+  result.makeExecutable()
+
+  updateArchBinary(result, $targetPlatform)
 
 proc findAllPlatformsBinaries*(ctx: DockerInvocation, platforms: seq[DockerPlatform]): TableRef[DockerPlatform, string] =
   result = newTable[DockerPlatform, string]()

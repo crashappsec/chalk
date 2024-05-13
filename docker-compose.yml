@@ -123,6 +123,7 @@ services:
     volumes:
       - $PWD:$PWD
       - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp:/tmp
     working_dir: $PWD/tests/functional
     networks:
       - chalk

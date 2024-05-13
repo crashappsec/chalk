@@ -1735,8 +1735,15 @@ Note that, by default, Chalk will use its own binary for the wrapping, unless
 it sees an arch flag and determines that this is the wrong binary.
 
 In such a case, you should have a binary available for the
-architecture you are building for to copy in, which can be specified
-via the `arch_binary_locations` field.
+architecture you are building for to copy in. The binary
+can be found via these configurations in the order of precedence:
+
+* `docker.arch_binary_locations`
+* `docker.arch_binary_locations_path`
+* `docker.download_arch_binary` via `docker.download_arch_binary_url`
+
+If there isn't an architecture match, and no binary can be found,
+docker entrypoint is aborted.
 
 Note that *either* we need to be able to copy the chalk binary into
 the context directory before invoking Docker, or you need to be on a
@@ -1784,9 +1791,6 @@ where the configured Chalk binary lives for the platform. Currently,
 this only accepts local file system paths, so the binary must be
 local.
 
-If there isn't an architecture match, and no binary can be found per
-this field,
-
 Keys are expected in "Os/Architecture/Variant" form, eg:
 "linux/arm64", "linux/amd64", "linux/arm/v7" etc.
 
@@ -1796,6 +1800,59 @@ that officially support Docker, specifically Linux on arm64 and amd64
 architecture not in this set (bravo for getting Chalk to build!), it
 will still refuse to copy itself in, except via this configuration
 field.
+"""
+  }
+
+  field arch_binary_locations_path {
+    type:     string
+    default:  "~/.local/chalk/bin"
+    shortdoc: "Path where to auto-discover chalk binary locations"
+    doc:      """
+Full path from which chalk binary locations can be auto-discovered
+when `arch_binary_locations` is not provided.
+
+Path within the directory is expected to be the docker platform.
+For example tree of the config path:
+
+```
+<docker.arch_binary_locations_path>
+└── linux/
+    ├── amd64/
+    │   └── chalk
+    ├── arm64
+    │   └── chalk
+    └── arm
+        ├── v7/
+        │   └── chalk
+        └── v8/
+            └── chalk
+```
+"""
+  }
+
+  field download_arch_binary {
+    type:     bool
+    default:  true
+    shortdoc: "Automatically download chalk binaries for other architectures"
+    doc:      """
+When wrapping docker builds and architecture binary is not specified in
+`arch_binary_locations` config, it is attempted to be downloaded automatically.
+Which version of binary is downloaded is controlled by
+`download_arch_binary_version` configuration.
+"""
+  }
+
+  field download_arch_binary_url {
+    type:     string
+    default:  "https://dl.crashoverride.run/chalk/chalk-%version-%os-%architecture"
+    shortdoc: "URL template where to download chalk binaries"
+    doc:      """
+Template for a URL where to download the chalk binary when `download_arch_binary`
+is true. The template can render these variables:
+
+* `{version}`
+* `{os}`
+* `{architecture}`
 """
   }
 
@@ -1928,6 +1985,18 @@ _always_ reset the embedded configuration to the default.
 """
   }
 
+  field replace_all {
+    type:        bool
+    default:     false
+    doc:         """
+When this is on, loads will not use the interactive interface for
+configuring config. Instead, chalk will read complete config
+from stdin.
+
+The input should be of the same shape as provided by `chalk dump json`.
+"""
+  }
+
   field validate_configs_on_load {
     type:        bool
     default:     true
@@ -1963,19 +2032,6 @@ configuration parameter `dump.params`
 """
   }
 
-  field update_arch_binaries {
-    type:    bool
-    default: true
-    doc:     """
-When this is true, if you run a `chalk load` on this binary, it will
-try to (via docker) load the exact same configuration into any
-cross-architecture binaries listed in docker.arch_binary_locations.
-
-Note that, if you source config components from a local directory, you
-currently will need to update them manually, as those directories will
-not be mapped into the container.
-"""
-  }
 }
 
 singleton exec {

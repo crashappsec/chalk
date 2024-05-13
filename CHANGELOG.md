@@ -42,8 +42,14 @@
     is not guaranteed to be top layer in all cases.
     For example it is not top layer without buildx.
     Therefore all layers must be searched.
+  - `load.update_arch_binaries` - docker multi-platform
+    builds ensure config is loaded into multi-arch chalk
+    binaries and therefore it is not needed to pre-load
+    any configurations at load time. This also removed
+    `chalk load --update-arch-binaries` flag.
 
   [#282](https://github.com/crashappsec/chalk/pull/282)
+  [#286](https://github.com/crashappsec/chalk/pull/286)
 
 - `push_default` reporting template is removed as `push`
   is now a top-level chalkable operation and therefore
@@ -110,6 +116,32 @@
 - `docker`/`buildx`/`cosign` versions are now printed
   in `chalk version` command.
   [#282](https://github.com/crashappsec/chalk/pull/282)
+- New command for dumping all user configurations as json
+  as well as corresponding load all flag to import them:
+
+  ```sh
+  chalk dump all | chalk load --replace --all -
+  ```
+
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
+- Docker multi-platform builds now automatically downloads
+  corresponding chalk binary for other architectures
+  if not already present on disk.
+
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
+- New chalk configurations:
+
+  - `docker.arch_binary_locations_path` - path where to
+    auto-discover chalk binary locations for docker
+    multi-platform builds.
+  - `docker.download_arch_binary` - whether to automatically
+    download chalk binaries for other architectures.
+  - `docker.download_arch_binary_url` - URL template where
+    to download chalk binaries.
+
+  [#286](https://github.com/crashappsec/chalk/pull/286)
 
 ## 0.3.5
 

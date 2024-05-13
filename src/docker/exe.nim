@@ -5,6 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
+import std/[os]
 import ".."/[config, util, semver]
 
 var

@@ -35,7 +35,7 @@ proc runCmdConfLoad*() =
 
   if url == "default":
     if selfChalk.isMarked() and "$CHALK_CONFIG" notin selfChalk.extract:
-      cantLoad("Already using the default configuration.")
+      info("Already using the default configuration.")
     else:
       selfChalk.extract.del("$CHALK_CONFIG")
       selfChalk.extract.del("$CHALK_COMPONENT_CACHE")

@@ -541,7 +541,14 @@ configurations to cross-platform binaries.
 This does a more complete dump of source code; not just the base
 configuration, but also any cached components that have been loaded.
 """
+    }
 
+    command all {
+      shortdoc: "Output JSON of the config+cache+parameters"
+      doc: """
+This allows to dump json of the complete chalk config so that
+it can be loaded into another chalk binary.
+"""
     }
   }
 
@@ -568,16 +575,16 @@ to the config.
 """
     }
 
-    flag_yn update_arch_binaries {
-      field_to_set: "load.update_arch_binaries"
+    flag_yn all {
+      field_to_set: "load.replace_all"
       doc: """
-When this is true, if you run a `chalk load` on this binary, it will
-try to (via docker) load the exact same configuration into any
-cross-architecture binaries listed in docker.arch_binary_locations.
+When provided, all chalk configurations are replaced with values taken
+from stdin. The excepted shape of the JSON as provided via `chalk dump json`.
+This flag is meant to be used to copy complete chalk config from one chalk
+binary to another. For example this can be used to transfer configs
+between different platforms or chalk versions.
 
-Note that, if you source config components from a local directory, you
-currently will need to update them manually, as those directories will
-not be mapped into the container.
+It must be used together with `--replace`.
 """
     }
 
@@ -585,7 +592,7 @@ not be mapped into the container.
       field_to_set: "load.params_via_stdin"
       doc: """
 When provided, parameters will be taken from stdin, as a json
-dictionary.  Keys are the parameter name as specified in the
+dictionary. Keys are the parameter name as specified in the
 'parameter' block. If parameters that are needed aren't supplied, then
 defaults will be accepted.
 """
