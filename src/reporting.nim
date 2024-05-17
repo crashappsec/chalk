@@ -51,8 +51,7 @@ proc setPerChalkReports(tmpl: ReportTemplate) =
   ## Adds the `_CHALKS` key in the `hostinfo` global to the current
   ## collection context with whatever items were requested in the
   ## reporting template passed.
-  var
-    reports = seq[Box](@[])
+  var reports = seq[Box](@[])
 
   for chalk in getAllChalks():
     if not chalk.isMarked() and len(chalk.collectedData) == 0:

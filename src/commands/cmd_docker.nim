@@ -29,6 +29,7 @@ proc runCmdDocker*(args: seq[string]) =
   var
     exitCode = 0
     ctx      = initDockerInvocation(args)
+  dockerInvocation = ctx
 
   if getDockerExeLocation() == "":
     error("docker command is missing. chalk requires docker binary installed to wrap docker commands.")

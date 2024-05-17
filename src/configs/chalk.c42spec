@@ -1856,6 +1856,22 @@ is true. The template can render these variables:
 """
   }
 
+  field install_binfmt {
+    type: bool
+    default: true
+    shortdoc: "Automatically installed binfmt (QEMU)"
+    doc:      """
+For multi-platform builds chalk adds RUN commands to Dockerfile.
+As a result if binfmt is not installed for QEMU, the build
+can fail therefore falling back to non-chalked builds.
+This option allows to automatically install binfmt (QEMU)
+to allow chalked build to work.
+
+For more information see docker docs:
+https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop
+"""
+  }
+
   field label_prefix {
     type:    string
     default: "run.crashoverride."

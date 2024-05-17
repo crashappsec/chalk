@@ -80,11 +80,20 @@
   - `_IMAGE_COMPRESSED_SIZE` - compressed docker image size
     when collecting image metadata directly from the registry
   - `DOCKER_PLATFORMS` - all platforms used in docker build
+  - `DOCKER_FILE_CHALKED` - post-chalk Dockerfile content
+    as it is built
   - Docker base image fields:
     - `DOCKER_BASE_IMAGE` - base image used in Dockerfile
     - `DOCKER_BASE_IMAGE_REPO` - just the repo name
     - `DOCKER_BASE_IMAGE_TAG` - just the tag
     - `DOCKER_BASE_IMAGE_DIGEST` - just the digest
+  - Docker versions and general information:
+    - `_DOCKER_CLIENT_VERSION`
+    - `_DOCKER_SERVER_VERSION`
+    - `_DOCKER_BUILDX_VERSION`
+    - `_DOCKER_INFO` - output of `docker info`
+    - `_DOCKER_BUILDER_BUILDKIT_VERSION`
+    - `_DOCKER_BUILDER_INFO` - output of `docker buildx inspect <builder>`
   - `_IMAGE_DIGEST` - docker registry v2 image manifest digest
   - `_IMAGE_LIST_DIGEST` - docker registry v2 image list manifest digest
   - `_IMAGE_PROVENANCE` - provenance JSON when image was built with
@@ -140,6 +149,9 @@
     download chalk binaries for other architectures.
   - `docker.download_arch_binary_url` - URL template where
     to download chalk binaries.
+  - `docker.install_binfmt` - for multi-platform builds
+    automatically install binfmt when not all platforms
+    are supported by the buildx builder
 
   [#286](https://github.com/crashappsec/chalk/pull/286)
 

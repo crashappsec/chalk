@@ -497,7 +497,8 @@ plugin docker {
     codec:    true
     priority: 1
     enabled:  true
-    pre_chalk_keys: ["ARTIFACT_TYPE", "DOCKER_FILE", "DOCKERFILE_PATH",
+    pre_chalk_keys: ["ARTIFACT_TYPE",
+                     "DOCKER_FILE", "DOCKER_FILE_CHALKED", "DOCKERFILE_PATH",
                      "DOCKER_PLATFORM", "DOCKER_PLATFORMS",
                      "DOCKER_LABELS", "DOCKER_TAGS",
                      "DOCKER_BASE_IMAGE", "DOCKER_BASE_IMAGE_REPO",
@@ -505,7 +506,6 @@ plugin docker {
                      "DOCKER_CONTEXT", "DOCKER_ADDITIONAL_CONTEXTS",
                      "DOCKER_CHALK_ADDED_LABELS",
                      "DOCKER_CHALK_ADDED_TO_DOCKERFILE" ]
-
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE", "_REPO_TAGS",
         "_REPO_DIGESTS", "_IMAGE_COMMENT", "_IMAGE_CREATION_DATETIME",
         "_IMAGE_ID", "_IMAGE_DIGEST", "_IMAGE_LIST_DIGEST",
@@ -576,6 +576,10 @@ plugin docker {
         "_INSTANCE_MAC", "_INSTANCE_NETWORKS",  "_OP_ALL_CONTAINER_METADATA",
         "_OP_ALL_IMAGE_METADATA", "_STORE_URI"
     ]
+    post_run_keys:  ["_DOCKER_CLIENT_VERSION", "_DOCKER_SERVER_VERSION",
+                     "_DOCKER_BUILDX_VERSION", "_DOCKER_INFO",
+                     "_DOCKER_BUILDER_BUILDKIT_VERSION",
+                     "_DOCKER_BUILDER_INFO"]
     doc: """
 The docker Codec is responsible for chalk marks for Docker images and
 containers, but also does all of the docker-specific data collection

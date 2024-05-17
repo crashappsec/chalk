@@ -14,6 +14,14 @@
 import ".."/[config]
 import "."/[ids]
 
+proc extractBuildx(ctx: DockerInvocation) =
+  ctx.foundBuildx = ctx.cmdName.startsWith("buildx.")
+
+proc extractBuilder(ctx: DockerInvocation) =
+  if "builder" in ctx.processedFlags:
+    let targets = unpack[seq[string]](ctx.processedFlags["builder"].getValue())
+    ctx.foundBuilder = targets[0]
+
 proc extractIidFile(ctx: DockerInvocation) =
   if "iidfile" in ctx.processedFlags:
     let targets = unpack[seq[string]](ctx.processedFlags["iidfile"].getValue())
@@ -170,7 +178,7 @@ proc extractContext(ctx: DockerInvocation) =
 
   ctx.foundContext = lastGoodArg
 
-proc initDockerInvocation*(args: seq[string]): DockerInvocation =
+proc initDockerInvocation*(originalArgs: seq[string]): DockerInvocation =
   ## This does the initial command line parsing, caching the fields we
   ## look at into the DockerInvocation object so that callers don't
   ## have to care about how con4m stores it, etc.
@@ -185,33 +193,55 @@ proc initDockerInvocation*(args: seq[string]): DockerInvocation =
   ## run the parse and then allow us to extract the subcommand,
   ## flags and remaining arguments.
 
-  con4mRuntime.addStartGetopts("docker.getopts", args = args).run()
+  try:
+    con4mRuntime.addStartGetopts("docker.getopts", args = originalArgs).run()
+  except:
+    discard
 
-  let cmd = block:
-    case con4mRuntime.getCommand()
-    of "build":
-      DockerCmd.build
-    of "push":
-      DockerCmd.push
-    else:
-      DockerCmd.other
+  let
+    cmdName =
+      try:
+        con4mRuntime.getCommand()
+      except:
+        ""
+    cmd =
+      case cmdName
+      of "buildx.build", "build":
+        DockerCmd.build
+      of "push":
+        DockerCmd.push
+      else:
+        DockerCmd.other
+    flags =
+      try:
+        con4mRuntime.getFlags()
+      except:
+        initOrderedTable[string, FlagSpec]()
+    args =
+      try:
+        con4mRuntime.getArgs()
+      except:
+        @[]
 
   # this sets minimal fields required to execute fallback behavior
   # the rest of the fields are set in another function to isolate
   # any possible exceptions
   return DockerInvocation(
     chalkId:        dockerGenerateChalkId(),
-    originalArgs:   args,
+    originalArgs:   originalArgs,
     originalStdIn:  "", # populated if stdin is read anywhere
-    processedFlags: con4mRuntime.getFlags(),
-    processedArgs:  con4mRuntime.getArgs(),
+    cmdName:        cmdName,
     cmd:            cmd,
+    processedFlags: flags,
+    processedArgs:  args,
   )
 
 proc extractDockerCommand*(self: DockerInvocation): DockerCmd =
   result = self.cmd
   case self.cmd
   of DockerCmd.build:
+    self.extractBuildx()
+    self.extractBuilder()
     self.extractIidFile()
     self.extractMetadataFile()
     self.extractDockerFile()

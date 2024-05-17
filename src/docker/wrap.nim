@@ -7,8 +7,9 @@
 
 ## Dockerfile wrapping logic
 
-import ".."/[config, semver]
-import "."/[dockerfile, exe, ids, image]
+import std/[sequtils]
+import ".."/[config, selfextract]
+import "."/[dockerfile, platform, exe, ids, image]
 
 proc getTargetUser(ctx: DockerInvocation, platform: DockerPlatform): string =
   ## get USER from the target section
@@ -68,15 +69,15 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
   else:
     trace("docker: making file available to docker via copy: " & loc & " @ " & newPath)
 
-  if supportsBuildContextFlag():
+  if ctx.supportsBuildContextFlag():
     once:
       trace("docker: injection method: --build-context")
 
     ctx.newCmdLine.add("--build-context")
-    ctx.newCmdLine.add("chalkexedir" & $(contextCounter) & "=" & dir)
+    ctx.newCmdLine.add("chalkcontext" & $(contextCounter) & "=" & dir)
     toAdd.add("COPY " &
               chmodstr &
-              "--from=chalkexedir" & $(contextCounter) &
+              "--from=chalkcontext" & $(contextCounter) &
               " " & file & " " & newPath)
     contextCounter += 1
     if move:
@@ -135,6 +136,32 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
         "Could not write to context directory (" & dstLoc & ").",
       )
 
+proc addByPlatform(ctx: DockerInvocation, newPath: string, image = "scratch"): string =
+  # in order to copy file by platform, we need to create
+  # an intermediate build where the file path contains
+  # the build platform which will allow us to COPY
+  # that file into final image by referencing $TARGETPLATFORM
+  # build arg hence customizing the file by platform.
+  # for example:
+  # FROM scratch as chalk_base
+  # COPY foo /linux/amd64
+  # COPY bar /linux/arm64
+  # FROM alpine
+  # ARG TARGETPLATFORM
+  # COPY --from=chalk_base /$TARGETPLATFORM /chalk.json
+  let
+    base = "chalk" & newPath.replace("/", "_").replace(".", "_")
+    env  = "/$TARGETPLATFORM"
+    arg  = "ARG TARGETPLATFORM"
+    copy = "COPY --from=" & base & " " & env & " " & newPath
+  if base notin ctx.addedPlatform:
+    ctx.addedPlatform[base] = @["FROM " & image & " AS " & base]
+  if arg notin ctx.addedInstructions:
+    ctx.addedInstructions.add(arg)
+  if copy notin ctx.addedInstructions:
+    ctx.addedInstructions.add(copy)
+  return base
+
 proc makeFileAvailableToDocker*(ctx:        DockerInvocation,
                                 path:       string,
                                 newPath:    string,
@@ -144,42 +171,18 @@ proc makeFileAvailableToDocker*(ctx:        DockerInvocation,
                                 byPlatform: bool           = false,
                                 platform:   DockerPlatform) =
   if byPlatform:
-    if not supportsBuildContextFlag():
+    if not ctx.supportsBuildContextFlag():
       raise newException(
         ValueError,
         "recent version of buildx is required for copying files by platform into Dockerfile",
       )
-    # in order to copy file by platform, we need to create
-    # an intermediate build where the file path contains
-    # the build platform which will allow us to COPY
-    # that file into final image by referencing $TARGETPLATFORM
-    # build arg hence customizing the file by platform.
-    # for example:
-    # FROM scratch as chalk_base
-    # COPY foo /linux/amd64
-    # COPY bar /linux/arm64
-    # FROM alpine
-    # ARG TARGETPLATFORM
-    # COPY --from=chalk_base /$TARGETPLATFORM /chalk.json
-    let
-      platformBase = "chalk" & newPath.replace("/", "_").replace(".", "_")
-      platformPath = "/" & $platform
-      platformEnv  = "/$TARGETPLATFORM"
-      platformArg  = "ARG TARGETPLATFORM"
-      platformCopy = "COPY --from=" & platformBase & " " & platformEnv & " " & newPath
-    if platformBase notin ctx.addedPlatform:
-      ctx.addedPlatform[platformBase] = @["FROM scratch AS " & platformBase]
-    if platformArg notin ctx.addedInstructions:
-      ctx.addedInstructions.add(platformArg)
-    if platformCopy notin ctx.addedInstructions:
-      ctx.addedInstructions.add(platformCopy)
     ctx.makeFileAvailableToDocker(
       path    = path,
-      newPath = platformPath,
+      newPath = "/" & $platform,
       user    = user,
       move    = move,
       chmod   = chmod,
-      toAdd   = ctx.addedPlatform[platformBase],
+      toAdd   = ctx.addedPlatform[ctx.addByPlatform(newPath)],
     )
   else:
     ctx.makeFileAvailableToDocker(
@@ -210,3 +213,78 @@ proc makeTextAvailableToDocker*(ctx:        DockerInvocation,
     byPlatform = byPlatform,
     platform   = platform,
   )
+
+proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
+                                 binaries: TableRef[DockerPlatform, string],
+                                 newPath:  string  = "/chalk",
+                                 user:     string,
+                                 move:     bool,
+                                 chmod:    string  = "0755") =
+  let
+    system = getSystemBuildPlatform()
+    first  = binaries.keys().toSeq()[0]
+  # even if not multi-platform, when target platform doesnt match
+  # system platform we have to ensure copied chalk has identical configs
+  if len(binaries) > 1 or first != system:
+    if not ctx.supportsBuildContextFlag():
+      raise newException(
+        ValueError,
+        "recent version of buildx is required for copying chalk by platform into Dockerfile",
+      )
+    let
+      validate = get[bool](chalkConfig, "load.validate_configs_on_load")
+      binfmt   = get[bool](chalkConfig, "docker.install_binfmt")
+      # other chalks might have different config for validate_configs_on_load
+      # so we ensure we honor self config via CLI arg
+      check    = if validate: "--validation" else: "--no-validation"
+      config   = writeNewTempFile(getAllDumpJson())
+      base     = ctx.addByPlatform(newPath, image = "busybox")
+    ctx.makeFileAvailableToDocker(
+      path    = config,
+      newPath = "/config.json",
+      user    = user,
+      move    = move,
+      chmod   = "0444",
+      toAdd   = ctx.addedPlatform[base],
+    )
+    for platform, path in binaries:
+      # ensure platform is supported by the builder as chalk adds RUN commands
+      # to dockerfile and if binfmt is not installed, multi-platform build might fail
+      # where original dockerfile might not have any RUN commands which would
+      # succeed the build otherwise
+      if not ctx.doesBuilderSupportPlatform(platform):
+        if binfmt:
+          installBinFmt()
+        else:
+          raise newException(
+            ValueError,
+            "No support for " & $platform & " was detected in buildx builder. " &
+            "To automatically add support via QEMU enable 'docker.install_binfmt' configuration. " &
+            "Alternatively manually install binfmt as per " &
+            "https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop"
+          )
+      info("docker: wrapping image with this chalk binary: " & path & " (" & $platform & ")")
+      ctx.makeFileAvailableToDocker(
+        path    = path,
+        newPath = "/" & $platform,
+        user    = user,
+        move    = move,
+        chmod   = chmod,
+        toAdd   = ctx.addedPlatform[base],
+      )
+    ctx.addedPlatform[base] &= @[
+     "ARG TARGETPLATFORM",
+     "RUN /$TARGETPLATFORM load --replace --all " & check & " /config.json",
+     # sanity check plus it will show chalk metadata in build logs
+     "RUN /$TARGETPLATFORM version",
+    ]
+  else:
+    for _, path in binaries:
+      ctx.makeFileAvailableToDocker(
+        path    = path,
+        newPath = newPath,
+        user    = user,
+        move    = move,
+        chmod   = chmod,
+        toAdd   = ctx.addedInstructions,
+      )

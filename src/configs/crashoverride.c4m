@@ -196,7 +196,14 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.METADATA_HASH.use                       = true
   ~key.METADATA_ID.use                         = true
   ~key.SIGNATURE.use                           = true
+  ~key._DOCKER_CLIENT_VERSION.use              = true
+  ~key._DOCKER_SERVER_VERSION.use              = true
+  ~key._DOCKER_BUILDX_VERSION.use              = true
+  ~key._DOCKER_INFO.use                        = true
+  ~key._DOCKER_BUILDER_BUILDKIT_VERSION.use    = true
+  ~key._DOCKER_BUILDER_INFO.use                = true
   ~key.DOCKER_FILE.use                         = true
+  ~key.DOCKER_FILE_CHALKED.use                 = true
   ~key.DOCKERFILE_PATH.use                     = true
   ~key.DOCKER_PLATFORM.use                     = true
   ~key.DOCKER_PLATFORMS.use                    = true

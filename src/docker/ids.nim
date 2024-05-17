@@ -48,6 +48,18 @@ proc parseDockerPlatform*(platform: string): DockerPlatform =
     raise newException(ValueError, "Invalid docker platform: " & platform)
   return DockerPlatform(os: items[0], architecture: items[1])
 
+proc contains*[T](self: TableRef[DockerPlatform, T], key: DockerPlatform): bool =
+  for k, _ in self:
+    if k == key:
+      return true
+  return false
+
+proc `[]`*[T](self: TableRef[DockerPlatform, T], key: DockerPlatform): T =
+  for k, v in self:
+    if k == key:
+      return v
+  raise newException(KeyError, $key & " platform not found")
+
 # ----------------------------------------------------------------------------
 
 proc parseDigest*(digest: string): DockerImage =

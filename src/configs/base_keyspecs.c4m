@@ -1350,6 +1350,19 @@ docker file passed to the docker command line, prior to any chalking.
 """
 }
 
+keyspec DOCKER_FILE_CHALKED {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.3.6-dev"
+    shortdoc: "Updated Docker file contents post-chalk"
+    doc: """
+Full content of the dockerfile as it is built including all
+chalk additions added to it.
+"""
+}
+
 keyspec DOCKERFILE_PATH {
     kind:             ChalkTimeArtifact
     type:             string
@@ -1501,6 +1514,60 @@ keyspec DOCKER_BASE_IMAGE_DIGEST {
 Only registry digest of the base image if specified in Dockerfile used to build docker image.
 Note this only specifies the base image of the final build target.
 """
+}
+
+keyspec _DOCKER_CLIENT_VERSION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker client version"
+    doc:              "Docker CLI client version"
+}
+
+keyspec _DOCKER_SERVER_VERSION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker server version"
+    doc:              "Docker daemon server version"
+}
+
+keyspec _DOCKER_BUILDX_VERSION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker buildx version"
+    doc:              "Docker buildx version"
+}
+
+keyspec _DOCKER_INFO {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker info output"
+    doc:              "Docker info output"
+}
+
+keyspec _DOCKER_BUILDER_BUILDKIT_VERSION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker buildkit version of the builder"
+    doc:              "Docker buildkit version of the builder"
+}
+
+keyspec _DOCKER_BUILDER_INFO {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker buildx inspect output of the builder"
+    doc:              "Docker buildx inspect output of the builder"
 }
 
 keyspec _OP_ARTIFACT_TYPE {

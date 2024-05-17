@@ -353,9 +353,11 @@ type
     newCmdLine*:              seq[string] # Rewritten command line
     newStdIn*:                string
 
+    cmdName*:                 string
     case cmd*:                DockerCmd
 
     of DockerCmd.build:
+      foundBuildx*:           bool # whether using "docker buildx build" or "docker build"
       foundIidFile*:          string
       foundMetadataFile*:     string
       foundFileArg*:          string
@@ -367,6 +369,7 @@ type
       foundExtraContexts*:    OrderedTableRef[string, string]
       foundSecrets*:          TableRef[string, DockerSecret]
       foundTarget*:           string
+      foundBuilder*:          string
 
       gitContext*:            DockerGitContext
 
@@ -472,6 +475,7 @@ var
   commandName*:           string
   gitExeLocation*:        string = ""
   sshKeyscanExeLocation*: string = ""
+  dockerInvocation*:      DockerInvocation
 
 template dumpExOnDebug*() =
   if chalkConfig != nil and get[bool](chalkConfig, "chalk_debug"):

@@ -9,9 +9,11 @@ import std/[os]
 import ".."/[config, util, semver]
 
 var
-  buildXVersion     = parseVersion("0")
-  dockerVersion     = parseVersion("0")
-  dockerExeLocation = ""
+  dockerExeLocation   = ""
+  dockerClientVersion = parseVersion("0")
+  dockerServerVersion = parseVersion("0")
+  buildXVersion       = parseVersion("0")
+  buildKitVersion     = parseVersion("0")
 
 proc getDockerExeLocation*(): string =
   once:
@@ -41,7 +43,6 @@ proc getBuildXVersion*(): Version =
   once:
     if getEnv("DOCKER_BUILDKIT") == "0":
       return buildXVersion
-
     # examples:
     # github.com/docker/buildx v0.10.2 00ed17df6d20f3ca4553d45789264cdb78506e5f
     # github.com/docker/buildx 0.11.2 9872040b6626fb7d87ef7296fd5b832e8cc2ad17
@@ -52,10 +53,9 @@ proc getBuildXVersion*(): Version =
         trace("docker: buildx version: " & $(buildXVersion))
       except:
         dumpExOnDebug()
-
   return buildXVersion
 
-proc getDockerVersion*(): Version =
+proc getDockerClientVersion*(): Version =
   once:
     # examples:
     # Docker version 1.13.0, build 49bf474
@@ -64,22 +64,113 @@ proc getDockerVersion*(): Version =
     let version = runDockerGetEverything(@["--version"])
     if version.exitCode == 0:
       try:
-        dockerVersion = getVersionFromLine(version.stdOut)
-        trace("docker: version: " & $(dockerVersion))
+        dockerClientVersion = getVersionFromLine(version.stdOut)
+        trace("docker: client version: " & $(dockerClientVersion))
       except:
         dumpExOnDebug()
+  return dockerClientVersion
 
-  return dockerVersion
+proc getDockerServerVersion*(): Version =
+  once:
+    let version = runDockerGetEverything(@["version"])
+    if version.exitCode == 0:
+      try:
+        dockerServerVersion = getVersionFromLineWhich(
+          version.stdOut.splitLines(),
+          isAfterLineStartingWith = "Server:",
+          contains                = "Version:",
+        )
+        trace("docker: server version: " & $(dockerServerVersion))
+      except:
+        dumpExOnDebug()
+  return dockerServerVersion
 
-template hasBuildx*(): bool =
-  getBuildXVersion() > parseVersion("0")
+proc hasBuildx*(): bool =
+  return getBuildXVersion() > parseVersion("0")
 
-template supportsBuildContextFlag*(): bool =
+var dockerInfo = ""
+proc getDockerInfo*(): string =
+  once:
+    let output = runDockerGetEverything(@["info"])
+    if output.exitCode != 0:
+      raise newException(
+        ValueError,
+        "could not get docker info " &
+        output.getStdErr(),
+      )
+    dockerInfo = output.getStdOut()
+  return dockerInfo
+
+proc getBuilderName(ctx: DockerInvocation): string =
+  if not ctx.foundBuildx:
+    return "default"
+  if ctx.foundBuilder != "":
+    return ctx.foundBuilder
+  return getEnv("BUILDX_BUILDER")
+
+var builderInfo = ""
+proc getBuilderInfo*(ctx: DockerInvocation): string =
+  once:
+    if hasBuildX():
+      let name = ctx.getBuilderName()
+      var args = @["buildx", "inspect"]
+      if name != "":
+        args.add(name)
+      let output = runDockerGetEverything(args)
+      if output.exitCode != 0:
+        trace("docker: could not get buildx builder information: " & output.getStdErr())
+      builderInfo = output.getStdOut()
+  return builderInfo
+
+proc getBuildKitVersion*(ctx: DockerInvocation): Version =
+  once:
+    let info = ctx.getBuilderInfo()
+    try:
+      buildKitVersion = getVersionFromLineWhich(
+        info.splitLines(),
+        startsWith = "Buildkit:",
+      )
+      trace("docker: buildkit version: " & $(buildKitVersion))
+    except:
+      dumpExOnDebug()
+  return buildKitVersion
+
+proc supportsBuildContextFlag*(ctx: DockerInvocation): bool =
   # https://github.com/docker/buildx/releases/tag/v0.8.0
-  getDockerVersion() >= parseVersion("21") and getBuildXVersion() >= parseVersion("0.8")
+  # which requires dockerfile syntax >=1.4
+  # https://github.com/moby/buildkit/releases/tag/dockerfile%2F1.4.0
+  # which is included in buildkit >= 0.10 as its released from same commit
+  # https://github.com/moby/buildkit/releases/tag/v0.10.0
+  # which in turn is included in docker server version >= 23
+  # https://docs.docker.com/engine/release-notes/23.0/#2300
+  return (
+    getDockerClientVersion() >= parseVersion("21") and
+    getDockerServerVersion() >= parseVersion("23") and
+    getBuildXVersion()       >= parseVersion("0.8") and
+    ctx.getBuildKitVersion() >= parseVersion("0.10")
+  )
 
-template supportsCopyChmod*(): bool =
+proc supportsCopyChmod*(): bool =
   # > the --chmod option requires BuildKit.
   # > Refer to https://docs.docker.com/go/buildkit/ to learn how to
   # > build images with BuildKit enabled
-  hasBuildx()
+  return hasBuildx()
+
+proc supportsInspectJsonFlag*(): bool =
+  # https://github.com/docker/cli/pull/2936
+  return getDockerClientVersion() >= parseVersion("22")
+
+proc installBinFmt*() =
+  once:
+    # https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop
+    info("docker: installing binfmt for multi-platform builds")
+    let output = runDockerGetEverything(@[
+      "run",
+      "--privileged",
+      "--rm",
+      "tonistiigi/binfmt",
+      "--install",
+      "all",
+    ])
+    if output.exitCode != 0:
+      raise newException(ValueError, "could not install binfmt " & output.getStdErr())

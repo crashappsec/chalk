@@ -20,7 +20,8 @@ proc runCmdVersion*() =
   var cells: seq[seq[string]]
 
   let
-    docker = getDockerVersion()
+    client = getDockerClientVersion()
+    server = getDockerServerVersion()
     buildx = getBuildXVersion()
     cosign = getCosignVersion()
 
@@ -30,7 +31,8 @@ proc runCmdVersion*() =
   cells.add(@["Build CPU", hostCPU])
   cells.add(@["Build Date", CompileDate])
   cells.add(@["Build Time", CompileTime])
-  cells.add(@["Docker", docker.default()])
+  cells.add(@["Docker Client", client.default()])
+  cells.add(@["Docker Server", server.default()])
   cells.add(@["Buildx", buildx.default()])
   cells.add(@["Cosign", cosign.default()])
 

@@ -14,10 +14,8 @@ import "."/chalk_common
 export chalk_common
 
 var
-  ctxStack            = seq[CollectionCtx](@[])
-  collectionCtx       = CollectionCtx()
-  startTime*          = getMonoTime().ticks()
-  contextDirectories: seq[string]
+  ctxStack   = @[CollectionCtx()]
+  startTime* = getMonoTime().ticks()
 
 proc get*[T](chalkConfig: ChalkConfig, fqn: string): T =
   get[T](chalkConfig.`@@attrscope@@`, fqn)
@@ -40,43 +38,27 @@ template getNativeCodecsOnly*(): bool =
   nativeCodecsOnly
 
 proc inSubscan*(): bool =
-  return len(ctxStack) != 0
+  return len(ctxStack) > 1
 
 proc clearReportingState*() =
   startTime      = getMonoTime().ticks()
-  ctxStack       = @[]
-  collectionCtx  = CollectionCtx()
+  ctxStack       = @[CollectionCtx()]
   hostInfo       = ChalkDict()
   subscribedKeys = Table[string, bool]()
   systemErrors   = @[]
 
 proc pushCollectionCtx*(): CollectionCtx =
-  ctxStack.add(collectionCtx)
-  collectionCtx = CollectionCtx()
-  result        = collectionCtx
+  result = CollectionCtx()
+  ctxStack.add(result)
 
 proc popCollectionCtx*() =
-  if len(ctxStack) != 0:
-    # pop from stack last item
-    discard ctxStack.pop()
-  # if there is previous item on stack
-  # make it current collection context
-  if len(ctxStack) != 0:
-    collectionCtx = ctxStack[^1]
-  else:
-    collectionCtx = CollectionCtx()
+  if not inSubscan():
+    raise newException(IndexError, "Cannot pop collection context outside of subscan")
+  # pop from stack last item
+  discard ctxStack.pop()
 
-proc setContextDirectories*(l: seq[string]) =
-  # Used for 'where to look for stuff' plugins, particularly version control.
-  if inSubscan():
-    collectionCtx.contextDirectories = l
-  else:
-    contextDirectories = l
-
-proc getContextDirectories*(): seq[string] =
-  if inSubscan():
-    return collectionCtx.contextDirectories
-  return contextDirectories
+template collectionCtx(): CollectionCtx =
+  ctxStack[^1]
 
 proc getCurrentCollectionCtx*(): CollectionCtx =
   collectionCtx
@@ -102,6 +84,12 @@ proc getUnmarked*(): seq[string] =
   collectionCtx.unmarked
 proc addUnmarked*(s: string) =
   collectionCtx.unmarked.add(s)
+proc setContextDirectories*(l: seq[string]) =
+  # Used for 'where to look for stuff' plugins, particularly version control.
+  collectionCtx.contextDirectories = l
+proc getContextDirectories*(): seq[string] =
+  collectionCtx.contextDirectories
+
 proc isMarked*(chalk: ChalkObj): bool {.inline.} =
   return chalk.marked
 

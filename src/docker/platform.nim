@@ -6,7 +6,7 @@
 ##
 
 import std/[tables, httpclient]
-import ".."/[config, selfextract, util]
+import ".."/[config, util]
 import "."/[dockerfile, exe, image, ids, inspect, manifest]
 
 var defaultPlatforms = initTable[string, DockerPlatform]()
@@ -66,7 +66,7 @@ proc dockerProbeDefaultPlatforms*(): Table[string, DockerPlatform] =
       else:
         result[k] = parseDockerPlatform(value)
 
-proc getSystemBuildPlatform(): DockerPlatform =
+proc getSystemBuildPlatform*(): DockerPlatform =
   return DockerPlatform(os: hostOs, architecture: hostCPU)
 
 proc findDockerPlatform*(): DockerPlatform =
@@ -88,6 +88,8 @@ proc findBaseImagePlatform*(ctx: DockerInvocation,
   let baseSection = ctx.getBaseDockerSection()
   if baseSection.platform != nil:
     return baseSection.platform
+  if $baseSection.image == "scratch":
+    return getSystemBuildPlatform()
   try:
     # TODO maybe this should be done after registry attempts?
     # multi-platform builds can pull base image from registry regardless of local cache
@@ -189,45 +191,49 @@ proc findPlatformBinary(ctx: DockerInvocation, targetPlatform: DockerPlatform): 
   if targetPlatform == buildPlatform:
     return getMyAppPath()
 
-  var path = ""
-
   let pathByPlatform = findPlatformBinaries()
   if targetPlatform in pathByPlatform:
-    path = pathByPlatform[targetPlatform]
+    let path = pathByPlatform[targetPlatform]
+    if not path.isExecutable():
+      raise newException(
+        ValueError,
+        "chalk binary (" & result & ") for " &
+        "TARGETPLATFORM (" & $targetPlatform & ") " &
+        "is not executable."
+      )
+    return path
 
-  if path == "" and get[bool](chalkConfig, "docker.download_arch_binary"):
+  if get[bool](chalkConfig, "docker.download_arch_binary"):
     trace("docker: no chalk binary found for " &
           "TARGETPLATFORM (" & $targetPlatform & "). " &
           "Attempting to download chalk binary.")
-    path = downloadPlatformBinary(targetPlatform)
+    return downloadPlatformBinary(targetPlatform)
 
-  if path == "":
-    raise newException(
-      ValueError,
-      "no chalk binary found for " &
-      "TARGETPLATFORM (" & $targetPlatform & ")."
-    )
-
-  if not path.isExecutable():
-    raise newException(
-      ValueError,
-      "chalk binary (" & path & ") for " &
-      "TARGETPLATFORM (" & $targetPlatform & ") " &
-      "is not executable."
-    )
-
-  result = writeNewTempFile(data = "",
-                            prefix = "chalk-",
-                            suffix = "-" & replace($targetPlatform, '/', '-'))
-  copyFileWithPermissions(path, result)
-  result.makeExecutable()
-
-  updateArchBinary(result, $targetPlatform)
+  raise newException(
+    ValueError,
+    "no chalk binary found for " &
+    "TARGETPLATFORM (" & $targetPlatform & ")."
+  )
 
 proc findAllPlatformsBinaries*(ctx: DockerInvocation, platforms: seq[DockerPlatform]): TableRef[DockerPlatform, string] =
   result = newTable[DockerPlatform, string]()
   for platform in platforms:
     result[platform] = ctx.findPlatformBinary(platform)
+
+proc doesBuilderSupportPlatform*(ctx: DockerInvocation, platform: DockerPlatform): bool =
+  let info = ctx.getBuilderInfo()
+  for line in info.splitLines():
+    if line.startsWith("Platforms: "):
+      let platforms = line.split(maxsplit = 1)[1].split(Whitespace + {','})
+      for p in platforms:
+        if p != "":
+          if parseDockerPlatform(p) == platform:
+            return true
+      return false
+  raise newException(
+    ValueError,
+    "could not find platforms for buildx builder"
+  )
 
 proc copyPerPlatform*(self: ChalkObj, platforms: seq[DockerPlatform]): TableRef[DockerPlatform, ChalkObj] =
   result = newTable[DockerPlatform, ChalkObj]()

@@ -15,7 +15,7 @@ proc processGitContext(ctx: DockerInvocation) =
       ctx.gitContext = gitContext(ctx.foundContext,
                                   authTokenSecret = ctx.getSecret("GIT_AUTH_TOKEN"),
                                   authHeaderSecret = ctx.getSecret("GIT_AUTH_HEADER"))
-      if not supportsBuildContextFlag():
+      if not ctx.supportsBuildContextFlag():
         trace("docker: no support for additional contexts detected. " &
               "Checking out git context to disk")
         # if using git context, and buildx is not used which supports
@@ -27,39 +27,39 @@ proc processGitContext(ctx: DockerInvocation) =
     error("docker: chalk could not process docker git context: " & ctx.foundContext)
     raise
 
-proc processDockerFile(state: DockerInvocation) =
-  if state.dockerFileLoc == ":stdin:":
+proc processDockerFile(ctx: DockerInvocation) =
+  if ctx.dockerFileLoc == ":stdin:":
     let input           = stdin.readAll()
-    state.inDockerFile  = input
-    state.originalStdIn = input
+    ctx.inDockerFile  = input
+    ctx.originalStdIn = input
     trace("docker: read Dockerfile from stdin")
 
-  elif state.gitContext != nil and supportsBuildContextFlag():
-    # state.dockerFileLoc is resolvedPath which is invalid
+  elif ctx.gitContext != nil and ctx.supportsBuildContextFlag():
+    # ctx.dockerFileLoc is resolvedPath which is invalid
     # in git context as we need raw path passed in the CLI
-    var dockerFileLoc = state.foundFileArg
+    var dockerFileLoc = ctx.foundFileArg
     if dockerFileLoc == "":
       dockerFileLoc = "Dockerfile"
-    state.inDockerFile = state.gitContext.show(dockerFileLoc)
-    state.dockerFileLoc = ":stdin:"
+    ctx.inDockerFile = ctx.gitContext.show(dockerFileLoc)
+    ctx.dockerFileLoc = ":stdin:"
 
   else:
-    if state.dockerFileLoc == "":
-      let toResolve = joinPath(state.foundcontext, "Dockerfile")
-      state.dockerFileLoc = resolvePath(toResolve)
+    if ctx.dockerFileLoc == "":
+      let toResolve = joinPath(ctx.foundcontext, "Dockerfile")
+      ctx.dockerFileLoc = resolvePath(toResolve)
 
     try:
-      withFileStream(state.dockerFileLoc, mode = fmRead, strict = false):
+      withFileStream(ctx.dockerFileLoc, mode = fmRead, strict = false):
         if stream != nil:
-          state.inDockerFile = stream.readAll()
-          trace("docker: read Dockerfile at: " & state.dockerFileLoc)
+          ctx.inDockerFile = stream.readAll()
+          trace("docker: read Dockerfile at: " & ctx.dockerFileLoc)
         else:
-          error("docker: " & state.foundFileArg & ": Dockerfile not found")
+          error("docker: " & ctx.foundFileArg & ": Dockerfile not found")
           raise newException(ValueError, "No Dockerfile")
 
     except:
       dumpExOnDebug()
-      error("docker: " & state.foundFileArg & ": Dockerfile not readable")
+      error("docker: " & ctx.foundFileArg & ": Dockerfile not readable")
       raise newException(ValueError, "Read perms")
 
 proc processCmdLine(ctx: DockerInvocation) =
@@ -276,6 +276,7 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_CHALK_ADDED_TO_DOCKERFILE", ctx.addedInstructions)
   dict.setIfNeeded("DOCKER_CONTEXT",                   ctx.foundContext)
   dict.setIfNeeded("DOCKER_FILE",                      ctx.inDockerFile)
+  dict.setIfNeeded("DOCKER_FILE_CHALKED",              ctx.getUpdatedDockerfile())
   dict.setIfNeeded("DOCKER_LABELS",                    ctx.foundLabels)
   dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.foundPlatforms))
   dict.setIfNeeded("DOCKER_TAGS",                      ctx.foundTags.asRepoTag())

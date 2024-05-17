@@ -106,17 +106,13 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
           "Cannot wrap; no ENTRYPOINT found in Dockerfile"
         )
 
-  for platform, binary in binaries:
-    info("docker: wrapping image with this chalk binary: " & binary & " (" & $platform & ")")
-    ctx.makeFileAvailableToDocker(
-      path       = binary,
-      newPath    = "/chalk",
-      user       = user,
-      move       = false,
-      chmod      = "0755",
-      byPlatform = len(binaries) > 1,
-      platform   = platform,
-    )
+  ctx.makeChalkAvailableToDocker(
+      binaries = binaries,
+      newPath  = "/chalk",
+      user     = user,
+      move     = false,
+      chmod    = "0755",
+  )
 
   var toAdd: seq[string] = @[]
 

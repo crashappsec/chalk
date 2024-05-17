@@ -219,7 +219,7 @@ class Chalk:
         debug: bool = False,
         heartbeat: bool = False,
         replace: bool = False,
-        log_level: Optional[ChalkLogLevel] = None,
+        log_level: Optional[ChalkLogLevel] = "trace",
         exec_command: Optional[str | Path] = None,
         as_parent: Optional[bool] = None,
         no_color: bool = False,
@@ -343,12 +343,22 @@ class Chalk:
             env=env,
         )
 
-    def exec(self, artifact: Path, as_parent: bool = False) -> ChalkProgram:
+    def exec(
+        self,
+        artifact: Path,
+        as_parent: bool = False,
+        heartbeat: bool = False,
+        config: Optional[Path | str] = None,
+        params: Optional[list[str]] = None,
+    ) -> ChalkProgram:
         return self.run(
             command="exec",
             exec_command=artifact,
             log_level="trace",
             as_parent=as_parent,
+            heartbeat=heartbeat,
+            config=config,
+            params=params,
         )
 
     def delete(self, artifact: Path) -> ChalkProgram:

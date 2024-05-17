@@ -69,9 +69,6 @@ jobs:
           app_id: ${{ secrets.CHALK_GITHUB_APP_ID }}
           private_key: ${{ secrets.CHALK_GITHUB_APP_PRIVATE_KEY }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:

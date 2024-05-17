@@ -10,7 +10,7 @@
 ## inspect - return raw json as provided by docker CLI without any chalk context
 
 import std/[json]
-import ".."/[config, semver]
+import ".."/[config]
 import "."/[exe, ids]
 
 proc inspectHistoryCommands*(name: string): seq[string] =
@@ -40,8 +40,7 @@ proc inspectJson(name: string, what: string): JsonNode =
   trace("docker: inspecting " & what & " " & name)
   var
     args   = @[what, "inspect", name]
-  # https://github.com/docker/cli/pull/2936
-  if getDockerVersion() >= parseVersion("22"):
+  if supportsInspectJsonFlag():
     args &= @["--format", "json"]
   let
     output = runDockerGetEverything(args)

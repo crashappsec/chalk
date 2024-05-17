@@ -7,7 +7,6 @@
 
 ## Code specific to reading and writing Chalk's own chalk mark.
 
-import "./docker"/[exe, ids]
 import "."/[config, plugin_api, collect, con4mfuncs, chalkjson, util]
 
 const
@@ -304,85 +303,14 @@ const nocache = [getoptConfName,
                  coConfName,
                  embeddedConfName]
 
-proc updateArchBinary*(location: string, platform: string) =
-  trace("docker: attempting to update config for platform: " & platform & " (" & location & ")")
-
-  # running any container with explicit --platform can mutate local docker state
-  # for example if busybox was never pulled yet locally:
-  # docker run --platform=linux/arm64 busybox ...
-  # docker run busybox ... # will also run arm
-  # which can potentially break user behavior
-  # however if you build a test image with
-  # docker build --platform=linux/arm64 ...
-  # as that never actually pulls the image into local cache
-  # it does not impact any local docker daemon state
-  let
-    tmpTag = chooseNewTag()
-    empty  = runDockerGetEverything(@["build",
-                                      "--platform", platform,
-                                      "-t", tmpTag,
-                                      "-f", "-",
-                                      "."],
-                                    stdin  = "FROM --platform=" & $platform & " busybox",
-                                    silent = false)
-
-  if empty.getExit() != 0:
-    raise newException(
-      ValueError,
-      "docker command to create empty image for loading config in " & platform &
-      " failed: " & empty.getStderr() & " " & empty.getStdout()
-    )
-
-  try:
-    let
-      (dir, name) = location.splitPath()
-      validate    = get[bool](chalkConfig, "load.validate_configs_on_load")
-      baseArgs    = @["run",
-                      "--rm",
-                      "-i",
-                      "--platform", platform,
-                      # chalk replaces itself so we need to mount parent folder
-                      # as mounted volume might have restrictions when
-                      # mounting a single file
-                      "-v", dir & ":/chalk/",
-                      "--entrypoint", "/chalk/" & name,
-                      tmpTag]
-      # other chalk might have different config for validate_configs_on_load
-      # so we ensure we honor the parents config via CLI arg
-      check  = if validate: "--validate" else: "--no-validate"
-      args   = baseArgs & @["load", "--replace", "--all", check, "-"]
-      config = getAllDumpJson()
-      output = runDockerGetEverything(args, stdin = config, silent = false)
-
-    if output.getExit() != 0:
-      raise newException(
-        ValueError,
-        "Docker command to update config for architecture " & platform &
-        " failed. Perhaps QEMU is not configured?\n" &
-        output.getStderr() & " " & output.getStdout()
-      )
-
-    let sanity = runDockerGetEverything(baseArgs & @["version"])
-    if sanity.getExit != 0:
-      raise newException(
-        ValueError,
-        "Docker updated config for platform " & platform &
-        " but it could not complete sanity version check on updated binary: " &
-        sanity.getStderr()
-      )
-
-    info("docker: successfully updated config for platform " & platform & " (" & location & ")")
-
-  finally:
-    discard runDockerGetEverything(@["rmi", tmpTag])
-
-proc handleConfigLoadAll*() =
-  info("Replacing all chalk configuration from stdin")
+proc handleConfigLoadAll*(inpath: string) =
+  info("Replacing all chalk configuration from " & inpath)
   try:
     let
       validate = get[bool](chalkConfig, "load.validate_configs_on_load")
       required = @[configKey, paramKey, cacheKey]
-      jsonData = stdin.readAll().parseJson()
+      data     = if inpath == "-": stdin.readAll() else: tryToLoadFile(inpath.resolvePath())
+      jsonData = data.parseJson()
 
     var chalkData = ChalkDict()
     for k, v in jsonData.pairs():
@@ -433,9 +361,7 @@ proc handleConfigLoad*(inpath: string) =
     info("Attempting to load module from: " & inpath)
 
   if replaceAll:
-    if inpath != "-":
-      cantLoad("--all can only load from stdin now. Use '-'")
-    handleConfigLoadAll()
+    handleConfigLoadAll(inpath)
     return
 
   var path: string
