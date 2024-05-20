@@ -113,7 +113,7 @@ proc getBuilderInfo*(ctx: DockerInvocation): string =
   once:
     if hasBuildX():
       let name = ctx.getBuilderName()
-      var args = @["buildx", "inspect"]
+      var args = @["buildx", "inspect", "--bootstrap"]
       if name != "":
         args.add(name)
       let output = runDockerGetEverything(args)
@@ -124,11 +124,11 @@ proc getBuilderInfo*(ctx: DockerInvocation): string =
 
 proc getBuildKitVersion*(ctx: DockerInvocation): Version =
   once:
-    let info = ctx.getBuilderInfo()
+    let info = ctx.getBuilderInfo().toLower()
     try:
       buildKitVersion = getVersionFromLineWhich(
         info.splitLines(),
-        startsWith = "Buildkit:",
+        contains = "buildkit",
       )
       trace("docker: buildkit version: " & $(buildKitVersion))
     except:

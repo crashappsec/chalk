@@ -2,7 +2,6 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import itertools
 import platform
 import shutil
 import time
@@ -29,7 +28,7 @@ from .conf import (
     MARKS,
     REGISTRY,
 )
-from .utils.dict import Contains
+from .utils.dict import ANY, Contains
 from .utils.docker import Docker
 from .utils.log import get_logger
 from .utils.os import run
@@ -505,6 +504,8 @@ def test_multiplatform_build(
         push=push,
         platforms=list(platforms),
         config=CONFIGS / "docker_wrap.c4m",
+        provenance=True,
+        sbom=True,
         env={
             # for downloading arm chalk binary
             "CHALK_SERVER": server_http,
@@ -526,18 +527,41 @@ def test_multiplatform_build(
     chalk_ids = {i["CHALK_ID"] for i in build.marks}
     metadata_ids = {i["METADATA_ID"] for i in build.marks}
     hashes = {i["_CURRENT_HASH"] for i in build.marks}
-    digests = {i["_REPO_DIGESTS"][tag_base] for i in build.marks}
-    tags = set(itertools.chain(*[i["DOCKER_TAGS"] for i in build.marks]))
-    entrypoints = {tuple(i["_IMAGE_ENTRYPOINT"]) for i in build.marks}
+    ids = {i["_IMAGE_ID"] for i in build.marks}
+    image_digests = {i["_IMAGE_DIGEST"] for i in build.marks}
+    list_digests = {i["_IMAGE_LIST_DIGEST"] for i in build.marks}
+    repo_digests = {i["_REPO_DIGESTS"][tag_base] for i in build.marks}
 
     assert len(chalk_ids) == 1
     assert len(metadata_ids) == len(platforms)
     assert image_id in hashes
+    assert len(ids) == len(platforms)
+    assert hashes == ids
     assert len(hashes) == len(platforms)
-    assert len(digests) == len(platforms)
-    assert len(tags) == 1
-    assert tags == {tag}
-    assert entrypoints == {("/chalk", "exec", "--")}
+    assert len(repo_digests) == len(platforms)
+    assert len(image_digests) == len(platforms)
+    assert len(list_digests) == 1
+
+    for mark in build.marks:
+        assert mark.has(
+            DOCKER_TAGS=[tag],
+            DOCKER_PLATFORMS=platforms,
+            DOCKER_FILE_CHALKED=Contains(
+                {
+                    "/$TARGETPLATFORM load /config.json",
+                    "/$TARGETPLATFORM version",
+                }
+            ),
+            _IMAGE_ENTRYPOINT=["/chalk", "exec", "--"],
+            _IMAGE_SBOM={
+                "SPDXID": "SPDXRef-DOCUMENT",
+            },
+            _IMAGE_PROVENANCE={
+                "buildConfig": ANY,
+                "invocation": ANY,
+                "materials": ANY,
+            },
+        )
 
 
 @pytest.mark.slow()

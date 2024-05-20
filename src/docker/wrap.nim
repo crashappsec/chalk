@@ -274,9 +274,16 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
       )
     ctx.addedPlatform[base] &= @[
      "ARG TARGETPLATFORM",
-     "RUN /$TARGETPLATFORM load --replace --all " & check & " /config.json",
+     ("RUN /$TARGETPLATFORM load /config.json " &
+      "--log-level=error " &
+      "--skip-command-report " &
+      "--replace " &
+      "--all " &
+      check),
      # sanity check plus it will show chalk metadata in build logs
-     "RUN /$TARGETPLATFORM version",
+     ("RUN /$TARGETPLATFORM version " &
+      "--log-level=error " &
+      "--skip-command-report"),
     ]
   else:
     for _, path in binaries:

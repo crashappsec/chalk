@@ -426,6 +426,8 @@ class Chalk:
         secrets: Optional[dict[str, Path]] = None,
         log_level: ChalkLogLevel = "trace",
         env: Optional[dict[str, str]] = None,
+        provenance: bool = False,
+        sbom: bool = False,
         run_docker: bool = True,
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
@@ -446,6 +448,8 @@ class Chalk:
                 buildkit=buildkit,
                 buildx=buildx,
                 secrets=secrets,
+                provenance=provenance,
+                sbom=sbom,
             )
 
         image_hash, result = Docker.with_image_id(
@@ -467,6 +471,8 @@ class Chalk:
                     buildx=buildx,
                     secrets=secrets,
                     buildkit=buildkit,
+                    provenance=provenance,
+                    sbom=sbom,
                 ),
                 expected_success=expected_success,
                 ignore_errors=not expecting_report,

@@ -28,6 +28,8 @@ class Docker:
         buildx: bool = False,
         secrets: Optional[dict[str, Path]] = None,
         buildkit: bool = True,
+        provenance: bool = False,
+        sbom: bool = False,
     ):
         tags = tags or []
         if tag:
@@ -48,6 +50,10 @@ class Docker:
             cmd += ["--push"]
         if secrets and buildkit:
             cmd += [f"--secret=id={k},src={v}" for k, v in secrets.items()]
+        if provenance:
+            cmd += ["--provenance=true"]
+        if sbom:
+            cmd += ["--sbom=true"]
         cmd += [str(context or ".")]
         return cmd
 
@@ -66,6 +72,8 @@ class Docker:
         expected_success: bool = True,
         buildkit: bool = True,
         secrets: Optional[dict[str, Path]] = None,
+        provenance: bool = False,
+        sbom: bool = False,
         env: Optional[dict[str, str]] = None,
     ) -> tuple[str, Program]:
         """
@@ -84,6 +92,8 @@ class Docker:
                     buildx=buildx,
                     secrets=secrets,
                     buildkit=buildkit,
+                    provenance=provenance,
+                    sbom=sbom,
                 ),
                 expected_exit_code=int(not expected_success),
                 env={**Docker.build_env(buildkit=buildkit), **(env or {})},
