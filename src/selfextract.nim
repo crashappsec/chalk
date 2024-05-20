@@ -303,7 +303,7 @@ const nocache = [getoptConfName,
                  coConfName,
                  embeddedConfName]
 
-proc handleConfigLoadAll*(inpath: string) =
+proc handleConfigLoadAll*(inpath: string): bool =
   info("Replacing all chalk configuration from " & inpath)
   try:
     let
@@ -321,25 +321,43 @@ proc handleConfigLoadAll*(inpath: string) =
         cantLoad(key & " is required but is is missing")
 
     let
-      config = unpack[string](chalkData[configKey])
-      params = unpack[seq[Box]](chalkData[paramKey])
-      cache  = unpack[OrderedTableRef[string, string]](chalkData[cacheKey])
+      config         = unpack[string](chalkData[configKey])
+      params         = unpack[seq[Box]](chalkData[paramKey])
+      cache          = unpack[OrderedTableRef[string, string]](chalkData[cacheKey])
+      memoize        = chalkData.getOrDefault(memoizeKey, pack(ChalkDict()))
+      currentConfig  = getConfig()
+      currentParams  = getParams()
+      currentCache   = getCache()
+      currentMemoize = getMemoize()
+
+    echo(config, currentConfig)
+    echo(params, currentParams)
+    echo(cache, currentCache)
+    echo(memoize, currentMemoize)
+    if (
+      config  == currentConfig and
+      params  == currentParams and
+      cache   == currentCache and
+      memoize == currentMemoize
+    ):
+      return false
+
     if validate:
       testConfigFile(config, params, cache)
     else:
       warn("Skipping configuration validation. This could break chalk.")
 
-    selfChalkSetKey(configKey, chalkData[configKey])
-    selfChalkSetKey(cacheKey, chalkData[cacheKey])
-    selfChalkSetKey(paramKey, chalkData[paramKey])
-    if memoizeKey in chalkData:
-      selfChalkSetKey(memoizeKey, chalkData[memoizeKey])
+    selfChalkSetKey(configKey, pack(config))
+    selfChalkSetKey(cacheKey, pack(cache))
+    selfChalkSetKey(paramKey, pack(params))
+    selfChalkSetKey(memoizeKey, memoize)
+    return true
 
   except:
     dumpExOnDebug()
     cantLoad("Could not replace all config: " & getCurrentExceptionMsg())
 
-proc handleConfigLoad*(inpath: string) =
+proc handleConfigLoad*(inpath: string): bool =
   assert selfChalk != nil
 
   let
@@ -361,8 +379,7 @@ proc handleConfigLoad*(inpath: string) =
     info("Attempting to load module from: " & inpath)
 
   if replaceAll:
-    handleConfigLoadAll(inpath)
-    return
+    return handleConfigLoadAll(inpath)
 
   var path: string
 
@@ -493,3 +510,4 @@ proc handleConfigLoad*(inpath: string) =
   selfChalkSetKey(configKey, pack(newEmbedded))
   selfChalkSetKey(cacheKey, pack(cachedCode))
   selfChalkSetKey(paramKey, pack(paramsToSave))
+  return true

@@ -33,19 +33,25 @@ proc runCmdConfLoad*() =
   if selfChalk == nil or not canSelfInject:
     cantLoad("Platform does not support self-injection.")
 
-  if url == "default":
-    if selfChalk.isMarked() and "$CHALK_CONFIG" notin selfChalk.extract:
-      info("Already using the default configuration.")
+  let updated =
+    if url == "default":
+      if selfChalk.isMarked() and "$CHALK_CONFIG" notin selfChalk.extract:
+        false
+      else:
+        selfChalk.extract.del("$CHALK_CONFIG")
+        selfChalk.extract.del("$CHALK_COMPONENT_CACHE")
+        selfChalk.extract.del("$CHALK_SAVED_COMPONENT_PARAMETERS")
+        selfChalk.collectedData.del("$CHALK_CONFIG")
+        selfChalk.collectedData.del("$CHALK_COMPONENT_CACHE")
+        selfChalk.collectedData.del("$CHALK_SAVED_COMPONENT_PARAMETERS")
+        info("Installing the default configuration file.")
+        true
     else:
-      selfChalk.extract.del("$CHALK_CONFIG")
-      selfChalk.extract.del("$CHALK_COMPONENT_CACHE")
-      selfChalk.extract.del("$CHALK_SAVED_COMPONENT_PARAMETERS")
-      selfChalk.collectedData.del("$CHALK_CONFIG")
-      selfChalk.collectedData.del("$CHALK_COMPONENT_CACHE")
-      selfChalk.collectedData.del("$CHALK_SAVED_COMPONENT_PARAMETERS")
-      info("Installing the default configuration file.")
-  else:
-    url.handleConfigLoad()
+      url.handleConfigLoad()
 
-  selfChalk.writeSelfConfig()
+  if updated:
+    selfChalk.writeSelfConfig()
+  else:
+    info("Chalk is already using same configuration. Nothing to load")
+
   doReporting()
