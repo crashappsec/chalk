@@ -116,9 +116,6 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
       if chmodstr != "" and supportsCopyChmod():
         toAdd.add("COPY " & chmodstr & file & " " & newPath)
       elif chmod != "":
-        # TODO detect user from base image if possible but thats not
-        # trivial as what is a base image is not a trivial question
-        # due to multi-stage build possibilities...
         if hasUser:
           toAdd.add("USER root")
         toAdd.add("COPY " & file & " " & newPath)
