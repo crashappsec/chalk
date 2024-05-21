@@ -312,16 +312,20 @@ proc skipWhiteSpace(toks: seq[LineToken], i: var int) {.inline.} =
   if i < len(toks) and toks[i].kind == ltSpace:
     i += 1
 
-proc takeUntilWhiteSpace(toks: seq[LineToken], i: var int): seq[LineToken] =
+proc peekUntilWhiteSpace(toks: seq[LineToken], i: var int): seq[LineToken] =
   result = @[]
   for tok in toks[i..^1]:
     if tok.kind == ltSpace:
       break
     result.add(tok)
 
+proc takeUntilWhiteSpace(toks: seq[LineToken], i: var int): seq[LineToken] =
+  result = peekUntilWhiteSpace(toks, i)
+  i += len(result)
+
 proc parseOneFlag(ctx: DockerParse, toks: seq[LineToken], i: var int):
                  Option[DfFlag] =
-  let candidates = takeUntilWhiteSpace(toks, i)
+  let candidates = peekUntilWhiteSpace(toks, i)
 
   # flag requires at least 3 tokens -
   # * --<flag>
@@ -514,7 +518,7 @@ proc parseFrom(ctx: DockerParse, t: DockerCommand): FromInfo =
   skipWhiteSpace(toks, i)
 
   let spec = takeUntilWhiteSpace(toks, i)
-  if len(spec) == 0 or toks[i].kind != ltWord:
+  if len(spec) == 0 or spec[0].kind != ltWord:
     result.error = "No image name provided."
     return
 
