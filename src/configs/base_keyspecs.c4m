@@ -231,7 +231,7 @@ keyspec HOST_SYSNAME_WHEN_CHALKED {
     since:            "0.3.6-dev"
     shortdoc:         "Host sysname at Chalk time"
     doc:              """
-On posix systems, value of `uname().sysname` syscall,
+On posix systems, value of `sysname` field from `uname()` syscall,
 collected when chalk mark was created.
 """
 }
@@ -243,7 +243,7 @@ keyspec HOST_NODENAME_WHEN_CHALKED {
     since:            "0.3.6-dev"
     shortdoc:         "Host node name at Chalk time"
     doc:              """
-On posix systems, value of `uname().nodename` syscall,
+On posix systems, value of `nodename` field from `uname()` syscall,
 collected when chalk mark was created.
 """
 }
@@ -255,7 +255,7 @@ keyspec HOST_RELEASE_WHEN_CHALKED {
     since:            "0.3.6-dev"
     shortdoc:         "Host kernel release at Chalk time"
     doc:              """
-On posix systems, value of `uname().release` syscall,
+On posix systems, value of `release` field from `uname()` syscall,
 collected when chalk mark was created.
 """
 }
@@ -267,7 +267,7 @@ keyspec HOST_VERSION_WHEN_CHALKED {
     since:            "0.3.6-dev"
     shortdoc:         "Host kernel version at Chalk time"
     doc:              """
-On posix systems, value of `uname().version` syscall,
+On posix systems, value of `version` field from `uname()` syscall,
 collected when chalk mark was created.
 """
 }
@@ -279,7 +279,7 @@ keyspec HOST_MACHINE_WHEN_CHALKED {
     since:            "0.3.6-dev"
     shortdoc:         "Host machine at Chalk time"
     doc:              """
-On posix systems, value of `uname().machine` syscall,
+On posix systems, value of `machine` field from `uname()` syscall,
 collected when chalk mark was created.
 """
 }
@@ -3959,7 +3959,7 @@ keyspec _OP_HOST_SYSNAME {
     since:            "0.3.6-dev"
     shortdoc:         "Host sysname during chalk operation"
     doc:              """
-On posix systems, value of `uname().sysname` syscall,
+On posix systems, value of `sysname` field from `uname()` syscall,
 collected during current chalk operation.
 """
 }
@@ -3971,7 +3971,7 @@ keyspec _OP_HOST_NODENAME {
     since:            "0.3.6-dev"
     shortdoc:         "Host node during chalk operation"
     doc:              """
-On posix systems, value of `uname().nodename` syscall,
+On posix systems, value of `nodename` field from `uname()` syscall,
 collected during current chalk operation.
 """
 }
@@ -3983,7 +3983,7 @@ keyspec _OP_HOST_RELEASE {
     since:            "0.3.6-dev"
     shortdoc:         "Host kernel during chalk operation"
     doc:              """
-On posix systems, value of `uname().release` syscall,
+On posix systems, value of `release` field from `uname()` syscall,
 collected during current chalk operation.
 """
 }
@@ -3995,7 +3995,7 @@ keyspec _OP_HOST_VERSION {
     since:            "0.3.6-dev"
     shortdoc:         "Host kernel during chalk operation"
     doc:              """
-On posix systems, value of `uname().version` syscall,
+On posix systems, value of `version` field from `uname()` syscall,
 collected during current chalk operation.
 """
 }
@@ -4007,7 +4007,7 @@ keyspec _OP_HOST_MACHINE {
     since:            "0.3.6-dev"
     shortdoc:         "Host machine during chalk operation"
     doc:              """
-On posix systems, value of `uname().machine` syscall,
+On posix systems, value of `machine` field from `uname()` syscall,
 collected during current chalk operation.
 """
 }

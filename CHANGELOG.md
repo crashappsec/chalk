@@ -14,7 +14,7 @@
     driver and is not directly related to docker image
   - `DOCKER_CHALK_TEMPORARY_TAG` - chalk no longer adds
     temporary tag to docker builds
-  - `_SIGNATURE` - cosign generates uniquer signature
+  - `_SIGNATURE` - cosign generates unique signature
     per registry. New key is `_SIGNATURES`.
   - `_OP_HOSTINFO` - renamed to `_OP_HOST_VERSION`
   - `_OP_NODENAME` - renamed to `_OP_HOST_NODENAME`
