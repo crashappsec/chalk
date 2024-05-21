@@ -133,11 +133,17 @@ proc doReporting*(topic="report") {.exportc, cdecl.} =
     let ctx = getCurrentCollectionCtx()
     ctx.report = doEmbeddedReport()
   else:
+    let
+      skipCommand = get[bool](chalkConfig, "skip_command_report")
+      skipCustom  = get[bool](chalkConfig, "skip_custom_reports")
+    if skipCommand and skipCustom:
+      return
     trace("Collecting runtime host info.")
     collectRunTimeHostInfo()
     trace("Generating command report.")
     let report = doCommandReport()
     if report != "":
       safePublish(topic, report)
-    doCustomReporting()
+    if not skipCustom:
+      doCustomReporting()
     writeReportCache()

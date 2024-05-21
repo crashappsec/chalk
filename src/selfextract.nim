@@ -136,6 +136,9 @@ proc getSelfExtraction*(): Option[ChalkObj] =
 
       selfId = some(selfChalk.callGetChalkId())
 
+    for k, v in selfChalk.extract:
+      selfChalk.collectedData[k] = v
+
     setCommandName(cmd)
 
   if selfChalk != nil:

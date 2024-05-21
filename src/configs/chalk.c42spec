@@ -3273,6 +3273,17 @@ Note that this doesn't turn off any custom reports; you have to disable those se
 """
   }
 
+  field skip_custom_reports {
+    type:        bool
+    default:     false
+    shortdoc: "Skip custom report"
+    doc: """
+Skip publishing the custom reports (i.e., the custom_report configs). NO output sinks will get it.
+
+Together with skipping command report, all chalk reporting is effectively disabled.
+"""
+  }
+
   field skip_summary_report {
     type:        bool
     default:     false
@@ -3289,6 +3300,16 @@ However, if you want to disable it in your config file, you can just set:
 custom_report_terminal_chalk_time.enabled: false
 custom_report.terminal_other_op.enabled: false
 ```
+"""
+  }
+
+  field only_system_plugins {
+    type:     bool
+    default:  false
+    shortdoc: "Only run system plugins"
+    doc:      """
+Disables all misc plugins and runs only required system
+plugins for metadata collection.
 """
   }
 

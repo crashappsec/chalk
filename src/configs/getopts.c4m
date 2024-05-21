@@ -207,6 +207,14 @@ causes them to not get deleted.  Specifically, docker temporary files
 """
   }
 
+  flag_yn only_system_plugins {
+    field_to_set: "only_system_plugins"
+    doc: """
+When on, skips chalk reporting altogether for the load command
+which in turn disables any chalk metadata collection.
+"""
+  }
+
   flag_yn skip_command_report {
     field_to_set: "skip_command_report"
     yes_aliases: []
@@ -220,6 +228,18 @@ _For most commands, this defeats the purpose of Chalk, so use it sparingly._
 
 Note that this doesn't turn off any custom reports; you have to
 disable those separately.
+"""
+  }
+
+  flag_yn skip_custom_reports {
+    field_to_set: "skip_custom_reports"
+    yes_aliases: []
+    no_aliases:  []
+
+    doc: """
+Skip publishing the custom reports (i.e., the custom_report configs). NO output sinks will get it.
+
+Together with skipping command report, all chalk reporting is effectively disabled.
 """
   }
 

@@ -2,7 +2,7 @@
 
 ## On the `main` branch
 
-## Breaking Changes
+### Breaking Changes
 
 - Removed chalk keys:
 
@@ -156,6 +156,21 @@
     automatically install binfmt when not all platforms
     are supported by the buildx builder
 
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
+- `--skip-custom-reports` flag. Together with
+  `--skip-command-report` allows to completely disable
+  chalk reporting. Note that metadata collection
+  is still going to happen as metadata still needs
+  to be inserted into a chalkmark. Just no report about
+  the operation is going to be omitted.
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
+- `--only-system-plugins` flag. Allows to skip metadata
+  collection for all except system plugins. This is useful
+  to skip metadata collection when its required and there
+  are expensive plugins which would otherwise slow down
+  chalk operation.
   [#286](https://github.com/crashappsec/chalk/pull/286)
 
 ## 0.3.5

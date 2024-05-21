@@ -9,6 +9,9 @@ import std/re
 import "./docker"/[scan]
 import "."/[config, plugin_api]
 
+proc isSystem(p: Plugin): bool =
+  return p.name in ["system", "metsys"]
+
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we
   # are subscribed to, that hasn't already been provided?
@@ -81,8 +84,8 @@ proc collectChalkTimeHostInfo*() =
   trace("Collecting chalk time artifact info")
   for plugin in getAllPlugins():
     let subscribed = plugin.configInfo.preRunKeys
-    if not plugin.hasSubscribedKey(subscribed, hostInfo):
-      continue
+    if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
+    if not plugin.isSystem() and isNonSystemSuspended(): continue
     try:
       trace("Running plugin: " & plugin.name)
       let dict = plugin.callGetChalkTimeHostInfo()
@@ -112,6 +115,8 @@ proc initCollection*() =
   forceChalkKeys(["MAGIC", "CHALK_VERSION", "CHALK_ID", "METADATA_ID"])
   registerOutconfKeys()
 
+  if get[bool](chalkConfig, "only_system_plugins"):
+    suspendNonSystemCollection()
 
   # Next, register for any custom reports.
   for name, report in chalkConfig.reportSpecs:
@@ -137,6 +142,7 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
     if chalkCollectionSuspendedFor(plugin.name):               continue
     if not plugin.hasSubscribedKey(subscribed, data):          continue
     if plugin.configInfo.codec and plugin != artifact.myCodec: continue
+    if not plugin.isSystem() and isNonSystemSuspended():       continue
 
     trace("Running plugin: " & plugin.name)
     try:
@@ -169,6 +175,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
   trace("Collecting chalk-time data.")
   for plugin in getAllPlugins():
     if chalkCollectionSuspendedFor(plugin.name): continue
+    if not plugin.isSystem() and isNonSystemSuspended(): continue
 
     if plugin == obj.myCodec:
       trace("Filling in codec info")
@@ -183,8 +190,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
     if plugin.configInfo.codec and plugin != obj.myCodec: continue
 
     let subscribed = plugin.configInfo.preChalkKeys
-    if not plugin.hasSubscribedKey(subscribed, data) and
-       plugin.name notin ["system", "metsys"]:
+    if not plugin.hasSubscribedKey(subscribed, data) and not plugin.isSystem():
       trace(plugin.name & ": Skipping plugin; its metadata wouldn't be used.")
       continue
 
@@ -217,6 +223,7 @@ proc collectRunTimeHostInfo*() =
   for plugin in getAllPlugins():
     let subscribed = plugin.configInfo.postRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
+    if not plugin.isSystem() and isNonSystemSuspended(): continue
 
     trace("Running plugin: " & plugin.name)
     try:
