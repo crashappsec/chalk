@@ -56,5 +56,5 @@ proc runCmdDocker*(args: seq[string]) =
     # ignore any errors reporting/etc as we need to ensure
     # exit with appropriate exitCode if docker command passed
     error("docker post-command: " & getCurrentExceptionMsg())
-
-  quitChalk(exitCode)
+  finally:
+    quitChalk(exitCode)

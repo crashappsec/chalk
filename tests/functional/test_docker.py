@@ -122,6 +122,18 @@ def test_build(
     assert build.mark.has(_IMAGE_ENTRYPOINT=["/chalk", "exec", "--"])
 
 
+@pytest.mark.parametrize("buildkit", [True, False])
+def test_scratch(chalk: Chalk, buildkit: bool):
+    _, build = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
+        buildkit=buildkit,
+        expected_success=buildkit,
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    if buildkit:
+        assert "_IMAGE_ENTRYPOINT" not in build.mark
+
+
 def test_docker_context(chalk: Chalk, tmp_data_dir: Path):
     """
     Test docker can build when a context is "docker"
@@ -807,3 +819,19 @@ def test_docker_default_command(chalk_copy: Chalk, tmp_data_dir: Path):
     actual = run([str(docker), "--version"])
     assert actual
     assert actual.text == expected.text
+
+
+def test_version_bare(chalk_default: Chalk):
+    """
+    Runs in empty container which tests chalk has no external startup deps
+    """
+    image_id, build = Docker.build(
+        dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
+    )
+    assert build
+    assert Docker.run(
+        image_id,
+        volumes={chalk_default.binary: "/chalk"},
+        entrypoint="/chalk",
+        params=["version"],
+    )
