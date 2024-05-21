@@ -196,7 +196,8 @@ proc collectImageFrom(chalk: ChalkObj, contents: JsonNode, name: string, digest 
     tags               = caseless{"repotags"}.getStrElems()
     os                 = caseless{"os"}.getStr()
     arch               = caseless{"architecture"}.getStr()
-    platform           = DockerPlatform(os: os, architecture: arch)
+    variant            = caseless{"variant"}.getStr()
+    platform           = DockerPlatform(os: os, architecture: arch, variant: variant)
   var
     digests            = caseless{"repodigests"}.getStrElems()
   if (

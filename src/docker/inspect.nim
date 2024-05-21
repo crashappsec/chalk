@@ -79,7 +79,8 @@ proc inspectImageJson*(name: string, platform = DockerPlatform(nil)): JsonNode =
     data          = inspectJson(name, "image")
     os            = data{"Os"}.getStr()
     arch          = data{"Architecture"}.getStr()
-    foundPlatform = DockerPlatform(os: os, architecture: arch)
+    variant       = data{"Variant"}.getStr()
+    foundPlatform = DockerPlatform(os: os, architecture: arch, variant: variant)
   if platform != nil and platform != foundPlatform:
     raise newException(
       ValueError,

@@ -33,7 +33,7 @@ proc findPlatformManifest(self: DockerManifest, platform: DockerPlatform): Docke
   for manifest in self.manifests:
     if manifest.platform == platform:
       return manifest
-  raise newException(KeyError, "Could not find manifest for: " & $self.name & " " & $platform)
+  raise newException(KeyError, "Could not find manifest for: " & $self.name & " --platform=" & $platform)
 
 proc getCompressedSize(self: DockerManifest): int =
   if self.kind != DockerManifestType.image:
@@ -193,6 +193,7 @@ proc fetch(self: DockerManifest) =
     self.configPlatform = DockerPlatform(
       os:           data.json{"os"}.getStr(),
       architecture: data.json{"architecture"}.getStr(),
+      variant:      data.json{"variant"}.getStr(),
     )
   else:
     discard
@@ -224,7 +225,8 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
         platform:   DockerPlatform(
           os:           platform{"os"}.getStr(),
           architecture: platform{"architecture"}.getStr(),
-        ),
+          variant:      platform{"variant"}.getStr(),
+        )
       ))
     return list
 

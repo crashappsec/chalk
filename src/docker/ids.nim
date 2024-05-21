@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[sets, sequtils, uri]
+import std/[sets, sequtils, uri, sets]
 import ".."/[config, util]
 
 const hashHeader = "sha256:"
@@ -20,8 +20,55 @@ proc extractDockerHash*(value: Box): Box =
 
 # ----------------------------------------------------------------------------
 
+proc normalize*(self: DockerPlatform): DockerPlatform =
+  # https://github.com/containerd/containerd/blob/83031836b2cf55637d7abf847b17134c51b38e53/platforms/platforms.go
+  const
+    osMap = {
+      "masos":          "darwin",
+    }.toTable()
+    archMap = {
+      "aarch64":        "arm64",
+      "i386":           "386",
+      "x86_64":         "amd64",
+      "x86-64":         "amd64",
+    }.toTable()
+    archToVariantMap = {
+      "armel":         ("arm", "v6"),
+      "armhf":         ("arm", "v7"),
+    }.toTable()
+    # https://github.com/containerd/containerd/blob/83031836b2cf55637d7abf847b17134c51b38e53/platforms/database.go#L76-L109
+    archWithVariantMap = {
+      ("arm",   ""):   ("arm",   "v7"),
+      ("arm64", "v8"): ("arm64", ""),
+      ("amd64", "v1"): ("amd64", ""),
+    }.toTable()
+  var
+    os           = osMap.getOrDefault(self.os, self.os)
+    architecture = archMap.getOrDefault(self.architecture, self.architecture)
+    variant      = self.variant
+  (architecture, variant) = archToVariantMap.getOrDefault(
+    architecture,
+    (architecture, variant),
+  )
+  (architecture, variant) = archWithVariantMap.getOrDefault(
+    (architecture, variant),
+    (architecture, variant),
+  )
+  return DockerPlatform(
+    os:           os,
+    architecture: architecture,
+    variant:      variant,
+  )
+
+proc normalize*(items: seq[DockerPlatform]): seq[DockerPlatform] =
+  result = @[]
+  for i in items:
+    result.add(i.normalize())
+
 proc `$`*(self: DockerPlatform): string =
-  return self.os & "/" & self.architecture
+  result = self.os & "/" & self.architecture
+  if self.variant != "":
+    result &= "/" & self.variant
 
 proc `$`*(items: seq[DockerPlatform]): seq[string] =
   result = @[]
@@ -31,7 +78,7 @@ proc `$`*(items: seq[DockerPlatform]): seq[string] =
 proc `==`*(self, other: DockerPlatform): bool =
   if isNil(self) or isNil(other):
     return isNil(self) == isNil(other)
-  return $self == $other
+  return $self.normalize() == $other.normalize()
 
 proc isKnown*(self: DockerPlatform): bool =
   return (
@@ -43,10 +90,32 @@ proc isKnown*(self: DockerPlatform): bool =
   )
 
 proc parseDockerPlatform*(platform: string): DockerPlatform =
-  let items = platform.split('/', maxsplit = 1)
-  if len(items) != 2:
+  let parts = platform.toLower().split('/', maxsplit = 2)
+  case len(parts)
+  of 1:
+    if parts[0] in ["linux", "macos", "darwin"]:
+      return DockerPlatform(
+        os:           parts[0],
+        architecture: hostCPU,
+      )
+    else:
+      return DockerPlatform(
+        os:           hostOs,
+        architecture: parts[0],
+      )
+  of 2:
+    return DockerPlatform(
+      os:           parts[0],
+      architecture: parts[1],
+    )
+  of 3:
+    return DockerPlatform(
+      os:           parts[0],
+      architecture: parts[1],
+      variant:      parts[2],
+    )
+  else:
     raise newException(ValueError, "Invalid docker platform: " & platform)
-  return DockerPlatform(os: items[0], architecture: items[1])
 
 proc contains*[T](self: TableRef[DockerPlatform, T], key: DockerPlatform): bool =
   for k, _ in self:

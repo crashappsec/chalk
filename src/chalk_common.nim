@@ -199,6 +199,7 @@ type
   DockerPlatform* = ref object
     os*:           string
     architecture*: string
+    variant*:      string
 
   DockerParse* = ref object
     currentEscape*:      Rune

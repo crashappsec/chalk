@@ -496,7 +496,8 @@ def test_multiplatform_build(
 ):
     tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
     tag = f"{tag_base}:latest"
-    platforms = {"linux/amd64", "linux/arm64"}
+    platforms = {"linux/amd64/v1", "linux/arm64/v8", "linux/arm/v7"}
+    target_platforms = {"linux/amd64", "linux/arm64", "linux/arm/v7"}
 
     image_id, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
@@ -522,7 +523,7 @@ def test_multiplatform_build(
         return
 
     assert len(build.marks) == len(platforms)
-    assert {i["DOCKER_PLATFORM"] for i in build.marks} == platforms
+    assert {i["DOCKER_PLATFORM"] for i in build.marks} == target_platforms
 
     chalk_ids = {i["CHALK_ID"] for i in build.marks}
     metadata_ids = {i["METADATA_ID"] for i in build.marks}
@@ -545,7 +546,7 @@ def test_multiplatform_build(
     for mark in build.marks:
         assert mark.has(
             DOCKER_TAGS=[tag],
-            DOCKER_PLATFORMS=platforms,
+            DOCKER_PLATFORMS=target_platforms,
             DOCKER_FILE_CHALKED=Contains(
                 {
                     "/$TARGETPLATFORM load /config.json",

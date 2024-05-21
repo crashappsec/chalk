@@ -278,7 +278,7 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_FILE",                      ctx.inDockerFile)
   dict.setIfNeeded("DOCKER_FILE_CHALKED",              ctx.getUpdatedDockerfile())
   dict.setIfNeeded("DOCKER_LABELS",                    ctx.foundLabels)
-  dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.foundPlatforms))
+  dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.foundPlatforms.normalize()))
   dict.setIfNeeded("DOCKER_TAGS",                      ctx.foundTags.asRepoTag())
   dict.setIfNeeded("DOCKER_BASE_IMAGE",                $(ctx.getBaseDockerSection.image))
   dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",           ctx.getBaseDockerSection.image.repo)

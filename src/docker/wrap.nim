@@ -175,7 +175,7 @@ proc makeFileAvailableToDocker*(ctx:        DockerInvocation,
       )
     ctx.makeFileAvailableToDocker(
       path    = path,
-      newPath = "/" & $platform,
+      newPath = "/" & $platform.normalize(),
       user    = user,
       move    = move,
       chmod   = chmod,
@@ -263,7 +263,7 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
       info("docker: wrapping image with this chalk binary: " & path & " (" & $platform & ")")
       ctx.makeFileAvailableToDocker(
         path    = path,
-        newPath = "/" & $platform,
+        newPath = "/" & $platform.normalize(),
         user    = user,
         move    = move,
         chmod   = chmod,

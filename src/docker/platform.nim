@@ -95,7 +95,11 @@ proc findBaseImagePlatform*(ctx: DockerInvocation,
     # multi-platform builds can pull base image from registry regardless of local cache
     trace("docker: attempting to inspect base image for: " & $(baseSection.image))
     let config = inspectImageJson(baseSection.image.asRepoRef())
-    return DockerPlatform(os: config["Os"].getStr(), architecture: config["Architecture"].getStr())
+    return DockerPlatform(
+      os:           config["Os"].getStr(),
+      architecture: config["Architecture"].getStr(),
+      variant:      config{"Variant"}.getStr(),
+    )
   except:
     if hasBuildX():
       try:
@@ -113,7 +117,11 @@ proc findBaseImagePlatform*(ctx: DockerInvocation,
       let image =baseSection.image.asRepoRef()
       pullImage(image)
       let config = inspectImageJson(image)
-      return DockerPlatform(os: config["Os"].getStr(), architecture: config["Architecture"].getStr())
+      return DockerPlatform(
+        os:           config["Os"].getStr(),
+        architecture: config["Architecture"].getStr(),
+        variant:      config{"Variant"}.getStr(),
+      )
 
 proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
   let
