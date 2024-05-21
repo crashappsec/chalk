@@ -229,13 +229,15 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
         "recent version of buildx is required for copying chalk by platform into Dockerfile",
       )
     let
-      validate = get[bool](chalkConfig, "load.validate_configs_on_load")
-      binfmt   = get[bool](chalkConfig, "docker.install_binfmt")
+      validate  = get[bool](chalkConfig, "load.validate_configs_on_load")
+      binfmt    = get[bool](chalkConfig, "docker.install_binfmt")
       # other chalks might have different config for validate_configs_on_load
       # so we ensure we honor self config via CLI arg
-      check    = if validate: "--validation" else: "--no-validation"
-      config   = writeNewTempFile(getAllDumpJson())
-      base     = ctx.addByPlatform(newPath, image = "busybox")
+      check     = if validate: "--validation" else: "--no-validation"
+      config    = writeNewTempFile(getAllDumpJson())
+      base      = ctx.addByPlatform(newPath, image = "busybox")
+      log_level = getLogLevel()
+      verbosity = if log_level == llTrace: "trace" else: "error"
     ctx.makeFileAvailableToDocker(
       path    = config,
       newPath = "/config.json",
@@ -272,14 +274,14 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
     ctx.addedPlatform[base] &= @[
      "ARG TARGETPLATFORM",
      ("RUN /$TARGETPLATFORM load /config.json " &
-      "--log-level=error " &
+      "--log-level=" & verbosity & " " &
       "--skip-command-report " &
       "--replace " &
       "--all " &
       check),
      # sanity check plus it will show chalk metadata in build logs
      ("RUN /$TARGETPLATFORM version " &
-      "--log-level=error " &
+      "--log-level=" & verbosity & " " &
       "--skip-command-report"),
     ]
   else:
