@@ -93,17 +93,33 @@ proc getDockerInfo*(): string =
   once:
     let output = runDockerGetEverything(@["info"])
     if output.exitCode != 0:
-      raise newException(
-        ValueError,
-        "could not get docker info " &
-        output.getStdErr(),
-      )
-    dockerInfo = output.getStdOut()
+      error("docker: could not get docker info " & output.getStdErr())
+    else:
+      dockerInfo = output.getStdOut()
   return dockerInfo
+
+var contextName = "default"
+proc getContextName(): string =
+  once:
+    # https://docs.docker.com/engine/release-notes/19.03/#19030
+    let minimum = parseVersion("19.03")
+    if getDockerServerVersion() >= minimum and getDockerClientVersion() >= minimum:
+      let output = runDockerGetEverything(@["context", "inspect", "--format", "{{json .}}"])
+      if output.exitCode == 0:
+        try:
+          let
+            data = output.getStdOut.parseJson()
+            name = data{"Name"}.getStr()
+          if name != "":
+            contextName = name
+            trace("docker: context name: " & contextName)
+        except:
+          dumpExOnDebug()
+  return contextName
 
 proc getBuilderName(ctx: DockerInvocation): string =
   if not ctx.foundBuildx:
-    return "default"
+    return getContextName()
   if ctx.foundBuilder != "":
     return ctx.foundBuilder
   return getEnv("BUILDX_BUILDER")
