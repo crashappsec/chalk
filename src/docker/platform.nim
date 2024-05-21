@@ -128,6 +128,7 @@ proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
     config   = get[string](chalkConfig, "docker.download_arch_binary_url")
     url      = (config
                 .replace("{version}",      getChalkExeVersion())
+                .replace("{commit}",       getChalkCommitId())
                 .replace("{os}",           targetPlatform.os)
                 .replace("{architecture}", targetPlatform.architecture))
   trace("docker: downloading chalk binary from: " & url)

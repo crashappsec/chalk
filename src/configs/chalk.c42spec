@@ -1844,13 +1844,14 @@ Which version of binary is downloaded is controlled by
 
   field download_arch_binary_url {
     type:     string
-    default:  "https://dl.crashoverride.run/chalk/chalk-%version-%os-%architecture"
+    default:  "https://dl.crashoverride.run/chalk/chalk-{version}-{os}-{architecture}"
     shortdoc: "URL template where to download chalk binaries"
     doc:      """
 Template for a URL where to download the chalk binary when `download_arch_binary`
 is true. The template can render these variables:
 
 * `{version}`
+* `{commit}`
 * `{os}`
 * `{architecture}`
 """
