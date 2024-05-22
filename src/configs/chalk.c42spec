@@ -2981,7 +2981,7 @@ validate in the transparency log.
 
   field ignore_patterns {
     type:     list[string]
-    default:  [".*/\\..*", ".*\\.txt", ".*\\.json"]
+    default:  ["/dev/.*", "/proc/.*", "/sys/.*", ".*/\\..*", ".*\\.txt", ".*\\.json"]
     shortdoc: "Ignore Patterns"
     doc:       """
 For operations that insert or remove chalk marks, this is a list of

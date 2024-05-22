@@ -67,6 +67,9 @@
 - Docker builds without buildx could fail when base image
   specified `USER`.
   [#285](https://github.com/crashappsec/chalk/pull/285)
+- Tech stack plugin will hang when running chalk from
+  `/` as it would attempt to scan things like `/dev/random`.
+  [#286](https://github.com/crashappsec/chalk/pull/286)
 
 ## New Features
 
