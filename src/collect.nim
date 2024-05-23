@@ -84,6 +84,7 @@ proc collectChalkTimeHostInfo*() =
   trace("Collecting chalk time artifact info")
   for plugin in getAllPlugins():
     let subscribed = plugin.configInfo.preRunKeys
+    if chalkCollectionSuspendedFor(plugin.name):          continue
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
     try:
       trace("Running plugin: " & plugin.name)
@@ -216,6 +217,7 @@ proc collectRunTimeHostInfo*() =
   trace("Collecting run time host info")
   for plugin in getAllPlugins():
     let subscribed = plugin.configInfo.postRunKeys
+    if chalkCollectionSuspendedFor(plugin.name):          continue
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
 
     trace("Running plugin: " & plugin.name)
