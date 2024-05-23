@@ -3,6 +3,7 @@ docker.download_arch_binary_url = env("CHALK_SERVER") + "/dummy/chalk-%version-%
 docker.arch_binary_locations_path = env("CHALK_TMP")
 report_template terminal_insert {
   key._IMAGE_ENTRYPOINT.use = true
+  key._IMAGE_CMD.use = true
   key._IMAGE_SBOM.use = true
   key._IMAGE_PROVENANCE.use = true
 }

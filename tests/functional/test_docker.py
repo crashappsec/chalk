@@ -250,22 +250,82 @@ def test_base_image(chalk: Chalk, random_hex: str):
     assert Docker.run(image_id)
 
 
-@pytest.mark.parametrize("cmd", ["cmd", "entrypoint"])
 @pytest.mark.parametrize(
-    "test_file",
+    "test_file, entrypoint, cmd",
     [
-        "string.Dockerfile",
-        "json.Dockerfile",
+        (
+            "string.Dockerfile",
+            ["/chalk", "exec", "--"],
+            ["/bin/sh", "-c", "echo hello"],
+        ),
+        (
+            "json.Dockerfile",
+            ["/chalk", "exec", "--exec-command-name", "echo", "--"],
+            ["hello"],
+        ),
     ],
 )
-def test_wrap(chalk: Chalk, random_hex: str, test_file: str, cmd: str):
+def test_wrap_entrypoint(
+    chalk: Chalk, random_hex: str, test_file: str, entrypoint: list[str], cmd: list[str]
+):
     image_id, result = chalk.docker_build(
-        dockerfile=DOCKERFILES / "valid" / cmd / test_file,
-        context=DOCKERFILES / "valid" / cmd,
+        dockerfile=DOCKERFILES / "valid" / "entrypoint" / test_file,
+        context=DOCKERFILES / "valid" / "entrypoint",
         config=CONFIGS / "docker_wrap.c4m",
     )
     _, output = Docker.run(image_id)
     assert "hello" in output.text
+    assert result.mark.has(_IMAGE_ENTRYPOINT=entrypoint, _IMAGE_CMD=cmd)
+
+
+@pytest.mark.parametrize(
+    "test_file, entrypoint, cmd",
+    [
+        (
+            # shold preserve both entrypoint/cmd from base image
+            "base.Dockerfile",
+            ["/chalk", "exec", "--exec-command-name", "/docker-entrypoint.sh", "--"],
+            ["nginx", "-g", "daemon off;"],
+        ),
+    ],
+)
+def test_wrap_base_entrypoint(
+    chalk: Chalk, random_hex: str, test_file: str, entrypoint: list[str], cmd: list[str]
+):
+    image_id, result = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "entrypoint" / test_file,
+        context=DOCKERFILES / "valid" / "entrypoint",
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    assert result.mark.has(_IMAGE_ENTRYPOINT=entrypoint, _IMAGE_CMD=cmd)
+
+
+@pytest.mark.parametrize(
+    "test_file, entrypoint, cmd",
+    [
+        (
+            "string.Dockerfile",
+            ["/chalk", "exec", "--"],
+            ["/bin/sh", "-c", "echo hello"],
+        ),
+        (
+            "json.Dockerfile",
+            ["/chalk", "exec", "--"],
+            ["echo", "hello"],
+        ),
+    ],
+)
+def test_wrap_cmd(
+    chalk: Chalk, random_hex: str, test_file: str, entrypoint: list[str], cmd: list[str]
+):
+    image_id, result = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "cmd" / test_file,
+        context=DOCKERFILES / "valid" / "cmd",
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    _, output = Docker.run(image_id)
+    assert "hello" in output.text
+    assert result.mark.has(_IMAGE_ENTRYPOINT=entrypoint, _IMAGE_CMD=cmd)
 
 
 @pytest.mark.parametrize(

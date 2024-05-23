@@ -128,8 +128,12 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
       toAdd.add("ENTRYPOINT " & formatChalkExec())
       toAdd.add("CMD " & entrypoint.str)
     # When ENTRYPOINT is JSON, we wrap JSON with /chalk command
+    # setting ENTRYPOINT however resets the CMD and so to be safe
+    # we redefine CMD to guarantee its used
     else:
       toAdd.add("ENTRYPOINT " & formatChalkExec(entrypoint.json))
+      if cmd != nil:
+        toAdd.add("CMD " & $(cmd))
     trace("docker: ENTRYPOINT wrapped.")
 
   else:

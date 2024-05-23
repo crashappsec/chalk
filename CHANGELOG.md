@@ -70,6 +70,9 @@
 - Tech stack plugin will hang when running chalk from
   `/` as it would attempt to scan things like `/dev/random`.
   [#286](https://github.com/crashappsec/chalk/pull/286)
+- Docker wrapping was resetting image `CMD` when base
+  image had `ENTRYPOINT` defined.
+  [#286](https://github.com/crashappsec/chalk/pull/286)
 
 ## New Features
 
