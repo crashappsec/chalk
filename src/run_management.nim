@@ -234,6 +234,13 @@ proc persistInternalValues*(chalk: ChalkObj) =
     if item.startsWith("$"):
       chalk.collectedData[item] = value
 
+proc persistExtractedValues*(chalk: ChalkObj) =
+  if chalk.extract == nil:
+    return
+  for item, value in chalk.extract:
+    if item notin chalk.collectedData:
+      chalk.collectedData[item] = value
+
 proc makeNewValuesAvailable*(chalk: ChalkObj) =
   if chalk.extract == nil:
     chalk.extract = ChalkDict()

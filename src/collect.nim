@@ -95,7 +95,7 @@ proc collectChalkTimeHostInfo*() =
       for k, v in dict:
         if not plugin.canWrite(k, plugin.configInfo.preRunKeys):
           continue
-        if k notin hostInfo or k in plugin.configInfo.overrides:
+        if k notin hostInfo or k in plugin.configInfo.overrides or plugin.isSystem():
           hostInfo[k] = v
     except:
       warn("When collecting chalk-time host info, plugin implementation " &
@@ -150,7 +150,7 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
       if dict == nil or len(dict) == 0: continue
       for k, v in dict:
         if not plugin.canWrite(k, plugin.configInfo.postChalkKeys): continue
-        if k notin artifact.collectedData or k in plugin.configInfo.overrides:
+        if k notin artifact.collectedData or k in plugin.configInfo.overrides or plugin.isSystem():
           artifact.collectedData[k] = v
       trace(plugin.name & ": Plugin called.")
     except:
@@ -166,7 +166,7 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
 proc rtaiLinkingHack*(artifact: ChalkObj) {.cdecl, exportc.} =
   artifact.collectRunTimeArtifactInfo()
 
-proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
+proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
   # Note that callers must have set obj.collectedData to something
   # non-null.
   obj.opFailed      = false
@@ -206,7 +206,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj) =
 
       for k, v in dict:
         if not plugin.canWrite(k, plugin.configInfo.preChalkKeys): continue
-        if k notin obj.collectedData or k in plugin.configInfo.overrides:
+        if k notin obj.collectedData or k in plugin.configInfo.overrides or plugin.isSystem() or override:
           obj.collectedData[k] = v
       trace(plugin.name & ": Plugin called.")
     except:
@@ -232,7 +232,7 @@ proc collectRunTimeHostInfo*() =
 
       for k, v in dict:
         if not plugin.canWrite(k, plugin.configInfo.postRunKeys): continue
-        if k notin hostInfo or k in plugin.configInfo.overrides:
+        if k notin hostInfo or k in plugin.configInfo.overrides or plugin.isSystem():
           hostInfo[k] = v
     except:
       warn("When collecting run-time host info, plugin implementation " &

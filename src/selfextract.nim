@@ -136,9 +136,6 @@ proc getSelfExtraction*(): Option[ChalkObj] =
 
       selfId = some(selfChalk.callGetChalkId())
 
-    for k, v in selfChalk.extract:
-      selfChalk.collectedData[k] = v
-
     setCommandName(cmd)
 
   if selfChalk != nil:
@@ -157,6 +154,13 @@ proc newConfFileError(err, tb: string): bool =
 proc writeSelfConfig*(selfChalk: ChalkObj): bool
     {.cdecl, exportc, discardable.} =
   selfChalk.persistInternalValues()   # Found in run_management.nim
+  # ensure we dont drop any existing metadata
+  # since for example chalk load can be running in limited
+  # environment and so we dont want to drop things like original
+  # chalk commit id, etc
+  # although as a result well be overriding any of these fields
+  # if any of the plugins find them again
+  selfChalk.persistExtractedValues()
   collectChalkTimeHostInfo()
 
   let lastCount = if "$CHALK_LOAD_COUNT" notin selfChalk.collectedData:
@@ -166,7 +170,7 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
 
   selfChalk.collectedData["$CHALK_LOAD_COUNT"]          = pack(lastCount  + 1)
   selfChalk.collectedData["$CHALK_IMPLEMENTATION_NAME"] = pack(implName)
-  selfChalk.collectChalkTimeArtifactInfo()
+  selfChalk.collectChalkTimeArtifactInfo(override = true)
 
   trace(selfChalk.name & ": installing configuration.")
 
