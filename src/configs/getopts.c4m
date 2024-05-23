@@ -207,14 +207,6 @@ causes them to not get deleted.  Specifically, docker temporary files
 """
   }
 
-  flag_yn only_system_plugins {
-    field_to_set: "only_system_plugins"
-    doc: """
-When on, skips chalk reporting altogether for the load command
-which in turn disables any chalk metadata collection.
-"""
-  }
-
   flag_yn skip_command_report {
     field_to_set: "skip_command_report"
     yes_aliases: []

@@ -56,6 +56,11 @@
   it now uses `insertion_default` template.
   [#282](https://github.com/crashappsec/chalk/pull/282)
 
+- When loading custom configs with `chalk load`, metdata
+  collection is disabled for all plugins except for
+  required chalk plugins.
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
 ### Fixes
 
 - Fixed not being able to wrap docker builds when using
@@ -167,13 +172,6 @@
   is still going to happen as metadata still needs
   to be inserted into a chalkmark. Just no report about
   the operation is going to be omitted.
-  [#286](https://github.com/crashappsec/chalk/pull/286)
-
-- `--only-system-plugins` flag. Allows to skip metadata
-  collection for all except system plugins. This is useful
-  to skip metadata collection when its required and there
-  are expensive plugins which would otherwise slow down
-  chalk operation.
   [#286](https://github.com/crashappsec/chalk/pull/286)
 
 ## 0.3.5

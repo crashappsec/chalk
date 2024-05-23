@@ -8,7 +8,7 @@
 ## The `chalk load` command.
 
 import std/posix
-import ".."/[config, selfextract, reporting, collect]
+import ".."/[config, selfextract, plugin_api, reporting, collect]
 
 proc runCmdConfLoad*() =
   setContextDirectories(@["."])
@@ -47,6 +47,9 @@ proc runCmdConfLoad*() =
         info("Installing the default configuration file.")
         true
     else:
+      for plugin in getAllPlugins():
+        if not plugin.isSystem():
+          suspendChalkCollectionFor(plugin.name)
       url.handleConfigLoad()
 
   if updated:

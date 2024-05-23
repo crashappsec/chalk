@@ -212,11 +212,6 @@ template suspendHostCollection*() =         hostCollectionSuspends += 1
 template restoreHostCollection*() =         hostCollectionSuspends -= 1
 template hostCollectionSuspended*(): bool = hostCollectionSuspends != 0
 
-var nonSystemSuspends = 0
-template suspendNonSystemCollection*() = nonSystemSuspends += 1
-template restoreNonSystemCollection*() = nonSystemSuspends -= 1
-template isNonSystemSuspended*(): bool = nonSystemSuspends != 0
-
 var chalkCollectionSuspendedByPlugin = initTable[string, int]()
 template suspendChalkCollectionFor*(p: string) =
   if p notin chalkCollectionSuspendedByPlugin:

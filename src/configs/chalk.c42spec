@@ -3303,16 +3303,6 @@ custom_report.terminal_other_op.enabled: false
 """
   }
 
-  field only_system_plugins {
-    type:     bool
-    default:  false
-    shortdoc: "Only run system plugins"
-    doc:      """
-Disables all misc plugins and runs only required system
-plugins for metadata collection.
-"""
-  }
-
   field symlink_behavior {
     type: string
     default: "skip"

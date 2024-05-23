@@ -9,7 +9,7 @@ import std/re
 import "./docker"/[scan]
 import "."/[config, plugin_api]
 
-proc isSystem(p: Plugin): bool =
+proc isSystem*(p: Plugin): bool =
   return p.name in ["system", "metsys"]
 
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
@@ -85,7 +85,6 @@ proc collectChalkTimeHostInfo*() =
   for plugin in getAllPlugins():
     let subscribed = plugin.configInfo.preRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
-    if not plugin.isSystem() and isNonSystemSuspended(): continue
     try:
       trace("Running plugin: " & plugin.name)
       let dict = plugin.callGetChalkTimeHostInfo()
@@ -115,9 +114,6 @@ proc initCollection*() =
   forceChalkKeys(["MAGIC", "CHALK_VERSION", "CHALK_ID", "METADATA_ID"])
   registerOutconfKeys()
 
-  if get[bool](chalkConfig, "only_system_plugins"):
-    suspendNonSystemCollection()
-
   # Next, register for any custom reports.
   for name, report in chalkConfig.reportSpecs:
     if (getBaseCommandName() notin report.use_when and
@@ -142,7 +138,6 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
     if chalkCollectionSuspendedFor(plugin.name):               continue
     if not plugin.hasSubscribedKey(subscribed, data):          continue
     if plugin.configInfo.codec and plugin != artifact.myCodec: continue
-    if not plugin.isSystem() and isNonSystemSuspended():       continue
 
     trace("Running plugin: " & plugin.name)
     try:
@@ -175,7 +170,6 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
   trace("Collecting chalk-time data.")
   for plugin in getAllPlugins():
     if chalkCollectionSuspendedFor(plugin.name): continue
-    if not plugin.isSystem() and isNonSystemSuspended(): continue
 
     if plugin == obj.myCodec:
       trace("Filling in codec info")
@@ -223,7 +217,6 @@ proc collectRunTimeHostInfo*() =
   for plugin in getAllPlugins():
     let subscribed = plugin.configInfo.postRunKeys
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
-    if not plugin.isSystem() and isNonSystemSuspended(): continue
 
     trace("Running plugin: " & plugin.name)
     try:

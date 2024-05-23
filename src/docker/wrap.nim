@@ -275,7 +275,6 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
      "ARG TARGETPLATFORM",
      ("RUN /$TARGETPLATFORM load /config.json " &
       "--log-level=" & verbosity & " " &
-      "--only-system-plugins " &
       "--skip-command-report " &
       "--skip-custom-reports " &
       "--skip-summary-report " &
@@ -285,7 +284,6 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
      # sanity check plus it will show chalk metadata in build logs
      ("RUN /$TARGETPLATFORM version " &
       "--log-level=" & verbosity & " " &
-      "--only-system-plugins " &
       "--skip-command-report " &
       "--skip-custom-reports " &
       "--skip-summary-report"),
