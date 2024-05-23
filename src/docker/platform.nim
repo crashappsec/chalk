@@ -248,7 +248,7 @@ proc copyPerPlatform*(self: ChalkObj, platforms: seq[DockerPlatform]): TableRef[
   result = newTable[DockerPlatform, ChalkObj]()
   for platform in platforms:
     let copy = self.deepCopy()
-    copy.collectedData.setIfNeeded("DOCKER_PLATFORM", $platform)
+    copy.collectedData.setIfNeeded("DOCKER_PLATFORM", $(platform.normalize()))
     copy.platform = platform
     result[platform] = copy
 

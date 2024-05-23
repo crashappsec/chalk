@@ -52,6 +52,9 @@ class Docker:
             cmd += [f"--secret=id={k},src={v}" for k, v in secrets.items()]
         if provenance:
             cmd += ["--provenance=true"]
+        elif buildx:
+            # its on by default now
+            cmd += ["--provenance=false"]
         if sbom:
             cmd += ["--sbom=true"]
         cmd += [str(context or ".")]
