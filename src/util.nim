@@ -217,7 +217,7 @@ else:
 
 const currentAutocompleteVersion = (0, 1, 3)
 
-proc validateMetadata*(obj: ChalkObj): ValidateResult {.importc.}
+proc validateMetaData*(obj: ChalkObj): ValidateResult {.importc.}
 
 proc autocompleteFileCheck*() =
   if isatty(0) == 0 or get[bool](chalkConfig, "install_completion_script") == false:
@@ -240,7 +240,7 @@ proc autocompleteFileCheck*() =
 
     if len(allChalks) != 0 and allChalks[0].extract != nil:
       if "ARTIFACT_VERSION" in allChalks[0].extract and
-         allChalks[0].validateMetadata() == vOk:
+         allChalks[0].validateMetaData() == vOk:
         let
           boxedVers    = allChalks[0].extract["ARTIFACT_VERSION"]
           foundRawVers = unpack[string](boxedVers)
@@ -498,11 +498,29 @@ proc isInt*(i: string): bool =
   except:
     return false
 
+proc splitBy*(s: string, sep: string, default: string = ""): (string, string) =
+  let parts = s.split(sep, maxsplit = 1)
+  if len(parts) == 2:
+    return (parts[0], parts[1])
+  return (s, default)
+
+proc rSplitBy*(s: string, sep: string, default: string = ""): (string, string) =
+  let parts = s.rsplit(sep, maxsplit = 1)
+  if len(parts) == 2:
+    return (parts[0], parts[1])
+  return (s, default)
+
 proc removeSuffix*(s: string, suffix: string): string =
   # similar to strutil except it returns result back
   # vs in-place removal in stdlib
   result = s
   result.removeSuffix(suffix)
+
+proc removePrefix*(s: string, prefix: string): string =
+  # similar to strutil except it returns result back
+  # vs in-place removal in stdlib
+  result = s
+  result.removePrefix(prefix)
 
 proc `&`*(a: JsonNode, b: JsonNode): JsonNode =
   result = newJArray()
@@ -514,3 +532,67 @@ proc `&`*(a: JsonNode, b: JsonNode): JsonNode =
 proc `&=`*(a: var JsonNode, b: JsonNode) =
   for i in b.items():
     a.add(i)
+
+proc getStrElems*(node: JsonNode, default: seq[string] = @[]): seq[string] =
+  result = @[]
+  for i in node.getElems():
+    result.add(i.getStr())
+  if len(result) == 0:
+    return default
+
+proc toLowerKeysJsonNode*(node: JsonNode): JsonNode =
+  ## Returns a new `JsonNode` that is identical to the given `node`
+  ## except that every `JObject` key is lowercased.
+  case node.kind:
+  of JString:
+    return node
+  of JInt:
+    return node
+  of JFloat:
+    return node
+  of JBool:
+    return node
+  of JNull:
+    return node
+  of JObject:
+    result = newJObject()
+    for k, v in node.pairs():
+      result[k.toLower()] = v.toLowerKeysJsonNode()
+  of JArray:
+    result = newJArray()
+    for i in node.items():
+      result.add(i.toLowerKeysJsonNode())
+
+template withAtomicVar*[T](x: var T, code: untyped) =
+  let copy = x.deepCopy()
+  try:
+    code
+  except:
+    # restore variable to original value
+    x = copy
+    raise
+
+proc update*(self: ChalkDict, other: ChalkDict): ChalkDict {.discardable.} =
+  result = self
+  for k, v in other:
+    self[k] = v
+
+proc merge*(self: ChalkDict, other: ChalkDict): ChalkDict {.discardable.} =
+  result = self
+  for k, v in other:
+    if k in self and self[k].kind == MkSeq and v.kind == MkSeq:
+      self[k] &= v
+    else:
+      self[k] = v
+
+proc strip*(items: seq[string], leading = true, trailing = true, chars = Whitespace): seq[string] =
+  result = @[]
+  for i in items:
+    result.add(i.strip(leading = leading, trailing = trailing, chars = chars))
+
+proc makeExecutable*(path: string) =
+  let
+    existing = path.getFilePermissions()
+    wanted   = existing + {fpUserExec, fpGroupExec, fpOthersExec}
+  if existing != wanted:
+    path.setFilePermissions(wanted)

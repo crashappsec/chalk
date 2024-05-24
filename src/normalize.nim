@@ -12,8 +12,12 @@
 ## for that, because it'd be too easy to lose interoperability if
 ## people whiff on whatever we decide for how to handle spaces, etc.
 
-import std/algorithm
+import std/[algorithm, sequtils]
 import "."/config
+
+iterator sortedPairs(d: ChalkDict): tuple[key: string, value: Box] =
+  for key in d.keys().toSeq().sorted():
+    yield (key, d[key])
 
 proc u32ToStr(i: uint32): string =
   result = newStringOfCap(sizeof(uint32)+1)
@@ -44,12 +48,22 @@ proc binEncodeArr(arr: seq[Box]): string =
 
   for item in arr: result = result & binEncodeItem(item)
 
-proc binEncodeObj(self: ChalkDict): string =
-  result = "\x05" & u32ToStr(uint32(len(self)))
-
-  for outputKey in self.keys():
-    let val = self[outputKey]
-    result  = result & binEncodeStr(outputKey) & binEncodeItem(val)
+proc binEncodeObj(self: ChalkDict, ignore: seq[string] = @[]): string =
+  var
+    encoded = ""
+    count   = 0
+  # It's important to write everything out in a canonical order for
+  # signing.  The keys are written in the order we spec, and user-defined
+  # keys are in lexigraphical order.
+  #
+  # Note that even dictionary values (e.g., SBOMS) are kept ordered by
+  # the insertion ordering, so there is no ambiguity.
+  for k, v in self.sortedPairs():
+    if k in ignore:
+      continue
+    encoded  &= binEncodeStr(k) & binEncodeItem(v)
+    count += 1
+  return "\x05" & u32ToStr(uint32(count)) & encoded
 
 proc binEncodeFloat(f: float): string =
   result = "\x06" & floatToStr(f)
@@ -66,42 +80,9 @@ proc binEncodeItem(self: Box): string =
     echo self.kind, " ", $self
     unreachable
 
-
-proc getSortedKeys(d: ChalkDict): seq[string] {.inline.}=
-  var k: seq[string] = @[]
-
-  for item in d.keys():
-    k.add(item)
-
-  k.sort()
-  return k
-
 proc normalizeChalk*(dict: ChalkDict): string =
-  # Currently, this is only called for the METADATA_HASH field, which only
+  # Currently, this is only called for the METADATA_ID field, which only
   # signs things actually being written out.  We skip MAGIC, SIGNATURE
   # and SIGN_PARAMS.
-
-  var fieldCount = 0
   let ignoreList = get[seq[string]](chalkConfig, "ignore_when_normalizing")
-
-  # Count how many fields we will write.
-  for key, _ in dict:
-    if key notin ignoreList:
-      fieldCount = fieldCount + 1
-
-  result = u32ToStr(uint32(fieldCount))
-
-  for fullKey in dict.getSortedKeys():
-    # It's important to write everything out in a canonical order for
-    # signing.  The keys are written in the order we spec, and user-defined
-    # keys are in lexigraphical order.
-    #
-    # Note that even dictionary values (e.g., SBOMS) are kept ordered by
-    # the insertion ordering, so there is no ambiguity.
-    var outputKey = fullKey
-
-    if fullKey in ignoreList: continue
-    let
-      key = binEncodeStr(outputKey)
-      val = binEncodeItem(dict[outputKey])
-    result  &= key & val
+  return binEncodeObj(dict, ignoreList)

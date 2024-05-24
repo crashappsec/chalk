@@ -15,6 +15,7 @@ TAGS = {
     "Environment": "staging",
 }
 ACCOUNT_ID = "123456789012"
+REGION = "us-east-1"
 MAC = "00:25:96:FF:FE:12:34:56"
 # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
 # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v4.html
@@ -35,9 +36,9 @@ RESPONSES = {
     "/latest/meta-data/instance-type": "t2.medium",
     "/latest/meta-data/local-hostname": "ip-10-251-50-12.ec2.internal",
     "/latest/meta-data/local-ipv4": "10.251.50.12",
-    "/latest/meta-data/placement/availability-zone": "us-east-1e",
+    "/latest/meta-data/placement/availability-zone": f"{REGION}e",
     "/latest/meta-data/placement/availability-zone-id": "use1-az3",
-    "/latest/meta-data/placement/region": "us-east-1",
+    "/latest/meta-data/placement/region": REGION,
     "/latest/meta-data/public-hostname": "ec2-203-0-113-25.compute-1.amazonaws.com",
     "/latest/meta-data/public-ipv4": "203.0.113.25",
     "/latest/meta-data/security-groups": "\n".join(["default", "test"]),
@@ -93,7 +94,7 @@ RESPONSES = {
         {
             "accountId": ACCOUNT_ID,
             "architecture": "x86_64",
-            "availabilityZone": "us-east-1e",
+            "availabilityZone": f"{REGION}e",
             "billingProducts": None,
             "devpayProductCodes": None,
             "marketplaceProductCodes": None,
@@ -104,7 +105,7 @@ RESPONSES = {
             "pendingTime": "2023-09-11T06:01:38Z",
             "privateIp": "10.251.50.12",
             "ramdiskId": None,
-            "region": "us-east-1",
+            "region": REGION,
             "version": "2017-09-30",
         }
     ),
@@ -136,12 +137,12 @@ RESPONSES = {
             "DockerId": "cd189a933e5849daa93386466019ab50-2495160603",
             "Name": "curl",
             "DockerName": "curl",
-            "Image": "111122223333.dkr.ecr.us-west-2.amazonaws.com/curltest:latest",
+            "Image": f"{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/curltest:latest",
             "ImageID": "sha256:25f3695bedfb454a50f12d127839a68ad3caf91e451c1da073db34c542c4d2cb",
             "Labels": {
-                "com.amazonaws.ecs.cluster": "arn:aws:ecs:us-west-2:111122223333:cluster/default",
+                "com.amazonaws.ecs.cluster": f"arn:aws:ecs:{REGION}:{ACCOUNT_ID}:cluster/default",
                 "com.amazonaws.ecs.container-name": "curl",
-                "com.amazonaws.ecs.task-arn": "arn:aws:ecs:us-west-2:111122223333:task/default/cd189a933e5849daa93386466019ab50",
+                "com.amazonaws.ecs.task-arn": f"arn:aws:ecs:{REGION}:{ACCOUNT_ID}:task/default/cd189a933e5849daa93386466019ab50",
                 "com.amazonaws.ecs.task-definition-family": "curltest",
                 "com.amazonaws.ecs.task-definition-version": "2",
             },
@@ -159,16 +160,16 @@ RESPONSES = {
                     "MACAddress": "0a:de:f6:10:51:e5",
                     "IPv4SubnetCIDRBlock": "192.0.2.0/24",
                     "DomainNameServers": ["192.0.2.2"],
-                    "DomainNameSearchList": ["us-west-2.compute.internal"],
-                    "PrivateDNSName": "ip-10-0-0-222.us-west-2.compute.internal",
+                    "DomainNameSearchList": [f"{REGION}.compute.internal"],
+                    "PrivateDNSName": f"ip-10-0-0-222.{REGION}.compute.internal",
                     "SubnetGatewayIpv4Address": "192.0.2.0/24",
                 }
             ],
-            "ContainerARN": "arn:aws:ecs:us-west-2:111122223333:container/05966557-f16c-49cb-9352-24b3a0dcd0e1",
+            "ContainerARN": f"arn:aws:ecs:{REGION}:{ACCOUNT_ID}:container/05966557-f16c-49cb-9352-24b3a0dcd0e1",
             "LogOptions": {
                 "awslogs-create-group": "true",
                 "awslogs-group": "/ecs/containerlogs",
-                "awslogs-region": "us-west-2",
+                "awslogs-region": REGION,
                 "awslogs-stream": "ecs/curl/cd189a933e5849daa93386466019ab50",
             },
             "LogDriver": "awslogs",
@@ -177,8 +178,8 @@ RESPONSES = {
     ),
     "/ecs/task": json.dumps(
         {
-            "Cluster": "arn:aws:ecs:us-east-1:123456789012:cluster/clusterName",
-            "TaskARN": "arn:aws:ecs:us-east-1:123456789012:task/MyEmptyCluster/bfa2636268144d039771334145e490c5",
+            "Cluster": f"arn:aws:ecs:{REGION}:cluster/clusterName",
+            "TaskARN": f"arn:aws:ecs:{REGION}:task/MyEmptyCluster/bfa2636268144d039771334145e490c5",
             "Family": "sample-fargate",
             "Revision": "5",
             "DesiredStatus": "RUNNING",
@@ -186,7 +187,7 @@ RESPONSES = {
             "Limits": {"CPU": 0.25, "Memory": 512},
             "PullStartedAt": "2023-07-21T15:45:33.532811081Z",
             "PullStoppedAt": "2023-07-21T15:45:38.541068435Z",
-            "AvailabilityZone": "us-east-1d",
+            "AvailabilityZone": f"{REGION}d",
             "Containers": [
                 {
                     "DockerId": "bfa2636268144d039771334145e490c5-1117626119",
@@ -195,9 +196,9 @@ RESPONSES = {
                     "Image": "curlimages/curl",
                     "ImageID": "sha256:daf3f46a2639c1613b25e85c9ee4193af8a1d538f92483d67f9a3d7f21721827",
                     "Labels": {
-                        "com.amazonaws.ecs.cluster": "arn:aws:ecs:us-east-1:123456789012:cluster/MyEmptyCluster",
+                        "com.amazonaws.ecs.cluster": f"arn:aws:ecs:{REGION}:cluster/MyEmptyCluster",
                         "com.amazonaws.ecs.container-name": "curl-image",
-                        "com.amazonaws.ecs.task-arn": "arn:aws:ecs:us-east-1:123456789012:task/MyEmptyCluster/bfa2636268144d039771334145e490c5",
+                        "com.amazonaws.ecs.task-arn": f"arn:aws:ecs:{REGION}:task/MyEmptyCluster/bfa2636268144d039771334145e490c5",
                         "com.amazonaws.ecs.task-definition-family": "sample-fargate",
                         "com.amazonaws.ecs.task-definition-version": "5",
                     },
@@ -220,7 +221,7 @@ RESPONSES = {
                             "SubnetGatewayIpv4Address": "172.31.32.1/20",
                         }
                     ],
-                    "ContainerARN": "arn:aws:ecs:us-east-1:123456789012:container/MyEmptyCluster/bfa2636268144d039771334145e490c5/da6cccf7-1178-400c-afdf-7536173ee209",
+                    "ContainerARN": f"arn:aws:ecs:{REGION}:container/MyEmptyCluster/bfa2636268144d039771334145e490c5/da6cccf7-1178-400c-afdf-7536173ee209",
                     "Snapshotter": "overlayfs",
                 },
                 {
@@ -230,9 +231,9 @@ RESPONSES = {
                     "Image": "public.ecr.aws/docker/library/httpd:latest",
                     "ImageID": "sha256:8059bdd0058510c03ae4c808de8c4fd2c1f3c1b6d9ea75487f1e5caa5ececa02",
                     "Labels": {
-                        "com.amazonaws.ecs.cluster": "arn:aws:ecs:us-east-1:123456789012:cluster/MyEmptyCluster",
+                        "com.amazonaws.ecs.cluster": f"arn:aws:ecs:{REGION}:cluster/MyEmptyCluster",
                         "com.amazonaws.ecs.container-name": "fargate-app",
-                        "com.amazonaws.ecs.task-arn": "arn:aws:ecs:us-east-1:123456789012:task/MyEmptyCluster/bfa2636268144d039771334145e490c5",
+                        "com.amazonaws.ecs.task-arn": f"arn:aws:ecs:{REGION}:task/MyEmptyCluster/bfa2636268144d039771334145e490c5",
                         "com.amazonaws.ecs.task-definition-family": "sample-fargate",
                         "com.amazonaws.ecs.task-definition-version": "5",
                     },
@@ -255,7 +256,7 @@ RESPONSES = {
                             "SubnetGatewayIpv4Address": "172.31.32.1/20",
                         }
                     ],
-                    "ContainerARN": "arn:aws:ecs:us-east-1:123456789012:container/MyEmptyCluster/bfa2636268144d039771334145e490c5/f65b461d-aa09-4acb-a579-9785c0530cbc",
+                    "ContainerARN": f"arn:aws:ecs:{REGION}:container/MyEmptyCluster/bfa2636268144d039771334145e490c5/f65b461d-aa09-4acb-a579-9785c0530cbc",
                     "Snapshotter": "overlayfs",
                 },
             ],

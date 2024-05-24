@@ -23,71 +23,53 @@ proc recordExternalActions(kind: string, details: string) =
 
 setExternalActionCallback(recordExternalActions)
 
-
-proc validateMetadata*(obj: ChalkObj): ValidateResult {.cdecl, exportc.} =
+proc validateMetaData*(obj: ChalkObj): ValidateResult {.cdecl, exportc.} =
   let fields = obj.extract
 
-  # Re-compute the chalk ID.
+  # sanity checks
   if fields == nil or len(fields) == 0:
-    return
+    return vBadMd
   elif "CHALK_ID" notin fields:
     error(obj.name & ": extracted chalk mark missing CHALK_ID field")
     return vBadMd
   elif obj.callGetChalkID() != unpack[string](fields["CHALK_ID"]):
     error(obj.name & ": extracted CHALK_ID doesn't match computed CHALK_ID")
-    error(obj.callGetChalkID() & " vs: " &
-      unpack[string](fields["CHALK_ID"]))
+    error(obj.callGetChalkID() & " vs: " & unpack[string](fields["CHALK_ID"]))
     return vBadMd
-  var
-    toHash   = fields.normalizeChalk()
-    computed = toHash.sha256()
-
-  if "METADATA_HASH" in fields:
-    trace("computed = " & computed.hex())
-    trace("mdhash   = " & unpack[string](fields["METADATA_HASH"]))
-    if computed.hex() != unpack[string](fields["METADATA_HASH"]):
-      error(obj.name & ": extracted METADATA_HASH doesn't validate")
-      return vBadMd
-  else:
-    let computedMdId = computed.idFormat()
-    trace("computed = " & computedMdId)
-    trace("mdid     = " & unpack[string](fields["METADATA_ID"]))
-    if computedMdId != unpack[string](fields["METADATA_ID"]):
-      error(obj.name & ": extracted METADATA_ID doesn't validate")
-      return vBadMd
-
-  if obj.fsRef == "":
-    # For containers, validation currently happens via cmd_docker.nim;
-    # They could definitely come together.
-    #
-    # TODO: Probably should add a check here to make sure the codec is
-    # on a list of ones that may not set fsRef.
-    return vOk
-
-  if "SIGNATURE" notin fields:
-    if "SIGNING" in fields and unpack[bool](fields["SIGNING"]):
-      error(obj.name & ": SIGNING was set, but SIGNATURE was not found")
-      return vBadMd
-    else:
-      return vOk
-
-  if "INJECTOR_PUBLIC_KEY" notin fields:
-    error(obj.name & ": Bad chalk mark; signed, but missing INJECTOR_PUBLIC_KEY")
-    return vNoPk
-
-  if getCosignLocation() == "":
-    warn(obj.name & ": Signed but cannot validate; run `chalk setup` to fix")
-    return vNoCosign
-
-  let artHash = obj.callGetUnchalkedHash()
-  if artHash.isNone():
-    return vNoHash
+  elif "METADATA_ID" notin fields:
+    error(obj.name & ": extracted chalk mark missing METADATA_ID field")
+    return vBadMd
 
   let
-    sig    = unpack[string](fields["SIGNATURE"])
-    pubkey = unpack[string](fields["INJECTOR_PUBLIC_KEY"])
+    toHash       = fields.normalizeChalk()
+    computed     = toHash.sha256()
+    computedHash = computed.hex()
+    computedId   = computed.idFormat()
 
-  result = obj.cosignNonContainerVerify(artHash.get(), computed.hex(), sig, pubkey)
+  # metadata id is derived from metadata hash
+  # so we validate it by recomputing it from full hash
+  trace("computed = " & computedId)
+  trace("mdid     = " & unpack[string](fields["METADATA_ID"]))
+  if computedId != unpack[string](fields["METADATA_ID"]):
+    error(obj.name & ": extracted METADATA_ID doesn't validate")
+    return vBadMd
+
+  if "METADATA_HASH" in fields:
+    trace("computed = " & computedHash)
+    trace("mdhash   = " & unpack[string](fields["METADATA_HASH"]))
+    if computedHash != unpack[string](fields["METADATA_HASH"]):
+      error(obj.name & ": extracted METADATA_HASH doesn't validate")
+      return vBadMd
+
+  try:
+    if obj.canVerifyByHash():
+      return obj.verifyByHash(computedHash)
+    if obj.canVerifyBySigStore():
+      let (isValid, _) = obj.verifyBySigStore()
+      return isValid
+  except:
+    error("could not successfully validate signature due to: " & getCurrentExceptionMsg())
+    return vNoCosign
 
 # Even if you don't subscribe to TIMESTAMP_WHEN_CHALKED we collect it in case
 # you're subscribed to something that uses it in a substitution.
@@ -136,31 +118,34 @@ proc applySubstitutions(obj: ChalkObj) {.inline.} =
     if not s.contains("{"): continue
     obj.collectedData[k] = pack(s.multiReplace(subs))
 
-proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, ins: bool):
+proc setValidated*(self: var ChalkDict, chalk: ChalkObj, valid: ValidateResult) =
+  case valid
+  of vOk:
+    self.setIfNeeded("_VALIDATED_METADATA", true)
+  of vSignedOk:
+    self.setIfNeeded("_VALIDATED_METADATA", true)
+    self.setIfNeeded("_VALIDATED_SIGNATURE", true)
+  of vBadMd:
+    self.setIfNeeded("_VALIDATED_METADATA", false)
+    chalk.opFailed = true
+  of vNoPk, vNoCosign, vNoHash:
+    self.setIfNeeded("_VALIDATED_METADATA", true)
+    self.setIfNeeded("_VALIDATED_SIGNATURE", false)
+  of vBadSig:
+    self.setIfNeeded("_VALIDATED_METADATA", true)
+    self.setIfNeeded("_INVALID_SIGNATURE", true)
+
+proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
                               ChalkDict {.cdecl.} =
   result = ChalkDict()
 
-  if isChalkingOp():
+  if insert:
     obj.applySubstitutions()
     result.setIfNeeded("_OP_CHALKED_KEYS", toSeq(obj.getChalkMark().keys))
     result.setIfNeeded("_VIRTUAL", get[bool](chalkConfig, "virtual_chalk"))
-  else:
-    case obj.validateMetaData()
-    of vOk:
-      result.setIfNeeded("_VALIDATED_METADATA", true)
-    of vSignedOk:
-      result.setIfNeeded("_VALIDATED_METADATA", true)
-      result.setIfNeeded("_VALIDATED_SIGNATURE", true)
-    of vBadMd:
-      result.setIfNeeded("_VALIDATED_METADATA", false)
-      obj.opFailed = true
-    of vNoPk, vNoCosign, vNoHash:
-      result.setIfNeeded("_VALIDATED_METADATA", true)
-      result.setIfNeeded("_VALIDATED_SIGNATURE", false)
-    of vBadSig:
-      result.setIfNeeded("_VALIDATED_METADATA", true)
-      result.setIfNeeded("_INVALID_SIGNATURE", true)
 
+  else:
+    result.setValidated(obj, obj.validateMetaData())
     if obj.fsRef != "":
       result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
 
@@ -257,8 +242,11 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     result["_OP_HOST_REPORT_KEYS"] = pack(reportKeys)
 
   when defined(posix):
-    result.setIfNeeded("_OP_HOSTINFO", uinfo.version)
-    result.setIfNeeded("_OP_NODENAME", uinfo.nodename)
+    result.setIfNeeded("_OP_HOST_SYSNAME", uinfo.sysname)
+    result.setIfNeeded("_OP_HOST_RELEASE", uinfo.release)
+    result.setIfNeeded("_OP_HOST_VERSION", uinfo.version)
+    result.setIfNeeded("_OP_HOST_NODENAME", uinfo.nodename)
+    result.setIfNeeded("_OP_HOST_MACHINE", uinfo.machine)
 
 proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result           = ChalkDict()
@@ -278,8 +266,11 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result.setIfNeeded("PUBLIC_IPV4_ADDR_WHEN_CHALKED", pack(getMyIpV4Addr()))
 
   when defined(posix):
-    result.setIfNeeded("HOSTINFO_WHEN_CHALKED", uinfo.version)
-    result.setIfNeeded("NODENAME_WHEN_CHALKED", uinfo.nodename)
+    result.setIfNeeded("HOST_SYSNAME_WHEN_CHALKED", uinfo.sysname)
+    result.setIfNeeded("HOST_RELEASE_WHEN_CHALKED", uinfo.release)
+    result.setIfNeeded("HOST_VERSION_WHEN_CHALKED", uinfo.version)
+    result.setIfNeeded("HOST_NODENAME_WHEN_CHALKED", uinfo.nodename)
+    result.setIfNeeded("HOST_MACHINE_WHEN_CHALKED", uinfo.machine)
 
   if isSubscribedKey("INJECTOR_CHALK_ID"):
     let selfIdOpt = selfID
@@ -294,41 +285,32 @@ proc metsysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   if len(obj.err) != 0:
     obj.collectedData["ERR_INFO"] = pack(obj.err)
 
-  let pubKey = obj.willSignNonContainer()
-  if pubKey != "":
-    obj.collectedData["SIGNING"]             = pack(true)
-    obj.collectedData["INJECTOR_PUBLIC_KEY"] = pack(pubKey)
-    forceChalkKeys(["SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"])
-
   let
-    toHash   = obj.getChalkMark().normalizeChalk()
-    mdHash   = toHash.sha256()
-    encHash  = mdHash.hex()
+    toHash       = obj.getChalkMark().normalizeChalk()
+    computed     = toHash.sha256()
+    computedHash = computed.hex()
+    computedId   = computed.idFormat()
 
-  result["METADATA_HASH"] = pack(encHash)
-  result["METADATA_ID"]   = pack(idFormat(mdHash))
+  result["METADATA_HASH"] = pack(computedHash)
+  result["METADATA_ID"]   = pack(computedId)
 
-  if pubKey == "":
-    return
+  if obj.willSignByHash():
+    try:
+      result.update(obj.signByHash(computedHash))
+    except:
+      error("Cannot sign " & obj.name & ": " & getCurrentExceptionMsg())
 
-  let
-    hashOpt = obj.callGetUnchalkedHash()
-
-  if not hashOpt.isSome():
-    warn(obj.name &
-      ": Cannot sign; No hash available for this artifact at time of signing.")
-    return
-
-  let sig = obj.signNonContainer(hashOpt.get(), encHash)
-
-  if sig == "":
-    warn(obj.name & ": Cannot sign; cosign command failed.")
-    return
-
-  result["SIGNATURE"] = pack(sig)
+proc metsysGetRunTimeArtifactInfo(self: Plugin, obj: ChalkObj, insert: bool):
+                                  ChalkDict {.cdecl.} =
+  result = ChalkDict()
+  if insert and obj.willSignBySigStore():
+    try:
+      result.update(obj.signBySigStore())
+    except:
+      error("Cannot sign " & obj.name & ": " & getCurrentExceptionMsg())
 
 proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
-                             ChalkDict {.cdecl.} =
+                              ChalkDict {.cdecl.} =
   result = ChalkDict()
 
   if len(externalActions) > 0:
@@ -340,7 +322,6 @@ proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
       diff = getMonoTime().ticks() - startTime
       inMs = diff div 1000 # It's in nanosec, convert to 1/1000000th of a sec
 
-
     result["_CHALK_RUN_TIME"] = pack(inMs)
 
 proc loadSystem*() =
@@ -351,5 +332,6 @@ proc loadSystem*() =
             rtHostCallback = RunTimeHostCb(sysGetRunTimeHostInfo))
 
   newPlugin("metsys",
-           ctArtCallback = ChalkTimeArtifactCb(metsysGetChalkTimeArtifactInfo),
-           rtHostCallback = RunTimeHostCb(metsysGetRunTimeHostInfo))
+            ctArtCallback  = ChalkTimeArtifactCb(metsysGetChalkTimeArtifactInfo),
+            rtArtCallback  = RunTimeArtifactCb(metsysGetRunTimeArtifactInfo),
+            rtHostCallback = RunTimeHostCb(metsysGetRunTimeHostInfo))

@@ -94,11 +94,13 @@ proc authHeaders(args: seq[Box], s: ConfigState): Option[Box] =
       c4mHeaders[key] = value
   return some(pack(c4mHeaders))
 
+const memoizeKey* = "$CHALK_MEMOIZE"
+
 proc memoizeInChalkmark(args: seq[Box], s: ConfigState): Option[Box] =
   let
     name     = unpack[string](args[0])
     fn       = unpack[CallbackObj](args[1])
-    existing = selfChalkGetSubKey("$CHALK_MEMOIZE", name)
+    existing = selfChalkGetSubKey(memoizeKey, name)
   if existing.isSome():
     return existing
   let valueOpt = s.sCall(fn, @[])
@@ -106,7 +108,7 @@ proc memoizeInChalkmark(args: seq[Box], s: ConfigState): Option[Box] =
     error("In memoize(\"" & name & "\", fn), fn didnt return any value")
     return none(Box)
   let value = valueOpt.get()
-  selfChalkSetSubKey("$CHALK_MEMOIZE", name, value)
+  selfChalkSetSubKey(memoizeKey, name, value)
   return valueOpt
 
 proc c4mParseJson*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =

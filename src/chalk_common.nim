@@ -27,48 +27,48 @@ type
 
   ## The chalk info for a single artifact.
   ChalkObj* = ref object
-    name*:          string      ## The name to use for the artifact in errors.
-    cachedHash*:    string      ## Cached 'ending' hash
-    cachedPreHash*: string      ## Cached 'unchalked' hash
-    collectedData*: ChalkDict   ## What we're adding during insertion.
-    extract*:       ChalkDict   ## What we extracted, or nil if no extract.
-    cachedMark*:    string      ## Cached chalk mark.
-    commentPrefix*: string      ## For scripting languages only, the comment
-                                ## prefix we use when adding / rming marks
-    detectedLang*:  string      ## Currently only used in codecSource.
+    name*:          string           ## The name to use for the artifact in errors.
+    cachedHash*:    string           ## Cached 'ending' hash
+    cachedPreHash*: string           ## Cached 'unchalked' hash
+    collectedData*: ChalkDict        ## What we're adding during insertion.
+    extract*:       ChalkDict        ## What we extracted, or nil if no extract.
+    cachedMark*:    string           ## Cached chalk mark.
+    commentPrefix*: string           ## For scripting languages only, the comment
+                                     ## prefix we use when adding / rming marks
+    detectedLang*:  string           ## Currently only used in codecSource.
     opFailed*:      bool
     marked*:        bool
     embeds*:        seq[ChalkObj]
-    err*:           seq[string] ## Runtime logs for chalking are filtered
-                                ## based on the "chalk log level". They
-                                ## end up here, until the end of chalking
-                                ## where, they get added to ERR_INFO, if
-                                ## any.  To disable, simply set the chalk
-                                ## log level to 'none'.
-    cache*:         RootRef     ## Generic pointer a codec can use to
-                                ## store any state it might want to stash.
+    err*:           seq[string]      ## Runtime logs for chalking are filtered
+                                     ## based on the "chalk log level". They
+                                     ## end up here, until the end of chalking
+                                     ## where, they get added to ERR_INFO, if
+                                     ## any.  To disable, simply set the chalk
+                                     ## log level to 'none'.
+    cache*:         RootRef          ## Generic pointer a codec can use to
+                                     ## store any state it might want to stash.
     myCodec*:       Plugin
-    forceIgnore*:   bool        ## If the system decides the codec shouldn't
-                                ## process this, set this bool.
-    pid*:           Option[Pid] ## If an exec() or eval() and we know
-                                ## the pid, this will be set.
-    startOffset*:   int         ## Plugins by default use file streams; we
-    endOffset*:     int         ## keep state fields for that to bridge between
-                                ## extract and write. If the plugin needs to do
-                                ## something else, use the cache field
-                                ## below, instead.
-    fsRef*:         string      ## Reference for this artifact on a fs
-    userRef*:       string      ## Reference the user gave for the artifact.
-    repo*:          string      ## The docker repo.
-    tag*:           string      ## The image tag, if any.
-    shortId*:       string      ## The short hash ID of an image.
-    imageId*:       string      ## Image ID if this is a docker image
-    repoHash*:      string      ## Image ID in the repo.
-    containerId*:   string      ## Container ID if this is a container
-    signed*:        bool        ## True on the insert path once signed,
-                                ## and once we've seen an attestation otherwise
-    inspected*:     bool        ## True for images once inspected; we don't
-                                ## need to inspect twice when we build + push.
+    forceIgnore*:   bool             ## If the system decides the codec shouldn't
+                                     ## process this, set this bool.
+    pid*:           Option[Pid]      ## If an exec() or eval() and we know
+                                     ## the pid, this will be set.
+    startOffset*:   int              ## Plugins by default use file streams; we
+    endOffset*:     int              ## keep state fields for that to bridge between
+                                     ## extract and write. If the plugin needs to do
+                                     ## something else, use the cache field
+                                     ## below, instead.
+    fsRef*:         string           ## Reference for this artifact on a fs
+    platform*:      DockerPlatform   ## platform
+    images*:        seq[DockerImage] ## all images where image was tagged/pushed
+    imageId*:       string           ## Image ID if this is a docker image
+    imageDigest*:   string           ## Image digest in the repo.
+    listDigest*:    string           ## Manifest list digest in the repo.
+    containerId*:   string           ## Container ID if this is a container
+    noCosign*:      bool             ## When we know image is not in registry. skips validation
+    signed*:        bool             ## True on the insert path once signed,
+                                     ## and once we've seen an attestation otherwise
+    inspected*:     bool             ## True for images once inspected; we don't
+                                     ## need to inspect twice when we build + push.
     resourceType*:  set[ResourceType]
 
   ChalkTimeHostCb*     = proc (a: Plugin): ChalkDict {.cdecl.}
@@ -196,6 +196,11 @@ type
     else: discard
   CmdParseType* = enum cpFrom, cpUnknown
 
+  DockerPlatform* = ref object
+    os*:           string
+    architecture*: string
+    variant*:      string
+
   DockerParse* = ref object
     currentEscape*:      Rune
     stream*:             Stream
@@ -218,8 +223,8 @@ type
     endLine*:   int
 
   FromInfo* = ref object of InfoBase
-    flags*:  seq[DfFlag]
-    image*:  Option[LineToken]
+    flags*:  Table[string, DfFlag]
+    repo*:   Option[LineToken]
     tag*:    Option[LineToken]
     digest*: Option[LineToken]
     asArg*:  Option[LineToken]
@@ -241,16 +246,16 @@ type
     raw*:  string
 
   AddInfo* = ref object of InfoBase
-    flags*:  seq[DfFlag]
+    flags*:  Table[string, DfFlag]
     rawSrc*: seq[string]
     rawDst*: string
 
   CopyInfo* = ref object of InfoBase
-    flags*:  seq[DfFlag]
+    flags*:  Table[string, DfFlag]
     rawSrc*: seq[string]
     rawDst*: string
 
-  DfUserInfo* = ref object of InfoBase
+  UserInfo* = ref object of InfoBase
     str*: string
 
   LabelInfo* = ref object of InfoBase
@@ -259,12 +264,23 @@ type
   DockerFileSection* = ref object
     startLine*:   int
     endLine*:     int
-    image*:       string
+    platform*:    DockerPlatform
+    image*:       DockerImage
     alias*:       string
-    entryPoint*:  EntryPointInfo
+    entrypoint*:  EntryPointInfo
     cmd*:         CmdInfo
     shell*:       ShellInfo
-    lastUser*:    DfUserInfo
+    lastUser*:    UserInfo
+
+  DockerEntrypoint* = tuple
+    entrypoint: EntryPointInfo
+    cmd:        CmdInfo
+    shell:      ShellInfo
+
+  DockerImage* = tuple
+    repo:   string
+    tag:    string
+    digest: string
 
   GitHeadType* = enum
     commit, branch, tag
@@ -276,6 +292,36 @@ type
     # first matching branch for commit ref, if any
     branches*:     seq[string]
     tags*:         seq[string]
+
+  DigestedJson* = ref object
+    json*:   JsonNode
+    digest*: string
+    size*:   int
+
+  DockerManifestType* = enum
+    list, image, config, layer
+
+  DockerManifest* = ref object
+    name*:             DockerImage # where manifest was fetched from
+    otherNames*:       seq[DockerImage]
+    digest*:           string
+    mediaType*:        string
+    size*:             int
+    json*:             JsonNode
+    isFetched*:        bool
+    case kind*:        DockerManifestType
+    of list:
+      manifests*:      seq[DockerManifest]
+    of image:
+      list*:           DockerManifest # can be null if there is manifest list
+      platform*:       DockerPlatform
+      config*:         DockerManifest
+      layers*:         seq[DockerManifest]
+    of config:
+      image*:          DockerManifest
+      configPlatform*: DockerPlatform
+    of layer:
+      discard
 
   DockerGitContext* = ref object
     context*:      string
@@ -294,47 +340,62 @@ type
     id*:   string
     src*:  string
 
+  DockerCmd* = enum
+    build, push, other
+
   DockerInvocation* = ref object
-    dockerExe*:         string
-    opChalkObj*:        ChalkObj
-    chalkId*:           string # shared between multi-platform builds
-    originalArgs*:      seq[string]
-    cmd*:               string
-    processedArgs*:     seq[string]
-    flags*:             OrderedTable[string, FlagSpec]
-    foundLabels*:       OrderedTableRef[string, string]
-    foundTags*:         seq[string]
-    ourTag*:            string # This is what chalk added.
-    prefTag*:           string # This is what the user gave via -t or similar.
-    passedImage*:       string
-    buildArgs*:         Table[string, string]
-    foundFileArg*:      string
-    dockerfileLoc*:     string
-    inDockerFile*:      string
-    defaultPlatforms*:  Table[string, string]
-    foundPlatform*:     string
-    foundContext*:      string
-    otherContexts*:     OrderedTableRef[string, string]
-    gitContext*:        DockerGitContext
-    secrets*:           Table[string, DockerSecret]
-    errs*:              seq[string]
-    cmdBuild*:          bool
-    cmdPush*:           bool
-    privs*:             seq[string]
-    targetBuildStage*:  string
-    pushAllTags*:       bool
-    embededMarks*:      Box
-    newCmdLine*:        seq[string] # Rewritten command line
-    fileParseCtx*:      DockerParse
-    dfCommands*:        seq[InfoBase]
-    dfSections*:        seq[DockerFileSection]
-    dfSectionAliases*:  OrderedTable[string, DockerFileSection]
-    dfPassOnStdin*:     bool
-    addedInstructions*: seq[string]
+    chalkId*:                 string # shared between multi-platform builds
+
+    # basic attributes required for docker fail safe
+    originalArgs*:            seq[string]
+    originalStdIn*:           string # if we ever read stdin we backup here for fail-through
+    processedArgs*:           seq[string]
+    processedFlags*:          OrderedTable[string, FlagSpec]
+    newCmdLine*:              seq[string] # Rewritten command line
+    newStdIn*:                string
+
+    cmdName*:                 string
+    case cmd*:                DockerCmd
+
+    of DockerCmd.build:
+      foundBuildx*:           bool # whether using "docker buildx build" or "docker build"
+      foundIidFile*:          string
+      foundMetadataFile*:     string
+      foundFileArg*:          string
+      foundContext*:          string
+      foundLabels*:           OrderedTableRef[string, string]
+      foundTags*:             seq[DockerImage]
+      foundBuildArgs*:        TableRef[string, string]
+      foundPlatforms*:        seq[DockerPlatform]
+      foundExtraContexts*:    OrderedTableRef[string, string]
+      foundSecrets*:          TableRef[string, DockerSecret]
+      foundTarget*:           string
+      foundBuilder*:          string
+
+      gitContext*:            DockerGitContext
+
+      iidFilePath*:           string
+      iidFile*:               string
+      metadataFilePath*:      string
+      metadataFile*:          JsonNode
+      dockerFileLoc*:         string # can be :stdin:
+      inDockerFile*:          string
+      addedPlatform*:         OrderedTableRef[string, seq[string]]
+      addedInstructions*:     seq[string]
+
+      # parsed dockerfile
+      dfSections*:            seq[DockerFileSection]
+      dfSectionAliases*:      OrderedTable[string, DockerFileSection]
+
+    of DockerCmd.push:
+      foundImage*:            string
+      foundAllTags*:          bool
+
+    else:
+      discard
 
   ValidateResult* = enum
     vOk, vSignedOk, vBadMd, vNoCosign, vBadSig, vNoHash, vNoPk
-
 
 # # Compile-time only helper for generating one of the consts below.
 # proc commentC4mCode(s: string): string =
@@ -415,6 +476,7 @@ var
   commandName*:           string
   gitExeLocation*:        string = ""
   sshKeyscanExeLocation*: string = ""
+  dockerInvocation*:      DockerInvocation
 
 template dumpExOnDebug*() =
   if chalkConfig != nil and get[bool](chalkConfig, "chalk_debug"):

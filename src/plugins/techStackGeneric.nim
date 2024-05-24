@@ -115,11 +115,31 @@ proc scanFileStream(strm: FileStream, filePath: string, category: string, subcat
         inFileScope[category][subcategory] = true
         break
 
+var ignored: seq[Regex] = @[]
+proc getIgnored(): seq[Regex] =
+  once:
+    for i in get[seq[string]](chalkConfig, "ignore_patterns"):
+      ignored.add(re(i))
+  return ignored
+
+proc ignore(path: string): bool =
+  for pattern in getIgnored():
+    if path.match(pattern):
+      return true
+  return false
+
 proc scanFile(filePath: string, category: string, subcategory: string) =
-  withFileStream(filePath, mode = fmRead, strict = true):
-    if stream == nil:
-      return
-    scanFileStream(stream, filePath, category, subcategory)
+  if filePath.ignore():
+    return
+  when defined(debug):
+    trace("tech stack: scanning " & filePath)
+  try:
+    withFileStream(filePath, mode = fmRead, strict = true):
+      if stream == nil:
+        return
+      scanFileStream(stream, filePath, category, subcategory)
+  except:
+    return
 
 proc getProcNames(): HashSet[string] =
   ## Returns every Name value in files at `/proc/[0-9]+/status`.
@@ -174,16 +194,24 @@ proc hostHasTechStack(scope: hostScope, proc_names: HashSet[string]): bool =
 proc scanDirectory(directory: string, category: string, subcategory: string) =
   if inFileScope[category][subcategory]:
     return
+  when defined(debug):
+    trace("tech stack: scanning " & directory)
   for kind, path in walkDir(directory):
     if inFileScope[category][subcategory]:
       break
+    if path.ignore():
+      continue
     if kind == pcFile:
       scanFile(path, category, subcategory)
     elif kind == pcDir and not path.endsWith(".git"):
       scanDirectory(path, category, subcategory)
 
 proc getLanguages(directory: string, langs: var HashSet[string]) =
+  when defined(debug):
+    trace("tech stack: scanning languages " & directory)
   for kind, path in walkDir(directory):
+    if path.ignore():
+      continue
     if kind == pcFile:
       let ext = path.splitFile().ext
       if ext != "" and ext in languages:
@@ -192,6 +220,7 @@ proc getLanguages(directory: string, langs: var HashSet[string]) =
       getLanguages(path, langs)
 
 proc detectLanguages(): HashSet[string] =
+  trace("tech stack: detecting languages")
   result = initHashSet[string]()
 
   let canLoad = get[bool](chalkConfig, "use_tech_stack_detection")
@@ -200,6 +229,10 @@ proc detectLanguages(): HashSet[string] =
 
   for item in getContextDirectories():
     let fpath = expandFilename(item)
+    if item.ignore():
+      continue
+    when defined(debug):
+      trace("tech stack: scanning context " & item)
     if fpath.dirExists():
       getLanguages(fpath, result)
     else:
@@ -208,6 +241,7 @@ proc detectLanguages(): HashSet[string] =
         getLanguages(head, result)
 
 proc detectTechCwd(): TableRef[string, seq[string]] =
+  trace("tech stack: detecting cwd")
   result = newTable[string, seq[string]]()
   var hasResults = false
   for category, subcategories in categories:
@@ -219,6 +253,10 @@ proc detectTechCwd(): TableRef[string, seq[string]] =
       # does this need to be re-set upon every invocation here?
       inFileScope[category][subcategory] = false
       for item in getContextDirectories():
+        if item.ignore():
+          continue
+        when defined(debug):
+          trace("tech stack: scanning context " & item)
         if inFileScope[category][subcategory]:
           break
         let fpath = expandFilename(item)
@@ -245,6 +283,8 @@ proc loadState() =
       languages[val.getExtension()] = langName
 
     for key, val in chalkConfig.techStackRules:
+      when defined(debug):
+        trace("tech stack: loading " & key)
       let
         category    = val.getCategory()
         subcategory = val.getSubcategory()
@@ -312,6 +352,8 @@ proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
   var finalHost = newTable[string, seq[string]]()
 
   for key, val in chalkConfig.techStackRules:
+    when defined(debug):
+      trace("tech stack: collecting " & key)
     if val.hostScope == nil:
       continue
     let

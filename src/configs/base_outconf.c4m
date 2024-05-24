@@ -23,7 +23,8 @@ outconf build {
 }
 
 outconf push {
-  report_template:        "push_default"
+  mark_template:          "minimal"
+  report_template:        "insertion_default"
 }
 
 outconf exec {

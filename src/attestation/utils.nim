@@ -6,9 +6,12 @@
 ##
 
 import std/[base64, os]
-import ".."/[chalk_common, config, util]
+import ".."/[chalk_common, config, semver, util]
 
-var cosignLoc: string
+var cosignLoc      = ""
+var cosignVersion  = parseVersion("0")
+let minimumVersion = parseVersion("2.2.0")
+
 proc getCosignLocation*(downloadCosign = false): string =
   once:
     const cosignLoader = "load_attestation_binary(bool) -> string"
@@ -18,11 +21,39 @@ proc getCosignLocation*(downloadCosign = false): string =
       warn("Could not find or install cosign; cannot sign or verify.")
   return cosignLoc
 
+proc getCosignVersion*(): Version =
+  once:
+    let path = getCosignLocation()
+    if path == "":
+      return cosignVersion
+    let
+      cmd    = runCmdGetEverything(path, @["version"])
+      stdOut = cmd.getStdOut()
+      lines  = stdOut.splitLines()
+    if cmd.getExit() != 0:
+      warn("Could not find cosign version")
+      return cosignVersion
+    try:
+      cosignVersion = lines.getVersionFromLineWhich(startsWith = "GitVersion:")
+      trace("cosign version: " & $cosignVersion)
+      if cosignVersion < minimumVersion:
+        warn("Unsupported cosign version is installed " & $cosignVersion & ". " &
+             "Please upgrade to >= " & $minimumVersion & ". " &
+             "See https://blog.sigstore.dev/tuf-root-update/ for more details.")
+    except:
+      warn("Could not find cosign version from: " & stdOut)
+  return cosignVersion
+
+proc isCosignInstalled*(): bool =
+  return getCosignLocation() != ""
+
 proc canAttest*(key: AttestationKey): bool =
   if key == nil:
     return false
   return (
-    getCosignLocation() != "" and
+    isCosignInstalled() and
+    # https://blog.sigstore.dev/tuf-root-update/
+    getCosignVersion() >= minimumVersion and
     key.privateKey != "" and
     key.publicKey != "" and
     key.password != ""
@@ -32,8 +63,22 @@ proc canAttestVerify*(key: AttestationKey): bool =
   if key == nil:
     return false
   return (
-    getCosignLocation() != "" and
+    isCosignInstalled() and
+    # https://blog.sigstore.dev/tuf-root-update/
+    getCosignVersion() >= minimumVersion and
     key.publicKey != ""
+  )
+
+proc canVerifyByHash*(chalk: ChalkObj): bool =
+  return isCosignInstalled() and chalk.fsRef != ""
+
+proc canVerifyBySigStore*(chalk: ChalkObj): bool =
+  return (
+    isCosignInstalled() and
+    ResourceImage     in    chalk.resourceType and
+    ResourceContainer notin chalk.resourceType and
+    len(chalk.images) >     0 and
+    chalk.imageDigest !=    ""
   )
 
 template withCosignPassword(password: string, code: untyped) =
@@ -88,9 +133,12 @@ proc isValid*(self: AttestationKey): bool =
     info("Test sign successful.")
 
     let
-      vfyArgs = @["verify-blob", "--key=chalk.pub",
+      vfyArgs = @["verify-blob",
+                  "--key=chalk.pub",
                   "--insecure-ignore-tlog=true",
-                  "--insecure-ignore-sct=true", ("--signature=" & sig), "-"]
+                  "--insecure-ignore-sct=true",
+                  "--signature=" & sig,
+                  "-"]
       vfyOut  = runCmdGetEverything(cosign, vfyArgs, tosign)
 
     if vfyOut.getExit() != 0:

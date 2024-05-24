@@ -7,7 +7,7 @@
 
 # Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
-import "."/[config, confload, commands, norecurse, sinks, docker_base,
+import "."/[config, confload, commands, norecurse, sinks,
             attestation_api, util]
 
 when isMainModule:
@@ -37,6 +37,7 @@ when isMainModule:
   of "dump":               runCmdConfDump()
   of "dump.params":        runCmdConfDumpParams()
   of "dump.cache":         runCmdConfDumpCache()
+  of "dump.all":           runCmdConfDumpAll()
   of "load":               runCmdConfLoad()
   of "config":             showConfigValues(force = true)
   of "version":            runCmdVersion()

@@ -123,6 +123,9 @@ services:
     volumes:
       - $PWD:$PWD
       - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/buildkit:/etc/buildkit
+      - /etc/docker:/etc/docker
+      - /tmp:/tmp
     working_dir: $PWD/tests/functional
     networks:
       - chalk

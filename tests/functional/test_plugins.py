@@ -232,9 +232,9 @@ def test_ecs(
         {
             "_OP_CLOUD_PROVIDER": "aws",
             "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ecs",
-            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "111122223333",
-            "_OP_CLOUD_PROVIDER_REGION": "us-west-2",
-            "_AWS_REGION": "us-west-2",
+            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "123456789012",
+            "_OP_CLOUD_PROVIDER_REGION": "us-east-1",
+            "_AWS_REGION": "us-east-1",
             "_OP_CLOUD_METADATA": {
                 "aws_ecs": {
                     "container": dict,
@@ -322,9 +322,9 @@ def test_imds_ecs(
         {
             "_OP_CLOUD_PROVIDER": "aws",
             "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ecs",
-            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "111122223333",
+            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": "123456789012",
             "_OP_CLOUD_PROVIDER_IP": "203.0.113.25",
-            "_OP_CLOUD_PROVIDER_REGION": "us-west-2",
+            "_OP_CLOUD_PROVIDER_REGION": "us-east-1",
             "_OP_CLOUD_PROVIDER_INSTANCE_TYPE": "t2.medium",
             "_OP_CLOUD_PROVIDER_TAGS": {
                 "Name": "foobar",

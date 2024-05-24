@@ -302,7 +302,7 @@ report, or """, pre = false)
 
 proc getPluginHelp(state: ConfigState): Rope =
   let
-    keyFields = ["pre_run_keys", "artifact_keys", "post_chalk_keys",
+    keyFields = ["pre_run_keys", "pre_chalk_keys", "post_chalk_keys",
                  "post_run_keys"]
     kfNames   = ["Chalk-time host metadata",
                  "Chalk-time artifact metadata",
@@ -594,7 +594,6 @@ proc buildSinkConfigData(): seq[seq[Rope]] =
                  text(sublists[config].join(", "))])
 
 proc getConfigValues(): Rope =
-
   var
     state          = getChalkRuntime()
     cols           = [CcVarName, CcShort, CcCurValue]
@@ -643,10 +642,10 @@ proc getConfigValues(): Rope =
 
 proc showConfigValues*(force = false) =
   once:
-    if not (get[bool](chalkConfig, "show_config") or force): return
+    if not (get[bool](chalkConfig, "show_config") or force):
+      return
 
     let toOut = getConfigValues()
-
     if get[bool](chalkConfig, "use_pager"):
       runPager($(toOut))
     else:
