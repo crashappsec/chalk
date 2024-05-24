@@ -23,8 +23,9 @@
 ## is responsible for all of the collection logic.
 
 import std/[posix, unicode]
-import ".."/[config, collect, reporting, chalkjson, docker_cmdline, docker_base,
-             subscan, dockerfile, util, attestation_api, commands/cmd_help,
+import "../docker"/[base, exe, cmdline, scan, dockerfile, collect]
+import ".."/[config, collect, reporting, chalkjson,
+             subscan, util, attestation_api, commands/cmd_help,
              plugin_api]
 
 {.warning[CStringConv]: off.}
@@ -508,6 +509,21 @@ proc runBuild(ctx: DockerInvocation): int =
 
   chalk.marked = true
 
+proc getPushChalkObj(info: DockerInvocation): ChalkObj =
+  let
+    docker   = getPluginByName("docker")
+    chalkOpt = docker.scanImage(info.prefTag)
+
+  if chalkOpt.isNone():
+    warn("Cannot find image; running docker normally.")
+    info.dockerFailSafe()
+
+  if chalkOpt.get().containerId != "":
+    warn("Push references a container; giving up & running docker normally.")
+    info.dockerFailSafe()
+
+  return chalkOpt.get()
+
 proc runPush(ctx: DockerInvocation): int =
   let exe = getDockerExeLocation()
   if ctx.cmdBuild:
@@ -591,9 +607,12 @@ template gotBuildCommand() =
             ". Retrying w/o chalk.")
       ctx.dockerFailsafe()
     else:
-      if not ctx.opChalkObj.extractBasicImageInfo():
-        error("Could not inspect image after successful build. " &
-          "Chalk reporting will be limited.")
+      try:
+        ctx.opChalkObj.collectImage(ctx.prefTag)
+      except:
+        error("Could not inspect image after successful build due to: " &
+              getCurrentExceptionMsg() & ". " &
+              "Chalk reporting will be limited.")
   except:
     dumpExOnDebug()
     error("Chalk could not process Docker correctly: " & getCurrentExceptionMsg() &

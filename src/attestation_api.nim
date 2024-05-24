@@ -210,16 +210,16 @@ proc writeInToto(info:      DockerInvocation,
 proc callC4mPushAttestation*(info: DockerInvocation, mark: string): bool =
   let chalk = info.opChalkObj
 
-  if chalk.repo == "" or chalk.repoHash == "":
+  if chalk.repo == "" or chalk.imageDigest == "":
     trace("Could not find appropriate info needed for attesting")
     return false
 
   trace("Writing chalk mark via in toto attestation for image id " &
-    chalk.imageId & " with sha256 hash of " & chalk.repoHash)
+    chalk.imageId & " with sha256 hash of " & chalk.imageDigest)
 
   cosignKey.withCosignKey:
     result = info.writeInToto(chalk.repo,
-                              chalk.repo & "@sha256:" & chalk.repoHash,
+                              chalk.repo & "@sha256:" & chalk.imageDigest,
                               mark, getCosignLocation())
   if result:
     chalk.signed = true
@@ -250,7 +250,7 @@ proc coreVerify(key: AttestationKey, chalk: ChalkObj): bool =
                  "--key", fName,
                  "--insecure-ignore-tlog=" & $(noTlog),
                  "--type", "custom",
-                 chalk.repo & "@sha256:" & chalk.repoHash]
+                 chalk.repo & "@sha256:" & chalk.imageDigest]
       cosign = getCosignLocation()
     let
       allOut = runCmdGetEverything(cosign, args)
@@ -273,7 +273,7 @@ proc extractSigAndValidateNonInsert(chalk: ChalkObj) =
   if "INJECTOR_PUBLIC_KEY" notin chalk.extract:
     warn("Signer did not add their public key to the mark; cannot validate")
     chalk.setIfNeeded("_VALIDATED_SIGNATURE", false)
-  elif chalk.repo == "" or chalk.repoHash == "":
+  elif chalk.repo == "" or chalk.imageDigest == "":
     chalk.setIfNeeded("_VALIDATED_SIGNATURE", false)
   else:
     let
@@ -310,12 +310,12 @@ proc extractAttestationMark*(chalk: ChalkObj): ChalkDict =
   if not cosignKey.canAttestVerify():
     return
 
-  if chalk.repo == "":
+  if chalk.repo == "" or chalk.imageDigest == "":
     info("Cannot look for attestation mark w/o repo info")
     return
 
   let
-    refStr = chalk.repo & "@sha256:" & chalk.repoHash
+    refStr = chalk.repo & "@sha256:" & chalk.imageDigest
     args   = @["download", "attestation", refStr]
     cosign = getCosignLocation()
 
@@ -341,7 +341,7 @@ proc extractAttestationMark*(chalk: ChalkObj): ChalkDict =
 
     chalk.cachedMark = $(rawMark)
 
-    result = extractOneChalkJson(newStringStream(chalk.cachedMark), chalk.name)
+    result = extractOneChalkJson(chalk.cachedMark, chalk.name)
     info("Successfully extracted chalk mark from attestation.")
   except:
     info(chalk.name & ": Bad attestation found.")

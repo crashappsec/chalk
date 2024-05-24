@@ -61,9 +61,8 @@ type
     userRef*:       string      ## Reference the user gave for the artifact.
     repo*:          string      ## The docker repo.
     tag*:           string      ## The image tag, if any.
-    shortId*:       string      ## The short hash ID of an image.
     imageId*:       string      ## Image ID if this is a docker image
-    repoHash*:      string      ## Image ID in the repo.
+    imageDigest*:   string      ## Image digest in the repo.
     containerId*:   string      ## Container ID if this is a container
     signed*:        bool        ## True on the insert path once signed,
                                 ## and once we've seen an attestation otherwise
@@ -276,6 +275,36 @@ type
     # first matching branch for commit ref, if any
     branches*:     seq[string]
     tags*:         seq[string]
+
+  DockerManifestType* = enum
+    list, image, config, layer
+
+  DockerPlatform* = tuple[
+    os:           string,
+    architecture: string,
+  ]
+
+  DockerManifest* = ref object
+    imageName*:        string
+    digest*:           string
+    mediaType*:        string
+    size*:             int
+    json*:             JsonNode
+    isFetched*:        bool # whether json is fetched or only stub is filled
+    case kind*:        DockerManifestType
+    of list:
+      manifests*:      seq[DockerManifest]
+    of image:
+      list*:           DockerManifest # can be null if there is manifest list
+      platform*:       DockerPlatform
+      config*:         DockerManifest
+      layers*:         seq[DockerManifest]
+    of config:
+      image*:          DockerManifest
+      configPlatform*: DockerPlatform
+      imageConfig*:    JsonNode # only the config from the json
+    of layer:
+      discard
 
   DockerGitContext* = ref object
     context*:      string

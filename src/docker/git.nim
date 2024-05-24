@@ -5,7 +5,8 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 import std/[base64, strutils, uri]
-import "."/[config, util, docker_base]
+import ".."/[config, util]
+import "."/[base]
 
 const
   HEADS          = "refs/heads/"
@@ -72,12 +73,6 @@ proc isSSHGitContext(context: string): bool =
 
 proc isGitContext*(context: string): bool =
   return isHttpGitContext(context) or isSSHGitContext(context)
-
-proc splitBy(s: string, sep: string, default: string = ""): (string, string) =
-  let parts = s.split(sep, maxsplit = 1)
-  if len(parts) == 2:
-    return (parts[0], parts[1])
-  return (s, default)
 
 proc splitContext(context: string): (string, string, string) =
   let
@@ -217,7 +212,7 @@ proc getRemoteHead(git: DockerGitContext, head: string): GitHead =
   # that all metadata for the same head will be synced. For example,
   # normally git fetch <tag> will only fetch that one specific tag,
   # regardless if there are other tags pointing to the exact same commit.
-  # This will function will link all relevant tags which point to the same
+  # This function will link all relevant tags which point to the same
   # commit hence allowing fetch to correctly link all tags.
   # Same applies to branches as multiple branches can have the same head.
   let
@@ -260,7 +255,7 @@ proc init(git: DockerGitContext) =
   discard git.run(@["-c", "init.defaultBranch=" & DEFAULT_BRANCH, "--bare", "init"])
   discard git.run(@["remote", "add", "origin", git.remoteUrl])
 
-template setGitHEADToCommit() =
+proc setGitHEADToCommit(git: DockerGitContext) =
   # there is no git command to detach HEAD to a particular
   # commit so we have to update the file manually.
   # Again very annoying not does not seem to be possible with native CLI.
@@ -270,10 +265,10 @@ template setGitHEADToCommit() =
   # * git symbolic-ref HEAD        <- only supports updating to branches/tags
   discard tryToWriteFile(git.tmpGitDir.joinPath("HEAD"), git.head.commitId)
 
-template setGitHEADToName(refs: string) =
+proc setGitHEADToName(git: DockerGitContext, refs: string) =
   discard git.run(@["symbolic-ref", "HEAD", refs & git.head.gitRef])
 
-template setGitHEAD(git: DockerGitContext) =
+proc setGitHEAD(git: DockerGitContext) =
   # as git fetch on bare repos does not update `HEAD`,
   # we need to do that manually as otherwise HEAD will point
   # to the default branch name which is usually `main`
@@ -283,12 +278,12 @@ template setGitHEAD(git: DockerGitContext) =
   # which is necessary for git metadata reporting
   case git.head.gitType
     of GitHeadType.commit:
-      setGitHEADToCommit()
+      git.setGitHEADToCommit()
     of GitHeadType.branch:
-      setGitHEADToName(HEADS)
+      git.setGitHEADToName(HEADS)
     of GitHeadType.tag:
       # git tags are treated as detached commits on checkout
-      setGitHEADToCommit()
+      git.setGitHEADToCommit()
 
 proc fetch(git: DockerGitContext) =
   var args: seq[string] = @[

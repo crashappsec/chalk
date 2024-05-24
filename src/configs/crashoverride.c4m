@@ -263,9 +263,6 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._IMAGE_STOP_SIGNAL.use                  = true
   ~key._IMAGE_STOP_TIMEOUT.use                 = true
   ~key._IMAGE_SHELL.use                        = true
-  ~key._IMAGE_VIRTUAL_SIZE.use                 = true
-  ~key._IMAGE_LAST_TAG_TIME.use                = true
-  ~key._IMAGE_STORAGE_METADATA.use             = true
   ~key._INSTANCE_CONTAINER_ID.use              = true
   ~key._INSTANCE_CREATION_DATETIME.use         = true
   ~key._INSTANCE_ENTRYPOINT_PATH.use           = true

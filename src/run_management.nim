@@ -240,3 +240,9 @@ proc makeNewValuesAvailable*(chalk: ChalkObj) =
   for item, value in chalk.collectedData:
     if item.startsWith("$"):
       chalk.extract[item] = value
+
+proc dockerTag*(chalk: ChalkObj, default = ""): string =
+  if chalk.repo != "":
+    let tag = if chalk.tag == "": "latest" else: chalk.tag
+    return chalk.repo & ":" & tag
+  return default

@@ -8,7 +8,7 @@
 ## Dockerfile parsing
 
 import std/unicode
-import "."/config
+import ".."/config
 
 # RUN and COPY accept << and <<-
 # This one is particularly a HFS:
