@@ -171,7 +171,7 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")):
-    let resultOpt = hitProviderEndpoint("http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
+    let resultOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
     if not resultOpt.isSome():
         trace("Did not get metadata back from GCP endpoint")
         return
