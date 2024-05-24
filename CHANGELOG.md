@@ -78,6 +78,9 @@
 - Docker wrapping was resetting image `CMD` when base
   image had `ENTRYPOINT` defined.
   [#286](https://github.com/crashappsec/chalk/pull/286)
+- GCP instance metadata collection does not work by DNS
+  name reliably so switched to hard-coded IP.
+  [#293](https://github.com/crashappsec/chalk/pull/293)
 
 ## New Features
 
