@@ -7,10 +7,23 @@
 
 ## The `chalk version` command.
 
-import ".."/config
+import "../attestation"/utils
+import "../docker"/exe
+import ".."/[config, semver]
+
+proc default(version: Version, default = ""): string =
+  if version == parseVersion("0"):
+    return default
+  return $version
 
 proc runCmdVersion*() =
   var cells: seq[seq[string]]
+
+  let
+    client = getDockerClientVersion()
+    server = getDockerServerVersion()
+    buildx = getBuildXVersion()
+    cosign = getCosignVersion()
 
   cells.add(@["Chalk Version", getChalkExeVersion()])
   cells.add(@["Commit ID", getChalkCommitId()])
@@ -18,6 +31,10 @@ proc runCmdVersion*() =
   cells.add(@["Build CPU", hostCPU])
   cells.add(@["Build Date", CompileDate])
   cells.add(@["Build Time", CompileTime])
+  cells.add(@["Docker Client", client.default()])
+  cells.add(@["Docker Server", server.default()])
+  cells.add(@["Buildx", buildx.default()])
+  cells.add(@["Cosign", cosign.default()])
 
   var table = cells.quickTable(verticalHeaders = true, borders = BorderTypical)
 

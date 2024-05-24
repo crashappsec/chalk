@@ -76,7 +76,7 @@ def test_default_config(
 )
 def test_invalid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bool):
     # call chalk load on invalid config
-    load = chalk_copy.load(
+    chalk_copy.load(
         CONFIGS / test_config_file,
         use_embedded=use_embedded,
         expected_success=False,

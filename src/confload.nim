@@ -32,28 +32,6 @@ proc stashFlags(winner: ArgResult) =
 
   hostInfo["_OP_CMD_FLAGS"] = pack(flagStrs)
 
-proc installComponentParams*(params: seq[Box]) =
-  let runtime = getChalkRuntime()
-
-  for item in params:
-    let
-      row     = unpack[seq[Box]](item)
-      attr    = unpack[bool](row[0])
-      url     = unpack[string](row[1])
-      sym     = unpack[string](row[2])
-      c4mType = toCon4mType(unpack[string](row[3]))
-      value   = row[4]
-    if attr:
-      runtime.setAttributeParamValue(url, sym, value, c4mType)
-    else:
-      runtime.setVariableParamValue(url, sym, value, c4mType)
-
-proc loadCachedComponents(cache: OrderedTableRef[string, string]) =
-  for url, src in cache:
-    let component = getChalkRuntime().getComponentReference(url)
-    component.cacheComponent(src)
-    trace("Loaded cached version of: " & url & ".c4m")
-
 proc getEmbeddedConfig(): string =
   result         = defaultConfig
   let extraction = getSelfExtraction()
@@ -61,9 +39,9 @@ proc getEmbeddedConfig(): string =
     let
       selfChalk = extraction.get()
     if selfChalk.extract != nil:
-      if selfChalk.extract.contains("$CHALK_CONFIG"):
+      if selfChalk.extract.contains(configKey):
         trace("Found embedded config file in self-chalk.")
-        result = unpack[string](selfChalk.extract["$CHALK_CONFIG"])
+        result = unpack[string](selfChalk.extract[configKey])
       else:
         if selfChalk.marked:
           trace("Found a chalk mark, but it did not contain a config.")
@@ -73,16 +51,9 @@ proc getEmbeddedConfig(): string =
       # component must be loaded before parameters
       # otherwise loading params initializes the component first (if not present yet)
       # which will attempt to fetch the component from source (e.g. url)
-      if selfChalk.extract.contains("$CHALK_COMPONENT_CACHE"):
-        let
-          componentInfo = selfChalk.extract["$CHALK_COMPONENT_CACHE"]
-          unpackedInfo  = unpack[OrderedTableRef[string, string]](componentInfo)
-        loadCachedComponents(unpackedInfo)
-      if selfChalk.extract.contains("$CHALK_SAVED_COMPONENT_PARAMETERS"):
-        let params = selfChalk.extract["$CHALK_SAVED_COMPONENT_PARAMETERS"]
-        installComponentParams(unpack[seq[Box]](params))
-      else:
-        trace("No saved component parameters; skipping install.")
+      let runtime = getChalkRuntime()
+      runtime.loadCachedComponents(getCache())
+      runtime.loadComponentParams(getParams())
   else:
     trace("Since this binary can't be marked, using the default config.")
 
@@ -137,7 +108,7 @@ proc loadLocalStructs*(state: ConfigState) =
 
 proc handleCon4mErrors(err, tb: string): bool =
   if tb != "" and chalkConfig == nil or chalkConfig.chalkDebug:
-     echo formatCompilerError(err, nil, tb, default(InstInfo))
+     echo(formatCompilerError(err, nil, tb, default(InstInfo)))
   else:
     error(err)
   return true

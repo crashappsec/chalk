@@ -12,14 +12,14 @@ custom_report terminal_chalk_time {
   enabled:         true
   report_template: "terminal_insert"
   sink_configs:    ["json_console_out"]
-  use_when:        ["insert", "build"]
+  use_when:        ["insert", "build", "push"]
 }
 
 custom_report terminal_other_op {
   enabled:         true
   report_template: "terminal_rest"
   sink_configs:    ["json_console_out"]
-  use_when:        ["extract", "delete", "exec", "env", "heartbeat", "push"]
+  use_when:        ["extract", "delete", "exec", "env", "heartbeat"]
 }
 
 custom_report github_group_chalk_time {

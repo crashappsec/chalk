@@ -1,6 +1,10 @@
+variable "PLATFORM" {
+  default = replace(BAKE_LOCAL_PLATFORM, "/", "-")
+}
+
 target "chalk" {
-  cache-from = ["type=registry,ref=ghcr.io/crashappsec/chalk_compile:cache"]
-  cache-to   = ["type=registry,ref=ghcr.io/crashappsec/chalk_compile:cache"]
+  cache-from = ["type=registry,ref=ghcr.io/crashappsec/chalk_compile:cache-${PLATFORM}"]
+  cache-to   = ["type=registry,ref=ghcr.io/crashappsec/chalk_compile:cache-${PLATFORM}"]
 }
 
 target "server" {

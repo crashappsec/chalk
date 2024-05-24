@@ -583,7 +583,11 @@ proc getAllPlugins*(): seq[Plugin] =
   for (_, plugin) in preResult:
     result.add(plugin)
 
-template getPluginByName*(s: string): Plugin = installedPlugins[s]
+proc getPluginByName*(s: string): Plugin =
+  return installedPlugins[s]
+
+proc disablePluginByName*(s: string) =
+  getPluginByName(s).enabled = false
 
 proc getAllCodecs*(): seq[Plugin] =
   once:
