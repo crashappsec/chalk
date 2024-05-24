@@ -82,6 +82,12 @@ plugin vctl_git {
                       "COMMITTER", "DATE_COMMITTED", "COMMIT_MESSAGE",
                       "TAG", "TAG_SIGNED", "TAGGER", "DATE_TAGGED",
                       "TAG_MESSAGE", "VCS_DIR_WHEN_CHALKED"]
+    post_run_keys:   ["_COMMIT_ID", "_COMMIT_SIGNED",
+                      "_BRANCH", "_ORIGIN_URI",
+                      "_AUTHOR", "_DATE_AUTHORED",
+                      "_COMMITTER", "_DATE_COMMITTED", "_COMMIT_MESSAGE",
+                      "_TAG", "_TAG_SIGNED", "_TAGGER", "_DATE_TAGGED",
+                      "_TAG_MESSAGE"]
     doc: """
 This plugin collects version control information from .git directories
 that artifacts are found in.

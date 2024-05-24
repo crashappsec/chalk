@@ -123,6 +123,25 @@
     - `_OP_HOST_RELEASE`
     - `_OP_HOST_VERSION`
     - `_OP_HOST_MACHINE`
+  - All git keys now are also sent as run time host keys.
+    This allows to report from what repo the report is
+    running even if its different from repos of individual
+    chalk marks or when there are no chalk marks.
+
+    - `_ORIGIN_URI`
+    - `_BRANCH`
+    - `_TAG`
+    - `_TAG_SIGNED`
+    - `_COMMIT_ID`
+    - `_COMMIT_SIGNED`
+    - `_AUTHOR`
+    - `_DATE_AUTHORED`
+    - `_COMMITTER`
+    - `_DATE_COMMITTED`
+    - `_COMMIT_MESSAGE`
+    - `_TAGGER`
+    - `_DATE_TAGGED`
+    - `_TAG_MESSAGE`
 
   [#266](https://github.com/crashappsec/chalk/pull/266)
   [#282](https://github.com/crashappsec/chalk/pull/282)
