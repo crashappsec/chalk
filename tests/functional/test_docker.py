@@ -16,6 +16,7 @@ import pytest
 from .chalk.runner import Chalk, ChalkProgram
 from .chalk.validate import (
     MAGIC,
+    MISSING,
     ArtifactInfo,
     validate_docker_chalk_report,
     validate_virtual_chalk,
@@ -275,17 +276,32 @@ def test_wrap_entrypoint(
     )
     _, output = Docker.run(image_id)
     assert "hello" in output.text
-    assert result.mark.has(_IMAGE_ENTRYPOINT=entrypoint, _IMAGE_CMD=cmd)
+    assert result.mark.has(
+        _IMAGE_ENTRYPOINT=entrypoint,
+        _IMAGE_CMD=cmd,
+    )
 
 
 @pytest.mark.parametrize(
     "test_file, entrypoint, cmd",
     [
         (
-            # shold preserve both entrypoint/cmd from base image
+            # shold lookup entypoint/cmd from base image
             "base.Dockerfile",
             ["/chalk", "exec", "--exec-command-name", "/docker-entrypoint.sh", "--"],
-            ["nginx", "-g", "daemon off;"],
+            ["/bin/sh", "-c", "nginx"],
+        ),
+        (
+            # if ENTRYPOINT is set, it resets CMD
+            "override.Dockerfile",
+            ["/chalk", "exec", "--exec-command-name", "two", "--", "entrypoint"],
+            MISSING,
+        ),
+        (
+            # CMD honors higher section ENTRYPOINTs
+            "cmd.Dockerfile",
+            ["/chalk", "exec", "--exec-command-name", "one", "--", "entrypoint"],
+            ["/bin/sh", "-c", "two cmd"],
         ),
     ],
 )
@@ -297,7 +313,10 @@ def test_wrap_base_entrypoint(
         context=DOCKERFILES / "valid" / "entrypoint",
         config=CONFIGS / "docker_wrap.c4m",
     )
-    assert result.mark.has(_IMAGE_ENTRYPOINT=entrypoint, _IMAGE_CMD=cmd)
+    assert result.mark.has(
+        _IMAGE_ENTRYPOINT=entrypoint,
+        _IMAGE_CMD=cmd,
+    )
 
 
 @pytest.mark.parametrize(

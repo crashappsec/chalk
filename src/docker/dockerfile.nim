@@ -7,7 +7,7 @@
 
 ## Dockerfile parsing
 
-import std/unicode
+import std/[algorithm, sequtils, unicode]
 import ".."/config
 import "."/[ids]
 
@@ -989,6 +989,12 @@ iterator getTargetDockerSections*(ctx: DockerInvocation): DockerFileSection =
   yield section
   while $(section.image) in ctx.dfSectionAliases:
     section = ctx.dfSectionAliases[$(section.image)]
+    yield section
+
+iterator getBaseDockerSections*(ctx: DockerInvocation): DockerFileSection =
+  ## iterator for all chain of docker sections used to build target section
+  ## first section is the base section and last it the actual target section
+  for section in ctx.getTargetDockerSections().toSeq().reversed():
     yield section
 
 proc getBaseDockerSection*(ctx: DockerInvocation):  DockerFileSection =

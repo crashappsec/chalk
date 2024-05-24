@@ -1,1 +1,2 @@
 FROM nginx
+CMD nginx

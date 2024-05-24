@@ -14,39 +14,35 @@ proc getTargetEntrypoints(ctx: DockerInvocation, platform: DockerPlatform): Dock
   ## get entrypoints (entrypoint/cmd/shell) from the target section
   ## this recursively looks up parent sections in dockerfile
   ## and eventually looks up entrypoints in base image
+  let
+    base    = ctx.getBaseDockerSection()
   var
-    section    = ctx.getTargetDockerSection()
-    entrypoint = section.entrypoint
-    cmd        = section.cmd
-    shell      = section.shell
-  while entrypoint == nil or cmd == nil or shell == nil:
-    if $(section.image) in ctx.dfSectionAliases:
-      section = ctx.dfSectionAliases[$(section.image)]
-      if entrypoint == nil:
-        entrypoint = section.entrypoint
-        if entrypoint != nil:
-          # defining entrypoint in image wipes any previous CMD
-          # and it needs to be redefined again in Dockerfile
-          cmd      = nil
-      if cmd == nil:
-        cmd        = section.cmd
-      if shell == nil:
-        shell      = section.shell
-    else:
-      # no more sections in Dockerfile and instead we need to
-      # inspect the base image
-      let info = fetchImageEntrypoint(section.image, platform)
-      if entrypoint == nil:
-        entrypoint = info.entrypoint
-        if entrypoint != nil:
-          # defining entrypoint in image wipes any previous CMD
-          # and it needs to be redefined again in Dockerfile
-          cmd      = nil
-      if cmd == nil:
-        cmd        = info.cmd
-      if shell == nil:
-        shell      = info.shell
-      break
+    entrypoint = base.entrypoint
+    cmd        = base.cmd
+    shell      = base.shell
+  for s in ctx.getBaseDockerSections():
+    if s.entrypoint != nil:
+      entrypoint = s.entrypoint
+      # defining entrypoint in image wipes any previous CMD
+      # and it needs to be redefined again in Dockerfile
+      cmd        = nil
+    if s.cmd != nil:
+      cmd        = s.cmd
+    if s.shell != nil:
+      shell      = s.shell
+  # no more sections in Dockerfile and instead we need to
+  # inspect the base image
+  if entrypoint == nil or cmd == nil or shell == nil:
+    let info = fetchImageEntrypoint(base.image, platform)
+    # if entrypoint was defined somewhere in the dockerfile,
+    # base image CMD is automatically ignored so only set
+    # if entrypoint is missing
+    if cmd == nil and entrypoint == nil:
+      cmd        = info.cmd
+    if entrypoint == nil:
+      entrypoint = info.entrypoint
+    if shell == nil:
+      shell      = info.shell
   # default shell to /bin/sh so that we can wrap CMD shell-form correctly
   if shell == nil:
     shell = ShellInfo()
