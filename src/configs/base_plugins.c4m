@@ -58,7 +58,7 @@ plugin metsys {
     ~enabled: true
     pre_chalk_keys:  ["METADATA_HASH", "ERR_INFO", "METADATA_ID",
                       "SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"]
-    post_chalk_keys: ["_SIGNATURE"]
+    post_chalk_keys: ["_SIGNATURES"]
     post_run_keys:   ["_CHALK_EXTERNAL_ACTION_AUDIT", "_CHALK_RUN_TIME"]
     ~priority:       high()
     doc: """

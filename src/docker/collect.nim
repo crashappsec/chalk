@@ -213,11 +213,11 @@ proc collectImageFrom(chalk: ChalkObj, contents: JsonNode, name: string, digest 
   if chalk.cachedHash == "":
     chalk.cachedHash   = id
   if len(tags) > 0:
-    chalk.image        = parseImage(tags[0])
+    chalk.images       = parseImages(tags)
   if len(digests) > 0:
-    let image          = parseImage(digests[0])
-    chalk.image        = image
-    chalk.imageDigest  = image.digest
+    let images         = parseImages(digests)
+    chalk.images       = images
+    chalk.imageDigest  = images[0].digest
   if digest != "":
     chalk.imageDigest  = digest.extractDockerHash()
   if chalk.name == "":

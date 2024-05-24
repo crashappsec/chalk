@@ -58,7 +58,7 @@ type
                                 ## something else, use the cache field
                                 ## below, instead.
     fsRef*:         string      ## Reference for this artifact on a fs
-    image*:         DockerImage ## Docker image
+    images*:        seq[DockerImage] ## all images where image was tagged/pushed
     imageId*:       string      ## Image ID if this is a docker image
     imageDigest*:   string      ## Image digest in the repo.
     containerId*:   string      ## Container ID if this is a container

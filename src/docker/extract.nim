@@ -128,31 +128,32 @@ proc extractImageMark(self: ChalkObj): string =
     )
 
 proc extractMarkFromSigStore(self: ChalkObj): string =
-  let
-    image  = self.image.withDigest(self.imageDigest).asRepoDigest()
-    args   = @["download", "attestation", image]
-    cosign = getCosignLocation()
-  info("cosign: downloading attestation for " & image)
-  trace("cosign " & args.join(" "))
-  let
-    allOut = runCmdGetEverything(cosign, args)
-    res    = allOut.getStdout()
-    code   = allout.getExit()
-  if code != 0:
-    raise newException(
-      ValueError,
-      allOut.getStdErr().splitLines()[0]
-    )
-  let
-    json      = parseJson(res)
-    signature = json["signatures"][0]
-    payload   = parseJson(json["payload"].getStr().decode())
-    data      = payload["predicate"]["Data"].getStr().strip()
-    predicate = parseJson(data)["predicate"]
-    attrs     = predicate["attributes"].getElems()[0]
-    rawMark   = attrs["evidence"].getStr()
-  self.collectedData["_SIGNATURE"] = signature.nimJsonToBox()
-  return rawMark
+  var err = "no attestation found to extract chalk mark"
+  for image in self.images.uniq():
+    let
+      spec   = image.withDigest(self.imageDigest).asRepoDigest()
+      args   = @["download", "attestation", spec]
+      cosign = getCosignLocation()
+    info("cosign: downloading attestation for " & spec)
+    trace("cosign " & args.join(" "))
+    let
+      allOut = runCmdGetEverything(cosign, args)
+      res    = allOut.getStdout()
+      code   = allout.getExit()
+    if code != 0:
+      err = allOut.getStdErr().splitLines()[0]
+      continue
+    let
+      json      = parseJson(res)
+      sigs      = json["signatures"]
+      payload   = parseJson(json["payload"].getStr().decode())
+      data      = payload["predicate"]["Data"].getStr().strip()
+      predicate = parseJson(data)["predicate"]
+      attrs     = predicate["attributes"].getElems()[0]
+      rawMark   = attrs["evidence"].getStr()
+    self.collectedData["_SIGNATURES"] = sigs.nimJsonToBox()
+    return rawMark
+  raise newException(ValueError, err)
 
 proc extractFrom(self: ChalkObj, mark: string, name: string) =
   if mark == "":
@@ -169,17 +170,17 @@ proc extractFrom(self: ChalkObj, mark: string, name: string) =
 proc extractImage*(self: ChalkObj) =
   if self.canVerifyBySigStore():
     try:
-      self.extractFrom(self.extractMarkFromSigStore(), $self.image)
+      self.extractFrom(self.extractMarkFromSigStore(), self.getImageName())
       self.signed = true
-      info("docker: " & $self.image & ": chalk mark successfully extracted from attestation.")
+      info("docker: " & self.getImageName() & ": chalk mark successfully extracted from attestation.")
       return
     except:
       self.noCosign = true
-      trace("docker: " & $self.image & ": could not extract chalk mark " &
+      trace("docker: " & self.getImageName & ": could not extract chalk mark " &
            "via attestation due to: " & getCurrentExceptionMsg())
 
-  self.extractFrom(self.extractImageMark(), $self.image)
-  info("docker: " & $self.image & ": chalk mark successfuly extracted from image.")
+  self.extractFrom(self.extractImageMark(), self.getImageName())
+  info("docker: " & self.getImageName() & ": chalk mark successfuly extracted from image.")
 
 proc extractContainer*(self: ChalkObj) =
   let

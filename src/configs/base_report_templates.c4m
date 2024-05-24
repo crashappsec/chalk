@@ -288,7 +288,7 @@ report and subtract from it.
   key._REPO_TAGS.use                         = true
   key._REPO_DIGESTS.use                      = true
   key._FOUND_BASE_MARK.use                   = true
-  key._SIGNATURE.use                         = true
+  key._SIGNATURES.use                        = true
   key._INVALID_SIGNATURE.use                 = true
   key._ACTION_ID.use                         = true
   key._ARGV.use                              = true
@@ -804,7 +804,7 @@ doc: """
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
   key._FOUND_BASE_MARK.use                    = true
-  key._SIGNATURE.use                          = true
+  key._SIGNATURES.use                         = true
   key._INVALID_SIGNATURE.use                  = true
   key._VALIDATED_SIGNATURE.use                = true
   key._VALIDATED_METADATA.use                 = true
@@ -1217,7 +1217,7 @@ container.
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
   key._FOUND_BASE_MARK.use                    = true
-  key._SIGNATURE.use                          = true
+  key._SIGNATURES.use                         = true
   key._INVALID_SIGNATURE.use                  = true
   key._VALIDATED_SIGNATURE.use                = true
   key._VALIDATED_METADATA.use                 = true
@@ -1633,7 +1633,7 @@ and keep the run-time key.
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
   key._FOUND_BASE_MARK.use                    = true
-  key._SIGNATURE.use                          = true
+  key._SIGNATURES.use                         = true
   key._INVALID_SIGNATURE.use                  = true
   key._VALIDATED_SIGNATURE.use                = true
   key._VALIDATED_METADATA.use                 = true
@@ -1750,7 +1750,7 @@ running insert commands.
   key._INFERRED_TECH_STACKS_HOST.use          = true
   key.METADATA_ID.use                         = true
   key.SIGNATURE.use                           = true
-  key._SIGNATURE.use                          = true
+  key._SIGNATURES.use                         = true
   key._VALIDATED_SIGNATURE.use                = true
   key._VIRTUAL.use                            = true
   key._CURRENT_HASH.use                       = true
@@ -1803,7 +1803,7 @@ running commands that do NOT insert chalk marks.
   key.DOCKER_TAGS.use                         = true
   key.METADATA_ID.use                         = true
   key.SIGNATURE.use                           = true
-  key._SIGNATURE.use                          = true
+  key._SIGNATURES.use                         = true
   key._VALIDATED_SIGNATURE.use                = true
   key._CURRENT_HASH.use                       = true
   key._OP_ARTIFACT_TYPE.use                   = true
