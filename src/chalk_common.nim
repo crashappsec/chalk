@@ -58,12 +58,11 @@ type
                                 ## something else, use the cache field
                                 ## below, instead.
     fsRef*:         string      ## Reference for this artifact on a fs
-    userRef*:       string      ## Reference the user gave for the artifact.
-    repo*:          string      ## The docker repo.
-    tag*:           string      ## The image tag, if any.
+    image*:         DockerImage ## Docker image
     imageId*:       string      ## Image ID if this is a docker image
     imageDigest*:   string      ## Image digest in the repo.
     containerId*:   string      ## Container ID if this is a container
+    noCosign*:      bool        ## When we know image is not in registry. skips validation
     signed*:        bool        ## True on the insert path once signed,
                                 ## and once we've seen an attestation otherwise
     inspected*:     bool        ## True for images once inspected; we don't
@@ -195,6 +194,10 @@ type
     else: discard
   CmdParseType* = enum cpFrom, cpUnknown
 
+  DockerPlatform* = ref object
+    os*:           string
+    architecture*: string
+
   DockerParse* = ref object
     currentEscape*:      Rune
     stream*:             Stream
@@ -217,8 +220,8 @@ type
     endLine*:   int
 
   FromInfo* = ref object of InfoBase
-    flags*:  seq[DfFlag]
-    image*:  Option[LineToken]
+    flags*:  Table[string, DfFlag]
+    repo*:   Option[LineToken]
     tag*:    Option[LineToken]
     digest*: Option[LineToken]
     asArg*:  Option[LineToken]
@@ -240,12 +243,12 @@ type
     raw*:  string
 
   AddInfo* = ref object of InfoBase
-    flags*:  seq[DfFlag]
+    flags*:  Table[string, DfFlag]
     rawSrc*: seq[string]
     rawDst*: string
 
   CopyInfo* = ref object of InfoBase
-    flags*:  seq[DfFlag]
+    flags*:  Table[string, DfFlag]
     rawSrc*: seq[string]
     rawDst*: string
 
@@ -258,12 +261,23 @@ type
   DockerFileSection* = ref object
     startLine*:   int
     endLine*:     int
-    image*:       string
+    platform*:    DockerPlatform
+    image*:       DockerImage
     alias*:       string
-    entryPoint*:  EntryPointInfo
+    entrypoint*:  EntryPointInfo
     cmd*:         CmdInfo
     shell*:       ShellInfo
     lastUser*:    DfUserInfo
+
+  DockerEntrypoint* = tuple
+    entrypoint: EntryPointInfo
+    cmd:        CmdInfo
+    shell:      ShellInfo
+
+  DockerImage* = tuple
+    repo:   string
+    tag:    string
+    digest: string
 
   GitHeadType* = enum
     commit, branch, tag
@@ -276,21 +290,22 @@ type
     branches*:     seq[string]
     tags*:         seq[string]
 
+  DigestedJson* = ref object
+    json*:   JsonNode
+    digest*: string
+    size*:   int
+
   DockerManifestType* = enum
     list, image, config, layer
 
-  DockerPlatform* = tuple[
-    os:           string,
-    architecture: string,
-  ]
-
   DockerManifest* = ref object
-    imageName*:        string
+    name*:             DockerImage # where manifest was fetched from
+    otherNames*:       seq[DockerImage]
     digest*:           string
     mediaType*:        string
     size*:             int
     json*:             JsonNode
-    isFetched*:        bool # whether json is fetched or only stub is filled
+    isFetched*:        bool
     case kind*:        DockerManifestType
     of list:
       manifests*:      seq[DockerManifest]
@@ -323,47 +338,59 @@ type
     id*:   string
     src*:  string
 
+  DockerCmd* = enum
+    build, push, other
+
   DockerInvocation* = ref object
-    dockerExe*:         string
-    opChalkObj*:        ChalkObj
-    chalkId*:           string # shared between multi-platform builds
-    originalArgs*:      seq[string]
-    cmd*:               string
-    processedArgs*:     seq[string]
-    flags*:             OrderedTable[string, FlagSpec]
-    foundLabels*:       OrderedTableRef[string, string]
-    foundTags*:         seq[string]
-    ourTag*:            string # This is what chalk added.
-    prefTag*:           string # This is what the user gave via -t or similar.
-    passedImage*:       string
-    buildArgs*:         Table[string, string]
-    foundFileArg*:      string
-    dockerfileLoc*:     string
-    inDockerFile*:      string
-    defaultPlatforms*:  Table[string, string]
-    foundPlatform*:     string
-    foundContext*:      string
-    otherContexts*:     OrderedTableRef[string, string]
-    gitContext*:        DockerGitContext
-    secrets*:           Table[string, DockerSecret]
-    errs*:              seq[string]
-    cmdBuild*:          bool
-    cmdPush*:           bool
-    privs*:             seq[string]
-    targetBuildStage*:  string
-    pushAllTags*:       bool
-    embededMarks*:      Box
-    newCmdLine*:        seq[string] # Rewritten command line
-    fileParseCtx*:      DockerParse
-    dfCommands*:        seq[InfoBase]
-    dfSections*:        seq[DockerFileSection]
-    dfSectionAliases*:  OrderedTable[string, DockerFileSection]
-    dfPassOnStdin*:     bool
-    addedInstructions*: seq[string]
+    chalkId*:                 string # shared between multi-platform builds
+
+    # basic attributes required for docker fail safe
+    originalArgs*:            seq[string]
+    originalStdIn*:           string # if we ever read stdin we backup here for fail-through
+    processedArgs*:           seq[string]
+    processedFlags*:          OrderedTable[string, FlagSpec]
+    newCmdLine*:              seq[string] # Rewritten command line
+    newStdIn*:                string
+
+    case cmd*:                DockerCmd
+
+    of DockerCmd.build:
+      foundIidFile*:          string
+      foundMetadataFile*:     string
+      foundFileArg*:          string
+      foundContext*:          string
+      foundLabels*:           OrderedTableRef[string, string]
+      foundTags*:             seq[DockerImage]
+      foundBuildArgs*:        TableRef[string, string]
+      foundPlatforms*:        seq[DockerPlatform]
+      foundExtraContexts*:    OrderedTableRef[string, string]
+      foundSecrets*:          TableRef[string, DockerSecret]
+      foundTarget*:           string
+
+      gitContext*:            DockerGitContext
+
+      iidFilePath*:           string
+      iidFile*:               string
+      metadataFilePath*:      string
+      metadataFile*:          JsonNode
+      dockerFileLoc*:         string # can be :stdin:
+      inDockerFile*:          string
+      addedPlatform*:         OrderedTableRef[string, seq[string]]
+      addedInstructions*:     seq[string]
+
+      # parsed dockerfile
+      dfSections*:            seq[DockerFileSection]
+      dfSectionAliases*:      OrderedTable[string, DockerFileSection]
+
+    of DockerCmd.push:
+      foundImage*:            string
+      foundAllTags*:          bool
+
+    else:
+      discard
 
   ValidateResult* = enum
     vOk, vSignedOk, vBadMd, vNoCosign, vBadSig, vNoHash, vNoPk
-
 
 # # Compile-time only helper for generating one of the consts below.
 # proc commentC4mCode(s: string): string =

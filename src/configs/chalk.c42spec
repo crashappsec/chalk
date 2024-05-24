@@ -15,7 +15,7 @@ valid_chalk_cmds     := ["help", "insert", "extract", "delete", "config",
                          "load", "dump", "docker", "version", "env", "exec",
                          "setup", "docgen"]
 
-all_cmds_that_insert := ["insert", "build", "load", "setup"]
+all_cmds_that_insert := ["insert", "build", "push", "load", "setup"]
 
 
 
@@ -134,6 +134,7 @@ currently:
 
 - `chalk insert` (the *insert* operation)
 - `chalk docker build` (the *build* operation)
+- `chalk docker push` (the *push* operation)
 - `chalk setup` (the *setup* operation)
 - `chalk load` (the *load* operation)
 
@@ -915,7 +916,7 @@ therefore come last).
     doc: "List of keys this plugin provides before our artifact collection."
   }
 
-field artifact_keys {
+field pre_chalk_keys {
     type:       list[string]
     default:    []
     write_lock: true
@@ -1423,7 +1424,7 @@ only two things:
 for a given operation (for the default operation report)
 
 > ❗ Chalk marks are only inserted as part of the following operations:
-  `insert`, `build`, `load` and `setup`
+  `insert`, `build`, `push`, `load` and `setup`
 
 For specifying a chalk mark template, set the `outconf` section's
 `mark_template` field to the name of the mark template you defined (it
@@ -1690,20 +1691,6 @@ By default we skip unsigned images, because the process (necessarily) involves d
 """
   }
 
-  field search_base_layers_for_marks {
-    type:    bool
-    default: false
-    shortdoc: "Extract marks from containers"
-    doc: """
-When extracting from images when `ignore_unsigned_images = false`, Chalk will start by checking for a digital signature containing the Chalk mark in the repo, when available.
-
-But if there's no signature, assuming `ignore_unsigned_images` is true, Chalk looks in the top layer of the file system.
-
-When no Chalk can be found in either place, if this attribute is set to true, we'll look at the other layers in the image and report the `CHALK_ID` and `METADATA_ID` of the topmost layer with a mark, using the `_FOUND_BASE_MARK` key (the image itself is said to be unchalked; it's more about being able to use knowledge of a chalked base image).
-
-Note that this does nothing unless `ignore_unsigned_images` is false.
-"""
-  }
 }
 
 singleton docker {
@@ -2891,9 +2878,7 @@ If neither is provided, you may very well end up with `/tmp` or
     shortdoc: "Always sign"
     doc:      """
 When true, Chalk will attempt to use Cosign to sign *all* artifacts
-when chalking. If it's false, Chalk will still try to sign when
-chalking containers, as otherwise it's not practical to determine when
-containers have been modified since chalking.
+when chalking.
 
 Even if this is false, Chalk will try to sign if either the chalking
 template or the reporting template have SIGNATURE set.
@@ -3429,7 +3414,7 @@ func override_key_check(keyname: string, val: list[string]) {
   parts := keyname.split(".")
   base  := "plugin." + parts[1] + "."
   k1    := attr_get(base + "pre_run_keys",    list[string])
-  k2    := attr_get(base + "artifact_keys",   list[string])
+  k2    := attr_get(base + "pre_chalk_keys",  list[string])
   k3    := attr_get(base + "post_chalk_keys", list[string])
   k4    := attr_get(base + "post_run_keys",   list[string])
 

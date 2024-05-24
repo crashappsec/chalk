@@ -389,8 +389,8 @@ docker {
        optional_arg: true
      }
      flag_multi_arg interactive {
-     	aliases: ["i"]
-	optional_arg: true
+       aliases: ["i"]
+       optional_arg: true
      }
      flag_multi_arg io_maxbandwidth { }
      flag_multi_arg io_maxiops { }

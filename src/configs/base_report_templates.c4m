@@ -88,13 +88,13 @@ report and subtract from it.
   key.DOCKER_FILE.use                        = true
   key.DOCKERFILE_PATH.use                    = true
   key.DOCKER_PLATFORM.use                    = true
+  key.DOCKER_PLATFORMS.use                   = true
   key.DOCKER_LABELS.use                      = true
   key.DOCKER_TAGS.use                        = true
   key.DOCKER_CONTEXT.use                     = true
   key.DOCKER_ADDITIONAL_CONTEXTS.use         = true
   key.DOCKER_CHALK_ADDED_LABELS.use          = true
   key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use   = true
-  key.DOCKER_CHALK_TEMPORARY_TAG.use         = true
   key._OP_ARTIFACT_TYPE.use                  = true
   key._OP_ARTIFACT_PATH.use                  = true
   key._CURRENT_HASH.use                      = true
@@ -606,13 +606,13 @@ doc: """
   key.DOCKER_FILE.use                         = true
   key.DOCKERFILE_PATH.use                     = true
   key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
   key.DOCKER_CONTEXT.use                      = true
   key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
   key.DOCKER_CHALK_ADDED_LABELS.use           = true
   key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use    = true
-  key.DOCKER_CHALK_TEMPORARY_TAG.use          = true
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_PATH.use                   = true
   key._CURRENT_HASH.use                       = true
@@ -1022,13 +1022,13 @@ container.
   key.DOCKER_FILE.use                         = true
   key.DOCKERFILE_PATH.use                     = true
   key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
   key.DOCKER_CONTEXT.use                      = true
   key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
   key.DOCKER_CHALK_ADDED_LABELS.use           = true
   key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use    = true
-  key.DOCKER_CHALK_TEMPORARY_TAG.use          = true
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_PATH.use                   = true
   key._CURRENT_HASH.use                       = true
@@ -1438,13 +1438,13 @@ and keep the run-time key.
   key.DOCKER_FILE.use                         = true
   key.DOCKERFILE_PATH.use                     = true
   key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
   key.DOCKER_CONTEXT.use                      = true
   key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
   key.DOCKER_CHALK_ADDED_LABELS.use           = true
   key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use    = true
-  key.DOCKER_CHALK_TEMPORARY_TAG.use          = true
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_PATH.use                   = true
   key._CURRENT_HASH.use                       = true
@@ -1665,30 +1665,6 @@ that do not generate a chalk report.
   key._OP_NODENAME.use                        = true
 }
 
-report_template push_default {
-  shortdoc: "Default report for docker push commands"
-  doc: """
-  When we report on a 'docker push', these are the important
-  per-artifact items we collect. The `CURRENT_HASH` and `REPO_DIGESTS`
-  fields are both necessary for following the breadcrumbs, so should be
-  on in all circumstances (we'll probably force them on eventually).
-
-  You can certainly collect a lot more data here, but we expect it
-  should usually be redundant w/ the info you collected during a build.
-"""
-  key._ACTION_ID.use                          = true
-  key._TIMESTAMP.use                          = true
-  key._DATETIME.use                           = true
-  key._OPERATION.use                          = true
-  ~key._CURRENT_HASH.use                      = true
-  key._STORE_URI.use                          = true
-  key._REPO_TAGS.use                          = true
-  ~key._REPO_DIGESTS.use                      = true
-  key.INJECTOR_PUBLIC_KEY.use                 = true
-  key.CHALK_ID.use                            = true
-  key.METADATA_ID.use                         = true
-}
-
 report_template audit {
   shortdoc: "Default audit report (audits are off by default)"
   doc: """
@@ -1767,6 +1743,7 @@ running insert commands.
   key.DOCKER_FILE.use                         = true
   key.DOCKERFILE_PATH.use                     = true
   key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
   key.INFERRED_TECH_STACKS.use                = true
@@ -1821,6 +1798,7 @@ running commands that do NOT insert chalk marks.
   key.DOCKER_FILE.use                         = true
   key.DOCKERFILE_PATH.use                     = true
   key.DOCKER_PLATFORM.use                     = true
+  key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
   key.METADATA_ID.use                         = true

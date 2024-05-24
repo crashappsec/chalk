@@ -11,7 +11,7 @@
 
 import std/[json]
 import ".."/[config, chalkjson, util]
-import "."/[inspect, json, hash]
+import "."/[inspect, manifest, json, ids]
 
 # https://docs.docker.com/engine/api/v1.44/#tag/Image/operation/ImageInspect
 # https://github.com/opencontainers/image-spec/blob/main/config.md
@@ -187,51 +187,66 @@ let dockerContainerAutoMap: JsonToChalkKeysMapping = {
 
 proc collectCommon(chalk: ChalkObj, contents: JsonNode, map = dockerImageAutoMap) =
   chalk.setIfNeeded("_IMAGE_ID", chalk.imageId)
-  chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents.nimJsonToBox())
   chalk.collectedData.mapFromJson(contents, map)
 
-proc collectImage*(chalk: ChalkObj, name: string) =
+proc collectImageFrom(chalk: ChalkObj, contents: JsonNode, name: string, digest = "") =
   let
-    contents          = inspectImageJson(name) # TODO filter by platform
-    id                = contents["Id"].getStr().extractDockerHash()
-    tags              = contents["RepoTags"].getElems()
-    digests           = contents["RepoDigests"].getElems()
-    userRef           = name.extractDockerHash()
+    caseless           = contents.toLowerKeysJsonNode()
+    id                 = caseless{"id"}.getStr().extractDockerHash()
+    tags               = caseless{"repotags"}.getStrElems()
+    os                 = caseless{"os"}.getStr()
+    arch               = caseless{"architecture"}.getStr()
+    platform           = DockerPlatform(os: os, architecture: arch)
+  var
+    digests            = caseless{"repodigests"}.getStrElems()
+  if (
+    # sometimes even after --push, docker inspect does not return
+    # anything for RepoDigests but it does populate RepoTags
+    # in which case when we know the digest via another mechanism
+    # such as --metadata-file we manually populate digests
+    len(digests) == 0 and
+    len(tags) > 0 and
+    digest != ""
+  ):
+    digests            = $(parseImages(tags).withDigest(digest))
+    contents["RepoDigests"] = %*(digests)
   if chalk.cachedHash == "":
-    chalk.cachedHash  = id
+    chalk.cachedHash   = id
   if len(tags) > 0:
-    let (repo, tag)   = tags[0].getStr().splitBy(":", "latest")
-    chalk.repo        = repo
-    chalk.tag         = tag
+    chalk.image        = parseImage(tags[0])
   if len(digests) > 0:
-    chalk.imageDigest = digests[0].getStr().extractDockerHash()
+    let image          = parseImage(digests[0])
+    chalk.image        = image
+    chalk.imageDigest  = image.digest
+  if digest != "":
+    chalk.imageDigest  = digest.extractDockerHash()
   if chalk.name == "":
-    chalk.name        = chalk.dockerTag(default = userRef)
-  if chalk.userRef == "":
-    chalk.userRef     = chalk.dockerTag(default = userRef)
+    chalk.name         = name
+    chalk.setIfNeeded("_REPO_DIGESTS", pack(digests))
   # we could be inspecting container image hence resource type should be untouched
   if ResourceContainer notin chalk.resourceType:
     chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerImage)
   chalk.resourceType.incl(ResourceImage)
-  chalk.imageId       = id
+  chalk.imageId        = id
   chalk.collectCommon(contents, dockerImageAutoMap)
-  if "_REPO_DIGESTS" in chalk.collectedData:
-    let
-      box  = chalk.collectedData["_REPO_DIGESTS"]
-      info = unpack[OrderedTableRef[string, string]](box)
-    for k, v in info:
-      trace("Image ID is: " & chalk.imageId)
-      trace("Repo Digest: " & v)
-      if chalk.repo != "" and chalk.repo != k:
-        warn("Changing repo from " & chalk.repo & " to: " & k)
-      chalk.repo        = k
-      chalk.imageDigest = v
-      break
+  chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents.nimJsonToBox())
+  chalk.setIfNeeded("DOCKER_PLATFORM", $platform)
+
+proc collectImage*(chalk: ChalkObj, name: string, digest = "") =
+  let contents = inspectImageJson(name)
+  chalk.collectImageFrom(contents, name, digest = digest)
 
 proc collectImage*(chalk: ChalkObj) =
   if chalk.imageId == "":
     raise newException(ValueError, "docker: no image name/id to inspect")
   chalk.collectImage(chalk.imageId)
+
+proc collectImageManifest*(chalk: ChalkObj,
+                           name: DockerImage,
+                           platform: DockerPlatform,
+                           otherNames: seq[DockerImage] = @[]) =
+  let contents = fetchImageManifest(name, platform, otherNames = otherNames).config.json
+  chalk.collectImageFrom(contents, $name)
 
 proc collectContainer*(chalk: ChalkObj, name: string) =
   let
@@ -249,3 +264,4 @@ proc collectContainer*(chalk: ChalkObj, name: string) =
   chalk.resourceType.incl(ResourceContainer)
   chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerContainer)
   chalk.collectCommon(contents, dockerContainerAutoMap)
+  chalk.setIfNeeded("_OP_ALL_CONTAINER_METADATA", contents.nimJsonToBox())

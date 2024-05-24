@@ -29,6 +29,7 @@ from .conf import (
     MARKS,
     REGISTRY,
 )
+from .utils.dict import Contains
 from .utils.docker import Docker
 from .utils.log import get_logger
 from .utils.os import run
@@ -290,10 +291,10 @@ def test_virtual_valid(
         chalk_info={
             "_CURRENT_HASH": image_hash,
             "_IMAGE_ID": image_hash,
-            "_REPO_TAGS": [tag + ":latest"],
+            "_REPO_TAGS": Contains({f"{tag}:latest"}),
             "DOCKERFILE_PATH": str(dockerfile),
             # docker tags should be set to tag above
-            "DOCKER_TAGS": [tag],
+            "DOCKER_TAGS": Contains({f"{tag}:latest"}),
         },
     )
     validate_docker_chalk_report(
@@ -362,10 +363,10 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
         chalk_info={
             "_CURRENT_HASH": image_hash,
             "_IMAGE_ID": image_hash,
-            "_REPO_TAGS": [tag + ":latest"],
+            "_REPO_TAGS": Contains({f"{tag}:latest"}),
             "DOCKERFILE_PATH": str(DOCKERFILES / test_file / "Dockerfile"),
             # docker tags should be set to tag above
-            "DOCKER_TAGS": [tag],
+            "DOCKER_TAGS": Contains({f"{tag}:latest"}),
         },
     )
     validate_docker_chalk_report(
@@ -501,21 +502,25 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
 
     image_id, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
-        tag=tag,
+        tag=tag_base,
         push=push,
         platforms=list(platforms),
     )
 
+    if not push:
+        # as no image is loaded without --push,
+        # we cant inspect anything
+        with pytest.raises(KeyError):
+            build.marks
+        return
+
     assert len(build.marks) == len(platforms)
     assert {i["DOCKER_PLATFORM"] for i in build.marks} == platforms
-
-    if not push:
-        return
 
     chalk_ids = {i["CHALK_ID"] for i in build.marks}
     metadata_ids = {i["METADATA_ID"] for i in build.marks}
     hashes = {i["_CURRENT_HASH"] for i in build.marks}
-    digests = {i["_REPO_DIGESTS"][tag_base] for i in build.marks}
+    digests = {i["_REPO_DIGESTS"][tag] for i in build.marks}
     tags = set(itertools.chain(*[i["DOCKER_TAGS"] for i in build.marks]))
 
     assert len(chalk_ids) == 1
@@ -523,11 +528,8 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
     assert image_id in hashes
     assert len(hashes) == len(platforms)
     assert len(digests) == len(platforms)
-    assert len(tags) == len(platforms)
-    for t in tags:
-        assert t != tag
-        assert t.startswith(tag)
-        assert any(t.endswith(i.replace("/", "-")) for i in platforms)
+    assert len(tags) == 1
+    assert tags == {tag}
 
 
 @pytest.mark.slow()
@@ -654,7 +656,7 @@ def test_extract(chalk: Chalk, random_hex: str):
             "_OP_ARTIFACT_TYPE": "Docker Image",
             "_IMAGE_ID": image_id,
             "_CURRENT_HASH": image_id,
-            "_REPO_TAGS": [tag + ":latest"],
+            "_REPO_TAGS": Contains({f"{tag}:latest"}),
         },
     )
 

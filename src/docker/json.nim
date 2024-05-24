@@ -10,6 +10,13 @@
 import std/[json]
 import ".."/[config, chalkjson, util]
 
+proc parseAndDigestJson*(data: string): DigestedJson =
+  return DigestedJson(
+    json:   parseJson(data),
+    digest: "sha256:" & sha256(data).hex(),
+    size:   len(data),
+  )
+
 type
   JsonTransformer*        = proc (node: JsonNode): JsonNode
   JsonToChalkKeysMapping* = OrderedTable[string, (string, JsonTransformer)]
@@ -61,7 +68,7 @@ proc mapFromJson(self:         ChalkDict,
 
   let boxedValue = value.nimJsonToBox()
   if not boxedValue.checkAutoType(chalkConfig.keyspecs[chalkKey].`type`):
-    warn("Docker-provided JSON key " & jsonKey &
+    warn("docker: JSON key " & jsonKey &
          " associated with chalk key '" & chalkKey &
          "' is not of the expected type. Using it anyway.")
 

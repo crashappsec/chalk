@@ -507,7 +507,7 @@ proc getChalkMark*(obj: ChalkObj): ChalkDict =
 proc getChalkMarkAsStr*(obj: ChalkObj): string =
 
   if obj.cachedMark != "":
-    trace("RETURN CACHEMARK " & $obj.cachedMark)
+    trace("Chalk cachemark " & $obj.cachedMark)
     return obj.cachedMark
   trace("Converting Mark to JSON. Mark template is: " &
     getOutputConfig().markTemplate)

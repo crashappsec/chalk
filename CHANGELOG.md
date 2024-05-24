@@ -12,14 +12,58 @@
     `0001-01-01T00:00:00Z`
   - `_IMAGE_STORAGE_METADATA` - metadata of a docker storage
     driver and is not directly related to docker image
+  - `DOCKER_CHALK_TEMPORARY_TAG` - chalk no longer adds
+    temporary tag to docker builds
 
   [#266](https://github.com/crashappsec/chalk/pull/266)
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+
+- Changed chalk keys:
+
+  - `DOCKER_CHALK_ADDED_TO_DOCKERFILE` - is now a list
+    vs a single string
+
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+
+- Removed configurations:
+
+  - `extract.search_base_layers_for_marks` - chalk mark
+    is not guaranteed to be top layer in all cases.
+    For example it is not top layer without buildx.
+    Therefore all layers must be searched.
+
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+
+- `push_default` reporting template is removed as `push`
+  is now a top-level chalkable operation and therefore
+  it now uses `insertion_default` template.
+  [#282](https://github.com/crashappsec/chalk/pull/282)
 
 ### Fixes
 
 - Fixed not being able to wrap docker builds when using
   `scratch` as base image.
   [#266](https://github.com/crashappsec/chalk/pull/266)
+- Docker ENTRYPOINT wrapping base image inspection works
+  without requiring buildx.
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+
+## New Features
+
+- Chalk docker builds now fully support manifest lists.
+  This affects all commands which produce manifest lists
+  such as multi-platform builds and new features like
+  `--provenance=true` and `--sbom=true`.
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+- New Chalk keys:
+
+  - `DOCKER_PLATFORMS` - all platforms used in docker build
+
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+
+- `docker`/`buildx`/`cosign` versions are now printed
+  in `chalk version` command.
+  [#282](https://github.com/crashappsec/chalk/pull/282)
 
 ## 0.3.5
 

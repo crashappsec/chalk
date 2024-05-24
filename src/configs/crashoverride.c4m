@@ -193,13 +193,13 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.DOCKER_FILE.use                         = true
   ~key.DOCKERFILE_PATH.use                     = true
   ~key.DOCKER_PLATFORM.use                     = true
+  ~key.DOCKER_PLATFORMS.use                    = true
   ~key.DOCKER_LABELS.use                       = true
   ~key.DOCKER_TAGS.use                         = true
   ~key.DOCKER_CONTEXT.use                      = true
   ~key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
   ~key.DOCKER_CHALK_ADDED_LABELS.use           = true
   ~key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use    = true
-  ~key.DOCKER_CHALK_TEMPORARY_TAG.use          = true
   ~key._OP_ARTIFACT_TYPE.use                   = true
   ~key._OP_ARTIFACT_PATH.use                   = true
   ~key._CURRENT_HASH.use                       = true
