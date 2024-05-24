@@ -80,6 +80,9 @@ def test_repo(
         ORIGIN_URI=remote or "local",
         VCS_DIR_WHEN_CHALKED=str(tmp_data_dir),
     )
+    assert result.report.has(
+        _ORIGIN_URI=remote or "local",
+    )
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)

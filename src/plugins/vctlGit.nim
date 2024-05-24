@@ -648,24 +648,26 @@ proc pack(tags: Table[string, GitTag]): ChalkDict =
   for name, tag in tags:
     result[name] = pack(tag.pack())
 
-proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo) =
-  chalkDict.setIfNeeded(keyVcsDir,        info.vcsDir.splitPath().head)
-  chalkDict.setIfNeeded(keyOrigin,        info.origin)
-  chalkDict.setIfNeeded(keyCommit,        info.commitId)
-  chalkDict.setIfNeeded(keyCommitSigned,  info.signed)
-  chalkDict.setIfNeeded(keyBranch,        info.branch)
-  chalkDict.setIfNeeded(keyAuthor,        info.author)
-  chalkDict.setIfNeeded(keyAuthorDate,    info.authorDate)
-  chalkDict.setIfNeeded(keyCommitter,     info.committer)
-  chalkDict.setIfNeeded(keyCommitDate,    info.commitDate)
-  chalkDict.setIfNeeded(keyCommitMessage, info.message)
+proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
+  if prefix == "":
+    chalkDict.setIfNeeded(prefix & keyVcsDir,      info.vcsDir.splitPath().head)
+
+  chalkDict.setIfNeeded(prefix & keyOrigin,        info.origin)
+  chalkDict.setIfNeeded(prefix & keyCommit,        info.commitId)
+  chalkDict.setIfNeeded(prefix & keyCommitSigned,  info.signed)
+  chalkDict.setIfNeeded(prefix & keyBranch,        info.branch)
+  chalkDict.setIfNeeded(prefix & keyAuthor,        info.author)
+  chalkDict.setIfNeeded(prefix & keyAuthorDate,    info.authorDate)
+  chalkDict.setIfNeeded(prefix & keyCommitter,     info.committer)
+  chalkDict.setIfNeeded(prefix & keyCommitDate,    info.commitDate)
+  chalkDict.setIfNeeded(prefix & keyCommitMessage, info.message)
 
   if info.latestTag != nil:
-    chalkDict.setIfNeeded(keyLatestTag,   info.latestTag.name)
-    chalkDict.setIfNeeded(keyTagger,      info.latestTag.tagger)
-    chalkDict.setIfNeeded(keyTaggedDate,  info.latestTag.date)
-    chalkDict.setIfNeeded(keyTagSigned,   info.latestTag.signed)
-    chalkDict.setIfNeeded(keyTagMessage,  info.latestTag.message)
+    chalkDict.setIfNeeded(prefix & keyLatestTag,   info.latestTag.name)
+    chalkDict.setIfNeeded(prefix & keyTagger,      info.latestTag.tagger)
+    chalkDict.setIfNeeded(prefix & keyTaggedDate,  info.latestTag.date)
+    chalkDict.setIfNeeded(prefix & keyTagSigned,   info.latestTag.signed)
+    chalkDict.setIfNeeded(prefix & keyTagMessage,  info.latestTag.message)
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
   if obj.fsRef == "":
@@ -683,7 +685,7 @@ proc gitInit(self: Plugin) =
   for path in getContextDirectories():
     cache.findAndLoad(path.resolvePath())
 
-proc gitGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
+proc gitGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
                                 ChalkDict {.cdecl.} =
   once:
     self.gitInit()
@@ -704,7 +706,19 @@ proc gitGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
       result.setVcsKeys(info)
       break
 
+proc gitGetRunTimeHostInfo(self: Plugin, chalks: seq[ChalkObj]):
+                           ChalkDict {.cdecl.} =
+  once:
+    self.gitInit()
+
+  result = ChalkDict()
+  let cache = GitInfo(self.internalState)
+  for dir, info in cache.vcsDirs:
+    result.setVcsKeys(info, prefix = "_")
+    break
+
 proc loadVctlGit*() =
   newPlugin("vctl_git",
-            ctArtCallback = ChalkTimeArtifactCb(gitGetChalkTimeArtifactInfo),
-            cache         = RootRef(GitInfo()))
+            ctArtCallback  = ChalkTimeArtifactCb(gitGetChalkTimeArtifactInfo),
+            rtHostCallback = RunTimeHostCb(gitGetRunTimeHostInfo),
+            cache          = RootRef(GitInfo()))

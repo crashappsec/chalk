@@ -1,2 +1,2 @@
 FROM alpine
-CMD set -x && echo hello
+CMD echo hello

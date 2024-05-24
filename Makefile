@@ -48,6 +48,7 @@ $(BINARY).bck: $(SOURCES)
 debug: CHALK_BUILD=build --define:debug
 release: CHALK_BUILD=build
 debug release:
+	$(eval export CHALK_BUILD)
 	-rm -f $(BINARY) $(BINARY).bck
 	$(MAKE) $(BINARY)
 

@@ -219,7 +219,7 @@ class Chalk:
         debug: bool = False,
         heartbeat: bool = False,
         replace: bool = False,
-        log_level: Optional[ChalkLogLevel] = None,
+        log_level: Optional[ChalkLogLevel] = "trace",
         exec_command: Optional[str | Path] = None,
         as_parent: Optional[bool] = None,
         no_color: bool = False,
@@ -343,12 +343,22 @@ class Chalk:
             env=env,
         )
 
-    def exec(self, artifact: Path, as_parent: bool = False) -> ChalkProgram:
+    def exec(
+        self,
+        artifact: Path,
+        as_parent: bool = False,
+        heartbeat: bool = False,
+        config: Optional[Path | str] = None,
+        params: Optional[list[str]] = None,
+    ) -> ChalkProgram:
         return self.run(
             command="exec",
             exec_command=artifact,
             log_level="trace",
             as_parent=as_parent,
+            heartbeat=heartbeat,
+            config=config,
+            params=params,
         )
 
     def delete(self, artifact: Path) -> ChalkProgram:
@@ -416,6 +426,8 @@ class Chalk:
         secrets: Optional[dict[str, Path]] = None,
         log_level: ChalkLogLevel = "trace",
         env: Optional[dict[str, str]] = None,
+        provenance: bool = False,
+        sbom: bool = False,
         run_docker: bool = True,
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
@@ -436,6 +448,8 @@ class Chalk:
                 buildkit=buildkit,
                 buildx=buildx,
                 secrets=secrets,
+                provenance=provenance,
+                sbom=sbom,
             )
 
         image_hash, result = Docker.with_image_id(
@@ -457,6 +471,8 @@ class Chalk:
                     buildx=buildx,
                     secrets=secrets,
                     buildkit=buildkit,
+                    provenance=provenance,
+                    sbom=sbom,
                 ),
                 expected_success=expected_success,
                 ignore_errors=not expecting_report,
@@ -473,8 +489,8 @@ class Chalk:
             else:
                 assert len(result.marks) == 1
             # sanity check that chalk mark includes basic chalk keys
-            assert image_hash == result.marks[-1]["_CURRENT_HASH"]
-            assert image_hash == result.marks[-1]["_IMAGE_ID"]
+            assert image_hash in [i["_CURRENT_HASH"] for i in result.marks]
+            assert image_hash in [i["_IMAGE_ID"] for i in result.marks]
             if isinstance(context, Path):
                 dockerfile = dockerfile or (
                     (cwd or context or Path(os.getcwd())) / "Dockerfile"

@@ -2,6 +2,200 @@
 
 ## On the `main` branch
 
+### Breaking Changes
+
+- Removed chalk keys:
+
+  - `_IMAGE_VIRTUAL_SIZE` - deprecated by docker
+  - `_IMAGE_LAST_TAG_TIME` - scoped to local daemon and is
+    not shared with buildx. Many images report as
+    `0001-01-01T00:00:00Z`
+  - `_IMAGE_STORAGE_METADATA` - metadata of a docker storage
+    driver and is not directly related to docker image
+  - `DOCKER_CHALK_TEMPORARY_TAG` - chalk no longer adds
+    temporary tag to docker builds
+  - `_SIGNATURE` - cosign generates unique signature
+    per registry. New key is `_SIGNATURES`.
+  - `_OP_HOSTINFO` - renamed to `_OP_HOST_VERSION`
+  - `_OP_NODENAME` - renamed to `_OP_HOST_NODENAME`
+  - `HOSTINFO_WHEN_CHALKED` - renamed to `HOST_VERSION_WHEN_CHALKED`
+  - `NODENAME_WHEN_CHALKED` - renamed to `HOST_NODENAME_WHEN_CHALKED`
+
+  [#266](https://github.com/crashappsec/chalk/pull/266)
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+  [#284](https://github.com/crashappsec/chalk/pull/284)
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
+- Changed chalk keys:
+
+  - `DOCKER_CHALK_ADDED_TO_DOCKERFILE` - is now a list
+    vs a single string
+  - `_IMAGE_STOP_SIGNAL` - is now a string vs an int.
+    Docker always reported stop signal as string.
+    This was a mistake in field definition.
+
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+
+- Removed configurations:
+
+  - `extract.search_base_layers_for_marks` - chalk mark
+    is not guaranteed to be top layer in all cases.
+    For example it is not top layer without buildx.
+    Therefore all layers must be searched.
+  - `load.update_arch_binaries` - docker multi-platform
+    builds ensure config is loaded into multi-arch chalk
+    binaries and therefore it is not needed to pre-load
+    any configurations at load time. This also removed
+    `chalk load --update-arch-binaries` flag.
+
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
+- `push_default` reporting template is removed as `push`
+  is now a top-level chalkable operation and therefore
+  it now uses `insertion_default` template.
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+
+- When loading custom configs with `chalk load`, metdata
+  collection is disabled for all plugins except for
+  required chalk plugins.
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
+### Fixes
+
+- Fixed not being able to wrap docker builds when using
+  `scratch` as base image.
+  [#266](https://github.com/crashappsec/chalk/pull/266)
+- Docker ENTRYPOINT wrapping base image inspection works
+  without requiring buildx.
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+- Docker builds without buildx could fail when base image
+  specified `USER`.
+  [#285](https://github.com/crashappsec/chalk/pull/285)
+- Tech stack plugin will hang when running chalk from
+  `/` as it would attempt to scan things like `/dev/random`.
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+- Docker wrapping was resetting image `CMD` when base
+  image had `ENTRYPOINT` defined.
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+- GCP instance metadata collection does not work by DNS
+  name reliably so switched to hard-coded IP.
+  [#293](https://github.com/crashappsec/chalk/pull/293)
+
+## New Features
+
+- Chalk docker builds now fully support manifest lists.
+  This affects all commands which produce manifest lists
+  such as multi-platform builds and new features like
+  `--provenance=true` and `--sbom=true`.
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+- New Chalk keys:
+
+  - `_IMAGE_COMPRESSED_SIZE` - compressed docker image size
+    when collecting image metadata directly from the registry
+  - `DOCKER_PLATFORMS` - all platforms used in docker build
+  - `DOCKER_FILE_CHALKED` - post-chalk Dockerfile content
+    as it is built
+  - Docker base image fields:
+    - `DOCKER_BASE_IMAGE` - base image used in Dockerfile
+    - `DOCKER_BASE_IMAGE_REPO` - just the repo name
+    - `DOCKER_BASE_IMAGE_TAG` - just the tag
+    - `DOCKER_BASE_IMAGE_DIGEST` - just the digest
+  - Docker versions and general information:
+    - `_DOCKER_CLIENT_VERSION`
+    - `_DOCKER_SERVER_VERSION`
+    - `_DOCKER_BUILDX_VERSION`
+    - `_DOCKER_INFO` - output of `docker info`
+    - `_DOCKER_BUILDER_BUILDKIT_VERSION`
+    - `_DOCKER_BUILDER_INFO` - output of `docker buildx inspect <builder>`
+  - `_IMAGE_DIGEST` - docker registry v2 image manifest digest
+  - `_IMAGE_LIST_DIGEST` - docker registry v2 image list manifest digest
+  - `_IMAGE_PROVENANCE` - provenance JSON when image was built with
+    `--provenance=true`
+  - `_IMAGE_SBOM` - SBOM JSON when image was built with
+    `--sbom=true`
+  - `_SIGNATURES` - all docker registry cosign signatures
+  - All `uname()` fields have dedicated fields:
+    - `HOST_SYSNAME_WHEN_CHALKED`
+    - `HOST_NODENAME_WHEN_CHALKED`
+    - `HOST_RELEASE_WHEN_CHALKED`
+    - `HOST_VERSION_WHEN_CHALKED`
+    - `HOST_MACHINE_WHEN_CHALKED`
+    - `_OP_HOST_SYSNAME`
+    - `_OP_HOST_NODENAME`
+    - `_OP_HOST_RELEASE`
+    - `_OP_HOST_VERSION`
+    - `_OP_HOST_MACHINE`
+  - All git keys now are also sent as run time host keys.
+    This allows to report from what repo the report is
+    running even if its different from repos of individual
+    chalk marks or when there are no chalk marks.
+
+    - `_ORIGIN_URI`
+    - `_BRANCH`
+    - `_TAG`
+    - `_TAG_SIGNED`
+    - `_COMMIT_ID`
+    - `_COMMIT_SIGNED`
+    - `_AUTHOR`
+    - `_DATE_AUTHORED`
+    - `_COMMITTER`
+    - `_DATE_COMMITTED`
+    - `_COMMIT_MESSAGE`
+    - `_TAGGER`
+    - `_DATE_TAGGED`
+    - `_TAG_MESSAGE`
+
+  [#266](https://github.com/crashappsec/chalk/pull/266)
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+  [#284](https://github.com/crashappsec/chalk/pull/284)
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
+- Docker build `cosign` attestation is pushed to each tagged
+  registry. As a result attestations can be validated from any
+  registry when pulling images.
+  [#284](https://github.com/crashappsec/chalk/pull/284)
+- `docker`/`buildx`/`cosign` versions are now printed
+  in `chalk version` command.
+  [#282](https://github.com/crashappsec/chalk/pull/282)
+- New command for dumping all user configurations as json
+  as well as corresponding load all flag to import them:
+
+  ```sh
+  chalk dump all | chalk load --replace --all -
+  ```
+
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
+- Docker multi-platform builds now automatically downloads
+  corresponding chalk binary for other architectures
+  if not already present on disk.
+
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
+- New chalk configurations:
+
+  - `docker.arch_binary_locations_path` - path where to
+    auto-discover chalk binary locations for docker
+    multi-platform builds.
+  - `docker.download_arch_binary` - whether to automatically
+    download chalk binaries for other architectures.
+  - `docker.download_arch_binary_url` - URL template where
+    to download chalk binaries.
+  - `docker.install_binfmt` - for multi-platform builds
+    automatically install binfmt when not all platforms
+    are supported by the buildx builder
+
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
+- `--skip-custom-reports` flag. Together with
+  `--skip-command-report` allows to completely disable
+  chalk reporting. Note that metadata collection
+  is still going to happen as metadata still needs
+  to be inserted into a chalkmark. Just no report about
+  the operation is going to be omitted.
+  [#286](https://github.com/crashappsec/chalk/pull/286)
+
 ## 0.3.5
 
 **Apr 05, 2024**

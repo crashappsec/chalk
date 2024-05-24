@@ -7,7 +7,7 @@
 
 ## The `chalk insert` command.
 
-import ".."/[config, collect, reporting, chalkjson, plugin_api]
+import ".."/[config, selfextract, collect, reporting, chalkjson, plugin_api]
 
 
 proc runCmdInsert*(path: seq[string]) {.exportc,cdecl.} =
@@ -19,7 +19,7 @@ proc runCmdInsert*(path: seq[string]) {.exportc,cdecl.} =
     trace(item.name & ": begin chalking")
     item.collectChalkTimeArtifactInfo()
     trace(item.name & ": chalk data collection finished.")
-    if item.isMarked() and "$CHALK_CONFIG" in item.extract:
+    if item.isMarked() and configKey in item.extract:
       info(item.name & ": Is a configured chalk exe; skipping insertion.")
       item.removeFromAllChalks()
       item.forceIgnore = true

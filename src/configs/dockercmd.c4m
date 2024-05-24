@@ -205,6 +205,116 @@ docker {
       args: (0, high())
     }
 
+    command buildx {
+      args: (0, high())
+      arg_sub_mutex: false
+
+      command build {
+        # copy of docker build flags
+        # parsing separately under buildx allows to detect buildx accurately
+
+        aliases: ["b"]  # Only in buildx, but no reason not to handle it here.
+        args: (0, high())
+
+        flag_multi_arg add_host { }
+        flag_multi_arg allow { }
+        flag_multi_arg attest { }
+        flag_multi_arg build_arg { }
+        flag_multi_arg build_context { }
+        flag_multi_arg builder { }
+        flag_multi_arg cache_from { }
+        flag_multi_arg cache_to { }
+        flag_multi_arg cgroup_parent { }
+        flag_multi_arg file {
+          aliases: ["f"]
+        }
+        flag_multi_arg iidfile { }
+        flag_multi_arg label { }
+        flag_yn        load {
+          yes_aliases: []
+          no_aliases:  []
+        }
+        flag_multi_arg metadata_file { }
+        flag_multi_arg network { }
+        flag_yn        no_cache {
+          yes_aliases: []
+          no_aliases:  []
+        }
+        flag_multi_arg no_cache_filter { }
+        flag_multi_arg output {
+          aliases: ["o"]
+        }
+        flag_multi_arg platform { }
+        flag_multi_arg progress { }
+        flag_multi_arg provenance { }
+        flag_yn        pull {
+          yes_aliases: []
+          no_aliases:  []
+        }
+        flag_yn        quiet {
+          yes_aliases: ["q"]
+        }
+        flag_multi_arg sbom { }
+        flag_multi_arg secret { }
+        flag_multi_arg shm_size { }
+        flag_multi_arg ssh { }
+        flag_multi_arg tag {
+          aliases: ["t"]
+        }
+        flag_multi_arg target { }
+        flag_multi_arg ulimit { }
+
+        flag_yn push {
+          yes_aliases: []
+          no_aliases: []
+        }
+
+        flag_multi_arg output_type {
+        }
+
+        flag_yn pull {
+          yes_aliases: []
+          no_aliases: []
+        }
+
+        # Below here is stuff from 'docker build' that buildx should
+        # support, even though it isn't in `docker buildx build
+        # --help`.
+        flag_yn compress {
+          yes_aliases: []
+          no_aliases:  []
+        }
+        flag_multi_arg cpu_period { }
+        flag_multi_arg cpu_quota { }
+        flag_multi_arg cpu_shares {
+          aliases: ["c"]
+        }
+        flag_multi_arg cpuset_cpus { }
+        flag_multi_arg cpuset_mems { }
+        # This one doesn't seem to exist but is in the docs?
+        flag_multi_arg disable_content_trust { }
+        flag_yn        force_rm {
+          yes_aliases: []
+          no_aliases: []
+        }
+        flag_multi_arg isolation { }
+        flag_multi_arg memory {
+          aliases: ["m"]
+        }
+        flag_multi_arg memory_swap { }
+        flag_yn rm {
+          yes_aliases: []
+          no_aliases:  []
+        }
+        flag_multi_arg security_opt { }
+        flag_multi_arg shm_size { }
+        flag_yn squash {
+          yes_aliases: []
+          no_aliases:  []
+        }
+      }
+    }
+
     command build {
       aliases: ["b"]  # Only in buildx, but no reason not to handle it here.
       args: (0, high())
@@ -389,8 +499,8 @@ docker {
        optional_arg: true
      }
      flag_multi_arg interactive {
-     	aliases: ["i"]
-	optional_arg: true
+       aliases: ["i"]
+       optional_arg: true
      }
      flag_multi_arg io_maxbandwidth { }
      flag_multi_arg io_maxiops { }

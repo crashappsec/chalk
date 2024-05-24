@@ -51,8 +51,7 @@ proc setPerChalkReports(tmpl: ReportTemplate) =
   ## Adds the `_CHALKS` key in the `hostinfo` global to the current
   ## collection context with whatever items were requested in the
   ## reporting template passed.
-  var
-    reports = seq[Box](@[])
+  var reports = seq[Box](@[])
 
   for chalk in getAllChalks():
     if not chalk.isMarked() and len(chalk.collectedData) == 0:
@@ -129,17 +128,22 @@ template doCustomReporting() =
 
     safePublish(topic, buildHostReport(templateToUse))
 
-
 proc doReporting*(topic="report") {.exportc, cdecl.} =
   if inSubscan():
     let ctx = getCurrentCollectionCtx()
     ctx.report = doEmbeddedReport()
   else:
+    let
+      skipCommand = get[bool](chalkConfig, "skip_command_report")
+      skipCustom  = get[bool](chalkConfig, "skip_custom_reports")
+    if skipCommand and skipCustom:
+      return
     trace("Collecting runtime host info.")
     collectRunTimeHostInfo()
     trace("Generating command report.")
     let report = doCommandReport()
     if report != "":
       safePublish(topic, report)
-    doCustomReporting()
+    if not skipCustom:
+      doCustomReporting()
     writeReportCache()

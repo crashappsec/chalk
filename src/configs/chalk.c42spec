@@ -15,7 +15,7 @@ valid_chalk_cmds     := ["help", "insert", "extract", "delete", "config",
                          "load", "dump", "docker", "version", "env", "exec",
                          "setup", "docgen"]
 
-all_cmds_that_insert := ["insert", "build", "load", "setup"]
+all_cmds_that_insert := ["insert", "build", "push", "load", "setup"]
 
 
 
@@ -134,6 +134,7 @@ currently:
 
 - `chalk insert` (the *insert* operation)
 - `chalk docker build` (the *build* operation)
+- `chalk docker push` (the *push* operation)
 - `chalk setup` (the *setup* operation)
 - `chalk load` (the *load* operation)
 
@@ -915,7 +916,7 @@ therefore come last).
     doc: "List of keys this plugin provides before our artifact collection."
   }
 
-field artifact_keys {
+field pre_chalk_keys {
     type:       list[string]
     default:    []
     write_lock: true
@@ -1423,7 +1424,7 @@ only two things:
 for a given operation (for the default operation report)
 
 > ❗ Chalk marks are only inserted as part of the following operations:
-  `insert`, `build`, `load` and `setup`
+  `insert`, `build`, `push`, `load` and `setup`
 
 For specifying a chalk mark template, set the `outconf` section's
 `mark_template` field to the name of the mark template you defined (it
@@ -1690,20 +1691,6 @@ By default we skip unsigned images, because the process (necessarily) involves d
 """
   }
 
-  field search_base_layers_for_marks {
-    type:    bool
-    default: false
-    shortdoc: "Extract marks from containers"
-    doc: """
-When extracting from images when `ignore_unsigned_images = false`, Chalk will start by checking for a digital signature containing the Chalk mark in the repo, when available.
-
-But if there's no signature, assuming `ignore_unsigned_images` is true, Chalk looks in the top layer of the file system.
-
-When no Chalk can be found in either place, if this attribute is set to true, we'll look at the other layers in the image and report the `CHALK_ID` and `METADATA_ID` of the topmost layer with a mark, using the `_FOUND_BASE_MARK` key (the image itself is said to be unchalked; it's more about being able to use knowledge of a chalked base image).
-
-Note that this does nothing unless `ignore_unsigned_images` is false.
-"""
-  }
 }
 
 singleton docker {
@@ -1748,8 +1735,15 @@ Note that, by default, Chalk will use its own binary for the wrapping, unless
 it sees an arch flag and determines that this is the wrong binary.
 
 In such a case, you should have a binary available for the
-architecture you are building for to copy in, which can be specified
-via the `arch_binary_locations` field.
+architecture you are building for to copy in. The binary
+can be found via these configurations in the order of precedence:
+
+* `docker.arch_binary_locations`
+* `docker.arch_binary_locations_path`
+* `docker.download_arch_binary` via `docker.download_arch_binary_url`
+
+If there isn't an architecture match, and no binary can be found,
+docker entrypoint is aborted.
 
 Note that *either* we need to be able to copy the chalk binary into
 the context directory before invoking Docker, or you need to be on a
@@ -1797,9 +1791,6 @@ where the configured Chalk binary lives for the platform. Currently,
 this only accepts local file system paths, so the binary must be
 local.
 
-If there isn't an architecture match, and no binary can be found per
-this field,
-
 Keys are expected in "Os/Architecture/Variant" form, eg:
 "linux/arm64", "linux/amd64", "linux/arm/v7" etc.
 
@@ -1809,6 +1800,76 @@ that officially support Docker, specifically Linux on arm64 and amd64
 architecture not in this set (bravo for getting Chalk to build!), it
 will still refuse to copy itself in, except via this configuration
 field.
+"""
+  }
+
+  field arch_binary_locations_path {
+    type:     string
+    default:  "~/.local/chalk/bin"
+    shortdoc: "Path where to auto-discover chalk binary locations"
+    doc:      """
+Full path from which chalk binary locations can be auto-discovered
+when `arch_binary_locations` is not provided.
+
+Path within the directory is expected to be the docker platform.
+For example tree of the config path:
+
+```
+<docker.arch_binary_locations_path>
+└── linux/
+    ├── amd64/
+    │   └── chalk
+    ├── arm64
+    │   └── chalk
+    └── arm
+        ├── v7/
+        │   └── chalk
+        └── v8/
+            └── chalk
+```
+"""
+  }
+
+  field download_arch_binary {
+    type:     bool
+    default:  true
+    shortdoc: "Automatically download chalk binaries for other architectures"
+    doc:      """
+When wrapping docker builds and architecture binary is not specified in
+`arch_binary_locations` config, it is attempted to be downloaded automatically.
+Which version of binary is downloaded is controlled by
+`download_arch_binary_version` configuration.
+"""
+  }
+
+  field download_arch_binary_url {
+    type:     string
+    default:  "https://dl.crashoverride.run/chalk/chalk-{version}-{os}-{architecture}"
+    shortdoc: "URL template where to download chalk binaries"
+    doc:      """
+Template for a URL where to download the chalk binary when `download_arch_binary`
+is true. The template can render these variables:
+
+* `{version}`
+* `{commit}`
+* `{os}`
+* `{architecture}`
+"""
+  }
+
+  field install_binfmt {
+    type: bool
+    default: true
+    shortdoc: "Automatically installed binfmt (QEMU)"
+    doc:      """
+For multi-platform builds chalk adds RUN commands to Dockerfile.
+As a result if binfmt is not installed for QEMU, the build
+can fail therefore falling back to non-chalked builds.
+This option allows to automatically install binfmt (QEMU)
+to allow chalked build to work.
+
+For more information see docker docs:
+https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop
 """
   }
 
@@ -1941,6 +2002,18 @@ _always_ reset the embedded configuration to the default.
 """
   }
 
+  field replace_all {
+    type:        bool
+    default:     false
+    doc:         """
+When this is on, loads will not use the interactive interface for
+configuring config. Instead, chalk will read complete config
+from stdin.
+
+The input should be of the same shape as provided by `chalk dump json`.
+"""
+  }
+
   field validate_configs_on_load {
     type:        bool
     default:     true
@@ -1976,19 +2049,6 @@ configuration parameter `dump.params`
 """
   }
 
-  field update_arch_binaries {
-    type:    bool
-    default: true
-    doc:     """
-When this is true, if you run a `chalk load` on this binary, it will
-try to (via docker) load the exact same configuration into any
-cross-architecture binaries listed in docker.arch_binary_locations.
-
-Note that, if you source config components from a local directory, you
-currently will need to update them manually, as those directories will
-not be mapped into the container.
-"""
-  }
 }
 
 singleton exec {
@@ -2891,9 +2951,7 @@ If neither is provided, you may very well end up with `/tmp` or
     shortdoc: "Always sign"
     doc:      """
 When true, Chalk will attempt to use Cosign to sign *all* artifacts
-when chalking. If it's false, Chalk will still try to sign when
-chalking containers, as otherwise it's not practical to determine when
-containers have been modified since chalking.
+when chalking.
 
 Even if this is false, Chalk will try to sign if either the chalking
 template or the reporting template have SIGNATURE set.
@@ -2923,7 +2981,7 @@ validate in the transparency log.
 
   field ignore_patterns {
     type:     list[string]
-    default:  [".*/\\..*", ".*\\.txt", ".*\\.json"]
+    default:  ["/dev/.*", "/proc/.*", "/sys/.*", ".*/\\..*", ".*\\.txt", ".*\\.json"]
     shortdoc: "Ignore Patterns"
     doc:       """
 For operations that insert or remove chalk marks, this is a list of
@@ -3215,6 +3273,17 @@ Note that this doesn't turn off any custom reports; you have to disable those se
 """
   }
 
+  field skip_custom_reports {
+    type:        bool
+    default:     false
+    shortdoc: "Skip custom report"
+    doc: """
+Skip publishing the custom reports (i.e., the custom_report configs). NO output sinks will get it.
+
+Together with skipping command report, all chalk reporting is effectively disabled.
+"""
+  }
+
   field skip_summary_report {
     type:        bool
     default:     false
@@ -3429,7 +3498,7 @@ func override_key_check(keyname: string, val: list[string]) {
   parts := keyname.split(".")
   base  := "plugin." + parts[1] + "."
   k1    := attr_get(base + "pre_run_keys",    list[string])
-  k2    := attr_get(base + "artifact_keys",   list[string])
+  k2    := attr_get(base + "pre_chalk_keys",  list[string])
   k3    := attr_get(base + "post_chalk_keys", list[string])
   k4    := attr_get(base + "post_run_keys",   list[string])
 
