@@ -242,8 +242,11 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     result["_OP_HOST_REPORT_KEYS"] = pack(reportKeys)
 
   when defined(posix):
-    result.setIfNeeded("_OP_HOSTINFO", uinfo.version)
-    result.setIfNeeded("_OP_NODENAME", uinfo.nodename)
+    result.setIfNeeded("_OP_HOST_SYSNAME", uinfo.sysname)
+    result.setIfNeeded("_OP_HOST_RELEASE", uinfo.release)
+    result.setIfNeeded("_OP_HOST_VERSION", uinfo.version)
+    result.setIfNeeded("_OP_HOST_NODENAME", uinfo.nodename)
+    result.setIfNeeded("_OP_HOST_MACHINE", uinfo.machine)
 
 proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result           = ChalkDict()
@@ -263,8 +266,11 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result.setIfNeeded("PUBLIC_IPV4_ADDR_WHEN_CHALKED", pack(getMyIpV4Addr()))
 
   when defined(posix):
-    result.setIfNeeded("HOSTINFO_WHEN_CHALKED", uinfo.version)
-    result.setIfNeeded("NODENAME_WHEN_CHALKED", uinfo.nodename)
+    result.setIfNeeded("HOST_SYSNAME_WHEN_CHALKED", uinfo.sysname)
+    result.setIfNeeded("HOST_RELEASE_WHEN_CHALKED", uinfo.release)
+    result.setIfNeeded("HOST_VERSION_WHEN_CHALKED", uinfo.version)
+    result.setIfNeeded("HOST_NODENAME_WHEN_CHALKED", uinfo.nodename)
+    result.setIfNeeded("HOST_MACHINE_WHEN_CHALKED", uinfo.machine)
 
   if isSubscribedKey("INJECTOR_CHALK_ID"):
     let selfIdOpt = selfID

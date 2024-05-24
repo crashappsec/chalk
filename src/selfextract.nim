@@ -7,9 +7,46 @@
 
 ## Code specific to reading and writing Chalk's own chalk mark.
 
-import std/posix
-import "./docker"/[exe]
 import "."/[config, plugin_api, collect, con4mfuncs, chalkjson, util]
+
+const
+  configKey* = "$CHALK_CONFIG"
+  paramKey*  = "$CHALK_SAVED_COMPONENT_PARAMETERS"
+  cacheKey*  = "$CHALK_COMPONENT_CACHE"
+
+proc getConfig*(): string =
+  let
+    valueOpt = selfChalkGetKey(configKey)
+    value    = valueOpt.get(pack(defaultConfig))
+  return unpack[string](value)
+
+proc getParams*(): seq[Box] =
+  let
+    valueOpt = selfChalkGetKey(paramKey)
+    value    = valueOpt.get(pack(newSeq[Box]()))
+  return unpack[seq[Box]](value)
+
+proc getCache*(): OrderedTableRef[string, string] =
+  let
+    valueOpt = selfChalkGetKey(cacheKey)
+    value    = valueOpt.get(pack(newOrderedTable[string, string]()))
+  return unpack[OrderedTableRef[string, string]](value)
+
+proc getMemoize(): Box =
+  let
+    valueOpt = selfChalkGetKey(memoizeKey)
+    value    = valueOpt.get(pack(newOrderedTable[string, Box]()))
+  return value
+
+proc getAllDumpJson*(): string =
+  var data = ChalkDict()
+  data[configKey]  = pack(getConfig())
+  data[paramKey]   = pack(getParams())
+  data[cacheKey]   = pack(getCache())
+  # memoize allows user config to store things in chalk mark
+  # hence we need to explicitly include it
+  data[memoizeKey] = getMemoize()
+  return data.toJson()
 
 proc handleSelfChalkWarnings*() =
   if not canSelfInject:
@@ -114,25 +151,16 @@ proc newConfFileError(err, tb: string): bool =
   else:
     cantLoad(err)
 
-proc makeExecutable(f: File) =
-  ## Todo: this can move to nimutils actually.
-  when defined(posix):
-    let fd = f.getOsFileHandle()
-    var statRes: Stat
-    var mode:    int
-
-    if fstat(fd, statRes) == 0:
-      mode = int(statRes.st_mode)
-      if (mode and 0x6000) != 0:
-        mode = mode or 0x100
-      else:
-        mode = mode or 0x111
-
-      discard fchmod(fd, Mode(mode))
-
 proc writeSelfConfig*(selfChalk: ChalkObj): bool
     {.cdecl, exportc, discardable.} =
   selfChalk.persistInternalValues()   # Found in run_management.nim
+  # ensure we dont drop any existing metadata
+  # since for example chalk load can be running in limited
+  # environment and so we dont want to drop things like original
+  # chalk commit id, etc
+  # although as a result well be overriding any of these fields
+  # if any of the plugins find them again
+  selfChalk.persistExtractedValues()
   collectChalkTimeHostInfo()
 
   let lastCount = if "$CHALK_LOAD_COUNT" notin selfChalk.collectedData:
@@ -140,9 +168,9 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
                   else:
                     unpack[int](selfChalk.collectedData["$CHALK_LOAD_COUNT"])
 
-  selfChalk.collectedData["$CHALK_LOAD_COUNT"]          = pack(lastCount + 1)
+  selfChalk.collectedData["$CHALK_LOAD_COUNT"]          = pack(lastCount  + 1)
   selfChalk.collectedData["$CHALK_IMPLEMENTATION_NAME"] = pack(implName)
-  selfChalk.collectChalkTimeArtifactInfo()
+  selfChalk.collectChalkTimeArtifactInfo(override = true)
 
   trace(selfChalk.name & ": installing configuration.")
 
@@ -169,20 +197,40 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
       error("Failed to write. Operation aborted.")
       return false
     else:
-      when defined(posix):
-        let f = open(selfChalk.fsRef)
-        try:
-          f.makeExecutable()
-        finally:
-          f.close()
+      selfChalk.fsRef.makeExecutable()
 
   info("Configuration replaced in binary: " & selfChalk.fsRef)
   selfChalk.makeNewValuesAvailable()
   return true
 
-proc testConfigFile*(uri: string, newCon4m: string, params: seq[Box]):
-                   ConfigState =
+proc loadCachedComponents*(runtime: ConfigState, cache: OrderedTableRef[string, string]) =
+  for url, src in cache:
+    let component = runtime.getComponentReference(url)
+    component.cacheComponent(src)
+    trace("Loaded cached version of: " & url & ".c4m")
+
+proc loadComponentParams*(runtime: ConfigState, params: seq[Box]) =
+  for item in params:
+    let
+      row     = unpack[seq[Box]](item)
+      attr    = unpack[bool](row[0])
+      url     = unpack[string](row[1])
+      sym     = unpack[string](row[2])
+      c4mType = toCon4mType(unpack[string](row[3]))
+      value   = row[4]
+    if attr:
+      runtime.setAttributeParamValue(url, sym, value, c4mType)
+    else:
+      runtime.setVariableParamValue(url, sym, value, c4mType)
+
+proc testConfigFile(newCon4m: string,
+                    params:   seq[Box],
+                    cache:    OrderedTableRef[string, string]) =
+  # need to test with another top-level config name
+  # otherwise cycle is bound to be detected
+  let uri = "[testing config]"
   info(uri & ": Validating configuration.")
+
   if get[bool](chalkConfig, "load.validation_warning"):
     warn("Note: validation involves creating a new configuration context"  &
          " and evaluating your code to make sure it at least evaluates "   &
@@ -216,30 +264,19 @@ proc testConfigFile*(uri: string, newCon4m: string, params: seq[Box]):
     # Test Run will cause (un)subscribe() to ignore subscriptions, and
     # will suppress log messages, etc.
     stack.run()
-    for item in params:
-      let
-        row     = unpack[seq[Box]](item)
-        attr    = unpack[bool](row[0])
-        url     = unpack[string](row[1])
-        sym     = unpack[string](row[2])
-        c4mType = toCon4mType(unpack[string](row[3]))
-        value   = row[4]
-      if attr:
-        stack.configState.setAttributeParamValue(url, sym, value, c4mType)
-      else:
-        stack.configState.setVariableParamValue(url, sym, value, c4mType)
-
+    stack.configState.loadCachedComponents(cache)
+    stack.configState.loadComponentParams(params)
     startTestRun()
     stack.addConfLoad(uri, toStream(newCon4m))
     stack.run()
-    endTestRun()
     if stack.errored:
       quit(1)
     info(uri & ": Configuration successfully validated.")
-    return stack.configState
   except:
     dumpExOnDebug()
     cantLoad(getCurrentExceptionMsg() & "\n")
+  finally:
+    endTestRun()
 
 proc toBox(param: ParameterInfo, component: ComponentInfo): Box =
   # Though you can pack / unpack con4m types, we don't have a JSON
@@ -273,51 +310,83 @@ const nocache = [getoptConfName,
                  coConfName,
                  embeddedConfName]
 
-proc updateArchBinaries*(newConfig: string, newParams: seq[Box],
-                         bins: TableRef[string, string] = nil) =
-  var binInfo: TableRef[string, string]
-
-  if bins != nil:
-    binInfo = bins
-  elif not get[bool](chalkConfig, "load.update_arch_binaries"):
-    return
-  else:
-    binInfo = getOpt[typeof(binInfo)](chalkConfig, "docker.arch_binary_locations").get(nil)
-
-  if binInfo == nil or len(binInfo) == 0:
-    trace("No multi-arch binaries to load.")
-    return
-  for arch, unresolvedLocation in binInfo:
-    let location = unresolvedLocation.resolvePath()
-
-    info("Attempting to update config for architecture: " & arch & " (" &
-      location & ")")
+proc handleConfigLoadAll*(inpath: string): bool =
+  info("Replacing all chalk configuration from " & inpath)
+  try:
     let
-      (dir, fname) = location.splitPath()
-      confLoc      = dir.joinPath("config.c4m")
+      validate = get[bool](chalkConfig, "load.validate_configs_on_load")
+      required = @[configKey, paramKey, cacheKey]
+      data     = if inpath == "-": stdin.readAll() else: tryToLoadFile(inpath.resolvePath())
+      jsonData = data.parseJson()
 
-    if not tryToWriteFile(confLoc, newConfig):
-      warn("Could not write config to: " & confLoc)
-      continue
+    var chalkData = ChalkDict()
+    for k, v in jsonData.pairs():
+      chalkData[k] = v.nimJsonToBox()
+
+    for key in required:
+      if key notin chalkData:
+        cantLoad(key & " is required but is is missing")
 
     let
-      chalkMnt = location & ":/chalk"
-      confMnt  = confLoc & ":/config.c4m"
-      ctrCmd   = "chmod +x /chalk && /chalk load --replace /config.c4m"
-      arch     = "linux/" & arch
-      args     = @[ "run", "--rm", "--platform", arch, "-v", chalkMnt, "-v",
-                    confMnt, "alpine", "sh", "-c", ctrCmd]
-      output = runDockerGetEverything(args, stdin = boxToJson(pack(newParams)))
+      config         = unpack[string](chalkData[configKey])
+      params         = unpack[seq[Box]](chalkData[paramKey])
+      cache          = unpack[OrderedTableRef[string, string]](chalkData[cacheKey])
+      memoize        = chalkData.getOrDefault(memoizeKey, pack(ChalkDict()))
+      currentConfig  = getConfig()
+      currentParams  = getParams()
+      currentCache   = getCache()
+      currentMemoize = getMemoize()
 
-    if output.getExit() != 0:
-      warn("Docker command to update config for archiecture " & arch &
-        " failed: " & output.getStderr())
-      continue
+    echo(config, currentConfig)
+    echo(params, currentParams)
+    echo(cache, currentCache)
+    echo(memoize, currentMemoize)
+    if (
+      config  == currentConfig and
+      params  == currentParams and
+      cache   == currentCache and
+      memoize == currentMemoize
+    ):
+      return false
+
+    if validate:
+      testConfigFile(config, params, cache)
     else:
-      info("Successfully updated config for architecture " & arch)
+      warn("Skipping configuration validation. This could break chalk.")
 
-proc handleConfigLoad*(inpath: string) =
+    selfChalkSetKey(configKey, pack(config))
+    selfChalkSetKey(cacheKey, pack(cache))
+    selfChalkSetKey(paramKey, pack(params))
+    selfChalkSetKey(memoizeKey, memoize)
+    return true
+
+  except:
+    dumpExOnDebug()
+    cantLoad("Could not replace all config: " & getCurrentExceptionMsg())
+
+proc handleConfigLoad*(inpath: string): bool =
   assert selfChalk != nil
+
+  let
+    validate          = get[bool](chalkConfig, "load.validate_configs_on_load")
+    replace           = get[bool](chalkConfig, "load.replace_conf")
+    replaceAll        = get[bool](chalkConfig, "load.replace_all")
+    confPaths         = get[seq[string]](chalkConfig, "config_path").strip(leading = false, chars = {'/'})
+    confFilename      = get[string](chalkConfig, "config_filename")
+    paramsViaStdin    = get[bool](chalkConfig, "load.params_via_stdin")
+
+  if replace:
+    info("Replacing base configuration with module from: " & inpath)
+    selfChalkDelKey(configKey)
+    selfChalkDelKey(cacheKey)
+    selfChalkDelKey(paramKey)
+  elif replaceAll:
+    cantLoad("--replace must be used together with --all")
+  else:
+    info("Attempting to load module from: " & inpath)
+
+  if replaceAll:
+    return handleConfigLoadAll(inpath)
 
   var path: string
 
@@ -332,28 +401,12 @@ proc handleConfigLoad*(inpath: string) =
     path = inpath
 
   let
-    validate          = get[bool](chalkConfig, "load.validate_configs_on_load")
-    replace           = get[bool](chalkConfig, "load.replace_conf")
-    confPaths         = get[seq[string]](chalkConfig, "config_path")
-    confFilename      = get[string](chalkConfig, "config_filename")
-
-  if replace:
-    info("Replacing base configuration with module from: " & path)
-    selfChalkDelKey("$CHALK_CONFIG")
-    selfChalkDelKey("$CHALK_COMPONENT_CACHE")
-    selfChalkDelKey("$CHALK_SAVED_COMPONENT_PARAMETERS")
-  else:
-    info("Attempting to load module from: " & path)
-
-  let
     runtime           = getChalkRuntime()
     alreadyCached     = haveComponentFromUrl(runtime, path).isSome()
     (base, module, _) = path.fullUrlToParts()
-    curConfOpt        = selfChalkGetKey("$CHALK_CONFIG")
+    curConfOpt        = selfChalkGetKey(configKey)
 
-  var
-    component: ComponentInfo
-    testState: ConfigState
+  var component: ComponentInfo
 
   try:
     component  = runtime.loadComponentFromUrl(path)
@@ -380,10 +433,10 @@ proc handleConfigLoad*(inpath: string) =
                   newEmbedded & "\n" & useLine
     newEmbedded = withUse.strip()
 
-  if get[bool](chalkConfig, "load.params_via_stdin"):
+  if paramsViaStdin:
     try:
       let
-        chalkJsonTree = newStringStream(stdin.readLine()).chalkParseJson()
+        chalkJsonTree = newStringStream(stdin.readAll()).chalkParseJson()
         runtime       = getChalkRuntime()
 
       if chalkJsonTree.kind != CJArray:
@@ -424,10 +477,7 @@ proc handleConfigLoad*(inpath: string) =
     paramsToTest.addParams(item)
 
   if validate:
-    # need to test with another top-level config name
-    # otherwise cycle is bound to be detected
-    testState = testConfigFile("[testing config]", newEmbedded, paramsToTest)
-    assert testState != nil
+    testConfigFile(newEmbedded, paramsToTest, getCache())
   else:
     warn("Skipping configuration validation. This could break chalk.")
 
@@ -464,15 +514,7 @@ proc handleConfigLoad*(inpath: string) =
       discard
     cachedCode[item.url] = item.source
 
-  selfChalkSetKey("$CHALK_CONFIG", pack(newEmbedded))
-  selfChalkSetKey("$CHALK_COMPONENT_CACHE", pack(cachedCode))
-  selfChalkSetKey("$CHALK_SAVED_COMPONENT_PARAMETERS", pack(paramsToSave))
-
-  if testState != nil:
-    let archOpt: Option[TableRef[string, string]] =
-      getOpt[TableRef[string, string]](testState, "docker.arch_binary_locations")
-    if archOpt.isSome():
-      updateArchBinaries(newEmbedded, paramsToSave, archOpt.get())
-      return
-
-  updateArchBinaries(newEmbedded, paramsToSave)
+  selfChalkSetKey(configKey, pack(newEmbedded))
+  selfChalkSetKey(cacheKey, pack(cachedCode))
+  selfChalkSetKey(paramKey, pack(paramsToSave))
+  return true

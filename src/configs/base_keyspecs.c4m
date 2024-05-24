@@ -224,17 +224,63 @@ This key is reserved for future use; it is not currently used in any capacity.
 """
 }
 
-keyspec HOSTINFO_WHEN_CHALKED {
+keyspec HOST_SYSNAME_WHEN_CHALKED {
     kind:             ChalkTimeHost
     type:             string
     standard:         true
-    since:            "0.1.0"
-    shortdoc:         "Host platform information at Chalk time"
+    since:            "0.3.6-dev"
+    shortdoc:         "Host sysname at Chalk time"
     doc:              """
-This returns information about the host on which the chalk operation
-occurred, collected at the time of that operation. On posix
-systems, it's taken from the 'version' field obtained from a call to
-the `uname()` system call.
+On posix systems, value of `sysname` field from `uname()` syscall,
+collected when chalk mark was created.
+"""
+}
+
+keyspec HOST_NODENAME_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host node name at Chalk time"
+    doc:              """
+On posix systems, value of `nodename` field from `uname()` syscall,
+collected when chalk mark was created.
+"""
+}
+
+keyspec HOST_RELEASE_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host kernel release at Chalk time"
+    doc:              """
+On posix systems, value of `release` field from `uname()` syscall,
+collected when chalk mark was created.
+"""
+}
+
+keyspec HOST_VERSION_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host kernel version at Chalk time"
+    doc:              """
+On posix systems, value of `version` field from `uname()` syscall,
+collected when chalk mark was created.
+"""
+}
+
+keyspec HOST_MACHINE_WHEN_CHALKED {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host machine at Chalk time"
+    doc:              """
+On posix systems, value of `machine` field from `uname()` syscall,
+collected when chalk mark was created.
 """
 }
 
@@ -248,19 +294,6 @@ keyspec PUBLIC_IPV4_ADDR_WHEN_CHALKED {
 This returns the IPv4 address on the local machine used to route
 external traffic. It's determined by setting up a UDP connection to
 Cloudflare's public DNS service, but does not involve sending any data.
-"""
-}
-
-keyspec NODENAME_WHEN_CHALKED {
-    kind:             ChalkTimeHost
-    type:             string
-    standard:         true
-    since:            "0.1.0"
-    shortdoc:         "Host node name at Chalk time"
-    doc:              """
-The node name at the time of the software's chalk mark insertion. On
-posix systems, this will be equivalent to the `uname()` field
-`nodename`.
 """
 }
 
@@ -808,6 +841,182 @@ To sign commits use `-S` parameter: `git commit -S`.
 """
 }
 
+keyspec _ORIGIN_URI {
+    kind:                RunTimeHost
+    type:                string
+    standard:            true
+    since:               "0.3.6-dev"
+    apply_substitutions: true
+    shortdoc:            "URI for repository associated at time of marking"
+    doc:                 """
+The URI associated with the origin of the source code repository found at the
+time of chalk operation.
+"""
+}
+
+keyspec _AUTHOR {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Author of most recent commit"
+    doc:              """
+The author of the most recent commit in the current branch, which is likely the same as the committer but not always.
+"""
+}
+
+keyspec _DATE_AUTHORED {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Human readable timestamp of the author's commit"
+    doc:              """
+The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+"""
+}
+
+keyspec _COMMITTER {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Committer of most recent commit"
+    doc:              """
+The committer of the most recent commit in the current branch.
+"""
+}
+
+keyspec _DATE_COMMITTED {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Human readable timestamp of most recent commit"
+    doc:              """
+The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+"""
+}
+
+keyspec _COMMIT_MESSAGE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Commit message of most recent commit"
+    doc:              """
+The commit message of the most recent commit in the current branch.
+If the commit is signed, the COMMIT_MESSAGE value does not contain the signature.
+"""
+}
+
+keyspec _BRANCH {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Current repo branch at time of marking"
+    doc:              """
+The branch name found in the source code repository found at the time
+of chalk operation.
+"""
+}
+
+keyspec _TAG {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Current repo tag at time of marking"
+    doc:              """
+The latest tag name found in the source code repository found at the time
+of chalk operation. Annotated tags take precedence over regular tags.
+
+Annotated tags are created with `git tag -a -m "comment"`.
+"""
+}
+
+keyspec _TAG_SIGNED {
+    kind:             RunTimeHost
+    type:             bool
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Whether the tag is signed"
+    doc:              """
+If the most recent tag was signed.
+
+Signed tags are automatically annotated.
+To sign commit use `-s` parameter: `git tag -s -m "comment"`.
+"""
+}
+
+keyspec _TAGGER {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Tagger of most recent tag"
+    doc:              """
+The tagger of the most recent annotated tag.
+
+Annotated tags are created with `git tag -a -m "comment"`.
+"""
+}
+
+keyspec _DATE_TAGGED {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Human readable timestamp of most recent tag"
+    doc:              """
+The date of the annotated tag in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+
+Annotated tags are created with `git tag -a -m "comment"`.
+"""
+}
+
+keyspec _TAG_MESSAGE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Tag message of the most recent annotated tag"
+    doc:              """
+The tag message of the most recent annotated tag found in the source code
+repository at the time of chalk operation.
+
+If the tag is signed, the TAG_MESSAGE value does not contain the signature.
+
+Annotated tags are created with `git tag -a -m "comment"`.
+"""
+}
+
+keyspec _COMMIT_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Commit ID in current repo at time of marking"
+    doc:              """
+The most recent commit hash or id for the current repository and
+branch identified at the time of chalk operation.
+"""
+}
+
+keyspec _COMMIT_SIGNED {
+    kind:             RunTimeHost
+    type:             bool
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Whether the commit is signed"
+    doc:              """
+If the most recent commit was signed.
+
+To sign commits use `-S` parameter: `git commit -S`.
+"""
+}
+
 keyspec ARTIFACT_VERSION {
     kind:             ChalkTimeArtifact
     type:             string
@@ -1317,6 +1526,19 @@ docker file passed to the docker command line, prior to any chalking.
 """
 }
 
+keyspec DOCKER_FILE_CHALKED {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.3.6-dev"
+    shortdoc: "Updated Docker file contents post-chalk"
+    doc: """
+Full content of the dockerfile as it is built including all
+chalk additions added to it.
+"""
+}
+
 keyspec DOCKERFILE_PATH {
     kind:             ChalkTimeArtifact
     type:             string
@@ -1347,7 +1569,7 @@ keyspec DOCKER_PLATFORMS {
     type:             list[string]
     standard:         true
     system:           false
-    since:            "0.3.7"
+    since:            "0.3.6-dev"
     doc: """
 All platforms passed when performing 'docker build', if any.
 """
@@ -1420,6 +1642,108 @@ keyspec DOCKER_CHALK_ADDED_TO_DOCKERFILE {
     doc: """
 Additional instructions added to the passed dockerfile.
 """
+}
+
+keyspec DOCKER_BASE_IMAGE {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.3.6-dev"
+    doc: """
+Name of the base image specified in Dockerfile used to build docker image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_REPO {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.3.6-dev"
+    doc: """
+Only registry repository of the base image specified in Dockerfile used to build docker image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_TAG {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.3.6-dev"
+    doc: """
+Only registry tag of the base image if specified in Dockerfile used to build docker image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_DIGEST {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.3.6-dev"
+    doc: """
+Only registry digest of the base image if specified in Dockerfile used to build docker image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
+keyspec _DOCKER_CLIENT_VERSION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker client version"
+    doc:              "Docker CLI client version"
+}
+
+keyspec _DOCKER_SERVER_VERSION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker server version"
+    doc:              "Docker daemon server version"
+}
+
+keyspec _DOCKER_BUILDX_VERSION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker buildx version"
+    doc:              "Docker buildx version"
+}
+
+keyspec _DOCKER_INFO {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker info output"
+    doc:              "Docker info output"
+}
+
+keyspec _DOCKER_BUILDER_BUILDKIT_VERSION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker buildkit version of the builder"
+    doc:              "Docker buildkit version of the builder"
+}
+
+keyspec _DOCKER_BUILDER_INFO {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Docker buildx inspect output of the builder"
+    doc:              "Docker buildx inspect output of the builder"
 }
 
 keyspec _OP_ARTIFACT_TYPE {
@@ -1931,9 +2255,46 @@ keyspec _IMAGE_ID {
     kind:     RunTimeArtifact
     type:     string
     standard: true
-    shortdoc: "Reported image ID for a container"
+    since:    "0.1.0"
+    shortdoc: "Reported image ID for the image or container"
     doc: """
-The image ID reported by docker for a container image.
+The image ID reported by docker for an image or a container.
+Image ID is the digest of the image config json object.
+"""
+}
+
+keyspec _IMAGE_DIGEST {
+    kind:     RunTimeArtifact
+    type:     string
+    standard: true
+    since:    "0.3.6-dev"
+    shortdoc: "Reported digest of the image manifest"
+    doc: """
+The image digest reported by docker for an image.
+This is the digest of the image manifest as its referenced in
+the registry.
+
+This key assumes registry v2 spec which guarantees digest is
+the same across different registries.
+"""
+}
+
+keyspec _IMAGE_LIST_DIGEST {
+    kind:     RunTimeArtifact
+    type:     string
+    standard: true
+    since:    "0.3.6-dev"
+    shortdoc: "Reported digest of the image manifest"
+    doc: """
+The manifest list digest for an image.
+This is only reported for images which built manifest list
+such as multi-platform builds or buildx builds which pushed
+additional metadata to the registry such as `--provenance`.
+This digest can be used to lookup that metdata back from the
+registry.
+
+This key assumes registry v2 spec which guarantees digest is
+the same across different registries.
 """
 }
 
@@ -2256,7 +2617,7 @@ Key-value pairs adding metadata to images
 
 keyspec _IMAGE_STOP_SIGNAL {
     kind:     RunTimeArtifact
-    type:     int
+    type:     string
     standard: true
     doc: """
 The signal to be sent to the main process inside the container, which by default is SIGTERM
@@ -2278,6 +2639,28 @@ keyspec _IMAGE_SHELL {
     standard: true
     doc: """
 The shell used within an image (e.g., `/bin/sh`) used to execute ENTRYPOINT, RUN and/or CMD commands
+"""
+}
+
+keyspec _IMAGE_PROVENANCE {
+    kind:     RunTimeArtifact
+    type:     `x
+    standard: true
+    since:    "0.3.6-dev"
+    shortdoc: "Docker image provenance information"
+    doc: """
+Docker SLSA provenance information created with `docker build --provenance=true`.
+"""
+}
+
+keyspec _IMAGE_SBOM {
+    kind:     RunTimeArtifact
+    type:     `x
+    standard: true
+    since:    "0.3.6-dev"
+    shortdoc: "Docker image SBOM information"
+    doc: """
+Docker SPDX SBOM information created with `docker build --sbom=true`.
 """
 }
 
@@ -3308,7 +3691,7 @@ keyspec _SIGNATURES {
     type:             list[dict[string, string]]
     standard:         true
     system:           true
-    since:            "0.1.0"
+    since:            "0.3.6-dev"
     doc:              """
 Digital signatures for artifact.  For build/push operations, this will
 generally represent the digital signatures added as part of the
@@ -3745,17 +4128,63 @@ keyspec _OP_HOSTNAME {
 """
 }
 
-keyspec _OP_HOSTINFO {
+keyspec _OP_HOST_SYSNAME {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.1.0"
-    shortdoc:         "Detailed host info from current operation"
+    since:            "0.3.6-dev"
+    shortdoc:         "Host sysname during chalk operation"
     doc:              """
-This returns information about the host on which the urrent operation
-occurred, collected at the time of that operation. On posix
-systems, it's taken from the 'version' field obtained from a call to
-the `uname()` system call.
+On posix systems, value of `sysname` field from `uname()` syscall,
+collected during current chalk operation.
+"""
+}
+
+keyspec _OP_HOST_NODENAME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host node during chalk operation"
+    doc:              """
+On posix systems, value of `nodename` field from `uname()` syscall,
+collected during current chalk operation.
+"""
+}
+
+keyspec _OP_HOST_RELEASE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host kernel during chalk operation"
+    doc:              """
+On posix systems, value of `release` field from `uname()` syscall,
+collected during current chalk operation.
+"""
+}
+
+keyspec _OP_HOST_VERSION {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host kernel during chalk operation"
+    doc:              """
+On posix systems, value of `version` field from `uname()` syscall,
+collected during current chalk operation.
+"""
+}
+
+keyspec _OP_HOST_MACHINE {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.3.6-dev"
+    shortdoc:         "Host machine during chalk operation"
+    doc:              """
+On posix systems, value of `machine` field from `uname()` syscall,
+collected during current chalk operation.
 """
 }
 
@@ -3776,17 +4205,6 @@ cloud provider APIs, docker, procfs, etc.
 """
 }
 
-
-keyspec _OP_NODENAME {
-    kind:             RunTimeHost
-    type:             string
-    standard:         true
-    since:            "0.1.0"
-    doc:              """
-The node name at the time of the current operation. On posix systems,
-this should be equivalent to the uname 'nodename' field.
-"""
-}
 
 keyspec _OP_CLOUD_METADATA {
     kind:             RunTimeHost

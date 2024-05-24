@@ -80,6 +80,12 @@ proc `<=`*(self: Version, other: Version): bool =
 proc `$`*(self: Version): string =
   return self.name
 
+proc normalize*(self: Version): string =
+  let s = $self
+  if s == "0":
+    return ""
+  return s
+
 proc getVersionFromLine*(line: string): Version =
   for word in line.splitWhitespace():
     if '.' in word:
@@ -90,9 +96,18 @@ proc getVersionFromLine*(line: string): Version =
         discard
   raise newException(ValueError, "no version found")
 
-proc getVersionFromLineWhich*(lines: seq[string], startsWith = ""): Version =
+proc getVersionFromLineWhich*(lines: seq[string],
+                              startsWith = "",
+                              contains = "",
+                              isAfterLineStartingWith = ""): Version =
+  var isAfter = false
   for line in lines:
+    isAfter = isAfter or line.startsWith(isAfterLineStartingWith)
+    if not isAfter:
+      continue
     if startsWith != "" and not line.startsWith(startsWith):
+      continue
+    if contains != "" and contains notin line:
       continue
     try:
       return getVersionFromLine(line)

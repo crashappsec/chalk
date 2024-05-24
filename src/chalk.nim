@@ -37,6 +37,7 @@ when isMainModule:
   of "dump":               runCmdConfDump()
   of "dump.params":        runCmdConfDumpParams()
   of "dump.cache":         runCmdConfDumpCache()
+  of "dump.all":           runCmdConfDumpAll()
   of "load":               runCmdConfLoad()
   of "config":             showConfigValues(force = true)
   of "version":            runCmdVersion()

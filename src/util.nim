@@ -584,3 +584,15 @@ proc merge*(self: ChalkDict, other: ChalkDict): ChalkDict {.discardable.} =
       self[k] &= v
     else:
       self[k] = v
+
+proc strip*(items: seq[string], leading = true, trailing = true, chars = Whitespace): seq[string] =
+  result = @[]
+  for i in items:
+    result.add(i.strip(leading = leading, trailing = trailing, chars = chars))
+
+proc makeExecutable*(path: string) =
+  let
+    existing = path.getFilePermissions()
+    wanted   = existing + {fpUserExec, fpGroupExec, fpOthersExec}
+  if existing != wanted:
+    path.setFilePermissions(wanted)

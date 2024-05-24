@@ -14,9 +14,11 @@ plugin system {
   pre_run_keys:     ["INJECTOR_CHALK_ID", "INJECTOR_VERSION", "TIME_CHALKED",
                      "INJECTOR_COMMIT_ID", "DATE_CHALKED",
                      "TZ_OFFSET_WHEN_CHALKED", "DATETIME_WHEN_CHALKED",
-                     "INJECTOR_ENV", "HOSTINFO_WHEN_CHALKED",
+                     "HOST_SYSNAME_WHEN_CHALKED", "HOST_NODENAME_WHEN_CHALKED",
+                     "HOST_RELEASE_WHEN_CHALKED", "HOST_VERSION_WHEN_CHALKED",
+                     "HOST_MACHINE_WHEN_CHALKED", "INJECTOR_ENV",
                      "PUBLIC_IPV4_ADDR_WHEN_CHALKED", "INJECTOR_PUBLIC_KEY",
-                     "NODENAME_WHEN_CHALKED", "PLATFORM_WHEN_CHALKED"]
+                     "PLATFORM_WHEN_CHALKED"]
 
   pre_chalk_keys:  ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
                     "PRE_CHALK_HASH", "TIMESTAMP_WHEN_CHALKED"]
@@ -27,7 +29,8 @@ plugin system {
                     "_INVALID_SIGNATURE"]
 
   post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
-                    "_OP_HOSTINFO", "_OP_PUBLIC_IPV4_ADDR", "_OP_NODENAME",
+                    "_OP_HOST_SYSNAME", "_OP_HOST_NODENAME", "_OP_HOST_RELEASE",
+                    "_OP_HOST_VERSION", "_OP_HOST_MACHINE", "_OP_PUBLIC_IPV4_ADDR",
                     "_OP_PLATFORM", "_OP_CHALKER_COMMIT_ID",
                     "_OP_CHALKER_VERSION", "_OP_CHALK_COUNT", "_OP_CMD_FLAGS",
                     "_OP_EXE_NAME", "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
@@ -79,6 +82,12 @@ plugin vctl_git {
                       "COMMITTER", "DATE_COMMITTED", "COMMIT_MESSAGE",
                       "TAG", "TAG_SIGNED", "TAGGER", "DATE_TAGGED",
                       "TAG_MESSAGE", "VCS_DIR_WHEN_CHALKED"]
+    post_run_keys:   ["_COMMIT_ID", "_COMMIT_SIGNED",
+                      "_BRANCH", "_ORIGIN_URI",
+                      "_AUTHOR", "_DATE_AUTHORED",
+                      "_COMMITTER", "_DATE_COMMITTED", "_COMMIT_MESSAGE",
+                      "_TAG", "_TAG_SIGNED", "_TAGGER", "_DATE_TAGGED",
+                      "_TAG_MESSAGE"]
     doc: """
 This plugin collects version control information from .git directories
 that artifacts are found in.
@@ -182,6 +191,7 @@ Can capture data both during build and during process run time.
 
 plugin cloud_metadata {
     enabled:         true
+    priority:        1000
     post_run_keys:   ["_GCP_INSTANCE_METADATA", "_AZURE_INSTANCE_METADATA",
     "_OP_CLOUD_PROVIDER", "_OP_CLOUD_PROVIDER_SERVICE_TYPE",
     "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", "_OP_CLOUD_PROVIDER_REGION",
@@ -226,6 +236,7 @@ machine in which chalk is being run.
 
 plugin aws_ecs {
     enabled:         true
+    priority:        2000 # have precedence over cloud metadata
     pre_run_keys:    ["CLOUD_METADATA_WHEN_CHALKED"]
     post_run_keys:   ["_OP_CLOUD_METADATA",
                       "_OP_CLOUD_PROVIDER",
@@ -241,6 +252,7 @@ metdata interface.
 
 plugin aws_lambda {
     enabled:         true
+    priority:        2000 # have precedence over cloud metadata
     post_run_keys:   ["_OP_CLOUD_METADATA",
                       "_OP_CLOUD_PROVIDER",
                       "_OP_CLOUD_PROVIDER_ACCOUNT_INFO",
@@ -491,15 +503,19 @@ plugin docker {
     codec:    true
     priority: 1
     enabled:  true
-    pre_chalk_keys: ["ARTIFACT_TYPE", "DOCKER_FILE", "DOCKERFILE_PATH",
+    pre_chalk_keys: ["ARTIFACT_TYPE",
+                     "DOCKER_FILE", "DOCKER_FILE_CHALKED", "DOCKERFILE_PATH",
                      "DOCKER_PLATFORM", "DOCKER_PLATFORMS",
                      "DOCKER_LABELS", "DOCKER_TAGS",
+                     "DOCKER_BASE_IMAGE", "DOCKER_BASE_IMAGE_REPO",
+                     "DOCKER_BASE_IMAGE_TAG", "DOCKER_BASE_IMAGE_DIGEST",
                      "DOCKER_CONTEXT", "DOCKER_ADDITIONAL_CONTEXTS",
                      "DOCKER_CHALK_ADDED_LABELS",
                      "DOCKER_CHALK_ADDED_TO_DOCKERFILE" ]
-
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE", "_REPO_TAGS",
         "_REPO_DIGESTS", "_IMAGE_COMMENT", "_IMAGE_CREATION_DATETIME",
+        "_IMAGE_ID", "_IMAGE_DIGEST", "_IMAGE_LIST_DIGEST",
+        "_IMAGE_PROVENANCE", "_IMAGE_SBOM",
         "_IMAGE_DOCKER_VERSION", "_IMAGE_AUTHOR", "_IMAGE_ARCHITECTURE",
         "_IMAGE_VARIANT", "_IMAGE_OS", "_IMAGE_OS_VERSION", "_IMAGE_SIZE",
         "_IMAGE_ROOT_FS_TYPE", "_IMAGE_ROOT_FS_LAYERS", "_IMAGE_HOSTNAME",
@@ -566,6 +582,10 @@ plugin docker {
         "_INSTANCE_MAC", "_INSTANCE_NETWORKS",  "_OP_ALL_CONTAINER_METADATA",
         "_OP_ALL_IMAGE_METADATA", "_STORE_URI"
     ]
+    post_run_keys:  ["_DOCKER_CLIENT_VERSION", "_DOCKER_SERVER_VERSION",
+                     "_DOCKER_BUILDX_VERSION", "_DOCKER_INFO",
+                     "_DOCKER_BUILDER_BUILDKIT_VERSION",
+                     "_DOCKER_BUILDER_INFO"]
     doc: """
 The docker Codec is responsible for chalk marks for Docker images and
 containers, but also does all of the docker-specific data collection

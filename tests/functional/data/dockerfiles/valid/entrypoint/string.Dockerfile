@@ -1,3 +1,3 @@
 FROM alpine
-ENTRYPOINT set -x && echo hello
+ENTRYPOINT echo hello
 CMD foo # should not be used

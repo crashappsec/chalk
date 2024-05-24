@@ -16,17 +16,20 @@ proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
   # If our mundged docker invocation fails, then we conservatively
   # assume we made some big mistake, and run Docker the way it
   # was originally called.
-  let
-    exe      = getDockerExeLocation()
-    # even if docker is not found call subprocess with valid command name
-    # so that we can bubble up error from subprocess
-    docker   = if exe != "": exe else: "docker"
+  var exitCode = 1
+  try:
+    let
+      exe      = getDockerExeLocation()
+      # even if docker is not found call subprocess with valid command name
+      # so that we can bubble up error from subprocess
+      docker   = if exe != "": exe else: "docker"
     exitCode = runCmdNoOutputCapture(docker,
                                      ctx.originalArgs,
                                      ctx.originalStdIn)
-  doReporting("fail")
-  showConfigValues()
-  quitChalk(exitCode)
+    doReporting("fail")
+    showConfigValues()
+  finally:
+    quitChalk(exitCode)
 
 template withDockerFailsafe*(ctx: DockerInvocation, code: untyped) =
   try:
@@ -46,11 +49,11 @@ proc dockerPassThrough*(ctx: DockerInvocation) {.noreturn.} =
                                      ctx.originalStdIn)
     if get[bool](chalkConfig, "docker.report_unwrapped_commands"):
       reporting.doReporting("report")
-    quitChalk(exitCode)
   except:
     dumpExOnDebug()
     doReporting("fail")
     showConfigValues()
+  finally:
     quitChalk(exitCode)
 
 proc runMungedDockerInvocation*(ctx: DockerInvocation): int =

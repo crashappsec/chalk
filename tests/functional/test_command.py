@@ -175,9 +175,11 @@ def test_env(chalk: Chalk):
     report = result.report
 
     # fields to check: platform, hostinfo, nodename
-    assert run(["uname", "-s"]).text in report["_OP_PLATFORM"]
-    assert run(["uname", "-v"]).text in report["_OP_HOSTINFO"]
-    assert run(["uname", "-n"]).text in report["_OP_NODENAME"]
+    assert run(["uname", "-s"]).text in report["_OP_HOST_SYSNAME"]
+    assert run(["uname", "-r"]).text in report["_OP_HOST_RELEASE"]
+    assert run(["uname", "-v"]).text in report["_OP_HOST_VERSION"]
+    assert run(["uname", "-n"]).text in report["_OP_HOST_NODENAME"]
+    assert run(["uname", "-m"]).text in report["_OP_HOST_MACHINE"]
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)

@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[sets, sequtils, uri]
+import std/[sets, sequtils, uri, sets]
 import ".."/[config, util]
 
 const hashHeader = "sha256:"
@@ -18,25 +18,57 @@ proc extractDockerHash*(value: string): string =
 proc extractDockerHash*(value: Box): Box =
   return pack(extractDockerHash(unpack[string](value)))
 
-proc extractDockerHashList*(value: seq[string]): seq[string] =
-  for item in value:
-    result.add(item.extractDockerHash())
-
-proc extractDockerHashMap*(value: seq[string]): OrderedTable[string, string] =
-  result = initOrderedTable[string, string]()
-  for item in value:
-    if '@' notin item:
-      raise newException(
-        ValueError,
-        "Invalid docker repo name. Expecting <repo>@sha256:<digest> but got: " & item
-      )
-    let (repo, hash) = item.splitBy("@")
-    result[repo] = hash.extractDockerHash()
-
 # ----------------------------------------------------------------------------
 
+proc normalize*(self: DockerPlatform): DockerPlatform =
+  # https://github.com/containerd/containerd/blob/83031836b2cf55637d7abf847b17134c51b38e53/platforms/platforms.go
+  const
+    osMap = {
+      "masos":          "darwin",
+    }.toTable()
+    archMap = {
+      "aarch64":        "arm64",
+      "i386":           "386",
+      "x86_64":         "amd64",
+      "x86-64":         "amd64",
+    }.toTable()
+    archToVariantMap = {
+      "armel":         ("arm", "v6"),
+      "armhf":         ("arm", "v7"),
+    }.toTable()
+    # https://github.com/containerd/containerd/blob/83031836b2cf55637d7abf847b17134c51b38e53/platforms/database.go#L76-L109
+    archWithVariantMap = {
+      ("arm",   ""):   ("arm",   "v7"),
+      ("arm64", "v8"): ("arm64", ""),
+      ("amd64", "v1"): ("amd64", ""),
+    }.toTable()
+  var
+    os           = osMap.getOrDefault(self.os, self.os)
+    architecture = archMap.getOrDefault(self.architecture, self.architecture)
+    variant      = self.variant
+  (architecture, variant) = archToVariantMap.getOrDefault(
+    architecture,
+    (architecture, variant),
+  )
+  (architecture, variant) = archWithVariantMap.getOrDefault(
+    (architecture, variant),
+    (architecture, variant),
+  )
+  return DockerPlatform(
+    os:           os,
+    architecture: architecture,
+    variant:      variant,
+  )
+
+proc normalize*(items: seq[DockerPlatform]): seq[DockerPlatform] =
+  result = @[]
+  for i in items:
+    result.add(i.normalize())
+
 proc `$`*(self: DockerPlatform): string =
-  return self.os & "/" & self.architecture
+  result = self.os & "/" & self.architecture
+  if self.variant != "":
+    result &= "/" & self.variant
 
 proc `$`*(items: seq[DockerPlatform]): seq[string] =
   result = @[]
@@ -46,7 +78,7 @@ proc `$`*(items: seq[DockerPlatform]): seq[string] =
 proc `==`*(self, other: DockerPlatform): bool =
   if isNil(self) or isNil(other):
     return isNil(self) == isNil(other)
-  return $self == $other
+  return $self.normalize() == $other.normalize()
 
 proc isKnown*(self: DockerPlatform): bool =
   return (
@@ -58,17 +90,51 @@ proc isKnown*(self: DockerPlatform): bool =
   )
 
 proc parseDockerPlatform*(platform: string): DockerPlatform =
-  let items = platform.split('/', maxsplit = 1)
-  if len(items) != 2:
+  let parts = platform.toLower().split('/', maxsplit = 2)
+  case len(parts)
+  of 1:
+    if parts[0] in ["linux", "macos", "darwin"]:
+      return DockerPlatform(
+        os:           parts[0],
+        architecture: hostCPU,
+      )
+    else:
+      return DockerPlatform(
+        os:           hostOs,
+        architecture: parts[0],
+      )
+  of 2:
+    return DockerPlatform(
+      os:           parts[0],
+      architecture: parts[1],
+    )
+  of 3:
+    return DockerPlatform(
+      os:           parts[0],
+      architecture: parts[1],
+      variant:      parts[2],
+    )
+  else:
     raise newException(ValueError, "Invalid docker platform: " & platform)
-  return DockerPlatform(os: items[0], architecture: items[1])
+
+proc contains*[T](self: TableRef[DockerPlatform, T], key: DockerPlatform): bool =
+  for k, _ in self:
+    if k == key:
+      return true
+  return false
+
+proc `[]`*[T](self: TableRef[DockerPlatform, T], key: DockerPlatform): T =
+  for k, v in self:
+    if k == key:
+      return v
+  raise newException(KeyError, $key & " platform not found")
 
 # ----------------------------------------------------------------------------
 
 proc parseDigest*(digest: string): DockerImage =
   return ("", "", digest.extractDockerHash())
 
-proc parseImage*(name: string): DockerImage =
+proc parseImage*(name: string, defaultTag = "latest"): DockerImage =
   # parseUri requires some scheme to parse url correctly so we add dummy https
   # parsed uri will allow us to figure out if tag contains version
   # (note that tag can be full registry path which can include
@@ -96,11 +162,11 @@ proc parseImage*(name: string): DockerImage =
 
     # there is no tag
     else:
-      return (image, "latest", digest)
+      return (image, defaultTag, digest)
 
   # image is regular foo[:tag] format
   else:
-    let (repo, tag) = image.splitBy(":", "latest")
+    let (repo, tag) = image.splitBy(":", defaultTag)
     return (repo, tag, digest)
 
 proc parseImages*(names: seq[string]): seq[DockerImage] =
@@ -199,6 +265,24 @@ proc getImageName*(self: ChalkObj): string =
   if len(self.images) > 0:
     return $(self.images[0])
   return self.name
+
+# ----------------------------------------------------------------------------
+
+proc extractDockerHashList*(value: seq[string]): seq[string] =
+  for item in value:
+    result.add(item.extractDockerHash())
+
+proc extractDockerHashMap*(value: seq[string]): OrderedTableRef[string, string] =
+  result = newOrderedTable[string, string]()
+  for image in parseImages(value).uniq():
+    if image.digest == "":
+      raise newException(
+        ValueError,
+        "Invalid docker repo name. Expecting <repo>@sha256:<digest> but got: " & $image
+      )
+    # specifically omitting tag as digest is more precise to reference
+    # something from the registry
+    result[image.repo] = image.digest
 
 # ----------------------------------------------------------------------------
 

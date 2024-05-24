@@ -5,8 +5,8 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import "../docker"/[collect, ids]
-import ".."/[config, plugin_api]
+import "../docker"/[collect, ids, exe]
+import ".."/[config, plugin_api, semver]
 
 const markLocation = "/chalk.json"
 
@@ -26,6 +26,17 @@ proc dockerGetRunTimeArtifactInfo(self: Plugin, chalk: ChalkObj, ins: bool):
   if ResourceContainer notin chalk.resourceType:
     chalk.collectImage()
 
+proc dockerGetRunTimeHostInfo(self: Plugin, chalks: seq[ChalkObj]): ChalkDict {.cdecl.} =
+  result = ChalkDict()
+  result.setIfNeeded("_DOCKER_CLIENT_VERSION", getDockerClientVersion().normalize())
+  result.setIfNeeded("_DOCKER_SERVER_VERSION", getDockerServerVersion().normalize())
+  result.setIfNeeded("_DOCKER_BUILDX_VERSION", getBuildXVersion().normalize())
+  result.setIfNeeded("_DOCKER_INFO",           getDockerInfo())
+  let ctx = dockerInvocation
+  if ctx != nil:
+    result.setIfNeeded("_DOCKER_BUILDER_INFO", ctx.getBuilderInfo())
+    result.setIfNeeded("_DOCKER_BUILDER_BUILDKIT_VERSION",    ctx.getBuildKitVersion().normalize())
+
 proc loadCodecDocker*() =
   # cant use getDockerExePath as that uses codecs to ignore chalk
   # wrappings hence we just check if anything docker is on PATH here
@@ -33,6 +44,7 @@ proc loadCodecDocker*() =
   if not enabled:
     warn("Disabling docker codec as docker command is not available")
   newCodec("docker",
-           rtArtCallback = RunTimeArtifactCb(dockerGetRunTimeArtifactInfo),
-           getChalkId    = ChalkIdCb(dockerGetChalkId),
-           enabled       = enabled)
+           rtArtCallback  = RunTimeArtifactCb(dockerGetRunTimeArtifactInfo),
+           rtHostCallback = RunTimeHostCb(dockerGetRunTimeHostInfo),
+           getChalkId     = ChalkIdCb(dockerGetChalkId),
+           enabled        = enabled)

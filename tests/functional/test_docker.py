@@ -2,7 +2,6 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import itertools
 import platform
 import shutil
 import time
@@ -17,6 +16,7 @@ import pytest
 from .chalk.runner import Chalk, ChalkProgram
 from .chalk.validate import (
     MAGIC,
+    MISSING,
     ArtifactInfo,
     validate_docker_chalk_report,
     validate_virtual_chalk,
@@ -29,7 +29,7 @@ from .conf import (
     MARKS,
     REGISTRY,
 )
-from .utils.dict import Contains
+from .utils.dict import ANY, Contains
 from .utils.docker import Docker
 from .utils.log import get_logger
 from .utils.os import run
@@ -112,7 +112,7 @@ def test_build(
     """
     Test various variants of docker build command
     """
-    image_id, _ = chalk.docker_build(
+    image_id, build = chalk.docker_build(
         dockerfile=dockerfile,
         cwd=cwd,
         tag=random_hex if tag else None,
@@ -120,6 +120,19 @@ def test_build(
         config=CONFIGS / "docker_wrap.c4m",
     )
     assert image_id
+    assert build.mark.has(_IMAGE_ENTRYPOINT=["/chalk", "exec", "--"])
+
+
+@pytest.mark.parametrize("buildkit", [True, False])
+def test_scratch(chalk: Chalk, buildkit: bool):
+    _, build = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
+        buildkit=buildkit,
+        expected_success=buildkit,
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    if buildkit:
+        assert "_IMAGE_ENTRYPOINT" not in build.mark
 
 
 def test_docker_context(chalk: Chalk, tmp_data_dir: Path):
@@ -238,22 +251,100 @@ def test_base_image(chalk: Chalk, random_hex: str):
     assert Docker.run(image_id)
 
 
-@pytest.mark.parametrize("cmd", ["cmd", "entrypoint"])
 @pytest.mark.parametrize(
-    "test_file",
+    "test_file, entrypoint, cmd",
     [
-        "string.Dockerfile",
-        "json.Dockerfile",
+        (
+            "string.Dockerfile",
+            ["/chalk", "exec", "--"],
+            ["/bin/sh", "-c", "echo hello"],
+        ),
+        (
+            "json.Dockerfile",
+            ["/chalk", "exec", "--exec-command-name", "echo", "--"],
+            ["hello"],
+        ),
     ],
 )
-def test_wrap(chalk: Chalk, random_hex: str, test_file: str, cmd: str):
+def test_wrap_entrypoint(
+    chalk: Chalk, random_hex: str, test_file: str, entrypoint: list[str], cmd: list[str]
+):
     image_id, result = chalk.docker_build(
-        dockerfile=DOCKERFILES / "valid" / cmd / test_file,
-        context=DOCKERFILES / "valid" / cmd,
+        dockerfile=DOCKERFILES / "valid" / "entrypoint" / test_file,
+        context=DOCKERFILES / "valid" / "entrypoint",
         config=CONFIGS / "docker_wrap.c4m",
     )
     _, output = Docker.run(image_id)
     assert "hello" in output.text
+    assert result.mark.has(
+        _IMAGE_ENTRYPOINT=entrypoint,
+        _IMAGE_CMD=cmd,
+    )
+
+
+@pytest.mark.parametrize(
+    "test_file, entrypoint, cmd",
+    [
+        (
+            # shold lookup entypoint/cmd from base image
+            "base.Dockerfile",
+            ["/chalk", "exec", "--exec-command-name", "/docker-entrypoint.sh", "--"],
+            ["/bin/sh", "-c", "nginx"],
+        ),
+        (
+            # if ENTRYPOINT is set, it resets CMD
+            "override.Dockerfile",
+            ["/chalk", "exec", "--exec-command-name", "two", "--", "entrypoint"],
+            MISSING,
+        ),
+        (
+            # CMD honors higher section ENTRYPOINTs
+            "cmd.Dockerfile",
+            ["/chalk", "exec", "--exec-command-name", "one", "--", "entrypoint"],
+            ["/bin/sh", "-c", "two cmd"],
+        ),
+    ],
+)
+def test_wrap_base_entrypoint(
+    chalk: Chalk, random_hex: str, test_file: str, entrypoint: list[str], cmd: list[str]
+):
+    image_id, result = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "entrypoint" / test_file,
+        context=DOCKERFILES / "valid" / "entrypoint",
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    assert result.mark.has(
+        _IMAGE_ENTRYPOINT=entrypoint,
+        _IMAGE_CMD=cmd,
+    )
+
+
+@pytest.mark.parametrize(
+    "test_file, entrypoint, cmd",
+    [
+        (
+            "string.Dockerfile",
+            ["/chalk", "exec", "--"],
+            ["/bin/sh", "-c", "echo hello"],
+        ),
+        (
+            "json.Dockerfile",
+            ["/chalk", "exec", "--"],
+            ["echo", "hello"],
+        ),
+    ],
+)
+def test_wrap_cmd(
+    chalk: Chalk, random_hex: str, test_file: str, entrypoint: list[str], cmd: list[str]
+):
+    image_id, result = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "cmd" / test_file,
+        context=DOCKERFILES / "valid" / "cmd",
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    _, output = Docker.run(image_id)
+    assert "hello" in output.text
+    assert result.mark.has(_IMAGE_ENTRYPOINT=entrypoint, _IMAGE_CMD=cmd)
 
 
 @pytest.mark.parametrize(
@@ -487,16 +578,32 @@ def test_build_and_push(chalk: Chalk, test_file: str, random_hex: str, push: boo
     platform.system() == "Darwin",
     reason="Skipping local docker push on mac due to issues https://github.com/docker/for-mac/issues/6704",
 )
-def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push: bool):
+def test_multiplatform_build(
+    chalk: Chalk,
+    test_file: str,
+    random_hex: str,
+    push: bool,
+    server_http: str,
+):
     tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
     tag = f"{tag_base}:latest"
-    platforms = {"linux/amd64", "linux/arm64"}
+    platforms = {"linux/amd64/v1", "linux/arm64/v8", "linux/arm/v7"}
+    target_platforms = {"linux/amd64", "linux/arm64", "linux/arm/v7"}
 
     image_id, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag_base,
         push=push,
         platforms=list(platforms),
+        config=CONFIGS / "docker_wrap.c4m",
+        provenance=True,
+        sbom=True,
+        env={
+            # for downloading arm chalk binary
+            "CHALK_SERVER": server_http,
+            # to isolate downloaded binaries
+            "CHALK_TMP": f"/tmp/{random_hex}",
+        },
     )
 
     if not push:
@@ -507,21 +614,46 @@ def test_multiplatform_build(chalk: Chalk, test_file: str, random_hex: str, push
         return
 
     assert len(build.marks) == len(platforms)
-    assert {i["DOCKER_PLATFORM"] for i in build.marks} == platforms
+    assert {i["DOCKER_PLATFORM"] for i in build.marks} == target_platforms
 
     chalk_ids = {i["CHALK_ID"] for i in build.marks}
     metadata_ids = {i["METADATA_ID"] for i in build.marks}
     hashes = {i["_CURRENT_HASH"] for i in build.marks}
-    digests = {i["_REPO_DIGESTS"][tag] for i in build.marks}
-    tags = set(itertools.chain(*[i["DOCKER_TAGS"] for i in build.marks]))
+    ids = {i["_IMAGE_ID"] for i in build.marks}
+    image_digests = {i["_IMAGE_DIGEST"] for i in build.marks}
+    list_digests = {i["_IMAGE_LIST_DIGEST"] for i in build.marks}
+    repo_digests = {i["_REPO_DIGESTS"][tag_base] for i in build.marks}
 
     assert len(chalk_ids) == 1
     assert len(metadata_ids) == len(platforms)
     assert image_id in hashes
+    assert len(ids) == len(platforms)
+    assert hashes == ids
     assert len(hashes) == len(platforms)
-    assert len(digests) == len(platforms)
-    assert len(tags) == 1
-    assert tags == {tag}
+    assert len(repo_digests) == len(platforms)
+    assert len(image_digests) == len(platforms)
+    assert len(list_digests) == 1
+
+    for mark in build.marks:
+        assert mark.has(
+            DOCKER_TAGS=[tag],
+            DOCKER_PLATFORMS=target_platforms,
+            DOCKER_FILE_CHALKED=Contains(
+                {
+                    "/$TARGETPLATFORM load /config.json",
+                    "/$TARGETPLATFORM version",
+                }
+            ),
+            _IMAGE_ENTRYPOINT=["/chalk", "exec", "--"],
+            _IMAGE_SBOM={
+                "SPDXID": "SPDXRef-DOCUMENT",
+            },
+            _IMAGE_PROVENANCE={
+                "buildConfig": ANY,
+                "invocation": ANY,
+                "materials": ANY,
+            },
+        )
 
 
 @pytest.mark.slow()
@@ -766,3 +898,19 @@ def test_docker_default_command(chalk_copy: Chalk, tmp_data_dir: Path):
     actual = run([str(docker), "--version"])
     assert actual
     assert actual.text == expected.text
+
+
+def test_version_bare(chalk_default: Chalk):
+    """
+    Runs in empty container which tests chalk has no external startup deps
+    """
+    image_id, build = Docker.build(
+        dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
+    )
+    assert build
+    assert Docker.run(
+        image_id,
+        volumes={chalk_default.binary: "/chalk"},
+        entrypoint="/chalk",
+        params=["version"],
+    )

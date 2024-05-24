@@ -12,7 +12,9 @@ import ".."/[chalk_common, config, www_authenticate]
 import "."/[exe, json, ids]
 
 # cache is by repo ref as its normalized in buildx imagetools command
-var manifestCache = initTable[string, DockerManifest]()
+var
+  jsonCache     = initTable[string, DigestedJson]()
+  manifestCache = initTable[string, DockerManifest]()
 
 proc findAllPlatformsManifests(self: DockerManifest): seq[DockerManifest] =
   ## find all valid platform images from the manifest list
@@ -31,7 +33,7 @@ proc findPlatformManifest(self: DockerManifest, platform: DockerPlatform): Docke
   for manifest in self.manifests:
     if manifest.platform == platform:
       return manifest
-  raise newException(KeyError, "Could not find manifest for: " & $self.name & " " & $platform)
+  raise newException(KeyError, "Could not find manifest for: " & $self.name & " --platform=" & $platform)
 
 proc getCompressedSize(self: DockerManifest): int =
   if self.kind != DockerManifestType.image:
@@ -40,14 +42,17 @@ proc getCompressedSize(self: DockerManifest): int =
   for layer in self.layers:
     result += layer.size
 
-proc requestManifestJson(name: DockerImage): DigestedJson =
+proc requestManifestJson(name: DockerImage, flags = @["--raw"], fallback = true): DigestedJson =
   ## fetch raw json manifest via docker imagetools
   ## however if that fails withs 401 error, attept to manually
   ## fetch the manifest via the URL from the error message
   ## as the error could be due to www-authenticate challenge
+  let key = name.asRepoDigest() & $flags
+  if key in jsonCache:
+    return jsonCache[key]
   let
     msg = "docker: requesting manifest for: " & $name
-    args   = @["buildx", "imagetools", "inspect", name.asRepoDigest(), "--raw"]
+    args   = @["buildx", "imagetools", "inspect", name.asRepoDigest()] & flags
   trace("docker: docker " & args.join(" "))
   let
     output = runDockerGetEverything(args)
@@ -56,9 +61,15 @@ proc requestManifestJson(name: DockerImage): DigestedJson =
     text   = stdout & stderr
   if output.getExit() == 0:
     try:
-      return parseAndDigestJson(stdout)
+      let value = parseAndDigestJson(stdout)
+      if value.json.kind == JNull:
+        raise newException(ValueError, msg & " didnt return valid json: " & $value.json)
+      jsonCache[key] = value
+      return value
     except:
       raise newException(ValueError, msg & " failed with: " & getCurrentExceptionMsg())
+  elif not fallback:
+    raise newException(ValueError, msg & " exited with: " & $output.getExit())
   # sample output:
   # ERROR: unexpected status from HEAD request to https://<registry>: 401 Unauthorized
   if "401 Unauthorized" notin stderr:
@@ -87,7 +98,9 @@ proc requestManifestJson(name: DockerImage): DigestedJson =
     let response      = safeRequest(url, headers = headers)
     if not response.code().is2xx():
       raise newException(ValueError, msg & " manifest was not returned from URL: " & response.status)
-    return parseAndDigestJson(response.body())
+    let value = parseAndDigestJson(response.body())
+    jsonCache[key] = value
+    return value
   except:
     raise newException(ValueError,
                        msg & " failed to fetch manifest via www-authenticate challenge: " &
@@ -177,10 +190,10 @@ proc fetch(self: DockerManifest) =
     let data = requestManifestJson(name)
     self.setJson(data)
     self.mimickLocalConfig()
-    self.imageConfig = self.json{"config"}
     self.configPlatform = DockerPlatform(
       os:           data.json{"os"}.getStr(),
       architecture: data.json{"architecture"}.getStr(),
+      variant:      data.json{"variant"}.getStr(),
     )
   else:
     discard
@@ -204,6 +217,7 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
       list.manifests.add(DockerManifest(
         kind:       DockerManifestType.image,
         name:       name,
+        list:       list,
         otherNames: otherNames,
         mediaType:  item{"mediaType"}.getStr(),
         digest:     item{"digest"}.getStr(),
@@ -211,7 +225,8 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
         platform:   DockerPlatform(
           os:           platform{"os"}.getStr(),
           architecture: platform{"architecture"}.getStr(),
-        ),
+          variant:      platform{"variant"}.getStr(),
+        )
       ))
     return list
 
@@ -237,7 +252,46 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
   else:
     raise newException(ValueError, "Unsupported docker manifest json")
 
-proc fetchManifest(name: DockerImage, otherNames: seq[DockerImage] = @[]): DockerManifest =
+proc fetchProvenance*(name: DockerImage, platform: DockerPlatform): JsonNode =
+  # https://docs.docker.com/reference/cli/docker/buildx/imagetools/inspect/
+  try:
+    # for single-platform manifests, there is only a single provenance
+    return requestManifestJson(
+      name,
+      flags    = @["--format", "{{json .Provenance.SLSA}}"],
+      fallback = false,
+    ).json
+  except:
+    # for multi-platform we have to filter on the platform
+    # note index only supports a few keys so have to manually
+    # take SLSA key
+    return requestManifestJson(
+      name,
+      flags    = @["--format", "{{json (index .Provenance \"" & $platform & "\")}}"],
+      fallback = false,
+    ).json{"SLSA"}
+
+
+proc fetchSBOM*(name: DockerImage, platform: DockerPlatform): JsonNode =
+  # https://docs.docker.com/reference/cli/docker/buildx/imagetools/inspect/
+  try:
+    # for single-platform manifests, there is only a single sbom
+    return requestManifestJson(
+      name,
+      flags    = @["--format", "{{json .SBOM.SPDX}}"],
+      fallback = false,
+    ).json
+  except:
+    # for multi-platform we have to filter on the platform
+    # note index only supports a few keys so have to manually
+    # take SPDX key
+    return requestManifestJson(
+      name,
+      flags    = @["--format", "{{json (index .SBOM \"" & $platform & "\")}}"],
+      fallback = false,
+    ).json{"SPDX"}
+
+proc fetchManifest*(name: DockerImage, otherNames: seq[DockerImage] = @[]): DockerManifest =
   ## request either manifest list or image manifest for specified image
   # keep in mind that image can be of multiple formats
   # foo                   # image manifest name

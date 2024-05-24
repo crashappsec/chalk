@@ -7,7 +7,7 @@
 
 ## Dockerfile parsing
 
-import std/unicode
+import std/[algorithm, sequtils, unicode]
 import ".."/config
 import "."/[ids]
 
@@ -241,7 +241,7 @@ proc lexQuoted(ctx: DockerParse, d: DockerStatement, s: seq[Rune], q: Rune, i: v
   result.contents.add(val)
 
 const nonWordRunes = [Rune('$'), Rune('"'), Rune('\''), Rune('#'), Rune('='),
-                      Rune('{'), Rune('}')]
+                      Rune('{'), Rune('}'), Rune(':'), Rune('@')]
 
 proc lexWord(ctx: DockerParse, d: DockerStatement, s: seq[Rune], i: var int): LineToken =
   result = LineToken(kind:      ltWord,
@@ -312,16 +312,20 @@ proc skipWhiteSpace(toks: seq[LineToken], i: var int) {.inline.} =
   if i < len(toks) and toks[i].kind == ltSpace:
     i += 1
 
-proc takeUntilWhiteSpace(toks: seq[LineToken], i: var int): seq[LineToken] =
+proc peekUntilWhiteSpace(toks: seq[LineToken], i: var int): seq[LineToken] =
   result = @[]
   for tok in toks[i..^1]:
     if tok.kind == ltSpace:
       break
     result.add(tok)
 
+proc takeUntilWhiteSpace(toks: seq[LineToken], i: var int): seq[LineToken] =
+  result = peekUntilWhiteSpace(toks, i)
+  i += len(result)
+
 proc parseOneFlag(ctx: DockerParse, toks: seq[LineToken], i: var int):
                  Option[DfFlag] =
-  let candidates = takeUntilWhiteSpace(toks, i)
+  let candidates = peekUntilWhiteSpace(toks, i)
 
   # flag requires at least 3 tokens -
   # * --<flag>
@@ -513,34 +517,39 @@ proc parseFrom(ctx: DockerParse, t: DockerCommand): FromInfo =
 
   skipWhiteSpace(toks, i)
 
-  if len(toks) == i or toks[i].kind == ltOther:
+  let spec = takeUntilWhiteSpace(toks, i)
+  if len(spec) == 0 or spec[0].kind != ltWord:
     result.error = "No image name provided."
     return
 
-  result.repo = some(toks[i])
-
-  i += 1
-  if len(toks) <= i: return
-
-  if toks[i].kind == ltOther and i + 1 != len(toks):
-    case toks[i].contents[0]
+  result.repo = some(spec[0])
+  var s = 1
+  while s < len(spec):
+    case spec[s].contents[0]
     of ":":
-      i += 1
-      if toks[i].kind == ltSpace:
+      s += 1
+      if spec[s].kind != ltWord:
         result.error = "Missing image tag after ':'"
         return
-      result.tag = some(toks[i])
-      i += 1
+      result.tag = some(spec[s])
     of "@":
-      i += 1
-      if toks[i].kind == ltSpace:
+      s += 1
+      if spec[s].kind != ltWord or spec[s].contents != @["sha256"]:
         result.error = "Missing image digest after '@'"
         return
-      result.digest = some(toks[i])
-      i += 1
+      s += 1
+      if spec[s].kind != ltOther or spec[s].contents != @[":"]:
+        result.error = "Missing ':' delimiter after digest '@sha256'"
+        return
+      s += 1
+      if spec[s].kind != ltWord:
+        result.error = "Missing digest value"
+        return
+      result.digest = some(spec[s])
     else:
-      result.error = "Unrecognized value after image: '" & toks[i].contents[0]
+      result.error = "Unrecognized value after image: '" & spec[s].contents[0] & "'"
       return
+    s += 1
 
   skipWhiteSpace(toks, i)
   if i == len(toks): return
@@ -955,6 +964,11 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
       "Did not find any build sections in Dockerfile (no FROM directive)"
     )
 
+proc getFirstDockerSection*(ctx: DockerInvocation): DockerFileSection =
+  if len(ctx.dfSections) == 0:
+    raise newException(ValueError, "there are no docker sections")
+  return ctx.dfSections[0]
+
 proc getTargetDockerSection*(ctx: DockerInvocation): DockerFileSection =
   ## get the target docker section which is to be built
   ## will either be the last section if no target is specified
@@ -975,6 +989,12 @@ iterator getTargetDockerSections*(ctx: DockerInvocation): DockerFileSection =
   yield section
   while $(section.image) in ctx.dfSectionAliases:
     section = ctx.dfSectionAliases[$(section.image)]
+    yield section
+
+iterator getBaseDockerSections*(ctx: DockerInvocation): DockerFileSection =
+  ## iterator for all chain of docker sections used to build target section
+  ## first section is the base section and last it the actual target section
+  for section in ctx.getTargetDockerSections().toSeq().reversed():
     yield section
 
 proc getBaseDockerSection*(ctx: DockerInvocation):  DockerFileSection =

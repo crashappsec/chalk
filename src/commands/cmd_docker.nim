@@ -29,6 +29,7 @@ proc runCmdDocker*(args: seq[string]) =
   var
     exitCode = 0
     ctx      = initDockerInvocation(args)
+  dockerInvocation = ctx
 
   if getDockerExeLocation() == "":
     error("docker command is missing. chalk requires docker binary installed to wrap docker commands.")
@@ -55,5 +56,5 @@ proc runCmdDocker*(args: seq[string]) =
     # ignore any errors reporting/etc as we need to ensure
     # exit with appropriate exitCode if docker command passed
     error("docker post-command: " & getCurrentExceptionMsg())
-
-  quitChalk(exitCode)
+  finally:
+    quitChalk(exitCode)

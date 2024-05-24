@@ -15,7 +15,7 @@ proc processGitContext(ctx: DockerInvocation) =
       ctx.gitContext = gitContext(ctx.foundContext,
                                   authTokenSecret = ctx.getSecret("GIT_AUTH_TOKEN"),
                                   authHeaderSecret = ctx.getSecret("GIT_AUTH_HEADER"))
-      if not supportsBuildContextFlag():
+      if not ctx.supportsBuildContextFlag():
         trace("docker: no support for additional contexts detected. " &
               "Checking out git context to disk")
         # if using git context, and buildx is not used which supports
@@ -27,39 +27,39 @@ proc processGitContext(ctx: DockerInvocation) =
     error("docker: chalk could not process docker git context: " & ctx.foundContext)
     raise
 
-proc processDockerFile(state: DockerInvocation) =
-  if state.dockerFileLoc == ":stdin:":
+proc processDockerFile(ctx: DockerInvocation) =
+  if ctx.dockerFileLoc == ":stdin:":
     let input           = stdin.readAll()
-    state.inDockerFile  = input
-    state.originalStdIn = input
+    ctx.inDockerFile  = input
+    ctx.originalStdIn = input
     trace("docker: read Dockerfile from stdin")
 
-  elif state.gitContext != nil and supportsBuildContextFlag():
-    # state.dockerFileLoc is resolvedPath which is invalid
+  elif ctx.gitContext != nil and ctx.supportsBuildContextFlag():
+    # ctx.dockerFileLoc is resolvedPath which is invalid
     # in git context as we need raw path passed in the CLI
-    var dockerFileLoc = state.foundFileArg
+    var dockerFileLoc = ctx.foundFileArg
     if dockerFileLoc == "":
       dockerFileLoc = "Dockerfile"
-    state.inDockerFile = state.gitContext.show(dockerFileLoc)
-    state.dockerFileLoc = ":stdin:"
+    ctx.inDockerFile = ctx.gitContext.show(dockerFileLoc)
+    ctx.dockerFileLoc = ":stdin:"
 
   else:
-    if state.dockerFileLoc == "":
-      let toResolve = joinPath(state.foundcontext, "Dockerfile")
-      state.dockerFileLoc = resolvePath(toResolve)
+    if ctx.dockerFileLoc == "":
+      let toResolve = joinPath(ctx.foundcontext, "Dockerfile")
+      ctx.dockerFileLoc = resolvePath(toResolve)
 
     try:
-      withFileStream(state.dockerFileLoc, mode = fmRead, strict = false):
+      withFileStream(ctx.dockerFileLoc, mode = fmRead, strict = false):
         if stream != nil:
-          state.inDockerFile = stream.readAll()
-          trace("docker: read Dockerfile at: " & state.dockerFileLoc)
+          ctx.inDockerFile = stream.readAll()
+          trace("docker: read Dockerfile at: " & ctx.dockerFileLoc)
         else:
-          error("docker: " & state.foundFileArg & ": Dockerfile not found")
+          error("docker: " & ctx.foundFileArg & ": Dockerfile not found")
           raise newException(ValueError, "No Dockerfile")
 
     except:
       dumpExOnDebug()
-      error("docker: " & state.foundFileArg & ": Dockerfile not readable")
+      error("docker: " & ctx.foundFileArg & ": Dockerfile not readable")
       raise newException(ValueError, "Read perms")
 
 proc processCmdLine(ctx: DockerInvocation) =
@@ -161,12 +161,13 @@ proc getUpdatedDockerfile(ctx: DockerInvocation): string =
   if len(ctx.addedInstructions) == 0:
     return ctx.inDockerFile
   let
+    first   = ctx.getFirstDockerSection()
     section = ctx.getTargetDockerSection()
     lines   = ctx.inDockerFile.splitLines()
-  var updated: seq[string] = @[]
+  var updated: seq[string] = lines[0 ..< first.startLine] & @[""]
   for _, base in ctx.addedPlatform:
     updated &= base & @[""]
-  updated &= lines[0 .. section.endLine].join("\n").strip().splitLines() & @[""]
+  updated &= lines[first.startLine .. section.endLine].join("\n").strip().splitLines() & @[""]
   updated &= ctx.addedInstructions & @[""]
   updated &= lines[section.endLine + 1 .. ^1].join("\n").strip().splitLines()
   return updated.join("\n").strip() & "\n"
@@ -275,9 +276,14 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_CHALK_ADDED_TO_DOCKERFILE", ctx.addedInstructions)
   dict.setIfNeeded("DOCKER_CONTEXT",                   ctx.foundContext)
   dict.setIfNeeded("DOCKER_FILE",                      ctx.inDockerFile)
+  dict.setIfNeeded("DOCKER_FILE_CHALKED",              ctx.getUpdatedDockerfile())
   dict.setIfNeeded("DOCKER_LABELS",                    ctx.foundLabels)
-  dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.foundPlatforms))
+  dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.foundPlatforms.normalize()))
   dict.setIfNeeded("DOCKER_TAGS",                      ctx.foundTags.asRepoTag())
+  dict.setIfNeeded("DOCKER_BASE_IMAGE",                $(ctx.getBaseDockerSection.image))
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",           ctx.getBaseDockerSection.image.repo)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_TAG",            ctx.getBaseDockerSection.image.tag)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST",         ctx.getBaseDockerSection.image.digest)
 
 proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerPlatform, ChalkObj]) =
   if dockerImageExists(ctx.iidFile):
@@ -293,13 +299,13 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
     # iidfile can be one of in order of precedence:
     # 1. manifest list digest
     # 2. image config digest
-    # and so we attempt to get digest id from metdata file first
+    # and so we attempt to get digest id from metadata file first
     let
       digest = ctx.metadataFile{"containerimage.digest"}.getStr(ctx.iidFile)
       names  = parseImages(ctx.metadataFile{"image.name"}.getStr().split(","))
     for platform, chalk in chalksByPlatform:
       let name = ctx.foundTags[0].withDigest(digest)
-      chalk.collectImageManifest(name, platform, otherNames = names)
+      chalk.collectImageManifest(name, otherNames = names)
   else:
     # this case in theory should never happen
     # as iid file when present should always be either locally loaded image

@@ -181,6 +181,8 @@ proc nimJsonToBox*(node: JsonNode): Box =
   # expect to see values come back as 'null' that we might want to
   # represent in the final JSON; thankfully, Box automatically turns
   # MkObj types to 'null' when it encounters them.
+  if node == nil:
+    raise newException(ValueError, "cannot convert nil to Box")
   case node.kind
   of JString:
     return pack[string](node.getStr())

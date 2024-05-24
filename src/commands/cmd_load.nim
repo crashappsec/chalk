@@ -8,7 +8,7 @@
 ## The `chalk load` command.
 
 import std/posix
-import ".."/[config, selfextract, reporting, collect]
+import ".."/[config, selfextract, plugin_api, reporting, collect]
 
 proc runCmdConfLoad*() =
   setContextDirectories(@["."])
@@ -33,19 +33,28 @@ proc runCmdConfLoad*() =
   if selfChalk == nil or not canSelfInject:
     cantLoad("Platform does not support self-injection.")
 
-  if url == "default":
-    if selfChalk.isMarked() and "$CHALK_CONFIG" notin selfChalk.extract:
-      cantLoad("Already using the default configuration.")
+  let updated =
+    if url == "default":
+      if selfChalk.isMarked() and "$CHALK_CONFIG" notin selfChalk.extract:
+        false
+      else:
+        selfChalk.extract.del("$CHALK_CONFIG")
+        selfChalk.extract.del("$CHALK_COMPONENT_CACHE")
+        selfChalk.extract.del("$CHALK_SAVED_COMPONENT_PARAMETERS")
+        selfChalk.collectedData.del("$CHALK_CONFIG")
+        selfChalk.collectedData.del("$CHALK_COMPONENT_CACHE")
+        selfChalk.collectedData.del("$CHALK_SAVED_COMPONENT_PARAMETERS")
+        info("Installing the default configuration file.")
+        true
     else:
-      selfChalk.extract.del("$CHALK_CONFIG")
-      selfChalk.extract.del("$CHALK_COMPONENT_CACHE")
-      selfChalk.extract.del("$CHALK_SAVED_COMPONENT_PARAMETERS")
-      selfChalk.collectedData.del("$CHALK_CONFIG")
-      selfChalk.collectedData.del("$CHALK_COMPONENT_CACHE")
-      selfChalk.collectedData.del("$CHALK_SAVED_COMPONENT_PARAMETERS")
-      info("Installing the default configuration file.")
-  else:
-    url.handleConfigLoad()
+      for plugin in getAllPlugins():
+        if not plugin.isSystem():
+          suspendChalkCollectionFor(plugin.name)
+      url.handleConfigLoad()
 
-  selfChalk.writeSelfConfig()
+  if updated:
+    selfChalk.writeSelfConfig()
+  else:
+    info("Chalk is already using same configuration. Nothing to load")
+
   doReporting()

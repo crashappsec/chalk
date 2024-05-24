@@ -1,6 +1,14 @@
 # this needs to be before any FROM clauses
 ARG BASE=ubuntu
+ARG DOCKER_VERSION=24
+ARG BUILDX_VERSION=0.14.0
+ARG COSIGN_VERSION=2.2.3
 ARG PYTHON_VERSION=3.11.3
+ARG POETRY_VERSION=1.5.1
+
+FROM docker:$DOCKER_VERSION as docker
+FROM docker/buildx-bin:$BUILDX_VERSION as buildx
+FROM gcr.io/projectsigstore/cosign:v$COSIGN_VERSION as cosign
 
 # ----------------------------------------------------------------------------
 
@@ -38,7 +46,7 @@ RUN apt-get update -y && \
 
 FROM $BASE
 
-ARG POETRY_VERSION=1.5.1
+ARG POETRY_VERSION
 RUN pip install --no-cache-dir poetry==${POETRY_VERSION}
 
 ENV VIRTUAL_ENV=/tests.env
@@ -51,9 +59,9 @@ RUN mkdir -p /.cache/pypoetry \
 COPY pyproject.toml poetry.lock $WORKDIR/
 RUN poetry install --no-plugins
 
-COPY --from=gcr.io/projectsigstore/cosign:v2.2.3 /ko-app/cosign /usr/local/bin/cosign
-COPY --from=docker:24 /usr/local/bin/docker /usr/local/bin/docker
-COPY --from=docker/buildx-bin:0.11.2 /buildx /usr/lib/docker/cli-plugins/docker-buildx
+COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
+COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=buildx /buildx /usr/lib/docker/cli-plugins/docker-buildx
 
 RUN docker context create node-amd64
 RUN docker context create node-arm64
