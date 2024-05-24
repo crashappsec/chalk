@@ -6,7 +6,7 @@
 ##
 
 import ".."/[config, collect, chalkjson, plugin_api, subscan, util]
-import "."/[base, collect, ids, dockerfile, inspect, git, exe, entrypoint, platform, util]
+import "."/[base, collect, ids, dockerfile, inspect, git, exe, entrypoint, platform, wrap, util]
 
 proc processGitContext(ctx: DockerInvocation) =
   try:
@@ -379,33 +379,40 @@ proc dockerBuild*(ctx: DockerInvocation): int =
     trace("docker: wrapping regular build")
     ctx.addLabels(oneChalk)
     ctx.addEnvVars(oneChalk)
-    if wrapEntrypoint:
-      trace("docker: wrapping ENTRYPOINT")
+    try:
+      # this ensures all platforms have same USER
+      let user = ctx.getCommonTargetUser(platforms)
+      if wrapEntrypoint:
+        trace("docker: wrapping ENTRYPOINT")
+        try:
+          ctx.withAtomicAdds():
+            let
+              # this also ensures all platfoms have the same entrypoints
+              entrypoints = ctx.getCommonTargetEntrypoints(platforms)
+              binaries    = ctx.findAllPlatformsBinaries(platforms)
+            ctx.rewriteEntryPoint(entrypoints, binaries, user)
+        except:
+          dumpExOnDebug()
+          warn("docker: cannot wrap ENTRYPOINT due to: " & getCurrentExceptionMsg())
+      trace("docker: injecting chalk mark (/chalk.json) to build")
       try:
         ctx.withAtomicAdds():
-          let
-            # this also ensures all platfoms have the same entrypoints
-            entrypoints = ctx.getCommonTargetEntrypoints(platforms)
-            binaries    = ctx.findAllPlatformsBinaries(platforms)
-          ctx.rewriteEntryPoint(entrypoints, binaries)
+          for platform, chalk in chalksByPlatform:
+            ctx.makeTextAvailableToDocker(
+              text       = chalk.getChalkMarkAsStr(),
+              newPath    = "/chalk.json",
+              user       = user,
+              move       = true,
+              chmod      = "0444",
+              byPlatform = ctx.isMultiPlatform(),
+              platform   = platform,
+            )
       except:
         dumpExOnDebug()
-        warn("docker: cannot wrap ENTRYPOINT due to: " & getCurrentExceptionMsg())
-    trace("docker: injecting chalk mark (/chalk.json) to build")
-    try:
-      ctx.withAtomicAdds():
-        for platform, chalk in chalksByPlatform:
-          ctx.makeTextAvailableToDocker(
-            text       = chalk.getChalkMarkAsStr(),
-            newPath    = "/chalk.json",
-            move       = true,
-            chmod      = "0444",
-            byPlatform = ctx.isMultiPlatform(),
-            platform   = platform,
-          )
+        warn("docker: Cannot inject chalk mark (/chalk.json) due to: " & getCurrentExceptionMsg())
     except:
       dumpExOnDebug()
-      warn("docker: Cannot inject chalk mark (/chalk.json) due to: " & getCurrentExceptionMsg())
+      warn("docker: Cannot wrap docker image due to: " & getCurrentExceptionMsg())
 
   # collecting build information has to be after all wrapping
   # as some chalk keys are record how docker build was mutated

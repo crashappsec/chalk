@@ -252,7 +252,7 @@ type
     rawSrc*: seq[string]
     rawDst*: string
 
-  DfUserInfo* = ref object of InfoBase
+  UserInfo* = ref object of InfoBase
     str*: string
 
   LabelInfo* = ref object of InfoBase
@@ -267,7 +267,7 @@ type
     entrypoint*:  EntryPointInfo
     cmd*:         CmdInfo
     shell*:       ShellInfo
-    lastUser*:    DfUserInfo
+    lastUser*:    UserInfo
 
   DockerEntrypoint* = tuple
     entrypoint: EntryPointInfo

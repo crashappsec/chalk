@@ -50,6 +50,9 @@
 - Docker ENTRYPOINT wrapping base image inspection works
   without requiring buildx.
   [#282](https://github.com/crashappsec/chalk/pull/282)
+- Docker builds without buildx could fail when base image
+  specified `USER`.
+  [#285](https://github.com/crashappsec/chalk/pull/285)
 
 ## New Features
 

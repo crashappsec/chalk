@@ -192,19 +192,11 @@ def test_composite_build(
     )
     assert image_id
 
-    # TODO this is a known limitation for the moment
-    # we EXPECT this case to fail without buildkit enabled,
-    # as base image adjusts USER and child Dockerfile
-    # does not have any indication that USER was adjusted
-    # and so we cannot detect USER from base image.
-    # In this case chalk falls back to standard docker build
-    # which means there is no chalk report in the output
-    second_image_id, result = chalk.docker_build(
+    second_image_id, _ = chalk.docker_build(
         dockerfile=test,
         buildkit=buildkit,
         args={"BASE": random_hex},
         config=CONFIGS / "docker_wrap.c4m",
-        expecting_report=buildkit,
     )
     assert second_image_id
 
