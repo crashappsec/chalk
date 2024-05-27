@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.3.6-dev"
+chalk_version :=   "0.4.0"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -228,7 +228,7 @@ keyspec HOST_SYSNAME_WHEN_CHALKED {
     kind:             ChalkTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Host sysname at Chalk time"
     doc:              """
 On posix systems, value of `sysname` field from `uname()` syscall,
@@ -240,7 +240,7 @@ keyspec HOST_NODENAME_WHEN_CHALKED {
     kind:             ChalkTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Host node name at Chalk time"
     doc:              """
 On posix systems, value of `nodename` field from `uname()` syscall,
@@ -252,7 +252,7 @@ keyspec HOST_RELEASE_WHEN_CHALKED {
     kind:             ChalkTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Host kernel release at Chalk time"
     doc:              """
 On posix systems, value of `release` field from `uname()` syscall,
@@ -264,7 +264,7 @@ keyspec HOST_VERSION_WHEN_CHALKED {
     kind:             ChalkTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Host kernel version at Chalk time"
     doc:              """
 On posix systems, value of `version` field from `uname()` syscall,
@@ -276,7 +276,7 @@ keyspec HOST_MACHINE_WHEN_CHALKED {
     kind:             ChalkTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Host machine at Chalk time"
     doc:              """
 On posix systems, value of `machine` field from `uname()` syscall,
@@ -845,7 +845,7 @@ keyspec _ORIGIN_URI {
     kind:                RunTimeHost
     type:                string
     standard:            true
-    since:               "0.3.6-dev"
+    since:               "0.4.0"
     apply_substitutions: true
     shortdoc:            "URI for repository associated at time of marking"
     doc:                 """
@@ -858,7 +858,7 @@ keyspec _AUTHOR {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Author of most recent commit"
     doc:              """
 The author of the most recent commit in the current branch, which is likely the same as the committer but not always.
@@ -869,7 +869,7 @@ keyspec _DATE_AUTHORED {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Human readable timestamp of the author's commit"
     doc:              """
 The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
@@ -880,7 +880,7 @@ keyspec _COMMITTER {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Committer of most recent commit"
     doc:              """
 The committer of the most recent commit in the current branch.
@@ -891,7 +891,7 @@ keyspec _DATE_COMMITTED {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Human readable timestamp of most recent commit"
     doc:              """
 The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
@@ -902,7 +902,7 @@ keyspec _COMMIT_MESSAGE {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Commit message of most recent commit"
     doc:              """
 The commit message of the most recent commit in the current branch.
@@ -914,7 +914,7 @@ keyspec _BRANCH {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Current repo branch at time of marking"
     doc:              """
 The branch name found in the source code repository found at the time
@@ -926,7 +926,7 @@ keyspec _TAG {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Current repo tag at time of marking"
     doc:              """
 The latest tag name found in the source code repository found at the time
@@ -940,7 +940,7 @@ keyspec _TAG_SIGNED {
     kind:             RunTimeHost
     type:             bool
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Whether the tag is signed"
     doc:              """
 If the most recent tag was signed.
@@ -954,7 +954,7 @@ keyspec _TAGGER {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Tagger of most recent tag"
     doc:              """
 The tagger of the most recent annotated tag.
@@ -967,7 +967,7 @@ keyspec _DATE_TAGGED {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Human readable timestamp of most recent tag"
     doc:              """
 The date of the annotated tag in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
@@ -980,7 +980,7 @@ keyspec _TAG_MESSAGE {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Tag message of the most recent annotated tag"
     doc:              """
 The tag message of the most recent annotated tag found in the source code
@@ -996,7 +996,7 @@ keyspec _COMMIT_ID {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Commit ID in current repo at time of marking"
     doc:              """
 The most recent commit hash or id for the current repository and
@@ -1008,7 +1008,7 @@ keyspec _COMMIT_SIGNED {
     kind:             RunTimeHost
     type:             bool
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Whether the commit is signed"
     doc:              """
 If the most recent commit was signed.
@@ -1531,7 +1531,7 @@ keyspec DOCKER_FILE_CHALKED {
     type:             string
     standard:         true
     system:           false
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc: "Updated Docker file contents post-chalk"
     doc: """
 Full content of the dockerfile as it is built including all
@@ -1569,7 +1569,7 @@ keyspec DOCKER_PLATFORMS {
     type:             list[string]
     standard:         true
     system:           false
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     doc: """
 All platforms passed when performing 'docker build', if any.
 """
@@ -1649,7 +1649,7 @@ keyspec DOCKER_BASE_IMAGE {
     type:             string
     standard:         true
     system:           false
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     doc: """
 Name of the base image specified in Dockerfile used to build docker image.
 Note this only specifies the base image of the final build target.
@@ -1661,7 +1661,7 @@ keyspec DOCKER_BASE_IMAGE_REPO {
     type:             string
     standard:         true
     system:           false
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     doc: """
 Only registry repository of the base image specified in Dockerfile used to build docker image.
 Note this only specifies the base image of the final build target.
@@ -1673,7 +1673,7 @@ keyspec DOCKER_BASE_IMAGE_TAG {
     type:             string
     standard:         true
     system:           false
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     doc: """
 Only registry tag of the base image if specified in Dockerfile used to build docker image.
 Note this only specifies the base image of the final build target.
@@ -1685,7 +1685,7 @@ keyspec DOCKER_BASE_IMAGE_DIGEST {
     type:             string
     standard:         true
     system:           false
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     doc: """
 Only registry digest of the base image if specified in Dockerfile used to build docker image.
 Note this only specifies the base image of the final build target.
@@ -1696,7 +1696,7 @@ keyspec _DOCKER_CLIENT_VERSION {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Docker client version"
     doc:              "Docker CLI client version"
 }
@@ -1705,7 +1705,7 @@ keyspec _DOCKER_SERVER_VERSION {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Docker server version"
     doc:              "Docker daemon server version"
 }
@@ -1714,7 +1714,7 @@ keyspec _DOCKER_BUILDX_VERSION {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Docker buildx version"
     doc:              "Docker buildx version"
 }
@@ -1723,7 +1723,7 @@ keyspec _DOCKER_INFO {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Docker info output"
     doc:              "Docker info output"
 }
@@ -1732,7 +1732,7 @@ keyspec _DOCKER_BUILDER_BUILDKIT_VERSION {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Docker buildkit version of the builder"
     doc:              "Docker buildkit version of the builder"
 }
@@ -1741,7 +1741,7 @@ keyspec _DOCKER_BUILDER_INFO {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Docker buildx inspect output of the builder"
     doc:              "Docker buildx inspect output of the builder"
 }
@@ -2267,7 +2267,7 @@ keyspec _IMAGE_DIGEST {
     kind:     RunTimeArtifact
     type:     string
     standard: true
-    since:    "0.3.6-dev"
+    since:    "0.4.0"
     shortdoc: "Reported digest of the image manifest"
     doc: """
 The image digest reported by docker for an image.
@@ -2283,7 +2283,7 @@ keyspec _IMAGE_LIST_DIGEST {
     kind:     RunTimeArtifact
     type:     string
     standard: true
-    since:    "0.3.6-dev"
+    since:    "0.4.0"
     shortdoc: "Reported digest of the image manifest"
     doc: """
 The manifest list digest for an image.
@@ -2646,7 +2646,7 @@ keyspec _IMAGE_PROVENANCE {
     kind:     RunTimeArtifact
     type:     `x
     standard: true
-    since:    "0.3.6-dev"
+    since:    "0.4.0"
     shortdoc: "Docker image provenance information"
     doc: """
 Docker SLSA provenance information created with `docker build --provenance=true`.
@@ -2657,7 +2657,7 @@ keyspec _IMAGE_SBOM {
     kind:     RunTimeArtifact
     type:     `x
     standard: true
-    since:    "0.3.6-dev"
+    since:    "0.4.0"
     shortdoc: "Docker image SBOM information"
     doc: """
 Docker SPDX SBOM information created with `docker build --sbom=true`.
@@ -3691,7 +3691,7 @@ keyspec _SIGNATURES {
     type:             list[dict[string, string]]
     standard:         true
     system:           true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     doc:              """
 Digital signatures for artifact.  For build/push operations, this will
 generally represent the digital signatures added as part of the
@@ -4132,7 +4132,7 @@ keyspec _OP_HOST_SYSNAME {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Host sysname during chalk operation"
     doc:              """
 On posix systems, value of `sysname` field from `uname()` syscall,
@@ -4144,7 +4144,7 @@ keyspec _OP_HOST_NODENAME {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Host node during chalk operation"
     doc:              """
 On posix systems, value of `nodename` field from `uname()` syscall,
@@ -4156,7 +4156,7 @@ keyspec _OP_HOST_RELEASE {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Host kernel during chalk operation"
     doc:              """
 On posix systems, value of `release` field from `uname()` syscall,
@@ -4168,7 +4168,7 @@ keyspec _OP_HOST_VERSION {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Host kernel during chalk operation"
     doc:              """
 On posix systems, value of `version` field from `uname()` syscall,
@@ -4180,7 +4180,7 @@ keyspec _OP_HOST_MACHINE {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.3.6-dev"
+    since:            "0.4.0"
     shortdoc:         "Host machine during chalk operation"
     doc:              """
 On posix systems, value of `machine` field from `uname()` syscall,
