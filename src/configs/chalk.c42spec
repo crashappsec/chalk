@@ -1740,7 +1740,7 @@ can be found via these configurations in the order of precedence:
 
 * `docker.arch_binary_locations`
 * `docker.arch_binary_locations_path`
-* `docker.download_arch_binary` via `docker.download_arch_binary_url`
+* `docker.download_arch_binary` via `docker.download_arch_binary_urls`
 
 If there isn't an architecture match, and no binary can be found,
 docker entrypoint is aborted.
@@ -1827,6 +1827,9 @@ For example tree of the config path:
         └── v8/
             └── chalk
 ```
+
+If `download_arch_binary` is true, chalk will download other architecture
+binaries into this folder.
 """
   }
 
@@ -1842,18 +1845,25 @@ Which version of binary is downloaded is controlled by
 """
   }
 
-  field download_arch_binary_url {
-    type:     string
-    default:  "https://dl.crashoverride.run/chalk/chalk-{version}-{os}-{architecture}"
+  field download_arch_binary_urls {
+    type:     list[string]
+    default:  ["https://dl.crashoverride.run/chalk/chalk-{version}-{os}-{architecture}",
+               # this allows to download pre-release builds
+               "https://dl.crashoverride.run/chalk-commit-builds/chalk-{commit}-{os}-{architecture}"]
     shortdoc: "URL template where to download chalk binaries"
     doc:      """
-Template for a URL where to download the chalk binary when `download_arch_binary`
-is true. The template can render these variables:
+List of templates of URLs where to download the chalk binary when `download_arch_binary`
+is true. Each template can render these variables:
 
 * `{version}`
 * `{commit}`
 * `{os}`
 * `{architecture}`
+
+Chalk is attempted to be downloaded from each URL in the order they are defined.
+
+Downloaded chalk is saved to `arch_binary_locations_path` so that future lookups
+can lookup already downloaded binary.
 """
   }
 

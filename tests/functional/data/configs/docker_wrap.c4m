@@ -1,5 +1,5 @@
 docker.wrap_entrypoint = true
-docker.download_arch_binary_url = env("CHALK_SERVER") + "/dummy/chalk-%version-%os-%architecture"
+docker.download_arch_binary_urls = [env("CHALK_SERVER") + "/dummy/chalk-%version-%os-%architecture"]
 docker.arch_binary_locations_path = env("CHALK_TMP")
 report_template terminal_insert {
   key._IMAGE_ENTRYPOINT.use = true
