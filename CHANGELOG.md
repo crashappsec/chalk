@@ -21,10 +21,10 @@
   - `HOSTINFO_WHEN_CHALKED` - renamed to `HOST_VERSION_WHEN_CHALKED`
   - `NODENAME_WHEN_CHALKED` - renamed to `HOST_NODENAME_WHEN_CHALKED`
 
-  [#266](https://github.com/crashappsec/chalk/pull/266)
-  [#282](https://github.com/crashappsec/chalk/pull/282)
-  [#284](https://github.com/crashappsec/chalk/pull/284)
-  [#286](https://github.com/crashappsec/chalk/pull/286)
+  ([#266](https://github.com/crashappsec/chalk/pull/266),
+  [#282](https://github.com/crashappsec/chalk/pull/282),
+  [#284](https://github.com/crashappsec/chalk/pull/284),
+  [#286](https://github.com/crashappsec/chalk/pull/286))
 
 - Changed chalk keys:
 
@@ -34,7 +34,7 @@
     Docker always reported stop signal as string.
     This was a mistake in field definition.
 
-  [#282](https://github.com/crashappsec/chalk/pull/282)
+  ([#282](https://github.com/crashappsec/chalk/pull/282))
 
 - Removed configurations:
 
@@ -48,39 +48,39 @@
     any configurations at load time. This also removed
     `chalk load --update-arch-binaries` flag.
 
-  [#282](https://github.com/crashappsec/chalk/pull/282)
-  [#286](https://github.com/crashappsec/chalk/pull/286)
+  ([#282](https://github.com/crashappsec/chalk/pull/282),
+  [#286](https://github.com/crashappsec/chalk/pull/286))
 
 - `push_default` reporting template is removed as `push`
   is now a top-level chalkable operation and therefore
   it now uses `insertion_default` template.
-  [#282](https://github.com/crashappsec/chalk/pull/282)
+  ([#282](https://github.com/crashappsec/chalk/pull/282))
 
 - When loading custom configs with `chalk load`, metdata
   collection is disabled for all plugins except for
   required chalk plugins.
-  [#286](https://github.com/crashappsec/chalk/pull/286)
+  ([#286](https://github.com/crashappsec/chalk/pull/286))
 
 ### Fixes
 
 - Fixed not being able to wrap docker builds when using
   `scratch` as base image.
-  [#266](https://github.com/crashappsec/chalk/pull/266)
+  ([#266](https://github.com/crashappsec/chalk/pull/266))
 - Docker ENTRYPOINT wrapping base image inspection works
   without requiring buildx.
-  [#282](https://github.com/crashappsec/chalk/pull/282)
+  ([#282](https://github.com/crashappsec/chalk/pull/282))
 - Docker builds without buildx could fail when base image
   specified `USER`.
-  [#285](https://github.com/crashappsec/chalk/pull/285)
+  ([#285](https://github.com/crashappsec/chalk/pull/285))
 - Tech stack plugin will hang when running chalk from
   `/` as it would attempt to scan things like `/dev/random`.
-  [#286](https://github.com/crashappsec/chalk/pull/286)
+  ([#286](https://github.com/crashappsec/chalk/pull/286))
 - Docker wrapping was resetting image `CMD` when base
   image had `ENTRYPOINT` defined.
-  [#286](https://github.com/crashappsec/chalk/pull/286)
+  ([#286](https://github.com/crashappsec/chalk/pull/286))
 - GCP instance metadata collection does not work by DNS
   name reliably so switched to hard-coded IP.
-  [#293](https://github.com/crashappsec/chalk/pull/293)
+  ([#293](https://github.com/crashappsec/chalk/pull/293))
 
 ## New Features
 
@@ -88,7 +88,7 @@
   This affects all commands which produce manifest lists
   such as multi-platform builds and new features like
   `--provenance=true` and `--sbom=true`.
-  [#282](https://github.com/crashappsec/chalk/pull/282)
+  ([#282](https://github.com/crashappsec/chalk/pull/282))
 - New Chalk keys:
 
   - `_IMAGE_COMPRESSED_SIZE` - compressed docker image size
@@ -146,18 +146,18 @@
     - `_DATE_TAGGED`
     - `_TAG_MESSAGE`
 
-  [#266](https://github.com/crashappsec/chalk/pull/266)
-  [#282](https://github.com/crashappsec/chalk/pull/282)
-  [#284](https://github.com/crashappsec/chalk/pull/284)
-  [#286](https://github.com/crashappsec/chalk/pull/286)
+  ([#266](https://github.com/crashappsec/chalk/pull/266),
+  [#282](https://github.com/crashappsec/chalk/pull/282),
+  [#284](https://github.com/crashappsec/chalk/pull/284),
+  [#286](https://github.com/crashappsec/chalk/pull/286))
 
 - Docker build `cosign` attestation is pushed to each tagged
   registry. As a result attestations can be validated from any
   registry when pulling images.
-  [#284](https://github.com/crashappsec/chalk/pull/284)
+  ([#284](https://github.com/crashappsec/chalk/pull/284))
 - `docker`/`buildx`/`cosign` versions are now printed
   in `chalk version` command.
-  [#282](https://github.com/crashappsec/chalk/pull/282)
+  ([#282](https://github.com/crashappsec/chalk/pull/282))
 - New command for dumping all user configurations as json
   as well as corresponding load all flag to import them:
 
@@ -165,13 +165,13 @@
   chalk dump all | chalk load --replace --all -
   ```
 
-  [#286](https://github.com/crashappsec/chalk/pull/286)
+  ([#286](https://github.com/crashappsec/chalk/pull/286))
 
 - Docker multi-platform builds now automatically downloads
   corresponding chalk binary for other architectures
   if not already present on disk.
 
-  [#286](https://github.com/crashappsec/chalk/pull/286)
+  ([#286](https://github.com/crashappsec/chalk/pull/286))
 
 - New chalk configurations:
 
@@ -186,7 +186,7 @@
     automatically install binfmt when not all platforms
     are supported by the buildx builder
 
-  [#286](https://github.com/crashappsec/chalk/pull/286)
+  ([#286](https://github.com/crashappsec/chalk/pull/286))
 
 - `--skip-custom-reports` flag. Together with
   `--skip-command-report` allows to completely disable
@@ -194,7 +194,7 @@
   is still going to happen as metadata still needs
   to be inserted into a chalkmark. Just no report about
   the operation is going to be omitted.
-  [#286](https://github.com/crashappsec/chalk/pull/286)
+  ([#286](https://github.com/crashappsec/chalk/pull/286))
 
 ## 0.3.5
 
@@ -205,21 +205,21 @@
 - S3 sinks must now specify the bucket region. Previously
   it defaulted to `us-east-1` if the `AWS_REGION` or
   `AWS_DEFAULT_REGION` environment variables were not set
-  [#246](https://github.com/crashappsec/chalk/pull/246)
+  ([#246](https://github.com/crashappsec/chalk/pull/246))
 
 ### Fixes
 
 - The Docker codec is now bypassed when `docker` is not
   installed. Previously, any chalk sub-scan such as
   during `chalk exec` had misleading error logs.
-  [#248](https://github.com/crashappsec/chalk/pull/248)
+  ([#248](https://github.com/crashappsec/chalk/pull/248))
 - `chalk docker ...` now exits with a non-zero exit code
   when `docker` is not installed.
-  [#256](https://github.com/crashappsec/chalk/pull/256)
+  ([#256](https://github.com/crashappsec/chalk/pull/256))
 - Fixed parsing CLI params when wrapping `docker`
   (rename `chalk` exe to `docker`) and a docker command
   had a "docker" param.
-  [#257](https://github.com/crashappsec/chalk/pull/257)
+  ([#257](https://github.com/crashappsec/chalk/pull/257))
 
 ## 0.3.4
 
@@ -259,48 +259,48 @@
   }
   ```
 
-  [#239](https://github.com/crashappsec/chalk/pull/239)
+  ([#239](https://github.com/crashappsec/chalk/pull/239))
 
 ### Fixes
 
 - Docker build correctly wraps `ENTRYPOINT` when base
   image has it defined.
-  [#147](https://github.com/crashappsec/chalk/pull/147)
+  ([#147](https://github.com/crashappsec/chalk/pull/147))
 - Fixes a segfault when using secrets backup service
   during `chalk setup`.
-  [#220](https://github.com/crashappsec/chalk/pull/220)
+  ([#220](https://github.com/crashappsec/chalk/pull/220))
 - Honoring cache component cache on chalk conf load.
-  [#222](https://github.com/crashappsec/chalk/pull/222)
+  ([#222](https://github.com/crashappsec/chalk/pull/222))
 - Fixes a segfault when accidentally providing `http://`
   URL to a sink instead of `https://`.
-  [#223](https://github.com/crashappsec/chalk/pull/223)
+  ([#223](https://github.com/crashappsec/chalk/pull/223))
 - Fixes leaking FDs which didn't allow to chalk large
   zip files such as large Java jar file.
-  [#229](https://github.com/crashappsec/chalk/pull/229)
+  ([#229](https://github.com/crashappsec/chalk/pull/229))
 - Fixes chalking zip file reporting git-repo keys.
-  [#230](https://github.com/crashappsec/chalk/issues/230)
+  ([#230](https://github.com/crashappsec/chalk/issues/230))
 - Fixes cosign not honoring `CHALK_PASSWORD` in all operations.
-  [#232](https://github.com/crashappsec/chalk/pull/232)
+  ([#232](https://github.com/crashappsec/chalk/pull/232))
 - Git plugin did not parse some git objects correctly
   which in some cases misreported git keys.
-  [#241](https://github.com/crashappsec/chalk/pull/241)
+  ([#241](https://github.com/crashappsec/chalk/pull/241))
 - Fixes `chalk load` not honoring default parameter
   value after any incorrect previous value was provided
-  [#242](https://github.com/crashappsec/chalk/pull/242)
+  ([#242](https://github.com/crashappsec/chalk/pull/242))
 
 ### New Features
 
 - `memoize` con4m function which allows caching function
   callback result into chalk mark for future lookups.
-  [#239](https://github.com/crashappsec/chalk/pull/239)
+  ([#239](https://github.com/crashappsec/chalk/pull/239))
 - `auth_headers` con4m function which allows getting auth
   headers for a specific auth config.
-  [#239](https://github.com/crashappsec/chalk/pull/239)
+  ([#239](https://github.com/crashappsec/chalk/pull/239))
 - `parse_json` con4m function which parses JSON string.
-  [#239](https://github.com/crashappsec/chalk/pull/239)
+  ([#239](https://github.com/crashappsec/chalk/pull/239))
 - `get` attestation key provider which allows to retrieve
   key-material over API.
-  [#239](https://github.com/crashappsec/chalk/pull/239)
+  ([#239](https://github.com/crashappsec/chalk/pull/239))
 - `chalk exec` does not require `--exec-command-name`
   and can get command name to exec directly from args:
 
@@ -308,7 +308,7 @@
   chalk exec -- echo hello
   ```
 
-  [#155](https://github.com/crashappsec/chalk/pull/155)
+  ([#155](https://github.com/crashappsec/chalk/pull/155))
 
 ## 0.3.3
 
@@ -325,30 +325,30 @@
 
   If the commit or tag is signed, the `COMMIT_MESSAGE` or
   `TAG_MESSAGE` value does not contain the signature.
-  [#211](https://github.com/crashappsec/chalk/pull/211)
+  ([#211](https://github.com/crashappsec/chalk/pull/211))
 
 - Chalk falls back to bundled Mozilla CA Store when there
   are no system TLS certs to use (e.g. busybox container).
-  [#196](https://github.com/crashappsec/chalk/pull/196)
+  ([#196](https://github.com/crashappsec/chalk/pull/196))
 
 ### Fixes
 
 - Fixes possible exception when signing backup service
   would return non-json response
-  [#189](https://github.com/crashappsec/chalk/pull/189)
+  ([#189](https://github.com/crashappsec/chalk/pull/189))
 - Signing key backup service is only called for chalk
   commands which require cosign private key -
   insert/build/push.
   As a result other commands such as `exec` do not interact
   with the backup service.
-  [#191](https://github.com/crashappsec/chalk/pull/191)
+  ([#191](https://github.com/crashappsec/chalk/pull/191))
 - Fixing docker build attempting to use `--build-context`
   on older docker versions which did not support that flag.
-  [#207](https://github.com/crashappsec/chalk/pull/207)
+  ([#207](https://github.com/crashappsec/chalk/pull/207))
 - Fixes `echo foo | chalk docker login --password-stdin`
   as `stdin` was not being closed in the pipe to docker
   process.
-  [#209](https://github.com/crashappsec/chalk/pull/209)
+  ([#209](https://github.com/crashappsec/chalk/pull/209))
 
 ## 0.3.2
 
@@ -357,20 +357,20 @@
 ### Fixes
 
 - Fixes a typo in `chalk version` for the build date.
-  [#148](https://github.com/crashappsec/chalk/pull/148)
+  ([#148](https://github.com/crashappsec/chalk/pull/148))
 - `TERM=dump` renders without colors
-  [#163](https://github.com/crashappsec/chalk/pull/163)
+  ([#163](https://github.com/crashappsec/chalk/pull/163))
 - `AWS_REGION` env var is honored in `s3` sinks
-  [#164](https://github.com/crashappsec/chalk/pull/164)
+  ([#164](https://github.com/crashappsec/chalk/pull/164))
 - Show GitHub chalk report on `chalk extract`
-  [#166](https://github.com/crashappsec/chalk/pull/166)
+  ([#166](https://github.com/crashappsec/chalk/pull/166))
 - `chalk help docgen` shows help for `docgen` command
-  [#173](https://github.com/crashappsec/chalk/pull/173)
+  ([#173](https://github.com/crashappsec/chalk/pull/173))
 - `chalk load` would duplicate already loaded components
   in the config
-  [#176](https://github.com/crashappsec/chalk/pull/176)
+  ([#176](https://github.com/crashappsec/chalk/pull/176))
 - `chalk setup` would not honor existing keys, if present
-  [#184](https://github.com/crashappsec/chalk/pull/184)
+  ([#184](https://github.com/crashappsec/chalk/pull/184))
 
 ## 0.3.1
 
@@ -379,7 +379,7 @@
 ### Breaking Changes
 
 - Remove the `--no-api-login` option.
-  [#137](https://github.com/crashappsec/chalk/pull/137)
+  ([#137](https://github.com/crashappsec/chalk/pull/137))
 
 ### New Features
 
@@ -411,7 +411,7 @@
   containing JSON data. In addition cloud metadata is now
   nested to allow to include more metadata about running
   cloud instances.
-  [#112](https://github.com/crashappsec/chalk/pull/112)
+  ([#112](https://github.com/crashappsec/chalk/pull/112))
 
 - The signing key backup service has been completely overhauled and
   no longer uses the OIDC Device Code Flow to authenticate to the API.
@@ -433,63 +433,63 @@
 ### New Features
 
 - Adding support for git context for docker build commands.
-  [#86](https://github.com/crashappsec/chalk/pull/86)
+  ([#86](https://github.com/crashappsec/chalk/pull/86))
 - Adding new git metadata fields about:
 
   - authored commit
   - committer
   - tag
 
-  [#86](https://github.com/crashappsec/chalk/pull/86)
-  [#89](https://github.com/crashappsec/chalk/pull/89)
+  ([#86](https://github.com/crashappsec/chalk/pull/86),
+  [#89](https://github.com/crashappsec/chalk/pull/89))
 
 - Improved pretty printing for various commands
-  [#99](https://github.com/crashappsec/chalk/pull/99)
+  ([#99](https://github.com/crashappsec/chalk/pull/99))
 - Added `github_json_group` for printing chalk marks
   in GitHub Actions.
-  [#86](https://github.com/crashappsec/chalk/pull/86)
+  ([#86](https://github.com/crashappsec/chalk/pull/86))
 - Adding `presign` sink to allow uploads to S3 without
   hard-coded credentials in the chalk configuration.
-  [#103](https://github.com/crashappsec/chalk/pull/103)
+  ([#103](https://github.com/crashappsec/chalk/pull/103))
 - Adding JWT/Basic auth authentication options to sinks.
-  [#111](https://github.com/crashappsec/chalk/pull/111)
+  ([#111](https://github.com/crashappsec/chalk/pull/111))
 - Adding `docker.wrap_cmd` to allow to customize whether
   `CMD` should be wrapped when `ENTRYPOINT` is missing
   in `Dockerfile`.
-  [#112](https://github.com/crashappsec/chalk/pull/112)
+  ([#112](https://github.com/crashappsec/chalk/pull/112))
 - Adding minimal AWS lambda metadata collection.
   It includes only basic information about lambda function
   such as its ARN and its runtime environment.
-  [#112](https://github.com/crashappsec/chalk/pull/112)
+  ([#112](https://github.com/crashappsec/chalk/pull/112))
 - Adding experimental support for detection of technologies used at chalk and
   runtime (programming languages, databases, servers, etc.)
-  [#128](https://github.com/crashappsec/chalk/pull/128)
+  ([#128](https://github.com/crashappsec/chalk/pull/128))
 
 ### Fixes
 
 - Fixes docker version comparison checks.
   As a result buildx is correctly detected now for >=0.10.
-  [#86](https://github.com/crashappsec/chalk/pull/86)
+  ([#86](https://github.com/crashappsec/chalk/pull/86))
 - Subprocess command output was not reliable being captured.
-  [#93](https://github.com/crashappsec/chalk/pull/93)
+  ([#93](https://github.com/crashappsec/chalk/pull/93))
 - Fixes automatic installation of `semgrep` when SAST is enabled.
-  [#94](https://github.com/crashappsec/chalk/pull/94)
+  ([#94](https://github.com/crashappsec/chalk/pull/94))
 - Ensuring chalk executable has correct permissions.
   Otherwise reading embedded configuration would fail in some cases.
-  [#104](https://github.com/crashappsec/chalk/pull/104)
+  ([#104](https://github.com/crashappsec/chalk/pull/104))
 - Pushing all tags during `docker build --push -t one -t two ...`.
-  [#110](https://github.com/crashappsec/chalk/pull/110)
+  ([#110](https://github.com/crashappsec/chalk/pull/110))
 - Sending `_ACTION_ID` during `push` command.
-  [#116](https://github.com/crashappsec/chalk/pull/116)
+  ([#116](https://github.com/crashappsec/chalk/pull/116))
 - All component parameters are saved in the chalk mark.
-  [#126](https://github.com/crashappsec/chalk/pull/126)
+  ([#126](https://github.com/crashappsec/chalk/pull/126))
 - Gracefully handling permission issues when chalk is running
   as non-existing user. This is most common in lambda
   which runs as user `993`.
-  [#112](https://github.com/crashappsec/chalk/pull/112)
+  ([#112](https://github.com/crashappsec/chalk/pull/112))
 - `CMD` wrapping supports wrapping shell scripts
   (e.g. `CMD set -x && echo hello`).
-  [#132](https://github.com/crashappsec/chalk/pull/132)
+  ([#132](https://github.com/crashappsec/chalk/pull/132))
 
 ### Known Issues
 
@@ -511,12 +511,12 @@
 ### New Features
 
 - Adding support for docker multi-platform builds.
-  [#54](https://github.com/crashappsec/chalk/pull/54)
+  ([#54](https://github.com/crashappsec/chalk/pull/54))
 
 ### Fixes
 
 - Honoring Syft/SBOM configs during docker builds.
-  [#84](https://github.com/crashappsec/chalk/pull/84)
+  ([#84](https://github.com/crashappsec/chalk/pull/84))
 
 ## 0.2.1
 
@@ -525,7 +525,7 @@
 ### Fixes
 
 - Component parameters can set config attributes.
-  [#75](https://github.com/crashappsec/chalk/issues/75)
+  ([#75](https://github.com/crashappsec/chalk/issues/75))
 
 ## 0.2.0
 
@@ -547,28 +547,28 @@
   incompatible will not run (and generally won't even load).
 
   We will eventually do an in-app UI to browse and install modules.
-  [#47](https://github.com/crashappsec/chalk/pull/47)
-  [#67](https://github.com/crashappsec/chalk/pull/67)
+  ([#47](https://github.com/crashappsec/chalk/pull/47))
+  ([#67](https://github.com/crashappsec/chalk/pull/67))
 
 - Added initial metadata collection for GCP and Azure, along with a
   metadata key to provide the current cloud provider, and a key that
   distinguishes the cloud provider's environments. Currently, this
   only does AWS (eks, ecs, ec2).
-  [#59](https://github.com/crashappsec/chalk/pull/59)
-  [#65](https://github.com/crashappsec/chalk/pull/65)
+  ([#59](https://github.com/crashappsec/chalk/pull/59))
+  ([#65](https://github.com/crashappsec/chalk/pull/65))
 
 - Added OIDC token refreshing, along with `chalk login` and
   `chalk logout` commands to log out of auth for the secret manager.
-  [#51](https://github.com/crashappsec/chalk/pull/51)
-  [#55](https://github.com/crashappsec/chalk/pull/55)
-  [#60](https://github.com/crashappsec/chalk/pull/60)
+  ([#51](https://github.com/crashappsec/chalk/pull/51))
+  [#55](https://github.com/crashappsec/chalk/pull/55),
+  [#60](https://github.com/crashappsec/chalk/pull/60))
 
 - The initial rendering engine work was completed. This means
   `chalk help`, `chalk help metadata` are fully functional. This engine is
   effectively most of the way to a web browser, and will enable us to
   offload a lot of the documentation, and do a little storefront (once
   we integrate in notcurses).
-  [#58](https://github.com/crashappsec/chalk/pull/58)
+  ([#58](https://github.com/crashappsec/chalk/pull/58))
 
 - If you're doing multi-arch binary support, Chalk can now pass your
   native binary's configuration to other arches, though it does
@@ -578,25 +578,25 @@
 ### Fixes
 
 - Docker support when installed via `Snap`.
-  [#9](https://github.com/crashappsec/chalk/pull/9)
+  ([#9](https://github.com/crashappsec/chalk/pull/9))
 - Removes error log when using chalk on ARM Linux as chalk fully
   runs on ARM Linux now.
-  [#7](https://github.com/crashappsec/chalk/pull/7)
+  ([#7](https://github.com/crashappsec/chalk/pull/7))
 - When a `Dockerfile` uses `USER` directive, chalk can now wrap
   entrypoint in that image
   (`docker.wrap_entrypoint = true` in chalk config).
-  [#34](https://github.com/crashappsec/chalk/pull/34)
+  ([#34](https://github.com/crashappsec/chalk/pull/34))
 - Segfault when running chalk operation (e.g. `insert`) in empty
   git repo without any commits.
-  [#39](https://github.com/crashappsec/chalk/pull/39)
+  ([#39](https://github.com/crashappsec/chalk/pull/39))
 - Sometimes Docker build would not wrap entrypoint.
-  [#45](https://github.com/crashappsec/chalk/pull/45)
+  ([#45](https://github.com/crashappsec/chalk/pull/45))
 - Cosign now only gets installed if needed.
-  [#49](https://github.com/crashappsec/chalk/pull/49)
+  ([#49](https://github.com/crashappsec/chalk/pull/49))
 - Docker `ENTRYPOINT`/`COMMAND` wrapping now preserves all named
   arguments from original `ENTRYPOINT`/`COMMAND`.
   (e.g. `ENTRYPOINT ["ls", "-la"]`)
-  [#70](https://github.com/crashappsec/chalk/issues/70)
+  ([#70](https://github.com/crashappsec/chalk/issues/70))
 
 ### Known Issues
 
