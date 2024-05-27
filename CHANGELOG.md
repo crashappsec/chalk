@@ -180,7 +180,7 @@
     multi-platform builds.
   - `docker.download_arch_binary` - whether to automatically
     download chalk binaries for other architectures.
-  - `docker.download_arch_binary_url` - URL template where
+  - `docker.download_arch_binary_urls` - URL template where
     to download chalk binaries.
   - `docker.install_binfmt` - for multi-platform builds
     automatically install binfmt when not all platforms

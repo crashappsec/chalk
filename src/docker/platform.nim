@@ -124,42 +124,52 @@ proc findBaseImagePlatform*(ctx: DockerInvocation,
       )
 
 proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
-  let
-    config   = get[string](chalkConfig, "docker.download_arch_binary_url")
-    url      = (config
-                .replace("{version}",      getChalkExeVersion())
-                .replace("{commit}",       getChalkCommitId())
-                .replace("{os}",           targetPlatform.os)
-                .replace("{architecture}", targetPlatform.architecture))
-  trace("docker: downloading chalk binary from: " & url)
-  let response = safeRequest(url)
-  if response.code != Http200:
-    trace("docker: while downloading chalk binary recieved: " & response.status)
-    raise newException(
-      ValueError,
-      "Could not fetch chalk binary from '" & url & "' " &
-      "due to " & response.status
-    )
+  let platform = targetPlatform.normalize()
+  var
+    statuses: seq[string] = @[]
+    urls:     seq[string] = @[]
 
-  let
-    base = get[string](chalkConfig, "docker.arch_binary_locations_path")
-    folder =
-      if base == "":
-        writeNewTempFile("")
-      else:
-        base.resolvePath().joinPath($targetPlatform)
+  # attempt to donwload from all urls in the order they are defined
+  for config in get[seq[string]](chalkConfig, "docker.download_arch_binary_urls"):
+    let url = (config
+               .replace("{version}",      getChalkExeVersion())
+               .replace("{commit}",       getChalkCommitId())
+               .replace("{os}",           platform.os)
+               .replace("{architecture}", platform.architecture))
+    urls.add(url)
+    trace("docker: downloading chalk binary from: " & url)
+    let response = safeRequest(url)
+    if response.code != Http200:
+      statuses.add(response.status)
+      trace("docker: while downloading chalk binary recieved: " & response.status)
+      continue
 
-  folder.createDir()
-  result = folder.joinPath("chalk")
+    let
+      base = get[string](chalkConfig, "docker.arch_binary_locations_path")
+      folder =
+        if base == "":
+          writeNewTempFile("")
+        else:
+          base.resolvePath().joinPath($platform)
 
-  if not result.tryToWriteFile(response.body()):
-    raise newException(
-      ValueError,
-      "Could not save fetched chalk binary to: " & result
-    )
+    folder.createDir()
+    result = folder.joinPath("chalk")
 
-  trace("docker: saved downloaded chalk binary for " & $targetPlatform & " to " & result)
-  result.makeExecutable()
+    if not result.tryToWriteFile(response.body()):
+      raise newException(
+        ValueError,
+        "Could not save fetched chalk binary to: " & result
+      )
+
+    trace("docker: saved downloaded chalk binary for " & $platform & " to " & result)
+    result.makeExecutable()
+    return
+
+  raise newException(
+    ValueError,
+    "Could not fetch chalk binary from any of '" & $urls & "' " &
+    "due to " & $statuses
+  )
 
 proc findPlatformBinaries(): TableRef[DockerPlatform, string] =
   result = newTable[DockerPlatform, string]()
