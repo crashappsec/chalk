@@ -86,7 +86,8 @@ proc findOptionalConf(state: ConfigState): Option[string] =
 
 proc loadLocalStructs*(state: ConfigState) =
   chalkConfig = state.attrs.loadChalkConfig()
-  if chalkConfig.color.isSome(): setShowColor(chalkConfig.color.get())
+  if chalkConfig.color.isSome() and isatty(1) == 1:
+    setShowColor(chalkConfig.color.get())
   setLogLevel(chalkConfig.logLevel)
   var configPath: seq[string] = @[]
   for path in chalkConfig.configPath:
