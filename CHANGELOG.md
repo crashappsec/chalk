@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## HEAD
+## On the `main` branch
+
+### Fixes
 
 - Fixed metadata reporting for GCP cloud run services
   ([#304](https://github.com/crashappsec/chalk/pull/304))
