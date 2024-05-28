@@ -82,7 +82,7 @@
   name reliably so switched to hard-coded IP.
   ([#293](https://github.com/crashappsec/chalk/pull/293))
 
-## New Features
+### New Features
 
 - Chalk docker builds now fully support manifest lists.
   This affects all commands which produce manifest lists
@@ -200,7 +200,7 @@
 
 **Apr 05, 2024**
 
-## Breaking Changes
+### Breaking Changes
 
 - S3 sinks must now specify the bucket region. Previously
   it defaulted to `us-east-1` if the `AWS_REGION` or
