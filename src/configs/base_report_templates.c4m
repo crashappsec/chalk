@@ -89,6 +89,8 @@ report and subtract from it.
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
   key.BUILD_CONTACT.use                       = true
+  key.BUILD_ORIGIN_ID.use                     = true
+  key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
@@ -648,6 +650,8 @@ doc: """
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
   key.BUILD_CONTACT.use                       = true
+  key.BUILD_ORIGIN_ID.use                     = true
+  key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
@@ -1099,6 +1103,8 @@ container.
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
   key.BUILD_CONTACT.use                       = true
+  key.BUILD_ORIGIN_ID.use                     = true
+  key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
@@ -1550,6 +1556,8 @@ and keep the run-time key.
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
   key.BUILD_CONTACT.use                       = true
+  key.BUILD_ORIGIN_ID.use                     = true
+  key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true

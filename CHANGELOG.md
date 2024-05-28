@@ -7,6 +7,17 @@
 - Fixed metadata reporting for GCP cloud run services
   ([#304](https://github.com/crashappsec/chalk/pull/304))
 
+### New Features
+
+- New chalk keys:
+
+  - Keys to uniquely identify origin repository as per
+    CI/CD system:
+    - `BUILD_ORIGIN_ID`
+    - `BUILD_ORIGIN_OWNER_ID`
+
+  ([#303](https://github.com/crashappsec/chalk/pull/303))
+
 ## 0.4.0
 
 **May 28, 2024**

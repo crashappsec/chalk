@@ -112,7 +112,8 @@ artifacts will be attached to that info.
 plugin ci_github {
     enabled:         true
     pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
-                     "BUILD_TRIGGER", "BUILD_CONTACT"]
+                      "BUILD_TRIGGER", "BUILD_CONTACT",
+                      "BUILD_ORIGIN_ID", "BUILD_ORIGIN_OWNER_ID"]
     doc: """
 Collects information about associated build jobs in github actions.
 
@@ -133,7 +134,8 @@ This only collects data when adding chalk marks.
 plugin ci_gitlab {
     enabled:         true
     pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
-                      "BUILD_TRIGGER", "BUILD_CONTACT"]
+                      "BUILD_TRIGGER", "BUILD_CONTACT",
+                      "BUILD_ORIGIN_ID", "BUILD_ORIGIN_OWNER_ID"]
     doc: """
 Collects information about associated build jobs in Gitlab.
 
