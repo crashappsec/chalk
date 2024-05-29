@@ -8,10 +8,32 @@
 ## This plugin is responsible for providing metadata gleaned from a
 ## github CI environment.
 
-
+import std/[json, httpclient, strutils]
 import ".."/[config, plugin_api]
 
-proc githubGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
+proc getRepoNodeId(api: string, repo: string): string =
+  # https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#get-a-repository
+  let token = getEnv("GITHUB_TOKEN")
+  if token == "":
+    warn("github: GITHUB_TOKEN is empty. " &
+         "If this is running inside GitHub action, make sure ${{ github.token }} is explicitly passed. " &
+         "See https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow")
+    return ""
+  if not api.startsWith("http://") and not api.startsWith("https://"):
+    warn("github: invalid api url (" & api & "). Cannot query repo node id")
+    return ""
+  let
+    url      = api.strip(chars = {'/'}, leading = false) & "/repos/" & repo.strip(chars = {'/'}, trailing = false)
+    headers  = newHttpHeaders({"Authorization": "Bearer " & token})
+    response = safeRequest(url, httpMethod = HttpGet, headers = headers)
+  if not response.code().is2xx():
+    warn("github: could not fetch repo info from " & url & ". " &
+         "Received " & response.status)
+    return ""
+  let data = parseJson(response.body())
+  return data{"node_id"}.getStr()
+
+proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
   result = ChalkDict()
 
   # https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
@@ -43,6 +65,12 @@ proc githubGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
       GITHUB_REPOSITORY.strip(chars = {'/'}) & "/actions/runs/" &
       GITHUB_RUN_ID
     ))
+
+  if GITHUB_API_URL != "" and isSubscribedKey("BUILD_ORIGIN_KEY"):
+    try:
+      result.setIfNeeded("BUILD_ORIGIN_KEY", getRepoNodeId(GITHUB_API_URL, GITHUB_REPOSITORY))
+    except:
+      warn("github: could not fetch repo node id: " & getCurrentExceptionMsg())
 
   # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
   if GITHUB_EVENT_NAME != "" and GITHUB_REF_TYPE != "":

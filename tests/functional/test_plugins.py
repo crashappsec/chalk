@@ -55,7 +55,7 @@ def test_codeowners(tmp_data_dir: Path, chalk: Chalk):
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-def test_github(copy_files: list[Path], chalk: Chalk):
+def test_github(copy_files: list[Path], chalk: Chalk, server_imds: str):
     bin_path = copy_files[0]
     artifact = ArtifactInfo.one_elf(
         bin_path,
@@ -64,8 +64,9 @@ def test_github(copy_files: list[Path], chalk: Chalk):
             "BUILD_TRIGGER": "tag",
             "BUILD_CONTACT": ["octocat"],
             "BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493",
-            "BUILD_API_URI": "https://api.github.com",
+            "BUILD_API_URI": server_imds,
             "BUILD_ORIGIN_ID": "123",
+            "BUILD_ORIGIN_KEY": "abc",
             "BUILD_ORIGIN_OWNER_ID": "456",
         },
     )
@@ -78,7 +79,7 @@ def test_github(copy_files: list[Path], chalk: Chalk):
             "GITHUB_SERVER_URL": "https://github.com",
             "GITHUB_REPOSITORY": "octocat/Hello-World",
             "GITHUB_RUN_ID": "1658821493",
-            "GITHUB_API_URL": "https://api.github.com",
+            "GITHUB_API_URL": server_imds,
             "GITHUB_ACTOR": "octocat",
             "GITHUB_REPOSITORY_ID": "123",
             "GITHUB_REPOSITORY_OWNER_ID": "456",

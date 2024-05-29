@@ -599,6 +599,11 @@ RESPONSES = {
             "zone": "projects/11111111111/zones/europe-west1-b",
         }
     ),
+    "/repos/octocat/Hello-World": json.dumps(
+        {
+            "node_id": "abc",
+        }
+    ),
 }
 
 
@@ -610,7 +615,7 @@ def health():
     return
 
 
-@app.put(f"/latest/api/token", response_class=PlainTextResponse)
+@app.put("/latest/api/token", response_class=PlainTextResponse)
 def token():
     return TOKEN
 
