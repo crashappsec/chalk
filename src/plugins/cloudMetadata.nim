@@ -14,6 +14,8 @@ const
   awsBaseUri     = "http://169.254.169.254/latest/"
   awsMdUri       = awsBaseUri & "meta-data/"
   awsDynUri      = awsBaseUri & "dynamic/"
+  CLOUD_RUN_TIMEOUT_SECONDS = "CLOUD_RUN_TIMEOUT_SECONDS"
+  K_SERVICE = "K_SERVICE"
   # special keys for special processing
   AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS = "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE"
 
@@ -150,7 +152,20 @@ proc isAwsEc2Host(vendor: string): bool =
   return false
 
 proc isGoogleHost(vendor: string): bool =
-  return contains(strutils.toLowerAscii(vendor), "google")
+  # vendor is present
+  if contains(strutils.toLowerAscii(vendor), "google"):
+    return true
+
+  # vendor information should be present in most services, but its not present
+  # in cloud run. In cloud run we can
+  # detect the presence of a knative service via ENV variables but we are being
+  # conservative in also checking resolv.conf
+  let resolv_contents = tryToLoadFile("/etc/resolv.conf")
+  return ("google.internal" in resolv_contents and
+          getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "" and
+          getEnv(K_SERVICE) != "")
+
+
 
 proc isAzureHost(vendor: string): bool =
   return contains(strutils.toLowerAscii(vendor), "microsoft")
@@ -221,6 +236,9 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     if isSubscribedKey("_OP_CLOUD_PROVIDER"):
         # FIXME use enum
         result["_OP_CLOUD_PROVIDER"] = pack("gcp")
+    if getEnv(K_SERVICE) != "" and getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "":
+        result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("gcp_cloud_run_service")
+
     return
 
   #
