@@ -164,7 +164,23 @@ proc isGoogleHost(vendor: string): bool =
   # in cloud run. In cloud run we can detect the presence of a knative service
   # via ENV variables but we are being conservative in also checking resolv.conf
   let resolvContents = tryToLoadFile("/etc/resolv.conf")
-  return ("google.internal" in resolvContents and
+  var hasGoogleInternal = false
+  for line in resolvContents.splitLines():
+    # Checking that resolv.conf contains `google.internal` outside of a comment
+    # should be more than sufficient.
+    #
+    # From `man resolv.conf`:
+    #
+    # - The keyword and value must appear on a single line, and the keyword
+    #   (e.g., nameserver) must start the line.  The value follows the keyword,
+    #   separated by white space.
+    #
+    # - Lines that contain a semicolon (;) or hash character (#) in the first
+    #   column are treated as comments.
+    if line.len() > 0 and line[0] notin {';', '#'} and line.contains("google.internal"):
+      hasGoogleInternal = true
+      break
+  return (hasGoogleInternal and
           getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "" and
           getEnv(K_SERVICE) != "")
 
