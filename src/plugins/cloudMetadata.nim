@@ -14,7 +14,10 @@ const
   awsBaseUri     = "http://169.254.169.254/latest/"
   awsMdUri       = awsBaseUri & "meta-data/"
   awsDynUri      = awsBaseUri & "dynamic/"
-  # this env var is undocumented in GCP besides the functions-framework-php repo
+  # this env var is undocumented in GCP, but does exist in GoogleCloudPlatform repos:
+  # - https://github.com/GoogleCloudPlatform/functions-framework-php/blob/e3a4d658ab3fd127931818d26aaa3e29c622f40c/router.php#L46
+  # - https://github.com/GoogleCloudPlatform/functions-framework-python/blob/02472e7315d0fd642db26441b3cb21f799906739/src/functions_framework/_http/gunicorn.py#L35
+  # - https://github.com/GoogleCloudPlatform/functions-framework-nodejs/blob/0bb6efb6c6a915bc96c50ed5aeda79d7b8e3b15e/src/options.ts#L121
   CLOUD_RUN_TIMEOUT_SECONDS = "CLOUD_RUN_TIMEOUT_SECONDS"
   K_SERVICE = "K_SERVICE"
   # special keys for special processing
