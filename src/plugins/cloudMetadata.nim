@@ -14,6 +14,7 @@ const
   awsBaseUri     = "http://169.254.169.254/latest/"
   awsMdUri       = awsBaseUri & "meta-data/"
   awsDynUri      = awsBaseUri & "dynamic/"
+  # this env var is undocumented in GCP besides the functions-framework-php repo
   CLOUD_RUN_TIMEOUT_SECONDS = "CLOUD_RUN_TIMEOUT_SECONDS"
   K_SERVICE = "K_SERVICE"
   # special keys for special processing
