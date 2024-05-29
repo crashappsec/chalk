@@ -1113,12 +1113,12 @@ keyspec BUILD_ORIGIN_ID {
   since:    "0.4.1"
   shortdoc: "ID of the ORIGIN_URI in the CI/CD system"
   doc:      """
-ORIGIN_URI reports git's origin remote URI. That value however
-might not be unique within the build system. For example GitHub
-allows to rename repos and as such over time ORIGIN_URI might change
-however GitHub's internal repo ID will not. This field will report,
-when available, build systems internal origin repo ID so that it
-can be uniquely identified.
+The ORIGIN_URI key reports the URI of the git origin remote. However,
+that value might not be unique within the build system: for example,
+renaming a repo on GitHub will change the ORIGIN_URI. But that won't
+change GitHub's internal repo ID. This field will report, when
+available, the build system's internal origin repo ID so that the repo
+can be uniquely identified over time.
 """
 }
 
@@ -1130,8 +1130,8 @@ keyspec BUILD_ORIGIN_OWNER_ID {
   shortdoc: "ID of the owner of ORIGIN_URI in the CI/CD system"
   doc:      """
 Reports, if available, the owner ID of the ORIGIN_URI.
-For example in GitHub it will be the organization ID to which
-the repo belongs to.
+For example, in GitHub it will be the organization ID to which
+the repo belongs.
 """
 }
 
