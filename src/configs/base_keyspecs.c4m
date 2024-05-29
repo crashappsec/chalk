@@ -1149,6 +1149,18 @@ the repo belongs.
 """
 }
 
+keyspec BUILD_ORIGIN_OWNER_KEY {
+  kind:     ChalkTimeHost
+  type:     string
+  standard: true
+  since:    "0.4.1"
+  shortdoc: "Key of the owner of ORIGIN_URI in the CI/CD system"
+  doc:      """
+Similar to BUILD_ORIGIN_KEY, this reports the key of the owner
+of the repo for easy lookup in CI/CD APIs.
+"""
+}
+
 keyspec BUILD_ID {
     kind:             ChalkTimeHost
     type:             string

@@ -114,7 +114,7 @@ plugin ci_github {
     pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
                       "BUILD_TRIGGER", "BUILD_CONTACT",
                       "BUILD_ORIGIN_ID", "BUILD_ORIGIN_OWNER_ID",
-                      "BUILD_ORIGIN_KEY"]
+                      "BUILD_ORIGIN_KEY", "BUILD_ORIGIN_OWNER_KEY"]
     doc: """
 Collects information about associated build jobs in github actions.
 

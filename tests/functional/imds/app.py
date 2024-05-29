@@ -602,6 +602,9 @@ RESPONSES = {
     "/repos/octocat/Hello-World": json.dumps(
         {
             "node_id": "abc",
+            "owner": {
+                "node_id": "xyz",
+            },
         }
     ),
 }

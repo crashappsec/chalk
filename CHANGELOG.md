@@ -17,6 +17,7 @@
     - `BUILD_ORIGIN_ID`
     - `BUILD_ORIGIN_KEY`
     - `BUILD_ORIGIN_OWNER_ID`
+    - `BUILD_ORIGIN_OWNER_KEY`
 
     For example, the `BUILD_ORIGIN_ID` for a GitHub repo
     will not be changed by renaming that repo. Chalk

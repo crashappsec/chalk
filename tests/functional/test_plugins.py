@@ -68,6 +68,7 @@ def test_github(copy_files: list[Path], chalk: Chalk, server_imds: str):
             "BUILD_ORIGIN_ID": "123",
             "BUILD_ORIGIN_KEY": "abc",
             "BUILD_ORIGIN_OWNER_ID": "456",
+            "BUILD_ORIGIN_OWNER_KEY": "xyz",
         },
     )
     insert = chalk.insert(

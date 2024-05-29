@@ -11,17 +11,18 @@
 import std/[json, httpclient, strutils]
 import ".."/[config, plugin_api]
 
-proc getRepoNodeId(api: string, repo: string): string =
+proc getRepo(api: string, repo: string): JsonNode =
   # https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#get-a-repository
+  result = newJObject()
   let token = getEnv("GITHUB_TOKEN")
   if token == "":
     warn("github: GITHUB_TOKEN is empty. " &
          "If this is running inside GitHub action, make sure ${{ github.token }} is explicitly passed. " &
          "See https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow")
-    return ""
+    return
   if not api.startsWith("http://") and not api.startsWith("https://"):
     warn("github: invalid api url (" & api & "). Cannot query repo node id")
-    return ""
+    return
   let
     url      = api.strip(chars = {'/'}, leading = false) & "/repos/" & repo.strip(chars = {'/'}, trailing = false)
     headers  = newHttpHeaders({"Authorization": "Bearer " & token})
@@ -29,9 +30,8 @@ proc getRepoNodeId(api: string, repo: string): string =
   if not response.code().is2xx():
     warn("github: could not fetch repo info from " & url & ". " &
          "Received " & response.status)
-    return ""
-  let data = parseJson(response.body())
-  return data{"node_id"}.getStr()
+    return
+  return parseJson(response.body())
 
 proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
   result = ChalkDict()
@@ -66,11 +66,16 @@ proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
       GITHUB_RUN_ID
     ))
 
-  if GITHUB_API_URL != "" and isSubscribedKey("BUILD_ORIGIN_KEY"):
+  if GITHUB_API_URL != "" and (
+    isSubscribedKey("BUILD_ORIGIN_KEY") or
+    isSubscribedKey("BUILD_ORIGIN_OWNER_KEY")
+  ):
     try:
-      result.setIfNeeded("BUILD_ORIGIN_KEY", getRepoNodeId(GITHUB_API_URL, GITHUB_REPOSITORY))
+      let data = getRepo(GITHUB_API_URL, GITHUB_REPOSITORY)
+      result.setIfNeeded("BUILD_ORIGIN_KEY",       data{"node_id"}.getStr())
+      result.setIfNeeded("BUILD_ORIGIN_OWNER_KEY", data{"owner"}{"node_id"}.getStr())
     except:
-      warn("github: could not fetch repo node id: " & getCurrentExceptionMsg())
+      warn("github: could not fetch repo info: " & getCurrentExceptionMsg())
 
   # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
   if GITHUB_EVENT_NAME != "" and GITHUB_REF_TYPE != "":
