@@ -159,8 +159,8 @@ proc isGoogleHost(vendor: string): bool =
   # vendor information should be present in most services, but its not present
   # in cloud run. In cloud run we can detect the presence of a knative service
   # via ENV variables but we are being conservative in also checking resolv.conf
-  let resolv_contents = tryToLoadFile("/etc/resolv.conf")
-  return ("google.internal" in resolv_contents and
+  let resolvContents = tryToLoadFile("/etc/resolv.conf")
+  return ("google.internal" in resolvContents and
           getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "" and
           getEnv(K_SERVICE) != "")
 
