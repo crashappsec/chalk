@@ -1,5 +1,10 @@
 # Chalk Release Notes
 
+## HEAD
+
+- Fixed metadata reporting for GCP cloud run services
+  ([#304](https://github.com/crashappsec/chalk/pull/304))
+
 ## 0.4.0
 
 **May 28, 2024**
