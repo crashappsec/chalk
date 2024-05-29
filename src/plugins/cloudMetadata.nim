@@ -14,6 +14,12 @@ const
   awsBaseUri     = "http://169.254.169.254/latest/"
   awsMdUri       = awsBaseUri & "meta-data/"
   awsDynUri      = awsBaseUri & "dynamic/"
+  # this env var is undocumented in GCP, but does exist in GoogleCloudPlatform repos:
+  # - https://github.com/GoogleCloudPlatform/functions-framework-php/blob/e3a4d658ab3fd127931818d26aaa3e29c622f40c/router.php#L46
+  # - https://github.com/GoogleCloudPlatform/functions-framework-python/blob/02472e7315d0fd642db26441b3cb21f799906739/src/functions_framework/_http/gunicorn.py#L35
+  # - https://github.com/GoogleCloudPlatform/functions-framework-nodejs/blob/0bb6efb6c6a915bc96c50ed5aeda79d7b8e3b15e/src/options.ts#L121
+  CLOUD_RUN_TIMEOUT_SECONDS = "CLOUD_RUN_TIMEOUT_SECONDS"
+  K_SERVICE = "K_SERVICE"
   # special keys for special processing
   AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS = "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE"
 
@@ -150,7 +156,35 @@ proc isAwsEc2Host(vendor: string): bool =
   return false
 
 proc isGoogleHost(vendor: string): bool =
-  return contains(strutils.toLowerAscii(vendor), "google")
+  # vendor is present
+  if contains(strutils.toLowerAscii(vendor), "google"):
+    return true
+
+  # vendor information should be present in most services, but its not present
+  # in cloud run. In cloud run we can detect the presence of a knative service
+  # via ENV variables but we are being conservative in also checking resolv.conf
+  let resolvContents = tryToLoadFile("/etc/resolv.conf")
+  var hasGoogleInternal = false
+  for line in resolvContents.splitLines():
+    # Checking that resolv.conf contains `google.internal` outside of a comment
+    # should be more than sufficient.
+    #
+    # From `man resolv.conf`:
+    #
+    # - The keyword and value must appear on a single line, and the keyword
+    #   (e.g., nameserver) must start the line.  The value follows the keyword,
+    #   separated by white space.
+    #
+    # - Lines that contain a semicolon (;) or hash character (#) in the first
+    #   column are treated as comments.
+    if line.len() > 0 and line[0] notin {';', '#'} and line.contains("google.internal"):
+      hasGoogleInternal = true
+      break
+  return (hasGoogleInternal and
+          getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "" and
+          getEnv(K_SERVICE) != "")
+
+
 
 proc isAzureHost(vendor: string): bool =
   return contains(strutils.toLowerAscii(vendor), "microsoft")
@@ -171,7 +205,7 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")):
-    let resultOpt = hitProviderEndpoint("http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
+    let resultOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
     if not resultOpt.isSome():
         trace("Did not get metadata back from GCP endpoint")
         return
@@ -221,6 +255,9 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     if isSubscribedKey("_OP_CLOUD_PROVIDER"):
         # FIXME use enum
         result["_OP_CLOUD_PROVIDER"] = pack("gcp")
+    if getEnv(K_SERVICE) != "" and getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "":
+        result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("gcp_cloud_run_service")
+
     return
 
   #
