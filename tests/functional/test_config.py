@@ -500,3 +500,25 @@ def test_no_certs(chalk_default: Chalk, server_chalkdust: str):
         tty=False,
         volumes={chalk_default.binary: "/chalk"},
     )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_custom_keys(chalk: Chalk, copy_files: list[Path]):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "custom_keys.c4m",
+        env={"ENV_VAR": "world"},
+    )
+    assert insert.report.has(
+        X_REPORT_VALUE="hello",
+        X_REPORT_ENV_VAR="world",
+        X_REPORT_CMD="mars",
+        X_REPORT_FUNC="hello world",
+    )
+    assert insert.mark.has(
+        X_MARK_VALUE="hello",
+        X_MARK_ENV_VAR="world",
+        X_MARK_CMD="mars",
+        X_MARK_FUNC="hello world",
+    )

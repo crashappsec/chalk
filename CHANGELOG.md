@@ -6,6 +6,8 @@
 
 - Fixed metadata reporting for GCP cloud run services
   ([#304](https://github.com/crashappsec/chalk/pull/304))
+- Fixes custom key name validation
+  ([#307](https://github.com/crashappsec/chalk/pull/307))
 
 ### New Features
 

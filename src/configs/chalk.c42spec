@@ -757,7 +757,7 @@ clearly to types supported by JSON.
 
   field standard {
     type:        bool
-    require:     false
+    default:     false
     stack_limit: 0
     hidden:      true
     doc:         """
@@ -3807,11 +3807,11 @@ func key_name_validation() {
     if attr_get(base + "standard", bool) { continue; }
     kind     := attr_get(base + "kind", int)
     if kind == ChalkTimeHost or kind == ChalkTimeArtifact {
-      if key_name.find("X-") == 0 { continue; }
+      if key_name.find("X_") == 0 { continue; }
     }
-    elif key_name.find("_X-") == 0 { continue; }
+    elif key_name.find("_X_") == 0 { continue; }
     return ("Custom key '" + key_name + "' is invalid. Chalkable custom " +
-            "keys must start with X- (or _X- for non-chalkable keys)")
+            "keys must start with X_ (or _X_ for non-chalkable keys)")
   }
 }
 
