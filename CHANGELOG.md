@@ -4,8 +4,8 @@
 
 ### Fixes
 
-- On MacOS builds, downloading root certs was failing
-  due to missing quotes around the url
+- When building Chalk on macOS, downloading root certs
+  could fail due to missing quotes around the URL
   ([nimutils #68](https://github.com/crashappsec/nimutils/pull/68))
 
 ## 0.4.1
