@@ -11,18 +11,13 @@
 
 - New chalk keys:
 
-  - Keys to uniquely identify the origin repository, using
-    a stable identifier provided by the CI/CD system:
+  - Keys to identify the origin repository, using
+    an identifier provided by the CI/CD system:
 
     - `BUILD_ORIGIN_ID`
     - `BUILD_ORIGIN_KEY`
     - `BUILD_ORIGIN_OWNER_ID`
     - `BUILD_ORIGIN_OWNER_KEY`
-
-    For example, the `BUILD_ORIGIN_ID` for a GitHub repo
-    will not be changed by renaming that repo. Chalk
-    already had e.g. the `ORIGIN_URI` key, but that value
-    could change over time due to such repo renaming.
 
   ([#303](https://github.com/crashappsec/chalk/pull/303))
 
