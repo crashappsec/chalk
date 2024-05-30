@@ -55,7 +55,7 @@ def test_codeowners(tmp_data_dir: Path, chalk: Chalk):
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-def test_github(copy_files: list[Path], chalk: Chalk):
+def test_github(copy_files: list[Path], chalk: Chalk, server_imds: str):
     bin_path = copy_files[0]
     artifact = ArtifactInfo.one_elf(
         bin_path,
@@ -64,7 +64,11 @@ def test_github(copy_files: list[Path], chalk: Chalk):
             "BUILD_TRIGGER": "tag",
             "BUILD_CONTACT": ["octocat"],
             "BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493",
-            "BUILD_API_URI": "https://api.github.com",
+            "BUILD_API_URI": server_imds,
+            "BUILD_ORIGIN_ID": "123",
+            "BUILD_ORIGIN_KEY": "abc",
+            "BUILD_ORIGIN_OWNER_ID": "456",
+            "BUILD_ORIGIN_OWNER_KEY": "xyz",
         },
     )
     insert = chalk.insert(
@@ -76,8 +80,10 @@ def test_github(copy_files: list[Path], chalk: Chalk):
             "GITHUB_SERVER_URL": "https://github.com",
             "GITHUB_REPOSITORY": "octocat/Hello-World",
             "GITHUB_RUN_ID": "1658821493",
-            "GITHUB_API_URL": "https://api.github.com",
+            "GITHUB_API_URL": server_imds,
             "GITHUB_ACTOR": "octocat",
+            "GITHUB_REPOSITORY_ID": "123",
+            "GITHUB_REPOSITORY_OWNER_ID": "456",
             # there are a bunch of variations of these
             # but for now at least we test basic flow
             "GITHUB_EVENT_NAME": "push",
@@ -104,6 +110,8 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
             "BUILD_CONTACT": ["user"],
             "BUILD_URI": "https://gitlab.com/gitlab-org/gitlab/-/jobs/4999820578",
             "BUILD_API_URI": "https://gitlab.com/api/v4",
+            "BUILD_ORIGIN_ID": "123",
+            "BUILD_ORIGIN_OWNER_ID": "456",
         },
     )
     insert = chalk.insert(
@@ -117,6 +125,8 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
             "CI_API_V4_URL": "https://gitlab.com/api/v4",
             "GITLAB_USER_LOGIN": "user",
             "CI_PIPELINE_SOURCE": "push",
+            "CI_PROJECT_ID": "123",
+            "CI_PROJECT_NAMESPACE_ID": "456",
         },
     )
     validate_chalk_report(

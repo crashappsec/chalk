@@ -79,6 +79,10 @@ or vice versa.
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
   key.BUILD_CONTACT.use                       = true
+  key.BUILD_ORIGIN_ID.use                     = true
+  key.BUILD_ORIGIN_KEY.use                    = true
+  key.BUILD_ORIGIN_OWNER_ID.use               = true
+  key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
@@ -174,6 +178,10 @@ mark_template mark_large {
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
   key.BUILD_CONTACT.use                       = true
+  key.BUILD_ORIGIN_ID.use                     = true
+  key.BUILD_ORIGIN_KEY.use                    = true
+  key.BUILD_ORIGIN_OWNER_ID.use               = true
+  key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
@@ -267,6 +275,10 @@ use the mark template named `reproducable`.
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
   key.BUILD_CONTACT.use                       = true
+  key.BUILD_ORIGIN_ID.use                     = true
+  key.BUILD_ORIGIN_KEY.use                    = true
+  key.BUILD_ORIGIN_OWNER_ID.use               = true
+  key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
   key.EMBEDDED_CHALK.use                      = true
@@ -327,6 +339,10 @@ the time and the nonce removed.
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
   key.BUILD_CONTACT.use                       = true
+  key.BUILD_ORIGIN_ID.use                     = true
+  key.BUILD_ORIGIN_KEY.use                    = true
+  key.BUILD_ORIGIN_OWNER_ID.use               = true
+  key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
   key.EMBEDDED_CHALK.use                      = true

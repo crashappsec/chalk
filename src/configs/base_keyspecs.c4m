@@ -1106,8 +1106,70 @@ the artifact was chalked.
 """
 }
 
+keyspec BUILD_ORIGIN_ID {
+  kind:     ChalkTimeHost
+  type:     string
+  standard: true
+  since:    "0.4.1"
+  shortdoc: "ID of the ORIGIN_URI in the CI/CD system"
+  doc:      """
+The ORIGIN_URI key reports the URI of the git origin remote.
+This key, if available, will report the repo ID of the repository
+as it is stored internally by the CI/CD system.
+
+For GitHub this corresponds to repo REST ID.
+For GitLab this is the project ID.
+"""
+}
+
+keyspec BUILD_ORIGIN_KEY {
+  kind:     ChalkTimeHost
+  type:     string
+  standard: true
+  since:    "0.4.1"
+  shortdoc: "Key of the ORIGIN_URI in the CI/CD system"
+  doc:      """
+Similar to BUILD_ORIGIN_ID and this reports supplemental repository
+key for easier CI/CD API interactions.
+
+For GitHub this corresponds to repo GraphQL node_id.
+For GitLab this is not used.
+"""
+}
+
+keyspec BUILD_ORIGIN_OWNER_ID {
+  kind:     ChalkTimeHost
+  type:     string
+  standard: true
+  since:    "0.4.1"
+  shortdoc: "ID of the owner of ORIGIN_URI in the CI/CD system"
+  doc:      """
+The ORIGIN_URI key reports the URI of the git origin remote.
+This key, if available, will report the repo owners ID of the repository
+as it is stored internally by the CI/CD system.
+
+For GitHub this corresponds to repo's org/user REST ID.
+For GitLab this is the namespace ID.
+"""
+}
+
+keyspec BUILD_ORIGIN_OWNER_KEY {
+  kind:     ChalkTimeHost
+  type:     string
+  standard: true
+  since:    "0.4.1"
+  shortdoc: "Key of the owner of ORIGIN_URI in the CI/CD system"
+  doc:      """
+Similar to BUILD_ORIGIN_OWNER_ID and this reports supplemental owner
+key for easier CI/CD API interactions.
+
+For GitHub this corresponds to repos user/org GraphQL node_id.
+For GitLab this is not used.
+"""
+}
+
 keyspec BUILD_ID {
-    kind:             ChalkTimeArtifact
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -1120,7 +1182,7 @@ associated job ID.
 }
 
 keyspec BUILD_URI {
-    kind:                ChalkTimeArtifact
+    kind:                ChalkTimeHost
     type:                string
     standard:            true
     since:               "0.1.0"
@@ -1137,7 +1199,7 @@ key's documentation for more detail).
 }
 
 keyspec BUILD_API_URI {
-    kind:                ChalkTimeArtifact
+    kind:                ChalkTimeHost
     type:                string
     standard:            true
     since:               "0.1.0"
@@ -1155,7 +1217,7 @@ key's documentation for more detail).
 }
 
 keyspec BUILD_TRIGGER {
-    kind:             ChalkTimeArtifact
+    kind:             ChalkTimeHost
     type:             string
     standard:         true
     since:            "0.1.0"
@@ -1166,7 +1228,7 @@ Any recorded build trigger found at chalk time.
 }
 
 keyspec BUILD_CONTACT {
-    kind:             ChalkTimeArtifact
+    kind:             ChalkTimeHost
     type:             list[string]
     standard:         true
     since:            "0.1.0"
