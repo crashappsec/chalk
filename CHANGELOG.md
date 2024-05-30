@@ -2,6 +2,12 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- On MacOS builds, downloading root certs was failing
+  due to missing quotes around the url
+  ([nimutils #68](https://github.com/crashappsec/nimutils/pull/68))
+
 ## 0.4.1
 
 **May 30, 2024**
