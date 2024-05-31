@@ -2,6 +2,12 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- When building Chalk on macOS, downloading root certs
+  could fail due to missing quotes around the URL
+  ([nimutils #68](https://github.com/crashappsec/nimutils/pull/68))
+
 ## 0.4.1
 
 **May 30, 2024**
