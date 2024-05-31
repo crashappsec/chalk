@@ -8,6 +8,13 @@
   could fail due to missing quotes around the URL
   ([nimutils #68](https://github.com/crashappsec/nimutils/pull/68))
 
+### New Features
+
+- New chalk keys:
+
+  - New key holding GCP project metadata: `_GCP_PROJECT_METADATA`
+    ([#311](https://github.com/crashappsec/chalk/pull/31))
+
 ## 0.4.1
 
 **May 30, 2024**

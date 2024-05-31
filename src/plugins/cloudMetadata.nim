@@ -155,7 +155,7 @@ proc isAwsEc2Host(vendor: string): bool =
 
   return false
 
-proc isGoogleHost(vendor: string): bool =
+proc isGoogleHost(vendor: string, resolvContents: string): bool =
   # vendor is present
   if contains(strutils.toLowerAscii(vendor), "google"):
     return true
@@ -163,7 +163,6 @@ proc isGoogleHost(vendor: string): bool =
   # vendor information should be present in most services, but its not present
   # in cloud run. In cloud run we can detect the presence of a knative service
   # via ENV variables but we are being conservative in also checking resolv.conf
-  let resolvContents = tryToLoadFile("/etc/resolv.conf")
   var hasGoogleInternal = false
   for line in resolvContents.splitLines():
     # Checking that resolv.conf contains `google.internal` outside of a comment
@@ -193,21 +192,37 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
                                ChalkDict {.cdecl.} =
   result = ChalkDict()
   let vendor = tryToLoadFile(get[string](chalkConfig, "cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path"))
+  let resolv = tryToLoadFile(get[string](chalkConfig, "cloud_provider.cloud_instance_hw_identifiers.sys_resolv_path"))
 
   #
   # GCP
   #
-  if isGoogleHost(vendor) and
+  if isGoogleHost(vendor, resolv) and
     (isSubscribedKey("_GCP_INSTANCE_METADATA") or
+    isSubscribedKey("_GCP_PROJECT_METADATA") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_IP") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")):
+    trace("Querying for GCP metadata")
+    if isSubscribedKey("_GCP_PROJECT_METADATA"):
+      let projectOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/project/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
+      if projectOpt.isSome():
+        try:
+          let valueProj = projectOpt.get()
+          if valueProj.startswith("{"):
+            let jsonProjValue = parseJson(valueProj)
+            setIfNeeded(result, "_GCP_PROJECT_METADATA", jsonProjValue.nimJsonToBox())
+          else:
+              trace("GCP project metadata didnt respond with json object. Ignoring it")
+        except:
+            trace("Could not insert _GCP_PROJECT_METADATA")
+
     let resultOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
     if not resultOpt.isSome():
-        trace("Did not get metadata back from GCP endpoint")
+        trace("Did not get instance metadata back from GCP endpoint")
         return
     let value = resultOpt.get()
     if not value.startswith("{"):
