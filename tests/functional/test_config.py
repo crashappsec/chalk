@@ -90,6 +90,35 @@ def test_invalid_load(chalk_copy: Chalk, test_config_file: str, use_embedded: bo
 
 
 @pytest.mark.parametrize(
+    "copy_files",
+    [[CONFIGS / "validation" / "valid_2.c4m"]],
+    indirect=True,
+)
+def test_load_valid_then_invalid(chalk_copy: Chalk, copy_files: list[Path]):
+    config = copy_files[0]
+    # call chalk load on valid config
+    chalk_copy.load(
+        config,
+        expected_success=True,
+        replace=False,
+    )
+    # mutate config to be invalid
+    with config.open("a") as fid:
+        fid.write("\nlog_level = debug")
+    chalk_copy.load(
+        config,
+        expected_success=False,
+        replace=False,
+    )
+    # chalk should still have valid config embedded
+    # and further calls should not fail and not have any errors
+    extract = chalk_copy.extract(chalk_copy.binary)
+    for report in extract.reports:
+        assert report["_OPERATION"] == "extract"
+        assert "_OP_ERRORS" not in report
+
+
+@pytest.mark.parametrize(
     "test_config_file, expected_error",
     [
         ("validation/valid_1.c4m", VALIDATION_ERROR),
