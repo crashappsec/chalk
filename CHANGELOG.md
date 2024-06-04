@@ -7,6 +7,9 @@
 - When building Chalk on macOS, downloading root certs
   could fail due to missing quotes around the URL
   ([nimutils #68](https://github.com/crashappsec/nimutils/pull/68))
+- Regression:`chalk load` did not revalidate previously loaded
+  components in Chalk since >=0.4.0
+  ([#313](https://github.com/crashappsec/chalk/pull/313))
 
 ### New Features
 
