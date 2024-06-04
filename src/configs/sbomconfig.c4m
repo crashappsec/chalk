@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -16,44 +16,62 @@ tool syft {
                                                   dict[string, string])
   syft_exe_dir:      "/tmp"
   syft_installer:    "https://raw.githubusercontent.com/anchore/syft/main/install.sh"
+  syft_container:    "anchore/syft"
+  syft_entrypoint:   "/syft"
   syft_argv:         " -o cyclonedx-json"  # CycloneDX by default.
   ~doc:              """
 This runs the syft SBOM tool.  If it can't be found in the current path,
-chalk will attempt to install it into /tmp, via the official installer,
-located at `https://raw.githubusercontent.com/anchore/syft/main/install.sh`
+chalk will:
+
+1. use docker (if present) to run syft
+2. attempt to install it into /tmp, via the official installer,
+   located at `https://raw.githubusercontent.com/anchore/syft/main/install.sh`
 
 You can configure the following fields in the tool.syft object:
 
-syft_exe_dir:   Where to try to install syft, if not found.  Defaults to "/tmp"
-syft_installer: Location of the official syft installer.
-syft_argv:      Command-line flags to pass to syft. Defaults to:
-                -o cyclone-json
+syft_exe_dir:    Where to try to install syft, if not found.  Defaults to "/tmp"
+syft_container:  Name of docker container to use to run syft
+syft_entrypoint: What entrypoint to use inside the container
+syft_installer:  Location of the official syft installer.
+syft_argv:       Command-line flags to pass to syft. Defaults to:
+                 -o cyclone-json
 """
 }
 
-func find_syft(ignore) {
+func find_syft(path) {
   result := find_exe("syft", ["/tmp"]) # /tmp is in addition to $PATH
-
   if result == "" {
-    trace("find_syft: Unable to find syft in $PATH")
+    docker_path := docker_exe()
+    if docker_path == "" {
+      trace("find_syft: Unable to find syft in $PATH and docker is not available")
+    } elif tool.syft.syft_entrypoint != "" and tool.syft.syft_container != "" {
+      trace("find_syft: Using docker for running syft")
+      return (
+        docker_path + " run " +
+        "--rm " +
+        "--entrypoint=" + tool.syft.syft_entrypoint + " " +
+        "-v " + path + ":" + path + " " +
+        tool.syft.syft_container
+      )
+    } else {
+      trace("find_syft: Unable to find syft in $PATH and docker is disabled")
+    }
   } else {
     trace("found syft at: " + result)
   }
 }
 
-func install_syft(ignore) {
+func install_syft(path) {
   info("Attempting to install syft from " + tool.syft.syft_installer)
 
   contents := url_get(tool.syft.syft_installer)
 
   if not starts_with(contents, "#!") {
-    error("Unable to install syft into: " + tool.syft.syft_exe_dir + ": " +
-    contents)
-
+    error("Syft installer is not a valid shell script due to lack of shebang")
     return false
   }
 
-  trace("Downloaded syft successfully.")
+  trace("Downloaded syft installer script successfully.")
 
   installer := to_tmp_file(contents, ".sh")
   cmdline   := "sh " + installer + " -b " + tool.syft.syft_exe_dir
@@ -75,8 +93,6 @@ func install_syft(ignore) {
 
 func get_syft_args(path) {
   result := path + tool.syft.syft_argv + " 2>/dev/null"
-
-  trace("args to syft: " + result)
 }
 
 func extract_syft_sbom(out: string, code) {
@@ -85,18 +101,14 @@ func extract_syft_sbom(out: string, code) {
   if code != 0 {
     error("syft failed to run properly; ignoring")
     echo(out)
+    return {}
   }
 
-  validIndicator := "\"component"
-  emptyIndicator := "\"components\": []"
+  if not starts_with(strip(out), "{") {
+    error("syft did not run properly - invalid json returned; ignoring")
+    echo(out)
+    return {}
+  }
 
-  if not contains(out, validIndicator) {
-    warn("syft did not run properly; ignoring")
-  }
-  elif contains(out, emptyIndicator) {
-    info("syft didn't find any components; ignoring.")
-  }
-  else {
-     return { "SBOM" : out }
-  }
+  return { "SBOM" : parse_json(out) }
 }

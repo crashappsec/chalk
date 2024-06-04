@@ -14,7 +14,7 @@
 
 import std/[httpclient]
 import pkg/[con4m/st, nimutils/jwt]
-import "."/[config, reporting, sinks, chalkjson]
+import "."/[config, reporting, sinks, chalkjson, docker/exe]
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
@@ -111,7 +111,7 @@ proc memoizeInChalkmark(args: seq[Box], s: ConfigState): Option[Box] =
   selfChalkSetSubKey(memoizeKey, name, value)
   return valueOpt
 
-proc c4mParseJson*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
+proc c4mParseJson(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   let
     data = unpack[string](args[0])
   try:
@@ -122,6 +122,9 @@ proc c4mParseJson*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   except:
     error("Could not parse JSON: " & getCurrentExceptionMsg())
     return none(Box)
+
+proc dockerExe(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
+  return some(pack(getDockerExeLocation()))
 
 let chalkCon4mBuiltins* = [
     ("version() -> string",
@@ -222,6 +225,12 @@ Same as `url_post()`, but takes a certificate file location in the final
 parameter, with which HTTPS connections must authenticate against.
 """,
      @["parsing"]),
+     ("docker_exe() -> string",
+      BuiltInFn(dockerExe),
+      """
+Find non-chalked docker executable path.
+""",
+      @["chalk"]),
 
 ]
 

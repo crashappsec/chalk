@@ -920,7 +920,9 @@ def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
                                     {
                                         "physicalLocation": {
                                             "artifactLocation": {
-                                                "uri": "helloworld.py",
+                                                "uri": str(
+                                                    tmp_data_dir / "helloworld.py"
+                                                ),
                                                 "uriBaseId": "%SRCROOT%",
                                             },
                                             "region": {
