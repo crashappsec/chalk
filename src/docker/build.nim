@@ -408,7 +408,6 @@ proc dockerBuild*(ctx: DockerInvocation): int =
               text       = chalk.getChalkMarkAsStr(),
               newPath    = "/chalk.json",
               user       = user,
-              move       = true,
               chmod      = "0444",
               byPlatform = ctx.isMultiPlatform(),
               platform   = platform,
