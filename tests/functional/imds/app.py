@@ -7,7 +7,6 @@ import json
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 
-
 PREFIX = "/latest"
 TOKEN = "token"
 TAGS = {
@@ -519,6 +518,9 @@ RESPONSES = {
         }
     ),
     # GCP
+    "/computeMetadata/v1/project": json.dumps(
+        {"numericProjectId": 434557252559, "projectId": "gcp-integration-423910"}
+    ),
     "/computeMetadata/v1/instance": json.dumps(
         {
             "attributes": {

@@ -2608,6 +2608,14 @@ end users.
     doc:     "Path where to check AWS board vendor if running in AWS, Google or Microsoft nodes"
   }
 
+  # added after discussion in https://github.com/crashappsec/chalk/pull/311
+  field sys_resolv_path {
+    type:    string
+    default: "/etc/resolv.conf"
+    hidden:  true
+    doc:     "The path for /etc/resolv.conf or equivalent that allows us to infer service or provider from contents"
+  }
+
   field sys_product_path {
     # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
     type:    string

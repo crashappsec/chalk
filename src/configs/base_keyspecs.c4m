@@ -4661,6 +4661,18 @@ See https://cloud.google.com/compute/docs/metadata/overview for more
 """
 }
 
+keyspec _GCP_PROJECT_METADATA {
+    kind:             RunTimeHost
+    type:             dict[string, `x]
+    standard:         true
+    since:            "0.4.2"
+    doc: """
+JSON containing project attributes, such as the project id and numeric id
+
+See https://cloud.google.com/compute/docs/metadata/overview for more.
+"""
+}
+
 keyspec _AWS_INSTANCE_IDENTITY_DOCUMENT {
     kind:             RunTimeHost
     type:             dict[string, `x]

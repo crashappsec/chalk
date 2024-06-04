@@ -2,11 +2,11 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import os
 import re
 import shutil
 from pathlib import Path
 
-import os
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
@@ -22,7 +22,6 @@ from .utils.dict import ANY
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
-
 
 logger = get_logger()
 
@@ -500,13 +499,149 @@ def test_metadata_azure(
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 @pytest.mark.parametrize("tmp_file", [{}], indirect=True)
+def test_metadata_gcp_no_vendor(
+    copy_files: list[Path],
+    chalk: Chalk,
+    tmp_file: Path,
+    server_imds: str,
+):
+    tmp_file.write_text("search google.internal.")
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "resolv.c4m",
+        env={
+            "TEST_RESOLV": str(tmp_file),
+            "CLOUD_RUN_TIMEOUT_SECONDS": "120",
+            "K_SERVICE": "test",
+        },
+    )
+    assert insert.report.contains(
+        {
+            "_OP_CLOUD_PROVIDER": "gcp",
+            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": {
+                "11111111111-compute@developer.gserviceaccount.com": {
+                    "aliases": ["default"],
+                    "email": "11111111111-compute@developer.gserviceaccount.com",
+                    "scopes": [
+                        "https://www.googleapis.com/auth/devstorage.read_only",
+                        "https://www.googleapis.com/auth/logging.write",
+                        "https://www.googleapis.com/auth/monitoring.write",
+                        "https://www.googleapis.com/auth/servicecontrol",
+                        "https://www.googleapis.com/auth/service.management.readonly",
+                        "https://www.googleapis.com/auth/trace.append",
+                    ],
+                },
+                "default": {
+                    "aliases": ["default"],
+                    "email": "11111111111-compute@developer.gserviceaccount.com",
+                    "scopes": [
+                        "https://www.googleapis.com/auth/devstorage.read_only",
+                        "https://www.googleapis.com/auth/logging.write",
+                        "https://www.googleapis.com/auth/monitoring.write",
+                        "https://www.googleapis.com/auth/servicecontrol",
+                        "https://www.googleapis.com/auth/service.management.readonly",
+                        "https://www.googleapis.com/auth/trace.append",
+                    ],
+                },
+            },
+            "_OP_CLOUD_PROVIDER_IP": "35.205.62.123",
+            "_OP_CLOUD_PROVIDER_REGION": "europe-west1-b",
+            "_OP_CLOUD_PROVIDER_INSTANCE_TYPE": "e2-micro",
+            "_GCP_PROJECT_METADATA": {
+                "numericProjectId": 434557252559,
+                "projectId": "gcp-integration-423910",
+            },
+            "_GCP_INSTANCE_METADATA": {
+                "attributes": {
+                    "ssh-keys": 'test:ecdsa-sha2-nistp256 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKgXTiO1+sSWCEsq/bWaLdY= google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:11:57+0000"}\ntest:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCvddnbJ/XWxMUPXOsDMNoRHJeaCgwqk6g7UYvrXqogwmJ1WpC1QPuG3mhDjmBOcjINi7TYsozDKZilL2BDu2i6CGC1s2Tokq41lsgnCePNdnYmPcA318PmuMmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeT7R92kx google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:12:12+0000"}'
+                },
+                "cpuPlatform": "Intel Broadwell",
+                "description": "",
+                "disks": [
+                    {
+                        "deviceName": "instance-1",
+                        "index": 0,
+                        "interface": "SCSI",
+                        "mode": "READ_WRITE",
+                        "type": "PERSISTENT-BALANCED",
+                    }
+                ],
+                "guestAttributes": {},
+                "hostname": "instance-1.europe-west1-b.c.test-chalk-402014.internal",
+                "id": 133380848178631130,
+                "image": "projects/debian-cloud/global/images/debian-11-bullseye-v20231010",
+                "licenses": [{"id": "4324324324234234234"}],
+                "machineType": "projects/11111111111/machineTypes/e2-micro",
+                "maintenanceEvent": "NONE",
+                "name": "instance-1",
+                "networkInterfaces": [
+                    {
+                        "accessConfigs": [
+                            {"externalIp": "35.205.62.123", "type": "ONE_TO_ONE_NAT"}
+                        ],
+                        "dnsServers": ["169.254.169.254"],
+                        "forwardedIps": [],
+                        "gateway": "10.132.0.1",
+                        "ip": "10.132.0.2",
+                        "ipAliases": [],
+                        "mac": "42:01:0a:84:00:02",
+                        "mtu": 1460,
+                        "network": "projects/11111111111/networks/default",
+                        "subnetmask": "255.255.240.0",
+                        "targetInstanceIps": [],
+                    }
+                ],
+                "partnerAttributes": {},
+                "preempted": "FALSE",
+                "remainingCpuTime": -1,
+                "scheduling": {
+                    "automaticRestart": "TRUE",
+                    "onHostMaintenance": "MIGRATE",
+                    "preemptible": "FALSE",
+                },
+                "serviceAccounts": {
+                    "11111111111-compute@developer.gserviceaccount.com": {
+                        "aliases": ["default"],
+                        "email": "11111111111-compute@developer.gserviceaccount.com",
+                        "scopes": [
+                            "https://www.googleapis.com/auth/devstorage.read_only",
+                            "https://www.googleapis.com/auth/logging.write",
+                            "https://www.googleapis.com/auth/monitoring.write",
+                            "https://www.googleapis.com/auth/servicecontrol",
+                            "https://www.googleapis.com/auth/service.management.readonly",
+                            "https://www.googleapis.com/auth/trace.append",
+                        ],
+                    },
+                    "default": {
+                        "aliases": ["default"],
+                        "email": "11111111111-compute@developer.gserviceaccount.com",
+                        "scopes": [
+                            "https://www.googleapis.com/auth/devstorage.read_only",
+                            "https://www.googleapis.com/auth/logging.write",
+                            "https://www.googleapis.com/auth/monitoring.write",
+                            "https://www.googleapis.com/auth/servicecontrol",
+                            "https://www.googleapis.com/auth/service.management.readonly",
+                            "https://www.googleapis.com/auth/trace.append",
+                        ],
+                    },
+                },
+                "tags": [],
+                "virtualClock": {"driftToken": "0"},
+                "zone": "projects/11111111111/zones/europe-west1-b",
+            },
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_metadata_gcp(
     copy_files: list[Path],
     chalk: Chalk,
     tmp_file: Path,
     server_imds: str,
 ):
-    # make imds plugin think we are running in EC2
     tmp_file.write_text("Google")
     bin_path = copy_files[0]
     insert = chalk.insert(
@@ -546,6 +681,10 @@ def test_metadata_gcp(
             "_OP_CLOUD_PROVIDER_IP": "35.205.62.123",
             "_OP_CLOUD_PROVIDER_REGION": "europe-west1-b",
             "_OP_CLOUD_PROVIDER_INSTANCE_TYPE": "e2-micro",
+            "_GCP_PROJECT_METADATA": {
+                "numericProjectId": 434557252559,
+                "projectId": "gcp-integration-423910",
+            },
             "_GCP_INSTANCE_METADATA": {
                 "attributes": {
                     "ssh-keys": 'test:ecdsa-sha2-nistp256 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKgXTiO1+sSWCEsq/bWaLdY= google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:11:57+0000"}\ntest:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCvddnbJ/XWxMUPXOsDMNoRHJeaCgwqk6g7UYvrXqogwmJ1WpC1QPuG3mhDjmBOcjINi7TYsozDKZilL2BDu2i6CGC1s2Tokq41lsgnCePNdnYmPcA318PmuMmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeT7R92kx google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:12:12+0000"}'

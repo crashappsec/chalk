@@ -377,6 +377,7 @@ report and subtract from it.
   key._OP_CLOUD_PROVIDER_INSTANCE_TYPE.use    = true
   key._AZURE_INSTANCE_METADATA.use            = true
   key._GCP_INSTANCE_METADATA.use              = true
+  key._GCP_PROJECT_METADATA.use               = true
   key._AWS_INSTANCE_IDENTITY_DOCUMENT.use     = true
   key._AWS_INSTANCE_IDENTITY_PKCS7.use        = true
   key._AWS_INSTANCE_IDENTITY_SIGNATURE.use    = true
@@ -582,6 +583,7 @@ doc: """
   # json
   key._AZURE_INSTANCE_METADATA.use                   = true
   key._GCP_INSTANCE_METADATA.use                     = true
+  key._GCP_PROJECT_METADATA.use                      = true
   key._AWS_IAM_INFO.use                              = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
@@ -1052,6 +1054,7 @@ container.
   # json
   key._AZURE_INSTANCE_METADATA.use                   = true
   key._GCP_INSTANCE_METADATA.use                     = true
+  key._GCP_PROJECT_METADATA.use                      = true
   key._AWS_IAM_INFO.use                              = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
@@ -1507,6 +1510,7 @@ and keep the run-time key.
   # json
   key._AZURE_INSTANCE_METADATA.use                   = true
   key._GCP_INSTANCE_METADATA.use                     = true
+  key._GCP_PROJECT_METADATA.use                      = true
   key._AWS_IAM_INFO.use                              = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
