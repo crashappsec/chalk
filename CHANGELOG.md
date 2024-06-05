@@ -16,14 +16,14 @@
   scans when the Docker context was outside that
   directory.
   ([#314](https://github.com/crashappsec/chalk/pull/314))
-- Docker wrapping `ENTRYPOINT` without `buildx` was failing
-  when docker context folder already had either `chalk`
-  or `docker` file/folder.
+- Without Buildx, Docker failed to wrap `ENTRYPOINT` when
+  the Docker context folder already had a file/directory named
+  `chalk` or `docker`.
   ([#315](https://github.com/crashappsec/chalk/pull/315))
-- Docker wrapping `ENTRYPOINT` with buildx was failing
-  when chalk binary was located next to `.dockerignore`
-  (e.g. in chalk repo itself) hence chalk could not be
-  copied during the build.
+- With Buildx, Docker failed to wrap `ENTRYPOINT` when
+  a `chalk` binary was located next to `.dockerignore`
+  (e.g. in the Chalk repo itself) because `chalk` could
+  not be copied during the build.
   ([#315](https://github.com/crashappsec/chalk/pull/315))
 
 ### New Features
