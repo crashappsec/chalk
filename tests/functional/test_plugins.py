@@ -2,11 +2,11 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import os
 import re
 import shutil
 from pathlib import Path
 
+import os
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
@@ -22,6 +22,7 @@ from .utils.dict import ANY
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
+
 
 logger = get_logger()
 
@@ -843,8 +844,9 @@ def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
     assert chalk_mark.contains(sbom_data)
 
 
+@pytest.mark.parametrize("use_docker", [True, False])
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk):
+def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk, use_docker: bool):
     bin_path = copy_files[0]
 
     # we need to enable sboms + embed sboms so load test config
@@ -872,26 +874,33 @@ def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk):
 
     artifact = ArtifactInfo.one_elf(bin_path, chalk_info=sbom_data)
 
-    insert = chalk.insert(bin_path)
+    insert = chalk.insert(bin_path, env={"EXTERNAL_TOOL_USE_DOCKER": str(use_docker)})
     validate_chalk_report(
         chalk_report=insert.report,
         artifact_map=artifact,
         virtual=False,
         chalk_action="insert",
     )
+    if use_docker:
+        assert "ghcr.io/anchore/syft" in insert.logs
+    else:
+        assert "ghcr.io/anchore/syft" not in insert.logs
 
     # check that sbom has been embedded into the artifact
     chalk_mark = ChalkMark.from_binary(bin_path)
     assert chalk_mark.contains(sbom_data)
 
 
+@pytest.mark.parametrize("use_docker", [True, False])
 @pytest.mark.parametrize(
     "test_file",
     [
         "sample_1",
     ],
 )
-def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
+def test_semgrep(
+    tmp_data_dir: Path, test_file: str, chalk_copy: Chalk, use_docker: bool
+):
     shutil.copytree(PYS / test_file, tmp_data_dir, dirs_exist_ok=True)
     # copy rule.yaml also
     shutil.copy(DATA / "semgrep" / "rule.yaml", tmp_data_dir)
@@ -920,7 +929,9 @@ def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
                                     {
                                         "physicalLocation": {
                                             "artifactLocation": {
-                                                "uri": "helloworld.py",
+                                                "uri": str(
+                                                    tmp_data_dir / "helloworld.py"
+                                                ),
                                                 "uriBaseId": "%SRCROOT%",
                                             },
                                             "region": {
@@ -962,13 +973,19 @@ def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
         tmp_data_dir / "helloworld.py", chalk_info=sast_data
     )
 
-    insert = chalk.insert(artifact=tmp_data_dir)
+    insert = chalk.insert(
+        artifact=tmp_data_dir, env={"EXTERNAL_TOOL_USE_DOCKER": str(use_docker)}
+    )
     validate_chalk_report(
         chalk_report=insert.report,
         artifact_map=artifact,
         virtual=False,
         chalk_action="insert",
     )
+    if use_docker:
+        assert "semgrep/semgrep" in insert.logs
+    else:
+        assert "semgrep/semgrep" not in insert.logs
 
     # check that sbom has been embedded into the artifact
     chalk_mark = ChalkMark.from_binary(tmp_data_dir / "helloworld.py")

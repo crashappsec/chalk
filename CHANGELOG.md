@@ -10,6 +10,12 @@
 - Regression:`chalk load` did not revalidate previously loaded
   components in Chalk since >=0.4.0
   ([#313](https://github.com/crashappsec/chalk/pull/313))
+- The external tool `semgrep` now correctly scans the
+  Chalk context folder. Previously, it always scanned the
+  current working directory, which produced incorrect
+  scans when the Docker context was outside that
+  directory.
+  ([#314](https://github.com/crashappsec/chalk/pull/314))
 
 ### New Features
 
@@ -17,6 +23,11 @@
 
   - New key holding GCP project metadata: `_GCP_PROJECT_METADATA`
     ([#311](https://github.com/crashappsec/chalk/pull/31))
+
+- The Chalk external tools `syft` and `semgrep` are now run via Docker
+  when they are not installed and Docker is available. This avoids the
+  need to install them on the host system.
+  ([#314](https://github.com/crashappsec/chalk/pull/314))
 
 ## 0.4.1
 

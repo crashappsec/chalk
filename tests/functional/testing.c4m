@@ -8,3 +8,8 @@ custom_report.terminal_other_op.enabled: false
 if not env_exists("VENDOR") {
   cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path: "/tmp/nonexisting"
 }
+
+# to avoid rate throttling in CI
+tool.syft.syft_container = "ghcr.io/anchore/syft"
+# unfortunately semgrep does not publish to ghcr
+# https://github.com/semgrep/semgrep/issues/9169

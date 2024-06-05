@@ -1379,7 +1379,7 @@ metadata.
 
 keyspec SBOM {
     kind:             ChalkTimeArtifact
-    type:             dict[string, `x]
+    type:             dict[string, dict[string, `x]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "SBOM(s) collected at Chalk time"

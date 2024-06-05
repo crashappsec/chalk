@@ -7,3 +7,9 @@ mark_template.mark_default.key.SBOM.use: true
 
 # `chalk docker build` uses the `minimal` template.
 mark_template.minimal.key.SBOM.use: true
+
+if env("EXTERNAL_TOOL_USE_DOCKER") != "False" {
+  tool.syft.syft_prefer_docker = true
+} else {
+  tool.syft.syft_entrypoint    = ""
+}
