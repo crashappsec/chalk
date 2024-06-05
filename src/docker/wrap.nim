@@ -73,15 +73,31 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
     once:
       trace("docker: injection method: --build-context")
 
-    ctx.newCmdLine.add("--build-context")
-    ctx.newCmdLine.add("chalkcontext" & $(contextCounter) & "=" & dir)
-    toAdd.add("COPY " &
-              chmodstr &
-              "--from=chalkcontext" & $(contextCounter) &
-              " " & file & " " & newPath)
-    contextCounter += 1
+    let
+      context = "chalkcontext" & $contextCounter
+      ignore  = dir.joinPath(".dockerignore")
+      shift   = ignore.fileExists()
+      folder  = if shift: getNewTempDir() else: dir
+      dstLoc  = folder.joinPath(file)
+
     if move:
       registerTempFile(loc)
+
+    if shift:
+      if move:
+        trace("docker: .dockerignore is present in context. moving to tmp " & dstLoc)
+        moveFile(loc, dstLoc)
+      else:
+        trace("docker: .dockerignore is present in context. copying to tmp " & dstLoc)
+        copyFile(loc, dstLoc)
+
+    ctx.newCmdLine.add("--build-context")
+    ctx.newCmdLine.add(context & "=" & folder)
+    toAdd.add("COPY " &
+              chmodstr &
+              "--from=" & context & " " &
+              file & " " & newPath)
+    contextCounter += 1
 
   elif ctx.foundContext == "-":
     raise newException(
@@ -94,7 +110,10 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
       trace("docker: injection method: COPY")
 
     let contextDir = ctx.foundContext.resolvePath()
-    var dstLoc     = contextDir.joinPath(file)
+    # using extension which is unlikely to be already ignored by .dockerignore
+    # by default temporary files use .tmp extension which might be ignored
+    # whereas chalk is a lot less likely
+    var dstLoc     = contextDir.joinPath(file & ".chalk")
 
     trace("docker: context directory is: " & contextDir)
     if not dirExists(contextDir):
@@ -104,26 +123,27 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
       )
 
     try:
+      while dirExists(dstLoc) or fileExists(dstLoc):
+        dstLoc &= ".chalk"
       if move:
         moveFile(loc, dstLoc)
         trace("docker: moved " & loc & " to " & dstLoc)
       else:
-        while fileExists(dstLoc):
-          dstLoc &= ".tmp"
         copyFile(loc, dstLoc)
         trace("docker: copied " & loc & " to " & dstLoc)
+      let (_, name) = dstLoc.splitPath()
 
       if chmodstr != "" and supportsCopyChmod():
-        toAdd.add("COPY " & chmodstr & file & " " & newPath)
+        toAdd.add("COPY " & chmodstr & name & " " & newPath)
       elif chmod != "":
         if hasUser:
           toAdd.add("USER root")
-        toAdd.add("COPY " & file & " " & newPath)
+        toAdd.add("COPY " & name & " " & newPath)
         toAdd.add("RUN chmod " & chmod & " " & newPath)
         if hasUser:
           toAdd.add("USER " & user)
       else:
-        toAdd.add("COPY " & file & " " & newPath)
+        toAdd.add("COPY " & name & " " & newPath)
       registerTempFile(dstLoc)
 
     except:
@@ -195,7 +215,6 @@ proc makeTextAvailableToDocker*(ctx:        DockerInvocation,
                                 text:       string,
                                 newPath:    string,
                                 user:       string,
-                                move:       bool           = true,
                                 chmod:      string         = "",
                                 byPlatform: bool           = false,
                                 platform:   DockerPlatform = DockerPlatform(nil)) =
@@ -205,7 +224,7 @@ proc makeTextAvailableToDocker*(ctx:        DockerInvocation,
     path       = path,
     newPath    = newPath,
     user       = user,
-    move       = move,
+    move       = true, # cleanup file after build
     chmod      = chmod,
     byPlatform = byPlatform,
     platform   = platform,
