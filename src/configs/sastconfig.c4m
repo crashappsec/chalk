@@ -25,13 +25,13 @@ This runs the semgrep static analyizer.  If it doesn't exist in the
 path, chalk will:
 
 1. use docker (if present) to run semgrep
-2. attempt to install it via 'pipx install semgrep'
-3. attempt to install it via 'python3 -m pip install semgrep'
+2. otherwise, attempt to install it via 'pipx install semgrep'
+3. otherwise, attempt to install it via 'python3 -m pip install semgrep'
 
 You can configure the following fields in the tool.semgrep object:
 
-semgrep_container:      Name of docker container to use to run semgrep
-semgrep_entrypoint:     What entrypoint to use to run semgrep
+semgrep_container:      The name of the docker container to use to run semgrep
+semgrep_entrypoint:     The entrypoint to use to run semgrep
 semgrep_config_profile: The semgrep profile to use.  Defaults to 'auto'
 semgrep_format:         The output format flag to pass. Defaults to 'sarif'
 semgrep_metrics:        Whether to ping semgrep. 'on' or 'off'. Defaults to 'on' to be compatible with config=auto
@@ -50,12 +50,12 @@ func find_semgrep(path) {
       if not is_dir(path) {
         dir, _ := path_split(path)
       }
-      # to allow to use relative path within cwd of the config_profile
+      # Allow using a relative path within cwd of the config_profile
       cwd_volume := ""
       if dir != cwd() {
         cwd_volume := "-v " + cwd() + ":" + cwd() + " "
       }
-      # to allow to use config from outside of cwd, such as in ~
+      # Allow using a config from outside of cwd, such as in ~
       config_volume := ""
       config := resolve_path(tool.semgrep.semgrep_config_profile)
       if is_file(config) {
@@ -105,6 +105,8 @@ func install_semgrep(path) {
 }
 
 func get_semgrep_args(path) {
+  # `semgrep ci` does not support specifying a target. Use the `scan` subcommand instead.
+  # https://github.com/semgrep/semgrep/issues/10305
   result := "scan --config=" + tool.semgrep.semgrep_config_profile
   result := result + " --" + tool.semgrep.semgrep_format + " "
   result := result + "--metrics=" + tool.semgrep.semgrep_metrics + " "
@@ -122,7 +124,7 @@ func load_semgrep_results(out: string, code) {
   }
 
   if not starts_with(strip(out), "{") {
-    error("semgrep did not run properly - invalid json returned; ignoring")
+    error("semgrep did not run properly - invalid JSON returned; ignoring")
     echo(out)
     return {}
   }

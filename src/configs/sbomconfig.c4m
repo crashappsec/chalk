@@ -24,7 +24,7 @@ This runs the syft SBOM tool.  If it can't be found in the current path,
 chalk will:
 
 1. use docker (if present) to run syft
-2. attempt to install it into /tmp, via the official installer,
+2. otherwise, attempt to install it into /tmp, via the official installer,
    located at `https://raw.githubusercontent.com/anchore/syft/main/install.sh`
 
 You can configure the following fields in the tool.syft object:
@@ -105,7 +105,7 @@ func extract_syft_sbom(out: string, code) {
   }
 
   if not starts_with(strip(out), "{") {
-    error("syft did not run properly - invalid json returned; ignoring")
+    error("syft did not run properly - invalid JSON returned; ignoring")
     echo(out)
     return {}
   }
