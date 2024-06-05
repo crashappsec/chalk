@@ -39,6 +39,10 @@ proc runOneTool(info: PIInfo, path: string): ChalkDict =
       return
     exe = ensureRunCallback[string](info.obj.getToolLocation, args)
 
+  if exe == "":
+    trace(info.name & ": could not be found. skipping")
+    return
+
   let
     argv = ensureRunCallback[string](info.obj.getCommandArgs, args)
     cmd  = exe & " " & argv.strip()

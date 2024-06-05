@@ -9,17 +9,18 @@
 
 tool syft {
   ~kind: "sbom"
-  ~get_tool_location: func find_syft(string) -> string
-  ~attempt_install:   func install_syft(string) -> bool
-  ~get_command_args:  func get_syft_args(string) -> string
-  ~produce_keys:      (func extract_syft_sbom(string, int) ->
-                                                  dict[string, string])
-  syft_exe_dir:      "/tmp"
-  syft_installer:    "https://raw.githubusercontent.com/anchore/syft/main/install.sh"
-  syft_container:    "anchore/syft"
-  syft_entrypoint:   "/syft"
-  syft_argv:         " -o cyclonedx-json"  # CycloneDX by default.
-  ~doc:              """
+  ~get_tool_location:  func find_syft(string) -> string
+  ~attempt_install:    func install_syft(string) -> bool
+  ~get_command_args:   func get_syft_args(string) -> string
+  ~produce_keys:       (func extract_syft_sbom(string, int) ->
+                                                   dict[string, string])
+  syft_exe_dir:       "/tmp"
+  syft_installer:     "https://raw.githubusercontent.com/anchore/syft/main/install.sh"
+  syft_container:     "anchore/syft"
+  syft_entrypoint:    "/syft"
+  syft_prefer_docker: false
+  syft_argv:          " -o cyclonedx-json"  # CycloneDX by default.
+  ~doc:               """
 This runs the syft SBOM tool.  If it can't be found in the current path,
 chalk will:
 
@@ -29,36 +30,63 @@ chalk will:
 
 You can configure the following fields in the tool.syft object:
 
-syft_exe_dir:    Where to try to install syft, if not found.  Defaults to "/tmp"
-syft_container:  Name of docker container to use to run syft
-syft_entrypoint: What entrypoint to use inside the container
-syft_installer:  Location of the official syft installer.
-syft_argv:       Command-line flags to pass to syft. Defaults to:
-                 -o cyclone-json
+syft_prefer_docker: When true, docker is preferred over system-installed syft.
+                    Defaults to `false`.
+syft_container:     The name of docker container to use to run syft.
+                    Defaults to 'anchore/syft' from Docker Hub.
+syft_entrypoint:    The entrypoint to use inside the container.
+                    Defaults to '/syft'.
+syft_exe_dir:       Where to try to install syft, if not found.
+                    Defaults to '/tmp'.
+syft_installer:     URL of the official syft installer script.
+                    Defaults to 'https://raw.githubusercontent.com/anchore/syft/main/install.sh'.
+syft_argv:          Command-line flags to pass to syft.
+                    Defaults to '-o cyclone-json'
 """
 }
 
-func find_syft(path) {
-  result := find_exe("syft", ["/tmp"]) # /tmp is in addition to $PATH
-  if result == "" {
-    docker_path := docker_exe()
-    if docker_path == "" {
-      trace("find_syft: Unable to find syft in $PATH and docker is not available")
-    } elif tool.syft.syft_entrypoint != "" and tool.syft.syft_container != "" {
-      trace("find_syft: Using docker for running syft")
-      return (
-        docker_path + " run " +
-        "--rm " +
-        "--entrypoint=" + tool.syft.syft_entrypoint + " " +
-        "-v " + path + ":" + path + " " +
-        tool.syft.syft_container
-      )
-    } else {
-      trace("find_syft: Unable to find syft in $PATH and docker is disabled")
-    }
-  } else {
-    trace("found syft at: " + result)
+func syft_docker(path) {
+  result := ""
+  if tool.syft.syft_entrypoint == "" or tool.syft.syft_container == "" {
+    trace("find_syft: docker is disabled - both container and entrypoint must be defined")
+    return
   }
+  docker_path := docker_exe()
+  if docker_path == "" {
+    trace("find_syft: docker is missing; unable to use docker for syft")
+    return
+  }
+  trace("find_syft: using docker for running syft")
+  return (
+    docker_path + " run " +
+    "--rm " +
+    "--entrypoint=" + tool.syft.syft_entrypoint + " " +
+    "-v " + path + ":" + path + " " +
+    tool.syft.syft_container
+  )
+}
+
+func syft_system() {
+  result := find_exe("syft", [tool.syft.syft_exe_dir]) # /tmp is in addition to $PATH
+  if result == "" {
+    trace("find_syft: Unable to find syft in $PATH")
+  } else {
+    trace("find_syft: found syft in $PATH: " + result)
+  }
+}
+
+func find_syft(path) {
+  if tool.syft.syft_prefer_docker {
+    result := syft_docker(path)
+    if result != "" {
+      return
+    }
+  }
+  result := syft_system()
+  if result != "" {
+    return result
+  }
+  result := syft_docker(path)
 }
 
 func install_syft(path) {
