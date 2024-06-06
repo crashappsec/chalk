@@ -2,6 +2,13 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- `BUILD_URI` for GitHub actions now includes run attempt
+  in the URI. Previously `BUILD_URI` always linked to
+  latest attempt.
+  ([#320](https://github.com/crashappsec/chalk/pull/320))
+
 ## 0.4.2
 
 **June 5, 2024**

@@ -45,6 +45,7 @@ proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
     GITHUB_REPOSITORY_ID       = getEnv("GITHUB_REPOSITORY_ID")
     GITHUB_REPOSITORY_OWNER_ID = getEnv("GITHUB_REPOSITORY_OWNER_ID")
     GITHUB_RUN_ID              = getEnv("GITHUB_RUN_ID")
+    GITHUB_RUN_ATTEMPT         = getEnv("GITHUB_RUN_ATTEMPT")
     GITHUB_API_URL             = getEnv("GITHUB_API_URL")
     GITHUB_ACTOR               = getEnv("GITHUB_ACTOR")
     GITHUB_EVENT_NAME          = getEnv("GITHUB_EVENT_NAME")
@@ -60,11 +61,14 @@ proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
 
   if (GITHUB_SERVER_URL != "" and GITHUB_REPOSITORY != "" and
       GITHUB_RUN_ID != ""):
-    result.setIfNeeded("BUILD_URI", (
+    var uri = (
       GITHUB_SERVER_URL.strip(leading = false, chars = {'/'}) & "/" &
       GITHUB_REPOSITORY.strip(chars = {'/'}) & "/actions/runs/" &
       GITHUB_RUN_ID
-    ))
+    )
+    if GITHUB_RUN_ATTEMPT != "":
+      uri = uri.strip(chars = {'/'}) & "/attempts/" & GITHUB_RUN_ATTEMPT
+    result.setIfNeeded("BUILD_URI", uri)
 
   if GITHUB_API_URL != "" and (
     isSubscribedKey("BUILD_ORIGIN_KEY") or
