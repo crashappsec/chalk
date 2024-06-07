@@ -70,7 +70,7 @@ jobs:
           private_key: ${{ secrets.CHALK_GITHUB_APP_PRIVATE_KEY }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@885d1462b80bc1c1c7f0b00334ad271f09369c55 # 2.10.0
+        uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # 3.3.0
         with:
           install: true
 
