@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Python
-        uses: actions/setup-python@3542bca2639a428e1796aaa6a2ffef0c0f575566 # 3.1.4
+        uses: actions/setup-python@82c7e631bb3cdc910f68e0081d67478d79c6982d # 5.1.0
 
       - name: Run pre-commit
         uses: pre-commit/action@646c83fcd040023954eafda54b4db0192ce70507 # 3.0.0
