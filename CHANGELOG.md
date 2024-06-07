@@ -4,8 +4,75 @@
 
 ### Fixes
 
+- `BUILD_URI` for GitHub actions now includes run attempt
+  in the URI. Previously `BUILD_URI` always linked to
+  latest attempt.
+  ([#320](https://github.com/crashappsec/chalk/pull/320))
+
+## 0.4.2
+
+**June 5, 2024**
+
+### Fixes
+
+- When building Chalk on macOS, downloading root certs
+  could fail due to missing quotes around the URL
+  ([nimutils #68](https://github.com/crashappsec/nimutils/pull/68))
+- Regression:`chalk load` did not revalidate previously loaded
+  components in Chalk since >=0.4.0
+  ([#313](https://github.com/crashappsec/chalk/pull/313))
+- The external tool `semgrep` now correctly scans the
+  Chalk context folder. Previously, it always scanned the
+  current working directory, which produced incorrect
+  scans when the Docker context was outside that
+  directory.
+  ([#314](https://github.com/crashappsec/chalk/pull/314))
+- Without Buildx, Docker failed to wrap `ENTRYPOINT` when
+  the Docker context folder already had a file/directory named
+  `chalk` or `docker`.
+  ([#315](https://github.com/crashappsec/chalk/pull/315))
+- With Buildx, Docker failed to wrap `ENTRYPOINT` when
+  a `chalk` binary was located next to `.dockerignore`
+  (e.g. in the Chalk repo itself) because `chalk` could
+  not be copied during the build.
+  ([#315](https://github.com/crashappsec/chalk/pull/315))
+
+### New Features
+
+- New chalk keys:
+
+  - New key holding GCP project metadata: `_GCP_PROJECT_METADATA`
+    ([#311](https://github.com/crashappsec/chalk/pull/31))
+
+- The Chalk external tools `syft` and `semgrep` are now run via Docker
+  when they are not installed and Docker is available. This avoids the
+  need to install them on the host system.
+  ([#314](https://github.com/crashappsec/chalk/pull/314))
+
+## 0.4.1
+
+**May 30, 2024**
+
+### Fixes
+
 - Fixed metadata reporting for GCP cloud run services
   ([#304](https://github.com/crashappsec/chalk/pull/304))
+- Fixes custom key name validation
+  ([#307](https://github.com/crashappsec/chalk/pull/307))
+
+### New Features
+
+- New chalk keys:
+
+  - Keys to identify the origin repository, using
+    an identifier provided by the CI/CD system:
+
+    - `BUILD_ORIGIN_ID`
+    - `BUILD_ORIGIN_KEY`
+    - `BUILD_ORIGIN_OWNER_ID`
+    - `BUILD_ORIGIN_OWNER_KEY`
+
+  ([#303](https://github.com/crashappsec/chalk/pull/303))
 
 ## 0.4.0
 

@@ -102,7 +102,7 @@ def test_no_docker(chalk: Chalk):
     ],
 )
 def test_build(
-    chalk: Chalk,
+    chalk_copy: Chalk,
     dockerfile: Optional[Path],
     cwd: Optional[Path],
     tag: Optional[bool],
@@ -112,7 +112,8 @@ def test_build(
     """
     Test various variants of docker build command
     """
-    image_id, build = chalk.docker_build(
+    chalk_copy.binary.rename("chalk")
+    image_id, build = chalk_copy.docker_build(
         dockerfile=dockerfile,
         cwd=cwd,
         tag=random_hex if tag else None,

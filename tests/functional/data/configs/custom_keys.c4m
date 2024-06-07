@@ -1,0 +1,56 @@
+keyspec X_REPORT_VALUE {
+  kind:     ChalkTimeHost
+  type:     string
+  value:    "hello"
+}
+keyspec X_REPORT_ENV_VAR {
+  kind:     ChalkTimeHost
+  type:     string
+  value:    env("ENV_VAR")
+}
+keyspec X_REPORT_CMD {
+  kind:     ChalkTimeHost
+  type:     string
+  value:    strip(run("echo mars"))
+}
+keyspec X_REPORT_FUNC {
+  kind:     ChalkTimeHost
+  type:     string
+  callback: func key_callback
+}
+
+keyspec X_MARK_VALUE {
+  kind:     ChalkTimeArtifact
+  type:     string
+  value:    "hello"
+}
+keyspec X_MARK_ENV_VAR {
+  kind:     ChalkTimeArtifact
+  type:     string
+  value:    env("ENV_VAR")
+}
+keyspec X_MARK_CMD {
+  kind:     ChalkTimeArtifact
+  type:     string
+  value:    strip(run("echo mars"))
+}
+keyspec X_MARK_FUNC {
+  kind:     ChalkTimeArtifact
+  type:     string
+  callback: func key_callback
+}
+
+func key_callback(contexts) {
+  return "hello " + env("ENV_VAR")
+}
+
+report_template insertion_default {
+  key.X_REPORT_VALUE.use   = true
+  key.X_REPORT_ENV_VAR.use = true
+  key.X_REPORT_CMD.use     = true
+  key.X_REPORT_FUNC.use    = true
+  key.X_MARK_VALUE.use     = true
+  key.X_MARK_ENV_VAR.use   = true
+  key.X_MARK_CMD.use       = true
+  key.X_MARK_FUNC.use      = true
+}

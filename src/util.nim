@@ -582,8 +582,22 @@ proc merge*(self: ChalkDict, other: ChalkDict): ChalkDict {.discardable.} =
   for k, v in other:
     if k in self and self[k].kind == MkSeq and v.kind == MkSeq:
       self[k] &= v
+    elif k in self and self[k].kind == MkTable and v.kind == MkTable:
+      let
+        mine   = unpack[ChalkDict](self[k])
+        theirs = unpack[ChalkDict](v)
+      for kk, vv in theirs:
+        mine[kk] = vv
+      self[k] = pack(mine)
     else:
       self[k] = v
+
+proc nestWith*(self: ChalkDict, key: string): ChalkDict =
+  result = ChalkDict()
+  for k, v in self:
+    let value = ChalkDict()
+    value[key] = v
+    result[k] = pack(value)
 
 proc strip*(items: seq[string], leading = true, trailing = true, chars = Whitespace): seq[string] =
   result = @[]

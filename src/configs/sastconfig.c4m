@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -18,31 +18,99 @@ tool semgrep {
   semgrep_format:         "sarif"
   semgrep_metrics:        "on"
   semgrep_other_flags:    ""
+  semgrep_exe_dirs:       ["/tmp/semgrep.env/bin", "~/.local/bin"]
+  semgrep_container:      "semgrep/semgrep"
+  semgrep_entrypoint:     "semgrep"
+  semgrep_prefer_docker:  false
   doc: """
 This runs the semgrep static analyizer.  If it doesn't exist in the
-path, chalk will attempt to install it via 'python3 -m pip install semgrep'.
+path, chalk will:
+
+1. use docker (if present) to run semgrep
+2. otherwise, attempt to install it via 'pipx install semgrep'
+3. otherwise, attempt to install it via 'python3 -m pip install semgrep'
 
 You can configure the following fields in the tool.semgrep object:
 
-semgrep_config_profile: The semgrep profile to use.  Defaults to 'auto'
-semgrep_format:         The output format flag to pass. Defaults to 'sarif'
-semgrep_metrics:        Whether to ping semgrep. 'on' or 'off'. Defaults to 'on' to be compatible with config=auto
+semgrep_prefer_docker:  When true, docker is preferred over system-installed semgrep.
+                        Defaults to `false`.
+semgrep_container:      The name of the docker container to use to run semgrep.
+                        Defaults to 'semgrep/semgrep' from Docker Hub.
+semgrep_entrypoint:     The entrypoint to use to run semgrep.
+                        Defaults to 'semgrep'.
+semgrep_exe_dirs:       In addition to $PATH, where to search for semgrep.
+                        Defaults to ["/tmp/semgrep.env/bin", "~/.local/bin"].
+semgrep_config_profile: The semgrep profile to use.
+                        Defaults to 'auto'.
+semgrep_format:         The output format flag to pass.
+                        Defaults to  'sarif'.
+semgrep_metrics:        Whether to ping semgrep. 'on' or 'off'.
+                        Defaults to 'on' to be compatible with config=auto
 """
 }
 
+func semgrep_docker(path) {
+  result := ""
+  if tool.semgrep.semgrep_entrypoint == "" or tool.semgrep.semgrep_container == "" {
+    trace("find_semgrep: docker is disabled - both container and entrypoint must be defined")
+    return
+  }
+  docker_path := docker_exe()
+  if docker_path == "" {
+    trace("find_semgrep: docker is missing; unable to use docker for semgrep")
+    return
+  }
+  dir := path
+  if not is_dir(path) {
+    dir, _ := path_split(path)
+  }
+  # Allow using a relative path within cwd of the config_profile
+  cwd_volume := ""
+  if dir != cwd() {
+    cwd_volume := "-v " + cwd() + ":" + cwd() + " "
+  }
+  # Allow using a config from outside of cwd, such as in ~
+  config_volume := ""
+  config := resolve_path(tool.semgrep.semgrep_config_profile)
+  if is_file(config) {
+    config_volume := "-v " + config + ":" + config + " "
+  }
+  return (
+    docker_path + " run " +
+    "--rm " +
+    "--entrypoint=" + tool.semgrep.semgrep_entrypoint + " " +
+    "-w " + dir + " " +
+    "-v " + dir + ":" + dir + " " +
+    cwd_volume +
+    config_volume +
+    tool.semgrep.semgrep_container
+  )
+}
 
-
-func find_semgrep(ignore) {
-  result := find_exe("semgrep", ["/tmp/semgrep.env/bin", "~/.local/bin"])
-
+func semgrep_system() {
+  result := find_exe("semgrep", tool.semgrep.semgrep_exe_dirs)
   if result == "" {
     trace("find_semgrep: Unable to find semgrep in $PATH")
   } else {
-    trace("found semgrep at: " + result)
+    trace("find_semgrep: found semgrep in $PATH: " + result)
   }
 }
 
-func install_semgrep(ignore) {
+func find_semgrep(path) {
+  if tool.semgrep.semgrep_prefer_docker {
+    result := semgrep_docker(path)
+    if result != "" {
+      return
+    }
+  }
+  result := semgrep_system()
+  if result != "" {
+    return result
+  }
+  result := semgrep_docker(path)
+}
+
+func install_semgrep(path) {
   # perfer pipx for installation
   trace("attempting to install semgrep via pipx...")
   output, code := system("pipx install semgrep")
@@ -67,28 +135,30 @@ func install_semgrep(ignore) {
   return false
 }
 
-func get_semgrep_args(artifact) {
-  result := "ci --config=" + tool.semgrep.semgrep_config_profile
+func get_semgrep_args(path) {
+  # `semgrep ci` does not support specifying a target. Use the `scan` subcommand instead.
+  # https://github.com/semgrep/semgrep/issues/10305
+  result := "scan --config=" + tool.semgrep.semgrep_config_profile
   result := result + " --" + tool.semgrep.semgrep_format + " "
-  result := result + "--metrics " + tool.semgrep.semgrep_metrics + " "
-  result := result + tool.semgrep.semgrep_other_flags + " 2>/dev/null"
-  trace("semgrep args: " + result)
+  result := result + "--metrics=" + tool.semgrep.semgrep_metrics + " "
+  result := result + tool.semgrep.semgrep_other_flags + " "
+  result := result + path + " 2>/dev/null"
 }
 
 func load_semgrep_results(out: string, code) {
   result := {}
 
-  validIndicator := "\"results\": "
-  emptyIndicator := "\"results\": []"
+  if code != 0 {
+    error("semgrep failed to run properly; ignoring")
+    echo(out)
+    return {}
+  }
 
-  if not contains(out, validIndicator) {
-    warn("semgrep did not run properly; ignoring")
+  if not starts_with(strip(out), "{") {
+    error("semgrep did not run properly - invalid JSON returned; ignoring")
+    echo(out)
+    return {}
   }
-  elif contains(out, emptyIndicator) {
-    info("semgrep didn't find any components; ignoring.")
-  }
-  else {
-    trace("semgrep ran with results")
-    return { "SAST" : out }
-  }
+
+  return { "SAST" : parse_json(out) }
 }

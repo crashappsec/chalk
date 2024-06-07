@@ -26,11 +26,15 @@ proc getParams*(): seq[Box] =
     value    = valueOpt.get(pack(newSeq[Box]()))
   return unpack[seq[Box]](value)
 
-proc getCache*(): OrderedTableRef[string, string] =
+proc getCache*(ignore: seq[string] = @[]): OrderedTableRef[string, string] =
   let
     valueOpt = selfChalkGetKey(cacheKey)
     value    = valueOpt.get(pack(newOrderedTable[string, string]()))
-  return unpack[OrderedTableRef[string, string]](value)
+  result = newOrderedTable[string, string]()
+  for k, v in unpack[OrderedTableRef[string, string]](value):
+    if k in ignore:
+      continue
+    result[k] = v
 
 proc getMemoize(): Box =
   let
@@ -477,7 +481,10 @@ proc handleConfigLoad*(inpath: string): bool =
     paramsToTest.addParams(item)
 
   if validate:
-    testConfigFile(newEmbedded, paramsToTest, getCache())
+    # ignore component url in case already cached component is being reloaded
+    # this way we can correctly validate it, as otherwise cache will reload
+    # it back as it is stored in the cache
+    testConfigFile(newEmbedded, paramsToTest, getCache(ignore = @[component.url]))
   else:
     warn("Skipping configuration validation. This could break chalk.")
 

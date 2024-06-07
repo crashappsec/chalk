@@ -7,7 +7,6 @@ import json
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 
-
 PREFIX = "/latest"
 TOKEN = "token"
 TAGS = {
@@ -519,6 +518,9 @@ RESPONSES = {
         }
     ),
     # GCP
+    "/computeMetadata/v1/project": json.dumps(
+        {"numericProjectId": 434557252559, "projectId": "gcp-integration-423910"}
+    ),
     "/computeMetadata/v1/instance": json.dumps(
         {
             "attributes": {
@@ -599,6 +601,14 @@ RESPONSES = {
             "zone": "projects/11111111111/zones/europe-west1-b",
         }
     ),
+    "/repos/octocat/Hello-World": json.dumps(
+        {
+            "node_id": "abc",
+            "owner": {
+                "node_id": "xyz",
+            },
+        }
+    ),
 }
 
 
@@ -610,7 +620,7 @@ def health():
     return
 
 
-@app.put(f"/latest/api/token", response_class=PlainTextResponse)
+@app.put("/latest/api/token", response_class=PlainTextResponse)
 def token():
     return TOKEN
 

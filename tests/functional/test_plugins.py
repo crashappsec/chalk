@@ -55,7 +55,7 @@ def test_codeowners(tmp_data_dir: Path, chalk: Chalk):
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-def test_github(copy_files: list[Path], chalk: Chalk):
+def test_github(copy_files: list[Path], chalk: Chalk, server_imds: str):
     bin_path = copy_files[0]
     artifact = ArtifactInfo.one_elf(
         bin_path,
@@ -63,8 +63,12 @@ def test_github(copy_files: list[Path], chalk: Chalk):
             "BUILD_ID": "1658821493",
             "BUILD_TRIGGER": "tag",
             "BUILD_CONTACT": ["octocat"],
-            "BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493",
-            "BUILD_API_URI": "https://api.github.com",
+            "BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493/attempts/5",
+            "BUILD_API_URI": server_imds,
+            "BUILD_ORIGIN_ID": "123",
+            "BUILD_ORIGIN_KEY": "abc",
+            "BUILD_ORIGIN_OWNER_ID": "456",
+            "BUILD_ORIGIN_OWNER_KEY": "xyz",
         },
     )
     insert = chalk.insert(
@@ -76,8 +80,11 @@ def test_github(copy_files: list[Path], chalk: Chalk):
             "GITHUB_SERVER_URL": "https://github.com",
             "GITHUB_REPOSITORY": "octocat/Hello-World",
             "GITHUB_RUN_ID": "1658821493",
-            "GITHUB_API_URL": "https://api.github.com",
+            "GITHUB_RUN_ATTEMPT": "5",
+            "GITHUB_API_URL": server_imds,
             "GITHUB_ACTOR": "octocat",
+            "GITHUB_REPOSITORY_ID": "123",
+            "GITHUB_REPOSITORY_OWNER_ID": "456",
             # there are a bunch of variations of these
             # but for now at least we test basic flow
             "GITHUB_EVENT_NAME": "push",
@@ -104,6 +111,8 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
             "BUILD_CONTACT": ["user"],
             "BUILD_URI": "https://gitlab.com/gitlab-org/gitlab/-/jobs/4999820578",
             "BUILD_API_URI": "https://gitlab.com/api/v4",
+            "BUILD_ORIGIN_ID": "123",
+            "BUILD_ORIGIN_OWNER_ID": "456",
         },
     )
     insert = chalk.insert(
@@ -117,6 +126,8 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
             "CI_API_V4_URL": "https://gitlab.com/api/v4",
             "GITLAB_USER_LOGIN": "user",
             "CI_PIPELINE_SOURCE": "push",
+            "CI_PROJECT_ID": "123",
+            "CI_PROJECT_NAMESPACE_ID": "456",
         },
     )
     validate_chalk_report(
@@ -490,13 +501,149 @@ def test_metadata_azure(
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 @pytest.mark.parametrize("tmp_file", [{}], indirect=True)
+def test_metadata_gcp_no_vendor(
+    copy_files: list[Path],
+    chalk: Chalk,
+    tmp_file: Path,
+    server_imds: str,
+):
+    tmp_file.write_text("search google.internal.")
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "resolv.c4m",
+        env={
+            "TEST_RESOLV": str(tmp_file),
+            "CLOUD_RUN_TIMEOUT_SECONDS": "120",
+            "K_SERVICE": "test",
+        },
+    )
+    assert insert.report.contains(
+        {
+            "_OP_CLOUD_PROVIDER": "gcp",
+            "_OP_CLOUD_PROVIDER_ACCOUNT_INFO": {
+                "11111111111-compute@developer.gserviceaccount.com": {
+                    "aliases": ["default"],
+                    "email": "11111111111-compute@developer.gserviceaccount.com",
+                    "scopes": [
+                        "https://www.googleapis.com/auth/devstorage.read_only",
+                        "https://www.googleapis.com/auth/logging.write",
+                        "https://www.googleapis.com/auth/monitoring.write",
+                        "https://www.googleapis.com/auth/servicecontrol",
+                        "https://www.googleapis.com/auth/service.management.readonly",
+                        "https://www.googleapis.com/auth/trace.append",
+                    ],
+                },
+                "default": {
+                    "aliases": ["default"],
+                    "email": "11111111111-compute@developer.gserviceaccount.com",
+                    "scopes": [
+                        "https://www.googleapis.com/auth/devstorage.read_only",
+                        "https://www.googleapis.com/auth/logging.write",
+                        "https://www.googleapis.com/auth/monitoring.write",
+                        "https://www.googleapis.com/auth/servicecontrol",
+                        "https://www.googleapis.com/auth/service.management.readonly",
+                        "https://www.googleapis.com/auth/trace.append",
+                    ],
+                },
+            },
+            "_OP_CLOUD_PROVIDER_IP": "35.205.62.123",
+            "_OP_CLOUD_PROVIDER_REGION": "europe-west1-b",
+            "_OP_CLOUD_PROVIDER_INSTANCE_TYPE": "e2-micro",
+            "_GCP_PROJECT_METADATA": {
+                "numericProjectId": 434557252559,
+                "projectId": "gcp-integration-423910",
+            },
+            "_GCP_INSTANCE_METADATA": {
+                "attributes": {
+                    "ssh-keys": 'test:ecdsa-sha2-nistp256 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKgXTiO1+sSWCEsq/bWaLdY= google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:11:57+0000"}\ntest:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCvddnbJ/XWxMUPXOsDMNoRHJeaCgwqk6g7UYvrXqogwmJ1WpC1QPuG3mhDjmBOcjINi7TYsozDKZilL2BDu2i6CGC1s2Tokq41lsgnCePNdnYmPcA318PmuMmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeT7R92kx google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:12:12+0000"}'
+                },
+                "cpuPlatform": "Intel Broadwell",
+                "description": "",
+                "disks": [
+                    {
+                        "deviceName": "instance-1",
+                        "index": 0,
+                        "interface": "SCSI",
+                        "mode": "READ_WRITE",
+                        "type": "PERSISTENT-BALANCED",
+                    }
+                ],
+                "guestAttributes": {},
+                "hostname": "instance-1.europe-west1-b.c.test-chalk-402014.internal",
+                "id": 133380848178631130,
+                "image": "projects/debian-cloud/global/images/debian-11-bullseye-v20231010",
+                "licenses": [{"id": "4324324324234234234"}],
+                "machineType": "projects/11111111111/machineTypes/e2-micro",
+                "maintenanceEvent": "NONE",
+                "name": "instance-1",
+                "networkInterfaces": [
+                    {
+                        "accessConfigs": [
+                            {"externalIp": "35.205.62.123", "type": "ONE_TO_ONE_NAT"}
+                        ],
+                        "dnsServers": ["169.254.169.254"],
+                        "forwardedIps": [],
+                        "gateway": "10.132.0.1",
+                        "ip": "10.132.0.2",
+                        "ipAliases": [],
+                        "mac": "42:01:0a:84:00:02",
+                        "mtu": 1460,
+                        "network": "projects/11111111111/networks/default",
+                        "subnetmask": "255.255.240.0",
+                        "targetInstanceIps": [],
+                    }
+                ],
+                "partnerAttributes": {},
+                "preempted": "FALSE",
+                "remainingCpuTime": -1,
+                "scheduling": {
+                    "automaticRestart": "TRUE",
+                    "onHostMaintenance": "MIGRATE",
+                    "preemptible": "FALSE",
+                },
+                "serviceAccounts": {
+                    "11111111111-compute@developer.gserviceaccount.com": {
+                        "aliases": ["default"],
+                        "email": "11111111111-compute@developer.gserviceaccount.com",
+                        "scopes": [
+                            "https://www.googleapis.com/auth/devstorage.read_only",
+                            "https://www.googleapis.com/auth/logging.write",
+                            "https://www.googleapis.com/auth/monitoring.write",
+                            "https://www.googleapis.com/auth/servicecontrol",
+                            "https://www.googleapis.com/auth/service.management.readonly",
+                            "https://www.googleapis.com/auth/trace.append",
+                        ],
+                    },
+                    "default": {
+                        "aliases": ["default"],
+                        "email": "11111111111-compute@developer.gserviceaccount.com",
+                        "scopes": [
+                            "https://www.googleapis.com/auth/devstorage.read_only",
+                            "https://www.googleapis.com/auth/logging.write",
+                            "https://www.googleapis.com/auth/monitoring.write",
+                            "https://www.googleapis.com/auth/servicecontrol",
+                            "https://www.googleapis.com/auth/service.management.readonly",
+                            "https://www.googleapis.com/auth/trace.append",
+                        ],
+                    },
+                },
+                "tags": [],
+                "virtualClock": {"driftToken": "0"},
+                "zone": "projects/11111111111/zones/europe-west1-b",
+            },
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_metadata_gcp(
     copy_files: list[Path],
     chalk: Chalk,
     tmp_file: Path,
     server_imds: str,
 ):
-    # make imds plugin think we are running in EC2
     tmp_file.write_text("Google")
     bin_path = copy_files[0]
     insert = chalk.insert(
@@ -536,6 +683,10 @@ def test_metadata_gcp(
             "_OP_CLOUD_PROVIDER_IP": "35.205.62.123",
             "_OP_CLOUD_PROVIDER_REGION": "europe-west1-b",
             "_OP_CLOUD_PROVIDER_INSTANCE_TYPE": "e2-micro",
+            "_GCP_PROJECT_METADATA": {
+                "numericProjectId": 434557252559,
+                "projectId": "gcp-integration-423910",
+            },
             "_GCP_INSTANCE_METADATA": {
                 "attributes": {
                     "ssh-keys": 'test:ecdsa-sha2-nistp256 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKgXTiO1+sSWCEsq/bWaLdY= google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:11:57+0000"}\ntest:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCvddnbJ/XWxMUPXOsDMNoRHJeaCgwqk6g7UYvrXqogwmJ1WpC1QPuG3mhDjmBOcjINi7TYsozDKZilL2BDu2i6CGC1s2Tokq41lsgnCePNdnYmPcA318PmuMmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeT7R92kx google-ssh {"userName":"test@crashoverride.com","expireOn":"2023-10-14T15:12:12+0000"}'
@@ -694,8 +845,9 @@ def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
     assert chalk_mark.contains(sbom_data)
 
 
+@pytest.mark.parametrize("use_docker", [True, False])
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk):
+def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk, use_docker: bool):
     bin_path = copy_files[0]
 
     # we need to enable sboms + embed sboms so load test config
@@ -723,26 +875,33 @@ def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk):
 
     artifact = ArtifactInfo.one_elf(bin_path, chalk_info=sbom_data)
 
-    insert = chalk.insert(bin_path)
+    insert = chalk.insert(bin_path, env={"EXTERNAL_TOOL_USE_DOCKER": str(use_docker)})
     validate_chalk_report(
         chalk_report=insert.report,
         artifact_map=artifact,
         virtual=False,
         chalk_action="insert",
     )
+    if use_docker:
+        assert "ghcr.io/anchore/syft" in insert.logs
+    else:
+        assert "ghcr.io/anchore/syft" not in insert.logs
 
     # check that sbom has been embedded into the artifact
     chalk_mark = ChalkMark.from_binary(bin_path)
     assert chalk_mark.contains(sbom_data)
 
 
+@pytest.mark.parametrize("use_docker", [True, False])
 @pytest.mark.parametrize(
     "test_file",
     [
         "sample_1",
     ],
 )
-def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
+def test_semgrep(
+    tmp_data_dir: Path, test_file: str, chalk_copy: Chalk, use_docker: bool
+):
     shutil.copytree(PYS / test_file, tmp_data_dir, dirs_exist_ok=True)
     # copy rule.yaml also
     shutil.copy(DATA / "semgrep" / "rule.yaml", tmp_data_dir)
@@ -771,7 +930,9 @@ def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
                                     {
                                         "physicalLocation": {
                                             "artifactLocation": {
-                                                "uri": "helloworld.py",
+                                                "uri": str(
+                                                    tmp_data_dir / "helloworld.py"
+                                                ),
                                                 "uriBaseId": "%SRCROOT%",
                                             },
                                             "region": {
@@ -813,13 +974,19 @@ def test_semgrep(tmp_data_dir: Path, test_file: str, chalk_copy: Chalk):
         tmp_data_dir / "helloworld.py", chalk_info=sast_data
     )
 
-    insert = chalk.insert(artifact=tmp_data_dir)
+    insert = chalk.insert(
+        artifact=tmp_data_dir, env={"EXTERNAL_TOOL_USE_DOCKER": str(use_docker)}
+    )
     validate_chalk_report(
         chalk_report=insert.report,
         artifact_map=artifact,
         virtual=False,
         chalk_action="insert",
     )
+    if use_docker:
+        assert "semgrep/semgrep" in insert.logs
+    else:
+        assert "semgrep/semgrep" not in insert.logs
 
     # check that sbom has been embedded into the artifact
     chalk_mark = ChalkMark.from_binary(tmp_data_dir / "helloworld.py")

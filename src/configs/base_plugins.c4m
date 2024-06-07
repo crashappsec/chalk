@@ -112,7 +112,9 @@ artifacts will be attached to that info.
 plugin ci_github {
     enabled:         true
     pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
-                     "BUILD_TRIGGER", "BUILD_CONTACT"]
+                      "BUILD_TRIGGER", "BUILD_CONTACT",
+                      "BUILD_ORIGIN_ID", "BUILD_ORIGIN_OWNER_ID",
+                      "BUILD_ORIGIN_KEY", "BUILD_ORIGIN_OWNER_KEY"]
     doc: """
 Collects information about associated build jobs in github actions.
 
@@ -133,7 +135,8 @@ This only collects data when adding chalk marks.
 plugin ci_gitlab {
     enabled:         true
     pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI",
-                      "BUILD_TRIGGER", "BUILD_CONTACT"]
+                      "BUILD_TRIGGER", "BUILD_CONTACT",
+                      "BUILD_ORIGIN_ID", "BUILD_ORIGIN_OWNER_ID"]
     doc: """
 Collects information about associated build jobs in Gitlab.
 
@@ -192,7 +195,8 @@ Can capture data both during build and during process run time.
 plugin cloud_metadata {
     enabled:         true
     priority:        1000
-    post_run_keys:   ["_GCP_INSTANCE_METADATA", "_AZURE_INSTANCE_METADATA",
+    post_run_keys:   ["_GCP_INSTANCE_METADATA", "_GCP_PROJECT_METADATA",
+    "_AZURE_INSTANCE_METADATA",
     "_OP_CLOUD_PROVIDER", "_OP_CLOUD_PROVIDER_SERVICE_TYPE",
     "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", "_OP_CLOUD_PROVIDER_REGION",
     "_OP_CLOUD_PROVIDER_REGION", "_OP_CLOUD_PROVIDER_IP",
