@@ -13,7 +13,7 @@ from unittest import mock
 import os
 import pytest
 
-from .chalk.runner import Chalk, ChalkProgram
+from .chalk.runner import Chalk, ChalkMark, ChalkProgram
 from .chalk.validate import (
     MAGIC,
     MISSING,
@@ -213,6 +213,60 @@ def test_composite_build(
         config=CONFIGS / "docker_wrap.c4m",
     )
     assert second_image_id
+
+
+@pytest.mark.parametrize(
+    "base, test",
+    [
+        (
+            DOCKERFILES / "valid" / "split_dockerfiles" / "base.Dockerfile",
+            DOCKERFILES / "valid" / "split_dockerfiles" / "test.Dockerfile",
+        ),
+    ],
+)
+def test_onbuild(chalk: Chalk, base: Path, test: Path, random_hex: str):
+    """
+    check onbuild correctly mutates /chalk.json
+
+    when using chalked image as base image, all child builds, when not wrapped
+    should reflect that in /chalk.json
+    """
+    image_id, build = chalk.docker_build(
+        dockerfile=base,
+        tag=random_hex,
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    assert image_id
+    assert build.mark.has(_IMAGE_ENTRYPOINT=["/chalk", "exec", "--"])
+
+    second_image_id, _ = Docker.build(
+        dockerfile=test,
+        args={"BASE": random_hex},
+    )
+    assert second_image_id
+    assert (
+        Docker.inspect(second_image_id)[0]["Config"]["User"]
+        == build.mark["_IMAGE_USER"]
+    )
+
+    _, result = Docker.run(
+        image=second_image_id,
+        entrypoint="cat",
+        params=["/chalk.json"],
+        expected_success=True,
+    )
+    mark = ChalkMark.from_json(result.text)
+    assert mark.has(
+        METADATA_ID=MISSING,
+        METADATA_HASH=MISSING,
+        CHALK_ID=MISSING,
+        OLD_CHALK_METADATA_ID=build.mark["METADATA_ID"],
+        EMBEDDED_CHALK=[
+            {
+                "METADATA_ID": build.mark["METADATA_ID"],
+            },
+        ],
+    )
 
 
 def test_base_ecr(chalk: Chalk):

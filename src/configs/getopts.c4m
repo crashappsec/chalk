@@ -714,11 +714,21 @@ commands that do not match known topics)
   }
 
 
-command docgen {
+  command docgen {
     shortdoc: "Generate technical documentation"
     doc: """
 Internal function to generate technical documentation in markdown format.
 """
+  }
+
+  command __ {
+    shortdoc: "Internal commands"
+    doc:      "Internal commands"
+
+    command onbuild {
+      shortdoc: "Docker ONBUILD"
+      doc:      "Adjust /chalk.json during docker ONBUILD"
+    }
   }
 
 }

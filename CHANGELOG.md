@@ -8,6 +8,13 @@
   in the URI. Previously `BUILD_URI` always linked to
   latest attempt.
   ([#320](https://github.com/crashappsec/chalk/pull/320))
+- Building Docker image on top of previously wrapped chalked
+  base image, `/chalk.json` now correctly indicates it is
+  not the original wrapped base image.
+  Previously `chalk exec` would report chalk mark from
+  `/chalk.json` which was from the base image which is
+  not expected.
+  ([#322](https://github.com/crashappsec/chalk/pull/322))
 
 ## 0.4.2
 
