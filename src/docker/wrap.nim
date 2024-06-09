@@ -131,26 +131,41 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
       else:
         copyFile(loc, dstLoc)
         trace("docker: copied " & loc & " to " & dstLoc)
+      registerTempFile(dstLoc)
       let (_, name) = dstLoc.splitPath()
 
-      if chmodstr != "" and supportsCopyChmod():
-        toAdd.add("COPY " & chmodstr & name & " " & newPath)
-      elif chmod != "":
-        if hasUser:
-          toAdd.add("USER root")
-        toAdd.add("COPY " & name & " " & newPath)
-        toAdd.add("RUN chmod " & chmod & " " & newPath)
-        if hasUser:
-          toAdd.add("USER " & user)
+      if supportsMultiStageBuilds():
+        let base = "chalk" & newPath.replace("/", "_").replace(".", "_")
+        toAdd.add("COPY --from=" & base & " " & newPath & " " & newPath)
+        ctx.addedPlatform[base] = @[
+          "FROM busybox AS " & base,
+          "COPY " & name & " " & newPath,
+          "RUN chmod " & chmod & " " & newPath,
+        ]
       else:
-        toAdd.add("COPY " & name & " " & newPath)
-      registerTempFile(dstLoc)
+        # NOTE this can fail as we have no guarantee that
+        # RUN will work (e.g. distroless images) but we are out of
+        # options at this point as:
+        # * there is no buildx
+        # * docker is older version which doesnt support multi-stage builds
+        # and so we try our best but we cant pull a rabbit out of a hat...
+        if chmodstr != "" and supportsCopyChmod():
+          toAdd.add("COPY " & chmodstr & name & " " & newPath)
+        elif chmod != "":
+          if hasUser:
+            toAdd.add("USER root")
+          toAdd.add("COPY " & name & " " & newPath)
+          toAdd.add("RUN chmod " & chmod & " " & newPath)
+          if hasUser:
+            toAdd.add("USER " & user)
+        else:
+          toAdd.add("COPY " & name & " " & newPath)
 
     except:
       dumpExOnDebug()
       raise newException(
         ValueError,
-        "Could not write to context directory (" & dstLoc & ").",
+        "Could not write to context directory (" & dstLoc & "): " & getCurrentExceptionMsg(),
       )
 
 proc addByPlatform(ctx: DockerInvocation, newPath: string, image = "scratch"): string =
