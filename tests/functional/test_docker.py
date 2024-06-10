@@ -129,7 +129,7 @@ def test_scratch(chalk: Chalk, buildkit: bool):
     _, build = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
         buildkit=buildkit,
-        expected_success=buildkit,
+        run_docker=buildkit,  # non-buildx doesnt allow empty image
         config=CONFIGS / "docker_wrap.c4m",
     )
     if buildkit:

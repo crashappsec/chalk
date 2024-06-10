@@ -176,6 +176,10 @@ proc supportsInspectJsonFlag*(): bool =
   # https://github.com/docker/cli/pull/2936
   return getDockerClientVersion() >= parseVersion("22")
 
+proc supportsMultiStageBuilds*(): bool =
+  # https://docs.docker.com/engine/release-notes/17.05/
+  return getDockerServerVersion() >= parseVersion("17.05")
+
 proc installBinFmt*() =
   once:
     # https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop

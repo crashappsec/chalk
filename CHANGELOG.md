@@ -15,6 +15,9 @@
   `/chalk.json` which was from the base image which is
   not expected.
   ([#322](https://github.com/crashappsec/chalk/pull/322))
+- Docker build without `buildx` was failing for distroless
+  images with non-root `USER`.
+  ([#323](https://github.com/crashappsec/chalk/pull/323))
 
 ## 0.4.2
 
