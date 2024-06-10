@@ -2034,4 +2034,6 @@ running commands that do NOT insert chalk marks.
   key._INSTANCE_NAME.use                      = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
+  key.OLD_CHALK_METADATA_HASH.use             = true
+  key.OLD_CHALK_METADATA_ID.use               = true
  }

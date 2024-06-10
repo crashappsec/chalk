@@ -111,6 +111,12 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
   )
 
   var toAdd: seq[string] = @[]
+  let hasUser = user != "" and user != "root"
+  if hasUser:
+    toAdd.add("ONBUILD USER root")
+  toAdd.add("""ONBUILD RUN ["/chalk", "--no-use-embedded-config", "--no-use-external-config", "__", "onbuild"]""")
+  if hasUser:
+    toAdd.add("ONBUILD USER " & user)
 
   if entrypoint != nil:
     # When ENTRYPOINT is string, it is a shell script
