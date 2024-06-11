@@ -471,7 +471,6 @@ var
   doingTestRun*           = false
   nativeCodecsOnly*       = false
   passedHelpFlag*         = false
-  chalkConfig*:           ChalkConfig
   con4mRuntime*:          ConfigStack
   commandName*:           string
   gitExeLocation*:        string = ""

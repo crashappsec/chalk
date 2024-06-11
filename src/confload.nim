@@ -85,7 +85,6 @@ proc findOptionalConf(state: ConfigState): Option[string] =
         trace(fname & ": No configuration file found.")
 
 proc loadLocalStructs*(state: ConfigState) =
-  chalkConfig = state.attrs.loadChalkConfig()
   if getOpt[bool](getChalkScope(), "color").isSome(): setShowColor(get[bool](getChalkScope(), "color"))
   setLogLevel(get[string](getChalkScope(), "log_level"))
   var configPath: seq[string] = @[]
