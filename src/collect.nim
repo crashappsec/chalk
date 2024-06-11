@@ -55,9 +55,14 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   error("Plugin '" & plugin.name & "' can't write system key: '" & key & "'")
   return false
 
-proc registerKeys(templ: MarkTemplate | ReportTemplate) =
-  for name, content in templ.keys:
-    if content.use: subscribedKeys[name] = true
+proc registerKeys(templ: AttrScope) =
+  let keyOpt = getObjectOpt(templ, "key")
+  if keyOpt.isSome():
+    let key = keyOpt.get()
+    for name, content in key.contents:
+      if content.isA(AttrScope):
+        let useOpt = getOpt[bool](content.get(AttrScope), "use")
+        if useOpt.isSome() and useOpt.get(): subscribedKeys[name] = true
 
 proc registerOutconfKeys() =
   # We always subscribe to _VALIDATED, even if they don't want to
@@ -73,11 +78,11 @@ proc registerOutconfKeys() =
 
   let markTemplate = get[string](outconf, "mark_template")
   if markTemplate != "":
-    chalkConfig.markTemplates[markTemplate].registerKeys()
+    getObject(getChalkScope(), "mark_template." & markTemplate).registerKeys()
 
   let reportTemplate = get[string](outconf, "report_template")
   if reportTemplate != "":
-    chalkConfig.reportTemplates[reportTemplate].registerKeys()
+    getObject(getChalkScope(), "report_template." & reportTemplate).registerKeys()
 
 proc collectChalkTimeHostInfo*() =
   if hostCollectionSuspended():
@@ -129,7 +134,7 @@ proc initCollection*() =
     if templNameOpt.isSome():
       let templName = templNameOpt.get()
       if templName != "":
-        chalkConfig.reportTemplates[templName].registerKeys()
+        getObject(getChalkScope(), "report_template." & templName).registerKeys()
 
   if isChalkingOp():
       collectChalkTimeHostInfo()

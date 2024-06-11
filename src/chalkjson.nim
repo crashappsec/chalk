@@ -442,12 +442,12 @@ proc extractOneChalkJson*(chalkData: string, path: string): ChalkDict =
 
 # Output ordering for keys.
 proc orderKeys*(dict: ChalkDict,
-                tplate: MarkTemplate | ReportTemplate): seq[string] =
+                tplate: AttrScope): seq[string] =
   var tmp: seq[(int, string)] = @[]
   for k, _ in dict:
     var order = get[int](getChalkScope(), "keyspec." & k & ".normalized_order")
-    if tplate != nil and k in tplate.keys:
-      let orderOpt = tplate.keys[k].order
+    if tplate != nil and getObjectOpt(tplate, "key." & k).isSome():
+      let orderOpt = getOpt[int](tplate, "key." & k & ".order")
       if orderOpt.isSome():
         order = orderOpt.get()
     tmp.add((order, k))
@@ -460,7 +460,7 @@ proc orderKeys*(dict: ChalkDict,
 # we need, which gives us a JsonNode object, that we then convert
 # back to a string, with necessary quotes intact.
 
-proc toJson*(dict: ChalkDict, tplate: MarkTemplate | ReportTemplate): string =
+proc toJson*(dict: ChalkDict, tplate: AttrScope): string =
   result    = ""
   var comma = ""
   let keys = dict.orderKeys(tplate)
@@ -476,10 +476,10 @@ proc toJson*(dict: ChalkDict, tplate: MarkTemplate | ReportTemplate): string =
   result = "{ " & result & " }"
 
 proc toJson*(dict: ChalkDict): string =
-  return dict.toJson(MarkTemplate(nil))
+  return dict.toJson(AttrScope(nil))
 
 proc prepareContents*(dict: ChalkDict,
-                      t: MarkTemplate | ReportTemplate): string =
+                      t: AttrScope): string =
   return dict.filterByTemplate(t).toJson(t)
 
 proc forcePrivateKeys() =

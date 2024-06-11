@@ -48,48 +48,62 @@ proc selfChalkSetSubKey*(key: string, subKey: string, subValue: Box) =
   value[subKey] = subValue
   selfChalkSetKey(key, pack(value))
 
-proc filterByTemplate*(dict: ChalkDict, p: MarkTemplate | ReportTemplate): ChalkDict =
+proc filterByTemplate*(dict: ChalkDict, p: AttrScope): ChalkDict =
   result = ChalkDict()
   for k, v in dict:
-    if k in p.keys and p.keys[k].use:
-      result[k] = v
+    let pKeysOpt = getObjectOpt(p, "key")
+    if pKeysOpt.isSome():
+      let pKeys = pKeysOpt.get()
+      if getObjectOpt(pKeys, k).isSome() and get[bool](pKeys, k & ".use"):
+        result[k] = v
 
 proc getOutputConfig*(): AttrScope =
   return getObject(getChalkScope(), "outconf." & getBaseCommandName())
 
-template getMarkTemplate*(): MarkTemplate =
+template getMarkTemplate*(): AttrScope =
   let
     outconf  = getOutputConfig()
     tmplName = get[string](outconf, "mark_template")
 
-  chalkConfig.markTemplates[tmplName]
+  getObject(getChalkScope(), "mark_template." & tmplName)
 
-template getReportTemplate*(): ReportTemplate =
+template getReportTemplate*(): AttrScope =
   let
     outconf  = getOutputConfig()
     tmplName = get[string](outconf, "report_template")
 
-  chalkConfig.reportTemplates[tmplName]
+  getObject(getChalkScope(), "report_template." & tmplName)
 
 template forceReportKeys*(keynames: openarray[string]) =
   let templateRef = getReportTemplate()
 
+  # Create the "key" section if required.
+  if getObjectOpt(templateRef, "key").isNone() and keynames.len > 0:
+    discard attrLookup(templateRef, ["key"], 0, vlSecDef)
+
+  let keys = getObject(templateRef, "key")
+
   for item in keynames:
-    if item in templateRef.keys:
-      templateRef.keys[item].use = true
-    else:
-      templateRef.keys[item] = KeyConfig(use: true)
+    # Create the item section if required.
+    if item notin getContents(keys):
+      discard attrLookup(keys, [item], 0, vlSecDef)
+    doAssert attrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool)).code == errOk
 
 template forceChalkKeys*(keynames: openarray[string]) =
   if isChalkingOp():
-    let
-      templateRef = getMarkTemplate()
+    let templateRef = getMarkTemplate()
+
+    # Create the "key" section if required.
+    if getObjectOpt(templateRef, "key").isNone() and keynames.len > 0:
+      discard attrLookup(templateRef, ["key"], 0, vlSecDef)
+
+    let keys = getObject(templateRef, "key")
 
     for item in keynames:
-      if item in templateRef.keys:
-        templateRef.keys[item].use = true
-      else:
-        templateRef.keys[item] = KeyConfig(use: true)
+      # Create the item section if required.
+      if item notin getContents(keys):
+        discard attrLookup(keys, [item], 0, vlSecDef)
+      doAssert attrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool)).code == errOk
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.sCall(cb, args)

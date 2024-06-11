@@ -234,7 +234,7 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   let templateName = get[string](getOutputConfig(), "report_template")
   if isSubscribedKey("_OP_HOST_REPORT_KEYS") and templateName != "":
     let
-      templateToUse = chalkConfig.reportTemplates[templateName]
+      templateToUse = getObject(getChalkScope(), "report_template." & templateName)
       reportKeys    = toSeq(hostInfo.filterByTemplate(templateToUse).keys)
 
     result["_OP_HOST_REPORT_KEYS"] = pack(reportKeys)

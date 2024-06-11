@@ -47,7 +47,7 @@ proc topicUnsubscribe*(args: seq[Box], unused: ConfigState): Option[Box] =
 
   return some(pack(unsubscribe(topic, `rec?`.get())))
 
-proc setPerChalkReports(tmpl: ReportTemplate) =
+proc setPerChalkReports(tmpl: AttrScope) =
   ## Adds the `_CHALKS` key in the `hostinfo` global to the current
   ## collection context with whatever items were requested in the
   ## reporting template passed.
@@ -67,7 +67,7 @@ proc setPerChalkReports(tmpl: ReportTemplate) =
   elif "_CHALKS" in hostInfo:
     hostInfo.del("_CHALKS")
 
-template buildHostReport*(tmpl: ReportTemplate): string =
+template buildHostReport*(tmpl: AttrScope): string =
   setPerChalkReports(tmpl)
   prepareContents(hostInfo, tmpl)
 
@@ -121,7 +121,8 @@ template doCustomReporting() =
     if len(sinkConfs) == 0 and topic notin ["audit", "chalk_usage_stats"]:
       warn("Report '" & topic & "' has no configured sinks.  Skipping.")
 
-    let templateToUse = chalkConfig.reportTemplates[get[string](spec, "report_template")]
+    let reportTemplate = get[string](spec, "report_template")
+    let templateToUse = getObject(getChalkScope(), "report_template." & reportTemplate)
 
     for sinkConfName in sinkConfs:
       let res = topicSubscribe((@[pack(topic), pack(sinkConfName)])).get()

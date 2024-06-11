@@ -340,14 +340,16 @@ proc getReportTemplateDocs(state: ConfigState): Rope =
                                  title = atom("Report Templates"))
 
 proc formatOneTemplate(state: ConfigState,
-                     tmpl: MarkTemplate | ReportTemplate): Rope =
+                     tmpl: AttrScope): Rope =
   var
     keysToReport: seq[string]
 
-  result = markdown(tmpl.doc.getOrElse("No description available."))
+  let docOpt = getOpt[string](tmpl, "doc")
+  let doc = if docOpt.isSome(): docOpt.get() else: "No description available."
+  result = markdown(doc)
 
-  for k, v in tmpl.keys:
-    if v.use == true:
+  for k, v in getInstantiations(tmpl, "key"):
+    if get[bool](v, "use") == true:
       keysToReport.add(k)
 
   if len(keysToReport) == 0:
@@ -374,19 +376,19 @@ See `chalk help reporting` for more information on templates.
       reportTemplates: seq[string]
 
     if "all" in args:
-      for k, v in chalkConfig.markTemplates:
+      for k, v in getChalkSubsections("mark_template"):
         markTemplates.add(k)
-      for k, v in chalkConfig.reportTemplates:
+      for k, v in getChalkSubsections("report_template"):
         reportTemplates.add(k)
     else:
       for item in args:
-        if item notin chalkConfig.markTemplates and
-           item notin chalkConfig.reportTemplates:
+        if item notin getContents(getChalkScope().getObject("mark_template")) and
+           item notin getContents(getChalkScope().getObject("report_template")):
           result += h3("No template found named: " & item )
         else:
-          if item in chalkConfig.markTemplates:
+          if item in getContents(getChalkScope().getObject("mark_template")):
             markTemplates.add(item)
-          if item in chalkConfig.reportTemplates:
+          if item in getContents(getChalkScope().getObject("report_template")):
             reportTemplates.add(item)
 
     if len(markTemplates) + len(reportTemplates) == 0:
@@ -394,13 +396,13 @@ See `chalk help reporting` for more information on templates.
       return
 
     for markTmplName in markTemplates:
-      let theTemplate = chalkConfig.markTemplates[markTmplName]
+      let theTemplate = getObject(getChalkScope(), "mark_template." & markTmplName)
 
       result += h2("Mark Template: " & markTmplName)
       result += state.formatOneTemplate(theTemplate)
 
     for repTmplName in reportTemplates:
-      let theTemplate = chalkConfig.reportTemplates[repTmplName]
+      let theTemplate = getObject(getChalkScope(), "report_template." & repTmplName)
 
       result += h2("Report Template: " & repTmplName)
       result += state.formatOneTemplate(theTemplate)
