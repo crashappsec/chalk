@@ -71,11 +71,13 @@ proc registerOutconfKeys() =
 
   let outconf = getOutputConfig()
 
-  if outconf.markTemplate != "":
-    chalkConfig.markTemplates[outConf.markTemplate].registerKeys()
+  let markTemplate = get[string](outconf, "mark_template")
+  if markTemplate != "":
+    chalkConfig.markTemplates[markTemplate].registerKeys()
 
-  if outconf.reportTemplate != "":
-    chalkConfig.reportTemplates[outConf.reportTemplate].registerKeys()
+  let reportTemplate = get[string](outconf, "report_template")
+  if reportTemplate != "":
+    chalkConfig.reportTemplates[reportTemplate].registerKeys()
 
 proc collectChalkTimeHostInfo*() =
   if hostCollectionSuspended():

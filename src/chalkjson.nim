@@ -492,7 +492,7 @@ proc forcePrivateKeys() =
   forceChalkKeys(toForce)
 
 proc getChalkMark*(obj: ChalkObj): ChalkDict =
-  trace("Creating mark using template: " & getOutputConfig().markTemplate)
+  trace("Creating mark using template: " & get[string](getOutputConfig(), "mark_template"))
 
   forcePrivateKeys()
 
@@ -512,7 +512,7 @@ proc getChalkMarkAsStr*(obj: ChalkObj): string =
     trace("Chalk cachemark " & $obj.cachedMark)
     return obj.cachedMark
   trace("Converting Mark to JSON. Mark template is: " &
-    getOutputConfig().markTemplate)
+    get[string](getOutputConfig(), "mark_template"))
 
   if obj.cachedMark != "":
     return obj.cachedMark

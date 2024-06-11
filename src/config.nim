@@ -54,20 +54,20 @@ proc filterByTemplate*(dict: ChalkDict, p: MarkTemplate | ReportTemplate): Chalk
     if k in p.keys and p.keys[k].use:
       result[k] = v
 
-proc getOutputConfig*(): OutputConfig =
-  return chalkConfig.outputConfigs[getBaseCommandName()]
+proc getOutputConfig*(): AttrScope =
+  return getObject(getChalkScope(), "outconf." & getBaseCommandName())
 
 template getMarkTemplate*(): MarkTemplate =
   let
-    outconf  = chalkConfig.outputConfigs[getBaseCommandName()]
-    tmplName = outconf.mark_template
+    outconf  = getOutputConfig()
+    tmplName = get[string](outconf, "mark_template")
 
   chalkConfig.markTemplates[tmplName]
 
 template getReportTemplate*(): ReportTemplate =
   let
-    outconf  = chalkConfig.outputConfigs[getBaseCommandName()]
-    tmplName = outconf.report_template
+    outconf  = getOutputConfig()
+    tmplName = get[string](outconf, "report_template")
 
   chalkConfig.reportTemplates[tmplName]
 

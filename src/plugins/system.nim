@@ -150,8 +150,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
       result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
 
   var
-    config       = getOutputConfig()
-    templateName = config.reportTemplate
+    templateName = get[string](getOutputConfig(), "report_template")
 
   if templateName != "":
     let
@@ -232,10 +231,9 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   if isSubscribedKey("_ENV"):
     result["_ENV"] = getEnvDict()
 
-  if isSubscribedKey("_OP_HOST_REPORT_KEYS") and
-     getOutputConfig().reportTemplate != "":
+  let templateName = get[string](getOutputConfig(), "report_template")
+  if isSubscribedKey("_OP_HOST_REPORT_KEYS") and templateName != "":
     let
-      templateName  = getOutputConfig().reportTemplate
       templateToUse = chalkConfig.reportTemplates[templateName]
       reportKeys    = toSeq(hostInfo.filterByTemplate(templateToUse).keys)
 
