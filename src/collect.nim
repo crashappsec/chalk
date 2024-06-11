@@ -116,15 +116,18 @@ proc initCollection*() =
   registerOutconfKeys()
 
   # Next, register for any custom reports.
-  for name, report in chalkConfig.reportSpecs:
-    if (getBaseCommandName() notin report.use_when and
-        "*" notin report.use_when):
-      continue
+  for name, report in getChalkSubsections("custom_report"):
+    let useWhenOpt = getOpt[seq[string]](report, "use_when")
+    if useWhenOpt.isSome():
+      let useWhen = useWhenOpt.get()
+      if (getBaseCommandName() notin useWhen and "*" notin useWhen):
+        continue
 
-    let templName = report.reportTemplate
-
-    if templName != "":
-      chalkConfig.reportTemplates[templName].registerKeys()
+    let templNameOpt = getOpt[string](report, "report_template")
+    if templNameOpt.isSome():
+      let templName = templNameOpt.get()
+      if templName != "":
+        chalkConfig.reportTemplates[templName].registerKeys()
 
   if isChalkingOp():
       collectChalkTimeHostInfo()
