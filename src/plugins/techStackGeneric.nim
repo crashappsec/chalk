@@ -279,8 +279,8 @@ proc detectTechCwd(): TableRef[string, seq[string]] =
 
 proc loadState() =
   once:
-    for langName, val in chalkConfig.linguistLanguages:
-      languages[val.getExtension()] = langName
+    for langName, val in getChalkSubsections("linguist_language"):
+      languages[get[string](val, "extension")] = langName
 
     for key, val in chalkConfig.techStackRules:
       when defined(debug):
