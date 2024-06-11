@@ -113,7 +113,7 @@ proc applySubstitutions(obj: ChalkObj) {.inline.} =
   for k, v in obj.collectedData:
     if v.kind != MkStr: continue    # If it's not a string object, no sub to do.
     let spec = k.getKeySpec().get() # Should have crashed by now if false :)
-    if not spec.applySubstitutions: continue
+    if not get[bool](spec, "apply_substitutions"): continue
     let s = unpack[string](v)
     if not s.contains("{"): continue
     obj.collectedData[k] = pack(s.multiReplace(subs))

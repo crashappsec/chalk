@@ -445,7 +445,7 @@ proc orderKeys*(dict: ChalkDict,
                 tplate: MarkTemplate | ReportTemplate): seq[string] =
   var tmp: seq[(int, string)] = @[]
   for k, _ in dict:
-    var order = chalkConfig.keySpecs[k].normalizedOrder
+    var order = get[int](getChalkScope(), "keyspec." & k & ".normalized_order")
     if tplate != nil and k in tplate.keys:
       let orderOpt = tplate.keys[k].order
       if orderOpt.isSome():
@@ -485,7 +485,7 @@ proc prepareContents*(dict: ChalkDict,
 proc forcePrivateKeys() =
   var toForce: seq[string]
 
-  for k, _ in chalkConfig.keySpecs:
+  for k, _ in getChalkSubsections("keyspec"):
     if k.startswith("$"):
       toForce.add(k)
 

@@ -27,11 +27,11 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   # This would all be redundant to what we can check in the config file spec,
   # except that we do allow "*" fields for plugins, so we need the runtime
   # check to filter out inappropriate items.
-  let spec = chalkConfig.keySpecs[key]
+  let spec = getObject(getChalkScope(), "keyspec." & key)
 
   if key in get[seq[string]](plugin.configInfo, "ignore"): return false
 
-  if spec.codec:
+  if get[bool](spec, "codec"):
     if get[bool](plugin.configInfo, "codec"):
       return true
     else:
@@ -41,14 +41,14 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   if key notin decls and "*" notin decls:
     error("Plugin '" & plugin.name & "' produced undeclared key: '" & key & "'")
     return false
-  if not spec.system:
+  if not get[bool](spec, "system"):
     return true
 
   case plugin.name
   of "system", "metsys":
     return true
   of "conffile":
-    if spec.confAsSystem:
+    if get[bool](spec, "conf_as_system"):
       return true
   else: discard
 

@@ -112,8 +112,10 @@ proc setCommandName*(s: string) =
 proc getChalkRuntime*(): ConfigState      = con4mRuntime.configState
 proc getValidationRuntime*(): ConfigState = con4mRuntime.validationState
 
-proc getKeySpec*(name: string): Option[KeySpec] =
-  if name in chalkConfig.keyspecs: return some(chalkConfig.keyspecs[name])
+proc getKeySpec*(name: string): Option[AttrScope] =
+  for k, v in getChalkSubsections("keyspec"):
+    if name == k:
+      return some(v)
 
 proc getPluginConfig*(name: string): Option[AttrScope] =
   for k, v in getChalkSubsections("plugin"):
