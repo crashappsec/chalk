@@ -17,6 +17,9 @@ var
   ctxStack   = @[CollectionCtx()]
   startTime* = getMonoTime().ticks()
 
+proc getChalkScope*(): AttrScope =
+  con4mRuntime.configState.attrs
+
 proc get*[T](chalkConfig: ChalkConfig, fqn: string): T =
   get[T](chalkConfig.`@@attrscope@@`, fqn)
 

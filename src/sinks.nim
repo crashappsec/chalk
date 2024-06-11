@@ -161,7 +161,7 @@ proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
 
   if get[string](chalkConfig, "log_level") in ["trace", "info"]:
     let
-      attrRoot = chalkConfig.`@@attrscope@@`
+      attrRoot = getChalkScope()
       attrOpt  = attrRoot.getObjectOpt("sink_config." & cfg.name)
       attr     = attrOpt.getOrElse(nil)
 
@@ -182,7 +182,7 @@ proc getAuthConfigByName*(name: string, attr: AttrScope = AttrScope(nil)): Optio
     return some(availableAuthConfigs[name])
 
   let
-    attrRoot = if attr != nil: attr else: chalkConfig.`@@attrscope@@`
+    attrRoot = if attr != nil: attr else: getChalkScope()
     attrs    = attrRoot.getObjectOpt("auth_config." & name).getOrElse(nil)
     opts     = OrderedTableRef[string, string]()
 
@@ -230,7 +230,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     return some(availableSinkConfigs[name])
 
   let
-    attrRoot = chalkConfig.`@@attrscope@@`
+    attrRoot = getChalkScope()
     attrs    = attrRoot.getObjectOpt("sink_config." & name).getOrElse(nil)
 
   if attrs == nil:
