@@ -13,7 +13,7 @@ import ".."/[config, plugin_api, util]
 
 type PIInfo = ref object
   name: string
-  obj:  ToolInfo
+  obj:  AttrScope
 
 proc ensureRunCallback[T](cb: CallbackObj, args: seq[Box]): T =
   let value = runCallback(cb, args)
@@ -30,27 +30,27 @@ proc runOneTool(info: PIInfo, path: string): ChalkDict =
   trace("Running tool: " & info.name)
   result = ChalkDict()
   let args = @[pack(path)]
-  var exe  = ensureRunCallback[string](info.obj.getToolLocation, args)
+  var exe  = ensureRunCallback[string](get[CallbackObj](info.obj, "get_tool_location"), args)
 
   if exe == "":
-    let installed = ensureRunCallback[bool](info.obj.attemptInstall, args)
+    let installed = ensureRunCallback[bool](get[CallbackObj](info.obj, "attempt_install"), args)
     if not installed:
       trace(info.name & ": could not be installed. skipping")
       return
-    exe = ensureRunCallback[string](info.obj.getToolLocation, args)
+    exe = ensureRunCallback[string](get[CallbackObj](info.obj, "get_tool_location"), args)
 
   if exe == "":
     trace(info.name & ": could not be found. skipping")
     return
 
   let
-    argv = ensureRunCallback[string](info.obj.getCommandArgs, args)
+    argv = ensureRunCallback[string](get[CallbackObj](info.obj, "get_command_args"), args)
     cmd  = exe & " " & argv.strip()
   trace(cmd)
   let
     outs = unpack[seq[Box]](c4mSystem(@[pack(cmd)]).get())
 
-  let d = ensureRunCallback[ChalkDict](info.obj.produceKeys, outs)
+  let d = ensureRunCallback[ChalkDict](get[CallbackObj](info.obj, "produce_keys"), outs)
   if len(d) == 0:
     trace(info.name & ": produced no keys. skipping")
     return
@@ -82,16 +82,17 @@ template toolBase(path: string) {.dirty.} =
   if getCommandName() notin @["build", "insert"]:
     return result
 
-  for k, v in chalkConfig.tools:
-    if not v.enabled:                    continue
-    if not runSbom and v.kind == "sbom": continue
-    if not runSast and v.kind == "sast": continue
+  for k, v in getChalkSubsections("tool"):
+    if not get[bool](v, "enabled"): continue
+    let kind = get[string](v, "kind")
+    if not runSbom and kind == "sbom": continue
+    if not runSast and kind == "sast": continue
 
-    let tool = (v.priority, PIInfo(name: k, obj: v))
-    if v.kind notin toolInfo:
-      toolInfo[v.kind] = @[tool]
+    let tool = (get[int](v, "priority"), PIInfo(name: k, obj: v))
+    if kind notin toolInfo:
+      toolInfo[kind] = @[tool]
     else:
-      toolInfo[v.kind].add(tool)
+      toolInfo[kind].add(tool)
 
   for k, v in toolInfo:
     for (ignore, info) in v.sorted():
@@ -105,7 +106,7 @@ template toolBase(path: string) {.dirty.} =
         # merged structure should be:
         # { SBOM: { foo: {...}, bar: {...} } }
         result.merge(data.nestWith(info.name))
-        if len(data) >= 0 and info.obj.stopOnSuccess:
+        if len(data) >= 0 and get[bool](info.obj, "stop_on_success"):
           break
       except:
         error(info.name & ": " & getCurrentExceptionMsg())
