@@ -27,7 +27,7 @@ proc isValidEnvVarName*(s: string): bool =
 var labelPrefix: string
 proc formatLabelKey(s: string): string =
   once:
-    labelPrefix = get[string](chalkConfig, "docker.label_prefix")
+    labelPrefix = get[string](getChalkScope(), "docker.label_prefix")
 
   result = labelPrefix
 

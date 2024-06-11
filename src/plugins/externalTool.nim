@@ -74,8 +74,8 @@ template toolBase(path: string) {.dirty.} =
   var
     toolInfo = initTable[string, seq[(int, PIInfo)]]()
   let
-    runSbom  = get[bool](chalkConfig, "run_sbom_tools")
-    runSast  = get[bool](chalkConfig, "run_sast_tools")
+    runSbom  = get[bool](getChalkScope(), "run_sbom_tools")
+    runSast  = get[bool](getChalkScope(), "run_sast_tools")
 
   # tools should only run during insert operations
   # note this is a subset of chalkable operations

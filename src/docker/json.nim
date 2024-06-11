@@ -79,7 +79,7 @@ proc mapFromJson*(self: ChalkDict,
                   node:  JsonNode,
                   map:  JsonToChalkKeysMapping) =
   let
-    reportEmpty = get[bool](chalkConfig, "docker.report_empty_fields")
+    reportEmpty = get[bool](getChalkScope(), "docker.report_empty_fields")
     lowerJson   = node.toLowerKeysJsonNode()
   for jsonKey, (chalkKey, transformer) in map:
     try:

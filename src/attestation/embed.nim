@@ -14,7 +14,7 @@ type Embed = ref object of AttestationKeyProvider
 proc initCallback(this: AttestationKeyProvider) =
   let
     self        = Embed(this)
-    location    = get[string](chalkConfig, "attestation.attestation_key_embed.location")
+    location    = get[string](getChalkScope(), "attestation.attestation_key_embed.location")
   self.location = location
 
 proc generateKeyCallback(this: AttestationKeyProvider): AttestationKey =

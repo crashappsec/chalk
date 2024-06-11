@@ -201,7 +201,7 @@ template setIfNeeded*[T](o: ChalkObj, k: string, v: T) =
   setIfNeeded(o.collectedData, k, v)
 
 proc isChalkingOp*(): bool =
-  return commandName in get[seq[string]](chalkConfig, "valid_chalk_command_names")
+  return commandName in get[seq[string]](getChalkScope(), "valid_chalk_command_names")
 
 proc lookupByPath*(obj: ChalkDict, path: string): Option[Box] =
   let

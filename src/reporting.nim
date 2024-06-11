@@ -77,7 +77,7 @@ proc doCommandReport(): string {.inline.} =
     reportTemplate = getReportTemplate()
     # The above goes from the string name to the object.
 
-  if get[bool](chalkConfig, "skip_command_report"):
+  if get[bool](getChalkScope(), "skip_command_report"):
     info("Skipping the command report as per the `skip_command_report` directive")
     result = ""
   else:
@@ -116,7 +116,7 @@ template doCustomReporting() =
     let useWhen = get[seq[string]](spec, "use_when")
     if getCommandName() notin useWhen and "*" notin useWhen:
       continue
-    if topic == "audit" and not get[bool](chalkConfig, "publish_audit"):
+    if topic == "audit" and not get[bool](getChalkScope(), "publish_audit"):
       continue
     if len(sinkConfs) == 0 and topic notin ["audit", "chalk_usage_stats"]:
       warn("Report '" & topic & "' has no configured sinks.  Skipping.")
@@ -138,8 +138,8 @@ proc doReporting*(topic="report") {.exportc, cdecl.} =
     ctx.report = doEmbeddedReport()
   else:
     let
-      skipCommand = get[bool](chalkConfig, "skip_command_report")
-      skipCustom  = get[bool](chalkConfig, "skip_custom_reports")
+      skipCommand = get[bool](getChalkScope(), "skip_command_report")
+      skipCustom  = get[bool](getChalkScope(), "skip_custom_reports")
     if skipCommand and skipCustom:
       return
     trace("Collecting runtime host info.")

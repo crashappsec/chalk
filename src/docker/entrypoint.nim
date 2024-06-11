@@ -70,8 +70,8 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
                         binaries:   TableRef[DockerPlatform, string],
                         user:       string) =
   let
-    fromArgs             = get[bool](chalkConfig, "exec.command_name_from_args")
-    wrapCmd              = get[bool](chalkConfig, "docker.wrap_cmd")
+    fromArgs             = get[bool](getChalkScope(), "exec.command_name_from_args")
+    wrapCmd              = get[bool](getChalkScope(), "docker.wrap_cmd")
     (entrypoint, cmd, _) = entrypoint
 
   if not fromArgs:

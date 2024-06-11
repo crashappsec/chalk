@@ -112,7 +112,7 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
       " subscribers)")
 
     if n == 0 and startSubscriptions != 0:
-      if get[bool](chalkConfig, "use_report_cache"):
+      if get[bool](getChalkScope(), "use_report_cache"):
         error("For topic '" & topic & "': No output config is working, but " &
               "failures will be stored in the report cache")
       else:
@@ -120,7 +120,7 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
         error("No output configuration is working for this report, and there " &
           "is no report cache configured, so no metadata was recorded.")
 
-        if get[bool](chalkConfig, "force_output_on_reporting_fails"):
+        if get[bool](getChalkScope(), "force_output_on_reporting_fails"):
           error("Here is the orphaned report:")
           doPanicWrite(msg)
           error("Run with --use-report-cache to automatically buffer failures " &
@@ -129,7 +129,7 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
           error("Re-run with --force-output to try again, getting a report " &
             "on the console if io config fails again.")
     elif n != startSubscriptions:
-      if get[bool](chalkConfig, "use_report_cache"):
+      if get[bool](getChalkScope(), "use_report_cache"):
         error("For topic '" & topic & "': publish failures will be cached.")
       else:
         error("No report cache is enabled; sink configs with failures will " &
@@ -141,7 +141,7 @@ proc loadReportCache(fname: string) =
   once:
     try:
       let
-        retries = get[int](chalkConfig, "report_cache_lock_timeout_sec")
+        retries = get[int](getChalkScope(), "report_cache_lock_timeout_sec")
         lines   = readViaLockFile(fname).strip().split("\n")
       for line in lines:
         let
@@ -319,7 +319,7 @@ proc panicPublish(contents, tmpfilename, targetname, err: string) =
   doPanicWrite(s)
 
 proc safePublish*(topic, msg: string) =
-  if not get[bool](chalkConfig, "use_report_cache"):
+  if not get[bool](getChalkScope(), "use_report_cache"):
     tracePublish(topic, msg)
     return
 
@@ -332,7 +332,7 @@ proc safePublish*(topic, msg: string) =
 
   sinkErrors = @[]
 
-  let fname = resolvePath(get[string](chalkConfig, "report_cache_location"))
+  let fname = resolvePath(get[string](getChalkScope(), "report_cache_location"))
   loadReportCache(fname)
 
   if reportCache.len() != 0:
@@ -357,7 +357,7 @@ proc writeReportCache*() =
   # Everything else we might have published was probably mainly intended
   # for the console.
 
-  if not get[bool](chalkConfig, "use_report_cache"):
+  if not get[bool](getChalkScope(), "use_report_cache"):
     return
 
   # If nothing published, the reporting cache may not have been loaded, in
@@ -365,7 +365,7 @@ proc writeReportCache*() =
   if cacheOpenFailed and len(reportCache) != 0:
     error(msgPossibleLoss)
 
-  let fname = resolvePath(get[string](chalkConfig, "report_cache_location"))
+  let fname = resolvePath(get[string](getChalkScope(), "report_cache_location"))
 
   if not dirtyCache and len(reportCache) != 0:
     warn("Report cache contains unreported message(s); Cached entries " &
