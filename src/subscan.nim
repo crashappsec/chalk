@@ -19,7 +19,7 @@ proc runChalkSubScan*(location: seq[string],
                       cmd:      string,
                       suspendHost = true): CollectionCtx =
   let
-    oldRecursive = chalkConfig.recursive
+    oldRecursive = get[bool](chalkConfig, "recursive")
     oldCmd       = getCommandName()
     oldArgs      = getArgs()
     logLevel     = getLogLevel()
@@ -31,15 +31,16 @@ proc runChalkSubScan*(location: seq[string],
 
   var savedLogLevel: Option[LogLevel]
 
-  if logLevel > llError and not chalkConfig.chalkDebug:
+  if logLevel > llError and not get[bool](chalkConfig, "chalk_debug"):
     trace("*** Setting log-level = \"error\" for scan.  Use --debug to turn on")
     savedLogLevel = some(logLevel)
     setLogLevel(llError)
 
+  let runtime = getChalkRuntime()
   try:
     if suspendHost:
       suspendHostCollection()
-    chalkConfig.recursive = true
+    doAssert runtime.attrSet("recursive", pack(true)).code == errOk
     result                = pushCollectionCtx()
     case cmd
     # if someone is doing 'docker' recursively, we look
@@ -59,7 +60,7 @@ proc runChalkSubScan*(location: seq[string],
     setCommandName(oldCmd)
     setArgs(oldArgs)
     trace("Subscan done. Restored command name to: " & oldCmd)
-    chalkConfig.recursive = oldRecursive
+    doAssert runtime.attrSet("recursive", pack(oldRecursive)).code == errOk
 
 template runChalkSubScan*(location: string,
                           cmd:      string,
