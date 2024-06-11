@@ -548,21 +548,21 @@ var
   installedPlugins: Table[string, Plugin]
   codecs:           seq[Plugin] = @[]
 
-template isCodec*(plugin: Plugin): bool = plugin.configInfo.codec
+template isCodec*(plugin: Plugin): bool = get[bool](plugin.configInfo, "codec")
 
 proc checkPlugin(plugin: Plugin, codec: bool): bool {.inline.} =
   let
     name  = plugin.name
     maybe = getPluginConfig(name)
-    spec  = maybe.getOrElse(PluginSpec(nil))
+    spec  = maybe.getOrElse(AttrScope(nil))
 
   if maybe.isNone():
     error("No config provided for plugin " & name & ". Plugin ignored.")
-  elif not maybe.get().getEnabled():
+  elif not get[bool](maybe.get(), "enabled"):
       trace("Plugin " & name & " is disabled via config file.")
   elif name in installedPlugins:
     error("Double install of plugin named: " & name)
-  elif spec.codec != codec:
+  elif get[bool](spec, "codec") != codec:
     if codec:
       error("Codec expected, but the config file does not declare that it " &
         "is a codec.")
@@ -577,7 +577,7 @@ proc checkPlugin(plugin: Plugin, codec: bool): bool {.inline.} =
 proc getAllPlugins*(): seq[Plugin] =
   var preResult: seq[(int, Plugin)] = @[]
   for name, plugin in installedPlugins:
-    preResult.add((plugin.configInfo.getPriority(), plugin))
+    preResult.add (get[int](plugin.configInfo, "priority"), plugin)
 
   preResult.sort()
   for (_, plugin) in preResult:
