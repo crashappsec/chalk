@@ -45,34 +45,8 @@ proc con4mDevMode() =
   ## environment (the value doesn't matter).
   exec script
 
-proc depCheck() =
-  ## At compile time, this will generate c4autoconf if the file doesn't
-  ## exist, or if the spec file has a newer timestamp.
-  echo "Looking for changes to src/configs/chalk.c42spec"
-
-  echo staticexec("""
-OUTFILE=src/c4autoconf.nim
-SPEC=src/configs/chalk.c42spec
-
-# Docker build won't see the spec file when building, and shouldn't error.
-if [ ! -e ${SPEC} ] ; then
-  exit 0
-fi
-
-if [ ! ${OUTFILE} -nt  ${SPEC} ] ; then
-  echo Config schema changed. Regenerating c4autoconf.nim.
-  con4m gen ${SPEC} --language=nim --output-file=${OUTFILE}
-else
-  echo No change to chalk.c42spec
-fi
-""")
-
 before build:
   con4mDevMode()
-  depCheck()
-
-before install:
-  depCheck()
 
 # Add --trace if needed.
 after build:

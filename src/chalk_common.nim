@@ -15,9 +15,8 @@
 import std/[os, json, streams, tables, options, strutils, sugar, posix,
             unicode, re]
 import pkg/[nimutils, nimutils/logging, nimutils/managedtmp, con4m]
-import "."/c4autoconf
 export os, json, options, tables, strutils, streams, sugar, nimutils, logging,
-       managedtmp, con4m, c4autoconf
+       managedtmp, con4m
 
 type
   ChalkDict*    = OrderedTableRef[string, Box]

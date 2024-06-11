@@ -61,7 +61,7 @@ version:
 
 .PHONY: clean
 clean:
-	-rm -rf $(BINARY) $(BINARY).bck src/c4autoconf.nim dist nimutils con4m nimble.develop
+	-rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop
 
 .PHONY: chalk-docs
 chalk-docs: $(BINARY)

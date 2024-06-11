@@ -14,7 +14,6 @@ chalk.conf
 chalk.dSYM
 chalk-tmp
 chalk-*.tmp
-src/c4autoconf.nim
 *.o
 *.json
 *.jsonl
