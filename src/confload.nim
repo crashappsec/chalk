@@ -107,7 +107,7 @@ proc loadLocalStructs*(state: ConfigState) =
   setCon4mVerbosity(c4errLevel)
 
 proc handleCon4mErrors(err, tb: string): bool =
-  if tb != "" and chalkConfig == nil or get[bool](getChalkScope(), "chalk_debug"):
+  if tb != "" and getChalkScope() == nil or get[bool](getChalkScope(), "chalk_debug"):
      echo(formatCompilerError(err, nil, tb, default(InstInfo)))
   else:
     error(err)

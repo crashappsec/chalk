@@ -42,7 +42,7 @@ proc chalkErrFilter*(msg: string, info: StringTable): (string, bool) =
   if not getSuspendLogging() and keyLogLevel in info:
     let llStr = info[keyLogLevel]
 
-    if (llStr in toLogLevelMap) and chalkConfig != nil and
+    if (llStr in toLogLevelMap) and getChalkScope() != nil and
      (toLogLevelMap[llStr] <= toLogLevelMap[get[string](getChalkScope(), "chalk_log_level")]):
       return (msg, true)
 
@@ -148,7 +148,7 @@ proc ioErrorHandler(cfg: SinkConfig, t: Topic, msg, err, tb: string) =
     error(toOut)
   else:
     trace(toOut)
-  if chalkConfig != nil and get[bool](getChalkScope(), "chalk_debug"):
+  if getChalkScope() != nil and get[bool](getChalkScope(), "chalk_debug"):
     publish("debug", tb)
 
 proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =

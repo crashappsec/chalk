@@ -479,7 +479,7 @@ var
   dockerInvocation*:      DockerInvocation
 
 template dumpExOnDebug*() =
-  if chalkConfig != nil and get[bool](getChalkScope(), "chalk_debug"):
+  if getChalkScope() != nil and get[bool](getChalkScope(), "chalk_debug"):
     let
       msg = "" # "Handling exception (msg = " & getCurrentExceptionMsg() & ")\n"
       tb  = "Traceback (most recent call last)\n" &

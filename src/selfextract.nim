@@ -150,7 +150,7 @@ proc getSelfExtraction*(): Option[ChalkObj] =
 # The rest of this is specific to writing the self-config.
 
 proc newConfFileError(err, tb: string): bool =
-  if chalkConfig != nil and get[bool](getChalkScope(), "chalk_debug"):
+  if getChalkScope() != nil and get[bool](getChalkScope(), "chalk_debug"):
     cantLoad(err & "\n" & tb)
   else:
     cantLoad(err)
