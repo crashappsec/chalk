@@ -27,12 +27,6 @@ iterator getChalkSubsections*(s: string): (string, AttrScope) =
     if v.isA(AttrScope):
       yield (k, v.get(AttrScope))
 
-proc get*[T](chalkConfig: ChalkConfig, fqn: string): T =
-  get[T](chalkConfig.`@@attrscope@@`, fqn)
-
-proc getOpt*[T](chalkConfig: ChalkConfig, fqn: string): Option[T] =
-  getOpt[T](chalkConfig.`@@attrscope@@`, fqn)
-
 proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
   ## Sets the value of the `fqn` attribute in `ctx.attrs` to `value`, raising
   ## `AssertionDefect` if unsuccessful.
