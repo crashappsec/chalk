@@ -136,6 +136,18 @@ def test_scratch(chalk: Chalk, buildkit: bool):
         assert "_IMAGE_ENTRYPOINT" not in build.mark
 
 
+def test_distroless(chalk: Chalk):
+    image_id, build = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "distroless" / "Dockerfile",
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    # distroless image has user marked as "0" vs usual "root" or missing user
+    assert "ONBUILD USER" not in build.mark["DOCKER_FILE_CHALKED"]
+
+    _, output = Docker.run(image=image_id)
+    assert "hello" in output.text
+
+
 def test_docker_context(chalk: Chalk, tmp_data_dir: Path):
     """
     Test docker can build when a context is "docker"
