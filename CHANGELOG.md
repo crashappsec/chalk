@@ -2,6 +2,15 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- `chalk exec` did not pass full executable being
+  execed in arguments in `execv()` syscall.
+  This broke distro-less Python images which used
+  virtualenv as `sys.executable` wasn't virtual env
+  python but instead was system python path.
+  ([#333](https://github.com/crashappsec/chalk/pull/333))
+
 ## 0.4.3
 
 **June 10, 2024**

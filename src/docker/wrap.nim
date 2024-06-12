@@ -50,7 +50,7 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
   let
     loc           = path.resolvePath()
     (dir, file)   = loc.splitPath()
-    hasUser       = user != "" and user != "root"
+    hasUser       = user != "" and user != "root" and user != "0"
 
   # if USER directive is present and --chmod is not requested
   # default container user will not have access to the copied file

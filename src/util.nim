@@ -396,15 +396,13 @@ proc findExePath*(cmdName:    string,
   return some(foundExes[0])
 
 proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
-  if len(prioritizedExes) != 0:
-    let cargs = allocCStringArray(@[prioritizedExes[0].splitPath.tail] & args)
-
-    for path in prioritizedExes:
-      trace("execve: " & path & " " & args.join(" "))
-      discard execv(cstring(path), cargs)
-      # Either execv doesn't return, or something went wrong. No need to check the
-      # error code.
-      error("Chalk: when execing '" & path & "': " & $(strerror(errno)))
+  for path in prioritizedExes:
+    let cargs = allocCStringArray(@[path] & args)
+    trace("execv: " & path & " " & args.join(" "))
+    discard execv(cstring(path), cargs)
+    # Either execv doesn't return, or something went wrong. No need to check the
+    # error code.
+    error("Chalk: when execing '" & path & "': " & $(strerror(errno)))
 
   error("Chalk: exec could not find a working executable to run.")
   quitChalk(1)
