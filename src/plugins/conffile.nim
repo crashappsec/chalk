@@ -12,13 +12,14 @@ import ".."/[config, plugin_api]
 
 proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
   result = ChalkDict()
-  for k, v in getChalkSubsections("keyspec"):
+  for k in getChalkSubsections("keyspec"):
+    let v = "keyspec." & k
     if opt.isNone() and k in hostInfo:                continue
     if opt.isSome() and k in opt.get().collectedData: continue
-    if get[int](v, "kind") != int(kt): continue
+    if get[int](getChalkScope(), v & ".kind") != int(kt): continue
     if k notin subscribedKeys: continue
-    let valueOpt = attrLookup(v, "value")
-    let callbackOpt = attrLookup(v, "callback")
+    let valueOpt = attrLookup(getChalkScope(), v & ".value")
+    let callbackOpt = attrLookup(getChalkScope(), v & ".callback")
     if valueOpt.isSome():
       result[k] = unpack[Box](valueOpt.get())
     elif callbackOpt.isSome():
