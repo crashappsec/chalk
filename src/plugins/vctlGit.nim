@@ -521,7 +521,7 @@ proc loadCommit(info: RepoInfo, commitId: string) =
 proc loadSymref(info: RepoInfo, gitRef: string) =
   let
     fname = gitRef[4 .. ^1].strip()
-    parts = fname.split({ DirSep, '/'}, maxsplit = 3)
+    parts = fname.split({ DirSep, '/'}, maxsplit = 2)
 
   if parts.len() < 3:
     error(fNameHead & ": Git HEAD file couldn't be loaded")

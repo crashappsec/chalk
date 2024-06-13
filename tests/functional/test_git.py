@@ -53,7 +53,7 @@ def test_repo(
     tag_message = "Changes since the previous tag:\n\n- Fix widget\n- Improve performance of bar by 42%"
     git = (
         Git(tmp_data_dir, sign=sign)
-        .init(remote=remote)
+        .init(remote=remote, branch="foo/bar")
         .add()
         .commit(commit_message)
         .tag(f"{random_hex}-1")
@@ -64,7 +64,7 @@ def test_repo(
     author = re.compile(rf"^{git.author} \d+ [+-]\d+$")
     committer = re.compile(rf"^{git.committer} \d+ [+-]\d+$")
     assert result.mark.has(
-        BRANCH="main",
+        BRANCH="foo/bar",
         COMMIT_ID=ANY,
         COMMIT_SIGNED=sign,
         AUTHOR=author,
