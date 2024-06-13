@@ -194,6 +194,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.CODE_OWNERS.use                         = true
   ~key.VCS_DIR_WHEN_CHALKED.use                = true
   ~key.BUILD_ID.use                            = true
+  ~key.BUILD_COMMIT_ID.use                     = true
   ~key.BUILD_URI.use                           = true
   ~key.BUILD_API_URI.use                       = true
   ~key.BUILD_TRIGGER.use                       = true

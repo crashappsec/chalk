@@ -8,6 +8,12 @@
   not extract chalk mark from the image.
   ([#338](https://github.com/crashappsec/chalk/pull/338))
 
+### New Features
+
+- Added `BUILD_COMMIT_ID` key. This reports the commit ID
+  which triggered the build in CI/CD.
+  ([#339](https://github.com/crashappsec/chalk/pull/339))
+
 ## 0.4.4
 
 **June 12, 2024**

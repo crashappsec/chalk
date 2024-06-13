@@ -14,8 +14,7 @@ import ".."/[config, plugin_api]
 proc jenkinsGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result = ChalkDict()
 
-  # https://www.jenkins.io/doc/book/pipeline/
-  #                        jenkinsfile/#using-environment-variables
+  # https://www.jenkins.io/doc/book/pipeline/jenkinsfile/#using-environment-variables
   let
     CI = getEnv("CI")
 

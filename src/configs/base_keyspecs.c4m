@@ -1216,6 +1216,17 @@ key's documentation for more detail).
 """
 }
 
+keyspec BUILD_COMMIT_ID {
+  kind:     ChalkTimeHost
+  type:     string
+  standard: true
+  since:    "0.4.5"
+  shortdoc: "Commit ID which triggered the build"
+  doc:      """
+Commit ID which triggered the build in CI/CD at chalk time.
+"""
+}
+
 keyspec BUILD_TRIGGER {
     kind:             ChalkTimeHost
     type:             string
