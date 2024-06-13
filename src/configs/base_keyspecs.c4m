@@ -2661,7 +2661,7 @@ The set MAC address for a container
 
 keyspec _IMAGE_ONBUILD {
     kind:     RunTimeArtifact
-    type:     string
+    type:     list[string]
     standard: true
     doc: """
 The ONBUILD instruction which adds to the image a trigger instruction to be executed at a later time, when the image is used as the base for another build.
