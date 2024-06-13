@@ -11,6 +11,9 @@
   and therefore could not report correct
   branch name/commit id.
   ([#340](https://github.com/crashappsec/chalk/pull/340))
+- For packed repos (e.g. via `git gc`), chalk could not
+  report all git-related keys like `COMMIT_ID`, `TAG`, etc.
+  ([#341](https://github.com/crashappsec/chalk/pull/341))
 
 ### New Features
 

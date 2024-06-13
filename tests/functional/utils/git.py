@@ -5,7 +5,6 @@
 import functools
 import re
 from pathlib import Path
-from time import sleep
 from typing import Optional
 
 import os
@@ -68,6 +67,10 @@ class Git:
         if message or self.sign:
             args += ["-a", "-m", message or "dummy"]
         self.run(args)
+        return self
+
+    def pack(self):
+        self.run(["git", "gc"])
         return self
 
     @property
