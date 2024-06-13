@@ -7,6 +7,10 @@
 - Docker push of distroless image built without `buildx` could
   not extract chalk mark from the image.
   ([#338](https://github.com/crashappsec/chalk/pull/338))
+- Chalk did not handle git branch names with `/` in them
+  and therefore could not report correct
+  branch name/commit id.
+  ([#340](https://github.com/crashappsec/chalk/pull/340))
 
 ### New Features
 
