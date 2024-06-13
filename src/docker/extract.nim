@@ -15,8 +15,7 @@ proc hasChalkLayer(self: ChalkObj): bool =
   result = false
   let layers = inspectHistoryCommands(self.imageId)
   for layer in layers:
-    let withoutComment = layer.split("#")[0].strip()
-    if layer.startsWith("COPY ") and layer.endsWith(" /chalk.json"):
+    if "COPY " in layer and " /chalk.json" in layer:
       return true
 
 proc extractMarkFromStdOut(s: string): string =

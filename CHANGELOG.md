@@ -2,6 +2,12 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- Docker push of distroless image built without `buildx` could
+  not extract chalk mark from the image.
+  ([#338](https://github.com/crashappsec/chalk/pull/338))
+
 ## 0.4.4
 
 **June 12, 2024**

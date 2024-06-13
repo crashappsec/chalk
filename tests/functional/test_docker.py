@@ -597,30 +597,45 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
     assert TEST_LABEL in labels.values()
 
 
-@pytest.mark.parametrize("push", [True, False])
+@pytest.mark.parametrize(
+    "push, buildkit",
+    [
+        (True, True),  # non-buildx does not support --push
+        (False, True),
+        (False, False),
+    ],
+)
 @pytest.mark.parametrize(
     "test_file",
     [
-        "valid/sample_1",
+        "valid/empty",
     ],
 )
 @pytest.mark.skipif(
     platform.system() == "Darwin",
     reason="Skipping local docker push on mac due to issues https://github.com/docker/for-mac/issues/6704",
 )
-def test_build_and_push(chalk: Chalk, test_file: str, random_hex: str, push: bool):
+def test_build_and_push(
+    chalk: Chalk,
+    test_file: str,
+    random_hex: str,
+    push: bool,
+    buildkit: bool,
+):
     tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
     tag = f"{tag_base}:latest"
 
     current_hash_build, push_result = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
+        buildkit=buildkit,
         tag=tag,
         push=push,
+        run_docker=buildkit,  # legacy builder doesnt allow to build empty image
     )
 
     # if without --push at build time, explicitly push to registry
     if not push:
-        push_result = chalk.docker_push(tag)
+        push_result = chalk.docker_push(tag, buildkit=buildkit)
 
     current_hash_push = push_result.mark["_CURRENT_HASH"]
     repo_digest_push = push_result.mark["_REPO_DIGESTS"][tag_base]
