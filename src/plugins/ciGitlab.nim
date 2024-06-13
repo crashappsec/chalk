@@ -18,6 +18,7 @@ proc gitlabGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.}  =
   let
     CI                  = getEnv("CI")
     GITLAB_CI           = getEnv("GITLAB_CI")
+    GITLAB_COMMIT_SHA   = getEnv("CI_COMMIT_SHA")
     GITLAB_JOB_URL      = getEnv("CI_JOB_URL")
     GITLAB_JOB_ID       = getEnv("CI_JOB_ID")
     GITLAB_API_URL      = getEnv("CI_API_V4_URL")
@@ -30,6 +31,7 @@ proc gitlabGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.}  =
   if CI == "" and GITLAB_CI == "": return
 
   result.setIfNeeded("BUILD_ID",              GITLAB_JOB_ID)
+  result.setIfNeeded("BUILD_COMMIT_ID",       GITLAB_COMMIT_SHA)
   result.setIfNeeded("BUILD_URI",             GITLAB_JOB_URL)
   result.setIfNeeded("BUILD_API_URI",         GITLAB_API_URL)
   result.setIfNeeded("BUILD_ORIGIN_ID",       GITLAB_PROJECT_ID)

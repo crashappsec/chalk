@@ -75,6 +75,7 @@ or vice versa.
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.BUILD_ID.use                            = true
+  key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
@@ -174,6 +175,7 @@ mark_template mark_large {
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.BUILD_ID.use                            = true
+  key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
@@ -271,6 +273,7 @@ use the mark template named `reproducable`.
   key.PACKAGE_URI.use                         = true
   key.CODE_OWNERS.use                         = true
   key.BUILD_ID.use                            = true
+  key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
@@ -335,6 +338,7 @@ the time and the nonce removed.
   key.PACKAGE_URI.use                         = true
   key.CODE_OWNERS.use                         = true
   key.BUILD_ID.use                            = true
+  key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
