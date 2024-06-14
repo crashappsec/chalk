@@ -31,6 +31,7 @@ const
   gitAuthor        = "author"
   gitCommitter     = "committer"
   gitMessage       = "message" ## Either a commit message or a tag message.
+  gitCommit        = "commit"
   gitTag           = "tag"
   gitSign          = "gpgsig"
   gitTagger        = "tagger"
@@ -38,6 +39,7 @@ const
   gitIdxExt        = ".idx"
   gitIdxHeader     = "\xff\x74\x4f\x63\x00\x00\x00\x02"
   gitObjects       = "objects"
+  gitPackRefs      = "packed-refs"
   gitPack          = gitObjects.joinPath("pack")
   gitPackExt       = ".pack"
   gitTimeFmt       = "ddd MMM dd HH:mm:ss YYYY"
@@ -282,6 +284,8 @@ template formatCommitObjectTime(line: string): string =
 proc readPackedObject(path: string, offset: uint64): string =
   ## read packaged git object
   ## supports reading git commit and tag objects
+  ## https://git-scm.com/docs/pack-format
+  ## https://git-scm.com/book/en/v2/Git-Internals-Packfiles
   withFileStream(path, mode = fmRead, strict = true):
     stream.setPosition(int(offset))
     let initialReadSize = 0x1000
@@ -289,8 +293,14 @@ proc readPackedObject(path: string, offset: uint64): string =
       data    = stream.readStr(initialReadSize)
       byte    = uint8(data[0])
       objType = ((byte shr 4) and 7)
-    if not (objType == gitObjCommit or objType == gitObjTag):
-      raise(newException(CatchableError, "not a commit or tag object - unsupported git object type: " & $objType))
+      gitType =
+        case objType
+        of gitObjCommit:
+          gitCommit
+        of gitObjTag:
+          gitTag
+        else:
+          raise newException(ValueError, "not a commit or tag object - unsupported git object type: " & $objType)
     var
       uncompressedSize = uint64(byte and 0x0F)
       shiftBits        = 4
@@ -312,10 +322,18 @@ proc readPackedObject(path: string, offset: uint64): string =
     let remaining = initialReadSize - currentOffset
     if uncompressedSize > uint64(remaining):
       data &= stream.readStr(remaining)
-    var sourcePointer = cast[ptr UncheckedArray[uint8]](addr data[currentOffset])
-    inflate(result, sourcePointer, len(data)-currentOffset, 2)
+    var
+      sourcePointer    = cast[ptr UncheckedArray[uint8]](addr data[currentOffset])
+      uncompressedData = ""
+    inflate(uncompressedData, sourcePointer, len(data)-currentOffset, 2)
+    # add back object header to match individual object files
+    # for consistent parsing
+    let objectHeader = gitType & " " & $uncompressedSize & "\x00"
+    return objectHeader & uncompressedData
 
 proc findPackedGitObject(vcsDir, refId: string): string =
+  ## https://git-scm.com/docs/pack-format
+  ## https://git-scm.com/book/en/v2/Git-Internals-Packfiles
   let
     nameBytes       = parseHexStr(refId)
     nameLen         = uint64(len(nameBytes))
@@ -374,7 +392,16 @@ proc findPackedGitObject(vcsDir, refId: string): string =
     return readPackedObject(filename.replace(gitIdxExt, gitPackExt), offset)
   raise newException(CatchableError, "failed to parse git index")
 
+proc isTag(self: Table[string, string]): bool =
+  let gitType = self.getOrDefault(gitHeaderType)
+  return (
+    gitType   == gitTag and
+    gitTag    in self   and
+    gitObject in self
+  )
+
 proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
+  ## https://git-scm.com/book/en/v2/Git-Internals-Git-Objects
   let
     objFile     = info.vcsDir.joinPath(gitObjects, refId[0 ..< 2], refId[2 .. ^1])
     objFileData = tryToLoadFile(objFile)
@@ -414,8 +441,9 @@ proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
     # although in theory this can be spoofed by
     # simply including dummy gpg signature in the tag annotation
     # but then signature cant be validated, even by git verify-tag
-    if result.getOrDefault(gitHeaderType) == gitTag and
-       gpgSignStart in lines and gpgSignEnd in lines and
+    if result.isTag() and
+       gpgSignStart in lines and
+       gpgSignEnd   in lines and
        objData.endsWith(gpgSignEnd):
       result[gitSign] = ""
 
@@ -448,6 +476,30 @@ proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
   except:
     warn("unable to retrieve Git ref data: " & refId & " due to: " & getCurrentExceptionMsg())
 
+proc getAllPackedRefs(info: RepoInfo): Table[string, string] =
+  result = initTable[string, string]()
+  let
+    path = info.vcsDir.joinPath(gitPackRefs)
+    refs = tryToLoadFile(path).strip()
+  if refs == "":
+    return
+  for line in refs.splitLines():
+    # format is <sha> <ref>
+    if "refs/" notin line:
+      continue
+    let parts = line.split()
+    if len(parts) != 2:
+      continue
+    result[parts[1]] = parts[0]
+
+proc loadRef(info: RepoInfo, gitRef: string): string =
+  let
+    path  = info.vcsDir.joinPath(gitRef)
+    objId = tryToLoadFile(path).strip()
+  if objId != "":
+    return objId
+  return info.getAllPackedRefs().getOrDefault(gitRef)
+
 proc loadAuthor(info: RepoInfo, commitId: string) =
   let fields = info.loadObject(commitId)
   # this makes only the same assumptions as git itself:
@@ -466,12 +518,20 @@ proc loadTags(info: RepoInfo, commitId: string) =
   if commitId == "":
     return
 
-  let tagPath           = info.vcsDir.joinPath("refs", "tags")
+  let tagPath = info.vcsDir.joinPath("refs", "tags")
+  var allTags = initTable[string, string]()
 
+  for gitRef, objId in info.getAllPackedRefs():
+    if not gitRef.startsWith("refs/tags/"):
+      continue
+    let parts = gitRef.split("/", maxsplit = 2)
+    allTags[parts[2]] = objId
   for tag in tagPath.walkDirRec(relative = true):
     let tagCommit = tryToLoadFile(tagPath.joinPath(tag)).strip()
-    if tagCommit == "":
-      continue
+    if tagCommit != "":
+      allTags[tag] = tagCommit
+
+  for tag, tagCommit in allTags:
     # regular tag which points directly to the current commit ID
     if tagCommit == commitId:
         trace("tag: " & tag)
@@ -485,7 +545,7 @@ proc loadTags(info: RepoInfo, commitId: string) =
       try:
         let fields = info.loadObject(tagCommit)
         # not an annotated tag
-        if fields.getOrDefault(gitHeaderType) != gitTag:
+        if not fields.isTag():
           continue
         # we found annotated commit pointing to current commit
         if fields[gitTag] == tag and fields[gitObject] == info.commitId:
@@ -521,7 +581,7 @@ proc loadCommit(info: RepoInfo, commitId: string) =
 proc loadSymref(info: RepoInfo, gitRef: string) =
   let
     fname = gitRef[4 .. ^1].strip()
-    parts = fname.split({ DirSep, '/'}, maxsplit = 2)
+    parts = fname.split({ DirSep, '/' }, maxsplit = 2)
 
   if parts.len() < 3:
     error(fNameHead & ": Git HEAD file couldn't be loaded")
@@ -530,18 +590,13 @@ proc loadSymref(info: RepoInfo, gitRef: string) =
   let name = parts[2]
   case parts[1]:
     of "heads":
-      info.branch    = name
+      info.branch = name
       trace("branch: " & info.branch)
 
-  let
-    fNameRef = info.vcsDir.joinPath(fname)
-    commitId = tryToLoadFile(fNameRef).strip()
-
+  let commitId = info.loadRef(fname)
   if commitId == "":
-    warn(fNameRef               &
-         ": Git ref file for '" &
-         name                   &
-         "' doesnt exist. Most likely it's an empty git repo.")
+    warn(gitRef & ": Git ref file for '" & name & "' doesnt exist. " &
+         "Most likely it's an empty git repo.")
     return
 
   info.loadCommit(commitId)
