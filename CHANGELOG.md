@@ -1,6 +1,6 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.4.5
 
 ### Fixes
 
