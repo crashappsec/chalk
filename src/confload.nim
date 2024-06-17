@@ -98,7 +98,7 @@ proc loadLocalStructs*(state: ConfigState) =
       # no log as this function is called multiple times
       # and any logs are very verbose
       continue
-  doAssert state.attrSet("config_path", pack(configPath)).code == errOk
+  state.con4mAttrSet("config_path", pack(configPath))
   var c4errLevel =  if get[bool](chalkConfig, "con4m_pinpoint"): c4vShowLoc else: c4vBasic
 
   if get[bool](chalkConfig, "chalk_debug"):

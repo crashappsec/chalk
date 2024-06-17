@@ -16,9 +16,9 @@ proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we
   # are subscribed to, that hasn't already been provided?
   for k in keys:
-    if k in p.configInfo.ignore:            continue
+    if k in get[seq[string]](p.configInfo, "ignore"): continue
     if k notin subscribedKeys and k != "*": continue
-    if k in p.configInfo.overrides: return true
+    if k in get[seq[string]](p.configInfo, "overrides"): return true
     if k notin dict:                return true
 
   return false
@@ -27,12 +27,12 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   # This would all be redundant to what we can check in the config file spec,
   # except that we do allow "*" fields for plugins, so we need the runtime
   # check to filter out inappropriate items.
-  let spec = chalkConfig.keySpecs[key]
+  let spec = getObject(getChalkScope(), "keyspec." & key)
 
-  if key in plugin.configInfo.ignore: return false
+  if key in get[seq[string]](plugin.configInfo, "ignore"): return false
 
-  if spec.codec:
-    if plugin.configInfo.codec:
+  if get[bool](spec, "codec"):
+    if get[bool](plugin.configInfo, "codec"):
       return true
     else:
       error("Plugin '" & plugin.name & "' can't write codec key: '" & key & "'")
@@ -41,23 +41,29 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   if key notin decls and "*" notin decls:
     error("Plugin '" & plugin.name & "' produced undeclared key: '" & key & "'")
     return false
-  if not spec.system:
+  if not get[bool](spec, "system"):
     return true
 
   case plugin.name
   of "system", "metsys":
     return true
   of "conffile":
-    if spec.confAsSystem:
+    if get[bool](spec, "conf_as_system"):
       return true
   else: discard
 
   error("Plugin '" & plugin.name & "' can't write system key: '" & key & "'")
   return false
 
-proc registerKeys(templ: MarkTemplate | ReportTemplate) =
-  for name, content in templ.keys:
-    if content.use: subscribedKeys[name] = true
+proc registerKeys(templ: AttrScope) =
+  let keyOpt = getObjectOpt(templ, "key")
+  if keyOpt.isSome():
+    let key = keyOpt.get()
+    for name, content in key.contents:
+      if content.isA(AttrScope):
+        let useOpt = getOpt[bool](content.get(AttrScope), "use")
+        if useOpt.isSome() and useOpt.get():
+          subscribedKeys[name] = true
 
 proc registerOutconfKeys() =
   # We always subscribe to _VALIDATED, even if they don't want to
@@ -71,11 +77,13 @@ proc registerOutconfKeys() =
 
   let outconf = getOutputConfig()
 
-  if outconf.markTemplate != "":
-    chalkConfig.markTemplates[outConf.markTemplate].registerKeys()
+  let markTemplate = get[string](outconf, "mark_template")
+  if markTemplate != "":
+    getObject(getChalkScope(), "mark_template." & markTemplate).registerKeys()
 
-  if outconf.reportTemplate != "":
-    chalkConfig.reportTemplates[outConf.reportTemplate].registerKeys()
+  let reportTemplate = get[string](outconf, "report_template")
+  if reportTemplate != "":
+    getObject(getChalkScope(), "report_template." & reportTemplate).registerKeys()
 
 proc collectChalkTimeHostInfo*() =
   if hostCollectionSuspended():
@@ -83,7 +91,7 @@ proc collectChalkTimeHostInfo*() =
 
   trace("Collecting chalk time artifact info")
   for plugin in getAllPlugins():
-    let subscribed = plugin.configInfo.preRunKeys
+    let subscribed = get[seq[string]](plugin.configInfo, "pre_run_keys")
     if chalkCollectionSuspendedFor(plugin.name):          continue
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
     try:
@@ -93,9 +101,9 @@ proc collectChalkTimeHostInfo*() =
         continue
 
       for k, v in dict:
-        if not plugin.canWrite(k, plugin.configInfo.preRunKeys):
+        if not plugin.canWrite(k, get[seq[string]](plugin.configInfo, "pre_run_keys")):
           continue
-        if k notin hostInfo or k in plugin.configInfo.overrides or plugin.isSystem():
+        if k notin hostInfo or k in get[seq[string]](plugin.configInfo, "overrides") or plugin.isSystem():
           hostInfo[k] = v
     except:
       warn("When collecting chalk-time host info, plugin implementation " &
@@ -116,15 +124,18 @@ proc initCollection*() =
   registerOutconfKeys()
 
   # Next, register for any custom reports.
-  for name, report in chalkConfig.reportSpecs:
-    if (getBaseCommandName() notin report.use_when and
-        "*" notin report.use_when):
-      continue
+  for name, report in getChalkSubsections("custom_report"):
+    let useWhenOpt = getOpt[seq[string]](report, "use_when")
+    if useWhenOpt.isSome():
+      let useWhen = useWhenOpt.get()
+      if (getBaseCommandName() notin useWhen and "*" notin useWhen):
+        continue
 
-    let templName = report.reportTemplate
-
-    if templName != "":
-      chalkConfig.reportTemplates[templName].registerKeys()
+    let templNameOpt = getOpt[string](report, "report_template")
+    if templNameOpt.isSome():
+      let templName = templNameOpt.get()
+      if templName != "":
+        getObject(getChalkScope(), "report_template." & templName).registerKeys()
 
   if isChalkingOp():
       collectChalkTimeHostInfo()
@@ -134,19 +145,19 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
   for plugin in getAllPlugins():
     let
       data       = artifact.collectedData
-      subscribed = plugin.configInfo.postChalkKeys
+      subscribed = get[seq[string]](plugin.configInfo, "post_chalk_keys")
 
     if chalkCollectionSuspendedFor(plugin.name):               continue
     if not plugin.hasSubscribedKey(subscribed, data):          continue
-    if plugin.configInfo.codec and plugin != artifact.myCodec: continue
+    if get[bool](plugin.configInfo, "codec") and plugin != artifact.myCodec: continue
 
     trace("Running plugin: " & plugin.name)
     try:
       let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
       if dict == nil or len(dict) == 0: continue
       for k, v in dict:
-        if not plugin.canWrite(k, plugin.configInfo.postChalkKeys): continue
-        if k notin artifact.collectedData or k in plugin.configInfo.overrides or plugin.isSystem():
+        if not plugin.canWrite(k, get[seq[string]](plugin.configInfo, "post_chalk_keys")): continue
+        if k notin artifact.collectedData or k in get[seq[string]](plugin.configInfo, "overrides") or plugin.isSystem():
           artifact.collectedData[k] = v
       trace(plugin.name & ": Plugin called.")
     except:
@@ -182,9 +193,9 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
       if obj.fsRef != "":
         data["PATH_WHEN_CHALKED"] = pack(resolvePath(obj.fsRef))
 
-    if plugin.configInfo.codec and plugin != obj.myCodec: continue
+    if get[bool](plugin.configInfo, "codec") and plugin != obj.myCodec: continue
 
-    let subscribed = plugin.configInfo.preChalkKeys
+    let subscribed = get[seq[string]](plugin.configInfo, "pre_chalk_keys")
     if not plugin.hasSubscribedKey(subscribed, data) and not plugin.isSystem():
       trace(plugin.name & ": Skipping plugin; its metadata wouldn't be used.")
       continue
@@ -200,8 +211,8 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
         continue
 
       for k, v in dict:
-        if not plugin.canWrite(k, plugin.configInfo.preChalkKeys): continue
-        if k notin obj.collectedData or k in plugin.configInfo.overrides or plugin.isSystem() or override:
+        if not plugin.canWrite(k, get[seq[string]](plugin.configInfo, "pre_chalk_keys")): continue
+        if k notin obj.collectedData or k in get[seq[string]](plugin.configInfo, "overrides") or plugin.isSystem() or override:
           obj.collectedData[k] = v
       trace(plugin.name & ": Plugin called.")
     except:
@@ -216,7 +227,7 @@ proc collectRunTimeHostInfo*() =
   ## artifact loop below.
   trace("Collecting run time host info")
   for plugin in getAllPlugins():
-    let subscribed = plugin.configInfo.postRunKeys
+    let subscribed = get[seq[string]](plugin.configInfo, "post_run_keys")
     if chalkCollectionSuspendedFor(plugin.name):          continue
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
 
@@ -226,8 +237,8 @@ proc collectRunTimeHostInfo*() =
       if dict == nil or len(dict) == 0: continue
 
       for k, v in dict:
-        if not plugin.canWrite(k, plugin.configInfo.postRunKeys): continue
-        if k notin hostInfo or k in plugin.configInfo.overrides or plugin.isSystem():
+        if not plugin.canWrite(k, get[seq[string]](plugin.configInfo, "post_run_keys")): continue
+        if k notin hostInfo or k in get[seq[string]](plugin.configInfo, "overrides") or plugin.isSystem():
           hostInfo[k] = v
     except:
       warn("When collecting run-time host info, plugin implementation " &

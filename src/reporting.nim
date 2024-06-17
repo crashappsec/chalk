@@ -47,7 +47,7 @@ proc topicUnsubscribe*(args: seq[Box], unused: ConfigState): Option[Box] =
 
   return some(pack(unsubscribe(topic, `rec?`.get())))
 
-proc setPerChalkReports(tmpl: ReportTemplate) =
+proc setPerChalkReports(tmpl: AttrScope) =
   ## Adds the `_CHALKS` key in the `hostinfo` global to the current
   ## collection context with whatever items were requested in the
   ## reporting template passed.
@@ -67,7 +67,7 @@ proc setPerChalkReports(tmpl: ReportTemplate) =
   elif "_CHALKS" in hostInfo:
     hostInfo.del("_CHALKS")
 
-template buildHostReport*(tmpl: ReportTemplate): string =
+template buildHostReport*(tmpl: AttrScope): string =
   setPerChalkReports(tmpl)
   prepareContents(hostInfo, tmpl)
 
@@ -105,21 +105,25 @@ template doEmbeddedReport(): Box =
     pack[seq[Box]](@[])
 
 template doCustomReporting() =
-  for topic, spec in chalkConfig.reportSpecs:
-    if not spec.enabled: continue
+  for topic, spec in getChalkSubsections("custom_report"):
+    let enabledOpt = getOpt[bool](spec, "enabled")
+    if enabledOpt.isNone() or not enabledOpt.get(): continue
     var
-      sinkConfs = spec.sinkConfigs
+      sinkConfs = get[seq[string]](spec, "sink_configs")
 
     discard registerTopic(topic)
 
-    if getCommandName() notin spec.useWhen and "*" notin spec.useWhen:
+    let useWhen = get[seq[string]](spec, "use_when")
+    if getCommandName() notin useWhen and "*" notin useWhen:
       continue
     if topic == "audit" and not get[bool](chalkConfig, "publish_audit"):
       continue
     if len(sinkConfs) == 0 and topic notin ["audit", "chalk_usage_stats"]:
       warn("Report '" & topic & "' has no configured sinks.  Skipping.")
 
-    let templateToUse = chalkConfig.reportTemplates[spec.reportTemplate]
+    let
+      reportTemplate = get[string](spec, "report_template")
+      templateToUse = getObject(getChalkScope(), "report_template." & reportTemplate)
 
     for sinkConfName in sinkConfs:
       let res = topicSubscribe((@[pack(topic), pack(sinkConfName)])).get()

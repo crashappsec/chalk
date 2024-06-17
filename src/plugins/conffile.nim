@@ -12,15 +12,17 @@ import ".."/[config, plugin_api]
 
 proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
   result = ChalkDict()
-  for k, v in chalkConfig.keySpecs:
+  for k, v in getChalkSubsections("keyspec"):
     if opt.isNone() and k in hostInfo:                continue
     if opt.isSome() and k in opt.get().collectedData: continue
-    if v.kind != int(kt): continue
+    if get[int](v, "kind") != int(kt): continue
     if k notin subscribedKeys: continue
-    if v.value.isSome():
-      result[k] = v.value.get()
-    elif v.callback.isSome():
-      let cbOpt = runCallback(v.callback.get(), args)
+    let valueOpt = attrLookup(v, "value")
+    let callbackOpt = attrLookup(v, "callback")
+    if valueOpt.isSome():
+      result[k] = unpack[Box](valueOpt.get())
+    elif callbackOpt.isSome():
+      let cbOpt = runCallback(unpack[CallbackObj](callbackOpt.get()), args)
       if cbOpt.isSome(): result[k] = cbOpt.get()
 
 proc confGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =

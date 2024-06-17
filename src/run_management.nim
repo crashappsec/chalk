@@ -17,11 +17,36 @@ var
   ctxStack   = @[CollectionCtx()]
   startTime* = getMonoTime().ticks()
 
+proc getChalkScope*(): AttrScope =
+  con4mRuntime.configState.attrs
+
+iterator getChalkSubsections*(s: string): (string, AttrScope) =
+  ## Walks the contents of the given chalk config section, and yields the
+  ## (keyName, scope) pairs for the subsections.
+  for k, v in con4mRuntime.configState.attrs.getObject(s).contents:
+    if v.isA(AttrScope):
+      yield (k, v.get(AttrScope))
+
 proc get*[T](chalkConfig: ChalkConfig, fqn: string): T =
   get[T](chalkConfig.`@@attrscope@@`, fqn)
 
 proc getOpt*[T](chalkConfig: ChalkConfig, fqn: string): Option[T] =
   getOpt[T](chalkConfig.`@@attrscope@@`, fqn)
+
+proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
+  ## Sets the value of the `fqn` attribute in `ctx.attrs` to `value`, raising
+  ## `AssertionDefect` if unsuccessful.
+  ##
+  ## This proc must only be used if the attribute is already set. If the
+  ## attribute isn't already set, use the other `con4mAttrSet` overload instead.
+  doAssert attrSet(ctx, fqn, value).code == errOk
+
+proc con4mAttrSet*(attrs: AttrScope, fqn: string, value: Box, attrType: Con4mType) =
+  ## Sets the value of the `fqn` attribute in `attrs` to `value`, raising
+  ## `AssertionDefect` if unsuccessful.
+  ##
+  ## This proc may be used if the attribute is not already set.
+  doAssert attrSet(attrs, fqn, value, attrType).code == errOk
 
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.

@@ -103,7 +103,7 @@ proc addVirtualLabels(ctx: DockerInvocation, chalk: ChalkObj) =
   if labelTemplName == "":
     return
   let
-    labelTemplate = chalkConfig.markTemplates[labelTemplName]
+    labelTemplate = getObject(getChalkScope(), "mark_template." & labelTemplName)
     hostLabelsToAdd = hostInfo.filterByTemplate(labelTemplate)
     artLabelsToAdd  = chalk.collectedData.filterByTemplate(labelTemplate)
   var args: seq[string] = @[]
@@ -122,7 +122,7 @@ proc addLabels(ctx: DockerInvocation, chalk: ChalkObj) =
   if labelTemplName == "":
     return
   let
-    labelTemplate    = chalkConfig.markTemplates[labelTemplName]
+    labelTemplate    = getObject(getChalkScope(), "mark_template." & labelTemplName)
     hostLabelsToAdd  = hostInfo.filterByTemplate(labelTemplate)
     artLabelsToAdd   = chalk.collectedData.filterByTemplate(labelTemplate)
   var added: seq[string] = @[]

@@ -67,7 +67,8 @@ proc mapFromJson(self:         ChalkDict,
       discard
 
   let boxedValue = value.nimJsonToBox()
-  if not boxedValue.checkAutoType(chalkConfig.keyspecs[chalkKey].`type`):
+  let t = get[Con4mType](getChalkScope(), "keyspec." & chalkKey & ".type")
+  if not boxedValue.checkAutoType(t):
     warn("docker: JSON key " & jsonKey &
          " associated with chalk key '" & chalkKey &
          "' is not of the expected type. Using it anyway.")

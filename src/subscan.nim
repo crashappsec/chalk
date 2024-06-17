@@ -40,7 +40,7 @@ proc runChalkSubScan*(location: seq[string],
   try:
     if suspendHost:
       suspendHostCollection()
-    doAssert runtime.attrSet("recursive", pack(true)).code == errOk
+    runtime.con4mAttrSet("recursive", pack(true))
     result                = pushCollectionCtx()
     case cmd
     # if someone is doing 'docker' recursively, we look
@@ -60,7 +60,7 @@ proc runChalkSubScan*(location: seq[string],
     setCommandName(oldCmd)
     setArgs(oldArgs)
     trace("Subscan done. Restored command name to: " & oldCmd)
-    doAssert runtime.attrSet("recursive", pack(oldRecursive)).code == errOk
+    runtime.con4mAttrSet("recursive", pack(oldRecursive))
 
 template runChalkSubScan*(location: string,
                           cmd:      string,

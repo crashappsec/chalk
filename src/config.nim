@@ -48,48 +48,62 @@ proc selfChalkSetSubKey*(key: string, subKey: string, subValue: Box) =
   value[subKey] = subValue
   selfChalkSetKey(key, pack(value))
 
-proc filterByTemplate*(dict: ChalkDict, p: MarkTemplate | ReportTemplate): ChalkDict =
+proc filterByTemplate*(dict: ChalkDict, p: AttrScope): ChalkDict =
   result = ChalkDict()
   for k, v in dict:
-    if k in p.keys and p.keys[k].use:
-      result[k] = v
+    let pKeysOpt = getObjectOpt(p, "key")
+    if pKeysOpt.isSome():
+      let pKeys = pKeysOpt.get()
+      if getObjectOpt(pKeys, k).isSome() and get[bool](pKeys, k & ".use"):
+        result[k] = v
 
-proc getOutputConfig*(): OutputConfig =
-  return chalkConfig.outputConfigs[getBaseCommandName()]
+proc getOutputConfig*(): AttrScope =
+  return getObject(getChalkScope(), "outconf." & getBaseCommandName())
 
-template getMarkTemplate*(): MarkTemplate =
+template getMarkTemplate*(): AttrScope =
   let
-    outconf  = chalkConfig.outputConfigs[getBaseCommandName()]
-    tmplName = outconf.mark_template
+    outconf  = getOutputConfig()
+    tmplName = get[string](outconf, "mark_template")
 
-  chalkConfig.markTemplates[tmplName]
+  getObject(getChalkScope(), "mark_template." & tmplName)
 
-template getReportTemplate*(): ReportTemplate =
+template getReportTemplate*(): AttrScope =
   let
-    outconf  = chalkConfig.outputConfigs[getBaseCommandName()]
-    tmplName = outconf.report_template
+    outconf  = getOutputConfig()
+    tmplName = get[string](outconf, "report_template")
 
-  chalkConfig.reportTemplates[tmplName]
+  getObject(getChalkScope(), "report_template." & tmplName)
 
 template forceReportKeys*(keynames: openarray[string]) =
   let templateRef = getReportTemplate()
 
+  # Create the "key" section if required.
+  if getObjectOpt(templateRef, "key").isNone() and keynames.len > 0:
+    discard attrLookup(templateRef, ["key"], ix = 0, op = vlSecDef)
+
+  let keys = getObject(templateRef, "key")
+
   for item in keynames:
-    if item in templateRef.keys:
-      templateRef.keys[item].use = true
-    else:
-      templateRef.keys[item] = KeyConfig(use: true)
+    # Create the item section if required.
+    if item notin getContents(keys):
+      discard attrLookup(keys, [item], ix = 0, op = vlSecDef)
+    con4mAttrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool))
 
 template forceChalkKeys*(keynames: openarray[string]) =
   if isChalkingOp():
-    let
-      templateRef = getMarkTemplate()
+    let templateRef = getMarkTemplate()
+
+    # Create the "key" section if required.
+    if getObjectOpt(templateRef, "key").isNone() and keynames.len > 0:
+      discard attrLookup(templateRef, ["key"], ix = 0, op = vlSecDef)
+
+    let keys = getObject(templateRef, "key")
 
     for item in keynames:
-      if item in templateRef.keys:
-        templateRef.keys[item].use = true
-      else:
-        templateRef.keys[item] = KeyConfig(use: true)
+      # Create the item section if required.
+      if item notin getContents(keys):
+        discard attrLookup(keys, [item], ix = 0, op = vlSecDef)
+      con4mAttrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool))
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.sCall(cb, args)
@@ -112,12 +126,15 @@ proc setCommandName*(s: string) =
 proc getChalkRuntime*(): ConfigState      = con4mRuntime.configState
 proc getValidationRuntime*(): ConfigState = con4mRuntime.validationState
 
-proc getKeySpec*(name: string): Option[KeySpec] =
-  if name in chalkConfig.keyspecs: return some(chalkConfig.keyspecs[name])
+proc getKeySpec*(name: string): Option[AttrScope] =
+  for k, v in getChalkSubsections("keyspec"):
+    if name == k:
+      return some(v)
 
-proc getPluginConfig*(name: string): Option[PluginSpec] =
-  if name in chalkConfig.plugins:
-    return some(chalkConfig.plugins[name])
+proc getPluginConfig*(name: string): Option[AttrScope] =
+  for k, v in getChalkSubsections("plugin"):
+    if k == name:
+      return some(v)
 
 var autoHelp*:       string = ""
 proc getAutoHelp*(): string = autoHelp
