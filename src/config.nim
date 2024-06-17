@@ -79,14 +79,14 @@ template forceReportKeys*(keynames: openarray[string]) =
 
   # Create the "key" section if required.
   if getObjectOpt(templateRef, "key").isNone() and keynames.len > 0:
-    discard attrLookup(templateRef, ["key"], 0, vlSecDef)
+    discard attrLookup(templateRef, ["key"], ix = 0, op = vlSecDef)
 
   let keys = getObject(templateRef, "key")
 
   for item in keynames:
     # Create the item section if required.
     if item notin getContents(keys):
-      discard attrLookup(keys, [item], 0, vlSecDef)
+      discard attrLookup(keys, [item], ix = 0, op = vlSecDef)
     doAssert attrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool)).code == errOk
 
 template forceChalkKeys*(keynames: openarray[string]) =
@@ -95,14 +95,14 @@ template forceChalkKeys*(keynames: openarray[string]) =
 
     # Create the "key" section if required.
     if getObjectOpt(templateRef, "key").isNone() and keynames.len > 0:
-      discard attrLookup(templateRef, ["key"], 0, vlSecDef)
+      discard attrLookup(templateRef, ["key"], ix = 0, op = vlSecDef)
 
     let keys = getObject(templateRef, "key")
 
     for item in keynames:
       # Create the item section if required.
       if item notin getContents(keys):
-        discard attrLookup(keys, [item], 0, vlSecDef)
+        discard attrLookup(keys, [item], ix = 0, op = vlSecDef)
       doAssert attrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool)).code == errOk
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
