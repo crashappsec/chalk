@@ -30,6 +30,7 @@ from .utils.git import DATE_FORMAT, Git
         ),
     ],
 )
+@pytest.mark.parametrize("pack", [True, False])
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 @pytest.mark.parametrize(
     "set_tag_message",
@@ -46,6 +47,7 @@ def test_repo(
     sign: bool,
     random_hex: str,
     set_tag_message: bool,
+    pack: bool,
 ):
     commit_message = (
         "fix widget\n\nBefore this commit, the widget behaved incorrectly when foo."
@@ -53,18 +55,20 @@ def test_repo(
     tag_message = "Changes since the previous tag:\n\n- Fix widget\n- Improve performance of bar by 42%"
     git = (
         Git(tmp_data_dir, sign=sign)
-        .init(remote=remote)
+        .init(remote=remote, branch="foo/bar")
         .add()
         .commit(commit_message)
-        .tag(f"{random_hex}-1")
-        .tag(f"{random_hex}-2", tag_message if set_tag_message else None)
+        .tag(f"foo/{random_hex}-1")
+        .tag(f"foo/{random_hex}-2", tag_message if set_tag_message else None)
     )
+    if pack:
+        git.pack()
     artifact = copy_files[0]
     result = chalk_copy.insert(artifact)
     author = re.compile(rf"^{git.author} \d+ [+-]\d+$")
     committer = re.compile(rf"^{git.committer} \d+ [+-]\d+$")
     assert result.mark.has(
-        BRANCH="main",
+        BRANCH="foo/bar",
         COMMIT_ID=ANY,
         COMMIT_SIGNED=sign,
         AUTHOR=author,
@@ -72,7 +76,7 @@ def test_repo(
         COMMITTER=committer,
         DATE_COMMITTED=DATE_FORMAT,
         COMMIT_MESSAGE=commit_message,
-        TAG=f"{random_hex}-2",
+        TAG=f"foo/{random_hex}-2",
         TAG_SIGNED=sign,
         TAGGER=committer if (sign or set_tag_message) else MISSING,
         DATE_TAGGED=DATE_FORMAT if (sign or set_tag_message) else MISSING,

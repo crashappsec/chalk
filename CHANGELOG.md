@@ -2,6 +2,27 @@
 
 ## On the `main` branch
 
+## 0.4.5
+
+### Fixes
+
+- Docker push of distroless image built without `buildx` could
+  not extract chalk mark from the image.
+  ([#338](https://github.com/crashappsec/chalk/pull/338))
+- Chalk did not handle git branch names with `/` in them
+  and therefore could not report correct
+  branch name/commit id.
+  ([#340](https://github.com/crashappsec/chalk/pull/340))
+- For packed repos (e.g. via `git gc`), chalk could not
+  report all git-related keys like `COMMIT_ID`, `TAG`, etc.
+  ([#341](https://github.com/crashappsec/chalk/pull/341))
+
+### New Features
+
+- Added `BUILD_COMMIT_ID` key. This reports the commit ID
+  which triggered the build in CI/CD.
+  ([#339](https://github.com/crashappsec/chalk/pull/339))
+
 ## 0.4.4
 
 **June 12, 2024**

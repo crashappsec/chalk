@@ -85,6 +85,7 @@ report and subtract from it.
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.BUILD_ID.use                            = true
+  key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
@@ -650,6 +651,7 @@ doc: """
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.BUILD_ID.use                            = true
+  key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
@@ -1106,6 +1108,7 @@ container.
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.BUILD_ID.use                            = true
+  key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true
@@ -1562,6 +1565,7 @@ and keep the run-time key.
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.BUILD_ID.use                            = true
+  key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
   key.BUILD_TRIGGER.use                       = true

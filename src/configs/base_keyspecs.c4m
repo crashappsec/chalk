@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.4.5-dev"
+chalk_version :=   "0.4.6-dev"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -1213,6 +1213,17 @@ for that endpoint.
 This field is generally expected to be supplied by the user, and can
 use the same substitutions allowed for the `CHALK_PTR` field (see that
 key's documentation for more detail).
+"""
+}
+
+keyspec BUILD_COMMIT_ID {
+  kind:     ChalkTimeHost
+  type:     string
+  standard: true
+  since:    "0.4.5"
+  shortdoc: "Commit ID which triggered the build"
+  doc:      """
+Commit ID which triggered the build in CI/CD at chalk time.
 """
 }
 
@@ -2661,7 +2672,7 @@ The set MAC address for a container
 
 keyspec _IMAGE_ONBUILD {
     kind:     RunTimeArtifact
-    type:     string
+    type:     list[string]
     standard: true
     doc: """
 The ONBUILD instruction which adds to the image a trigger instruction to be executed at a later time, when the image is used as the base for another build.

@@ -61,6 +61,7 @@ def test_github(copy_files: list[Path], chalk: Chalk, server_imds: str):
         bin_path,
         host_info={
             "BUILD_ID": "1658821493",
+            "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
             "BUILD_TRIGGER": "tag",
             "BUILD_CONTACT": ["octocat"],
             "BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493/attempts/5",
@@ -107,6 +108,7 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
         bin_path,
         host_info={
             "BUILD_ID": "4999820578",
+            "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
             "BUILD_TRIGGER": "push",
             "BUILD_CONTACT": ["user"],
             "BUILD_URI": "https://gitlab.com/gitlab-org/gitlab/-/jobs/4999820578",
@@ -121,6 +123,7 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
             # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
             "CI": "true",
             "GITLAB_CI": "true",
+            "CI_COMMIT_SHA": "ffac537e6cbbf934b08745a378932722df287a53",
             "CI_JOB_URL": "https://gitlab.com/gitlab-org/gitlab/-/jobs/4999820578",
             "CI_JOB_ID": "4999820578",
             "CI_API_V4_URL": "https://gitlab.com/api/v4",

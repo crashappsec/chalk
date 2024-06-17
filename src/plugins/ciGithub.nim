@@ -55,6 +55,7 @@ proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
   if CI == "" and GITHUB_SHA == "": return
 
   result.setIfNeeded("BUILD_ID",              GITHUB_RUN_ID)
+  result.setIfNeeded("BUILD_COMMIT_ID",       GITHUB_SHA)
   result.setIfNeeded("BUILD_ORIGIN_ID",       GITHUB_REPOSITORY_ID)
   result.setIfNeeded("BUILD_ORIGIN_OWNER_ID", GITHUB_REPOSITORY_OWNER_ID)
   result.setIfNeeded("BUILD_API_URI",         GITHUB_API_URL)

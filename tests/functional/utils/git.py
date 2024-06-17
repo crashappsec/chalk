@@ -5,7 +5,6 @@
 import functools
 import re
 from pathlib import Path
-from time import sleep
 from typing import Optional
 
 import os
@@ -34,11 +33,12 @@ class Git:
         first_commit: bool = True,
         add: bool = True,
         remote: Optional[str] = None,
+        branch: str = "main",
     ):
         author_name, author_email = self.author.split()
         committer_name, committer_email = self.committer.split()
         self.run(["git", "init"])
-        self.run(["git", "branch", "-m", "main"])
+        self.run(["git", "branch", "-m", branch])
         self.config("author.name", author_name)
         self.config("author.email", author_email)
         self.config("committer.name", committer_name)
@@ -67,6 +67,10 @@ class Git:
         if message or self.sign:
             args += ["-a", "-m", message or "dummy"]
         self.run(args)
+        return self
+
+    def pack(self):
+        self.run(["git", "gc"])
         return self
 
     @property
