@@ -87,7 +87,7 @@ template forceReportKeys*(keynames: openarray[string]) =
     # Create the item section if required.
     if item notin getContents(keys):
       discard attrLookup(keys, [item], ix = 0, op = vlSecDef)
-    doAssert attrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool)).code == errOk
+    con4mAttrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool))
 
 template forceChalkKeys*(keynames: openarray[string]) =
   if isChalkingOp():
@@ -103,7 +103,7 @@ template forceChalkKeys*(keynames: openarray[string]) =
       # Create the item section if required.
       if item notin getContents(keys):
         discard attrLookup(keys, [item], ix = 0, op = vlSecDef)
-      doAssert attrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool)).code == errOk
+      con4mAttrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool))
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.sCall(cb, args)
