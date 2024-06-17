@@ -577,7 +577,7 @@ proc checkPlugin(plugin: Plugin, codec: bool): bool {.inline.} =
 proc getAllPlugins*(): seq[Plugin] =
   var preResult: seq[(int, Plugin)] = @[]
   for name, plugin in installedPlugins:
-    preResult.add (get[int](plugin.configInfo, "priority"), plugin)
+    preResult.add(get[int](plugin.configInfo, "priority"), plugin)
 
   preResult.sort()
   for (_, plugin) in preResult:

@@ -121,8 +121,9 @@ template doCustomReporting() =
     if len(sinkConfs) == 0 and topic notin ["audit", "chalk_usage_stats"]:
       warn("Report '" & topic & "' has no configured sinks.  Skipping.")
 
-    let reportTemplate = get[string](spec, "report_template")
-    let templateToUse = getObject(getChalkScope(), "report_template." & reportTemplate)
+    let
+      reportTemplate = get[string](spec, "report_template")
+      templateToUse = getObject(getChalkScope(), "report_template." & reportTemplate)
 
     for sinkConfName in sinkConfs:
       let res = topicSubscribe((@[pack(topic), pack(sinkConfName)])).get()

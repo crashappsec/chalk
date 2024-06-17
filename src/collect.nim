@@ -62,7 +62,8 @@ proc registerKeys(templ: AttrScope) =
     for name, content in key.contents:
       if content.isA(AttrScope):
         let useOpt = getOpt[bool](content.get(AttrScope), "use")
-        if useOpt.isSome() and useOpt.get(): subscribedKeys[name] = true
+        if useOpt.isSome() and useOpt.get():
+          subscribedKeys[name] = true
 
 proc registerOutconfKeys() =
   # We always subscribe to _VALIDATED, even if they don't want to
