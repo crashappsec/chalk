@@ -497,8 +497,17 @@ proc loadRef(info: RepoInfo, gitRef: string): string =
     path  = info.vcsDir.joinPath(gitRef)
     objId = tryToLoadFile(path).strip()
   if objId != "":
-    return objId
-  return info.getAllPackedRefs().getOrDefault(gitRef)
+    result = objId
+  else:
+    result = info.getAllPackedRefs().getOrDefault(gitRef)
+  if result == "":
+    return
+  if gitRef.startsWith("refs/tags"):
+    let fields = info.loadObject(result)
+    if fields.isTag():
+      let commitId = fields[gitObject]
+      trace("git object for " & gitRef & ": " & result & " which points to commit: " & commitId)
+      result = commitId
 
 proc loadAuthor(info: RepoInfo, commitId: string) =
   let fields = info.loadObject(commitId)
@@ -592,6 +601,8 @@ proc loadSymref(info: RepoInfo, gitRef: string) =
     of "heads":
       info.branch = name
       trace("branch: " & info.branch)
+    of "tags":
+      trace("tag: " & name)
 
   let commitId = info.loadRef(fname)
   if commitId == "":

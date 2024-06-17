@@ -16,12 +16,13 @@ from .utils.git import DATE_FORMAT, Git
 
 
 @pytest.mark.parametrize(
-    "remote, sign",
+    "remote, sign, symbolic_ref",
     [
-        ("git@github.com:crashappsec/chalk.git", False),
-        (None, False),
+        ("git@github.com:crashappsec/chalk.git", False, False),
+        (None, False, False),
         pytest.param(
             None,
+            True,
             True,
             marks=pytest.mark.skipif(
                 not os.environ.get("GPG_KEY"),
@@ -48,6 +49,7 @@ def test_repo(
     random_hex: str,
     set_tag_message: bool,
     pack: bool,
+    symbolic_ref: bool,
 ):
     commit_message = (
         "fix widget\n\nBefore this commit, the widget behaved incorrectly when foo."
@@ -63,12 +65,14 @@ def test_repo(
     )
     if pack:
         git.pack()
+    if symbolic_ref:
+        git.symbolic_ref(f"refs/tags/foo/{random_hex}-2")
     artifact = copy_files[0]
     result = chalk_copy.insert(artifact)
     author = re.compile(rf"^{git.author} \d+ [+-]\d+$")
     committer = re.compile(rf"^{git.committer} \d+ [+-]\d+$")
     assert result.mark.has(
-        BRANCH="foo/bar",
+        BRANCH="foo/bar" if not symbolic_ref else MISSING,
         COMMIT_ID=ANY,
         COMMIT_SIGNED=sign,
         AUTHOR=author,
