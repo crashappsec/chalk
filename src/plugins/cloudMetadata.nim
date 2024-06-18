@@ -139,7 +139,7 @@ proc isAwsEc2Host(vendor: string): bool =
   # ref: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
 
   # older Xen instances
-  let uuid = tryToLoadFile(get[string](chalkConfig, "cloud_provider.cloud_instance_hw_identifiers.sys_hypervisor_path"))
+  let uuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_hypervisor_path"))
   if strutils.toLowerAscii(uuid).startswith("ec2"):
       return true
 
@@ -149,7 +149,7 @@ proc isAwsEc2Host(vendor: string): bool =
 
   # this will only work if we have root, normally sudo dmidecode  --string system-uuid
   # gives the same output
-  let product_uuid = tryToLoadFile(get[string](chalkConfig, "cloud_provider.cloud_instance_hw_identifiers.sys_product_path"))
+  let product_uuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_product_path"))
   if strutils.toLowerAscii(product_uuid).startsWith("ec2"):
       return true
 
@@ -191,8 +191,8 @@ proc isAzureHost(vendor: string): bool =
 proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
                                ChalkDict {.cdecl.} =
   result = ChalkDict()
-  let vendor = tryToLoadFile(get[string](chalkConfig, "cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path"))
-  let resolv = tryToLoadFile(get[string](chalkConfig, "cloud_provider.cloud_instance_hw_identifiers.sys_resolv_path"))
+  let vendor = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path"))
+  let resolv = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_resolv_path"))
 
   #
   # GCP

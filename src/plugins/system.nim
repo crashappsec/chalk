@@ -142,7 +142,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
   if insert:
     obj.applySubstitutions()
     result.setIfNeeded("_OP_CHALKED_KEYS", toSeq(obj.getChalkMark().keys))
-    result.setIfNeeded("_VIRTUAL", get[bool](chalkConfig, "virtual_chalk"))
+    result.setIfNeeded("_VIRTUAL", get[bool](getChalkScope(), "virtual_chalk"))
 
   else:
     result.setValidated(obj, obj.validateMetaData())
@@ -180,10 +180,10 @@ proc getEnvDict(): Box =
   once:
     envdict = Con4mDict[string, string]()
     let
-      always = get[seq[string]](chalkConfig, "env_always_show")
-      never  = get[seq[string]](chalkConfig, "env_never_show")
-      redact = get[seq[string]](chalkConfig, "env_redact")
-      def    = get[string](chalkConfig, "env_default_action")[0]
+      always = get[seq[string]](getChalkScope(), "env_always_show")
+      never  = get[seq[string]](getChalkScope(), "env_never_show")
+      redact = get[seq[string]](getChalkScope(), "env_redact")
+      def    = get[string](getChalkScope(), "env_default_action")[0]
 
     for (k, v) in envPairs():
       # TODO: could add some con4m to warn on overlap across these 3. For now,

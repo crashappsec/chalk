@@ -130,7 +130,7 @@ proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
     urls:     seq[string] = @[]
 
   # attempt to donwload from all urls in the order they are defined
-  for config in get[seq[string]](chalkConfig, "docker.download_arch_binary_urls"):
+  for config in get[seq[string]](getChalkScope(), "docker.download_arch_binary_urls"):
     let url = (config
                .replace("{version}",      getChalkExeVersion())
                .replace("{commit}",       getChalkCommitId())
@@ -145,7 +145,7 @@ proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
       continue
 
     let
-      base = get[string](chalkConfig, "docker.arch_binary_locations_path")
+      base = get[string](getChalkScope(), "docker.arch_binary_locations_path")
       folder =
         if base == "":
           writeNewTempFile("")
@@ -175,8 +175,8 @@ proc findPlatformBinaries(): TableRef[DockerPlatform, string] =
   result = newTable[DockerPlatform, string]()
 
   let
-    basePath = get[string](chalkConfig, "docker.arch_binary_locations_path")
-    locOpt   = getOpt[TableRef[string, string]](chalkConfig, "docker.arch_binary_locations")
+    basePath = get[string](getChalkScope(), "docker.arch_binary_locations_path")
+    locOpt   = getOpt[TableRef[string, string]](getChalkScope(), "docker.arch_binary_locations")
 
   if basePath != "":
     let base = basePath.resolvePath()
@@ -222,7 +222,7 @@ proc findPlatformBinary(ctx: DockerInvocation, targetPlatform: DockerPlatform): 
       )
     return path
 
-  if get[bool](chalkConfig, "docker.download_arch_binary"):
+  if get[bool](getChalkScope(), "docker.download_arch_binary"):
     trace("docker: no chalk binary found for " &
           "TARGETPLATFORM (" & $targetPlatform & "). " &
           "Attempting to download chalk binary.")

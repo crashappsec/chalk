@@ -84,5 +84,5 @@ proc normalizeChalk*(dict: ChalkDict): string =
   # Currently, this is only called for the METADATA_ID field, which only
   # signs things actually being written out.  We skip MAGIC, SIGNATURE
   # and SIGN_PARAMS.
-  let ignoreList = get[seq[string]](chalkConfig, "ignore_when_normalizing")
+  let ignoreList = get[seq[string]](getChalkScope(), "ignore_when_normalizing")
   return binEncodeObj(dict, ignoreList)

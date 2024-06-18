@@ -7,7 +7,6 @@
 
 ## Wrappers for more abstracted accessing of configuration information
 
-from pkg/con4m import get, getOpt
 import "."/[run_management, config_version]
 export run_management
 

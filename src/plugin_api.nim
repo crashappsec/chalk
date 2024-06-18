@@ -416,7 +416,7 @@ proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
     if path.match(item):
       once:
         trace(path & ": ignored due to matching ignore pattern: " &
-          get[seq[string]](chalkConfig, "ignore_patterns")[i])
+          get[seq[string]](getChalkScope(), "ignore_patterns")[i])
         trace("We will NOT report additional path skips.")
       return true
 
@@ -441,7 +441,7 @@ proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
     followFLinks = false
 
   if isChalkingOp():
-    let symLinkBehavior = get[string](chalkConfig, "symlink_behavior")
+    let symLinkBehavior = get[string](getChalkScope(), "symlink_behavior")
     if symLinkBehavior == "skip":
       skipLinks = true
     elif symLinkBehavior == "clobber":

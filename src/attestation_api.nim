@@ -26,7 +26,7 @@ proc getCosignKey(chalk: ChalkObj): AttestationKey =
   return AttestationKey(publicKey: pubKey)
 
 proc getProvider(): AttestationKeyProvider =
-  let name = get[string](chalkConfig, "attestation.key_provider")
+  let name = get[string](getChalkScope(), "attestation.key_provider")
   if name notin keyProviders:
     raise newException(KeyError, "Unsupported attestation key provider: " & name)
   return keyProviders[name]
@@ -165,7 +165,7 @@ proc willSign(): bool =
   if not cosignKey.canAttest():
     return false
   # We sign artifacts if either condition is true.
-  if isSubscribedKey("SIGNATURE") or get[bool](chalkConfig, "always_try_to_sign"):
+  if isSubscribedKey("SIGNATURE") or get[bool](getChalkScope(), "always_try_to_sign"):
     return true
   trace("Artifact signing not configured.")
   return false
@@ -182,7 +182,7 @@ proc willSignBySigStore*(chalk: ChalkObj): bool =
 proc verifyBySigStore(chalk: ChalkObj, key: AttestationKey, image: DockerImage): (ValidateResult, ChalkDict) =
   let
     spec   = image.withDigest(chalk.imageDigest).asRepoDigest()
-    log    = get[bool](chalkConfig, "use_transparency_log")
+    log    = get[bool](getChalkScope(), "use_transparency_log")
     cosign = getCosignLocation()
   var
     dict   = ChalkDict()
@@ -255,7 +255,7 @@ proc signBySigStore*(chalk: ChalkObj): ChalkDict =
         name    = image.repo
         spec    = image.withDigest(chalk.imageDigest).asRepoDigest()
         mark    = chalk.getChalkMarkAsStr()
-        log     = get[bool](chalkConfig, "use_transparency_log")
+        log     = get[bool](getChalkScope(), "use_transparency_log")
         cosign  = getCosignLocation()
         args    = @["attest",
                     "--tlog-upload=" & $log,
@@ -316,7 +316,7 @@ proc signByHash*(chalk: ChalkObj, mdHash : string): ChalkDict =
       "No hash available for this artifact at time of signing."
     )
   let
-    log  = get[bool](chalkConfig, "use_transparency_log")
+    log  = get[bool](getChalkScope(), "use_transparency_log")
     args = @["sign-blob",
              "--tlog-upload=" & $log,
              "--yes",
@@ -366,7 +366,7 @@ proc verifyByHash*(chalk: ChalkObj, mdHash: string): ValidateResult =
 
   let
     sig    = unpack[string](chalk.extract["SIGNATURE"])
-    noTlog = not get[bool](chalkConfig, "use_transparency_log")
+    noTlog = not get[bool](getChalkScope(), "use_transparency_log")
     args   = @["verify-blob",
                "--insecure-ignore-tlog=" & $noTlog,
                "--key=chalk.pub",

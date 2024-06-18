@@ -118,7 +118,7 @@ proc scanFileStream(strm: FileStream, filePath: string, category: string, subcat
 var ignored: seq[Regex] = @[]
 proc getIgnored(): seq[Regex] =
   once:
-    for i in get[seq[string]](chalkConfig, "ignore_patterns"):
+    for i in get[seq[string]](getChalkScope(), "ignore_patterns"):
       ignored.add(re(i))
   return ignored
 
@@ -223,7 +223,7 @@ proc detectLanguages(): HashSet[string] =
   trace("tech stack: detecting languages")
   result = initHashSet[string]()
 
-  let canLoad = get[bool](chalkConfig, "use_tech_stack_detection")
+  let canLoad = get[bool](getChalkScope(), "use_tech_stack_detection")
   if not canLoad:
     return result
 
@@ -342,7 +342,7 @@ proc loadState() =
 
 proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
   result = ChalkDict()
-  let canLoad = get[bool](chalkConfig, "use_tech_stack_detection")
+  let canLoad = get[bool](getChalkScope(), "use_tech_stack_detection")
   if not canLoad:
     trace("Skipping tech stack runtime detection plugin")
     return result
@@ -372,7 +372,7 @@ proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
 
 proc techStackArtifact*(self: Plugin, objs: ChalkObj): ChalkDict {.cdecl.} =
   result = ChalkDict()
-  let canLoad = get[bool](chalkConfig, "use_tech_stack_detection")
+  let canLoad = get[bool](getChalkScope(), "use_tech_stack_detection")
   if not canLoad:
     trace("Skipping tech stack detection plugin for artifacts")
     return result

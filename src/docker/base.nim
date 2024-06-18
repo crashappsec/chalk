@@ -47,7 +47,7 @@ proc dockerPassThrough*(ctx: DockerInvocation) {.noreturn.} =
     exitCode = runCmdNoOutputCapture(exe,
                                      ctx.originalArgs,
                                      ctx.originalStdIn)
-    if get[bool](chalkConfig, "docker.report_unwrapped_commands"):
+    if get[bool](getChalkScope(), "docker.report_unwrapped_commands"):
       reporting.doReporting("report")
   except:
     dumpExOnDebug()
