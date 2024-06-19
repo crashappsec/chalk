@@ -69,10 +69,18 @@ class Git:
         self.run(args)
         return self
 
+    def checkout(self, spec: str):
+        self.run(["git", "checkout", spec])
+        return self
+
+    def symbolic_ref(self, ref: str):
+        self.run(["git", "symbolic-ref", "HEAD", ref])
+        return self
+
     def pack(self):
         self.run(["git", "gc"])
         return self
 
     @property
     def latest_commit(self) -> str:
-        return self.run(["git", "rev-parse", "HEAD"]).text
+        return self.run(["git", "log", "-n1", "--pretty=format:%H"]).text
