@@ -157,7 +157,9 @@ template parseNameFrom(line: string): string =
   elif TAGS in line:
     line.split(TAGS)[1].split()[0].strip().removeSuffix(ANNOTATED_TAG)
   else:
-    ""
+    # if the line is parsable use the second item as the refspec
+    # otherwise default to complete line
+    line.split().getOrDefault(1, line)
 
 template parseCommitFrom(line: string): string =
   line.split()[0]
@@ -170,17 +172,29 @@ template parseDefaultBranch(git: DockerGitContext, lines: seq[string]): string =
 
 proc parseCommitForName(name: string, lines: seq[string]): string =
   for line in lines:
-    if not line.startsWith("ref:") and parseNameFrom(line) == name:
+    if not line.startsWith("ref:") and parseNameFrom(line) == parseNameFrom(name):
       return parseCommitFrom(line)
   error("Git: there is no git reference for " & name)
   raise newException(ValueError, "Git no commit for reference")
 
-proc parseAllNamesForCommit(commit: string, refs: string, lines: seq[string]): seq[string] =
+proc parseAllNamesForCommit(commit:     string,
+                            lines:      seq[string],
+                            refs:       string = "",
+                            ignoreRefs: seq[string] = @[]): seq[string] =
   for line in lines:
-    if line.startsWith(commit) and refs in line:
-      let name = parseNameFrom(line)
-      if name != "":
-        result.add(name)
+    if line.startsWith(commit):
+      var matched = false
+      if refs != "":
+        matched = refs in line
+      elif len(ignoreRefs) > 0:
+        matched = true
+        for r in ignoreRefs:
+          if r in line:
+            matched = false
+      if matched:
+        let name = parseNameFrom(line)
+        if name != "":
+          result.add(name)
 
 proc getRemoteHead(git: DockerGitContext, head: string): GitHead =
   # In order for git fetch to be efficient, we do shallow fetch
@@ -225,8 +239,9 @@ proc getRemoteHead(git: DockerGitContext, head: string): GitHead =
     result.gitRef    = head
     result.gitType   = GitHeadType.commit
     result.commitId  = head
-    result.branches  = parseAllNamesForCommit(result.commitId, HEADS, lines)
-    result.tags      = parseAllNamesForCommit(result.commitId, TAGS,  lines)
+    result.branches  = parseAllNamesForCommit(result.commitId, lines, HEADS, lines)
+    result.tags      = parseAllNamesForCommit(result.commitId, lines, TAGS,  lines)
+    result.refs      = parseAllNamesForCommit(result.commitId, lines, ignoreRefs = @[HEADS, TAGS])
 
   else:
     result.gitRef    = head
@@ -234,15 +249,15 @@ proc getRemoteHead(git: DockerGitContext, head: string): GitHead =
     if result.commitId == "":
       error("Git: failed to find git reference " & head & " in " & git.remoteUrl)
       raise newException(ValueError, "Git failed")
-    result.branches  = parseAllNamesForCommit(result.commitId, HEADS, lines)
-    result.tags      = parseAllNamesForCommit(result.commitId, TAGS,  lines)
+    result.branches  = parseAllNamesForCommit(result.commitId, lines, HEADS)
+    result.tags      = parseAllNamesForCommit(result.commitId, lines, TAGS)
+    result.refs      = parseAllNamesForCommit(result.commitId, lines, ignoreRefs = @[HEADS, TAGS])
     if head in result.tags:
       result.gitType = GitHeadType.tag
     elif head in result.branches:
       result.gitType = GitHeadType.branch
     else:
-      error("Git: failed to find git reference " & head & " in " & git.remoteUrl)
-      raise newException(ValueError, "Git failed")
+      result.gitType = GitHeadType.other
 
 proc init(git: DockerGitContext) =
   discard git.run(@["-c", "init.defaultBranch=" & DEFAULT_BRANCH, "--bare", "init"])
@@ -251,7 +266,7 @@ proc init(git: DockerGitContext) =
 proc setGitHEADToCommit(git: DockerGitContext) =
   # there is no git command to detach HEAD to a particular
   # commit so we have to update the file manually.
-  # Again very annoying not does not seem to be possible with native CLI.
+  # Again very annoying but does not seem to be possible with native CLI.
   # These dont work:
   # * git reset --soft             <- does not change .git/HEAD
   # * git update-ref HEAD <COMMIT> <- updates refs/<HEAD> instead
@@ -274,6 +289,8 @@ proc setGitHEAD(git: DockerGitContext) =
       git.setGitHEADToCommit()
     of GitHeadType.branch:
       git.setGitHEADToName(HEADS)
+    of GitHeadType.other:
+      git.setGitHeadToname("")
     of GitHeadType.tag:
       # git tags are treated as detached commits on checkout
       git.setGitHEADToCommit()
@@ -297,6 +314,8 @@ proc fetch(git: DockerGitContext) =
     args.add(branch & ":" & HEADS & branch)
   for tag in git.head.tags:
     args.add(tag & ":" & TAGS & tag)
+  for spec in git.head.refs:
+    args.add(spec & ":" & spec)
   discard git.run(args)
   git.setGitHead()
 

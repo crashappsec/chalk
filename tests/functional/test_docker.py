@@ -798,9 +798,30 @@ def test_multiplatform_build(
             False,
             True,
         ),
+        # with tag
+        (
+            "https://github.com/crashappsec/chalk-docker-git-context.git#1-annotated",
+            None,
+            False,
+            True,
+        ),
         # with branch and nested folder for context
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#main:nested",
+            None,
+            False,
+            True,
+        ),
+        # with PR ref
+        (
+            "https://github.com/crashappsec/chalk-docker-git-context.git#refs/pull/1/merge",
+            None,
+            False,
+            True,
+        ),
+        # with tag ref
+        (
+            "https://github.com/crashappsec/chalk-docker-git-context.git#refs/tags/1-annotated",
             None,
             False,
             True,
