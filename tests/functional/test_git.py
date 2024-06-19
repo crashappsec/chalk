@@ -111,3 +111,26 @@ def test_empty_repo(
         ORIGIN_URI=MISSING,
         VCS_DIR_WHEN_CHALKED=MISSING,
     )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_refetch_tag(
+    tmp_data_dir: Path,
+    chalk_copy: Chalk,
+    copy_files: list[Path],
+):
+    repo = Git(tmp_data_dir).clone(
+        "https://github.com/crashappsec/chalk-docker-git-context.git"
+    )
+    # replicate what github checkout action does
+    # https://github.com/crashappsec/chalk/issues/345
+    repo.fetch(
+        ref="1-signed",
+        refs={repo.latest_commit: "refs/tags/1-signed"},
+    )
+    artifact = copy_files[0]
+    result = chalk_copy.insert(artifact)
+    assert result.mark.has(
+        TAG="1-signed",
+        TAG_SIGNED=True,
+    )

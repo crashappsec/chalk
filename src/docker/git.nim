@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 import std/[base64, strutils, uri]
-import ".."/[config, util]
+import ".."/[config, git, util]
 import "."/[base]
 
 const
@@ -14,13 +14,6 @@ const
   ANNOTATED_TAG  = "^{}"
   GIT_USER       = "x-access-token"
   DEFAULT_BRANCH = "main"
-
-proc setGitExeLocation() =
-  once:
-    gitExeLocation = util.findExePath("git").get("")
-    if gitExeLocation == "":
-      error("No git command found in PATH")
-      raise newException(ValueError, "No git")
 
 proc setSshKeyscanExeLocation() =
   once:
@@ -152,7 +145,7 @@ proc run(git:    DockerGitContext,
     # therefore the cd here is required so that git operations
     # are isolated in their own directory
     withWorkingDir(git.tmpGitDir):
-      result = runCmdGetEverything(gitExeLocation, allArgs.raw())
+      result = runCmdGetEverything(getGitExeLocation(), allArgs.raw())
   if strict and result.exitCode != 0:
     error("Failed to run git " & allArgs.redacted().join(" "))
     error(strip(result.stdOut & result.stdErr))

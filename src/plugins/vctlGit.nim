@@ -10,7 +10,7 @@
 
 import std/[algorithm, nativesockets, sequtils, times]
 import pkg/[zippy, zippy/inflate]
-import ".."/[config, plugin_api, util]
+import ".."/[config, git, plugin_api, util]
 
 const
   eBadGitConf      = "Git configuration file is invalid"
@@ -272,6 +272,9 @@ type
     origin:     Option[string]
     vcsDirs:    OrderedTable[string, RepoInfo]
 
+proc isAnnotated(self: GitTag): bool =
+  return self.tagCommitId != ""
+
 proc getUint32BE(data: string, whence: SomeInteger=0): uint32 =
   result = ntohl(cast[ptr [uint32]](addr data[whence])[])
 
@@ -509,8 +512,8 @@ proc loadRef(info: RepoInfo, gitRef: string): string =
       trace("git object for " & gitRef & ": " & result & " which points to commit: " & commitId)
       result = commitId
 
-proc loadAuthor(info: RepoInfo, commitId: string) =
-  let fields = info.loadObject(commitId)
+proc loadAuthor(info: RepoInfo) =
+  let fields = info.loadObject(info.commitId)
   # this makes only the same assumptions as git itself:
   # https://github.com/git/git/blob/master/commit.c#L97 ddcb8fd
   info.author     = fields.getOrDefault(gitAuthor, "")
@@ -522,70 +525,112 @@ proc loadAuthor(info: RepoInfo, commitId: string) =
   info.message    = fields.getOrDefault(gitMessage, "")
   info.signed     = gitSign in fields
 
-proc loadTags(info: RepoInfo, commitId: string) =
-  # need commit to compare with
-  if commitId == "":
-    return
+proc loadTag(info: RepoInfo, tag: string, tagCommit: string) =
+  # lightweight tag which points directly to the current commit ID
+  if tagCommit == info.commitId:
+      trace("tag: " & tag)
+      info.tags[tag] = GitTag(name:     tag,
+                              commitId: tagCommit)
+  # otherwise we need to check where tag points to as the tag can be either:
+  # * pointing to another commit
+  # * annotated commit object pointing to another commit
+  # * annotated commit object pointing to the current commit
+  else:
+    try:
+      let fields = info.loadObject(tagCommit)
+      # not an annotated tag
+      if not fields.isTag():
+        return
+      # we found annotated commit pointing to current commit
+      if fields[gitTag] == tag and fields[gitObject] == info.commitId:
+        let
+          tagger   = fields[gitTagger]
+          unixTime = parseTime(tagger)
+          date     = formatCommitObjectTime(tagger)
+          signed   = gitSign in fields
+          message  = fields[gitMessage]
+        info.tags[tag] = GitTag(name:        tag,
+                                commitId:    fields[gitObject],
+                                tagCommitId: tagCommit,
+                                tagger:      tagger,
+                                unixTime:    unixTime,
+                                date:        date,
+                                signed:      signed,
+                                message:     message)
+        trace("annotated tag: " & tag)
+    except:
+      warn(tag & ": Git tag couldn't be loaded")
 
-  let tagPath = info.vcsDir.joinPath("refs", "tags")
-  var allTags = initTable[string, string]()
-
+proc loadAllTags(info: RepoInfo): Table[string, string] =
+  result = initTable[string, string]()
   for gitRef, objId in info.getAllPackedRefs():
     if not gitRef.startsWith("refs/tags/"):
       continue
     let parts = gitRef.split("/", maxsplit = 2)
-    allTags[parts[2]] = objId
+    result[parts[2]] = objId
+  let tagPath = info.vcsDir.joinPath("refs", "tags")
   for tag in tagPath.walkDirRec(relative = true):
     let tagCommit = tryToLoadFile(tagPath.joinPath(tag)).strip()
     if tagCommit != "":
-      allTags[tag] = tagCommit
+      result[tag] = tagCommit
 
-  for tag, tagCommit in allTags:
-    # regular tag which points directly to the current commit ID
-    if tagCommit == commitId:
-        trace("tag: " & tag)
-        info.tags[tag] = GitTag(name:     tag,
-                                commitId: tagCommit)
-    # otherwise we need to check where tag points to as the tag can be either:
-    # * pointing to another commit
-    # * annotated commit object pointing to another commit
-    # * annotated commit object pointing to the current commit
-    else:
-      try:
-        let fields = info.loadObject(tagCommit)
-        # not an annotated tag
-        if not fields.isTag():
-          continue
-        # we found annotated commit pointing to current commit
-        if fields[gitTag] == tag and fields[gitObject] == info.commitId:
-          let
-            tagger   = fields[gitTagger]
-            unixTime = parseTime(tagger)
-            date     = formatCommitObjectTime(tagger)
-            signed   = gitSign in fields
-            message  = fields[gitMessage]
-          info.tags[tag] = GitTag(name:        tag,
-                                  commitId:    fields[gitObject],
-                                  tagCommitId: tagCommit,
-                                  tagger:      tagger,
-                                  unixTime:    unixTime,
-                                  date:        date,
-                                  signed:      signed,
-                                  message:     message)
-          trace("annotated tag: " & tag)
-      except:
-        warn(tag & ": Git tag couldn't be loaded")
+proc loadTags(info: RepoInfo) =
+  # need commit to compare with
+  if info.commitId == "":
+    return
+
+  info.tags = initTable[string, GitTag]()
+  for tag, tagCommit in info.loadAllTags():
+    info.loadTag(tag       = tag,
+                 tagCommit = tagCommit)
 
   if len(info.tags) > 0:
     let sortedTags = info.tags.values().toSeq().sortedByIt((it.unixTime, it.name))
     info.latestTag = sortedTags[^1]
     trace("latest tag: " & info.latestTag.name)
 
+proc refetchTags(info: RepoInfo) =
+  if info.origin == "":
+    return
+  if not get[bool](getChalkScope(), "git.refetch_lightweight_tags"):
+    return
+  var toRefetch: seq[GitTag] = @[]
+  for _, tag in info.tags:
+    if not tag.isAnnotated():
+      toRefetch.add(tag)
+  if len(toRefetch) == 0:
+    return
+  let exe = getGitExeLocation()
+  if exe == "":
+    return
+  var args = @[
+    "fetch",
+    "origin",
+    "--force",                 # allow to update the tag
+    "--no-tags",               # dont fetch everything
+    "--no-recurse-submodules", # ignore submodules
+    "--depth=1",               # faster fetch
+    info.commitId,
+  ]
+  for tag in toRefetch:
+    args.add(tag.name & ":refs/tags/" & tag.name)
+  trace("git " & args.join(" "))
+  let output = runCmdGetEverything(getGitExeLocation(), args)
+  if output.getExit() != 0:
+    trace("git: could not fetch latest tag from origin: " & output.getStdErr())
+    return
+  let oldLatestTag = info.latestTag
+  info.loadTags()
+  if oldLatestTag.tagCommitId != info.latestTag.tagCommitId:
+    info("git: origin fetch updated tag (" & info.latestTag.name & ") from " &
+         "lightweight tag to annotated tag. Its object id changed from commit " &
+         oldLatestTag.commitId & " to tag commit " & info.latestTag.tagCommitId)
+
 proc loadCommit(info: RepoInfo, commitId: string) =
   info.commitId = commitId
   trace("commit ID: " & info.commitID)
-  info.loadAuthor(commitId)
-  info.loadTags(commitId)
+  info.loadAuthor()
+  info.loadTags()
 
 proc loadSymref(info: RepoInfo, gitRef: string) =
   let
@@ -697,6 +742,7 @@ proc findAndLoad(plugin: GitInfo, path: string) =
       if stream != nil:
         let config = stream.parseGitConfig()
         info.origin = info.calcOrigin(config)
+        info.refetchTags()
     except:
       error(confFileName & ": Git configuration file not parsed.")
       dumpExOnDebug()

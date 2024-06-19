@@ -31,7 +31,6 @@ class Git:
         self,
         *,
         first_commit: bool = True,
-        add: bool = True,
         remote: Optional[str] = None,
         branch: str = "main",
     ):
@@ -49,6 +48,12 @@ class Git:
             self.config("user.signingkey", os.environ.get("GPG_KEY", ""))
         if remote:
             self.run(["git", "remote", "add", "origin", remote])
+        return self
+
+    def clone(self, origin: str, ref: str = "main"):
+        self.init(first_commit=False, remote=origin)
+        self.fetch()
+        self.checkout(ref)
         return self
 
     def config(self, key: str, value: str):
@@ -71,6 +76,21 @@ class Git:
 
     def checkout(self, spec: str):
         self.run(["git", "checkout", spec])
+        return self
+
+    def fetch(
+        self,
+        remote: str = "origin",
+        *,
+        ref: Optional[str] = None,
+        refs: Optional[dict[str, str]] = None,
+    ):
+        args = ["git", "fetch", "--force", remote]
+        if refs:
+            assert ref
+            args.append(ref)
+            args += [f"{k}:{v}" for k, v in (refs or {}).items()]
+        self.run(args)
         return self
 
     def symbolic_ref(self, ref: str):
