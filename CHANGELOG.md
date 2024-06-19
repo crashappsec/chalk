@@ -2,6 +2,13 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- Chalk did not extract correct commit ID for git repos
+  with `HEAD` being symbolic reference to an annotated tag.
+  This usually happens via `git symbolic-ref HEAD`.
+  ([#347](https://github.com/crashappsec/chalk/pull/347))
+
 ## 0.4.5
 
 ### Fixes
