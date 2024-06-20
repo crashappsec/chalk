@@ -23,6 +23,10 @@
 
   ([#351](https://github.com/crashappsec/chalk/pull/351))
 
+- Chalk did not correctly handle git annotated tags with an
+  empty message.
+  ([#354](https://github.com/crashappsec/chalk/pull/354))
+
 ## 0.4.5
 
 ### Fixes

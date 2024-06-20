@@ -16,14 +16,18 @@ from .utils.git import DATE_FORMAT, Git
 
 
 @pytest.mark.parametrize(
-    "remote, sign, symbolic_ref",
+    "remote, sign, symbolic_ref, annotate, empty",
     [
-        ("git@github.com:crashappsec/chalk.git", False, False),
-        (None, False, False),
+        ("git@github.com:crashappsec/chalk.git", False, False, True, False),
+        (None, False, False, True, False),
+        (None, False, False, False, False),
+        (None, False, False, True, True),
         pytest.param(
             None,
             True,
             True,
+            True,
+            False,
             marks=pytest.mark.skipif(
                 not os.environ.get("GPG_KEY"),
                 reason="GPG_KEY is required",
@@ -33,35 +37,35 @@ from .utils.git import DATE_FORMAT, Git
 )
 @pytest.mark.parametrize("pack", [True, False])
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize(
-    "set_tag_message",
-    [
-        False,
-        True,
-    ],
-)
 def test_repo(
     tmp_data_dir: Path,
     chalk_copy: Chalk,
     copy_files: list[Path],
     remote: Optional[str],
     sign: bool,
+    annotate: bool,
     random_hex: str,
-    set_tag_message: bool,
     pack: bool,
     symbolic_ref: bool,
+    empty: bool,
 ):
     commit_message = (
-        "fix widget\n\nBefore this commit, the widget behaved incorrectly when foo."
+        ("fix widget\n\nBefore this commit, the widget behaved incorrectly when foo.")
+        if not empty
+        else ""
     )
-    tag_message = "Changes since the previous tag:\n\n- Fix widget\n- Improve performance of bar by 42%"
+    tag_message = (
+        "Changes since the previous tag:\n\n- Fix widget\n- Improve performance of bar by 42%"
+        if not empty
+        else ""
+    )
     git = (
         Git(tmp_data_dir, sign=sign)
         .init(remote=remote, branch="foo/bar")
         .add()
         .commit(commit_message)
         .tag(f"foo/{random_hex}-1")
-        .tag(f"foo/{random_hex}-2", tag_message if set_tag_message else None)
+        .tag(f"foo/{random_hex}-2", tag_message if sign or annotate else None)
     )
     if pack:
         git.pack()
@@ -79,12 +83,12 @@ def test_repo(
         DATE_AUTHORED=DATE_FORMAT,
         COMMITTER=committer,
         DATE_COMMITTED=DATE_FORMAT,
-        COMMIT_MESSAGE=commit_message,
+        COMMIT_MESSAGE=commit_message if not empty else MISSING,
         TAG=f"foo/{random_hex}-2",
         TAG_SIGNED=sign,
-        TAGGER=committer if (sign or set_tag_message) else MISSING,
-        DATE_TAGGED=DATE_FORMAT if (sign or set_tag_message) else MISSING,
-        TAG_MESSAGE=tag_message if set_tag_message else ("dummy" if sign else MISSING),
+        TAGGER=committer if (sign or annotate) else MISSING,
+        DATE_TAGGED=DATE_FORMAT if (sign or annotate) else MISSING,
+        TAG_MESSAGE=(tag_message if (sign or annotate) and not empty else MISSING),
         ORIGIN_URI=remote or "local",
         VCS_DIR_WHEN_CHALKED=str(tmp_data_dir),
     )
