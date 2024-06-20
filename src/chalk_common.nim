@@ -433,8 +433,6 @@ const
   sbomConfName*       = "configs/sbomconfig.c4m"
   sastConfName*       = "configs/sastconfig.c4m"
   secretsConfName*    = "configs/secretscannerconfig.c4m"
-  techStackConfName*  = "configs/techstackconfig.c4m"
-  linguistConfName*  = "configs/linguist.c4m"
   ioConfName*         = "configs/ioconfig.c4m"
   attestConfName*     = "configs/attestation.c4m"
   coConfName*         = "configs/crashoverride.c4m"
@@ -456,8 +454,6 @@ const
   sbomConfig*         = staticRead(sbomConfName)
   sastConfig*         = staticRead(sastConfName)
   secretsConfig*      = staticRead(secretsConfName)
-  techStackConfig*    = staticRead(techStackConfName)
-  linguistConfig*     = staticRead(linguistConfName)
   ioConfig*           = staticRead(ioConfName)
   defaultConfig*      = staticRead(defCfgFname)
   attestConfig*       = staticRead(attestConfName)

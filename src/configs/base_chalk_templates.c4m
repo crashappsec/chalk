@@ -120,7 +120,6 @@ or vice versa.
   key.DOCKER_BASE_IMAGE_CHALK.use             = true
   key.DOCKER_BASE_IMAGES.use                  = true
   key.DOCKER_COPY_IMAGES.use                  = true
-  key.INFERRED_TECH_STACKS.use                = true
 }
 
 mark_template mark_large {
@@ -231,7 +230,6 @@ mark_template mark_large {
   key.DOCKER_BASE_IMAGE_CHALK.use             = true
   key.DOCKER_BASE_IMAGES.use                  = true
   key.DOCKER_COPY_IMAGES.use                  = true
-  key.INFERRED_TECH_STACKS.use                = true
   key.$CHALK_CONFIG.use                       = true
   key.$CHALK_IMPLEMENTATION_NAME.use          = true
   key.$CHALK_LOAD_COUNT.use                   = true
@@ -304,7 +302,6 @@ use the mark template named `reproducable`.
   key.EMBEDDED_TMPDIR.use                     = true
   key.SIGNATURE.use                           = true
   key.INJECTOR_PUBLIC_KEY.use                 = true
-  key.INFERRED_TECH_STACKS.use                = true
   key.DOCKER_FILE.use                         = true
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_ANNOTATIONS.use                  = true
@@ -385,7 +382,6 @@ the time and the nonce removed.
   key.EMBEDDED_TMPDIR.use                     = true
   key.SIGNATURE.use                           = true
   key.INJECTOR_PUBLIC_KEY.use                 = true
-  key.INFERRED_TECH_STACKS.use                = true
   key.$CHALK_CONFIG.use                       = true
   key.$CHALK_IMPLEMENTATION_NAME.use          = true
   key.$CHALK_LOAD_COUNT.use                   = true
