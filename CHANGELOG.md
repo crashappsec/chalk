@@ -13,6 +13,15 @@
   regular tags (not annotated) from origin. To customize
   this behavior use `git.refetch_lightweight_tags` config.
   ([#349](https://github.com/crashappsec/chalk/pull/349))
+- Chalk docker build did not support remote git context
+  which was neither a tag or a branch.
+  For example:
+
+  ```
+  docker build https://github.com/user/repo.git#refs/pull/1/merge
+  ```
+
+  ([#351](https://github.com/crashappsec/chalk/pull/351))
 
 ## 0.4.5
 
