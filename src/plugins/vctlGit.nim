@@ -605,7 +605,7 @@ proc refetchTags(info: RepoInfo) =
     return
   var args = @[
     "fetch",
-    "origin",
+    info.origin,
     "--force",                 # allow to update the tag
     "--no-tags",               # dont fetch everything
     "--no-recurse-submodules", # ignore submodules
