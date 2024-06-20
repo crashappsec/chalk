@@ -8,6 +8,11 @@
   with `HEAD` being symbolic reference to an annotated tag.
   This usually happens via `git symbolic-ref HEAD`.
   ([#347](https://github.com/crashappsec/chalk/pull/347))
+- Chalk misreported annotated git tag as not annotated.
+  To ensure tag is up-to-date with origin, chalk refetches
+  regular tags (not annotated) from origin. To customize
+  this behavior use `git.refetch_lightweight_tags` config.
+  ([#349](https://github.com/crashappsec/chalk/pull/349))
 
 ## 0.4.5
 

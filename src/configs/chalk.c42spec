@@ -85,7 +85,6 @@ object key {
   gen_typename:  "KeyConfig"
   gen_setters:   false
   doc:           """
-
 These objects are used in reporting templates and chalking templates
 to help determine what to produce. The two fields in this object are:
 
@@ -124,7 +123,6 @@ object mark_template {
   gen_typename:  "MarkTemplate"
   gen_setters:   false
   doc: """
-
 # Chalk Mark Templates
 
 Chalk decides what metadata keys should be added to a chalk mark based
@@ -266,7 +264,6 @@ object report_template {
   gen_typename:  "ReportTemplate"
   gen_setters:   false
   doc: """
-
 # Report Templates
 
 Report templates specify what metadata gets added into reports. You
@@ -326,7 +323,6 @@ object tool {
    gen_typename:  "ToolInfo"
    gen_setters:   false
    doc:           """
-
 Tool sections allow you to automatically run external tools for
 collecting metadata, for tool types that are known to chalk (This
 doesn't preclude chalk from providing its own collection for these
@@ -409,7 +405,6 @@ be used directly, or can be called if you want to do something fancier.
      type:     func (string) -> bool
      require:  true
      doc:      """
-
 A callback used when implementing tools.  You must implement this for
 any new tool you add, even if you have no intention of ever attempting
 an actual installation (in which case, it can simply return false).
@@ -982,7 +977,6 @@ object sink {
   user_def_ok:   true
   validator:     func sink_object_check
   doc:           """
-
 This object type is needed to add new data sinks to chalk. If you're
 not a Chalk developer, this probably isn't going to be particularly
 useful; Instead, use `sink_config` to configure a sink, and then
@@ -1410,7 +1404,6 @@ object outconf {
   gen_setters:   false
   user_def_ok:   false
   doc:           """
-
 ## Changing reports for operations
 
 Each chalk operation that reports metadata will have one or more
@@ -1665,7 +1658,6 @@ singleton extract {
   gen_setters: false
   user_def_ok: false
   doc: """
-
 These are configuration options specific to how container extraction
 works for containers (plenty of the global options apply to
 extraction). Currently, the only options involve how we handle looking
@@ -1977,6 +1969,39 @@ ENV ARTIFACT_IDENTIFIER="X6VRPZ-C828-KDNS-QDXRT0"
   }
 }
 
+singleton git {
+  gen_fieldname: "gitConfig"
+  gen_typename:  "GitConfig"
+  gen_setters:   false
+  user_def_ok:   false
+  doc: """
+Options how chalk interacts with git.
+"""
+
+  field refetch_lightweight_tags {
+    type:     bool
+    default:  true
+    shortdoc: "Refetch latest tag from origin"
+    doc:      """
+During chalk insertion, when chalk encounters a git tag,
+there is a possibility the tag might not be up to date.
+For example if repo is fetched via:
+
+```
+git fetch origin --force <ref> +<commit>:refs/tags/<tag>
+```
+
+Git will explicitly create tag locally which will point to the commit.
+This might not be accurate as the tag might be annotated in origin.
+As such chalk will not be able to report accurately metadata about the tag
+such as date tagged, tagger, etc.
+
+When this config is true, chalk will refetch lightweight tags (not annotated)
+from the origin to ensure its local definition is up to date.
+"""
+  }
+}
+
 singleton load {
   gen_fieldname: "loadConfig"
   gen_typename:  "LoadConfig"
@@ -1993,7 +2018,6 @@ configuration being loaded.
     default:  false
     shortdoc: "Replace on load"
     doc: """
-
 When this value is true, the entire stored configuration file will be
 REPLACED with the specified configuration, as long as that
 configuration loads successfully.
@@ -2255,7 +2279,6 @@ singleton env_config {
   gen_setters:   false
   user_def_ok:   false
   doc: """
-
 This section is for internal configuration information gathering
 runtime environment information when running with the 'env' command,
 which is similar to the exec command, but where the exec command
@@ -2343,7 +2366,6 @@ unless you provide a custom callback.
     default: false
     shortdoc: "Marking requires +x"
     doc: """
-
 When this is true, Chalk will not attempt to mark source code *unless*
 the executable bit is set. However, the execute bit can get added later;
 it's a trade-off!
@@ -2669,6 +2691,7 @@ root {
   allow cloud_provider
   allow tech_stack_rule
   allow linguist_language
+  allow git
 
   shortdoc: "Chalk Configuration Options"
 
@@ -2750,7 +2773,6 @@ then chalk will produce a help message.
     write_lock: false
     shortdoc:   "The currently running command"
     doc:        """
-
 Once the command line is fully parsed, this will get the value of the
 selected command.  If the command is ambiguous, fill it in with the
 value 'default_commmand'.
@@ -2936,7 +2958,6 @@ Set the default path to search for artifacts, unless overridden by command-line 
     require: false
     shortdoc: "Specify a default place for /tmp files if needed"
     doc: """
-
 Generally, systems use `/tmp` for temporary files, and most modern API
 interfaces to using `/tmp` take mitigation against file-based race
 conditions, for instance, by leveraging per-app directories and
