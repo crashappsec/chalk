@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.4.6
+
+**June 20, 2024**
 
 ### Fixes
 
@@ -28,6 +30,8 @@
   ([#354](https://github.com/crashappsec/chalk/pull/354))
 
 ## 0.4.5
+
+**June 14, 2024**
 
 ### Fixes
 
