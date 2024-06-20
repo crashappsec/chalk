@@ -474,7 +474,8 @@ proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
             objData.len
         else:
           objData.len
-      result[gitMessage] = objData[iMessageStart ..< iMessageEnd].strip()
+      if iMessageStart > 0 and iMessageEnd > 0 and iMessageStart <= iMessageEnd:
+        result[gitMessage] = objData[iMessageStart ..< iMessageEnd].strip()
 
   except:
     warn("unable to retrieve Git ref data: " & refId & " due to: " & getCurrentExceptionMsg())
@@ -548,7 +549,7 @@ proc loadTag(info: RepoInfo, tag: string, tagCommit: string) =
           unixTime = parseTime(tagger)
           date     = formatCommitObjectTime(tagger)
           signed   = gitSign in fields
-          message  = fields[gitMessage]
+          message  = fields.getOrDefault(gitMessage)
         info.tags[tag] = GitTag(name:        tag,
                                 commitId:    fields[gitObject],
                                 tagCommitId: tagCommit,
@@ -559,7 +560,7 @@ proc loadTag(info: RepoInfo, tag: string, tagCommit: string) =
                                 message:     message)
         trace("annotated tag: " & tag)
     except:
-      warn(tag & ": Git tag couldn't be loaded")
+      warn(tag & ": Git tag couldn't be loaded - " & getCurrentExceptionMsg())
 
 proc loadAllTags(info: RepoInfo): Table[string, string] =
   result = initTable[string, string]()
@@ -590,7 +591,7 @@ proc loadTags(info: RepoInfo) =
     trace("latest tag: " & info.latestTag.name)
 
 proc refetchTags(info: RepoInfo) =
-  if info.origin == "":
+  if info.origin == "" or info.origin == ghLocal:
     return
   if not get[bool](getChalkScope(), "git.refetch_lightweight_tags"):
     return

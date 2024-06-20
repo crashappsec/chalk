@@ -64,13 +64,17 @@ class Git:
         return self
 
     def commit(self, message="dummy"):
-        self.run(["git", "commit", "--allow-empty", "-m", message])
+        args = ["git", "commit", "--allow-empty"]
+        if message == "":
+            args += ["--allow-empty-message"]
+        args += ["-m", message]
+        self.run(args)
         return self
 
-    def tag(self, tag: str, message=""):
+    def tag(self, tag: str, message: Optional[str] = None):
         args = ["git", "tag", tag]
-        if message or self.sign:
-            args += ["-a", "-m", message or "dummy"]
+        if message is not None or self.sign:
+            args += ["-a", "-m", message if message is not None else "dummy"]
         self.run(args)
         return self
 
