@@ -1,5 +1,7 @@
 # Chalk Release Notes
 
+## On the `main` branch
+
 ## 0.4.6
 
 **June 20, 2024**
