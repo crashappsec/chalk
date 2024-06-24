@@ -180,6 +180,21 @@ proc supportsMultiStageBuilds*(): bool =
   # https://docs.docker.com/engine/release-notes/17.05/
   return getDockerServerVersion() >= parseVersion("17.05")
 
+proc supportsMetadataFile*(ctx: DockerInvocation): bool =
+  # docker buildx build
+  if ctx.foundBuildx:
+    # https://github.com/docker/buildx/releases/tag/v0.6.0
+    return getBuildXVersion() >= parseVersion("0.6")
+  else:
+    # docker>=23 (technically was changed in 22-rc)
+    # docker build is an alias to docker buildx build therefore
+    # any buildx flags are also added to build command
+    # https://docs.docker.com/engine/release-notes/23.0/#2300
+    return (
+      getBuildXVersion() >= parseVersion("0.6") and
+      getDockerClientVersion() >= parseVersion("22")
+    )
+
 proc installBinFmt*() =
   once:
     # https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop

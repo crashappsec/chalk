@@ -217,7 +217,7 @@ proc setIidFile(ctx: DockerInvocation) =
     ctx.iidFilePath = ctx.foundIidFile
 
 proc setMetadataFile(ctx: DockerInvocation) =
-  if ctx.foundMetadataFile == "" and hasBuildx():
+  if ctx.foundMetadataFile == "" and ctx.supportsMetadataFile():
     trace("docker: adding --metadata-file flag")
     # ensure file is closed so docker can overwrite it
     ctx.metadataFilePath = writeNewTempFile("", suffix = ".metatadata-file")
