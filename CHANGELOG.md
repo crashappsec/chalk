@@ -2,6 +2,15 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- Docker build `--metadata-file` flag is only added when
+  using `buildx >= 0.6.0`. In addition the flag is only added
+  when using `docker >= 22` as docker aliased `docker build`
+  to `docker buildx build` which allows to use buildx flags
+  in normal build command.
+  ([#357](https://github.com/crashappsec/chalk/pull/357))
+
 ## 0.4.6
 
 **June 20, 2024**
