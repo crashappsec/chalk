@@ -281,7 +281,7 @@ type
     digest: string
 
   GitHeadType* = enum
-    commit, branch, tag
+    commit, branch, tag, other
 
   GitHead* = ref object
     gitRef*:       string
@@ -290,6 +290,7 @@ type
     # first matching branch for commit ref, if any
     branches*:     seq[string]
     tags*:         seq[string]
+    refs*:         seq[string]
 
   DigestedJson* = ref object
     json*:   JsonNode

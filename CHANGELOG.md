@@ -2,14 +2,51 @@
 
 ## On the `main` branch
 
+## 0.4.7
+
+**June 24, 2024**
+
+### Fixes
+
+- Docker build `--metadata-file` flag is only added when
+  using `buildx >= 0.6.0`. In addition the flag is only added
+  when using `docker >= 22` as docker aliased `docker build`
+  to `docker buildx build` which allows to use buildx flags
+  in normal build command.
+  ([#357](https://github.com/crashappsec/chalk/pull/357))
+
+## 0.4.6
+
+**June 20, 2024**
+
 ### Fixes
 
 - Chalk did not extract correct commit ID for git repos
   with `HEAD` being symbolic reference to an annotated tag.
   This usually happens via `git symbolic-ref HEAD`.
   ([#347](https://github.com/crashappsec/chalk/pull/347))
+- Chalk misreported annotated git tag as not annotated.
+  To ensure tag is up-to-date with origin, chalk refetches
+  regular tags (not annotated) from origin. To customize
+  this behavior use `git.refetch_lightweight_tags` config.
+  ([#349](https://github.com/crashappsec/chalk/pull/349))
+- Chalk docker build did not support remote git context
+  which was neither a tag or a branch.
+  For example:
+
+  ```
+  docker build https://github.com/user/repo.git#refs/pull/1/merge
+  ```
+
+  ([#351](https://github.com/crashappsec/chalk/pull/351))
+
+- Chalk did not correctly handle git annotated tags with an
+  empty message.
+  ([#354](https://github.com/crashappsec/chalk/pull/354))
 
 ## 0.4.5
+
+**June 14, 2024**
 
 ### Fixes
 

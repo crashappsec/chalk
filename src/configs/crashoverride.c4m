@@ -83,7 +83,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._OP_CLOUD_PROVIDER_IP.use                      = true
   ~key._OP_CLOUD_PROVIDER_TAGS.use                    = true
   ~key._OP_CLOUD_PROVIDER_INSTANCE_TYPE.use           = true
-
+  ~key._CHALK_RUN_TIME.use                            = true
 
   # IMDS keys
   # dynamic

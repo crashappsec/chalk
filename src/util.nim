@@ -608,3 +608,8 @@ proc makeExecutable*(path: string) =
     wanted   = existing + {fpUserExec, fpGroupExec, fpOthersExec}
   if existing != wanted:
     path.setFilePermissions(wanted)
+
+proc getOrDefault*[T](self: openArray[T], i: int, default: T): T =
+  if len(self) > i:
+    return self[i]
+  return default

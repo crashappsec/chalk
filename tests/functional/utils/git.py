@@ -31,7 +31,6 @@ class Git:
         self,
         *,
         first_commit: bool = True,
-        add: bool = True,
         remote: Optional[str] = None,
         branch: str = "main",
     ):
@@ -51,6 +50,12 @@ class Git:
             self.run(["git", "remote", "add", "origin", remote])
         return self
 
+    def clone(self, origin: str, ref: str = "main"):
+        self.init(first_commit=False, remote=origin)
+        self.fetch()
+        self.checkout(ref)
+        return self
+
     def config(self, key: str, value: str):
         self.run(["git", "config", key, value])
 
@@ -59,18 +64,37 @@ class Git:
         return self
 
     def commit(self, message="dummy"):
-        self.run(["git", "commit", "--allow-empty", "-m", message])
+        args = ["git", "commit", "--allow-empty"]
+        if message == "":
+            args += ["--allow-empty-message"]
+        args += ["-m", message]
+        self.run(args)
         return self
 
-    def tag(self, tag: str, message=""):
+    def tag(self, tag: str, message: Optional[str] = None):
         args = ["git", "tag", tag]
-        if message or self.sign:
-            args += ["-a", "-m", message or "dummy"]
+        if message is not None or self.sign:
+            args += ["-a", "-m", message if message is not None else "dummy"]
         self.run(args)
         return self
 
     def checkout(self, spec: str):
         self.run(["git", "checkout", spec])
+        return self
+
+    def fetch(
+        self,
+        remote: str = "origin",
+        *,
+        ref: Optional[str] = None,
+        refs: Optional[dict[str, str]] = None,
+    ):
+        args = ["git", "fetch", "--force", remote]
+        if refs:
+            assert ref
+            args.append(ref)
+            args += [f"{k}:{v}" for k, v in (refs or {}).items()]
+        self.run(args)
         return self
 
     def symbolic_ref(self, ref: str):
