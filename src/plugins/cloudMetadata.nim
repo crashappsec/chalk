@@ -88,9 +88,9 @@ template jsonKey(keyname: string, url: string) =
           let jsonValue = parseJson(value)
           # redact some keys as they contain sensitive api keys
           case keyname
-            of AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS:
-              jsonValue["SecretAccessKey"] = newJString("<<redacted>>")
-              jsonValue["Token"] = newJString("<<redacted>>")
+          of AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS:
+            jsonValue["SecretAccessKey"] = newJString("<<redacted>>")
+            jsonValue["Token"] = newJString("<<redacted>>")
           setIfNeeded(result, keyname, jsonValue.nimJsonToBox())
         except:
           trace("IMDSv2 responded with invalid json for URL: " & url)
