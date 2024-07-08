@@ -208,9 +208,8 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")
   ):
-    if isSubscribedKey("_OP_CLOUD_PROVIDER"):
-      # FIXME use enum
-      result["_OP_CLOUD_PROVIDER"] = pack("gcp")
+    # FIXME use enum
+    result.setIfNeeded("_OP_CLOUD_PROVIDER", "gcp")
 
     trace("Querying for GCP metadata")
     if isSubscribedKey("_GCP_PROJECT_METADATA"):
@@ -291,9 +290,8 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")
   ):
-    if isSubscribedKey("_OP_CLOUD_PROVIDER"):
-      # FIXME use enum
-      result["_OP_CLOUD_PROVIDER"] = pack("azure")
+    # FIXME use enum
+    result.setIfNeeded("_OP_CLOUD_PROVIDER", "azure")
 
     let resultOpt = hitProviderEndpoint("http://169.254.169.254/metadata/instance?api-version=2021-02-01", newHttpHeaders([("Metadata", "true")]))
     if not resultOpt.isSome():
@@ -348,9 +346,8 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     trace("Not an EC2 instance - skipping check for IMDSv2")
     return
 
-  if isSubscribedKey("_OP_CLOUD_PROVIDER"):
-    # FIXME use enum
-    result["_OP_CLOUD_PROVIDER"] = pack("aws")
+  # FIXME use enum
+  result.setIfNeeded("_OP_CLOUD_PROVIDER", "aws")
 
   var tokenOpt: Option[string]
 
