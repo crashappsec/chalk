@@ -197,15 +197,16 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   #
   # GCP
   #
-  if isGoogleHost(vendor, resolv) and
-    (isSubscribedKey("_GCP_INSTANCE_METADATA") or
+  if isGoogleHost(vendor, resolv) and (
+    isSubscribedKey("_GCP_INSTANCE_METADATA") or
     isSubscribedKey("_GCP_PROJECT_METADATA") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_IP") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")):
+    isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")
+  ):
     trace("Querying for GCP metadata")
     if isSubscribedKey("_GCP_PROJECT_METADATA"):
       let projectOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/project/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
@@ -278,14 +279,15 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   #
   # Azure
   #
-  if isAzureHost(vendor) and
-    (isSubscribedKey("_AZURE_INSTANCE_METADATA") or
+  if isAzureHost(vendor) and (
+    isSubscribedKey("_AZURE_INSTANCE_METADATA") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_IP") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")):
+    isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")
+  ):
     let resultOpt = hitProviderEndpoint("http://169.254.169.254/metadata/instance?api-version=2021-02-01", newHttpHeaders([("Metadata", "true")]))
     if not resultOpt.isSome():
       trace("Did not get metadata back from Azure endpoint")
