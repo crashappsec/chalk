@@ -2,6 +2,13 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- The `_OP_CLOUD_PROVIDER` key could previously be missing
+  when the instance metadata service couldn't be reached or
+  returned invalid data.
+  ([#362](https://github.com/crashappsec/chalk/pull/362))
+
 ## 0.4.7
 
 **June 24, 2024**

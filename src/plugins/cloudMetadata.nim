@@ -200,6 +200,7 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   if isGoogleHost(vendor, resolv) and (
     isSubscribedKey("_GCP_INSTANCE_METADATA") or
     isSubscribedKey("_GCP_PROJECT_METADATA") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_IP") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
@@ -207,6 +208,10 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")
   ):
+    if isSubscribedKey("_OP_CLOUD_PROVIDER"):
+      # FIXME use enum
+      result["_OP_CLOUD_PROVIDER"] = pack("gcp")
+
     trace("Querying for GCP metadata")
     if isSubscribedKey("_GCP_PROJECT_METADATA"):
       let projectOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/project/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
@@ -268,9 +273,6 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     except:
       trace("GCP metadata responded with invalid json")
 
-    if isSubscribedKey("_OP_CLOUD_PROVIDER"):
-      # FIXME use enum
-      result["_OP_CLOUD_PROVIDER"] = pack("gcp")
     if getEnv(K_SERVICE) != "" and getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "":
       result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("gcp_cloud_run_service")
 
@@ -281,6 +283,7 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   #
   if isAzureHost(vendor) and (
     isSubscribedKey("_AZURE_INSTANCE_METADATA") or
+    isSubscribedKey("_OP_CLOUD_PROVIDER") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_IP") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
@@ -288,6 +291,10 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
     isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")
   ):
+    if isSubscribedKey("_OP_CLOUD_PROVIDER"):
+      # FIXME use enum
+      result["_OP_CLOUD_PROVIDER"] = pack("azure")
+
     let resultOpt = hitProviderEndpoint("http://169.254.169.254/metadata/instance?api-version=2021-02-01", newHttpHeaders([("Metadata", "true")]))
     if not resultOpt.isSome():
       trace("Did not get metadata back from Azure endpoint")
@@ -332,9 +339,6 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     except:
       trace("Azure metadata responded with invalid json")
 
-    if isSubscribedKey("_OP_CLOUD_PROVIDER"):
-      # FIXME use enum
-      result["_OP_CLOUD_PROVIDER"] = pack("azure")
     return
 
   #
@@ -343,6 +347,10 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   if not isAwsEc2Host(vendor):
     trace("Not an EC2 instance - skipping check for IMDSv2")
     return
+
+  if isSubscribedKey("_OP_CLOUD_PROVIDER"):
+    # FIXME use enum
+    result["_OP_CLOUD_PROVIDER"] = pack("aws")
 
   var tokenOpt: Option[string]
 
@@ -359,9 +367,6 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     let k8sPort = getEnv("KUBERNETES_PORT")
     let k8sServiceHost = getEnv("KUBERNETES_SERVICE_HOST")
     if k8sPort != "" or k8sServiceHost != "":
-      if isSubscribedKey("_OP_CLOUD_PROVIDER"):
-        # FIXME use enum
-        result["_OP_CLOUD_PROVIDER"] = pack("aws")
       # this is most definitely fargate at this point, but might have FP, so
       # leaving EKS to be on the safe side
       result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_eks")
@@ -369,10 +374,6 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
 
   let
     token = tokenOpt.get()
-
-  if isSubscribedKey("_OP_CLOUD_PROVIDER"):
-    # FIXME use enum
-    result["_OP_CLOUD_PROVIDER"] = pack("aws")
 
   # at this point we have metadata, differentiate between eks, ec2, ecs
   if isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE"):
