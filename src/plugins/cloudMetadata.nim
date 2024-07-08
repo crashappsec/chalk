@@ -141,17 +141,17 @@ proc isAwsEc2Host(vendor: string): bool =
   # older Xen instances
   let uuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_hypervisor_path"))
   if strutils.toLowerAscii(uuid).startswith("ec2"):
-      return true
+    return true
 
   # nitro instances
   if contains(strutils.toLowerAscii(vendor), "amazon"):
-      return true
+    return true
 
   # this will only work if we have root, normally sudo dmidecode  --string system-uuid
   # gives the same output
   let product_uuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_product_path"))
   if strutils.toLowerAscii(product_uuid).startsWith("ec2"):
-      return true
+    return true
 
   return false
 
@@ -216,62 +216,62 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
             let jsonProjValue = parseJson(valueProj)
             setIfNeeded(result, "_GCP_PROJECT_METADATA", jsonProjValue.nimJsonToBox())
           else:
-              trace("GCP project metadata didnt respond with json object. Ignoring it")
+            trace("GCP project metadata didnt respond with json object. Ignoring it")
         except:
-            trace("Could not insert _GCP_PROJECT_METADATA")
+          trace("Could not insert _GCP_PROJECT_METADATA")
 
     let resultOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
     if not resultOpt.isSome():
-        trace("Did not get instance metadata back from GCP endpoint")
-        return
+      trace("Did not get instance metadata back from GCP endpoint")
+      return
     let value = resultOpt.get()
     if not value.startswith("{"):
-        trace("GCP metadata didnt respond with json object. Ignoring it")
-        return
+      trace("GCP metadata didnt respond with json object. Ignoring it")
+      return
     try:
-        let jsonValue = parseJson(value)
-        try:
-            setIfNeeded(result, "_GCP_INSTANCE_METADATA", jsonValue.nimJsonToBox())
-        except:
-            trace("Could not insert _GCP_INSTANCE_METADATA")
-        try:
-            setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["tags"].nimJsonToBox())
-        except:
-            trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
-        try:
-            setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["serviceAccounts"].nimJsonToBox())
-        except:
-            trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
-        try:
-            for iface in jsonValue["networkInterfaces"]:
-                var found = false
-                for config in iface["accessConfigs"]:
-                    let ipv4 = config["externalIp"].getStr()
-                    if ipv4 != "":
-                        found = true
-                        # just pick the first
-                        setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
-                        break
-                if found:
-                    break
-        except:
-            trace("Could not insert _OP_CLOUD_PROVIDER_IP for gcp")
-        try:
-            setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["zone"].getStr().split("/")[^1])
-        except:
-            trace("Could not insert _OP_CLOUD_PROVIDER_REGION for gcp")
-        try:
-            setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["machineType"].getStr().split("/")[^1])
-        except:
-            trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for gcp")
+      let jsonValue = parseJson(value)
+      try:
+        setIfNeeded(result, "_GCP_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+      except:
+        trace("Could not insert _GCP_INSTANCE_METADATA")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["tags"].nimJsonToBox())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["serviceAccounts"].nimJsonToBox())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
+      try:
+        for iface in jsonValue["networkInterfaces"]:
+          var found = false
+          for config in iface["accessConfigs"]:
+            let ipv4 = config["externalIp"].getStr()
+            if ipv4 != "":
+              found = true
+              # just pick the first
+              setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
+              break
+          if found:
+            break
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_IP for gcp")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["zone"].getStr().split("/")[^1])
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_REGION for gcp")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["machineType"].getStr().split("/")[^1])
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for gcp")
     except:
-        trace("GCP metadata responded with invalid json")
+      trace("GCP metadata responded with invalid json")
 
     if isSubscribedKey("_OP_CLOUD_PROVIDER"):
-        # FIXME use enum
-        result["_OP_CLOUD_PROVIDER"] = pack("gcp")
+      # FIXME use enum
+      result["_OP_CLOUD_PROVIDER"] = pack("gcp")
     if getEnv(K_SERVICE) != "" and getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "":
-        result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("gcp_cloud_run_service")
+      result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("gcp_cloud_run_service")
 
     return
 
@@ -288,51 +288,51 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")):
     let resultOpt = hitProviderEndpoint("http://169.254.169.254/metadata/instance?api-version=2021-02-01", newHttpHeaders([("Metadata", "true")]))
     if not resultOpt.isSome():
-        trace("Did not get metadata back from Azure endpoint")
-        return
+      trace("Did not get metadata back from Azure endpoint")
+      return
     let value = resultOpt.get()
     if not value.startswith("{"):
-        trace("Azure metadata didnt respond with json object. Ignoring it")
-        return
+      trace("Azure metadata didnt respond with json object. Ignoring it")
+      return
     try:
-        let jsonValue = parseJson(value)
-        setIfNeeded(result, "_AZURE_INSTANCE_METADATA", jsonValue.nimJsonToBox())
-        try:
-            setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["compute"]["tagsList"].nimJsonToBox())
-        except:
-            trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for azure")
-        try:
-            for iface in jsonValue["network"]["interface"]:
-                var found = false
-                for address in iface["ipv4"]["ipAddress"]:
-                    let ipv4 = address["publicIpAddress"].getStr()
-                    if ipv4 != "":
-                        found = true
-                        # just pick the first
-                        setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
-                        break
-                if found:
-                    break
-        except:
-            trace("Could not insert _OP_CLOUD_PROVIDER_IP for azure")
-        try:
-            setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["compute"]["subscriptionId"].getStr())
-        except:
-            trace("Could not insert _OP_CLOUD_PROVIDER_ACCOUNT_INFO for azure")
-        try:
-            setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["compute"]["location"].getStr())
-        except:
-            trace("Could not insert _OP_CLOUD_PROVIDER_REGION for azure")
-        try:
-            setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["compute"]["vmSize"].getStr())
-        except:
-            trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for azure")
+      let jsonValue = parseJson(value)
+      setIfNeeded(result, "_AZURE_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["compute"]["tagsList"].nimJsonToBox())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for azure")
+      try:
+        for iface in jsonValue["network"]["interface"]:
+          var found = false
+          for address in iface["ipv4"]["ipAddress"]:
+            let ipv4 = address["publicIpAddress"].getStr()
+            if ipv4 != "":
+              found = true
+              # just pick the first
+              setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
+              break
+          if found:
+            break
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_IP for azure")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["compute"]["subscriptionId"].getStr())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_ACCOUNT_INFO for azure")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["compute"]["location"].getStr())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_REGION for azure")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["compute"]["vmSize"].getStr())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for azure")
     except:
-        trace("Azure metadata responded with invalid json")
+      trace("Azure metadata responded with invalid json")
 
     if isSubscribedKey("_OP_CLOUD_PROVIDER"):
-        # FIXME use enum
-        result["_OP_CLOUD_PROVIDER"] = pack("azure")
+      # FIXME use enum
+      result["_OP_CLOUD_PROVIDER"] = pack("azure")
     return
 
   #
@@ -357,12 +357,12 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     let k8sPort = getEnv("KUBERNETES_PORT")
     let k8sServiceHost = getEnv("KUBERNETES_SERVICE_HOST")
     if k8sPort != "" or k8sServiceHost != "":
-        if isSubscribedKey("_OP_CLOUD_PROVIDER"):
-            # FIXME use enum
-            result["_OP_CLOUD_PROVIDER"] = pack("aws")
-        # this is most definitely fargate at this point, but might have FP, so
-        # leaving EKS to be on the safe side
-        result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_eks")
+      if isSubscribedKey("_OP_CLOUD_PROVIDER"):
+        # FIXME use enum
+        result["_OP_CLOUD_PROVIDER"] = pack("aws")
+      # this is most definitely fargate at this point, but might have FP, so
+      # leaving EKS to be on the safe side
+      result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_eks")
     return
 
   let
@@ -378,17 +378,17 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     let ecsv3 = getEnv("ECS_CONTAINER_METADATA_URI")
     let ecsv4 = getEnv("ECS_CONTAINER_METADATA_URI_V4")
     if ecsv3 != "" or ecsv4 != "":
-        result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_ecs")
+      result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_ecs")
     else:
-        let k8sPort = getEnv("KUBERNETES_PORT")
-        let k8sServiceHost = getEnv("KUBERNETES_SERVICE_HOST")
-        if k8sPort != "" or k8sServiceHost != "":
-            # XXX this might have FP in case of a user that has deployed k8s within
-            # a single EC2 instance, so should differentiate from the rest of the
-            # IMDS metadata versions
-            result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_eks")
-        else:
-            result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_ec2")
+      let k8sPort = getEnv("KUBERNETES_PORT")
+      let k8sServiceHost = getEnv("KUBERNETES_SERVICE_HOST")
+      if k8sPort != "" or k8sServiceHost != "":
+        # XXX this might have FP in case of a user that has deployed k8s within
+        # a single EC2 instance, so should differentiate from the rest of the
+        # IMDS metadata versions
+        result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_eks")
+      else:
+        result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_ec2")
 
   # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-categories.html
   # dynamic entries
