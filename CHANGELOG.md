@@ -4,9 +4,14 @@
 
 ### Fixes
 
-- The `_OP_CLOUD_PROVIDER` key could previously be missing
-  when the instance metadata service couldn't be reached or
-  returned invalid data.
+- A chalk report would previously omit the `_OP_CLOUD_PROVIDER`
+  key when:
+
+  - No other instance metadata key (e.g. `_GCP_INSTANCE_METADATA`
+    or `_OP_CLOUD_PROVIDER_IP`) was subscribed.
+  - The instance metadata service couldn't be reached, or
+    returned invalid data.
+
   ([#362](https://github.com/crashappsec/chalk/pull/362))
 
 ## 0.4.7
