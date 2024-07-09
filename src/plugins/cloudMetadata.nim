@@ -31,13 +31,14 @@ proc getAwsToken(): Option[string] =
                            httpMethod = HttpPut,
                            timeout    = 250, # 1/4 of a second
                            headers    = hdrs)
+    body     = response.body().strip()
 
   if not response.code.is2xx():
-    trace("Could not retrieve IMDSv2 token from: " & url)
+    trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
     return none(string)
 
   trace("Retrieved AWS metadata token")
-  return some(response.bodyStream.readAll().strip())
+  return some(body)
 
 proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
   let
@@ -45,16 +46,18 @@ proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
                            httpMethod = HttpGet,
                            timeout    = 250, # 1/4 of a second
                            headers    = hdrs)
+    body     = response.body().strip()
 
   if not response.code.is2xx():
-    trace("Could not retrieve metadata from: " & path)
+    trace("Could not retrieve metadata from: " & path & " - " & response.status & ": " & body)
     return none(string)
 
-  trace("Retrieved metadata from: " & path)
-  result = some(response.bodyStream.readAll().strip())
-  if not result.isSome():
-    # log failing keys in trace mode only as some are expected to be absent
+  if body == "":
+    # some paths are expected to be empty so this is not an error
     trace("Got empty metadata from: " & path)
+
+  trace("Retrieved metadata from: " & path)
+  return some(body)
 
 template oneItem(keyname: string, url: string) =
   if isSubscribedKey(keyname):
