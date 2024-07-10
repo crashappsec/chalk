@@ -23,23 +23,6 @@ const
   # special keys for special processing
   AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS = "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE"
 
-proc getAwsToken(): Option[string] =
-  let
-    url      = awsBaseUri & "api/token"
-    hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
-    response = safeRequest(url        = url,
-                           httpMethod = HttpPut,
-                           timeout    = 250, # 1/4 of a second
-                           headers    = hdrs)
-    body     = response.body().strip()
-
-  if not response.code.is2xx():
-    trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
-    return none(string)
-
-  trace("Retrieved AWS metadata token")
-  return some(body)
-
 proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
   let
     response = safeRequest(url        = path,
@@ -58,85 +41,6 @@ proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
 
   trace("Retrieved metadata from: " & path)
   return some(body)
-
-template oneItem(keyname: string, url: string) =
-  if isSubscribedKey(keyname):
-    let
-      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
-      resultOpt = hitProviderEndpoint(url, hdrs)
-    if resultOpt.isSome():
-      setIfNotEmpty(result, keyname, resultOpt.get())
-
-template listKey(keyname: string, url: string) =
-  if isSubscribedKey(keyname):
-    let
-      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
-      resultOpt = hitProviderEndpoint(url, hdrs)
-    if resultOpt.isSome():
-      setIfNeeded(result, keyname, resultOpt.get().splitLines())
-
-template jsonKey(keyname: string, url: string) =
-  if isSubscribedKey(keyname):
-    let
-      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
-      resultOpt = hitProviderEndpoint(url, hdrs)
-    if resultOpt.isSome():
-      let value = resultOpt.get()
-      # imdsv2 does not respond with application/json content-type
-      # header and so we check first char before attempting json parse
-      if not value.startswith("{"):
-        trace("IMDSv2 didnt respond with json object. Ignoring it. URL: " & url)
-      else:
-        try:
-          let jsonValue = parseJson(value)
-          # redact some keys as they contain sensitive api keys
-          case keyname
-          of AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS:
-            jsonValue["SecretAccessKey"] = newJString("<<redacted>>")
-            jsonValue["Token"] = newJString("<<redacted>>")
-          setIfNeeded(result, keyname, jsonValue.nimJsonToBox())
-        except:
-          trace("IMDSv2 responded with invalid json for URL: " & url)
-
-template extractJsonKey(keyname: string, url: string, subkey: string) =
-  if isSubscribedKey(keyname):
-    let
-      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
-      resultOpt = hitProviderEndpoint(url, hdrs)
-    if resultOpt.isSome():
-      let value = resultOpt.get()
-      # imdsv2 does not respond with application/json content-type
-      # header and so we check first char before attempting json parse
-      if not value.startswith("{"):
-        trace("Provider Didn't respond with json object. Ignoring it. URL: " & url)
-      else:
-        try:
-          let jsonValue = parseJson(value)
-          setIfNotEmpty(result, keyname, jsonValue[subkey].getStr())
-        except:
-          trace("Could not set " & keyname & " with subkey " & subkey & " from " & url)
-
-template getTags(keyname: string, url: string) =
-  if isSubscribedKey(keyname):
-    let
-      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
-      resultOpt = hitProviderEndpoint(url, hdrs)
-    if resultOpt.isSome():
-      let
-        value = resultOpt.get()
-        tags  = ChalkDict()
-      # tag reponse is a newline-delimited list of tags
-      # which are set on the instance
-      # to each tag values an endpoint needs to be hit
-      # for each tag key to get its value
-      for line in value.split("\n"):
-        let name = line.strip()
-        if name == "":
-          continue
-        let tagOpt = hitProviderEndpoint(url & "/" & name, hdrs)
-        if tagOpt.isSome():
-          tags[name] = pack(tagOpt.get())
-        setIfNeeded(result, keyname, tags)
 
 type
   HostKind = enum
@@ -275,6 +179,102 @@ proc getGcpMetadata(): ChalkDict =
 
     if getEnv(K_SERVICE) != "" and getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "":
       result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("gcp_cloud_run_service")
+
+proc getAwsToken(): Option[string] =
+  let
+    url      = awsBaseUri & "api/token"
+    hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
+    response = safeRequest(url        = url,
+                           httpMethod = HttpPut,
+                           timeout    = 250, # 1/4 of a second
+                           headers    = hdrs)
+    body     = response.body().strip()
+
+  if not response.code.is2xx():
+    trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
+    return none(string)
+
+  trace("Retrieved AWS metadata token")
+  return some(body)
+
+template oneItem(keyname: string, url: string) =
+  if isSubscribedKey(keyname):
+    let
+      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
+      resultOpt = hitProviderEndpoint(url, hdrs)
+    if resultOpt.isSome():
+      setIfNotEmpty(result, keyname, resultOpt.get())
+
+template listKey(keyname: string, url: string) =
+  if isSubscribedKey(keyname):
+    let
+      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
+      resultOpt = hitProviderEndpoint(url, hdrs)
+    if resultOpt.isSome():
+      setIfNeeded(result, keyname, resultOpt.get().splitLines())
+
+template jsonKey(keyname: string, url: string) =
+  if isSubscribedKey(keyname):
+    let
+      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
+      resultOpt = hitProviderEndpoint(url, hdrs)
+    if resultOpt.isSome():
+      let value = resultOpt.get()
+      # imdsv2 does not respond with application/json content-type
+      # header and so we check first char before attempting json parse
+      if not value.startswith("{"):
+        trace("IMDSv2 didnt respond with json object. Ignoring it. URL: " & url)
+      else:
+        try:
+          let jsonValue = parseJson(value)
+          # redact some keys as they contain sensitive api keys
+          case keyname
+          of AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS:
+            jsonValue["SecretAccessKey"] = newJString("<<redacted>>")
+            jsonValue["Token"] = newJString("<<redacted>>")
+          setIfNeeded(result, keyname, jsonValue.nimJsonToBox())
+        except:
+          trace("IMDSv2 responded with invalid json for URL: " & url)
+
+template extractJsonKey(keyname: string, url: string, subkey: string) =
+  if isSubscribedKey(keyname):
+    let
+      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
+      resultOpt = hitProviderEndpoint(url, hdrs)
+    if resultOpt.isSome():
+      let value = resultOpt.get()
+      # imdsv2 does not respond with application/json content-type
+      # header and so we check first char before attempting json parse
+      if not value.startswith("{"):
+        trace("Provider Didn't respond with json object. Ignoring it. URL: " & url)
+      else:
+        try:
+          let jsonValue = parseJson(value)
+          setIfNotEmpty(result, keyname, jsonValue[subkey].getStr())
+        except:
+          trace("Could not set " & keyname & " with subkey " & subkey & " from " & url)
+
+template getTags(keyname: string, url: string) =
+  if isSubscribedKey(keyname):
+    let
+      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
+      resultOpt = hitProviderEndpoint(url, hdrs)
+    if resultOpt.isSome():
+      let
+        value = resultOpt.get()
+        tags  = ChalkDict()
+      # tag reponse is a newline-delimited list of tags
+      # which are set on the instance
+      # to each tag values an endpoint needs to be hit
+      # for each tag key to get its value
+      for line in value.split("\n"):
+        let name = line.strip()
+        if name == "":
+          continue
+        let tagOpt = hitProviderEndpoint(url & "/" & name, hdrs)
+        if tagOpt.isSome():
+          tags[name] = pack(tagOpt.get())
+        setIfNeeded(result, keyname, tags)
 
 proc getAwsMetadata(): ChalkDict =
   result = ChalkDict()
