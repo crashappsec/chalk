@@ -186,8 +186,6 @@ proc isGoogleHost(vendor: string, resolvContents: string): bool =
           getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "" and
           getEnv(K_SERVICE) != "")
 
-
-
 proc isAzureHost(vendor: string): bool =
   return vendor.toLowerAscii().contains("microsoft")
 
