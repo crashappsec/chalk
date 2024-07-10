@@ -70,9 +70,9 @@ proc getAzureMetadata(): ChalkDict =
       return
     try:
       let jsonValue = parseJson(value)
-      setIfNeeded(result, "_AZURE_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+      result.setIfNeeded("_AZURE_INSTANCE_METADATA", jsonValue.nimJsonToBox())
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["compute"]["tagsList"].nimJsonToBox())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_TAGS", jsonValue["compute"]["tagsList"].nimJsonToBox())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for azure")
       try:
@@ -83,22 +83,22 @@ proc getAzureMetadata(): ChalkDict =
             if ipv4 != "":
               found = true
               # just pick the first
-              setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
+              result.setIfNeeded("_OP_CLOUD_PROVIDER_IP", ipv4)
               break
           if found:
             break
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_IP for azure")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["compute"]["subscriptionId"].getStr())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["compute"]["subscriptionId"].getStr())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_ACCOUNT_INFO for azure")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["compute"]["location"].getStr())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_REGION", jsonValue["compute"]["location"].getStr())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_REGION for azure")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["compute"]["vmSize"].getStr())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["compute"]["vmSize"].getStr())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for azure")
     except:
@@ -124,7 +124,7 @@ proc getGcpMetadata(): ChalkDict =
           let valueProj = projectOpt.get()
           if valueProj.startswith("{"):
             let jsonProjValue = parseJson(valueProj)
-            setIfNeeded(result, "_GCP_PROJECT_METADATA", jsonProjValue.nimJsonToBox())
+            result.setIfNeeded("_GCP_PROJECT_METADATA", jsonProjValue.nimJsonToBox())
           else:
             trace("GCP project metadata didnt respond with json object. Ignoring it")
         except:
@@ -141,15 +141,15 @@ proc getGcpMetadata(): ChalkDict =
     try:
       let jsonValue = parseJson(value)
       try:
-        setIfNeeded(result, "_GCP_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+        result.setIfNeeded("_GCP_INSTANCE_METADATA", jsonValue.nimJsonToBox())
       except:
         trace("Could not insert _GCP_INSTANCE_METADATA")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["tags"].nimJsonToBox())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_TAGS", jsonValue["tags"].nimJsonToBox())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["serviceAccounts"].nimJsonToBox())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["serviceAccounts"].nimJsonToBox())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
       try:
@@ -160,18 +160,18 @@ proc getGcpMetadata(): ChalkDict =
             if ipv4 != "":
               found = true
               # just pick the first
-              setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
+              result.setIfNeeded("_OP_CLOUD_PROVIDER_IP", ipv4)
               break
           if found:
             break
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_IP for gcp")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["zone"].getStr().split("/")[^1])
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_REGION", jsonValue["zone"].getStr().split("/")[^1])
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_REGION for gcp")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["machineType"].getStr().split("/")[^1])
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["machineType"].getStr().split("/")[^1])
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for gcp")
     except:
