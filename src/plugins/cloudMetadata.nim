@@ -143,24 +143,24 @@ proc isAwsEc2Host(vendor: string): bool =
 
   # older Xen instances
   let uuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_hypervisor_path"))
-  if strutils.toLowerAscii(uuid).startswith("ec2"):
+  if uuid.toLowerAscii().startswith("ec2"):
     return true
 
   # nitro instances
-  if contains(strutils.toLowerAscii(vendor), "amazon"):
+  if vendor.toLowerAscii().contains("amazon"):
     return true
 
   # this will only work if we have root, normally sudo dmidecode  --string system-uuid
   # gives the same output
   let product_uuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_product_path"))
-  if strutils.toLowerAscii(product_uuid).startsWith("ec2"):
+  if product_uuid.toLowerAscii().startsWith("ec2"):
     return true
 
   return false
 
 proc isGoogleHost(vendor: string, resolvContents: string): bool =
   # vendor is present
-  if contains(strutils.toLowerAscii(vendor), "google"):
+  if vendor.toLowerAscii().contains("google"):
     return true
 
   # vendor information should be present in most services, but its not present
@@ -189,7 +189,7 @@ proc isGoogleHost(vendor: string, resolvContents: string): bool =
 
 
 proc isAzureHost(vendor: string): bool =
-  return contains(strutils.toLowerAscii(vendor), "microsoft")
+  return vendor.toLowerAscii().contains("microsoft")
 
 proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
                                ChalkDict {.cdecl.} =
