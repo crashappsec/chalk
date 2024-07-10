@@ -456,17 +456,17 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     vendor = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path"))
     resolv = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_resolv_path"))
 
-  let hostKind = getHostKind(vendor, resolv)
-  result = case hostKind
-  of hkUnknown:
-    trace("Unknown cloud host: does not seem to be AWS, Azure, or Google")
-    ChalkDict()
-  of hkAws:
-    getAwsMetadata()
-  of hkAzure:
-    getAzureMetadata()
-  of hkGcp:
-    getGcpMetadata()
+  result =
+    case getHostKind(vendor, resolv)
+    of hkUnknown:
+      trace("Unknown cloud host: does not seem to be AWS, Azure, or Google")
+      ChalkDict()
+    of hkAws:
+      getAwsMetadata()
+    of hkAzure:
+      getAzureMetadata()
+    of hkGcp:
+      getGcpMetadata()
 
 proc loadCloudMetadata*() =
   newPlugin("cloud_metadata", rtHostCallback = RunTimeHostCb(cloudMetadataGetrunTimeHostInfo))
