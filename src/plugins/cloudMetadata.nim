@@ -60,7 +60,10 @@ proc getAzureMetadata(): ChalkDict =
       isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
-    let resultOpt = hitProviderEndpoint("http://169.254.169.254/metadata/instance?api-version=2021-02-01", newHttpHeaders([("Metadata", "true")]))
+    let resultOpt = hitProviderEndpoint(
+      "http://169.254.169.254/metadata/instance?api-version=2021-02-01",
+      newHttpHeaders([("Metadata", "true")]),
+    )
     if not resultOpt.isSome():
       trace("Did not get metadata back from Azure endpoint")
       return
@@ -118,7 +121,10 @@ proc getGcpMetadata(): ChalkDict =
       isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
     trace("Querying for GCP metadata")
     if isSubscribedKey("_GCP_PROJECT_METADATA"):
-      let projectOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/project/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
+      let projectOpt = hitProviderEndpoint(
+        "http://169.254.169.254/computeMetadata/v1/project/?recursive=true",
+        newHttpHeaders([("Metadata-Flavor", "Google")]),
+      )
       if projectOpt.isSome():
         try:
           let valueProj = projectOpt.get()
@@ -130,7 +136,10 @@ proc getGcpMetadata(): ChalkDict =
         except:
           trace("Could not insert _GCP_PROJECT_METADATA")
 
-    let resultOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
+    let resultOpt = hitProviderEndpoint(
+      "http://169.254.169.254/computeMetadata/v1/instance/?recursive=true",
+      newHttpHeaders([("Metadata-Flavor", "Google")]),
+    )
     if not resultOpt.isSome():
       trace("Did not get instance metadata back from GCP endpoint")
       return
