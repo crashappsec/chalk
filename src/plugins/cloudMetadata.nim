@@ -398,11 +398,13 @@ proc getAwsMetadata(): ChalkDict =
   result.getTags(token, "_OP_CLOUD_PROVIDER_TAGS",                 awsMdUri & "tags/instance")
 
   if "_AWS_MAC" in result:
-    let mac = unpack[string]result["_AWS_MAC"]
-    result.oneItem(token, "_AWS_VPC_ID",                           awsMdUri & "network/interfaces/macs/" & mac & "/vpc-id")
-    result.oneItem(token, "_AWS_SUBNET_ID",                        awsMdUri & "network/interfaces/macs/" & mac & "/subnet-id")
-    result.oneItem(token, "_AWS_INTERFACE_ID",                     awsMdUri & "network/interfaces/macs/" & mac & "/interface-id")
-    result.listKey(token, "_AWS_SECURITY_GROUP_IDS",               awsMdUri & "network/interfaces/macs/" & mac & "/security-group-ids")
+    let
+      mac    = unpack[string]result["_AWS_MAC"]
+      macUrl = awsMdUri & "network/interfaces/macs/" & mac
+    result.oneItem(token, "_AWS_VPC_ID",                           macUrl & "/vpc-id")
+    result.oneItem(token, "_AWS_SUBNET_ID",                        macUrl & "/subnet-id")
+    result.oneItem(token, "_AWS_INTERFACE_ID",                     macUrl & "/interface-id")
+    result.listKey(token, "_AWS_SECURITY_GROUP_IDS",               macUrl & "/security-group-ids")
 
 proc isAwsEc2Host(vendor: string): bool =
   # ref: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
