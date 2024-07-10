@@ -152,8 +152,8 @@ proc isAwsEc2Host(vendor: string): bool =
 
   # this will only work if we have root, normally sudo dmidecode  --string system-uuid
   # gives the same output
-  let product_uuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_product_path"))
-  if product_uuid.toLowerAscii().startsWith("ec2"):
+  let productUuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_product_path"))
+  if productUuid.toLowerAscii().startsWith("ec2"):
     return true
 
   return false
