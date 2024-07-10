@@ -476,8 +476,8 @@ proc getHostKind(vendor: string, resolvContents: string): HostKind =
   else:
     hkUnknown
 
-proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
-                               ChalkDict {.cdecl.} =
+proc cloudMetadataGetrunTimeHostInfo*(self: Plugin,
+                                      objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
   let
     vendor = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path"))
     resolv = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_resolv_path"))
