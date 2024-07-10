@@ -143,7 +143,7 @@ proc isAwsEc2Host(vendor: string): bool =
 
   # older Xen instances
   let uuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_hypervisor_path"))
-  if uuid.toLowerAscii().startswith("ec2"):
+  if uuid.toLowerAscii().startsWith("ec2"):
     return true
 
   # nitro instances
