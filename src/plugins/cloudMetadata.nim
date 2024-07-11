@@ -224,7 +224,7 @@ proc listKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) 
       hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
       resultOpt = hitProviderEndpoint(url, hdrs)
     if resultOpt.isSome():
-      setIfNeeded(chalkDict, keyname, resultOpt.get().splitLines())
+      chalkDict.setIfNeeded(keyname, resultOpt.get().splitLines())
 
 proc jsonKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
   ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
@@ -251,7 +251,7 @@ proc jsonKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) 
           of AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS:
             jsonValue["SecretAccessKey"] = newJString("<<redacted>>")
             jsonValue["Token"] = newJString("<<redacted>>")
-          setIfNeeded(chalkDict, keyname, jsonValue.nimJsonToBox())
+          chalkDict.setIfNeeded(keyname, jsonValue.nimJsonToBox())
         except:
           trace("IMDSv2 responded with invalid json for URL: " & url)
 
@@ -298,7 +298,7 @@ proc getTags(chalkDict: ChalkDict, token: string, keyname: string, url: string) 
         let tagOpt = hitProviderEndpoint(url & "/" & name, hdrs)
         if tagOpt.isSome():
           tags[name] = pack(tagOpt.get())
-        setIfNeeded(chalkDict, keyname, tags)
+        chalkDict.setIfNeeded(keyname, tags)
 
 proc getAwsMetadata(): ChalkDict =
   result = ChalkDict()
