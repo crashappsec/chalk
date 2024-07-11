@@ -23,23 +23,6 @@ const
   # special keys for special processing
   AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS = "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE"
 
-proc getAwsToken(): Option[string] =
-  let
-    url      = awsBaseUri & "api/token"
-    hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
-    response = safeRequest(url        = url,
-                           httpMethod = HttpPut,
-                           timeout    = 250, # 1/4 of a second
-                           headers    = hdrs)
-    body     = response.body().strip()
-
-  if not response.code.is2xx():
-    trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
-    return none(string)
-
-  trace("Retrieved AWS metadata token")
-  return some(body)
-
 proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
   let
     response = safeRequest(url        = path,
@@ -57,6 +40,161 @@ proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
     trace("Got empty metadata from: " & path)
 
   trace("Retrieved metadata from: " & path)
+  return some(body)
+
+type
+  HostKind = enum
+    hkUnknown = "unknown"
+    hkAws = "aws"
+    hkAzure = "azure"
+    hkGcp = "gcp"
+
+proc getAzureMetadata(): ChalkDict =
+  result = ChalkDict()
+  result.setIfNeeded("_OP_CLOUD_PROVIDER", $hkAzure)
+
+  if isSubscribedKey("_AZURE_INSTANCE_METADATA") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_IP") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
+    let resultOpt = hitProviderEndpoint("http://169.254.169.254/metadata/instance?api-version=2021-02-01", newHttpHeaders([("Metadata", "true")]))
+    if not resultOpt.isSome():
+      trace("Did not get metadata back from Azure endpoint")
+      return
+    let value = resultOpt.get()
+    if not value.startswith("{"):
+      trace("Azure metadata didnt respond with json object. Ignoring it")
+      return
+    try:
+      let jsonValue = parseJson(value)
+      setIfNeeded(result, "_AZURE_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["compute"]["tagsList"].nimJsonToBox())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for azure")
+      try:
+        for iface in jsonValue["network"]["interface"]:
+          var found = false
+          for address in iface["ipv4"]["ipAddress"]:
+            let ipv4 = address["publicIpAddress"].getStr()
+            if ipv4 != "":
+              found = true
+              # just pick the first
+              setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
+              break
+          if found:
+            break
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_IP for azure")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["compute"]["subscriptionId"].getStr())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_ACCOUNT_INFO for azure")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["compute"]["location"].getStr())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_REGION for azure")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["compute"]["vmSize"].getStr())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for azure")
+    except:
+      trace("Azure metadata responded with invalid json")
+
+proc getGcpMetadata(): ChalkDict =
+  result = ChalkDict()
+  result.setIfNeeded("_OP_CLOUD_PROVIDER", $hkGcp)
+
+  if isSubscribedKey("_GCP_INSTANCE_METADATA") or
+      isSubscribedKey("_GCP_PROJECT_METADATA") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_IP") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
+      isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
+    trace("Querying for GCP metadata")
+    if isSubscribedKey("_GCP_PROJECT_METADATA"):
+      let projectOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/project/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
+      if projectOpt.isSome():
+        try:
+          let valueProj = projectOpt.get()
+          if valueProj.startswith("{"):
+            let jsonProjValue = parseJson(valueProj)
+            setIfNeeded(result, "_GCP_PROJECT_METADATA", jsonProjValue.nimJsonToBox())
+          else:
+            trace("GCP project metadata didnt respond with json object. Ignoring it")
+        except:
+          trace("Could not insert _GCP_PROJECT_METADATA")
+
+    let resultOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
+    if not resultOpt.isSome():
+      trace("Did not get instance metadata back from GCP endpoint")
+      return
+    let value = resultOpt.get()
+    if not value.startswith("{"):
+      trace("GCP metadata didnt respond with json object. Ignoring it")
+      return
+    try:
+      let jsonValue = parseJson(value)
+      try:
+        setIfNeeded(result, "_GCP_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+      except:
+        trace("Could not insert _GCP_INSTANCE_METADATA")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["tags"].nimJsonToBox())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["serviceAccounts"].nimJsonToBox())
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
+      try:
+        for iface in jsonValue["networkInterfaces"]:
+          var found = false
+          for config in iface["accessConfigs"]:
+            let ipv4 = config["externalIp"].getStr()
+            if ipv4 != "":
+              found = true
+              # just pick the first
+              setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
+              break
+          if found:
+            break
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_IP for gcp")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["zone"].getStr().split("/")[^1])
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_REGION for gcp")
+      try:
+        setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["machineType"].getStr().split("/")[^1])
+      except:
+        trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for gcp")
+    except:
+      trace("GCP metadata responded with invalid json")
+
+    if getEnv(K_SERVICE) != "" and getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "":
+      result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("gcp_cloud_run_service")
+
+proc getAwsToken(): Option[string] =
+  let
+    url      = awsBaseUri & "api/token"
+    hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
+    response = safeRequest(url        = url,
+                           httpMethod = HttpPut,
+                           timeout    = 250, # 1/4 of a second
+                           headers    = hdrs)
+    body     = response.body().strip()
+
+  if not response.code.is2xx():
+    trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
+    return none(string)
+
+  trace("Retrieved AWS metadata token")
   return some(body)
 
 template oneItem(keyname: string, url: string) =
@@ -138,220 +276,9 @@ template getTags(keyname: string, url: string) =
           tags[name] = pack(tagOpt.get())
         setIfNeeded(result, keyname, tags)
 
-proc isAwsEc2Host(vendor: string): bool =
-  # ref: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
-
-  # older Xen instances
-  let uuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_hypervisor_path"))
-  if strutils.toLowerAscii(uuid).startswith("ec2"):
-    return true
-
-  # nitro instances
-  if contains(strutils.toLowerAscii(vendor), "amazon"):
-    return true
-
-  # this will only work if we have root, normally sudo dmidecode  --string system-uuid
-  # gives the same output
-  let product_uuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_product_path"))
-  if strutils.toLowerAscii(product_uuid).startsWith("ec2"):
-    return true
-
-  return false
-
-proc isGoogleHost(vendor: string, resolvContents: string): bool =
-  # vendor is present
-  if contains(strutils.toLowerAscii(vendor), "google"):
-    return true
-
-  # vendor information should be present in most services, but its not present
-  # in cloud run. In cloud run we can detect the presence of a knative service
-  # via ENV variables but we are being conservative in also checking resolv.conf
-  var hasGoogleInternal = false
-  for line in resolvContents.splitLines():
-    # Checking that resolv.conf contains `google.internal` outside of a comment
-    # should be more than sufficient.
-    #
-    # From `man resolv.conf`:
-    #
-    # - The keyword and value must appear on a single line, and the keyword
-    #   (e.g., nameserver) must start the line.  The value follows the keyword,
-    #   separated by white space.
-    #
-    # - Lines that contain a semicolon (;) or hash character (#) in the first
-    #   column are treated as comments.
-    if line.len() > 0 and line[0] notin {';', '#'} and line.contains("google.internal"):
-      hasGoogleInternal = true
-      break
-  return (hasGoogleInternal and
-          getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "" and
-          getEnv(K_SERVICE) != "")
-
-
-
-proc isAzureHost(vendor: string): bool =
-  return contains(strutils.toLowerAscii(vendor), "microsoft")
-
-proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
-                               ChalkDict {.cdecl.} =
+proc getAwsMetadata(): ChalkDict =
   result = ChalkDict()
-  let vendor = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path"))
-  let resolv = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_resolv_path"))
-
-  #
-  # GCP
-  #
-
-  if isGoogleHost(vendor, resolv):
-    # FIXME use enum
-    result.setIfNeeded("_OP_CLOUD_PROVIDER", "gcp")
-
-  if isGoogleHost(vendor, resolv) and (
-    isSubscribedKey("_GCP_INSTANCE_METADATA") or
-    isSubscribedKey("_GCP_PROJECT_METADATA") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_IP") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")
-  ):
-    trace("Querying for GCP metadata")
-    if isSubscribedKey("_GCP_PROJECT_METADATA"):
-      let projectOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/project/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
-      if projectOpt.isSome():
-        try:
-          let valueProj = projectOpt.get()
-          if valueProj.startswith("{"):
-            let jsonProjValue = parseJson(valueProj)
-            setIfNeeded(result, "_GCP_PROJECT_METADATA", jsonProjValue.nimJsonToBox())
-          else:
-            trace("GCP project metadata didnt respond with json object. Ignoring it")
-        except:
-          trace("Could not insert _GCP_PROJECT_METADATA")
-
-    let resultOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
-    if not resultOpt.isSome():
-      trace("Did not get instance metadata back from GCP endpoint")
-      return
-    let value = resultOpt.get()
-    if not value.startswith("{"):
-      trace("GCP metadata didnt respond with json object. Ignoring it")
-      return
-    try:
-      let jsonValue = parseJson(value)
-      try:
-        setIfNeeded(result, "_GCP_INSTANCE_METADATA", jsonValue.nimJsonToBox())
-      except:
-        trace("Could not insert _GCP_INSTANCE_METADATA")
-      try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["tags"].nimJsonToBox())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
-      try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["serviceAccounts"].nimJsonToBox())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
-      try:
-        for iface in jsonValue["networkInterfaces"]:
-          var found = false
-          for config in iface["accessConfigs"]:
-            let ipv4 = config["externalIp"].getStr()
-            if ipv4 != "":
-              found = true
-              # just pick the first
-              setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
-              break
-          if found:
-            break
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_IP for gcp")
-      try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["zone"].getStr().split("/")[^1])
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_REGION for gcp")
-      try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["machineType"].getStr().split("/")[^1])
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for gcp")
-    except:
-      trace("GCP metadata responded with invalid json")
-
-    if getEnv(K_SERVICE) != "" and getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "":
-      result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("gcp_cloud_run_service")
-
-    return
-
-  #
-  # Azure
-  #
-  if isAzureHost(vendor):
-    # FIXME use enum
-    result.setIfNeeded("_OP_CLOUD_PROVIDER", "azure")
-
-  if isAzureHost(vendor) and (
-    isSubscribedKey("_AZURE_INSTANCE_METADATA") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_IP") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
-    isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE")
-  ):
-    let resultOpt = hitProviderEndpoint("http://169.254.169.254/metadata/instance?api-version=2021-02-01", newHttpHeaders([("Metadata", "true")]))
-    if not resultOpt.isSome():
-      trace("Did not get metadata back from Azure endpoint")
-      return
-    let value = resultOpt.get()
-    if not value.startswith("{"):
-      trace("Azure metadata didnt respond with json object. Ignoring it")
-      return
-    try:
-      let jsonValue = parseJson(value)
-      setIfNeeded(result, "_AZURE_INSTANCE_METADATA", jsonValue.nimJsonToBox())
-      try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["compute"]["tagsList"].nimJsonToBox())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for azure")
-      try:
-        for iface in jsonValue["network"]["interface"]:
-          var found = false
-          for address in iface["ipv4"]["ipAddress"]:
-            let ipv4 = address["publicIpAddress"].getStr()
-            if ipv4 != "":
-              found = true
-              # just pick the first
-              setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
-              break
-          if found:
-            break
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_IP for azure")
-      try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["compute"]["subscriptionId"].getStr())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_ACCOUNT_INFO for azure")
-      try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["compute"]["location"].getStr())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_REGION for azure")
-      try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["compute"]["vmSize"].getStr())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for azure")
-    except:
-      trace("Azure metadata responded with invalid json")
-
-    return
-
-  #
-  # AWS via imdsv2
-  #
-  if not isAwsEc2Host(vendor):
-    trace("Not an EC2 instance - skipping check for IMDSv2")
-    return
-
-  # FIXME use enum
-  result.setIfNeeded("_OP_CLOUD_PROVIDER", "aws")
+  result.setIfNeeded("_OP_CLOUD_PROVIDER", $hkAws)
 
   var tokenOpt: Option[string]
 
@@ -461,6 +388,85 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     oneItem("_AWS_SUBNET_ID",                        awsMdUri & "network/interfaces/macs/" & mac & "/subnet-id")
     oneItem("_AWS_INTERFACE_ID",                     awsMdUri & "network/interfaces/macs/" & mac & "/interface-id")
     listKey("_AWS_SECURITY_GROUP_IDS",               awsMdUri & "network/interfaces/macs/" & mac & "/security-group-ids")
+
+proc isAwsEc2Host(vendor: string): bool =
+  # ref: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
+
+  # older Xen instances
+  let uuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_hypervisor_path"))
+  if uuid.toLowerAscii().startsWith("ec2"):
+    return true
+
+  # nitro instances
+  if vendor.toLowerAscii().contains("amazon"):
+    return true
+
+  # this will only work if we have root, normally sudo dmidecode  --string system-uuid
+  # gives the same output
+  let productUuid = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_product_path"))
+  if productUuid.toLowerAscii().startsWith("ec2"):
+    return true
+
+  return false
+
+proc isAzureHost(vendor: string): bool =
+  return vendor.toLowerAscii().contains("microsoft")
+
+proc isGoogleHost(vendor: string, resolvContents: string): bool =
+  # vendor is present
+  if vendor.toLowerAscii().contains("google"):
+    return true
+
+  # vendor information should be present in most services, but its not present
+  # in cloud run. In cloud run we can detect the presence of a knative service
+  # via ENV variables but we are being conservative in also checking resolv.conf
+  var hasGoogleInternal = false
+  for line in resolvContents.splitLines():
+    # Checking that resolv.conf contains `google.internal` outside of a comment
+    # should be more than sufficient.
+    #
+    # From `man resolv.conf`:
+    #
+    # - The keyword and value must appear on a single line, and the keyword
+    #   (e.g., nameserver) must start the line.  The value follows the keyword,
+    #   separated by white space.
+    #
+    # - Lines that contain a semicolon (;) or hash character (#) in the first
+    #   column are treated as comments.
+    if line.len() > 0 and line[0] notin {';', '#'} and line.contains("google.internal"):
+      hasGoogleInternal = true
+      break
+  return (hasGoogleInternal and
+          getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "" and
+          getEnv(K_SERVICE) != "")
+
+proc getHostKind(vendor: string, resolvContents: string): HostKind =
+  if isAwsEc2Host(vendor):
+    hkAws
+  elif isAzureHost(vendor):
+    hkAzure
+  elif isGoogleHost(vendor, resolvContents):
+    hkGcp
+  else:
+    hkUnknown
+
+proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
+                               ChalkDict {.cdecl.} =
+  let
+    vendor = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path"))
+    resolv = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_resolv_path"))
+
+  result =
+    case getHostKind(vendor, resolv)
+    of hkUnknown:
+      trace("Unknown cloud host: does not seem to be AWS, Azure, or Google")
+      ChalkDict()
+    of hkAws:
+      getAwsMetadata()
+    of hkAzure:
+      getAzureMetadata()
+    of hkGcp:
+      getGcpMetadata()
 
 proc loadCloudMetadata*() =
   newPlugin("cloud_metadata", rtHostCallback = RunTimeHostCb(cloudMetadataGetrunTimeHostInfo))
