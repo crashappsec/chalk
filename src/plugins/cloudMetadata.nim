@@ -60,7 +60,10 @@ proc getAzureMetadata(): ChalkDict =
       isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
-    let resultOpt = hitProviderEndpoint("http://169.254.169.254/metadata/instance?api-version=2021-02-01", newHttpHeaders([("Metadata", "true")]))
+    let resultOpt = hitProviderEndpoint(
+      "http://169.254.169.254/metadata/instance?api-version=2021-02-01",
+      newHttpHeaders([("Metadata", "true")]),
+    )
     if not resultOpt.isSome():
       trace("Did not get metadata back from Azure endpoint")
       return
@@ -70,9 +73,9 @@ proc getAzureMetadata(): ChalkDict =
       return
     try:
       let jsonValue = parseJson(value)
-      setIfNeeded(result, "_AZURE_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+      result.setIfNeeded("_AZURE_INSTANCE_METADATA", jsonValue.nimJsonToBox())
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["compute"]["tagsList"].nimJsonToBox())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_TAGS", jsonValue["compute"]["tagsList"].nimJsonToBox())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for azure")
       try:
@@ -83,22 +86,22 @@ proc getAzureMetadata(): ChalkDict =
             if ipv4 != "":
               found = true
               # just pick the first
-              setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
+              result.setIfNeeded("_OP_CLOUD_PROVIDER_IP", ipv4)
               break
           if found:
             break
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_IP for azure")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["compute"]["subscriptionId"].getStr())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["compute"]["subscriptionId"].getStr())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_ACCOUNT_INFO for azure")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["compute"]["location"].getStr())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_REGION", jsonValue["compute"]["location"].getStr())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_REGION for azure")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["compute"]["vmSize"].getStr())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["compute"]["vmSize"].getStr())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for azure")
     except:
@@ -118,19 +121,25 @@ proc getGcpMetadata(): ChalkDict =
       isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
     trace("Querying for GCP metadata")
     if isSubscribedKey("_GCP_PROJECT_METADATA"):
-      let projectOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/project/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
+      let projectOpt = hitProviderEndpoint(
+        "http://169.254.169.254/computeMetadata/v1/project/?recursive=true",
+        newHttpHeaders([("Metadata-Flavor", "Google")]),
+      )
       if projectOpt.isSome():
         try:
           let valueProj = projectOpt.get()
           if valueProj.startswith("{"):
             let jsonProjValue = parseJson(valueProj)
-            setIfNeeded(result, "_GCP_PROJECT_METADATA", jsonProjValue.nimJsonToBox())
+            result.setIfNeeded("_GCP_PROJECT_METADATA", jsonProjValue.nimJsonToBox())
           else:
             trace("GCP project metadata didnt respond with json object. Ignoring it")
         except:
           trace("Could not insert _GCP_PROJECT_METADATA")
 
-    let resultOpt = hitProviderEndpoint("http://169.254.169.254/computeMetadata/v1/instance/?recursive=true", newHttpHeaders([("Metadata-Flavor", "Google")]))
+    let resultOpt = hitProviderEndpoint(
+      "http://169.254.169.254/computeMetadata/v1/instance/?recursive=true",
+      newHttpHeaders([("Metadata-Flavor", "Google")]),
+    )
     if not resultOpt.isSome():
       trace("Did not get instance metadata back from GCP endpoint")
       return
@@ -141,15 +150,15 @@ proc getGcpMetadata(): ChalkDict =
     try:
       let jsonValue = parseJson(value)
       try:
-        setIfNeeded(result, "_GCP_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+        result.setIfNeeded("_GCP_INSTANCE_METADATA", jsonValue.nimJsonToBox())
       except:
         trace("Could not insert _GCP_INSTANCE_METADATA")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_TAGS", jsonValue["tags"].nimJsonToBox())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_TAGS", jsonValue["tags"].nimJsonToBox())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["serviceAccounts"].nimJsonToBox())
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["serviceAccounts"].nimJsonToBox())
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
       try:
@@ -160,18 +169,18 @@ proc getGcpMetadata(): ChalkDict =
             if ipv4 != "":
               found = true
               # just pick the first
-              setIfNeeded(result, "_OP_CLOUD_PROVIDER_IP", ipv4)
+              result.setIfNeeded("_OP_CLOUD_PROVIDER_IP", ipv4)
               break
           if found:
             break
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_IP for gcp")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_REGION", jsonValue["zone"].getStr().split("/")[^1])
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_REGION", jsonValue["zone"].getStr().split("/")[^1])
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_REGION for gcp")
       try:
-        setIfNeeded(result, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["machineType"].getStr().split("/")[^1])
+        result.setIfNeeded("_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["machineType"].getStr().split("/")[^1])
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for gcp")
     except:
@@ -197,23 +206,33 @@ proc getAwsToken(): Option[string] =
   trace("Retrieved AWS metadata token")
   return some(body)
 
-template oneItem(keyname: string, url: string) =
+proc oneItem(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
+  ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
+  ## in `chalkDict` to the value of the response (if non-empty).
   if isSubscribedKey(keyname):
     let
       hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
       resultOpt = hitProviderEndpoint(url, hdrs)
     if resultOpt.isSome():
-      setIfNotEmpty(result, keyname, resultOpt.get())
+      setIfNotEmpty(chalkDict, keyname, resultOpt.get())
 
-template listKey(keyname: string, url: string) =
+proc listKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
+  ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
+  ## in `chalkDict` to the value of the response (as a `seq` of lines).
   if isSubscribedKey(keyname):
     let
       hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
       resultOpt = hitProviderEndpoint(url, hdrs)
     if resultOpt.isSome():
-      setIfNeeded(result, keyname, resultOpt.get().splitLines())
+      chalkDict.setIfNeeded(keyname, resultOpt.get().splitLines())
 
-template jsonKey(keyname: string, url: string) =
+proc jsonKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
+  ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
+  ## in `chalkDict` to the value of the response (as JSON).
+  ##
+  ## If `keyname` is the value of `AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS`,
+  ## sets `<<redacted>>` as the values of `SecretAccessKey` and `Token` in
+  ## `chalkDict`.
   if isSubscribedKey(keyname):
     let
       hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
@@ -232,11 +251,14 @@ template jsonKey(keyname: string, url: string) =
           of AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS:
             jsonValue["SecretAccessKey"] = newJString("<<redacted>>")
             jsonValue["Token"] = newJString("<<redacted>>")
-          setIfNeeded(result, keyname, jsonValue.nimJsonToBox())
+          chalkDict.setIfNeeded(keyname, jsonValue.nimJsonToBox())
         except:
           trace("IMDSv2 responded with invalid json for URL: " & url)
 
-template extractJsonKey(keyname: string, url: string, subkey: string) =
+proc extractJsonKey(chalkDict: ChalkDict, token: string, keyname: string,
+                    url: string, subkey: string) =
+  ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
+  ## in `chalkDict` to the value of `subkey` in the response.
   if isSubscribedKey(keyname):
     let
       hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
@@ -250,11 +272,13 @@ template extractJsonKey(keyname: string, url: string, subkey: string) =
       else:
         try:
           let jsonValue = parseJson(value)
-          setIfNotEmpty(result, keyname, jsonValue[subkey].getStr())
+          setIfNotEmpty(chalkDict, keyname, jsonValue[subkey].getStr())
         except:
           trace("Could not set " & keyname & " with subkey " & subkey & " from " & url)
 
-template getTags(keyname: string, url: string) =
+proc getTags(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
+  ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
+  ## in `chalkDict` to a `ChalkDict` of tag/value pairs.
   if isSubscribedKey(keyname):
     let
       hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
@@ -274,7 +298,7 @@ template getTags(keyname: string, url: string) =
         let tagOpt = hitProviderEndpoint(url & "/" & name, hdrs)
         if tagOpt.isSome():
           tags[name] = pack(tagOpt.get())
-        setIfNeeded(result, keyname, tags)
+        chalkDict.setIfNeeded(keyname, tags)
 
 proc getAwsMetadata(): ChalkDict =
   result = ChalkDict()
@@ -324,70 +348,72 @@ proc getAwsMetadata(): ChalkDict =
   # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-categories.html
   # dynamic entries
   # dynamic data categories
-  jsonKey("_AWS_INSTANCE_IDENTITY_DOCUMENT",         awsDynUri & "instance-identity/document")
-  extractJsonKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO",  awsDynUri & "instance-identity/document", "accountId")
-  extractJsonKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE", awsDynUri & "instance-identity/document", "instanceType")
-  extractJsonKey("_OP_CLOUD_PROVIDER_INSTANCE_ARCH", awsDynUri & "instance-identity/document", "architecture")
-  oneItem("_AWS_INSTANCE_IDENTITY_PKCS7",            awsDynUri & "instance-identity/pkcs7")
-  oneItem("_AWS_INSTANCE_IDENTITY_SIGNATURE",        awsDynUri & "instance-identity/signature")
-  oneItem("_AWS_INSTANCE_MONITORING",                awsDynUri & "fws/instance-monitoring")
+  result.jsonKey(token, "_AWS_INSTANCE_IDENTITY_DOCUMENT",         awsDynUri & "instance-identity/document")
+  result.extractJsonKey(token, "_OP_CLOUD_PROVIDER_ACCOUNT_INFO",  awsDynUri & "instance-identity/document", "accountId")
+  result.extractJsonKey(token, "_OP_CLOUD_PROVIDER_INSTANCE_TYPE", awsDynUri & "instance-identity/document", "instanceType")
+  result.extractJsonKey(token, "_OP_CLOUD_PROVIDER_INSTANCE_ARCH", awsDynUri & "instance-identity/document", "architecture")
+  result.oneItem(token, "_AWS_INSTANCE_IDENTITY_PKCS7",            awsDynUri & "instance-identity/pkcs7")
+  result.oneItem(token, "_AWS_INSTANCE_IDENTITY_SIGNATURE",        awsDynUri & "instance-identity/signature")
+  result.oneItem(token, "_AWS_INSTANCE_MONITORING",                awsDynUri & "fws/instance-monitoring")
 
-  oneItem("_AWS_AMI_ID",                             awsMdUri & "ami-id")
-  oneItem("_AWS_AMI_LAUNCH_INDEX",                   awsMdUri & "ami-launch-index")
-  oneItem("_AWS_AMI_MANIFEST_PATH",                  awsMdUri & "ami-manifest-path")
-  oneItem("_AWS_ANCESTOR_AMI_IDS",                   awsMdUri & "ancestor-ami-ids")
-  oneItem("_AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE", awsMdUri & "autoscaling/target-lifecycle-state")
-  oneItem("_AWS_AZ",                                 awsMdUri & "placement/availability-zone")
-  oneItem("_AWS_AZ_ID",                              awsMdUri & "placement/availability-zone-id")
-  oneItem("_AWS_BLOCK_DEVICE_MAPPING_AMI",           awsMdUri & "block-device-mapping/ami")
-  oneItem("_AWS_BLOCK_DEVICE_MAPPING_ROOT",          awsMdUri & "block-device-mapping/root")
-  oneItem("_AWS_BLOCK_DEVICE_MAPPING_SWAP",          awsMdUri & "block-device-mapping/swap")
-  oneItem("_AWS_DEDICATED_HOST_ID",                  awsMdUri & "placement/host-id")
-  oneItem("_AWS_EVENTS_MAINTENANCE_HISTORY",         awsMdUri & "events/maintenance/history")
-  oneItem("_AWS_EVENTS_MAINTENANCE_SCHEDULED",       awsMdUri & "events/maintenance/scheduled")
-  oneItem("_AWS_EVENTS_RECOMMENDATIONS_REBALANCE",   awsMdUri & "events/recommendations/rebalance")
-  oneItem("_AWS_HOSTNAME",                           awsMdUri & "hostname")
-  oneItem("_AWS_INSTANCE_ACTION",                    awsMdUri & "instance-action")
-  oneItem("_AWS_INSTANCE_ID",                        awsMdUri & "instance-id")
-  oneItem("_AWS_INSTANCE_LIFE_CYCLE",                awsMdUri & "instance-life-cycle")
-  oneItem("_AWS_INSTANCE_TYPE",                      awsMdUri & "instance-type")
-  oneItem("_AWS_IPV6_ADDR",                          awsMdUri & "ipv6")
-  oneItem("_AWS_KERNEL_ID",                          awsMdUri & "kernel-id")
-  oneItem("_AWS_LOCAL_HOSTNAME",                     awsMdUri & "local-hostname")
-  oneItem("_AWS_LOCAL_IPV4_ADDR",                    awsMdUri & "local-ipv4")
-  oneItem("_AWS_MAC",                                awsMdUri & "mac")
-  oneItem("_AWS_METRICS_VHOSTMD",                    awsMdUri & "metrics/vhostmd")
-  oneItem("_AWS_OPENSSH_PUBKEY",                     awsMdUri & "public-keys/0/openssh-key")
-  oneItem("_AWS_PARTITION_NAME",                     awsMdUri & "services/partition")
-  oneItem("_AWS_PARTITION_NUMBER",                   awsMdUri & "placement/partition-number")
-  oneItem("_AWS_PLACEMENT_GROUP",                    awsMdUri & "placement/group-name")
-  oneItem("_AWS_PRODUCT_CODES",                      awsMdUri & "product-codes")
-  oneItem("_AWS_PUBLIC_HOSTNAME",                    awsMdUri & "public-hostname")
-  oneItem("_AWS_PUBLIC_IPV4_ADDR",                   awsMdUri & "public-ipv4")
-  oneItem("_OP_CLOUD_PROVIDER_IP",                   awsMdUri & "public-ipv4")
-  oneItem("_AWS_RAMDISK_ID",                         awsMdUri & "ramdisk-id")
-  oneItem("_AWS_REGION",                             awsMdUri & "placement/region")
-  oneItem("_OP_CLOUD_PROVIDER_REGION",               awsMdUri & "placement/region")
-  oneItem("_AWS_RESERVATION_ID",                     awsMdUri & "reservation-id")
-  oneItem("_AWS_RESOURCE_DOMAIN",                    awsMdUri & "services/domain")
-  oneItem("_AWS_SPOT_INSTANCE_ACTION",               awsMdUri & "spot/instance-action")
-  oneItem("_AWS_SPOT_TERMINATION_TIME",              awsMdUri & "spot/termination-time")
+  result.oneItem(token, "_AWS_AMI_ID",                             awsMdUri & "ami-id")
+  result.oneItem(token, "_AWS_AMI_LAUNCH_INDEX",                   awsMdUri & "ami-launch-index")
+  result.oneItem(token, "_AWS_AMI_MANIFEST_PATH",                  awsMdUri & "ami-manifest-path")
+  result.oneItem(token, "_AWS_ANCESTOR_AMI_IDS",                   awsMdUri & "ancestor-ami-ids")
+  result.oneItem(token, "_AWS_AUTOSCALING_TARGET_LIFECYCLE_STATE", awsMdUri & "autoscaling/target-lifecycle-state")
+  result.oneItem(token, "_AWS_AZ",                                 awsMdUri & "placement/availability-zone")
+  result.oneItem(token, "_AWS_AZ_ID",                              awsMdUri & "placement/availability-zone-id")
+  result.oneItem(token, "_AWS_BLOCK_DEVICE_MAPPING_AMI",           awsMdUri & "block-device-mapping/ami")
+  result.oneItem(token, "_AWS_BLOCK_DEVICE_MAPPING_ROOT",          awsMdUri & "block-device-mapping/root")
+  result.oneItem(token, "_AWS_BLOCK_DEVICE_MAPPING_SWAP",          awsMdUri & "block-device-mapping/swap")
+  result.oneItem(token, "_AWS_DEDICATED_HOST_ID",                  awsMdUri & "placement/host-id")
+  result.oneItem(token, "_AWS_EVENTS_MAINTENANCE_HISTORY",         awsMdUri & "events/maintenance/history")
+  result.oneItem(token, "_AWS_EVENTS_MAINTENANCE_SCHEDULED",       awsMdUri & "events/maintenance/scheduled")
+  result.oneItem(token, "_AWS_EVENTS_RECOMMENDATIONS_REBALANCE",   awsMdUri & "events/recommendations/rebalance")
+  result.oneItem(token, "_AWS_HOSTNAME",                           awsMdUri & "hostname")
+  result.oneItem(token, "_AWS_INSTANCE_ACTION",                    awsMdUri & "instance-action")
+  result.oneItem(token, "_AWS_INSTANCE_ID",                        awsMdUri & "instance-id")
+  result.oneItem(token, "_AWS_INSTANCE_LIFE_CYCLE",                awsMdUri & "instance-life-cycle")
+  result.oneItem(token, "_AWS_INSTANCE_TYPE",                      awsMdUri & "instance-type")
+  result.oneItem(token, "_AWS_IPV6_ADDR",                          awsMdUri & "ipv6")
+  result.oneItem(token, "_AWS_KERNEL_ID",                          awsMdUri & "kernel-id")
+  result.oneItem(token, "_AWS_LOCAL_HOSTNAME",                     awsMdUri & "local-hostname")
+  result.oneItem(token, "_AWS_LOCAL_IPV4_ADDR",                    awsMdUri & "local-ipv4")
+  result.oneItem(token, "_AWS_MAC",                                awsMdUri & "mac")
+  result.oneItem(token, "_AWS_METRICS_VHOSTMD",                    awsMdUri & "metrics/vhostmd")
+  result.oneItem(token, "_AWS_OPENSSH_PUBKEY",                     awsMdUri & "public-keys/0/openssh-key")
+  result.oneItem(token, "_AWS_PARTITION_NAME",                     awsMdUri & "services/partition")
+  result.oneItem(token, "_AWS_PARTITION_NUMBER",                   awsMdUri & "placement/partition-number")
+  result.oneItem(token, "_AWS_PLACEMENT_GROUP",                    awsMdUri & "placement/group-name")
+  result.oneItem(token, "_AWS_PRODUCT_CODES",                      awsMdUri & "product-codes")
+  result.oneItem(token, "_AWS_PUBLIC_HOSTNAME",                    awsMdUri & "public-hostname")
+  result.oneItem(token, "_AWS_PUBLIC_IPV4_ADDR",                   awsMdUri & "public-ipv4")
+  result.oneItem(token, "_OP_CLOUD_PROVIDER_IP",                   awsMdUri & "public-ipv4")
+  result.oneItem(token, "_AWS_RAMDISK_ID",                         awsMdUri & "ramdisk-id")
+  result.oneItem(token, "_AWS_REGION",                             awsMdUri & "placement/region")
+  result.oneItem(token, "_OP_CLOUD_PROVIDER_REGION",               awsMdUri & "placement/region")
+  result.oneItem(token, "_AWS_RESERVATION_ID",                     awsMdUri & "reservation-id")
+  result.oneItem(token, "_AWS_RESOURCE_DOMAIN",                    awsMdUri & "services/domain")
+  result.oneItem(token, "_AWS_SPOT_INSTANCE_ACTION",               awsMdUri & "spot/instance-action")
+  result.oneItem(token, "_AWS_SPOT_TERMINATION_TIME",              awsMdUri & "spot/termination-time")
 
-  listKey("_AWS_SECURITY_GROUPS",                    awsMdUri & "security-groups")
+  result.listKey(token, "_AWS_SECURITY_GROUPS",                    awsMdUri & "security-groups")
 
-  jsonKey("_AWS_IAM_INFO",                           awsMdUri & "iam/info")
-  jsonKey("_AWS_IDENTITY_CREDENTIALS_EC2_INFO",      awsMdUri & "identity-credentials/ec2/info")
-  jsonKey(AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS,   awsMdUri & "identity-credentials/ec2/security-credentials/ec2-instance")
+  result.jsonKey(token, "_AWS_IAM_INFO",                           awsMdUri & "iam/info")
+  result.jsonKey(token, "_AWS_IDENTITY_CREDENTIALS_EC2_INFO",      awsMdUri & "identity-credentials/ec2/info")
+  result.jsonKey(token, AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS,   awsMdUri & "identity-credentials/ec2/security-credentials/ec2-instance")
 
-  getTags("_AWS_TAGS",                               awsMdUri & "tags/instance")
-  getTags("_OP_CLOUD_PROVIDER_TAGS",                 awsMdUri & "tags/instance")
+  result.getTags(token, "_AWS_TAGS",                               awsMdUri & "tags/instance")
+  result.getTags(token, "_OP_CLOUD_PROVIDER_TAGS",                 awsMdUri & "tags/instance")
 
   if "_AWS_MAC" in result:
-    let mac = unpack[string]result["_AWS_MAC"]
-    oneItem("_AWS_VPC_ID",                           awsMdUri & "network/interfaces/macs/" & mac & "/vpc-id")
-    oneItem("_AWS_SUBNET_ID",                        awsMdUri & "network/interfaces/macs/" & mac & "/subnet-id")
-    oneItem("_AWS_INTERFACE_ID",                     awsMdUri & "network/interfaces/macs/" & mac & "/interface-id")
-    listKey("_AWS_SECURITY_GROUP_IDS",               awsMdUri & "network/interfaces/macs/" & mac & "/security-group-ids")
+    let
+      mac    = unpack[string]result["_AWS_MAC"]
+      macUrl = awsMdUri & "network/interfaces/macs/" & mac
+    result.oneItem(token, "_AWS_VPC_ID",                           macUrl & "/vpc-id")
+    result.oneItem(token, "_AWS_SUBNET_ID",                        macUrl & "/subnet-id")
+    result.oneItem(token, "_AWS_INTERFACE_ID",                     macUrl & "/interface-id")
+    result.listKey(token, "_AWS_SECURITY_GROUP_IDS",               macUrl & "/security-group-ids")
 
 proc isAwsEc2Host(vendor: string): bool =
   # ref: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
@@ -450,8 +476,8 @@ proc getHostKind(vendor: string, resolvContents: string): HostKind =
   else:
     hkUnknown
 
-proc cloudMetadataGetrunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
-                               ChalkDict {.cdecl.} =
+proc cloudMetadataGetrunTimeHostInfo*(self: Plugin,
+                                      objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
   let
     vendor = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path"))
     resolv = tryToLoadFile(get[string](getChalkScope(), "cloud_provider.cloud_instance_hw_identifiers.sys_resolv_path"))
