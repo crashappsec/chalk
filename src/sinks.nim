@@ -35,8 +35,10 @@ const
 
 proc chalkErrSink*(msg: string, cfg: SinkConfig, t: Topic, arg: StringTable) =
   let errObject = getErrorObject()
-  if not isChalkingOp() or errObject.isNone(): systemErrors.add(msg)
-  else: errObject.get().err.add(msg)
+  if not isChalkingOp() or errObject.isNone():
+    systemErrors.add(msg)
+  else:
+    errObject.get().err.add(msg)
 
 proc chalkErrFilter*(msg: string, info: StringTable): (string, bool) =
   if not getSuspendLogging() and keyLogLevel in info:

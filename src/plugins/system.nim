@@ -201,9 +201,6 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
                           ChalkDict {.cdecl.} =
   result = ChalkDict()
 
-  if len(systemErrors)  != 0:
-    result.setIfNeeded("_OP_ERRORS", systemErrors)
-
   if len(getUnmarked()) != 0:
     result.setIfNeeded("_UNMARKED", getUnmarked())
 
@@ -310,6 +307,9 @@ proc metsysGetRunTimeArtifactInfo(self: Plugin, obj: ChalkObj, insert: bool):
 proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
                               ChalkDict {.cdecl.} =
   result = ChalkDict()
+
+  if len(systemErrors)  != 0:
+    result.setIfNeeded("_OP_ERRORS", systemErrors)
 
   if len(externalActions) > 0:
     result.setIfNeeded("_CHALK_EXTERNAL_ACTION_AUDIT", externalActions)
