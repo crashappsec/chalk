@@ -24,23 +24,32 @@ const
   AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS = "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE"
 
 proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
-  let
-    response = safeRequest(url        = path,
-                           httpMethod = HttpGet,
-                           timeout    = 250, # 1/4 of a second
-                           headers    = hdrs)
-    body     = response.body().strip()
+  try:
+    let
+      response = safeRequest(url        = path,
+                             httpMethod = HttpGet,
+                             timeout    = 500, # 1/2 of a second
+                             headers    = hdrs)
+      body     = response.body().strip()
 
-  if not response.code.is2xx():
-    trace("Could not retrieve metadata from: " & path & " - " & response.status & ": " & body)
+    if not response.code.is2xx():
+      # 404 is expected response for some endpoints and logging full response body
+      # is very verbose. We only care about full body for other errors like 400,500,etc
+      if response.code == Http404:
+        trace("Could not retrieve metadata from: " & path & " - " & response.status)
+      else:
+        trace("Could not retrieve metadata from: " & path & " - " & response.status & ": " & body)
+      return none(string)
+
+    if body == "":
+      # some paths are expected to be empty so this is not an error
+      trace("Got empty metadata from: " & path)
+
+    trace("Retrieved metadata from: " & path)
+    return some(body)
+  except:
+    trace("Could not retrieve metadata from: " & path & " due to: " & getCurrentExceptionMsg())
     return none(string)
-
-  if body == "":
-    # some paths are expected to be empty so this is not an error
-    trace("Got empty metadata from: " & path)
-
-  trace("Retrieved metadata from: " & path)
-  return some(body)
 
 type
   HostKind = enum
@@ -190,21 +199,25 @@ proc getGcpMetadata(): ChalkDict =
       result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("gcp_cloud_run_service")
 
 proc getAwsToken(): Option[string] =
-  let
-    url      = awsBaseUri & "api/token"
-    hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
-    response = safeRequest(url        = url,
-                           httpMethod = HttpPut,
-                           timeout    = 250, # 1/4 of a second
-                           headers    = hdrs)
-    body     = response.body().strip()
+  let url      = awsBaseUri & "api/token"
+  try:
+    let
+      hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
+      response = safeRequest(url        = url,
+                             httpMethod = HttpPut,
+                             timeout    = 500, # 1/2 of a second
+                             headers    = hdrs)
+      body     = response.body().strip()
 
-  if not response.code.is2xx():
-    trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
+    if not response.code.is2xx():
+      trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
+      return none(string)
+
+    trace("Retrieved AWS metadata token")
+    return some(body)
+  except:
+    trace("Could not retrieve IMDSv2 token from: " & url & " due to: " & getCurrentExceptionMsg())
     return none(string)
-
-  trace("Retrieved AWS metadata token")
-  return some(body)
 
 proc oneItem(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
   ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
