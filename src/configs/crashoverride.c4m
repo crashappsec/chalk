@@ -431,8 +431,6 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._INVALID_SIGNATURE.use                  = true
   ~key._VALIDATED_SIGNATURE.use                = true
   ~key._VALIDATED_METADATA.use                 = true
-  ~key.INFERRED_TECH_STACKS.use                = true
-  ~key._INFERRED_TECH_STACKS_HOST.use          = true
   ~key.$CHALK_CONFIG.use                       = true
   ~key.$CHALK_IMPLEMENTATION_NAME.use          = true
   ~key.$CHALK_LOAD_COUNT.use                   = true

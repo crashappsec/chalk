@@ -197,16 +197,6 @@ causes them to not get deleted.  Specifically, docker temporary files
 """
   }
 
-  flag_yn use_tech_stack_detection {
-    field_to_set: "use_tech_stack_detection"
-    yes_aliases: []
-    no_aliases:  []
-
-    doc: """
-  Enable experimental tech stack detection via regexes
-"""
-  }
-
   flag_yn skip_command_report {
     field_to_set: "skip_command_report"
     yes_aliases: []

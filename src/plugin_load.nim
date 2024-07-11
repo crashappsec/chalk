@@ -38,4 +38,4 @@ loadPlugins(["codecDocker", "codecElf", "codecMacOs", "codecPythonPyc",
              "codecSource", "codecZip", "codecFallbackElf",
              "ciGithub", "ciGitlab", "ciJenkins", "conffile", "awsEcs", "awsLambda",
              "externalTool", "cloudMetadata", "ownerAuthors", "ownerGithub",
-             "procfs", "system", "vctlGit", "techStackGeneric"])
+             "procfs", "system", "vctlGit"])

@@ -230,16 +230,6 @@ Captures metadata from cloud instances.
 """
 }
 
-plugin tech_stack_generic {
-    enabled:         true
-    pre_chalk_keys:  ["INFERRED_TECH_STACKS"]
-    post_run_keys:   ["_INFERRED_TECH_STACKS_HOST"]
-    doc: """
-Captures metadata on the kinds of technologies used in the active directory or host
-machine in which chalk is being run.
-"""
-}
-
 plugin aws_ecs {
     enabled:         true
     priority:        2000 # have precedence over cloud metadata

@@ -2,6 +2,12 @@
 
 ## On the `main` branch
 
+### Breaking Changes
+
+- Tech stack plugin is removed and all its associated
+  configurations as well as keys.
+  ([#352](https://github.com/crashappsec/chalk/pull/352))
+
 ### Fixes
 
 - A chalk report would previously omit the `_OP_CLOUD_PROVIDER`

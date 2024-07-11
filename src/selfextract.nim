@@ -259,9 +259,6 @@ proc testConfigFile(newCon4m: string,
                addConfLoad(attestConfName,    toStream(attestConfig)).
                addConfLoad(sbomConfName,      toStream(sbomConfig)).
                addConfLoad(sastConfName,      toStream(sastConfig)).
-               # TODO for Theo: load the internal config file for rules
-               addConfLoad(linguistConfName,  toStream(linguistConfig)).
-               addConfLoad(techStackConfName, toStream(techStackConfig)).
                addConfLoad(coConfName,        toStream(coConfig))
 
   try:
@@ -309,8 +306,6 @@ const nocache = [getoptConfName,
                  ioConfName,
                  attestConfName,
                  defCfgFname,
-                 linguistConfName,
-                 techStackConfName,
                  coConfName,
                  embeddedConfName]
 

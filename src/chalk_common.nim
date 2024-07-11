@@ -415,8 +415,6 @@ const
   baseConfName*       = "configs/base_*.c4m"
   sbomConfName*       = "configs/sbomconfig.c4m"
   sastConfName*       = "configs/sastconfig.c4m"
-  techStackConfName*  = "configs/techstackconfig.c4m"
-  linguistConfName*  = "configs/linguist.c4m"
   ioConfName*         = "configs/ioconfig.c4m"
   attestConfName*     = "configs/attestation.c4m"
   coConfName*         = "configs/crashoverride.c4m"
@@ -436,8 +434,6 @@ const
                         staticRead("configs/dockercmd.c4m")
   sbomConfig*         = staticRead(sbomConfName)
   sastConfig*         = staticRead(sastConfName)
-  techStackConfig*    = staticRead(techStackConfName)
-  linguistConfig*     = staticRead(linguistConfName)
   ioConfig*           = staticRead(ioConfName)
   defaultConfig*      = staticRead(defCfgFname) #& commentC4mCode(ioConfig)
   attestConfig*       = staticRead(attestConfName)

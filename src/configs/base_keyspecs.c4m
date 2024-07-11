@@ -1414,32 +1414,6 @@ collecting this information.
 """
 }
 
-keyspec INFERRED_TECH_STACKS {
-    kind:             ChalkTimeArtifact
-    type:             `x
-    standard:         true
-    since:            "0.3.0"
-    shortdoc: "Technologies used within the context of the active directory"
-    doc:              """
-This field is meant to capture technologies used in the context
-of the directory from which chalk is being run, such as databases,
-servers etc. The feature is currently experimental.
-"""
-}
-
-keyspec _INFERRED_TECH_STACKS_HOST {
-    kind:             RunTimeHost
-    type:             `x
-    standard:         true
-    since:            "0.3.0"
-    shortdoc: "Technologies used in the host where chalk is running in"
-    doc:              """
-This field is meant to capture technologies used in host on which
-chalk is being run, such as databases,
-servers etc. The feature is currently experimental.
-"""
-}
-
 keyspec SAST {
     kind:             ChalkTimeArtifact
     type:             dict[string, `x]

@@ -772,28 +772,6 @@ def test_metadata_gcp(
     )
 
 
-@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-def test_tech_stack(chalk_copy: Chalk, copy_files: list[Path]):
-    bin_path = copy_files[0]
-    parent = bin_path.parent
-    (parent / "test.nim").write_text("")
-    (parent / "test.php").write_text("")
-    result = chalk_copy.insert(
-        bin_path,
-        config=CONFIGS / "techstack.c4m",
-    )
-    assert result.mark.has(
-        INFERRED_TECH_STACKS={"language": {"PHP", "Nim"}},
-    )
-    assert result.report.has(
-        _INFERRED_TECH_STACKS_HOST={
-            "framework": {
-                "other",
-            }
-        }
-    )
-
-
 @pytest.mark.parametrize("test_file", ["valid/sample_1"])
 def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
     # we need to enable sboms + embed sboms
