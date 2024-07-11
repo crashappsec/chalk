@@ -28,7 +28,7 @@ plugin system {
                     "_VALIDATED_SIGNATURE", "_VALIDATED_METADATA",
                     "_INVALID_SIGNATURE"]
 
-  post_run_keys:   ["_UNMARKED", "_OP_ERRORS", "_OPERATION", "_OP_SEARCH_PATH",
+  post_run_keys:   ["_UNMARKED", "_OPERATION", "_OP_SEARCH_PATH",
                     "_OP_HOST_SYSNAME", "_OP_HOST_NODENAME", "_OP_HOST_RELEASE",
                     "_OP_HOST_VERSION", "_OP_HOST_MACHINE", "_OP_PUBLIC_IPV4_ADDR",
                     "_OP_PLATFORM", "_OP_CHALKER_COMMIT_ID",
@@ -62,7 +62,7 @@ plugin metsys {
     pre_chalk_keys:  ["METADATA_HASH", "ERR_INFO", "METADATA_ID",
                       "SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"]
     post_chalk_keys: ["_SIGNATURES"]
-    post_run_keys:   ["_CHALK_EXTERNAL_ACTION_AUDIT", "_CHALK_RUN_TIME"]
+    post_run_keys:   ["_OP_ERRORS", "_CHALK_EXTERNAL_ACTION_AUDIT", "_CHALK_RUN_TIME"]
     ~priority:       high()
     doc: """
 Like the `system` module, this module is non-overridable keys added by

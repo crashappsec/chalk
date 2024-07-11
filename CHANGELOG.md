@@ -14,6 +14,12 @@
 
   ([#362](https://github.com/crashappsec/chalk/pull/362))
 
+- `_OP_ERRORS` was missing any logs/errors from plugins.
+  The key was collected by the `system` plugin which
+  is executed first. The key is now populated by `metsys`
+  plugin which is executed last.
+  ([#369](https://github.com/crashappsec/chalk/pull/369))
+
 ## 0.4.7
 
 **June 24, 2024**
