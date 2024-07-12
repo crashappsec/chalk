@@ -24,23 +24,32 @@ const
   AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS = "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE"
 
 proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
-  let
-    response = safeRequest(url        = path,
-                           httpMethod = HttpGet,
-                           timeout    = 250, # 1/4 of a second
-                           headers    = hdrs)
-    body     = response.body().strip()
+  try:
+    let
+      response = safeRequest(url        = path,
+                             httpMethod = HttpGet,
+                             timeout    = 500, # 1/2 of a second
+                             headers    = hdrs)
+      body     = response.body().strip()
 
-  if not response.code.is2xx():
-    trace("Could not retrieve metadata from: " & path & " - " & response.status & ": " & body)
+    if not response.code.is2xx():
+      # 404 is expected response for some endpoints and logging full response body
+      # is very verbose. We only care about full body for other errors like 400,500,etc
+      if response.code == Http404:
+        trace("Could not retrieve metadata from: " & path & " - " & response.status)
+      else:
+        trace("Could not retrieve metadata from: " & path & " - " & response.status & ": " & body)
+      return none(string)
+
+    if body == "":
+      # some paths are expected to be empty so this is not an error
+      trace("Got empty metadata from: " & path)
+
+    trace("Retrieved metadata from: " & path)
+    return some(body)
+  except:
+    trace("Could not retrieve metadata from: " & path & " due to: " & getCurrentExceptionMsg())
     return none(string)
-
-  if body == "":
-    # some paths are expected to be empty so this is not an error
-    trace("Got empty metadata from: " & path)
-
-  trace("Retrieved metadata from: " & path)
-  return some(body)
 
 type
   HostKind = enum
@@ -58,7 +67,6 @@ proc getAzureMetadata(): ChalkDict =
       isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
-      isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
     let resultOpt = hitProviderEndpoint(
       "http://169.254.169.254/metadata/instance?api-version=2021-02-01",
@@ -75,10 +83,6 @@ proc getAzureMetadata(): ChalkDict =
       let jsonValue = parseJson(value)
       result.setIfNeeded("_AZURE_INSTANCE_METADATA", jsonValue.nimJsonToBox())
       try:
-        result.setIfNeeded("_OP_CLOUD_PROVIDER_TAGS", jsonValue["compute"]["tagsList"].nimJsonToBox())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for azure")
-      try:
         for iface in jsonValue["network"]["interface"]:
           var found = false
           for address in iface["ipv4"]["ipAddress"]:
@@ -91,25 +95,24 @@ proc getAzureMetadata(): ChalkDict =
           if found:
             break
       except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_IP for azure")
-      try:
-        result.setIfNeeded("_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["compute"]["subscriptionId"].getStr())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_ACCOUNT_INFO for azure")
-      try:
-        result.setIfNeeded("_OP_CLOUD_PROVIDER_REGION", jsonValue["compute"]["location"].getStr())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_REGION for azure")
-      try:
-        result.setIfNeeded("_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["compute"]["vmSize"].getStr())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for azure")
+        trace("Could not set _OP_CLOUD_PROVIDER_IP for azure: " & getCurrentExceptionMsg())
+      result.trySetIfNeeded("_OP_CLOUD_PROVIDER_TAGS"):
+        jsonValue["compute"]["tagsList"].nimJsonToBox()
+      result.trySetIfNeeded("_OP_CLOUD_PROVIDER_ACCOUNT_INFO"):
+        jsonValue["compute"]["subscriptionId"].getStr()
+      result.trySetIfNeeded("_OP_CLOUD_PROVIDER_REGION"):
+        jsonValue["compute"]["location"].getStr()
+      result.trySetIfNeeded("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
+        jsonValue["compute"]["vmSize"].getStr()
     except:
-      trace("Azure metadata responded with invalid json")
+      trace("Azure metadata responded with invalid json: " & getCurrentExceptionMsg())
 
 proc getGcpMetadata(): ChalkDict =
   result = ChalkDict()
   result.setIfNeeded("_OP_CLOUD_PROVIDER", $hkGcp)
+
+  if getEnv(K_SERVICE) != "" and getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "":
+    result.setIfNeeded("_OP_CLOUD_PROVIDER_SERVICE_TYPE", "gcp_cloud_run_service")
 
   if isSubscribedKey("_GCP_INSTANCE_METADATA") or
       isSubscribedKey("_GCP_PROJECT_METADATA") or
@@ -117,7 +120,6 @@ proc getGcpMetadata(): ChalkDict =
       isSubscribedKey("_OP_CLOUD_PROVIDER_REGION") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
-      isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
     trace("Querying for GCP metadata")
     if isSubscribedKey("_GCP_PROJECT_METADATA"):
@@ -134,7 +136,7 @@ proc getGcpMetadata(): ChalkDict =
           else:
             trace("GCP project metadata didnt respond with json object. Ignoring it")
         except:
-          trace("Could not insert _GCP_PROJECT_METADATA")
+          trace("Could not set _GCP_PROJECT_METADATA: " & getCurrentExceptionMsg())
 
     let resultOpt = hitProviderEndpoint(
       "http://169.254.169.254/computeMetadata/v1/instance/?recursive=true",
@@ -150,18 +152,6 @@ proc getGcpMetadata(): ChalkDict =
     try:
       let jsonValue = parseJson(value)
       try:
-        result.setIfNeeded("_GCP_INSTANCE_METADATA", jsonValue.nimJsonToBox())
-      except:
-        trace("Could not insert _GCP_INSTANCE_METADATA")
-      try:
-        result.setIfNeeded("_OP_CLOUD_PROVIDER_TAGS", jsonValue["tags"].nimJsonToBox())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
-      try:
-        result.setIfNeeded("_OP_CLOUD_PROVIDER_ACCOUNT_INFO", jsonValue["serviceAccounts"].nimJsonToBox())
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_TAGS for gcp")
-      try:
         for iface in jsonValue["networkInterfaces"]:
           var found = false
           for config in iface["accessConfigs"]:
@@ -174,37 +164,40 @@ proc getGcpMetadata(): ChalkDict =
           if found:
             break
       except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_IP for gcp")
-      try:
-        result.setIfNeeded("_OP_CLOUD_PROVIDER_REGION", jsonValue["zone"].getStr().split("/")[^1])
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_REGION for gcp")
-      try:
-        result.setIfNeeded("_OP_CLOUD_PROVIDER_INSTANCE_TYPE", jsonValue["machineType"].getStr().split("/")[^1])
-      except:
-        trace("Could not insert _OP_CLOUD_PROVIDER_INSTANCE_TYPE for gcp")
+        trace("Could not insert _OP_CLOUD_PROVIDER_IP for gcp: " & getCurrentExceptionMsg())
+      result.trySetIfNeeded("_GCP_INSTANCE_METADATA"):
+        jsonValue.nimJsonToBox()
+      result.trySetIfNeeded("_OP_CLOUD_PROVIDER_TAGS"):
+        jsonValue["tags"].nimJsonToBox()
+      result.trySetIfNeeded("_OP_CLOUD_PROVIDER_ACCOUNT_INFO"):
+        jsonValue["serviceAccounts"].nimJsonToBox()
+      result.trySetIfNeeded("_OP_CLOUD_PROVIDER_REGION"):
+        jsonValue["zone"].getStr().split("/")[^1]
+      result.trySetIfNeeded("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
+        jsonValue["machineType"].getStr().split("/")[^1]
     except:
-      trace("GCP metadata responded with invalid json")
-
-    if getEnv(K_SERVICE) != "" and getEnv(CLOUD_RUN_TIMEOUT_SECONDS) != "":
-      result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("gcp_cloud_run_service")
+      trace("GCP metadata responded with invalid json: " & getCurrentExceptionMsg())
 
 proc getAwsToken(): Option[string] =
-  let
-    url      = awsBaseUri & "api/token"
-    hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
-    response = safeRequest(url        = url,
-                           httpMethod = HttpPut,
-                           timeout    = 250, # 1/4 of a second
-                           headers    = hdrs)
-    body     = response.body().strip()
+  let url      = awsBaseUri & "api/token"
+  try:
+    let
+      hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
+      response = safeRequest(url        = url,
+                             httpMethod = HttpPut,
+                             timeout    = 500, # 1/2 of a second
+                             headers    = hdrs)
+      body     = response.body().strip()
 
-  if not response.code.is2xx():
-    trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
+    if not response.code.is2xx():
+      trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
+      return none(string)
+
+    trace("Retrieved AWS metadata token")
+    return some(body)
+  except:
+    trace("Could not retrieve IMDSv2 token from: " & url & " due to: " & getCurrentExceptionMsg())
     return none(string)
-
-  trace("Retrieved AWS metadata token")
-  return some(body)
 
 proc oneItem(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
   ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
@@ -214,7 +207,7 @@ proc oneItem(chalkDict: ChalkDict, token: string, keyname: string, url: string) 
       hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
       resultOpt = hitProviderEndpoint(url, hdrs)
     if resultOpt.isSome():
-      setIfNotEmpty(chalkDict, keyname, resultOpt.get())
+      chalkDict.setIfNotEmpty(keyname, resultOpt.get())
 
 proc listKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
   ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
@@ -253,7 +246,7 @@ proc jsonKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) 
             jsonValue["Token"] = newJString("<<redacted>>")
           chalkDict.setIfNeeded(keyname, jsonValue.nimJsonToBox())
         except:
-          trace("IMDSv2 responded with invalid json for URL: " & url)
+          trace("IMDSv2 responded with invalid json from " & url & ": " & getCurrentExceptionMsg())
 
 proc extractJsonKey(chalkDict: ChalkDict, token: string, keyname: string,
                     url: string, subkey: string) =
@@ -270,11 +263,8 @@ proc extractJsonKey(chalkDict: ChalkDict, token: string, keyname: string,
       if not value.startswith("{"):
         trace("Provider Didn't respond with json object. Ignoring it. URL: " & url)
       else:
-        try:
-          let jsonValue = parseJson(value)
-          setIfNotEmpty(chalkDict, keyname, jsonValue[subkey].getStr())
-        except:
-          trace("Could not set " & keyname & " with subkey " & subkey & " from " & url)
+        chalkDict.trySetIfNeeded(keyname):
+          parseJson(value)[subkey].getStr()
 
 proc getTags(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
   ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
@@ -297,53 +287,40 @@ proc getTags(chalkDict: ChalkDict, token: string, keyname: string, url: string) 
           continue
         let tagOpt = hitProviderEndpoint(url & "/" & name, hdrs)
         if tagOpt.isSome():
-          tags[name] = pack(tagOpt.get())
+          tags.setIfNotEmpty(name, tagOpt.get())
         chalkDict.setIfNeeded(keyname, tags)
 
 proc getAwsMetadata(): ChalkDict =
   result = ChalkDict()
   result.setIfNeeded("_OP_CLOUD_PROVIDER", $hkAws)
 
-  var tokenOpt: Option[string]
-
-  try:
-    tokenOpt = getAwsToken()
-    if tokenOpt.isNone():
-      trace("IMDSv2 token not available.")
-      return
-  except:
-    trace("IMDSv2 metadata not available.")
-    # if we do not find imdsv2 but we have a kubernetes cluster and running
-    # in AWS EC2, most likely we are running in an eks fargate cluster.
-    # https://docs.aws.amazon.com/eks/latest/userguide/fargate.html
-    let k8sPort = getEnv("KUBERNETES_PORT")
-    let k8sServiceHost = getEnv("KUBERNETES_SERVICE_HOST")
-    if k8sPort != "" or k8sServiceHost != "":
-      # this is most definitely fargate at this point, but might have FP, so
-      # leaving EKS to be on the safe side
-      result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_eks")
-    return
-
-  let
-    token = tokenOpt.get()
-
-  # at this point we have metadata, differentiate between eks, ec2, ecs
+  # fetching token can fail due to timeout however as hardware vendor indicated
+  # we are running in AWS and so we should report what type of the service
+  # we are running in AWS (eks, ec2, ecs, etc)
   if isSubscribedKey("_OP_CLOUD_PROVIDER_SERVICE_TYPE"):
     # XXX ignoring task metadata v2 which is no longer actively maintained
     let ecsv3 = getEnv("ECS_CONTAINER_METADATA_URI")
     let ecsv4 = getEnv("ECS_CONTAINER_METADATA_URI_V4")
     if ecsv3 != "" or ecsv4 != "":
-      result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_ecs")
+      result.setIfNotEmpty("_OP_CLOUD_PROVIDER_SERVICE_TYPE", "aws_ecs")
     else:
       let k8sPort = getEnv("KUBERNETES_PORT")
       let k8sServiceHost = getEnv("KUBERNETES_SERVICE_HOST")
+      # https://docs.aws.amazon.com/eks/latest/userguide/fargate.html
       if k8sPort != "" or k8sServiceHost != "":
         # XXX this might have FP in case of a user that has deployed k8s within
         # a single EC2 instance, so should differentiate from the rest of the
         # IMDS metadata versions
-        result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_eks")
+        result.setIfNotEmpty("_OP_CLOUD_PROVIDER_SERVICE_TYPE", "aws_eks")
       else:
-        result["_OP_CLOUD_PROVIDER_SERVICE_TYPE"] = pack("aws_ec2")
+        result.setIfNotEmpty("_OP_CLOUD_PROVIDER_SERVICE_TYPE", "aws_ec2")
+
+  let tokenOpt = getAwsToken()
+  if tokenOpt.isNone():
+    trace("IMDSv2 token not available.")
+    return
+
+  let token = tokenOpt.get()
 
   # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-categories.html
   # dynamic entries
