@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.4.8
+
+**July 12, 2024**
 
 ### Fixes
 
@@ -12,7 +14,7 @@
   - The instance metadata service couldn't be reached, or
     returned invalid data.
 
-  ([#362](https://github.com/crashappsec/chalk/pull/362)
+  ([#362](https://github.com/crashappsec/chalk/pull/362),
   [#370](https://github.com/crashappsec/chalk/pull/370))
 
 - `_OP_ERRORS` was missing any logs/errors from plugins.
