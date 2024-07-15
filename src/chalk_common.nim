@@ -478,13 +478,12 @@ var
   dockerInvocation*:      DockerInvocation
 
 template dumpExOnDebug*() =
-  if getChalkScope() != nil and get[bool](getChalkScope(), "chalk_debug"):
+  when not defined(release):
     let
       msg = "" # "Handling exception (msg = " & getCurrentExceptionMsg() & ")\n"
       tb  = "Traceback (most recent call last)\n" &
              getCurrentException().getStackTrace()
       ii  = default(InstInfo)
-
     publish("debug", formatCompilerError(msg, nil, tb, ii))
 
 proc getBaseCommandName*(): string =

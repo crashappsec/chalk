@@ -49,6 +49,7 @@ proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
     return some(body)
   except:
     trace("Could not retrieve metadata from: " & path & " due to: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
     return none(string)
 
 type
@@ -197,6 +198,7 @@ proc getAwsToken(): Option[string] =
     return some(body)
   except:
     trace("Could not retrieve IMDSv2 token from: " & url & " due to: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
     return none(string)
 
 proc oneItem(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
