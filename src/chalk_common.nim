@@ -479,12 +479,16 @@ var
 
 template dumpExOnDebug*() =
   when not defined(release):
-    let
-      msg = "" # "Handling exception (msg = " & getCurrentExceptionMsg() & ")\n"
-      tb  = "Traceback (most recent call last)\n" &
-             getCurrentException().getStackTrace()
-      ii  = default(InstInfo)
-    publish("debug", formatCompilerError(msg, nil, tb, ii))
+    let stack = getCurrentException().getStackTrace()
+    if getChalkScope() != nil and get[bool](getChalkScope(), "chalk_debug"):
+      let
+        msg = "" # "Handling exception (msg = " & getCurrentExceptionMsg() & ")\n"
+        tb  = "Traceback (most recent call last)\n" & stack
+        ii  = default(InstInfo)
+        fmt = formatCompilerError(msg, nil, tb, ii)
+      publish("debug", fmt)
+    else:
+      trace(stack)
 
 proc getBaseCommandName*(): string =
   if '.' in commandName:
