@@ -247,7 +247,7 @@
   it now uses `insertion_default` template.
   ([#282](https://github.com/crashappsec/chalk/pull/282))
 
-- When loading custom configs with `chalk load`, metdata
+- When loading custom configs with `chalk load`, metadata
   collection is disabled for all plugins except for
   required chalk plugins.
   ([#286](https://github.com/crashappsec/chalk/pull/286))
@@ -744,7 +744,7 @@
 - Added initial metadata collection for GCP and Azure, along with a
   metadata key to provide the current cloud provider, and a key that
   distinguishes the cloud provider's environments. Currently, this
-  only does AWS (eks, ecs, ec2).
+  only does AWS (EKS, ECS, EC2).
   ([#59](https://github.com/crashappsec/chalk/pull/59))
   ([#65](https://github.com/crashappsec/chalk/pull/65))
 
