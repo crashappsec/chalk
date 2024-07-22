@@ -2,6 +2,14 @@
 
 ## On the `main` branch
 
+### New Features
+
+- `docker build` and `docker push` now use `mark_default`
+  chalk template instead of `minimal`. As such basic
+  metadata about the repository is now included by default
+  in the chalk mark (e.g. `/chalk.json`) such as the
+  repository origin and commit id.
+
 ## 0.4.8
 
 **July 12, 2024**
