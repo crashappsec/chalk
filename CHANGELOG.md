@@ -9,6 +9,7 @@
   metadata about the repository is now included by default
   in the chalk mark (e.g. `/chalk.json`) such as the
   repository origin and commit id.
+  ([#380](https://github.com/crashappsec/chalk/pull/380))
 
 ## 0.4.8
 
