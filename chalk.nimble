@@ -10,7 +10,7 @@ srcDir        = "src"
 bin           = @["chalk"]
 
 # Dependencies
-requires "nim >= 2.0.0"
+requires "nim >= 2.0.8"
 requires "https://github.com/crashappsec/con4m#435f230db9cc51beade76427297c206b91e91a70"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
 
