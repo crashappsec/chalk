@@ -197,6 +197,12 @@ template setIfNeeded*[T](o: ChalkDict, k: string, v: T) =
 template setIfNeeded*[T](o: ChalkObj, k: string, v: T) =
   setIfNeeded(o.collectedData, k, v)
 
+template trySetIfNeeded*(o: ChalkDict, k: string, code: untyped) =
+  try:
+    o.setIfNeeded(k, code)
+  except:
+    trace("Could not set chalk key " & k & " due to: " & getCurrentExceptionMsg())
+
 proc isChalkingOp*(): bool =
   return commandName in get[seq[string]](getChalkScope(), "valid_chalk_command_names")
 

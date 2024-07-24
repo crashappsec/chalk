@@ -2811,11 +2811,11 @@ everything, use 'trace' or 'verbose' (they are aliases).
     shortdoc: "Reporting Log Level"
     doc:      """
 Determines what kind of logging messages will be added to metadata via the
-ERR_INFO or `_ERR_INFO` keys. During the chalk phase of chalking ops only,
+ERR_INFO or `_OP_ERRORS` keys. During the chalk phase of chalking ops only,
 per-object errors that are at least as severe as specified will be added to
 the object's  `ERR_INFO` field.
 
-Everything else will go to `_ERR_INFO`.
+Everything else will go to `_OP_ERRORS`.
 
 Generally, we recommend setting this to `warn` for docker, and `error`
 for everything else, as docker only reports errors when there is a

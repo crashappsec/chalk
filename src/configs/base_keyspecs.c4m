@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.4.8-dev"
+chalk_version :=   "0.4.9-dev"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -5458,7 +5458,6 @@ Calculates the amount of time between the start of a chalk executable
 and when a report is generated. It's an integer with resolution of
 1/1000000th of a second.
 """
-
 }
 
 keyspec $CHALK_CONFIG {

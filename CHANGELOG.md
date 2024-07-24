@@ -2,6 +2,38 @@
 
 ## On the `main` branch
 
+### New Features
+
+- `docker build` and `docker push` now use `mark_default`
+  chalk template instead of `minimal`. As such basic
+  metadata about the repository is now included by default
+  in the chalk mark (e.g. `/chalk.json`) such as the
+  repository origin and commit id.
+  ([#380](https://github.com/crashappsec/chalk/pull/380))
+
+## 0.4.8
+
+**July 12, 2024**
+
+### Fixes
+
+- A chalk report would previously omit the `_OP_CLOUD_PROVIDER`
+  and `_OP_CLOUD_PROVIDER_SERVICE_TYPE` keys when:
+
+  - No other instance metadata key (e.g. `_GCP_INSTANCE_METADATA`
+    or `_OP_CLOUD_PROVIDER_IP`) was subscribed.
+  - The instance metadata service couldn't be reached, or
+    returned invalid data.
+
+  ([#362](https://github.com/crashappsec/chalk/pull/362),
+  [#370](https://github.com/crashappsec/chalk/pull/370))
+
+- `_OP_ERRORS` was missing any logs/errors from plugins.
+  The key was collected by the `system` plugin which
+  is executed first. The key is now populated by `metsys`
+  plugin which is executed last.
+  ([#369](https://github.com/crashappsec/chalk/pull/369))
+
 ## 0.4.7
 
 **June 24, 2024**
@@ -224,7 +256,7 @@
   it now uses `insertion_default` template.
   ([#282](https://github.com/crashappsec/chalk/pull/282))
 
-- When loading custom configs with `chalk load`, metdata
+- When loading custom configs with `chalk load`, metadata
   collection is disabled for all plugins except for
   required chalk plugins.
   ([#286](https://github.com/crashappsec/chalk/pull/286))
@@ -721,7 +753,7 @@
 - Added initial metadata collection for GCP and Azure, along with a
   metadata key to provide the current cloud provider, and a key that
   distinguishes the cloud provider's environments. Currently, this
-  only does AWS (eks, ecs, ec2).
+  only does AWS (EKS, ECS, EC2).
   ([#59](https://github.com/crashappsec/chalk/pull/59))
   ([#65](https://github.com/crashappsec/chalk/pull/65))
 

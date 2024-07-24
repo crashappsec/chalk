@@ -34,7 +34,7 @@ We provide free binary downloads on our [release page](https://crashoverride.com
 
 ## Issues
 
-If you encounter any issues with Chalk please submit a Github issue to
+If you encounter any issues with Chalk please submit a GitHub issue to
 [this repo](https://github.com/crashappsec/chalk/issues).
 
 ## Ideas and feedback
