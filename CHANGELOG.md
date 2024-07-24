@@ -10,6 +10,15 @@
   in the chalk mark (e.g. `/chalk.json`) such as the
   repository origin and commit id.
   ([#380](https://github.com/crashappsec/chalk/pull/380))
+- New chalk keys:
+
+  - `DOCKER_TARGET` - name of the target being built in `Dockerfile`
+  - `DOCKER_BASE_IMAGES` - breakdown of all base images across
+    all sections of `Dockerfile`
+  - `DOCKER_COPY_IMAGES` - breakdown of all external `COPY --from`
+    across all sections of `Dockerfile`
+
+  ([#382](https://github.com/crashappsec/chalk/pull/382))
 
 ## 0.4.8
 

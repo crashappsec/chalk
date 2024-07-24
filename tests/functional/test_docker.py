@@ -318,6 +318,103 @@ def test_base_image(chalk: Chalk, random_hex: str):
     assert Docker.run(image_id)
 
 
+def test_base_images(chalk: Chalk):
+    _, result = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "bases" / "Dockerfile",
+    )
+    assert result.mark.has(
+        DOCKER_TARGET="",
+        DOCKER_BASE_IMAGE="ubuntu:24.04",
+        DOCKER_BASE_IMAGE_REPO="ubuntu",
+        DOCKER_BASE_IMAGE_TAG="24.04",
+        DOCKER_BASE_IMAGES={
+            "one": {
+                "from": "alpine",
+                "name": "alpine",
+                "repo": "alpine",
+            },
+            "two": {
+                "from": "ubuntu:24.04",
+                "name": "ubuntu:24.04",
+                "repo": "ubuntu",
+                "tag": "24.04",
+            },
+            "three": {
+                "from": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
+                "name": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
+                "repo": "busybox",
+                "digest": "9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
+            },
+            "four": {
+                "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                "repo": "nginx",
+                "tag": "1.27.0",
+                "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+            },
+            "five": {
+                "from": "one",
+                "name": "alpine",
+                "repo": "alpine",
+            },
+            "": {
+                "from": "two",
+                "name": "ubuntu:24.04",
+                "repo": "ubuntu",
+                "tag": "24.04",
+            },
+        },
+        DOCKER_COPY_IMAGES={
+            "two": [
+                {
+                    "from": "docker",
+                    "name": "docker",
+                    "repo": "docker",
+                    "src": ["/usr/local/bin/docker"],
+                    "dest": "/docker",
+                },
+                {
+                    "from": "busybox:latest",
+                    "name": "busybox:latest",
+                    "repo": "busybox",
+                    "tag": "latest",
+                    "src": ["/bin/busybox"],
+                    "dest": "/busybox",
+                },
+            ],
+            "five": [
+                {
+                    "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                    "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                    "repo": "nginx",
+                    "tag": "1.27.0",
+                    "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                    "src": ["/usr/sbin/nginx"],
+                    "dest": "/nginx",
+                },
+                {
+                    "from": "one",
+                    "name": "alpine",
+                    "repo": "alpine",
+                    "src": ["/bin/sh"],
+                    "dest": "/sh",
+                },
+            ],
+            "": [
+                {
+                    "from": "four",
+                    "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                    "repo": "nginx",
+                    "tag": "1.27.0",
+                    "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                    "src": ["/usr/sbin/nginx"],
+                    "dest": "/nginx",
+                }
+            ],
+        },
+    )
+
+
 @pytest.mark.parametrize(
     "test_file, entrypoint, cmd",
     [

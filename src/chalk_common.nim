@@ -251,6 +251,7 @@ type
 
   CopyInfo* = ref object of InfoBase
     flags*:  Table[string, DfFlag]
+    frm*:    string
     rawSrc*: seq[string]
     rawDst*: string
 
@@ -266,6 +267,7 @@ type
     platform*:    DockerPlatform
     image*:       DockerImage
     alias*:       string
+    copies*:      seq[CopyInfo]
     entrypoint*:  EntryPointInfo
     cmd*:         CmdInfo
     shell*:       ShellInfo
