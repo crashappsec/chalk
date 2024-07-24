@@ -163,12 +163,10 @@ proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
 
   if get[string](getChalkScope(), "log_level") in ["trace", "info"]:
     let
-      attrRoot = getChalkScope()
-      attrOpt  = attrRoot.getObjectOpt("sink_config." & cfg.name)
-      attr     = attrOpt.getOrElse(nil)
+      section  = "sink_config." & cfg.name
 
-    if attr != nil and errmsg == "Write":
-      let msgOpt = getOpt[string](attr, "on_write_msg")
+    if sectionExists(getChalkScope(), section) and errmsg == "Write":
+      let msgOpt = getOpt[string](getChalkScope(), section & ".on_write_msg")
       if msgOpt.isSome():
         info(strutils.strip(msgOpt.get()))
     elif quiet:
@@ -185,16 +183,16 @@ proc getAuthConfigByName*(name: string, attr: AttrScope = AttrScope(nil)): Optio
 
   let
     attrRoot = if attr != nil: attr else: getChalkScope()
-    attrs    = attrRoot.getObjectOpt("auth_config." & name).getOrElse(nil)
+    section  = "auth_config." & name
     opts     = OrderedTableRef[string, string]()
 
-  if attrs == nil:
-    error("auth_config." & name & " is referenced but its missing in the config")
+  if not sectionExists(attrRoot, section):
+    error(section & " is referenced but its missing in the config")
     return none(AuthConfig)
 
-  let authType = getOpt[string](attrs, "auth").getOrElse("")
+  let authType = getOpt[string](attrRoot, section & ".auth").getOrElse("")
   if authType == "":
-    error("auth_config." & name & ".auth is required")
+    error(section & ".auth is required")
     return none(AuthConfig)
 
   let implementationOpt = getAuthImplementation(authType)
@@ -202,22 +200,22 @@ proc getAuthConfigByName*(name: string, attr: AttrScope = AttrScope(nil)): Optio
     error("there is no implementation for " & authType & " auth")
     return none(AuthConfig)
 
-  for k, _ in attrs.contents:
+  for k, _ in getObject(attrRoot, section).contents:
     case k
     of "auth":
       continue
     else:
-      let boxOpt = getOpt[Box](attrs, k)
+      let boxOpt = getOpt[Box](attrRoot, section & "." & k)
       if boxOpt.isSome():
         opts[k]  = unpack[string](boxOpt.get())
       else:
-        error("auth_config." & name & "." & k & " is missing")
+        error(section & "." & k & " is missing")
         return none(AuthConfig)
 
   try:
     result = configAuth(implementationOpt.get(), name, some(opts))
   except:
-    error("auth_config." & name & " is misconfigured: " & getCurrentExceptionMsg())
+    error(section & " is misconfigured: " & getCurrentExceptionMsg())
     return none(AuthConfig)
 
   if result.isSome():
@@ -232,10 +230,9 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     return some(availableSinkConfigs[name])
 
   let
-    attrRoot = getChalkScope()
-    attrs    = attrRoot.getObjectOpt("sink_config." & name).getOrElse(nil)
+    section  = "sink_config." & name
 
-  if attrs == nil:
+  if not sectionExists(getChalkScope(), section):
     return none(SinkConfig)
 
   var
@@ -248,22 +245,22 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     priority:    int
     deleteList:  seq[string]
 
-  for k, _ in attrs.contents:
+  for k, _ in getObject(getChalkScope(), section).contents:
     case k
     of "enabled":
-      if not get[bool](attrs, k):
+      if not get[bool](getChalkScope(), section & "." & k):
         error("Sink configuration '" & name & " is disabled.")
         enabled = false
     of "priority":
-      priority    = getOpt[int](attrs, k).getOrElse(0)
+      priority    = getOpt[int](getChalkScope(), section & "." & k).getOrElse(0)
     of "filters":
-      filterNames = getOpt[seq[string]](attrs, k).getOrElse(@[])
+      filterNames = getOpt[seq[string]](getChalkScope(), section & "." & k).getOrElse(@[])
     of "sink":
-      sinkName    = getOpt[string](attrs, k).getOrElse("")
+      sinkName    = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
     of "auth":
-      authName    = getOpt[string](attrs, k).getOrElse("")
+      authName    = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
     of "use_search_path", "disallow_http":
-      let boxOpt = getOpt[Box](attrs, k)
+      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
       if boxOpt.isSome():
         if boxOpt.get().kind != MkBool:
           error(k & " (sink config key) must be 'true' or 'false'")
@@ -271,15 +268,15 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
           opts[k] = $(unpack[bool](boxOpt.get()))
     of "pinned_cert":
       let
-        certContents = getOpt[string](attrs, k).getOrElse("")
+        certContents = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
         path         = writeNewTempFile(certContents, "pinned", ".pem")
-      discard attrs.setOverride("pinned_cert_file", some(pack(path)))
+      discard setOverride(getChalkScope(), section & ".pinned_cert_file", some(pack(path)))
       # Can't delete from a dict while we're iterating over it.
       deleteList.add(k)
     of "on_write_msg":
       discard
     of "log_search_path":
-      let boxOpt = getOpt[Box](attrs, k)
+      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
       if boxOpt.isSome():
         try:
           let path = unpack[seq[string]](boxOpt.get())
@@ -287,7 +284,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
         except:
           error(k & " (sink config key) must be a list of string paths.")
     of "headers":
-      let boxOpt = getOpt[Box](attrs, k)
+      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
       if boxOpt.isSome():
         try:
           let hdrs    = unpack[Con4mDict[string, string]](boxOpt.get())
@@ -299,7 +296,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
           error(k & " (sink config key) must be a dict that map " &
                     "header names to values (which must be strings).")
     of "timeout", "truncation_amount":
-      let boxOpt = getOpt[Box](attrs, k)
+      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
       if boxOpt.isSome():
         # TODO: move this check to the spec.
         if boxOpt.get().kind != MkInt:
@@ -311,23 +308,23 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       try:
         # Todo: move this check to a type check in the spec.
         # This will accept con4m size types; they're auto-converted to int.
-        let asInt = getOpt[int64](attrs, k).getOrElse(int64(10 * 1048576))
+        let asInt = getOpt[int64](getChalkScope(), section & "." & k).getOrElse(int64(10 * 1048576))
         opts[k] = $(asInt)
       except:
         error(k & " (sink config key) must be a size specification")
         continue
     of "filename":
-      opts[k] = getOpt[string](attrs, k).getOrElse("")
+      opts[k] = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
       try:
         opts[k] = resolvePath(opts[k])
       except:
         warn(opts[k] & ": could not resolve sink filename. disabling sink")
         enabled = false
     else:
-      opts[k] = getOpt[string](attrs, k).getOrElse("")
+      opts[k] = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
 
   for item in deleteList:
-    attrs.contents.del(item)
+    getObject(getChalkScope(), section).contents.del(item)
 
   case sinkName
   of "":

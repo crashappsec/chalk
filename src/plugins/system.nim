@@ -112,8 +112,8 @@ proc applySubstitutions(obj: ChalkObj) {.inline.} =
 
   for k, v in obj.collectedData:
     if v.kind != MkStr: continue    # If it's not a string object, no sub to do.
-    let spec = k.getKeySpec().get() # Should have crashed by now if false :)
-    if not get[bool](spec, "apply_substitutions"): continue
+    # Should have crashed by now if section does not exist :)
+    if not get[bool](getChalkScope(), "keyspec." & k & ".apply_substitutions"): continue
     let s = unpack[string](v)
     if not s.contains("{"): continue
     obj.collectedData[k] = pack(s.multiReplace(subs))
@@ -150,7 +150,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
       result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
 
   var
-    templateName = get[string](getOutputConfig(), "report_template")
+    templateName = get[string](getChalkScope(), getOutputConfig() & ".report_template")
 
   if templateName != "":
     let
@@ -228,10 +228,10 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   if isSubscribedKey("_ENV"):
     result["_ENV"] = getEnvDict()
 
-  let templateName = get[string](getOutputConfig(), "report_template")
+  let templateName = get[string](getChalkScope(), getOutputConfig() & ".report_template")
   if isSubscribedKey("_OP_HOST_REPORT_KEYS") and templateName != "":
     let
-      templateToUse = getObject(getChalkScope(), "report_template." & templateName)
+      templateToUse = "report_template." & templateName
       reportKeys    = toSeq(hostInfo.filterByTemplate(templateToUse).keys)
 
     result["_OP_HOST_REPORT_KEYS"] = pack(reportKeys)

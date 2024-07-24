@@ -442,12 +442,12 @@ proc extractOneChalkJson*(chalkData: string, path: string): ChalkDict =
 
 # Output ordering for keys.
 proc orderKeys*(dict: ChalkDict,
-                tplate: AttrScope): seq[string] =
+                tplate: string): seq[string] =
   var tmp: seq[(int, string)] = @[]
   for k, _ in dict:
     var order = get[int](getChalkScope(), "keyspec." & k & ".normalized_order")
-    if tplate != nil and getObjectOpt(tplate, "key." & k).isSome():
-      let orderOpt = getOpt[int](tplate, "key." & k & ".order")
+    if tplate != "" and sectionExists(getChalkScope(), tplate & ".key." & k):
+      let orderOpt = getOpt[int](getChalkScope(), tplate & ".key." & k & ".order")
       if orderOpt.isSome():
         order = orderOpt.get()
     tmp.add((order, k))
@@ -460,7 +460,7 @@ proc orderKeys*(dict: ChalkDict,
 # we need, which gives us a JsonNode object, that we then convert
 # back to a string, with necessary quotes intact.
 
-proc toJson*(dict: ChalkDict, tplate: AttrScope): string =
+proc toJson*(dict: ChalkDict, tplate: string): string =
   result    = ""
   var comma = ""
   let keys = dict.orderKeys(tplate)
@@ -476,23 +476,23 @@ proc toJson*(dict: ChalkDict, tplate: AttrScope): string =
   result = "{ " & result & " }"
 
 proc toJson*(dict: ChalkDict): string =
-  return dict.toJson(AttrScope(nil))
+  return dict.toJson("")
 
 proc prepareContents*(dict: ChalkDict,
-                      t: AttrScope): string =
+                      t: string): string =
   return dict.filterByTemplate(t).toJson(t)
 
 proc forcePrivateKeys() =
   var toForce: seq[string]
 
-  for k, _ in getChalkSubsections("keyspec"):
+  for k in getChalkSubsections("keyspec"):
     if k.startswith("$"):
       toForce.add(k)
 
   forceChalkKeys(toForce)
 
 proc getChalkMark*(obj: ChalkObj): ChalkDict =
-  trace("Creating mark using template: " & get[string](getOutputConfig(), "mark_template"))
+  trace("Creating mark using template: " & get[string](getChalkScope(), getOutputConfig() & ".mark_template"))
 
   forcePrivateKeys()
 
@@ -512,7 +512,7 @@ proc getChalkMarkAsStr*(obj: ChalkObj): string =
     trace("Chalk cachemark " & $obj.cachedMark)
     return obj.cachedMark
   trace("Converting Mark to JSON. Mark template is: " &
-    get[string](getOutputConfig(), "mark_template"))
+    get[string](getChalkScope(), getOutputConfig() & ".mark_template"))
 
   if obj.cachedMark != "":
     return obj.cachedMark
