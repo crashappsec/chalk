@@ -1765,6 +1765,159 @@ Note this only specifies the base image of the final build target.
 """
 }
 
+keyspec DOCKER_BASE_IMAGES {
+    kind:             ChalkTimeArtifact
+    type:             dict[string, `x]
+    standard:         true
+    system:           false
+    since:            "0.4.9"
+    doc: """
+All base images via `FROM` statements used in the Dockerfile for all its sections.
+Each base image will break it into its individual components of:
+
+* from - name as `FROM` references image. Can be either base image or Dockerfile target/section name
+* name - full name as its referenced in Dockerfile
+* repo - only the repo of the image
+* tag - only the tag of the image (if `:<tag>` is provided)
+* digest - only the digest of the image (if `@sha256:<digest>` is provided)
+
+Some special cases:
+
+* if the final target/section doesnt have an alias,
+  it will be under empty string key
+* any transient targets/sections which reference another target/section
+  via `FROM <alias>` the root base image is going to be reported
+
+```
+FROM alpine as one
+FROM ubuntu:latest as two
+FROM busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7 as three
+FROM nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe as four
+FROM one as five
+FROM two
+```
+
+`DOCKER_BASE_IMAGES` is going to be:
+
+```
+{
+  "one": {
+    "from": "alpine",
+    "name": "alpine",
+    "repo": "alpine"
+  },
+  "two": {
+    "from": "ubuntu:latest",
+    "name": "ubuntu:latest",
+    "repo": "ubuntu",
+    "tag": "latest"
+  },
+  "three": {
+    "from": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
+    "name": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
+    "repo": "busybox",
+    "digest": "9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7"
+  },
+  "four": {
+    "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+    "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+    "repo": "nginx",
+    "tag": "1.27.0",
+    "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe"
+  }
+  "five": {
+    "from": "one",
+    "name": "alpine",
+    "repo": "alpine"
+  },
+  "": {
+    "from": "two",
+    "name": "ubuntu:latest",
+    "repo": "ubuntu",
+    "tag": "latest"
+  }
+}
+```
+"""
+}
+
+keyspec DOCKER_COPY_IMAGES {
+    kind:             ChalkTimeArtifact
+    type:             dict[string, `x]
+    standard:         true
+    system:           false
+    since:            "0.4.9"
+    doc: """
+All images used in the Dockerfile `COPY --from` directives for all its sections.
+All `COPY` statements are grouped by the Dockerfile target/section.
+
+* from - name as `COPY` references image. Can be either base image or Dockerfile target/section name
+* name - full name as its referenced in Dockerfile
+* repo - only the repo of the image
+* tag - only the tag of the image (if `:<tag>` is provided)
+* digest - only the digest of the image (if `@sha256:<digest>` is provided)
+* src - what COPY copies from image
+* dest - where COPY copies to in the target/section
+
+Special cases:
+
+* If the `COPY` references another target/section within the Dockerfile, its
+  base image is reported.
+
+```
+FROM alpine as one
+FROM ubuntu as two
+COPY --from=docker /usr/local/bin/docker /docker
+COPY --from=busybox:latest /bin/busybox /busybox
+FROM scratch
+COPY --from=nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe /bin/nginx /nginx
+COPY --from=one /bin/sh /sh
+```
+
+`DOCKER_COPY_IMAGES` is going to be:
+
+```
+{
+  "two": [
+    {
+      "from": "docker",
+      "name": "docker",
+      "repo": "docker",
+      "src": ["/bin/docker"],
+      "dest": "/docker",
+    },
+    {
+      "from": "busybox:latest",
+      "name": "busybox:latest",
+      "repo": "busybox",
+      "tag": "latest",
+      "src": ["/bin/busybox"],
+      "dest": "/busybox",
+    }
+  ],
+  "": [
+    {
+      "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+      "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+      "repo": "nginx",
+      "tag": "1.27.0"
+      "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe"
+      "src": ["/bin/nginx"],
+      "dest": "/nginx",
+    },
+    {
+      "from": "one",
+      "name": "alpine",
+      "repo": "alpine",
+      "src": ["/bin/sh"],
+      "dest": "/sh"
+    }
+  ]
+}
+```
+"""
+}
+
 keyspec _DOCKER_CLIENT_VERSION {
     kind:             RunTimeHost
     type:             string
