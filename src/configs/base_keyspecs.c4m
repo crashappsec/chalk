@@ -1717,6 +1717,18 @@ Additional instructions added to the passed dockerfile.
 """
 }
 
+keyspec DOCKER_TARGET {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.4.9"
+    doc: """
+Name of the Dockerfile target being built.
+Empty string is used for alias-less target.
+"""
+}
+
 keyspec DOCKER_BASE_IMAGE {
     kind:             ChalkTimeArtifact
     type:             string
