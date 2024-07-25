@@ -120,6 +120,7 @@ report and subtract from it.
   key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
+  key.DOCKER_TARGET.use                       = true
   key.DOCKER_CONTEXT.use                      = true
   key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
   key.DOCKER_CHALK_ADDED_LABELS.use           = true
@@ -128,6 +129,8 @@ report and subtract from it.
   key.DOCKER_BASE_IMAGE_REPO.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
+  key.DOCKER_BASE_IMAGES.use                  = true
+  key.DOCKER_COPY_IMAGES.use                  = true
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_PATH.use                   = true
   key._CURRENT_HASH.use                       = true
@@ -686,6 +689,7 @@ doc: """
   key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
+  key.DOCKER_TARGET.use                       = true
   key.DOCKER_CONTEXT.use                      = true
   key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
   key.DOCKER_CHALK_ADDED_LABELS.use           = true
@@ -694,6 +698,8 @@ doc: """
   key.DOCKER_BASE_IMAGE_REPO.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
+  key.DOCKER_BASE_IMAGES.use                  = true
+  key.DOCKER_COPY_IMAGES.use                  = true
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_PATH.use                   = true
   key._CURRENT_HASH.use                       = true
@@ -1143,6 +1149,7 @@ container.
   key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
+  key.DOCKER_TARGET.use                       = true
   key.DOCKER_CONTEXT.use                      = true
   key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
   key.DOCKER_CHALK_ADDED_LABELS.use           = true
@@ -1151,6 +1158,8 @@ container.
   key.DOCKER_BASE_IMAGE_REPO.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
+  key.DOCKER_BASE_IMAGES.use                  = true
+  key.DOCKER_COPY_IMAGES.use                  = true
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_PATH.use                   = true
   key._CURRENT_HASH.use                       = true
@@ -1601,6 +1610,7 @@ and keep the run-time key.
   key.DOCKER_LABELS.use                       = true
   key.DOCKER_TAGS.use                         = true
   key.DOCKER_CONTEXT.use                      = true
+  key.DOCKER_TARGET.use                       = true
   key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
   key.DOCKER_CHALK_ADDED_LABELS.use           = true
   key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use    = true
@@ -1608,6 +1618,8 @@ and keep the run-time key.
   key.DOCKER_BASE_IMAGE_REPO.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
+  key.DOCKER_BASE_IMAGES.use                  = true
+  key.DOCKER_COPY_IMAGES.use                  = true
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_PATH.use                   = true
   key._CURRENT_HASH.use                       = true
@@ -1941,6 +1953,8 @@ running insert commands.
   key.DOCKER_BASE_IMAGE_REPO.use              = false
   key.DOCKER_BASE_IMAGE_TAG.use               = false
   key.DOCKER_BASE_IMAGE_DIGEST.use            = false
+  key.DOCKER_BASE_IMAGES.use                  = false
+  key.DOCKER_COPY_IMAGES.use                  = false
   key.INFERRED_TECH_STACKS.use                = true
   key._INFERRED_TECH_STACKS_HOST.use          = true
   key.METADATA_ID.use                         = true
@@ -2023,6 +2037,8 @@ running commands that do NOT insert chalk marks.
   key.DOCKER_BASE_IMAGE_REPO.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
+  key.DOCKER_BASE_IMAGES.use                  = true
+  key.DOCKER_COPY_IMAGES.use                  = true
   key.METADATA_ID.use                         = true
   key.SIGNATURE.use                           = true
   key._SIGNATURES.use                         = true

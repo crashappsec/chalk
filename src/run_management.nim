@@ -174,7 +174,7 @@ template isSubscribedKey*(key: string): bool =
   else:
     false
 
-template setIfSubscribed[T](d: ChalkDict, k: string, v: T) =
+template setIfSubscribed*[T](d: ChalkDict, k: string, v: T) =
   if isSubscribedKey(k):
     when T is Box:
       d[k] = v

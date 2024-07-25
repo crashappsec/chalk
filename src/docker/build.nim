@@ -270,7 +270,9 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   trace("docker: subscan complete.")
 
 proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
-  let dict = chalk.collectedData
+  let
+    base = ctx.getBaseDockerSection()
+    dict = chalk.collectedData
   dict.setIfNeeded("DOCKERFILE_PATH",                  ctx.dockerFileLoc)
   dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",       ctx.foundExtraContexts)
   dict.setIfNeeded("DOCKER_CHALK_ADDED_TO_DOCKERFILE", ctx.addedInstructions)
@@ -280,10 +282,15 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_LABELS",                    ctx.foundLabels)
   dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.foundPlatforms.normalize()))
   dict.setIfNeeded("DOCKER_TAGS",                      ctx.foundTags.asRepoTag())
-  dict.setIfNeeded("DOCKER_BASE_IMAGE",                $(ctx.getBaseDockerSection.image))
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",           ctx.getBaseDockerSection.image.repo)
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_TAG",            ctx.getBaseDockerSection.image.tag)
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST",         ctx.getBaseDockerSection.image.digest)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE",                $(base.image))
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",           base.image.repo)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_TAG",            base.image.tag)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST",         base.image.digest)
+  dict.setIfNeeded("DOCKER_BASE_IMAGES",               ctx.formatBaseImages())
+  dict.setIfNeeded("DOCKER_COPY_IMAGES",               ctx.formatCopyImages())
+  # note this key is expected to be empty string for alias-less targets
+  # hence setIfSubscribed vs setIfNeeded which doesnt allow to set empty strings
+  dict.setIfSubscribed("DOCKER_TARGET",                ctx.getTargetDockerSection().alias)
 
 proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerPlatform, ChalkObj]) =
   if dockerImageExists(ctx.iidFile):

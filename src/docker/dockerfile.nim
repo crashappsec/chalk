@@ -82,6 +82,18 @@ proc evalSubstitutions(ctx:    DockerParse,
   for item in list:
     result &= ctx.evalSubstitutions(item, errors)
 
+proc evalFlag(ctx: DockerParse,
+              flag: DfFlag,
+              errors: var seq[string]): string =
+  return ctx.evalSubstitutions(flag.argtoks, errors)
+
+proc evalFlags(ctx: DockerParse,
+               flags: Table[string, DfFlag],
+               errors: var seq[string]): Table[string, string] =
+  result = initTable[string, string]()
+  for name, flag in flags:
+    result[name] = ctx.evalFlag(flag, errors)
+
 proc evalOrReturnEmptyString(ctx:    DockerParse,
                              field:  Option[LineToken],
                              errors: var seq[string]): string =
@@ -919,10 +931,7 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
           ctx.dfSectionAliases[section.alias] = section
 
       if "--platform" in item.flags:
-        let
-          platformFlag = item.flags["--platform"]
-          platformToks = platformFlag.argtoks
-          platform     = parse.evalSubstitutions(platformToks, errors)
+        let platform = parse.evalFlag(item.flags["--platform"], errors)
         if platform == "":
           raise newException(ValueError, "Could not eval image plaform")
         section.platform = parseDockerPlatform(platform)
@@ -938,6 +947,12 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
     elif obj of LabelInfo:
       for k, v in LabelInfo(obj).labels:
         labels[k] = v
+    elif obj of CopyInfo:
+      let copy = CopyInfo(obj)
+      if "--from" in copy.flags:
+        copy.frm = parse.evalFlag(copy.flags["--from"], errors)
+      section.copies.add(copy)
+
     # TODO: when we support CopyInfo, we need to add a case for it here
     # to save the source location as a hint for where to look for git info
 
@@ -982,24 +997,90 @@ proc getTargetDockerSection*(ctx: DockerInvocation): DockerFileSection =
       raise newException(KeyError, ctx.foundTarget & ": is not found in Dockerfile")
     return ctx.dfSectionAliases[ctx.foundTarget]
 
+iterator getTargetDockerSections*(ctx: DockerInvocation, section: DockerFileSection): DockerFileSection =
+  ## iterator for all chain of docker sections used to build section
+  ## last section is the base section which will pull an external image
+  var s = section
+  yield s
+  while $(s.image) in ctx.dfSectionAliases:
+    s = ctx.dfSectionAliases[$(s.image)]
+    yield s
+
 iterator getTargetDockerSections*(ctx: DockerInvocation): DockerFileSection =
   ## iterator for all chain of docker sections used to build target section
   ## last section is the base section which will pull an external image
-  var section = ctx.getTargetDockerSection()
-  yield section
-  while $(section.image) in ctx.dfSectionAliases:
-    section = ctx.dfSectionAliases[$(section.image)]
-    yield section
+  for s in ctx.getTargetDockerSections(ctx.getTargetDockerSection()):
+    yield s
+
+iterator getBaseDockerSections*(ctx: DockerInvocation, section: DockerFileSection): DockerFileSection =
+  ## iterator for all chain of docker sections used to build section
+  ## first section is the base section and last it the actual target section
+  for s in ctx.getTargetDockerSections(section).toSeq().reversed():
+    yield s
 
 iterator getBaseDockerSections*(ctx: DockerInvocation): DockerFileSection =
   ## iterator for all chain of docker sections used to build target section
   ## first section is the base section and last it the actual target section
-  for section in ctx.getTargetDockerSections().toSeq().reversed():
-    yield section
+  for s in ctx.getBaseDockerSections(ctx.getTargetDockerSection()):
+    yield s
+
+proc getBaseDockerSection*(ctx: DockerInvocation, section: DockerFileSection):  DockerFileSection =
+  ## get dockerfile section which defines base image
+  ## which is to be pulled from the registry
+  ## (not another section in dockerfile)
+  for s in ctx.getBaseDockerSections(section):
+    return s
 
 proc getBaseDockerSection*(ctx: DockerInvocation):  DockerFileSection =
   ## get dockerfile section which defines base image
   ## which is to be pulled from the registry
   ## (not another section in dockerfile)
-  for section in ctx.getTargetDockerSections():
-    result = section
+  for s in ctx.getBaseDockerSections():
+    return s
+
+proc formatBaseImage(ctx: DockerInvocation, section: DockerFileSection): TableRef[string, string] =
+  let base = ctx.getBaseDockerSection(section)
+  result = newTable[string, string]()
+  result["from"]     = $section.image
+  result["name"]     = $base.image
+  result["repo"]     = base.image.repo
+  if base.image.tag != "":
+    result["tag"]    = base.image.tag
+  if base.image.digest != "":
+    result["digest"] = base.image.digest
+
+proc formatBaseImages*(ctx: DockerInvocation): ChalkDict =
+  result = ChalkDict()
+  for section in ctx.dfSections:
+    result[section.alias] = pack(ctx.formatBaseImage(section))
+
+proc formatCopyImage(ctx: DockerInvocation, copy: CopyInfo): ChalkDict =
+  let image =
+    if copy.frm in ctx.dfSectionAliases:
+      ctx.getBaseDockerSection(ctx.dfSectionAliases[copy.frm]).image
+    else:
+      parseImage(copy.frm, defaultTag = "")
+  result = ChalkDict()
+  result["from"]     = pack(copy.frm)
+  result["name"]     = pack($image)
+  result["repo"]     = pack(image.repo)
+  if image.tag != "":
+    result["tag"]    = pack(image.tag)
+  if image.digest != "":
+    result["digest"] = pack(image.digest)
+  result["src"]      = pack(copy.rawSrc)
+  result["dest"]     = pack(copy.rawDst)
+
+proc formatCopyImages*(ctx: DockerInvocation): ChalkDict =
+  result = ChalkDict()
+  for section in ctx.dfSections:
+    var copies: seq[ChalkDict] = @[]
+    for copy in section.copies:
+      if copy.frm == "":
+        continue
+      # copying from custom context, not another image
+      if copy.frm in ctx.foundExtraContexts:
+        continue
+      copies.add(ctx.formatCopyImage(copy))
+    if len(copies) > 0:
+      result[section.alias] = pack(copies)

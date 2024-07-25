@@ -229,6 +229,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.DOCKER_PLATFORMS.use                    = true
   ~key.DOCKER_LABELS.use                       = true
   ~key.DOCKER_TAGS.use                         = true
+  ~key.DOCKER_TARGET.use                       = true
   ~key.DOCKER_CONTEXT.use                      = true
   ~key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
   ~key.DOCKER_CHALK_ADDED_LABELS.use           = true
@@ -237,6 +238,8 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.DOCKER_BASE_IMAGE_REPO.use              = true
   ~key.DOCKER_BASE_IMAGE_TAG.use               = true
   ~key.DOCKER_BASE_IMAGE_DIGEST.use            = true
+  ~key.DOCKER_BASE_IMAGES.use                  = true
+  ~key.DOCKER_COPY_IMAGES.use                  = true
   ~key._OP_ARTIFACT_TYPE.use                   = true
   ~key._OP_ARTIFACT_PATH.use                   = true
   ~key._CURRENT_HASH.use                       = true
