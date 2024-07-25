@@ -17,7 +17,7 @@ type
     bearer
     other
 
-  AuthChallenge* = ref object
+  AuthChallenge = ref object
     scheme:    string
     options:   OrderedTable[string, string]
     case kind: AuthChallengeType
@@ -56,12 +56,12 @@ proc initBearerChallenge(options: var OrderedTable[string, string]): AuthChallen
                        realm:   realm,
                        url:     $uri)
 
-proc elicitHeaders*(self: AuthChallenge): HttpHeaders =
+proc elicitHeaders(self: AuthChallenge): HttpHeaders =
   case self.kind:
   of other:
     raise newException(ValueError, "unsupported auth challenge scheme: " & self.scheme)
   of bearer:
-    trace("docker: fetching manifest bearer token from: " & self.url)
+    trace("http: fetching bearer token from: " & self.url)
     let tokenResponse = safeRequest(self.url)
     if not tokenResponse.code().is2xx():
       raise newException(ValueError,
@@ -85,7 +85,7 @@ proc elicitHeaders*(challenges: seq[AuthChallenge]): HttpHeaders =
     except:
       continue
 
-proc parseAuthChallenge*(data: string): AuthChallenge =
+proc parseAuthChallenge(data: string): AuthChallenge =
   let typeAndOptions = data.split(maxsplit = 1)
   if len(typeAndOptions) != 2:
     raise newException(ValueError, "invalid auth challenge: " & data)
@@ -107,7 +107,7 @@ proc parseAuthChallenge*(data: string): AuthChallenge =
   else:
     return initOtherChallenge(scheme, allOptions)
 
-proc parseAuthChallenges*(data: string): seq[AuthChallenge] =
+proc parseAuthChallenges(data: string): seq[AuthChallenge] =
   # https://www.rfc-editor.org/rfc/rfc7235#section-4.1
   # for example:
   # www-authenticate: Bearer realm="https://public.ecr.aws/token/",service="public.ecr.aws",scope="aws"
@@ -125,3 +125,71 @@ proc parseAuthChallenges*(data: string): seq[AuthChallenge] =
       challenge &= word & ","
   if challenge != "":
     result.add(parseAuthChallenge(challenge.strip(chars = {' ', ','})))
+
+var authByHost = initTable[string, HttpHeaders]()
+
+proc authSafeRequest*(url: Uri | string,
+                      httpMethod: HttpMethod | string = HttpGet,
+                      body = "",
+                      headers: HttpHeaders = newHttpHeaders(),
+                      multipart: MultipartData = nil,
+                      retries: int = 0,
+                      firstRetryDelayMs: int = 0,
+                      timeout: int = 1000,
+                      pinnedCert: string = "",
+                      maxRedirects: int = 3,
+                      disallowHttp: bool = false,
+                      raiseOnStatus: bool = true,
+                      ): Response =
+  let uri =
+    when url is string:
+      parseUri(url)
+    else:
+      url
+
+  var authHeaders = headers
+  if uri.hostname in authByHost:
+    for k, v in authByHost[uri.hostname]:
+      if not authheaders.hasKey(k):
+        authHeaders[k] = v
+
+  result = safeRequest(url               = uri,
+                       httpMethod        = httpMethod,
+                       body              = body,
+                       headers           = authHeaders,
+                       multipart         = multipart,
+                       retries           = retries,
+                       firstRetryDelayMs = firstRetryDelayMs,
+                       timeout           = timeout,
+                       pinnedCert        = pinnedCert,
+                       maxRedirects      = maxRedirects,
+                       disallowHttp      = disallowHttp)
+
+  if (
+    result.code() == Http401 and
+    result.headers.hasKey("www-authenticate")
+  ):
+    trace("http: eliciting auth headers via www-authenticate for " & $uri)
+    let
+      wwwAuthenticate = result.headers["www-authenticate"]
+      challenges      = parseAuthChallenges(wwwAuthenticate)
+      newHeaders      = challenges.elicitHeaders()
+    authByHost[uri.hostname] = newHeaders
+    for k, v in newHeaders.pairs():
+      authHeaders[k] = v
+
+    # reattempt request
+    result = safeRequest(url               = uri,
+                         httpMethod        = httpMethod,
+                         body              = body,
+                         headers           = authHeaders,
+                         multipart         = multipart,
+                         retries           = retries,
+                         firstRetryDelayMs = firstRetryDelayMs,
+                         timeout           = timeout,
+                         pinnedCert        = pinnedCert,
+                         maxRedirects      = maxRedirects,
+                         disallowHttp      = disallowHttp)
+
+  if not result.code().is2xx():
+    raise newException(ValueError, $uri & " failed with " & result.status)
