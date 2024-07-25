@@ -83,19 +83,8 @@ proc requestManifestJson(name: DockerImage, flags = @["--raw"], fallback = true)
       break
   if url == "":
     raise newException(ValueError, msg & " failed to find auth challenge URL: " & text)
-  trace(msg & " requires auth. fetching www-authenticate challenge from: " & url)
-  let headChallenge = safeRequest(url, httpMethod = HttpHead)
-  if headChallenge.code() != Http401:
-    raise newException(ValueError, msg & " failed to get 401 for: " & url)
-  if not headChallenge.headers.hasKey("www-authenticate"):
-    raise newException(ValueError, msg & " www-authenticate header is not returned by: " & url)
   try:
-    let
-      wwwAuthenticate = headChallenge.headers["www-authenticate"]
-      challenges      = parseAuthChallenges(wwwAuthenticate)
-      headers         = challenges.elicitHeaders()
-    trace(msg & " from URL: " & url)
-    let response      = safeRequest(url, headers = headers)
+    let response = authSafeRequest(url)
     if not response.code().is2xx():
       raise newException(ValueError, msg & " manifest was not returned from URL: " & response.status)
     let value = parseAndDigestJson(response.body())
