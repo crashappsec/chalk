@@ -139,7 +139,8 @@ proc authSafeRequest*(url: Uri | string,
                       pinnedCert: string = "",
                       maxRedirects: int = 3,
                       disallowHttp: bool = false,
-                      raiseOnStatus: bool = true,
+                      only2xx: bool = false,
+                      raiseWhenAbove: int = 0,
                       ): Response =
   let uri =
     when url is string:
@@ -163,7 +164,9 @@ proc authSafeRequest*(url: Uri | string,
                        timeout           = timeout,
                        pinnedCert        = pinnedCert,
                        maxRedirects      = maxRedirects,
-                       disallowHttp      = disallowHttp)
+                       disallowHttp      = disallowHttp,
+                       only2xx           = false,
+                       raiseWhenAbove    = 0)
 
   if (
     result.code() == Http401 and
@@ -189,7 +192,10 @@ proc authSafeRequest*(url: Uri | string,
                          timeout           = timeout,
                          pinnedCert        = pinnedCert,
                          maxRedirects      = maxRedirects,
-                         disallowHttp      = disallowHttp)
+                         disallowHttp      = disallowHttp,
+                         only2xx           = false,
+                         raiseWhenAbove    = 0)
 
-  if not result.code().is2xx():
-    raise newException(ValueError, $uri & " failed with " & result.status)
+  discard result.check(url            = url,
+                       only2xx        = only2xx,
+                       raiseWhenAbove = raiseWhenAbove)
