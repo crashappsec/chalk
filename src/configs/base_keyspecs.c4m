@@ -1726,6 +1726,10 @@ keyspec DOCKER_TARGET {
     doc: """
 Name of the Dockerfile target being built.
 Empty string is used for alias-less target.
+
+For example `docker build --target=foo` this key will report `"foo"`.
+Also note that when `--target` is not specified, this key will report the
+alias of the last target/section within the Dockerfile.
 """
 }
 
@@ -1895,7 +1899,7 @@ COPY --from=one /bin/sh /sh
       "from": "docker",
       "name": "docker",
       "repo": "docker",
-      "src": ["/bin/docker"],
+      "src": ["/usr/local/bin/docker"],
       "dest": "/docker",
     },
     {
