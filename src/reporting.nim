@@ -47,7 +47,7 @@ proc topicUnsubscribe*(args: seq[Box], unused: ConfigState): Option[Box] =
 
   return some(pack(unsubscribe(topic, `rec?`.get())))
 
-proc setPerChalkReports(tmpl: string) =
+proc setPerChalkReports(tmpl: AttrScope) =
   ## Adds the `_CHALKS` key in the `hostinfo` global to the current
   ## collection context with whatever items were requested in the
   ## reporting template passed.
@@ -67,7 +67,7 @@ proc setPerChalkReports(tmpl: string) =
   elif "_CHALKS" in hostInfo:
     hostInfo.del("_CHALKS")
 
-template buildHostReport*(tmpl: string): string =
+template buildHostReport*(tmpl: AttrScope): string =
   setPerChalkReports(tmpl)
   prepareContents(hostInfo, tmpl)
 
@@ -105,16 +105,15 @@ template doEmbeddedReport(): Box =
     pack[seq[Box]](@[])
 
 template doCustomReporting() =
-  for topic in getChalkSubsections("custom_report"):
-    let spec = "custom_report." & topic
-    let enabledOpt = getOpt[bool](getChalkScope(), spec & ".enabled")
+  for topic, spec in getChalkSubsections("custom_report"):
+    let enabledOpt = getOpt[bool](spec, "enabled")
     if enabledOpt.isNone() or not enabledOpt.get(): continue
     var
-      sinkConfs = get[seq[string]](getChalkScope(), spec & ".sink_configs")
+      sinkConfs = get[seq[string]](spec, "sink_configs")
 
     discard registerTopic(topic)
 
-    let useWhen = get[seq[string]](getChalkScope(), spec & ".use_when")
+    let useWhen = get[seq[string]](spec, "use_when")
     if getCommandName() notin useWhen and "*" notin useWhen:
       continue
     if topic == "audit" and not get[bool](getChalkScope(), "publish_audit"):
@@ -123,8 +122,8 @@ template doCustomReporting() =
       warn("Report '" & topic & "' has no configured sinks.  Skipping.")
 
     let
-      reportTemplate = get[string](getChalkScope(), spec & ".report_template")
-      templateToUse  = "report_template." & reportTemplate
+      reportTemplate = get[string](spec, "report_template")
+      templateToUse = getObject(getChalkScope(), "report_template." & reportTemplate)
 
     for sinkConfName in sinkConfs:
       let res = topicSubscribe((@[pack(topic), pack(sinkConfName)])).get()

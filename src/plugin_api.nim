@@ -548,20 +548,21 @@ var
   installedPlugins: Table[string, Plugin]
   codecs:           seq[Plugin] = @[]
 
-template isCodec*(plugin: Plugin): bool = get[bool](getChalkScope(), "plugin." & plugin.name & ".codec")
+template isCodec*(plugin: Plugin): bool = get[bool](plugin.configInfo, "codec")
 
 proc checkPlugin(plugin: Plugin, codec: bool): bool {.inline.} =
   let
-    name    = plugin.name
-    section = "plugin." & name
+    name  = plugin.name
+    maybe = getPluginConfig(name)
+    spec  = maybe.getOrElse(AttrScope(nil))
 
-  if not sectionExists(getChalkScope(), section):
+  if maybe.isNone():
     error("No config provided for plugin " & name & ". Plugin ignored.")
-  elif not get[bool](getChalkScope(), section & ".enabled"):
+  elif not get[bool](maybe.get(), "enabled"):
       trace("Plugin " & name & " is disabled via config file.")
   elif name in installedPlugins:
     error("Double install of plugin named: " & name)
-  elif get[bool](getChalkScope(), section & ".codec") != codec:
+  elif get[bool](spec, "codec") != codec:
     if codec:
       error("Codec expected, but the config file does not declare that it " &
         "is a codec.")
@@ -569,14 +570,14 @@ proc checkPlugin(plugin: Plugin, codec: bool): bool {.inline.} =
       error("Plugin expected, but the config file declares that it's a codec.")
   else:
     trace("Installed plugin: " & name)
+    plugin.configInfo      = spec
     installedPlugins[name] = plugin
     return true
 
 proc getAllPlugins*(): seq[Plugin] =
   var preResult: seq[(int, Plugin)] = @[]
   for name, plugin in installedPlugins:
-    let tup = (get[int](getChalkScope(), "plugin." & plugin.name & ".priority"), plugin)
-    preResult.add(tup)
+    preResult.add((get[int](plugin.configInfo, "priority"), plugin)) # Appends a tuple.
 
   preResult.sort()
   for (_, plugin) in preResult:
