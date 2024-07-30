@@ -2,6 +2,13 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- When base image is already wrapped by chalk, `ENTRYPOINT`
+  was recursively wrapped which broke image runtime
+  as it was always exiting with non-zero code.
+  ([#385](https://github.com/crashappsec/chalk/pull/385))
+
 ### New Features
 
 - `docker build` and `docker push` now use `mark_default`

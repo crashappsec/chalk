@@ -318,6 +318,24 @@ def test_base_image(chalk: Chalk, random_hex: str):
     assert Docker.run(image_id)
 
 
+def test_recursion_wrapping(chalk: Chalk, random_hex: str):
+    base_id, _ = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile.base",
+        context=DOCKERFILES / "valid" / "base",
+        tag=random_hex,
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    assert base_id
+
+    image_id, result = chalk.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile",
+        context=DOCKERFILES / "valid" / "base",
+        args={"BASE": random_hex},
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    assert Docker.run(image_id)
+
+
 def test_base_images(chalk: Chalk):
     _, result = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "bases" / "Dockerfile",
