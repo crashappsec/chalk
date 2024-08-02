@@ -28,7 +28,7 @@ proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
     let
       response = safeRequest(url        = path,
                              httpMethod = HttpGet,
-                             timeout    = 500, # 1/2 of a second
+                             timeout    = 1000, # 1 of a second
                              headers    = hdrs)
       body     = response.body().strip()
 
@@ -186,7 +186,7 @@ proc getAwsToken(): Option[string] =
       hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
       response = safeRequest(url        = url,
                              httpMethod = HttpPut,
-                             timeout    = 500, # 1/2 of a second
+                             timeout    = 1000, # 1 of a second
                              headers    = hdrs)
       body     = response.body().strip()
 

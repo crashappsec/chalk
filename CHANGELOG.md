@@ -2,6 +2,13 @@
 
 ## On the `main` branch
 
+### Other
+
+- Increasing cloud metadata endpoint collection timeout
+  from 500ms to 1sec as in some cases it takes longer than
+  500ms to get a response.
+  ([#388](https://github.com/crashappsec/chalk/pull/388))
+
 ## 0.4.9
 
 **July 30, 2024**
