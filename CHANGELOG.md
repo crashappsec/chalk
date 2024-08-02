@@ -8,6 +8,9 @@
   from 500ms to 1sec as in some cases it takes longer than
   500ms to get a response.
   ([#388](https://github.com/crashappsec/chalk/pull/388))
+- Not showing `exec` report when chalk is running in
+  interactive shell.
+  ([#390](https://github.com/crashappsec/chalk/pull/390))
 
 ## 0.4.9
 
