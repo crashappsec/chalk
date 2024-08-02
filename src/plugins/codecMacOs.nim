@@ -78,7 +78,7 @@ proc macScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     try:
       header = stream.peekStr(4)
     except:
-      warn(path & ": could not read.")
+      warn(path & ": could not read due to: " & getCurrentExceptionMsg())
       dumpExOnDebug()
       return none(ChalkObj)
 

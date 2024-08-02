@@ -745,7 +745,7 @@ proc findAndLoad(plugin: GitInfo, path: string) =
         info.origin = info.calcOrigin(config)
         info.refetchTags()
     except:
-      error(confFileName & ": Git configuration file not parsed.")
+      error(confFileName & ": Git configuration file not parsed: " & getCurrentExceptionMsg())
       dumpExOnDebug()
 
   plugin.vcsDirs[vcsDir] = info

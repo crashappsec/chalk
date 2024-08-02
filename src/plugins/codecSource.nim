@@ -106,7 +106,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
         trace(path & ": After shebang is processed, language is: " & lang)
         hasBang = if lang == "": false else: true
     except:
-      warn(path & ": source codec could not read from open file.")
+      warn(path & ": source codec could not read from open file due to: " & getCurrentExceptionMsg())
 
     # While we already checked this above, if the shebang was there,
     # but was invalid, we'll behave as if it wasn't there at all.

@@ -62,7 +62,7 @@ proc authorsGetChalkTimeArtifactInfo*(self: Plugin, ignore: ChalkObj): ChalkDict
     if s != "":
       result["CODE_OWNERS"] = pack(s)
   except:
-    error(fname & ": File found, but could not be read")
+    error(fname & ": File found, but could not be read due to: " & getCurrentExceptionMsg())
     dumpExOnDebug()
 
 proc loadOwnerAuthors*() =
