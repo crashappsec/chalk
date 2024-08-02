@@ -124,7 +124,7 @@ proc getFdInfo(n: string): ProcFdSet =
 
         result[fd]        = procDict
     except:
-      warn("Unexpected failure in getFdInfo for " & fullFdPath)
+      warn("Unexpected failure in getFdInfo for " & fullFdPath & " due to: " & getCurrentExceptionMsg())
       dumpExOnDebug()
 
 proc getPidArgv(pid: string): string =

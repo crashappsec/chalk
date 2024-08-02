@@ -72,7 +72,7 @@ proc collectLambdaMetadata(): ChalkDict =
           lambdaMetadata.setIfNotEmpty("AWS_LAMBDA_LOG_STREAM_ARN", $(streamArn))
 
       except:
-        error("lambda: could not fetch information about AWS account")
+        error("lambda: could not fetch information about AWS account due to: " & getCurrentExceptionMsg())
     else:
       warn("lambda: AWS credentials env vars are missing")
 
