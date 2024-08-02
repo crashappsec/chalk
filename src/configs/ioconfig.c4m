@@ -50,7 +50,7 @@ if env_exists("CI") and env_exists("GITHUB_SHA") {
   custom_report.github_group_chalk_time.enabled: true
 }
 
-cmd        := command_name()
+cmd := command_name()
 
 subscribe("report",   "default_out")
 subscribe("audit",    "default_out")
@@ -69,18 +69,17 @@ if cmd.starts_with("dump") {
   }
 }
 
-# Set up the log level based on the command.
-quieter_cmds := ["docker", "exec"]
-cmd := command_name()
-
-if cmd == "not_supplied" and quieter_cmds.contains(default_command) {
+if cmd == "docker" or default_command == "docker" {
   log_level: "error"
-}
-elif quieter_cmds.contains(cmd) {
+} elif cmd == "exec" or default_command == "exec" {
+  if using_tty() {
+    # hide any chalk errors in interactive shell
+    log_level: "none"
+  } else {
     log_level: "error"
-}
-else {
-    log_level: "info"
+  }
+} else {
+  log_level: "info"
 }
 
 

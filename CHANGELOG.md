@@ -11,6 +11,9 @@
 - Not showing `exec` report when chalk is running in
   interactive shell.
   ([#390](https://github.com/crashappsec/chalk/pull/390))
+- Not showing any `chalk exec` logs when running in
+  interactive shell.
+  ([#394](https://github.com/crashappsec/chalk/pull/394))
 
 ## 0.4.9
 
