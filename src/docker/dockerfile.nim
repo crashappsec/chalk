@@ -677,10 +677,9 @@ proc `$`*(i: ShellInfo): string =
   return $(i.json)
 
 proc `$`*(i: CmdInfo | EntryPointInfo): string =
-  if i.str != "":
-    return i.str
-  else:
+  if i.json != nil:
     return $(i.json)
+  return i.str
 
 template eqByString(t: untyped) =
   proc `==`*(a, b: t): bool =

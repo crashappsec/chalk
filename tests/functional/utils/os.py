@@ -56,6 +56,13 @@ class Program:
             else:
                 self.logger.error(f"{self.bin} failed")
 
+    def __eq__(self, other: "Program") -> bool:
+        return (
+            self.exit_code == other.exit_code
+            and self.stdout == other.stdout
+            and self.stderr == other.stderr
+        )
+
     def __bool__(self) -> bool:
         """
         Boolean when program exited successfully with 0.

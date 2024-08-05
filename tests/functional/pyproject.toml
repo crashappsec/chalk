@@ -21,6 +21,7 @@ requests = "^2.32.3"
 structlog = "^23.1.0"
 fastapi = "^0.109.1"
 uvicorn = "^0.23.2"
+more-itertools = "^10.3.0"
 
 [tool.poetry.group.neovim.dependencies]
 mypy = {version = "^0.991", optional = true}

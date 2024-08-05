@@ -491,11 +491,12 @@ class Chalk:
             # sanity check that chalk mark includes basic chalk keys
             assert image_hash in [i["_CURRENT_HASH"] for i in result.marks]
             assert image_hash in [i["_IMAGE_ID"] for i in result.marks]
-            if isinstance(context, Path):
-                dockerfile = dockerfile or (
-                    (cwd or context or Path(os.getcwd())) / "Dockerfile"
-                )
-                assert str(dockerfile) == result.marks[-1]["DOCKERFILE_PATH"]
+            if isinstance(dockerfile, Path) or dockerfile is None:
+                if isinstance(context, Path):
+                    dockerfile = dockerfile or (
+                        (cwd or context or Path(os.getcwd())) / "Dockerfile"
+                    )
+                    assert str(dockerfile) == result.marks[-1]["DOCKERFILE_PATH"]
         elif not expecting_report:
             try:
                 assert not result.reports
