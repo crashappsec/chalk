@@ -20,13 +20,6 @@ var
 proc getChalkScope*(): AttrScope =
   con4mRuntime.configState.attrs
 
-iterator getChalkSubsections*(s: string): string =
-  ## Walks the contents of the given chalk config section, and yields the
-  ## names of the subsections.
-  for k, v in con4mRuntime.configState.attrs.getObject(s).contents:
-    if v.isA(AttrScope):
-      yield k
-
 proc sectionExists*(scope: AttrScope, s: string): bool =
   scope.getObjectOpt(s).isSome()
 
@@ -38,6 +31,13 @@ proc attrGetOpt*[T](fqn: string): Option[T] =
 
 proc attrGetObject*(fqn: string): AttrScope =
   getObject(getChalkScope(), fqn)
+
+iterator getChalkSubsections*(s: string): string =
+  ## Walks the contents of the given chalk config section, and yields the
+  ## names of the subsections.
+  for k, v in attrGetObject(s).contents:
+    if v.isA(AttrScope):
+      yield k
 
 proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
   ## Sets the value of the `fqn` attribute in `ctx.attrs` to `value`, raising
