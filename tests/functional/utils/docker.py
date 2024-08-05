@@ -3,8 +3,12 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 from pathlib import Path
-from typing import Any, Optional, TypeVar
+from tempfile import NamedTemporaryFile
+from typing import Optional, TypeVar
 
+from more_itertools import windowed
+
+from .dict import ContainsMixin
 from .log import get_logger
 from .os import Program, run
 
@@ -13,8 +17,15 @@ logger = get_logger()
 
 ProgramType = TypeVar("ProgramType", bound=Program)
 
+# global var to GC tmp files when process exits
+dockerfiles = []
+
 
 class Docker:
+    @staticmethod
+    def dockerfile(d: str) -> str:
+        return "\n".join(i.strip() for i in d.splitlines()).strip()
+
     @staticmethod
     def build_cmd(
         *,
@@ -38,10 +49,19 @@ class Docker:
         if platforms or buildx:
             cmd += ["buildx"]
         cmd += ["build"]
+        if buildx and not platforms:
+            cmd += ["--load"]
         for t in tags:
             cmd += ["-t", t]
         if dockerfile:
-            cmd += ["-f", str(dockerfile)]
+            if isinstance(dockerfile, Path):
+                cmd += ["-f", str(dockerfile)]
+            else:
+                tmp = NamedTemporaryFile(delete_on_close=False)
+                tmp.file.write(dockerfile.encode())
+                tmp.file.close()
+                dockerfiles.append(tmp)
+                cmd += ["-f", tmp.name]
         for name, value in (args or {}).items():
             cmd += [f"--build-arg={name}={value}"]
         if platforms:
@@ -115,8 +135,11 @@ class Docker:
     def with_image_id(build: ProgramType) -> tuple[str, ProgramType]:
         image_id = ""
 
-        if build.exit_code == 0:  # and not any(
-            if build.env.get("DOCKER_BUILDKIT", "1") == "1":
+        if build.exit_code == 0:
+            if build.env.get("DOCKER_BUILDKIT", "1") == "1" or (
+                "docker",
+                "buildx",
+            ) in list(windowed(build.cmd, 2)):
 
                 def get_sha256(needle: str) -> str:
                     return build.find(
@@ -212,8 +235,8 @@ class Docker:
         return run(["docker", "buildx", "imagetools", "inspect", tag])
 
     @staticmethod
-    def inspect(name: str) -> list[dict[str, Any]]:
-        return run(["docker", "inspect", name]).json()
+    def inspect(name: str) -> list[ContainsMixin]:
+        return [ContainsMixin(i) for i in run(["docker", "inspect", name]).json()]
 
     @staticmethod
     def all_images() -> list[str]:

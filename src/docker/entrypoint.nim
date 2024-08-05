@@ -7,8 +7,8 @@
 
 ## Utilities for inspecting/fetching/wrapping dockerfile entrypoints
 
-import ".."/[config]
-import "."/[dockerfile, ids, image, wrap, util]
+import ".."/[config, util]
+import "."/[dockerfile, exe, ids, image, wrap, util]
 
 proc getTargetEntrypoints(ctx: DockerInvocation, platform: DockerPlatform): DockerEntrypoint =
   ## get entrypoints (entrypoint/cmd/shell) from the target section
@@ -47,6 +47,7 @@ proc getTargetEntrypoints(ctx: DockerInvocation, platform: DockerPlatform): Dock
   if shell == nil:
     shell = ShellInfo()
     shell.json = `%*`(["/bin/sh", "-c"])
+  # if entrypoint is empty, set its json to shell
   return (entrypoint, cmd, shell)
 
 proc getCommonTargetEntrypoints*(ctx: DockerInvocation, platforms: seq[DockerPlatform]): DockerEntrypoint =
@@ -70,9 +71,9 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
                         binaries:   TableRef[DockerPlatform, string],
                         user:       string) =
   let
-    fromArgs             = attrGet[bool]("exec.command_name_from_args")
-    wrapCmd              = attrGet[bool]("docker.wrap_cmd")
-    (entrypoint, cmd, _) = entrypoint
+    fromArgs                 = attrGet[bool]("exec.command_name_from_args")
+    wrapCmd                  = attrGet[bool]("docker.wrap_cmd")
+    (entrypoint, cmd, shell) = entrypoint
 
   if not fromArgs:
     raise newException(
@@ -119,22 +120,10 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
     toAdd.add("ONBUILD USER " & user)
 
   if entrypoint != nil:
-    # When ENTRYPOINT is string, it is a shell script
-    # in which case docker ignores CMD which means we can
-    # change it without changing container semantics so we:
-    # * convert ENTRYPOINT to JSON
-    # * pass existing ENTRYPOINT as CMD string
-    # this will then call chalk as entrypoint and
-    # will pass SHELL + CMD as args to chalk
-    if entrypoint.str != "":
-      toAdd.add("ENTRYPOINT " & formatChalkExec())
-      toAdd.add("CMD " & entrypoint.str)
-      trace("docker: ENTRYPOINT wrapped.")
-
     # When ENTRYPOINT is JSON, we wrap JSON with /chalk command
     # setting ENTRYPOINT however resets the CMD and so to be safe
     # we redefine CMD to guarantee its used
-    else:
+    if entrypoint.json != nil:
       if len(entrypoint.json) > 2 and entrypoint.json[0..1] == %(@["/chalk", "exec"]):
         trace("docker: ENTRYPOINT is already wrapped by /chalk. skipping")
       else:
@@ -142,6 +131,28 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
         if cmd != nil:
           toAdd.add("CMD " & $(cmd))
         trace("docker: ENTRYPOINT wrapped.")
+
+    # When ENTRYPOINT is a string, it is a shell script
+    # in which case docker wraps ENTRYPOINT with SHELL
+    # which basically ends up ignoring CMD as SHELL is
+    # usually [/bin/sh, -c] hence EXEC is going to be
+    # [/bin/sh, -c, ENTRYPOINT] + CMD which effectively
+    # ignores CMD as only "-c" will execute the ENTRYPOINT
+    # however as SHELL can be customized we cannot simply
+    # drop CMD
+    else:
+      let entry =
+        # when ENTRYPOINT is an empty string, doing a build with
+        # buildx leaves empty string as an arg in exec
+        # https://github.com/moby/buildkit/pull/1874
+        if entrypoint.str != "" or hasBuildx():
+          shell.json & %(@[entrypoint.str])
+        else:
+          %(@[])
+      toAdd.add("ENTRYPOINT " & formatChalkExec(entry))
+      if cmd != nil:
+        toAdd.add("CMD " & $(cmd))
+      trace("docker: ENTRYPOINT wrapped.")
 
   else:
     # When ENTRYPOINT is missing, we can use /chalk as ENTRYPOINT

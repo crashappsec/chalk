@@ -89,8 +89,20 @@ proc addLabelCmds*(self: var seq[string], labels: ChalkDict) =
     self.addLabelCmd(k, v.boxToJson())
 
 proc formatChalkExec*(args: JsonNode = newJArray()): string =
-  var arr = `%*`(["/chalk", "exec"])
+  var
+    arr  = `%*`(["/chalk", "exec"])
+    args =
+      if args == nil or args == %(@[""]):
+        newJArray()
+      else:
+        args
   if len(args) > 0:
+    if unicode.strip(args[0].getStr()) == "":
+      raise newException(
+        ValueError,
+        "invalid first element in " & $args &
+        " - has to be valid executable command"
+      )
     arr.add(`%`("--exec-command-name"))
     arr.add(args[0])
   arr.add(`%`("--"))

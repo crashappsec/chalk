@@ -2,6 +2,18 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- Fixing `ENTRYPOINT` wrapping for empty-like definitions:
+
+  - `ENTRYPOINT`
+  - `ENTRYPOINT []`
+  - `ENTRYPOINT [""]`
+    Now chalk correctly parses and wraps as appropriate
+    depending on the use of buildkit.
+
+  ([#396](https://github.com/crashappsec/chalk/pull/396))
+
 ### Other
 
 - Increasing cloud metadata endpoint collection timeout
