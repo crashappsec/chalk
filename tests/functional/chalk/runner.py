@@ -79,10 +79,10 @@ class ChalkMark(ContainsMixin, dict):
         # MAGIC must always be present in chalk mark and marks the beginning of the json
         assert MAGIC in text
         start = text.rfind("{", 0, text.find(MAGIC))
-        end = text.rfind("}", start)
         assert start > 0
-        assert end > 0
-        mark_json = text[start : end + 1]
+        beginning = text[start:].split("\x00")[0]
+        end = beginning.rfind("}")
+        mark_json = beginning[: end + 1]
         mark = json.loads(mark_json)
         assert mark
         return cls(report=ChalkReport({}), mark=mark)
