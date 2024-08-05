@@ -33,6 +33,9 @@ proc sectionExists*(scope: AttrScope, s: string): bool =
 proc attrGet*[T](fqn: string): T =
   get[T](getChalkScope(), fqn)
 
+proc attrGetOpt*[T](fqn: string): Option[T] =
+  getOpt[T](getChalkScope(), fqn)
+
 proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
   ## Sets the value of the `fqn` attribute in `ctx.attrs` to `value`, raising
   ## `AssertionDefect` if unsuccessful.

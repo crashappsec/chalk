@@ -85,7 +85,7 @@ proc findOptionalConf(state: ConfigState): Option[string] =
         trace(fname & ": No configuration file found.")
 
 proc loadLocalStructs*(state: ConfigState) =
-  if getOpt[bool](getChalkScope(), "color").isSome(): setShowColor(attrGet[bool]("color"))
+  if attrGetOpt[bool]("color").isSome(): setShowColor(attrGet[bool]("color"))
   setLogLevel(attrGet[string]("log_level"))
   var configPath: seq[string] = @[]
   for path in attrGet[seq[string]]("config_path"):
@@ -206,7 +206,7 @@ proc loadAllConfigs*() =
         doRun()
       hostInfo["_OP_CONFIG"] = pack(configFile)
 
-  if commandName == "not_supplied" and getOpt[string](getChalkScope(), "default_command").isSome():
+  if commandName == "not_supplied" and attrGetOpt[string]("default_command").isSome():
     setErrorHandler(stack, handleOtherErrors)
     addFinalizeGetOpts(stack, printAutoHelp = false)
     addCallback(stack, loadLocalStructs)

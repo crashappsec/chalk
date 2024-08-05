@@ -344,7 +344,7 @@ proc formatOneTemplate(state: ConfigState,
   var
     keysToReport: seq[string]
 
-  let docOpt = getOpt[string](getChalkScope(), tmpl & ".doc")
+  let docOpt = attrGetOpt[string](tmpl & ".doc")
   let doc = if docOpt.isSome(): docOpt.get() else: "No description available."
   result = markdown(doc)
 
@@ -485,7 +485,7 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
     # see if the command was explicitly passed, or if it was implicit.
     # If it was implicit, give the help overview instead of the command
     # overview.
-    let defaultCmd = getOpt[string](getChalkScope(), "default_command").get("")
+    let defaultCmd = attrGetOpt[string]("default_command").get("")
     if defaultCmd != "" and defaultCmd notin commandLineParams():
       toOut = con4mRuntime.getHelpOverview()
     else:

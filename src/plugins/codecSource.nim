@@ -121,7 +121,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     # At this point, *if* there's a custom_logic callback, we need to
     # call it, otherwise we are done.
 
-    let opt = getOpt[CallbackObj](getChalkScope(), "source_marks.custom_logic")
+    let opt = attrGetOpt[CallbackObj]("source_marks.custom_logic")
 
     if opt.isSome():
       let

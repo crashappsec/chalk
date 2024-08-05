@@ -61,7 +61,7 @@ proc registerKeys(templ: string) =
   if sectionExists(getChalkScope(), section):
     for name in getChalkSubsections(section):
       let content = section & "." & name
-      let useOpt = getOpt[bool](getChalkScope(), content & ".use")
+      let useOpt = attrGetOpt[bool](content & ".use")
       if useOpt.isSome() and useOpt.get():
         subscribedKeys[name] = true
 
@@ -128,13 +128,13 @@ proc initCollection*() =
   # Next, register for any custom reports.
   for name in getChalkSubsections("custom_report"):
     let report = "custom_report." & name
-    let useWhenOpt = getOpt[seq[string]](getChalkScope(), report & ".use_when")
+    let useWhenOpt = attrGetOpt[seq[string]](report & ".use_when")
     if useWhenOpt.isSome():
       let useWhen = useWhenOpt.get()
       if (getBaseCommandName() notin useWhen and "*" notin useWhen):
         continue
 
-    let templNameOpt = getOpt[string](getChalkScope(), report & ".report_template")
+    let templNameOpt = attrGetOpt[string](report & ".report_template")
     if templNameOpt.isSome():
       let templName = templNameOpt.get()
       if templName != "":

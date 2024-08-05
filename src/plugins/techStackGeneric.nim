@@ -161,7 +161,7 @@ proc getProcNames(): HashSet[string] =
 # ps output etc in upcoming revisions
 proc hostHasTechStack(scope: string, proc_names: HashSet[string]): bool =
   # first check directories and filepaths, then processes
-  let scopedDirs = getOpt[seq[string]](getChalkScope(), scope & ".directories")
+  let scopedDirs = attrGetOpt[seq[string]](scope & ".directories")
   var fExists = false
   var dExists = false
 
@@ -171,14 +171,14 @@ proc hostHasTechStack(scope: string, proc_names: HashSet[string]): bool =
         dExists = true
         break
 
-  let filepaths = getOpt[seq[string]](getChalkScope(), scope & ".filepaths")
+  let filepaths = attrGetOpt[seq[string]](scope & ".filepaths")
   if filepaths.isSome():
     for path in filepaths.get():
       if fileExists(path):
         fExists = true
         break
 
-  let names = getOpt[seq[string]](getChalkScope(), scope & ".process_names")
+  let names = attrGetOpt[seq[string]](scope & ".process_names")
   if names.isSome():
     let
       rule_names   = toHashSet(names.get())
@@ -311,7 +311,7 @@ proc loadState() =
         tsRules.incl(key)
         regexes[key] = re(attrGet[string](val & ".file_scope.regex"))
         headLimits[key] = attrGet[int](val & ".file_scope.head")
-        let filetypes = getOpt[seq[string]](getChalkScope(), val & ".file_scope.filetypes")
+        let filetypes = attrGetOpt[seq[string]](val & ".file_scope.filetypes")
         if filetypes.isSome():
           let ftypes = filetypes.get()
           ruleFiletypes[key] = ftypes
@@ -322,7 +322,7 @@ proc loadState() =
           # XXX move to a template for looking things up and adding if
           # they don't exist
           ftRules.mgetOrPut(FT_ANY, initHashSet[string]()).incl(key)
-          let excludeFiletypes = getOpt[seq[string]](getChalkScope(), val & ".file_scope.excluded_filetypes")
+          let excludeFiletypes = attrGetOpt[seq[string]](val & ".file_scope.excluded_filetypes")
           if excludeFiletypes.isSome():
             let exclFtps = excludeFiletypes.get()
             ruleExcludeFiletypes[key] = exclFtps
@@ -330,13 +330,13 @@ proc loadState() =
               excludeFtRules.mgetOrPut(ft, initHashSet[string]()).incl(key)
 
         # get paths and excluded paths that need to always be considered
-        let filepaths = getOpt[seq[string]](getChalkScope(), val & ".file_scope.filepaths")
+        let filepaths = attrGetOpt[seq[string]](val & ".file_scope.filepaths")
         if filepaths.isSome():
           let fpaths = filepaths.get()
           for path in fpaths:
             pthRules.mgetOrPut(path, initHashSet[string]()).incl(key)
 
-        let excludeFilepaths = getOpt[seq[string]](getChalkScope(), val & ".file_scope.excluded_filepaths")
+        let excludeFilepaths = attrGetOpt[seq[string]](val & ".file_scope.excluded_filepaths")
         if excludeFilepaths.isSome():
           let excfpaths = excludeFilepaths.get()
           for path in excfpaths:

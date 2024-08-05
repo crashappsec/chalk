@@ -96,7 +96,7 @@ proc processCmdLine(ctx: DockerInvocation) =
 
 proc addVirtualLabels(ctx: DockerInvocation, chalk: ChalkObj) =
   trace("docker: adding virtual label args via --label flags")
-  let labelOpt = getOpt[TableRef[string, string]](getChalkScope(), "docker.custom_labels")
+  let labelOpt = attrGetOpt[TableRef[string, string]]("docker.custom_labels")
   if labelOpt.isSome():
     ctx.newCmdLine.addLabelArgs(labelOpt.get())
   let labelTemplName = attrGet[string]("docker.label_template")
@@ -115,7 +115,7 @@ proc addVirtualLabels(ctx: DockerInvocation, chalk: ChalkObj) =
 
 proc addLabels(ctx: DockerInvocation, chalk: ChalkObj) =
   trace("docker: adding labels to Dockerfile")
-  let labelOpt = getOpt[TableRef[string, string]](getChalkScope(), "docker.custom_labels")
+  let labelOpt = attrGetOpt[TableRef[string, string]]("docker.custom_labels")
   if labelOpt.isSome():
     ctx.addedInstructions.addLabelCmds(labelOpt.get())
   let labelTemplName = attrGet[string]("docker.label_template")

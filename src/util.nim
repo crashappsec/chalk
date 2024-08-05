@@ -103,7 +103,7 @@ proc canOpenFile*(path: string, mode: FileMode = FileMode.fmRead): bool =
   return canOpen
 
 proc setupManagedTemp*() =
-  let customTmpDirOpt = getOpt[string](getChalkScope(), "default_tmp_dir")
+  let customTmpDirOpt = attrGetOpt[string]("default_tmp_dir")
 
   if customTmpDirOpt.isSome() and not existsEnv("TMPDIR"):
     putenv("TMPDIR", customTmpDirOpt.get())

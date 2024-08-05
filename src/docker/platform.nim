@@ -176,7 +176,7 @@ proc findPlatformBinaries(): TableRef[DockerPlatform, string] =
 
   let
     basePath = attrGet[string]("docker.arch_binary_locations_path")
-    locOpt   = getOpt[TableRef[string, string]](getChalkScope(), "docker.arch_binary_locations")
+    locOpt   = attrGetOpt[TableRef[string, string]]("docker.arch_binary_locations")
 
   if basePath != "":
     let base = basePath.resolvePath()

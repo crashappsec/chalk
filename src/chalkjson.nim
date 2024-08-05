@@ -447,7 +447,7 @@ proc orderKeys*(dict: ChalkDict,
   for k, _ in dict:
     var order = attrGet[int]("keyspec." & k & ".normalized_order")
     if tplate != "" and sectionExists(getChalkScope(), tplate & ".key." & k):
-      let orderOpt = getOpt[int](getChalkScope(), tplate & ".key." & k & ".order")
+      let orderOpt = attrGetOpt[int](tplate & ".key." & k & ".order")
       if orderOpt.isSome():
         order = orderOpt.get()
     tmp.add((order, k))

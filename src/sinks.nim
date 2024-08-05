@@ -166,7 +166,7 @@ proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
       section  = "sink_config." & cfg.name
 
     if sectionExists(getChalkScope(), section) and errmsg == "Write":
-      let msgOpt = getOpt[string](getChalkScope(), section & ".on_write_msg")
+      let msgOpt = attrGetOpt[string](section & ".on_write_msg")
       if msgOpt.isSome():
         info(strutils.strip(msgOpt.get()))
     elif quiet:
@@ -252,15 +252,15 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
         error("Sink configuration '" & name & " is disabled.")
         enabled = false
     of "priority":
-      priority    = getOpt[int](getChalkScope(), section & "." & k).getOrElse(0)
+      priority    = attrGetOpt[int](section & "." & k).getOrElse(0)
     of "filters":
-      filterNames = getOpt[seq[string]](getChalkScope(), section & "." & k).getOrElse(@[])
+      filterNames = attrGetOpt[seq[string]](section & "." & k).getOrElse(@[])
     of "sink":
-      sinkName    = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
+      sinkName    = attrGetOpt[string](section & "." & k).getOrElse("")
     of "auth":
-      authName    = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
+      authName    = attrGetOpt[string](section & "." & k).getOrElse("")
     of "use_search_path", "disallow_http":
-      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
+      let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         if boxOpt.get().kind != MkBool:
           error(k & " (sink config key) must be 'true' or 'false'")
@@ -268,7 +268,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
           opts[k] = $(unpack[bool](boxOpt.get()))
     of "pinned_cert":
       let
-        certContents = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
+        certContents = attrGetOpt[string](section & "." & k).getOrElse("")
         path         = writeNewTempFile(certContents, "pinned", ".pem")
       discard setOverride(getChalkScope(), section & ".pinned_cert_file", some(pack(path)))
       # Can't delete from a dict while we're iterating over it.
@@ -276,7 +276,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     of "on_write_msg":
       discard
     of "log_search_path":
-      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
+      let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         try:
           let path = unpack[seq[string]](boxOpt.get())
@@ -284,7 +284,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
         except:
           error(k & " (sink config key) must be a list of string paths.")
     of "headers":
-      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
+      let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         try:
           let hdrs    = unpack[Con4mDict[string, string]](boxOpt.get())
@@ -296,7 +296,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
           error(k & " (sink config key) must be a dict that map " &
                     "header names to values (which must be strings).")
     of "timeout", "truncation_amount":
-      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
+      let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         # TODO: move this check to the spec.
         if boxOpt.get().kind != MkInt:
@@ -308,20 +308,20 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       try:
         # Todo: move this check to a type check in the spec.
         # This will accept con4m size types; they're auto-converted to int.
-        let asInt = getOpt[int64](getChalkScope(), section & "." & k).getOrElse(int64(10 * 1048576))
+        let asInt = attrGetOpt[int64](section & "." & k).getOrElse(int64(10 * 1048576))
         opts[k] = $(asInt)
       except:
         error(k & " (sink config key) must be a size specification")
         continue
     of "filename":
-      opts[k] = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
+      opts[k] = attrGetOpt[string](section & "." & k).getOrElse("")
       try:
         opts[k] = resolvePath(opts[k])
       except:
         warn(opts[k] & ": could not resolve sink filename. disabling sink")
         enabled = false
     else:
-      opts[k] = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
+      opts[k] = attrGetOpt[string](section & "." & k).getOrElse("")
 
   for item in deleteList:
     getObject(getChalkScope(), section).contents.del(item)

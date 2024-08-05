@@ -107,7 +107,7 @@ template doEmbeddedReport(): Box =
 template doCustomReporting() =
   for topic in getChalkSubsections("custom_report"):
     let spec = "custom_report." & topic
-    let enabledOpt = getOpt[bool](getChalkScope(), spec & ".enabled")
+    let enabledOpt = attrGetOpt[bool](spec & ".enabled")
     if enabledOpt.isNone() or not enabledOpt.get(): continue
     var
       sinkConfs = attrGet[seq[string]](spec & ".sink_configs")
