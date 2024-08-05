@@ -33,6 +33,7 @@ class Docker:
         tags: Optional[list[str]] = None,
         context: Optional[Path | str] = None,
         dockerfile: Optional[Path | str] = None,
+        content: Optional[str] = None,
         args: Optional[dict[str, str]] = None,
         push: bool = False,
         platforms: Optional[list[str]] = None,
@@ -53,15 +54,14 @@ class Docker:
             cmd += ["--load"]
         for t in tags:
             cmd += ["-t", t]
-        if dockerfile:
-            if isinstance(dockerfile, Path):
-                cmd += ["-f", str(dockerfile)]
-            else:
-                tmp = NamedTemporaryFile(delete_on_close=False)
-                tmp.file.write(dockerfile.encode())
-                tmp.file.close()
-                dockerfiles.append(tmp)
-                cmd += ["-f", tmp.name]
+        if content:
+            tmp = NamedTemporaryFile(delete_on_close=False)
+            tmp.file.write(content.encode())
+            tmp.file.close()
+            dockerfiles.append(tmp)
+            cmd += ["-f", tmp.name]
+        elif dockerfile:
+            cmd += ["-f", str(dockerfile)]
         for name, value in (args or {}).items():
             cmd += [f"--build-arg={name}={value}"]
         if platforms:
@@ -87,6 +87,7 @@ class Docker:
         tags: Optional[list[str]] = None,
         context: Optional[Path | str] = None,
         dockerfile: Optional[Path | str] = None,
+        content: Optional[str] = None,
         args: Optional[dict[str, str]] = None,
         cwd: Optional[Path] = None,
         push: bool = False,
@@ -109,6 +110,7 @@ class Docker:
                     tags=tags,
                     context=context,
                     dockerfile=dockerfile,
+                    content=content,
                     args=args,
                     push=push,
                     platforms=platforms,
