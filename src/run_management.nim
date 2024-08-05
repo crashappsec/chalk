@@ -36,6 +36,9 @@ proc attrGet*[T](fqn: string): T =
 proc attrGetOpt*[T](fqn: string): Option[T] =
   getOpt[T](getChalkScope(), fqn)
 
+proc attrGetObject*(fqn: string): AttrScope =
+  getObject(getChalkScope(), fqn)
+
 proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
   ## Sets the value of the `fqn` attribute in `ctx.attrs` to `value`, raising
   ## `AssertionDefect` if unsuccessful.

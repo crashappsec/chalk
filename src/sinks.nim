@@ -245,7 +245,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     priority:    int
     deleteList:  seq[string]
 
-  for k, _ in getObject(getChalkScope(), section).contents:
+  for k, _ in attrGetObject(section).contents:
     case k
     of "enabled":
       if not attrGet[bool](section & "." & k):
@@ -324,7 +324,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       opts[k] = attrGetOpt[string](section & "." & k).getOrElse("")
 
   for item in deleteList:
-    getObject(getChalkScope(), section).contents.del(item)
+    attrGetObject(section).contents.del(item)
 
   case sinkName
   of "":

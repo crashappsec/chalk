@@ -107,7 +107,7 @@ proc getChalkKey*(chalk: ChalkObj, k: string): string =
   if key.startsWith("_"):
     raise newException(KeyError, "Invalid key; cannot use run-time keys, only chalk-time keys.")
 
-  if key notin getContents(getChalkScope().getObject("keyspec")):
+  if key notin getContents(attrGetObject("keyspec")):
     raise newException(KeyError, "Invalid for env var; Chalk key doesn't exist.")
 
   if key in hostInfo:

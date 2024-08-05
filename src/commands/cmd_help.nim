@@ -382,13 +382,13 @@ See `chalk help reporting` for more information on templates.
         reportTemplates.add(k)
     else:
       for item in args:
-        if item notin getObject(getChalkScope(), "mark_template").getContents() and
-           item notin getObject(getChalkScope(), "report_template").getContents():
+        if item notin attrGetObject("mark_template").getContents() and
+           item notin attrGetObject("report_template").getContents():
           result += h3("No template found named: " & item )
         else:
-          if item in getObject(getChalkScope(), "mark_template").getContents():
+          if item in attrGetObject("mark_template").getContents():
             markTemplates.add(item)
-          if item in getObject(getChalkScope(), "report_template").getContents():
+          if item in attrGetObject("report_template").getContents():
             reportTemplates.add(item)
 
     if len(markTemplates) + len(reportTemplates) == 0:
