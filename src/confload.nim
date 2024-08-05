@@ -85,10 +85,10 @@ proc findOptionalConf(state: ConfigState): Option[string] =
         trace(fname & ": No configuration file found.")
 
 proc loadLocalStructs*(state: ConfigState) =
-  if getOpt[bool](getChalkScope(), "color").isSome(): setShowColor(get[bool](getChalkScope(), "color"))
-  setLogLevel(get[string](getChalkScope(), "log_level"))
+  if getOpt[bool](getChalkScope(), "color").isSome(): setShowColor(attrGet[bool]("color"))
+  setLogLevel(attrGet[string]("log_level"))
   var configPath: seq[string] = @[]
-  for path in get[seq[string]](getChalkScope(), "config_path"):
+  for path in attrGet[seq[string]]("config_path"):
     try:
       configPath.add(path.resolvePath())
     except:
@@ -98,15 +98,15 @@ proc loadLocalStructs*(state: ConfigState) =
       # and any logs are very verbose
       continue
   state.con4mAttrSet("config_path", pack(configPath))
-  var c4errLevel =  if get[bool](getChalkScope(), "con4m_pinpoint"): c4vShowLoc else: c4vBasic
+  var c4errLevel =  if attrGet[bool]("con4m_pinpoint"): c4vShowLoc else: c4vBasic
 
-  if get[bool](getChalkScope(), "chalk_debug"):
+  if attrGet[bool]("chalk_debug"):
     c4errLevel = if c4errLevel == c4vBasic: c4vTrace else: c4vMax
 
   setCon4mVerbosity(c4errLevel)
 
 proc handleCon4mErrors(err, tb: string): bool =
-  if tb != "" and getChalkScope() == nil or get[bool](getChalkScope(), "chalk_debug"):
+  if tb != "" and getChalkScope() == nil or attrGet[bool]("chalk_debug"):
      echo(formatCompilerError(err, nil, tb, default(InstInfo)))
   else:
     error(err)
@@ -190,12 +190,12 @@ proc loadAllConfigs*() =
   # The embedded config has already been validated.
   let configFile = getEmbeddedConfig()
 
-  if get[bool](getChalkScope(), "load_embedded_config"):
+  if attrGet[bool]("load_embedded_config"):
     stack.addConfLoad(embeddedConfName, toStream(configFile)).
           addCallback(loadLocalStructs)
     doRun()
 
-  if get[bool](getChalkScope(), "load_external_config"):
+  if attrGet[bool]("load_external_config"):
     let optConf = stack.configState.findOptionalConf()
     if optConf.isSome():
       let fName = optConf.get()

@@ -30,6 +30,9 @@ iterator getChalkSubsections*(s: string): string =
 proc sectionExists*(scope: AttrScope, s: string): bool =
   scope.getObjectOpt(s).isSome()
 
+proc attrGet*[T](fqn: string): T =
+  get[T](getChalkScope(), fqn)
+
 proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
   ## Sets the value of the `fqn` attribute in `ctx.attrs` to `value`, raising
   ## `AssertionDefect` if unsuccessful.
@@ -204,7 +207,7 @@ template trySetIfNeeded*(o: ChalkDict, k: string, code: untyped) =
     trace("Could not set chalk key " & k & " due to: " & getCurrentExceptionMsg())
 
 proc isChalkingOp*(): bool =
-  return commandName in get[seq[string]](getChalkScope(), "valid_chalk_command_names")
+  return commandName in attrGet[seq[string]]("valid_chalk_command_names")
 
 proc lookupByPath*(obj: ChalkDict, path: string): Option[Box] =
   let

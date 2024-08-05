@@ -16,7 +16,7 @@ proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
     let v = "keyspec." & k
     if opt.isNone() and k in hostInfo:                continue
     if opt.isSome() and k in opt.get().collectedData: continue
-    if get[int](getChalkScope(), v & ".kind") != int(kt): continue
+    if attrGet[int](v & ".kind") != int(kt): continue
     if k notin subscribedKeys: continue
     let valueOpt = attrLookup(getChalkScope(), v & ".value")
     let callbackOpt = attrLookup(getChalkScope(), v & ".callback")

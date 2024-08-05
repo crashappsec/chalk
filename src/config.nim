@@ -53,18 +53,18 @@ proc filterByTemplate*(dict: ChalkDict, p: string): ChalkDict =
     let section = p & ".key"
     if sectionExists(getChalkScope(), section):
       let ss = section & "." & k
-      if sectionExists(getChalkScope(), ss) and get[bool](getChalkScope(), ss & ".use"):
+      if sectionExists(getChalkScope(), ss) and attrGet[bool](ss & ".use"):
         result[k] = v
 
 proc getOutputConfig*(): string =
   return "outconf." & getBaseCommandName()
 
 template getMarkTemplate*(): string =
-  let tmplName = get[string](getChalkScope(), getOutputConfig() & ".mark_template")
+  let tmplName = attrGet[string](getOutputConfig() & ".mark_template")
   "mark_template." & tmplName
 
 template getReportTemplate*(): string =
-  let tmplName = get[string](getChalkScope(), getOutputConfig() & ".report_template")
+  let tmplName = attrGet[string](getOutputConfig() & ".report_template")
   "report_template." & tmplName
 
 template forceReportKeys*(keynames: openarray[string]) =

@@ -416,7 +416,7 @@ proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
     if path.match(item):
       once:
         trace(path & ": ignored due to matching ignore pattern: " &
-          get[seq[string]](getChalkScope(), "ignore_patterns")[i])
+          attrGet[seq[string]]("ignore_patterns")[i])
         trace("We will NOT report additional path skips.")
       return true
 
@@ -441,7 +441,7 @@ proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
     followFLinks = false
 
   if isChalkingOp():
-    let symLinkBehavior = get[string](getChalkScope(), "symlink_behavior")
+    let symLinkBehavior = attrGet[string]("symlink_behavior")
     if symLinkBehavior == "skip":
       skipLinks = true
     elif symLinkBehavior == "clobber":
@@ -548,7 +548,7 @@ var
   installedPlugins: Table[string, Plugin]
   codecs:           seq[Plugin] = @[]
 
-template isCodec*(plugin: Plugin): bool = get[bool](getChalkScope(), "plugin." & plugin.name & ".codec")
+template isCodec*(plugin: Plugin): bool = attrGet[bool]("plugin." & plugin.name & ".codec")
 
 proc checkPlugin(plugin: Plugin, codec: bool): bool {.inline.} =
   let
@@ -557,11 +557,11 @@ proc checkPlugin(plugin: Plugin, codec: bool): bool {.inline.} =
 
   if not sectionExists(getChalkScope(), section):
     error("No config provided for plugin " & name & ". Plugin ignored.")
-  elif not get[bool](getChalkScope(), section & ".enabled"):
+  elif not attrGet[bool](section & ".enabled"):
       trace("Plugin " & name & " is disabled via config file.")
   elif name in installedPlugins:
     error("Double install of plugin named: " & name)
-  elif get[bool](getChalkScope(), section & ".codec") != codec:
+  elif attrGet[bool](section & ".codec") != codec:
     if codec:
       error("Codec expected, but the config file does not declare that it " &
         "is a codec.")
@@ -575,7 +575,7 @@ proc checkPlugin(plugin: Plugin, codec: bool): bool {.inline.} =
 proc getAllPlugins*(): seq[Plugin] =
   var preResult: seq[(int, Plugin)] = @[]
   for name, plugin in installedPlugins:
-    let tup = (get[int](getChalkScope(), "plugin." & plugin.name & ".priority"), plugin)
+    let tup = (attrGet[int]("plugin." & plugin.name & ".priority"), plugin)
     preResult.add(tup)
 
   preResult.sort()

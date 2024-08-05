@@ -117,11 +117,11 @@ proc restore(self: Backup,
 proc initCallback(this: AttestationKeyProvider) =
   let
     self         = Backup(this)
-    authName     = get[string](getChalkScope(), "attestation.attestation_key_backup.auth")
-    location     = get[string](getChalkScope(), "attestation.attestation_key_backup.location")
+    authName     = attrGet[string]("attestation.attestation_key_backup.auth")
+    location     = attrGet[string]("attestation.attestation_key_backup.location")
     authOpt      = getAuthConfigByName(authName)
-    url          = get[string](getChalkScope(), "attestation.attestation_key_backup.uri").removeSuffix("/")
-    timeout      = cast[int](get[Con4mDuration](getChalkScope(), "attestation.attestation_key_backup.timeout"))
+    url          = attrGet[string]("attestation.attestation_key_backup.uri").removeSuffix("/")
+    timeout      = cast[int](attrGet[Con4mDuration]("attestation.attestation_key_backup.timeout"))
 
   if authOpt.isNone():
     raise newException(ValueError,

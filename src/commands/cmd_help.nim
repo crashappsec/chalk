@@ -349,7 +349,7 @@ proc formatOneTemplate(state: ConfigState,
   result = markdown(doc)
 
   for k in getChalkSubsections(tmpl & ".key"):
-    if get[bool](getChalkScope(), tmpl & ".key." & k & ".use") == true:
+    if attrGet[bool](tmpl & ".key." & k & ".use") == true:
       keysToReport.add(k)
 
   if len(keysToReport) == 0:
@@ -545,7 +545,7 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
           toOut = con4mRuntime.fullTextSearch(args)
           break
 
-  if get[bool](getChalkScope(), "use_pager"):
+  if attrGet[bool]("use_pager"):
     runPager($(toOut))
   else:
     print(toOut)
@@ -644,11 +644,11 @@ proc getConfigValues(): Rope =
 
 proc showConfigValues*(force = false) =
   once:
-    if not (get[bool](getChalkScope(), "show_config") or force):
+    if not (attrGet[bool]("show_config") or force):
       return
 
     let toOut = getConfigValues()
-    if get[bool](getChalkScope(), "use_pager"):
+    if attrGet[bool]("use_pager"):
       runPager($(toOut))
     else:
       print(toOut)

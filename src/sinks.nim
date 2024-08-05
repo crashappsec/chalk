@@ -45,7 +45,7 @@ proc chalkErrFilter*(msg: string, info: StringTable): (string, bool) =
     let llStr = info[keyLogLevel]
 
     if (llStr in toLogLevelMap) and getChalkScope() != nil and
-     (toLogLevelMap[llStr] <= toLogLevelMap[get[string](getChalkScope(), "chalk_log_level")]):
+     (toLogLevelMap[llStr] <= toLogLevelMap[attrGet[string]("chalk_log_level")]):
       return (msg, true)
 
   return ("", false)
@@ -88,7 +88,7 @@ template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
 
   line &= " (sink conf='" & cfg.name & "')"
 
-  if get[string](getChalkScope(), "log_level") == "trace":
+  if attrGet[string]("log_level") == "trace":
     case cfg.mySink.name
     of "post", "presign":
       let
@@ -146,22 +146,22 @@ proc ioErrorHandler(cfg: SinkConfig, t: Topic, msg, err, tb: string) =
   let
     toOut = formatIo(cfg, t, err, msg)
 
-  if not quiet or get[bool](getChalkScope(), "chalk_debug"):
+  if not quiet or attrGet[bool]("chalk_debug"):
     error(toOut)
   else:
     trace(toOut)
-  if getChalkScope() != nil and get[bool](getChalkScope(), "chalk_debug"):
+  if getChalkScope() != nil and attrGet[bool]("chalk_debug"):
     publish("debug", tb)
 
 proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
   let quiet = t.name in quietTopics
 
-  if quiet and not get[bool](getChalkScope(), "chalk_debug"):
+  if quiet and not attrGet[bool]("chalk_debug"):
     return
 
   let toOut = formatIo(cfg, t, errmsg, "")
 
-  if get[string](getChalkScope(), "log_level") in ["trace", "info"]:
+  if attrGet[string]("log_level") in ["trace", "info"]:
     let
       section  = "sink_config." & cfg.name
 
@@ -248,7 +248,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
   for k, _ in getObject(getChalkScope(), section).contents:
     case k
     of "enabled":
-      if not get[bool](getChalkScope(), section & "." & k):
+      if not attrGet[bool](section & "." & k):
         error("Sink configuration '" & name & " is disabled.")
         enabled = false
     of "priority":
@@ -347,10 +347,10 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       opts["content_type"] = "application/json"
   of "file":
     if "log_search_path" notin opts:
-      opts["log_search_path"] = get[seq[string]](getChalkScope(), "log_search_path").join(":")
+      opts["log_search_path"] = attrGet[seq[string]]("log_search_path").join(":")
   of "rotating_log":
     if "log_search_path" notin opts:
-      opts["log_search_path"] = get[seq[string]](getChalkScope(), "log_search_path").join(":")
+      opts["log_search_path"] = attrGet[seq[string]]("log_search_path").join(":")
   else:
     discard
 
@@ -392,14 +392,14 @@ proc getSinkConfigs*(): Table[string, SinkConfig] = return availableSinkConfigs
 
 proc setupDefaultLogConfigs*() =
   let
-    auditFile = get[string](getChalkScope(), "audit_location")
-    doAudit   = get[bool](getChalkScope(), "publish_audit")
+    auditFile = attrGet[string]("audit_location")
+    doAudit   = attrGet[bool]("publish_audit")
 
   if doAudit and auditFile != "":
     let
       f         = some(newOrderedTable({ "filename" : auditFile,
                                          "max" :
-                                         $(get[Con4mSize](getChalkScope(), "audit_file_size"))}))
+                                         $(attrGet[Con4mSize]("audit_file_size"))}))
       sink      = getSinkImplementation("rotating_log").get()
       auditConf = configSink(sink, "audit", f, handler=errCbOpt,
                              logger=okCbOpt).get()
@@ -410,7 +410,7 @@ proc setupDefaultLogConfigs*() =
     else:
       trace("Audit log subscription enabled")
   let
-    uri     = get[string](getChalkScope(), "crashoverride_usage_reporting_url")
+    uri     = attrGet[string]("crashoverride_usage_reporting_url")
     params  = some(newOrderedTable({ "uri":          uri,
                                      "content_type": "application/json" }))
     sink    = getSinkImplementation("post").get()

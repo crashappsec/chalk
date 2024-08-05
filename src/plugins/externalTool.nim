@@ -30,27 +30,27 @@ proc runOneTool(info: PIInfo, path: string): ChalkDict =
   result = ChalkDict()
   let args = @[pack(path)]
   let base = "tool." & info.name
-  var exe  = ensureRunCallback[string](get[CallbackObj](getChalkScope(), base & ".get_tool_location"), args)
+  var exe  = ensureRunCallback[string](attrGet[CallbackObj](base & ".get_tool_location"), args)
 
   if exe == "":
-    let installed = ensureRunCallback[bool](get[CallbackObj](getChalkScope(), base & ".attempt_install"), args)
+    let installed = ensureRunCallback[bool](attrGet[CallbackObj](base & ".attempt_install"), args)
     if not installed:
       trace(info.name & ": could not be installed. skipping")
       return
-    exe = ensureRunCallback[string](get[CallbackObj](getChalkScope(), base & ".get_tool_location"), args)
+    exe = ensureRunCallback[string](attrGet[CallbackObj](base & ".get_tool_location"), args)
 
   if exe == "":
     trace(info.name & ": could not be found. skipping")
     return
 
   let
-    argv = ensureRunCallback[string](get[CallbackObj](getChalkScope(), base & ".get_command_args"), args)
+    argv = ensureRunCallback[string](attrGet[CallbackObj](base & ".get_command_args"), args)
     cmd  = exe & " " & argv.strip()
   trace(cmd)
   let
     outs = unpack[seq[Box]](c4mSystem(@[pack(cmd)]).get())
 
-  let d = ensureRunCallback[ChalkDict](get[CallbackObj](getChalkScope(), base & ".produce_keys"), outs)
+  let d = ensureRunCallback[ChalkDict](attrGet[CallbackObj](base & ".produce_keys"), outs)
   if len(d) == 0:
     trace(info.name & ": produced no keys. skipping")
     return
@@ -74,8 +74,8 @@ template toolBase(path: string) {.dirty.} =
   var
     toolInfo = initTable[string, seq[(int, PIInfo)]]()
   let
-    runSbom  = get[bool](getChalkScope(), "run_sbom_tools")
-    runSast  = get[bool](getChalkScope(), "run_sast_tools")
+    runSbom  = attrGet[bool]("run_sbom_tools")
+    runSast  = attrGet[bool]("run_sast_tools")
 
   # tools should only run during insert operations
   # note this is a subset of chalkable operations
@@ -84,12 +84,12 @@ template toolBase(path: string) {.dirty.} =
 
   for k in getChalkSubsections("tool"):
     let v = "tool." & k
-    if not get[bool](getChalkScope(), v & ".enabled"): continue
-    let kind = get[string](getChalkScope(), v & ".kind")
+    if not attrGet[bool](v & ".enabled"): continue
+    let kind = attrGet[string](v & ".kind")
     if not runSbom and kind == "sbom": continue
     if not runSast and kind == "sast": continue
 
-    let tool = (get[int](getChalkScope(), v & ".priority"), PIInfo(name: k))
+    let tool = (attrGet[int](v & ".priority"), PIInfo(name: k))
     if kind notin toolInfo:
       toolInfo[kind] = @[tool]
     else:
@@ -107,7 +107,7 @@ template toolBase(path: string) {.dirty.} =
         # merged structure should be:
         # { SBOM: { foo: {...}, bar: {...} } }
         result.merge(data.nestWith(info.name))
-        if len(data) >= 0 and get[bool](getChalkScope(), "tool." & info.name & ".stop_on_success"):
+        if len(data) >= 0 and attrGet[bool]("tool." & info.name & ".stop_on_success"):
           break
       except:
         error(info.name & ": " & getCurrentExceptionMsg())
