@@ -215,7 +215,7 @@ elif hostOs == "macosx":
 else:
     template makeCompletionAutoSource() = discard
 
-const currentAutocompleteVersion = (0, 1, 3)
+const currentAutocompleteVersion = (0, 4, 9)
 
 proc validateMetaData*(obj: ChalkObj): ValidateResult {.importc.}
 
