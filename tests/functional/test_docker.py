@@ -434,34 +434,191 @@ def test_base_images(chalk: Chalk):
 
 
 @pytest.mark.parametrize(
-    "test_file, entrypoint, cmd",
+    "test_file, docker_entrypoint, chalk_entrypoint, cmd, buildkit, buildx, runnable",
     [
         (
-            "string.Dockerfile",
-            ["/chalk", "exec", "--"],
+            Docker.dockerfile(
+                """
+                FROM alpine
+                ENTRYPOINT echo hello
+                CMD echo world
+                """
+            ),
             ["/bin/sh", "-c", "echo hello"],
+            [
+                "/chalk",
+                "exec",
+                "--exec-command-name",
+                "/bin/sh",
+                "--",
+                "-c",
+                "echo hello",
+            ],
+            ["/bin/sh", "-c", "echo world"],
+            True,  # buildkit
+            False,  # buildx
+            True,  # runnable
         ),
         (
-            "json.Dockerfile",
+            Docker.dockerfile(
+                """
+                FROM alpine
+                ENTRYPOINT ["echo"]
+                CMD ["hello"]
+                """
+            ),
+            ["echo"],
             ["/chalk", "exec", "--exec-command-name", "echo", "--"],
             ["hello"],
+            True,  # buildkit
+            False,  # buildx
+            True,  # runnable
+        ),
+        (
+            Docker.dockerfile(
+                """
+                FROM alpine as base
+                ENTRYPOINT ["/bin/sh", "-c"]
+                FROM base
+                ENTRYPOINT []
+                CMD ["echo", "hello"]
+                """
+            ),
+            None,
+            ["/chalk", "exec", "--"],
+            ["echo", "hello"],
+            True,  # buildkit
+            False,  # buildx
+            True,  # runnable
+        ),
+        (
+            Docker.dockerfile(
+                """
+                FROM alpine
+                ENTRYPOINT
+                CMD ["echo", "hello"]
+            """
+            ),
+            ["/bin/sh", "-c", ""],
+            ["/chalk", "exec", "--exec-command-name", "/bin/sh", "--", "-c", ""],
+            ["echo", "hello"],
+            True,  # buildkit
+            False,  # buildx
+            True,  # runnable
+        ),
+        (
+            Docker.dockerfile(
+                """
+                FROM alpine
+                ENTRYPOINT
+                CMD ["echo", "hello"]
+                """
+            ),
+            None,
+            ["/chalk", "exec", "--"],
+            ["echo", "hello"],
+            False,  # buildkit
+            False,  # buildx
+            True,  # runnable
+        ),
+        (
+            Docker.dockerfile(
+                """
+                FROM alpine
+                ENTRYPOINT
+                CMD ["echo", "hello"]
+                """
+            ),
+            ["/bin/sh", "-c", ""],
+            ["/chalk", "exec", "--exec-command-name", "/bin/sh", "--", "-c", ""],
+            ["echo", "hello"],
+            False,  # buildkit
+            True,  # buildx
+            True,  # runnable
+        ),
+        (
+            Docker.dockerfile(
+                """
+                FROM alpine
+                ENTRYPOINT [""]
+                CMD ["echo", "hello"]
+                """
+            ),
+            [""],
+            ["/chalk", "exec", "--"],
+            ["echo", "hello"],
+            True,  # buildkit
+            False,  # buildx
+            True,  # runnable
+        ),
+        (
+            Docker.dockerfile(
+                """
+                FROM alpine
+                ENTRYPOINT [" "]
+                CMD ["echo", "hello"]
+                """
+            ),
+            [" "],
+            [" "],  # chalk should bail out wrapping known invalid entrypoint
+            ["echo", "hello"],
+            True,  # buildkit
+            False,  # buildx
+            False,  # runnable
+        ),
+        (
+            Docker.dockerfile(
+                """
+                FROM alpine
+                ENTRYPOINT ["", ""]
+                CMD ["echo", "hello"]
+                """
+            ),
+            ["", ""],
+            ["", ""],  # same thing. chalk should bail out
+            ["echo", "hello"],
+            True,  # buildkit
+            False,  # buildx
+            False,  # runnable
         ),
     ],
 )
 def test_wrap_entrypoint(
-    chalk: Chalk, random_hex: str, test_file: str, entrypoint: list[str], cmd: list[str]
+    chalk: Chalk,
+    test_file: str,
+    docker_entrypoint: list[str],
+    chalk_entrypoint: list[str],
+    cmd: list[str],
+    buildkit: bool,
+    buildx: bool,
+    runnable: bool,
 ):
-    image_id, result = chalk.docker_build(
-        dockerfile=DOCKERFILES / "valid" / "entrypoint" / test_file,
-        context=DOCKERFILES / "valid" / "entrypoint",
-        config=CONFIGS / "docker_wrap.c4m",
+    docker_id, _ = Docker.build(
+        dockerfile=test_file,
+        buildkit=buildkit,
+        buildx=buildx,
     )
-    _, output = Docker.run(image_id)
-    assert "hello" in output.text
+    assert Docker.inspect(docker_id)[0].has(
+        Config={
+            "Entrypoint": docker_entrypoint,
+            "Cmd": cmd,
+        }
+    )
+    _, docker_output = Docker.run(docker_id, expected_success=runnable)
+
+    image_id, result = chalk.docker_build(
+        dockerfile=test_file,
+        config=CONFIGS / "docker_wrap.c4m",
+        buildkit=buildkit,
+        buildx=buildx,
+        run_docker=False,  # explicitly running above
+    )
     assert result.mark.has(
-        _IMAGE_ENTRYPOINT=entrypoint,
+        _IMAGE_ENTRYPOINT=chalk_entrypoint,
         _IMAGE_CMD=cmd,
     )
+    _, chalk_output = Docker.run(image_id, expected_success=runnable)
+    assert docker_output == chalk_output
 
 
 @pytest.mark.parametrize(

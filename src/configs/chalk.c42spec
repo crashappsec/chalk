@@ -1758,13 +1758,8 @@ configuration present in the binary in the time of the wrapping.
     shortdoc: "Wrap image CMD, when ENTRYPOINT is missing"
     doc:     """
 Similar to `wrap_entrypoint` except when Dockerfile does not have `ENTRYPOINT`,
-whether to wrap `CMD` instead.
-
-Note that enabling this option can potentially break image functionality
-as base images can define `ENTRYPOINT` which might expect specific format for `CMD`.
-This config should only be enabled when `ENTRYPOINT` is able to execute arbitrary
-scripts which is usually default docker `ENTRYPOINT` in most cases.
-Example where this might not be the case are docker images for AWS lambda functions.
+whether to wrap `CMD` via `ENTRYPOINT` instead.
+This effectively adds `ENTRYPOINT` to the image.
 """
   }
 

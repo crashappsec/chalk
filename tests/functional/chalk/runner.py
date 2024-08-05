@@ -79,10 +79,10 @@ class ChalkMark(ContainsMixin, dict):
         # MAGIC must always be present in chalk mark and marks the beginning of the json
         assert MAGIC in text
         start = text.rfind("{", 0, text.find(MAGIC))
-        end = text.rfind("}", start)
         assert start > 0
-        assert end > 0
-        mark_json = text[start : end + 1]
+        beginning = text[start:].split("\x00")[0]
+        end = beginning.rfind("}")
+        mark_json = beginning[: end + 1]
         mark = json.loads(mark_json)
         assert mark
         return cls(report=ChalkReport({}), mark=mark)
@@ -491,11 +491,12 @@ class Chalk:
             # sanity check that chalk mark includes basic chalk keys
             assert image_hash in [i["_CURRENT_HASH"] for i in result.marks]
             assert image_hash in [i["_IMAGE_ID"] for i in result.marks]
-            if isinstance(context, Path):
-                dockerfile = dockerfile or (
-                    (cwd or context or Path(os.getcwd())) / "Dockerfile"
-                )
-                assert str(dockerfile) == result.marks[-1]["DOCKERFILE_PATH"]
+            if isinstance(dockerfile, Path) or dockerfile is None:
+                if isinstance(context, Path):
+                    dockerfile = dockerfile or (
+                        (cwd or context or Path(os.getcwd())) / "Dockerfile"
+                    )
+                    assert str(dockerfile) == result.marks[-1]["DOCKERFILE_PATH"]
         elif not expecting_report:
             try:
                 assert not result.reports

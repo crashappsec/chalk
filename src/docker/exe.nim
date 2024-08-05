@@ -39,10 +39,12 @@ proc runDockerGetEverything*(args: seq[string], stdin = "", silent = true): Exec
   return result
 
 proc getBuildXVersion*(): Version =
-  # Have to parse the thing to get compares right.
   once:
     if getEnv("DOCKER_BUILDKIT") == "0":
-      return buildXVersion
+      if dockerInvocation != nil and dockerInvocation.cmd == build and dockerInvocation.foundBuildx:
+        trace("docker: DOCKER_BUILDKIT is disabled but explicitly running with buildx")
+      else:
+        return buildXVersion
     # examples:
     # github.com/docker/buildx v0.10.2 00ed17df6d20f3ca4553d45789264cdb78506e5f
     # github.com/docker/buildx 0.11.2 9872040b6626fb7d87ef7296fd5b832e8cc2ad17
