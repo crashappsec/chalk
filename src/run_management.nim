@@ -54,6 +54,9 @@ proc con4mAttrSet*(fqn: string, value: Box, attrType: Con4mType) =
   ## This proc may be used if the attribute is not already set.
   doAssert attrSet(getChalkScope(), fqn, value, attrType).code == errOk
 
+proc con4mSectionCreate*(fqn: string) =
+  discard attrLookup(getChalkScope(), fqn.split('.'), ix = 0, op = vlSecDef)
+
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
 proc startTestRun*() =

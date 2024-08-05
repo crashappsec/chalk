@@ -73,19 +73,14 @@ template forceReportKeys*(keynames: openarray[string]) =
 
   # Create the "key" section if required.
   if not sectionExists(section) and keynames.len > 0:
-    discard attrLookup(
-      attrGetObject(templateRef),
-      ["key"],
-      ix = 0,
-      op = vlSecDef,
-    )
+    con4mSectionCreate(section)
 
   let keys = attrGetObject(section).getContents()
 
   for item in keynames:
     # Create the item section if required.
     if item notin keys:
-      discard attrLookup(getChalkScope(), [templateRef, "key", item], ix = 0, op = vlSecDef)
+      con4mSectionCreate(section & "." & item)
     con4mAttrSet(
       section & "." & item & ".use",
       pack(true),
@@ -99,19 +94,14 @@ template forceChalkKeys*(keynames: openarray[string]) =
 
     # Create the "key" section if required.
     if not sectionExists(section) and keynames.len > 0:
-      discard attrLookup(
-        attrGetObject(templateRef),
-        ["key"],
-        ix = 0,
-        op = vlSecDef,
-      )
+      con4mSectionCreate(section)
 
     let keys = attrGetObject(section).getContents()
 
     for item in keynames:
       # Create the item section if required.
       if item notin keys:
-        discard attrLookup(getChalkScope(), [templateRef, "key", item], ix = 0, op = vlSecDef)
+        con4mSectionCreate(section & "." & item)
       con4mAttrSet(
         section & "." & item & ".use",
         pack(true),
