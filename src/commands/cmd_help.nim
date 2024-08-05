@@ -340,16 +340,16 @@ proc getReportTemplateDocs(state: ConfigState): Rope =
                                  title = atom("Report Templates"))
 
 proc formatOneTemplate(state: ConfigState,
-                     tmpl: string): Rope =
+                     tmpl: AttrScope): Rope =
   var
     keysToReport: seq[string]
 
-  let docOpt = getOpt[string](getChalkScope(), tmpl & ".doc")
+  let docOpt = getOpt[string](tmpl, "doc")
   let doc = if docOpt.isSome(): docOpt.get() else: "No description available."
   result = markdown(doc)
 
-  for k in getChalkSubsections(tmpl & ".key"):
-    if get[bool](getChalkScope(), tmpl & ".key." & k & ".use") == true:
+  for k, v in getInstantiations(tmpl, "key"):
+    if get[bool](v, "use") == true:
       keysToReport.add(k)
 
   if len(keysToReport) == 0:
@@ -376,19 +376,19 @@ See `chalk help reporting` for more information on templates.
       reportTemplates: seq[string]
 
     if "all" in args:
-      for k in getChalkSubsections("mark_template"):
+      for k, v in getChalkSubsections("mark_template"):
         markTemplates.add(k)
-      for k in getChalkSubsections("report_template"):
+      for k, v in getChalkSubsections("report_template"):
         reportTemplates.add(k)
     else:
       for item in args:
-        if item notin getObject(getChalkScope(), "mark_template").getContents() and
-           item notin getObject(getChalkScope(), "report_template").getContents():
+        if item notin getContents(getChalkScope().getObject("mark_template")) and
+           item notin getContents(getChalkScope().getObject("report_template")):
           result += h3("No template found named: " & item )
         else:
-          if item in getObject(getChalkScope(), "mark_template").getContents():
+          if item in getContents(getChalkScope().getObject("mark_template")):
             markTemplates.add(item)
-          if item in getObject(getChalkScope(), "report_template").getContents():
+          if item in getContents(getChalkScope().getObject("report_template")):
             reportTemplates.add(item)
 
     if len(markTemplates) + len(reportTemplates) == 0:
@@ -396,13 +396,13 @@ See `chalk help reporting` for more information on templates.
       return
 
     for markTmplName in markTemplates:
-      let theTemplate = "mark_template." & markTmplName
+      let theTemplate = getObject(getChalkScope(), "mark_template." & markTmplName)
 
       result += h2("Mark Template: " & markTmplName)
       result += state.formatOneTemplate(theTemplate)
 
     for repTmplName in reportTemplates:
-      let theTemplate = "report_template." & repTmplName
+      let theTemplate = getObject(getChalkScope(), "report_template." & repTmplName)
 
       result += h2("Report Template: " & repTmplName)
       result += state.formatOneTemplate(theTemplate)

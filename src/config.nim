@@ -47,78 +47,62 @@ proc selfChalkSetSubKey*(key: string, subKey: string, subValue: Box) =
   value[subKey] = subValue
   selfChalkSetKey(key, pack(value))
 
-proc filterByTemplate*(dict: ChalkDict, p: string): ChalkDict =
+proc filterByTemplate*(dict: ChalkDict, p: AttrScope): ChalkDict =
   result = ChalkDict()
   for k, v in dict:
-    let section = p & ".key"
-    if sectionExists(getChalkScope(), section):
-      let ss = section & "." & k
-      if sectionExists(getChalkScope(), ss) and get[bool](getChalkScope(), ss & ".use"):
+    let pKeysOpt = getObjectOpt(p, "key")
+    if pKeysOpt.isSome():
+      let pKeys = pKeysOpt.get()
+      if getObjectOpt(pKeys, k).isSome() and get[bool](pKeys, k & ".use"):
         result[k] = v
 
-proc getOutputConfig*(): string =
-  return "outconf." & getBaseCommandName()
+proc getOutputConfig*(): AttrScope =
+  return getObject(getChalkScope(), "outconf." & getBaseCommandName())
 
-template getMarkTemplate*(): string =
-  let tmplName = get[string](getChalkScope(), getOutputConfig() & ".mark_template")
-  "mark_template." & tmplName
+template getMarkTemplate*(): AttrScope =
+  let
+    outconf  = getOutputConfig()
+    tmplName = get[string](outconf, "mark_template")
 
-template getReportTemplate*(): string =
-  let tmplName = get[string](getChalkScope(), getOutputConfig() & ".report_template")
-  "report_template." & tmplName
+  getObject(getChalkScope(), "mark_template." & tmplName)
+
+template getReportTemplate*(): AttrScope =
+  let
+    outconf  = getOutputConfig()
+    tmplName = get[string](outconf, "report_template")
+
+  getObject(getChalkScope(), "report_template." & tmplName)
 
 template forceReportKeys*(keynames: openarray[string]) =
   let templateRef = getReportTemplate()
-  let section     = templateRef & ".key"
 
   # Create the "key" section if required.
-  if not sectionExists(getChalkScope(), section) and keynames.len > 0:
-    discard attrLookup(
-      getObject(getChalkScope(), templateRef),
-      ["key"],
-      ix = 0,
-      op = vlSecDef,
-    )
+  if getObjectOpt(templateRef, "key").isNone() and keynames.len > 0:
+    discard attrLookup(templateRef, ["key"], ix = 0, op = vlSecDef)
 
-  let keys = getObject(getChalkScope(), section).getContents()
+  let keys = getObject(templateRef, "key")
 
   for item in keynames:
     # Create the item section if required.
-    if item notin keys:
-      discard attrLookup(getChalkScope(), [templateRef, "key", item], ix = 0, op = vlSecDef)
-    con4mAttrSet(
-      getChalkScope(),
-      section & "." & item & ".use",
-      pack(true),
-      Con4mType(kind: TypeBool),
-    )
+    if item notin getContents(keys):
+      discard attrLookup(keys, [item], ix = 0, op = vlSecDef)
+    con4mAttrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool))
 
 template forceChalkKeys*(keynames: openarray[string]) =
   if isChalkingOp():
     let templateRef = getMarkTemplate()
-    let section     = templateRef & ".key"
 
     # Create the "key" section if required.
-    if not sectionExists(getChalkScope(), section) and keynames.len > 0:
-      discard attrLookup(
-        getObject(getChalkScope(), templateRef),
-        ["key"],
-        ix = 0,
-        op = vlSecDef,
-      )
+    if getObjectOpt(templateRef, "key").isNone() and keynames.len > 0:
+      discard attrLookup(templateRef, ["key"], ix = 0, op = vlSecDef)
 
-    let keys = getObject(getChalkScope(), section).getContents()
+    let keys = getObject(templateRef, "key")
 
     for item in keynames:
       # Create the item section if required.
-      if item notin keys:
-        discard attrLookup(getChalkScope(), [templateRef, "key", item], ix = 0, op = vlSecDef)
-      con4mAttrSet(
-        getChalkScope(),
-        section & "." & item & ".use",
-        pack(true),
-        Con4mType(kind: TypeBool),
-      )
+      if item notin getContents(keys):
+        discard attrLookup(keys, [item], ix = 0, op = vlSecDef)
+      con4mAttrSet(keys, item & ".use", pack(true), Con4mType(kind: TypeBool))
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.sCall(cb, args)
@@ -140,6 +124,16 @@ proc setCommandName*(s: string) =
 
 proc getChalkRuntime*(): ConfigState      = con4mRuntime.configState
 proc getValidationRuntime*(): ConfigState = con4mRuntime.validationState
+
+proc getKeySpec*(name: string): Option[AttrScope] =
+  for k, v in getChalkSubsections("keyspec"):
+    if name == k:
+      return some(v)
+
+proc getPluginConfig*(name: string): Option[AttrScope] =
+  for k, v in getChalkSubsections("plugin"):
+    if k == name:
+      return some(v)
 
 var autoHelp*:       string = ""
 proc getAutoHelp*(): string = autoHelp
