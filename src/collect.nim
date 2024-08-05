@@ -28,7 +28,7 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   # except that we do allow "*" fields for plugins, so we need the runtime
   # check to filter out inappropriate items.
   let section = "keyspec." & key
-  doAssert sectionExists(getChalkScope(), section)
+  doAssert sectionExists(section)
 
   if key in attrGet[seq[string]]("plugin." & plugin.name & ".ignore"): return false
 
@@ -58,7 +58,7 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
 
 proc registerKeys(templ: string) =
   let section = templ & ".key"
-  if sectionExists(getChalkScope(), section):
+  if sectionExists(section):
     for name in getChalkSubsections(section):
       let content = section & "." & name
       let useOpt = attrGetOpt[bool](content & ".use")

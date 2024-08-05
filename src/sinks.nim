@@ -165,7 +165,7 @@ proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
     let
       section  = "sink_config." & cfg.name
 
-    if sectionExists(getChalkScope(), section) and errmsg == "Write":
+    if sectionExists(section) and errmsg == "Write":
       let msgOpt = attrGetOpt[string](section & ".on_write_msg")
       if msgOpt.isSome():
         info(strutils.strip(msgOpt.get()))
@@ -186,7 +186,7 @@ proc getAuthConfigByName*(name: string, attr: AttrScope = AttrScope(nil)): Optio
     section  = "auth_config." & name
     opts     = OrderedTableRef[string, string]()
 
-  if not sectionExists(attrRoot, section):
+  if attrRoot.getObjectOpt(section).isNone():
     error(section & " is referenced but its missing in the config")
     return none(AuthConfig)
 
@@ -232,7 +232,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
   let
     section  = "sink_config." & name
 
-  if not sectionExists(getChalkScope(), section):
+  if not sectionExists(section):
     return none(SinkConfig)
 
   var

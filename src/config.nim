@@ -51,9 +51,9 @@ proc filterByTemplate*(dict: ChalkDict, p: string): ChalkDict =
   result = ChalkDict()
   for k, v in dict:
     let section = p & ".key"
-    if sectionExists(getChalkScope(), section):
+    if sectionExists(section):
       let ss = section & "." & k
-      if sectionExists(getChalkScope(), ss) and attrGet[bool](ss & ".use"):
+      if sectionExists(ss) and attrGet[bool](ss & ".use"):
         result[k] = v
 
 proc getOutputConfig*(): string =
@@ -72,7 +72,7 @@ template forceReportKeys*(keynames: openarray[string]) =
   let section     = templateRef & ".key"
 
   # Create the "key" section if required.
-  if not sectionExists(getChalkScope(), section) and keynames.len > 0:
+  if not sectionExists(section) and keynames.len > 0:
     discard attrLookup(
       attrGetObject(templateRef),
       ["key"],
@@ -99,7 +99,7 @@ template forceChalkKeys*(keynames: openarray[string]) =
     let section     = templateRef & ".key"
 
     # Create the "key" section if required.
-    if not sectionExists(getChalkScope(), section) and keynames.len > 0:
+    if not sectionExists(section) and keynames.len > 0:
       discard attrLookup(
         attrGetObject(templateRef),
         ["key"],

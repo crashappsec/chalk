@@ -20,8 +20,8 @@ var
 proc getChalkScope*(): AttrScope =
   con4mRuntime.configState.attrs
 
-proc sectionExists*(scope: AttrScope, s: string): bool =
-  scope.getObjectOpt(s).isSome()
+proc sectionExists*(s: string): bool =
+  getChalkScope().getObjectOpt(s).isSome()
 
 proc attrGet*[T](fqn: string): T =
   get[T](getChalkScope(), fqn)

@@ -555,7 +555,7 @@ proc checkPlugin(plugin: Plugin, codec: bool): bool {.inline.} =
     name    = plugin.name
     section = "plugin." & name
 
-  if not sectionExists(getChalkScope(), section):
+  if not sectionExists(section):
     error("No config provided for plugin " & name & ". Plugin ignored.")
   elif not attrGet[bool](section & ".enabled"):
       trace("Plugin " & name & " is disabled via config file.")

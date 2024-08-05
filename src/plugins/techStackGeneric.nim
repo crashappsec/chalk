@@ -296,12 +296,12 @@ proc loadState() =
         mgetOrPut(subcategory, @[]).
         add(key)
 
-      if sectionExists(getChalkScope(), val & ".host_scope"):
+      if sectionExists(val & ".host_scope"):
         if category notin inHostScope:
           inHostScope[category] = newTable[string, bool]()
           inHostScope[category][subcategory] = false
       else:
-        if not sectionExists(getChalkScope(), val & ".file_scope"):
+        if not sectionExists(val & ".file_scope"):
           error("One of file_scope, host_scope must be defined for rule " & key & ". Skipping")
           continue
         if category notin inFileScope:
@@ -357,7 +357,7 @@ proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
     when defined(debug):
       trace("tech stack: collecting " & key)
     let val = "tech_stack_rule." & key
-    if not sectionExists(getChalkScope(), val & ".host_scope"):
+    if not sectionExists(val & ".host_scope"):
       continue
     let
       category    = attrGet[string](val & ".category")
