@@ -87,7 +87,6 @@ template forceReportKeys*(keynames: openarray[string]) =
     if item notin keys:
       discard attrLookup(getChalkScope(), [templateRef, "key", item], ix = 0, op = vlSecDef)
     con4mAttrSet(
-      getChalkScope(),
       section & "." & item & ".use",
       pack(true),
       Con4mType(kind: TypeBool),
@@ -114,7 +113,6 @@ template forceChalkKeys*(keynames: openarray[string]) =
       if item notin keys:
         discard attrLookup(getChalkScope(), [templateRef, "key", item], ix = 0, op = vlSecDef)
       con4mAttrSet(
-        getChalkScope(),
         section & "." & item & ".use",
         pack(true),
         Con4mType(kind: TypeBool),

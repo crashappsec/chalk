@@ -47,12 +47,12 @@ proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
   ## attribute isn't already set, use the other `con4mAttrSet` overload instead.
   doAssert attrSet(ctx, fqn, value).code == errOk
 
-proc con4mAttrSet*(attrs: AttrScope, fqn: string, value: Box, attrType: Con4mType) =
-  ## Sets the value of the `fqn` attribute in `attrs` to `value`, raising
-  ## `AssertionDefect` if unsuccessful.
+proc con4mAttrSet*(fqn: string, value: Box, attrType: Con4mType) =
+  ## Sets the value of the `fqn` attribute to `value`, raising `AssertionDefect`
+  ## if unsuccessful.
   ##
   ## This proc may be used if the attribute is not already set.
-  doAssert attrSet(attrs, fqn, value, attrType).code == errOk
+  doAssert attrSet(getChalkScope(), fqn, value, attrType).code == errOk
 
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
