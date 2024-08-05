@@ -410,6 +410,7 @@ class Chalk:
         self,
         *,
         dockerfile: Optional[Path | str] = None,
+        content: Optional[str] = None,
         tag: Optional[str] = None,
         tags: Optional[list[str]] = None,
         context: Optional[Path | str] = None,
@@ -440,6 +441,7 @@ class Chalk:
                 tags=tags,
                 context=context,
                 dockerfile=dockerfile,
+                content=content,
                 args=args,
                 cwd=cwd,
                 push=push,
@@ -465,6 +467,7 @@ class Chalk:
                     tags=tags,
                     context=context,
                     dockerfile=dockerfile,
+                    content=content,
                     args=args,
                     push=push,
                     platforms=platforms,
@@ -491,12 +494,11 @@ class Chalk:
             # sanity check that chalk mark includes basic chalk keys
             assert image_hash in [i["_CURRENT_HASH"] for i in result.marks]
             assert image_hash in [i["_IMAGE_ID"] for i in result.marks]
-            if isinstance(dockerfile, Path) or dockerfile is None:
-                if isinstance(context, Path):
-                    dockerfile = dockerfile or (
-                        (cwd or context or Path(os.getcwd())) / "Dockerfile"
-                    )
-                    assert str(dockerfile) == result.marks[-1]["DOCKERFILE_PATH"]
+            if isinstance(context, Path) and not content:
+                dockerfile = dockerfile or (
+                    (cwd or context or Path(os.getcwd())) / "Dockerfile"
+                )
+                assert str(dockerfile) == result.marks[-1]["DOCKERFILE_PATH"]
         elif not expecting_report:
             try:
                 assert not result.reports
