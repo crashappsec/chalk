@@ -2,6 +2,10 @@
 
 ## On the `main` branch
 
+## 0.4.10
+
+**Aug 5, 2024**
+
 ### Fixes
 
 - Fixing `ENTRYPOINT` wrapping for empty-like definitions:

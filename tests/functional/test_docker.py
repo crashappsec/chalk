@@ -594,7 +594,7 @@ def test_wrap_entrypoint(
     runnable: bool,
 ):
     docker_id, _ = Docker.build(
-        dockerfile=test_file,
+        content=test_file,
         buildkit=buildkit,
         buildx=buildx,
     )
@@ -607,7 +607,7 @@ def test_wrap_entrypoint(
     _, docker_output = Docker.run(docker_id, expected_success=runnable)
 
     image_id, result = chalk.docker_build(
-        dockerfile=test_file,
+        content=test_file,
         config=CONFIGS / "docker_wrap.c4m",
         buildkit=buildkit,
         buildx=buildx,
