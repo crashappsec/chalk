@@ -121,7 +121,7 @@ services:
       context: ./tests/functional
       args:
         BASE: ${BASE:-ubuntu}
-    entrypoint: ./entrypoint.sh
+    entrypoint: $PWD/tests/functional/entrypoint.sh
     cap_add:
       - SYS_PTRACE # for gdb
     security_opt:

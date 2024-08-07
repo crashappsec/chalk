@@ -5,7 +5,8 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[os]
+import std/[os, sets]
+import pkg/[parsetoml]
 import ".."/[config, util, semver]
 
 var
@@ -27,15 +28,23 @@ proc getDockerExeLocation*(): string =
       warn("docker: no command found in PATH. `chalk docker` not available.")
   return dockerExeLocation
 
-proc runDockerGetEverything*(args: seq[string], stdin = "", silent = true): ExecOutput =
-  let exe = getDockerExeLocation()
+proc runDockerGetEverything*(args: seq[string],
+                             stdin = "",
+                             silent = true,
+                             raiseOnError = false): ExecOutput =
+  let
+    exe = getDockerExeLocation()
+    msg = exe & " " & args.join(" ")
   if not silent:
-    trace("docker: " & exe & " " & args.join(" "))
+    trace("docker: " & msg)
     if stdin != "":
       trace("docker: stdin: \n" & stdin)
   result = runCmdGetEverything(exe, args, stdin)
   if not silent and result.exitCode > 0:
     trace(strutils.strip(result.stderr & result.stdout))
+  if result.exitCode > 0 and raiseOnError:
+    error("docker: " & msg & "\n" & result.stderr)
+    raise newException(ValueError, msg & " - exited with non-zero " & $result.exitCode)
   return result
 
 proc getBuildXVersion*(): Version =
@@ -100,6 +109,55 @@ proc getDockerInfo*(): string =
       dockerInfo = output.getStdOut()
   return dockerInfo
 
+proc getDockerInfoSubList*(key: string): seq[string] =
+  let lower = key.toLower()
+  result = @[]
+  var found = false
+  for line in getDockerInfo().splitLines():
+    if line.strip().toLower() == lower:
+      found = true
+      continue
+    if not found:
+      continue
+    # all list entries are indented
+    # so if a line doesnt have indent we exhaused relevant lines
+    if line.strip() == line:
+      break
+    result.add(line.strip())
+
+proc readDockerHostFile*(path: string): string =
+  # note that the docker socket can be mounted to a container where
+  # chalk is running from hence we attempt to get the file content
+  # via a docker run and mounting source path which will allow
+  # us to get the content of file of the docker daemon host,
+  # not where chalk is running
+  let
+    inner  = "/mnt" & path
+    output = runDockerGetEverything(
+      @[
+        "run",
+        "--entrypoint=cat",
+        # note that --mount does not create the source path if one doesnt exist already
+        # unlike --volume which creates a folder if one is not present already
+        "--mount", "type=bind,source=" & path & ",target=" & inner,
+        "busybox",
+        inner,
+      ],
+      silent = false,
+    )
+  if output.exitCode != 0:
+    raise newException(ValueError, "could not read " & path)
+  trace("docker: read docker host's " & path)
+  return output.stdOut
+
+proc readFirstDockerHostFile*(paths: seq[string]): tuple[path: string, content: string] =
+  for path in paths.toSet():
+    try:
+      return (path, readDockerHostFile(path))
+    except:
+      continue
+  raise newException(ValueError, "could not read any of " & $paths)
+
 var contextName = "default"
 proc getContextName(): string =
   once:
@@ -135,11 +193,64 @@ proc getBuilderInfo*(ctx: DockerInvocation): string =
       var args = @["buildx", "inspect", "--bootstrap"]
       if name != "":
         args.add(name)
-      let output = runDockerGetEverything(args)
+      let output = runDockerGetEverything(args, silent = false)
       if output.exitCode != 0:
         trace("docker: could not get buildx builder information: " & output.getStdErr())
       builderInfo = output.getStdOut()
   return builderInfo
+
+proc getBuilderNodesInfo*(ctx: DockerInvocation): Table[string, string] =
+  result = initTable[string, string]()
+  var
+    foundNodes = false
+    name       = ""
+  for line in ctx.getBuilderInfo().splitLines():
+    let lower = line.toLower()
+    if lower.startsWith("driver:"):
+      let driver = line.splitWhitespace()[^1]
+      if driver != "docker-container":
+        trace("docker: unsupported buildx builder driver: " & driver)
+        return
+    if lower.startsWith("nodes:"):
+      foundNodes = true
+      continue
+    if not foundNodes:
+      continue
+    if lower.startsWith("name:"):
+      name = line.splitWhitespace()[^1]
+      result[name] = ""
+    result[name] &= line & "\n"
+
+proc readBuilderNodeFile*(ctx: DockerInvocation, node: string, path: string): string =
+  let
+    # ideally we can query the namespaces however they are not exposed
+    # via docker info output and are only stored in the buildx config files
+    # which we cant read until we know the namespaces
+    # TODO search through all running containers if the default namespace is not found
+    container = "buildx_buildkit_" & node
+    output    = runDockerGetEverything(
+      @[
+        "exec",
+        container,
+        "cat",
+        path,
+      ],
+      silent = false,
+    )
+  if output.exitCode != 0:
+    raise newException(ValueError, "could not read buildx node's " & container & " " & path)
+  return output.stdOut
+
+iterator iterBuilderNodesConfigs*(ctx: DockerInvocation): tuple[name: string, config: JsonNode] =
+  for name, _ in ctx.getBuilderNodesInfo():
+    try:
+      let
+        toml   = ctx.readBuilderNodeFile(name, "/etc/buildkit/buildkitd.toml")
+        config = parsetoml.parseString(toml).toJson()
+      yield (name, config)
+    except:
+      trace("docker: could not load toml for buildx node " & name & " due to: " & getCurrentExceptionMsg())
+      continue
 
 proc getBuildKitVersion*(ctx: DockerInvocation): Version =
   once:
@@ -153,6 +264,20 @@ proc getBuildKitVersion*(ctx: DockerInvocation): Version =
     except:
       dumpExOnDebug()
   return buildKitVersion
+
+var dockerAuth = newJObject()
+proc getDockerAuthConfig*(): JsonNode =
+  once:
+    let path = "~/.docker/config.json"
+    try:
+      let data = tryToLoadFile(path.resolvePath())
+      if data != "":
+        dockerAuth = parseJson(data)
+      else:
+        trace("docker: no auth config file " & path)
+    except:
+      trace("docker: could not read docker auth config file " & path & " due to: " & getCurrentExceptionMsg())
+  return dockerAuth
 
 proc supportsBuildContextFlag*(ctx: DockerInvocation): bool =
   # https://github.com/docker/buildx/releases/tag/v0.8.0

@@ -8,7 +8,7 @@
 ## This is for any common code for system stuff, such as executing
 ## code.
 
-import std/[tempfiles, posix, monotimes, parseutils, exitprocs]
+import std/[httpcore, tempfiles, posix, monotimes, parseutils, exitprocs]
 import pkg/[nimutils/managedtmp]
 import "."/[config, subscan, fd_cache]
 export fd_cache
@@ -626,3 +626,8 @@ proc getRelativePathBetween*(fromPath: string, toPath: string) : string =
   if result.startsWith("..") or result == "":
     trace("File is ephemeral or not contained within VCS project")
     return ""
+
+proc update*(self: HttpHeaders, with: HttpHeaders): HttpHeaders =
+  for k, v in with.pairs():
+    self[k] = v
+  return self

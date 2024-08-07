@@ -5,10 +5,12 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[sets, sequtils, uri, sets]
+import std/[net, sets, sequtils, uri]
 import ".."/[config, util]
 
-const hashHeader = "sha256:"
+const
+  DEFAULT_REGISTRY = "registry-1.docker.io"
+  hashHeader       = "sha256:"
 
 proc extractDockerHash*(value: string): string =
   # this function is also used to process container ids
@@ -131,9 +133,6 @@ proc `[]`*[T](self: TableRef[DockerPlatform, T], key: DockerPlatform): T =
 
 # ----------------------------------------------------------------------------
 
-proc parseDigest*(digest: string): DockerImage =
-  return ("", "", digest.extractDockerHash())
-
 proc parseImage*(name: string, defaultTag = "latest"): DockerImage =
   # parseUri requires some scheme to parse url correctly so we add dummy https
   # parsed uri will allow us to figure out if tag contains version
@@ -183,10 +182,107 @@ proc withDigest*(items: seq[DockerImage], digest: string): seq[DockerImage] =
   for i in items:
     result.add(i.withDigest(digest))
 
+proc registry*(self: DockerImage): string =
+  return self.repo.split('/', maxsplit = 1)[0]
+
+proc domain*(self: DockerImage): string =
+  return self.registry.split(':', maxsplit = 1)[0]
+
+proc isFullyQualified(self: DockerImage): bool =
+  ## determine if the docker image is a fully qualified image name
+  ## as in if the image should be pulled/pushed to default docker registry (docker hub)
+  ## or to a fully qualified domain name
+  ## docker checks:
+  ## * if its localhost
+  ## * presence of `.` or `:` (port) in the potential registy domain
+  ## * if its uppercase as repo name cannot have uppercase chars
+  ## and defaults everything else to docker hub even if its valid and resolvable domain
+  ## like `registry/test` even if `registry` is a valid resolvable address locally
+  ## (e.g. via `/etc/hosts` file)
+  ## https://github.com/docker/cli/blob/826fc32e82e23bb5f80e85d8777427c5f0c24b4d/cli/command/image/pull.go#L58C36-L58C56
+  ## https://github.com/distribution/reference/blob/8c942b0459dfdcc5b6685581dd0a5a470f615bff/normalize.go#L143-L191
+  let parts = self.repo.split('/', maxsplit = 1)
+  # there is no parts in the name so like "nginx"
+  # so it cant be fully qualified name
+  if len(parts) == 1:
+    return false
+  let maybeRegistry = parts[0]
+  return (
+    maybeRegistry.toLower() == "localhost" or
+    {':', '.'} in maybeRegistry or
+    maybeRegistry.toLower() != maybeRegistry
+  )
+
+proc qualify*(self: DockerImage): DockerImage =
+  ## fully qualify image name with the full registry domain
+  ## note qualified name does not specify any scheme like http or https
+  ## it simply specifies complete image reference in the registry
+  if self.isFullyQualified():
+    return self
+  let repo =
+    if '/' in self.repo:
+      self.repo
+    else:
+      "library/" & self.repo
+  result = (
+    DEFAULT_REGISTRY & "/" & repo,
+    self.tag,
+    self.digest,
+  )
+
+proc normalize*(self: DockerImage): DockerImage =
+  ## normalize qualified registry domain
+  ## normalization maps some hardcoded registry domains
+  ## to their standard API domains
+  # https://github.com/docker/cli/issues/3793#issuecomment-1269051403
+  const registryMapping = {
+    "docker.io":       DEFAULT_REGISTRY,
+    "index.docker.io": DEFAULT_REGISTRY,
+  }.toTable()
+  let qualified = self.qualify()
+  # parseUri doesnt parse uri without any scheme
+  var uri       = parseUri("https://" & qualified.repo)
+  uri.hostname  = registryMapping.getOrDefault(uri.hostname, uri.hostname)
+  let repo = ($uri).removePrefix("https://")
+  result = (
+    repo,
+    self.tag,
+    self.digest,
+  )
+
+proc uri*(self: DockerImage, scheme = "", path = "", healthcheck = false): Uri =
+  ## generate working URI for the registry API
+  ## note this only supports v2 registries hence hardcodes v2 suffix
+  ## also this doesnt account for any insecure registry configs
+  let normalized = self.normalize()
+  var uri = parseUri("https://" & normalized.repo)
+  if healthcheck:
+    uri.path = "/v2/"
+  else:
+    uri.path = "/v2" & uri.path
+  if scheme == "":
+    if uri.hostname in @["localhost", $IPv4_loopback(), $IPv6_loopback()]:
+      uri.scheme = "http"
+    else:
+      uri.scheme = "https"
+  else:
+    uri.scheme = scheme.split(":")[0]
+  if path != "":
+    uri.path = uri.path.strip(chars = {'/'}, leading = false) & path
+  return uri
+
 # below are various rendering variants as in different cases
 # different form is required
 # for example to interact with the registry tag should be omitted - <repo>@sha256:<digest>
 # locally for docker inspect - <repo>:<tag>
+
+proc imageRef*(self: DockerImage): string =
+  if self.digest != "":
+    result = hashHeader & self.digest
+  elif self.tag != "":
+    result = self.tag
+  else:
+    result = "latest"
 
 proc asRepoTag*(self: DockerImage): string =
   ## render image as repo+tag

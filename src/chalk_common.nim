@@ -224,9 +224,7 @@ type
 
   FromInfo* = ref object of InfoBase
     flags*:  Table[string, DfFlag]
-    repo*:   Option[LineToken]
-    tag*:    Option[LineToken]
-    digest*: Option[LineToken]
+    image*:  Option[seq[LineToken]]
     asArg*:  Option[LineToken]
 
   ShellInfo* = ref object of InfoBase
@@ -296,10 +294,14 @@ type
     tags*:         seq[string]
     refs*:         seq[string]
 
-  DigestedJson* = ref object
+  DigestedJson* = ref object of RootObj
     json*:   JsonNode
     digest*: string
     size*:   int
+
+  DockerDigestedJson* = ref object of DigestedJson
+    mediaType*: string
+    kind*:      DockerManifestType
 
   DockerManifestType* = enum
     list, image, config, layer

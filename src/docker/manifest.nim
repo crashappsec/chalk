@@ -9,7 +9,7 @@
 
 import std/[httpclient]
 import ".."/[chalk_common, config, www_authenticate]
-import "."/[exe, json, ids]
+import "."/[exe, json, ids, registry]
 
 # cache is by repo ref as its normalized in buildx imagetools command
 var
@@ -52,7 +52,7 @@ proc requestManifestJson(name: DockerImage, flags = @["--raw"], fallback = true)
     return jsonCache[key]
   let
     msg = "docker: requesting manifest for: " & $name
-    args   = @["buildx", "imagetools", "inspect", name.asRepoDigest()] & flags
+    args   = @["buildx", "imagetools", "inspect", name.asRepoRef()] & flags
   trace("docker: docker " & args.join(" "))
   let
     output = runDockerGetEverything(args)
@@ -169,14 +169,24 @@ proc fetch(self: DockerManifest) =
   let name = self.name.withDigest(self.digest)
   case self.kind
   of DockerManifestType.image:
-    let data = requestManifestJson(name)
+    let data =
+      try:
+        manifestGet(name, self.mediaType)
+      except:
+        error("docker: " & getCurrentExceptionMsg())
+        requestManifestJson(name)
     self.setJson(data)
     self.setImageConfig(data)
     self.setImageLayers(data)
     self.config.fetch()
     self.setImagePlatform(self.config.configPlatform)
   of DockerManifestType.config:
-    let data = requestManifestJson(name)
+    let data =
+      try:
+        layerGet(name, self.mediaType)
+      except:
+        error("docker: " & getCurrentExceptionMsg())
+        requestManifestJson(name)
     self.setJson(data)
     self.mimickLocalConfig()
     self.configPlatform = DockerPlatform(
@@ -289,9 +299,17 @@ proc fetchManifest*(name: DockerImage, otherNames: seq[DockerImage] = @[]): Dock
   # therefore we gracefully handle each possibility
   if name.asRepoDigest() in manifestCache:
     return manifestCache[name.asRepoDigest()]
-  let data = requestManifestJson(name)
-  result = newManifest(name, data, otherNames = otherNames)
-  result.fetch()
+  try:
+    let
+      meta = manifestHead(name)
+      data = manifestGet(name.withDigest(meta.digest), meta.mediaType)
+    result = newManifest(name, data, otherNames = otherNames)
+    result.fetch()
+  except:
+    error("docker: " & getCurrentExceptionMsg())
+    let data = requestManifestJson(name)
+    result = newManifest(name, data, otherNames = otherNames)
+    result.fetch()
   manifestCache[name.asRepoDigest()] = result
 
 proc fetchOnlyImageManifest*(name: DockerImage): DockerManifest =
