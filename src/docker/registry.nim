@@ -12,15 +12,19 @@
 ## https://docs.docker.com/build/buildkit/toml-configuration/
 
 import std/[net, uri, httpclient, nativesockets]
+import pkg/nimutils/net
 import ".."/[config, ip, util, www_authenticate]
 import "."/[exe, json, ids]
 
-type RegistryConfig = ref object
-  scheme*:     string
-  certPath*:   string
-  pinnedCert*: string
-  verifyMode*: SslCVerifyMode
-  auth*:       HttpHeaders
+type
+  RegistryResponseError* = object of ValueError
+
+  RegistryConfig = ref object
+    scheme*:     string
+    certPath*:   string
+    pinnedCert*: string
+    verifyMode*: SslCVerifyMode
+    auth*:       HttpHeaders
 
 const
   TIMEOUT = 3000 # sec
@@ -211,8 +215,9 @@ proc request(self: DockerImage,
       if config.certPath != "":
         msg &= "@" & config.certPath
     trace("docker: " & msg)
+    var invalid = false
     try:
-      result = (msg, authSafeRequest(
+      let response = authSafeRequest(
         uri,
         httpMethod,
         headers    = newHttpHeaders(
@@ -222,12 +227,17 @@ proc request(self: DockerImage,
         verifyMode = config.verifyMode,
         timeout    = TIMEOUT,
         retries    = 2,
-        only2xx    = true,
-      ))
+      )
+      # as we can talk to the registry, any errors from this point on
+      # mean image doesnt exist in the registry or invalid config such as
+      # invalid auth which we cant improve even if we attempt other configs
+      invalid = true
+      discard response.check(url = uri, only2xx = true)
       configByRegistry[self.registry] = config
-      return
+      return (msg, response)
     except:
-      discard
+      if invalid:
+        raise newException(RegistryResponseError, getCurrentExceptionMsg())
   quit(1) # TODO obviously remove but useful for testing
   raise newException(ValueError, "could not find working registry configuration for " & $self)
 
