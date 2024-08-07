@@ -172,6 +172,9 @@ proc fetch(self: DockerManifest) =
     let data =
       try:
         manifestGet(name, self.mediaType)
+      except RegistryResponseError:
+        trace("docker: " & getCurrentExceptionMsg())
+        raise
       except:
         error("docker: " & getCurrentExceptionMsg())
         requestManifestJson(name)
@@ -184,6 +187,9 @@ proc fetch(self: DockerManifest) =
     let data =
       try:
         layerGet(name, self.mediaType)
+      except RegistryResponseError:
+        trace("docker: " & getCurrentExceptionMsg())
+        raise
       except:
         error("docker: " & getCurrentExceptionMsg())
         requestManifestJson(name)
@@ -305,6 +311,9 @@ proc fetchManifest*(name: DockerImage, otherNames: seq[DockerImage] = @[]): Dock
       data = manifestGet(name.withDigest(meta.digest), meta.mediaType)
     result = newManifest(name, data, otherNames = otherNames)
     result.fetch()
+  except RegistryResponseError:
+    trace("docker: " & getCurrentExceptionMsg())
+    raise
   except:
     error("docker: " & getCurrentExceptionMsg())
     let data = requestManifestJson(name)
