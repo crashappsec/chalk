@@ -33,24 +33,27 @@ proc toInt(self: IpAddress): IpInt =
     result = (self.address_v6[0..7].toInt(), self.address_v6[8..15].toInt())
   else:
     result = (0, self.address_v4.toInt())
+  # echo($self, " ", result[0].toHex(), " " , result[1].toHex())
 
-proc ipRange*(self: IpAddress, bits: int): IpRange =
-  if bits < 0:
-    raise newException(ValueError, "invalid IP range with negative bit range " & $bits)
+proc ipRange*(self: IpAddress, bits: uint): IpRange =
   if bits == 0:
     return ((0, 0), (high(uint64), high(uint64)))
   let
-    diff = (if self.family == IPv6: 128 else: 32) - bits
+    same = bits + (if self.family == IPv6: 0 else: 96)
     ip   = self.toInt()
+  if same > 128:
+    raise newException(ValueError, "invalid cidr bit range " & $self & "/" & $bits)
+  elif same == 128:
+    return (ip, ip)
+  let
     a, b = ip
-    ma   = if diff >  64: toMask[uint64](0 .. diff - 64 - 1) else: 0
-    mb   = if diff <= 64: toMask[uint64](0 .. diff      - 1) else: high(uint64)
+    ma   = if same >  64: 0'u64        else: high(uint64) shr same
+    mb   = if same <= 64: high(uint64) else: high(uint64) shr (same - 64)
   result = (
     (a[0].clearMasked(ma), b[1].clearMasked(mb)),
     (a[0].setMasked(ma),   b[1].setMasked(mb)),
   )
-  # echo($self)
-  # echo("bits: ", bits, " diff: ", diff)
+  # echo("bits: ", bits, " same: ", same)
   # echo("mask: ", ma.toHex(), " ", mb.toHex())
   # echo("low:  ", result[0][0].toHex(), " ", result[0][1].toHex())
   # echo("high: ", result[1][0].toHex(), " ", result[1][1].toHex())
@@ -61,7 +64,7 @@ proc parseIpCidr*(self: string): tuple[ip: IpAddress, range: IpRange] =
     raise newException(ValueError, "Invalid IP CIDR " & self)
   let
     ip   = parseIpAddress(maybeIp)
-    bits = parseInt(suffix)
+    bits = parseUInt(suffix)
   return (ip, ip.ipRange(bits))
 
 proc parseIpCidrRange*(self: string): IpRange =
