@@ -8,9 +8,9 @@
 ## Very basic implementation of https://www.rfc-editor.org/rfc/rfc7235#section-4.1
 ## Currently only bearer challenge is supported
 
-import std/[httpclient, uri, tables, strutils, json, sequtils]
+import std/[httpclient, net, uri, tables, strutils, json, sequtils]
 import pkg/nimutils/net
-import "."/[config]
+import "."/[config, util]
 
 type
   AuthChallengeType = enum
@@ -56,13 +56,13 @@ proc initBearerChallenge(options: var OrderedTable[string, string]): AuthChallen
                        realm:   realm,
                        url:     $uri)
 
-proc elicitHeaders(self: AuthChallenge): HttpHeaders =
+proc elicitHeaders(self: AuthChallenge, headers = newHttpHeaders()): HttpHeaders =
   case self.kind:
   of other:
     raise newException(ValueError, "unsupported auth challenge scheme: " & self.scheme)
   of bearer:
     trace("http: fetching bearer token from: " & self.url)
-    let tokenResponse = safeRequest(self.url)
+    let tokenResponse = safeRequest(self.url, headers = headers)
     if not tokenResponse.code().is2xx():
       raise newException(ValueError,
                          "Bearer auth realm URL did not return valid response: " &
@@ -77,11 +77,11 @@ proc elicitHeaders(self: AuthChallenge): HttpHeaders =
                          tokenBody)
     return newHttpHeaders({"Authorization": "Bearer " & token})
 
-proc elicitHeaders*(challenges: seq[AuthChallenge]): HttpHeaders =
+proc elicitHeaders*(challenges: seq[AuthChallenge], headers = newHttpHeaders()): HttpHeaders =
   result = newHttpHeaders()
   for challenge in challenges:
     try:
-      return challenge.elicitHeaders()
+      return challenge.elicitHeaders(headers = headers)
     except:
       continue
 
@@ -137,6 +137,7 @@ proc authSafeRequest*(url: Uri | string,
                       firstRetryDelayMs: int = 0,
                       timeout: int = 1000,
                       pinnedCert: string = "",
+                      verifyMode = CVerifyPeer,
                       maxRedirects: int = 3,
                       disallowHttp: bool = false,
                       only2xx: bool = false,
@@ -150,9 +151,7 @@ proc authSafeRequest*(url: Uri | string,
 
   var authHeaders = headers
   if uri.hostname in authByHost:
-    for k, v in authByHost[uri.hostname]:
-      if not authheaders.hasKey(k):
-        authHeaders[k] = v
+    authHeaders = authHeaders.update(authByHost[uri.hostname])
 
   result = safeRequest(url               = uri,
                        httpMethod        = httpMethod,
@@ -163,6 +162,7 @@ proc authSafeRequest*(url: Uri | string,
                        firstRetryDelayMs = firstRetryDelayMs,
                        timeout           = timeout,
                        pinnedCert        = pinnedCert,
+                       verifyMode        = verifyMode,
                        maxRedirects      = maxRedirects,
                        disallowHttp      = disallowHttp,
                        only2xx           = false,
@@ -176,10 +176,9 @@ proc authSafeRequest*(url: Uri | string,
     let
       wwwAuthenticate = result.headers["www-authenticate"]
       challenges      = parseAuthChallenges(wwwAuthenticate)
-      newHeaders      = challenges.elicitHeaders()
+      newHeaders      = challenges.elicitHeaders(authHeaders)
     authByHost[uri.hostname] = newHeaders
-    for k, v in newHeaders.pairs():
-      authHeaders[k] = v
+    authHeaders              = authHeaders.update(newHeaders)
 
     # reattempt request
     result = safeRequest(url               = uri,
@@ -191,6 +190,7 @@ proc authSafeRequest*(url: Uri | string,
                          firstRetryDelayMs = firstRetryDelayMs,
                          timeout           = timeout,
                          pinnedCert        = pinnedCert,
+                         verifyMode        = verifyMode,
                          maxRedirects      = maxRedirects,
                          disallowHttp      = disallowHttp,
                          only2xx           = false,
