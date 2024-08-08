@@ -120,10 +120,11 @@ proc getContextName(): string =
   return contextName
 
 proc getBuilderName(ctx: DockerInvocation): string =
-  if not ctx.foundBuildx:
-    return getContextName()
-  if ctx.foundBuilder != "":
-    return ctx.foundBuilder
+  if ctx != nil and ctx.cmd == DockerCmd.build:
+    if not ctx.foundBuildx:
+      return getContextName()
+    if ctx.foundBuilder != "":
+      return ctx.foundBuilder
   return getEnv("BUILDX_BUILDER")
 
 var builderInfo = ""
