@@ -3289,21 +3289,22 @@ func validate_probability(name, value) {
   return ""
 }
 
-func key_callback_check(keyname, callback: func (string) -> `x) {
-  path      = split(keyname, ".")
-  key_name  = path[1]
-  fieldType = $(attr_get("keyspec." + key_name + ".type", typespec))
-  expected  = to_type("(string) -> " + fieldType)
-  actual    = typeof(callback)
-
-  if not typecmp(expected, actual) {
-    return ("In: '" + keyname + "' callback is of type '" + $(actual) +
-            "', but the key specification requires the type: '" +
-            $(expected) + "'")
-  }
-
-  return ""
-}
+# TODO(ee7): Resolve crash.
+# func key_callback_check(keyname, callback: (string) -> `x) {
+#   path      = split(keyname, ".")
+#   key_name  = path[1]
+#   fieldType = $(attr_get("keyspec." + key_name + ".type", typespec))
+#   expected  = to_type("(string) -> " + fieldType)
+#   actual    = typeof(callback)
+#
+#   if not typecmp(expected, actual) {
+#     return ("In: '" + keyname + "' callback is of type '" + $(actual) +
+#             "', but the key specification requires the type: '" +
+#             $(expected) + "'")
+#   }
+#
+#   return ""
+# }
 
 func never_early_check(keyname, val) {
   result = ""
