@@ -17,11 +17,11 @@ auth_config crashoverride {
 }
 
 func get_crashoverride_reporting_jwt() {
-  headers := auth_headers("crashoverride")
+  headers = auth_headers("crashoverride")
   if contains(headers, "authorization") {
-    response := url_post("https://chalk.crashoverride.run/v0.1/key-provider/jwt", "", headers)
-    json     := parse_json(response)
-    token    := get(json, "jwt")
+    response = url_post("https://chalk.crashoverride.run/v0.1/key-provider/jwt", "", headers)
+    json     = parse_json(response)
+    token    = get(json, "jwt")
     return token
   }
   return ""

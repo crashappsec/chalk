@@ -20,10 +20,10 @@ of a minute are okay.
 }
 var heartbeat_minute_frequency: float
 
-minutes  := int(heartbeat_minute_frequency)
-sec_as_f := (heartbeat_minute_frequency - float(minutes)) * 60.0
-sec      := int(sec_as_f)
+minutes  = int(heartbeat_minute_frequency)
+sec_as_f = (heartbeat_minute_frequency - float(minutes)) * 60.0
+sec      = int(sec_as_f)
 
-duration := Duration($(minutes) + " min " + $(sec) + " sec")
+duration = Duration($(minutes) + " min " + $(sec) + " sec")
 exec.heartbeat: true
 exec.heartbeat_rate: duration
