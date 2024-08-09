@@ -3300,58 +3300,59 @@ func never_early_check(keyname, val) {
   }
 }
 
-func plugin_keyspec_check(keyname, val: list[string], context) {
-  result = "" # Default on success
+# TODO(ee7): Resolve crash.
+# func plugin_keyspec_check(keyname, val: list[string], context) {
+#   result = "" # Default on success
 
-  # For each key in val...
-  # 1) If the key doesn't exist, fail.
-  # 2) If the key exists, it must be either of kind ChalkTimeHost or
-  #    ChalkTimeArtifact
-  # 3) If it's of type chalk, never_early must be false.
+#   # For each key in val...
+#   # 1) If the key doesn't exist, fail.
+#   # 2) If the key exists, it must be either of kind ChalkTimeHost or
+#   #    ChalkTimeArtifact
+#   # 3) If it's of type chalk, never_early must be false.
 
-  for i from 0 to len(val) {
-    item = val[i]
+#   for i from 0 to len(val) {
+#     item = val[i]
 
-    if item == "*" { continue; }
+#     if item == "*" { continue; }
 
-    if not keyspec_exists(item) {
-      return (keyname + ": specified key '" + item + "' does not have an " +
-        "associated keyspec")
-    }
+#     if not keyspec_exists(item) {
+#       return (keyname + ": specified key '" + item + "' does not have an " +
+#         "associated keyspec")
+#     }
 
-    base              = "keyspec." + item + "."
-    kind_field        = base + "kind"
-    kind              = attr_get(kind_field, int)
+#     base              = "keyspec." + item + "."
+#     kind_field        = base + "kind"
+#     kind              = attr_get(kind_field, int)
 
-    if context == CCPreRun {
-      if kind == ChalkTimeHost { continue }
-      elif kind == ChalkTimeArtifact {
-        never_early_field = base + "never_early"
-        if attr_get(never_early_field, bool) == false {
-          continue
-        }
-      }
-      return (keyname + ": specified key '" + item + "' cannot appear in " +
-             "the 'Pre-Run' collection context")
-    }
-    elif context == CCArtifact or context == CCPostChalk {
-      if kind == RunTimeHost or (kind == ChalkTimeHost and context == CCPostChalk) {
-        return (keyname + ": specified key '" + item + "' is a host-level " +
-                "key that cannot appear at artifact collection time")
-      }
-      if context == CCPostChalk and kind == ChalkTimeArtifact {
-        return (keyname + ": specified key '" + item + "' must be available " +
-                "during artifact collection")
-      }
-    }
-    else {  # context == CCPostRun
-      if kind == RunTimeHost { continue }
+#     if context == CCPreRun {
+#       if kind == ChalkTimeHost { continue }
+#       elif kind == ChalkTimeArtifact {
+#         never_early_field = base + "never_early"
+#         if attr_get(never_early_field, bool) == false {
+#           continue
+#         }
+#       }
+#       return (keyname + ": specified key '" + item + "' cannot appear in " +
+#              "the 'Pre-Run' collection context")
+#     }
+#     elif context == CCArtifact or context == CCPostChalk {
+#       if kind == RunTimeHost or (kind == ChalkTimeHost and context == CCPostChalk) {
+#         return (keyname + ": specified key '" + item + "' is a host-level " +
+#                 "key that cannot appear at artifact collection time")
+#       }
+#       if context == CCPostChalk and kind == ChalkTimeArtifact {
+#         return (keyname + ": specified key '" + item + "' must be available " +
+#                 "during artifact collection")
+#       }
+#     }
+#     else {  # context == CCPostRun
+#       if kind == RunTimeHost { continue }
 
-      return (keyname + ": specified key '" + item + "' cannot appear in " +
-              " the 'Post-Run' collection context")
-    }
-  }
-}
+#       return (keyname + ": specified key '" + item + "' cannot appear in " +
+#               " the 'Post-Run' collection context")
+#     }
+#   }
+# }
 
 func pre_run_key_check(keyname, val) {
   return plugin_keyspec_check(keyname, val, CCPreRun)
@@ -3369,25 +3370,26 @@ func post_run_key_check(keyname, val) {
   return plugin_keyspec_check(keyname, val, CCPostRun)
 }
 
-func override_key_check(keyname: string, val: list[string]) {
-  result = ""
-  parts = keyname.split(".")
-  base  = "plugin." + parts[1] + "."
-  k1    = attr_get(base + "pre_run_keys",    list[string])
-  k2    = attr_get(base + "pre_chalk_keys",  list[string])
-  k3    = attr_get(base + "post_chalk_keys", list[string])
-  k4    = attr_get(base + "post_run_keys",   list[string])
+# TODO(ee7): Resolve crash.
+# func override_key_check(keyname: string, val: list[string]) {
+#   result = ""
+#   parts = keyname.split(".")
+#   base  = "plugin." + parts[1] + "."
+#   k1    = attr_get(base + "pre_run_keys",    list[string])
+#   k2    = attr_get(base + "pre_chalk_keys",  list[string])
+#   k3    = attr_get(base + "post_chalk_keys", list[string])
+#   k4    = attr_get(base + "post_run_keys",   list[string])
 
-  for i from 0 to len(val) {
-    if k1.contains(val[i]) or k1.contains("*") { continue; }
-    if k2.contains(val[i]) or k2.contains("*") { continue; }
-    if k3.contains(val[i]) or k3.contains("*") { continue; }
-    if k4.contains(val[i]) or k4.contains("*") { continue; }
-      return (keyname + ": Plugin does not produce the metadata key: '" +
-             val[i] + "'" )
+#   for i from 0 to len(val) {
+#     if k1.contains(val[i]) or k1.contains("*") { continue; }
+#     if k2.contains(val[i]) or k2.contains("*") { continue; }
+#     if k3.contains(val[i]) or k3.contains("*") { continue; }
+#     if k4.contains(val[i]) or k4.contains("*") { continue; }
+#       return (keyname + ": Plugin does not produce the metadata key: '" +
+#              val[i] + "'" )
 
-  }
-}
+#   }
+# }
 
 func validate_mark_template(template_name) {
   result = ""
@@ -3558,29 +3560,30 @@ func sink_ref_check(name, sink_config_name) {
   }
 }
 
-func use_when_check(name, value: list[string]) {
-  result = ""
+# TODO(ee7): Resolve crash.
+# func use_when_check(name, value: list[string]) {
+#   result = ""
 
-  if value.contains("*") {
-    if value.len() > 1 {
-      return "For field use_when, '*' should be the only item when it appears"
-    }
-    return
-  }
-  for i from 0 to value.len() {
-    if valid_chalk_cmds.contains(value[i]) {
-      continue
-    }
-    if other_report_ops.contains(value[i]) {
-      continue
-    }
-    return ("'use_when' must be a valid chalk report type, or a '*' " +
-           " to indicate all of them. '" + value[i] +
-           "' isn't a chalk command.  Valid report types are: " +
-           valid_chalk_cmds.join(", ") + ", " + other_report_ops.join(", ")
-           )
-  }
-}
+#   if value.contains("*") {
+#     if value.len() > 1 {
+#       return "For field use_when, '*' should be the only item when it appears"
+#     }
+#     return
+#   }
+#   for i from 0 to value.len() {
+#     if valid_chalk_cmds.contains(value[i]) {
+#       continue
+#     }
+#     if other_report_ops.contains(value[i]) {
+#       continue
+#     }
+#     return ("'use_when' must be a valid chalk report type, or a '*' " +
+#            " to indicate all of them. '" + value[i] +
+#            "' isn't a chalk command.  Valid report types are: " +
+#            valid_chalk_cmds.join(", ") + ", " + other_report_ops.join(", ")
+#            )
+#   }
+# }
 
 func sink_check(name, scfg: string) {
   result = ""
@@ -3665,178 +3668,183 @@ func custom_report_extra_validation() {
   }
 }
 
-func key_name_validation() {
-  result     = ""
-  spec_sects = sections("keyspec")
-  for i from 0 to len(spec_sects) {
-    key_name = spec_sects[i]
-    base     = "keyspec." + key_name + "."
-    if attr_get(base + "standard", bool) { continue; }
-    kind     = attr_get(base + "kind", int)
-    if kind == ChalkTimeHost or kind == ChalkTimeArtifact {
-      if key_name.find("X_") == 0 { continue; }
-    }
-    elif key_name.find("_X_") == 0 { continue; }
-    return ("Custom key '" + key_name + "' is invalid. Chalkable custom " +
-            "keys must start with X_ (or _X_ for non-chalkable keys)")
-  }
-}
+# TODO(ee7): Resolve crash.
+# func key_name_validation() {
+#   result     = ""
+#   spec_sects = sections("keyspec")
+#   for i from 0 to len(spec_sects) {
+#     key_name = spec_sects[i]
+#     base     = "keyspec." + key_name + "."
+#     if attr_get(base + "standard", bool) { continue; }
+#     kind     = attr_get(base + "kind", int)
+#     if kind == ChalkTimeHost or kind == ChalkTimeArtifact {
+#       if key_name.find("X_") == 0 { continue; }
+#     }
+#     elif key_name.find("_X_") == 0 { continue; }
+#     return ("Custom key '" + key_name + "' is invalid. Chalkable custom " +
+#             "keys must start with X_ (or _X_ for non-chalkable keys)")
+#   }
+# }
 
-func sink_object_check(path) {
-  result = ""
-  f = fields(path)
+# TODO(ee7): Resolve crash.
+# func sink_object_check(path) {
+#   result = ""
+#   f = fields(path)
 
-  for i from 0 to len(f) {
-    fieldname = path + "." + f[i]
-    fieldtype = attr_type(fieldname)
-    if typecmp(fieldtype, bool) or typecmp(fieldtype, string) {
-      continue
-    }
-    return ("All sink fields must be a bool indicating whether a field is " +
-            "required, or a string specifying a default value " +
-            "(offending field: '" + f[i] + "' has type: " + $(fieldtype))
-  }
-}
+#   for i from 0 to len(f) {
+#     fieldname = path + "." + f[i]
+#     fieldtype = attr_type(fieldname)
+#     if typecmp(fieldtype, bool) or typecmp(fieldtype, string) {
+#       continue
+#     }
+#     return ("All sink fields must be a bool indicating whether a field is " +
+#             "required, or a string specifying a default value " +
+#             "(offending field: '" + f[i] + "' has type: " + $(fieldtype))
+#   }
+# }
 
 sink_config_skip_fields = ["enabled", "priority", "loaded", "sink", "filters"]
 global sink_config_skip_fields
 
-func sink_config_check(path) {
-  result   = ""
-  sinkname = attr_get(path + ".sink", string)
-  if sinkname == "" {
-    return # Unconfigured.
-  }
-  if not attr_exists("sink." + sinkname) {
-    return "No such sink configured: '" + sinkname + "'"
-  }
-  sinkfields = fields("sink." + sinkname)
-  conffields = fields(path)
+# TODO(ee7): Resolve crash.
+# func sink_config_check(path) {
+#   result   = ""
+#   sinkname = attr_get(path + ".sink", string)
+#   if sinkname == "" {
+#     return # Unconfigured.
+#   }
+#   if not attr_exists("sink." + sinkname) {
+#     return "No such sink configured: '" + sinkname + "'"
+#   }
+#   sinkfields = fields("sink." + sinkname)
+#   conffields = fields(path)
 
-  for i from 0 to len(conffields) {
-    conffield = conffields[i]
-    if sink_config_skip_fields.contains(conffield) {
-      continue
-    }
+#   for i from 0 to len(conffields) {
+#     conffield = conffields[i]
+#     if sink_config_skip_fields.contains(conffield) {
+#       continue
+#     }
 
-    if not sinkfields.contains(conffield) {
-      return ("sink config provides field '" + conffield +
-              "', but the specified sink '" + sinkname +
-              "' does not use that field.")
-    }
+#     if not sinkfields.contains(conffield) {
+#       return ("sink config provides field '" + conffield +
+#               "', but the specified sink '" + sinkname +
+#               "' does not use that field.")
+#     }
 
-    if contains(["timeout", "truncation_amount", "max"], conffield) {
-      t = attr_type(path + "." + conffield)
-      if not typecmp(t, Size) and not typecmp(t, int) {
-          return conffield + ": This field must be a con4m Size, or an int (in bytes)"
-      }
-    }
-    elif conffield == "headers" {
-      t = attr_type(path + "." + conffield)
-      if not typecmp(t, dict[string, string]) {
-          return conffield + ": Field must be a dict[string, string]"
-      }
-    }
-    elif contains(["priority"], conffield) {
-      t = attr_type(path + "." + conffield)
-      if not typecmp(t, int) {
-          return conffield + ": This field must be int"
-      }
-    }
-    elif contains(["enabled", "use_search_path", "disallow_http"], conffield) {
-      t = attr_type(path + "." + conffield)
-      if not typecmp(t, bool) {
-          return conffield + ": Field must be `true` or `false`"
-      }
-    }
-    elif contains(["log_search_path", "filters"], conffield) {
-      t = attr_type(path + "." + conffield)
-      if not typecmp(t, list[string]) {
-          return conffield + ": Field must be a list[string]"
-      }
-    }
-    elif not typecmp(attr_type(path + "." + conffield), string) {
-      return conffield + ": Field must be a string."
-    }
-    elif conffield == "pinned_cert_file" {
-      if attr_exists(path + ".pinned_cert") {
-        return ("Cannot have `pinned_cert_file` and `pinned_cert` in the same" +
-        "sink configuration.")
-      }
-    }
+#     if contains(["timeout", "truncation_amount", "max"], conffield) {
+#       t = attr_type(path + "." + conffield)
+#       if not typecmp(t, Size) and not typecmp(t, int) {
+#           return conffield + ": This field must be a con4m Size, or an int (in bytes)"
+#       }
+#     }
+#     elif conffield == "headers" {
+#       t = attr_type(path + "." + conffield)
+#       if not typecmp(t, dict[string, string]) {
+#           return conffield + ": Field must be a dict[string, string]"
+#       }
+#     }
+#     elif contains(["priority"], conffield) {
+#       t = attr_type(path + "." + conffield)
+#       if not typecmp(t, int) {
+#           return conffield + ": This field must be int"
+#       }
+#     }
+#     elif contains(["enabled", "use_search_path", "disallow_http"], conffield) {
+#       t = attr_type(path + "." + conffield)
+#       if not typecmp(t, bool) {
+#           return conffield + ": Field must be `true` or `false`"
+#       }
+#     }
+#     elif contains(["log_search_path", "filters"], conffield) {
+#       t = attr_type(path + "." + conffield)
+#       if not typecmp(t, list[string]) {
+#           return conffield + ": Field must be a list[string]"
+#       }
+#     }
+#     elif not typecmp(attr_type(path + "." + conffield), string) {
+#       return conffield + ": Field must be a string."
+#     }
+#     elif conffield == "pinned_cert_file" {
+#       if attr_exists(path + ".pinned_cert") {
+#         return ("Cannot have `pinned_cert_file` and `pinned_cert` in the same" +
+#         "sink configuration.")
+#       }
+#     }
 
-  }
+#   }
 
-  for i from 0 to len(sinkfields) {
-    fullname = "sink." + sinkname + "." + sinkfields[i]
-     t = attr_type(fullname)
-     if not typecmp(t, bool) {   # TODO-- short circuit didn't work??
-       continue
-     }
-     if not attr_get(fullname, bool) {
-       continue
-     }
-     if not conffields.contains(sinkfields[i]) {
-       return "sink config is missing required field: '" + sinkfields[i] + "'"
-     }
-  }
-}
+#   for i from 0 to len(sinkfields) {
+#     fullname = "sink." + sinkname + "." + sinkfields[i]
+#      t = attr_type(fullname)
+#      if not typecmp(t, bool) {   # TODO-- short circuit didn't work??
+#        continue
+#      }
+#      if not attr_get(fullname, bool) {
+#        continue
+#      }
+#      if not conffields.contains(sinkfields[i]) {
+#        return "sink config is missing required field: '" + sinkfields[i] + "'"
+#      }
+#   }
+# }
 
-func auth_object_check(path) {
-  result = ""
-  f = fields(path)
-  for i from 0 to len(f) {
-    fieldname = path + "." + f[i]
-    fieldtype = attr_type(fieldname)
-    if typecmp(fieldtype, bool) or typecmp(fieldtype, string) {
-      continue
-    }
-    return ("All auth fields must be a bool indicating whether a field is " +
-            "required, or a string specifying a default value " +
-            "(offending field: '" + f[i] + "' has type: " + $(fieldtype))
-  }
-}
+# TODO(ee7): Resolve crash.
+# func auth_object_check(path) {
+#   result = ""
+#   f = fields(path)
+#   for i from 0 to len(f) {
+#     fieldname = path + "." + f[i]
+#     fieldtype = attr_type(fieldname)
+#     if typecmp(fieldtype, bool) or typecmp(fieldtype, string) {
+#       continue
+#     }
+#     return ("All auth fields must be a bool indicating whether a field is " +
+#             "required, or a string specifying a default value " +
+#             "(offending field: '" + f[i] + "' has type: " + $(fieldtype))
+#   }
+# }
 
-func auth_config_check(path) {
-  result   = ""
-  authname = attr_get(path + ".auth", string)
-  if authname == "" {
-    return # Unconfigured.
-  }
-  if not attr_exists("auth." + authname) {
-    return "No such auth configured: '" + authname + "'"
-  }
-  authfields = fields("auth." + authname)
-  conffields = fields(path)
+# TODO(ee7): Resolve crash.
+# func auth_config_check(path) {
+#   result   = ""
+#   authname = attr_get(path + ".auth", string)
+#   if authname == "" {
+#     return # Unconfigured.
+#   }
+#   if not attr_exists("auth." + authname) {
+#     return "No such auth configured: '" + authname + "'"
+#   }
+#   authfields = fields("auth." + authname)
+#   conffields = fields(path)
 
-  # ensure config has all required fields are present as defined in auth
-  for i from 0 to len(authfields) {
-    fullname = "auth." + authname + "." + authfields[i]
-    t = attr_type(fullname)
-    if not typecmp(t, bool) {   # TODO-- short circuit didn't work??
-      continue
-    }
-    if not attr_get(fullname, bool) {
-      continue
-    }
-    if not conffields.contains(authfields[i]) {
-      return "auth config is missing required field: '" + authfields[i] + "'"
-    }
-  }
+#   # ensure config has all required fields are present as defined in auth
+#   for i from 0 to len(authfields) {
+#     fullname = "auth." + authname + "." + authfields[i]
+#     t = attr_type(fullname)
+#     if not typecmp(t, bool) {   # TODO-- short circuit didn't work??
+#       continue
+#     }
+#     if not attr_get(fullname, bool) {
+#       continue
+#     }
+#     if not conffields.contains(authfields[i]) {
+#       return "auth config is missing required field: '" + authfields[i] + "'"
+#     }
+#   }
 
-  # check config field fields
-  for i from 0 to len(conffields) {
-    conffield = conffields[i]
-    if not authfields.contains(conffield) {
-      return ("auth config provides field '" + conffield +
-              "', but the specified auth '" + authname +
-              "' does not use that field.")
-    }
-    if not typecmp(attr_type(path + "." + conffield), string) {
-      return "This field must be a string."
-    }
-  }
-}
+#   # check config field fields
+#   for i from 0 to len(conffields) {
+#     conffield = conffields[i]
+#     if not authfields.contains(conffield) {
+#       return ("auth config provides field '" + conffield +
+#               "', but the specified auth '" + authname +
+#               "' does not use that field.")
+#     }
+#     if not typecmp(attr_type(path + "." + conffield), string) {
+#       return "This field must be a string."
+#     }
+#   }
+# }
 
 func outconf_mark_templates_exist()
 {
