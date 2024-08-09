@@ -81,7 +81,6 @@ global known_sink_filters, other_report_ops
 named key {
   # TODO: no callbacks or value fields when system is set on the keyspec.
   user_def_ok:   false
-  gen_fieldname: "keys"
   gen_typename:  "KeyConfig"
   gen_setters:   false
   doc:           """
@@ -119,7 +118,6 @@ the normalization order from the associated keyspec.
 
 named mark_template {
   user_def_ok:   false
-  gen_fieldname: "markTemplates"
   gen_typename:  "MarkTemplate"
   gen_setters:   false
   doc: """
@@ -260,7 +258,6 @@ This field will be shown when showing the full template in help documentation.
 
 named report_template {
   user_def_ok:   false
-  gen_fieldname: "reportTemplates"
   gen_typename:  "ReportTemplate"
   gen_setters:   false
   doc: """
@@ -319,7 +316,6 @@ This field will be shown when the running command `chalk template [your_report_n
 
 named tool {
    user_def_ok:   true
-   gen_fieldname: "tools"
    gen_typename:  "ToolInfo"
    gen_setters:   false
    doc:           """
@@ -452,7 +448,6 @@ failure, and no other keys will be checked.
 linguist_types = ["programming", "data", "markup"]
 named linguist_language {
   user_def_ok:   false
-  gen_fieldname: "linguist_languages"
   gen_typename:  "LinguistLanguage"
   gen_setters:   false
 
@@ -492,7 +487,6 @@ valid_subcategory_types = ["firebird", "hypersonicSQL",
 
 named tech_stack_rule {
   user_def_ok:   false
-  gen_fieldname: "techStackRules"
   gen_typename:  "TechStackRule"
   gen_setters:   false
 
@@ -520,7 +514,6 @@ named tech_stack_rule {
 
 singleton file_scope {
   user_def_ok: false
-  gen_fieldname: "fileScope"
   gen_typename:  "FileScope"
   gen_setters: false
 
@@ -585,7 +578,6 @@ defined in the filepaths directive will be getting considered regardless.
 
 singleton host_scope {
   user_def_ok: false
-  gen_fieldname: "hostScope"
   gen_typename:  "hostScope"
   gen_setters: false
 
@@ -626,7 +618,6 @@ If set to false, the mere presence of a directory or filepath will mark a detect
 
 named keyspec {
   user_def_ok:   false
-  gen_fieldname: "keyspecs"
   gen_typename:  "KeySpec"
   gen_setters:   false
   doc:           """
@@ -870,7 +861,6 @@ Note that these substitutions currently only are applied at chalk time, and for 
 }
 
 named plugin {
-  gen_fieldname: "plugins"
   gen_typename:  "PluginSpec"
   user_def_ok:   false
   gen_setters:   false
@@ -970,7 +960,6 @@ the key.  This is invalid for system keys.
 }
 
 named sink {
-  gen_fieldname: "sinks"
   gen_typename:  "SinkSpec"
   gen_setters:   false
   user_def_ok:   true
@@ -1007,7 +996,6 @@ checked when corresponding `sink_config` objects are found.
 }
 
 named sink_config {
-  gen_fieldname: "sinkConfs"
   gen_typename:  "SinkConfigObj"
   gen_setters:   false
   user_def_ok:   true
@@ -1104,7 +1092,6 @@ field.
 }
 
 named auth {
-  gen_fieldname: "auths"
   gen_typename:  "AuthSpec"
   gen_setters:   false
   user_def_ok:   true
@@ -1150,7 +1137,6 @@ auth_config my_auth_config {
 }
 
 named auth_config {
-  gen_fieldname: "authConfs"
   gen_typename:  "AuthConfigObj"
   gen_setters:   false
   user_def_ok:   true
@@ -1172,7 +1158,6 @@ auth_config my_auth_config {
 }
 
 singleton attestation_key_embed {
-  gen_fieldname: "attestationKeyEmbedConfig"
   gen_typename:  "AttestationKeyEmbedConfig"
   gen_setters:   false
   user_def_ok:   true
@@ -1200,7 +1185,6 @@ Chalk will also embed the key-pairs internally, for future operations.
 }
 
 singleton attestation_key_backup {
-  gen_fieldname: "attestationKeyBackupConfig"
   gen_typename:  "AttestationKeyBackupConfig"
   gen_setters:   false
   user_def_ok:   true
@@ -1264,7 +1248,6 @@ just without doing any signing / verifying.
 }
 
 singleton attestation_key_get {
-  gen_fieldname: "attestationKeyGetConfig"
   gen_typename:  "AttestationKeyGetConfig"
   gen_setters:   false
   user_def_ok:   true
@@ -1322,7 +1305,6 @@ just without doing any signing / verifying.
 attestation_key_types = ["embed", "backup", "get"]
 
 singleton attestation {
-  gen_fieldname: "attestationConfig"
   gen_typename:  "AttestationConfig"
   gen_setters:   false
   user_def_ok:   true
@@ -1396,7 +1378,6 @@ See individual key provider objects for all supported configuration fields.
 }
 
 named outconf {
-  gen_fieldname: "outputConfigs"
   gen_typename:  "OutputConfig"
   gen_setters:   false
   user_def_ok:   false
@@ -1501,7 +1482,6 @@ basis. Only valid chalk commands are valid section names.
 }
 
 named custom_report {
-  gen_fieldname: "reportSpecs"
   gen_typename:  "ReportSpec"
   gen_setters:   false
   user_def_ok:   false
@@ -1650,7 +1630,6 @@ If not specified, reports apply to any command that reports.
 }
 
 singleton extract {
-  gen_fieldname: "extractConfig"
   gen_typename: "ExtractConfig"
   gen_setters: false
   user_def_ok: false
@@ -1683,7 +1662,6 @@ By default we skip unsigned images, because the process (necessarily) involves d
 }
 
 singleton docker {
-  gen_fieldname: "dockerConfig"
   gen_typename:  "DockerConfig"
   gen_setters:   false
   user_def_ok:   false
@@ -1962,7 +1940,6 @@ ENV ARTIFACT_IDENTIFIER="X6VRPZ-C828-KDNS-QDXRT0"
 }
 
 singleton git {
-  gen_fieldname: "gitConfig"
   gen_typename:  "GitConfig"
   gen_setters:   false
   user_def_ok:   false
@@ -1995,7 +1972,6 @@ from the origin to ensure its local definition is up to date.
 }
 
 singleton load {
-  gen_fieldname: "loadConfig"
   gen_typename:  "LoadConfig"
   gen_setters:   false
   user_def_ok:   false
@@ -2078,7 +2054,6 @@ configuration parameter `dump.params`
 }
 
 singleton exec {
-  gen_fieldname: "execConfig"
   gen_typename:  "ExecConfig"
   gen_setters:   false
   user_def_ok:   false
@@ -2266,7 +2241,6 @@ final report, if the monitored process has exited.
 }
 
 singleton env_config {
-  gen_fieldname: "envConfig"
   gen_typename:  "EnvConfig"
   gen_setters:   false
   user_def_ok:   false
@@ -2300,7 +2274,6 @@ This is not yet implemented.
 }
 
 singleton source_marks {
-  gen_fieldname: "srcConfig"
   gen_typename:  "SrcConfig"
   gen_setters:   false
   user_def_ok:   false
@@ -2594,7 +2567,6 @@ pretty weird language names.
 }
 
 singleton cloud_instance_hw_identifiers {
-  gen_fieldname: "cloudInstanceHwConfig"
   gen_typename:  "CloudInstanceHwConfig"
   gen_setters:   false
   user_def_ok:   false
@@ -2640,7 +2612,6 @@ end users.
 }
 
 singleton cloud_provider {
-  gen_fieldname: "cloudProviderConfig"
   gen_typename:  "CloudProviderConfig"
   gen_setters:   false
   user_def_ok:   false
