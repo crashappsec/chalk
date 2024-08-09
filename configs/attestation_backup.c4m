@@ -16,4 +16,4 @@ auth_config crashoverride {
   ~auth:  "jwt"
 }
 
-attestation.key_provider = "backup"
+attestation.key_provider: "backup"
