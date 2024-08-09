@@ -128,13 +128,13 @@ func extract_syft_sbom(out: string, code) {
 
   if code != 0 {
     error("syft failed to run properly; ignoring")
-    echo(out)
+    print(out)
     return {}
   }
 
   if not starts_with(strip(out), "{") {
     error("syft did not run properly - invalid JSON returned; ignoring")
-    echo(out)
+    print(out)
     return {}
   }
 

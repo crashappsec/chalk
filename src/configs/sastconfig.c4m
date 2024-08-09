@@ -150,13 +150,13 @@ func load_semgrep_results(out: string, code) {
 
   if code != 0 {
     error("semgrep failed to run properly; ignoring")
-    echo(out)
+    print(out)
     return {}
   }
 
   if not starts_with(strip(out), "{") {
     error("semgrep did not run properly - invalid JSON returned; ignoring")
-    echo(out)
+    print(out)
     return {}
   }
 

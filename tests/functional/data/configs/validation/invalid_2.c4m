@@ -1,2 +1,2 @@
 # invalid config syntax but valid nim
-echo "blah blah"
+print "blah blah"
