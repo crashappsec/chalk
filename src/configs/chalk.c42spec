@@ -357,7 +357,7 @@ named tool {
     """
     type:     int
     default:  50
-    range:    (0, high())
+    range:    0, high()
   }
 
   field stop_on_success {
@@ -681,7 +681,7 @@ named keyspec {
     type:        int
     require:     true
     lock:        true
-    range:       (ChalkTimeHost, RunTimeHost)
+    range:       ChalkTimeHost, RunTimeHost
   }
 
   field never_early {
@@ -792,7 +792,7 @@ named keyspec {
     """
     type:        int
     default:     default_key_priority
-    range:       (0, high())
+    range:       0, high()
   }
 
   field apply_substitutions {
@@ -849,7 +849,7 @@ named plugin {
     """
     type:     int
     default:  50
-    range:    (0, high())
+    range:    0, high()
   }
 
   field ignore {
@@ -1022,7 +1022,7 @@ named sink_config {
     """
     type:    int
     default: 0
-    range:   (0, high())
+    range:   0, high()
   }
 
   field filters {
@@ -2729,7 +2729,7 @@ root {
     """
     type:    int
     default: 50
-    range:   (0, high())
+    range:   0, high()
     hidden:  true
   }
 
