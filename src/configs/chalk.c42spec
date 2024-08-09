@@ -1874,7 +1874,8 @@ singleton docker {
     ```
     """
     type: dict[string, string]
-    default: { }
+    # TODO(ee7): remove, or uncomment when this no longer hangs
+    # default: { }
   }
 }
 
