@@ -8,26 +8,26 @@
 ## This is the con4m specification to enable con4m to automatically
 ## validate chalk config files.
 
-default_key_priority := 4611686018427387904  # 2^62.
+default_key_priority = 4611686018427387904  # 2^62.
 
 # These are the valid command-line commands.
-valid_chalk_cmds     := ["help", "insert", "extract", "delete", "config",
-                         "load", "dump", "docker", "version", "env", "exec",
-                         "setup", "docgen", "__"]
+valid_chalk_cmds     = ["help", "insert", "extract", "delete", "config",
+                        "load", "dump", "docker", "version", "env", "exec",
+                        "setup", "docgen", "__"]
 
-all_cmds_that_insert := ["insert", "build", "push", "load", "setup"]
+all_cmds_that_insert = ["insert", "build", "push", "load", "setup"]
 
 
 
 # Beyond valid chalk commands, these can generate reports.
-other_report_ops     := ["build", "push", "heartbeat"]
-tool_types           := ["sbom", "sast"]
-valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
-key_types            := ["Chalk-time Host", "Chalk-time Artifact",
-                         "Run-time Artifact", "Run-time Host"]
-known_sink_filters   := ["log_level", "log_prefix", "pretty_json",
-                         "fix_new_line", "add_topic", "wrap",
-                         "github_log_group"]
+other_report_ops     = ["build", "push", "heartbeat"]
+tool_types           = ["sbom", "sast"]
+valid_log_levels     = ["verbose", "trace", "info", "warn", "error", "none"]
+key_types            = ["Chalk-time Host", "Chalk-time Artifact",
+                        "Run-time Artifact", "Run-time Host"]
+known_sink_filters   = ["log_level", "log_prefix", "pretty_json",
+                        "fix_new_line", "add_topic", "wrap",
+                        "github_log_group"]
 
 # This is the enum for key types.   See 'key' object documentation below
 # for more details.
@@ -449,7 +449,7 @@ failure, and no other keys will be checked.
   }
 }
 
-linguist_types := ["programming", "data", "markup"]
+linguist_types = ["programming", "data", "markup"]
 named linguist_language {
   user_def_ok:   false
   gen_fieldname: "linguist_languages"
@@ -475,16 +475,16 @@ named linguist_language {
 }
 
 
-valid_tech_stack_categories := ["database", "webServer", "protocol", "framework"]
-valid_tech_stack_database_types := ["firebird", "hypersonicSQL",
+valid_tech_stack_categories = ["database", "webServer", "protocol", "framework"]
+valid_tech_stack_database_types = ["firebird", "hypersonicSQL",
     "ibmDb2", "microsoftAccess", "microsoftSQLServer",
      "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other"]
 
-valid_tech_stack_web_server_types := ["apache", "nginx", "iis"]
-valid_tech_stack_protocol_types := ["ldap"]
-valid_tech_stack_framework_types := ["javaSpring"]
+valid_tech_stack_web_server_types = ["apache", "nginx", "iis"]
+valid_tech_stack_protocol_types = ["ldap"]
+valid_tech_stack_framework_types = ["javaSpring"]
 
-valid_subcategory_types := ["firebird", "hypersonicSQL",
+valid_subcategory_types = ["firebird", "hypersonicSQL",
     "ibmDb2", "microsoftAccess", "microsoftSQLServer",
      "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other",
      "apache", "nginx", "iis", "ldap", "javaSpring"]
@@ -1320,7 +1320,7 @@ just without doing any signing / verifying.
   }
 }
 
-attestation_key_types := ["embed", "backup", "get"]
+attestation_key_types = ["embed", "backup", "get"]
 
 singleton attestation {
   gen_fieldname: "attestationConfig"
@@ -3053,7 +3053,7 @@ This is primarily meant to make it easier to test new configurations by disablin
     doc: """
 When true, this will cause chalk to run any configured and enabled SBOM tool implementations. Currently, this is just `syft`, which will be downloaded into /tmp if not found on the system.
 
-You can change that directory by setting the global variable `SYFT_EXE_DIR` with the `:=` operator (it is *not* an attribute).
+You can change that directory by setting the global variable `SYFT_EXE_DIR` with the `=` operator (it is *not* an attribute).
 The syft command line arguments used at invocation (minus the target location) can be set via the `SYFT_ARGV` global variable. It's default value is:
 ```
 -o cyclonedx-json 2>/dev/null
@@ -3414,7 +3414,7 @@ func validate_key_path(path, template_name) {
   if not ends_with(path, ".key") or not ends_with(path, ".pub") {
     return "Key path must use either .key or .pub extension"
   }
-  parts := path_split(path)
+  parts = path_split(path)
   if len(parts[1]) <= 5 {
     return "Key path must define a filename"
   }
@@ -3429,11 +3429,11 @@ func validate_probability(name, value) {
 }
 
 func key_callback_check(keyname, callback: func (string) -> `x) {
-  path      := split(keyname, ".")
-  key_name  := path[1]
-  fieldType := $(attr_get("keyspec." + key_name + ".type", typespec))
-  expected  := to_type("(string) -> " + fieldType)
-  actual    := typeof(callback)
+  path      = split(keyname, ".")
+  key_name  = path[1]
+  fieldType = $(attr_get("keyspec." + key_name + ".type", typespec))
+  expected  = to_type("(string) -> " + fieldType)
+  actual    = typeof(callback)
 
   if not typecmp(expected, actual) {
     return ("In: '" + keyname + "' callback is of type '" + $(actual) +
@@ -3445,12 +3445,12 @@ func key_callback_check(keyname, callback: func (string) -> `x) {
 }
 
 func never_early_check(keyname, val) {
-  result := ""
+  result = ""
 
   if val == true {
-    path       := split(keyname, ".")
-    kind_field := "keyspec." + path[1] + ".kind"
-    kind       := attr_get(kind_field, int)
+    path       = split(keyname, ".")
+    kind_field = "keyspec." + path[1] + ".kind"
+    kind       = attr_get(kind_field, int)
 
     if kind != ChalkTimeArtifact {
       return "'never_early' only for fields of type ChalkTimeArtifact"
@@ -3459,7 +3459,7 @@ func never_early_check(keyname, val) {
 }
 
 func plugin_keyspec_check(keyname, val: list[string], context) {
-  result := "" # Default on success
+  result = "" # Default on success
 
   # For each key in val...
   # 1) If the key doesn't exist, fail.
@@ -3468,7 +3468,7 @@ func plugin_keyspec_check(keyname, val: list[string], context) {
   # 3) If it's of type chalk, never_early must be false.
 
   for i from 0 to len(val) {
-    item := val[i]
+    item = val[i]
 
     if item == "*" { continue; }
 
@@ -3477,14 +3477,14 @@ func plugin_keyspec_check(keyname, val: list[string], context) {
         "associated keyspec")
     }
 
-    base              := "keyspec." + item + "."
-    kind_field        := base + "kind"
-    kind              := attr_get(kind_field, int)
+    base              = "keyspec." + item + "."
+    kind_field        = base + "kind"
+    kind              = attr_get(kind_field, int)
 
     if context == CCPreRun {
       if kind == ChalkTimeHost { continue }
       elif kind == ChalkTimeArtifact {
-        never_early_field := base + "never_early"
+        never_early_field = base + "never_early"
         if attr_get(never_early_field, bool) == false {
           continue
         }
@@ -3528,13 +3528,13 @@ func post_run_key_check(keyname, val) {
 }
 
 func override_key_check(keyname: string, val: list[string]) {
-  result := ""
-  parts := keyname.split(".")
-  base  := "plugin." + parts[1] + "."
-  k1    := attr_get(base + "pre_run_keys",    list[string])
-  k2    := attr_get(base + "pre_chalk_keys",  list[string])
-  k3    := attr_get(base + "post_chalk_keys", list[string])
-  k4    := attr_get(base + "post_run_keys",   list[string])
+  result = ""
+  parts = keyname.split(".")
+  base  = "plugin." + parts[1] + "."
+  k1    = attr_get(base + "pre_run_keys",    list[string])
+  k2    = attr_get(base + "pre_chalk_keys",  list[string])
+  k3    = attr_get(base + "post_chalk_keys", list[string])
+  k4    = attr_get(base + "post_run_keys",   list[string])
 
   for i from 0 to len(val) {
     if k1.contains(val[i]) or k1.contains("*") { continue; }
@@ -3548,22 +3548,22 @@ func override_key_check(keyname: string, val: list[string]) {
 }
 
 func validate_mark_template(template_name) {
-  result := ""
+  result = ""
 
   if template_name == "" {
     return
   }
 
-  sects := sections("mark_template")
+  sects = sections("mark_template")
 
   if not sects.contains(template_name) {
     return ("specifies a Chalk mark template '" + template_name + "', but no " +
     "such template exists")
   }
 
-  specs         := sections("keyspec")
-  key_attr_path := "mark_template." + template_name + ".key"
-  template_keys := sections(key_attr_path)
+  specs         = sections("keyspec")
+  key_attr_path = "mark_template." + template_name + ".key"
+  template_keys = sections(key_attr_path)
 
   for i from 0 to len(template_keys) {
     if not specs.contains(template_keys[i]) {
@@ -3572,7 +3572,7 @@ func validate_mark_template(template_name) {
                 " (no matching keyspec section found).")
     }
 
-    full_value_path := key_attr_path + "." + template_keys[i] + ".use"
+    full_value_path = key_attr_path + "." + template_keys[i] + ".use"
 
     if find(template_keys[i], "_") == 0 {
         return ("Chalk mark template '" + template_name +
@@ -3584,18 +3584,18 @@ func validate_mark_template(template_name) {
 }
 
 func validate_report_template(name) {
-  result := ""
+  result = ""
 
-  sects := sections("report_template")
+  sects = sections("report_template")
 
   if not sects.contains(name) {
     return ("specificate a Report template '" + name + "', but no " +
     "such template exists")
   }
 
-  specs         := sections("keyspec")
-  key_attr_path := "report_template." + name + ".key"
-  template_keys := sections(key_attr_path)
+  specs         = sections("keyspec")
+  key_attr_path = "report_template." + name + ".key"
+  template_keys = sections(key_attr_path)
 
   for i from 0 to len(template_keys) {
     if not specs.contains(template_keys[i]) {
@@ -3607,44 +3607,44 @@ func validate_report_template(name) {
 }
 
 func in_outconf(name) {
-  secname := name.split(".")[1]
+  secname = name.split(".")[1]
   return "For output configuration of command '" + secname + "': "
 }
 
 func in_report(name) {
-  reportname := name.split(".")[1]
+  reportname = name.split(".")[1]
   return "In custom report '" + reportname + "': "
 }
 
 func outconf_mark_template_check(name, template_name) {
-  result := ""
-  path   := split(name, ".")
-  cmd    := path[1]
+  result = ""
+  path   = split(name, ".")
+  cmd    = path[1]
 
   if template_name != "" and not contains(all_cmds_that_insert, cmd) {
     return (in_outconf(name) + "' Cannot define a chalk mark template; " +
             "They are only valid for commands that add chalk marks.")
   }
 
-  result := validate_mark_template(template_name)
+  result = validate_mark_template(template_name)
   if result != "" {
-    result := in_outconf(name) + result
+    result = in_outconf(name) + result
   }
 }
 
 func outconf_report_template_check(name, template_name) {
-  result := validate_report_template(template_name)
+  result = validate_report_template(template_name)
 
   if result != "" {
-    result := in_outconf(name) + result
+    result = in_outconf(name) + result
   }
 }
 
 func custom_report_template_check(name, report_template_name) {
-  result := validate_report_template(report_template_name)
+  result = validate_report_template(report_template_name)
 
   if result != "" {
-    result := in_report(name) + result
+    result = in_report(name) + result
   }
 }
 
@@ -3652,19 +3652,19 @@ func label_template_check(name, mark_template_name) {
   if mark_template_name == "" {
     return "" # Not specifies is okay, just won't get used.
   }
-  result := validate_mark_template(mark_template_name)
+  result = validate_mark_template(mark_template_name)
   if result != "" {
-    result := "When specifying a label template: " + result
-    result := result + " (template must be an existing mark_template)"
+    result = "When specifying a label template: " + result
+    result = result + " (template must be an existing mark_template)"
   }
 }
 
 func is_valid_label(label) {
-  result := true
-  chars := to_chars(label)
-  l     := chars.len()
+  result = true
+  chars = to_chars(label)
+  l     = chars.len()
   for i from 0 to l {
-    c := chars[i]
+    c = chars[i]
     if is_alphanum(c) {
       continue
     }
@@ -3686,9 +3686,9 @@ func label_prefix_check(name, value) {
 }
 
 func custom_labels_check(name, value) {
-  result := ""
-  stuff := value.keys()
-  l     := len(stuff)
+  result = ""
+  stuff = value.keys()
+  l     = len(stuff)
   for i from 0 to l {
     if not is_valid_label(stuff[i]) {
       return ("Docker label prefix must only contain letters, numbers, " +
@@ -3698,7 +3698,7 @@ func custom_labels_check(name, value) {
 }
 
 func exec_arg_semantics_check(name, value) {
-  result := ""
+  result = ""
   if value and attr_get("exec.append_command_line_args", bool) {
     return ("Cannot have both exec.append_command_line_args == true and " +
             "exec.override_ok == true")
@@ -3706,7 +3706,7 @@ func exec_arg_semantics_check(name, value) {
 }
 
 func sink_ref_check(name, sink_config_name) {
-  result := ""
+  result = ""
 
   # No sink config means use the default crashoveride one.
   if sink_config_name == "" { return; }
@@ -3716,7 +3716,7 @@ func sink_ref_check(name, sink_config_name) {
 }
 
 func use_when_check(name, value: list[string]) {
-  result := ""
+  result = ""
 
   if value.contains("*") {
     if value.len() > 1 {
@@ -3740,9 +3740,9 @@ func use_when_check(name, value: list[string]) {
 }
 
 func sink_check(name, scfg: string) {
-  result := ""
+  result = ""
   if not sections("sink_config").contains(scfg) {
-    report := name.split(".")[1]
+    report = name.split(".")[1]
 
     return ("The report '" + report + "' applies sink configuration '" + scfg +
            "', but that configuration has not been set.")
@@ -3750,15 +3750,15 @@ func sink_check(name, scfg: string) {
 }
 
 func sink_list_check(name, sinklist: list[string]) {
-  result := ""
+  result = ""
   for i from 0 to len(sinklist) {
-     result := sink_check(name, sinklist[i])
+     result = sink_check(name, sinklist[i])
      if result != "" { return; }
   }
 }
 
 func sink_filter_check(name, filterList: list[string]) {
-  result := ""
+  result = ""
   for i from 0 to len(filterList) {
     if not known_sink_filters.contains(filterList[i]) {
       return "Unknown filter in sink configuration: " + filterList[i]
@@ -3768,7 +3768,7 @@ func sink_filter_check(name, filterList: list[string]) {
 
 # TODO: should add a "choices" constraint to con4m.
 func zip_check(keyname: string, value: list[string]) {
-  valid_items := ["zip", "jar", "war", "ear"]
+  valid_items = ["zip", "jar", "war", "ear"]
 
   for i from 0 to len(value) {
     if not contains(valid_items, value[i]) {
@@ -3779,7 +3779,7 @@ func zip_check(keyname: string, value: list[string]) {
 }
 
 func py_check(keyname: string, value: list[string]) {
-  valid_items := ["py", "pyw", "ipy"]
+  valid_items = ["py", "pyw", "ipy"]
 
   for i from 0 to len(value) {
     if not contains(valid_items, value[i]) {
@@ -3790,7 +3790,7 @@ func py_check(keyname: string, value: list[string]) {
 }
 
 func pyc_check(keyname: string, value: list[string]) {
-  valid_items := ["pyc", "pyo", "pyd"]
+  valid_items = ["pyc", "pyo", "pyd"]
 
   for i from 0 to len(value) {
     if not contains(valid_items, value[i]) {
@@ -3801,7 +3801,7 @@ func pyc_check(keyname: string, value: list[string]) {
 }
 
 func default_command_check(keyname, value) {
-  value := value.split(".")[0]
+  value = value.split(".")[0]
   if contains(valid_chalk_cmds, value) {
     return ""
   }
@@ -3812,10 +3812,10 @@ func default_command_check(keyname, value) {
 
 # Run any checks across fields that we haven't yet done...
 func custom_report_extra_validation() {
-  result       := ""
-  report_sects := sections("custom_report")
+  result       = ""
+  report_sects = sections("custom_report")
   for i from 0 to len(report_sects) {
-    base := "custom_report." + report_sects[i] + "."
+    base = "custom_report." + report_sects[i] + "."
     if attr_get(base + "report_template", string) == "" {
       return "Custom Report '" + report_sects[i] + "' must set a report"
     }
@@ -3823,13 +3823,13 @@ func custom_report_extra_validation() {
 }
 
 func key_name_validation() {
-  result     := ""
-  spec_sects := sections("keyspec")
+  result     = ""
+  spec_sects = sections("keyspec")
   for i from 0 to len(spec_sects) {
-    key_name := spec_sects[i]
-    base     := "keyspec." + key_name + "."
+    key_name = spec_sects[i]
+    base     = "keyspec." + key_name + "."
     if attr_get(base + "standard", bool) { continue; }
-    kind     := attr_get(base + "kind", int)
+    kind     = attr_get(base + "kind", int)
     if kind == ChalkTimeHost or kind == ChalkTimeArtifact {
       if key_name.find("X_") == 0 { continue; }
     }
@@ -3840,12 +3840,12 @@ func key_name_validation() {
 }
 
 func sink_object_check(path) {
-  result := ""
-  f := fields(path)
+  result = ""
+  f = fields(path)
 
   for i from 0 to len(f) {
-    fieldname := path + "." + f[i]
-    fieldtype := attr_type(fieldname)
+    fieldname = path + "." + f[i]
+    fieldtype = attr_type(fieldname)
     if typecmp(fieldtype, bool) or typecmp(fieldtype, string) {
       continue
     }
@@ -3855,23 +3855,23 @@ func sink_object_check(path) {
   }
 }
 
-sink_config_skip_fields := ["enabled", "priority", "loaded", "sink", "filters"]
+sink_config_skip_fields = ["enabled", "priority", "loaded", "sink", "filters"]
 export sink_config_skip_fields
 
 func sink_config_check(path) {
-  result   := ""
-  sinkname := attr_get(path + ".sink", string)
+  result   = ""
+  sinkname = attr_get(path + ".sink", string)
   if sinkname == "" {
     return # Unconfigured.
   }
   if not attr_exists("sink." + sinkname) {
     return "No such sink configured: '" + sinkname + "'"
   }
-  sinkfields := fields("sink." + sinkname)
-  conffields := fields(path)
+  sinkfields = fields("sink." + sinkname)
+  conffields = fields(path)
 
   for i from 0 to len(conffields) {
-    conffield := conffields[i]
+    conffield = conffields[i]
     if sink_config_skip_fields.contains(conffield) {
       continue
     }
@@ -3883,31 +3883,31 @@ func sink_config_check(path) {
     }
 
     if contains(["timeout", "truncation_amount", "max"], conffield) {
-      t := attr_type(path + "." + conffield)
+      t = attr_type(path + "." + conffield)
       if not typecmp(t, Size) and not typecmp(t, int) {
           return conffield + ": This field must be a con4m Size, or an int (in bytes)"
       }
     }
     elif conffield == "headers" {
-      t := attr_type(path + "." + conffield)
+      t = attr_type(path + "." + conffield)
       if not typecmp(t, dict[string, string]) {
           return conffield + ": Field must be a dict[string, string]"
       }
     }
     elif contains(["priority"], conffield) {
-      t := attr_type(path + "." + conffield)
+      t = attr_type(path + "." + conffield)
       if not typecmp(t, int) {
           return conffield + ": This field must be int"
       }
     }
     elif contains(["enabled", "use_search_path", "disallow_http"], conffield) {
-      t := attr_type(path + "." + conffield)
+      t = attr_type(path + "." + conffield)
       if not typecmp(t, bool) {
           return conffield + ": Field must be `true` or `false`"
       }
     }
     elif contains(["log_search_path", "filters"], conffield) {
-      t := attr_type(path + "." + conffield)
+      t = attr_type(path + "." + conffield)
       if not typecmp(t, list[string]) {
           return conffield + ": Field must be a list[string]"
       }
@@ -3925,8 +3925,8 @@ func sink_config_check(path) {
   }
 
   for i from 0 to len(sinkfields) {
-    fullname := "sink." + sinkname + "." + sinkfields[i]
-     t := attr_type(fullname)
+    fullname = "sink." + sinkname + "." + sinkfields[i]
+     t = attr_type(fullname)
      if not typecmp(t, bool) {   # TODO-- short circuit didn't work??
        continue
      }
@@ -3940,11 +3940,11 @@ func sink_config_check(path) {
 }
 
 func auth_object_check(path) {
-  result := ""
-  f := fields(path)
+  result = ""
+  f = fields(path)
   for i from 0 to len(f) {
-    fieldname := path + "." + f[i]
-    fieldtype := attr_type(fieldname)
+    fieldname = path + "." + f[i]
+    fieldtype = attr_type(fieldname)
     if typecmp(fieldtype, bool) or typecmp(fieldtype, string) {
       continue
     }
@@ -3955,21 +3955,21 @@ func auth_object_check(path) {
 }
 
 func auth_config_check(path) {
-  result   := ""
-  authname := attr_get(path + ".auth", string)
+  result   = ""
+  authname = attr_get(path + ".auth", string)
   if authname == "" {
     return # Unconfigured.
   }
   if not attr_exists("auth." + authname) {
     return "No such auth configured: '" + authname + "'"
   }
-  authfields := fields("auth." + authname)
-  conffields := fields(path)
+  authfields = fields("auth." + authname)
+  conffields = fields(path)
 
   # ensure config has all required fields are present as defined in auth
   for i from 0 to len(authfields) {
-    fullname := "auth." + authname + "." + authfields[i]
-    t := attr_type(fullname)
+    fullname = "auth." + authname + "." + authfields[i]
+    t = attr_type(fullname)
     if not typecmp(t, bool) {   # TODO-- short circuit didn't work??
       continue
     }
@@ -3983,7 +3983,7 @@ func auth_config_check(path) {
 
   # check config field fields
   for i from 0 to len(conffields) {
-    conffield := conffields[i]
+    conffield = conffields[i]
     if not authfields.contains(conffield) {
       return ("auth config provides field '" + conffield +
               "', but the specified auth '" + authname +
@@ -3997,14 +3997,14 @@ func auth_config_check(path) {
 
 func outconf_mark_templates_exist()
 {
-  result := ""
+  result = ""
 
   # If they've been explicitly set, then they will have been checked by
   # a value validator. So all we need to do here is make sure that the
   # insertion outconfs have non-null values.
 
   for i from 0 to len(all_cmds_that_insert) {
-    s := attr_get("outconf." + all_cmds_that_insert[i] + ".mark_template",
+    s = attr_get("outconf." + all_cmds_that_insert[i] + ".mark_template",
                   string)
 
     if s == "" {
@@ -4016,10 +4016,10 @@ func outconf_mark_templates_exist()
 }
 
 func final_check() {
-  result := key_name_validation()
+  result = key_name_validation()
   if result != "" { return; }
-  result := custom_report_extra_validation()
+  result = custom_report_extra_validation()
   if result != "" { return; }
-  result := outconf_mark_templates_exist()
+  result = outconf_mark_templates_exist()
   if result != "" { return; }
 }
