@@ -2562,14 +2562,6 @@ root {
 
   The config file types can be disabled with the command-line flags `--no-use-embedded-config` or `--no-use-external-config`. Usually, the former is useful for testing, and the later is good for ensuring a well-configured binary doesn't pick up stray configurations.
   """
-
-  prologue: """
-# This file is auto-generated as part of the chalk build.
-# Please do NOT edit it. Edit the specification file from
-# which it was generated instead: src/configs/chalk.c42spec
-# That will trigger a rebuild.
-
-"""
   user_def_ok:  false
   allow: keyspec, plugin, sink, sink_config, auth, auth_config, attestation, mark_template, report_template, outconf, custom_report, tool, extract, docker, exec, load, env_config, source_marks, cloud_provider, tech_stack_rule, linguist_language, git
 
