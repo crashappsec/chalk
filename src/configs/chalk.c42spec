@@ -75,8 +75,8 @@ enum CCPreRun, CCArtifact, CCPostChalk, CCPostRun
 # At some point, I'm going to change this in con4m to automatically
 # export.
 
-export default_key_priority, valid_chalk_cmds, all_cmds_that_insert
-export known_sink_filters, other_report_ops
+global default_key_priority, valid_chalk_cmds, all_cmds_that_insert
+global known_sink_filters, other_report_ops
 
 named key {
   # TODO: no callbacks or value fields when system is set on the keyspec.
@@ -3856,7 +3856,7 @@ func sink_object_check(path) {
 }
 
 sink_config_skip_fields = ["enabled", "priority", "loaded", "sink", "filters"]
-export sink_config_skip_fields
+global sink_config_skip_fields
 
 func sink_config_check(path) {
   result   = ""

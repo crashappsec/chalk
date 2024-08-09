@@ -93,7 +93,7 @@ ascii_magic   =   "dadfedabbadabbed"
 #
 # User-defined MUST begin with the X- prefix.
 enum   ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
-export ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
+global ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
 
 keyspec MAGIC {
     required_in_chalk_mark: true

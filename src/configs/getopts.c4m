@@ -742,7 +742,7 @@ func set_config_file(filename) {
 }
 
 reports_seen  = []
-export reports_seen
+global reports_seen
 
 func set_reports_on_off(names: list[string], val) {
    result = ""
