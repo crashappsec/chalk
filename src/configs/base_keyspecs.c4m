@@ -52,8 +52,8 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.4.12-dev"
-ascii_magic   :=   "dadfedabbadabbed"
+chalk_version =   "0.4.12-dev"
+ascii_magic   =   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
 # are not conceptually part of the chalked metadata.

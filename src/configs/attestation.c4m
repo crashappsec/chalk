@@ -14,22 +14,22 @@ func install_cosign() {
   # Follow https://docs.sigstore.dev/system_config/installation/
   # to install attestation
 
-  host_arch := arch()
-  host_os := osname()
+  host_arch = arch()
+  host_os = osname()
   if host_os == "macosx" {
-    host_os := "darwin"
+    host_os = "darwin"
   }
 
-  install_name := "cosign-" + host_os + "-" + host_arch
-  install_url  := "https://github.com/sigstore/cosign/releases/latest/download/" + install_name
+  install_name = "cosign-" + host_os + "-" + host_arch
+  install_url  = "https://github.com/sigstore/cosign/releases/latest/download/" + install_name
   info("Downloading cosign.....")
-  contents     := url_get(install_url)
+  contents     = url_get(install_url)
 
   trace("Downloaded cosign.")
   write_file("/tmp/cosign", contents)
   trace(run("chmod +x /tmp/cosign"))
 
-  cosign_path := find_exe("cosign", ["/tmp"])
+  cosign_path = find_exe("cosign", ["/tmp"])
 
   if cosign_path != "" {
     trace("Successfully installed attestation into: " + cosign_path)
@@ -41,13 +41,13 @@ func install_cosign() {
 }
 
 func load_attestation_binary(download_if_not_present: bool) {
-  result             := ""
-  supplemental_path  := [env("GOPATH") + "/bin", "~/go/bin", "/tmp"]
-  attestation_binary := find_exe("cosign", supplemental_path)
+  result             = ""
+  supplemental_path  = [env("GOPATH") + "/bin", "~/go/bin", "/tmp"]
+  attestation_binary = find_exe("cosign", supplemental_path)
 
   if attestation_binary == "" and download_if_not_present == true {
     if install_cosign() {
-      attestation_binary := find_exe("cosign", supplemental_path)
+      attestation_binary = find_exe("cosign", supplemental_path)
       if attestation_binary == "" {
         error("cosign could not be found!!!")
         return attestation_binary

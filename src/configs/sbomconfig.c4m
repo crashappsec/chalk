@@ -46,12 +46,12 @@ syft_argv:          Command-line flags to pass to syft.
 }
 
 func syft_docker(path) {
-  result := ""
+  result = ""
   if tool.syft.syft_entrypoint == "" or tool.syft.syft_container == "" {
     trace("find_syft: docker is disabled - both container and entrypoint must be defined")
     return
   }
-  docker_path := docker_exe()
+  docker_path = docker_exe()
   if docker_path == "" {
     trace("find_syft: docker is missing; unable to use docker for syft")
     return
@@ -67,7 +67,7 @@ func syft_docker(path) {
 }
 
 func syft_system() {
-  result := find_exe("syft", [tool.syft.syft_exe_dir]) # /tmp is in addition to $PATH
+  result = find_exe("syft", [tool.syft.syft_exe_dir]) # /tmp is in addition to $PATH
   if result == "" {
     trace("find_syft: Unable to find syft in $PATH")
   } else {
@@ -77,22 +77,22 @@ func syft_system() {
 
 func find_syft(path) {
   if tool.syft.syft_prefer_docker {
-    result := syft_docker(path)
+    result = syft_docker(path)
     if result != "" {
       return
     }
   }
-  result := syft_system()
+  result = syft_system()
   if result != "" {
     return result
   }
-  result := syft_docker(path)
+  result = syft_docker(path)
 }
 
 func install_syft(path) {
   info("Attempting to install syft from " + tool.syft.syft_installer)
 
-  contents := url_get(tool.syft.syft_installer)
+  contents = url_get(tool.syft.syft_installer)
 
   if not starts_with(contents, "#!") {
     error("Syft installer is not a valid shell script due to lack of shebang")
@@ -101,12 +101,12 @@ func install_syft(path) {
 
   trace("Downloaded syft installer script successfully.")
 
-  installer := to_tmp_file(contents, ".sh")
-  cmdline   := "sh " + installer + " -b " + tool.syft.syft_exe_dir
+  installer = to_tmp_file(contents, ".sh")
+  cmdline   = "sh " + installer + " -b " + tool.syft.syft_exe_dir
 
   trace("Running: " + cmdline)
 
-  sout, code := system(cmdline)
+  sout, code = system(cmdline)
 
   info(sout)
   if code == 0 {
@@ -120,11 +120,11 @@ func install_syft(path) {
 }
 
 func get_syft_args(path) {
-  result := path + tool.syft.syft_argv + " 2>/dev/null"
+  result = path + tool.syft.syft_argv + " 2>/dev/null"
 }
 
 func extract_syft_sbom(out: string, code) {
-  result := {}
+  result = {}
 
   if code != 0 {
     error("syft failed to run properly; ignoring")

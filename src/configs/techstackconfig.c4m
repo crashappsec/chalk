@@ -1,5 +1,5 @@
-common_excluded_filetypes := [".pyc", ".yml", ".yaml", ".json", ".tmp", ".md", ".txt", ".c4m", ".lock"]
-head_limit := 50
+common_excluded_filetypes = [".pyc", ".yml", ".yaml", ".json", ".tmp", ".md", ".txt", ".c4m", ".lock"]
+head_limit = 50
 
 tech_stack_rule sqlite_generic {
   category: "database"

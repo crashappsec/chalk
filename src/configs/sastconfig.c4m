@@ -50,30 +50,30 @@ semgrep_metrics:        Whether to ping semgrep. 'on' or 'off'.
 }
 
 func semgrep_docker(path) {
-  result := ""
+  result = ""
   if tool.semgrep.semgrep_entrypoint == "" or tool.semgrep.semgrep_container == "" {
     trace("find_semgrep: docker is disabled - both container and entrypoint must be defined")
     return
   }
-  docker_path := docker_exe()
+  docker_path = docker_exe()
   if docker_path == "" {
     trace("find_semgrep: docker is missing; unable to use docker for semgrep")
     return
   }
-  dir := path
+  dir = path
   if not is_dir(path) {
-    dir, _ := path_split(path)
+    dir, _ = path_split(path)
   }
   # Allow using a relative path within cwd of the config_profile
-  cwd_volume := ""
+  cwd_volume = ""
   if dir != cwd() {
-    cwd_volume := "-v " + cwd() + ":" + cwd() + " "
+    cwd_volume = "-v " + cwd() + ":" + cwd() + " "
   }
   # Allow using a config from outside of cwd, such as in ~
-  config_volume := ""
-  config := resolve_path(tool.semgrep.semgrep_config_profile)
+  config_volume = ""
+  config = resolve_path(tool.semgrep.semgrep_config_profile)
   if is_file(config) {
-    config_volume := "-v " + config + ":" + config + " "
+    config_volume = "-v " + config + ":" + config + " "
   }
   return (
     docker_path + " run " +
@@ -88,7 +88,7 @@ func semgrep_docker(path) {
 }
 
 func semgrep_system() {
-  result := find_exe("semgrep", tool.semgrep.semgrep_exe_dirs)
+  result = find_exe("semgrep", tool.semgrep.semgrep_exe_dirs)
   if result == "" {
     trace("find_semgrep: Unable to find semgrep in $PATH")
   } else {
@@ -98,22 +98,22 @@ func semgrep_system() {
 
 func find_semgrep(path) {
   if tool.semgrep.semgrep_prefer_docker {
-    result := semgrep_docker(path)
+    result = semgrep_docker(path)
     if result != "" {
       return
     }
   }
-  result := semgrep_system()
+  result = semgrep_system()
   if result != "" {
     return result
   }
-  result := semgrep_docker(path)
+  result = semgrep_docker(path)
 }
 
 func install_semgrep(path) {
   # perfer pipx for installation
   trace("attempting to install semgrep via pipx...")
-  output, code := system("pipx install semgrep")
+  output, code = system("pipx install semgrep")
   if code == 0 {
     return true
   }
@@ -122,9 +122,9 @@ func install_semgrep(path) {
   trace("pipx installation unsuccessful, attempting to install semgrep to python3 venv...")
 
   # venv is only compatible with python3
-  output, code := system("python3 -m venv /tmp/semgrep.env")
+  output, code = system("python3 -m venv /tmp/semgrep.env")
   if code == 0 {
-    output, code := system("/tmp/semgrep.env/bin/python3 -m pip install 'semgrep>=1.48'")
+    output, code = system("/tmp/semgrep.env/bin/python3 -m pip install 'semgrep>=1.48'")
     if code == 0 {
       trace("semgrep successfully installed")
       return true
@@ -138,15 +138,15 @@ func install_semgrep(path) {
 func get_semgrep_args(path) {
   # `semgrep ci` does not support specifying a target. Use the `scan` subcommand instead.
   # https://github.com/semgrep/semgrep/issues/10305
-  result := "scan --config=" + tool.semgrep.semgrep_config_profile
-  result := result + " --" + tool.semgrep.semgrep_format + " "
-  result := result + "--metrics=" + tool.semgrep.semgrep_metrics + " "
-  result := result + tool.semgrep.semgrep_other_flags + " "
-  result := result + path + " 2>/dev/null"
+  result = "scan --config=" + tool.semgrep.semgrep_config_profile
+  result = result + " --" + tool.semgrep.semgrep_format + " "
+  result = result + "--metrics=" + tool.semgrep.semgrep_metrics + " "
+  result = result + tool.semgrep.semgrep_other_flags + " "
+  result = result + path + " 2>/dev/null"
 }
 
 func load_semgrep_results(out: string, code) {
-  result := {}
+  result = {}
 
   if code != 0 {
     error("semgrep failed to run properly; ignoring")

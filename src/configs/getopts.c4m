@@ -8,7 +8,7 @@
 ## Spec for command line.
 
 
-default_recursive_doc := """
+default_recursive_doc = """
 Determines whether a file scan will recursively walk paths to find artifacts.
 """
 
@@ -734,24 +734,24 @@ Internal function to generate technical documentation in markdown format.
 }
 
 func set_config_file(filename) {
-   dir, file := filename.path_split()
-   arr := attr_get("config_path", list[string])
+   dir, file = filename.path_split()
+   arr = attr_get("config_path", list[string])
    add_override("config_path", array_add(arr, [dir]))
    add_override("config_filename", file)
    return ""
 }
 
-reports_seen  := []
+reports_seen  = []
 export reports_seen
 
 func set_reports_on_off(names: list[string], val) {
-   result := ""
-   reports := sections("custom_report")
+   result = ""
+   reports = sections("custom_report")
    for i from 0 to len(names) {
      if reports_seen.contains(names[i]) {
        return "Already set a value for report '" + names[i] + "'"
      }
-     reports_seen := array_add(reports_seen, [names[i]])
+     reports_seen = array_add(reports_seen, [names[i]])
      if not reports.contains(names[i]) {
        return ("No such report: '" + names[i] + "'\nKnown reports are: " +
                reports.join(", "))
@@ -769,7 +769,7 @@ func set_disabled_reports(names) {
 }
 
 func set_report_cache_file(file) {
-  result := ""
+  result = ""
 
   add_override("use_report_cache", true)
   add_override("report_cache_location", file)

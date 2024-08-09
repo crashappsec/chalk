@@ -50,7 +50,7 @@ if env_exists("CI") and env_exists("GITHUB_SHA") {
   custom_report.github_group_chalk_time.enabled: true
 }
 
-cmd := command_name()
+cmd = command_name()
 
 subscribe("report",   "default_out")
 subscribe("audit",    "default_out")
@@ -59,7 +59,7 @@ subscribe("virtual",  "virtual_chalk_log")
 subscribe("help",     "console_out")
 
 if cmd.starts_with("dump") {
-  args := command_argv()
+  args = command_argv()
   if len(args) == 0 {
     subscribe("confdump", "console_out")
   } else {
