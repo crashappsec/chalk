@@ -92,8 +92,7 @@ ascii_magic   =   "dadfedabbadabbed"
 # new metadata keys to the space.
 #
 # User-defined MUST begin with the X- prefix.
-enum   ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
-global ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
+enum global { ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost }
 
 keyspec MAGIC {
     required_in_chalk_mark: true

@@ -32,7 +32,7 @@ known_sink_filters   = ["log_level", "log_prefix", "pretty_json",
 # This is the enum for key types.   See 'key' object documentation below
 # for more details.
 #
-enum ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
+enum { ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost }
 
 # The four types of metadata keys are collected at different points in
 # a chalk run, thus there are different callbacks a plugin much
@@ -67,7 +67,7 @@ enum ChalkTimeHost, ChalkTimeArtifact, RunTimeArtifact, RunTimeHost
 # post-chalk is after an artifact has been processed
 # post-run is after ALL artifacts have been processed
 
-enum CCPreRun, CCArtifact, CCPostChalk, CCPostRun
+enum { CCPreRun, CCArtifact, CCPostChalk, CCPostRun }
 
 # Make these available through future configuration stacks.  Enums are
 # automatically available.
