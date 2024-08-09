@@ -81,7 +81,6 @@ global known_sink_filters, other_report_ops
 named key {
   # TODO: no callbacks or value fields when system is set on the keyspec.
   user_def_ok:   false
-  gen_typename:  "KeyConfig"
   gen_setters:   false
   doc:           """
 These objects are used in reporting templates and chalking templates
@@ -118,7 +117,6 @@ the normalization order from the associated keyspec.
 
 named mark_template {
   user_def_ok:   false
-  gen_typename:  "MarkTemplate"
   gen_setters:   false
   doc: """
 # Chalk Mark Templates
@@ -258,7 +256,6 @@ This field will be shown when showing the full template in help documentation.
 
 named report_template {
   user_def_ok:   false
-  gen_typename:  "ReportTemplate"
   gen_setters:   false
   doc: """
 # Report Templates
@@ -316,7 +313,6 @@ This field will be shown when the running command `chalk template [your_report_n
 
 named tool {
    user_def_ok:   true
-   gen_typename:  "ToolInfo"
    gen_setters:   false
    doc:           """
 Tool sections allow you to automatically run external tools for
@@ -448,7 +444,6 @@ failure, and no other keys will be checked.
 linguist_types = ["programming", "data", "markup"]
 named linguist_language {
   user_def_ok:   false
-  gen_typename:  "LinguistLanguage"
   gen_setters:   false
 
   field type {
@@ -487,7 +482,6 @@ valid_subcategory_types = ["firebird", "hypersonicSQL",
 
 named tech_stack_rule {
   user_def_ok:   false
-  gen_typename:  "TechStackRule"
   gen_setters:   false
 
   field description {
@@ -514,7 +508,6 @@ named tech_stack_rule {
 
 singleton file_scope {
   user_def_ok: false
-  gen_typename:  "FileScope"
   gen_setters: false
 
   field regex {
@@ -578,7 +571,6 @@ defined in the filepaths directive will be getting considered regardless.
 
 singleton host_scope {
   user_def_ok: false
-  gen_typename:  "hostScope"
   gen_setters: false
 
   field filepaths {
@@ -618,7 +610,6 @@ If set to false, the mere presence of a directory or filepath will mark a detect
 
 named keyspec {
   user_def_ok:   false
-  gen_typename:  "KeySpec"
   gen_setters:   false
   doc:           """
 The keyspec section is where you define critical metadata about chalk
@@ -861,7 +852,6 @@ Note that these substitutions currently only are applied at chalk time, and for 
 }
 
 named plugin {
-  gen_typename:  "PluginSpec"
   user_def_ok:   false
   gen_setters:   false
 
@@ -960,7 +950,6 @@ the key.  This is invalid for system keys.
 }
 
 named sink {
-  gen_typename:  "SinkSpec"
   gen_setters:   false
   user_def_ok:   true
   validator:     func sink_object_check
@@ -996,7 +985,6 @@ checked when corresponding `sink_config` objects are found.
 }
 
 named sink_config {
-  gen_typename:  "SinkConfigObj"
   gen_setters:   false
   user_def_ok:   true
   validator:     func sink_config_check
@@ -1092,7 +1080,6 @@ field.
 }
 
 named auth {
-  gen_typename:  "AuthSpec"
   gen_setters:   false
   user_def_ok:   true
   validator:     func auth_object_check
@@ -1137,7 +1124,6 @@ auth_config my_auth_config {
 }
 
 named auth_config {
-  gen_typename:  "AuthConfigObj"
   gen_setters:   false
   user_def_ok:   true
   validator:     func auth_config_check
@@ -1158,7 +1144,6 @@ auth_config my_auth_config {
 }
 
 singleton attestation_key_embed {
-  gen_typename:  "AttestationKeyEmbedConfig"
   gen_setters:   false
   user_def_ok:   true
   doc:           """
@@ -1185,7 +1170,6 @@ Chalk will also embed the key-pairs internally, for future operations.
 }
 
 singleton attestation_key_backup {
-  gen_typename:  "AttestationKeyBackupConfig"
   gen_setters:   false
   user_def_ok:   true
   doc:           """
@@ -1248,7 +1232,6 @@ just without doing any signing / verifying.
 }
 
 singleton attestation_key_get {
-  gen_typename:  "AttestationKeyGetConfig"
   gen_setters:   false
   user_def_ok:   true
   doc:           """
@@ -1305,7 +1288,6 @@ just without doing any signing / verifying.
 attestation_key_types = ["embed", "backup", "get"]
 
 singleton attestation {
-  gen_typename:  "AttestationConfig"
   gen_setters:   false
   user_def_ok:   true
   doc:           """
@@ -1378,7 +1360,6 @@ See individual key provider objects for all supported configuration fields.
 }
 
 named outconf {
-  gen_typename:  "OutputConfig"
   gen_setters:   false
   user_def_ok:   false
   doc:           """
@@ -1482,7 +1463,6 @@ basis. Only valid chalk commands are valid section names.
 }
 
 named custom_report {
-  gen_typename:  "ReportSpec"
   gen_setters:   false
   user_def_ok:   false
 
@@ -1630,7 +1610,6 @@ If not specified, reports apply to any command that reports.
 }
 
 singleton extract {
-  gen_typename: "ExtractConfig"
   gen_setters: false
   user_def_ok: false
   doc: """
@@ -1662,7 +1641,6 @@ By default we skip unsigned images, because the process (necessarily) involves d
 }
 
 singleton docker {
-  gen_typename:  "DockerConfig"
   gen_setters:   false
   user_def_ok:   false
   doc: """
@@ -1940,7 +1918,6 @@ ENV ARTIFACT_IDENTIFIER="X6VRPZ-C828-KDNS-QDXRT0"
 }
 
 singleton git {
-  gen_typename:  "GitConfig"
   gen_setters:   false
   user_def_ok:   false
   doc: """
@@ -1972,7 +1949,6 @@ from the origin to ensure its local definition is up to date.
 }
 
 singleton load {
-  gen_typename:  "LoadConfig"
   gen_setters:   false
   user_def_ok:   false
   doc: """
@@ -2054,7 +2030,6 @@ configuration parameter `dump.params`
 }
 
 singleton exec {
-  gen_typename:  "ExecConfig"
   gen_setters:   false
   user_def_ok:   false
   doc: """
@@ -2241,7 +2216,6 @@ final report, if the monitored process has exited.
 }
 
 singleton env_config {
-  gen_typename:  "EnvConfig"
   gen_setters:   false
   user_def_ok:   false
   doc: """
@@ -2274,7 +2248,6 @@ This is not yet implemented.
 }
 
 singleton source_marks {
-  gen_typename:  "SrcConfig"
   gen_setters:   false
   user_def_ok:   false
 
@@ -2567,7 +2540,6 @@ pretty weird language names.
 }
 
 singleton cloud_instance_hw_identifiers {
-  gen_typename:  "CloudInstanceHwConfig"
   gen_setters:   false
   user_def_ok:   false
   shortdoc: """
@@ -2612,7 +2584,6 @@ end users.
 }
 
 singleton cloud_provider {
-  gen_typename:  "CloudProviderConfig"
   gen_setters:   false
   user_def_ok:   false
   shortdoc: """
@@ -2629,7 +2600,6 @@ root {
 # That will trigger a rebuild.
 
 """
-  gen_typename: "ChalkConfig"
   gen_setters:  false
   user_def_ok:  false
 
