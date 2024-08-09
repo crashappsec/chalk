@@ -383,7 +383,7 @@ named tool {
     There is a generic implementation of this called `do_which` that can
     be used directly, or can be called if you want to do something fancier.
     """
-    type:     func (string) -> string
+    type:     (string) -> string
     require:  true
   }
 
@@ -399,7 +399,7 @@ named tool {
 
     See the Chalk Config File builtins reference or `chalk help builtins` for functions that can help, including ones for file access, execution, etc.
     """
-    type:     func (string) -> bool
+    type:     (string) -> bool
     require:  true
   }
 
@@ -407,7 +407,7 @@ named tool {
     """
     Given the artifact path and an argument determined based on the metadata-key, return the command-line (`argv` minus program name) that we should run. This is passed to the system shell; Note that we do not run w/ privs even if chalk is `setuid()`
     """
-    type:     func (string) -> string
+    type:     (string) -> string
     require:  true
   }
 
@@ -424,7 +424,7 @@ named tool {
     failure, and no other keys will be checked.
     """
     # exit code, output
-    type:     func (string, int) -> dict[string, string]
+    type:     (string, int) -> dict[string, string]
     require:  true
   }
 
@@ -776,7 +776,7 @@ named keyspec {
     If nothing overrides, the conffile plugin will call this for a value.  Cannot
     appear with a 'value' field.
     """
-    type:       func (string) -> `x
+    type:       (string) -> `x
     require:    false
     validator:  func key_callback_check
   }
@@ -2346,7 +2346,7 @@ singleton source_marks {
     This also means that we might use odd language names, like 'node',
     since it's the thing we're likely to see in a shebang line.
     """
-    type:    func (string, string, string, bool, bool) -> bool
+    type:    (string, string, string, bool, bool) -> bool
     require: false
   }
 
