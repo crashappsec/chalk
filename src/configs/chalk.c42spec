@@ -793,7 +793,7 @@ or callback field.  This is really an internal thing.
   }
 
   field value {
-    type:       "type"
+    type:    -> type
     require:    false
     doc:        """
 If nothing overrides, the conffile plugin will add these in.  Cannot appear
