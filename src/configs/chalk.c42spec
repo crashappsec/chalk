@@ -71,6 +71,14 @@ enum { CCPreRun, CCArtifact, CCPostChalk, CCPostRun }
 
 global known_sink_filters, other_report_ops
 
+valid_tech_stack_database_types = ["firebird", "hypersonicSQL",
+    "ibmDb2", "microsoftAccess", "microsoftSQLServer",
+     "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other"]
+
+valid_tech_stack_web_server_types = ["apache", "nginx", "iis"]
+valid_tech_stack_protocol_types = ["ldap"]
+valid_tech_stack_framework_types = ["javaSpring"]
+
 confspec {
 named key {
   """
@@ -427,9 +435,7 @@ named tool {
     hidden:   true
   }
 }
-}
 
-confspec {
 named linguist_language {
   user_def_ok:   false
 
@@ -448,20 +454,8 @@ named linguist_language {
     type:    list[string]
     require: false
   }
-
-}
 }
 
-valid_tech_stack_database_types = ["firebird", "hypersonicSQL",
-    "ibmDb2", "microsoftAccess", "microsoftSQLServer",
-     "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other"]
-
-valid_tech_stack_web_server_types = ["apache", "nginx", "iis"]
-valid_tech_stack_protocol_types = ["ldap"]
-valid_tech_stack_framework_types = ["javaSpring"]
-
-
-confspec {
 named tech_stack_rule {
   user_def_ok:   false
 
@@ -1245,9 +1239,7 @@ singleton attestation_key_get {
     default: "3 sec"'duration
   }
 }
-}
 
-confspec {
 singleton attestation {
   """
   Attestation allows chalk to sign artifacts (via cosign) which embeds the
