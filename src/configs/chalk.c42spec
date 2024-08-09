@@ -78,7 +78,7 @@ enum CCPreRun, CCArtifact, CCPostChalk, CCPostRun
 export default_key_priority, valid_chalk_cmds, all_cmds_that_insert
 export known_sink_filters, other_report_ops
 
-object key {
+named key {
   # TODO: no callbacks or value fields when system is set on the keyspec.
   user_def_ok:   false
   gen_fieldname: "keys"
@@ -117,7 +117,7 @@ the normalization order from the associated keyspec.
   }
 }
 
-object mark_template {
+named mark_template {
   user_def_ok:   false
   gen_fieldname: "markTemplates"
   gen_typename:  "MarkTemplate"
@@ -258,7 +258,7 @@ This field will be shown when showing the full template in help documentation.
   allow key {}
 }
 
-object report_template {
+named report_template {
   user_def_ok:   false
   gen_fieldname: "reportTemplates"
   gen_typename:  "ReportTemplate"
@@ -317,7 +317,7 @@ This field will be shown when the running command `chalk template [your_report_n
   allow key {}
 }
 
-object tool {
+named tool {
    user_def_ok:   true
    gen_fieldname: "tools"
    gen_typename:  "ToolInfo"
@@ -450,7 +450,7 @@ failure, and no other keys will be checked.
 }
 
 linguist_types := ["programming", "data", "markup"]
-object linguist_language {
+named linguist_language {
   user_def_ok:   false
   gen_fieldname: "linguist_languages"
   gen_typename:  "LinguistLanguage"
@@ -490,7 +490,7 @@ valid_subcategory_types := ["firebird", "hypersonicSQL",
      "apache", "nginx", "iis", "ldap", "javaSpring"]
 
 
-object tech_stack_rule {
+named tech_stack_rule {
   user_def_ok:   false
   gen_fieldname: "techStackRules"
   gen_typename:  "TechStackRule"
@@ -625,7 +625,7 @@ If set to false, the mere presence of a directory or filepath will mark a detect
   }
 }
 
-object keyspec {
+named keyspec {
   user_def_ok:   false
   gen_fieldname: "keyspecs"
   gen_typename:  "KeySpec"
@@ -870,7 +870,7 @@ Note that these substitutions currently only are applied at chalk time, and for 
   }
 }
 
-object plugin {
+named plugin {
   gen_fieldname: "plugins"
   gen_typename:  "PluginSpec"
   user_def_ok:   false
@@ -970,7 +970,7 @@ the key.  This is invalid for system keys.
   }
 }
 
-object sink {
+named sink {
   gen_fieldname: "sinks"
   gen_typename:  "SinkSpec"
   gen_setters:   false
@@ -1007,7 +1007,7 @@ checked when corresponding `sink_config` objects are found.
   }
 }
 
-object sink_config {
+named sink_config {
   gen_fieldname: "sinkConfs"
   gen_typename:  "SinkConfigObj"
   gen_setters:   false
@@ -1104,7 +1104,7 @@ field.
   }
 }
 
-object auth {
+named auth {
   gen_fieldname: "auths"
   gen_typename:  "AuthSpec"
   gen_setters:   false
@@ -1150,7 +1150,7 @@ auth_config my_auth_config {
   }
 }
 
-object auth_config {
+named auth_config {
   gen_fieldname: "authConfs"
   gen_typename:  "AuthConfigObj"
   gen_setters:   false
@@ -1398,7 +1398,7 @@ See individual key provider objects for all supported configuration fields.
 
 }
 
-object outconf {
+named outconf {
   gen_fieldname: "outputConfigs"
   gen_typename:  "OutputConfig"
   gen_setters:   false
@@ -1503,7 +1503,7 @@ basis. Only valid chalk commands are valid section names.
 """
 }
 
-object custom_report {
+named custom_report {
   gen_fieldname: "reportSpecs"
   gen_typename:  "ReportSpec"
   gen_setters:   false
