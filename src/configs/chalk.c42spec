@@ -348,7 +348,7 @@ named tool {
     type:       string
     require:    true
     choice:     tool_types
-    write_lock: true
+    lock:       true
   }
 
   field priority {
@@ -659,7 +659,7 @@ named keyspec {
     # Required fields apply only to what must go into a chalk mark.
     type:        bool
     default:     false
-    write_lock:  true
+    lock:        true
   }
 
   field required_in_self_mark {
@@ -668,7 +668,7 @@ named keyspec {
     """
     type:        bool
     default:     false
-    write_lock:  true
+    lock:        true
   }
 
   field kind {
@@ -680,7 +680,7 @@ named keyspec {
     """
     type:        int
     require:     true
-    write_lock:  true
+    lock:        true
     range:       (ChalkTimeHost, RunTimeHost)
   }
 
@@ -704,7 +704,7 @@ named keyspec {
     """
     type:        bool
     default:     false
-    write_lock:  true
+    lock:        true
     validator:   func never_early_check
   }
 
@@ -715,7 +715,7 @@ named keyspec {
     """
     type:       typespec
     require:    true
-    write_lock: true
+    lock:       true
   }
 
   field standard {
@@ -739,7 +739,7 @@ named keyspec {
     """
     type:       bool
     default:    false
-    write_lock: true
+    lock:       true
   }
 
   field conf_as_system {
@@ -757,7 +757,7 @@ named keyspec {
     "Codec keys may only be provided by codecs (and MUST be provided)."
     type:       bool
     default:    false
-    write_lock: true
+    lock:       true
   }
 
   field value {
@@ -783,7 +783,7 @@ named keyspec {
     "Version of the standard in which this key first appeared."
     type:       string
     require:    false
-    write_lock: true
+    lock:       true
   }
 
   field normalized_order {
@@ -817,7 +817,7 @@ named keyspec {
     """
     type:        bool
     default:     false
-    write_lock:  true
+    lock:        true
   }
 
   field doc {
@@ -864,14 +864,14 @@ named plugin {
     "This key must be set for all codecs."
     type:       bool
     default:    false
-    write_lock: true
+    lock:       true
   }
 
   field pre_run_keys {
     "List of keys this plugin provides before our artifact collection."
     type:       list[string]
     default:    []
-    write_lock: true
+    lock:       true
     validator:  func pre_run_key_check
   }
 
@@ -884,7 +884,7 @@ field pre_chalk_keys {
     """
     type:       list[string]
     default:    []
-    write_lock: true
+    lock:       true
     validator:  func chalk_key_check
   }
 
@@ -895,7 +895,7 @@ field pre_chalk_keys {
     """
     type:       list[string]
     default:    []
-    write_lock: true
+    lock:       true
     validator:  func post_chalk_key_check
   }
 
@@ -903,7 +903,7 @@ field pre_chalk_keys {
     "List of keys this plugin provides after a run completes."
     type:       list[string]
     default:    []
-    write_lock: true
+    lock:       true
     validator:  func post_run_key_check
   }
 
@@ -1056,7 +1056,7 @@ named sink_config {
     # Turning off, because attempts to copy the default config will generally
     # fail due to this, and it seems to lead to plenty of confusion that I do
     # not want.
-    # write_lock: true
+    # lock:       true
   }
 }
 
@@ -2578,7 +2578,7 @@ root {
     "The path to search for an external configuration file."
     type:       list[string]
     default:    ["/etc/chalk/", "/etc/", ".", "~/.config/chalk", "~"]
-    write_lock: true
+    lock:       true
   }
 
   field config_filename {
@@ -2586,14 +2586,14 @@ root {
     "The file name to look for when searching for a file"
     type:       string
     default:    "chalk.c4m"
-    write_lock: true
+    lock:       true
   }
 
   field valid_chalk_command_names {
     "Expose command names used for insertion to the implementation"
     type:       list[string]
     default:    all_cmds_that_insert
-    write_lock: true
+    lock:       true
     hidden:     true
   }
 
@@ -2601,7 +2601,7 @@ root {
     "Expose the full list of command names to the implementation"
     type:       list[string]
     default:    valid_chalk_cmds
-    write_lock: true
+    lock:       true
     hidden:     true
   }
 
@@ -2613,7 +2613,7 @@ root {
     type:       list[string]
     default:    ["MAGIC", "METADATA_HASH", "METADATA_ID", "SIGNING", "SIGNATURE",
                  "EMBEDDED_CHALK"]
-    write_lock: true
+    lock:       true
     hidden:     true
   }
 
@@ -2626,7 +2626,7 @@ root {
     """
     type:       string
     require:    false
-    write_lock: false
+    lock:       false
     validator:  func default_command_check
   }
 
@@ -2643,7 +2643,7 @@ root {
     """
     type:       string
     default:    ""
-    write_lock: false
+    lock:       false
   }
 
   field color {
@@ -2755,7 +2755,7 @@ root {
     """
     type:       bool
     default:    false
-    write_lock: true
+    lock:       true
   }
 
   field report_total_time {
@@ -2992,14 +2992,14 @@ root {
     """
     type:       bool
     default:    false
-    write_lock: true
+    lock:       true
   }
 
   field ktype_names {
     "Internal; used to map key type enum values back to text, and I think isn't even used anymore."
     type:       list[string]
     default:    key_types
-    write_lock: true
+    lock:       true
     hidden:     true
   }
 
