@@ -81,7 +81,6 @@ global known_sink_filters, other_report_ops
 named key {
   # TODO: no callbacks or value fields when system is set on the keyspec.
   user_def_ok:   false
-  gen_setters:   false
   doc:           """
 These objects are used in reporting templates and chalking templates
 to help determine what to produce. The two fields in this object are:
@@ -117,7 +116,6 @@ the normalization order from the associated keyspec.
 
 named mark_template {
   user_def_ok:   false
-  gen_setters:   false
   doc: """
 # Chalk Mark Templates
 
@@ -256,7 +254,6 @@ This field will be shown when showing the full template in help documentation.
 
 named report_template {
   user_def_ok:   false
-  gen_setters:   false
   doc: """
 # Report Templates
 
@@ -313,7 +310,6 @@ This field will be shown when the running command `chalk template [your_report_n
 
 named tool {
    user_def_ok:   true
-   gen_setters:   false
    doc:           """
 Tool sections allow you to automatically run external tools for
 collecting metadata, for tool types that are known to chalk (This
@@ -444,7 +440,6 @@ failure, and no other keys will be checked.
 linguist_types = ["programming", "data", "markup"]
 named linguist_language {
   user_def_ok:   false
-  gen_setters:   false
 
   field type {
     type:    string
@@ -482,7 +477,6 @@ valid_subcategory_types = ["firebird", "hypersonicSQL",
 
 named tech_stack_rule {
   user_def_ok:   false
-  gen_setters:   false
 
   field description {
     type:    string
@@ -508,7 +502,6 @@ named tech_stack_rule {
 
 singleton file_scope {
   user_def_ok: false
-  gen_setters: false
 
   field regex {
     type:    string
@@ -571,7 +564,6 @@ defined in the filepaths directive will be getting considered regardless.
 
 singleton host_scope {
   user_def_ok: false
-  gen_setters: false
 
   field filepaths {
     type:    list[string]
@@ -610,7 +602,6 @@ If set to false, the mere presence of a directory or filepath will mark a detect
 
 named keyspec {
   user_def_ok:   false
-  gen_setters:   false
   doc:           """
 The keyspec section is where you define critical metadata about chalk
 keys.  The spec can even specify the value of the key.
@@ -853,7 +844,6 @@ Note that these substitutions currently only are applied at chalk time, and for 
 
 named plugin {
   user_def_ok:   false
-  gen_setters:   false
 
   field priority {
     type:     int
@@ -950,7 +940,6 @@ the key.  This is invalid for system keys.
 }
 
 named sink {
-  gen_setters:   false
   user_def_ok:   true
   validator:     func sink_object_check
   doc:           """
@@ -985,7 +974,6 @@ checked when corresponding `sink_config` objects are found.
 }
 
 named sink_config {
-  gen_setters:   false
   user_def_ok:   true
   validator:     func sink_config_check
   doc: """
@@ -1080,7 +1068,6 @@ field.
 }
 
 named auth {
-  gen_setters:   false
   user_def_ok:   true
   validator:     func auth_object_check
   doc:           """
@@ -1124,7 +1111,6 @@ auth_config my_auth_config {
 }
 
 named auth_config {
-  gen_setters:   false
   user_def_ok:   true
   validator:     func auth_config_check
   doc:           """
@@ -1144,7 +1130,6 @@ auth_config my_auth_config {
 }
 
 singleton attestation_key_embed {
-  gen_setters:   false
   user_def_ok:   true
   doc:           """
 Attestation key provider which embeds the signing keys into chalk binary.
@@ -1170,7 +1155,6 @@ Chalk will also embed the key-pairs internally, for future operations.
 }
 
 singleton attestation_key_backup {
-  gen_setters:   false
   user_def_ok:   true
   doc:           """
 Attestation key provider which embeds the signing keys into chalk binary.
@@ -1232,7 +1216,6 @@ just without doing any signing / verifying.
 }
 
 singleton attestation_key_get {
-  gen_setters:   false
   user_def_ok:   true
   doc:           """
 Attestation key provider which gets the keys via HTTP GET request.
@@ -1288,7 +1271,6 @@ just without doing any signing / verifying.
 attestation_key_types = ["embed", "backup", "get"]
 
 singleton attestation {
-  gen_setters:   false
   user_def_ok:   true
   doc:           """
 Attestation allows chalk to sign artifacts (via cosign) which embeds the
@@ -1360,7 +1342,6 @@ See individual key provider objects for all supported configuration fields.
 }
 
 named outconf {
-  gen_setters:   false
   user_def_ok:   false
   doc:           """
 ## Changing reports for operations
@@ -1463,7 +1444,6 @@ basis. Only valid chalk commands are valid section names.
 }
 
 named custom_report {
-  gen_setters:   false
   user_def_ok:   false
 
   doc:           """
@@ -1610,7 +1590,6 @@ If not specified, reports apply to any command that reports.
 }
 
 singleton extract {
-  gen_setters: false
   user_def_ok: false
   doc: """
 These are configuration options specific to how container extraction
@@ -1641,7 +1620,6 @@ By default we skip unsigned images, because the process (necessarily) involves d
 }
 
 singleton docker {
-  gen_setters:   false
   user_def_ok:   false
   doc: """
 These are configuration options specific to how Chalk will behave when
@@ -1918,7 +1896,6 @@ ENV ARTIFACT_IDENTIFIER="X6VRPZ-C828-KDNS-QDXRT0"
 }
 
 singleton git {
-  gen_setters:   false
   user_def_ok:   false
   doc: """
 Options how chalk interacts with git.
@@ -1949,7 +1926,6 @@ from the origin to ensure its local definition is up to date.
 }
 
 singleton load {
-  gen_setters:   false
   user_def_ok:   false
   doc: """
 Options that control how the `chalk load` command works. Note that
@@ -2030,7 +2006,6 @@ configuration parameter `dump.params`
 }
 
 singleton exec {
-  gen_setters:   false
   user_def_ok:   false
   doc: """
 When the `chalk docker` command wraps a container, it inserts a
@@ -2216,7 +2191,6 @@ final report, if the monitored process has exited.
 }
 
 singleton env_config {
-  gen_setters:   false
   user_def_ok:   false
   doc: """
 This section is for internal configuration information gathering
@@ -2248,7 +2222,6 @@ This is not yet implemented.
 }
 
 singleton source_marks {
-  gen_setters:   false
   user_def_ok:   false
 
   doc: """
@@ -2540,7 +2513,6 @@ pretty weird language names.
 }
 
 singleton cloud_instance_hw_identifiers {
-  gen_setters:   false
   user_def_ok:   false
   shortdoc: """
 Configuration information for AWS EC2, GCP, or Azure nodes
@@ -2584,7 +2556,6 @@ end users.
 }
 
 singleton cloud_provider {
-  gen_setters:   false
   user_def_ok:   false
   shortdoc: """
 Configuration information for the different Cloud Provider
@@ -2600,7 +2571,6 @@ root {
 # That will trigger a rebuild.
 
 """
-  gen_setters:  false
   user_def_ok:  false
 
   allow: keyspec, plugin, sink, sink_config, auth, auth_config, attestation, mark_template, report_template, outconf, custom_report, tool, extract, docker, exec, load, env_config, source_marks, cloud_provider, tech_stack_rule, linguist_language, git
