@@ -4,7 +4,7 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-default_command = "help"
+default_command: "help"
 
 # Used in keyspec
 func call_rand(key) { return $(lower(hex(rand())));  }

@@ -63,8 +63,8 @@ if cmd.starts_with("dump") {
   if len(args) == 0 {
     subscribe("confdump", "console_out")
   } else {
-    sink_config.dump_out.enabled  = true
-    sink_config.dump_out.filename = args[0]
+    sink_config.dump_out.enabled : true
+    sink_config.dump_out.filename: args[0]
     subscribe("confdump", "dump_out")
   }
 }

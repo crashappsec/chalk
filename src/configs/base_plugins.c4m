@@ -308,7 +308,7 @@ This plugin is responsible for collecting any values explicitly set in
 the configuration file by the user. The user can set values statically
 when the configuration loads, by specifying:
 
-```keyspec.KEY_NAME.value = ...```
+```keyspec.KEY_NAME.value: ...```
 
 In this case, per-artifact data will be the same across all artifacts
 processed.
@@ -325,7 +325,7 @@ changed by making the plugin high priority instead of low priority.
 
 For instance, if you really wanted, you could set:
 
-```plugin.conffile.priority = 2```
+```plugin.conffile.priority: 2```
 """
 }
 

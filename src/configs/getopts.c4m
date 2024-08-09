@@ -309,8 +309,8 @@ you can activate it for both regular and docker insertions with the
 following in your configuration file:
 
 ```
-outconf.insert.chalk = "myconf"
-outconf.docker.chalk = "myconf"
+outconf.insert.chalk: "myconf"
+outconf.docker.chalk: "myconf"
 ```
 
 For information on mark templates on the command line, see: `chalk
