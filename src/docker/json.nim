@@ -67,7 +67,7 @@ proc mapFromJson(self:         ChalkDict,
       discard
 
   let boxedValue = value.nimJsonToBox()
-  let t = get[Con4mType](getChalkScope(), "keyspec." & chalkKey & ".type")
+  let t = attrGet[Con4mType]("keyspec." & chalkKey & ".type")
   if not boxedValue.checkAutoType(t):
     warn("docker: JSON key " & jsonKey &
          " associated with chalk key '" & chalkKey &
@@ -79,7 +79,7 @@ proc mapFromJson*(self: ChalkDict,
                   node:  JsonNode,
                   map:  JsonToChalkKeysMapping) =
   let
-    reportEmpty = get[bool](getChalkScope(), "docker.report_empty_fields")
+    reportEmpty = attrGet[bool]("docker.report_empty_fields")
     lowerJson   = node.toLowerKeysJsonNode()
   for jsonKey, (chalkKey, transformer) in map:
     try:

@@ -113,7 +113,7 @@ proc applySubstitutions(obj: ChalkObj) {.inline.} =
   for k, v in obj.collectedData:
     if v.kind != MkStr: continue    # If it's not a string object, no sub to do.
     # Should have crashed by now if section does not exist :)
-    if not get[bool](getChalkScope(), "keyspec." & k & ".apply_substitutions"): continue
+    if not attrGet[bool]("keyspec." & k & ".apply_substitutions"): continue
     let s = unpack[string](v)
     if not s.contains("{"): continue
     obj.collectedData[k] = pack(s.multiReplace(subs))
@@ -142,7 +142,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
   if insert:
     obj.applySubstitutions()
     result.setIfNeeded("_OP_CHALKED_KEYS", toSeq(obj.getChalkMark().keys))
-    result.setIfNeeded("_VIRTUAL", get[bool](getChalkScope(), "virtual_chalk"))
+    result.setIfNeeded("_VIRTUAL", attrGet[bool]("virtual_chalk"))
 
   else:
     result.setValidated(obj, obj.validateMetaData())
@@ -150,7 +150,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
       result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
 
   var
-    templateName = get[string](getChalkScope(), getOutputConfig() & ".report_template")
+    templateName = attrGet[string](getOutputConfig() & ".report_template")
 
   if templateName != "":
     let
@@ -180,10 +180,10 @@ proc getEnvDict(): Box =
   once:
     envdict = Con4mDict[string, string]()
     let
-      always = get[seq[string]](getChalkScope(), "env_always_show")
-      never  = get[seq[string]](getChalkScope(), "env_never_show")
-      redact = get[seq[string]](getChalkScope(), "env_redact")
-      def    = get[string](getChalkScope(), "env_default_action")[0]
+      always = attrGet[seq[string]]("env_always_show")
+      never  = attrGet[seq[string]]("env_never_show")
+      redact = attrGet[seq[string]]("env_redact")
+      def    = attrGet[string]("env_default_action")[0]
 
     for (k, v) in envPairs():
       # TODO: could add some con4m to warn on overlap across these 3. For now,
@@ -228,7 +228,7 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   if isSubscribedKey("_ENV"):
     result["_ENV"] = getEnvDict()
 
-  let templateName = get[string](getChalkScope(), getOutputConfig() & ".report_template")
+  let templateName = attrGet[string](getOutputConfig() & ".report_template")
   if isSubscribedKey("_OP_HOST_REPORT_KEYS") and templateName != "":
     let
       templateToUse = "report_template." & templateName

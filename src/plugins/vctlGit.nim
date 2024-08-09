@@ -593,7 +593,7 @@ proc loadTags(info: RepoInfo) =
 proc refetchTags(info: RepoInfo) =
   if info.origin == "" or info.origin == ghLocal:
     return
-  if not get[bool](getChalkScope(), "git.refetch_lightweight_tags"):
+  if not attrGet[bool]("git.refetch_lightweight_tags"):
     return
   var toRefetch: seq[GitTag] = @[]
   for _, tag in info.tags:

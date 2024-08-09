@@ -51,20 +51,20 @@ proc filterByTemplate*(dict: ChalkDict, p: string): ChalkDict =
   result = ChalkDict()
   for k, v in dict:
     let section = p & ".key"
-    if sectionExists(getChalkScope(), section):
+    if sectionExists(section):
       let ss = section & "." & k
-      if sectionExists(getChalkScope(), ss) and get[bool](getChalkScope(), ss & ".use"):
+      if sectionExists(ss) and attrGet[bool](ss & ".use"):
         result[k] = v
 
 proc getOutputConfig*(): string =
   return "outconf." & getBaseCommandName()
 
 template getMarkTemplate*(): string =
-  let tmplName = get[string](getChalkScope(), getOutputConfig() & ".mark_template")
+  let tmplName = attrGet[string](getOutputConfig() & ".mark_template")
   "mark_template." & tmplName
 
 template getReportTemplate*(): string =
-  let tmplName = get[string](getChalkScope(), getOutputConfig() & ".report_template")
+  let tmplName = attrGet[string](getOutputConfig() & ".report_template")
   "report_template." & tmplName
 
 template forceReportKeys*(keynames: openarray[string]) =
@@ -72,22 +72,16 @@ template forceReportKeys*(keynames: openarray[string]) =
   let section     = templateRef & ".key"
 
   # Create the "key" section if required.
-  if not sectionExists(getChalkScope(), section) and keynames.len > 0:
-    discard attrLookup(
-      getObject(getChalkScope(), templateRef),
-      ["key"],
-      ix = 0,
-      op = vlSecDef,
-    )
+  if not sectionExists(section) and keynames.len > 0:
+    con4mSectionCreate(section)
 
-  let keys = getObject(getChalkScope(), section).getContents()
+  let keys = attrGetObject(section).getContents()
 
   for item in keynames:
     # Create the item section if required.
     if item notin keys:
-      discard attrLookup(getChalkScope(), [templateRef, "key", item], ix = 0, op = vlSecDef)
+      con4mSectionCreate(section & "." & item)
     con4mAttrSet(
-      getChalkScope(),
       section & "." & item & ".use",
       pack(true),
       Con4mType(kind: TypeBool),
@@ -99,22 +93,16 @@ template forceChalkKeys*(keynames: openarray[string]) =
     let section     = templateRef & ".key"
 
     # Create the "key" section if required.
-    if not sectionExists(getChalkScope(), section) and keynames.len > 0:
-      discard attrLookup(
-        getObject(getChalkScope(), templateRef),
-        ["key"],
-        ix = 0,
-        op = vlSecDef,
-      )
+    if not sectionExists(section) and keynames.len > 0:
+      con4mSectionCreate(section)
 
-    let keys = getObject(getChalkScope(), section).getContents()
+    let keys = attrGetObject(section).getContents()
 
     for item in keynames:
       # Create the item section if required.
       if item notin keys:
-        discard attrLookup(getChalkScope(), [templateRef, "key", item], ix = 0, op = vlSecDef)
+        con4mSectionCreate(section & "." & item)
       con4mAttrSet(
-        getChalkScope(),
         section & "." & item & ".use",
         pack(true),
         Con4mType(kind: TypeBool),

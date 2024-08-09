@@ -77,7 +77,7 @@ proc doCommandReport(): string {.inline.} =
     reportTemplate = getReportTemplate()
     # The above goes from the string name to the object.
 
-  if get[bool](getChalkScope(), "skip_command_report"):
+  if attrGet[bool]("skip_command_report"):
     info("Skipping the command report as per the `skip_command_report` directive")
     result = ""
   else:
@@ -107,23 +107,23 @@ template doEmbeddedReport(): Box =
 template doCustomReporting() =
   for topic in getChalkSubsections("custom_report"):
     let spec = "custom_report." & topic
-    let enabledOpt = getOpt[bool](getChalkScope(), spec & ".enabled")
+    let enabledOpt = attrGetOpt[bool](spec & ".enabled")
     if enabledOpt.isNone() or not enabledOpt.get(): continue
     var
-      sinkConfs = get[seq[string]](getChalkScope(), spec & ".sink_configs")
+      sinkConfs = attrGet[seq[string]](spec & ".sink_configs")
 
     discard registerTopic(topic)
 
-    let useWhen = get[seq[string]](getChalkScope(), spec & ".use_when")
+    let useWhen = attrGet[seq[string]](spec & ".use_when")
     if getCommandName() notin useWhen and "*" notin useWhen:
       continue
-    if topic == "audit" and not get[bool](getChalkScope(), "publish_audit"):
+    if topic == "audit" and not attrGet[bool]("publish_audit"):
       continue
     if len(sinkConfs) == 0 and topic notin ["audit", "chalk_usage_stats"]:
       warn("Report '" & topic & "' has no configured sinks.  Skipping.")
 
     let
-      reportTemplate = get[string](getChalkScope(), spec & ".report_template")
+      reportTemplate = attrGet[string](spec & ".report_template")
       templateToUse  = "report_template." & reportTemplate
 
     for sinkConfName in sinkConfs:
@@ -139,8 +139,8 @@ proc doReporting*(topic="report") {.exportc, cdecl.} =
     ctx.report = doEmbeddedReport()
   else:
     let
-      skipCommand = get[bool](getChalkScope(), "skip_command_report")
-      skipCustom  = get[bool](getChalkScope(), "skip_custom_reports")
+      skipCommand = attrGet[bool]("skip_command_report")
+      skipCustom  = attrGet[bool]("skip_custom_reports")
     if skipCommand and skipCustom:
       return
     trace("Collecting runtime host info.")

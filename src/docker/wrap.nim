@@ -263,8 +263,8 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
         "recent version of buildx is required for copying chalk by platform into Dockerfile",
       )
     let
-      validate  = get[bool](getChalkScope(), "load.validate_configs_on_load")
-      binfmt    = get[bool](getChalkScope(), "docker.install_binfmt")
+      validate  = attrGet[bool]("load.validate_configs_on_load")
+      binfmt    = attrGet[bool]("docker.install_binfmt")
       # other chalks might have different config for validate_configs_on_load
       # so we ensure we honor self config via CLI arg
       check     = if validate: "--validation" else: "--no-validation"

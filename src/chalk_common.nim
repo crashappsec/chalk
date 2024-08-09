@@ -481,7 +481,7 @@ var
 template dumpExOnDebug*() =
   when not defined(release):
     let stack = getCurrentException().getStackTrace()
-    if getChalkScope() != nil and get[bool](getChalkScope(), "chalk_debug"):
+    if getChalkScope() != nil and attrGet[bool]("chalk_debug"):
       let
         msg = "" # "Handling exception (msg = " & getCurrentExceptionMsg() & ")\n"
         tb  = "Traceback (most recent call last)\n" & stack

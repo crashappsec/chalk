@@ -445,9 +445,9 @@ proc orderKeys*(dict: ChalkDict,
                 tplate: string): seq[string] =
   var tmp: seq[(int, string)] = @[]
   for k, _ in dict:
-    var order = get[int](getChalkScope(), "keyspec." & k & ".normalized_order")
-    if tplate != "" and sectionExists(getChalkScope(), tplate & ".key." & k):
-      let orderOpt = getOpt[int](getChalkScope(), tplate & ".key." & k & ".order")
+    var order = attrGet[int]("keyspec." & k & ".normalized_order")
+    if tplate != "" and sectionExists(tplate & ".key." & k):
+      let orderOpt = attrGetOpt[int](tplate & ".key." & k & ".order")
       if orderOpt.isSome():
         order = orderOpt.get()
     tmp.add((order, k))
@@ -492,7 +492,7 @@ proc forcePrivateKeys() =
   forceChalkKeys(toForce)
 
 proc getChalkMark*(obj: ChalkObj): ChalkDict =
-  trace("Creating mark using template: " & get[string](getChalkScope(), getOutputConfig() & ".mark_template"))
+  trace("Creating mark using template: " & attrGet[string](getOutputConfig() & ".mark_template"))
 
   forcePrivateKeys()
 
@@ -512,7 +512,7 @@ proc getChalkMarkAsStr*(obj: ChalkObj): string =
     trace("Chalk cachemark " & $obj.cachedMark)
     return obj.cachedMark
   trace("Converting Mark to JSON. Mark template is: " &
-    get[string](getChalkScope(), getOutputConfig() & ".mark_template"))
+    attrGet[string](getOutputConfig() & ".mark_template"))
 
   if obj.cachedMark != "":
     return obj.cachedMark

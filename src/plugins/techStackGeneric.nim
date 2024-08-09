@@ -118,7 +118,7 @@ proc scanFileStream(strm: FileStream, filePath: string, category: string, subcat
 var ignored: seq[Regex] = @[]
 proc getIgnored(): seq[Regex] =
   once:
-    for i in get[seq[string]](getChalkScope(), "ignore_patterns"):
+    for i in attrGet[seq[string]]("ignore_patterns"):
       ignored.add(re(i))
   return ignored
 
@@ -161,7 +161,7 @@ proc getProcNames(): HashSet[string] =
 # ps output etc in upcoming revisions
 proc hostHasTechStack(scope: string, proc_names: HashSet[string]): bool =
   # first check directories and filepaths, then processes
-  let scopedDirs = getOpt[seq[string]](getChalkScope(), scope & ".directories")
+  let scopedDirs = attrGetOpt[seq[string]](scope & ".directories")
   var fExists = false
   var dExists = false
 
@@ -171,20 +171,20 @@ proc hostHasTechStack(scope: string, proc_names: HashSet[string]): bool =
         dExists = true
         break
 
-  let filepaths = getOpt[seq[string]](getChalkScope(), scope & ".filepaths")
+  let filepaths = attrGetOpt[seq[string]](scope & ".filepaths")
   if filepaths.isSome():
     for path in filepaths.get():
       if fileExists(path):
         fExists = true
         break
 
-  let names = getOpt[seq[string]](getChalkScope(), scope & ".process_names")
+  let names = attrGetOpt[seq[string]](scope & ".process_names")
   if names.isSome():
     let
       rule_names   = toHashSet(names.get())
       intersection = proc_names * rule_names
     if len(intersection) > 0:
-      if get[bool](getChalkScope(), scope & ".strict"):
+      if attrGet[bool](scope & ".strict"):
         return fExists or dExists
       return true
 
@@ -223,7 +223,7 @@ proc detectLanguages(): HashSet[string] =
   trace("tech stack: detecting languages")
   result = initHashSet[string]()
 
-  let canLoad = get[bool](getChalkScope(), "use_tech_stack_detection")
+  let canLoad = attrGet[bool]("use_tech_stack_detection")
   if not canLoad:
     return result
 
@@ -280,8 +280,7 @@ proc detectTechCwd(): TableRef[string, seq[string]] =
 proc loadState() =
   once:
     for langName in getChalkSubsections("linguist_language"):
-      let ext = get[string](getChalkScope(),
-                            "linguist_language." & langName & ".extension")
+      let ext = attrGet[string]("linguist_language." & langName & ".extension")
       languages[ext] = langName
 
     for key in getChalkSubsections("tech_stack_rule"):
@@ -289,20 +288,20 @@ proc loadState() =
         trace("tech stack: loading " & key)
       let val = "tech_stack_rule." & key
       let
-        category    = get[string](getChalkScope(), val & ".category")
-        subcategory = get[string](getChalkScope(), val & ".subcategory")
+        category    = attrGet[string](val & ".category")
+        subcategory = attrGet[string](val & ".subcategory")
 
       categories.
         mgetOrPut(category, newTable[string, seq[string]]()).
         mgetOrPut(subcategory, @[]).
         add(key)
 
-      if sectionExists(getChalkScope(), val & ".host_scope"):
+      if sectionExists(val & ".host_scope"):
         if category notin inHostScope:
           inHostScope[category] = newTable[string, bool]()
           inHostScope[category][subcategory] = false
       else:
-        if not sectionExists(getChalkScope(), val & ".file_scope"):
+        if not sectionExists(val & ".file_scope"):
           error("One of file_scope, host_scope must be defined for rule " & key & ". Skipping")
           continue
         if category notin inFileScope:
@@ -310,9 +309,9 @@ proc loadState() =
         inFileScope[category][subcategory] = false
 
         tsRules.incl(key)
-        regexes[key] = re(get[string](getChalkScope(), val & ".file_scope.regex"))
-        headLimits[key] = get[int](getChalkScope(), val & ".file_scope.head")
-        let filetypes = getOpt[seq[string]](getChalkScope(), val & ".file_scope.filetypes")
+        regexes[key] = re(attrGet[string](val & ".file_scope.regex"))
+        headLimits[key] = attrGet[int](val & ".file_scope.head")
+        let filetypes = attrGetOpt[seq[string]](val & ".file_scope.filetypes")
         if filetypes.isSome():
           let ftypes = filetypes.get()
           ruleFiletypes[key] = ftypes
@@ -323,7 +322,7 @@ proc loadState() =
           # XXX move to a template for looking things up and adding if
           # they don't exist
           ftRules.mgetOrPut(FT_ANY, initHashSet[string]()).incl(key)
-          let excludeFiletypes = getOpt[seq[string]](getChalkScope(), val & ".file_scope.excluded_filetypes")
+          let excludeFiletypes = attrGetOpt[seq[string]](val & ".file_scope.excluded_filetypes")
           if excludeFiletypes.isSome():
             let exclFtps = excludeFiletypes.get()
             ruleExcludeFiletypes[key] = exclFtps
@@ -331,13 +330,13 @@ proc loadState() =
               excludeFtRules.mgetOrPut(ft, initHashSet[string]()).incl(key)
 
         # get paths and excluded paths that need to always be considered
-        let filepaths = getOpt[seq[string]](getChalkScope(), val & ".file_scope.filepaths")
+        let filepaths = attrGetOpt[seq[string]](val & ".file_scope.filepaths")
         if filepaths.isSome():
           let fpaths = filepaths.get()
           for path in fpaths:
             pthRules.mgetOrPut(path, initHashSet[string]()).incl(key)
 
-        let excludeFilepaths = getOpt[seq[string]](getChalkScope(), val & ".file_scope.excluded_filepaths")
+        let excludeFilepaths = attrGetOpt[seq[string]](val & ".file_scope.excluded_filepaths")
         if excludeFilepaths.isSome():
           let excfpaths = excludeFilepaths.get()
           for path in excfpaths:
@@ -345,7 +344,7 @@ proc loadState() =
 
 proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
   result = ChalkDict()
-  let canLoad = get[bool](getChalkScope(), "use_tech_stack_detection")
+  let canLoad = attrGet[bool]("use_tech_stack_detection")
   if not canLoad:
     trace("Skipping tech stack runtime detection plugin")
     return result
@@ -358,11 +357,11 @@ proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
     when defined(debug):
       trace("tech stack: collecting " & key)
     let val = "tech_stack_rule." & key
-    if not sectionExists(getChalkScope(), val & ".host_scope"):
+    if not sectionExists(val & ".host_scope"):
       continue
     let
-      category    = get[string](getChalkScope(), val & ".category")
-      subcategory = get[string](getChalkScope(), val & ".subcategory")
+      category    = attrGet[string](val & ".category")
+      subcategory = attrGet[string](val & ".subcategory")
     if (category in inHostScope and
         subcategory in inHostScope[category] and
         not inHostScope[category][subcategory]):
@@ -376,7 +375,7 @@ proc techStackRuntime*(self: Plugin, objs: seq[ChalkObj]): ChalkDict {.cdecl.} =
 
 proc techStackArtifact*(self: Plugin, objs: ChalkObj): ChalkDict {.cdecl.} =
   result = ChalkDict()
-  let canLoad = get[bool](getChalkScope(), "use_tech_stack_detection")
+  let canLoad = attrGet[bool]("use_tech_stack_detection")
   if not canLoad:
     trace("Skipping tech stack detection plugin for artifacts")
     return result

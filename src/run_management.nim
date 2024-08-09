@@ -20,15 +20,24 @@ var
 proc getChalkScope*(): AttrScope =
   con4mRuntime.configState.attrs
 
+proc sectionExists*(s: string): bool =
+  getChalkScope().getObjectOpt(s).isSome()
+
+proc attrGet*[T](fqn: string): T =
+  get[T](getChalkScope(), fqn)
+
+proc attrGetOpt*[T](fqn: string): Option[T] =
+  getOpt[T](getChalkScope(), fqn)
+
+proc attrGetObject*(fqn: string): AttrScope =
+  getObject(getChalkScope(), fqn)
+
 iterator getChalkSubsections*(s: string): string =
   ## Walks the contents of the given chalk config section, and yields the
   ## names of the subsections.
-  for k, v in con4mRuntime.configState.attrs.getObject(s).contents:
+  for k, v in attrGetObject(s).contents:
     if v.isA(AttrScope):
       yield k
-
-proc sectionExists*(scope: AttrScope, s: string): bool =
-  scope.getObjectOpt(s).isSome()
 
 proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
   ## Sets the value of the `fqn` attribute in `ctx.attrs` to `value`, raising
@@ -38,12 +47,15 @@ proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
   ## attribute isn't already set, use the other `con4mAttrSet` overload instead.
   doAssert attrSet(ctx, fqn, value).code == errOk
 
-proc con4mAttrSet*(attrs: AttrScope, fqn: string, value: Box, attrType: Con4mType) =
-  ## Sets the value of the `fqn` attribute in `attrs` to `value`, raising
-  ## `AssertionDefect` if unsuccessful.
+proc con4mAttrSet*(fqn: string, value: Box, attrType: Con4mType) =
+  ## Sets the value of the `fqn` attribute to `value`, raising `AssertionDefect`
+  ## if unsuccessful.
   ##
   ## This proc may be used if the attribute is not already set.
-  doAssert attrSet(attrs, fqn, value, attrType).code == errOk
+  doAssert attrSet(getChalkScope(), fqn, value, attrType).code == errOk
+
+proc con4mSectionCreate*(fqn: string) =
+  discard attrLookup(getChalkScope(), fqn.split('.'), ix = 0, op = vlSecDef)
 
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
@@ -204,7 +216,7 @@ template trySetIfNeeded*(o: ChalkDict, k: string, code: untyped) =
     trace("Could not set chalk key " & k & " due to: " & getCurrentExceptionMsg())
 
 proc isChalkingOp*(): bool =
-  return commandName in get[seq[string]](getChalkScope(), "valid_chalk_command_names")
+  return commandName in attrGet[seq[string]]("valid_chalk_command_names")
 
 proc lookupByPath*(obj: ChalkDict, path: string): Option[Box] =
   let

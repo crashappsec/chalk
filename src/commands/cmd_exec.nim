@@ -163,7 +163,7 @@ proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
 
 template doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: untyped) =
   let
-    inMicroSec    = int(get[Con4mDuration](getChalkScope(), "exec.heartbeat_rate"))
+    inMicroSec    = int(attrGet[Con4mDuration]("exec.heartbeat_rate"))
     sleepInterval = int(inMicroSec / 1000)
 
   setCommandName("heartbeat")
@@ -187,16 +187,16 @@ proc runCmdExec*(args: seq[string]) =
     return
 
   let
-    fromArgs   = get[bool](getChalkScope(), "exec.command_name_from_args")
-    cmdPath    = get[seq[string]](getChalkScope(), "exec.search_path")
-    defaults   = get[seq[string]](getChalkScope(), "exec.default_args")
-    appendArgs = get[bool](getChalkScope(), "exec.append_command_line_args")
-    overrideOk = get[bool](getChalkScope(), "exec.override_ok")
-    usePath    = get[bool](getChalkScope(), "exec.use_path")
-    pct        = get[int](getChalkScope(), "exec.reporting_probability")
+    fromArgs   = attrGet[bool]("exec.command_name_from_args")
+    cmdPath    = attrGet[seq[string]]("exec.search_path")
+    defaults   = attrGet[seq[string]]("exec.default_args")
+    appendArgs = attrGet[bool]("exec.append_command_line_args")
+    overrideOk = attrGet[bool]("exec.override_ok")
+    usePath    = attrGet[bool]("exec.use_path")
+    pct        = attrGet[int]("exec.reporting_probability")
     ppid       = getpid()   # Get the current pid before we fork.
   var
-    cmdName    = get[string](getChalkScope(), "exec.command_name")
+    cmdName    = attrGet[string]("exec.command_name")
 
   var argsToPass = defaults
 
@@ -238,7 +238,7 @@ proc runCmdExec*(args: seq[string]) =
 
   let pid  = fork()
 
-  if get[bool](getChalkScope(), "exec.chalk_as_parent"):
+  if attrGet[bool]("exec.chalk_as_parent"):
     if pid == 0:
       handleExec(allOpts, argsToPass)
     elif pid == -1:
@@ -253,7 +253,7 @@ proc runCmdExec*(args: seq[string]) =
       #
       # Yes this is also racy but a proper fix will be more complicated.
       let
-        inMicroSec   = int(get[Con4mDuration](getChalkScope(), "exec.initial_sleep_time"))
+        inMicroSec   = int(attrGet[Con4mDuration]("exec.initial_sleep_time"))
         initialSleep = int(inMicroSec / 1000)
 
       sleep(initialSleep)
@@ -265,7 +265,7 @@ proc runCmdExec*(args: seq[string]) =
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting()
 
-      if get[bool](getChalkScope(), "exec.heartbeat"):
+      if attrGet[bool]("exec.heartbeat"):
         chalkOpt.doHeartbeatAsParent(pid)
       else:
         trace("Waiting for spawned process to exit.")
@@ -286,7 +286,7 @@ proc runCmdExec*(args: seq[string]) =
       trace("Chalk is child process: " & $(cpid))
 
       let
-        inMicroSec   = int(get[Con4mDuration](getChalkScope(), "exec.initial_sleep_time"))
+        inMicroSec   = int(attrGet[Con4mDuration]("exec.initial_sleep_time"))
         initialSleep = int(inMicroSec / 1000)
 
       sleep(initialSleep)
@@ -305,5 +305,5 @@ proc runCmdExec*(args: seq[string]) =
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting()
 
-      if get[bool](getChalkScope(), "exec.heartbeat"):
+      if attrGet[bool]("exec.heartbeat"):
         chalkOpt.doHeartbeatAsChild(ppid)

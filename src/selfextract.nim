@@ -150,7 +150,7 @@ proc getSelfExtraction*(): Option[ChalkObj] =
 # The rest of this is specific to writing the self-config.
 
 proc newConfFileError(err, tb: string): bool =
-  if getChalkScope() != nil and get[bool](getChalkScope(), "chalk_debug"):
+  if getChalkScope() != nil and attrGet[bool]("chalk_debug"):
     cantLoad(err & "\n" & tb)
   else:
     cantLoad(err)
@@ -235,7 +235,7 @@ proc testConfigFile(newCon4m: string,
   let uri = "[testing config]"
   info(uri & ": Validating configuration.")
 
-  if get[bool](getChalkScope(), "load.validation_warning"):
+  if attrGet[bool]("load.validation_warning"):
     warn("Note: validation involves creating a new configuration context"  &
          " and evaluating your code to make sure it at least evaluates "   &
          "fine on a default path.  subscribe() and unsubscribe() will "    &
@@ -318,7 +318,7 @@ proc handleConfigLoadAll*(inpath: string): bool =
   info("Replacing all chalk configuration from " & inpath)
   try:
     let
-      validate = get[bool](getChalkScope(), "load.validate_configs_on_load")
+      validate = attrGet[bool]("load.validate_configs_on_load")
       required = @[configKey, paramKey, cacheKey]
       data     = if inpath == "-": stdin.readAll() else: tryToLoadFile(inpath.resolvePath())
       jsonData = data.parseJson()
@@ -372,12 +372,12 @@ proc handleConfigLoad*(inpath: string): bool =
   assert selfChalk != nil
 
   let
-    validate          = get[bool](getChalkScope(), "load.validate_configs_on_load")
-    replace           = get[bool](getChalkScope(), "load.replace_conf")
-    replaceAll        = get[bool](getChalkScope(), "load.replace_all")
-    confPaths         = get[seq[string]](getChalkScope(), "config_path").strip(leading = false, chars = {'/'})
-    confFilename      = get[string](getChalkScope(), "config_filename")
-    paramsViaStdin    = get[bool](getChalkScope(), "load.params_via_stdin")
+    validate          = attrGet[bool]("load.validate_configs_on_load")
+    replace           = attrGet[bool]("load.replace_conf")
+    replaceAll        = attrGet[bool]("load.replace_all")
+    confPaths         = attrGet[seq[string]]("config_path").strip(leading = false, chars = {'/'})
+    confFilename      = attrGet[string]("config_filename")
+    paramsViaStdin    = attrGet[bool]("load.params_via_stdin")
 
   if replace:
     info("Replacing base configuration with module from: " & inpath)

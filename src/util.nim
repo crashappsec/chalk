@@ -29,7 +29,7 @@ proc regularTerminationSignal(signal: cint) {.noconv.} =
   try:
     error("pid: " & $(pid) & " - Aborting due to signal: " &
           sigNameMap[signal] & "(" & $(signal) & ")")
-    if get[bool](getChalkScope(), "chalk_debug"):
+    if attrGet[bool]("chalk_debug"):
       publish("debug", "Stack trace: \n" & getStackTrace())
 
   except:
@@ -73,13 +73,13 @@ proc reportTmpFileExitState*(files, dirs, errs: seq[string]) =
   for err in errs:
     error(err)
 
-  if get[bool](getChalkScope(), "chalk_debug") and len(dirs) + len(files) != 0:
+  if attrGet[bool]("chalk_debug") and len(dirs) + len(files) != 0:
     error("Due to --debug flag, skipping cleanup; moving the " &
           "following to ./chalk-tmp:")
     for item in files & dirs:
       error(item)
 
-  if get[bool](getChalkScope(), "report_total_time"):
+  if attrGet[bool]("report_total_time"):
     echo "Total run time: " & $(int(getMonoTime().ticks() - startTime) /
                                 1000000000) &
       " seconds"
@@ -103,7 +103,7 @@ proc canOpenFile*(path: string, mode: FileMode = FileMode.fmRead): bool =
   return canOpen
 
 proc setupManagedTemp*() =
-  let customTmpDirOpt = getOpt[string](getChalkScope(), "default_tmp_dir")
+  let customTmpDirOpt = attrGetOpt[string]("default_tmp_dir")
 
   if customTmpDirOpt.isSome() and not existsEnv("TMPDIR"):
     putenv("TMPDIR", customTmpDirOpt.get())
@@ -114,7 +114,7 @@ proc setupManagedTemp*() =
   if existsEnv("TMPDIR"):
     discard existsOrCreateDir(getEnv("TMPDIR"))
 
-  if get[bool](getChalkScope(), "chalk_debug"):
+  if attrGet[bool]("chalk_debug"):
     let
       tmpPath = resolvePath("chalk-tmp")
       tmpCheck = resolvePath(".chalk-tmp-check")
@@ -220,7 +220,7 @@ const currentAutocompleteVersion = (0, 1, 3)
 proc validateMetaData*(obj: ChalkObj): ValidateResult {.importc.}
 
 proc autocompleteFileCheck*() =
-  if isatty(0) == 0 or get[bool](getChalkScope(), "install_completion_script") == false:
+  if isatty(0) == 0 or attrGet[bool]("install_completion_script") == false:
     return
 
   var dst = ""
@@ -298,7 +298,7 @@ template otherSetupTasks*() =
   autocompleteFileCheck()
   if isatty(1) == 0:
     setShowColor(false)
-  limitFDCacheSize(get[int](getChalkScope(), "cache_fd_limit"))
+  limitFDCacheSize(attrGet[int]("cache_fd_limit"))
 
 var exitCode = 0
 
