@@ -233,7 +233,7 @@ proc collectImageFrom(chalk: ChalkObj, contents: JsonNode, name: string, digest 
   chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents.nimJsonToBox())
   chalk.setIfNeeded("DOCKER_PLATFORM", $platform)
 
-proc normalizeDigestsFromManifest(chalk: ChalkObj, manifest: Dockermanifest) =
+proc normalizeDigestsFromManifest(chalk: ChalkObj, manifest: DockerManifest) =
   chalk.imageDigest = manifest.digest.extractDockerHash()
   chalk.setIfNeeded("_IMAGE_DIGEST", chalk.imageDigest)
   if manifest.list != nil:

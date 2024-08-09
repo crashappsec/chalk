@@ -2,6 +2,15 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- `docker` run-time host metadata collection was failing
+  for non-build commands such as `docker push`.
+  ([#399](https://github.com/crashappsec/chalk/pull/399))
+- `procfs` plugin was throwing an exception while parsing
+  `/proc/net/dev` to populate `_OP_IPV[4/6]_INTERFACES` keys.
+  ([#399](https://github.com/crashappsec/chalk/pull/399))
+
 ## 0.4.10
 
 **Aug 5, 2024**
