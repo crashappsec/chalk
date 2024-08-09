@@ -1,5 +1,5 @@
-crashoverride_usage_reporting_url = "http://chalk.crashoverride.local:8585/ping"
-log_level = "trace"
+crashoverride_usage_reporting_url: "http://chalk.crashoverride.local:8585/ping"
+log_level: "trace"
 
 sink_config my_presign_config {
   enabled: true

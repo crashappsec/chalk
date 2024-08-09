@@ -1,4 +1,4 @@
-use_tech_stack_detection = true
+use_tech_stack_detection: true
 
 tech_stack_rule pytest_host {
   category: "framework"

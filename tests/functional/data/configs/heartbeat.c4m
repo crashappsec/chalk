@@ -6,15 +6,15 @@ exec.heartbeat: true
 exec.heartbeat_rate: "1 seconds"'duration
 
 report_template heartbeat_report_template {
-    key._CHALKS.use = true # Needed to include the per-artifact reports.
-    key._OPERATION.use  = true
+    key._CHALKS.use: true # Needed to include the per-artifact reports.
+    key._OPERATION.use : true
 
-    key.CHALK_ID.use = true
-    key.ARTIFACT_TYPE.use = true
-    key._OP_ARTIFACT_PATH.use = true
-    key.HASH.use = true
-    key._CURRENT_HASH.use = true
-    key._PROCESS_PID.use = true
+    key.CHALK_ID.use: true
+    key.ARTIFACT_TYPE.use: true
+    key._OP_ARTIFACT_PATH.use: true
+    key.HASH.use: true
+    key._CURRENT_HASH.use: true
+    key._PROCESS_PID.use: true
 }
 
 

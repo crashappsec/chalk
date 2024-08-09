@@ -1,9 +1,9 @@
 report_template minimal_report_template {
-    key._OPERATION.use    = true
-    key.MAGIC.use         = true
-    key._CHALKS.use      = true
-    key.CHALK_ID.use      = true
-    key.CHALK_VERSION.use = true
+    key._OPERATION.use   : true
+    key.MAGIC.use        : true
+    key._CHALKS.use     : true
+    key.CHALK_ID.use     : true
+    key.CHALK_VERSION.use: true
 }
 
 outconf insert {

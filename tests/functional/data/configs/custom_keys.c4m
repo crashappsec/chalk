@@ -45,12 +45,12 @@ func key_callback(contexts) {
 }
 
 report_template insertion_default {
-  key.X_REPORT_VALUE.use   = true
-  key.X_REPORT_ENV_VAR.use = true
-  key.X_REPORT_CMD.use     = true
-  key.X_REPORT_FUNC.use    = true
-  key.X_MARK_VALUE.use     = true
-  key.X_MARK_ENV_VAR.use   = true
-  key.X_MARK_CMD.use       = true
-  key.X_MARK_FUNC.use      = true
+  key.X_REPORT_VALUE.use   : true
+  key.X_REPORT_ENV_VAR.use : true
+  key.X_REPORT_CMD.use     : true
+  key.X_REPORT_FUNC.use    : true
+  key.X_MARK_VALUE.use     : true
+  key.X_MARK_ENV_VAR.use   : true
+  key.X_MARK_CMD.use       : true
+  key.X_MARK_FUNC.use      : true
 }

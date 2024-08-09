@@ -9,7 +9,7 @@ mark_template.mark_default.key.SBOM.use: true
 mark_template.minimal.key.SBOM.use: true
 
 if env("EXTERNAL_TOOL_USE_DOCKER") != "False" {
-  tool.syft.syft_prefer_docker = true
+  tool.syft.syft_prefer_docker : true
 } else {
-  tool.syft.syft_entrypoint    = ""
+  tool.syft.syft_entrypoint    : ""
 }

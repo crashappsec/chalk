@@ -5,7 +5,7 @@ sink_config my_rotating_config {
     filename: env("SINK_TEST_OUTPUT_ROTATING_LOG")
 }
 
-log_level = "trace"
+log_level: "trace"
 
 if env_exists("SINK_TEST_OUTPUT_ROTATING_LOG") {
   subscribe("report", "my_rotating_config")

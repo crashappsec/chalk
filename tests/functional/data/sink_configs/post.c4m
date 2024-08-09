@@ -8,7 +8,7 @@ sink_config my_https_config {
   }
 }
 
-log_level = "trace"
+log_level: "trace"
 
 ptr_url := ""
 if env_exists("CHALK_POST_URL") {

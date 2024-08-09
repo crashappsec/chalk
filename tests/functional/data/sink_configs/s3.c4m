@@ -7,7 +7,7 @@ sink_config my_s3_config {
   uid:     env("AWS_ACCESS_KEY_ID")
 }
 
-log_level = "trace"
+log_level: "trace"
 
 ptr_url := ""
 
