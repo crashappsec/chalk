@@ -201,14 +201,14 @@ In the Chalk config file, the above syntax doesn't overwrite the
 entire existing template.  The above syntax is 100% equal to:
 
 ```
-mark_template.mark_default.key.SBOM.use          = true
-mark_template.mark_default.key.ARTIFACT_TYPE.use = false
+mark_template.mark_default.key.SBOM.use          : true
+mark_template.mark_default.key.ARTIFACT_TYPE.use : false
 ```
 
 > ❗ The Chalk config file treats dot assignments and sections the
-  same.  The two notations are 100% interchangeable. And, the colon and
-  the equals sign are the same thing.
-
+  same.  The two notations are 100% interchangeable.  Note also that
+  `=` will set either an attribute or a variable, and `:` will set
+  only an attribute (not a variable).
 
 Similarly, you can go for a combination of the two styles:
 
@@ -1568,7 +1568,7 @@ chalking occurs:
 
 ```
 report_template mdlog_report {
-  key.METADATA_ID.use = true
+  key.METADATA_ID.use : true
 }
 
 sink_config mdlog_file {
@@ -3700,8 +3700,8 @@ func custom_labels_check(name, value) {
 func exec_arg_semantics_check(name, value) {
   result := ""
   if value and attr_get("exec.append_command_line_args", bool) {
-    return ("Cannot have both exec.append_command_line_args = true and " +
-            "exec.override_ok = true")
+    return ("Cannot have both exec.append_command_line_args == true and " +
+            "exec.override_ok == true")
   }
 }
 
