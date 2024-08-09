@@ -282,21 +282,28 @@ proc normalizeDigests(chalk: ChalkObj) =
   # we dont have any images
   if chalk.imageDigest == "" or len(chalk.images) == 0:
     return
-  for image in chalk.images:
-    try:
-      let manifest = fetchImageManifest(image.withDigest(chalk.imageDigest), chalk.platform)
-      chalk.normalizeDigestsFromManifest(manifest)
-      break
-    except:
-      continue
+  if hasBuildX():
+    for image in chalk.images:
+      try:
+        let manifest = fetchImageManifest(image.withDigest(chalk.imageDigest), chalk.platform)
+        chalk.normalizeDigestsFromManifest(manifest)
+        break
+      except:
+        continue
+  else:
+    if dockerInvocation != nil and dockerInvocation.cmd == push:
+      # if there is no buildx, this means its a vanilla docker push
+      # which means for docker push it cannot be a list manifest
+      # so we should be able to normalize it
+      chalk.setIfNeeded("_IMAGE_DIGEST", chalk.imageDigest)
   let repoDigests = extractDockerHashMap($(chalk.images.withDigest(chalk.imageDigest)))
   chalk.setIfNeeded("_REPO_DIGESTS", pack(repoDigests))
 
 proc collectImage*(chalk: ChalkObj, name: string, digest = "") =
   let contents = inspectImageJson(name)
   chalk.collectImageFrom(contents, name, digest = digest)
+  chalk.normalizeDigests()
   if hasBuildX():
-    chalk.normalizeDigests()
     chalk.collectProvenance()
     chalk.collectSBOM()
 
