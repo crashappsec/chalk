@@ -3,7 +3,7 @@ custom_report.terminal_chalk_time.enabled: false
 custom_report.terminal_other_op.enabled: false
 
 exec.heartbeat: true
-exec.heartbeat_rate: <<1 seconds>>
+exec.heartbeat_rate: "1 seconds"'duration
 
 report_template heartbeat_report_template {
     key._CHALKS.use = true # Needed to include the per-artifact reports.

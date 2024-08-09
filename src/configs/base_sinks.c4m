@@ -79,7 +79,7 @@ undeleted data into a new, temporary log file, and swapping it into
 the destination file once finished. As a result, you should assume you
 need 2x the value of `max` available in terms of disk space.
 
-`max` and `truncation_amount` should be Size objects (e.g., `<< 100mb >>` )
+`max` and `truncation_amount` should be Size objects (e.g., `"100 mb"'size` )
 """
 }
 

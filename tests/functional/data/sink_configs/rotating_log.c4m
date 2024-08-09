@@ -1,7 +1,7 @@
 sink_config my_rotating_config {
     enabled:  true
     sink:     "rotating_log"
-    max: <<10mb>>
+    max: "10 mb"'size
     filename: env("SINK_TEST_OUTPUT_ROTATING_LOG")
 }
 

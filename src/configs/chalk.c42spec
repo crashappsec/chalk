@@ -1254,7 +1254,7 @@ making requests to fetch the password.
 
   field timeout {
     type:    Duration
-    default: << 3 sec >>
+    default: "3 sec"'duration
     shortdoc: "HTTPS timeout for request to the key backup service"
     doc: """
 If the timeout is exceeded and the operation fails, chalk will proceed,
@@ -1311,7 +1311,7 @@ making requests to fetch the key.
 
   field timeout {
     type:    Duration
-    default: << 3 sec >>
+    default: "3 sec"'duration
     shortdoc: "HTTPS timeout for request to the key provider service"
     doc: """
 If the timeout is exceeded and the operation fails, chalk will proceed,
@@ -2137,7 +2137,7 @@ adding `chalk exec --` prefix.
 
   field initial_sleep_time {
     type: Duration
-    default: <<50 msecs>> # 1/20th of a second
+    default: "50 msecs"'duration # 1/20th of a second
     shortdoc: "Exec: initial sleep time"
     doc: """
 Controls how long after exec + fork Chalk waits before collecting data
@@ -2251,7 +2251,7 @@ controlled by the `heartbeat_rate` field.
 
   field heartbeat_rate {
     type:    Duration
-    default: <<20 seconds>>
+    default: "20 seconds"'duration
     shortdoc: "Heartbeat rate"
     doc: """
 When `heartbeat` is true, after any report, chalk will sleep the specified
@@ -2920,7 +2920,7 @@ Defaults to 'chalk-audit.json'
   field audit_file_size {
     type:       Size
     shortdoc:   "Audit Report log max size"
-    default:    <<100mb>>
+    default:    "100 mb"'size
     doc:        """
 When using the default log file for the built-in audit report (which, by the way, is off by default), this controls the maximum size allowable for the audit log. If a write to the cache would exceed this amount, the system will truncate down to 75% of the size.
 """
