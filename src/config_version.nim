@@ -9,7 +9,7 @@ proc getChalkVersion*(withSuffix = true): string =
   result = ""
   const path = currentSourcePath().parentDir() / "configs" / "base_keyspecs.c4m"
   for line in path.staticRead().splitLines():
-    const pattern = """chalk_version$s:=$s"$i.$i.$i$*"$."""
+    const pattern = """chalk_version$s=$s"$i.$i.$i$*"$."""
     let (isMatch, major, minor, patch, suffix) = line.scanTuple(pattern)
     if isMatch and major >= 0 and minor >= 0 and patch >= 0:
       let version = $major & '.' & $minor & '.' & $patch
