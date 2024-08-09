@@ -3520,21 +3520,22 @@ func label_template_check(name, mark_template_name) {
   }
 }
 
-func is_valid_label(label) {
-  result = true
-  chars = to_chars(label)
-  l     = chars.len()
-  for i from 0 to l {
-    c = chars[i]
-    if is_alphanum(c) {
-      continue
-    }
-    if contains(['.', '-', '$'], c) {
-      continue
-    }
-    return false
-  }
-}
+# TODO(ee7): Uncomment after single quotes are reimplemented (exception raised from: src/adts/numbers.c:259)
+# func is_valid_label(label) {
+#   result = true
+#   chars = to_chars(label)
+#   l     = chars.len()
+#   for i from 0 to l {
+#     c = chars[i]
+#     if is_alphanum(c) {
+#       continue
+#     }
+#     if contains(['.', '-', '$'], c) {
+#       continue
+#     }
+#     return false
+#   }
+# }
 
 func label_prefix_check(name, value) {
 
