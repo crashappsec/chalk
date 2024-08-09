@@ -8,16 +8,14 @@
 ## This is the con4m specification to enable con4m to automatically
 ## validate chalk config files.
 
-const default_key_priority = 4611686018427387904  # 2^62.
+const global default_key_priority = 4611686018427387904  # 2^62.
 
 # These are the valid command-line commands.
-const valid_chalk_cmds     = ["help", "insert", "extract", "delete", "config",
-                              "load", "dump", "docker", "version", "env", "exec",
-                              "setup", "docgen", "__"]
+const global valid_chalk_cmds = ["help", "insert", "extract", "delete", "config",
+                                 "load", "dump", "docker", "version", "env", "exec",
+                                 "setup", "docgen", "__"]
 
-const all_cmds_that_insert = ["insert", "build", "push", "load", "setup"]
-
-
+const global all_cmds_that_insert = ["insert", "build", "push", "load", "setup"]
 
 # Beyond valid chalk commands, these can generate reports.
 other_report_ops     = ["build", "push", "heartbeat"]
@@ -71,7 +69,6 @@ enum { CCPreRun, CCArtifact, CCPostChalk, CCPostRun }
 # At some point, I'm going to change this in con4m to automatically
 # export.
 
-global default_key_priority, valid_chalk_cmds, all_cmds_that_insert
 global known_sink_filters, other_report_ops
 
 confspec {
