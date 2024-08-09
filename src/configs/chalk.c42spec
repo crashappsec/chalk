@@ -8,23 +8,23 @@
 ## This is the con4m specification to enable con4m to automatically
 ## validate chalk config files.
 
-default_key_priority = 4611686018427387904  # 2^62.
+const default_key_priority = 4611686018427387904  # 2^62.
 
 # These are the valid command-line commands.
-valid_chalk_cmds     = ["help", "insert", "extract", "delete", "config",
-                        "load", "dump", "docker", "version", "env", "exec",
-                        "setup", "docgen", "__"]
+const valid_chalk_cmds     = ["help", "insert", "extract", "delete", "config",
+                              "load", "dump", "docker", "version", "env", "exec",
+                              "setup", "docgen", "__"]
 
-all_cmds_that_insert = ["insert", "build", "push", "load", "setup"]
+const all_cmds_that_insert = ["insert", "build", "push", "load", "setup"]
 
 
 
 # Beyond valid chalk commands, these can generate reports.
 other_report_ops     = ["build", "push", "heartbeat"]
-tool_types           = ["sbom", "sast"]
-valid_log_levels     = ["verbose", "trace", "info", "warn", "error", "none"]
-key_types            = ["Chalk-time Host", "Chalk-time Artifact",
-                        "Run-time Artifact", "Run-time Host"]
+const tool_types     = ["sbom", "sast"]
+const valid_log_levels = ["verbose", "trace", "info", "warn", "error", "none"]
+const key_types        = ["Chalk-time Host", "Chalk-time Artifact",
+                          "Run-time Artifact", "Run-time Host"]
 known_sink_filters   = ["log_level", "log_prefix", "pretty_json",
                         "fix_new_line", "add_topic", "wrap",
                         "github_log_group"]
@@ -436,7 +436,7 @@ named tool {
 }
 }
 
-linguist_types = ["programming", "data", "markup"]
+const linguist_types = ["programming", "data", "markup"]
 
 confspec {
 named linguist_language {
@@ -461,7 +461,7 @@ named linguist_language {
 }
 }
 
-valid_tech_stack_categories = ["database", "webServer", "protocol", "framework"]
+const valid_tech_stack_categories = ["database", "webServer", "protocol", "framework"]
 valid_tech_stack_database_types = ["firebird", "hypersonicSQL",
     "ibmDb2", "microsoftAccess", "microsoftSQLServer",
      "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other"]
@@ -470,7 +470,7 @@ valid_tech_stack_web_server_types = ["apache", "nginx", "iis"]
 valid_tech_stack_protocol_types = ["ldap"]
 valid_tech_stack_framework_types = ["javaSpring"]
 
-valid_subcategory_types = ["firebird", "hypersonicSQL",
+const valid_subcategory_types = ["firebird", "hypersonicSQL",
     "ibmDb2", "microsoftAccess", "microsoftSQLServer",
      "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other",
      "apache", "nginx", "iis", "ldap", "javaSpring"]
@@ -1260,7 +1260,7 @@ singleton attestation_key_get {
 }
 }
 
-attestation_key_types = ["embed", "backup", "get"]
+const attestation_key_types = ["embed", "backup", "get"]
 
 confspec {
 singleton attestation {
