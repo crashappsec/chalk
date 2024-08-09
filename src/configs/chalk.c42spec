@@ -21,10 +21,6 @@ const all_cmds_that_insert = ["insert", "build", "push", "load", "setup"]
 
 # Beyond valid chalk commands, these can generate reports.
 other_report_ops     = ["build", "push", "heartbeat"]
-const tool_types     = ["sbom", "sast"]
-const valid_log_levels = ["verbose", "trace", "info", "warn", "error", "none"]
-const key_types        = ["Chalk-time Host", "Chalk-time Artifact",
-                          "Run-time Artifact", "Run-time Host"]
 known_sink_filters   = ["log_level", "log_prefix", "pretty_json",
                         "fix_new_line", "add_topic", "wrap",
                         "github_log_group"]
@@ -348,7 +344,7 @@ named tool {
     "Specifies which kind of tool this is."
     type:       string
     require:    true
-    choice:     tool_types
+    choice:     ["sbom", "sast"]
     lock:       true
   }
 
@@ -436,8 +432,6 @@ named tool {
 }
 }
 
-const linguist_types = ["programming", "data", "markup"]
-
 confspec {
 named linguist_language {
   user_def_ok:   false
@@ -445,7 +439,7 @@ named linguist_language {
   field type {
     type:    string
     require: true
-    choice: linguist_types
+    choice: ["programming", "data", "markup"]
   }
 
   field extension {
@@ -461,7 +455,6 @@ named linguist_language {
 }
 }
 
-const valid_tech_stack_categories = ["database", "webServer", "protocol", "framework"]
 valid_tech_stack_database_types = ["firebird", "hypersonicSQL",
     "ibmDb2", "microsoftAccess", "microsoftSQLServer",
      "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other"]
@@ -469,11 +462,6 @@ valid_tech_stack_database_types = ["firebird", "hypersonicSQL",
 valid_tech_stack_web_server_types = ["apache", "nginx", "iis"]
 valid_tech_stack_protocol_types = ["ldap"]
 valid_tech_stack_framework_types = ["javaSpring"]
-
-const valid_subcategory_types = ["firebird", "hypersonicSQL",
-    "ibmDb2", "microsoftAccess", "microsoftSQLServer",
-     "mongoDB", "mySQL", "oracle", "postgreSQL","sqlite", "sysbase", "other",
-     "apache", "nginx", "iis", "ldap", "javaSpring"]
 
 
 confspec {
@@ -488,13 +476,15 @@ named tech_stack_rule {
   field category {
     type: string
     require: true
-    choice:   valid_tech_stack_categories
+    choice: ["database", "webServer", "protocol", "framework"]
   }
 
   field subcategory {
     type: string
     require: true
-    choice: valid_subcategory_types
+    choice: ["firebird", "hypersonicSQL", "ibmDb2", "microsoftAccess",
+             "microsoftSQLServer", "mongoDB", "mySQL", "oracle", "postgreSQL", "sqlite",
+             "sysbase", "other", "apache", "nginx", "iis", "ldap", "javaSpring"]
   }
 
   allow: file_scope, host_scope
@@ -795,7 +785,7 @@ named keyspec {
     priority and should be sorted alphabetically.
     """
     type:        int
-    default:     default_key_priority
+    default:     4611686018427387904  # TODO: default_key_priority
     range:       0, high()
   }
 
@@ -1260,8 +1250,6 @@ singleton attestation_key_get {
 }
 }
 
-const attestation_key_types = ["embed", "backup", "get"]
-
 confspec {
 singleton attestation {
   """
@@ -1328,7 +1316,7 @@ singleton attestation {
   field key_provider {
     "What provider to use for fetching signing key"
     type:    string
-    choice:  attestation_key_types
+    choice:  ["embed", "backup", "get"]
     default: "embed"
   }
 
@@ -2585,7 +2573,7 @@ root {
   field valid_chalk_command_names {
     "Expose command names used for insertion to the implementation"
     type:       list[string]
-    default:    all_cmds_that_insert
+    default:    ["insert", "build", "push", "load", "setup"] # TODO: all_commands_that_insert
     lock:       true
     hidden:     true
   }
@@ -2593,7 +2581,9 @@ root {
   field valid_chalk_commands {
     "Expose the full list of command names to the implementation"
     type:       list[string]
-    default:    valid_chalk_cmds
+    default:    ["help", "insert", "extract", "delete", "config",
+                 "load", "dump", "docker", "version", "env", "exec",
+                 "setup", "docgen", "__"] # TODO: valid_chalk_cmds
     lock:       true
     hidden:     true
   }
@@ -2657,7 +2647,7 @@ root {
     """
     type:     string
     default:  "warn"
-    choice:   valid_log_levels
+    choice:   ["verbose", "trace", "info", "warn", "error", "none"] # TODO: valid_log_levels
   }
 
   field chalk_log_level {
@@ -2676,7 +2666,7 @@ root {
     """
     type:     string
     default:  "error"
-    choice:   valid_log_levels
+    choice:   ["verbose", "trace", "info", "warn", "error", "none"] # TODO: valid_log_levels
   }
 
   # Chalk posts to 'virtual' topic instead of calling insert.
@@ -2991,7 +2981,8 @@ root {
   field ktype_names {
     "Internal; used to map key type enum values back to text, and I think isn't even used anymore."
     type:       list[string]
-    default:    key_types
+    default:    ["Chalk-time Host", "Chalk-time Artifact",
+                 "Run-time Artifact", "Run-time Host"] # TODO: key_types
     lock:       true
     hidden:     true
   }
