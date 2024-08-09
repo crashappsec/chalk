@@ -78,6 +78,7 @@ enum { CCPreRun, CCArtifact, CCPostChalk, CCPostRun }
 global default_key_priority, valid_chalk_cmds, all_cmds_that_insert
 global known_sink_filters, other_report_ops
 
+confspec {
 named key {
   """
   These objects are used in reporting templates and chalking templates
@@ -433,8 +434,11 @@ named tool {
     hidden:   true
   }
 }
+}
 
 linguist_types = ["programming", "data", "markup"]
+
+confspec {
 named linguist_language {
   user_def_ok:   false
 
@@ -455,6 +459,7 @@ named linguist_language {
   }
 
 }
+}
 
 valid_tech_stack_categories = ["database", "webServer", "protocol", "framework"]
 valid_tech_stack_database_types = ["firebird", "hypersonicSQL",
@@ -471,6 +476,7 @@ valid_subcategory_types = ["firebird", "hypersonicSQL",
      "apache", "nginx", "iis", "ldap", "javaSpring"]
 
 
+confspec {
 named tech_stack_rule {
   user_def_ok:   false
 
@@ -1252,9 +1258,11 @@ singleton attestation_key_get {
     default: "3 sec"'duration
   }
 }
+}
 
 attestation_key_types = ["embed", "backup", "get"]
 
+confspec {
 singleton attestation {
   """
   Attestation allows chalk to sign artifacts (via cosign) which embeds the
@@ -3255,6 +3263,7 @@ root {
     type:    bool
     default: false
   }
+}
 }
 
 func keyspec_exists(name) {
