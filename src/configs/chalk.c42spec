@@ -537,10 +537,7 @@ singleton file_scope {
     """
     type:    list[string]
     require: false
-  }
-
-  exclusions {
-    filetypes: "excluded_filetypes"
+    exclusions: excluded_filetypes
   }
 
   field excluded_filetypes {
@@ -765,6 +762,7 @@ named keyspec {
     """
     type:    -> type
     require:    false
+    exclusions: callback
   }
 
   field callback {
@@ -828,10 +826,6 @@ named keyspec {
     type:     string
     require:  false
     hidden:   true
-  }
-
-  exclusions {
-    value: "callback"
   }
 }
 
