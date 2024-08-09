@@ -1,5 +1,5 @@
 func validate_url(url) {
-  result := ""
+  result = ""
 
   if (not url.starts_with("http://")) and (not url.starts_with("https://")) {
     return "Only http / https URLs are supported"

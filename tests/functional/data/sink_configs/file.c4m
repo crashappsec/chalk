@@ -6,6 +6,6 @@ sink_config my_file_config {
 
 if env_exists("SINK_TEST_OUTPUT_FILE") {
   subscribe("report", "my_file_config")
-  configured_sink := true
+  configured_sink = true
   use_report_cache: false
 }

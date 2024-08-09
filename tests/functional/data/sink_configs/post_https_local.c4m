@@ -24,12 +24,12 @@ sink_config my_https_config {
   }
 }
 
-ptr_url := ""
+ptr_url = ""
 if env_exists("CHALK_POST_URL") {
   subscribe("report", "my_https_config")
-  configured_sink := true
+  configured_sink = true
   if ptr_url == "" {
-    ptr_url := env("CHALK_POST_URL")
+    ptr_url = env("CHALK_POST_URL")
   }
 }
 

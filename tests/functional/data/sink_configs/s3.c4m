@@ -9,7 +9,7 @@ sink_config my_s3_config {
 
 log_level: "trace"
 
-ptr_url := ""
+ptr_url = ""
 
 if env_exists("AWS_S3_BUCKET_URI") {
   if not env_exists("AWS_ACCESS_KEY_ID") {
@@ -18,9 +18,9 @@ if env_exists("AWS_S3_BUCKET_URI") {
      warn("To configure AWS must provide AWS_SECRET_ACCESS_KEY")
   } else {
     subscribe("report", "my_s3_config")
-    configured_sink := true
+    configured_sink = true
     if ptr_url == "" {
-      ptr_url := env("AWS_S3_BUCKET_URI")
+      ptr_url = env("AWS_S3_BUCKET_URI")
     }
   }
 }
