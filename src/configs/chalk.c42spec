@@ -726,7 +726,6 @@ named keyspec {
     """
     type:        bool
     default:     false
-    stack_limit: 0
     hidden:      true
   }
 
@@ -749,7 +748,6 @@ named keyspec {
     """
     type:        bool
     default:     false
-    stack_limit: 0
     hidden:      true
   }
 
