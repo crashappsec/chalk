@@ -255,7 +255,7 @@ This field will be shown when showing the full template in help documentation.
 """
   }
 
-  allow key {}
+  allow: key
 }
 
 named report_template {
@@ -314,7 +314,7 @@ This field will be shown when the running command `chalk template [your_report_n
 """
   }
 
-  allow key {}
+  allow: key
 }
 
 named tool {
@@ -513,8 +513,7 @@ named tech_stack_rule {
     choice: valid_subcategory_types
   }
 
-  allow file_scope
-  allow host_scope
+  allow: file_scope, host_scope
 
 }
 
@@ -1385,9 +1384,7 @@ attestation {
 
 See individual key provider objects for all supported configuration fields.
 """
-  allow attestation_key_embed
-  allow attestation_key_backup
-  allow attestation_key_get
+  allow: attestation_key_embed, attestation_key_backup, attestation_key_get
 
   field key_provider {
     type:    string
@@ -1713,7 +1710,7 @@ will run it again without itself in the way. Such cases are the only
 times in the default configuration where error messages are logged to
 the console (when running `chalk docker`).
 """
-  allow getopts
+  allow: getopts
 
   field wrap_entrypoint {
     type:    bool
@@ -2650,7 +2647,7 @@ singleton cloud_provider {
   shortdoc: """
 Configuration information for the different Cloud Provider
 """
-  allow cloud_instance_hw_identifiers { }
+  allow: cloud_instance_hw_identifiers
 }
 
 root {
@@ -2665,28 +2662,7 @@ root {
   gen_setters:  false
   user_def_ok:  false
 
-  allow keyspec
-  allow plugin
-  allow sink
-  allow sink_config
-  allow auth
-  allow auth_config
-  allow attestation
-  allow mark_template
-  allow report_template
-  allow outconf
-  allow custom_report
-  allow tool
-  allow extract
-  allow docker
-  allow exec
-  allow load
-  allow env_config
-  allow source_marks
-  allow cloud_provider
-  allow tech_stack_rule
-  allow linguist_language
-  allow git
+  allow: keyspec, plugin, sink, sink_config, auth, auth_config, attestation, mark_template, report_template, outconf, custom_report, tool, extract, docker, exec, load, env_config, source_marks, cloud_provider, tech_stack_rule, linguist_language, git
 
   shortdoc: "Chalk Configuration Options"
 
