@@ -18,6 +18,9 @@
   the pushed image can only be image manifest as only buildx
   supports list manifests.
   ([#401](https://github.com/crashappsec/chalk/pull/401))
+- `_REPO_DIGESTS` was reported even when image digest was
+  not known during buildx-enabled docker builds.
+  ([#402](https://github.com/crashappsec/chalk/pull/402))
 
 ## 0.4.10
 

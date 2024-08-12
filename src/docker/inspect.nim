@@ -53,6 +53,8 @@ proc inspectJson(name: string, what: string): JsonNode =
       stdout & " " & stderr,
     )
   let json = parseJson(stdout)
+  when defined(debug):
+    trace(json.pretty())
   if len(json) != 1:
     raise newException(
       ValueError,
