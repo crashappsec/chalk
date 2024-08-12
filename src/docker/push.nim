@@ -19,6 +19,10 @@ proc dockerPush*(ctx: DockerInvocation): int =
     error("docker: " & ctx.foundImage & " is not found. pushing without chalk")
     return ctx.runMungedDockerInvocation()
 
+  # force DOCKER_PLATFORM to be included in chalk normalization
+  # which is required to compute unique METADATA_* keys
+  forceChalkKeys(["DOCKER_PLATFORM"])
+
   let chalk = chalkOpt.get()
   if not chalk.isChalked():
     warn("docker: " & chalk.name & " is not chalked. reporting will be limited")
