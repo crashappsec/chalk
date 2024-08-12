@@ -21,6 +21,9 @@
 - `_REPO_DIGESTS` was reported even when image digest was
   not known during buildx-enabled docker builds.
   ([#402](https://github.com/crashappsec/chalk/pull/402))
+- `METADATA_ID` and `METADATA_HASH` were incorrectly
+  computed for all `docker push` operations.
+  ([#403](https://github.com/crashappsec/chalk/pull/403))
 
 ## 0.4.10
 

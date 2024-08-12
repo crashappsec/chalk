@@ -918,6 +918,7 @@ def test_build_and_push(
         CHALK_ID=ANY,
         # primary key needed to associate build+push
         METADATA_ID=ANY,
+        METADATA_HASH=ANY,
         _CURRENT_HASH=image_id,
         _IMAGE_ID=image_id,
         _IMAGE_DIGEST=image_digest if push else MISSING,
@@ -932,7 +933,8 @@ def test_build_and_push(
 
     assert push_result.mark.has(
         CHALK_ID=build_result.mark["CHALK_ID"],
-        METADATA_ID=ANY,  # build_result.mark["METADATA_ID"],
+        METADATA_ID=build_result.mark["METADATA_ID"],
+        METADATA_HASH=build_result.mark["METADATA_HASH"],
         _CURRENT_HASH=image_id,
         _IMAGE_ID=image_id,
         _IMAGE_DIGEST=image_digest,
@@ -954,7 +956,7 @@ def test_push_without_buildx(
     tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
     tag = f"{tag_base}:latest"
 
-    image_id, _ = chalk.docker_build(
+    image_id, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         buildkit=False,
         tag=tag,
@@ -980,9 +982,10 @@ def test_push_without_buildx(
         ":", maxsplit=1
     )[-1]
     assert push.mark.has(
-        CHALK_ID=ANY,
+        CHALK_ID=build.mark["CHALK_ID"],
         # primary key needed to associate build+push
-        METADATA_ID=ANY,
+        METADATA_ID=build.mark["METADATA_ID"],
+        METADATA_HASH=build.mark["METADATA_HASH"],
         _CURRENT_HASH=image_id,
         _IMAGE_ID=image_id,
         _IMAGE_DIGEST=image_digest,

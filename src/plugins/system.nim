@@ -77,7 +77,12 @@ proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
                                                         ChalkDict {.cdecl.} =
   result                           = ChalkDict()
   result["MAGIC"]                  = pack(magicUTF8)
-  result["TIMESTAMP_WHEN_CHALKED"] = pack(unixTimeInMS())
+  if ResourceImage in obj.resourceType:
+    if "TIMESTAMP_WHEN_CHALKED" notin obj.collectedData:
+      # image is immutable so cannot overwrite timestamp from original build
+      result["TIMESTAMP_WHEN_CHALKED"] = pack(unixTimeInMS())
+  else:
+    result["TIMESTAMP_WHEN_CHALKED"] = pack(unixTimeInMS())
 
   if isSubscribedKey("PRE_CHALK_HASH") and obj.fsRef != "":
     withFilesTream(obj.fsRef, mode = fmRead, strict = true):
