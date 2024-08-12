@@ -29,7 +29,7 @@ from .conf import (
     MARKS,
     REGISTRY,
 )
-from .utils.dict import ANY, Contains
+from .utils.dict import ANY, MISSING, Contains
 from .utils.docker import Docker
 from .utils.log import get_logger
 from .utils.os import run
@@ -897,7 +897,7 @@ def test_build_and_push(
     tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
     tag = f"{tag_base}:latest"
 
-    image_id, push_result = chalk.docker_build(
+    image_id, build_result = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         buildkit=buildkit,
         tag=tag,
@@ -905,6 +905,7 @@ def test_build_and_push(
         run_docker=buildkit,  # legacy builder doesnt allow to build empty image
     )
 
+    push_result = build_result
     # if without --push at build time, explicitly push to registry
     if not push:
         push_result = chalk.docker_push(tag, buildkit=buildkit)
@@ -913,10 +914,25 @@ def test_build_and_push(
         ":", maxsplit=1
     )[-1]
 
-    assert push_result.mark.has(
+    assert build_result.mark.has(
         CHALK_ID=ANY,
         # primary key needed to associate build+push
         METADATA_ID=ANY,
+        _CURRENT_HASH=image_id,
+        _IMAGE_ID=image_id,
+        _IMAGE_DIGEST=image_digest if push else MISSING,
+        _REPO_DIGESTS=(
+            {
+                tag_base: image_digest,
+            }
+            if push
+            else MISSING
+        ),
+    )
+
+    assert push_result.mark.has(
+        CHALK_ID=build_result.mark["CHALK_ID"],
+        METADATA_ID=ANY,  # build_result.mark["METADATA_ID"],
         _CURRENT_HASH=image_id,
         _IMAGE_ID=image_id,
         _IMAGE_DIGEST=image_digest,

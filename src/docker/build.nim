@@ -297,7 +297,13 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
     trace("docker: built image is loaded locally")
     # in some cases even with --push, repo digests show up as blank in docker inspect
     # but we might know the digest from the --metadata-file so we normalize to that
-    let digest = ctx.metadataFile{"containerimage.digest"}.getStr()
+    let
+      config = ctx.metadataFile{"containerimage.config.digest"}.getStr()
+      maybe  = ctx.metadataFile{"containerimage.digest"}.getStr()
+      # if the digest matches config digest we know this is config digest (image id)
+      # and not image digest most likely because there was no --push
+      # and therefore digest is unknown at this time
+      digest = if config == maybe: "" else: maybe
     # image was loaded to docker cache
     for platform, chalk in chalksByPlatform:
       chalk.collectImage(ctx.iidFile, digest = digest)
