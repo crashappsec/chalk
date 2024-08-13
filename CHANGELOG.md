@@ -2,6 +2,29 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- `docker` run-time host metadata collection was failing
+  for non-build commands such as `docker push`.
+  ([#399](https://github.com/crashappsec/chalk/pull/399))
+- `procfs` plugin was throwing an exception while parsing
+  `/proc/net/dev` to populate `_OP_IPV[4/6]_INTERFACES` keys.
+  ([#399](https://github.com/crashappsec/chalk/pull/399))
+- `_IMAGE_DIGEST` is sent when for `docker push` when
+  buildx is not available. Normally chalk needs to validate
+  type of the manifest in the registry (image or list)
+  which is currently done via `buildx imagetools`.
+  When buildx is missing and the operation was `docker push`
+  the pushed image can only be image manifest as only buildx
+  supports list manifests.
+  ([#401](https://github.com/crashappsec/chalk/pull/401))
+- `_REPO_DIGESTS` was reported even when image digest was
+  not known during buildx-enabled docker builds.
+  ([#402](https://github.com/crashappsec/chalk/pull/402))
+- `METADATA_ID` and `METADATA_HASH` were incorrectly
+  computed for all `docker push` operations.
+  ([#403](https://github.com/crashappsec/chalk/pull/403))
+
 ## 0.4.10
 
 **Aug 5, 2024**

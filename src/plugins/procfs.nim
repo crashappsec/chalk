@@ -17,7 +17,7 @@ when hostOs != "linux":
   {.warning[UnusedImport]: off.}
 
 import std/[posix, re, base64]
-import ".."/[config, plugin_api]
+import ".."/[config, plugin_api, util]
 
 type
   ProcDict   = OrderedTableRef[string, string]
@@ -300,19 +300,24 @@ proc getIPv4Interfaces(): ProcTable =
   if contents == "":
     return
 
-  var lines = contents.split("\n")
-
+  var lines = contents.splitLines()
   if len(lines) < 3: return
 
   for line in lines[2 .. ^1]:
-    let
-      mostly = re.split(line, re"\s\s+")
-      i      = mostly[0].find(':')
+    if line == "":
+      continue
 
-    if i == -1: continue
+    let (name, stats) = line.strip().splitBy(":")
+    if stats == "":
+      continue
+    let parts = stats.strip().splitWhiteSpace()
+    # should be:
+    # recv: [bytes, packets, errors, drops, fifo, frame, compressed, multicast]
+    # transmit: [bytes, packets, errors, drops, fifo, colls, carrier, compressed]
+    if len(parts) != 16:
+      continue
 
-    result.add(@[mostly[0][0 ..< i], mostly[0][i+1 .. ^1].strip()] &
-                 mostly[1..^1])
+    result.add(@[name] & parts)
 
 template getRawIPv6Interfaces(): ProcTable =
   tableFileSplit("/proc/net/if_inet6")
