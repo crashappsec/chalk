@@ -84,6 +84,7 @@ type
   Plugin* = ref object
     name*:                     string
     enabled*:                  bool
+    configInfo*:               AttrScope
     getChalkTimeHostInfo*:     ChalkTimeHostCb
     getChalkTimeArtifactInfo*: ChalkTimeArtifactCb
     getRunTimeArtifactInfo*:   RunTimeArtifactCb
