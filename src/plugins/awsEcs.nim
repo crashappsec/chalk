@@ -27,7 +27,7 @@ proc requestECSMetadata(path: string): Option[Box] =
   var body = ""
   try:
     var
-      resp   = safeRequest(url)
+      resp   = safeRequest(url, retries=2, connectRetries=2)
     if resp.code != Http200:
       error("ecs: " & url & " returned " & resp.status)
       return none(Box)
