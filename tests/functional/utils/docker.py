@@ -2,8 +2,8 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+from contextlib import contextmanager
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import Optional, TypeVar
 
 from more_itertools import windowed
@@ -17,15 +17,13 @@ logger = get_logger()
 
 ProgramType = TypeVar("ProgramType", bound=Program)
 
-# global var to GC tmp files when process exits
-dockerfiles = []
-
 
 class Docker:
     @staticmethod
     def dockerfile(d: str) -> str:
         return "\n".join(i.strip() for i in d.splitlines()).strip()
 
+    @contextmanager
     @staticmethod
     def build_cmd(
         *,
@@ -43,6 +41,7 @@ class Docker:
         provenance: bool = False,
         sbom: bool = False,
     ):
+        stdin = b""
         tags = tags or []
         if tag:
             tags = [tag] + tags
@@ -55,11 +54,8 @@ class Docker:
         for t in tags:
             cmd += ["-t", t]
         if content:
-            tmp = NamedTemporaryFile(delete_on_close=False)
-            tmp.file.write(content.encode())
-            tmp.file.close()
-            dockerfiles.append(tmp)
-            cmd += ["-f", tmp.name]
+            stdin = content.encode()
+            cmd += ["-f", "-"]
         elif dockerfile:
             cmd += ["-f", str(dockerfile)]
         for name, value in (args or {}).items():
@@ -78,7 +74,7 @@ class Docker:
         if sbom:
             cmd += ["--sbom=true"]
         cmd += [str(context or ".")]
-        return cmd
+        yield cmd, stdin
 
     @staticmethod
     def build(
@@ -103,28 +99,30 @@ class Docker:
         """
         run docker build with parameters
         """
-        return Docker.with_image_id(
-            run(
-                Docker.build_cmd(
-                    tag=tag,
-                    tags=tags,
-                    context=context,
-                    dockerfile=dockerfile,
-                    content=content,
-                    args=args,
-                    push=push,
-                    platforms=platforms,
-                    buildx=buildx,
-                    secrets=secrets,
-                    buildkit=buildkit,
-                    provenance=provenance,
-                    sbom=sbom,
-                ),
-                expected_exit_code=int(not expected_success),
-                env={**Docker.build_env(buildkit=buildkit), **(env or {})},
-                cwd=cwd,
+        with Docker.build_cmd(
+            tag=tag,
+            tags=tags,
+            context=context,
+            dockerfile=dockerfile,
+            content=content,
+            args=args,
+            push=push,
+            platforms=platforms,
+            buildx=buildx,
+            secrets=secrets,
+            buildkit=buildkit,
+            provenance=provenance,
+            sbom=sbom,
+        ) as (params, stdin):
+            return Docker.with_image_id(
+                run(
+                    params,
+                    stdin=stdin,
+                    expected_exit_code=int(not expected_success),
+                    env={**Docker.build_env(buildkit=buildkit), **(env or {})},
+                    cwd=cwd,
+                )
             )
-        )
 
     @staticmethod
     def build_env(
