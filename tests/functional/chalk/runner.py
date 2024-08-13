@@ -454,38 +454,38 @@ class Chalk:
                 sbom=sbom,
             )
 
-        image_hash, result = Docker.with_image_id(
-            self.run(
-                # TODO remove log level but there are error bugs due to --debug
-                # which fail the command validation
-                log_level=log_level,
-                debug=True,
-                virtual=virtual,
-                config=config,
-                params=Docker.build_cmd(
-                    tag=tag,
-                    tags=tags,
-                    context=context,
-                    dockerfile=dockerfile,
-                    content=content,
-                    args=args,
-                    push=push,
-                    platforms=platforms,
-                    buildx=buildx,
-                    secrets=secrets,
-                    buildkit=buildkit,
-                    provenance=provenance,
-                    sbom=sbom,
-                ),
-                expected_success=expected_success,
-                ignore_errors=not expecting_report,
-                cwd=cwd,
-                env={
-                    **Docker.build_env(buildkit=buildkit),
-                    **(env or {}),
-                },
+        with Docker.build_cmd(
+            tag=tag,
+            tags=tags,
+            context=context,
+            dockerfile=dockerfile,
+            content=content,
+            args=args,
+            push=push,
+            platforms=platforms,
+            buildx=buildx,
+            secrets=secrets,
+            buildkit=buildkit,
+            provenance=provenance,
+            sbom=sbom,
+        ) as (params, stdin):
+            image_hash, result = Docker.with_image_id(
+                self.run(
+                    log_level=log_level,
+                    debug=True,
+                    virtual=virtual,
+                    config=config,
+                    params=params,
+                    stdin=stdin,
+                    expected_success=expected_success,
+                    ignore_errors=not expecting_report,
+                    cwd=cwd,
+                    env={
+                        **Docker.build_env(buildkit=buildkit),
+                        **(env or {}),
+                    },
+                )
             )
-        )
         if expecting_report and expected_success and image_hash:
             if platforms:
                 assert len(result.marks) == len(platforms)

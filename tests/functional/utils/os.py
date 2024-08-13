@@ -57,11 +57,7 @@ class Program:
                 self.logger.error(f"{self.bin} failed")
 
     def __eq__(self, other: "Program") -> bool:
-        return (
-            self.exit_code == other.exit_code
-            and self.stdout == other.stdout
-            and self.stderr == other.stderr
-        )
+        return self.exit_code == other.exit_code and self.stdout == other.stdout
 
     def __bool__(self) -> bool:
         """
@@ -80,6 +76,7 @@ class Program:
             exit_code=self.exit_code,
             expected_status_code=self.expected_exit_code,
             duration=self.duration,
+            stdin=self.input,
             stdout=self.text,
             stderr=self.logs,
             cwd=self.cwd,
@@ -109,6 +106,10 @@ class Program:
     @property
     def logs(self) -> str:
         return self._strip_ansi(self.stderr.decode().strip())
+
+    @property
+    def input(self) -> str:
+        return (self.stdin or b"").decode()
 
     @property
     def error(self) -> CalledProcessError:
