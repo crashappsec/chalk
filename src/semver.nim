@@ -17,14 +17,14 @@ type Version* = ref object
   suffix: string
   name:   string
 
-proc parseVersion*(version: string): Version =
+proc parseVersion*(version: string, withSuffix: bool = true): Version =
   var
     major  = 0
     minor  = 0
     patch  = 0
     suffix = ""
-  let
     name     = version.strip(chars={'V', 'v'}, trailing=false).strip(chars={',', '.', '-', '+'})
+  let
     sections = name.split({'-', '+'}, maxsplit=1)
     parts    = sections[0].split('.')
   case len(parts):
@@ -40,7 +40,11 @@ proc parseVersion*(version: string): Version =
     else:
       raise newException(ValueError, "Invalid or unsupported version format")
   if len(sections) == 2:
-    suffix = sections[1]
+    if withSuffix:
+      suffix = sections[1]
+    else:
+      name.removeSuffix(sections[1])
+      name = name.strip(chars={'-', '+'}, leading=false)
   return Version(name:   name,
                  major:  major,
                  minor:  minor,

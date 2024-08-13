@@ -10,7 +10,7 @@
 
 import std/[tempfiles, posix, monotimes, parseutils, exitprocs]
 import pkg/[nimutils/managedtmp]
-import "."/[config, subscan, fd_cache]
+import "."/[config, subscan, fd_cache, semver]
 export fd_cache
 
 let sigNameMap = { 1: "SIGHUP", 2: "SIGINT", 3: "SIGQUIT", 4: "SIGILL",
@@ -215,7 +215,6 @@ elif hostOs == "macosx":
 else:
     template makeCompletionAutoSource() = discard
 
-const currentAutocompleteVersion = (0, 4, 9)
 
 proc validateMetaData*(obj: ChalkObj): ValidateResult {.importc.}
 
@@ -230,7 +229,9 @@ proc autocompleteFileCheck*() =
     # resolvePath can fail on ~ when uid doesnt have home dir
     return
 
-  let alreadyExists = fileExists(dst)
+  let
+    alreadyExists = fileExists(dst)
+    curVers = parseVersion(get[string](getChalkScope(), "keyspec.CHALK_VERSION.value"), withSuffix = false)
   if alreadyExists:
     var invalidMark = true
 
@@ -244,31 +245,12 @@ proc autocompleteFileCheck*() =
         let
           boxedVers    = allChalks[0].extract["ARTIFACT_VERSION"]
           foundRawVers = unpack[string](boxedVers)
-          splitVers    = foundRawVers.split(".")
-
-        if len(splitVers) == 3:
-          var
-            major, minor, patch: int
-            totalParsed = 2
-
-          totalParsed += parseInt(splitVers[0], major)
-          totalParsed += parseInt(splitVers[1], minor)
-          totalParsed += parseInt(splitVers[2], patch)
-
-          if totalParsed == len(foundRawVers):
-            invalidMark = false
-
-            trace("Extracted semver string from existing autocomplete file: " &
-                  foundRawVers)
-
-          if (major, minor, patch) != (0, 0, 0) and
-             currentAutoCompleteVersion > (major, minor, patch):
-            var curVers = $(currentAutocompleteVersion[0]) & "." &
-                          $(currentAutocompleteVersion[1]) & "." &
-                          $(currentAutocompleteVersion[2])
-
-            info("Updating autocomplete script to version: " & curVers)
-          else:
+          autoVers = parseVersion(foundRawVers)
+        trace("Extracted semver string from existing autocomplete file: " &
+              foundRawVers)
+        if curVers > autoVers:
+            info("Updating autocomplete script to version: " & $curVers)
+        else:
             trace("Autocomplete script does not need updating.")
             return
 
