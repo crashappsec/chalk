@@ -26,10 +26,12 @@ const
 proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
   try:
     let
-      response = safeRequest(url        = path,
-                             httpMethod = HttpGet,
-                             timeout    = 1000, # 1 of a second
-                             headers    = hdrs)
+      response = safeRequest(url            = path,
+                             httpMethod     = HttpGet,
+                             timeout        = 1000, # 1 of a second
+                             connectRetries = 2,
+                             retries        = 2,
+                             headers        = hdrs)
       body     = response.body().strip()
 
     if not response.code.is2xx():
@@ -184,10 +186,12 @@ proc getAwsToken(): Option[string] =
   try:
     let
       hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
-      response = safeRequest(url        = url,
-                             httpMethod = HttpPut,
-                             timeout    = 1000, # 1 of a second
-                             headers    = hdrs)
+      response = safeRequest(url            = url,
+                             httpMethod     = HttpPut,
+                             timeout        = 1000, # 1 of a second
+                             connectRetries = 2,
+                             retries        = 2,
+                             headers        = hdrs)
       body     = response.body().strip()
 
     if not response.code.is2xx():
