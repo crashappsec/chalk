@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.4.11
+
+**Aug 13, 2024**
 
 ### Fixes
 
@@ -10,7 +12,7 @@
 - `procfs` plugin was throwing an exception while parsing
   `/proc/net/dev` to populate `_OP_IPV[4/6]_INTERFACES` keys.
   ([#399](https://github.com/crashappsec/chalk/pull/399))
-- `_IMAGE_DIGEST` is sent when for `docker push` when
+- `_IMAGE_DIGEST` is sent for `docker push` when
   buildx is not available. Normally chalk needs to validate
   type of the manifest in the registry (image or list)
   which is currently done via `buildx imagetools`.
