@@ -1,0 +1,12 @@
+~env_always_show = [
+  "AWS_ROLE_ARN",
+  "KUBERNETES_PORT_443_TCP_ADDR",
+  "KUBERNETES_SERVICE_HOST",
+  "K_REVISION",
+  "K_SERVICE",
+  "PATH",
+  "PWD",
+  "SSH_TTY",
+  "USER",
+  "XDG_SESSION_TYPE"
+]

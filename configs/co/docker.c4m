@@ -1,0 +1,3 @@
+~docker.wrap_entrypoint      = true
+# required for entrypoint to work correctly
+~exec.command_name_from_args = true

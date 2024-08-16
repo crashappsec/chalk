@@ -1,0 +1,7 @@
+parameter var collect_sbom {
+    default:  true
+    shortdoc: "Collect SBOMs via syft"
+    doc:      "Whether SBOMs should be collected for chalking operations via syft"
+}
+
+~run_sbom_tools = collect_sbom
