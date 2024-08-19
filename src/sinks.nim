@@ -45,7 +45,7 @@ proc chalkErrFilter*(msg: string, info: StringTable): (string, bool) =
     let llStr = info[keyLogLevel]
 
     if (llStr in toLogLevelMap) and getChalkScope() != nil and
-     (toLogLevelMap[llStr] <= toLogLevelMap[get[string](getChalkScope(), "chalk_log_level")]):
+     (toLogLevelMap[llStr] <= toLogLevelMap[attrGet[string]("chalk_log_level")]):
       return (msg, true)
 
   return ("", false)
@@ -88,7 +88,7 @@ template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
 
   line &= " (sink conf='" & cfg.name & "')"
 
-  if get[string](getChalkScope(), "log_level") == "trace":
+  if attrGet[string]("log_level") == "trace":
     case cfg.mySink.name
     of "post", "presign":
       let
@@ -146,27 +146,27 @@ proc ioErrorHandler(cfg: SinkConfig, t: Topic, msg, err, tb: string) =
   let
     toOut = formatIo(cfg, t, err, msg)
 
-  if not quiet or get[bool](getChalkScope(), "chalk_debug"):
+  if not quiet or attrGet[bool]("chalk_debug"):
     error(toOut)
   else:
     trace(toOut)
-  if getChalkScope() != nil and get[bool](getChalkScope(), "chalk_debug"):
+  if getChalkScope() != nil and attrGet[bool]("chalk_debug"):
     publish("debug", tb)
 
 proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
   let quiet = t.name in quietTopics
 
-  if quiet and not get[bool](getChalkScope(), "chalk_debug"):
+  if quiet and not attrGet[bool]("chalk_debug"):
     return
 
   let toOut = formatIo(cfg, t, errmsg, "")
 
-  if get[string](getChalkScope(), "log_level") in ["trace", "info"]:
+  if attrGet[string]("log_level") in ["trace", "info"]:
     let
       section  = "sink_config." & cfg.name
 
-    if sectionExists(getChalkScope(), section) and errmsg == "Write":
-      let msgOpt = getOpt[string](getChalkScope(), section & ".on_write_msg")
+    if sectionExists(section) and errmsg == "Write":
+      let msgOpt = attrGetOpt[string](section & ".on_write_msg")
       if msgOpt.isSome():
         info(strutils.strip(msgOpt.get()))
     elif quiet:
@@ -186,7 +186,7 @@ proc getAuthConfigByName*(name: string, attr: AttrScope = AttrScope(nil)): Optio
     section  = "auth_config." & name
     opts     = OrderedTableRef[string, string]()
 
-  if not sectionExists(attrRoot, section):
+  if attrRoot.getObjectOpt(section).isNone():
     error(section & " is referenced but its missing in the config")
     return none(AuthConfig)
 
@@ -232,7 +232,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
   let
     section  = "sink_config." & name
 
-  if not sectionExists(getChalkScope(), section):
+  if not sectionExists(section):
     return none(SinkConfig)
 
   var
@@ -245,22 +245,22 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     priority:    int
     deleteList:  seq[string]
 
-  for k, _ in getObject(getChalkScope(), section).contents:
+  for k, _ in attrGetObject(section).contents:
     case k
     of "enabled":
-      if not get[bool](getChalkScope(), section & "." & k):
+      if not attrGet[bool](section & "." & k):
         error("Sink configuration '" & name & " is disabled.")
         enabled = false
     of "priority":
-      priority    = getOpt[int](getChalkScope(), section & "." & k).getOrElse(0)
+      priority    = attrGetOpt[int](section & "." & k).getOrElse(0)
     of "filters":
-      filterNames = getOpt[seq[string]](getChalkScope(), section & "." & k).getOrElse(@[])
+      filterNames = attrGetOpt[seq[string]](section & "." & k).getOrElse(@[])
     of "sink":
-      sinkName    = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
+      sinkName    = attrGetOpt[string](section & "." & k).getOrElse("")
     of "auth":
-      authName    = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
+      authName    = attrGetOpt[string](section & "." & k).getOrElse("")
     of "use_search_path", "disallow_http":
-      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
+      let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         if boxOpt.get().kind != MkBool:
           error(k & " (sink config key) must be 'true' or 'false'")
@@ -268,7 +268,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
           opts[k] = $(unpack[bool](boxOpt.get()))
     of "pinned_cert":
       let
-        certContents = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
+        certContents = attrGetOpt[string](section & "." & k).getOrElse("")
         path         = writeNewTempFile(certContents, "pinned", ".pem")
       discard setOverride(getChalkScope(), section & ".pinned_cert_file", some(pack(path)))
       # Can't delete from a dict while we're iterating over it.
@@ -276,7 +276,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     of "on_write_msg":
       discard
     of "log_search_path":
-      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
+      let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         try:
           let path = unpack[seq[string]](boxOpt.get())
@@ -284,7 +284,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
         except:
           error(k & " (sink config key) must be a list of string paths.")
     of "headers":
-      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
+      let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         try:
           let hdrs    = unpack[Con4mDict[string, string]](boxOpt.get())
@@ -296,7 +296,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
           error(k & " (sink config key) must be a dict that map " &
                     "header names to values (which must be strings).")
     of "timeout", "truncation_amount":
-      let boxOpt = getOpt[Box](getChalkScope(), section & "." & k)
+      let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         # TODO: move this check to the spec.
         if boxOpt.get().kind != MkInt:
@@ -308,23 +308,23 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       try:
         # Todo: move this check to a type check in the spec.
         # This will accept con4m size types; they're auto-converted to int.
-        let asInt = getOpt[int64](getChalkScope(), section & "." & k).getOrElse(int64(10 * 1048576))
+        let asInt = attrGetOpt[int64](section & "." & k).getOrElse(int64(10 * 1048576))
         opts[k] = $(asInt)
       except:
         error(k & " (sink config key) must be a size specification")
         continue
     of "filename":
-      opts[k] = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
+      opts[k] = attrGetOpt[string](section & "." & k).getOrElse("")
       try:
         opts[k] = resolvePath(opts[k])
       except:
         warn(opts[k] & ": could not resolve sink filename. disabling sink")
         enabled = false
     else:
-      opts[k] = getOpt[string](getChalkScope(), section & "." & k).getOrElse("")
+      opts[k] = attrGetOpt[string](section & "." & k).getOrElse("")
 
   for item in deleteList:
-    getObject(getChalkScope(), section).contents.del(item)
+    attrGetObject(section).contents.del(item)
 
   case sinkName
   of "":
@@ -347,10 +347,10 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       opts["content_type"] = "application/json"
   of "file":
     if "log_search_path" notin opts:
-      opts["log_search_path"] = get[seq[string]](getChalkScope(), "log_search_path").join(":")
+      opts["log_search_path"] = attrGet[seq[string]]("log_search_path").join(":")
   of "rotating_log":
     if "log_search_path" notin opts:
-      opts["log_search_path"] = get[seq[string]](getChalkScope(), "log_search_path").join(":")
+      opts["log_search_path"] = attrGet[seq[string]]("log_search_path").join(":")
   else:
     discard
 
@@ -392,14 +392,14 @@ proc getSinkConfigs*(): Table[string, SinkConfig] = return availableSinkConfigs
 
 proc setupDefaultLogConfigs*() =
   let
-    auditFile = get[string](getChalkScope(), "audit_location")
-    doAudit   = get[bool](getChalkScope(), "publish_audit")
+    auditFile = attrGet[string]("audit_location")
+    doAudit   = attrGet[bool]("publish_audit")
 
   if doAudit and auditFile != "":
     let
       f         = some(newOrderedTable({ "filename" : auditFile,
                                          "max" :
-                                         $(get[Con4mSize](getChalkScope(), "audit_file_size"))}))
+                                         $(attrGet[Con4mSize]("audit_file_size"))}))
       sink      = getSinkImplementation("rotating_log").get()
       auditConf = configSink(sink, "audit", f, handler=errCbOpt,
                              logger=okCbOpt).get()
@@ -410,7 +410,7 @@ proc setupDefaultLogConfigs*() =
     else:
       trace("Audit log subscription enabled")
   let
-    uri     = get[string](getChalkScope(), "crashoverride_usage_reporting_url")
+    uri     = attrGet[string]("crashoverride_usage_reporting_url")
     params  = some(newOrderedTable({ "uri":          uri,
                                      "content_type": "application/json" }))
     sink    = getSinkImplementation("post").get()

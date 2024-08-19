@@ -344,12 +344,12 @@ proc formatOneTemplate(state: ConfigState,
   var
     keysToReport: seq[string]
 
-  let docOpt = getOpt[string](getChalkScope(), tmpl & ".doc")
+  let docOpt = attrGetOpt[string](tmpl & ".doc")
   let doc = if docOpt.isSome(): docOpt.get() else: "No description available."
   result = markdown(doc)
 
   for k in getChalkSubsections(tmpl & ".key"):
-    if get[bool](getChalkScope(), tmpl & ".key." & k & ".use") == true:
+    if attrGet[bool](tmpl & ".key." & k & ".use") == true:
       keysToReport.add(k)
 
   if len(keysToReport) == 0:
@@ -382,13 +382,13 @@ See `chalk help reporting` for more information on templates.
         reportTemplates.add(k)
     else:
       for item in args:
-        if item notin getObject(getChalkScope(), "mark_template").getContents() and
-           item notin getObject(getChalkScope(), "report_template").getContents():
+        if item notin attrGetObject("mark_template").getContents() and
+           item notin attrGetObject("report_template").getContents():
           result += h3("No template found named: " & item )
         else:
-          if item in getObject(getChalkScope(), "mark_template").getContents():
+          if item in attrGetObject("mark_template").getContents():
             markTemplates.add(item)
-          if item in getObject(getChalkScope(), "report_template").getContents():
+          if item in attrGetObject("report_template").getContents():
             reportTemplates.add(item)
 
     if len(markTemplates) + len(reportTemplates) == 0:
@@ -485,7 +485,7 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
     # see if the command was explicitly passed, or if it was implicit.
     # If it was implicit, give the help overview instead of the command
     # overview.
-    let defaultCmd = getOpt[string](getChalkScope(), "default_command").get("")
+    let defaultCmd = attrGetOpt[string]("default_command").get("")
     if defaultCmd != "" and defaultCmd notin commandLineParams():
       toOut = con4mRuntime.getHelpOverview()
     else:
@@ -545,7 +545,7 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
           toOut = con4mRuntime.fullTextSearch(args)
           break
 
-  if get[bool](getChalkScope(), "use_pager"):
+  if attrGet[bool]("use_pager"):
     runPager($(toOut))
   else:
     print(toOut)
@@ -644,11 +644,11 @@ proc getConfigValues(): Rope =
 
 proc showConfigValues*(force = false) =
   once:
-    if not (get[bool](getChalkScope(), "show_config") or force):
+    if not (attrGet[bool]("show_config") or force):
       return
 
     let toOut = getConfigValues()
-    if get[bool](getChalkScope(), "use_pager"):
+    if attrGet[bool]("use_pager"):
       runPager($(toOut))
     else:
       print(toOut)

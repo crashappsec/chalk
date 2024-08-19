@@ -16,14 +16,14 @@ proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
     let v = "keyspec." & k
     if opt.isNone() and k in hostInfo:                continue
     if opt.isSome() and k in opt.get().collectedData: continue
-    if get[int](getChalkScope(), v & ".kind") != int(kt): continue
+    if attrGet[int](v & ".kind") != int(kt): continue
     if k notin subscribedKeys: continue
-    let valueOpt = attrLookup(getChalkScope(), v & ".value")
-    let callbackOpt = attrLookup(getChalkScope(), v & ".callback")
+    let valueOpt = attrGetOpt[Box](v & ".value")
+    let callbackOpt = attrGetOpt[CallbackObj](v & ".callback")
     if valueOpt.isSome():
-      result[k] = unpack[Box](valueOpt.get())
+      result[k] = valueOpt.get()
     elif callbackOpt.isSome():
-      let cbOpt = runCallback(unpack[CallbackObj](callbackOpt.get()), args)
+      let cbOpt = runCallback(callbackOpt.get(), args)
       if cbOpt.isSome(): result[k] = cbOpt.get()
 
 proc confGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =

@@ -16,9 +16,9 @@ proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we
   # are subscribed to, that hasn't already been provided?
   for k in keys:
-    if k in get[seq[string]](getChalkScope(), "plugin." & p.name & ".ignore"): continue
+    if k in attrGet[seq[string]]("plugin." & p.name & ".ignore"): continue
     if k notin subscribedKeys and k != "*": continue
-    if k in get[seq[string]](getChalkScope(), "plugin." & p.name & ".overrides"): return true
+    if k in attrGet[seq[string]]("plugin." & p.name & ".overrides"): return true
     if k notin dict:                return true
 
   return false
@@ -28,12 +28,12 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   # except that we do allow "*" fields for plugins, so we need the runtime
   # check to filter out inappropriate items.
   let section = "keyspec." & key
-  doAssert sectionExists(getChalkScope(), section)
+  doAssert sectionExists(section)
 
-  if key in get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".ignore"): return false
+  if key in attrGet[seq[string]]("plugin." & plugin.name & ".ignore"): return false
 
-  if get[bool](getChalkScope(), section & ".codec"):
-    if get[bool](getChalkScope(), "plugin." & plugin.name & ".codec"):
+  if attrGet[bool](section & ".codec"):
+    if attrGet[bool]("plugin." & plugin.name & ".codec"):
       return true
     else:
       error("Plugin '" & plugin.name & "' can't write codec key: '" & key & "'")
@@ -42,14 +42,14 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   if key notin decls and "*" notin decls:
     error("Plugin '" & plugin.name & "' produced undeclared key: '" & key & "'")
     return false
-  if not get[bool](getChalkScope(), section & ".system"):
+  if not attrGet[bool](section & ".system"):
     return true
 
   case plugin.name
   of "system", "metsys":
     return true
   of "conffile":
-    if get[bool](getChalkScope(), section & ".conf_as_system"):
+    if attrGet[bool](section & ".conf_as_system"):
       return true
   else: discard
 
@@ -58,10 +58,10 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
 
 proc registerKeys(templ: string) =
   let section = templ & ".key"
-  if sectionExists(getChalkScope(), section):
+  if sectionExists(section):
     for name in getChalkSubsections(section):
       let content = section & "." & name
-      let useOpt = getOpt[bool](getChalkScope(), content & ".use")
+      let useOpt = attrGetOpt[bool](content & ".use")
       if useOpt.isSome() and useOpt.get():
         subscribedKeys[name] = true
 
@@ -77,11 +77,11 @@ proc registerOutconfKeys() =
 
   let outconf = getOutputConfig()
 
-  let markTemplate = get[string](getChalkScope(), outconf & ".mark_template")
+  let markTemplate = attrGet[string](outconf & ".mark_template")
   if markTemplate != "":
     registerKeys("mark_template." & markTemplate)
 
-  let reportTemplate = get[string](getChalkScope(), outconf & ".report_template")
+  let reportTemplate = attrGet[string](outconf & ".report_template")
   if reportTemplate != "":
     registerKeys("report_template." & reportTemplate)
 
@@ -91,7 +91,7 @@ proc collectChalkTimeHostInfo*() =
 
   trace("Collecting chalk time artifact info")
   for plugin in getAllPlugins():
-    let subscribed = get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".pre_run_keys")
+    let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".pre_run_keys")
     if chalkCollectionSuspendedFor(plugin.name):          continue
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
     try:
@@ -101,10 +101,10 @@ proc collectChalkTimeHostInfo*() =
         continue
 
       for k, v in dict:
-        if not plugin.canWrite(k, get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".pre_run_keys")):
+        if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".pre_run_keys")):
           continue
         if k notin hostInfo or
-            k in get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".overrides") or
+            k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
             plugin.isSystem():
           hostInfo[k] = v
     except:
@@ -128,13 +128,13 @@ proc initCollection*() =
   # Next, register for any custom reports.
   for name in getChalkSubsections("custom_report"):
     let report = "custom_report." & name
-    let useWhenOpt = getOpt[seq[string]](getChalkScope(), report & ".use_when")
+    let useWhenOpt = attrGetOpt[seq[string]](report & ".use_when")
     if useWhenOpt.isSome():
       let useWhen = useWhenOpt.get()
       if (getBaseCommandName() notin useWhen and "*" notin useWhen):
         continue
 
-    let templNameOpt = getOpt[string](getChalkScope(), report & ".report_template")
+    let templNameOpt = attrGetOpt[string](report & ".report_template")
     if templNameOpt.isSome():
       let templName = templNameOpt.get()
       if templName != "":
@@ -148,20 +148,20 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
   for plugin in getAllPlugins():
     let
       data       = artifact.collectedData
-      subscribed = get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".post_chalk_keys")
+      subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".post_chalk_keys")
 
     if chalkCollectionSuspendedFor(plugin.name):               continue
     if not plugin.hasSubscribedKey(subscribed, data):          continue
-    if get[bool](getChalkScope(), "plugin." & plugin.name & ".codec") and plugin != artifact.myCodec: continue
+    if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != artifact.myCodec: continue
 
     trace("Running plugin: " & plugin.name)
     try:
       let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
       if dict == nil or len(dict) == 0: continue
       for k, v in dict:
-        if not plugin.canWrite(k, get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".post_chalk_keys")): continue
+        if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".post_chalk_keys")): continue
         if k notin artifact.collectedData or
-            k in get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".overrides") or
+            k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
             plugin.isSystem():
           artifact.collectedData[k] = v
       trace(plugin.name & ": Plugin called.")
@@ -198,9 +198,9 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
       if obj.fsRef != "":
         data["PATH_WHEN_CHALKED"] = pack(resolvePath(obj.fsRef))
 
-    if get[bool](getChalkScope(), "plugin." & plugin.name & ".codec") and plugin != obj.myCodec: continue
+    if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != obj.myCodec: continue
 
-    let subscribed = get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".pre_chalk_keys")
+    let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")
     if not plugin.hasSubscribedKey(subscribed, data) and not plugin.isSystem():
       trace(plugin.name & ": Skipping plugin; its metadata wouldn't be used.")
       continue
@@ -216,9 +216,9 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
         continue
 
       for k, v in dict:
-        if not plugin.canWrite(k, get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".pre_chalk_keys")): continue
+        if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")): continue
         if k notin obj.collectedData or
-            k in get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".overrides") or
+            k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
             plugin.isSystem() or
             override:
           obj.collectedData[k] = v
@@ -235,7 +235,7 @@ proc collectRunTimeHostInfo*() =
   ## artifact loop below.
   trace("Collecting run time host info")
   for plugin in getAllPlugins():
-    let subscribed = get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".post_run_keys")
+    let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".post_run_keys")
     if chalkCollectionSuspendedFor(plugin.name):          continue
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
 
@@ -245,9 +245,9 @@ proc collectRunTimeHostInfo*() =
       if dict == nil or len(dict) == 0: continue
 
       for k, v in dict:
-        if not plugin.canWrite(k, get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".post_run_keys")): continue
+        if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".post_run_keys")): continue
         if k notin hostInfo or
-            k in get[seq[string]](getChalkScope(), "plugin." & plugin.name & ".overrides") or
+            k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
             plugin.isSystem():
           hostInfo[k] = v
     except:
@@ -271,7 +271,7 @@ proc ignoreArtifact(path: string, regexps: seq[Regex]): bool {.inline.} =
   for i, item in regexps:
     if path.match(item):
       trace(path & ": returned artifact ignored due to matching: " &
-        get[seq[string]](getChalkScope(), "ignore_patterns")[i])
+        attrGet[seq[string]]("ignore_patterns")[i])
       trace("Developers: codecs should not be returning ignored artifacts.")
       return true
 
@@ -283,7 +283,7 @@ proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
   let selfPath = resolvePath(getMyAppPath())
 
   result.fileExclusions = @[selfPath]
-  result.recurse        = get[bool](getChalkScope(), "recursive")
+  result.recurse        = attrGet[bool]("recursive")
 
   for item in argv:
     let maybe = resolvePath(item)
@@ -300,10 +300,10 @@ proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
 
   let
     selfPath = resolvePath(getMyAppPath())
-    skipList = get[seq[string]](getChalkScope(), "ignore_patterns")
+    skipList = attrGet[seq[string]]("ignore_patterns")
 
   result.fileExclusions = @[selfPath]
-  result.recurse        = get[bool](getChalkScope(), "recursive")
+  result.recurse        = attrGet[bool]("recursive")
 
   for item in skipList:
     result.skips.add(re(item))

@@ -19,7 +19,7 @@ proc runChalkSubScan*(location: seq[string],
                       cmd:      string,
                       suspendHost = true): CollectionCtx =
   let
-    oldRecursive = get[bool](getChalkScope(), "recursive")
+    oldRecursive = attrGet[bool]("recursive")
     oldCmd       = getCommandName()
     oldArgs      = getArgs()
     logLevel     = getLogLevel()
@@ -31,7 +31,7 @@ proc runChalkSubScan*(location: seq[string],
 
   var savedLogLevel: Option[LogLevel]
 
-  if logLevel > llError and not get[bool](getChalkScope(), "chalk_debug"):
+  if logLevel > llError and not attrGet[bool]("chalk_debug"):
     trace("*** Setting log-level = \"error\" for scan.  Use --debug to turn on")
     savedLogLevel = some(logLevel)
     setLogLevel(llError)

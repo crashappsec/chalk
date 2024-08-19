@@ -96,10 +96,10 @@ proc processCmdLine(ctx: DockerInvocation) =
 
 proc addVirtualLabels(ctx: DockerInvocation, chalk: ChalkObj) =
   trace("docker: adding virtual label args via --label flags")
-  let labelOpt = getOpt[TableRef[string, string]](getChalkScope(), "docker.custom_labels")
+  let labelOpt = attrGetOpt[TableRef[string, string]]("docker.custom_labels")
   if labelOpt.isSome():
     ctx.newCmdLine.addLabelArgs(labelOpt.get())
-  let labelTemplName = get[string](getChalkScope(), "docker.label_template")
+  let labelTemplName = attrGet[string]("docker.label_template")
   if labelTemplName == "":
     return
   let
@@ -115,10 +115,10 @@ proc addVirtualLabels(ctx: DockerInvocation, chalk: ChalkObj) =
 
 proc addLabels(ctx: DockerInvocation, chalk: ChalkObj) =
   trace("docker: adding labels to Dockerfile")
-  let labelOpt = getOpt[TableRef[string, string]](getChalkScope(), "docker.custom_labels")
+  let labelOpt = attrGetOpt[TableRef[string, string]]("docker.custom_labels")
   if labelOpt.isSome():
     ctx.addedInstructions.addLabelCmds(labelOpt.get())
-  let labelTemplName = get[string](getChalkScope(), "docker.label_template")
+  let labelTemplName = attrGet[string]("docker.label_template")
   if labelTemplName == "":
     return
   let
@@ -137,7 +137,7 @@ proc addEnvVars(ctx: DockerInvocation, chalk: ChalkObj) =
   var
     toAdd: seq[string] = @[]
     value: string
-  for k, v in get[TableRef[string, string]](getChalkScope(), "docker.additional_env_vars"):
+  for k, v in attrGet[TableRef[string, string]]("docker.additional_env_vars"):
     if not k.isValidEnvVarName():
       warn("docker: ENV var " & k & " NOT added. Environment vars may only have " &
            "Letters (which will be upper-cased), numbers, and underscores.")
@@ -350,9 +350,9 @@ proc dockerBuild*(ctx: DockerInvocation): int =
       # multi-platform builds should have same chalk id
       chalkId      = ctx.chalkId,
     )
-    wrapVirtual    = get[bool](getChalkScope(), "virtual_chalk")
-    wrapEntrypoint = get[bool](getChalkScope(), "docker.wrap_entrypoint")
-    dockerSubscan  = get[bool](getChalkScope(), "chalk_contained_items")
+    wrapVirtual    = attrGet[bool]("virtual_chalk")
+    wrapEntrypoint = attrGet[bool]("docker.wrap_entrypoint")
+    dockerSubscan  = attrGet[bool]("chalk_contained_items")
 
   trace("docker: processing build CLI args")
   ctx.processGitContext()

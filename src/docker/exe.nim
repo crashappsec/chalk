@@ -18,7 +18,7 @@ var
 proc getDockerExeLocation*(): string =
   once:
     let
-      dockerConfigPath = getOpt[string](getChalkScope(), "docker_exe")
+      dockerConfigPath = attrGetOpt[string]("docker_exe")
       dockerExeOpt     = findExePath("docker",
                                      configPath      = dockerConfigPath,
                                      ignoreChalkExes = true)

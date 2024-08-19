@@ -69,7 +69,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     hasBang = false
 
   if not isExe and isChalkingOp() and
-     get[bool](getChalkScope(), "source_marks.only_mark_when_execute_set"):
+     attrGet[bool]("source_marks.only_mark_when_execute_set"):
     return none(ChalkObj)
 
   var
@@ -80,10 +80,10 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
 
   if ext != "":
     ext  = ext[1 .. ^1] # No need for the period.
-    if ext in get[seq[string]](getChalkScope(), "source_marks.text_only_extensions"):
+    if ext in attrGet[seq[string]]("source_marks.text_only_extensions"):
       return none(ChalkObj)
 
-    let exts = get[TableRef[string, string]](getChalkScope(), "source_marks.extensions_to_languages_map")
+    let exts = attrGet[TableRef[string, string]]("source_marks.extensions_to_languages_map")
     if ext in exts:
       # We might revise this if there's a shebang line; it takes precidence.
       lang = exts[ext]
@@ -97,7 +97,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       let bytes = stream.peekStr(2)
 
       if bytes != "#!":
-        if isChalkingOp() and get[bool](getChalkScope(), "source_marks.only_mark_shebangs"):
+        if isChalkingOp() and attrGet[bool]("source_marks.only_mark_shebangs"):
           return none(ChalkObj)
         elif not stream.seemsToBeUtf8():
           return none(ChalkObj)
@@ -111,7 +111,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     # While we already checked this above, if the shebang was there,
     # but was invalid, we'll behave as if it wasn't there at all.
     if not hasBang and isChalkingOp() and
-       get[bool](getChalkScope(), "source_marks.only_mark_shebangs"):
+       attrGet[bool]("source_marks.only_mark_shebangs"):
       return none(ChalkObj)
 
     if lang == "":
@@ -121,7 +121,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     # At this point, *if* there's a custom_logic callback, we need to
     # call it, otherwise we are done.
 
-    let opt = getOpt[CallbackObj](getChalkScope(), "source_marks.custom_logic")
+    let opt = attrGetOpt[CallbackObj]("source_marks.custom_logic")
 
     if opt.isSome():
       let
@@ -131,7 +131,7 @@ proc sourceScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       if not proceed:
         return none(ChalkObj)
 
-    let langs = get[TableRef[string, string]](getChalkScope(), "source_marks.language_to_comment_map")
+    let langs = attrGet[TableRef[string, string]]("source_marks.language_to_comment_map")
     if lang in langs:
       commentPrefix = langs[lang]
     else:
