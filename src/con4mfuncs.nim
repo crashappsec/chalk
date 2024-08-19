@@ -13,8 +13,8 @@
 ## con4m at some point, as long as it's all optional.
 
 import std/[httpclient]
-import pkg/[con4m/st, nimutils/jwt]
-import "."/[config, reporting, sinks, chalkjson, docker/exe]
+import pkg/[nimutils/jwt]
+import "."/[config, reporting, sinks, chalkjson, con4m/files/con4m/st, docker/exe]
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))

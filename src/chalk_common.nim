@@ -14,7 +14,8 @@
 
 import std/[os, json, streams, tables, options, strutils, sugar, posix,
             unicode, re]
-import pkg/[nimutils, nimutils/logging, nimutils/managedtmp, con4m]
+import pkg/[nimutils, nimutils/logging, nimutils/managedtmp]
+import "."/[con4m/files/con4m]
 export os, json, options, tables, strutils, streams, sugar, nimutils, logging,
        managedtmp, con4m
 
