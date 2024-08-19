@@ -1,0 +1,70 @@
+%{H Con4m Overview}%
+
+We got tired of building mini-DSLs in YAML, especially since YAML has many syntactic quirks that make it bad for such things.
+
+Con4m gives you an Apache-like configuration file format, while meeting any scripting needs your users might have. Con4m will validate configuration files before loading them, even making sure the types and values all what YOU need them to be, if your provide a brief specification defining the schema you want for your config files.
+
+Con4m also allows you to 'stack' configuration files. For instance, the app can load an internal default configuration hardcoded into the program, then layer a system-level config over it, then layer a local config on top.
+
+After the configuration file loads, you can call any user-defined functions provided, if your application might need feedback from the user after configuration loads.
+
+You can also create your own builtin functions to make available to users who use the scripting capabilities. Con4m does provides a bunch of builtins, but you can selectively disable them if you so choose.
+
+%{H Basic Example}%
+
+Let’s imagine the user has provided a config file like this:
+%{c
+use_color: false
+
+host localhost {
+      ip: "127.0.0.1"
+      port: 8080
+}
+host workstation {
+      port: 8080
+      if env("CUSTOM_VAR") != "" {
+         ip: env("CUSTOM_VAR")
+      }
+      else {
+         ip: "10.12.1.10"
+      }
+}
+}%
+
+In this example, the conditional runs when the config file is evaluated (if something needs to be evaluated dynamically, you can do that with a callback).
+
+Con4m provides a number of builtin functions like env(), which makes it easy for you to check environment variables, but also for your users to customize environment variables to suit their needs. You can easily provide your own built-in functions.
+
+Let’s say the application writer has loaded this configuration file into the variable s. She may then write the following c42 spec:
+
+%{c
+object host {
+  field ip {
+    type: "string"
+    required: true
+  }
+
+  field port {
+    type: "int"
+    required: true
+  }
+
+  field use_tls {
+    type: "bool"
+    default: true
+  }
+}
+}%
+When you call Con4m with the above spec, asking it to load a user's configuration file, the following happens:
+%{#
+The spec file loads.
+The user's configuration is checked for syntax and type safety.
+The user's config is evaluated.
+The user's config file is type checked against the type information provided in the spec. You can also provide additional validation constraints, like forcing strings to be from a particular set of values, or having integers be in a range. Whenever these constraints are violated, the user gets a descriptive error message.
+If the user doesn't provide information, default values will be loaded from your spec. If you didn't provide a value, but the field is required, then the user gets an appropriate error.
+You then get an easy API for querying and setting these values as your code runs. And, you can call back into the user's config via callback whenever needed.
+}%
+
+%{H More Information}%
+{bold}'{appName} help con4m'{reset} for an introduction to con4m's syntax.
+{bold}'{appName} help topics'{reset} for a list of all available help topics.

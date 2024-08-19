@@ -1,0 +1,103 @@
+%{H Con4m's Default Builtin Functions}%
+
+Note that, via API, individual calls can be excluded by providing the ID number associated with that function.  See the API reference.
+%{T :<30:
+ID::Function::Description
+1::bool(int) -> bool::Convert an integer to a true/false value.
+2::bool(float) -> bool::Convert a float to a true/false value.
+3::bool(string) -> bool:: Convert a string to a true/false value.
+4::bool([@T]) -> bool::Convert a list of any type to a true/false value.
+5::bool({@K : @V}) -> bool::Convert a dictionary of any type to a true/false value.
+6::float(int) -> float::Convert an integer to a floating point representation.
+7::int(float) -> int::Convert a float to an integer by truncating the decimal part.
+8::$(@t) -> string::Convert any type into a string.
+9::Duration(string) -> Duration::Convert a string into a Duration object.
+10::IPAddr(string) -> IPAddr::Convert a string into an IPAddr object.
+11::CIDR(string) -> CIDR::Convert a string into a CIDR object.
+12::Size(string) -> Size::Convert a string into a size object.
+13::Date(string) -> Date::Convert a string into a Date object.
+14::Time(string) -> Time::Convert a string into a Time object.
+15::DateTime(string) -> DateTime::Convert a string into a DateTime object.
+16::to_usec(Duration) -> int::Extract the number of microseconds from a Duration object.
+17::to_msec(Duration) -> int::Extract the number of milliseconds from a Duration object.
+18::to_sec(Duration) -> int::Extract the number of seconds from a Duration object.
+101::contains(string, string) -> bool::Returns true if the first argument contains second argument anywhere.
+102::find(string, string) -> int::If the first string contains the second as a substring, returns the starting byte index of the first match, starting from 0.  If the  substring is not found, this returns -1.
+103::len(string) -> int::Returns the number of bytes in a string
+104::slice(string, int) -> string::Returns a new string that is a substring starting at the provided byte index, through the end of the string.  As with languages like Python, negative values work, indexing from the back of the string.
+105::slice(string, int, int) -> string::Returns a new string that is a substring starting at the first provided byte index, through the second provided index (not inclusive). As with languages like Python, negative values work, indexing from the back of the string.
+106::split(string, string) -> [string]::Take the first string, and break it into a list containing all of the pieces that are separated by the second string, putting the results in a list
+107::strip(string) -> string::Returns a second string, with any trailing or leading whitespace removed.
+108::pad(string, int) -> string::Puts the specified number of spaces in front of each line of a string.
+109::format(string) -> string:: Makes substitutions within a string, based on variables that are in scope. For the input string, anything inside braces {} will be treated as a specifier. You can access attributes that are out of scope by fully dotting from the top-level name.  Note that all tags are currently part of the dotted name. You can use both attributes and variables in a specifier. Strings, bools, ints and floats are acceptable for specifiers, but lists and dictionaries are not. Note that there is currently no way to specify things like padding and alignment in a format specifier. If you want to insert an actual { or } character that shouldn't be part of a specifier, quote them by doubling them up (e.g., {{ to get a single left brace)
+110::base64(string) -> string::Base64 encode a string.
+111::base64_web(string) -> string::Base64 encode a string using the web-safe character scheme.
+112::debase64(string) -> string::Decode a base64 encoded string (works with regular or web character sets)
+113::hex(string) -> string::Hex-encode a string.
+114::hex(int) -> string::Hex-encode an integer.
+115::dehex(string) -> string::Decode a hex-encoded string.
+116::sha256(string) -> string::Compute the SHA256 checksum of a value, returning a hex-encoded value.
+117::sha512(string) -> string::Compute the SHA512 checksum of a value, returning a hex-encoded value.
+118::upper(string) -> string::Convert all lower case code points in a string to upper case.
+119::lower(string) -> string::Converts all upper case code points in a string to lower case.
+201::len([@T]) -> int::Returns the number of items in a list.
+202::len({@K : @V}) -> int:: Returns the number of items in a dictionary.
+203::keys({@K : @V}) -> [@K]::Returns a list of the keys in a dictionary.
+204::values({@K: @V}) -> [@V]::Returns a list of the values in a dictionary.
+205::items({@K: @V}) -> [(@K, @V)]:: Returns a list of the key / value pairs in a dictionary.
+206::contains([@T], @T) -> bool::Tests for presence of the second argument in the first argument.
+207::contains({@K:@V}, @K) -> bool::Tests for presence of the second argument in the keys of the dictionary passed as the first argument.
+208::set([@T], int, @T) -> [@T]:: Returns a new list based on the original list, where the item number passed in the second argument is replaced by the item passed in the third argument.  Note that, in con4m, all data is immutable, so this will not update the original list, just return a new copy.
+209::set({@K : @V}, @K, @V) -> {@K : @V}:: Returns a new dictionary that's the same as the first dictionary, except with the key specified in the second argument set to the value from the third argument.
+210::delete([@T], @T) -> [@T])::Deletes any occurrences of an item from a list, returning a new list with any deletions.  If the item is not in the list, a copy of the original list will be returned.  The list is passed as the first argument, and the item to delete as the second.
+211::delete({@k:@v}, @k) -> {@k:@v}::Deletes the key/value pair associated with a given key, returning a new dictionary.  If the item is not in the dictionary, a copy of the original dictionary will be returned.  The dict is passed as the first argument, and the key to delete as the second argument.
+212::remove([@x], int) -> [@x]::Removes an item from a list by 0-based index, returning a copy of the list with the item removed. If the index is out of range, a copy of the original list is returned.
+301::listDir() -> [string]::Returns a list of files in the current working directory
+302::listDir(string) -> [string]::Returns a list of files in the specified directory. If the directory is invalid, no error is given; the results will be the same as if the directory were empty.
+303::readFile(string) -> string::Returns the contents of the file.  On error, this will return the empty string.
+304::writeFile(string, string) -> bool::Writes, to the file name given in the first argument, the value of the string given in the second argument.  Returns true if successful, false otherwise.
+305::copyFile(string, string) -> bool::Copies the contents of the file specified by the first argument to the file specified by the second, creating the new file if necessary, overwriting it otherwise.  Returns true if successful, false otherwise.
+306::moveFile(string, string) -> bool::Moves the  file specified by the first argument to the location specified by the second, overwriting any file, if present.  Returns true if successful, false otherwise.
+307::rmFile(string)->bool:: Removes the specified file, if allowed.  Returns true if successful.
+308::joinPath(string, string) -> string::Combines two pieces of a path in a way where you don't have to worry about extra slashes.
+309::resolvePath(string) -> string::Turns a possibly relative path into an absolute path. This also expands tildes into home directories
+310::splitPath(string) -> (string, string)::Separates out the final path component from the rest of the path, i.e., typically used to split out the file name from the remainder of the path.
+311::cwd()->string::Returns the current working directory of the process.
+312::chdir(string) -> bool::Changes the current working directory of the process.  Returns true if successful.
+313::mkdir(string) -> bool::Creates a directory, and returns true on success.
+314::isDir(string) -> bool:: Returns true if the given file name exists at the time of the call, and is a directory.
+315::isFile(string) -> bool:: Returns true if the given file name exists at the time of the call, and is a regular file.
+316::isLink(string) -> bool::Returns true if the given file name exists at the time of the call, and is a link.
+317::chmod(string, int) -> bool::Attempt to set the file permissions; returns true if successful.
+318::fileLen(string) -> int::Returns the number of bytes in the specified file, or -1 if there is an error (e.g., no file, or not readable)
+319::to_tmp_file(string, string) -> string::Creates a new temporary file, using significant entropy in the file name to avoid race conditions.  The name of the temporary file is returned. The contents are populated by the string in the first parameter.  The second parameter is an extra string that will be used as the end of the file name, so that it is recognizable on the file system (i.e., you set the extension).
+401::echo(*string)::Output a list of strings... to stderr, NOT stdout. A newline is added at the end, but no spaces are added between arguments.
+402::abort(string):: Stops the program immediately.
+403::env() -> {string : string}::Returns a dictionary containing all environment variables and their contents.
+404::env(string) -> string::Returns the value of a single environment variable.  If not set, the empty string is returned.  Note that it’s possible for environment variables to be set to an empty string, in which case use envExists()
+405::envExists(string) -> bool::Returns true if the provided argument is a set environment variable, false otherwise.
+406::setEnv(string, string) -> bool::Sets the environment variable specified in the first argument to the value specified in the second.  Returns true if successful
+407::getpid() -> int::Returns the current process ID
+408::quote(string)->string::Takes a string, and quotes it in a way that's acceptable for passing to shells.
+409::osname() -> string::A short string with the OS name
+410::arch() -> string::A short string with the CPU architecture
+411::program_args() -> [string]::The raw command line args the program received
+412::program_path() -> string),::The full path to the executable running
+413::program_name() -> string::The file name only for the executable
+414::high() -> int::The highest value possible for an int
+415::low() -> int::The lowest value possible for an int
+416::rand() -> int:: Returns a cryptographically secure random number, uniformly distributed across all possible integers.
+501::bitor(int, int) -> int::A bitwise OR
+502::bitand(int, int) -> int::A bitwise AND
+503::xor(int, int) -> int::The XOR operation
+504::shl(int, int) -> int::Shift the bits of the first operand to the left by the amount specified in the second.
+505::shr(int, int) -> int::Shift the bits of the first operand to the right by the amount specified in the second.
+506::bitnot(int) -> int::Returns the binary inverse of an integer.
+601::sections(string) -> [string]::This is primarily intended for a c42m specification; given a dotted con4m section name (the root is the empty string), returns a list with all the names of the con4m sections defined within that section, at the time of c42m validation.  It's primarily meant for iterating through what "objects" are defined, so that you can, for instance, check to make sure references to object names in one part of a config are actually defined. This is also available during a con4m script's execution, but is far less useful there.
+901::run(string) -> string::Runs a specified command, as if on the command line, returning the output (This is the same to the system() call in many languages).
+902::system(string) -> (string, int)::Like system, runs a specified command as if on the command line, but returns a tuple consisting of the output and the exit code. Only available on Posix systems.
+903::getuid() -> int:: Returns the current uid of the process.
+904::geteuid() -> int::Returns the current euid of the process. Note, however, that, even if the process has euid 0, those permissions will be dropped before any call that runs a command or might modify the file system.
+905::uname() -> [string]:: Returns five items, the sysname (the name of the operating system implementation), the nodename (the network name of this machine), the release level of the operating system, the version level of the operating system and the machine hardware platform.  This is just proxying the uname() system call, but usually the version string (result[3]) will be everything-in-one.
+}%
+The function ID can be used to remove the function from a con4m runtime instance.  Functions starting with 900 are Posix-specific, and may not be available on every platform (i.e., Windows)

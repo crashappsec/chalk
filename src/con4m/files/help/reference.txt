@@ -1,0 +1,115 @@
+%{H Con4m Language syntax reference }%
+Below is a syntax reference for the Con4m language.  The syntax is meant to be simple enough that anyone with even minimal programming experience should be able to pick up. And, for those people who just want to edit key/value configuration items without writing any code, that should be equally simple and familiar.
+
+The language is designed to be fast, and currently does not have any features that might lead to an infinite loop (or infinite recursion).
+
+%{h EBNF specification }%
+Major lexical elements are  are all-uppercase, and detailed below. Minor ones are inlined, in double quotes. Note that all comment and white space tokens, other than newlines, are always ignored.
+Newlines are ignored in most expression contexts (they’re only used to separate statements where there would otherwise be ambiguity).
+%{c
+top           ::= (sectBodyItems | enum | fnOrCallback) *
+body          ::= sectBodyItems *
+coreBodyItems ::= ifStmt | forStmt | continueStmt | breakStmt | returnStmt |
+                  useStmt | fromStmt | parameterDecl | exportStmt | varStmt |
+                  assignment expression (NL|";")+
+assignment    ::= accessExpr ("," accessExpr)* eqOp expression (NL|";")+
+eqOp          ::= ("="|":"|":=")
+sectBodyItems ::= coreBodyItems | section
+enum          ::= "enum" ID ("," ID)*
+
+section       ::= ID (STR | ID)? "{" body "}"
+ifStmt        ::= "if" expression "{" body "}"
+                  ("elif" expression "{" body "}")*
+                  ("else" expression "{" body" "}")?
+paramDefault  ::= "default" ":" expr
+paramValidate ::= "validate" ":" expr
+paramBody     ::= (STR (STR?))? (paramDefault?|paramValidate?)|
+                                (paramValidate?|paramDefault?)
+parameterDecl ::= "parameter" (("var" ID) | ID ("." ID)*) "{" paramBody "}"
+forStmt       ::= "for" ID "from" expression "to" expression "{" body "}"
+useStmt       ::= "use" ID
+fromStmt      ::= "from" STR useStmt
+continueStmt  ::= "continue" (";")?
+breakStmt     ::= "break" (";")?
+returnStmt    ::= "return" expression? (";")?
+fnOrCallback  ::= ("func" | "callback") ID formalSpec fnBody
+formalSpec    ::= "(" (paramSpec? ("," paramSpec)* ")"
+paramSpec     ::= ID (":" typeSpec)
+varDeclItem   ::= ID ("," ID)* ":" typeSpec
+varStmt       ::= "export" varDeclItem ("," varDeclItem)*
+varStmt       ::= "var" varDeclItem ("," varDeclItem)*
+typeVar       ::= "`" ID ("[" typeSpec (("||"|"or") typeSpec)+ "]")?
+typeSpec      ::= "bool" | "int" | "string" | "float" | "void" |
+                  "typespec" ("[" typeVar "]")? |
+                  "list"  "[" typeSpec "]" |
+		  "dict"  "[" typeSpec "," typeSpec "]" |
+		  "tuple" "[" typeSpec "," (typeSpec)+ "]" |
+		  "func"  "(" (typeSpec ("," typeSpec)*)? ")" ("->" typeSpec)? |
+                  typeVar
+fnBody        ::= "{" coreBodyItems* "}"
+# Note that literal matches before accessExpr, so a lparen at an exprStart
+# or in a unaryExpr will be treated as a tuple literal.
+exprStart     ::= unaryExpr | notExpr | literal | accessExpr
+unaryExpr     ::= ("+" | "-") (literal | accessExpr)
+notExpr       ::= ("!" | "not") expression
+literal       ::= NUM | STR | listLiteral | dictLiteral | typeSpec | TRUE | FALSE | OTHER
+accessExpr    ::= (ID | "$" | parenExpr) (memberExpr | indexExpr | callActuals)*
+tupleLiteral  ::= "(" expression ("," expression)*)+ ")"
+listLiteral   ::= "[" (expression ("," expression)* )? "]"
+dictLiteral   ::= "{" (expression ":" expression
+                       ("," expression ":" expression)*) "}"
+parenExpr     ::= "(" expression ")"
+memberExpr    ::= "." ID
+indexExpr     ::= "[" expression "]"
+callActuals   ::= "(" (expression ("," expression)* )? ")"
+expression    ::= exprStart (orExpr*)
+orExpr        ::= ("||" | "or")  expression | andExpr
+andExpr       ::= ("&&" | "and") andExprRHS | neExpr
+andExprRHS    ::= exprStart (andExpr)*
+neExpr        ::= "!=" neExprRHS | eqExpr
+neExprRHS     ::= exprStart (neExpr)*
+eqExpr        ::= "==" eqExprRHS | gteExpr
+eqExprRHS     ::= exprStart (eqExpr)*
+gteExpr       ::= ">=" gteExprRHS | lteExpr
+gteExprRHS    ::= exprStart (gteExpr)*
+lteExpr       ::= "<=" lteExprRHS | gtExpr
+lteExprRHS    ::= exprStart (lteExpr)*
+gtExpr        ::= ">" gtExprRHS | ltExpr
+gtExprRHS     ::= exprStart (gtExpr)*
+ltExpr        ::= "<" ltExprRHS | plusExpr
+ltExprRHS     ::= exprStart (ltExpr)*
+plusExpr      ::= "+" plusExprRHS | minusExpr
+plusExprRHS   ::= exprStart (plusExpr)*
+minusExpr     ::= "-" minusExprRHS | modExpr
+minusExprRHS  ::= exprStart (minusExpr)*
+modExpr       ::= "%" modExprRHS | mulExpr
+modExprRHS    ::= exprStart (modExpr)*
+mulExpr       ::= "*" mulExprRHS | divExpr
+mulExprRHS    ::= exprStart (mulExpr)*
+divExpr       ::= "/" divExprRHS | accessExpr
+divExprRHS    ::= exprStart (divExpr)*
+# whileStmt     ::= "while" expression "{" body "}"
+}%
+
+%{h Major Lexical elements }%
+Most of the lexical elements are inlined above, except for the following:
+%{c
+WS          ::= (" " | "\\t")+  ; Whitespace
+NL          ::= ("\\r\\n" | "\\n") ; Newline
+ID          ::= IdStart (IdContinue)* ; As defined by unicode standard
+TRUE        ::= "True" | "true"
+FALSE       ::= "False" | "false"
+NUM         ::= ("0".."9")+
+                    ("." ("0".."9")+)?
+                    (("e"|"E") ("+"|"-")? ("0".."9")+)?
+STR         ::= '"' ( ('\\\\' '"') | [^"\\n] )* '"'
+OTHER       ::= "<<" .* ">>"
+LINECOMMENT ::= ("#" | "//") [^\n]*
+LONGCOMMENT ::= "/*" .* "*/" ; MINIMAL munch match.
+}%
+
+%{h Additional Notes }%
+%{#
+Early on, I removed the `while` operator, to ensure termination. I’ll probably add it back in as an optional item, or with an eval cost limit.
+Strings actually are parsed for escape sequences, and handle both `\uxxxx` and `\Uxxxxxxxx` formats. However, we do not currently look for hex escapes, since input config files are always expected to be valid Unicode (generally UTF-8).
+}%

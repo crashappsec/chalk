@@ -1,0 +1,339 @@
+%{H Con4m 2 Spec (aka C42) }%
+Con4m accepts spec files in a particular schema we call C42, which it can use to automatically validate configuration files.
+
+In a C42 specification, you generally will denote the types of sections your files can have, and specify the fields that can be used. Each section spec can denote what other kinds of sections are accepted inside. You can think of these as object type declarations.
+
+For each field you can specify properties like the type, but you can also express more precise constraints, such as selecting from a limited set of valid choices. You can even write your own custom validators.
+
+Once your sections are defined, you declare the top-level structure of your config file inside the (singleton) {bold}root{reset} section.
+
+%{H Our First config file specification }%
+Let's create a simple specification inspired by our Code Chalking project, which adds metadata to many types of software artifact. In this format, we want users to be able to specify custom metadata keys, each of which have properties, like types. We'll do this with a 'key' section. Perhaps we could imagine keys having multiple configurations that get applied in various environments, which we'll put into 'config' objects. Let's say that we also want to avoid polluting the top-level namespace, and want a singleton section called 'global' for any global configuration.
+
+For the moment, we won't declare any fields, just the object types:
+%{c
+object key {
+  allow config { }
+  user_def_ok: false
+}
+
+object config {
+  user_def_ok: false
+}
+
+singleton global {
+  user_def_ok: false
+}
+}%
+The above specifies we have three different section types we can see. Key sections may contain config sections, but they are not required. If we wish to force them, we can add a 'require' section, instead of an 'allow' section:
+%{c
+object key {
+  require config { }
+}
+}%
+Here, we follow the "zero, one, infinity" principle. If you want to enforce specific object names or limit to a specific number, you *can* with hooking that runs post-configuration. But generally, if you need a fixed number of specific sections, the way we prefer is to have multiple singleton sections.
+
+Right now, there is nothing you can add to the allow or require sections that has semantic value. We do intend to add fields, primarily to control code generation. The opening and closing braces are still required for an empty section. though.
+
+You may also notice each object type sets 'used_def_ok' to "false". When this is false, you will specify every field you want to see. If it is set to "true", then any field not specified by your spec will be accepted. You can enumerate such fields and access their types via API. This field must appear in every 'object' or 'singleton' section.
+
+%{h The Root section}%
+So far, none of the above can appear in a real configuration file, because we haven't specified the top-level structure of the config file. If we try to pass the above through con4m, it will tell us that. For instance, if we put the above in test.c4m, we could do:
+%{c
+{green}user % {reset}./con4m specgen test.c4m --language=none
+{red}{bold}error:{reset} {cyan}{bold} Required section 'root' is missing, and there are no other fields present that would remove this constraint.
+}%
+Adding a 'root' section is easy, which otherwise looks like and acts like an 'object' or 'singleton' section, in that it needs 'used_def_ok:' and can have multiple 'allow' or 'require' sections inside it:
+%{c
+root {
+  allow key { }
+  allow global { }
+  user_def_ok: false
+}
+}%
+Adding that to the bottom of test.c4m is enough to get our spec to validate:
+%{c
+{green}user % {reset}./con4m specgen test.c4m --language=none
+{white}{bold}Spec successfully validated.{reset}
+}%
+%{h Adding Attributes }%
+But, our configuration file needs attributes, or else it's not going to be very useful!  We can do this in 'field' sections, which work inside objects, singletons and root sections, to define attributes and their properties.
+
+Every field you define MUST include two fields. One is the 'type' field, which takes a string, and generally represents the required con4m type (there are some advanced features discussed below that stretch this).
+
+The second field you must provide can be either 'default', or 'require'. These keys are NOT allowed to appear together.
+
+The 'default' key allows you to specify a default value for a field, when the user doesn't explicitly provide it. This default is specified at the object definition level only, and is applied to all sections lacking the value. If the *first* run of your config file is lacking a value, and the default gets added, then it will be considered present for subsequent runs (unless the field value is deleted).
+
+The second option is the 'require' field, which is a boolean value. Here, you are not providing a default value, but you're specifying whether con4m should care in its checking phase whether the field is missing or not.
+
+Since 'default' implies the user ISN'T required to provide a value, and since it's redundant to say 'required' but then specify a default, these values CANNOT be used for the same field. But, you can use them across different fields. For example, we might add to our 'global' section:
+%{c
+singleton global {
+  user_def_ok: false
+  field use_color {
+    type:    "bool"
+    default: true
+  }
+  field log_level {
+    type: "string"
+    required: true
+  }
+}
+}%
+which specifies a default value for the field if the user doesn't provide it explicitly.
+
+%{h Our first useful config}%
+Now let's add a field to each section, and then once we get it validating, we can try it out on a real config file:
+%{c
+object key {
+  allow config { }
+  field command {  # a command we will run to collect the metadata.
+    type: "string"
+    require: true
+  }
+  user_def_ok: false
+}
+
+object config {
+  user_def_ok: false
+  field enabled {
+    type: "bool"
+    default: true
+  }
+}
+
+singleton global {
+  user_def_ok: false
+  field use_color {
+    type:    "bool"
+    default: true
+  }
+  field log_level {
+    type: "string"
+    require: true
+  }
+}
+root {
+  allow key { }
+  allow global { }
+  user_def_ok: false
+}
+}%
+Let's first make sure it validates:
+%{c
+{green}user % {reset}./con4m specgen test.c4m --language=none
+{white}{bold}Spec successfully validated.{reset}
+}%
+Now, let's create a configuration file 'myconf.c4m' to test our spec:
+%{c
+global {
+  log_level: "info"
+}
+
+key mykey {
+  command: "string"
+  config prod {
+    enabled: false
+  }
+  config testing {
+  # Default for 'enabled' will be true, per above
+  }
+}
+}%
+While you can now use your spec and run this config file from the API, let's test it out using the con4m executable:
+%{c
+{green}user % {reset}con4m c --spec=test.c4m myconf.c4m
+
+{red}{bold}Results:{cyan}
+\{
+  "key": \{
+    "mykey": \{
+      "command": "string",
+      "config": \{
+        "testing": \{\},
+        "prod": \{
+          "enabled": false
+        \}
+      \}
+    \}
+  \},
+  "global": \{
+    "log_level": "info"
+  \}
+\}
+}%
+This outputs JSON to stdout. The APIs will give us a much simpler interfaces for enumerating configuration information.
+
+%{H Adding constraints}%
+In this example, our 'log_level' key probably only accepts a fixed number of values. Let's redefine that field to enforce a choice of values:
+%{c
+  field log_level {
+    type: "string"
+    require: true
+    choice: ["inform", "warn", "error", "debug"]
+  }
+}%
+Note that here we used 'inform', but in the example config, we used 'info'. So now, when we try to load the config file, we now get the error we want:
+%{c
+{green}user % {reset}con4m c --spec=test.c4m myconf.c4m{bold}
+{red}error:{reset} When {bold}{cyan}checking global.log_level{reset}: Value is not one of the valid choices: inform, warn, error, debug
+}%
+Note that con4m tells us the full path to the attribute that errors, but does NOT give us a line number. That's because spec validation happens after the config file finishes executing, and users can write arbitrary code; we currently are not tracking where in the code values are last set (though it's a good item for future work; we will probably do this once byte-compiling code instead of fully interpreting it).
+
+Choices work for both strings and integers.
+
+%{h Range Constraints}%
+Ranges allow you to give a minimum and maximum value acceptable for an integer. For instance:
+%{c
+field priority {
+  type: "int"
+  require: true
+  range: (0, 100)
+}
+}%
+Ranges only work for int types. The bounds are INCLUSIVE, so the above will accept 0 and 100 both.
+
+%{h Container Constraints}%
+For container types (i.e., lists, and dictionaries), you can use a constraint to set their minimum size, and/or their maximum size. For instance, if you have a field that needs a path, and you want to make sure there's at least one item:
+%{c
+field path {
+  type: "[string]"
+  default: ["."]
+  min_items: 1
+}
+}%
+%{h Field Validators }%
+Additionally, you can write an arbitrary field validator in con4m, that gets called if all other validation on the field completes successfully.
+
+For instance, we might want to have a configuration variable in root that specifies keys to save. And we might want to ensure that the keys provided for that field are specified elsewhere in the file. First, you specify the name of your validator in the field:
+%{c
+field saved_keys {
+  type: "[string]"
+  require: true
+  validator: "key_check"
+}%
+Then we can add a Con4m function named key_check, which takes the name of the field and the provided value, and then looks to see if it's in the 'key' sections. Validator callbacks return strings, which are used as error messages. If your callback returns the empty string, everything is considered to be okay. Here's an example implementation:
+%{c
+func key_check(keyname, value: [string]) {
+  sects := sections("key")
+
+  for i from 0 to len(value) {
+    if value[i] == "*" {
+      continue
+    }
+    if sects.contains(value[i]) {
+      continue
+    } else {
+      return "'" + value[i] + "' is not a valid (specified) key."
+    }
+  }
+  return ""
+}%
+The sections() builtin always returns a list of all sections under the input key for the user's execution state, even if you're running from within a con4m spec.
+
+%{h Exclusions }%
+You can add simple mutual exclusions between fields in a section. Meaning that, no matter whether fields are required or not, or have defaults or not, they won't be allowed to appear together (much how in the spec file itself, 'default' and 'require' cannot appear together).
+
+This is done by adding an 'exclusions' singleton in the scope where you want such an exclusion. For instance, if we were writing a spec for c42m's schema itself, we could express the constraint as follows:
+%{c
+object field {
+  field default {
+    type: "@x"
+    require: true
+  }
+  field require {
+    type: "bool"
+    require: true  # Both fields are technically required, but...
+  }
+  # Here we're going to relax that, by specifying they
+  # can't actually can't appear.
+  exclusions {
+    default: "require" # We could do these in either order.
+  }
+}
+}%
+%{H Advanced Type specs}%
+Note here that we used a special type, '@x'. This is a 'type variable', meaning it can bind to anything This works like most type systems. You could, for instance, declare a dict that takes arbitrary keys and values with: '{@k : @v}' or fix the keys to be of the same type: '{@t: @t}'. The letters are arbitrary. Con4m will allow any type, but once the user (or your base config) picks a type, Con4m will enforce it.
+
+Generally, we won't want quite that much flexibility. For instance, we might want to have the type of the default value be based on the type that is specified in another field.
+
+When specifying a field's type, typically you specify a Con4m type. However, there are two other options:
+%{-
+You can specify the type as "typespec", which indicates the field's type is technically a string, but the value represents a Con4m type.
+You can specify the type with a leading equals sign: "=field", which indicates to get the type of the field from another field, which must be a "typespec" field.
+}%
+For instance, if we want our 'key' sections to have a 'type' field and a 'value' field, where the value in the 'type' field specifies the type of the other value, we can do:
+%{c
+  field type {
+    type:      "typespec"
+    require:    true
+    write_lock: true
+  }
+  field value {
+    type:     "=type"
+    require:  false
+  }
+}%
+%{H Field Locking}%
+The c42 specification provides two ways for you to indicate when to lock individual fields:
+%{-
+You can add {bold}write_lock: true{reset} to a field's properties, to indicate that, whenever it is set, it cannot be set again. E.g., once a "typedesc" field gets set, its corresponding value generally should also stay static.
+You can add the {bold}stack_limit{reset} property, which takes an integer that represents how many 'stacks' are allowed. For instance, if you set {bold}stack_limit{reset} this to 0, then only the first run can set the value. This allows you to do multiple internal runs in a base configuration. For instance, our code chalking tool first loads a schema file, then loads a more operational configuration file focused on setting up I/O, and then can load a user-specific config that gets embedded into the executable. Those first two stacks set up state, some of which shouldn't be changed.
+}%
+%{H Using a working specification}%
+At the con4m command line, you can use the --spec= flag to provide your spec file. Or, you can provide it as a string programatically. See {bold}'{appName} help api'{reset} for more information on calling con4m programatically.
+
+%{H Controlling Code Generation}%
+You can augment your specification with variables that control how code generation occurs. First, you can tweak names. The Con4m name is used by default, but for instance, you might want to change the name in your target code, especially for objects.
+
+For instance, our 'key' sections in code will appear in our toplevel type as a table mapping the specified keys to a 'key' object. We might want the field in the root section to be called 'keys', because it's just more accurate. Or, instead of the default type name 'KeyType', you might want to call it 'KeyInfo'. We provide the following ways to munge your names:
+%{T
+Property::Applies to...::Description
+gen_typename::Sections (including the root)::Specifies the type name to use when generating this type.
+gen_fieldname::Sections (singletons and objects), and attributes::Specify what name to use when the name is a 'field' name. For sections, this is the variable name that will be used in other sections that allow this one, in order to reference the instance(s).
+}%
+
+Con4m does not currently check names very thoroughly. It does automatically quote any keyword collisions, and does this for your built-in fields (primarily since 'type' is a common field in Con4m specs, which often conflicts with a keyword in other languages). Other than that, it doesn't check for name validity, nor does it attempt to detect any naming conflicts whatsoever.
+
+When Con4m is generating your data type declarations, you can also inject fields that are for internal-use only, that do not get exposed to Con4m. Do that in sections, with the 'extra_decls' property. For instance, if we are writing a Nim program, the following spec:
+%{c
+root {
+  field test {
+    type "int"
+    require: true
+  }
+  gen_typename: "Example"
+  extra_decls: """
+  foo: string
+  bar: string
+"""
+}%
+
+Will generate the following type declaration:
+%{c
+type Example = ref object
+  test: int
+  foo: string
+  bar: string
+}%
+Note that there is currently no way to provide different blocks for different output languages. We assume here that the apps using conform are interfacing via a single language, even if Con4m itself needs to be able to output for multiple languages.
+
+Finally, you can suppress various pieces from being output, if you don't want the extra code it will generate:
+%{T
+Property::Applies to::Description
+gen_field_decls::Sections::This is 'true' by default, but if you set it to 'false', the type declaration we produce for the section (the object or singleton) will skip adding fields. You can still query them; we do still generate a field that effectively holds a reference to the appropriate Con4m object for querying. Setting this will still generate section declarations, though. If you don't want *anything* declared in your native language, you must just use the direct querying APIs and not doing any code generation at all. You can build individual getters and setters yourself if you want; the getters and setters built via code gen rely on a declared object type per section, holding on to references to the appropriate Con4m scope to deliver field values without doing a tiered lookup.
+gen_field_decl::Fields::This overrides the previous field; you can force individual fields to generate if you're skipping generation for most fields, OR you can skip individual fields if you're going with the default.
+gen_loader::Sections::Normally, we generate a function loadMyX() for each section X, to populate the fields after a Con4m run is done. You generally only call the load function for your root section, and it recurses. You can omit generating any of these functions if you want. This is generally a *bad* idea unless you aren't generating any fields either, because you'll have to manually populate those fields. If you skip a particular loader, no calls to the loader will be generated either.
+gen_getters::Sections::This is 'true' by default, but if you set it to false, it won't generate get() functions for your sections and fields, unless you override it with 'gen_getter'.
+gen_getter::Fields::Use this to go against the default when it comes generating a specific field's get() function.
+gen_setters::Sections::Can be set to 'false' to skip automatic generation of set() functions (unless overridden).
+gen_setter::Fields::Use this to go against the default when it comes generating a specific field's set() function.
+}%
+
+{bold}{red}Important:{reset}
+The get/set API changes locally cached fields AND updates the con4m state if your app calls the set method. However, it does NOT automatically update your cached state if items are set from a con4m run. The expectation is that you will call your generated top-level (root section) load() routine to re-populate a new set of data structures, then replace the state wholesale (each loader allocates fresh data structures).
+
+If you wish to change that behavior, you can definitely write a custom global set hook to do it, but it's not something Con4m will currently do for you. our reason for not making this bi-directional is because we currently expect all con4m access to be either single-threaded, or guarded with a user-managed lock. That includes accessing the con4m state directly, as well as executing a config. If you go to con4m to execute a config, it's much easier to be sure everything is done properly if you just reload everything at the end... you shouldn't rely on the new state until execution is done anyway.
+
+The data structures we produce can conceivably be operated in a multi-threaded environment; the sets generated may not be strictly safe, but since they're all word-sized values, most languages will provide atomic updates, but just will not make any guarantees about access order, for the code we generate. If you stick strictly to get()s, there's certainly no problem.

@@ -1,0 +1,9 @@
+%{H About Con4m}%
+Con4m is open source under the Apache 2.0 license.
+
+Con4m was written by John Viega (john@crashoverride.com).
+
+Pull requests are welcome! We're especially happy for people to interface libcon4m to other languages, and to do the language-specific code generation.
+
+%{H More Information}%
+{bold}'{appName} help topics'{reset} for a list of all available help topics.

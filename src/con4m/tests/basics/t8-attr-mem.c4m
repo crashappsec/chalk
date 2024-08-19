@@ -1,0 +1,3 @@
+x.y.z = 10
+
+echo(string(x.y.z))

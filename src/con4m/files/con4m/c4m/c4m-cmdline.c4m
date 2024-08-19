@@ -1,0 +1,246 @@
+# Command line argument spec for the con4m command line.
+# TODO: add validators.
+
+con4m_command = ""  # Will get filled in by getopts for us.
+con4m_args    = []
+
+getopts {
+  default_yes_prefixes: []
+  default_no_prefixes:  ["no"]
+  show_doc_on_err:      true
+  add_help_commands:    true
+  command_attribute:    "con4m_command"
+  arg_attribute:        "con4m_args"
+  default_command:      "run"
+  doc: """
+
+Con4m makes it EASY to build custom configuration files for your application that are fully validated to your specification. Your users can write in a simple, familiar format, but have access a lot more power, if needed. They can even easily write custom callbacks for you to call from your own environment. Plus, Con4m makes it easy to 'stack' configurations on top of each other, to customize environment variables, to reload configurations at runtime, etc.
+
+Con4m is accessible via command or API (currently from C or Nim, with Python and Go planned for 1.0).
+
+When running con4m the command line, by default, the 'run' command runs, which executes con4m configuration files, and outputs the resulting configuration state, either as JSON, or in a pretty-printed table.
+
+If multiple config files are provided, they are executed 'stacked', run one after another, in the order in which they appear on the command-line.
+
+Configurations can be validated extensively if you provide a 'c42' spec file to validate against. See 'help spec' for an example. Note that c42 specs are just config files that specify what is or isn't allowed in OTHER config files.
+
+urrently, con4m works natively with Nim, and provides a C API (libcon4m), which we intend to wrap for additional programming languages.
+
+The con4m compiler is capable of generating code to load native data structures and provide get/set interfaces for supported languages. To do this, you provide a schema in the form of a 'c42' spec file, and run the 'specgen' command.
+
+See:
+'con4m.out help specs' for details on working with Con4m specifications for additional checking.
+'con4m.out help con4m' for an overview of the con4m config file format (and language).
+'con4m.out help topics' for a list of all available help topics.
+"""
+
+  flag_yn color {
+    yes_aliases:  ["c"]
+    no_aliases:   ["C"]
+    field_to_set: "color"
+    doc: """
+Enable ANSI colors in output, overriding the NO_COLORS environment variable
+"""
+  }
+
+  command run {
+    aliases: ["c"]
+    args: (1, high())
+    doc: """
+"""
+
+    flag_yn show_tokens {
+      yes_aliases:  ["k", "show-toks", "show-tok", "toks"]
+      no_aliases:   ["K", "no-show-toks", "no-show-tok", "no-toks"]
+      field_to_set: "show_tokens"
+      doc: """
+Show tokens after the parsing phase, for the last specified con4m file passed.
+ When multiple files are passed, only shows tokens for files based on the value of '--show-when' (which defaults to 'last').
+"""
+    }
+
+    flag_yn show_parse_tree {
+      yes_aliases: ["p", "show-parse", "parse"]
+      no_aliases:  ["P", "no-parse", "no-show-parse"]
+      field_to_set: "show_parse_tree"
+      doc: """
+Shows the UNTYPED parse tree after the parsing phase, but before the checking phase.
+ Applied based on '--show-when'.
+"""
+    }
+
+    flag_yn show_checked_tree {
+      yes_aliases: ["t", "show-tree", "show-checked"]
+      no_aliases:  ["T", "no-show-tree", "no-show-checked"]
+      field_to_set: "show_checked_tree"
+      doc: """
+It's Christmas! Show the typed parse tree after the checking phase.
+Applied based on '--show-when'.
+"""
+    }
+
+    flag_yn show_spec_tokens {
+      yes_aliases:  ["show-spec-toks", "show-spec-tok", "spec-toks"]
+      no_aliases:   ["no-show-spec-toks", "no-show-spec-tok", "no-spec-toks"]
+      field_to_set: "show_spec_tokens"
+      doc: """
+Show tokens for c42 spec files after the parsing phase, for the last specified spec file passed.
+ Applied based on the value of '--spec-show-when'.
+"""
+    }
+
+    flag_yn show_spec_parse_tree {
+      yes_aliases: ["show-spec-parse", "spec-parse"]
+      no_aliases:  ["no-spec-parse", "no-spec-show-parse"]
+      field_to_set: "show_spec_parse_tree"
+      doc: """
+Shows the unchecked parse tree for spec files.
+Applied based on '--spec-show-when').
+"""
+    }
+
+    flag_yn show_spec_checked_tree {
+      yes_aliases: ["spec-show-tree", "spec-show-checked"]
+      no_aliases:  ["no-spec-show-tree", "no-spec-show-checked"]
+      field_to_set: "show_spec_checked_tree"
+      doc: """
+Specs deserve their time in lights. Show their typed parse tree after the checking phase.
+Applied based on '--spec-show-when'.
+"""
+    }
+
+    flag_yn show_funcs {
+      yes_aliases: ["f", "funcs"]
+      no_aliases:  ["F", "no-funcs"]
+      field_to_set: "show_funcs"
+      doc: """
+Show the function table, after checking but before evaluating.
+With multiple config files, this only ever gets applied in the last phase.
+
+If you want to see this before checking begins (when new functions will not be typed yet), use '--show-untyped-funcs'.
+
+This does not apply to spec files.
+"""
+    }
+
+    flag_yn show_untyped_funcs {
+      yes_aliases: ["u", "untyped-funcs"]
+      no_aliases:  ["U", "no-untyped-funcs"]
+      field_to_set: "show_untyped_funcs"
+      doc: """
+Shows the function table for the last file passed, before the checking phase begins, before functions are typed. Note that builtins and functions from previous files in the stack will be typed.
+"""
+    }
+
+    flag_choice output_style {
+      aliases: ["output", "o"]
+      choices: ["json", "pretty", "none"]
+      field_to_set: "output_style"
+      doc: """
+If a file successfully executes, this determines the style for
+outputting the resulting attribute space. Options are: "json",
+"pretty" (which gives tables), or "none". The default is "json".
+
+When passing in a stack of files files, when this happens is controlled by '--output-show-when', which defaults to 'last'.
+
+Note that this output goes to stdout; all other output goes to stderr.
+"""
+    }
+
+    flag_multi_choice show_when {
+      aliases: ["w", "when"]
+      choices: ["first", "last", "rest", "all"]
+      field_to_set: "show_when"
+      min:  1
+      max:  high()
+      doc: """
+For --show-* flags and --no-show-* flags this indicates for which phases the flags will apply. Choices are "first", "last", "rest" and "all". The default will be 'last'. If there is only one file passed, this flag is ignored.
+
+Note that this does not apply to spec files; see 'spec_when'.
+
+This also doesn't control for which files we'll show the final attribute output. For that, see 'output_show_when'.
+"""
+    }
+
+    flag_multi_choice spec_when {
+      aliases: ["spec-show-when"]
+      choices: ["first", "last", "rest", "all"]
+      field_to_set: "spec_when"
+      min:  1
+      max:  high()
+      doc: """
+For --show- flags and --no-show- flags this indicates for which spec files passed at the command line where the flags will apply. Choices are "first", "last", "rest" and "all". The default will be 'last'. If there is only one spec file passed, this flag is ignored (same if there are zero).
+"""
+    }
+
+    flag_multi_choice output_when {
+      aliases: ["output-show-when", "out-when", "out-show-when"]
+      choices: ["first", "last", "rest", "all"]
+      field_to_set: "output_when"
+      min:  1
+      max:  high()
+      doc: """
+When multiple con4m files are executed in a stack, controls when the final attributes are shown at the end. By default, this is "last".
+
+Note, to turn off output, use --output-style=none, in which case this flag is ignored.
+"""
+    }
+
+    flag_multi_arg spec {
+      aliases: ["specs"]
+      field_to_set: "specs"
+      doc: """
+C42 spec file(s) to load (in the given order). They are loaded before any con4m file passed as arguments to 'run', and then are used to do additional validation those files.
+"""
+    }
+
+    flag_multi_arg stub {
+      aliases: ["stubs"]
+      field_to_set: "stubs"
+      doc: """
+Automatically provide stubs for any listed functions that do nothing, to allow the program to finish checking and execute.
+"""
+    }
+
+    flag_choice stop_when {
+      aliases: ["stop", "x"]
+      choices: ["tokenize", "parse", "precheck", "eval", "postcheck"]
+      doc: """
+Stop the parse AFTER the given phase. Valid values are 'tokenize', 'parse', 'precheck', 'eval' and 'postcheck'; 'postcheck' is the default.
+
+Note that this only is ever applied to the *last* file named on the command line.
+"""
+    }
+  }
+
+flag_yn debug {
+      field_to_set: "debug_con4m"
+      doc: """
+Show *nim* stack traces when any error is output. This is intended to help diagnose compiler bugs. Note that we currently don't show con4m stack traces.
+"""
+  }
+
+  command gen {
+    aliases: ["generate", "spec", "specgen"]
+    args: (1, high())
+    doc:  """
+Auto-generates language-specific interface code, based on input spec files.
+"""
+    flag_choice language {
+      field_to_set: "language"
+      choices: ["nim", "none"]
+      doc: """
+The language for which to generate output. The default is 'none', which simply validates the spec as a valid c42 specification file. Valid values are currently "none" (validates only), and "nim". We expect to do Python, C and Go before 1.0.
+"""
+    }
+
+    flag_arg output_file {
+      field_to_set: "output_file"
+      doc: """
+Instead of writing to stdout, writes the generated code to the specified file. Ignored if the language is set to 'none'.
+"""
+    }
+  }
+
+  flag_help { }
+}

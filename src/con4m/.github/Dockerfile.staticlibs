@@ -1,0 +1,20 @@
+FROM ghcr.io/crashappsec/nim:ubuntu-2.0.0 as nim
+
+# https://github.com/actions/runner/issues/2033
+RUN if which git; then git config --global --add safe.directory "*"; fi
+
+# deps for compiling static deps
+RUN apt-get update -y && \
+    apt-get install -y \
+        autoconf \
+        cmake \
+        file \
+        g++ \
+        gcc \
+        git \
+        m4 \
+        make \
+        && \
+    apt-get clean -y
+
+WORKDIR /con4m

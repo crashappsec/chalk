@@ -1,0 +1,51 @@
+name: staticlibs
+
+on:
+  workflow_dispatch:
+    inputs:
+
+jobs:
+  buildlibs:
+    runs-on: ${{ matrix.builder }}
+
+    strategy:
+      matrix:
+        include:
+          - builder: ubuntu-latest
+            arch: amd64
+            os: linux
+          - builder: buildjet-2vcpu-ubuntu-2204-arm
+            arch: arm64
+            os: linux
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Show Static Libs
+        run: |
+          set -x
+          ls -la ~/.local/c0/libs/* || true
+          ls -la files/deps/lib/* || true
+
+      - name: Clean up existing libs
+        run: |
+          rm -rf files/deps/lib/*
+
+      - name: Build Static Libs
+        working-directory: ./.github
+        run: |
+          docker compose run --rm staticlibs nimble build
+
+      - name: Show Static Libs
+        run: |
+          set -x
+          ls -la ~/.local/c0/libs/* || true
+          ls -la files/deps/lib/* || true
+
+      - name: Save Artifact
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: ${{ matrix.os }}-${{ matrix.arch }}
+          path: ~/.local/c0/libs/*

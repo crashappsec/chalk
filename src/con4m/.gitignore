@@ -1,0 +1,8 @@
+nimcache/
+nimblecache/
+htmldocs/
+tests/t[^.]*[^m]
+tags
+*.dSYM
+/con4m
+files/con4m/parse

@@ -1,0 +1,7 @@
+enum A, B, C, D, E, F, G
+
+func test() {
+  echo(format("The integer value for the enum val F is: {F}"))
+}
+
+test()

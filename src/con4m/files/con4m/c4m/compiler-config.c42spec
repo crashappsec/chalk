@@ -1,0 +1,280 @@
+## This is the con4m specification for the config file to set up the
+## con4m command-line.
+##
+## None of this is generally used when linking to con4m, it is only
+## used for the con4m command line. However, you can get this
+## functionality programatically if you desire.
+
+root {
+  user_def_ok: true
+
+  field con4m_command {
+    type:     string
+    default:   ""
+    hidden:   true
+    doc:  """
+  This is set when parsing arguments, to tell us which command to run.
+  """
+  }
+
+  field con4m_args {
+    type: list[string]
+    default: []
+    hidden: true
+    doc: """
+  This is set  when parsing arguments.
+  """
+  }
+
+  field color {
+      type:     bool
+      require:  false
+      shortdoc: "Show Colors"
+      doc: """
+  Whether to output ANSI color. If this is not explicitly set, will respect
+  the presense of a NO_ANSI environment variable, but is otherwise on by default.
+"""
+  }
+
+  field show_tokens {
+    type:    bool
+    default: false
+    shortdoc: "Show Tokens"
+    doc: """
+When compiling, show tokens after the parsing phase, for the last specified con4m file passed.
+When multiple files are passed, only shows tokens for files based on the value of 'show_when' (which defaults to 'last').
+
+Override on the command line via '--show-tokens' or '--no-show-tokens'
+"""
+  }
+
+  field show_parse_tree {
+    type:    bool
+    default: false
+    shortdoc: "Show Parse Results"
+    doc: """
+Shows the UNTYPED parse tree after the parsing phase, but before the checking phase.
+
+Applied based on the value of 'show_when'.
+
+Override on the command line via '--show-parse-tree' (aka '-p' or '--parse'), or '--no-show-parse-tree' (aka '-P' or '--no-parse')
+"""
+  }
+
+  field show_checked_tree {
+    type: bool
+    default: false
+    shortdoc: "Show Typed Tree"
+    doc: """
+It's Christmas! Show the typed parse tree after the checking phase.
+Applied based on 'show_when'.
+
+Override on the command line via '--show-checked-tree' (aka '-t' or '--show-tree'), or '--no-show-checked-tree (aka '-T' or '--no-show-tree')
+"""
+  }
+
+  field show_spec_tokens {
+    type:    bool
+    default: false
+    shortdoc: "Show Tokens for Specs"
+    doc: """
+When compiling, show tokens for c42 spec files after the parsing phase, for the last specified spec file passed.
+
+Applied based on the value of 'spec_show_when'.
+
+Override on the command line via '--show-spec-tokens' or '--no-show-spec-tokens'
+"""
+  }
+
+  field show_spec_parse_tree {
+    type:    bool
+    default: false
+    shortdoc: "Show C42 Spec Parse"
+    doc: """
+Shows the uncheck parse tree for spec files.
+Applied based on the value of 'show_spec_when'.
+
+Override on the command line via '--show-spec-parse-tree' (aka '--spec-parse'), or '--no-show-spec-parse-tree' (aka '--no-spec-parse')
+"""
+  }
+
+  field show_spec_checked_tree {
+    type: bool
+    default: false
+    shortdoc: "Show C42 Typed Tree"
+    doc: """
+Specs deserve their time in lights. Show their typed parse tree after the checking phase.
+ Applied based on the value of 'show_spec_when'.
+
+Override on the command line via '--show-spec-checked-tree' (aka '--spec-show-tree'), or '--no-show-spec-checked-tree (aka '--no-spec-show-tree')
+"""
+  }
+
+  field specs {
+    type:    list[string]
+    default: []
+    doc: """
+C42 spec file(s) to load (in the given order). They are loaded before any con4m file passed as arguments to 'run', and then are used to do additional validation those files.
+
+Override on the command line via --specs=...
+
+This is ignored via API calls; you're expected to explicitly add your own specs.
+"""
+  }
+
+  field show_funcs {
+    type: bool
+    default: false
+    doc: """
+Show the function table, after checking but before evaluating.
+With multiple config files, this only ever gets applied in the last phase.
+
+If you want to see this before checking begins (when new functions will not be typed yet), use 'show_untyped_funcs'.
+
+Override on the command line via '--show-funcs' (aka '-f', '--funcs') or '--no-show-funcs' (aka '-F', '--no-funcs')
+
+This attribute does not apply to spec files.
+"""
+  }
+
+  field show_untyped_funcs {
+    type: bool
+    default: false
+    doc: """
+Shows the function table for the last file passed, before the checking phase begins, before functions are typed. Note that builtins and functions from previous files in the stack will be typed.
+
+Override on the command line via '--show-untyped-funcs' (aka '-u', '--untyped-funcs') or '--no-show-untyped-funcs' (aka '-U', '--no-untyped-funcs')
+
+This attribute does not apply to spec files.
+"""
+  }
+
+  field output_style {
+    type:   string
+    choice: ["json", "pretty", "raw", "none"]
+    default: "json"
+
+    doc: """
+If a file successfully executes, this determines the style for
+outputting the resulting attribute space. Options are: "json",
+"pretty" (which gives tables), "raw" (which gives unfomatted json)
+or "none". The default is "json".
+
+When passing in a stack of files files, when this happens is controlled by 'output_show_when', which defaults to 'last'.
+
+Note that this output goes to stdout; all other output goes to stderr.
+
+On the command line, this can be overridden with '--output-style=...' (aka '-o')
+
+This field is never used when programatically invoking a con4m stack; you're expected to print the results you need yourself (the debug outputting of intermediate states *is* however observed).
+"""
+  }
+
+  field show_when {
+    type: list[string]
+    validator: func show_when_check
+    default: ["last"]
+    doc: """
+For show_* fields, this indicates for which phases of a stack the option will apply. Choices are "first", "last", "rest", "none" or "all". The default will be 'last'. The 'first' item is the first item in any stack you create, and the 'last' item is the last most item every time you call run() on a stack. If you are incrementally running a stack from your own program, you should set this to "none" until you are ready to have the flags apply, then set this before running your stack.
+
+Note that this does not apply to spec files; that's done with the field 'spec_when'.
+
+This also doesn't control for which files we'll show the final attribute output. For that, see 'output_when'.
+
+On the command line, this can be overridden with '--show-when=...' (aka '-w')
+"""
+  }
+
+  field spec_when {
+    type: list[string]
+    validator: func show_when_check
+    default: ["last"]
+    doc: """
+Same as show_when, but applied to spec files in a stack.
+On the command line, this can be overridden with '--spec-when=...'
+"""
+  }
+
+  field output_when {
+    type: list[string]
+    validator: func show_when_check
+    default: ["last"]
+    doc: """
+This is only checked when using con4m on the command-line, not via API. It controls whether attributes are printed after a config gile completes execution or not. Valid choices are "first", "last", rest", or "all".
+
+Shutting off all output is handled by setting the output style, which is the attribute 'output_style'.
+
+This value can be overriden on the command line with '--output-when='.
+"""
+  }
+
+  field stubs {
+    type:    list[string]
+    default: []
+    doc:     """
+Automatically generates functions for the named items with the con4m signatures you provide. Those functions will do nothing. However, this is an easy way to allow full checking of files via the con4m command line, even if you provide application-specific builtins. Basically, just drop the signatures of those builtins into this field in ~/.config/con4m/con4m.conf and go!
+
+This currently only works from the command line.
+"""
+  }
+
+  field stop_when {
+    type:   string
+    choice: ["tokenize", "parse", "precheck", "eval", "postcheck"]
+    default: "postcheck"
+    doc: """
+For the last file in a stack of con4m files, stop evaluating after the specified phase. The default is 'postcheck'.
+
+You can override this on the command line via '--stop-when' (aka '--stop', '-x')
+"""
+  }
+
+  field debug_con4m {
+    type: bool
+    default: false
+    doc: """
+When true, this will cause con4m to produce *nim* stack traces any time an error is output. This is intended to help diagnose compiler bugs. There currently is no ability to see con4m stack traces.
+"""
+}
+
+  field language {
+    type:   string
+    choice: ["nim", "none"]
+    default: "none"
+    doc: """
+When running the con4m 'gen' command via the command line, this field determines the language for which to generate output. The default is 'none', which simply validates the spec as a valid c42 specification file. Valid values are currently "none" (validates only), and "nim". We expect to do Python, C and Go before 1.0.
+
+This field does nothing when using con4m programatically.
+
+On the command line, you can override this with the '--language=' flag.
+"""
+  }
+
+  field output_file {
+    type: string
+    require: false
+    doc: """
+When running the con4m 'gen' command from the command line, this field sets the location for writing any generated output. If not provided, any output will go to stdout.
+
+This is not ever used if calling con4m via API.
+
+On the command line, override this with '--output-file='
+"""
+  }
+}
+
+when_opts := ["first", "last", "rest", "all"]
+export when_opts
+
+func show_when_check(path, val: list[string]) {
+  result := ""
+
+  if val.contains("all") and len(val) != 1 {
+    return "'all' may not appear with other options."
+  }
+  for i from 0 to len(val) {
+    if not (when_opts.contains(val[i])) {
+      return "Unknown value; valid options are: first, last, rest, all"
+    }
+  }
+}

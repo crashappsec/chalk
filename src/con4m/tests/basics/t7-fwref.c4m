@@ -1,0 +1,17 @@
+x := 0
+
+for i from 1 to 10 {
+  x := doFact(i)
+  echo(format("Fact({i}) = {x}"))
+}
+
+func fact(f) {
+  result := 1
+  for i from 1 to f {
+    result := result * i
+  }
+}
+
+func doFact(f) {
+  return fact(f)
+}

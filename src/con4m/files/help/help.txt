@@ -1,0 +1,12 @@
+%{H Usage: {appName} [FLAGS] FILE ... }%
+%{H        {appName} specgen [FLAGS] FILE }%
+%{H        {appName} help [TOPIC] }%
+
+Con4m makes it EASY to build custom configuration files for your application that are fully validated to your specification. Your users can write in a simple, familiar format, but have access a lot more power, if needed. They can even easily write custom callbacks for you to call from your own environment. Plus, Con4m makes it easy to 'stack' configurations on top of each other, to customize environment variables, to reload configurations at runtime, etc.
+
+Con4m is accessible via command or API (currently from C or Nim, with Python and Go coming soon).
+
+%{H More information}%
+{bold}'{appName} help cmd'{reset} for an overview of the command line functionality, including arguments.
+{bold}'{appName} help overview'{reset} for an overview of the language.
+{bold}'{appName} help topics'{reset} for a list of all available help topics.

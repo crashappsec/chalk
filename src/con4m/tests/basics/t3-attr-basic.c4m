@@ -1,0 +1,14 @@
+defaults {
+ color: "blue"
+ hair: "wavy"
+ faves: ["x", "y", "z"]
+}
+
+# die := die + 1
+
+echo(defaults.color)
+echo(defaults.hair)
+
+for i from 0 to len(defaults.faves) {
+  echo(defaults.faves[i])
+}

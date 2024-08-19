@@ -1,0 +1,49 @@
+%{H Command line overview}%
+When running con4m the command line, by default, the 'compile' command runs, which executes con4m configuration files, and outputs the resulting configuration state, either as JSON, or in a pretty-printed table.
+
+If multiple config files are provided, they are executed 'stacked', run one after another, in the order in which they appear on the command-line.
+
+Configurations can be validated extensively if you provide a 'c42' spec file to validate against. See {bold}'{appName} help spec'{reset} for an example.
+
+Full con4m capabilities, particularly being able to run user-defined callbacks on-demand from your application, require calling con4m directly. Currently, con4m works natively with Nim, and provides a C API (libcon4m), which we intend to wrap for additional programming languages.
+
+The con4m compiler is capable of generating code to load native data structures and provide get/set interfaces for supported languages.  To do this, you provide a schema in the form of a 'c42' spec file, and run the 'specgen' command.
+
+%{H FLAGS}%
+The following flags work for both compilation and spec generation:
+%{T
+Short::Long::Description
+-a::--attr-output=ARG::If the run successfully executes, this determines the style for outputting the resulting attribute space.  Options are: "json", "pretty" (which gives tables), or "none".  The default is "json", which prints attribute results to stdout, and only after all stacked configs are run.  The "pretty" option will output state after each stacked config file runs.
+-k::--show-tokens::Show tokens after the parsing phase (if reached)
+-t::--show-parse-tree::Shows the UNTYPED parse tree after the parsing phase (if reached), but before the checking phase.
+-x::--show-checked-tree::It's Christmas! Show the typed parse tree after the checking phase.
+-F::--show-funcs::Show the function table once execution ends successfully.
+-C::--no-color::Disable ANSI colors in output. This overrides the presence or absence of a 'NO_COLORS' environment variable.
+-d::--debug::Turn on any custom runtime tracing, including stack traces for errors
+::--tokenize::Alias for --phase=tokenize
+::--parse::Alias for --phase=parse
+::--check::Alias for --phase=check
+::--pretty::Alias for --attr-output=pretty
+::--none::Alias for --attr-output=none
+-h::--help::This help message
+}%
+
+Additionally, the 'compile' command takes the following flags:
+%{T
+Short::Long::Description
+-p::--phase=ARG::Stop the parse after the given phase. Valid values are 'tokenize', 'parse', 'check', 'eval'; 'eval' is the default.
+-s::--spec=ARG::Before beginning, load a con4m 'c42spec' file, and then apply it to the c4m files that are parsed, to do additional validation.
+}%
+
+The 'specgen' command takes only a single argument, the c42 specification file to validate and generate code for.  This command takes the following flags:
+%{T
+Short::Long::Description
+-l::--language=ARG::The language for which to generate output.  Currently, this MUST be provided.  Valid values are "none" (validates only), and "nim".  C is coming soon.
+-o::--output-file=ARG::Instead of writing to stdout, writes the generated code to the specified file.  Ignored if the language is set to "none".
+}%
+
+%{H More Information}%
+{bold}'{appName} help overview'{reset} for an overview of the language.
+{bold}'{appName} help specs'{reset} for details on working with Con4m specifications for additional checking.
+{bold}'{appName} help con4m'{reset} for an overview of the con4m config file format (and language).
+{bold}'{appName} help topics'{reset} for a list of all available help topics.

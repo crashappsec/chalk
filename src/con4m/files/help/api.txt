@@ -1,0 +1,2 @@
+%{H API Docs: Coming Soon.}%
+Until then, see either the Nim source code, or "con4m.h" for the C interface.

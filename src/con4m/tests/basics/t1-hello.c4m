@@ -1,0 +1,8 @@
+x = 12485
+y = 400
+
+m = "foo" + "bar"
+
+echo(m)
+
+if (x > y) { echo("true") }

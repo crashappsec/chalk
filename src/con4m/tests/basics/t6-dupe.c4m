@@ -1,0 +1,25 @@
+func fact(f) {
+  if (f <= 1) {
+    result := f
+    return
+  }
+  return fact(f - 1) * f
+}
+
+x := 0
+
+for i from 1 to 10 {
+  x := fact(i)
+  echo(format("Fact({i}) = {x}"))
+}
+
+func doFact(f) {
+  return fact(f)
+}
+
+func fact(f) {
+  result := 1
+  for i from 1 to f {
+    result := result * i
+  }
+}

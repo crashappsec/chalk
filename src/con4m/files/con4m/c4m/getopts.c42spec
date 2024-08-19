@@ -1,0 +1,1227 @@
+### Default doc strings
+default_aliases_doc := """
+A list of additional names for this flag. Can include single
+character and longer flag names.
+"""
+
+default_doc_doc := """
+Documentation that will be printed for this flag, when requested.
+"""
+
+default_callback_doc := """
+The supplied con4m function will be called to do any work you wish to
+do, such as additional error checking, setting con4m fields with the
+value etc.
+
+If you return anything other than the empty string, we assume it's an
+error message to be given to the user due to validation failing.
+"""
+
+default_field_to_set_doc := """
+If supplied, once the command line is successfully parsed and any
+callbacks are run, the field named here will be set as an override.
+Note that we assume you will have not previously locked or overridden
+the field, or else the setting will not happen.
+
+The destination field must exist in your c42 spec, and be of the right
+type.
+"""
+
+default_choices_doc := """
+A list of valid choices for when this flag is provided.
+"""
+
+default_choice_flags_doc := """
+When true, for each possible choice in the 'choices' field,
+we will generate a flag that can be independently provided.
+For instance, if you do:
+
+flag_choice log_level {
+  choices:      ["info", "warn", "error"]
+  choice_flags: true
+}
+
+Then you will be able to do both:
+
+mycmd --loglevel= warn
+mycmd --warn
+"""
+
+##### End of default doc strings.
+object flag_yn {
+  user_def_ok: false
+
+  field yes_aliases  {
+    type:       list[string]
+    default:    []
+    write_lock: true
+    hidden:     true
+    doc: """
+A list of alternate flag-names that substitute for the 'yes' value.
+These flags are *not* given yes/no prefixes. This is primarily
+intended to be used for single-character flags.
+"""
+  }
+  field no_aliases  {
+    type:       list[string]
+    default:    []
+    write_lock: true
+    hidden:     true
+    doc: """
+A list of alternate flag-names that substitute for the 'yes' value.
+These flags are *not* given yes/no prefixes. This is primarily
+intended to be used for single-character flags.
+"""
+  }
+
+  field yes_prefixes {
+    type:       list[string]
+    require:    false    # inherits the global property if not provided.
+    write_lock: true
+    hidden:     true
+    doc:        """
+What prefixes to use for the 'yes' value. See the global version of
+this field for more detail (that field provides the default).
+"""
+  }
+
+  field no_prefixes  {
+    type:       list[string]
+    require:    false    # inherits the global property if not provided.
+    write_lock: true
+    hidden:     true
+    doc:        """
+What prefixes to use for the 'no' value. See the global version of
+this field for more detail (that field provides the default).
+"""
+  }
+  field doc  {
+    type:       string
+    default:    "There is no documentation for this option."
+    write_lock: true
+    hidden:     true
+    doc:        default_doc_doc
+  }
+
+  field shortdoc {
+    type:       string
+    default:    "Currently unused."
+    write_lock: true
+    hidden:     true
+    doc:        default_doc_doc
+  }
+
+  field callback  {
+    type:       func (bool) -> string
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func callback_exists_check
+    doc:        default_callback_doc
+  }
+
+  field field_to_set {
+    type:       string
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func field_type_bool_check
+    doc:        default_field_to_set_doc
+  }
+}
+
+singleton flag_help {
+  user_def_ok: false
+
+  field names  {
+    type:        list[string]
+    default:     ["help", "h"]
+    write_lock:  true
+    hidden:      true
+    doc:         """
+Flags that should produce a help message.
+"""
+  }
+
+  field doc {
+    type:       string
+    default:    "Shows a help message for this command."
+    write_lock: true
+    hidden:     true
+    doc:        default_doc_doc
+  }
+}
+
+object flag_choice {
+  user_def_ok: false
+
+  field aliases  {
+    type:        list[string]
+    default:     []
+    write_lock:  true
+    hidden:      true
+    doc:         default_aliases_doc
+  }
+
+  field choices {
+    type:        list[string]
+    require:     true
+    write_lock:  true
+    hidden:      true
+    doc:         default_choices_doc
+  }
+
+  field add_choice_flags {
+    type:        bool
+    default:     false
+    write_lock:  true
+    hidden:      true
+    doc:         default_choice_flags_doc
+  }
+
+  field doc  {
+    type:       string
+    default:    "There is no documentation for this option."
+    write_lock: true
+    hidden:     true
+    doc:        default_doc_doc
+  }
+
+  field callback  {
+    type:       func (string) -> string
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func callback_exists_check
+    doc:        default_callback_doc
+  }
+
+  field field_to_set {
+    type:       string
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func field_type_string_check
+    doc:        default_field_to_set_doc
+  }
+}
+
+object flag_arg {
+  user_def_ok: false
+
+  field aliases  {
+    type:        list[string]
+    default:     []
+    write_lock:  true
+    hidden:      true
+    doc:         default_aliases_doc
+  }
+
+  field doc  {
+    type:       string
+    default:    "There is no documentation for this option."
+    write_lock: true
+    hidden:     true
+    doc:        default_doc_doc
+  }
+
+  field callback  {
+    type:       func (string) -> string
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func callback_exists_check
+    doc:        default_callback_doc
+  }
+
+  field field_to_set {
+    type:       string
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func field_type_string_check
+    doc:        default_field_to_set_doc
+  }
+
+  field optional_arg {
+    type:        bool
+    default:     false
+    hidden:      true
+    doc:         """
+When this is true, if no argument is provided, we assume the empty string. Specifically, this means:
+
+{bold}--foo bar{reset}
+
+Will assume the argument to --foo is the empty string, and that bar is an actual command argument.
+
+Note that, even if this is not set, --foo= --boz will *not* treat --boz as an argument to foo, it will set the value to the empty string.
+
+Plenty of people do accidentally leave off the '=', or are used to commands that allow the space, so we recommend leaving this off when possible.
+"""
+  }
+}
+
+object flag_multi_arg {
+  user_def_ok: false
+
+  field aliases  {
+    type:        list[string]
+    default:     []
+    write_lock:  true
+    hidden:      true
+    doc:         default_aliases_doc
+  }
+
+  field doc  {
+    type:       string
+    default:    "There is no documentation for this option."
+    write_lock: true
+    hidden:     true
+    doc:        default_doc_doc
+  }
+
+  field callback  {
+    type:       func (list[string]) -> string
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func callback_exists_check
+    doc:        default_callback_doc
+  }
+
+  field field_to_set {
+    type:       string
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func field_type_strarr_check
+    doc:        default_field_to_set_doc
+  }
+
+  field optional_arg {
+    type:        bool
+    default:     false
+    hidden:      true
+    doc:         """
+When this is true, if no argument is provided, we assume the empty string. Specifically, this means:
+
+{bold}--foo bar{reset}
+
+Will assume the argument to --foo is the empty string, and that bar is an actual command argument.
+
+Note that, even if this is not set, --foo= --boz will *not* treat --boz as an argument to foo, it will set the value to the empty string.
+
+Plenty of people do accidentally leave off the '=', or are used to commands that allow the space, so we recommend leaving this off when possible.
+"""
+  }
+}
+
+object flag_multi_choice {
+  user_def_ok: false
+
+  field aliases  {
+    type:        list[string]
+    default:     []
+    write_lock:  true
+    hidden:      true
+    doc:         default_aliases_doc
+  }
+
+  field doc  {
+    type:       string
+    default:    "There is no documentation for this option."
+    write_lock: true
+    hidden:     true
+    doc:        default_doc_doc
+  }
+
+  field callback  {
+    type:       func (list[string]) -> string
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func callback_exists_check
+    doc:        default_callback_doc
+  }
+
+  field field_to_set {
+    type:       string
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func field_type_strarr_check
+    doc:        default_field_to_set_doc
+  }
+
+  field choices {
+    type:        list[string]
+    require:     true
+    write_lock:  true
+    hidden:      true
+    doc:         default_choices_doc
+  }
+
+  field add_choice_flags {
+    type:        bool
+    default:     false
+    write_lock:  true
+    hidden:      true
+    doc:         default_choice_flags_doc
+  }
+
+  field min {
+    type:        int
+    default:     1
+    write_lock:  true
+    hidden:      true
+    validator:   func be_at_least_1
+    doc:         """
+The minimum number of choices a user must provide when giving the flag.
+"""
+  }
+
+  field max {
+    type:        int
+    default:     high()
+    write_lock:  true
+    validator:   func be_greater_than_or_eq_to_min
+    hidden:      true
+    doc:         """
+The maximum number of choices a user may provide when giving the flag.
+"""
+  }
+}
+
+singleton topics {
+  user_def_ok: true
+  validator:   func extra_topic_check
+}
+
+object command {
+  user_def_ok: false
+  validator:   func consistency_check
+
+  allow flag_yn           {}
+  allow flag_help         {}
+  allow flag_choice       {}
+  allow flag_multi_choice {}
+  allow flag_arg          {}
+  allow flag_multi_arg    {}
+  allow command           {}
+  allow topics            {}
+
+  field aliases  {
+    type:        list[string]
+    default:     []
+    write_lock:  true
+    hidden:      true
+    doc:         "A list of aliases for this command."
+  }
+
+  field args {
+    type:       tuple[int, int]
+    default:    (0, 0)
+    write_lock: true
+    hidden:     true
+    validator:  func arg_range_check
+    doc: """
+The range for the number of allowed arguments for this command.
+Defaults to (0, 0).
+"""
+  }
+
+  field doc  {
+    type:       string
+    default:    "There is no documentation for this command."
+    write_lock: true
+    hidden:     true
+    doc:        """
+Documentation for this command that will be printed when the
+autogenerated 'help' command runs. A summary of arguments will also
+be output.
+"""
+  }
+
+  field shortdoc {
+    type:       string
+    default:    "There is no help for this command."
+    write_lock: true
+    hidden:     true
+    doc:        default_doc_doc
+  }
+
+  field arg_name {
+    type:    string
+    default: "ARG"
+    hidden:  true
+    doc:     "Used only when printing USAGE in help."
+  }
+
+  field callback  {
+    type:       func (list[string]) -> void
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func callback_exists_check
+    doc:        """
+
+This callback will run after all other validation callbacks, passing
+in the arguments specifically for this command.
+"""
+  }
+
+  field arg_sub_mutex {
+    type:       bool
+    default:    true
+    write_lock: true
+    hidden:     true
+    doc:        """
+When true, the value specified for the 'args' field will be assumed to
+only apply in the case that no sub-command is given. If a sub-command
+is given, but it shows up after some stray args that would belong to
+this command, then the user will get an error.
+
+If this is set to 'false', you will need to explicitly check each
+parent command for arguments.
+
+Setting this to 'false' can be useful in situations when you want to
+be more tolerant of errors, particularly for 'help' commands. There,
+it may be worth doing the extra effort to check and give them some
+more detailed guidance than what con4m would automate.
+"""
+  }
+
+  field ignore_all_flags {
+    type:       bool
+    default:    false
+    write_lock: true
+    hidden:     true
+    validator:  func no_flag_check
+    doc:        """
+When this is true, we assume you want to pass all remaining arguments
+through to some other thing, and that we should do no more parsing,
+just return everything else as args.
+
+This means:
+
+1) ignore_bad_flags cannot be true.
+2) There cannot be defined sub-commands.
+3) You probably want to set args to (0, high())
+"""
+  }
+  field ignore_bad_flags {
+    type:       bool
+    require:    false
+    write_lock: true
+    hidden:     true
+    doc:        """
+When this is true, unrecognized flags will be passed through as
+arguments.
+"""
+  }
+
+  field dash_arg_space_optional {
+    type: bool
+    default: true
+    write_lock: true
+    hidden: true
+    doc: """
+When this is true, -ffoo will be considered the same as: {bold}-f=foo{reset}
+When it's false, we treat it as: {bold}-f -f -o -o{reset}
+
+This is only checked for single-dash arguments where the flag is a single character, even if true.
+"""
+  }
+
+  field colon_ok {
+    type:     bool
+    require:  false
+    hidden:   true
+    doc: """
+Most people are used to = separating a flag name from its arguments; eg, {bold} mycommand --myflag=true{reset}. However, there are some corners of the world where a space separates, and some where they use colons.
+
+Our view is, "why not all of the above?" We aim to make the command line "do what the user means" whenever possible, even if they add in spaces, or use :, because they're used to it.
+
+With the colon, there's very little downside to leaving that on, since neither is commonly used in the actual name of a flag. So that's the default, but if you want to turn off colon support, you can.
+
+When you turn this on or off for a command, the value is automatically picked up by subcommands, unless you explicitly set it for them.
+
+"""
+  }
+
+  field space_ok {
+    type:     bool
+    require:  false
+    hidden:   true
+    doc: """
+If this is on, for non-optional arguments, we accept: {bold}--foo=bar, --foo= bar, --foo =bar and --foo bar{reset}.
+
+If it is off, we *only* accept --foo=bar. We call this 'docker' style. Personally, we prefer to be more forgiving, so 'true' is the default.
+
+Even when this is on, if a particular flag has an optional argument, we need a way to resolve that ambiguity, and the way we resolve it is by making the space NOT okay. So if --foo had an optional argument, the last one above would not be allowed, even if space_ok is on.
+
+When you turn this on or off for a command, the value is automatically picked up by subcommands, unless you explicitly set it for them.
+"""
+  }
+}
+
+singleton getopts {
+  user_def_ok: false
+  validator:   func consistency_check
+
+  allow flag_yn           {}
+  allow flag_help         {}
+  allow flag_choice       {}
+  allow flag_multi_choice {}
+  allow flag_arg          {}
+  allow flag_multi_arg    {}
+  allow command           {}
+  allow topics            {}
+
+  field args {
+    type:       tuple[int, int]
+    require:    false
+    write_lock: true
+    hidden:     true
+    validator:  func arg_range_check
+    doc: """
+The range for the number of allowed arguments for your parse before any
+specified command appears (if any does).
+
+This does not need to be provided. If it isn't, then the value will be
+set based on whether the user provided any commands. If commands are
+provided, then it's set to (0, 0) to indicate no arguments allowed.
+Otherwise, it's set to (0, high()) to indicate any number of
+arguments.
+"""
+  }
+
+  field doc {
+    type:       string
+    default:    "There is no help for this command."
+    write_lock: true
+    hidden:     true
+    doc:        default_doc_doc
+  }
+
+  field shortdoc {
+    type:       string
+    default:    "There is no help for this command."
+    write_lock: true
+    hidden:     true
+    doc:        default_doc_doc
+  }
+
+  field arg_name {
+    type:    string
+    default: "ARG"
+    hidden:  true
+    doc:     "Used only when printing USAGE in help."
+  }
+
+  field command_attribute {
+    type:       string
+    require:    false
+    validator:  func command_attribute_check
+    write_lock: true
+    hidden:     true
+    doc: """
+When provided, the value of 'command' will be set (as an override) to
+the con4m attribute named.
+
+The attribute provided must be of type "string".
+"""
+  }
+
+  field flag_attribute {
+    type:       string
+    require:    false
+    validator:  func flag_attribute_check
+    write_lock: true
+    hidden:     true
+    doc: """
+
+When provided, the resulting flag values from the command line parse
+will be stored in the con4m attribute named, as an override.
+
+The attribute provided must be of type: dict[string, string]
+
+All flag values are stored as strings if put into this dict.
+"""
+  }
+
+  field arg_attribute {
+    type:       string
+    require:    false
+    validator:  func arg_attribute_check
+    write_lock: true
+    hidden:     true
+    doc: """
+When provided, the resulting argument values from the command line
+parse will be stored in the con4m attribute named, as an override.
+
+The attribute provided must be of type: dict[string, seq[string]]
+
+The keys are the commands, where the root command is "". so if you
+have a tree of commands, like './myexe eks add container foo', where
+'foo' is an arg and 'myexe' is the executable, the top-level command
+will be 'eks', the subcommand will be 'add', and 'container' will be
+the sub-sub-command. Each command can have its own args before any
+sub-command that get correlated seprately.
+
+So here, the only thing with arguments is the sub-sub-command, so the
+resulting value wiil be:
+
+{ "eks.add.container" : ["foo"] }
+"""
+  }
+
+  field default_command {
+    type:       string
+    require:    false
+    write_lock: true
+    hidden:     true
+    # TODO: write a validator.
+    doc: """
+If provided, we try to guess which command is being run based on the
+arguments.
+
+If it's not provided, we assume that no command *is* a command.
+
+As a special option, you may set this to the string "?", which
+indicates that con4m should find every top-level command that would
+parse if assumed. When there's ambiguity, no callback items are set;
+the parse gets delayed, until you programatically call it to choose
+one. But, you can still access the various parses.
+
+We built this feature for our 'chalk' tool, where we want people to be
+able to customize and rename it (embedding the config in the binary),
+and have their configuration work without any command line parameters.
+
+Therefore, the embedded config might have the command we should
+choose. However, there are global flags that should be set before the
+config file is executed (for instance, whether to display color, since
+the config file might lead to output).
+
+When we get an ambiguous parse, we can confidently look at ANY parse's
+global flags to determine whether to put color on. Then we can run
+the config file before finalizing the command we chose.
+
+In the case of an ambiguous parse, if you provide a value for
+"command_attribute", it will be set with the value "?", which will be
+replaced once resolved.
+
+Similarly, flag_attribute will be populated with the values from the
+first matching parse. You will not have access to other flag sets
+until the command is finalized.
+"""
+  }
+
+  field default_yes_prefixes {
+    type:       list[string]
+    default:    []
+    write_lock: true
+    hidden:     true
+    validator:  func global_yes_prefixes_check
+    doc: """
+Gives a list of prefixes to automatically add to yn flags, that will
+be assigned the boolean value 'true' when the flag is provided on the
+command line.
+
+If the value given for this property is [], then it assumes the name
+itself *is* the yes version, instead of it being a flag that takes an
+arg.
+
+For instance, if you have a y/n flag called 'recursion', when this is
+set to ["enable"] (and default_no_prefixes set to ["disable"]), you
+will get the following flags:
+
+--enable-recursion
+--disable-recursion
+--recursion=[enable|disable]
+"""
+  }
+
+  field default_no_prefixes {
+    type:       list[string]
+    default:    ["no"]
+    write_lock: true
+    hidden:     true
+    validator:  func global_no_prefixes_check
+    doc: """
+Gives a list of prefixes to automatically add to yn flags, that will
+be assigned the boolean value 'true' when the flag is provided on the
+command line.
+"""
+  }
+
+  field show_doc_on_err {
+    type:       bool
+    default:    true
+    write_lock: true
+    hidden:     true
+    doc: """
+If this is true, any error will cause the current parsed command's
+'help' message to be displayed, and the error command to be returned.
+"""
+  }
+
+  field ignore_bad_flags {
+    type:       bool
+    default:    false
+    write_lock: true
+    hidden:     true
+    doc:        """
+When this is true, unrecognized flags will be passed through as
+arguments.
+"""
+  }
+
+  field dash_arg_space_optional {
+    type: bool
+    default: true
+    write_lock: true
+    hidden: true
+    doc: """
+When this is true, -ffoo will be considered the same as: {bold}-f=foo{reset}
+When it's false, we treat it as: {bold}-f -f -o -o{reset}
+
+This is only checked for single-dash arguments where the flag is a single character, even if true.
+"""
+  }
+
+  field colon_ok {
+    type:     bool
+    default:  true
+    hidden:   true
+    doc: """
+Most people are used to = separating a flag name from its arguments; eg, {bold} mycommand --myflag=true{reset}. However, there are some corners of the world where a space separates, and some where they use colons.
+
+Our view is, "why not all of the above?" We aim to make the command line "do what the user means" whenever possible, even if they add in spaces, or use :, because they're used to it.
+
+With the colon, there's very little downside to leaving that on, since neither is commonly used in the actual name of a flag. So that's the default, but if you want to turn off colon support, you can.
+
+When you turn this on or off for a command, the value is automatically picked up by subcommands, unless you explicitly set it for them.
+
+"""
+  }
+
+  field space_ok {
+    type:     bool
+    default:  true
+    hidden:   true
+    doc: """
+If this is on, for non-optional arguments, we accept: {bold}--foo=bar, --foo= bar, --foo =bar and --foo bar{reset}.
+
+If it is off, we *only* accept --foo=bar. We call this 'docker' style. Personally, we prefer to be more forgiving, so 'true' is the default.
+
+Even when this is on, if a particular flag has an optional argument, we need a way to resolve that ambiguity, and the way we resolve it is by making the space NOT okay. So if --foo had an optional argument, the last one above would not be allowed, even if space_ok is on.
+
+When you turn this on or off for a command, the value is automatically picked up by subcommands, unless you explicitly set it for them.
+"""
+  }
+
+
+  # TODO
+  field error_command {
+    type:       string
+    default:    "error"
+    write_lock: true
+    hidden:     true
+    validator:  func error_command_check
+    doc: """
+After parsing, this command will be set if there are any errors.
+"""
+  }
+
+  field add_help_commands {
+    type:       bool
+    default:    true
+    write_lock: true
+    hidden:     true
+    doc: """
+When true, all commands will have a default subcommand called 'help'
+added, which will print out the doc string for the command, if
+provided, or a reasonable error message if not.
+"""
+  }
+}
+
+func be_at_least_1(property, value) {
+  if value >= 1 {
+    return ""
+  }
+  return "Value for 'min' must be at least 1."
+}
+
+func be_greater_than_or_eq_to_min(property, value) {
+  base, me := attr_split(property)
+  max := attr_get(base + ".max", int)
+  if max >= value {
+    return ""
+  }
+  return "Max must not be smaller than 'min'"
+}
+
+func arg_range_check(property, range: tuple[int, int]) {
+  result   := ""
+  min, max := range
+
+  if min > max {
+    return "Minimum # of args cannot be larger than the maximum value"
+  }
+  if min < 0 {
+    return "Minimum # of args cannot be less than 0"
+  }
+}
+
+func no_flag_check(property, value) {
+  result := ""
+
+  if value == false {
+    return
+  }
+  base, me := attr_split(property)
+  ignore_name := base + ".ignore_bad_flags"
+  if attr_exists(ignore_name) and attr_get(ignore_name, bool) {
+    return "cannot have 'no_flag' and 'ignore_bad_flags' true at the same time"
+  }
+  if sections(base).contains("command") {
+    return "cannot have subcommands when 'no_flag' is true"
+  }
+}
+
+func attr_type_check(value: string, type: typespec) {
+  result := ""
+  if not typecmp(attr_type(value), type) {
+    return "attribute '" + value + "' must be of type: " + $(type)
+  }
+}
+
+func command_attribute_check(property, value) {
+  return attr_type_check(value, string)
+}
+
+func flag_attribute_check(property, value: string) {
+  return attr_type_check(value, dict[string, dict[string, string]])
+}
+
+func arg_attribute_check(property, value: string) {
+  return attr_type_check(value, list[string])
+}
+
+func global_yes_prefixes_check(property, yes_prefixes: list[string]) {
+  base, me := attr_split(property)
+  no_prefixes := attr_get(base + ".default_no_prefixes", list[string])
+  for i from 0 to len(yes_prefixes) {
+    if no_prefixes.contains(yes_prefixes[i]) {
+      return "no- prefixes cannot be identical to yes- prefixes."
+    }
+  }
+  result := ""
+}
+
+func global_no_prefixes_check(property, no_prefixes: list[string]) {
+  base, me := attr_split(property)
+  yes_prefixes := attr_get(base + ".default_yes_prefixes", list[string])
+  for i from 0 to len(yes_prefixes) {
+    if no_prefixes.contains(yes_prefixes[i]) {
+      return "no- prefixes cannot be identical to yes- prefixes."
+    }
+  }
+  result := ""
+}
+
+func error_command_check(property, value) {
+  result := ""
+  base, me := attr_split(property)
+  commands := sections(base + ".command")
+
+  if commands.contains(value) {
+    return "Cannot have the same value as a top-level command."
+  }
+}
+
+func callback_exists_check(property, value) {
+  if function_exists(value) {
+    return ""
+  }
+  return "Callback " + $(value) + " was specified but can't be found"
+}
+
+func field_type_bool_check(property, value) {
+  result := ""
+
+  if not attr_exists(value) { return; }
+
+  actual_type := attr_type(value)
+
+
+  if not typecmp(actual_type, bool) {
+    return ("Invalid type for specified field: " + value +
+            ". It should be a bool field, but got: " + $(actual_type))
+  }
+}
+
+func field_type_string_check(property, value) {
+  result := ""
+
+  if not attr_exists(value) { return; }
+
+  actual_type := attr_type(value)
+
+
+  if not typecmp(actual_type, string) {
+    return ("Invalid type for specified field: " + value +
+            ". It should be a string field, but got: " + $(actual_type))
+  }
+}
+
+func field_type_strarr_check(property, value) {
+  result := ""
+
+  if not attr_exists(value) { return; }
+
+  actual_type := attr_type(value)
+
+
+  if not typecmp(actual_type, list[string]) {
+    return ("Invalid type for specified field: " + value +
+            ". It should be a list[string] field, but got: " + $(actual_type))
+  }
+}
+
+func extra_topic_check(path) {
+  parent, cmd := attr_split(path)
+  attrs       := fields(path)
+  cmds        := sections(parent + ".command")
+  result      := ""
+
+  for i from 0 to len(attrs) {
+    if not typecmp(attr_type(path + "." + attrs[i]), string) {
+      return "Extra help topics must be strings."
+    }
+    if cmds.contains(attrs[i]) {
+      return "Extra help topics can't have the same name as a valid command."
+    }
+  }
+}
+
+func under_to_dash(str) {
+  return str.replace("_", "-")
+}
+
+func getopts_root(path) {
+  parts := path.split(".")
+  ix    := 0
+
+  for i from 0 to len(parts) {
+    if parts[i] == "getopts" {
+      ix := i
+    }
+  }
+
+  s := parts.slice(0, ix)
+  return s.join(".")
+}
+
+func dupe_flag(path, flagname) {
+  return ("In field '" + path +"', flag name '" + flagname +
+          "' is named as a flag for this command more than once.")
+}
+
+func consistency_check(path) {
+  all_flags     := []
+  yes_field     := getopts_root(path) + ".default_yes_prefixes"
+  no_field      := getopts_root(path) + ".default_no_prefixes"
+  default_yeses := attr_get(yes_field, list[string])
+  default_nos   := attr_get(no_field, list[string])
+
+  # Deal with the 'flag_help' singleton if present,
+  if attr_exists(path + ".flag_help") {
+    names := attr_get(path + ".flag_help.names", list[string])
+    for i from 0 to len(names) {
+        flag := under_to_dash(names[i])
+        if all_flags.contains(flag) {
+	  return dupe_flag(path + ".flag_help", flag)
+	}
+	all_flags := array_add(all_flags, [flag])
+    }
+  }
+
+  # Deal with yn objects.
+  yn_path := path + ".flag_yn"
+  if attr_exists(yn_path) {
+    yn_flags := sections(yn_path)
+    for i from 0 to len(yn_flags) {
+      flag      := under_to_dash(yn_flags[i])
+      flag_path := yn_path + "." + yn_flags[i]
+
+      if all_flags.contains(flag) {
+        return dupe_flag(flag_path + "." + yn_flags[i], flag)
+      }
+      all_flags := array_add(all_flags, [flag])
+
+      yes_aliases  := attr_get(flag_path + ".yes_aliases", list[string])
+      no_aliases   := attr_get(flag_path + ".no_aliases",  list[string])
+      yes_prefixes := default_yeses
+      no_prefixes  := default_nos
+      if attr_exists(flag_path + ".yes_prefixes") {
+        yes_prefixes := attr_get(flag_path + ".yes_prefixes", list[string])
+      }
+      if attr_exists(flag_path + ".no_prefixes") {
+        no_prefixes := attr_get(flag_path + ".no_prefixes", list[string])
+      }
+      for j from 0 to len(yes_aliases) {
+        yes_flag := under_to_dash(yes_aliases[j])
+	if all_flags.contains(yes_flag) {
+	  return dupe_flag(flag_path, yes_flag)
+	}
+        all_flags := array_add(all_flags, [yes_flag])
+      }
+      for j from 0 to len(no_aliases) {
+        no_flag := under_to_dash(no_aliases[j])
+	if all_flags.contains(no_flag) {
+	  return dupe_flag(flag_path, no_flag)
+	}
+        all_flags := array_add(all_flags, [no_flag])
+      }
+      for j from 0 to len(yes_prefixes) {
+        yes_flag := under_to_dash(yes_prefixes[j] + "-" + flag)
+	if all_flags.contains(yes_flag) {
+	  return dupe_flag(flag_path, yes_flag)
+	}
+        all_flags := array_add(all_flags, [yes_flag])
+      }
+      for j from 0 to len(no_prefixes) {
+        no_flag := under_to_dash(no_prefixes[j] + "-" + flag)
+	if all_flags.contains(no_flag) {
+	  return dupe_flag(flag_path, no_flag)
+	}
+        all_flags := array_add(all_flags, [no_flag])
+      }
+    }
+  }
+
+  # Deal with flag_choice objects and flag_multi_choice objects.
+  sec_names := [".flag_choice", ".flag_multi_choice"]
+
+  for k from 0 to 2 {
+    choice_path  := path + sec_names[k]
+    choice_flags := []
+    if attr_exists(choice_path) {
+      choice_flags := sections(choice_path)
+    }
+
+    for i from 0 to len(choice_flags) {
+      flag      := under_to_dash(choice_flags[i])
+      flag_path := choice_path + "." + choice_flags[i]
+      if all_flags.contains(flag) {
+        return dupe_flag(choice_path + "." + choice_flags[i], flag)
+      }
+      all_flags := array_add(all_flags, [flag])
+
+      aliases := attr_get(flag_path + ".aliases", list[string])
+
+      for j from 0 to len(aliases) {
+        flag := under_to_dash(aliases[j])
+        if all_flags.contains(flag) {
+          return dupe_flag(flag_path + ".aliases", flag)
+        }
+        all_flags := array_add(all_flags, [flag])
+      }
+      choices := attr_get(flag_path + ".choices", list[string])
+
+      if len(choices) < 2 {
+        return "Must offer at least two choices."
+      }
+      if k == 1 {
+        min := attr_get(flag_path + ".min", int)
+	max := attr_get(flag_path + ".max", int)
+
+        if max > len(choices) and max != high() {
+	  return ("max value is larger than the number of choices provided " +
+	         "(and isn't high())")
+	}
+	if min >= len(choices) {
+	  return "min value must be larger than the number of choices provided"
+	}
+      }
+
+      if attr_get(flag_path + ".add_choice_flags", bool) {
+        for j from 0 to len(choices) {
+          flag := under_to_dash(choices[j])
+  	if all_flags.contains(flag) {
+  	  return dupe_flag(flag_path + ".choices", flag)
+  	}
+  	all_flags := array_add(all_flags, [flag])
+        }
+      }
+    }
+  }
+
+  # Deal with flag_arg objects and multi_arg objects
+  sec_names := [".flag_arg", ".flag_multi_arg"]
+
+  for k from 0 to 2 {
+    farg_path  := path  + sec_names[k]
+    farg_flags := []
+    if attr_exists(farg_path) {
+      farg_flags := sections(farg_path)
+    }
+
+    for i from 0 to len(farg_flags) {
+      flag      := under_to_dash(farg_flags[i])
+      flag_path := farg_path + "." + farg_flags[i]
+      if all_flags.contains(flag) {
+        return dupe_flag(flag_path + "." + farg_flags[i], flag)
+      }
+      all_flags := array_add(all_flags, [flag])
+
+      aliases := attr_get(flag_path + ".aliases", list[string])
+      for j from 0 to len(aliases) {
+        flag := under_to_dash(aliases[j])
+        if all_flags.contains(flag) {
+          return dupe_flag(flag_path + ".aliases", flag)
+        }
+        all_flags := array_add(all_flags, [flag])
+      }
+    }
+  }
+
+  if len(all_flags) != 0 {
+    if attr_exists(path + ".no_flag") {
+      if attr_get(path + ".no_flag", bool) {
+        return ("'no_flag' was provided, but flags were specified for this " +
+	        "command.")
+      }
+    }
+  }
+
+  # Check for duplicate sub-command names.
+  cmd_path := path + ".command"
+
+  cmds := []  # Necessary because of current block-scoping rule.
+
+  if attr_exists(cmd_path) {
+    cmds := sections(cmd_path)
+  }
+  all_cmds := cmds
+  for i from 0 to len(cmds) {
+    aliases := attr_get(cmd_path + "." + cmds[i] + ".aliases", list[string])
+    for j from 0 to len(aliases) {
+      if all_cmds.contains(aliases[j]) {
+        return "Duplicate command: " + aliases[j]
+      }
+      all_cmds := array_add(all_cmds, [aliases[j]])
+    }
+  }
+
+  return ""
+}
+
+root {
+  # Allow us to ignore non-getopts parts when spec checking.
+  user_def_ok: true
+  allow getopts {}
+}

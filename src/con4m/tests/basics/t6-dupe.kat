@@ -1,0 +1,4 @@
+error: con4m: /Users/viega/dev/con4m/tests/basics/t6-dupe.c4m: 20:1: Duplicate implementation of function 'fact'
+  func fact(f) {
+  ^
+See con4m --help for help on usage.

@@ -1,0 +1,23 @@
+text := run("ls /bin/ps")
+
+# die := die + 1
+
+echo("Here's the output of ls:")
+echo(text)
+
+ctr := 0
+
+for i from 1 to 5 {
+  echo(string(i));  ctr := ctr + 1
+}
+
+for i from 5 to 1 {
+  echo(string(i));  ctr := ctr + 1
+}
+
+echo("I ran the counter " + string(ctr) + " times.")
+#echo(defaults.color)
+#echo(defaults.hair)
+#for i from 0 to len(defaults.faves) {
+#  echo(defaults.faves[i])
+#}

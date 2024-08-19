@@ -1,0 +1,9 @@
+services:
+  staticlibs:
+    build:
+      context: ..
+      dockerfile: .github/Dockerfile.staticlibs
+    working_dir: /con4m
+    volumes:
+      - ..:/con4m
+      - $HOME/.local/c0:/root/.local/c0
