@@ -2,6 +2,13 @@
 
 ## On the `main` branch
 
+### Breaking Changes
+
+- Removing `attestation_key_backup` provider. It was an
+  experimental service which is discontinued in favor
+  of other attestation providers.
+  ([#411](https://github.com/crashappsec/chalk/pull/411))
+
 ## 0.4.11
 
 **Aug 13, 2024**

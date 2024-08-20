@@ -187,7 +187,6 @@ def test_env(chalk: Chalk):
     "config",
     [
         CONFIGS / "attestation" / "embed.c4m",
-        CONFIGS / "attestation" / "backup.c4m",
         CONFIGS / "attestation" / "get.c4m",
     ],
 )
@@ -201,7 +200,6 @@ def test_setup(
     check that after setup attestion works for all key providers
     """
     env = {
-        "CHALK_BACKUP_URL": f"{server_http}/backup",
         "CHALK_GET_URL": f"{server_http}/cosign",
     }
     chalk_copy.load(config, replace=False)
@@ -242,7 +240,6 @@ def test_setup(
     "config, require_password",
     [
         (CONFIGS / "attestation" / "embed.c4m", True),
-        (CONFIGS / "attestation" / "backup.c4m", False),
         # note get provider does not support reading existing key
     ],
 )
@@ -268,7 +265,6 @@ def test_setup_existing_keys(
     private = (tmp_data_dir / "chalk.key").read_text()
     env = {
         "CHALK_PASSWORD": password,
-        "CHALK_BACKUP_URL": f"{server_http}/backup",
     }
 
     chalk_copy.load(config, replace=False)

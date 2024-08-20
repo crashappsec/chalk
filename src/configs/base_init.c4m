@@ -33,6 +33,5 @@ cloud_provider {
 
 attestation {
   attestation_key_embed { }
-  attestation_key_backup { }
   attestation_key_get { }
 }

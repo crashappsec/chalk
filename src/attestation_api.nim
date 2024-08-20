@@ -7,7 +7,7 @@
 
 import std/[net, os]
 import "."/[chalk_common, chalkjson, config, selfextract, plugin_api, semver, util]
-import "./attestation"/[embed, backup, get, utils]
+import "./attestation"/[embed, get, utils]
 import "./docker"/[ids]
 export getCosignLocation, canVerifyByHash, canVerifyBySigStore # from utils
 
@@ -15,7 +15,6 @@ proc writeSelfConfig(selfChalk: ChalkObj): bool {.importc, discardable.}
 
 let keyProviders = {
   embedProvider.name:  AttestationKeyProvider(embedProvider),
-  backupProvider.name: AttestationKeyProvider(backupProvider),
   getProvider.name:    AttestationKeyProvider(getProvider),
 }.toTable()
 
