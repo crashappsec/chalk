@@ -217,23 +217,6 @@ async def get_cosign():
     return cosign
 
 
-backup = {}
-
-
-@app.get("/backup/{key_id}", response_class=PlainTextResponse)
-async def get_backup(key_id: str):
-    try:
-        return backup[key_id]
-    except KeyError:
-        raise HTTPException(status_code=404)
-
-
-@app.put("/backup/{key_id}")
-async def put_backup(key_id: str, request: Request):
-    password = await request.body()
-    backup[key_id] = password
-
-
 @app.get("/dummy/{platform}", response_class=PlainTextResponse)
 async def get_dummy_chalk(platform: str):
     return """

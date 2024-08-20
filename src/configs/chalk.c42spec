@@ -1200,70 +1200,6 @@ Chalk will also embed the key-pairs internally, for future operations.
   }
 }
 
-singleton attestation_key_backup {
-  gen_fieldname: "attestationKeyBackupConfig"
-  gen_typename:  "AttestationKeyBackupConfig"
-  gen_setters:   false
-  user_def_ok:   true
-  doc:           """
-Attestation key provider which embeds the signing keys into chalk binary.
-For easy signing, however, the password is retrieved on-demand
-from the backup service when needing to sign artifacts.
-
-Any signing keys generated or imported are encrypted by a randomly generated
-password (which is derived by encoding 128 bits taken from a cryptographically
-secure source).
-
-When using the backup service, the password is encrypted by another randomly
-generated value, stored in your binary. The result is posted to our free
-service over TLS; the service will then be queried as it is needed.
-"""
-
-  field location {
-    type:      string
-    default:   "./chalk.key"
-    validator: func validate_key_path
-    shortdoc:  "Signing key location"
-    doc: """
-This is only used for the `chalk setup` command; it dictates where to
-either find a key pair to load, or where to write a keypair being
-generated.
-
-Chalk will also embed the keypairs internally, for future operations.
-"""
-  }
-
-  field uri {
-    type:     string
-    default:  "https://chalk.crashoverride.run/v0.1/key-backup"
-    shortdoc: "URL of the signing key backup API service"
-    doc: """
-This is the URL of the default signing key backup service provided by Crash Override.
-"""
-  }
-
-  field auth {
-    type:     string
-    default:  "crashoverride"
-    shortdoc: "Authentication config to use for the signing key backup service"
-    doc: """
-Authentication config as configured via `auth_config` to use for
-making requests to fetch the password.
-"""
-  }
-
-  field timeout {
-    type:    Duration
-    default: << 3 sec >>
-    shortdoc: "HTTPS timeout for request to the key backup service"
-    doc: """
-If the timeout is exceeded and the operation fails, chalk will proceed,
-just without doing any signing / verifying.
-"""
-  }
-
-}
-
 singleton attestation_key_get {
   gen_fieldname: "attestationKeyGetConfig"
   gen_typename:  "AttestationKeyGetConfig"
@@ -1320,7 +1256,7 @@ just without doing any signing / verifying.
   }
 }
 
-attestation_key_types := ["embed", "backup", "get"]
+attestation_key_types := ["embed", "get"]
 
 singleton attestation {
   gen_fieldname: "attestationConfig"
@@ -1362,11 +1298,6 @@ Supported key providers are:
 
 * `embed` - embeds keys into chalk and retrieves password via `CHALK_PASSWORD`
   environment variable
-* `backup` - embeds keys into chalk, backups password to signing key backup
-  compatible service. When requiring password it attempts to use the
-  `CHALK_PASSWORD` environment variable. If missing, retrieves password from
-  the backup service.
-  By default, the Crash Override signing key backup service is used.
 * `get` - embeds retrieved keys via API endpoint (with auth) into chalk.
   When requiring password it is retrieved from the same API endpoint.
   By default, the Crash Override signing key provider service is used.
@@ -1378,7 +1309,6 @@ Each provider can be configured separately:
 ```
 attestation {
   attestation_key_embed {...}
-  attestation_key_backup {...}
   attestation_key_get {...}
 }
 ```
@@ -1386,7 +1316,6 @@ attestation {
 See individual key provider objects for all supported configuration fields.
 """
   allow attestation_key_embed
-  allow attestation_key_backup
   allow attestation_key_get
 
   field key_provider {
