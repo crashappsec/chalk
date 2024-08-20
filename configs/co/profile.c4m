@@ -1,0 +1,39 @@
+parameter var profile_id {
+  shortdoc:  "CrashOverride Chalk profile ID"
+  doc:       "CrashOverride Chalk profile ID"
+  default:   ""
+}
+
+parameter var profile_key {
+  shortdoc:  "CrashOverride Chalk profile user-friendly key"
+  doc:       "CrashOverride Chalk profile user-friendly key"
+  default:   ""
+}
+
+parameter var profile_config {
+  shortdoc:  "CrashOverride Chalk exact profile config"
+  doc:       "CrashOverride Chalk exact profile config"
+  default:   ""
+}
+
+keyspec _X_CHALK_PROFILE_ID {
+  kind:  RunTimeHost
+  type:  string
+  value: profile_id
+}
+keyspec _X_CHALK_PROFILE_KEY {
+  kind:  RunTimeHost
+  type:  string
+  value: profile_key
+}
+keyspec _X_CHALK_PROFILE_CONFIG {
+  kind:  RunTimeHost
+  type:  `x
+  value: parse_json(profile_config)
+}
+
+report_template crashoverride {
+  key._X_CHALK_PROFILE_ID.use     = true
+  key._X_CHALK_PROFILE_KEY.use    = true
+  key._X_CHALK_PROFILE_CONFIG.use = true
+}

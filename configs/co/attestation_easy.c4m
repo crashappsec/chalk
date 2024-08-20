@@ -1,0 +1,25 @@
+func validate_jwt(token) {
+  if not is_jwt_valid(token) {
+    return "Invalid JWT token for retrieving cosign key material from CrashOverride"
+  }
+  return ""
+}
+
+parameter auth_config.crashoverride_attestation.token {
+  shortdoc:  "Crash Override Cosign API token"
+  doc:       "Token for retrieving cosign key material for attestation from CrashOverride"
+  default:   ""
+  validator: func validate_jwt(string) -> string
+}
+
+parameter attestation.attestation_key_get.uri {
+  shortdoc: "Crash Override API URL for key provider"
+  doc:      "URL for key provider service to fetch cosign key material"
+  default:  "https://chalk.crashoverride.run/v0.1/key-provider/keys"
+}
+
+auth_config crashoverride_attestation {
+  ~auth:  "jwt"
+}
+~attestation.attestation_key_get.auth = "crashoverride_attestation"
+~attestation.key_provider             = "get"

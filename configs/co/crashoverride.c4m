@@ -1,0 +1,43 @@
+func validate_jwt(token) {
+  if not is_jwt_valid(token) {
+    return "Invalid JWT token for reporting reports back to CrashOverride"
+  }
+  return ""
+}
+
+parameter auth_config.crashoverride_reporting.token {
+  shortdoc:  "Crash Override API token"
+  doc:       "Token sending reports to CrashOverride"
+  default:   ""
+  validator: func validate_jwt(string) -> string
+}
+
+parameter sink_config.crashoverride.uri {
+  shortdoc: "Reporting URL where to send reports"
+  doc:      "Reporting URL where to send reports"
+  default:  "https://chalk.crashoverride.run/v0.1/report"
+}
+
+auth_config crashoverride_reporting {
+  ~auth:  "jwt"
+}
+
+sink_config crashoverride {
+  ~enabled:         true
+  ~sink:            "presign"
+  ~priority:        999999
+  ~auth:            "crashoverride_reporting"
+}
+
+custom_report crashoverride {
+  ~enabled:         true
+  ~report_template: "crashoverride"
+  ~sink_configs:    ["crashoverride"]
+  ~use_when:        ["insert", "build", "push", "exec"]
+}
+
+# requirements for crashoverride integration
+~chalk_log_level             = "trace"
+~exec.command_name_from_args = true
+
+info("Crash Override integration is enabled and chalk reports will be sent to https://crashoverride.run")

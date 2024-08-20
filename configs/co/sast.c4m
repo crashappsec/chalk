@@ -1,0 +1,7 @@
+parameter var run_sast {
+    default:   true
+    shortdoc: "Run SAST Tools"
+    doc:      "Whether to run semgrep for chalking operations"
+}
+
+~run_sast_tools = run_sast
