@@ -9,6 +9,13 @@
   of other attestation providers.
   ([#411](https://github.com/crashappsec/chalk/pull/411))
 
+### Fixes
+
+- `conffile` plugin was sending some empty keys vs skipping
+  them during reporting. Now it has matching behavior to
+  other plugins which ignores empty keys.
+  ([#412](https://github.com/crashappsec/chalk/pull/412))
+
 ## 0.4.11
 
 **Aug 13, 2024**
