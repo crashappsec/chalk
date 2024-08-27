@@ -2,9 +2,10 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import os
 import shutil
 from pathlib import Path
+
+import os
 
 
 DOCKER_SSH_REPO = (

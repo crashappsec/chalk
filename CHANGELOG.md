@@ -15,6 +15,10 @@
   them during reporting. Now it has matching behavior to
   other plugins which ignores empty keys.
   ([#412](https://github.com/crashappsec/chalk/pull/412))
+- AWS instance is determined from board_asset_tag file when
+  present. This allows to report `_AWS_INSTANCE_ID` even
+  when cloud metadata endpoint is not reachable.
+  ([#413](https://github.com/crashappsec/chalk/pull/413))
 
 ## 0.4.11
 

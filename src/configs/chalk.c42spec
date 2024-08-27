@@ -2569,6 +2569,14 @@ end users.
     hidden:  true
     doc:     "Path where to check product uuid for cloud nodes"
   }
+
+  field sys_board_asset_tag_path {
+    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
+    type:    string
+    default: "/sys/devices/virtual/dmi/id/board_asset_tag"
+    hidden:  true
+    doc:     "Path where to check the system VM tag (instance ID for AWS)"
+  }
 }
 
 singleton cloud_provider {
@@ -2580,6 +2588,13 @@ singleton cloud_provider {
 Configuration information for the different Cloud Provider
 """
   allow cloud_instance_hw_identifiers { }
+
+  field metadata_ip {
+    type:    string
+    default: "169.254.169.254"
+    hidden:  true
+    doc:     "Default cloud metadata IP"
+  }
 }
 
 root {
