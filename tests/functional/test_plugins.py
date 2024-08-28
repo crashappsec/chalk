@@ -22,6 +22,7 @@ from .utils.dict import ANY
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
+from .utils.tmp import make_tmp_file
 
 
 logger = get_logger()
@@ -142,7 +143,35 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
+def test_aws_no_imds(
+    copy_files: list[Path],
+    chalk: Chalk,
+    server_imds: str,
+):
+    with make_tmp_file() as vendor, make_tmp_file() as instance:
+        # make imds plugin think we are running in EC2
+        vendor.write_text("Amazon")
+        instance.write_text("i-abc123xyz789")
+        bin_path = copy_files[0]
+        insert = chalk.insert(
+            bin_path,
+            config=CONFIGS / "imds.c4m",
+            env={
+                "VENDOR": str(vendor),
+                "METADATA_IP": "127.0.0.1",
+                "INSTANCE": str(instance),
+            },
+        )
+        assert insert.report.contains(
+            {
+                "_OP_CLOUD_PROVIDER": "aws",
+                "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ec2",
+                "_AWS_INSTANCE_ID": "i-abc123xyz789",
+            }
+        )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_imds(
     copy_files: list[Path],
     chalk: Chalk,
@@ -314,7 +343,6 @@ def test_lambda(
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_imds_ecs(
     copy_files: list[Path],
     chalk: Chalk,
@@ -349,7 +377,6 @@ def test_imds_ecs(
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_imds_eks(
     copy_files: list[Path],
     chalk: Chalk,
@@ -376,7 +403,6 @@ def test_imds_eks(
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_metadata_azure(
     copy_files: list[Path],
     chalk: Chalk,
@@ -503,7 +529,6 @@ def test_metadata_azure(
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_metadata_gcp_no_vendor(
     copy_files: list[Path],
     chalk: Chalk,
@@ -640,7 +665,6 @@ def test_metadata_gcp_no_vendor(
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-@pytest.mark.parametrize("tmp_file", [{}], indirect=True)
 def test_metadata_gcp(
     copy_files: list[Path],
     chalk: Chalk,

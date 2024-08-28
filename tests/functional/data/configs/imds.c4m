@@ -1,3 +1,9 @@
 if env_exists("VENDOR") {
   cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path: env("VENDOR")
 }
+if env_exists("INSTANCE") {
+  cloud_provider.cloud_instance_hw_identifiers.sys_board_asset_tag_path: env("INSTANCE")
+}
+if env_exists("METADATA_IP") {
+  cloud_provider.metadata_ip: env("METADATA_IP")
+}

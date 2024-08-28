@@ -8,7 +8,7 @@ from contextlib import ExitStack, chdir, closing
 from functools import lru_cache
 from pathlib import Path
 from secrets import token_bytes
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import TemporaryDirectory
 
 import os
 import pytest
@@ -29,6 +29,7 @@ from .conf import (
     SERVER_STATIC,
 )
 from .utils.log import get_logger
+from .utils.tmp import make_tmp_file
 
 
 logger = get_logger()
@@ -95,20 +96,8 @@ def tmp_file(request):
     }
     config.update(getattr(request, "param", {}))
     path = config.pop("path", None)
-    # tempfile does not allow to create file with specific path
-    # as it always randomizes the name
-    if path:
-        path = Path(path).resolve()
-        os.makedirs(path.parent, exist_ok=True)
-        try:
-            with path.open(config["mode"]) as f:
-                yield path
-        finally:
-            if config["delete"]:
-                path.unlink(missing_ok=True)
-    else:
-        with NamedTemporaryFile(**config) as f:
-            yield Path(f.name)
+    with make_tmp_file(path, **config) as tmp:
+        yield tmp
 
 
 @pytest.fixture(scope="function")

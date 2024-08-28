@@ -11,7 +11,7 @@ import std/[httpclient, net, strutils, json]
 import ".."/[config, plugin_api, chalkjson]
 
 const
-  awsBaseUri     = "http://169.254.169.254/latest/"
+  awsBaseUri     = "/latest/"
   awsMdUri       = awsBaseUri & "meta-data/"
   awsDynUri      = awsBaseUri & "dynamic/"
   # this env var is undocumented in GCP, but does exist in GoogleCloudPlatform repos:
@@ -23,10 +23,15 @@ const
   # special keys for special processing
   AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS = "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE"
 
+proc getUrl(path: string): string =
+  let ip = attrGet[string]("cloud_provider.metadata_ip")
+  return "http://" & ip & path
+
 proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
+  let url      = getUrl(path)
   try:
     let
-      response = safeRequest(url            = path,
+      response = safeRequest(url            = url,
                              httpMethod     = HttpGet,
                              timeout        = 1000, # 1 of a second
                              connectRetries = 2,
@@ -38,19 +43,19 @@ proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
       # 404 is expected response for some endpoints and logging full response body
       # is very verbose. We only care about full body for other errors like 400,500,etc
       if response.code == Http404:
-        trace("Could not retrieve metadata from: " & path & " - " & response.status)
+        trace("Could not retrieve metadata from: " & url & " - " & response.status)
       else:
-        trace("Could not retrieve metadata from: " & path & " - " & response.status & ": " & body)
+        trace("Could not retrieve metadata from: " & url & " - " & response.status & ": " & body)
       return none(string)
 
     if body == "":
       # some paths are expected to be empty so this is not an error
-      trace("Got empty metadata from: " & path)
+      trace("Got empty metadata from: " & url)
 
-    trace("Retrieved metadata from: " & path)
+    trace("Retrieved metadata from: " & url)
     return some(body)
   except:
-    trace("Could not retrieve metadata from: " & path & " due to: " & getCurrentExceptionMsg())
+    trace("Could not retrieve metadata from: " & url & " due to: " & getCurrentExceptionMsg())
     dumpExOnDebug()
     return none(string)
 
@@ -72,7 +77,7 @@ proc getAzureMetadata(): ChalkDict =
       isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
     let resultOpt = hitProviderEndpoint(
-      "http://169.254.169.254/metadata/instance?api-version=2021-02-01",
+      "/metadata/instance?api-version=2021-02-01",
       newHttpHeaders([("Metadata", "true")]),
     )
     if not resultOpt.isSome():
@@ -127,7 +132,7 @@ proc getGcpMetadata(): ChalkDict =
     trace("Querying for GCP metadata")
     if isSubscribedKey("_GCP_PROJECT_METADATA"):
       let projectOpt = hitProviderEndpoint(
-        "http://169.254.169.254/computeMetadata/v1/project/?recursive=true",
+        "/computeMetadata/v1/project/?recursive=true",
         newHttpHeaders([("Metadata-Flavor", "Google")]),
       )
       if projectOpt.isSome():
@@ -142,7 +147,7 @@ proc getGcpMetadata(): ChalkDict =
           trace("Could not set _GCP_PROJECT_METADATA: " & getCurrentExceptionMsg())
 
     let resultOpt = hitProviderEndpoint(
-      "http://169.254.169.254/computeMetadata/v1/instance/?recursive=true",
+      "/computeMetadata/v1/instance/?recursive=true",
       newHttpHeaders([("Metadata-Flavor", "Google")]),
     )
     if not resultOpt.isSome():
@@ -182,7 +187,7 @@ proc getGcpMetadata(): ChalkDict =
       trace("GCP metadata responded with invalid json: " & getCurrentExceptionMsg())
 
 proc getAwsToken(): Option[string] =
-  let url      = awsBaseUri & "api/token"
+  let url      = getUrl(awsBaseUri & "api/token")
   try:
     let
       hdrs     = newHttpHeaders([("X-aws-ec2-metadata-token-ttl-seconds", "10")])
@@ -320,6 +325,10 @@ proc getAwsMetadata(): ChalkDict =
         result.setIfNotEmpty("_OP_CLOUD_PROVIDER_SERVICE_TYPE", "aws_eks")
       else:
         result.setIfNotEmpty("_OP_CLOUD_PROVIDER_SERVICE_TYPE", "aws_ec2")
+
+  let instanceId = tryToLoadFile(attrGet[string]("cloud_provider.cloud_instance_hw_identifiers.sys_board_asset_tag_path")).strip()
+  if instanceId.toLowerAscii().startsWith("i-"):
+    result.setIfNeeded("_AWS_INSTANCE_ID", instanceId)
 
   let tokenOpt = getAwsToken()
   if tokenOpt.isNone():
