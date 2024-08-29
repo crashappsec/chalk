@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import ".."/[config, collect, plugin_api]
+import ".."/[config, collect, plugin_api, util]
 import "."/[base, collect, scan]
 
 proc dockerPush*(ctx: DockerInvocation): int =
@@ -37,7 +37,7 @@ proc dockerPush*(ctx: DockerInvocation): int =
   chalk.addToAllChalks()
   chalk.collectChalkTimeArtifactInfo()
 
-  result = ctx.runMungedDockerInvocation()
+  result = setExitCode(ctx.runMungedDockerInvocation())
 
   chalk.collectImage() # refetch repo tags/digests
   chalk.collectRunTimeArtifactInfo()

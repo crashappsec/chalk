@@ -26,6 +26,7 @@ proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
     exitCode = runCmdNoOutputCapture(docker,
                                      ctx.originalArgs,
                                      ctx.originalStdIn)
+    setExitCode(exitCode)
     doReporting("fail")
     showConfigValues()
   finally:

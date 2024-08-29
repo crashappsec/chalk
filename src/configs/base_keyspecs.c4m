@@ -4077,6 +4077,21 @@ generate reports.
 """
 }
 
+keyspec _OP_EXIT_CODE {
+  kind:     RunTimeHost
+  type:     int
+  standard: true
+  system:   true
+  since:    "0.4.13"
+  shortdoc: "Exit code of chalk operation"
+  doc:      """
+For operations such as docker builds, chalk invokes an external command
+which chalk proxies through. This key reports the external command
+exit code. This is useful for example for reports without any
+chalkmarks due to an external command failure.
+"""
+}
+
 keyspec _TIMESTAMP {
     kind:             RunTimeHost
     type:             int

@@ -443,7 +443,7 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   ctx.setIidFile()
   ctx.setMetadataFile()
 
-  result = ctx.runMungedDockerInvocation()
+  result = setExitCode(ctx.runMungedDockerInvocation())
   if result != 0:
     raise newException(
       ValueError,
