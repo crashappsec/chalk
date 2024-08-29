@@ -19,6 +19,11 @@
   present. This allows to report `_AWS_INSTANCE_ID` even
   when cloud metadata endpoint is not reachable.
   ([#413](https://github.com/crashappsec/chalk/pull/413))
+- Reporting AWS Lambda functions ARN for non-us-east-1
+  regions. Previously global STS AWS endpoint was used
+  which cannot fetch STS get-caller-identity for other
+  AWS regions.
+  ([#414](https://github.com/crashappsec/chalk/pull/414))
 
 ## 0.4.11
 
