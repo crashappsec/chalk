@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.4.12
+
+**Aug 29, 2024**
 
 ### Breaking Changes
 
