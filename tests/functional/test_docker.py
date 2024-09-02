@@ -122,6 +122,7 @@ def test_build(
     )
     assert image_id
     assert build.mark.has(_IMAGE_ENTRYPOINT=["/chalk", "exec", "--"])
+    assert build.report.has(_OP_EXIT_CODE=build.exit_code)
 
 
 @pytest.mark.parametrize("buildkit", [True, False])
@@ -754,12 +755,14 @@ def test_virtual_invalid(
 ):
     tag = f"{test_file}_{random_hex}"
     dockerfile = DOCKERFILES / test_file / "Dockerfile"
-    chalk.docker_build(
+    _, result = chalk.docker_build(
         dockerfile=dockerfile,
         tag=tag,
         virtual=True,
         expected_success=False,
     )
+
+    assert result.report.has(_OP_EXIT_CODE=result.exit_code)
 
     # invalid dockerfile should not create any chalk output
     assert not (
@@ -814,11 +817,13 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
 @pytest.mark.parametrize("test_file", ["invalid/sample_1", "invalid/sample_2"])
 def test_nonvirtual_invalid(chalk: Chalk, test_file: str, random_hex: str):
     tag = f"{test_file}_{random_hex}"
-    chalk.docker_build(
+    _, result = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
         expected_success=False,
     )
+
+    assert result.report.has(_OP_EXIT_CODE=result.exit_code)
 
 
 def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):

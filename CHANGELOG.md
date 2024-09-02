@@ -2,6 +2,12 @@
 
 ## On the `main` branch
 
+### New Features
+
+- `_OP_EXIT_CODE` key which reports external commands
+  exit code such as for `chalk docker build`.
+  ([#417](https://github.com/crashappsec/chalk/pull/417))
+
 ## 0.4.12
 
 **Aug 29, 2024**

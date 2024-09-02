@@ -48,6 +48,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._ARGV.use                                      = true
   ~key._ENV.use                                       = true
   ~key._OPERATION.use                                 = true
+  ~key._OP_EXIT_CODE.use                              = true
   ~key._TIMESTAMP.use                                 = true
   ~key._DATE.use                                      = false # Go with _DATETIME
   ~key._TIME.use                                      = false

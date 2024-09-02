@@ -313,6 +313,8 @@ proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
                               ChalkDict {.cdecl.} =
   result = ChalkDict()
 
+  result.setIfNeeded("_OP_EXIT_CODE", getExitCode())
+
   if len(systemErrors)  != 0:
     result.setIfNeeded("_OP_ERRORS", systemErrors)
 

@@ -305,8 +305,12 @@ var exitCode = 0
 proc quitChalk*(errCode = exitCode) {.noreturn.} =
   quit(errcode)
 
-proc setExitCode*(code: int) =
+proc getExitCode*(): int =
+  return exitCode
+
+proc setExitCode*(code: int): int {.discardable.} =
   exitCode = code
+  return code
 
 proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
   if chalk.fsRef == "":
