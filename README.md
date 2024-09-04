@@ -12,15 +12,15 @@ Using Chalk, you can build a graph connecting people, development, builds and pr
 
 You can use Chalk to solve a variety of specific use cases such as:
 
-#### Create software security supply chain compliance reports automatically
+### Create software security supply chain compliance reports automatically
 
 Many companies and the US Government are now mandating suppliers providing supply chain statements when delivering software. This how to is an easy button to deliver the SBOM, code and builds provenance and supports [SLSA](https://www.slsa.dev), Supply-chain Levels for Software Artifacts, [level 2](https://slsa.dev/spec/v1.0/levels) compliance (an emerging supply chain standard) before SLSA [level 1](https://slsa.dev/spec/v1.0/levels) has been mandated. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-create-software-security-supply-chain-compliance-reports-automatically).
 
-#### Create and maintain real-time application inventory
+### Create and maintain real-time application inventory
 
 From a code base, easily understand the environments where code and even particular branches are running. Gather code owners for the applications and code repos. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-create-a-real-time-application-inventory).
 
-#### How-to deploy Chalk globally using Docker
+### How-to deploy Chalk globally using Docker
 
 You can deploy Chalk by setting a global alias for Docker and having it call Chalk, so that every build that runs through your build server using Docker, will automatically be 'chalked'. It's a technique that can be combined with chalks ability to deploy tools and configure monitoring, to automatically add security controls and collect information for every application. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-deploy-chalk-globally-using-docker)]
 
