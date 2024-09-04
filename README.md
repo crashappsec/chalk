@@ -14,7 +14,7 @@ You can use Chalk to solve a variety of specific use cases such as:
 
 ### Create software security supply chain compliance reports automatically
 
-Many companies and the US Government are now mandating suppliers providing supply chain statements when delivering software. This how to is an easy button to deliver the SBOM, code and builds provenance and supports [SLSA](https://www.slsa.dev), Supply-chain Levels for Software Artifacts, [level 2](https://slsa.dev/spec/v1.0/levels) compliance (an emerging supply chain standard) before SLSA [level 1](https://slsa.dev/spec/v1.0/levels) has been mandated. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-create-software-security-supply-chain-compliance-reports-automatically).
+Many companies and the US Government are now mandating suppliers to provide supply chain statements when delivering software. This how to is an easy button to deliver the [software bill of materials (SBOM)](https://www.ntia.gov/page/software-bill-materials), code and builds provenance and supports [SLSA](https://www.slsa.dev), Supply-chain Levels for Software Artifacts, [level 2](https://slsa.dev/spec/v1.0/levels) compliance (an emerging supply chain standard) before SLSA [level 1](https://slsa.dev/spec/v1.0/levels) has been mandated. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-create-software-security-supply-chain-compliance-reports-automatically).
 
 ### Create and maintain real-time application inventory
 
