@@ -20,7 +20,7 @@ Many companies and the US Government are now mandating suppliers to provide supp
 
 From a code base, easily understand the environments where code and even particular branches are running. Gather code owners for the applications and code repos. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-create-a-real-time-application-inventory).
 
-### How-to deploy Chalk globally using Docker
+### Deploy Chalk globally using Docker
 
 You can deploy Chalk by setting a global alias for Docker and having it call Chalk, so that every build that runs through your build server using Docker, will automatically be 'chalked'. It's a technique that can be combined with chalks ability to deploy tools and configure monitoring, to automatically add security controls and collect information for every application. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-deploy-chalk-globally-using-docker)]
 
