@@ -4477,6 +4477,18 @@ metadata.
 """
 }
 
+keyspec _OP_CLOUD_SYS_VENDOR {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "0.4.13"
+  shortdoc: "Content of the system DMI vendor file"
+  doc:      """
+Content of the system hardware DMI vendor file as configured by
+`cloud_provider.cloud_instance_hw_identifiers.sys_vendor_path`.
+"""
+}
+
 keyspec _OP_ERRORS {
     kind:             RunTimeHost
     type:             list[string]

@@ -335,6 +335,7 @@ report and subtract from it.
   key._ENV.use                                = true
   key._TENANT_ID.use                          = true
   key._OPERATION.use                          = true
+  key._OP_EXIT_CODE.use                       = true
   key._TIMESTAMP.use                          = true
   key._DATE.use                               = true
   key._TIME.use                               = true
@@ -372,6 +373,7 @@ report and subtract from it.
   key._OP_ARP_TABLE.use                       = true
   key._OP_CPU_INFO.use                        = true
   key._OP_ALL_PS_INFO.use                     = true
+  key._OP_CLOUD_SYS_VENDOR.use                = true
   key._OP_CLOUD_PROVIDER.use                  = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
   key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use     = true
@@ -484,6 +486,7 @@ doc: """
   key._ENV.use                                = true
   key._TENANT_ID.use                          = true
   key._OPERATION.use                          = true
+  key._OP_EXIT_CODE.use                       = true
   key._TIMESTAMP.use                          = true
   key._DATE.use                               = true
   key._TIME.use                               = true
@@ -522,6 +525,7 @@ doc: """
   key._OP_CPU_INFO.use                        = true
   key._OP_ALL_PS_INFO.use                     = true
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
+  key._OP_CLOUD_SYS_VENDOR.use                = true
   key._OP_CLOUD_PROVIDER.use                  = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
   key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use     = true
@@ -996,6 +1000,7 @@ container.
   key._OP_CLOUD_METADATA.use                  = true
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
   key._OP_ERRORS.use                          = true
+  key._OP_CLOUD_SYS_VENDOR.use                = true
   key._OP_CLOUD_PROVIDER.use                  = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
   key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use     = true
@@ -1456,6 +1461,7 @@ and keep the run-time key.
   key._OP_CLOUD_METADATA.use                  = true
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
   key._OP_ERRORS.use                          = true
+  key._OP_CLOUD_SYS_VENDOR.use                = true
   key._OP_CLOUD_PROVIDER.use                  = true
   key._OP_CLOUD_PROVIDER_SERVICE_TYPE.use     = true
   key._OP_CLOUD_PROVIDER_ACCOUNT_INFO.use     = true
