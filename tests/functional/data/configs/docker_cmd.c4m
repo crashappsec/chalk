@@ -1,1 +1,2 @@
 default_command: "docker"
+error("chalk is wrapping docker")

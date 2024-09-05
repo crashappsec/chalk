@@ -399,10 +399,11 @@ proc findExePath*(cmdName:    string,
   trace("Found '" & cmdName & "' in PATH: " & foundExes[0])
   return some(foundExes[0])
 
-proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
+proc handleExec*(prioritizedExes: seq[string], args: seq[string], log = true) {.noreturn.} =
   for path in prioritizedExes:
     let cargs = allocCStringArray(@[path] & args)
-    trace("execv: " & path & " " & args.join(" "))
+    if log:
+      trace("execv: " & path & " " & args.join(" "))
     discard execv(cstring(path), cargs)
     # Either execv doesn't return, or something went wrong. No need to check the
     # error code.

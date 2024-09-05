@@ -1344,14 +1344,17 @@ def test_docker_diff_user(chalk_default: Chalk):
     assert result
 
 
-def test_docker_default_command(chalk_copy: Chalk, tmp_data_dir: Path):
+@pytest.mark.parametrize("bypass", [True, False])
+def test_docker_default_command(chalk_copy: Chalk, tmp_data_dir: Path, bypass: bool):
     assert chalk_copy.load(CONFIGS / "docker_cmd.c4m")
     expected = Docker.version()
     docker = tmp_data_dir / "docker"
     shutil.copy(chalk_copy.binary, docker)
-    actual = run([str(docker), "--version"])
+    actual = run([str(docker), "--version"], env={"CHALK_BYPASS": str(bypass)})
     assert actual
     assert actual.text == expected.text
+    if bypass:
+        assert actual.logs == expected.logs
 
 
 def test_version_bare(chalk_default: Chalk):
