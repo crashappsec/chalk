@@ -486,5 +486,7 @@ proc cloudMetadataGetrunTimeHostInfo*(self: Plugin,
     of hkGcp:
       getGcpMetadata()
 
+  result.setIfNeeded("_OP_CLOUD_SYS_VENDOR", vendor)
+
 proc loadCloudMetadata*() =
   newPlugin("cloud_metadata", rtHostCallback = RunTimeHostCb(cloudMetadataGetrunTimeHostInfo))

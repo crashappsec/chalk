@@ -7,6 +7,9 @@
 - `_OP_EXIT_CODE` key which reports external commands
   exit code such as for `chalk docker build`.
   ([#417](https://github.com/crashappsec/chalk/pull/417))
+- `_OP_CLOUD_SYS_VENDOR` key for reporting sys vendor
+  file content used to identity cloud provider.
+  ([#418](https://github.com/crashappsec/chalk/pull/418))
 
 ## 0.4.12
 

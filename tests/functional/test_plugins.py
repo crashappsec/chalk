@@ -150,7 +150,7 @@ def test_aws_no_imds(
 ):
     with make_tmp_file() as vendor, make_tmp_file() as instance:
         # make imds plugin think we are running in EC2
-        vendor.write_text("Amazon")
+        vendor.write_text("Amazon EC2")
         instance.write_text("i-abc123xyz789")
         bin_path = copy_files[0]
         insert = chalk.insert(
@@ -164,6 +164,7 @@ def test_aws_no_imds(
         )
         assert insert.report.contains(
             {
+                "_OP_CLOUD_SYS_VENDOR": "Amazon EC2",
                 "_OP_CLOUD_PROVIDER": "aws",
                 "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ec2",
                 "_AWS_INSTANCE_ID": "i-abc123xyz789",
