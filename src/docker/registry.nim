@@ -48,7 +48,7 @@ proc withBasicAuth(self: RegistryConfig, token: string): RegistryConfig =
     self.auth = newHttpHeaders()
   return self
 
-iterator iterDaemonRegistryHttpsConfigs(self: DockerImage): RegistryConfig =
+iterator iterDaemonRegistryConfigs(self: DockerImage): RegistryConfig =
   var (path, cert) =
     try:
       readFirstDockerHostFile(@[
@@ -61,6 +61,7 @@ iterator iterDaemonRegistryHttpsConfigs(self: DockerImage): RegistryConfig =
     trace("docker: found CA certificate for " & self.registry & " at " & path & " in docker daemon")
     yield RegistryConfig(
       scheme:     "https://",
+      verifyMode: CVerifyPeer,
       certPath:   path,
       pinnedCert: writeNewTempFile(
         cert,
@@ -68,42 +69,41 @@ iterator iterDaemonRegistryHttpsConfigs(self: DockerImage): RegistryConfig =
         suffix = ".crt",
       ),
     )
-  trace("docker: " & self.registry & " will attempt TLS without verifying server cert")
-  yield RegistryConfig(scheme: "https://", verifyMode: CVerifyNone)
 
-iterator iterDaemonRegistryConfigs(self: DockerImage): RegistryConfig =
-  template insecure() =
-    for i in self.iterDaemonRegistryHttpsConfigs():
-      yield i
+  template yieldInsecure() =
+    trace("docker: " & self.registry & " will attempt TLS without verifying server cert")
+    yield RegistryConfig(scheme: "https://", verifyMode: CVerifyNone)
     yield RegistryConfig(scheme: "http://", verifyMode: CVerifyNone)
+
   for i in getDockerInfoSubList("insecure registries:"):
     if self.registry == i or self.domain == i:
       trace("docker: " & i & " is configured as an insecure registry in docker daemon")
-      insecure()
-    # docker does not support port numbers along with cidr blocks
-    # so 127.0.0.0/8 cannot be combined with a port number
-    # like 127.0.0.0/8:1234
-    if ":" in i:
-      continue
-    try:
-      let
-        # if the domain is not an ip address, it raises an excpetion
-        # and which we ignore which is fine
-        (ip, ipRange)   = parseIpCidr(i)
-        # when the insecure registry is a cidr block
-        # any domain resolved to that block is insecure
-        selfIp =
-          try:
-            parseIpAddress(self.domain)
-          except:
-            parseIpAddress(getHostByName(self.domain).addrList[0])
-      if selfIp.family != ip.family:
+      yieldInsecure()
+    else:
+      # docker does not support port numbers along with cidr blocks
+      # so 127.0.0.0/8 cannot be combined with a port number
+      # like 127.0.0.0/8:1234
+      if ":" in i:
         continue
-      if selfIp in ipRange:
-        trace("docker: " & self.domain & " (" & $selfIp & ") is an insecure registry via IP address match for " & i)
-        insecure()
-    except:
-      continue
+      try:
+        let
+          # if the domain is not an ip address, it raises an excpetion
+          # and which we ignore which is fine
+          (ip, ipRange)   = parseIpCidr(i)
+          # when the insecure registry is a cidr block
+          # any domain resolved to that block is insecure
+          selfIp =
+            try:
+              parseIpAddress(self.domain)
+            except:
+              parseIpAddress(getHostByName(self.domain).addrList[0])
+        if selfIp.family != ip.family:
+          continue
+        if selfIp in ipRange:
+          trace("docker: " & self.domain & " (" & $selfIp & ") is an insecure registry via IP address match for " & i)
+          yieldInsecure()
+      except:
+        continue
 
 iterator iterBuildxRegistryConfigs(self: DockerImage): RegistryConfig =
   # TODO this should be compatible outside of build commands
@@ -127,8 +127,12 @@ iterator iterBuildxRegistryConfigs(self: DockerImage): RegistryConfig =
               yield RegistryConfig(
                 scheme:     "https://",
                 verifyMode: CVerifyPeer,
-                pinnedCert: data,
                 certPath:   path,
+                pinnedCert: writeNewTempFile(
+                  data,
+                  prefix = self.domain,
+                  suffix = ".crt",
+                ),
               )
             except:
               trace("docker: cannot read buildx registry CA from " & path & " in buildx node " & node)
@@ -165,43 +169,44 @@ iterator getConfigs(self: DockerImage): RegistryConfig =
   if self.registry in configByRegistry:
     yield configByRegistry[self.registry]
 
-  # find basic auth from docker config file
-  let token = self.getBasicAuth()
+  else:
+    # find basic auth from docker config file
+    let token = self.getBasicAuth()
 
-  # some configs could be duplicates such as if there are multiple buildx
-  # nodex they might all have equivalent configs
-  var checkedConfigs = newSeq[RegistryConfig]()
+    # some configs could be duplicates such as if there are multiple buildx
+    # nodex they might all have equivalent configs
+    var checkedConfigs = newSeq[RegistryConfig]()
 
-  # always attempt to talk to registry via https first
-  # which will bypass parsing all daemon/buildx configs/etc
-  # plus in most production flows this should be most common case
-  trace("docker: attempting secure registry config for " & self.registry)
-  let https = RegistryConfig(scheme: "https://", verifyMode: CVerifyPeer).withBasicAuth(token)
-  checkedConfigs.add(https)
-  yield https
+    # always attempt to talk to registry via https first
+    # which will bypass parsing all daemon/buildx configs/etc
+    # plus in most production flows this should be most common case
+    trace("docker: attempting secure registry config for " & self.registry)
+    let https = RegistryConfig(scheme: "https://", verifyMode: CVerifyPeer).withBasicAuth(token)
+    checkedConfigs.add(https)
+    yield https
 
-  let isBuildx = (
-    dockerInvocation != nil and
-    dockerInvocation.cmd == build and
-    dockerInvocation.foundBuildx
-  )
-  template buildx() =
-    for i in self.iterBuildxRegistryConfigs():
+    let isBuildx = (
+      dockerInvocation != nil and
+      dockerInvocation.cmd == build and
+      dockerInvocation.foundBuildx
+    )
+    template buildx() =
+      for i in self.iterBuildxRegistryConfigs():
+        if i notin checkedConfigs:
+          let i = i.withBasicAuth(token)
+          checkedConfigs.add(i)
+          yield i
+    # when running buildx, buildx nodes configs should take precedence
+    # over daemon configs but we still scan both just in case
+    if isBuildx:
+      buildx()
+    for i in self.iterDaemonRegistryConfigs():
       if i notin checkedConfigs:
         let i = i.withBasicAuth(token)
         checkedConfigs.add(i)
         yield i
-  # when running buildx, buildx nodes configs should take precedence
-  # over daemon configs but we still scan both just in case
-  if isBuildx:
-    buildx()
-  for i in self.iterDaemonRegistryConfigs():
-    if i notin checkedConfigs:
-      let i = i.withBasicAuth(token)
-      checkedConfigs.add(i)
-      yield i
-  if not isBuildx:
-    buildx()
+    if not isBuildx:
+      buildx()
 
 proc request(self: DockerImage,
              httpMethod: HttpMethod,
