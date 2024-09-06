@@ -277,12 +277,22 @@ def test_onbuild(chalk: Chalk, base: Path, test: Path, random_hex: str):
     )
 
 
-def test_base_ecr(chalk: Chalk):
+@pytest.mark.parametrize(
+    "image, entrypoint",
+    [
+        ("public.ecr.aws/lambda/python:3.11", "/lambda-entrypoint.sh"),
+        ("quay.io/cilium/alpine-curl", "/usr/bin/curl"),
+        ("registry.k8s.io/pause:3.9", "/pause"),
+        ("k8s.gcr.io/pause", "/pause"),
+        ("ghcr.io/crashappsec/pgcli:3.5.0", "pgcli"),
+    ],
+)
+def test_base_registry(chalk: Chalk, image: str, entrypoint: str):
     """
     ecr some manifest endpoints require additional auth even for public registries
     """
     _, build = chalk.docker_build(
-        dockerfile=DOCKERFILES / "valid" / "ecr" / "Dockerfile",
+        content=f"FROM {image}",
         config=CONFIGS / "docker_wrap.c4m",
     )
     assert build
@@ -291,7 +301,7 @@ def test_base_ecr(chalk: Chalk):
             "/chalk",
             "exec",
             "--exec-command-name",
-            "/lambda-entrypoint.sh",
+            entrypoint,
             "--",
         ],
     )
