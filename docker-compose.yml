@@ -130,6 +130,7 @@ services:
       - $PWD:$PWD
       - $HOME/.pdbrc.py:/root/.pdbrc.py
       - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/docker/certs.d:/etc/docker/certs.d
       - /etc/buildkit:/etc/buildkit
       - /etc/docker:/etc/docker
       - /tmp:/tmp
@@ -140,6 +141,10 @@ services:
       - gcp
     depends_on:
       registry:
+        condition: service_healthy
+      registry-tls:
+        condition: service_healthy
+      registry-tls-insecure:
         condition: service_healthy
       server:
         condition: service_healthy
@@ -174,6 +179,46 @@ services:
       test:
         - CMD-SHELL
         - sh -c "echo 'GET / HTTP/1.1' | nc -v localhost 5044"
+      start_period: 30s
+      interval: 1s
+
+  registry-tls:
+    image: registry:2
+    ports:
+      - "5045:5045"
+    volumes:
+      - /etc/docker/certs.d:/etc/docker/certs.d
+      - /etc/docker/keys:/etc/docker/keys
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:5045
+      REGISTRY_HTTP_TLS_CERTIFICATE: /etc/docker/certs.d/${IP:-127.0.0.1}:5045/ca.crt
+      REGISTRY_HTTP_TLS_KEY: /etc/docker/keys/${IP:-127.0.0.1}:5045/ca.key
+    networks:
+      - chalk
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - sh -c "echo 'GET / HTTP/1.1' | nc -v localhost 5045"
+      start_period: 30s
+      interval: 1s
+
+  registry-tls-insecure:
+    image: registry:2
+    ports:
+      - "5046:5046"
+    volumes:
+      - /etc/docker/certs.d:/etc/docker/certs.d
+      - /etc/docker/keys:/etc/docker/keys
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:5046
+      REGISTRY_HTTP_TLS_CERTIFICATE: /etc/docker/certs.d/${IP:-127.0.0.1}:5044/ca.crt
+      REGISTRY_HTTP_TLS_KEY: /etc/docker/keys/${IP:-127.0.0.1}:5044/ca.key
+    networks:
+      - chalk
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - sh -c "echo 'GET / HTTP/1.1' | nc -v localhost 5046"
       start_period: 30s
       interval: 1s
 

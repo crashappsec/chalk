@@ -57,7 +57,7 @@ class Program:
             else:
                 self.logger.error(f"{self.bin} failed")
 
-    def __eq__(self, other: "Program") -> bool:
+    def __eq__(self, other) -> bool:
         return self.exit_code == other.exit_code and self.stdout == other.stdout
 
     def __bool__(self) -> bool:
@@ -143,7 +143,7 @@ class Program:
             getattr(self.logger, log_level)(
                 "could not find string in output", needle=needle
             )
-        raise ValueError(f"{needle} not found in stdout")
+        raise ValueError(f"{needle} could not be found in stdout")
 
     def after(self, *, match: Optional[str] = None, text: Optional[str] = None) -> str:
         text = text or self.text

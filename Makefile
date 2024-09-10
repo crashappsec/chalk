@@ -131,6 +131,23 @@ $(HOME)/.pdbrc.py:
 
 .PHONY: docker-setup
 docker-setup: /etc/docker/daemon.json
+docker-setup: /etc/docker/certs.d/$(IP)\:5045/ca.crt
+# this actually gets used by 5046 which tests whether 5046 can be
+# connected to with insecure https
+docker-setup: /etc/docker/certs.d/$(IP)\:5044/ca.crt
+
+/etc/docker/certs.d/$(IP)\:%/ca.crt:
+	sudo mkdir -p $(@D)
+	sudo mkdir -p /etc/docker/keys/$(IP):$*
+	sudo openssl req \
+	  -newkey rsa:2048 \
+	  -nodes -sha256 \
+	  -subj '/CN=$(IP)/O=CrashOverride./C=US' \
+	  -addext "subjectAltName = IP:$(IP)" \
+	  -x509 \
+	  -days 365 \
+	  -keyout /etc/docker/keys/$(IP):$*/ca.key \
+	  -out $@
 
 .PHONY: tests
 tests: DOCKER=$(_DOCKER) # force rebuilds to use docker to match tests
@@ -162,5 +179,3 @@ src/pingttl: src/pingttl.nim
 
 .PHONY: sqlite
 sqlite: server/sqlite
-
-include $(wildcard .github/Makefile.*)

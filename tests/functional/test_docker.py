@@ -22,6 +22,8 @@ from .conf import (
     MAGIC,
     MARKS,
     REGISTRY,
+    REGISTRY_TLS,
+    REGISTRY_TLS_INSECURE,
     ROOT,
 )
 from .utils.dict import ANY, MISSING, Contains, IfExists
@@ -277,6 +279,7 @@ def test_onbuild(chalk: Chalk, base: Path, test: Path, random_hex: str):
     )
 
 
+@pytest.mark.parametrize("buildx", [True, False])
 @pytest.mark.parametrize(
     "image, entrypoint",
     [
@@ -287,13 +290,14 @@ def test_onbuild(chalk: Chalk, base: Path, test: Path, random_hex: str):
         ("ghcr.io/crashappsec/pgcli:3.5.0", "pgcli"),
     ],
 )
-def test_base_registry(chalk: Chalk, image: str, entrypoint: str):
+def test_base_registry(chalk: Chalk, image: str, entrypoint: str, buildx: bool):
     """
     ecr some manifest endpoints require additional auth even for public registries
     """
     _, build = chalk.docker_build(
         content=f"FROM {image}",
         config=CONFIGS / "docker_wrap.c4m",
+        buildx=buildx,
     )
     assert build
     assert build.mark.has(
@@ -315,13 +319,14 @@ def test_base_image(chalk: Chalk, random_hex: str):
     )
     assert base_id
 
-    image_id, result = chalk.docker_build(
+    image_id, _ = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile",
         context=DOCKERFILES / "valid" / "base",
         args={"BASE": random_hex},
         config=CONFIGS / "docker_wrap.c4m",
     )
-    assert Docker.run(image_id)
+    _, run = Docker.run(image_id)
+    assert run
 
 
 def test_recursion_wrapping(chalk: Chalk, random_hex: str):
@@ -333,13 +338,14 @@ def test_recursion_wrapping(chalk: Chalk, random_hex: str):
     )
     assert base_id
 
-    image_id, result = chalk.docker_build(
+    image_id, _ = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile",
         context=DOCKERFILES / "valid" / "base",
         args={"BASE": random_hex},
         config=CONFIGS / "docker_wrap.c4m",
     )
-    assert Docker.run(image_id)
+    _, run = Docker.run(image_id)
+    assert run
 
 
 def test_base_images(chalk: Chalk):
@@ -651,9 +657,9 @@ def test_wrap_entrypoint(
     ],
 )
 def test_wrap_base_entrypoint(
-    chalk: Chalk, random_hex: str, test_file: str, entrypoint: list[str], cmd: list[str]
+    chalk: Chalk, test_file: str, entrypoint: list[str], cmd: list[str]
 ):
-    image_id, result = chalk.docker_build(
+    _, result = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "entrypoint" / test_file,
         context=DOCKERFILES / "valid" / "entrypoint",
         config=CONFIGS / "docker_wrap.c4m",
@@ -679,9 +685,7 @@ def test_wrap_base_entrypoint(
         ),
     ],
 )
-def test_wrap_cmd(
-    chalk: Chalk, random_hex: str, test_file: str, entrypoint: list[str], cmd: list[str]
-):
+def test_wrap_cmd(chalk: Chalk, test_file: str, entrypoint: list[str], cmd: list[str]):
     image_id, result = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "cmd" / test_file,
         context=DOCKERFILES / "valid" / "cmd",
@@ -856,11 +860,15 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
 
 
 @pytest.mark.parametrize(
-    "push, buildkit",
+    "registry, push, buildkit, buildx",
     [
-        (True, True),  # non-buildx does not support --push
-        (False, True),
-        (False, False),
+        (REGISTRY, True, True, False),  # non-buildx does not support --push
+        (REGISTRY, False, True, False),
+        (REGISTRY, False, False, False),
+        (REGISTRY_TLS, True, True, False),
+        (REGISTRY_TLS_INSECURE, True, True, False),
+        (REGISTRY_TLS, True, True, True),
+        (REGISTRY_TLS_INSECURE, True, True, True),
     ],
 )
 @pytest.mark.parametrize(
@@ -875,17 +883,20 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
 )
 def test_build_and_push(
     chalk: Chalk,
+    registry: str,
     test_file: str,
     random_hex: str,
     push: bool,
     buildkit: bool,
+    buildx: bool,
 ):
-    tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
+    tag_base = f"{registry}/{test_file}_{random_hex}"
     tag = f"{tag_base}:latest"
 
     image_id, build_result = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         buildkit=buildkit,
+        buildx=buildx,
         tag=tag,
         push=push,
         run_docker=buildkit,  # legacy builder doesnt allow to build empty image
@@ -896,9 +907,7 @@ def test_build_and_push(
     if not push:
         push_result = chalk.docker_push(tag, buildkit=buildkit)
 
-    image_digest = Docker.inspect(tag_base)[0]["RepoDigests"][0].rsplit(
-        ":", maxsplit=1
-    )[-1]
+    image_digest, _ = Docker.with_image_digest(build_result)
 
     assert build_result.mark.has(
         CHALK_ID=ANY,
@@ -1189,7 +1198,7 @@ def test_git_context(
 ):
     tmp_file.write_text(os.environ["GITHUB_TOKEN"])
 
-    image_id, build = chalk.docker_build(
+    _, build = chalk.docker_build(
         context=context,
         dockerfile=dockerfile,
         tag=random_hex,
@@ -1335,9 +1344,10 @@ def test_version_bare(chalk_default: Chalk):
         dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
     )
     assert build
-    assert Docker.run(
+    _, run = Docker.run(
         image_id,
         volumes={chalk_default.binary: "/chalk"},
         entrypoint="/chalk",
         params=["version"],
     )
+    assert run
