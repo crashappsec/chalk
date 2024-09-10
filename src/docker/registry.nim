@@ -243,7 +243,6 @@ proc request(self: DockerImage,
     except:
       if invalid:
         raise newException(RegistryResponseError, getCurrentExceptionMsg())
-  quit(1) # TODO obviously remove but useful for testing
   raise newException(ValueError, "could not find working registry configuration for " & $self)
 
 proc manifestHead*(image: DockerImage): DockerDigestedJson =
