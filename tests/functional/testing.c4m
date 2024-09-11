@@ -9,6 +9,9 @@ report_template insertion_default {
   key._OP_EXIT_CODE.use = true
 }
 
+report_template report_default {
+}
+
 if not env_exists("CHALK_USAGE_URL") {
   crashoverride_usage_reporting_url: "https://chalk-test.crashoverride.run/v0.1/usage"
 }

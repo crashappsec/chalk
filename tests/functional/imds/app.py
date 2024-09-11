@@ -4,7 +4,7 @@
 # (see https://crashoverride.com/docs/chalk)
 import json
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
 
@@ -622,7 +622,9 @@ def health():
 
 
 @app.put("/latest/api/token", response_class=PlainTextResponse)
-def token():
+def token(request: Request):
+    if request.url.hostname != "169.254.169.254":
+        raise HTTPException(status_code=403)
     return TOKEN
 
 

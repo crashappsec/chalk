@@ -10,6 +10,10 @@
 - `_OP_CLOUD_SYS_VENDOR` key for reporting sys vendor
   file content used to identity cloud provider.
   ([#418](https://github.com/crashappsec/chalk/pull/418))
+- `_OP_CLOUD_METADATA_FAILURE_REASON` - reason why
+  cloud metadata cannot be reported if chalk can deduce
+  why its collection failed.
+  ([#422](https://github.com/crashappsec/chalk/pull/422))
 
 ## 0.4.12
 

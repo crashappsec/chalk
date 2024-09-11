@@ -186,7 +186,7 @@ proc getGcpMetadata(): ChalkDict =
     except:
       trace("GCP metadata responded with invalid json: " & getCurrentExceptionMsg())
 
-proc getAwsToken(): Option[string] =
+proc getAwsToken(): tuple[token: Option[string], reason: Option[string]] =
   let url      = getUrl(awsBaseUri & "api/token")
   try:
     let
@@ -199,16 +199,24 @@ proc getAwsToken(): Option[string] =
                              headers        = hdrs)
       body     = response.body().strip()
 
-    if not response.code.is2xx():
+    if response.code == Http403:
+      # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html#instance-metadata-returns
+      trace("Could not retrieve IMDSv2 as metadata endpoint is disabled")
+      return (none(string), some("instance metadata is disabled"))
+
+    elif not response.code.is2xx():
       trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
-      return none(string)
+      return (none(string), none(string))
 
     trace("Retrieved AWS metadata token")
-    return some(body)
+    return (some(body), none(string))
   except:
-    trace("Could not retrieve IMDSv2 token from: " & url & " due to: " & getCurrentExceptionMsg())
+    let msg = getCurrentExceptionMsg()
+    trace("Could not retrieve IMDSv2 token from: " & url & " due to: " & msg)
     dumpExOnDebug()
-    return none(string)
+    if "'readLine' timed out" in msg:
+      return (none(string), some("instance metadata hop limit is reached"))
+    return (none(string), none(string))
 
 proc oneItem(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
   ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
@@ -330,9 +338,11 @@ proc getAwsMetadata(): ChalkDict =
   if instanceId.toLowerAscii().startsWith("i-"):
     result.setIfNeeded("_AWS_INSTANCE_ID", instanceId)
 
-  let tokenOpt = getAwsToken()
+  let (tokenOpt, reasonOpt) = getAwsToken()
   if tokenOpt.isNone():
     trace("IMDSv2 token not available.")
+    if reasonOpt.isSome():
+      result.setIfNeeded("_OP_CLOUD_METADATA_FAILURE_REASON", reasonOpt.get())
     return
 
   let token = tokenOpt.get()

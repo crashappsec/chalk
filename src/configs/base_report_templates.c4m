@@ -362,6 +362,7 @@ report and subtract from it.
   key._OP_HOST_VERSION.use                    = true
   key._OP_HOST_MACHINE.use                    = true
   key._OP_CLOUD_METADATA.use                  = true
+  key._OP_CLOUD_METADATA_FAILURE_REASON.use   = true
   key._OP_ERRORS.use                          = true
   key._OP_HOST_REPORT_KEYS.use                = true
   key._OP_TCP_SOCKET_INFO.use                 = true
@@ -513,6 +514,7 @@ doc: """
   key._OP_HOST_VERSION.use                    = true
   key._OP_HOST_MACHINE.use                    = true
   key._OP_CLOUD_METADATA.use                  = true
+  key._OP_CLOUD_METADATA_FAILURE_REASON.use   = true
   key._OP_ERRORS.use                          = true
   key._OP_HOST_REPORT_KEYS.use                = true
   key._OP_TCP_SOCKET_INFO.use                 = true
@@ -998,6 +1000,7 @@ container.
   key._OP_HOST_VERSION.use                    = true
   key._OP_HOST_MACHINE.use                    = true
   key._OP_CLOUD_METADATA.use                  = true
+  key._OP_CLOUD_METADATA_FAILURE_REASON.use   = true
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
   key._OP_ERRORS.use                          = true
   key._OP_CLOUD_SYS_VENDOR.use                = true
@@ -1459,6 +1462,7 @@ and keep the run-time key.
   key._OP_HOST_VERSION.use                    = true
   key._OP_HOST_MACHINE.use                    = true
   key._OP_CLOUD_METADATA.use                  = true
+  key._OP_CLOUD_METADATA_FAILURE_REASON.use   = true
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
   key._OP_ERRORS.use                          = true
   key._OP_CLOUD_SYS_VENDOR.use                = true

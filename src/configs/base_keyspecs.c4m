@@ -4477,6 +4477,20 @@ metadata.
 """
 }
 
+keyspec _OP_CLOUD_METADATA_FAILURE_REASON {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "0.4.13"
+  shortdoc: "Reason why cloud metadata could not be collected"
+  doc:      """
+In some cases there is a known reason why cloud metadata cannot be
+collected such as cloud metadata being disabled on the instance.
+When chalk knows exact reason for the failure, it can report it
+for easier processing.
+"""
+}
+
 keyspec _OP_CLOUD_SYS_VENDOR {
   kind:     RunTimeHost
   type:     string
