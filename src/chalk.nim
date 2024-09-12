@@ -7,10 +7,12 @@
 
 # Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
-import "."/[config, confload, commands, norecurse, sinks,
+import "."/[bypass, config, confload, commands, norecurse, sinks,
             attestation_api, util]
 
 when isMainModule:
+  bypassChalk()
+
   setupSignalHandlers() # util.nim
   setupTerminal()       # util.nim
   ioSetup()             # sinks.nim

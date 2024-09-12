@@ -10,6 +10,9 @@
 - `_OP_CLOUD_SYS_VENDOR` key for reporting sys vendor
   file content used to identity cloud provider.
   ([#418](https://github.com/crashappsec/chalk/pull/418))
+- Supporting `CHALK_BYPASS` environment variable which
+  bypasses chalk altogether when chalk wraps `docker`.
+  ([#419](https://github.com/crashappsec/chalk/pull/419))
 
 ## 0.4.12
 
