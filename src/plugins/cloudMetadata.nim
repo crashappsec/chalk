@@ -226,8 +226,8 @@ proc getAwsToken(): Option[string] =
         code = "IMDS_HOP_LIMIT",
         error = msg,
         description = (
-          "Chalk timed out receiving response from IMDSv2 which implies chalk reached its hop limit. " &
-          "Hop limit needs to be at least 2 in order for a docker container to be able to receive response from IMDSv2. " &
+          "Chalk timed out while waiting to receive the token from IMDSv2, which likely means that the PUT response hop limit was reached. " &
+          "The hop limit needs to be at least 2 in order for a network-namespaced docker container to be able to receive the token from IMDSv2. " &
           "See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html"
         ),
       )
