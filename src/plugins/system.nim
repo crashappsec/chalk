@@ -282,8 +282,8 @@ proc metsysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
 
   # We add these directly into collectedData so that it can get
   # added to the MD hash when we call normalizeChalk()
-  if len(obj.err) != 0:
-    obj.collectedData["ERR_INFO"] = pack(obj.err)
+  obj.collectedData.setIfNeeded("ERR_INFO", obj.err)
+  obj.collectedData.setIfNeeded("FAILED_KEYS", obj.failedKeys)
 
   let
     toHash       = obj.getChalkMark().normalizeChalk()
@@ -314,12 +314,9 @@ proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
   result = ChalkDict()
 
   result.setIfNeeded("_OP_EXIT_CODE", getExitCode())
-
-  if len(systemErrors)  != 0:
-    result.setIfNeeded("_OP_ERRORS", systemErrors)
-
-  if len(externalActions) > 0:
-    result.setIfNeeded("_CHALK_EXTERNAL_ACTION_AUDIT", externalActions)
+  result.setIfNeeded("_OP_ERRORS", systemErrors)
+  result.setIfNeeded("_OP_FAILED_KEYS", failedKeys)
+  result.setIfNeeded("_CHALK_EXTERNAL_ACTION_AUDIT", externalActions)
 
   if isSubscribedKey("_CHALK_RUN_TIME"):
     # startTime lives in runManagement.

@@ -167,7 +167,11 @@ def test_aws_no_imds(
                 "_OP_CLOUD_SYS_VENDOR": "Amazon EC2",
                 "_OP_CLOUD_PROVIDER": "aws",
                 "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_ec2",
-                "_OP_CLOUD_METADATA_FAILURE_REASON": re.compile(r"disabled"),
+                "_OP_FAILED_KEYS": {
+                    "_OP_CLOUD_METADATA": {
+                        "code": "IMDS_DISABLED",
+                    },
+                },
                 "_AWS_INSTANCE_ID": "i-abc123xyz789",
             }
         )

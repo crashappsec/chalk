@@ -186,7 +186,7 @@ proc getGcpMetadata(): ChalkDict =
     except:
       trace("GCP metadata responded with invalid json: " & getCurrentExceptionMsg())
 
-proc getAwsToken(): tuple[token: Option[string], reason: Option[string]] =
+proc getAwsToken(): Option[string] =
   let url      = getUrl(awsBaseUri & "api/token")
   try:
     let
@@ -199,24 +199,39 @@ proc getAwsToken(): tuple[token: Option[string], reason: Option[string]] =
                              headers        = hdrs)
       body     = response.body().strip()
 
-    if response.code == Http403:
-      # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html#instance-metadata-returns
-      trace("Could not retrieve IMDSv2 as metadata endpoint is disabled")
-      return (none(string), some("instance metadata is disabled"))
-
-    elif not response.code.is2xx():
+    if not response.code.is2xx():
+      if response.code == Http403:
+        addFailedKey(
+          "_OP_CLOUD_METADATA",
+          code = "IMDS_DISABLED",
+          error = response.status,
+          description = (
+            "IMDSv2 returned 403 Forbidden which implies IMDS metadata is disabled. " &
+            "Enable IMDSv2 for chalk to collect more information about EC2 instances. " &
+            "See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html#instance-metadata-returns."
+          ),
+        )
       trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
-      return (none(string), none(string))
+      return none(string)
 
     trace("Retrieved AWS metadata token")
-    return (some(body), none(string))
+    return some(body)
   except:
     let msg = getCurrentExceptionMsg()
     trace("Could not retrieve IMDSv2 token from: " & url & " due to: " & msg)
     dumpExOnDebug()
     if "'readLine' timed out" in msg:
-      return (none(string), some("instance metadata hop limit is reached"))
-    return (none(string), none(string))
+      addFailedKey(
+        "_OP_CLOUD_METADATA",
+        code = "IMDS_HOP_LIMIT",
+        error = msg,
+        description = (
+          "Chalk timed out receiving response from IMDSv2 which implies chalk reached its hop limit. " &
+          "Hop limit needs to be at least 2 in order for a docker container to be able to receive response from IMDSv2. " &
+          "See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html"
+        ),
+      )
+    return none(string)
 
 proc oneItem(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
   ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
@@ -338,11 +353,9 @@ proc getAwsMetadata(): ChalkDict =
   if instanceId.toLowerAscii().startsWith("i-"):
     result.setIfNeeded("_AWS_INSTANCE_ID", instanceId)
 
-  let (tokenOpt, reasonOpt) = getAwsToken()
+  let tokenOpt = getAwsToken()
   if tokenOpt.isNone():
     trace("IMDSv2 token not available.")
-    if reasonOpt.isSome():
-      result.setIfNeeded("_OP_CLOUD_METADATA_FAILURE_REASON", reasonOpt.get())
     return
 
   let token = tokenOpt.get()

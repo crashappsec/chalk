@@ -75,7 +75,8 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._OP_HOST_VERSION.use                           = true
   ~key._OP_HOST_MACHINE.use                           = true
   ~key._OP_CLOUD_METADATA.use                         = true
-  ~key._OP_CLOUD_METADATA_FAILURE_REASON.use          = true
+  ~key._OP_FAILED_KEYS.use                            = true
+  ~key.FAILED_KEYS.use                                = true
   ~key._CHALK_EXTERNAL_ACTION_AUDIT.use               = true
   ~key._OP_ERRORS.use                                 = true
   ~key._OP_CLOUD_SYS_VENDOR.use                       = true
