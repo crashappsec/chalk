@@ -486,6 +486,12 @@ The named reporting template must already exist in your configuration.
 """
     }
   }
+
+  command daemon {
+    aliases: []
+    shortdoc: "Run in daemon mode"
+  }
+
   command config {
     aliases:  []
     shortdoc: "Show configuration variables and settings"

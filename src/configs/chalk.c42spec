@@ -13,7 +13,7 @@ default_key_priority := 4611686018427387904  # 2^62.
 # These are the valid command-line commands.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "config",
                          "load", "dump", "docker", "version", "env", "exec",
-                         "setup", "docgen", "__"]
+                         "daemon", "setup", "docgen", "__"]
 
 all_cmds_that_insert := ["insert", "build", "push", "load", "setup"]
 
@@ -2197,6 +2197,23 @@ final report, if the monitored process has exited.
   }
 }
 
+singleton daemon {
+  gen_fieldname: "daemonConfig"
+  gen_typename:  "DaemonConfig"
+  gen_setters:   false
+  user_def_ok:   false
+
+  field period {
+    type:  Duration
+    default: << 5 seconds >>
+    shortdoc: "How often the daemon should wake and process"
+    doc: """
+The chalk daemon will sleep for this amount of time before reporting on the host
+"""
+
+  }
+}
+
 singleton env_config {
   gen_fieldname: "envConfig"
   gen_typename:  "EnvConfig"
@@ -2624,6 +2641,7 @@ root {
   allow extract
   allow docker
   allow exec
+  allow daemon
   allow load
   allow env_config
   allow source_marks

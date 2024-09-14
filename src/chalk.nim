@@ -44,6 +44,7 @@ when isMainModule:
   of "docker":             runCmdDocker(getArgs())
   of "exec":               runCmdExec(getArgs())
   of "setup":              runCmdSetup()
+  of "daemon":             runCmdDaemon()
   of "docgen":             runChalkDocGen() # in cmd_help
   of "__.onbuild":         runCmdOnBuild() # in cmd_internal
   else:
