@@ -59,10 +59,10 @@ are not overridable via other plugins.
 
 plugin metsys {
     ~enabled: true
-    pre_chalk_keys:  ["METADATA_HASH", "ERR_INFO", "METADATA_ID",
+    pre_chalk_keys:  ["METADATA_HASH", "ERR_INFO", "FAILED_KEYS", "METADATA_ID",
                       "SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"]
     post_chalk_keys: ["_SIGNATURES"]
-    post_run_keys:   ["_OP_ERRORS", "_CHALK_EXTERNAL_ACTION_AUDIT",
+    post_run_keys:   ["_OP_ERRORS", "_OP_FAILED_KEYS", "_CHALK_EXTERNAL_ACTION_AUDIT",
                       "_CHALK_RUN_TIME", "_OP_EXIT_CODE"]
     ~priority:       high()
     doc: """

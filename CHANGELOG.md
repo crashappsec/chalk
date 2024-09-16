@@ -10,6 +10,16 @@
 - `_OP_CLOUD_SYS_VENDOR` key for reporting sys vendor
   file content used to identity cloud provider.
   ([#418](https://github.com/crashappsec/chalk/pull/418))
+- `FAILED_KEYS` and `_OP_FAILED_KEYS` - metadata keys
+  which chalk could not collect metadata for.
+  Each key contains:
+
+  - `code` - short identifiable code of a known error
+  - `message` - exact encountered error/exception message
+  - `description` - human-readable description of the error
+    with additional context how to potentially resolve it
+
+  ([#422](https://github.com/crashappsec/chalk/pull/422))
 
 ## 0.4.12
 

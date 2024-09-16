@@ -80,6 +80,7 @@ proc clearReportingState*() =
   hostInfo       = ChalkDict()
   subscribedKeys = Table[string, bool]()
   systemErrors   = @[]
+  failedKeys     = ChalkDict()
 
 proc pushCollectionCtx*(): CollectionCtx =
   result = CollectionCtx()
@@ -152,7 +153,9 @@ proc newChalk*(name:         string            = "",
                     resourceType:  resourceType,
                     extract:       extract,
                     cache:         cache,
-                    myCodec:       codec)
+                    myCodec:       codec,
+                    failedKeys:    ChalkDict(),
+                   )
 
   if chalkId != "":
     result.collectedData["CHALK_ID"] = pack(chalkId)
@@ -217,6 +220,17 @@ template trySetIfNeeded*(o: ChalkDict, k: string, code: untyped) =
 
 proc isChalkingOp*(): bool =
   return commandName in attrGet[seq[string]]("valid_chalk_command_names")
+
+proc addFailedKey*(key: string, code: string, error: string, description: string) =
+  let errObject = getErrorObject()
+  var failure   = ChalkDict()
+  failure["code"] = pack(code)
+  failure["error"] = pack(error)
+  failure["description"] = pack(description)
+  if not isChalkingOp() or errObject.isNone():
+    failedKeys[key] = pack(failure)
+  else:
+    errObject.get().failedKeys[key] = pack(failure)
 
 proc lookupByPath*(obj: ChalkDict, path: string): Option[Box] =
   let

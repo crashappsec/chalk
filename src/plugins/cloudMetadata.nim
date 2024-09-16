@@ -200,14 +200,37 @@ proc getAwsToken(): Option[string] =
       body     = response.body().strip()
 
     if not response.code.is2xx():
+      if response.code == Http403:
+        addFailedKey(
+          "_OP_CLOUD_METADATA",
+          code = "IMDS_DISABLED",
+          error = response.status,
+          description = (
+            "IMDSv2 returned 403 Forbidden which implies IMDS metadata is disabled. " &
+            "Enable IMDSv2 for chalk to collect more information about EC2 instances. " &
+            "See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html#instance-metadata-returns."
+          ),
+        )
       trace("Could not retrieve IMDSv2 token from: " & url & " - " & response.status & ": " & body)
       return none(string)
 
     trace("Retrieved AWS metadata token")
     return some(body)
   except:
-    trace("Could not retrieve IMDSv2 token from: " & url & " due to: " & getCurrentExceptionMsg())
+    let msg = getCurrentExceptionMsg()
+    trace("Could not retrieve IMDSv2 token from: " & url & " due to: " & msg)
     dumpExOnDebug()
+    if "'readLine' timed out" in msg:
+      addFailedKey(
+        "_OP_CLOUD_METADATA",
+        code = "IMDS_HOP_LIMIT",
+        error = msg,
+        description = (
+          "Chalk timed out while waiting to receive the token from IMDSv2, which likely means that the PUT response hop limit was reached. " &
+          "The hop limit needs to be at least 2 in order for a network-namespaced docker container to be able to receive the token from IMDSv2. " &
+          "See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html"
+        ),
+      )
     return none(string)
 
 proc oneItem(chalkDict: ChalkDict, token: string, keyname: string, url: string) =

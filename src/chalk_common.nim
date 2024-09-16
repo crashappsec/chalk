@@ -38,6 +38,7 @@ type
     opFailed*:      bool
     marked*:        bool
     embeds*:        seq[ChalkObj]
+    failedKeys*:    ChalkDict
     err*:           seq[string]      ## Runtime logs for chalking are filtered
                                      ## based on the "chalk log level". They
                                      ## end up here, until the end of chalking
@@ -464,6 +465,7 @@ let
 
 var
   hostInfo*               = ChalkDict()
+  failedKeys*             = ChalkDict()
   subscribedKeys*         = Table[string, bool]()
   systemErrors*           = seq[string](@[])
   selfChalk*              = ChalkObj(nil)

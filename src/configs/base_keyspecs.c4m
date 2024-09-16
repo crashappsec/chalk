@@ -1490,6 +1490,22 @@ variable that controls console logging output.
 """
 }
 
+keyspec FAILED_KEYS {
+  kind:     ChalkTimeArtifact
+  type:     dict[string, `x]
+  standard: true
+  since:    "0.4.13"
+  shortdoc: "Keys and errors why chalk could not collect them"
+  doc:      """
+In some cases there are known reasons why chalk cannot collect
+some metadata. For example chalk might not be able to collect
+AWS EC2 instance metadata if IMDSv2 is disabled for that instance.
+This key reports all known errors and reason why that key could
+not be collected so that further action can be taken to be able
+to collect that metadata in the future.
+"""
+}
+
 keyspec SIGNING {
     kind:             ChalkTimeArtifact
     never_early:      true
@@ -4500,6 +4516,22 @@ keyspec _OP_ERRORS {
 Errors identified during the current operation, not associated with a
 particular artifact. See the documentation for `ERR_INFO`, which
 shares the same log-level configuration.
+"""
+}
+
+keyspec _OP_FAILED_KEYS {
+  kind:     RunTimeHost
+  type:     dict[string, `x]
+  standard: true
+  since:    "0.4.13"
+  shortdoc: "Keys and errors why chalk could not collect them"
+  doc:      """
+In some cases there are known reasons why chalk cannot collect
+some metadata. For example chalk might not be able to collect
+AWS EC2 instance metadata if IMDSv2 is disabled for that instance.
+This key reports all known errors and reason why that key could
+not be collected so that further action can be taken to be able
+to collect that metadata in the future.
 """
 }
 
