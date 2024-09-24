@@ -2204,9 +2204,9 @@ singleton daemon {
   user_def_ok:   false
 
   field period {
-    type:  Duration
-    default: << 5 seconds >>
-    shortdoc: "How often the daemon should wake and process"
+    type: int
+    default: 5000
+    shortdoc: "How often the daemon should wake and process in milliseconds"
     doc: """
 The chalk daemon will sleep for this amount of time before reporting on the host
 """

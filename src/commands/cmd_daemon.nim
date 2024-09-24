@@ -15,14 +15,14 @@ import ".."/[config, util, reporting]
 # this const is not available in nim stdlib hence manual c import
 var TIOCNOTTY {.importc, header: "sys/ioctl.h"}: cuint
 
-proc daemon() =
+proc daemon(period: int) =
   while true:
     doReporting()
-    sleep 5000
+    sleep period
 
 proc runCmdDaemon*() =
   let
-    period = int(get[Con4mDuration](getChalkScope(), "daemon.period"))
+    period = get[int](getChalkScope(), "daemon.period")
 
   let pid = fork()
   if pid == -1:
@@ -44,4 +44,4 @@ proc runCmdDaemon*() =
       error("Error on disconnecting from tty: $1" % [$strerror(errno)])
 
   # loop forever
-  daemon()
+  daemon(period)

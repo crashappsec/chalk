@@ -489,7 +489,16 @@ The named reporting template must already exist in your configuration.
 
   command daemon {
     aliases: []
+    args: (0, high())
     shortdoc: "Run in daemon mode"
+
+    flag_arg period {
+      aliases: ["p"]
+      callback: func set_daemon_period
+      doc: """
+How long the daemon will sleep before submitting a new report in milliseconds
+"""
+      }
   }
 
   command config {
@@ -791,4 +800,13 @@ func set_artifact_search_path(args: list[string]) {
 
 func on_conf_load(args: list[string]) {
   add_override("artifact_search_path", [program_path() + "/" + program_name()])
+}
+
+func set_daemon_period(period: string) {
+  val := parseInt(period)
+  if val > 0 {
+      add_override("daemon.period", val)
+      return ""
+  }
+  return "Not a valid argument for period"
 }
