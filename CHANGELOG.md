@@ -21,6 +21,10 @@
 
   ([#422](https://github.com/crashappsec/chalk/pull/422))
 
+- `DOCKERFILE_VCS_RELATIVE_PATH` key reports the path of a
+  `Dockerfile` relative to the version control system's
+  project root. ([#426](https://github.com/crashappsec/chalk/pull/426))
+
 ## 0.4.12
 
 **Aug 29, 2024**

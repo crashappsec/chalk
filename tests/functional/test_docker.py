@@ -28,6 +28,7 @@ from .conf import (
     DOCKER_TOKEN_REPO,
     MARKS,
     REGISTRY,
+    ROOT,
 )
 from .utils.dict import ANY, MISSING, Contains
 from .utils.docker import Docker
@@ -716,6 +717,7 @@ def test_virtual_valid(
             "_IMAGE_ID": image_hash,
             "_REPO_TAGS": Contains({f"{tag}:latest"}),
             "DOCKERFILE_PATH": str(dockerfile),
+            "DOCKERFILE_VCS_RELATIVE_PATH": str(dockerfile.relative_to(ROOT.parent.parent)),
             # docker tags should be set to tag above
             "DOCKER_TAGS": Contains({f"{tag}:latest"}),
         },
@@ -775,8 +777,9 @@ def test_virtual_invalid(
 )
 def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
     tag = f"{test_file}_{random_hex}"
+    dockerfile = DOCKERFILES / test_file / "Dockerfile"
     image_hash, build = chalk.docker_build(
-        dockerfile=DOCKERFILES / test_file / "Dockerfile",
+        dockerfile=dockerfile,
         tag=tag,
         config=CONFIGS / "docker_wrap.c4m",
     )
@@ -790,6 +793,7 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
             "_IMAGE_ID": image_hash,
             "_REPO_TAGS": Contains({f"{tag}:latest"}),
             "DOCKERFILE_PATH": str(DOCKERFILES / test_file / "Dockerfile"),
+            "DOCKERFILE_VCS_RELATIVE_PATH": str(dockerfile.relative_to(ROOT.parent.parent)),
             # docker tags should be set to tag above
             "DOCKER_TAGS": Contains({f"{tag}:latest"}),
         },

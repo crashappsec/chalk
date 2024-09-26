@@ -229,6 +229,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.DOCKER_FILE.use                         = true
   ~key.DOCKER_FILE_CHALKED.use                 = true
   ~key.DOCKERFILE_PATH.use                     = true
+  ~key.DOCKERFILE_VCS_RELATIVE_PATH.use        = true
   ~key.DOCKER_PLATFORM.use                     = true
   ~key.DOCKER_PLATFORMS.use                    = true
   ~key.DOCKER_LABELS.use                       = true
