@@ -617,3 +617,12 @@ proc getOrDefault*[T](self: openArray[T], i: int, default: T): T =
   if len(self) > i:
     return self[i]
   return default
+
+proc getRelativePathBetween*(fromPath: string, toPath: string) : string =
+  ## Given the `fromPath`, usually the project root, return the relative
+  ## path of the file's `toPath`. Return nothing if its outside the project root
+  ## or if `toPath` is an empty string.
+  result = toPath.relativePath(fromPath)
+  if result.startsWith("..") or result == "":
+    trace("File is ephemeral or not contained within VCS project")
+    return ""

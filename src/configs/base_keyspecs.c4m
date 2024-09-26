@@ -1640,6 +1640,22 @@ Platform passed when performing `docker build`, if any.
 """
 }
 
+keyspec DOCKERFILE_PATH_WITHIN_VCTL {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.4.13"
+    shortdoc:         "Relative path of the Dockerfile to the VCS' root."
+    doc:              """
+The path of the Dockerfile used during `docker build` relative to the version
+control system's project root. Defaults to an empty string in the case of:
+
+* Dockerfile content was passed from `stdin` or process substitution
+* the relative path is outside the project (e.g., `../../Dockerfile`)
+"""
+}
+
 keyspec DOCKER_PLATFORM {
     kind:             ChalkTimeArtifact
     type:             string

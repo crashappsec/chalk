@@ -521,8 +521,8 @@ plugin docker {
     enabled:  true
     pre_chalk_keys: ["ARTIFACT_TYPE",
                      "DOCKER_FILE", "DOCKER_FILE_CHALKED", "DOCKERFILE_PATH",
-                     "DOCKER_PLATFORM", "DOCKER_PLATFORMS",
-                     "DOCKER_LABELS", "DOCKER_TAGS",
+                     "DOCKERFILE_PATH_WITHIN_VCTL", "DOCKER_PLATFORM",
+                     "DOCKER_PLATFORMS", "DOCKER_LABELS", "DOCKER_TAGS",
                      "DOCKER_BASE_IMAGE", "DOCKER_BASE_IMAGE_REPO",
                      "DOCKER_BASE_IMAGE_TAG", "DOCKER_BASE_IMAGE_DIGEST",
                      "DOCKER_CONTEXT", "DOCKER_ADDITIONAL_CONTEXTS",
