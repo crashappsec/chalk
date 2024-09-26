@@ -12,8 +12,6 @@ when not defined(debug):
     switch("warning", "Deprecated:off")
     switch("warning", "User:off")
 
-applyCommonLinkOptions()
-
 var
   default  = getEnv("HOME").joinPath(".local/c0")
   localDir = getEnv("LOCAL_INSTALL_DIR", default)

@@ -26,28 +26,6 @@ task test, "Run the unit tests":
     args = "--verbose pattern 'tests/unit/*.nim'" # By default, run all unit tests.
   exec "testament " & args
 
-proc con4mDevMode() =
-  let script = "bin/devmode"
-  # only missing in Dockerfile compile step
-  if not fileExists(script):
-    return
-  ## The devmode script is for use when doing combined work across
-  ## chalk and con4m / nimutils; it simply copies any con4m and nimble
-  ## source code into your most recent nimble directory before running
-  ## build.
-  ##
-  ## Note that by default the script assumes that con4m/ and nimtuils/
-  ## repos live under ../con4m/ and ../nimutils/ locally, and that
-  ## nimble's package directory is at ~/.nimble/pkgs. But you can use
-  ## environment variables: `CON4M_DIR`, `NIMUTILS_DIR`, `NIMBLE_PKGS`.
-  ##
-  ## And, the script only does stuff if `CON4M_DEV` is set in your
-  ## environment (the value doesn't matter).
-  exec script
-
-before build:
-  con4mDevMode()
-
 # Add --trace if needed.
 after build:
   when not defined(debug):
