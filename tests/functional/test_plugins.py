@@ -36,7 +36,8 @@ def test_network(copy_files: list[Path], chalk: Chalk):
         _NETWORK_PARTIAL_TRACEROUTE_IPS={
             "1.1.1.1": {
                 "1": ANY,
-                "2": ANY,
+                # github runners subnet blocks icmp so
+                # we never get a response for TTL>1
             },
         },
     )
