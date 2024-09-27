@@ -90,7 +90,7 @@ when hostOs == "linux":
     # convert to 16-bit by adding carry to sum
     while (sum shr 16) > 0:
       sum = (sum and 0xffff) + (sum shr 16)
-    result = not result
+    result = not uint16(sum)
 
   proc asArray(self: IcmpPing): array[8, uint8] =
     return cast[ptr array[sizeof(self), uint8]](self)[]
