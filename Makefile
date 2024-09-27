@@ -46,9 +46,10 @@ $(BINARY).bck: $(SOURCES)
 
 .PHONY: debug release
 debug: CHALK_BUILD=build --define:debug
+debug: DEBUG=true
 release: CHALK_BUILD=build
 debug release:
-	$(eval export CHALK_BUILD)
+	$(eval export CHALK_BUILD DEBUG)
 	-rm -f $(BINARY) $(BINARY).bck
 	$(MAKE) $(BINARY)
 

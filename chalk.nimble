@@ -11,7 +11,7 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 2.0.8"
-requires "https://github.com/crashappsec/con4m#ee26bd28d99cd0aa2dc3c9b2cd83bb0d145ec167"
+requires "https://github.com/crashappsec/con4m#57c908650544ab045a3a9aa6f26d274b1859d238"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
 
 # this allows us to get version externally
@@ -28,7 +28,12 @@ task test, "Run the unit tests":
 
 # Add --trace if needed.
 after build:
-  when not defined(debug):
+  # ideally this should work:
+  # when not defined(debug):
+  # however debug symbol doesnt seem to be defined by nimble?
+  # and it always runs strip
+  # instead we check env var set by Makefile
+  if getEnv("DEBUG", "false") != "true":
     exec "set -x && strip " & bin[0]
   exec "set -x && ./" & bin[0] & " --debug --no-use-external-config --skip-command-report load default"
 
