@@ -5662,6 +5662,20 @@ AWS where imdsv2 is available.
 """
 }
 
+keyspec _NETWORK_PARTIAL_TRACEROUTE_IPS {
+    kind:             RunTimeHost
+    type:             dict[string, dict[string, string]]
+    standard:         true
+    since:            "0.4.13"
+    shortdoc:         "Partial traceroute IPs for configured TTLs"
+    doc:              """
+For all IPs to traceroute, intermediate IPs for given TTL values
+as configured by `network.traceroute_ips`.
+As this is not a complete traceroute all the way to the destination,
+it is useful to find local network configurations such as subnet gateway
+where chalk is running.
+"""
+}
 
 keyspec _CHALK_EXTERNAL_ACTION_AUDIT {
     kind: RunTimeHost

@@ -9,6 +9,7 @@ FROM nim as deps
 RUN apt-get update -y && \
     apt-get install -y \
         curl \
+        make \
         musl-tools \
         && \
     apt-get clean -y

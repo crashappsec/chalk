@@ -2595,6 +2595,32 @@ Configuration information for the different Cloud Provider
     hidden:  true
     doc:     "Default cloud metadata IP"
   }
+
+}
+
+singleton network {
+  gen_fieldname: "networkConfig"
+  gen_typename:  "NetworkConfig"
+  gen_setters:   false
+  user_def_ok:   false
+  shortdoc: """
+Configuration for network metadata collection
+"""
+
+  field partial_traceroute_ips {
+    type:    dict[string, list[string]]
+    default: {"1.1.1.1": ["1", "2"]}
+    hidden:  true
+    doc:     """
+IPs to partially traceroute for specified TTLs.
+This can be useful to find local subnets where chalk is running.
+For example in docker container in a cloud environment will reveal
+hosts subnet gateway IP for TTL=2.
+This is a dictionary to allow to potentially query multiple networks
+if there are multiple egress routes.
+By default partial traceroute runs for public cloudflare 1.1.1.1.
+"""
+  }
 }
 
 root {
@@ -2631,6 +2657,7 @@ root {
   allow tech_stack_rule
   allow linguist_language
   allow git
+  allow network
 
   shortdoc: "Chalk Configuration Options"
 

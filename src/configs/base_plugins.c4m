@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2024, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -228,6 +228,15 @@ plugin cloud_metadata {
     "_AWS_TAGS"]
     doc: """
 Captures metadata from cloud instances.
+"""
+}
+
+plugin network {
+  enabled: true
+  post_run_keys: ["_NETWORK_PARTIAL_TRACEROUTE_IPS"]
+  doc: """
+Collect external networking configurations.
+Some of them can be probe-based.
 """
 }
 

@@ -31,6 +31,8 @@ cloud_provider {
   cloud_instance_hw_identifiers { }
 }
 
+network { }
+
 attestation {
   attestation_key_embed { }
   attestation_key_get { }
