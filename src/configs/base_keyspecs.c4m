@@ -5667,7 +5667,7 @@ keyspec _NETWORK_PARTIAL_TRACEROUTE_IPS {
     type:             dict[string, list[string]]
     standard:         true
     since:            "0.4.13"
-    shortdoc:         "Partial traceroute IPs to discover local network resources"
+    shortdoc:         "Partial traceroute IPs for run-time environment discovery"
     doc:              """
 Partial traceroutes to IPs as configured by `network.tracerroute_ips`.
 This allows to discover local network resources such as local
