@@ -34,11 +34,8 @@ def test_network(copy_files: list[Path], chalk: Chalk):
     insert = chalk.insert(bin_path)
     assert insert.report.has(
         _NETWORK_PARTIAL_TRACEROUTE_IPS={
-            "1.1.1.1": {
-                "1": ANY,
-                # github runners subnet blocks icmp so
-                # we never get a response for TTL>1
-            },
+            # by default traceroute is for 2 hops
+            "1.1.1.1": [ANY, ANY],
         },
     )
 

@@ -9,17 +9,15 @@ import std/[net]
 import ".."/[config, plugin_api, pingttl]
 
 proc getTtlIps(): Box =
-  var data = newTable[string, TableRef[string, string]]()
+  var data = newTable[string, seq[string]]()
   # pingttl is only implemented for linux
   when hostOs == "linux":
-    let ipTTLs = attrGet[TableRef[string, seq[string]]]("network.partial_traceroute_ips")
-    for dest, ttls in ipTTLs:
-      var route = newTable[string, string]()
-      for t in ttls:
-        let ttl = parseInt(t)
+    let ipHops = attrGet[TableRef[string, int]]("network.partial_traceroute_ips")
+    for dest, hops in ipHops:
+      var route = newSeq[string]()
+      for ttl in countup(1, hops):
         let ip  = tryGetIpForTTL(parseIpAddress(dest), ttl = ttl)
-        if ip.isSome():
-          route[t] = $(ip.get())
+        route.add($(ip.get()))
       if len(route) > 0:
         data[dest] = route
   return pack(data)
