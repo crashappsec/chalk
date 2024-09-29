@@ -16,8 +16,12 @@ proc getTtlIps(): Box =
     for dest, hops in ipHops:
       var route = newSeq[string]()
       for ttl in countup(1, hops):
-        let ip  = tryGetIpForTTL(parseIpAddress(dest), ttl = ttl)
-        route.add($(ip.get()))
+        let ip = tryGetIpForTTL(parseIpAddress(dest), ttl = ttl)
+        if ip.isSome():
+          route.add($(ip.get()))
+        else:
+          # ensure route list has all hops even if we could not detect intermediate IP
+          route.add("")
       if len(route) > 0:
         data[dest] = route
   return pack(data)
