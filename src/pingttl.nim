@@ -24,7 +24,7 @@ when hostOs == "linux":
 
   const
     msec           = 1000
-    defaultTimeout = 5
+    defaultTimeout = 10
 
   # these dont seem to be in stdlib?
   let
