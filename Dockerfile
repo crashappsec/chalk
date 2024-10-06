@@ -1,5 +1,5 @@
 FROM ghcr.io/crashappsec/nim:ubuntu-2.0.8 as nim
-FROM gcr.io/projectsigstore/cosign:v2.2.3 as cosign
+FROM ghcr.io/sigstore/cosign/cosign:v2.2.3 as cosign
 
 # -------------------------------------------------------------------
 
