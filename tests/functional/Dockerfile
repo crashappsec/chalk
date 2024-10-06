@@ -8,7 +8,7 @@ ARG POETRY_VERSION=1.5.1
 
 FROM docker:$DOCKER_VERSION as docker
 FROM docker/buildx-bin:$BUILDX_VERSION as buildx
-FROM gcr.io/projectsigstore/cosign:v$COSIGN_VERSION as cosign
+FROM ghcr.io/sigstore/cosign/cosign:v$COSIGN_VERSION as cosign
 
 # ----------------------------------------------------------------------------
 
