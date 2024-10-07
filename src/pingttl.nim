@@ -245,6 +245,7 @@ when hostOs == "linux":
         timeoutMs = timeoutMs,
       ))
     except:
+      trace("pingttl: could not find partial traceroute due to: " & getCurrentExceptionMsg())
       return none(IpAddress)
 
   when isMainModule:
