@@ -246,6 +246,7 @@ when hostOs == "linux":
       ))
     except:
       trace("pingttl: could not find partial traceroute due to: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
       return none(IpAddress)
 
   when isMainModule:
