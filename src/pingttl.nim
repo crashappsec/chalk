@@ -191,13 +191,17 @@ when hostOs == "linux":
         if int32(offender.sa_family) != posix.AF_INET:
           trace("pingttl: icmp error from unsupported offender source address family " & $offender.sa_family)
           raiseOSError(lastError)
-        # TODO how to get the sock len directly from the sockaddr structure?
-        # var
-        #   address: IpAddress
-        #   port:    Port
-        # fromSockAddr(cast[ptr Sockaddr_in](offender)[], ???, address, port)
-        let address = cast[ptr Sockaddr_in](offender)
-        return parseIpAddress($(inet_ntoa(address.sin_addr)))
+        var
+          address: IpAddress
+          port:    Port
+        # above we asserted only ipv4 so can pass size of ipv4 directly
+        # to add ipv6 will reuqire supporting icmp6 error codes as well
+        # which we dont need just yet
+        fromSockAddr(cast[ptr Sockaddr_in](offender)[],
+                     SockLen(sizeof(Sockaddr_in)),
+                     address,
+                     port)
+        return address
       cmsg = CMSG_NXTHDR(addr(msg), cmsg)
     raiseOSError(lastError)
 
