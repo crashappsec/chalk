@@ -5,26 +5,26 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-when hostOs == "linux":
-  import std/[
-    nativesockets,
-    net,
-    options,
-    os,
-    oserrors,
-    posix,
-  ]
+import std/[
+  nativesockets,
+  net,
+  options,
+  os,
+  oserrors,
+  posix,
+]
 
+const
+  msec           = 1000
+  defaultTimeout = 10
+
+when hostOs == "linux":
   # allow to use this as standalone module for testing without chalk imports
   when isMainModule:
     proc trace(s: string) =
       echo(s)
   else:
     import "."/[config]
-
-  const
-    msec           = 1000
-    defaultTimeout = 10
 
   # these dont seem to be in stdlib?
   let
