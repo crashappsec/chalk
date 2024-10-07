@@ -221,6 +221,8 @@ when hostOs == "linux":
       ).setChecksum()
       data = ping.asData()
       handle = createNativeSocket(posix.AF_INET, posix.SOCK_DGRAM, posix.IPPROTO_ICMP)
+    if handle == osInvalidSocket:
+      raise newException(OSError, "Could not open SOCK_DGRAM socket using IPPROTO_ICMP for partial tracerouting")
     defer: handle.close()
     handle.setSockOptInt(IPPROTO_IP, IP_TTL,           ttl)
     handle.setSockOptInt(IPPROTO_IP, IP_MULTICAST_TTL, ttl)

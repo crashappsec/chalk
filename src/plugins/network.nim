@@ -14,15 +14,18 @@ proc getTtlIps(): Box =
   when hostOs == "linux":
     let ipHops = attrGet[TableRef[string, int]]("network.partial_traceroute_ips")
     for dest, hops in ipHops:
-      var route = newSeq[string]()
+      var
+        route = newSeq[string]()
+        anyIp = false
       for ttl in countup(1, hops):
         let ip = tryGetIpForTTL(parseIpAddress(dest), ttl = ttl)
         if ip.isSome():
           route.add($(ip.get()))
+          anyIp = true
         else:
           # ensure route list has all hops even if we could not detect intermediate IP
           route.add("")
-      if len(route) > 0:
+      if anyIp:
         data[dest] = route
   return pack(data)
 
