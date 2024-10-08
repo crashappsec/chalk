@@ -222,10 +222,10 @@ when hostOs == "linux":
         sequence:   uint16(sequence),
       ).setChecksum()
       data = ping.asData()
-    var handle = createNativeSocket(posix.AF_INET, posix.SOCK_RAW, posix.IPPROTO_ICMP)
+    var handle = createNativeSocket(posix.AF_INET, posix.SOCK_DGRAM, posix.IPPROTO_ICMP)
     if handle == osInvalidSocket:
-      trace("pingttl: cant open SOCK_RAW. retrying with SOCK_DGRAM")
-      handle = createNativeSocket(posix.AF_INET, posix.SOCK_DGRAM, posix.IPPROTO_ICMP)
+      trace("pingttl: cant open SOCK_DGRAM. retrying with SOCK_RAW")
+      handle = createNativeSocket(posix.AF_INET, posix.SOCK_RAW, posix.IPPROTO_ICMP)
     if handle == osInvalidSocket:
       raise newException(OSError, "Partial traceroute could not open SOCK_RAW or SOCK_DGRAM for IPPROTO_ICMP. Missing network capability perhaps?")
     defer: handle.close()
