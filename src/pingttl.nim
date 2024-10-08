@@ -34,7 +34,6 @@ when hostOs == "linux":
     MSG_DONTWAIT      {.importc, header: "<sys/socket.h>".}:    int32
     IPPROTO_IP        {.importc, header: "<netinet/in.h>".}:    int
     IP_TTL            {.importc, header: "<netinet/in.h>".}:    int
-    IP_MULTICAST_TTL  {.importc, header: "<netinet/in.h>".}:    int
     IP_RECVERR        {.importc, header: "<netinet/in.h>".}:    int
     IP_RECVTTL        {.importc, header: "<netinet/in.h>".}:    int
     IP_RECVOPTS       {.importc, header: "<netinet/in.h>".}:    int
@@ -230,7 +229,6 @@ when hostOs == "linux":
       raise newException(OSError, "Partial traceroute could not open SOCK_RAW or SOCK_DGRAM for IPPROTO_ICMP. Missing network capability perhaps?")
     defer: handle.close()
     handle.setSockOptInt(IPPROTO_IP, IP_TTL,           ttl)
-    handle.setSockOptInt(IPPROTO_IP, IP_MULTICAST_TTL, ttl)
     handle.setSockOptInt(IPPROTO_IP, IP_RECVTTL,       1)
     handle.setSockOptInt(IPPROTO_IP, IP_RECVERR,       1)
     handle.setSockOptInt(IPPROTO_IP, IP_RECVOPTS,      1)
