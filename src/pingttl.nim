@@ -21,6 +21,8 @@ const
 when hostOs == "linux":
   # allow to use this as standalone module for testing without chalk imports
   when isMainModule:
+    proc dumpExOnDebug() =
+      discard
     proc trace(s: string) =
       echo(s)
   else:
@@ -220,9 +222,12 @@ when hostOs == "linux":
         sequence:   uint16(sequence),
       ).setChecksum()
       data = ping.asData()
+    var handle = createNativeSocket(posix.AF_INET, posix.SOCK_RAW, posix.IPPROTO_ICMP)
+    if handle == osInvalidSocket:
+      trace("pingttl: cant open SOCK_RAW. retrying with SOCK_DGRAM")
       handle = createNativeSocket(posix.AF_INET, posix.SOCK_DGRAM, posix.IPPROTO_ICMP)
     if handle == osInvalidSocket:
-      raise newException(OSError, "Could not open SOCK_DGRAM socket using IPPROTO_ICMP for partial tracerouting")
+      raise newException(OSError, "Partial traceroute could not open SOCK_RAW or SOCK_DGRAM for IPPROTO_ICMP. Missing network capability perhaps?")
     defer: handle.close()
     handle.setSockOptInt(IPPROTO_IP, IP_TTL,           ttl)
     handle.setSockOptInt(IPPROTO_IP, IP_MULTICAST_TTL, ttl)
