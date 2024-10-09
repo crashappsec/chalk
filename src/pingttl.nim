@@ -272,7 +272,7 @@ when hostOs == "linux":
     try:
       echo(getIpForTTL(ip, ttl = ttl))
     except:
-      echo("could not determine TTL IP")
+      echo("could not determine TTL IP: " & getCurrentExceptionMsg())
 
 else:
   proc getIpForTTL*(dest:     IpAddress,
