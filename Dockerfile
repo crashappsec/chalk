@@ -11,6 +11,7 @@ RUN apt-get update -y && \
         curl \
         make \
         musl-tools \
+        strace \
         && \
     apt-get clean -y
 
