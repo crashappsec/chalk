@@ -19,7 +19,8 @@ RUN apk add --no-cache \
     curl \
     gdb \
     git \
-    gpg
+    gpg \
+    strace
 
 RUN if uname -m | grep -Ei "arm|aarch"; then \
     apk add --no-cache \
@@ -39,6 +40,7 @@ RUN apt-get update -y && \
         gettext-base \
         git \
         gpg \
+        strace \
         && \
     apt-get clean -y
 
