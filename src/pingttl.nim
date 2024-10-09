@@ -35,8 +35,6 @@ when hostOs == "linux":
     IPPROTO_IP        {.importc, header: "<netinet/in.h>".}:    int
     IP_TTL            {.importc, header: "<netinet/in.h>".}:    int
     IP_RECVERR        {.importc, header: "<netinet/in.h>".}:    int
-    IP_RECVTTL        {.importc, header: "<netinet/in.h>".}:    int
-    IP_RECVOPTS       {.importc, header: "<netinet/in.h>".}:    int
     SO_SNDTIMEO       {.importc, header: "<netinet/in.h>".}:    cint
     SO_RCVTIMEO       {.importc, header: "<netinet/in.h>".}:    cint
     SO_EE_ORIGIN_ICMP {.importc, header: "<linux/errqueue.h>"}: uint8
@@ -63,6 +61,7 @@ when hostOs == "linux":
       checksum*:   uint16
       identifier*: uint16
       sequence*:   uint16
+      data*:       string
 
   proc SO_EE_OFFENDER(err: ptr SockExtendedErr):
     ptr Sockaddr {.importc, header: "<linux/errqueue.h>".}
@@ -78,23 +77,28 @@ when hostOs == "linux":
     ## replaced in the future.
     var
       sum: uint32 = 0
-      i           = 0
       l           = len(x) - 1
-    while i < l:
-      # sum is 16-bit word whereas input is seq of 8-bit ints
-      # hence shift left 8 to align bytes
-      sum += (x[i] shl 8) + x[i + 1]
-      i += 2
-    # input is odd length - add last byte
-    if i < len(x):
-      sum += x[i] shl 8
+    for i in countup(0, l, 2):
+      # checksum is 16-bit word whereas input is seq of 8-bit ints
+      # hence combine pairs of ints into 16-bit ints
+      # note everything is little-endian so shift left on second byte
+      let merged =
+        if i < l - 1:
+          cast[ptr uint16](addr x[i])[]
+        else:
+          uint16(x[i])
+      sum += uint32(merged)
     # convert to 16-bit by adding carry to sum
     while (sum shr 16) > 0:
       sum = (sum and 0xffff) + (sum shr 16)
     result = not uint16(sum)
 
-  proc asArray(self: IcmpPing): array[8, uint8] =
-    return cast[ptr array[sizeof(self), uint8]](self)[]
+  proc asArray(self: IcmpPing): seq[uint8] =
+    let a = cast[ptr array[8, uint8]](self)[]
+    for i in a:
+      result.add(i)
+    for i in self.data:
+      result.add(cast[uint8](i))
 
   proc asData(self: IcmpPing): string =
     for i in self.asArray():
@@ -219,6 +223,7 @@ when hostOs == "linux":
         checksum:   0'u16, # initial dummy checksum
         identifier: id,
         sequence:   uint16(sequence),
+        data:       "chalk",
       ).setChecksum()
       data = ping.asData()
     var handle = createNativeSocket(posix.AF_INET, posix.SOCK_DGRAM, posix.IPPROTO_ICMP)
@@ -226,12 +231,14 @@ when hostOs == "linux":
       trace("pingttl: cant open SOCK_DGRAM. retrying with SOCK_RAW")
       handle = createNativeSocket(posix.AF_INET, posix.SOCK_RAW, posix.IPPROTO_ICMP)
     if handle == osInvalidSocket:
-      raise newException(OSError, "Partial traceroute could not open SOCK_RAW or SOCK_DGRAM for IPPROTO_ICMP. Missing network capability perhaps?")
+      raise newException(
+        OSError,
+        "could not open SOCK_RAW or SOCK_DGRAM for IPPROTO_ICMP. " &
+        "Missing network capability perhaps?"
+      )
     defer: handle.close()
-    handle.setSockOptInt(IPPROTO_IP, IP_TTL,           ttl)
-    handle.setSockOptInt(IPPROTO_IP, IP_RECVTTL,       1)
-    handle.setSockOptInt(IPPROTO_IP, IP_RECVERR,       1)
-    handle.setSockOptInt(IPPROTO_IP, IP_RECVOPTS,      1)
+    handle.setSockOptInt(IPPROTO_IP, IP_TTL,     ttl)
+    handle.setSockOptInt(IPPROTO_IP, IP_RECVERR, 1)
     let timeout = Timeval(tv_sec: Time(0), tv_usec: Suseconds(timeoutMs * msec))
     discard handle.setsockopt(SOL_SOCKET, SO_SNDTIMEO, addr(timeout), SockLen(sizeof(timeout)))
     discard handle.setsockopt(SOL_SOCKET, SO_RCVTIMEO, addr(timeout), SockLen(sizeof(timeout)))
