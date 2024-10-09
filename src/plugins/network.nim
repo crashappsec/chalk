@@ -12,13 +12,15 @@ proc getTtlIps(): Box =
   var data = newTable[string, seq[string]]()
   # pingttl is only implemented for linux
   when hostOs == "linux":
-    let ipHops = attrGet[TableRef[string, int]]("network.partial_traceroute_ips")
+    let
+      ipHops    = attrGet[TableRef[string, int]]("network.partial_traceroute_ips")
+      timeoutMs = attrGet[int]("network.partial_traceroute_timeout_ms")
     for dest, hops in ipHops:
       var
         route = newSeq[string]()
         anyIp = false
       for ttl in countup(1, hops):
-        let ip = tryGetIpForTTL(parseIpAddress(dest), ttl = ttl)
+        let ip = tryGetIpForTTL(parseIpAddress(dest), ttl = ttl, timeoutMs = timeoutMs)
         if ip.isSome():
           route.add($(ip.get()))
           anyIp = true

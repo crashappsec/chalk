@@ -2621,6 +2621,13 @@ if there are multiple egress routes.
 By default partial traceroute runs for public cloudflare IP `1.1.1.1`.
 """
   }
+
+  field partial_traceroute_timeout_ms {
+    type:    int
+    default: 10
+    hidden:  true
+    doc:     "Timeout to use in ms for each hop in partial traceroute"
+  }
 }
 
 root {
