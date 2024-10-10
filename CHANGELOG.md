@@ -21,6 +21,11 @@
 
   ([#422](https://github.com/crashappsec/chalk/pull/422))
 
+- `_NETWORK_PARTIAL_TRACEROUTE_IPS` - collect local network
+  subnet IPs even when running inside docker network-namespaced
+  (not using `--network=host`) container
+  ([#425](https://github.com/crashappsec/chalk/pull/425))
+
 ## 0.4.12
 
 **Aug 29, 2024**

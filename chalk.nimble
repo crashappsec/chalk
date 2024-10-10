@@ -11,7 +11,7 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 2.0.8"
-requires "https://github.com/crashappsec/con4m#ee26bd28d99cd0aa2dc3c9b2cd83bb0d145ec167"
+requires "https://github.com/crashappsec/con4m#57c908650544ab045a3a9aa6f26d274b1859d238"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
 
 # this allows us to get version externally
@@ -26,31 +26,14 @@ task test, "Run the unit tests":
     args = "--verbose pattern 'tests/unit/*.nim'" # By default, run all unit tests.
   exec "testament " & args
 
-proc con4mDevMode() =
-  let script = "bin/devmode"
-  # only missing in Dockerfile compile step
-  if not fileExists(script):
-    return
-  ## The devmode script is for use when doing combined work across
-  ## chalk and con4m / nimutils; it simply copies any con4m and nimble
-  ## source code into your most recent nimble directory before running
-  ## build.
-  ##
-  ## Note that by default the script assumes that con4m/ and nimtuils/
-  ## repos live under ../con4m/ and ../nimutils/ locally, and that
-  ## nimble's package directory is at ~/.nimble/pkgs. But you can use
-  ## environment variables: `CON4M_DIR`, `NIMUTILS_DIR`, `NIMBLE_PKGS`.
-  ##
-  ## And, the script only does stuff if `CON4M_DEV` is set in your
-  ## environment (the value doesn't matter).
-  exec script
-
-before build:
-  con4mDevMode()
-
 # Add --trace if needed.
 after build:
-  when not defined(debug):
+  # ideally this should work:
+  # when not defined(debug):
+  # however debug symbol doesnt seem to be defined by nimble?
+  # and it always runs strip
+  # instead we check env var set by Makefile
+  if getEnv("DEBUG", "false") != "true":
     exec "set -x && strip " & bin[0]
   exec "set -x && ./" & bin[0] & " --debug --no-use-external-config --skip-command-report load default"
 

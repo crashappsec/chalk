@@ -28,6 +28,18 @@ from .utils.tmp import make_tmp_file
 logger = get_logger()
 
 
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_network(copy_files: list[Path], chalk: Chalk):
+    bin_path = copy_files[0]
+    insert = chalk.insert(bin_path)
+    assert insert.report.has(
+        _NETWORK_PARTIAL_TRACEROUTE_IPS={
+            # by default traceroute is for 2 hops
+            "1.1.1.1": [ANY, ANY],
+        },
+    )
+
+
 def test_codeowners(tmp_data_dir: Path, chalk: Chalk):
     folder = CODEOWNERS / "raw1"
     expected_owners = (folder / "CODEOWNERS").read_text()

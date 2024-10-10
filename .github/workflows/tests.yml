@@ -90,6 +90,11 @@ jobs:
         run: |
           docker buildx bake chalk server tests --load
 
+      - name: Test pingttl
+        if: inputs.chalk_url == ''
+        run: |
+          make src/pingttl
+
       - name: Compile Chalk
         if: inputs.chalk_url == ''
         run: |

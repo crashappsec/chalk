@@ -5662,6 +5662,18 @@ AWS where imdsv2 is available.
 """
 }
 
+keyspec _NETWORK_PARTIAL_TRACEROUTE_IPS {
+    kind:             RunTimeHost
+    type:             dict[string, list[string]]
+    standard:         true
+    since:            "0.4.13"
+    shortdoc:         "Partial traceroute IPs for run-time environment discovery"
+    doc:              """
+Partial traceroutes to IPs as configured by `network.tracerroute_ips`.
+This allows to discover local network resources such as local
+ingress gateway IP even within docker network-namespaced containers.
+"""
+}
 
 keyspec _CHALK_EXTERNAL_ACTION_AUDIT {
     kind: RunTimeHost

@@ -46,9 +46,10 @@ $(BINARY).bck: $(SOURCES)
 
 .PHONY: debug release
 debug: CHALK_BUILD=build --define:debug
+debug: DEBUG=true
 release: CHALK_BUILD=build
 debug release:
-	$(eval export CHALK_BUILD)
+	$(eval export CHALK_BUILD DEBUG)
 	-rm -f $(BINARY) $(BINARY).bck
 	$(MAKE) $(BINARY)
 
@@ -150,6 +151,12 @@ tests_parallel: tests
 .PHONY: tests_bash
 tests_bash:
 	docker compose run --rm --no-deps tests bash
+
+.PHONY: src/pingttl
+src/pingttl: src/pingttl.nim
+	$(DOCKER) nim c -r $< 1.1.1.1 1
+	-docker compose run --rm --no-deps --entrypoint=strace tests -- $$(pwd)/$@ 1.1.1.1 1
+	-docker compose run --rm --no-deps --entrypoint=strace tests -- $$(pwd)/$@ 1.1.1.1 2
 
 # ----------------------------------------------------------------------------
 # MISC
