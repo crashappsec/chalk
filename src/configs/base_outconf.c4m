@@ -35,6 +35,10 @@ outconf heartbeat {
   report_template:        "report_default"
 }
 
+outconf daemon {
+  report_template:        "report_default"
+}
+
 outconf delete {
   report_template:        "report_default"
 }
