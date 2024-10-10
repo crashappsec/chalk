@@ -50,7 +50,7 @@ before build:
 
 # Add --trace if needed.
 after build:
-  when not defined(debug):
+  when defined(release):
     exec "set -x && strip " & bin[0]
   exec "set -x && ./" & bin[0] & " --debug --no-use-external-config --skip-command-report load default"
 
