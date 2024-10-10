@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.4.13
+
+**Oct 10, 2024**
 
 ### New Features
 
