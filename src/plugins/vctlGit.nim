@@ -792,15 +792,14 @@ proc isInRepo(obj: ChalkObj, repo: string): bool =
 
   return false
 
-proc gitInit(self: Plugin): Plugin =
+proc gitInit(self: Plugin) =
   once:
     let cache = GitInfo(self.internalState)
     for path in getContextDirectories():
       cache.findAndLoad(path.resolvePath())
-  return self
 
 proc gitFirstDir*(self: Plugin): string =
-  discard self.gitInit()
+  self.gitInit()
   let cache = GitInfo(self.internalState)
   for dir, _ in cache.vcsDirs:
     return dir
@@ -808,7 +807,7 @@ proc gitFirstDir*(self: Plugin): string =
 
 proc gitGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
                                 ChalkDict {.cdecl.} =
-  discard self.gitInit()
+  self.gitInit()
 
   result    = ChalkDict()
   let cache = GitInfo(self.internalState)
@@ -828,7 +827,7 @@ proc gitGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
 
 proc gitGetRunTimeHostInfo(self: Plugin, chalks: seq[ChalkObj]):
                            ChalkDict {.cdecl.} =
-  discard self.gitInit()
+  self.gitInit()
 
   result = ChalkDict()
   let cache = GitInfo(self.internalState)
