@@ -116,6 +116,7 @@ report and subtract from it.
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
+  key.DOCKERFILE_PATH_WITHIN_VCTL.use         = true
   key.DOCKER_PLATFORM.use                     = true
   key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
@@ -695,6 +696,7 @@ doc: """
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
+  key.DOCKERFILE_PATH_WITHIN_VCTL.use         = true
   key.DOCKER_PLATFORM.use                     = true
   key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
@@ -1159,6 +1161,7 @@ container.
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
+  key.DOCKERFILE_PATH_WITHIN_VCTL.use         = true
   key.DOCKER_PLATFORM.use                     = true
   key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
@@ -1623,6 +1626,7 @@ and keep the run-time key.
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
+  key.DOCKERFILE_PATH_WITHIN_VCTL.use         = true
   key.DOCKER_PLATFORM.use                     = true
   key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
@@ -1963,6 +1967,7 @@ running insert commands.
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
+  key.DOCKERFILE_PATH_WITHIN_VCTL.use         = true
   key.DOCKER_PLATFORM.use                     = true
   key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true
@@ -2047,6 +2052,7 @@ running commands that do NOT insert chalk marks.
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
+  key.DOCKERFILE_PATH_WITHIN_VCTL.use         = true
   key.DOCKER_PLATFORM.use                     = true
   key.DOCKER_PLATFORMS.use                    = true
   key.DOCKER_LABELS.use                       = true

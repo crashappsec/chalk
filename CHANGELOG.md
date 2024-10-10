@@ -25,6 +25,9 @@
   subnet IPs even when running inside docker network-namespaced
   (not using `--network=host`) container
   ([#425](https://github.com/crashappsec/chalk/pull/425))
+- `DOCKERFILE_PATH_WITHIN_VCTL` key reports the path of a
+  `Dockerfile` relative to the VCS' project root.
+  ([#426](https://github.com/crashappsec/chalk/pull/426))
 
 ## 0.4.12
 

@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import ".."/[config, collect, chalkjson, plugin_api, subscan, util]
+import ".."/[config, collect, chalkjson, plugin_api, subscan, util, plugins/vctlGit]
 import "."/[base, collect, ids, dockerfile, inspect, git, exe, entrypoint, platform, wrap, util]
 
 proc processGitContext(ctx: DockerInvocation) =
@@ -271,8 +271,12 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
 
 proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   let
-    base = ctx.getBaseDockerSection()
-    dict = chalk.collectedData
+    base              = ctx.getBaseDockerSection()
+    dict              = chalk.collectedData
+    git               = getPluginByName("vctl_git")
+    projectRootPath   = git.gitFirstDir().parentDir()
+    dockerfileRelPath = getRelativePathBetween(projectRootPath, ctx.dockerFileLoc)
+
   dict.setIfNeeded("DOCKERFILE_PATH",                  ctx.dockerFileLoc)
   dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",       ctx.foundExtraContexts)
   dict.setIfNeeded("DOCKER_CHALK_ADDED_TO_DOCKERFILE", ctx.addedInstructions)
@@ -288,6 +292,7 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST",         base.image.digest)
   dict.setIfNeeded("DOCKER_BASE_IMAGES",               ctx.formatBaseImages())
   dict.setIfNeeded("DOCKER_COPY_IMAGES",               ctx.formatCopyImages())
+  dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",      dockerfileRelPath)
   # note this key is expected to be empty string for alias-less targets
   # hence setIfSubscribed vs setIfNeeded which doesnt allow to set empty strings
   dict.setIfSubscribed("DOCKER_TARGET",                ctx.getTargetDockerSection().alias)
