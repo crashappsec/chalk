@@ -4,6 +4,7 @@
 # (see https://crashoverride.com/docs/chalk)
 from contextlib import contextmanager
 from pathlib import Path
+from subprocess import CalledProcessError
 from typing import Optional, TypeVar
 
 from more_itertools import windowed
@@ -132,7 +133,12 @@ class Docker:
         return {"DOCKER_BUILDKIT": str(int(buildkit))}
 
     @staticmethod
-    def with_image_id(build: ProgramType) -> tuple[str, ProgramType]:
+    def with_image(
+        build: ProgramType,
+        buildkit="writing image",
+        buildx="exporting config",
+        legacy="{{ .ID }}",
+    ) -> tuple[str, ProgramType]:
         image_id = ""
 
         if build.exit_code == 0:
@@ -142,6 +148,8 @@ class Docker:
             ) in list(windowed(build.cmd, 2)):
 
                 def get_sha256(needle: str) -> str:
+                    if needle == "":
+                        return ""
                     return build.find(
                         needle,
                         text=build.logs,
@@ -151,7 +159,7 @@ class Docker:
                         log_level=None,
                     ).split(":")[-1]
 
-                image_id = get_sha256("writing image") or get_sha256("exporting config")
+                image_id = get_sha256(buildkit) or get_sha256(buildx)
                 if not image_id and (
                     # this is a multi-platform build so image_id is expected to be missing
                     get_sha256("exporting_manifest_list")
@@ -160,7 +168,7 @@ class Docker:
                 ):
                     pass
                 elif not image_id:
-                    raise ValueError("No buildx image_id found during docker build")
+                    raise ValueError("No buildx image found during docker build")
 
             else:
                 image_id = build.find(
@@ -171,11 +179,33 @@ class Docker:
                 )
                 # legacy builder returns short id so we figure out longer id
                 image_id = run(
-                    ["docker", "inspect", image_id, "--format", "{{ .ID }}"],
+                    ["docker", "inspect", image_id, "--format", legacy],
                     log_level="debug",
-                ).text.split(":")[1]
+                ).text.rsplit(":", maxsplit=1)[1]
 
         return image_id, build
+
+    @staticmethod
+    def with_image_id(build: ProgramType) -> tuple[str, ProgramType]:
+        return Docker.with_image(build)
+
+    @staticmethod
+    def with_image_digest(build: ProgramType) -> tuple[str, ProgramType]:
+        image_id, _ = Docker.with_image_id(build)
+        format = "{{ (index .RepoDigests 0) }}"
+        try:
+            image_digest = run(
+                ["docker", "inspect", image_id, "--format", format],
+                log_level="debug",
+            ).text.rsplit(":", maxsplit=1)[1]
+            return image_digest, build
+        except (IndexError, CalledProcessError):
+            return Docker.with_image(
+                build,
+                buildkit="",
+                buildx="exporting manifest",
+                legacy=format,
+            )
 
     @staticmethod
     def run(

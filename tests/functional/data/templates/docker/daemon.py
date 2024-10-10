@@ -44,6 +44,7 @@ if __name__ == "__main__":
             "localhost:5044",
             "registry:5044",
             f"{IP}:5044",
+            f"{IP}:5046",
         }
     )
     has_changes = config != updated
