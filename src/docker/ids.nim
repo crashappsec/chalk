@@ -182,12 +182,6 @@ proc withDigest*(items: seq[DockerImage], digest: string): seq[DockerImage] =
   for i in items:
     result.add(i.withDigest(digest))
 
-proc registry*(self: DockerImage): string =
-  return self.repo.split('/', maxsplit = 1)[0]
-
-proc domain*(self: DockerImage): string =
-  return self.registry.split(':', maxsplit = 1)[0]
-
 proc isFullyQualified(self: DockerImage): bool =
   ## determine if the docker image is a fully qualified image name
   ## as in if the image should be pulled/pushed to default docker registry (docker hub)
@@ -213,7 +207,7 @@ proc isFullyQualified(self: DockerImage): bool =
     maybeRegistry.toLower() != maybeRegistry
   )
 
-proc qualify*(self: DockerImage): DockerImage =
+proc qualify(self: DockerImage): DockerImage =
   ## fully qualify image name with the full registry domain
   ## note qualified name does not specify any scheme like http or https
   ## it simply specifies complete image reference in the registry
@@ -230,7 +224,22 @@ proc qualify*(self: DockerImage): DockerImage =
     self.digest,
   )
 
-proc normalize*(self: DockerImage): DockerImage =
+proc withRegistry*(self: DockerImage, registry: string): DockerImage =
+  if registry == "":
+    return self
+  # TODO handle paths in registry
+  # parseUri doesnt parse uri without any scheme
+  let qualified = self.qualify()
+  var uri       = parseUri("https://" & qualified.repo)
+  uri.hostname  = registry
+  let repo = ($uri).removePrefix("https://")
+  result = (
+    repo,
+    self.tag,
+    self.digest,
+  )
+
+proc normalize(self: DockerImage): DockerImage =
   ## normalize qualified registry domain
   ## normalization maps some hardcoded registry domains
   ## to their standard API domains
@@ -239,16 +248,12 @@ proc normalize*(self: DockerImage): DockerImage =
     "docker.io":       DEFAULT_REGISTRY,
     "index.docker.io": DEFAULT_REGISTRY,
   }.toTable()
-  let qualified = self.qualify()
-  # parseUri doesnt parse uri without any scheme
-  var uri       = parseUri("https://" & qualified.repo)
-  uri.hostname  = registryMapping.getOrDefault(uri.hostname, uri.hostname)
-  let repo = ($uri).removePrefix("https://")
-  result = (
-    repo,
-    self.tag,
-    self.digest,
-  )
+  let
+    qualified = self.qualify()
+    registry  = qualified.repo.split('/', maxsplit = 1)[0]
+  if registry in registryMapping:
+    return qualified.withRegistry(registryMapping[registry])
+  return qualified
 
 proc uri*(self: DockerImage, scheme = "", path = "", healthcheck = false): Uri =
   ## generate working URI for the registry API
@@ -270,6 +275,15 @@ proc uri*(self: DockerImage, scheme = "", path = "", healthcheck = false): Uri =
   if path != "":
     uri.path = uri.path.strip(chars = {'/'}, leading = false) & path
   return uri
+
+proc registry*(self: DockerImage): string =
+  return self.normalize().repo.split('/', maxsplit = 1)[0]
+
+proc domain*(self: DockerImage): string =
+  return self.registry.split(':', maxsplit = 1)[0]
+
+proc isDockerHub*(self: DockerImage): bool =
+  return self.normalize().registry == DEFAULT_REGISTRY
 
 # below are various rendering variants as in different cases
 # different form is required
