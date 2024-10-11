@@ -222,6 +222,22 @@ services:
       start_period: 30s
       interval: 1s
 
+  registry-proxy:
+    image: registry:2
+    ports:
+      - "5047:5047"
+    environment:
+      - REGISTRY_HTTP_ADDR=0.0.0.0:5047
+      - REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io
+    networks:
+      - chalk
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - sh -c "echo 'GET / HTTP/1.1' | nc -v localhost 5047"
+      start_period: 30s
+      interval: 1s
+
   sqlite:
     image: coleifer/sqlite-web
     volumes:
