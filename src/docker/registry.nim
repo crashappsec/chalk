@@ -23,7 +23,7 @@ type
   # for read-only docker can consult mirrors
   # whereas if it indents to write to the registry,
   # it only talks to the upstream registry
-  RegistryUse = enum
+  RegistryUse* = enum
     ReadWrite
     ReadOnly # allows use of mirrors
 
@@ -31,6 +31,7 @@ type
     scheme*:      string
     registry*:    string
     prefix*:      string
+    project*:     string
     certPath*:    string
     pinnedCert*:  string
     verifyMode*:  SslCVerifyMode
