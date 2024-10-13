@@ -45,6 +45,7 @@ BASE_OUTCONF = ROOT.parent.parent / "src" / "configs" / "base_outconf.c4m"
 REGISTRY = f"{os.environ.get('IP') or 'localhost'}:5044"
 REGISTRY_TLS = f"{os.environ.get('IP') or 'localhost'}:5045"
 REGISTRY_TLS_INSECURE = f"{os.environ.get('IP') or 'localhost'}:5046"
+REGISTRY_PROXY = f"{os.environ.get('IP') or 'localhost'}:5047"
 
 SERVER_CHALKDUST = "https://chalkdust.io"
 SERVER_IMDS = "http://169.254.169.254"
