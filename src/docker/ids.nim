@@ -10,14 +10,21 @@ import ".."/[config, util]
 
 const
   DEFAULT_REGISTRY = "registry-1.docker.io"
-  hashHeader       = "sha256:"
-
-proc normalizeRegistry*(self: string): string =
-  const registryMapping = {
+  HASH_HEADER      = "sha256:"
+  REGISTRY_MAPPING = {
     "docker.io":       DEFAULT_REGISTRY,
     "index.docker.io": DEFAULT_REGISTRY,
   }.toTable()
-  return registryMapping.getOrDefault(self, self)
+
+proc normalizeRegistry*(self: string): string =
+  return REGISTRY_MAPPING.getOrDefault(self, self)
+
+proc registryAliases*(self: string): HashSet[string] =
+  result.incl(self)
+  for k, v in REGISTRY_MAPPING:
+    if k == self or v == self:
+      result.incl(k)
+      result.incl(v)
 
 proc registry*(uri: Uri): string =
   var registry = uri.hostname
@@ -28,7 +35,7 @@ proc registry*(uri: Uri): string =
 proc extractDockerHash*(value: string): string =
   # this function is also used to process container ids
   # which can start with / hence the strip
-  return value.removePrefix(hashHeader).strip(chars = {'/'})
+  return value.removePrefix(HASH_HEADER).strip(chars = {'/'})
 
 proc extractDockerHash*(value: Box): Box =
   return pack(extractDockerHash(unpack[string](value)))
@@ -151,7 +158,7 @@ proc parseImage*(name: string, defaultTag = "latest"): DockerImage =
   # parsed uri will allow us to figure out if tag contains version
   # (note that tag can be full registry path which can include
   # port in the hostname)
-  if name.startsWith(hashHeader):
+  if name.startsWith(HASH_HEADER):
     return ("", "", name.extractDockerHash())
 
   let (image, rawDigest) = name.splitBy("@")
@@ -312,7 +319,7 @@ proc isDockerHub*(self: DockerImage): bool =
 
 proc imageRef*(self: DockerImage): string =
   if self.digest != "":
-    result = hashHeader & self.digest
+    result = HASH_HEADER & self.digest
   elif self.tag != "":
     result = self.tag
   else:
@@ -341,7 +348,7 @@ proc asRepoDigest*(self: DockerImage): string =
     )
   result = self.repo
   if self.digest != "":
-    result &= "@" & hashHeader & self.digest
+    result &= "@" & HASH_HEADER & self.digest
 
 proc asRepoRef*(self: DockerImage): string =
   ## render image as precisely as possible
@@ -350,7 +357,7 @@ proc asRepoRef*(self: DockerImage): string =
     result = self.asRepoTag()
   else:
     if self.repo == "":
-      result = hashHeader & self.digest
+      result = HASH_HEADER & self.digest
     else:
       result = self.asRepoDigest()
 
@@ -359,9 +366,9 @@ proc `$`*(self: DockerImage): string =
   if self.repo != "":
     result = self.asRepoTag()
     if self.digest != "":
-      result &= "@" & hashHeader & self.digest
+      result &= "@" & HASH_HEADER & self.digest
   elif self.digest != "":
-    result = hashHeader & self.digest
+    result = HASH_HEADER & self.digest
   else:
     raise newException(
       ValueError,
