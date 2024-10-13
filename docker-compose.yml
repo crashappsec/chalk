@@ -146,6 +146,8 @@ services:
         condition: service_healthy
       registry-tls-insecure:
         condition: service_healthy
+      registry-proxy:
+        condition: service_healthy
       server:
         condition: service_healthy
       server-tls:

@@ -22,6 +22,7 @@ from .conf import (
     MAGIC,
     MARKS,
     REGISTRY,
+    REGISTRY_PROXY,
     REGISTRY_TLS,
     REGISTRY_TLS_INSECURE,
     ROOT,
@@ -288,6 +289,8 @@ def test_onbuild(chalk: Chalk, base: Path, test: Path, random_hex: str):
         ("registry.k8s.io/pause:3.9", "/pause"),
         ("k8s.gcr.io/pause", "/pause"),
         ("ghcr.io/crashappsec/pgcli:3.5.0", "pgcli"),
+        ("nginx:1.27", "/docker-entrypoint.sh"),
+        (f"{REGISTRY_PROXY}/library/nginx:1.27", "/docker-entrypoint.sh"),
     ],
 )
 def test_base_registry(chalk: Chalk, image: str, entrypoint: str, buildx: bool):
