@@ -30,6 +30,7 @@ type
   RegistryConfig = ref object
     scheme*:      string
     registry*:    string
+    prefix*:      string
     certPath*:    string
     pinnedCert*:  string
     verifyMode*:  SslCVerifyMode
@@ -60,10 +61,12 @@ proc withBasicAuth(self: RegistryConfig, token: string): RegistryConfig =
 
 iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
                                            withHttp    = true,
+                                           prefix      = "",
                                            fallthrough = false): RegistryConfig =
   yield RegistryConfig(
     scheme:      "https://",
     registry:    self.registry,
+    prefix:      prefix,
     verifyMode:  CVerifyPeer,
     fallthrough: fallthrough,
   )
@@ -81,6 +84,7 @@ iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
     yield RegistryConfig(
       scheme:      "https://",
       registry:    self.registry,
+      prefix:      prefix,
       verifyMode:  CVerifyPeer,
       fallthrough: fallthrough,
       certPath:    path,
@@ -98,6 +102,7 @@ iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
       yield RegistryConfig(
         scheme:      "https://",
         registry:    self.registry,
+        prefix:      prefix,
         verifyMode:  CVerifyNone,
         fallthrough: fallthrough,
       )
@@ -105,6 +110,7 @@ iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
         yield RegistryConfig(
           scheme:      "http://",
           registry:    self.registry,
+          prefix:      prefix,
           verifyMode:  CVerifyNone,
           fallthrough: fallthrough,
         )
@@ -134,6 +140,7 @@ iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
           yield RegistryConfig(
             scheme:      "https://",
             registry:    self.registry,
+            prefix:      prefix,
             verifyMode:  CVerifyNone,
             fallthrough: fallthrough,
           )
@@ -141,6 +148,7 @@ iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
             yield RegistryConfig(
               scheme:      "http://",
               registry:    self.registry,
+              prefix:      prefix,
               verifyMode:  CVerifyNone,
               fallthrough: fallthrough,
             )
@@ -154,24 +162,25 @@ iterator iterDaemonRegistryConfigs(self: DockerImage, use: RegistryUse): Registr
       trace("docker: attempting to use docker hub mirror: " & mirror)
       let
         mirrorUri = parseUri(mirror)
-        domain = mirrorUri.hostname
-        registry =
-          if mirrorUri.port == "":
-            domain
-          else:
-            domain & ":" & mirrorUri.port
-        mirrored = self.withRegistry(registry)
+        registry  = mirrorUri.registry
+        prefix    = mirrorUri.path
+        mirrored  = self.withRegistry(registry)
       # mirror is to the same thing. skip
       if registry == self.registry:
         trace("docker: mirror is using docker hub itself. skipping")
         continue
       if mirrorUri.scheme == "https":
-        for i in mirrored.iterDaemonSpecificRegistryConfigs(withHttp = false, fallthrough = true):
+        for i in mirrored.iterDaemonSpecificRegistryConfigs(
+          withHttp    = false,
+          prefix      = prefix,
+          fallthrough = true,
+        ):
           yield i
       else:
         yield RegistryConfig(
           scheme:      "http://",
           registry:    registry,
+          prefix:      prefix,
           verifyMode:  CVerifyNone,
           fallthrough: true,
         )
@@ -283,7 +292,11 @@ proc request(self:       DockerImage,
              use =       RegistryUse.ReadOnly,
              ): (string, Response) =
   for config in self.getConfigs(use = use):
-    let uri = self.withRegistry(config.registry).uri(scheme = config.scheme, path = path)
+    let uri = self.withRegistry(config.registry).uri(
+      scheme = config.scheme,
+      prefix = config.prefix,
+      path   = path,
+    )
     var msg = $httpMethod & " " & $uri
     if uri.scheme == "https":
       msg &= " " & $config.verifyMode
