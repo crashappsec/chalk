@@ -293,9 +293,12 @@ proc withRegistry*(self: DockerImage, registry: string): DockerImage =
   if registry == "":
     return self
   # parseUri doesnt parse uri without any scheme
-  let normalized = self.normalize()
-  var uri        = parseUri("https://" & normalized.repo)
-  uri.hostname   = registry
+  let
+    normalized = self.normalize()
+    parsed     = parseUri("https://" & registry)
+  var uri      = parseUri("https://" & normalized.repo)
+  uri.hostname = parsed.hostname
+  uri.port     = parsed.port
   let repo = ($uri).removePrefix("https://")
   result = (
     repo,
