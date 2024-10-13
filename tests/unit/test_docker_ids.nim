@@ -48,5 +48,10 @@ proc main() =
   assertEq($(parseImage("foo").uri(project = "/bar")), "https://registry-1.docker.io/v2/bar/library/foo")
 
   assertEq($(parseImage("foo").withRegistry("foo.com").uri), "https://foo.com/v2/library/foo")
+  assertEq($(parseImage("foo").withRegistry("foo.com:1234").uri), "https://foo.com:1234/v2/library/foo")
+  assertEq($(parseImage("example.com/foo").withRegistry("foo.com").uri), "https://foo.com/v2/foo")
+  assertEq($(parseImage("example.com:1234/foo").withRegistry("foo.com").uri), "https://foo.com/v2/foo")
+  assertEq($(parseImage("example.com/foo").withRegistry("foo.com:1234").uri), "https://foo.com:1234/v2/foo")
+  assertEq($(parseImage("example.com:4567/foo").withRegistry("foo.com:1234").uri), "https://foo.com:1234/v2/foo")
 
 main()
