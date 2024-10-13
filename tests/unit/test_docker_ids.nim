@@ -41,11 +41,12 @@ proc main() =
   assertEq($(parseImage("127.0.0.1/bar").uri), "http://127.0.0.1/v2/bar")
   assertEq($(parseImage("127.0.0.1/bar").uri), "http://127.0.0.1/v2/bar")
   assertEq($(parseImage("127.0.0.1:1234/bar").uri), "http://127.0.0.1:1234/v2/bar")
+
   assertEq($(parseImage("localhost/bar").uri(scheme="https://")), "https://localhost/v2/bar")
+  assertEq($(parseImage("foo").uri(path = "/manifests/latest")), "https://registry-1.docker.io/v2/library/foo/manifests/latest")
+  assertEq($(parseImage("foo").uri(prefix = "/bar")), "https://registry-1.docker.io/bar/v2/library/foo")
+  assertEq($(parseImage("foo").uri(project = "/bar")), "https://registry-1.docker.io/v2/bar/library/foo")
 
   assertEq($(parseImage("foo").withRegistry("foo.com").uri), "https://foo.com/v2/library/foo")
-  assertEq($(parseImage("foo").withRegistry("foo.com").uri(prefix = "bar")), "https://foo.com/bar/v2/library/foo")
-
-  assertEq($(parseImage("foo").uri(path = "/manifests/latest")), "https://registry-1.docker.io/v2/library/foo/manifests/latest")
 
 main()

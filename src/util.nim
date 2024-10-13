@@ -512,7 +512,7 @@ proc rSplitBy*(s: string, sep: string, default: string = ""): (string, string) =
     return (parts[0], parts[1])
   return (s, default)
 
-proc removeSuffix*(s: string, suffix: string): string =
+proc removeSuffix*(s: string, suffix: string | char): string =
   # similar to strutil except it returns result back
   # vs in-place removal in stdlib
   result = s

@@ -12,6 +12,19 @@ const
   DEFAULT_REGISTRY = "registry-1.docker.io"
   hashHeader       = "sha256:"
 
+proc normalizeRegistry*(self: string): string =
+  const registryMapping = {
+    "docker.io":       DEFAULT_REGISTRY,
+    "index.docker.io": DEFAULT_REGISTRY,
+  }.toTable()
+  return registryMapping.getOrDefault(self, self)
+
+proc registry*(uri: Uri): string =
+  var registry = uri.hostname
+  if uri.port != "":
+    registry &= ":" & uri.port
+  return registry.normalizeRegistry()
+
 proc extractDockerHash*(value: string): string =
   # this function is also used to process container ids
   # which can start with / hence the strip
@@ -133,11 +146,6 @@ proc `[]`*[T](self: TableRef[DockerPlatform, T], key: DockerPlatform): T =
 
 # ----------------------------------------------------------------------------
 
-proc registry*(uri: Uri): string =
-  result = uri.hostname
-  if uri.port != "":
-    result &= ":" & uri.port
-
 proc parseImage*(name: string, defaultTag = "latest"): DockerImage =
   # parseUri requires some scheme to parse url correctly so we add dummy https
   # parsed uri will allow us to figure out if tag contains version
@@ -229,14 +237,10 @@ proc normalize(self: DockerImage): DockerImage =
   ## normalization maps some hardcoded registry domains
   ## to their standard API domains
   # https://github.com/docker/cli/issues/3793#issuecomment-1269051403
-  const registryMapping = {
-    "docker.io":       DEFAULT_REGISTRY,
-    "index.docker.io": DEFAULT_REGISTRY,
-  }.toTable()
   let
     qualified        = self.qualify()
     (registry, path) = qualified.repo.splitBy("/")
-    fullRegistry     = registryMapping.getOrDefault(registry, registry)
+    fullRegistry     = registry.normalizeRegistry()
     fullPath         =
       # library/ is only relevant to docker hub
       # all external registries are allowed top-level repos
@@ -250,13 +254,25 @@ proc normalize(self: DockerImage): DockerImage =
     self.digest,
   )
 
-proc uri*(self: DockerImage, scheme = "", path = "", prefix = ""): Uri =
+proc uri*(self:   DockerImage,
+          scheme  = "",
+          path    = "",
+          prefix  = "",
+          project = "",
+          ): Uri =
   ## generate working URI for the registry API
   ## note this only supports v2 registries hence hardcodes v2 suffix
   ## also this doesnt account for any insecure registry configs
   let normalized = self.normalize()
-  var uri = parseUri("https://" & normalized.repo)
-  uri.path = prefix.strip(chars = {'/'}, leading = false) & "/v2" & uri.path
+  var uri        = parseUri("https://" & normalized.repo)
+  let uriPath    = uri.path
+  uri.path = (
+    prefix.removeSuffix('/') &
+    "/v2" &
+    project.removeSuffix('/') &
+    uriPath.removeSuffix('/') &
+    path
+  )
   if scheme == "":
     if uri.hostname in @["localhost", $IPv4_loopback(), $IPv6_loopback()]:
       uri.scheme = "http"
@@ -264,8 +280,6 @@ proc uri*(self: DockerImage, scheme = "", path = "", prefix = ""): Uri =
       uri.scheme = "https"
   else:
     uri.scheme = scheme.split(":")[0]
-  if path != "":
-    uri.path = uri.path.strip(chars = {'/'}, leading = false) & path
   return uri
 
 proc withRegistry*(self: DockerImage, registry: string): DockerImage =
