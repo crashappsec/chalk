@@ -213,28 +213,8 @@ proc qualify(self: DockerImage): DockerImage =
   ## it simply specifies complete image reference in the registry
   if self.isFullyQualified():
     return self
-  let repo =
-    if '/' in self.repo:
-      self.repo
-    else:
-      "library/" & self.repo
   result = (
-    DEFAULT_REGISTRY & "/" & repo,
-    self.tag,
-    self.digest,
-  )
-
-proc withRegistry*(self: DockerImage, registry: string): DockerImage =
-  if registry == "":
-    return self
-  # TODO handle paths in registry
-  # parseUri doesnt parse uri without any scheme
-  let qualified = self.qualify()
-  var uri       = parseUri("https://" & qualified.repo)
-  uri.hostname  = registry
-  let repo = ($uri).removePrefix("https://")
-  result = (
-    repo,
+    DEFAULT_REGISTRY & "/" & self.repo,
     self.tag,
     self.digest,
   )
@@ -249,22 +229,29 @@ proc normalize(self: DockerImage): DockerImage =
     "index.docker.io": DEFAULT_REGISTRY,
   }.toTable()
   let
-    qualified = self.qualify()
-    registry  = qualified.repo.split('/', maxsplit = 1)[0]
-  if registry in registryMapping:
-    return qualified.withRegistry(registryMapping[registry])
-  return qualified
+    qualified        = self.qualify()
+    (registry, path) = qualified.repo.splitBy("/")
+    fullRegistry     = registryMapping.getOrDefault(registry, registry)
+    fullPath         =
+      # library/ is only relevant to docker hub
+      # all external registries are allowed top-level repos
+      if fullRegistry != DEFAULT_REGISTRY or '/' in path:
+        path
+      else:
+        "library/" & path
+  result = (
+    fullRegistry & "/" & fullPath,
+    self.tag,
+    self.digest,
+  )
 
-proc uri*(self: DockerImage, scheme = "", path = "", healthcheck = false): Uri =
+proc uri*(self: DockerImage, scheme = "", path = ""): Uri =
   ## generate working URI for the registry API
   ## note this only supports v2 registries hence hardcodes v2 suffix
   ## also this doesnt account for any insecure registry configs
   let normalized = self.normalize()
   var uri = parseUri("https://" & normalized.repo)
-  if healthcheck:
-    uri.path = "/v2/"
-  else:
-    uri.path = "/v2" & uri.path
+  uri.path = "/v2" & uri.path
   if scheme == "":
     if uri.hostname in @["localhost", $IPv4_loopback(), $IPv6_loopback()]:
       uri.scheme = "http"
@@ -275,6 +262,21 @@ proc uri*(self: DockerImage, scheme = "", path = "", healthcheck = false): Uri =
   if path != "":
     uri.path = uri.path.strip(chars = {'/'}, leading = false) & path
   return uri
+
+proc withRegistry*(self: DockerImage, registry: string): DockerImage =
+  if registry == "":
+    return self
+  # TODO handle paths in registry
+  # parseUri doesnt parse uri without any scheme
+  let normalized = self.normalize()
+  var uri        = parseUri("https://" & normalized.repo)
+  uri.hostname   = registry
+  let repo = ($uri).removePrefix("https://")
+  result = (
+    repo,
+    self.tag,
+    self.digest,
+  )
 
 proc registry*(self: DockerImage): string =
   return self.normalize().repo.split('/', maxsplit = 1)[0]
