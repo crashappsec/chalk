@@ -44,6 +44,7 @@ proc main() =
   assertEq($(parseImage("localhost/bar").uri(scheme="https://")), "https://localhost/v2/bar")
 
   assertEq($(parseImage("foo").withRegistry("foo.com").uri), "https://foo.com/v2/library/foo")
+  assertEq($(parseImage("foo").withRegistry("foo.com").uri(prefix = "bar")), "https://foo.com/bar/v2/library/foo")
 
   assertEq($(parseImage("foo").uri(path = "/manifests/latest")), "https://registry-1.docker.io/v2/library/foo/manifests/latest")
 

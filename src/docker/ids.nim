@@ -133,6 +133,11 @@ proc `[]`*[T](self: TableRef[DockerPlatform, T], key: DockerPlatform): T =
 
 # ----------------------------------------------------------------------------
 
+proc registry*(uri: Uri): string =
+  result = uri.hostname
+  if uri.port != "":
+    result &= ":" & uri.port
+
 proc parseImage*(name: string, defaultTag = "latest"): DockerImage =
   # parseUri requires some scheme to parse url correctly so we add dummy https
   # parsed uri will allow us to figure out if tag contains version
@@ -245,13 +250,13 @@ proc normalize(self: DockerImage): DockerImage =
     self.digest,
   )
 
-proc uri*(self: DockerImage, scheme = "", path = ""): Uri =
+proc uri*(self: DockerImage, scheme = "", path = "", prefix = ""): Uri =
   ## generate working URI for the registry API
   ## note this only supports v2 registries hence hardcodes v2 suffix
   ## also this doesnt account for any insecure registry configs
   let normalized = self.normalize()
   var uri = parseUri("https://" & normalized.repo)
-  uri.path = "/v2" & uri.path
+  uri.path = prefix.strip(chars = {'/'}, leading = false) & "/v2" & uri.path
   if scheme == "":
     if uri.hostname in @["localhost", $IPv4_loopback(), $IPv6_loopback()]:
       uri.scheme = "http"
@@ -266,7 +271,6 @@ proc uri*(self: DockerImage, scheme = "", path = ""): Uri =
 proc withRegistry*(self: DockerImage, registry: string): DockerImage =
   if registry == "":
     return self
-  # TODO handle paths in registry
   # parseUri doesnt parse uri without any scheme
   let normalized = self.normalize()
   var uri        = parseUri("https://" & normalized.repo)
