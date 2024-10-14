@@ -13,6 +13,7 @@ bin           = @["chalk"]
 requires "nim >= 2.0.8"
 requires "https://github.com/crashappsec/con4m#57c908650544ab045a3a9aa6f26d274b1859d238"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
+requires "https://github.com/NimParsers/parsetoml == 0.7.1" # MIT
 
 # this allows us to get version externally
 task version, "Show current version":

@@ -517,4 +517,5 @@ class Chalk:
     def docker_pull(self, image: str):
         return self.run(
             params=["docker", "pull", image],
+            expecting_report=False,
         )
