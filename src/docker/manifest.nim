@@ -187,7 +187,7 @@ proc fetch(self: DockerManifest, fetchConfig = true) =
     self.setImageLayers(data)
     if fetchConfig:
       self.config.fetch()
-    self.setImagePlatform(self.config.configPlatform)
+      self.setImagePlatform(self.config.configPlatform)
   of DockerManifestType.config:
     let data =
       try:
@@ -301,7 +301,9 @@ proc fetchSBOM*(name: DockerImage, platform: DockerPlatform): JsonNode =
       fallback = false,
     ).json{"SPDX"}
 
-proc fetchManifest*(name: DockerImage, otherNames: seq[DockerImage] = @[]): DockerManifest =
+proc fetchManifest*(name: DockerImage,
+                    otherNames: seq[DockerImage] = @[],
+                    fetchConfig = true): DockerManifest =
   ## request either manifest list or image manifest for specified image
   # keep in mind that image can be of multiple formats
   # foo                   # image manifest name
@@ -315,7 +317,6 @@ proc fetchManifest*(name: DockerImage, otherNames: seq[DockerImage] = @[]): Dock
       meta = manifestHead(name)
       data = manifestGet(name.withDigest(meta.digest), meta.mediaType)
     result = newManifest(name, data, otherNames = otherNames)
-    result.fetch()
   except RegistryResponseError:
     trace("docker: " & getCurrentExceptionMsg())
     raise
@@ -323,20 +324,20 @@ proc fetchManifest*(name: DockerImage, otherNames: seq[DockerImage] = @[]): Dock
     error("docker: " & getCurrentExceptionMsg())
     let data = requestManifestJson(name)
     result = newManifest(name, data, otherNames = otherNames)
-    result.fetch()
+  result.fetch(fetchConfig = fetchConfig)
   manifestCache[name.asRepoDigest()] = result
 
 proc fetchOnlyImageManifest*(name: DockerImage, fetchConfig = true): DockerManifest =
-  var manifest = fetchManifest(name)
+  var manifest = fetchManifest(name, fetchConfig = fetchConfig)
   if manifest.kind == DockerManifestType.list:
     let manifests = manifest.findAllPlatformsManifests()
     if len(manifests) == 1:
       manifest = manifests[0]
-      manifest.fetch(fetchConfig = fetchConfig)
     else:
       raise newException(KeyError, "There are multiple platform images for: " & $name)
   if manifest.kind != DockerManifestType.image:
     raise newException(ValueError, "Could not find image manifest for: " & $name)
+  manifest.fetch(fetchConfig = fetchConfig)
   return manifest
 
 proc fetchImageManifest*(name: DockerImage,
