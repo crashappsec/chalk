@@ -18,6 +18,13 @@ proc parseAndDigestJson*(data: string): DigestedJson =
     size:   len(data),
   )
 
+proc parseAndDigestJson*(data: string, digest: string): DigestedJson =
+  return DigestedJson(
+    json:   parseJson(data),
+    digest: digest,
+    size:   len(data),
+  )
+
 proc newDockerDigestedJson*(data: string,
                             digest: string,
                             mediaType: string,

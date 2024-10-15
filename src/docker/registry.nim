@@ -13,6 +13,7 @@
 
 import std/[net, uri, httpclient, nativesockets, sets]
 import pkg/nimutils/net
+import pkg/[zippy/tarballs]
 import ".."/[config, ip, util, www_authenticate]
 import "."/[exe, json, ids]
 
@@ -462,16 +463,57 @@ proc manifestGet*(image:  DockerImage,
     )
   return newDockerDigestedJson(response.body(), image.imageRef, accept, kind)
 
-proc layerGet*(image:  DockerImage,
-               accept: string,
-               use =   RegistryUse.ReadOnly,
-               ): DockerDigestedJson =
+proc layerGetStream*(image:  DockerImage,
+                     accept: string,
+                     use =   RegistryUse.ReadOnly,
+                     ): Stream =
   let
-    kind          = CONTENT_TYPE_MAPPING[accept]
     (_, response) = image.request(
       use        = use,
       httpMethod = HttpGet,
       path       = "/blobs/" & image.imageRef,
       accept     = accept,
     )
-  return newDockerDigestedJson(response.body(), image.imageRef, accept, kind)
+  return response.bodyStream
+
+proc layerGetString*(image:  DockerImage,
+                     accept: string,
+                     use =   RegistryUse.ReadOnly,
+                     ): string =
+  return image.layerGetStream(
+    use    = use,
+    accept = accept,
+  ).readAll()
+
+proc layerGetJson*(image:  DockerImage,
+                   accept: string,
+                   use =   RegistryUse.ReadOnly,
+                   ): DigestedJson =
+  return parseAndDigestJson(
+    image.layerGetString(
+      use    = use,
+      accept = accept,
+    ),
+    digest = image.imageRef,
+  )
+
+proc layerGetFSFileStream*(image:  DockerImage,
+                           name:   string,
+                           accept: string,
+                           use =   RegistryUse.ReadOnly,
+                           ): Stream =
+  trace("docker: extracting " & name & " from layer " & $image)
+  let
+    response = image.layerGetStream(
+      use    = use,
+      accept = accept,
+    )
+    (tarStream, tarPath) = getNewTempFile(suffix = name)
+  tarStream.write(response.readAll())
+  tarStream.close()
+  # extract needs non-existing path so doing one more joinPath
+  let
+    untarPath = getNewTempDir().joinPath(image.digest)
+    namePath  = untarPath.joinPath(name)
+  extractAll(tarPath, untarPath)
+  result = newFileStream(namePath)
