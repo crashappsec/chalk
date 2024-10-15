@@ -47,6 +47,8 @@ proc requestManifestJson(name: DockerImage, flags = @["--raw"], fallback = true)
   ## however if that fails withs 401 error, attept to manually
   ## fetch the manifest via the URL from the error message
   ## as the error could be due to www-authenticate challenge
+  if not hasBuildX():
+    raise newException(ValueError, "No buildx to iteract with registry")
   let key = name.asRepoDigest() & $flags
   if key in jsonCache:
     return jsonCache[key]
