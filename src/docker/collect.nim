@@ -233,7 +233,7 @@ proc collectImageFrom(chalk: ChalkObj, contents: JsonNode, name: string, digest 
   chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents.nimJsonToBox())
   chalk.setIfNeeded("DOCKER_PLATFORM", $platform)
 
-proc normalizeDigestsFromManifest(chalk: ChalkObj, manifest: DockerManifest) =
+proc collectDigestsFromManifest(chalk: ChalkObj, manifest: DockerManifest) =
   chalk.imageDigest = manifest.digest.extractDockerHash()
   chalk.setIfNeeded("_IMAGE_DIGEST", chalk.imageDigest)
   if manifest.list != nil:
@@ -272,7 +272,7 @@ proc collectSBOM(chalk: ChalkObj) =
     except:
       continue
 
-proc normalizeDigests(chalk: ChalkObj) =
+proc collectDigests(chalk: ChalkObj) =
   ## docker inspect can return repo digests field with digests
   ## for either manifest list (if exists) or a specific image digest
   ## but in chalk we want to normalize them to a single digest
@@ -286,7 +286,7 @@ proc normalizeDigests(chalk: ChalkObj) =
     for image in chalk.images:
       try:
         let manifest = fetchImageManifest(image.withDigest(chalk.imageDigest), chalk.platform)
-        chalk.normalizeDigestsFromManifest(manifest)
+        chalk.collectDigestsFromManifest(manifest)
         break
       except:
         continue
@@ -302,7 +302,7 @@ proc normalizeDigests(chalk: ChalkObj) =
 proc collectImage*(chalk: ChalkObj, name: string, digest = "") =
   let contents = inspectImageJson(name)
   chalk.collectImageFrom(contents, name, digest = digest)
-  chalk.normalizeDigests()
+  chalk.collectDigests()
   if hasBuildX():
     chalk.collectProvenance()
     chalk.collectSBOM()
@@ -319,7 +319,7 @@ proc collectImageManifest*(chalk: ChalkObj,
     manifest = fetchImageManifest(name, chalk.platform, otherNames = otherNames)
     contents = manifest.config.json
   chalk.collectImageFrom(contents, $name)
-  chalk.normalizeDigestsFromManifest(manifest)
+  chalk.collectDigestsFromManifest(manifest)
   chalk.collectProvenance()
   chalk.collectSBOM()
 
