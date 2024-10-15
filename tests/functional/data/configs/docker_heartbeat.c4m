@@ -1,5 +1,5 @@
 log_level: "trace"
-unsubscribe("report", "json_console_out")
+subscribe("report", "json_console_out")
 custom_report.terminal_chalk_time.enabled: false
 custom_report.terminal_other_op.enabled: false
 
@@ -10,30 +10,3 @@ docker.wrap_entrypoint: true
 docker.wrap_cmd: true
 docker.custom_labels: {"HELLO": "CRASH_OVERRIDE_TEST_LABEL"}
 docker.arch_binary_locations: {"linux/amd64": "/tmp/chalk"}
-
-report_template docker_heartbeat_report {
-    key._CHALKS.use = true # Needed to include the per-artifact reports.
-    key._OPERATION.use  = true
-    key._OP_ARGV.use = true
-
-    key.CHALK_ID.use = true
-    key.CHALK_VERSION.use = true
-    key.ARTIFACT_TYPE.use = true
-    key._OP_ARTIFACT_PATH.use = true
-    key.HASH.use = true
-    key._CURRENT_HASH.use = true
-    key._IMAGE_ID.use = true
-    key.DOCKERFILE_PATH.use = true
-    key._PROCESS_PID.use = true
-}
-
-sink_config test_std_out {
-    sink: "stdout"
-    enabled: true
-}
-
-custom_report exec_heartbeat_test {
-  report_template: "docker_heartbeat_report"
-  sink_configs: ["test_std_out"]
-  use_when: ["exec", "heartbeat", "build"]
-}

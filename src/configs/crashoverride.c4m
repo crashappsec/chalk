@@ -45,6 +45,7 @@ This is mostly a copy of insert template however all keys are immutable.
 
   # Runtime host keys.
   ~key._ACTION_ID.use                                 = true
+  ~key._EXEC_ID.use                                   = true
   ~key._ARGV.use                                      = true
   ~key._ENV.use                                       = true
   ~key._OPERATION.use                                 = true
