@@ -370,12 +370,19 @@ iterator getConfigs(self: DockerImage, use: RegistryUse): RegistryConfig =
     if not isBuildx:
       buildx()
 
+var jsonCache = initTable[
+  (DockerImage, HttpMethod, string, RegistryUse),
+  (string, Response)
+]()
 proc request(self:       DockerImage,
              httpMethod: HttpMethod,
              path:       string,
              accept:     string,
              use =       RegistryUse.ReadOnly,
              ): (string, Response) =
+  let cacheKey = (self, httpMethod, path, use)
+  if cacheKey in jsonCache:
+    return jsonCache[cacheKey]
   for config in self.getConfigs(use = use):
     let uri = self.withRegistry(config.registry).uri(
       scheme  = config.scheme,
@@ -414,6 +421,7 @@ proc request(self:       DockerImage,
       discard response.check(url = uri, only2xx = true)
       for u in use.uses():
         configByRegistry[(u, self.registry)] = config
+        jsonCache[(self, httpMethod, path, u)] = (msg, response)
       return (msg, response)
     except:
       if invalid:
