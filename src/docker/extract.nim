@@ -9,7 +9,7 @@
 
 import std/[base64]
 import ".."/[attestation/utils, config, chalkjson, util]
-import "."/[exe, inspect, ids]
+import "."/[exe, inspect, ids, manifest, registry]
 
 proc hasChalkLayer(self: ChalkObj): bool =
   result = false
@@ -17,6 +17,17 @@ proc hasChalkLayer(self: ChalkObj): bool =
   for layer in layers:
     if "COPY " in layer and " /chalk.json" in layer:
       return true
+
+proc hasChalkLayer(self: DockerManifest): bool =
+  if self.kind != DockerManifestType.image:
+    raise newException(ValueError, "Can only query chalk marks from manifest image. Given " & $self.kind)
+  let history = self.config.json{"history"}
+  if history == nil or history.kind != JArray or len(history) == 0:
+    raise newException(ValueError, $self.name & " image config does not have valid history")
+  let
+    lastStep  = history[^1]
+    createdBy = lastStep{"created_by"}.getStr()
+  return "COPY" in createdBy and "/chalk.json" in createdBy
 
 proc extractContainerMark(containerId: string): string =
   let (markStream, markTmp) = getNewTempFile(suffix = "chalk.json")
@@ -88,7 +99,49 @@ proc extractImageMark(self: ChalkObj): string =
   finally:
     discard runDockerGetEverything(@["rm", containerId])
 
-proc extractMarkFromSigStore(self: ChalkObj): string =
+proc extractMarkFromLayer(self: ChalkObj): string =
+  var err = "no chalk mark found in any of the registry images"
+  for image in self.images.uniq():
+    let spec = image.withDigest(self.imageDigest)
+    trace("docker: extract chalk mark from registry for " & $spec)
+    try:
+      let manifest = fetchImageManifest(spec, platform = self.platform)
+      if not manifest.hasChalkLayer():
+        raise newException(
+          ValueError,
+          "Last layer for " & $spec & " does not contain /chalk.json",
+        )
+      let lastLayer = manifest.layers[^1]
+      return lastLayer.nameRef.layerGetFSFileStream(
+        name   = "chalk.json",
+        accept = manifest.mediaType,
+      ).readAll()
+    except:
+      err = getCurrentExceptionMsg()
+      trace("docker: could not extract chalk mark from registry: " & err)
+      continue
+  raise newException(ValueError, err)
+
+proc extractMarkFromInToto(self: ChalkObj, json: JsonNode): string =
+  let
+    sigs      = json["signatures"]
+    payload   = parseJson(json["payload"].getStr().decode())
+    data      = payload["predicate"]["Data"].getStr().strip()
+    predicate = parseJson(data)["predicate"]
+    attrs     = predicate["attributes"].getElems()[0]
+    rawMark   = attrs["evidence"].getStr()
+  for subject in payload["subject"]:
+    let digest = subject["digest"]["sha256"].getStr()
+    if digest.extractDockerHash() != self.imageDigest.extractDockerHash():
+      raise newException(
+        ValueError,
+        "In-Toto attestation subject does not match image digest: " &
+        digest & " != " & self.imageDigest
+      )
+  self.collectedData["_SIGNATURES"] = sigs.nimJsonToBox()
+  return rawMark
+
+proc extractMarkFromSigStoreCosign(self: ChalkObj): string =
   var err = "no attestation found to extract chalk mark"
   for image in self.images.uniq():
     let
@@ -104,16 +157,39 @@ proc extractMarkFromSigStore(self: ChalkObj): string =
     if code != 0:
       err = allOut.getStdErr().splitLines()[0]
       continue
+    let json = parseJson(res)
+    return self.extractMarkFromInToto(json)
+  raise newException(ValueError, err)
+
+proc extractMarkFromSigStore(self: ChalkObj): string =
+  var err = "no attestation found to extract chalk mark"
+  for image in self.images.uniq():
     let
-      json      = parseJson(res)
-      sigs      = json["signatures"]
-      payload   = parseJson(json["payload"].getStr().decode())
-      data      = payload["predicate"]["Data"].getStr().strip()
-      predicate = parseJson(data)["predicate"]
-      attrs     = predicate["attributes"].getElems()[0]
-      rawMark   = attrs["evidence"].getStr()
-    self.collectedData["_SIGNATURES"] = sigs.nimJsonToBox()
-    return rawMark
+      tag  = "sha256-" & self.imageDigest & ".att"
+      spec = image.withTag(tag).withDigest("")
+    trace("docker: extract chalk mark from in-toto attestation for " & $spec)
+    let manifest = fetchOnlyImageManifest(spec, fetchConfig = false)
+    if manifest.kind != DockerManifestType.image:
+      raise newException(
+        ValueError,
+        "Attestation should be image manifest but is instead " & $manifest.kind,
+      )
+    if len(manifest.layers) != 1:
+      raise newException(
+        ValueError,
+        "Attestation manifest is expected to have at most one layer but " &
+        $spec & " has " & $len(manifest.layers),
+      )
+    let
+      layer     = manifest.layers[0]
+      predicate = layer.annotations{"predicateType"}.getStr()
+    if predicate != "https://cosign.sigstore.dev/attestation/v1":
+      raise newException(
+        ValueError,
+        "Unsupported attestation predicate: " & predicate,
+      )
+    let data = layer.nameRef.layerGetJson(accept = layer.mediaType)
+    return self.extractMarkFromInToto(data.json)
   raise newException(ValueError, err)
 
 proc extractFrom(self: ChalkObj, mark: string, name: string) =
@@ -129,6 +205,23 @@ proc extractFrom(self: ChalkObj, mark: string, name: string) =
   self.marked     = true
 
 proc extractImage*(self: ChalkObj) =
+  if self.imageDigest != "":
+    try:
+      self.extractFrom(self.extractMarkFromSigStore(), self.getImageName())
+      info("docker: " & self.getImageName() & ": chalk mark successfully extracted from in-toto attestation from registry")
+      return
+    except:
+      trace("docker: " & self.getImageName() & ": could not extract chalk mark " &
+            "via in-toto attestation due to: " & getCurrentExceptionMsg())
+
+    try:
+      self.extractFrom(self.extractMarkFromLayer(), self.getImageName())
+      info("docker: " & self.getImageName() & ": chalk mark successfully extracted from layer from registry")
+      return
+    except:
+      trace("docker: " & self.getImageName() & ": could not extract chalk mark " &
+            "via layer in registry due to: " & getCurrentExceptionMsg())
+
   if self.canVerifyBySigStore():
     try:
       self.extractFrom(self.extractMarkFromSigStore(), self.getImageName())

@@ -153,6 +153,7 @@ proc setImagePlatform(self: DockerManifest, platform: DockerPlatform) =
 proc setImageLayers(self: DockerManifest, data: DigestedJson) =
   if self.kind != DockerManifestType.image:
     raise newException(AssertionDefect, "can only set image layers on image manifests")
+  self.layers = @[]
   for layer in data.json{"layers"}.items():
     self.layers.add(DockerManifest(
       kind:          DockerManifestType.layer,
@@ -161,12 +162,13 @@ proc setImageLayers(self: DockerManifest, data: DigestedJson) =
       mediaType:     layer{"mediaType"}.getStr(),
       digest:        layer{"digest"}.getStr(),
       size:          layer{"size"}.getInt(),
+      annotations:   layer{"annotations"},
     ))
 
-proc fetch(self: DockerManifest) =
+proc fetch(self: DockerManifest, fetchConfig = true) =
   if self.isFetched:
     return
-  let name = self.name.withDigest(self.digest)
+  let name = self.nameRef()
   case self.kind
   of DockerManifestType.image:
     let data =
@@ -181,12 +183,13 @@ proc fetch(self: DockerManifest) =
     self.setJson(data)
     self.setImageConfig(data)
     self.setImageLayers(data)
-    self.config.fetch()
+    if fetchConfig:
+      self.config.fetch()
     self.setImagePlatform(self.config.configPlatform)
   of DockerManifestType.config:
     let data =
       try:
-        layerGet(name, self.mediaType)
+        layerGetJson(name, self.mediaType)
       except RegistryResponseError:
         trace("docker: " & getCurrentExceptionMsg())
         raise
@@ -321,13 +324,13 @@ proc fetchManifest*(name: DockerImage, otherNames: seq[DockerImage] = @[]): Dock
     result.fetch()
   manifestCache[name.asRepoDigest()] = result
 
-proc fetchOnlyImageManifest*(name: DockerImage): DockerManifest =
+proc fetchOnlyImageManifest*(name: DockerImage, fetchConfig = true): DockerManifest =
   var manifest = fetchManifest(name)
   if manifest.kind == DockerManifestType.list:
     let manifests = manifest.findAllPlatformsManifests()
     if len(manifests) == 1:
       manifest = manifests[0]
-      manifest.fetch()
+      manifest.fetch(fetchConfig = fetchConfig)
     else:
       raise newException(KeyError, "There are multiple platform images for: " & $name)
   if manifest.kind != DockerManifestType.image:

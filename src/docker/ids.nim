@@ -194,6 +194,9 @@ proc parseImages*(names: seq[string]): seq[DockerImage] =
     if name != "":
       result.add(parseImage(name))
 
+proc withTag*(self: DockerImage, tag: string): DockerImage =
+  return (self.repo, tag, self.digest)
+
 proc withDigest*(self: DockerImage, digest: string): DockerImage =
   return (self.repo, self.tag, digest.extractDockerHash())
 
@@ -405,6 +408,9 @@ proc getImageName*(self: ChalkObj): string =
   if len(self.images) > 0:
     return $(self.images[0])
   return self.name
+
+proc nameRef*(self: DockerManifest): DockerImage =
+  return self.name.withDigest(self.digest)
 
 # ----------------------------------------------------------------------------
 
