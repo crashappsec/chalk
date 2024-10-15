@@ -17,6 +17,7 @@ import ".."/[config, plugin_api, normalize, chalkjson, attestation_api,
 
 var
   externalActions: seq[seq[string]] = @[]
+  execId = secureRand[uint64]().toHex().toLower()
 
 proc recordExternalActions(kind: string, details: string) =
   externalActions.add(@[kind, details])
@@ -212,23 +213,22 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   if len(cachedSearchPath) != 0:
     result.setIfNeeded("_OP_SEARCH_PATH", cachedSearchPath)
 
-  result.setIfNeeded("_OPERATION", getBaseCommandName())
-  result.setIfNeeded("_OP_CHALKER_VERSION", getChalkExeVersion())
-  result.setIfNeeded("_OP_PLATFORM", getChalkPlatform())
+  result.setIfNeeded("_OPERATION",            getBaseCommandName())
+  result.setIfNeeded("_EXEC_ID",              execId)
+  result.setIfNeeded("_OP_CHALKER_VERSION",   getChalkExeVersion())
+  result.setIfNeeded("_OP_PLATFORM",          getChalkPlatform())
   result.setIfNeeded("_OP_CHALKER_COMMIT_ID", getChalkCommitId())
-  result.setIfNeeded("_OP_CHALK_COUNT", len(getAllChalks()) -
-                                         len(getUnmarked()))
-  result.setIfNeeded("_OP_EXE_NAME", getMyAppPath().splitPath().tail)
-  result.setIfNeeded("_OP_EXE_PATH", getAppDir())
-  result.setIfNeeded("_OP_ARGV", @[getMyAppPath()] &
-                                          commandLineParams())
-  result.setIfNeeded("_OP_HOSTNAME", getHostName())
-  result.setIfNeeded("_OP_UNMARKED_COUNT", len(getUnmarked()))
-  result.setIfNeeded("_TIMESTAMP", pack(uint64(instant * 1000.0)))
-  result.setIfNeeded("_DATE", pack(getDate()))
-  result.setIfNeeded("_TIME", pack(getTime()))
-  result.setIfNeeded("_TZ_OFFSET", pack(getOffset()))
-  result.setIfNeeded("_DATETIME", pack(getDateTime()))
+  result.setIfNeeded("_OP_CHALK_COUNT",       len(getAllChalks()) - len(getUnmarked()))
+  result.setIfNeeded("_OP_EXE_NAME",          getMyAppPath().splitPath().tail)
+  result.setIfNeeded("_OP_EXE_PATH",          getAppDir())
+  result.setIfNeeded("_OP_ARGV",              @[getMyAppPath()] & commandLineParams())
+  result.setIfNeeded("_OP_HOSTNAME",          getHostName())
+  result.setIfNeeded("_OP_UNMARKED_COUNT",    len(getUnmarked()))
+  result.setIfNeeded("_TIMESTAMP",            uint64(instant * 1000.0))
+  result.setIfNeeded("_DATE",                 pack(getDate()))
+  result.setIfNeeded("_TIME",                 pack(getTime()))
+  result.setIfNeeded("_TZ_OFFSET",            pack(getOffset()))
+  result.setIfNeeded("_DATETIME",             pack(getDateTime()))
 
   if isSubscribedKey("_ENV"):
     result["_ENV"] = getEnvDict()

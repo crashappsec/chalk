@@ -2,6 +2,20 @@
 
 ## On the `main` branch
 
+### New Features
+
+- `_EXEC_ID` key which is unique for each `chalk` execution
+  for all commands while chalk process is alive.
+  For example it will send consistent values for both
+  `exec` and `heartbeat` reports hence allowing to tie
+  both reports together.
+- `heartbeat` report template. It is a minimal reporting
+  template which is now used as the default report template
+  for all heartbeat reports. Main purpose of heartbeat is
+  to indicate liveliness hence such a minimal report.
+  All other metadata should be collected as part of `exec`
+  report instead.
+
 ## 0.4.13
 
 **Oct 10, 2024**
