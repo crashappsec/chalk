@@ -8,7 +8,7 @@
 ## module for interacting with remote registry docker manifests
 
 import std/[httpclient]
-import ".."/[chalk_common, config, www_authenticate]
+import ".."/[chalk_common, config, www_authenticate, semver]
 import "."/[exe, json, ids, registry]
 
 # cache is by repo ref as its normalized in buildx imagetools command
@@ -167,7 +167,8 @@ proc setImageLayers(self: DockerManifest, data: DigestedJson) =
       annotations:   layer{"annotations"},
     ))
 
-proc fetch(self: DockerManifest, fetchConfig = true) =
+proc fetch(self: DockerManifest, fetchConfig = true): DockerManifest {.discardable.} =
+  result = self
   if self.isFetched:
     return
   let name = self.nameRef()
@@ -225,14 +226,15 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
     for item in json["manifests"].items():
       let platform = item{"platform"}
       list.manifests.add(DockerManifest(
-        kind:       DockerManifestType.image,
-        name:       name,
-        list:       list,
-        otherNames: otherNames,
-        mediaType:  item{"mediaType"}.getStr(),
-        digest:     item{"digest"}.getStr(),
-        size:       item{"size"}.getInt(),
-        platform:   DockerPlatform(
+        kind:        DockerManifestType.image,
+        name:        name,
+        list:        list,
+        otherNames:  otherNames,
+        mediaType:   item{"mediaType"}.getStr(),
+        digest:      item{"digest"}.getStr(),
+        size:        item{"size"}.getInt(),
+        annotations: item{"annotations"},
+        platform:    DockerPlatform(
           os:           platform{"os"}.getStr(),
           architecture: platform{"architecture"}.getStr(),
           variant:      platform{"variant"}.getStr(),
@@ -261,45 +263,6 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
 
   else:
     raise newException(ValueError, "Unsupported docker manifest json")
-
-proc fetchProvenance*(name: DockerImage, platform: DockerPlatform): JsonNode =
-  # https://docs.docker.com/reference/cli/docker/buildx/imagetools/inspect/
-  try:
-    # for single-platform manifests, there is only a single provenance
-    return requestManifestJson(
-      name,
-      flags    = @["--format", "{{json .Provenance.SLSA}}"],
-      fallback = false,
-    ).json
-  except:
-    # for multi-platform we have to filter on the platform
-    # note index only supports a few keys so have to manually
-    # take SLSA key
-    return requestManifestJson(
-      name,
-      flags    = @["--format", "{{json (index .Provenance \"" & $platform & "\")}}"],
-      fallback = false,
-    ).json{"SLSA"}
-
-
-proc fetchSBOM*(name: DockerImage, platform: DockerPlatform): JsonNode =
-  # https://docs.docker.com/reference/cli/docker/buildx/imagetools/inspect/
-  try:
-    # for single-platform manifests, there is only a single sbom
-    return requestManifestJson(
-      name,
-      flags    = @["--format", "{{json .SBOM.SPDX}}"],
-      fallback = false,
-    ).json
-  except:
-    # for multi-platform we have to filter on the platform
-    # note index only supports a few keys so have to manually
-    # take SPDX key
-    return requestManifestJson(
-      name,
-      flags    = @["--format", "{{json (index .SBOM \"" & $platform & "\")}}"],
-      fallback = false,
-    ).json{"SPDX"}
 
 proc fetchManifest*(name: DockerImage,
                     otherNames: seq[DockerImage] = @[],
@@ -343,7 +306,7 @@ proc fetchOnlyImageManifest*(name: DockerImage, fetchConfig = true): DockerManif
 proc fetchImageManifest*(name: DockerImage,
                          platform: DockerPlatform,
                          otherNames: seq[DockerImage] = @[]): DockerManifest =
-  trace("docker: fetching manifest for: " & $name)
+  trace("docker: fetching image manifest for: " & $name)
   var manifest = fetchManifest(name, otherNames = otherNames)
   if manifest.kind == DockerManifestType.list:
     manifest = manifest.findPlatformManifest(platform)
@@ -357,3 +320,94 @@ proc fetchImageManifest*(name: DockerImage,
       $platform & " != " & "" & $manifest.platform
     )
   return manifest
+
+proc findSibling(self: DockerManifest, reference = "attestation-manifest"): DockerManifest =
+  if self.kind != DockerManifestType.image:
+    raise newException(ValueError, "Can only lookup sibling for image manifest")
+  if self.list == nil:
+    raise newException(ValueError, "Need reference to list manifest to lookup sibling")
+  for i in self.list.manifests:
+    if i.annotations == nil:
+      continue
+    if (
+      i.annotations{"vnd.docker.reference.type"}.getStr().toLower() == reference.toLower() and
+      i.annotations{"vnd.docker.reference.digest"}.getStr().toLower() == self.nameRef.imageRef.toLower()
+    ):
+      return i.fetch()
+  raise newException(KeyError, "Could not find sibling image of reference type: " & reference)
+
+proc findInTotoLayer(self: DockerManifest, predicate: string): DockerManifest =
+  if self.kind != DockerManifestType.image:
+    raise newException(ValueError, "Can only lookup layers in image manifest")
+  for l in self.layers:
+    if l.annotations == nil:
+      continue
+    if l.annotations{"in-toto.io/predicate-type"}.getStr().toLower().startsWith(predicate.toLower()):
+      return l
+  raise newException(KeyError, "Could not find in-toto layer for predicate: " & predicate)
+
+proc fetchProvenance*(name: DockerImage, platform: DockerPlatform): JsonNode =
+  # https://docs.docker.com/reference/cli/docker/buildx/imagetools/inspect/
+  try:
+    trace("docker: looking up provenance for: " & $name)
+    let layer = name.fetchImageManifest(platform).findSibling().findInTotoLayer("https://slsa.dev/provenance/")
+    result = layer.nameRef.layerGetJson(accept = layer.mediaType).json{"predicate"}
+    trace("docker: in registry found provenance for: " & $name)
+  except RegistryResponseError, KeyError:
+    trace("docker: " & getCurrentExceptionMsg())
+    raise
+  except:
+    error("docker: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
+    # https://github.com/docker/buildx/releases/tag/v0.13.0
+    if getBuildXVersion() < parseVersion("0.13"):
+      raise newException(ValueError, "buildx 0.13 is required to collect provenance via imagetools")
+    try:
+      # for single-platform manifests, there is only a single provenance
+      return requestManifestJson(
+        name,
+        flags    = @["--format", "{{json .Provenance.SLSA}}"],
+        fallback = false,
+      ).json
+    except:
+      # for multi-platform we have to filter on the platform
+      # note index only supports a few keys so have to manually
+      # take SLSA key
+      return requestManifestJson(
+        name,
+        flags    = @["--format", "{{json (index .Provenance \"" & $platform & "\")}}"],
+        fallback = false,
+      ).json{"SLSA"}
+
+proc fetchSBOM*(name: DockerImage, platform: DockerPlatform): JsonNode =
+  # https://docs.docker.com/reference/cli/docker/buildx/imagetools/inspect/
+  try:
+    trace("docker: looking up SBOM for: " & $name)
+    let layer = name.fetchImageManifest(platform).findSibling().findInTotoLayer("https://spdx.dev/Document")
+    result = layer.nameRef.layerGetJson(accept = layer.mediaType).json{"predicate"}
+    trace("docker: in registry found SBOM for: " & $name)
+  except RegistryResponseError, KeyError:
+    trace("docker: " & getCurrentExceptionMsg())
+    raise
+  except:
+    error("docker: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
+    # https://github.com/docker/buildx/releases/tag/v0.13.0
+    if getBuildXVersion() < parseVersion("0.13"):
+      raise newException(ValueError, "buildx 0.13 is required to collect SBOM via imagetools")
+    try:
+      # for single-platform manifests, there is only a single sbom
+      return requestManifestJson(
+        name,
+        flags    = @["--format", "{{json .SBOM.SPDX}}"],
+        fallback = false,
+      ).json
+    except:
+      # for multi-platform we have to filter on the platform
+      # note index only supports a few keys so have to manually
+      # take SPDX key
+      return requestManifestJson(
+        name,
+        flags    = @["--format", "{{json (index .SBOM \"" & $platform & "\")}}"],
+        fallback = false,
+      ).json{"SPDX"}

@@ -112,10 +112,10 @@ proc extractMarkFromLayer(self: ChalkObj): string =
           "Last layer for " & $spec & " does not contain /chalk.json",
         )
       let lastLayer = manifest.layers[^1]
-      return lastLayer.nameRef.layerGetFSFileStream(
+      return lastLayer.nameRef.layerGetFSFileString(
         name   = "chalk.json",
         accept = manifest.mediaType,
-      ).readAll()
+      )
     except:
       err = getCurrentExceptionMsg()
       trace("docker: could not extract chalk mark from registry: " & err)

@@ -10,7 +10,7 @@
 ## collect - use inspection result to load info into chalk
 
 import std/[json]
-import ".."/[config, chalkjson, util, semver]
+import ".."/[config, chalkjson, util]
 import "."/[inspect, exe, manifest, json, ids]
 
 # https://docs.docker.com/engine/api/v1.44/#tag/Image/operation/ImageInspect
@@ -241,9 +241,6 @@ proc collectDigestsFromManifest(chalk: ChalkObj, manifest: DockerManifest) =
     chalk.setIfNeeded("_IMAGE_LIST_DIGEST", chalk.listDigest)
 
 proc collectProvenance(chalk: ChalkObj) =
-  # https://github.com/docker/buildx/releases/tag/v0.13.0
-  if getBuildXVersion() < parseVersion("0.13"):
-    return
   if chalk.listDigest == "":
     return
   if not isSubscribedKey("_IMAGE_PROVENANCE"):
@@ -257,9 +254,6 @@ proc collectProvenance(chalk: ChalkObj) =
       continue
 
 proc collectSBOM(chalk: ChalkObj) =
-  # https://github.com/docker/buildx/releases/tag/v0.13.0
-  if getBuildXVersion() < parseVersion("0.13"):
-    return
   if chalk.listDigest == "":
     return
   if not isSubscribedKey("_IMAGE_SBOM"):
@@ -282,7 +276,12 @@ proc collectDigests(chalk: ChalkObj) =
   # we dont have any images
   if chalk.imageDigest == "" or len(chalk.images) == 0:
     return
-  if hasBuildX():
+  if not hasBuildX() and dockerInvocation != nil and dockerInvocation.cmd == push:
+    # if there is no buildx, this means its a vanilla docker push
+    # which means for docker push it cannot be a list manifest
+    # so we should be able to normalize it
+    chalk.setIfNeeded("_IMAGE_DIGEST", chalk.imageDigest)
+  else:
     for image in chalk.images:
       try:
         let manifest = fetchImageManifest(image.withDigest(chalk.imageDigest), chalk.platform)
@@ -290,12 +289,6 @@ proc collectDigests(chalk: ChalkObj) =
         break
       except:
         continue
-  else:
-    if dockerInvocation != nil and dockerInvocation.cmd == push:
-      # if there is no buildx, this means its a vanilla docker push
-      # which means for docker push it cannot be a list manifest
-      # so we should be able to normalize it
-      chalk.setIfNeeded("_IMAGE_DIGEST", chalk.imageDigest)
   let repoDigests = extractDockerHashMap($(chalk.images.withDigest(chalk.imageDigest)))
   chalk.setIfNeeded("_REPO_DIGESTS", pack(repoDigests))
 
@@ -303,9 +296,8 @@ proc collectImage*(chalk: ChalkObj, name: string, digest = "") =
   let contents = inspectImageJson(name)
   chalk.collectImageFrom(contents, name, digest = digest)
   chalk.collectDigests()
-  if hasBuildX():
-    chalk.collectProvenance()
-    chalk.collectSBOM()
+  chalk.collectProvenance()
+  chalk.collectSBOM()
 
 proc collectImage*(chalk: ChalkObj) =
   if chalk.imageId == "":
