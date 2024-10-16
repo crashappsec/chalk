@@ -13,6 +13,7 @@
 
 import std/[net, uri, httpclient, nativesockets, sets]
 import pkg/nimutils/net
+import pkg/[zippy/tarballs]
 import ".."/[config, ip, util, www_authenticate]
 import "."/[exe, json, ids]
 
@@ -369,12 +370,19 @@ iterator getConfigs(self: DockerImage, use: RegistryUse): RegistryConfig =
     if not isBuildx:
       buildx()
 
+var jsonCache = initTable[
+  (DockerImage, HttpMethod, string, RegistryUse),
+  (string, Response)
+]()
 proc request(self:       DockerImage,
              httpMethod: HttpMethod,
              path:       string,
              accept:     string,
              use =       RegistryUse.ReadOnly,
              ): (string, Response) =
+  let cacheKey = (self, httpMethod, path, use)
+  if cacheKey in jsonCache:
+    return jsonCache[cacheKey]
   for config in self.getConfigs(use = use):
     let uri = self.withRegistry(config.registry).uri(
       scheme  = config.scheme,
@@ -413,6 +421,7 @@ proc request(self:       DockerImage,
       discard response.check(url = uri, only2xx = true)
       for u in use.uses():
         configByRegistry[(u, self.registry)] = config
+        jsonCache[(self, httpMethod, path, u)] = (msg, response)
       return (msg, response)
     except:
       if invalid:
@@ -462,16 +471,46 @@ proc manifestGet*(image:  DockerImage,
     )
   return newDockerDigestedJson(response.body(), image.imageRef, accept, kind)
 
-proc layerGet*(image:  DockerImage,
-               accept: string,
-               use =   RegistryUse.ReadOnly,
-               ): DockerDigestedJson =
+proc layerGetString*(image:  DockerImage,
+                     accept: string,
+                     use =   RegistryUse.ReadOnly,
+                     ): string =
   let
-    kind          = CONTENT_TYPE_MAPPING[accept]
     (_, response) = image.request(
       use        = use,
       httpMethod = HttpGet,
       path       = "/blobs/" & image.imageRef,
       accept     = accept,
     )
-  return newDockerDigestedJson(response.body(), image.imageRef, accept, kind)
+  return response.body()
+
+proc layerGetJson*(image:  DockerImage,
+                   accept: string,
+                   use =   RegistryUse.ReadOnly,
+                   ): DigestedJson =
+  return parseAndDigestJson(
+    image.layerGetString(
+      use    = use,
+      accept = accept,
+    ),
+    digest = image.imageRef,
+  )
+
+proc layerGetFSFileString*(image:  DockerImage,
+                           name:   string,
+                           accept: string,
+                           use =   RegistryUse.ReadOnly,
+                           ): string =
+  trace("docker: extracting " & name & " from layer " & $image)
+  let
+    response = image.layerGetString(
+      use    = use,
+      accept = accept,
+    )
+    tarPath = writeNewTempFile(response, suffix = name)
+  let
+    # extract needs non-existing path so doing one more joinPath
+    untarPath = getNewTempDir().joinPath(image.digest)
+    namePath  = untarPath.joinPath(name)
+  extractAll(tarPath, untarPath)
+  result = tryToLoadFile(namePath)

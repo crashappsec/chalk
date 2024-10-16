@@ -312,6 +312,7 @@ type
     mediaType*:        string
     size*:             int
     json*:             JsonNode
+    annotations*:      JsonNode
     isFetched*:        bool
     case kind*:        DockerManifestType
     of list:

@@ -21,8 +21,8 @@ services:
       - $PWD:$PWD
       - $PWD/../nimutils:$PWD/../nimutils
       - $PWD/../con4m:$PWD/../con4m
-    # environment:
-    # CON4M_DEV is conditionally set in Makefile
+    environment:
+      CHALK_PASSWORD: ${CHALK_PASSWORD:-}
 
   # --------------------------------------------------------------------------
   # SERVER
