@@ -48,6 +48,12 @@ if __name__ == "__main__":
             f"{IP}:5047",
         }
     )
+    updated["registry-mirrors"] = sorted(
+        set(updated.get("registry-mirrors", []))
+        | {
+            f"http://{IP}:5047",
+        }
+    )
     has_changes = config != updated
     formatted = json.dumps(updated, indent=4)
 
