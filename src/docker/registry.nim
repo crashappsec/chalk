@@ -471,10 +471,10 @@ proc manifestGet*(image:  DockerImage,
     )
   return newDockerDigestedJson(response.body(), image.imageRef, accept, kind)
 
-proc layerGetStream*(image:  DockerImage,
+proc layerGetString*(image:  DockerImage,
                      accept: string,
                      use =   RegistryUse.ReadOnly,
-                     ): Stream =
+                     ): string =
   let
     (_, response) = image.request(
       use        = use,
@@ -482,16 +482,7 @@ proc layerGetStream*(image:  DockerImage,
       path       = "/blobs/" & image.imageRef,
       accept     = accept,
     )
-  return response.bodyStream
-
-proc layerGetString*(image:  DockerImage,
-                     accept: string,
-                     use =   RegistryUse.ReadOnly,
-                     ): string =
-  return image.layerGetStream(
-    use    = use,
-    accept = accept,
-  ).readAll()
+  return response.body()
 
 proc layerGetJson*(image:  DockerImage,
                    accept: string,
@@ -505,23 +496,21 @@ proc layerGetJson*(image:  DockerImage,
     digest = image.imageRef,
   )
 
-proc layerGetFSFileStream*(image:  DockerImage,
+proc layerGetFSFileString*(image:  DockerImage,
                            name:   string,
                            accept: string,
                            use =   RegistryUse.ReadOnly,
-                           ): Stream =
+                           ): string =
   trace("docker: extracting " & name & " from layer " & $image)
   let
-    response = image.layerGetStream(
+    response = image.layerGetString(
       use    = use,
       accept = accept,
     )
-    (tarStream, tarPath) = getNewTempFile(suffix = name)
-  tarStream.write(response.readAll())
-  tarStream.close()
-  # extract needs non-existing path so doing one more joinPath
+    tarPath = writeNewTempFile(response, suffix = name)
   let
+    # extract needs non-existing path so doing one more joinPath
     untarPath = getNewTempDir().joinPath(image.digest)
     namePath  = untarPath.joinPath(name)
   extractAll(tarPath, untarPath)
-  result = newFileStream(namePath)
+  result = tryToLoadFile(namePath)
