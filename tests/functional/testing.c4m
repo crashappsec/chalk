@@ -29,4 +29,4 @@ tool.syft.syft_container = "ghcr.io/anchore/syft"
 # https://github.com/semgrep/semgrep/issues/9169
 
 # sometimes CI tests need longer TTL to get ICMP error back
-network.partial_traceroute_timeout_ms = 100
+network.partial_traceroute_timeout_ms = 500
