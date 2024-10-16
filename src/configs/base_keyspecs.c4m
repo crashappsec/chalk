@@ -4000,8 +4000,8 @@ keyspec _ACTION_ID {
     since:            "0.1.0"
     shortdoc: "Unique ID per chalk report"
     doc:              """
-This is a unique identifier generated for the current run of chalk. It
-is not insertable into chalk marks, but may appear in any host report.
+This is a unique identifier generated for the current report run of chalk.
+It is not insertable into chalk marks, but may appear in any host report.
 
 The purpose of this value is to ensure every chalk action has a unique
 identifier, if desired.
@@ -4010,6 +4010,28 @@ The value is a 64-bit (secure) random value, encoded as hex.
 
 While there is a config-file callback associated with this metadata
 key, it is set by the system, and cannot be overridden by the user.
+"""
+}
+
+keyspec _EXEC_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    conf_as_system:   true
+    since:            "0.4.14"
+    shortdoc:         "Unique ID per chalk execution"
+    doc:              """
+This is a unique identifier generated for the current run of chalk.
+It is not insertable into chalk marks, but may appear in any host report.
+
+The purpose of this value is to ensure every chalk execution action
+has a unique identifier, if desired.
+For example, unlike `_ACTION_ID` which is unique for each report,
+`_EXEC_ID` is going to be the same for both `exec` and `heartbeat`
+reports hence allowing to tie them together.
+
+The value is a 64-bit (secure) random value, encoded as hex.
 """
 }
 
