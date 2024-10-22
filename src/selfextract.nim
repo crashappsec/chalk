@@ -230,57 +230,58 @@ proc loadComponentParams*(runtime: ConfigState, params: seq[Box]) =
 proc testConfigFile(newCon4m: string,
                     params:   seq[Box],
                     cache:    OrderedTableRef[string, string]) =
+  discard # TODO libnoob
   # need to test with another top-level config name
   # otherwise cycle is bound to be detected
-  let uri = "[testing config]"
-  info(uri & ": Validating configuration.")
+  # let uri = "[testing config]"
+  # info(uri & ": Validating configuration.")
 
-  if attrGet[bool]("load.validation_warning"):
-    warn("Note: validation involves creating a new configuration context"  &
-         " and evaluating your code to make sure it at least evaluates "   &
-         "fine on a default path.  subscribe() and unsubscribe() will "    &
-         "ignore any calls, but if your config always shells out, it will" &
-         " happen here.  To skip error checking, you can add "             &
-         "--no-validation.  But, if there's a basic error, chalk may not " &
-         "run without passing --no-use-embedded-config.  Suppress this "   &
-         "message in the future by setting `no_validation_warning` in the" &
-         " config, or passing --no-validation-warning on the command line.")
+  # if attrGet[bool]("load.validation_warning"):
+  #   warn("Note: validation involves creating a new configuration context"  &
+  #        " and evaluating your code to make sure it at least evaluates "   &
+  #        "fine on a default path.  subscribe() and unsubscribe() will "    &
+  #        "ignore any calls, but if your config always shells out, it will" &
+  #        " happen here.  To skip error checking, you can add "             &
+  #        "--no-validation.  But, if there's a basic error, chalk may not " &
+  #        "run without passing --no-use-embedded-config.  Suppress this "   &
+  #        "message in the future by setting `no_validation_warning` in the" &
+  #        " config, or passing --no-validation-warning on the command line.")
 
-  let
-    toStream = newStringStream
-    stack    = newConfigStack().
-               addSystemBuiltins().
-               addCustomBuiltins(chalkCon4mBuiltins).
-               addGetoptSpecLoad().
-               addSpecLoad(chalkSpecName,     toStream(chalkC42Spec)).
-               addConfLoad(baseConfName,      toStream(baseConfig)).
-               setErrorHandler(newConfFileError).
-               addConfLoad(ioConfName,        toStream(ioConfig)).
-               addConfLoad(attestConfName,    toStream(attestConfig)).
-               addConfLoad(sbomConfName,      toStream(sbomConfig)).
-               addConfLoad(sastConfName,      toStream(sastConfig)).
-               # TODO for Theo: load the internal config file for rules
-               addConfLoad(linguistConfName,  toStream(linguistConfig)).
-               addConfLoad(techStackConfName, toStream(techStackConfig)).
-               addConfLoad(coConfName,        toStream(coConfig))
+  # let
+  #   toStream = newStringStream
+  #   stack    = newConfigStack().
+  #              addSystemBuiltins().
+  #              addCustomBuiltins(chalkCon4mBuiltins).
+  #              addGetoptSpecLoad().
+  #              addSpecLoad(chalkSpecName,     toStream(chalkC42Spec)).
+  #              addConfLoad(baseConfName,      toStream(baseConfig)).
+  #              setErrorHandler(newConfFileError).
+  #              addConfLoad(ioConfName,        toStream(ioConfig)).
+  #              addConfLoad(attestConfName,    toStream(attestConfig)).
+  #              addConfLoad(sbomConfName,      toStream(sbomConfig)).
+  #              addConfLoad(sastConfName,      toStream(sastConfig)).
+  #              # TODO for Theo: load the internal config file for rules
+  #              addConfLoad(linguistConfName,  toStream(linguistConfig)).
+  #              addConfLoad(techStackConfName, toStream(techStackConfig)).
+  #              addConfLoad(coConfName,        toStream(coConfig))
 
-  try:
-    # Test Run will cause (un)subscribe() to ignore subscriptions, and
-    # will suppress log messages, etc.
-    stack.run()
-    stack.configState.loadCachedComponents(cache)
-    stack.configState.loadComponentParams(params)
-    startTestRun()
-    stack.addConfLoad(uri, toStream(newCon4m))
-    stack.run()
-    if stack.errored:
-      quit(1)
-    info(uri & ": Configuration successfully validated.")
-  except:
-    dumpExOnDebug()
-    cantLoad(getCurrentExceptionMsg() & "\n")
-  finally:
-    endTestRun()
+  # try:
+  #   # Test Run will cause (un)subscribe() to ignore subscriptions, and
+  #   # will suppress log messages, etc.
+  #   stack.run()
+  #   stack.configState.loadCachedComponents(cache)
+  #   stack.configState.loadComponentParams(params)
+  #   startTestRun()
+  #   stack.addConfLoad(uri, toStream(newCon4m))
+  #   stack.run()
+  #   if stack.errored:
+  #     quit(1)
+  #   info(uri & ": Configuration successfully validated.")
+  # except:
+  #   dumpExOnDebug()
+  #   cantLoad(getCurrentExceptionMsg() & "\n")
+  # finally:
+  #   endTestRun()
 
 proc toBox(param: ParameterInfo, component: ComponentInfo): Box =
   # Though you can pack / unpack con4m types, we don't have a JSON
@@ -315,213 +316,215 @@ const nocache = [getoptConfName,
                  embeddedConfName]
 
 proc handleConfigLoadAll*(inpath: string): bool =
-  info("Replacing all chalk configuration from " & inpath)
-  try:
-    let
-      validate = attrGet[bool]("load.validate_configs_on_load")
-      required = @[configKey, paramKey, cacheKey]
-      data     = if inpath == "-": stdin.readAll() else: tryToLoadFile(inpath.resolvePath())
-      jsonData = data.parseJson()
+  true # TODO libnoob
+  # info("Replacing all chalk configuration from " & inpath)
+  # try:
+  #   let
+  #     validate = attrGet[bool]("load.validate_configs_on_load")
+  #     required = @[configKey, paramKey, cacheKey]
+  #     data     = if inpath == "-": stdin.readAll() else: tryToLoadFile(inpath.resolvePath())
+  #     jsonData = data.parseJson()
 
-    var chalkData = ChalkDict()
-    for k, v in jsonData.pairs():
-      chalkData[k] = v.nimJsonToBox()
+  #   var chalkData = ChalkDict()
+  #   for k, v in jsonData.pairs():
+  #     chalkData[k] = v.nimJsonToBox()
 
-    for key in required:
-      if key notin chalkData:
-        cantLoad(key & " is required but is is missing")
+  #   for key in required:
+  #     if key notin chalkData:
+  #       cantLoad(key & " is required but is is missing")
 
-    let
-      config         = unpack[string](chalkData[configKey])
-      params         = unpack[seq[Box]](chalkData[paramKey])
-      cache          = unpack[OrderedTableRef[string, string]](chalkData[cacheKey])
-      memoize        = chalkData.getOrDefault(memoizeKey, pack(ChalkDict()))
-      currentConfig  = getConfig()
-      currentParams  = getParams()
-      currentCache   = getCache()
-      currentMemoize = getMemoize()
+  #   let
+  #     config         = unpack[string](chalkData[configKey])
+  #     params         = unpack[seq[Box]](chalkData[paramKey])
+  #     cache          = unpack[OrderedTableRef[string, string]](chalkData[cacheKey])
+  #     memoize        = chalkData.getOrDefault(memoizeKey, pack(ChalkDict()))
+  #     currentConfig  = getConfig()
+  #     currentParams  = getParams()
+  #     currentCache   = getCache()
+  #     currentMemoize = getMemoize()
 
-    echo(config, currentConfig)
-    echo(params, currentParams)
-    echo(cache, currentCache)
-    echo(memoize, currentMemoize)
-    if (
-      config  == currentConfig and
-      params  == currentParams and
-      cache   == currentCache and
-      memoize == currentMemoize
-    ):
-      return false
+  #   echo(config, currentConfig)
+  #   echo(params, currentParams)
+  #   echo(cache, currentCache)
+  #   echo(memoize, currentMemoize)
+  #   if (
+  #     config  == currentConfig and
+  #     params  == currentParams and
+  #     cache   == currentCache and
+  #     memoize == currentMemoize
+  #   ):
+  #     return false
 
-    if validate:
-      testConfigFile(config, params, cache)
-    else:
-      warn("Skipping configuration validation. This could break chalk.")
+  #   if validate:
+  #     testConfigFile(config, params, cache)
+  #   else:
+  #     warn("Skipping configuration validation. This could break chalk.")
 
-    selfChalkSetKey(configKey, pack(config))
-    selfChalkSetKey(cacheKey, pack(cache))
-    selfChalkSetKey(paramKey, pack(params))
-    selfChalkSetKey(memoizeKey, memoize)
-    return true
+  #   selfChalkSetKey(configKey, pack(config))
+  #   selfChalkSetKey(cacheKey, pack(cache))
+  #   selfChalkSetKey(paramKey, pack(params))
+  #   selfChalkSetKey(memoizeKey, memoize)
+  #   return true
 
-  except:
-    dumpExOnDebug()
-    cantLoad("Could not replace all config: " & getCurrentExceptionMsg())
+  # except:
+  #   dumpExOnDebug()
+  #   cantLoad("Could not replace all config: " & getCurrentExceptionMsg())
 
 proc handleConfigLoad*(inpath: string): bool =
-  assert selfChalk != nil
+  true # TODO libnoob
+  # assert selfChalk != nil
 
-  let
-    validate          = attrGet[bool]("load.validate_configs_on_load")
-    replace           = attrGet[bool]("load.replace_conf")
-    replaceAll        = attrGet[bool]("load.replace_all")
-    confPaths         = attrGet[seq[string]]("config_path").strip(leading = false, chars = {'/'})
-    confFilename      = attrGet[string]("config_filename")
-    paramsViaStdin    = attrGet[bool]("load.params_via_stdin")
+  # let
+  #   validate          = attrGet[bool]("load.validate_configs_on_load")
+  #   replace           = attrGet[bool]("load.replace_conf")
+  #   replaceAll        = attrGet[bool]("load.replace_all")
+  #   confPaths         = attrGet[seq[string]]("config_path").strip(leading = false, chars = {'/'})
+  #   confFilename      = attrGet[string]("config_filename")
+  #   paramsViaStdin    = attrGet[bool]("load.params_via_stdin")
 
-  if replace:
-    info("Replacing base configuration with module from: " & inpath)
-    selfChalkDelKey(configKey)
-    selfChalkDelKey(cacheKey)
-    selfChalkDelKey(paramKey)
-  elif replaceAll:
-    cantLoad("--replace must be used together with --all")
-  else:
-    info("Attempting to load module from: " & inpath)
+  # if replace:
+  #   info("Replacing base configuration with module from: " & inpath)
+  #   selfChalkDelKey(configKey)
+  #   selfChalkDelKey(cacheKey)
+  #   selfChalkDelKey(paramKey)
+  # elif replaceAll:
+  #   cantLoad("--replace must be used together with --all")
+  # else:
+  #   info("Attempting to load module from: " & inpath)
 
-  if replaceAll:
-    return handleConfigLoadAll(inpath)
+  # if replaceAll:
+  #   return handleConfigLoadAll(inpath)
 
-  var path: string
+  # var path: string
 
-  if inpath.endswith(".c4m"):
-    path = inpath
-  else:
-    path = inpath & ".c4m"
+  # if inpath.endswith(".c4m"):
+  #   path = inpath
+  # else:
+  #   path = inpath & ".c4m"
 
-  if fileExists(path):
-    path = inpath.resolvePath()
-  else:
-    path = inpath
+  # if fileExists(path):
+  #   path = inpath.resolvePath()
+  # else:
+  #   path = inpath
 
-  let
-    runtime           = getChalkRuntime()
-    alreadyCached     = haveComponentFromUrl(runtime, path).isSome()
-    (base, module, _) = path.fullUrlToParts()
-    curConfOpt        = selfChalkGetKey(configKey)
+  # let
+  #   runtime           = getChalkRuntime()
+  #   alreadyCached     = haveComponentFromUrl(runtime, path).isSome()
+  #   (base, module, _) = path.fullUrlToParts()
+  #   curConfOpt        = selfChalkGetKey(configKey)
 
-  var component: ComponentInfo
+  # var component: ComponentInfo
 
-  try:
-    component  = runtime.loadComponentFromUrl(path)
-  except:
-    dumpExOnDebug()
-    cantLoad(getCurrentExceptionMsg() & "\n")
+  # try:
+  #   component  = runtime.loadComponentFromUrl(path)
+  # except:
+  #   dumpExOnDebug()
+  #   cantLoad(getCurrentExceptionMsg() & "\n")
 
-  var
-    newComponents = component.getUsedComponents()
-    newEmbedded:    string
+  # var
+  #   newComponents = component.getUsedComponents()
+  #   newEmbedded:    string
 
-  if replace or curConfOpt.isNone():
-    newEmbedded = ""
-  else:
-    newEmbedded = unpack[string](curConfOpt.get())
+  # if replace or curConfOpt.isNone():
+  #   newEmbedded = ""
+  # else:
+  #   newEmbedded = unpack[string](curConfOpt.get())
 
-  if not alreadyCached or replace:
-    let
-      lines   = newEmbedded.splitLines()
-      useLine = "use " & module  & " from \"" & base & "\""
-      withUse = if useLine in lines:
-                  newEmbedded
-                else:
-                  newEmbedded & "\n" & useLine
-    newEmbedded = withUse.strip()
+  # if not alreadyCached or replace:
+  #   let
+  #     lines   = newEmbedded.splitLines()
+  #     useLine = "use " & module  & " from \"" & base & "\""
+  #     withUse = if useLine in lines:
+  #                 newEmbedded
+  #               else:
+  #                 newEmbedded & "\n" & useLine
+  #   newEmbedded = withUse.strip()
 
-  if paramsViaStdin:
-    try:
-      let
-        chalkJsonTree = newStringStream(stdin.readAll()).chalkParseJson()
-        runtime       = getChalkRuntime()
+  # if paramsViaStdin:
+  #   try:
+  #     let
+  #       chalkJsonTree = newStringStream(stdin.readAll()).chalkParseJson()
+  #       runtime       = getChalkRuntime()
 
-      if chalkJsonTree.kind != CJArray:
-        raise newException(IOError, "")
-      for row in chalkJsonTree.items:
-        if row.kind != CJArray or row.items.len() != 5:
-          raise newException(IOError, "")
-        let
-          attr    = row.items[0].boolval
-          url     = row.items[1].strval
-          sym     = row.items[2].strval
-          c4mType = row.items[3].strval.toCon4mType()
-          value   = row.items[4].jsonNodeToBox()
-        if attr:
-          runtime.setAttributeParamValue(url, sym, value, c4mType)
-        else:
-          runtime.setVariableParamValue(url, sym, value, c4mType)
-    except:
-      error("Invalid json parameters via stdin: " & getCurrentExceptionMsg())
-      dumpExOnDebug()
-      quit(1)
-  elif validate:
-    let prompt = "Press [enter] to check your configuration for conflicts."
-    runtime.basicConfigureParameters(component, newComponents, prompt)
-  else:
-    runtime.basicConfigureParameters(component, newComponents)
+  #     if chalkJsonTree.kind != CJArray:
+  #       raise newException(IOError, "")
+  #     for row in chalkJsonTree.items:
+  #       if row.kind != CJArray or row.items.len() != 5:
+  #         raise newException(IOError, "")
+  #       let
+  #         attr    = row.items[0].boolval
+  #         url     = row.items[1].strval
+  #         sym     = row.items[2].strval
+  #         c4mType = row.items[3].strval.toCon4mType()
+  #         value   = row.items[4].jsonNodeToBox()
+  #       if attr:
+  #         runtime.setAttributeParamValue(url, sym, value, c4mType)
+  #       else:
+  #         runtime.setVariableParamValue(url, sym, value, c4mType)
+  #   except:
+  #     error("Invalid json parameters via stdin: " & getCurrentExceptionMsg())
+  #     dumpExOnDebug()
+  #     quit(1)
+  # elif validate:
+  #   let prompt = "Press [enter] to check your configuration for conflicts."
+  #   runtime.basicConfigureParameters(component, newComponents, prompt)
+  # else:
+  #   runtime.basicConfigureParameters(component, newComponents)
 
-  # Load any saved parameters; we will pass them off to any testing
-  var
-    componentsToTest = runtime.programRoot.getUsedComponents(paramOnly = true)
-    paramsToTest:    seq[Box]
+  # # Load any saved parameters; we will pass them off to any testing
+  # var
+  #   componentsToTest = runtime.programRoot.getUsedComponents(paramOnly = true)
+  #   paramsToTest:    seq[Box]
 
-  for item in newComponents:
-    if item notin componentsToTest:
-      componentsToTest.add(item)
+  # for item in newComponents:
+  #   if item notin componentsToTest:
+  #     componentsToTest.add(item)
 
-  for item in componentsToTest:
-    paramsToTest.addParams(item)
+  # for item in componentsToTest:
+  #   paramsToTest.addParams(item)
 
-  if validate:
-    # ignore component url in case already cached component is being reloaded
-    # this way we can correctly validate it, as otherwise cache will reload
-    # it back as it is stored in the cache
-    testConfigFile(newEmbedded, paramsToTest, getCache(ignore = @[component.url]))
-  else:
-    warn("Skipping configuration validation. This could break chalk.")
+  # if validate:
+  #   # ignore component url in case already cached component is being reloaded
+  #   # this way we can correctly validate it, as otherwise cache will reload
+  #   # it back as it is stored in the cache
+  #   testConfigFile(newEmbedded, paramsToTest, getCache(ignore = @[component.url]))
+  # else:
+  #   warn("Skipping configuration validation. This could break chalk.")
 
-  # Now, load the code cache/params.
-  var
-    cachedCode =      OrderedTableRef[string, string]()
-    paramsToSave:     seq[Box]
-    componentsToSave: seq[ComponentInfo]
+  # # Now, load the code cache/params.
+  # var
+  #   cachedCode =      OrderedTableRef[string, string]()
+  #   paramsToSave:     seq[Box]
+  #   componentsToSave: seq[ComponentInfo]
 
-  if replace:
-    # when replacing only honor used tested components
-    # as that will only include loaded component+its deps
-    componentsToSave = componentsToTest
-  else:
-    # save all params across all components, if any
-    # as previous configuration could have existing params
-    # which we cannot delete if we only save params used for testing
-    for _, item in runtime.components:
-      componentsToSave.add(item)
+  # if replace:
+  #   # when replacing only honor used tested components
+  #   # as that will only include loaded component+its deps
+  #   componentsToSave = componentsToTest
+  # else:
+  #   # save all params across all components, if any
+  #   # as previous configuration could have existing params
+  #   # which we cannot delete if we only save params used for testing
+  #   for _, item in runtime.components:
+  #     componentsToSave.add(item)
 
-  for _, item in componentsToSave:
-    paramsToSave.addParams(item)
-    if item.url in nocache:
-      continue
-    if item.source == "":
-      continue
-    try:
-      let (head, tail) = item.url.splitPath()
-      # dont cache external configs
-      if head in confPaths and tail == confFilename:
-        continue
-    except:
-      # in case splitPath fails for some obscure urls?
-      discard
-    cachedCode[item.url] = item.source
+  # for _, item in componentsToSave:
+  #   paramsToSave.addParams(item)
+  #   if item.url in nocache:
+  #     continue
+  #   if item.source == "":
+  #     continue
+  #   try:
+  #     let (head, tail) = item.url.splitPath()
+  #     # dont cache external configs
+  #     if head in confPaths and tail == confFilename:
+  #       continue
+  #   except:
+  #     # in case splitPath fails for some obscure urls?
+  #     discard
+  #   cachedCode[item.url] = item.source
 
-  selfChalkSetKey(configKey, pack(newEmbedded))
-  selfChalkSetKey(cacheKey, pack(cachedCode))
-  selfChalkSetKey(paramKey, pack(paramsToSave))
-  return true
+  # selfChalkSetKey(configKey, pack(newEmbedded))
+  # selfChalkSetKey(cacheKey, pack(cachedCode))
+  # selfChalkSetKey(paramKey, pack(paramsToSave))
+  # return true

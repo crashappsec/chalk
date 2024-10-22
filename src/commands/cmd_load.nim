@@ -47,10 +47,11 @@ proc runCmdConfLoad*() =
         info("Installing the default configuration file.")
         true
     else:
-      for plugin in getAllPlugins():
-        if not plugin.isSystem():
-          suspendChalkCollectionFor(plugin.name)
-      url.handleConfigLoad()
+      true # TODO libnoob
+      # for plugin in getAllPlugins():
+      #   if not plugin.isSystem():
+      #     suspendChalkCollectionFor(plugin.name)
+      # url.handleConfigLoad()
 
   if updated:
     selfChalk.writeSelfConfig()
