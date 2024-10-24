@@ -10,6 +10,11 @@
 import "."/[config, confload, commands, norecurse, sinks,
             attestation_api, util]
 
+const cprofiling {.booldefine.} = false
+
+when cprofiling:
+  import nimprof
+
 when isMainModule:
   setupSignalHandlers() # util.nim
   setupTerminal()       # util.nim

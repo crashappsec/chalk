@@ -44,6 +44,9 @@ task debug, "Get a debug build":
 task release, "Package the release build":
   exec "nimble build"
 
+task performance, "Get a build that adds profiling support":
+  exec "nimble build --profiler:on --stackTrace:on -d:cprofiling"
+
 let completion_script_version = version
 
 task mark_completion, "Replace the chalk mark in a completion script, including the articact version":
