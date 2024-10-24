@@ -44,8 +44,11 @@ task debug, "Get a debug build":
 task release, "Package the release build":
   exec "nimble build"
 
-task performance, "Get a build that adds profiling support":
+task performance, "Get a build that adds execution profiling support":
   exec "nimble build --profiler:on --stackTrace:on -d:cprofiling"
+
+task memprofile, "Get a build that adds memory profiling to the binary":
+  exec "nimble build --profiler:off --stackTrace:on -d:memProfiler -d:cprofiling"
 
 let completion_script_version = version
 
