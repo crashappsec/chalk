@@ -48,44 +48,6 @@ n00b_buffer_from_bytes(char *bytes, int64_t len)
 }
 
 void
-n00b_buffer_resize(n00b_buffer_t *buf, uint64_t new_sz)
-{
-    if (!buf) {
-        return;
-    }
-
-    if (new_sz > buf->alloc_len) {
-        size_t new_cap = buf->alloc_len ? buf->alloc_len : 16;
-
-        while (new_cap < new_sz) {
-            new_cap *= 2;
-        }
-
-        char *new_data = (char *)realloc(buf->data, new_cap);
-
-        if (!new_data) {
-            // Allocation failure — leave buf untouched and let caller
-            // observe via byte_len < required.
-            return;
-        }
-
-        // Zero the newly grown portion to match n00b semantics.
-        memset(new_data + buf->alloc_len, 0, new_cap - buf->alloc_len);
-
-        buf->data      = new_data;
-        buf->alloc_len = new_cap;
-    }
-
-    buf->byte_len = (size_t)new_sz;
-}
-
-int64_t
-n00b_buffer_len(n00b_buffer_t *buf)
-{
-    return buf ? (int64_t)buf->byte_len : 0;
-}
-
-void
 n00b_buffer_free(n00b_buffer_t *buf)
 {
     if (!buf) {

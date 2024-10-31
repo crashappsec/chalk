@@ -6,7 +6,6 @@
 ##
 
 import std/[
-  os,
   sequtils,
 ]
 import ".."/[
