@@ -53,12 +53,12 @@ CMD ["cat", "/platforms.json"]
       withEnvRestore(envVars):
         let build  = runDockerGetEverything(@["build", "-t", tmpTag, "-f", "-", "."],
                                             probeFile)
-        if build.getExit() != 0:
+        if build.exitCode != 0:
           warn("docker: could not probe build platforms: " & build.stderr)
           return result
 
       let probe = runDockerGetEverything(@["run", "--rm", tmpTag])
-      if probe.getExit() != 0:
+      if probe.exitCode != 0:
         warn("docker: could not probe build platforms: " & probe.stderr)
         return result
 
