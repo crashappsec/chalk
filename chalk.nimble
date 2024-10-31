@@ -1,4 +1,4 @@
-import std/[cmdline, strformat, strscans, strutils, os]
+import std/[cmdline, strscans, os]
 
 when fileExists("src/config_version.nim"):
   from src/config_version import getChalkVersion
@@ -15,9 +15,9 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 2.0.8"
-requires "https://github.com/crashappsec/con4m#2a76ca94b687b038a95e5924ed22bdb9fd5d577f"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
 requires "https://github.com/NimParsers/parsetoml == 0.7.1" # MIT
+requires "unicodedb == 0.12.0"
 
 # this allows us to get version externally
 task version, "Show current version":

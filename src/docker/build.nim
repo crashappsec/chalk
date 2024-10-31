@@ -62,7 +62,7 @@ proc processGitContext(ctx: DockerInvocation) =
 
 proc processDockerFile(ctx: DockerInvocation) =
   if ctx.dockerFileLoc == stdinIndicator:
-    let input           = stdin.readAll()
+    let input         = syncio.stdin.readAll()
     ctx.inDockerFile  = input
     ctx.originalStdIn = input
     trace("docker: read Dockerfile from stdin")
