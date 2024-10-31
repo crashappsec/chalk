@@ -10,6 +10,7 @@
 
 import ".."/[
   commands/cmd_help,
+  n00b/subproc,
   reporting,
   types,
   utils/exec,
@@ -69,15 +70,14 @@ proc dockerPassThrough*(ctx: DockerInvocation) {.noreturn.} =
     quitChalk(exitCode)
 
 proc runMungedDockerInvocation*(ctx: DockerInvocation): int =
-  let
-    args  = ctx.newCmdLine
-    exe   = getDockerExeLocation()
-    stdin = ctx.newStdIn
-  trace("docker: " & exe & " " & args.join(" "))
-  if stdin != "":
-    trace("docker: stdin: \n" & stdin)
-  result = runCmdNoOutputCapture(exe, args, stdin)
-
+  result = runCommand(
+    getDockerExeLocation(),
+    ctx.newCmdLine,
+    stdin   = ctx.newStdIn,
+    capture = {},
+    proxy   = {StdAllFD},
+    verbose = true,
+  ).exitCode
 
 proc getAllDockerContexts*(ctx: DockerInvocation): seq[string] =
   result = @[]
