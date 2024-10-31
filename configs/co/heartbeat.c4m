@@ -20,7 +20,7 @@ parameter sink_config.crashoverride_heartbeats.uri {
 
 sink_config crashoverride_heartbeats {
   ~enabled:         true
-  ~sink:            "presign"
+  ~sink:            "post"
   ~priority:        999998
   ~auth:            "crashoverride_reporting"
 }
