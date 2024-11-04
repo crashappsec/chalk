@@ -276,8 +276,8 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
     let selfIdOpt = selfID
     if selfIdOpt.isSome(): result["INJECTOR_CHALK_ID"] = pack(selfIdOpt.get())
 
-proc metsysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
-                                     ChalkDict {.cdecl.} =
+proc attestationGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
+                                          ChalkDict {.cdecl.} =
   result = ChalkDict()
 
   # We add these directly into collectedData so that it can get
@@ -300,8 +300,8 @@ proc metsysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
     except:
       error("Cannot sign " & obj.name & ": " & getCurrentExceptionMsg())
 
-proc metsysGetRunTimeArtifactInfo(self: Plugin, obj: ChalkObj, insert: bool):
-                                  ChalkDict {.cdecl.} =
+proc attestationGetRunTimeArtifactInfo(self: Plugin, obj: ChalkObj, insert: bool):
+                                       ChalkDict {.cdecl.} =
   result = ChalkDict()
   if insert and obj.willSignBySigStore():
     try:
@@ -333,7 +333,9 @@ proc loadSystem*() =
             rtArtCallback  = RunTimeArtifactCb(sysGetRunTimeArtifactInfo),
             rtHostCallback = RunTimeHostCb(sysGetRunTimeHostInfo))
 
+  newPlugin("attestation",
+            ctArtCallback  = ChalkTimeArtifactCb(attestationGetChalkTimeArtifactInfo),
+            rtArtCallback  = RunTimeArtifactCb(attestationGetRunTimeArtifactInfo))
+
   newPlugin("metsys",
-            ctArtCallback  = ChalkTimeArtifactCb(metsysGetChalkTimeArtifactInfo),
-            rtArtCallback  = RunTimeArtifactCb(metsysGetRunTimeArtifactInfo),
             rtHostCallback = RunTimeHostCb(metsysGetRunTimeHostInfo))

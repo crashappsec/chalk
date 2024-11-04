@@ -17,7 +17,7 @@ proc dockerPush*(ctx: DockerInvocation): int =
 
   if chalkOpt.isNone():
     error("docker: " & ctx.foundImage & " is not found. pushing without chalk")
-    return ctx.runMungedDockerInvocation()
+    return setExitCode(ctx.runMungedDockerInvocation())
 
   # force DOCKER_PLATFORM to be included in chalk normalization
   # which is required to compute unique METADATA_* keys
@@ -30,7 +30,7 @@ proc dockerPush*(ctx: DockerInvocation): int =
     # so they create things like CHALK_ID, METADATA_ID
     # but we just want to report keys about the artifact
     # without "creating" new chalkmark so we chalk-time collection
-    suspendChalkCollectionFor("metsys")
+    suspendChalkCollectionFor("attestation")
     suspendChalkCollectionFor("docker")
 
   initCollection()
