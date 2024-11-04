@@ -65,11 +65,11 @@ version:
 
 .PHONY: clean
 clean:
-	-rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop
+	-$(DOCKER) rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop
 
 .PHONY: chalk-docs
 chalk-docs: $(BINARY)
-	rm -rf $@
+	$(DOCKER) rm -rf $@
 	$(DOCKER) ./$(BINARY) docgen
 
 # devmode for local deps
@@ -82,15 +82,15 @@ nimutils con4m::
 	# It does not like dep structure but it does create the folder
 	# and nimble build does honor it :shrug:
 	-$(DOCKER) nimble develop --add https://github.com/crashappsec/$@
-	cp -r ../$@/* $@
+	$(DOCKER) cp -r ../$@/* $@
 
 nimutils::
-	rm -rf $@/nimutils
-	cd $@ && ln -fs ../../$@/nimutils .
+	$(DOCKER) rm -rf $@/nimutils
+	$(DOCKER) ln -fs ../../$@/nimutils nimutils/$@
 
 con4m::
-	rm -rf $@/files
-	cd $@ && ln -fs ../../$@/files .
+	$(DOCKER) rm -rf $@/files
+	$(DOCKER) ln -fs ../../$@/files con4m/$@
 
 # ----------------------------------------------------------------------------
 # TOOL MAKEFILES
