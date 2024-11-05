@@ -95,16 +95,16 @@ def validate_chalk_report(
     for artifact in artifact_map.values():
         assert chalk_report.contains(artifact.host_info)
 
-    for chalk in chalk_report.marks:
-        path = chalk["PATH_WHEN_CHALKED"]
+    for mark in chalk_report.marks:
+        path = mark.lifted["PATH_WHEN_CHALKED"]
         assert path in artifact_map, "chalked artifact incorrect"
         artifact = artifact_map[path]
 
-        assert chalk.has(
+        assert mark.lifted.has(
             ARTIFACT_TYPE=artifact.type,
             **artifact.chalk_info,
         )
-        assert chalk.has_if(
+        assert mark.lifted.has_if(
             chalk_action == "insert",
             _VIRTUAL=virtual,
         )
