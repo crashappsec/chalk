@@ -7,6 +7,9 @@
 - When running `semgrep`, its always added to `PATH`,
   as otherwise semgrep is not able to find `pysemgrep` folder.
   ([#439](https://github.com/crashappsec/chalk/pull/439))
+- Docker pushing non-chalked images did not report metsys
+  plugin keys such as `_EXIT_CODE`, `_CHALK_RUN_TIME`.
+  ([#438](https://github.com/crashappsec/chalk/pull/438))
 
 ### New Features
 

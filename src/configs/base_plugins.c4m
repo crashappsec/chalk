@@ -58,18 +58,29 @@ are not overridable via other plugins.
 #
 # The priority field is set to high(int64).
 
-plugin metsys {
+plugin attestation {
     ~enabled: true
     pre_chalk_keys:  ["METADATA_HASH", "ERR_INFO", "FAILED_KEYS", "METADATA_ID",
                       "SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"]
     post_chalk_keys: ["_SIGNATURES"]
+    ~priority:       high() - 1
+    doc: """
+Like the `system` module, this module is non-overridable keys added by
+Chalk. It's just the ones that need to be computed at the very end of
+chalk-time data collection phase, so integrity / signing and audit.
+"""
+}
+
+plugin metsys {
+    ~enabled: true
     post_run_keys:   ["_OP_ERRORS", "_OP_FAILED_KEYS", "_CHALK_EXTERNAL_ACTION_AUDIT",
                       "_CHALK_RUN_TIME", "_OP_EXIT_CODE"]
     ~priority:       high()
     doc: """
 Like the `system` module, this module is non-overridable keys added by
 Chalk. It's just the ones that need to be computed at the very end of
-a data collection phase, so integrity / signing and audit.
+a run-time collection phase about the whole operation
+such as the overall chalk run time.
 """
 }
 
@@ -313,7 +324,7 @@ plugin conffile {
     pre_chalk_keys:   ["*"]  # Chalk-only keys are evaluated here.
     post_chalk_keys:  ["*"]  # Non-chalkable artifact keys here.
     post_run_keys:    ["*"]  # Post-run keys here.
-    priority:         high() - 1
+    priority:         high() - 2
     doc: """
 This plugin is responsible for collecting any values explicitly set in
 the configuration file by the user. The user can set values statically
@@ -392,7 +403,7 @@ plugin elf_last_resort {
     codec:           true
     pre_chalk_keys:  ["ARTIFACT_TYPE"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
-    ~priority: high() - 1
+    ~priority: high() - 3
     doc: """
 This codec is only used for operating on chalk marks for oddball
 hand-written elf-files. It works by leveraging the fact that appending

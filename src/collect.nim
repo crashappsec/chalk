@@ -10,7 +10,7 @@ import "./docker"/[scan]
 import "."/[config, plugin_api]
 
 proc isSystem*(p: Plugin): bool =
-  return p.name in ["system", "metsys"]
+  return p.name in ["system", "attestation", "metsys"]
 
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we
@@ -45,9 +45,10 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   if not attrGet[bool](section & ".system"):
     return true
 
-  case plugin.name
-  of "system", "metsys":
+  if plugin.isSystem():
     return true
+
+  case plugin.name
   of "conffile":
     if attrGet[bool](section & ".conf_as_system"):
       return true
