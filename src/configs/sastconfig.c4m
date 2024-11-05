@@ -93,6 +93,10 @@ func semgrep_system() {
     trace("find_semgrep: Unable to find semgrep in $PATH")
   } else {
     trace("find_semgrep: found semgrep in $PATH: " + result)
+    # ensure semgrep is on PATH
+    # https://github.com/semgrep/semgrep/issues/10652
+    head, tail := path_split(result)
+    result := "PATH=" + head + ":$PATH " + result
   }
 }
 
