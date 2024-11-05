@@ -54,7 +54,7 @@ class Docker:
         for t in tags:
             cmd += ["-t", t]
         if content:
-            stdin = content.encode()
+            stdin = Docker.dockerfile(content).encode()
             cmd += ["-f", "-"]
         elif dockerfile:
             cmd += ["-f", str(dockerfile)]

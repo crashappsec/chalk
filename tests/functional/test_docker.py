@@ -960,6 +960,14 @@ def test_build_and_push(
     assert pull.find("Digest:") == f"sha256:{image_digest}"
 
 
+def test_push_nonchalked(chalk: Chalk, random_hex: str):
+    tag_base = f"{REGISTRY}/nonchalked_{random_hex}"
+    tag = f"{tag_base}:latest"
+    Docker.build(content="FROM alpine", tag=tag)
+    push = chalk.docker_push(tag)
+    assert push.report.has(_OP_EXIT_CODE=0, _CHALK_RUN_TIME=ANY)
+
+
 @pytest.mark.parametrize("test_file", ["valid/sample_1"])
 def test_push_without_buildx(
     chalk: Chalk,

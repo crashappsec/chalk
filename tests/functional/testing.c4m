@@ -7,6 +7,7 @@ custom_report.terminal_other_op.use_when: ["extract", "delete", "exec", "env", "
 
 report_template insertion_default {
   key._OP_EXIT_CODE.use = true
+  key._CHALK_RUN_TIME.use = true
 }
 
 report_template report_default {
