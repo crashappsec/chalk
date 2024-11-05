@@ -32,7 +32,7 @@ outconf exec {
 }
 
 outconf heartbeat {
-  report_template:        "report_default"
+  report_template:        "heartbeat"
 }
 
 outconf delete {

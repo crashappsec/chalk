@@ -332,6 +332,7 @@ report and subtract from it.
   key._SIGNATURES.use                         = true
   key._INVALID_SIGNATURE.use                  = true
   key._ACTION_ID.use                          = true
+  key._EXEC_ID.use                            = true
   key._ARGV.use                               = true
   key._ENV.use                                = true
   key._TENANT_ID.use                          = true
@@ -486,6 +487,7 @@ doc: """
   key.SBOM.use                                = true
   key.SAST.use                                = true
   key._ACTION_ID.use                          = true
+  key._EXEC_ID.use                            = true
   key._ARGV.use                               = true
   key._ENV.use                                = true
   key._TENANT_ID.use                          = true
@@ -976,6 +978,7 @@ container.
 
   # Runtime host keys.
   key._ACTION_ID.use                          = true
+  key._EXEC_ID.use                            = true
   key._ARGV.use                               = true
   key._ENV.use                                = true
   key._TENANT_ID.use                          = true
@@ -1441,6 +1444,7 @@ and keep the run-time key.
 
   # Runtime host keys.
   key._ACTION_ID.use                          = true
+  key._EXEC_ID.use                            = true
   key._ARGV.use                               = true
   key._ENV.use                                = true
   key._TENANT_ID.use                          = true
@@ -1857,6 +1861,7 @@ that do not generate a chalk report.
 """
   key._OPERATION.use                          = true
   key._ACTION_ID.use                          = true
+  key._EXEC_ID.use                            = true
   key._DATETIME.use                           = true
   key._ARGV.use                               = true
   key._OP_CHALKER_COMMIT_ID.use               = true
@@ -1905,6 +1910,25 @@ report_template usage {
   ~key._OP_CHALKER_COMMIT_ID.use              = true
   ~key._OP_CHALKER_VERSION.use                = true
   ~key._OP_PLATFORM.use                       = true
+}
+
+report_template heartbeat {
+  shortdoc: "Small report for periodic heartbeats"
+  doc: """
+Very small report template for sending heartbeats.
+Normally exec report should collect most of the information
+about the chalk runtime. After that point heartbeat report
+only indicates liveliness of the process so it can be very
+minimal.
+"""
+  ~key.METADATA_ID.use                        = true
+  ~key.CHALK_ID.use                           = true
+  ~key._CHALKS.use                            = true
+  ~key._OPERATION.use                         = true
+  ~key._TIMESTAMP.use                         = true
+  ~key._DATETIME.use                          = true
+  ~key._ACTION_ID.use                         = true
+  ~key._EXEC_ID.use                           = true
 }
 
 report_template terminal_insert {

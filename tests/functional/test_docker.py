@@ -860,7 +860,7 @@ def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
     assert len(chalk_result.reports) > 1
     for heartbeat_report in chalk_result.reports[1:]:
         assert heartbeat_report["_OPERATION"] == "heartbeat"
-        assert heartbeat_report.mark == exec_report.mark
+        assert exec_report.mark.contains(heartbeat_report.mark)
 
 
 def test_docker_labels(chalk: Chalk, random_hex: str):

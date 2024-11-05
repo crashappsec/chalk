@@ -35,7 +35,8 @@ plugin system {
                     "_OP_CHALKER_VERSION", "_OP_CHALK_COUNT", "_OP_CMD_FLAGS",
                     "_OP_EXE_NAME", "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
                     "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
-                    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV"]
+                    "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV",
+                    "_EXEC_ID"]
 
   ~priority:       0
   doc: """
