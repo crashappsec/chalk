@@ -2,6 +2,12 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- When running `semgrep`, its always added to `PATH`,
+  as otherwise semgrep is not able to find `pysemgrep` folder.
+  ([#439](https://github.com/crashappsec/chalk/pull/439))
+
 ## 0.4.13
 
 **Oct 10, 2024**
