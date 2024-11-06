@@ -8,11 +8,13 @@
 ## This plugin uses information from the config file to set metadata
 ## keys.
 
-import std/[algorithm, sequtils]
+import std/[algorithm, sequtils, sets]
 import ".."/[config, plugin_api, util]
 
-type PIInfo = ref object
-  name: string
+type
+  AlreadyRanError = object of CatchableError
+  PIInfo = ref object
+    name: string
 
 proc ensureRunCallback[T](cb: CallbackObj, args: seq[Box]): T =
   let value = runCallback(cb, args)
@@ -20,11 +22,11 @@ proc ensureRunCallback[T](cb: CallbackObj, args: seq[Box]): T =
     raise newException(ValueError, "missing implemenetation of " & $(cb))
   return unpack[T](value.get())
 
-var toolCache = initTable[string, ChalkDict]()
+var alreadyRan = initHashSet[string]()
 proc runOneTool(info: PIInfo, path: string): ChalkDict =
   let key = info.name & ":" & path
-  if key in toolCache:
-    return toolCache[key]
+  if key in alreadyRan:
+    raise newException(AlreadyRanError, "")
 
   trace("Running tool: " & info.name)
   result = ChalkDict()
@@ -65,7 +67,7 @@ proc runOneTool(info: PIInfo, path: string): ChalkDict =
     d.del("info")
 
   trace(info.name & ": produced keys " & $(d.keys().toSeq()))
-  toolCache[key] = d
+  alreadyRan.incl(key)
   return d
 
 template toolBase(path: string) {.dirty.} =
@@ -109,6 +111,8 @@ template toolBase(path: string) {.dirty.} =
         result.merge(data.nestWith(info.name))
         if len(data) >= 0 and attrGet[bool]("tool." & info.name & ".stop_on_success"):
           break
+      except AlreadyRanError:
+        trace(info.name & ": already ran for " & path & ". skipping")
       except:
         error(info.name & ": " & getCurrentExceptionMsg())
 

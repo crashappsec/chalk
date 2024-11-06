@@ -10,6 +10,11 @@
 - Docker pushing non-chalked images did not report metsys
   plugin keys such as `_EXIT_CODE`, `_CHALK_RUN_TIME`.
   ([#438](https://github.com/crashappsec/chalk/pull/438))
+- External tools for non-file artifacts (e.g. docker image)
+  sent duplicate keys in both report-level as well as
+  chalk-mark level. For example `SBOM` key with equivalent
+  content was duplicated twice.
+  ([#440](https://github.com/crashappsec/chalk/pull/440))
 
 ### New Features
 

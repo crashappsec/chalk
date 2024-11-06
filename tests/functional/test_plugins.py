@@ -18,7 +18,7 @@ from .chalk.validate import (
     validate_virtual_chalk,
 )
 from .conf import CODEOWNERS, CONFIGS, DATA, DOCKERFILES, LS_PATH, PYS
-from .utils.dict import ANY
+from .utils.dict import ANY, MISSING
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
@@ -868,6 +868,9 @@ def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
     )
+
+    assert build.report.contains(sbom_data)
+    assert build.mark.has(SBOM=MISSING)
 
     # artifact is the docker image
     artifact_info = ArtifactInfo(
