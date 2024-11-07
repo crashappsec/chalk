@@ -1,13 +1,8 @@
 SHELL=bash
 BINARY=chalk
-CHALK_BUILD?=build
+CHALK_BUILD?=release
 
-# if CON4M_DEV exists, pass that to docker-compose
-# as docker-compose does not allow conditional env vars
 _DOCKER_ARGS=
-ifneq "$(shell echo $${CON4M_DEV+missing})" ""
-_DOCKER_ARGS=-e CON4M_DEV=true
-endif
 _DOCKER=docker compose run --rm $(_DOCKER_ARGS) chalk
 DOCKER?=$(_DOCKER)
 
@@ -25,6 +20,8 @@ SOURCES+=src/docs/CHANGELOG.md
 
 VERSION=$(shell cat src/configs/base_keyspecs.c4m \
           | grep -E "chalk_version\s+:=" | cut -d'"' -f2 | head -n1)
+
+BUILDS=$(shell cat *.nimble | grep -E '^task.*build' | cut -d, -f1 | awk '{print $$2}')
 
 # in case nimble bin is not in PATH - e.g. vanilla shell
 export PATH:=$(HOME)/.nimble/bin:$(PATH)
@@ -44,12 +41,10 @@ $(BINARY).bck: $(SOURCES)
 	cp $@ $(BINARY)
 	ls -la $(BINARY) $@
 
-.PHONY: debug release
-debug: CHALK_BUILD=build --define:debug
 debug: DEBUG=true
-release: CHALK_BUILD=build
-debug release:
-	$(eval export CHALK_BUILD DEBUG)
+$(BUILDS):
+	$(eval export CHALK_BUILD=$@)
+	$(eval export DEBUG)
 	-rm -f $(BINARY) $(BINARY).bck
 	$(MAKE) $(BINARY)
 
