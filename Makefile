@@ -131,11 +131,15 @@ ifneq "$(shell which systemctl 2> /dev/null)" ""
 		|| echo Please restart docker daemon after changing docker config
 endif
 
+$(HOME)/.pdbrc.py:
+	touch $@
+
 .PHONY: docker-setup
 docker-setup: /etc/docker/daemon.json
 
 .PHONY: tests
 tests: DOCKER=$(_DOCKER) # force rebuilds to use docker to match tests
+tests: $(HOME)/.pdbrc.py
 tests: docker-setup
 tests: $(BINARY) # note this will rebuild chalk if necessary
 	docker compose run --rm tests $(make_args) $(args)

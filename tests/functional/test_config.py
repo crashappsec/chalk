@@ -208,6 +208,7 @@ def test_external_configs(
         command="env",
         config=CONFIGS / config_path,
         expected_success=expected_success,
+        expecting_report=expected_success,
         ignore_errors=True,
     )
     if expected_error:
@@ -220,6 +221,7 @@ def test_external_configs(
     result_external = chalk_copy.run(
         command="env",
         expected_success=expected_success,
+        expecting_report=expected_success,
         ignore_errors=True,
     )
     if expected_error:
@@ -232,25 +234,25 @@ def test_custom_report(
     chalk_copy: Chalk,
     copy_files: list[Path],
     test_config_file: Path,
+    tmp_file: Path,
 ):
     bin_path = copy_files[0]
     # config sets custom report file output here
-    report_path = Path("/tmp/custom_report.log")
 
     # expecting a report for insert
-    assert chalk_copy.run(
+    assert chalk_copy.insert(
+        bin_path,
         config=test_config_file,
-        target=bin_path,
-        command="insert",
         virtual=False,
+        env={"LOG_FILE": str(tmp_file)},
     ).report
 
     # expecting a report for extract
-    assert chalk_copy.run(
+    assert chalk_copy.extract(
+        bin_path,
         config=test_config_file,
-        target=bin_path,
-        command="extract",
         virtual=False,
+        env={"LOG_FILE": str(tmp_file)},
     ).report
 
     # not expecting a report for env in report file
@@ -259,9 +261,10 @@ def test_custom_report(
         config=test_config_file,
         command="env",
         virtual=False,
+        env={"LOG_FILE": str(tmp_file)},
     ).reports
 
-    log_lines = report_path.read_text().splitlines()
+    log_lines = tmp_file.read_text().splitlines()
     reports = [ChalkReport.from_json(i) for i in log_lines]
 
     # only expecting report for insert and extract
@@ -452,12 +455,12 @@ def validate_report_keys(report: dict[str, Any], expected_keys: set[str]):
 
 # tests outconf profiles for non-docker operations
 @pytest.mark.parametrize(
-    "test_config_file",
+    "test_config_file, expecting_chalkmarks",
     [
-        ("profiles/empty_profile.c4m"),
-        ("profiles/default.c4m"),
-        ("profiles/minimal_profile.c4m"),
-        ("profiles/large_profile.c4m"),
+        ("profiles/empty_profile.c4m", False),
+        ("profiles/default.c4m", True),
+        ("profiles/minimal_profile.c4m", True),
+        ("profiles/large_profile.c4m", True),
     ],
 )
 @pytest.mark.parametrize(
@@ -473,6 +476,7 @@ def test_profiles(
     chalk_copy: Chalk,
     test_config_file: str,
     use_embedded: bool,
+    expecting_chalkmarks: bool,
 ):
     bin_path = copy_files[0]
     configs = merged_configs(CONFIGS / test_config_file)
@@ -481,7 +485,7 @@ def test_profiles(
     chalk_copy.load(CONFIGS / test_config_file, use_embedded=use_embedded)
 
     # insert report should have keys listed
-    insert = chalk_copy.insert(bin_path)
+    insert = chalk_copy.insert(bin_path, expecting_chalkmarks=expecting_chalkmarks)
     validate_chalk_report_keys(insert.report, configs["insert"])
 
     # check that binary has the correct chalk mark
@@ -501,7 +505,7 @@ def test_profiles(
     validate_report_keys(chalk_mark, configs["insert"]["mark_template"] | minimal_chalk)
 
     # extract
-    extract = chalk_copy.extract(bin_path)
+    extract = chalk_copy.extract(bin_path, expecting_chalkmarks=expecting_chalkmarks)
     validate_chalk_report_keys(extract.report, configs["extract"])
 
     # exec
@@ -518,7 +522,7 @@ def test_no_certs(chalk_default: Chalk, server_chalkdust: str):
     chalk should be able to connect to chalkdust even when system has no system certs
     by using bundled mozilla root CA store
     """
-    assert Docker.run(
+    _, build = Docker.run(
         # busybox does not ship with any system certs vs for example alpine
         image="busybox",
         entrypoint="/bin/sh",
@@ -529,6 +533,7 @@ def test_no_certs(chalk_default: Chalk, server_chalkdust: str):
         tty=False,
         volumes={chalk_default.binary: "/chalk"},
     )
+    assert build
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)

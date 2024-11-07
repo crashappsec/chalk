@@ -122,6 +122,7 @@ services:
       - seccomp=unconfined # for gdb
     volumes:
       - $PWD:$PWD
+      - $HOME/.pdbrc.py:/root/.pdbrc.py
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/buildkit:/etc/buildkit
       - /etc/docker:/etc/docker
