@@ -14,23 +14,17 @@ import os
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark, ChalkProgram
-from .chalk.validate import (
-    MAGIC,
-    MISSING,
-    ArtifactInfo,
-    validate_docker_chalk_report,
-    validate_virtual_chalk,
-)
 from .conf import (
     CONFIGS,
     DOCKERFILES,
     DOCKER_SSH_REPO,
     DOCKER_TOKEN_REPO,
+    MAGIC,
     MARKS,
     REGISTRY,
     ROOT,
 )
-from .utils.dict import ANY, MISSING, Contains
+from .utils.dict import ANY, MISSING, Contains, IfExists
 from .utils.docker import Docker
 from .utils.log import get_logger
 from .utils.os import run
@@ -707,12 +701,8 @@ def test_virtual_valid(
         virtual=True,
         env={"SINK_TEST_OUTPUT_FILE": "/tmp/sink_file.json"},
     )
-
-    # artifact is the docker image
-    # keys to check
-    artifact_info = ArtifactInfo(
-        type="Docker Image",
-        chalk_info={
+    assert build.mark.contains(
+        {
             "_CURRENT_HASH": image_hash,
             "_IMAGE_ID": image_hash,
             "_REPO_TAGS": Contains({f"{tag}:latest"}),
@@ -724,24 +714,8 @@ def test_virtual_valid(
             "DOCKER_TAGS": Contains({f"{tag}:latest"}),
         },
     )
-    validate_docker_chalk_report(
-        chalk_report=build.report,
-        artifact=artifact_info,
-        virtual=True,
-    )
 
-    chalk_version = build.mark["CHALK_VERSION"]
-    metadata_id = build.mark["METADATA_ID"]
-
-    vchalk = validate_virtual_chalk(
-        tmp_data_dir, artifact_map={image_hash: artifact_info}, virtual=True
-    )
-
-    # required keys in min chalk mark
-    assert "CHALK_ID" in vchalk
-    assert vchalk["MAGIC"] == MAGIC
-    assert vchalk["CHALK_VERSION"] == chalk_version
-    assert vchalk["METADATA_ID"] == metadata_id
+    assert build.vmark.contains({k: IfExists(v) for k, v in build.mark.items()})
 
     _, result = Docker.run(
         image=image_hash,
@@ -785,12 +759,8 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
         tag=tag,
         config=CONFIGS / "docker_wrap.c4m",
     )
-
-    # artifact is the docker image
-    artifact_info = ArtifactInfo(
-        type="Docker Image",
-        # keys to check
-        chalk_info={
+    assert build.mark.contains(
+        {
             "_CURRENT_HASH": image_hash,
             "_IMAGE_ID": image_hash,
             "_REPO_TAGS": Contains({f"{tag}:latest"}),
@@ -802,24 +772,17 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
             "DOCKER_TAGS": Contains({f"{tag}:latest"}),
         },
     )
-    validate_docker_chalk_report(
-        chalk_report=build.report, artifact=artifact_info, virtual=False
-    )
-
-    chalk_version = build.mark["CHALK_VERSION"]
-    metadata_id = build.mark["METADATA_ID"]
 
     _, result = Docker.run(
         image=image_hash,
         entrypoint="cat",
         params=["chalk.json"],
     )
-    chalk_json = result.json()
-
-    assert "CHALK_ID" in chalk_json
-    assert chalk_json["MAGIC"] == MAGIC, "chalk magic value incorrect"
-    assert chalk_json["CHALK_VERSION"] == chalk_version
-    assert chalk_json["METADATA_ID"] == metadata_id
+    chalk_json = ChalkMark(result.json())
+    # ensure required keys are present
+    assert chalk_json.has(MAGIC=MAGIC, CHALK_VERSION=ANY, CHALK_ID=ANY, METADATA_ID=ANY)
+    # ensure all values match with build report
+    assert build.mark.contains({k: IfExists(v) for k, v in chalk_json.items()})
 
 
 @pytest.mark.parametrize("test_file", ["invalid/sample_1", "invalid/sample_2"])
@@ -1237,39 +1200,27 @@ def test_extract(chalk: Chalk, random_hex: str):
         tag=tag,
     )
 
-    # artifact info should be consistent
-    image_artifact = ArtifactInfo(
-        type="Docker Image",
-        host_info={
+    # extract chalk from image id and image name
+    extract_by_name = chalk.extract(tag)
+    assert extract_by_name.report.contains(
+        {
             "_OPERATION": "extract",
             "_OP_EXE_NAME": chalk.binary.name,
             "_OP_UNMARKED_COUNT": 0,
             "_OP_CHALK_COUNT": 1,
-        },
-        chalk_info={
+        }
+    )
+    assert extract_by_name.mark.contains(
+        {
             "_OP_ARTIFACT_TYPE": "Docker Image",
             "_IMAGE_ID": image_id,
             "_CURRENT_HASH": image_id,
             "_REPO_TAGS": Contains({f"{tag}:latest"}),
-        },
-    )
-
-    # extract chalk from image id and image name
-    extract_by_name = chalk.extract(tag)
-    validate_docker_chalk_report(
-        chalk_report=extract_by_name.report,
-        artifact=image_artifact,
-        virtual=False,
-        chalk_action="extract",
+        }
     )
 
     extract_by_id = chalk.extract(image_id[:12])
-    validate_docker_chalk_report(
-        chalk_report=extract_by_id.report,
-        artifact=image_artifact,
-        virtual=False,
-        chalk_action="extract",
-    )
+    assert extract_by_id.report.contains(extract_by_name.report.deterministic())
 
     # run container and keep alive via tail
     container_id, _ = Docker.run(
@@ -1283,64 +1234,60 @@ def test_extract(chalk: Chalk, random_hex: str):
     # let container start
     time.sleep(2)
 
-    # new artifact for running container
-    artifact_container = ArtifactInfo(
-        type="Docker Container",
-        host_info={
+    # extract on container name and validate
+    extract_container_name = chalk.extract(container_name)
+    assert extract_container_name.report.contains(
+        {
             "_OPERATION": "extract",
             "_OP_EXE_NAME": chalk.binary.name,
             "_OP_UNMARKED_COUNT": 0,
             "_OP_CHALK_COUNT": 1,
-        },
-        chalk_info={
+        }
+    )
+    assert extract_container_name.mark.contains(
+        {
             "_OP_ARTIFACT_TYPE": "Docker Container",
             "_IMAGE_ID": image_id,
             "_CURRENT_HASH": image_id,
             "_INSTANCE_CONTAINER_ID": container_id,
             "_INSTANCE_NAME": container_name,
             "_INSTANCE_STATUS": "running",
-        },
-    )
-
-    # extract on container name and validate
-    extract_container_name = chalk.extract(container_name)
-    validate_docker_chalk_report(
-        chalk_report=extract_container_name.report,
-        artifact=artifact_container,
-        virtual=False,
-        chalk_action="extract",
+        }
     )
 
     # extract on container id and validate
     extract_container_id = chalk.extract(container_id)
-    validate_docker_chalk_report(
-        chalk_report=extract_container_id.report,
-        artifact=artifact_container,
-        virtual=False,
-        chalk_action="extract",
+    assert extract_container_id.report.contains(
+        extract_container_name.report.deterministic()
     )
 
     # shut down container
     Docker.stop_containers([container_name])
 
-    # update artifact info
-    artifact_container.chalk_info["_INSTANCE_STATUS"] = "exited"
-
     # extract on container name and container id now that container is stopped
     extract_container_name_stopped = chalk.extract(container_name)
-    validate_docker_chalk_report(
-        chalk_report=extract_container_name_stopped.report,
-        artifact=artifact_container,
-        virtual=False,
-        chalk_action="extract",
+    assert extract_container_name_stopped.report.contains(
+        {
+            "_OPERATION": "extract",
+            "_OP_EXE_NAME": chalk.binary.name,
+            "_OP_UNMARKED_COUNT": 0,
+            "_OP_CHALK_COUNT": 1,
+        }
+    )
+    assert extract_container_name_stopped.mark.contains(
+        {
+            "_OP_ARTIFACT_TYPE": "Docker Container",
+            "_IMAGE_ID": image_id,
+            "_CURRENT_HASH": image_id,
+            "_INSTANCE_CONTAINER_ID": container_id,
+            "_INSTANCE_NAME": container_name,
+            "_INSTANCE_STATUS": "exited",
+        }
     )
 
     extract_container_id_stopped = chalk.extract(container_id)
-    validate_docker_chalk_report(
-        chalk_report=extract_container_id_stopped.report,
-        artifact=artifact_container,
-        virtual=False,
-        chalk_action="extract",
+    assert extract_container_id_stopped.report.contains(
+        extract_container_name_stopped.report.deterministic()
     )
 
 

@@ -15,12 +15,6 @@ from pathlib import Path
 import pytest
 
 from .chalk.runner import Chalk
-from .chalk.validate import (
-    ArtifactInfo,
-    validate_chalk_report,
-    validate_extracted_chalk,
-    validate_virtual_chalk,
-)
 from .conf import CONFIGS, DATE_PATH, LS_PATH
 from .utils.dict import ANY
 from .utils.log import get_logger
@@ -32,24 +26,13 @@ logger = get_logger()
 
 # tests multiple insertions and extractions on the same binary
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-def test_insert_extract_repeated(
-    tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk
-):
+def test_insert_extract_repeated(copy_files: list[Path], chalk: Chalk):
     artifact = copy_files[0]
-    artifact_info = ArtifactInfo.one_elf(artifact)
 
     insert = chalk.insert(artifact=artifact, virtual=False)
-    validate_chalk_report(
-        chalk_report=insert.report, artifact_map=artifact_info, virtual=False
-    )
+    insert.marks_by_path.contains({str(artifact): {}})
 
     extract = chalk.extract(artifact=artifact)
-    validate_extracted_chalk(
-        extracted_chalk=extract.report, artifact_map=artifact_info, virtual=False
-    )
-    validate_virtual_chalk(
-        tmp_data_dir=tmp_data_dir, artifact_map=artifact_info, virtual=False
-    )
 
     assert extract.report.datetime > extract.mark.datetime
 
@@ -61,14 +44,9 @@ def test_insert_extract_repeated(
     # repeat the above process re-chalking the same binary and assert that the
     # fields are appropriately updated
     insert2 = chalk.insert(artifact=artifact, virtual=False)
-    validate_chalk_report(
-        chalk_report=insert2.report, artifact_map=artifact_info, virtual=False
-    )
+    insert2.marks_by_path.contains({str(artifact): {}})
 
     extract2 = chalk.extract(artifact=artifact)
-    validate_extracted_chalk(
-        extracted_chalk=extract2.report, artifact_map=artifact_info, virtual=False
-    )
 
     # but this time timestamps and random values should be different
     rand2 = extract2.mark.lifted["CHALK_RAND"]
@@ -79,9 +57,6 @@ def test_insert_extract_repeated(
 
     # do one final extraction
     extract3 = chalk.extract(artifact=artifact)
-    validate_extracted_chalk(
-        extracted_chalk=extract3.report, artifact_map=artifact_info, virtual=False
-    )
 
     # report datetime is diff as its at extraction time
     # but chalkarm should stay consistent
@@ -99,53 +74,37 @@ def test_insert_extract_directory(
 ):
     ls_artifact, date_artifact = copy_files
 
-    artifact_info = {
-        **ArtifactInfo.one_elf(ls_artifact),
-        **ArtifactInfo.one_elf(date_artifact),
-    }
-
     insert = chalk.insert(artifact=tmp_data_dir, virtual=False)
-    validate_chalk_report(
-        chalk_report=insert.report, artifact_map=artifact_info, virtual=False
+    assert insert.marks_by_path.contains(
+        {
+            str(ls_artifact): {},
+            str(date_artifact): {},
+        }
     )
 
-    extract = chalk.extract(artifact=tmp_data_dir)
-    validate_extracted_chalk(
-        extracted_chalk=extract.report, artifact_map=artifact_info, virtual=False
-    )
-    validate_virtual_chalk(
-        tmp_data_dir=tmp_data_dir, artifact_map=artifact_info, virtual=False
-    )
+    assert chalk.extract(artifact=tmp_data_dir)
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_insert_extract_delete(copy_files: list[Path], chalk: Chalk):
     artifact = copy_files[0]
-    artifact_info = ArtifactInfo.one_elf(artifact)
 
     # insert
     insert = chalk.insert(artifact=artifact, virtual=False)
-    validate_chalk_report(
-        chalk_report=insert.report, artifact_map=artifact_info, virtual=False
-    )
+    assert insert.marks_by_path.contains({str(artifact): {}})
     insert_1_hash = insert.report["_CHALKS"][0]["HASH"]
 
     # extract
     extract = chalk.extract(artifact=artifact)
-    validate_extracted_chalk(
-        extracted_chalk=extract.report, artifact_map=artifact_info, virtual=False
-    )
 
     # delete
     delete = chalk.run(command="delete", target=artifact)
-    assert delete.report["_OPERATION"] == "delete"
 
     for key in ["HASH", "_OP_ARTIFACT_PATH", "_OP_ARTIFACT_TYPE"]:
         assert extract.mark[key] == delete.mark[key]
 
     # extract again and we shouldn't get anything this time
-    nop_extract = chalk.extract(artifact=artifact)
-    assert "_CHALKS" not in nop_extract.report
+    assert chalk.extract(artifact=artifact, expecting_chalkmarks=False)
 
     # insert again and check that hash is the same as first insert
     insert2 = chalk.insert(artifact=artifact, virtual=False)

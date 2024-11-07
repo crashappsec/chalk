@@ -11,7 +11,7 @@ from typing import Any, Literal, Optional, cast
 
 from ..conf import MAGIC
 from ..utils.bin import sha256
-from ..utils.dict import ContainsMixin
+from ..utils.dict import ContainsMixin, MISSING, ANY, IfExists
 from ..utils.docker import Docker
 from ..utils.log import get_logger
 from ..utils.os import CalledProcessError, Program, run
@@ -37,16 +37,57 @@ ChalkLogLevel = Literal[
 logger = get_logger()
 
 
+def artifact_type(path: Path) -> str:
+    if path.suffix == ".py":
+        return "python"
+    elif path.suffix == ".zip":
+        return "ZIP"
+    else:
+        return "ELF"
+
+
 class ChalkReport(ContainsMixin, dict):
     name = "report"
 
     def __init__(self, report: dict[str, Any]):
         super().__init__(**report)
 
+    def deterministic(self, ignore: Optional[set[str]] = None):
+        return self.__class__(
+            {
+                k: v
+                for k, v in self.items()
+                if k
+                not in {
+                    "_TIMESTAMP",
+                    "_DATETIME",
+                    "_ACTION_ID",
+                    "_ARGV",
+                    "_OP_ARGV",
+                    "_EXEC_ID",
+                    # docker does not have deterministic output
+                    # insecure registries are not consistently ordered
+                    "_DOCKER_INFO",
+                }
+                | (ignore or set())
+            }
+        )
+
     @property
     def marks(self):
         assert len(self["_CHALKS"]) > 0
         return [ChalkMark(i, report=self) for i in self["_CHALKS"]]
+
+    @property
+    def marks_by_path(self):
+        return ContainsMixin(
+            {
+                i.get("PATH_WHEN_CHALKED", i.get("_OP_ARTIFACT_PATH")): i
+                for i in self.marks
+                # paths can be missing for example in minimum report profile
+                if "PATH_WHEN_CHALKED" in i or "_OP_ARTIFACT_PATH" in i
+            }
+        )
 
     @property
     def mark(self):
@@ -180,12 +221,38 @@ class ChalkProgram(Program):
         return self.reports[0]
 
     @property
+    def first_report(self):
+        assert len(self.reports) > 0
+        return self.reports[0]
+
+    @property
     def mark(self):
         return self.report.mark
 
     @property
     def marks(self):
         return self.report.marks
+
+    @property
+    def marks_by_path(self):
+        return self.report.marks_by_path
+
+    @property
+    def virtual_path(self):
+        return Path.cwd() / "virtual-chalk.json"
+
+    @property
+    def vmarks(self):
+        assert self.virtual_path.exists()
+        return [
+            ChalkMark.from_json(i) for i in self.virtual_path.read_text().splitlines()
+        ]
+
+    @property
+    def vmark(self):
+        marks = self.vmarks
+        assert len(marks) == 1
+        return marks[0]
 
 
 class Chalk:
@@ -284,22 +351,22 @@ class Chalk:
 
         # if chalk outputs report, sanity check its operation matches chalk_cmd
         if expecting_report:
-            try:
-                report = result.report
-            except Exception:
-                pass
-            else:
-                # report could be silenced on the profile level
-                if report:
-                    operation = cast(str, command)
-                    # when calling docker, the arg after docker is the operation
-                    if not operation and "docker" in params:
-                        try:
-                            operation = params[params.index("buildx") + 1]
-                        except ValueError:
-                            operation = params[params.index("docker") + 1]
-                    if operation:
-                        assert report.has(_OPERATION=operation)
+            report = result.first_report
+            operation = cast(str, command)
+            # when calling docker, the arg after docker is the operation
+            if not operation and "docker" in params:
+                try:
+                    operation = params[params.index("buildx") + 1]
+                except ValueError:
+                    operation = params[params.index("docker") + 1]
+            if operation:
+                assert report.has(_OPERATION=IfExists(operation))
+                if "_CHALKS" in report:
+                    for mark in report.marks:
+                        assert mark.has_if(
+                            operation in {"insert", "build"},
+                            _VIRTUAL=IfExists(virtual),
+                        )
 
         return result
 
@@ -313,8 +380,10 @@ class Chalk:
         log_level: ChalkLogLevel = "trace",
         env: Optional[dict[str, str]] = None,
         ignore_errors: bool = False,
+        expecting_report: bool = True,
+        expecting_chalkmarks: bool = True,
     ) -> ChalkProgram:
-        return self.run(
+        result = self.run(
             command="insert",
             target=artifact,
             config=config,
@@ -322,7 +391,27 @@ class Chalk:
             log_level=log_level,
             env=env,
             ignore_errors=ignore_errors,
+            expecting_report=expecting_report,
         )
+        if expecting_report:
+            if expecting_chalkmarks:
+                for chalk in result.marks:
+                    assert chalk.has(_VIRTUAL=IfExists(virtual))
+                if virtual:
+                    assert result.virtual_path.exists()
+                    for mark in result.vmarks:
+                        assert mark.has(
+                            CHALK_ID=ANY,
+                            MAGIC=MAGIC,
+                        )
+            else:
+                assert result.report.has(
+                    _CHALKS=MISSING,
+                    _UNMARKED=IfExists(ANY),
+                )
+        if not virtual:
+            assert not result.virtual_path.exists()
+        return result
 
     def extract(
         self,
@@ -332,8 +421,10 @@ class Chalk:
         config: Optional[Path] = None,
         log_level: ChalkLogLevel = "trace",
         env: Optional[dict[str, str]] = None,
+        virtual: bool = False,
+        expecting_chalkmarks: bool = True,
     ) -> ChalkProgram:
-        return self.run(
+        result = self.run(
             command="extract",
             target=artifact,
             log_level=log_level,
@@ -342,6 +433,22 @@ class Chalk:
             config=config,
             env=env,
         )
+        if virtual:
+            assert result.report.has(
+                _CHALKS=MISSING,
+                _UNMARKED=IfExists(ANY),
+            )
+        else:
+            if Path(artifact).exists() and expecting_chalkmarks:
+                for path, chalk in result.marks_by_path.items():
+                    assert chalk.has(
+                        ARTIFACT_TYPE=artifact_type(Path(path)),
+                        PLATFORM_WHEN_CHALKED=result.report["_OP_PLATFORM"],
+                        INJECTOR_COMMIT_ID=result.report["_OP_CHALKER_COMMIT_ID"],
+                    )
+            if not expecting_chalkmarks:
+                assert "_CHALKS" not in result.report
+        return result
 
     def exec(
         self,
@@ -373,7 +480,7 @@ class Chalk:
         if path is not None:
             assert not path.is_file()
             args = [str(path)]
-        result = self.run(command="dump", params=args)
+        result = self.run(command="dump", params=args, expecting_report=False)
         if path is not None:
             assert path.is_file()
         return result
@@ -487,10 +594,13 @@ class Chalk:
                 )
             )
         if expecting_report and expected_success and image_hash:
+            assert result.report.has(_VIRTUAL=IfExists(virtual))
             if platforms:
                 assert len(result.marks) == len(platforms)
             else:
                 assert len(result.marks) == 1
+            for chalk in result.marks:
+                assert chalk.has(_OP_ARTIFACT_TYPE="Docker Image")
             # sanity check that chalk mark includes basic chalk keys
             assert image_hash in [i["_CURRENT_HASH"] for i in result.marks]
             assert image_hash in [i["_IMAGE_ID"] for i in result.marks]
@@ -517,4 +627,5 @@ class Chalk:
     def docker_pull(self, image: str):
         return self.run(
             params=["docker", "pull", image],
+            expecting_report=False,
         )

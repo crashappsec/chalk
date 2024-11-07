@@ -43,28 +43,25 @@ def _validate_chalk(
 
 # TODO add a test for the file not being present
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
-def test_file_present(tmp_data_dir: Path, chalk: Chalk, copy_files: list[Path]):
+def test_file_present(
+    tmp_data_dir: Path, chalk: Chalk, copy_files: list[Path], tmp_file
+):
     artifact = copy_files[0]
 
     # prep config file
-    file_output_path = Path("/tmp/sink_file.json")
-    if not file_output_path.is_file():
-        # touch the file
-        open(file_output_path, "a").close()
-        os.utime(file_output_path, None)
-    assert file_output_path.is_file(), "file sink path must be a valid path"
+    assert tmp_file.is_file(), "file sink path must be a valid path"
 
     config = SINK_CONFIGS / "file.c4m"
     chalk.insert(
         config=config,
         artifact=artifact,
-        env={"SINK_TEST_OUTPUT_FILE": str(file_output_path)},
+        env={"SINK_TEST_OUTPUT_FILE": str(tmp_file)},
     )
 
     # check that file output is correct
-    assert file_output_path.is_file(), "file sink should exist after chalk operation"
+    assert tmp_file.is_file(), "file sink should exist after chalk operation"
 
-    contents = file_output_path.read_text()
+    contents = tmp_file.read_text()
     assert contents
     chalks = json.loads(contents)
     assert len(chalks) == 1

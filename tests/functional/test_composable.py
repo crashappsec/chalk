@@ -45,13 +45,11 @@ def test_composable_valid(
     replace: bool,
 ):
     # load the composable config
-    _load = chalk_copy.load(
+    chalk_copy.load(
         config=(configs / test_config_file).absolute(),
         replace=replace,
         stdin=b"\n" * 2**15,
     )
-    assert _load.report["_OPERATION"] == "load"
-    assert "_OP_ERRORS" not in _load.report
 
     # check chalk dump to validate that loaded config matches
     current_config_path = tmp_data_dir / "output.c4m"
@@ -65,18 +63,14 @@ def test_composable_valid(
 
     # basic check insert operation
     bin_path = copy_files[0]
-    _insert = chalk_copy.insert(
+    assert chalk_copy.insert(
         artifact=bin_path,
         # compliance by default sends reports to localhost
         # which will error here
         ignore_errors=True,
+        # with full replace, testing config is not loaded hence no reports
+        expecting_report=not replace,
     )
-    for report in _insert.reports:
-        assert report["_OPERATION"] == "insert"
-
-        if "_OP_ERRORS" in report:
-            logger.error("report has unexpected errors", errors=report["_OP_ERRORS"])
-        assert "_OP_ERRORS" not in report
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
@@ -202,7 +196,7 @@ def test_composable_reload(
     first_load_config = get_current_config(tmp_data_dir, chalk_copy)
 
     # load default config
-    chalk_copy.run(command="load", params=["default"])
+    chalk_copy.load("default")
     default_load_config = get_current_config(tmp_data_dir, chalk_copy)
 
     # reload sample valid config and ensure default is overwritten

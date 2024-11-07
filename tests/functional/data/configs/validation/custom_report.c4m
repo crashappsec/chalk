@@ -11,7 +11,7 @@ report_template test_report_template {
 
 sink_config test_file_out {
     sink: "file"
-    filename: "/tmp/custom_report.log"
+    filename: env("LOG_FILE")
     enabled: true
 }
 
