@@ -27,7 +27,7 @@ services:
   # --------------------------------------------------------------------------
   # SERVER
 
-  server: &server
+  server:
     build:
       context: ./server
       target: deps
@@ -50,8 +50,13 @@ services:
       interval: 1s
 
   server-tls:
-    <<: *server
+    build:
+      context: ./server
+      target: deps
     command: run -r -p 5858 --domain=tls.chalk.local --keyfile=cert.key --certfile=cert.pem --use-existing-cert
+    working_dir: /chalk/server
+    volumes:
+      - .:/chalk
     ports:
       - 5858:5858
     networks:
