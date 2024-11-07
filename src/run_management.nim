@@ -75,12 +75,13 @@ proc inSubscan*(): bool =
   return len(ctxStack) > 1
 
 proc clearReportingState*() =
-  startTime      = getMonoTime().ticks()
-  ctxStack       = @[CollectionCtx()]
-  hostInfo       = ChalkDict()
-  subscribedKeys = Table[string, bool]()
-  systemErrors   = @[]
-  failedKeys     = ChalkDict()
+  startTime       = getMonoTime().ticks()
+  ctxStack        = @[CollectionCtx()]
+  hostInfo        = ChalkDict()
+  subscribedKeys  = Table[string, bool]()
+  systemErrors    = @[]
+  failedKeys      = ChalkDict()
+  externalActions = @[]
 
 proc pushCollectionCtx*(): CollectionCtx =
   result = CollectionCtx()
@@ -108,7 +109,8 @@ proc getAllChalks*(): seq[ChalkObj] =
 proc getAllChalks*(cc: CollectionCtx): seq[ChalkObj] =
   cc.allChalks
 proc addToAllChalks*(o: ChalkObj) =
-  collectionCtx.allChalks.add(o)
+  if o notin collectionCtx.allChalks:
+    collectionCtx.allChalks.add(o)
 proc setAllChalks*(s: seq[ChalkObj]) =
   collectionCtx.allChalks = s
 proc removeFromAllChalks*(o: ChalkObj) =
@@ -118,7 +120,8 @@ proc removeFromAllChalks*(o: ChalkObj) =
 proc getUnmarked*(): seq[string] =
   collectionCtx.unmarked
 proc addUnmarked*(s: string) =
-  collectionCtx.unmarked.add(s)
+  if s notin collectionCtx.unmarked:
+    collectionCtx.unmarked.add(s)
 proc setContextDirectories*(l: seq[string]) =
   # Used for 'where to look for stuff' plugins, particularly version control.
   collectionCtx.contextDirectories = l

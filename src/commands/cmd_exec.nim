@@ -148,7 +148,6 @@ proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
   if chalkOpt.isSome():
     let chalk = chalkOpt.get()
 
-
     chalk.addToAllChalks()
     chalk.collectedData = ChalkDict()
 

@@ -5,15 +5,14 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
+const cprofiling {.booldefine.} = false
+when cprofiling:
+  import nimprof
+
 # Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
 import "."/[config, confload, commands, norecurse, sinks,
             attestation_api, util]
-
-const cprofiling {.booldefine.} = false
-
-when cprofiling:
-  import nimprof
 
 when isMainModule:
   setupSignalHandlers() # util.nim

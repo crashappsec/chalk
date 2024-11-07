@@ -479,6 +479,7 @@ var
   gitExeLocation*:        string = ""
   sshKeyscanExeLocation*: string = ""
   dockerInvocation*:      DockerInvocation
+  externalActions*:       seq[seq[string]] = @[]
 
 template dumpExOnDebug*() =
   when not defined(release):

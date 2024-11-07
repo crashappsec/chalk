@@ -15,9 +15,7 @@ import std/[monotimes, nativesockets, sequtils, times]
 import ".."/[config, plugin_api, normalize, chalkjson, attestation_api,
              util]
 
-var
-  externalActions: seq[seq[string]] = @[]
-  execId = secureRand[uint64]().toHex().toLower()
+var execId = secureRand[uint64]().toHex().toLower()
 
 proc recordExternalActions(kind: string, details: string) =
   externalActions.add(@[kind, details])
