@@ -10,12 +10,15 @@
 import pkg/[nimutils/stsclient]
 import ".."/[config, plugin_api]
 
-var lambdaMetadata: ChalkDict = ChalkDict()
+var lambdaMetadata = ChalkDict()
+
+proc clearCallback(self: Plugin) {.cdecl.} =
+  lambdaMetadata = ChalkDict()
 
 proc collectLambdaMetadata(): ChalkDict =
   # This can be called from outside if anything needs to query the JSON.
   # For now, we just return the whole blob.
-  once:
+  if len(lambdaMetadata) == 0:
     let
       region          = os.getEnv("AWS_REGION", os.getEnv("AWS_DEFAULT_REGION"))
       functionName    = os.getEnv("AWS_LAMBDA_FUNCTION_NAME")
@@ -94,4 +97,5 @@ proc lambdaCallback*(self: Plugin, objs: seq[ChalkObj]):
 
 proc loadAwsLambda*() =
   newPlugin("aws_lambda",
+            clearCallback  = PluginClearCb(clearCallback),
             rtHostCallback = RunTimeHostCb(lambdaCallback))

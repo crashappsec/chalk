@@ -71,20 +71,21 @@ type
                                      ## need to inspect twice when we build + push.
     resourceType*:  set[ResourceType]
 
+  PluginClearCb*       = proc (a: Plugin) {.cdecl.}
   ChalkTimeHostCb*     = proc (a: Plugin): ChalkDict {.cdecl.}
   ChalkTimeArtifactCb* = proc (a: Plugin, b: ChalkObj): ChalkDict {.cdecl.}
-  RunTimeArtifactCb*   = proc (a: Plugin, b: ChalkObj, c: bool):
-                             ChalkDict {.cdecl.}
+  RunTimeArtifactCb*   = proc (a: Plugin, b: ChalkObj, c: bool): ChalkDict {.cdecl.}
   RunTimeHostCb*       = proc (a: Plugin, b: seq[ChalkObj]): ChalkDict {.cdecl.}
   ScanCb*              = proc (a: Plugin, b: string): Option[ChalkObj] {.cdecl.}
   UnchalkedHashCb*     = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
   EndingHashCb*        = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
   ChalkIdCb*           = proc (a: Plugin, b: ChalkObj): string {.cdecl.}
-  HandleWriteCb*       = proc (a: Plugin, b: ChalkObj,
-                               c: Option[string]) {.cdecl.}
+  HandleWriteCb*       = proc (a: Plugin, b: ChalkObj, c: Option[string]) {.cdecl.}
+
   Plugin* = ref object
     name*:                     string
     enabled*:                  bool
+    clearState*:               PluginClearCb
     getChalkTimeHostInfo*:     ChalkTimeHostCb
     getChalkTimeArtifactInfo*: ChalkTimeArtifactCb
     getRunTimeArtifactInfo*:   RunTimeArtifactCb
@@ -474,12 +475,13 @@ var
   doingTestRun*           = false
   nativeCodecsOnly*       = false
   passedHelpFlag*         = false
-  con4mRuntime*:          ConfigStack
-  commandName*:           string
-  gitExeLocation*:        string = ""
-  sshKeyscanExeLocation*: string = ""
-  dockerInvocation*:      DockerInvocation
-  externalActions*:       seq[seq[string]] = @[]
+  installedPlugins*       = Table[string, Plugin]()
+  externalActions*        = newSeq[seq[string]]()
+  commandName*            = ""
+  gitExeLocation*         = ""
+  sshKeyscanExeLocation*  = ""
+  con4mRuntime*:          ConfigStack # can be nil
+  dockerInvocation*:      DockerInvocation # ca be nil
 
 template dumpExOnDebug*() =
   when not defined(release):

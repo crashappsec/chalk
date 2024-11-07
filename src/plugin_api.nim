@@ -544,9 +544,7 @@ proc defaultCodecWrite*(s:     Plugin,
   if not chalk.replaceFileContents(contents):
     chalk.opFailed = true
 
-var
-  installedPlugins: Table[string, Plugin]
-  codecs:           seq[Plugin] = @[]
+var codecs: seq[Plugin] = @[]
 
 template isCodec*(plugin: Plugin): bool = attrGet[bool]("plugin." & plugin.name & ".codec")
 
@@ -598,6 +596,7 @@ proc getAllCodecs*(): seq[Plugin] =
 
 proc newPlugin*(
   name:           string,
+  clearCallback:  PluginClearCb       = PluginClearCb(nil),
   ctHostCallback: ChalkTimeHostCb     = ChalkTimeHostCb(nil),
   ctArtCallback:  ChalkTimeArtifactCb = ChalkTimeArtifactCb(nil),
   rtArtCallback:  RunTimeArtifactCb   = RunTimeArtifactCb(nil),
@@ -605,6 +604,7 @@ proc newPlugin*(
   cache:          RootRef             = RootRef(nil)):
     Plugin {.discardable, cdecl.} =
   result = Plugin(name:                     name,
+                  clearState:               clearCallback,
                   getChalkTimeHostInfo:     ctHostCallback,
                   getChalkTimeArtifactInfo: ctArtCallback,
                   getRunTimeArtifactInfo:   rtArtCallback,

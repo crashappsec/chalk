@@ -21,8 +21,8 @@ type
     tmpDir:        string
 
 var
-    zipDirs:  seq[string]
-    chalkIds: seq[Box]
+  zipDirs:  seq[string]
+  chalkIds: seq[Box]
 
 template pushZipDir(s: string)   = zipDirs.add(s)
 template popZipDir()             = discard zipDirs.pop()

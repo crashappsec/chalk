@@ -82,6 +82,11 @@ proc clearReportingState*() =
   systemErrors    = @[]
   failedKeys      = ChalkDict()
   externalActions = @[]
+  for name, plugin in installedPlugins.pairs():
+    if plugin.clearState == nil:
+      continue
+    let cb = plugin.clearState
+    cb(plugin)
 
 proc pushCollectionCtx*(): CollectionCtx =
   result = CollectionCtx()

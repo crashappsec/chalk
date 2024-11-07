@@ -12,7 +12,7 @@
 import std/base64
 import ".."/[config, chalkjson, util, plugin_api]
 
-var prefix = """
+let prefix = """
 #!/bin/bash
 
 BASE_NAME=$(basename -- "${BASH_SOURCE[0]}")
@@ -38,7 +38,7 @@ fi
 (base64 -d)  < /bin/cat << CHALK_DADFEDABBADABBEDBAD_END > ${CMDLOC}
 """
 
-var postfixLines = [
+let postfixLines = [
   "CHALK_DADFEDABBADABBEDBAD_END",
   "chmod +x ${CMDLOC}",
   "exec ${CMDLOC} ${@}"

@@ -143,7 +143,6 @@ proc getParentExitStatus(trueParentPid: Pid): bool =
   return false
 
 proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
-  clearReportingState()
   initCollection()
   if chalkOpt.isSome():
     let chalk = chalkOpt.get()
@@ -166,10 +165,12 @@ template doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: untyped) =
     sleepInterval = int(inMicroSec / 1000)
 
   setCommandName("heartbeat")
+  clearReportingState()
 
   while true:
     sleep(sleepInterval)
     chalkOpt.doHeartbeatReport()
+    clearReportingState()
     if fn(pid):
       break
 

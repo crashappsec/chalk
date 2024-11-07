@@ -13,8 +13,13 @@ import ".."/[config, plugin_api, util]
 
 type
   AlreadyRanError = object of CatchableError
-  PIInfo = ref object
+  PIInfo          = ref object
     name: string
+
+var alreadyRan = initHashSet[string]()
+
+proc clearCallback(self: Plugin) {.cdecl.} =
+  alreadyRan = initHashSet[string]()
 
 proc ensureRunCallback[T](cb: CallbackObj, args: seq[Box]): T =
   let value = runCallback(cb, args)
@@ -22,7 +27,6 @@ proc ensureRunCallback[T](cb: CallbackObj, args: seq[Box]): T =
     raise newException(ValueError, "missing implemenetation of " & $(cb))
   return unpack[T](value.get())
 
-var alreadyRan = initHashSet[string]()
 proc runOneTool(info: PIInfo, path: string): ChalkDict =
   let key = info.name & ":" & path
   if key in alreadyRan:
@@ -130,5 +134,6 @@ proc toolGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
 
 proc loadExternalTool*() =
   newPlugin("tool",
+            clearCallback  = PluginClearCb(clearCallback),
             ctHostCallback = ChalkTimeHostCb(toolGetChalkTimeHostInfo),
             ctArtCallback  = ChalkTimeArtifactCb(toolGetChalkTimeArtifactInfo))
