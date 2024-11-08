@@ -105,6 +105,11 @@ async def presign_report_url(
     )
 
 
+@app.post("/500")
+async def error_500():
+    raise HTTPException(500)
+
+
 @app.post("/report", status_code=200)
 @app.put("/report", status_code=200)
 async def accept_report(

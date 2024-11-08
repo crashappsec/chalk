@@ -108,7 +108,8 @@ class ChalkReport(ContainsMixin, dict):
 
     @classmethod
     def from_json(cls, data: str):
-        return cls(json.loads(data)[0])
+        info = json.loads(data)
+        return cls(info if isinstance(info, dict) else info[0])
 
 
 class ChalkMark(ContainsMixin, dict):
@@ -254,6 +255,23 @@ class ChalkProgram(Program):
         assert len(marks) == 1
         return marks[0]
 
+    @property
+    def logged_reports_path(self):
+        return Path.cwd() / "chalk-reports.jsonl"
+
+    @property
+    def logged_reports(self):
+        return [
+            ChalkReport.from_json(json.loads(i)["$message"])
+            for i in self.logged_reports_path.read_text().splitlines()
+        ]
+
+    @property
+    def logged_report(self):
+        reports = self.logged_reports
+        assert len(reports) == 1
+        return reports[0]
+
 
 class Chalk:
     def __init__(
@@ -382,6 +400,7 @@ class Chalk:
         ignore_errors: bool = False,
         expecting_report: bool = True,
         expecting_chalkmarks: bool = True,
+        use_embedded: bool = True,
     ) -> ChalkProgram:
         result = self.run(
             command="insert",
@@ -392,6 +411,7 @@ class Chalk:
             env=env,
             ignore_errors=ignore_errors,
             expecting_report=expecting_report,
+            use_embedded=use_embedded,
         )
         if expecting_report:
             if expecting_chalkmarks:
