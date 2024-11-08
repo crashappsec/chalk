@@ -174,7 +174,7 @@ def test_post_http_fastapi(
     _test_server(
         artifact=copy_files[0],
         chalk=chalk,
-        conf="post_https_local.c4m",
+        conf="post_http_local.c4m",
         url=server_http,
         server_sql=server_sql,
         verify=None,
@@ -213,6 +213,31 @@ def test_post_https_fastapi(
 
 
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
+def test_500_http_fastapi(
+    copy_files: list[Path],
+    chalk: Chalk,
+    server_sql: Callable[[str], str | None],
+    server_http: str,
+):
+    build = _test_server(
+        artifact=copy_files[0],
+        chalk=chalk,
+        conf="post_http_local.c4m",
+        url=server_http,
+        server_sql=server_sql,
+        verify=None,
+        env={
+            "CHALK_POST_URL": f"{SERVER_HTTP}/500",
+            # testing if chalk at least parses headers correctly
+            "CHALK_POST_HEADERS": "x-test-header: test-header",
+        },
+        ignore_errors=True,
+    )
+    assert "publish failures will be cached" in build.logs
+    assert build.logged_report.contains(build.report)
+
+
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_presign_http_fastapi(
     copy_files: list[Path],
     chalk: Chalk,
@@ -242,6 +267,7 @@ def _test_server(
     server_sql: Callable[[str], str | None],
     verify: str | None,
     env: dict[str, str],
+    ignore_errors=False,
 ):
     initial_chalks_count = int(server_sql("SELECT count(*) FROM chalks") or 0)
 
@@ -249,16 +275,19 @@ def _test_server(
     assert env["CHALK_POST_URL"] != "", "post url is not set"
 
     config = SINK_CONFIGS / conf
-    proc = chalk.run(
-        command="insert",
-        target=artifact,
+    proc = chalk.insert(
+        artifact,
         config=config,
         use_embedded=False,
         env=env,
+        ignore_errors=ignore_errors,
     )
 
     metadata_id = proc.mark["METADATA_ID"]
     assert metadata_id, "metadata id for created chalk not found in stderr"
+
+    if ignore_errors:
+        return proc
 
     db_id = server_sql(f"SELECT chalk_id FROM chalks WHERE metadata_id='{metadata_id}'")
     assert db_id is not None
@@ -274,3 +303,5 @@ def _test_server(
     response.raise_for_status()
     fetched_chalk = response.json()
     assert fetched_chalk["METADATA_ID"] == metadata_id
+
+    return proc
