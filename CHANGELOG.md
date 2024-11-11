@@ -19,6 +19,11 @@
   be desirable to add additional files in current working directory.
   ([#445](https://github.com/crashappsec/chalk/pull/445))
 
+- `chalk setup` requires interactive shell to generate new
+  key-material. This will avoid accidentally generating
+  new keys in CI.
+  ([#447](https://github.com/crashappsec/chalk/pull/447))
+
 ### Fixes
 
 - When running `semgrep`, its always added to `PATH`,

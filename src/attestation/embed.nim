@@ -5,6 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
+import std/[posix]
 import ".."/[chalk_common, config]
 import "."/utils
 
@@ -20,6 +21,8 @@ proc initCallback(this: AttestationKeyProvider) =
   self.get_paths = attrGet[seq[string]]("attestation.attestation_key_embed.get_paths")
 
 proc generateKeyCallback(this: AttestationKeyProvider): AttestationKey =
+  if isatty(0) == 0:
+    raise newException(ValueError, "Can only generate chalk keys in interactive shell")
   let self = Embed(this)
   result = mintCosignKey(self.save_path.joinPath(self.filename))
   echo()

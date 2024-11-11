@@ -4,6 +4,7 @@
 # (see https://crashoverride.com/docs/chalk)
 import datetime
 import json
+import pty
 import re
 from contextlib import suppress
 from dataclasses import asdict, dataclass
@@ -198,6 +199,7 @@ def run(
     stdout: int = PIPE,
     stderr: int = PIPE,
     stdin: Optional[bytes] = None,
+    tty: bool = False,
     cwd: Optional[str | Path] = None,
     environ: Optional[dict[str, str]] = None,
     env: Optional[dict[str, str]] = None,
@@ -220,6 +222,8 @@ def run(
         Descriptor where stderr should be forwarded
     stdin : bytes, optional
         Optional input to be provided to the command via stdin
+    tty : bool, optional
+        Pass PTY to stdin
     cwd : str | Path, optional
         Optional path for current working directory for the cmd
     environ : dict[str, str], optional
@@ -268,12 +272,16 @@ def run(
     env_vars = environ or os.environ.copy()
     env_vars.update(env or {})
 
+    intty = None
+    if tty:
+        _, intty = pty.openpty()
+
     try:
         process = Popen(
             cmd,
             stdout=stdout,
             stderr=stderr,
-            stdin=PIPE if stdin is not None else None,
+            stdin=PIPE if stdin is not None else intty,
             cwd=cwd,
             env=env_vars,
             shell=shell,
