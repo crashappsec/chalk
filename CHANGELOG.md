@@ -2,6 +2,23 @@
 
 ## On the `main` branch
 
+### Breaking Changes
+
+- Changes in embed attestation provider configuration.
+  Removed `attestation_key_embed.location` configuration.
+  It is replaced with these configurations:
+
+  - `attestation_key_embed.filename`
+  - `attestation_key_embed.save_path`
+  - `attestation_key_embed.get_paths`
+
+  This allows to separate paths where `chalk setup` look-ups keys
+  as well where chalk will save generated key.
+  Also this allows to lookup keys relative to `chalk` binary
+  which is better suited for CI workflows where it might not
+  be desirable to add additional files in current working directory.
+  ([#445](https://github.com/crashappsec/chalk/pull/445))
+
 ### Fixes
 
 - When running `semgrep`, its always added to `PATH`,

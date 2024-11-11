@@ -161,6 +161,8 @@ proc normalizeKeyPath(path: string): tuple[publicKey: string, privateKey: string
     (dir, name, _) = resolved.splitFile()
     publicKey      = dir / name & ".pub"
     privateKey     = dir / name & ".key"
+  trace("Cosign public attestion keys path: " & publicKey)
+  trace("Cosign private attestion keys path: " & privateKey)
   return (publicKey, privateKey)
 
 proc getCosignKeyFromDisk*(path: string, password = ""): AttestationKey =
@@ -171,9 +173,9 @@ proc getCosignKeyFromDisk*(path: string, password = ""): AttestationKey =
     privateKey = tryToLoadFile(paths.privateKey)
 
   if publicKey == "":
-    raise newException(ValueError, "Cosign generated invalid public key")
+    raise newException(ValueError, "Unable to read cosign public key @" & paths.publicKey)
   if privateKey == "":
-    raise newException(ValueError, "Cosign generated invalid private key")
+    raise newException(ValueError, "Unable to read cosign private key @" & paths.privateKey)
 
   return AttestationKey(
     password:   pass,

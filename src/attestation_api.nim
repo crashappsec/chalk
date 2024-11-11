@@ -140,6 +140,7 @@ proc setupAttestation*() =
       raise newException(ValueError,
                         "Provider '" & provider.name & "' " &
                         "failed to retrieve existing key due to: " & retrieveError)
+    trace("Could not retrieve key. Will attempt to generate. error: " & retrieveError)
     try:
       cosignKey = provider.generateKey(provider)
       if cosignKey == nil:
