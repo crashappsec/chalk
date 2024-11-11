@@ -315,6 +315,7 @@ class Chalk:
         cwd: Optional[Path] = None,
         env: Optional[dict[str, str]] = None,
         stdin: Optional[bytes] = None,
+        tty: bool = False,
     ) -> ChalkProgram:
         params = params or []
         cmd: list[str] = [str(self.binary)]
@@ -362,6 +363,7 @@ class Chalk:
                 cwd=cwd,
                 env=env,
                 stdin=stdin,
+                tty=tty,
             )
         )
         if not ignore_errors and expected_success and result.errors:

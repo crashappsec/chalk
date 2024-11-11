@@ -162,7 +162,7 @@ def test_setup(
         "CHALK_GET_URL": f"{server_http}/cosign",
     }
     chalk_copy.load(config, replace=False)
-    setup = chalk_copy.run(command="setup", env=env)
+    setup = chalk_copy.run(command="setup", env=env, tty=True)
     assert setup.mark.contains(
         {
             "$CHALK_PUBLIC_KEY": re.compile(r"^-----BEGIN PUBLIC KEY"),
