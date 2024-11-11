@@ -1185,17 +1185,38 @@ Store that value appropriately as it will need to be provided back to
 chalk as `CHALK_PASSWORD` environment variable in subsequent operations.
 """
 
-  field location {
+  field filename {
     type:      string
-    default:   "./chalk.key"
-    validator: func validate_key_path
-    shortdoc:  "Signing key location"
-    doc: """
-This is only used for the `chalk setup` command; it dictates where to either
-find a key pair to load, or where to write a keypair being generated. If
-loading an existing key, the `CHALK_PASSWORD` environment variable is required.
+    default:   "chalk.key"
+    validator: func validate_key_name
+    shortdoc:  "Signing key filename"
+    doc:       """
+Chalk key-pair filename to load which is only used during `chalk setup` command.
+If not present, it will write the generated key with this filename.
+If loading an existing key, the `CHALK_PASSWORD` environment variable is required.
 
 Chalk will also embed the key-pairs internally, for future operations.
+"""
+  }
+
+  field save_path {
+    type:      string
+    default:   "."
+    shortdoc:  "Folder where to save generated signing key"
+    doc:       """
+Path where generated signing key is going to be saved.
+"""
+  }
+
+  field get_paths {
+    type:      list[string]
+    default:   [".", "$CHALK"]
+    shortdoc:  "Signing key paths"
+    doc:       """
+Paths where chalk keys can be looked up.
+Special substitution of `$CHALK` is allowed which allows to lookup
+chalk keys relative to chalk binary directory itself.
+For example it allows to place keys next to the chalk binary binary.
 """
   }
 }
@@ -3388,13 +3409,16 @@ func keyspec_exists(name) {
   return false
 }
 
-func validate_key_path(path, template_name) {
+func validate_key_name(path, template_name) {
   if not ends_with(path, ".key") or not ends_with(path, ".pub") {
     return "Key path must use either .key or .pub extension"
   }
   parts := path_split(path)
   if len(parts[1]) <= 5 {
     return "Key path must define a filename"
+  }
+  if parts[1] != path {
+    return "Can only specify filename without directory"
   }
   return ""
 }
