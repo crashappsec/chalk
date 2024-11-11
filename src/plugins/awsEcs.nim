@@ -17,10 +17,13 @@ let
 
 # returns ecs metadata as a json blob
 var
-  ecsMetadata: ChalkDict = ChalkDict()
+  ecsMetadata = ChalkDict()
   ecsUrl = cloudMetadataUrl4
 if ecsUrl == "":
   ecsUrl = cloudMetadataUrl3
+
+proc clearCallback(self: Plugin) {.cdecl.} =
+  ecsMetadata = ChalkDict()
 
 proc requestECSMetadata(path: string): Option[Box] =
   let url = ecsUrl & path
@@ -45,7 +48,7 @@ proc requestECSMetadata(path: string): Option[Box] =
 proc readECSMetadata*(): ChalkDict =
   # This can be called from outside if anything needs to query the JSON.
   # For now, we just return the whole blob.
-  once:
+  if len(ecsMetadata) == 0:
     if ecsUrl == "":
       trace("ecs: metadata env var is not defined: no AWS info available")
       return ecsMetadata
@@ -93,5 +96,6 @@ proc ecsGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
 
 proc loadAwsEcs*() =
   newPlugin("aws_ecs",
+            clearCallback  = PluginClearCb(clearCallback),
             ctHostCallback = ChalkTimeHostCb(ecsGetChalkTimeHostInfo),
             rtHostCallback = RunTimeHostCb(ecsGetRunTimeHostInfo))

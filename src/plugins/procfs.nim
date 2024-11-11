@@ -29,6 +29,9 @@ type
     udpSockInfoCache: Option[ProcTable]
     psInfoCache:      Option[ProcFdSet]
 
+proc clearCallback(self: Plugin) {.cdecl.} =
+  self.internalState = RootRef(ProcFsCache())
+
 const PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
 let
   clockSpeed = float(sysconf(SC_CLK_TCK))
@@ -694,6 +697,7 @@ proc procfsGetRunTimeArtifactInfo(self: Plugin, obj: ChalkObj, ins: bool):
 proc loadProcFs*() =
   when hostOs == "linux":
     newPlugin("procfs",
+              clearCallback  = PluginClearCb(clearCallback),
               rtHostCallback = RunTimeHostCb(procfsGetRunTimeHostInfo),
               rtArtCallback  = RunTimeArtifactCb(procfsGetRunTimeArtifactInfo),
               cache          = RootRef(ProcFsCache()))

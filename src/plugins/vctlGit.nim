@@ -272,6 +272,9 @@ type
     origin:     Option[string]
     vcsDirs:    OrderedTable[string, RepoInfo]
 
+proc clearCallback(self: Plugin) {.cdecl.} =
+  self.internalState = RootRef(GitInfo())
+
 proc isAnnotated(self: GitTag): bool =
   return self.tagCommitId != ""
 
@@ -793,8 +796,8 @@ proc isInRepo(obj: ChalkObj, repo: string): bool =
   return false
 
 proc gitInit(self: Plugin) =
-  once:
-    let cache = GitInfo(self.internalState)
+  let cache = GitInfo(self.internalState)
+  if len(cache.vcsDirs) == 0:
     for path in getContextDirectories():
       cache.findAndLoad(path.resolvePath())
 
@@ -837,6 +840,7 @@ proc gitGetRunTimeHostInfo(self: Plugin, chalks: seq[ChalkObj]):
 
 proc loadVctlGit*() =
   newPlugin("vctl_git",
+            clearCallback  = PluginClearCb(clearCallback),
             ctArtCallback  = ChalkTimeArtifactCb(gitGetChalkTimeArtifactInfo),
             rtHostCallback = RunTimeHostCb(gitGetRunTimeHostInfo),
             cache          = RootRef(GitInfo()))

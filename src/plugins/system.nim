@@ -15,9 +15,7 @@ import std/[monotimes, nativesockets, sequtils, times]
 import ".."/[config, plugin_api, normalize, chalkjson, attestation_api,
              util]
 
-var
-  externalActions: seq[seq[string]] = @[]
-  execId = secureRand[uint64]().toHex().toLower()
+var execId = secureRand[uint64]().toHex().toLower()
 
 proc recordExternalActions(kind: string, details: string) =
   externalActions.add(@[kind, details])
@@ -168,10 +166,14 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
     result["_OP_ARTIFACT_REPORT_KEYS"] = pack(reportKeys)
 
 var
-  instant   = epochTime()
-  timestamp = instant.fromUnixFloat()
-  envdict:          Con4mDict[string, string]
-  cachedSearchPath: seq[string] = @[]
+  instant          = epochTime()
+  timestamp        = instant.fromUnixFloat()
+  envdict          = Con4mDict[string, string]()
+  cachedSearchPath = newSeq[string]()
+
+proc clearCallback(self: Plugin) {.cdecl.} =
+  envdict          = Con4mDict[string, string]()
+  cachedSearchPath = @[]
 
 when defined(posix):
   let uinfo = uname()
@@ -183,7 +185,7 @@ template getOffset(): string   = timestamp.format("zzz")
 template getDateTime(): string = getDate() & "T" & getTime() & getOffset()
 
 proc getEnvDict(): Box =
-  once:
+  if len(envdict) == 0:
     envdict = Con4mDict[string, string]()
     let
       always = attrGet[seq[string]]("env_always_show")
@@ -328,6 +330,7 @@ proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
 
 proc loadSystem*() =
   newPlugin("system",
+            clearCallback  = PluginClearCb(clearCallback),
             ctHostCallback = ChalkTimeHostCb(sysGetChalkTimeHostInfo),
             ctArtCallback  = ChalkTimeArtifactCb(sysGetChalkTimeArtifactInfo),
             rtArtCallback  = RunTimeArtifactCb(sysGetRunTimeArtifactInfo),

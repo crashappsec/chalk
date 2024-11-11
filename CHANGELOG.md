@@ -15,6 +15,11 @@
   chalk-mark level. For example `SBOM` key with equivalent
   content was duplicated twice.
   ([#440](https://github.com/crashappsec/chalk/pull/440))
+- Memory leak in HTTP wrappers in `nimutils`.
+  This mostly manifested in `chalk exec` when heartbeats
+  were enabled as roughly each heartbeat would increase
+  memory footprint by ~1Mb.
+  ([#443](https://github.com/crashappsec/chalk/pull/443))
 
 ### New Features
 
