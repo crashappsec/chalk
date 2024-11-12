@@ -164,3 +164,7 @@ src/pingttl: src/pingttl.nim
 sqlite: server/sqlite
 
 include $(wildcard .github/Makefile.*)
+
+.PHONY: mark_completion
+mark_completion:
+	$(DOCKER) nimble -y mark_completion
