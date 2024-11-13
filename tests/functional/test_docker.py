@@ -3,6 +3,7 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import platform
+import re
 import shutil
 import time
 from contextlib import ExitStack
@@ -357,25 +358,30 @@ def test_base_images(chalk: Chalk):
     )
     assert result.mark.has(
         DOCKER_TARGET="",
-        DOCKER_BASE_IMAGE="ubuntu:24.04",
+        DOCKER_BASE_IMAGE=re.compile(r"ubuntu:24.04@sha256:"),
         DOCKER_BASE_IMAGE_REPO="ubuntu",
         DOCKER_BASE_IMAGE_TAG="24.04",
+        DOCKER_BASE_IMAGE_DIGEST=ANY,
         DOCKER_BASE_IMAGES={
             "one": {
-                "from": "alpine",
-                "name": "alpine",
+                "from": re.compile("alpine:latest@sha256:"),
+                "name": re.compile("alpine:latest@sha256:"),
                 "repo": "alpine",
+                "tag": "latest",
+                "digest": ANY,
             },
             "two": {
-                "from": "ubuntu:24.04",
-                "name": "ubuntu:24.04",
+                "from": re.compile("ubuntu:24.04@sha256:"),
+                "name": re.compile("ubuntu:24.04@sha256:"),
                 "repo": "ubuntu",
                 "tag": "24.04",
+                "digest": ANY,
             },
             "three": {
                 "from": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
                 "name": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
                 "repo": "busybox",
+                "tag": MISSING,
                 "digest": "9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
             },
             "four": {
@@ -387,14 +393,24 @@ def test_base_images(chalk: Chalk):
             },
             "five": {
                 "from": "one",
-                "name": "alpine",
+                "name": re.compile("alpine:latest@sha256:"),
                 "repo": "alpine",
+                "tag": "latest",
+                "digest": ANY,
+            },
+            "six": {
+                "from": "scratch",
+                "name": "scratch",
+                "repo": "scratch",
+                "tag": MISSING,
+                "digest": MISSING,
             },
             "": {
                 "from": "two",
-                "name": "ubuntu:24.04",
+                "name": re.compile("ubuntu:24.04@sha256:"),
                 "repo": "ubuntu",
                 "tag": "24.04",
+                "digest": ANY,
             },
         },
         DOCKER_COPY_IMAGES={
@@ -403,6 +419,8 @@ def test_base_images(chalk: Chalk):
                     "from": "docker",
                     "name": "docker",
                     "repo": "docker",
+                    "tag": MISSING,
+                    "digest": MISSING,
                     "src": ["/usr/local/bin/docker"],
                     "dest": "/docker",
                 },
@@ -411,6 +429,7 @@ def test_base_images(chalk: Chalk):
                     "name": "busybox:latest",
                     "repo": "busybox",
                     "tag": "latest",
+                    "digest": MISSING,
                     "src": ["/bin/busybox"],
                     "dest": "/busybox",
                 },
@@ -427,8 +446,10 @@ def test_base_images(chalk: Chalk):
                 },
                 {
                     "from": "one",
-                    "name": "alpine",
+                    "name": re.compile("alpine:latest@sha256:"),
                     "repo": "alpine",
+                    "tag": "latest",
+                    "digest": ANY,
                     "src": ["/bin/sh"],
                     "dest": "/sh",
                 },
