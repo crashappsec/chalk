@@ -41,9 +41,10 @@ BASE_OUTCONF = ROOT.parent.parent / "src" / "configs" / "base_outconf.c4m"
 # pushing to a registry is orchestrated over the docker socket
 # which means that the push comes from the host
 # therefore this is sufficient for the docker push command
-# FIXME: once we have buildx support we'll need to enable
-# insecure registry https://docs.docker.com/registry/insecure/
+# as well as the buildx
 REGISTRY = f"{os.environ.get('IP') or 'localhost'}:5044"
+REGISTRY_TLS = f"{os.environ.get('IP') or 'localhost'}:5045"
+REGISTRY_TLS_INSECURE = f"{os.environ.get('IP') or 'localhost'}:5046"
 
 SERVER_CHALKDUST = "https://chalkdust.io"
 SERVER_IMDS = "http://169.254.169.254"

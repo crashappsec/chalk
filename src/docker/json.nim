@@ -9,12 +9,25 @@
 
 import std/[json]
 import ".."/[config, chalkjson, util]
+import "."/[ids]
 
 proc parseAndDigestJson*(data: string): DigestedJson =
   return DigestedJson(
     json:   parseJson(data),
     digest: "sha256:" & sha256(data).hex(),
     size:   len(data),
+  )
+
+proc newDockerDigestedJson*(data: string,
+                            digest: string,
+                            mediaType: string,
+                            kind: DockerManifestType): DockerDigestedJson =
+  return DockerDigestedJson(
+    json:      parseJson(data),
+    digest:    "sha256:" & extractDockerhash(digest),
+    size:      len(data),
+    mediaType: mediaType,
+    kind:      kind,
   )
 
 type

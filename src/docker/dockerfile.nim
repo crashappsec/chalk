@@ -95,7 +95,7 @@ proc evalFlags(ctx: DockerParse,
     result[name] = ctx.evalFlag(flag, errors)
 
 proc evalOrReturnEmptyString(ctx:    DockerParse,
-                             field:  Option[LineToken],
+                             field:  Option[LineToken] | Option[seq[LineToken]],
                              errors: var seq[string]): string =
     if not field.isSome():
         return ""
@@ -112,16 +112,12 @@ method repr(x: FromInfo, ctx: DockerParse): string =
     let valid = if flag.valid: "valid" else: "NOT valid"
     result &= "(flag " & flag.name & " is " & valid & "; val = "
     result &= ctx.evalSubstitutions(flag.argToks, errors) & ") "
-  if x.repo.isNone():
-    result &= "repo = none??; "
+  if x.image.isNone():
+    result &= "image = none??; "
   else:
-    result &= "repo = " & ctx.evalSubstitutions(x.repo.get(), errors) & "; "
-  if x.tag.isSome():
-    result &= "digest = " & ctx.evalSubstitutions(x.tag.get(), errors) & "; "
-  elif x.digest.isSome():
-    result &= "digest = " & ctx.evalSubstitutions(x.digest.get(), errors) & "; "
+    result &= "image = " & ctx.evalSubstitutions(x.image.get(), errors) & "; "
   if x.asArg.isSome():
-    result &= "ARG = " & ctx.evalSubstitutions(x.asArg.get(), errors)
+    result &= "as = " & ctx.evalSubstitutions(x.asArg.get(), errors)
   result &= "\n"
 
   if x.error != "":
@@ -533,35 +529,7 @@ proc parseFrom(ctx: DockerParse, t: DockerCommand): FromInfo =
   if len(spec) == 0 or spec[0].kind != ltWord:
     result.error = "No image name provided."
     return
-
-  result.repo = some(spec[0])
-  var s = 1
-  while s < len(spec):
-    case spec[s].contents[0]
-    of ":":
-      s += 1
-      if spec[s].kind != ltWord:
-        result.error = "Missing image tag after ':'"
-        return
-      result.tag = some(spec[s])
-    of "@":
-      s += 1
-      if spec[s].kind != ltWord or spec[s].contents != @["sha256"]:
-        result.error = "Missing image digest after '@'"
-        return
-      s += 1
-      if spec[s].kind != ltOther or spec[s].contents != @[":"]:
-        result.error = "Missing ':' delimiter after digest '@sha256'"
-        return
-      s += 1
-      if spec[s].kind != ltWord:
-        result.error = "Missing digest value"
-        return
-      result.digest = some(spec[s])
-    else:
-      result.error = "Unrecognized value after image: '" & spec[s].contents[0] & "'"
-      return
-    s += 1
+  result.image = some(spec)
 
   skipWhiteSpace(toks, i)
   if i == len(toks): return
@@ -908,18 +876,13 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
         # last section ends when new one begins
         section.endLine = item.startLine - 1
 
+      let image = parse.evalOrReturnEmptyString(item.image, errors)
+      if image == "":
+        raise newException(ValueError, "Could not eval image")
       section = DockerFileSection(startLine: item.startLine, endLine: item.endLine)
-      section.image = (
-        parse.evalOrReturnEmptyString(item.repo, errors),
-        parse.evalOrReturnEmptyString(item.tag, errors),
-        parse.evalOrReturnEmptyString(item.digest, errors),
-      )
+      section.image = parseImage(image, defaultTag = "")
       if section.image.repo == "":
-        raise newException(ValueError, "Could not eval image name")
-      if item.tag.isSome() and section.image.tag == "":
-        raise newException(ValueError, "Could not eval image tag")
-      if item.digest.isSome() and section.image.digest == "":
-        raise newException(ValueError, "Could not eval image digest")
+        raise newException(ValueError, "Could not eval image")
       if item.asArg.isSome():
         section.alias = parse.evalOrReturnEmptyString(item.asArg, errors)
         if section.alias == "":
