@@ -197,6 +197,9 @@ proc parseImages*(names: seq[string]): seq[DockerImage] =
 proc withTag*(self: DockerImage, tag: string): DockerImage =
   return (self.repo, tag, self.digest)
 
+proc isPinned*(self: DockerImage): bool =
+  return self.digest != "" or self.repo == "scratch"
+
 proc withDigest*(self: DockerImage, digest: string): DockerImage =
   return (self.repo, self.tag, digest.extractDockerHash())
 

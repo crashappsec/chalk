@@ -15,7 +15,7 @@ proc getTargetEntrypoints(ctx: DockerInvocation, platform: DockerPlatform): Dock
   ## this recursively looks up parent sections in dockerfile
   ## and eventually looks up entrypoints in base image
   let
-    base    = ctx.getBaseDockerSection()
+    base       = ctx.getBaseDockerSection()
   var
     entrypoint = base.entrypoint
     cmd        = base.cmd
@@ -47,7 +47,6 @@ proc getTargetEntrypoints(ctx: DockerInvocation, platform: DockerPlatform): Dock
   if shell == nil:
     shell = ShellInfo()
     shell.json = `%*`(["/bin/sh", "-c"])
-  # if entrypoint is empty, set its json to shell
   return (entrypoint, cmd, shell)
 
 proc getCommonTargetEntrypoints*(ctx: DockerInvocation, platforms: seq[DockerPlatform]): DockerEntrypoint =

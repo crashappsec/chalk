@@ -870,7 +870,6 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
   for obj in cmds:
     if obj of FromInfo:
       let item = FromInfo(obj)
-
       # We're entering a new section, so finalize the old one first.
       if section != nil:
         # last section ends when new one begins
@@ -879,8 +878,14 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
       let image = parse.evalOrReturnEmptyString(item.image, errors)
       if image == "":
         raise newException(ValueError, "Could not eval image")
-      section = DockerFileSection(startLine: item.startLine, endLine: item.endLine)
-      section.image = parseImage(image, defaultTag = "")
+      let parsedImage = parseImage(image, defaultTag = "")
+      section = DockerFileSection(
+        startLine:  item.startLine,
+        endLine:    item.endLine,
+        fromImage:  item,
+        image:      parsedImage,
+        foundImage: parsedImage,
+      )
       if section.image.repo == "":
         raise newException(ValueError, "Could not eval image")
       if item.asArg.isSome():
@@ -941,10 +946,20 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
       "Did not find any build sections in Dockerfile (no FROM directive)"
     )
 
+proc asFrom*(self: DockerFileSection): string =
+  result = "FROM " & $self.image
+  if self.alias != "":
+    result &= " AS " & self.alias
+
 proc getFirstDockerSection*(ctx: DockerInvocation): DockerFileSection =
   if len(ctx.dfSections) == 0:
     raise newException(ValueError, "there are no docker sections")
   return ctx.dfSections[0]
+
+proc getLastDockerSection*(ctx: DockerInvocation): DockerFileSection =
+  if len(ctx.dfSections) == 0:
+    raise newException(ValueError, "there are no docker sections")
+  return ctx.dfSections[^1]
 
 proc getTargetDockerSection*(ctx: DockerInvocation): DockerFileSection =
   ## get the target docker section which is to be built

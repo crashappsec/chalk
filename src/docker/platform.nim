@@ -258,12 +258,5 @@ proc copyPerPlatform*(self: ChalkObj, platforms: seq[DockerPlatform]): TableRef[
   result = newTable[DockerPlatform, ChalkObj]()
   for platform in platforms:
     let copy = self.deepCopy()
-    copy.collectedData.setIfNeeded("DOCKER_PLATFORM", $(platform.normalize()))
     copy.platform = platform
     result[platform] = copy
-
-proc getAllPlatforms*(ctx: DockerInvocation): seq[DockerPlatform] =
-  result = ctx.foundPlatforms
-  if len(result) == 0:
-    trace("docker: no --platform is provided")
-    result.add(ctx.findBaseImagePlatform())

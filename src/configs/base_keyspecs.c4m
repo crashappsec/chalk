@@ -1676,7 +1676,7 @@ keyspec DOCKER_PLATFORMS {
     system:           false
     since:            "0.4.0"
     doc: """
-All platforms passed when performing 'docker build', if any.
+All platforms when performing 'docker build'.
 """
 }
 
