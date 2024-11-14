@@ -336,16 +336,22 @@ iterator getConfigs(self: DockerImage, use: RegistryUse): RegistryConfig =
   ## and iterators allow to make that lazy where if a config attempt
   ## fails, only then next config is fetched until a working config
   ## is found
-  if (use, self.registry) in configByRegistry:
-    yield configByRegistry[(use, self.registry)]
-
-  else:
-    # find basic auth from docker config file
-    let token = self.getBasicAuth()
-
+  var
+    cached = RegistryConfig(nil)
     # some configs could be duplicates such as if there are multiple buildx
     # nodex they might all have equivalent configs
-    var checkedConfigs = newSeq[RegistryConfig]()
+    checkedConfigs = newSeq[RegistryConfig]()
+
+  if (use, self.registry) in configByRegistry:
+    cached = configByRegistry[(use, self.registry)]
+    checkedConfigs.add(cached)
+    yield cached
+
+  # if the cached registry config is a mirror,
+  # we need to provide a way to fallthrough to upstream registry
+  if cached == nil or cached.fallthrough:
+    # find basic auth from docker config file
+    let token = self.getBasicAuth()
 
     let isBuildx = (
       dockerInvocation != nil and
