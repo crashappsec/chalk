@@ -5,6 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
+import std/json
 import ".."/[config, collect, chalkjson, plugin_api, subscan, util, plugins/vctlGit]
 import "."/[base, collect, ids, dockerfile, inspect, image, git, exe, entrypoint, platform, wrap, util]
 
@@ -305,24 +306,21 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   result = runChalkSubScan(usableContexts, "insert").report
   trace("docker: subscan complete.")
 
-proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation, platform: DockerPlatform) =
+proc collectBeforeChalkTime*(chalk: ChalkObj, ctx: DockerInvocation) =
   let
     base              = ctx.getBaseDockerSection()
     dict              = chalk.collectedData
     git               = getPluginByName("vctl_git")
     projectRootPath   = git.gitFirstDir().parentDir()
     dockerfileRelPath = getRelativePathBetween(projectRootPath, ctx.dockerFileLoc)
-
   dict.setIfNeeded("DOCKERFILE_PATH",                  ctx.dockerFileLoc)
   dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",      dockerfileRelPath)
   dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",       ctx.foundExtraContexts)
-  dict.setIfNeeded("DOCKER_CHALK_ADDED_TO_DOCKERFILE", ctx.addedInstructions)
   dict.setIfNeeded("DOCKER_CONTEXT",                   ctx.foundContext)
   dict.setIfNeeded("DOCKER_FILE",                      ctx.inDockerFile)
-  dict.setIfNeeded("DOCKER_FILE_CHALKED",              ctx.getUpdatedDockerFile())
-  dict.setIfNeeded("DOCKER_LABELS",                    ctx.foundLabels)
   dict.setIfNeeded("DOCKER_PLATFORM",                  $(chalk.platform.normalize()))
   dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.platforms.normalize()))
+  dict.setIfNeeded("DOCKER_LABELS",                    ctx.foundLabels)
   dict.setIfNeeded("DOCKER_TAGS",                      ctx.foundTags.asRepoTag())
   dict.setIfNeeded("DOCKER_BASE_IMAGE",                $(base.image))
   dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",           base.image.repo)
@@ -333,6 +331,11 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation, platform: Docke
   # note this key is expected to be empty string for alias-less targets
   # hence setIfSubscribed vs setIfNeeded which doesnt allow to set empty strings
   dict.setIfSubscribed("DOCKER_TARGET",                ctx.getTargetDockerSection().alias)
+
+proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
+  let dict = chalk.collectedData
+  dict.setIfNeeded("DOCKER_CHALK_ADDED_TO_DOCKERFILE", ctx.addedInstructions)
+  dict.setIfNeeded("DOCKER_FILE_CHALKED",              ctx.getUpdatedDockerFile())
 
 proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerPlatform, ChalkObj]) =
   if dockerImageExists(ctx.iidFile):
@@ -427,6 +430,8 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   # chalk time artifact info determines metadata id/etc
   # so has to be done by platform
   for _, chalk in chalksByPlatform:
+    # collect any additional keys which might need to be included in chalkmark
+    chalk.collectBeforeChalkTime(ctx)
     chalk.collectChalkTimeArtifactInfo()
     oneChalk = chalk
 
@@ -478,8 +483,8 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   # as some chalk keys are record how docker build was mutated
   # such as what instructions were added to dockerfile
   trace("docker: collecting pre-build metadata into chalkmark")
-  for platform, chalk in chalksByPlatform:
-    chalk.collectBeforeBuild(ctx, platform)
+  for _, chalk in chalksByPlatform:
+    chalk.collectBeforeBuild(ctx)
 
   ctx.setDockerFile()
   ctx.setIidFile()
