@@ -215,14 +215,6 @@ proc extractImage*(self: ChalkObj) =
       trace("docker: " & self.getImageName() & ": could not extract chalk mark " &
             "via in-toto attestation due to: " & getCurrentExceptionMsg())
 
-    try:
-      self.extractFrom(self.extractMarkFromLayer(), self.getImageName())
-      info("docker: " & self.getImageName() & ": chalk mark successfully extracted from layer from registry")
-      return
-    except:
-      trace("docker: " & self.getImageName() & ": could not extract chalk mark " &
-            "via layer in registry due to: " & getCurrentExceptionMsg())
-
   if self.canVerifyBySigStore():
     try:
       self.extractFrom(self.extractMarkFromSigStoreCosign(), self.getImageName())
@@ -233,6 +225,15 @@ proc extractImage*(self: ChalkObj) =
       self.noCosign = true
       trace("docker: " & self.getImageName & ": could not extract chalk mark " &
            "via attestation due to: " & getCurrentExceptionMsg())
+
+  if self.imageDigest != "":
+    try:
+      self.extractFrom(self.extractMarkFromLayer(), self.getImageName())
+      info("docker: " & self.getImageName() & ": chalk mark successfully extracted from layer from registry")
+      return
+    except:
+      trace("docker: " & self.getImageName() & ": could not extract chalk mark " &
+            "via layer in registry due to: " & getCurrentExceptionMsg())
 
   self.extractFrom(self.extractImageMark(), self.getImageName())
   info("docker: " & self.getImageName() & ": chalk mark successfuly extracted from image.")
