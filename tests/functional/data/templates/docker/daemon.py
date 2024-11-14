@@ -45,6 +45,7 @@ if __name__ == "__main__":
             "registry:5044",
             f"{IP}:5044",
             f"{IP}:5046",
+            f"{IP}:5047",
         }
     )
     has_changes = config != updated
