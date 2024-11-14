@@ -208,6 +208,7 @@ proc extractImage*(self: ChalkObj) =
   if self.imageDigest != "":
     try:
       self.extractFrom(self.extractMarkFromSigStore(), self.getImageName())
+      self.signed = true
       info("docker: " & self.getImageName() & ": chalk mark successfully extracted from in-toto attestation from registry")
       return
     except:
@@ -224,7 +225,7 @@ proc extractImage*(self: ChalkObj) =
 
   if self.canVerifyBySigStore():
     try:
-      self.extractFrom(self.extractMarkFromSigStore(), self.getImageName())
+      self.extractFrom(self.extractMarkFromSigStoreCosign(), self.getImageName())
       self.signed = true
       info("docker: " & self.getImageName() & ": chalk mark successfully extracted from attestation.")
       return
