@@ -37,6 +37,8 @@ after build:
   if getEnv("DEBUG", "false") != "true":
     exec "set -x && strip " & bin[0]
   exec "set -x && ./" & bin[0] & " --debug --no-use-external-config --skip-command-report load default"
+  if getEnv("CHALK_PASSWORD") != "":
+    exec "set -x && ./" & bin[0] & " --debug setup"
 
 task debug, "Get a debug build":
   # additional flags are configured in config.nims

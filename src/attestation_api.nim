@@ -230,7 +230,7 @@ proc verifyBySigStore*(chalk: ChalkObj): (ValidateResult, ChalkDict) =
     return (vNoHash, dict)
   if not isChalkingOp():
     if "INJECTOR_PUBLIC_KEY" notin chalk.extract:
-      error(chalk.name & ": Bad chalk mark; missing INJECTOR_PUBLIC_KEY")
+      warn(chalk.name & ": Bad chalk mark; missing INJECTOR_PUBLIC_KEY")
       return (vNoPk, dict)
     key = chalk.getCosignKey()
   if not key.canAttestVerify():
