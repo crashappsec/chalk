@@ -173,27 +173,28 @@ proc setImageLayers(self: DockerManifest, data: DigestedJson) =
 
 proc fetch(self: DockerManifest, fetchConfig = true): DockerManifest {.discardable.} =
   result = self
-  if self.isFetched:
-    return
   let name = self.nameRef()
   case self.kind
   of DockerManifestType.image:
-    let data =
-      try:
-        manifestGet(name, self.mediaType)
-      except RegistryResponseError:
-        trace("docker: " & getCurrentExceptionMsg())
-        raise
-      except:
-        error("docker: " & getCurrentExceptionMsg())
-        requestManifestJson(name)
-    self.setJson(data)
-    self.setImageConfig(data)
-    self.setImageLayers(data)
+    if not self.isFetched:
+      let data =
+        try:
+          manifestGet(name, self.mediaType)
+        except RegistryResponseError:
+          trace("docker: " & getCurrentExceptionMsg())
+          raise
+        except:
+          error("docker: " & getCurrentExceptionMsg())
+          requestManifestJson(name)
+      self.setJson(data)
+      self.setImageConfig(data)
+      self.setImageLayers(data)
     if fetchConfig:
       self.config.fetch()
       self.setImagePlatform(self.config.configPlatform)
   of DockerManifestType.config:
+    if self.isFetched:
+      return
     let data =
       try:
         layerGetJson(name, self.mediaType)

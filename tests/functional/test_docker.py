@@ -354,7 +354,30 @@ def test_recursion_wrapping(chalk: Chalk, random_hex: str):
 
 def test_base_images(chalk: Chalk):
     _, result = chalk.docker_build(
-        dockerfile=DOCKERFILES / "valid" / "bases" / "Dockerfile",
+        content=Docker.dockerfile(
+            """
+            ARG BASE=two
+
+            FROM alpine as one
+
+            FROM ubuntu:24.04 as two
+            COPY --from=docker /usr/local/bin/docker /docker
+            COPY --from=busybox:latest /bin/busybox /busybox
+
+            FROM busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7 as three
+
+            FROM nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe as four
+
+            FROM one as five
+            COPY --from=nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe /usr/sbin/nginx /nginx
+            COPY --from=one /bin/sh /sh
+
+            FROM scratch as six
+
+            FROM $BASE
+            COPY --from=four /usr/sbin/nginx /nginx
+            """
+        ),
     )
     assert result.mark.has(
         DOCKER_TARGET="",
@@ -364,10 +387,10 @@ def test_base_images(chalk: Chalk):
         DOCKER_BASE_IMAGE_DIGEST=ANY,
         DOCKER_BASE_IMAGES={
             "one": {
-                "from": re.compile("alpine:latest@sha256:"),
-                "name": re.compile("alpine:latest@sha256:"),
+                "from": re.compile("alpine@sha256:"),
+                "name": re.compile("alpine@sha256:"),
                 "repo": "alpine",
-                "tag": "latest",
+                "tag": MISSING,
                 "digest": ANY,
             },
             "two": {
@@ -393,9 +416,9 @@ def test_base_images(chalk: Chalk):
             },
             "five": {
                 "from": "one",
-                "name": re.compile("alpine:latest@sha256:"),
+                "name": re.compile("alpine@sha256:"),
                 "repo": "alpine",
-                "tag": "latest",
+                "tag": MISSING,
                 "digest": ANY,
             },
             "six": {
@@ -446,9 +469,9 @@ def test_base_images(chalk: Chalk):
                 },
                 {
                     "from": "one",
-                    "name": re.compile("alpine:latest@sha256:"),
+                    "name": re.compile("alpine@sha256:"),
                     "repo": "alpine",
-                    "tag": "latest",
+                    "tag": MISSING,
                     "digest": ANY,
                     "src": ["/bin/sh"],
                     "dest": "/sh",

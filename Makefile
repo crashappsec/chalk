@@ -2,6 +2,10 @@ SHELL=bash
 BINARY=chalk
 CHALK_BUILD?=release
 
+ifeq "$(CHALK_BUILD)" "debug"
+export DEBUG=true
+endif
+
 _DOCKER_ARGS=
 _DOCKER=docker compose run --rm $(_DOCKER_ARGS) chalk
 DOCKER?=$(_DOCKER)

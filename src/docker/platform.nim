@@ -87,41 +87,46 @@ proc findBaseImagePlatform*(ctx: DockerInvocation,
     return platformFlag
   let baseSection = ctx.getBaseDockerSection()
   if baseSection.platform != nil:
+    trace("docker: base image section defines platform")
     return baseSection.platform
   if $baseSection.image == "scratch":
+    trace("docker: image is scratch. looking up system build platform")
     return getSystemBuildPlatform()
   try:
     # TODO maybe this should be done after registry attempts?
     # multi-platform builds can pull base image from registry regardless of local cache
     trace("docker: attempting to inspect base image for: " & $(baseSection.image))
     let config = inspectImageJson(baseSection.image.asRepoRef())
-    return DockerPlatform(
+    result = DockerPlatform(
       os:           config["Os"].getStr(),
       architecture: config["Architecture"].getStr(),
       variant:      config{"Variant"}.getStr(),
     )
+    trace("docker: found image locally. using its platform " & $result)
   except:
+    # TODO still need to check buildx?
     if hasBuildX():
       try:
         trace("docker: attempting to fetch only platform image manifest for: " & $(baseSection.image))
         let manifest = fetchOnlyImageManifest(baseSection.image)
+        trace("docker: found image manifest. using " & $manifest.platform)
         return manifest.platform
       except KeyError:
-        trace("docker: could not find only platform manifest. looking for current host docker build platform manifest")
-        let
-          platform = findDockerPlatform()
-          manifest = fetchImageManifest(baseSection.image, platform)
+        let platform = findDockerPlatform()
+        trace("docker: could not find only platform manifest. looking for current host docker build platform manifest " & $platform)
+        let manifest = fetchImageManifest(baseSection.image, platform)
         return manifest.platform
     else:
       trace("docker: buildx is missing. pulling image locally for platform detection")
-      let image =baseSection.image.asRepoRef()
+      let image = baseSection.image.asRepoRef()
       pullImage(image)
       let config = inspectImageJson(image)
-      return DockerPlatform(
+      result = DockerPlatform(
         os:           config["Os"].getStr(),
         architecture: config["Architecture"].getStr(),
         variant:      config{"Variant"}.getStr(),
       )
+      trace("docker: found platform from pulled image " & $result)
 
 proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
   let platform = targetPlatform.normalize()
