@@ -67,11 +67,11 @@ proc setPerChalkReports(tmpl: string) =
   elif "_CHALKS" in hostInfo:
     hostInfo.del("_CHALKS")
 
-template buildHostReport*(tmpl: string): string =
+proc buildHostReport*(tmpl: string): string =
   setPerChalkReports(tmpl)
   prepareContents(hostInfo, tmpl)
 
-proc doCommandReport(): string {.inline.} =
+proc doCommandReport(): string =
   let
     unmarked       = getUnmarked()
     reportTemplate = getReportTemplate()
@@ -86,7 +86,7 @@ proc doCommandReport(): string {.inline.} =
 
     result = buildHostReport(reportTemplate)
 
-template doEmbeddedReport(): Box =
+proc doEmbeddedReport(): Box =
   let
     unmarked       = getUnmarked()
     reportTemplate = getReportTemplate()
@@ -104,7 +104,7 @@ template doEmbeddedReport(): Box =
   else:
     pack[seq[Box]](@[])
 
-template doCustomReporting() =
+proc doCustomReporting() =
   for topic in getChalkSubsections("custom_report"):
     let spec = "custom_report." & topic
     let enabledOpt = attrGetOpt[bool](spec & ".enabled")

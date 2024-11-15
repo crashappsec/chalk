@@ -404,8 +404,6 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   ctx.processDockerFile()
   ctx.processCmdLine()
   ctx.evalAndExtractDockerfile(ctx.getAllBuildArgs())
-  ctx.processPlatforms()
-  ctx.pinBuildSectionBaseImages()
 
   forceReportKeys(["_REPO_TAGS", "_REPO_DIGESTS"])
   # force DOCKER_PLATFORM to be included in chalk normalization
@@ -423,6 +421,9 @@ proc dockerBuild*(ctx: DockerInvocation): int =
       unpacked   = unpack[seq[Box]](subscanBox)
     baseChalk.collectedData.setIfNeeded("EMBEDDED_CHALK", unpacked)
     info("docker: context directories subscan finished.")
+
+  ctx.pinBuildSectionBaseImages()
+  ctx.processPlatforms()
 
   trace("docker: preparing chalk marks for build")
   var oneChalk         = baseChalk

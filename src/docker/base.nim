@@ -48,6 +48,7 @@ proc dockerPassThrough*(ctx: DockerInvocation) {.noreturn.} =
     exitCode = runCmdNoOutputCapture(exe,
                                      ctx.originalArgs,
                                      ctx.originalStdIn)
+    setExitCode(exitCode)
     if attrGet[bool]("docker.report_unwrapped_commands"):
       reporting.doReporting("report")
   except:
