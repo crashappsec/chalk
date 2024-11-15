@@ -102,6 +102,8 @@ proc processPlatforms(self: DockerInvocation) =
     self.platforms.add(self.findBaseImagePlatform())
 
 proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
+  if len(ctx.platforms) == 0:
+    raise newException(ValueError, "platforms is required to pin base images")
   for s in ctx.dfSections:
     let base = ctx.getBaseDockerSection(s)
     if s != base:
@@ -422,8 +424,8 @@ proc dockerBuild*(ctx: DockerInvocation): int =
     baseChalk.collectedData.setIfNeeded("EMBEDDED_CHALK", unpacked)
     info("docker: context directories subscan finished.")
 
-  ctx.pinBuildSectionBaseImages()
   ctx.processPlatforms()
+  ctx.pinBuildSectionBaseImages()
 
   trace("docker: preparing chalk marks for build")
   var oneChalk         = baseChalk
