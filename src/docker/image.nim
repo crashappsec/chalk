@@ -25,10 +25,10 @@ proc pullImage*(name: string) =
       stdout & " " & stderr,
     )
 
-proc fetchManifestListForImage*(image: DockerImage, platforms: seq[DockerPlatform]): DockerManifest =
+proc fetchManifestForImage*(image: DockerImage, platforms: seq[DockerPlatform]): DockerManifest =
   trace("docker: fetching manifest list for: " & $image & " " & $($platforms))
   try:
-    if len(platforms) != 1:
+    if len(platforms) > 1:
       raise newException(ValueError, "multi-platform build. cannot inspect local image for manifest digest")
     # if image is present locally, honor its digest
     let
@@ -63,7 +63,7 @@ proc fetchManifestListForImage*(image: DockerImage, platforms: seq[DockerPlatfor
     raise newException(ValueError, "Could not find manifest list for " & $image)
   except:
     trace("docker: " & getCurrentExceptionMsg())
-    return fetchListManifest(image, platforms)
+    return fetchListOrImageManifest(image, platforms)
 
 proc fetchImageOrManifestConfig(image: DockerImage, platform: DockerPlatform): JsonNode =
   trace("docker: fetching config for: " & $image & " " & $platform)

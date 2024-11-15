@@ -109,10 +109,10 @@ proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
     if s.image.isPinned():
       continue
     try:
-      let manifest = fetchManifestListForImage(s.image, ctx.platforms)
+      let manifest = fetchManifestForImage(s.image, ctx.platforms)
       s.image = manifest.nameRef()
     except:
-      trace("docker: could not pin " & $s.image & " due to: " & getCurrentExceptionMsg())
+      error("docker: could not pin " & $s.image & " due to: " & getCurrentExceptionMsg())
 
 proc addVirtualLabels(ctx: DockerInvocation, chalk: ChalkObj) =
   trace("docker: adding virtual label args via --label flags")
