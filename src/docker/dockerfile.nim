@@ -882,7 +882,7 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
       section = DockerFileSection(
         startLine:  item.startLine,
         endLine:    item.endLine,
-        fromImage:  item,
+        fromInfo:   item,
         image:      parsedImage,
         foundImage: parsedImage,
       )

@@ -264,7 +264,7 @@ type
     startLine*:   int
     endLine*:     int
     platform*:    DockerPlatform
-    fromImage*:   FromInfo
+    fromInfo*:    FromInfo
     image*:       DockerImage
     foundImage*:  DockerImage
     alias*:       string

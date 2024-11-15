@@ -197,7 +197,7 @@ proc getUpdatedDockerFile(ctx: DockerInvocation): string =
   for s in ctx.dfSections:
     if s.image != s.foundImage:
       var original = newSeq[string]()
-      for l in lines[s.fromImage.startLine .. s.fromImage.endLine]:
+      for l in lines[s.fromInfo.startLine .. s.fromInfo.endLine]:
         original &= @["# " & l]
       updated = updated.join("\n").strip().splitLines() & @[
         "",
@@ -206,7 +206,7 @@ proc getUpdatedDockerFile(ctx: DockerInvocation): string =
         s.asFrom(),
         "# }}}",
         "",
-        lines[s.fromImage.endLine + 1 .. s.endLine].join("\n"),
+        lines[s.fromInfo.endLine + 1 .. s.endLine].join("\n"),
       ]
     else:
       updated &= lines[s.startLine .. s.endLine]
