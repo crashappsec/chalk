@@ -188,11 +188,11 @@ proc parseImage*(name: string, defaultTag = "latest"): DockerImage =
     let (repo, tag) = image.splitBy(":", defaultTag)
     return (repo, tag, digest)
 
-proc parseImages*(names: seq[string]): seq[DockerImage] =
+proc parseImages*(names: seq[string], defaultTag = "latest"): seq[DockerImage] =
   result = @[]
   for name in names:
     if name != "":
-      result.add(parseImage(name))
+      result.add(parseImage(name, defaultTag = defaultTag))
 
 proc withTag*(self: DockerImage, tag: string): DockerImage =
   return (self.repo, tag, self.digest)

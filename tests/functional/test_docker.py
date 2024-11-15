@@ -352,10 +352,25 @@ def test_recursion_wrapping(chalk: Chalk, random_hex: str):
     assert run
 
 
-def test_base_images(chalk: Chalk):
-    _, result = chalk.docker_build(
+def test_base_images(chalk: Chalk, random_hex: str):
+    # most of the images below are manifest lists
+    # so we create a dummy one which is guaranteed to be regular image manifest
+    image = f"{REGISTRY}/{random_hex}_image"
+    Docker.build(
+        tag=image,
         content=Docker.dockerfile(
             """
+            FROM alpine
+            CMD /true
+            """
+        ),
+        push=True,
+        buildx=True,
+    )
+
+    _, result = chalk.docker_build(
+        content=Docker.dockerfile(
+            f"""
             ARG BASE=two
 
             FROM alpine as one
@@ -373,6 +388,8 @@ def test_base_images(chalk: Chalk):
             COPY --from=one /bin/sh /sh
 
             FROM scratch as six
+
+            FROM {image}:latest as seven
 
             FROM $BASE
             COPY --from=four /usr/sbin/nginx /nginx
@@ -427,6 +444,13 @@ def test_base_images(chalk: Chalk):
                 "repo": "scratch",
                 "tag": MISSING,
                 "digest": MISSING,
+            },
+            "seven": {
+                "from": re.compile(f"{image}:latest@sha256:"),
+                "name": re.compile(f"{image}:latest@sha256:"),
+                "repo": image,
+                "tag": "latest",
+                "digest": ANY,
             },
             "": {
                 "from": "two",

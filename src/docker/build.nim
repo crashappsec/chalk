@@ -6,8 +6,30 @@
 ##
 
 import std/json
-import ".."/[config, collect, chalkjson, plugin_api, subscan, util, plugins/vctlGit]
-import "."/[base, collect, ids, dockerfile, inspect, image, git, exe, entrypoint, platform, wrap, util]
+import ".."/[
+  chalkjson,
+  collect,
+  config,
+  plugin_api,
+  plugins/vctlGit,
+  subscan,
+  util,
+]
+import "."/[
+  base,
+  collect,
+  dockerfile,
+  entrypoint,
+  exe,
+  git,
+  ids,
+  image,
+  inspect,
+  platform,
+  registry,
+  util,
+  wrap,
+]
 
 proc processGitContext(ctx: DockerInvocation) =
   try:
@@ -113,6 +135,8 @@ proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
     try:
       let manifest = fetchManifestForImage(s.image, ctx.platforms)
       s.image = manifest.nameRef()
+    except RegistryResponseError:
+      trace("docker: could not pin " & $s.image & " due to: " & getCurrentExceptionMsg())
     except:
       error("docker: could not pin " & $s.image & " due to: " & getCurrentExceptionMsg())
 

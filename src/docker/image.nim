@@ -33,7 +33,7 @@ proc fetchManifestForImage*(image: DockerImage, platforms: seq[DockerPlatform]):
     # if image is present locally, honor its digest
     let
       local   = inspectImageJson(image.asRepoRef(), platforms[0])
-      digests = parseImages(local{"RepoDigests"}.getStrElems())
+      digests = parseImages(local{"RepoDigests"}.getStrElems(), defaultTag = image.tag)
     var
       sameRepo     = newSeq[DockerImage]()
       sameRegistry = newSeq[DockerImage]()
