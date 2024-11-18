@@ -46,22 +46,37 @@ def do_docker_cleanup() -> Iterator[None]:
     images: set[str] = set()
     containers: set[str] = set()
 
-    _docker_build = Chalk.docker_build
-    _run_container = Docker.run
+    _chalk_docker_build = Chalk.docker_build
+    _docker_build = Docker.build
+    _docker_tag = Docker.tag
+    _docker_run = Docker.run
 
-    def docker_build(self, *args, **kwargs):
-        image_hash, result = _docker_build(self, *args, **kwargs)
+    def chalk_docker_build(self, *args, **kwargs):
+        image_hash, result = _chalk_docker_build(self, *args, **kwargs)
         images.add(image_hash)
         return image_hash, result
 
-    def run_container(*args, **kwargs):
-        container_id, result = _run_container(*args, **kwargs)
+    def docker_build(*args, **kwargs):
+        image_hash, result = _docker_build(*args, **kwargs)
+        images.add(image_hash)
+        return image_hash, result
+
+    def docker_tag(tag, new_tag):
+        images.add(new_tag)
+        return _docker_tag(tag, new_tag)
+
+    def docker_run(*args, **kwargs):
+        container_id, result = _docker_run(*args, **kwargs)
         containers.add(container_id)
         return container_id, result
 
     with ExitStack() as stack:
-        stack.enter_context(mock.patch.object(Chalk, "docker_build", docker_build))
-        stack.enter_context(mock.patch.object(Docker, "run", run_container))
+        stack.enter_context(
+            mock.patch.object(Chalk, "docker_build", chalk_docker_build)
+        )
+        stack.enter_context(mock.patch.object(Docker, "build", docker_build))
+        stack.enter_context(mock.patch.object(Docker, "tag", docker_tag))
+        stack.enter_context(mock.patch.object(Docker, "run", docker_run))
         try:
             yield
         finally:
@@ -1018,7 +1033,60 @@ def test_push_nonchalked(chalk: Chalk, random_hex: str):
     tag = f"{tag_base}:latest"
     Docker.build(content="FROM alpine", tag=tag)
     push = chalk.docker_push(tag)
-    assert push.report.has(_OP_EXIT_CODE=0, _CHALK_RUN_TIME=ANY)
+    assert push.report.has(
+        _OP_EXIT_CODE=0,
+        _CHALK_RUN_TIME=ANY,
+    )
+
+
+def test_retagging(chalk: Chalk, random_hex: str):
+    tag_base = f"{REGISTRY}/retagged_{random_hex}"
+    tag = f"{tag_base}:latest"
+    # this pulls only a single platform
+    Docker.pull("alpine")
+    Docker.tag("alpine", tag)
+    # this pushes only a single platform
+    Docker.push(tag)
+    digest = Docker.imagetools_inspect(tag).digest
+    extract = chalk.extract(tag)
+    assert extract.mark.has(
+        _REPO_TAGS={"alpine", tag},
+        _REPO_DIGESTS={"alpine": digest, tag_base: digest},
+        _IMAGE_DIGEST=digest,
+    )
+
+
+def test_remanifest(chalk: Chalk, random_hex: str):
+    tag_base = f"{REGISTRY}/remanifest_{random_hex}"
+    tag1 = f"{tag_base}:1"
+    tag2 = f"{tag_base}:2"
+    tag_amd64 = f"{tag_base}:amd64"
+    tag_arm64 = f"{tag_base}:arm64"
+    id_amd64, _ = Docker.build(
+        content="FROM alpine", tag=tag_amd64, push=True, platforms=["linux/amd64"]
+    )
+    id_arm64, _ = Docker.build(
+        content="FROM alpine", tag=tag_arm64, push=True, platforms=["linux/arm64"]
+    )
+    amd64 = Docker.imagetools_inspect(tag_amd64).digest
+    arm64 = Docker.imagetools_inspect(tag_arm64).digest
+    Docker.manifest_create(
+        tag1, f"{tag_base}@sha256:{amd64}", f"{tag_base}@sha256:{arm64}"
+    )
+    Docker.manifest_create(tag2, f"{tag_base}@sha256:{amd64}")
+    list1 = Docker.imagetools_inspect(tag1).digest
+    list2 = Docker.imagetools_inspect(tag2).digest
+    Docker.pull(tag1, platform="linux/amd64")
+    Docker.pull(tag2, platform="linux/amd64")
+    Docker.pull(tag_amd64)
+    Docker.inspect(tag_amd64)
+    extract = chalk.extract(tag1)
+    assert extract.mark.has(
+        _REPO_TAGS={tag1, tag2, tag_amd64},
+        _REPO_DIGESTS={tag_base: amd64},
+        _IMAGE_DIGEST=amd64,
+        _IMAGE_ID=id_amd64,
+    )
 
 
 @pytest.mark.parametrize("test_file", ["valid/sample_1"])

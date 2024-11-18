@@ -8,6 +8,7 @@ import pty
 import re
 from contextlib import suppress
 from dataclasses import asdict, dataclass
+from hashlib import sha256
 from pathlib import Path
 from subprocess import PIPE, CalledProcessError, Popen, TimeoutExpired
 from typing import Literal, Optional
@@ -111,6 +112,10 @@ class Program:
     @property
     def input(self) -> str:
         return (self.stdin or b"").decode()
+
+    @property
+    def digest(self) -> str:
+        return sha256(self.stdout).hexdigest()
 
     @property
     def error(self) -> CalledProcessError:
