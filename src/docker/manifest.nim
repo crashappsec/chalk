@@ -16,7 +16,9 @@ var
   jsonCache     = initTable[string, DigestedJson]()
   manifestCache = initTable[string, DockerManifest]()
 
-proc findAllPlatformsManifests(self: DockerManifest): seq[DockerManifest] =
+proc findAllPlatformsManifests(self: DockerManifest,
+                               platforms: seq[DockerPlatform] = @[],
+                               ): seq[DockerManifest] =
   ## find all valid platform images from the manifest list
   ## as manifest could have additional things in the list which are
   ## not images such as provenance/sbom blobs
@@ -25,6 +27,8 @@ proc findAllPlatformsManifests(self: DockerManifest): seq[DockerManifest] =
   result = @[]
   for manifest in self.manifests:
     if manifest.platform.isKnown():
+      if len(platforms) > 0 and manifest.platform notin platforms:
+        continue
       result.add(manifest)
 
 proc findPlatformManifest(self: DockerManifest, platform: DockerPlatform): DockerManifest =
@@ -169,27 +173,28 @@ proc setImageLayers(self: DockerManifest, data: DigestedJson) =
 
 proc fetch(self: DockerManifest, fetchConfig = true): DockerManifest {.discardable.} =
   result = self
-  if self.isFetched:
-    return
   let name = self.nameRef()
   case self.kind
   of DockerManifestType.image:
-    let data =
-      try:
-        manifestGet(name, self.mediaType)
-      except RegistryResponseError:
-        trace("docker: " & getCurrentExceptionMsg())
-        raise
-      except:
-        error("docker: " & getCurrentExceptionMsg())
-        requestManifestJson(name)
-    self.setJson(data)
-    self.setImageConfig(data)
-    self.setImageLayers(data)
+    if not self.isFetched:
+      let data =
+        try:
+          manifestGet(name, self.mediaType)
+        except RegistryResponseError:
+          trace("docker: " & getCurrentExceptionMsg())
+          raise
+        except:
+          error("docker: " & getCurrentExceptionMsg())
+          requestManifestJson(name)
+      self.setJson(data)
+      self.setImageConfig(data)
+      self.setImageLayers(data)
     if fetchConfig:
       self.config.fetch()
       self.setImagePlatform(self.config.configPlatform)
   of DockerManifestType.config:
+    if self.isFetched:
+      return
     let data =
       try:
         layerGetJson(name, self.mediaType)
@@ -274,7 +279,9 @@ proc fetchManifest*(name: DockerImage,
   # foo@sha256:<checksum> # pinned to specific digest
   # therefore we gracefully handle each possibility
   if name.asRepoDigest() in manifestCache:
-    return manifestCache[name.asRepoDigest()]
+    result = manifestCache[name.asRepoDigest()]
+    result.fetch(fetchConfig = fetchConfig)
+    return
   try:
     let
       meta = manifestHead(name)
@@ -289,6 +296,16 @@ proc fetchManifest*(name: DockerImage,
     result = newManifest(name, data, otherNames = otherNames)
   result.fetch(fetchConfig = fetchConfig)
   manifestCache[name.asRepoDigest()] = result
+
+proc fetchListManifest*(name: DockerImage, platforms: seq[DockerPlatform] = @[]): DockerManifest =
+  result = fetchManifest(name, fetchConfig = false)
+  if result.kind != DockerManifestType.list:
+    raise newException(ValueError, "No manifest list for " & $name)
+  if len(platforms) == 0:
+    return
+  let found = result.findAllPlatformsManifests(platforms)
+  if len(found) < len(platforms):
+    raise newException(ValueError, "Could not find all platforms for " & $name & " " & $($platforms))
 
 proc fetchOnlyImageManifest*(name: DockerImage, fetchConfig = true): DockerManifest =
   var manifest = fetchManifest(name, fetchConfig = fetchConfig)
@@ -320,6 +337,16 @@ proc fetchImageManifest*(name: DockerImage,
       $platform & " != " & "" & $manifest.platform
     )
   return manifest
+
+proc fetchListOrImageManifest*(name: DockerImage, platforms: seq[DockerPlatform] = @[]): DockerManifest =
+  if len(platforms) > 1:
+    return fetchListManifest(name, platforms)
+  let
+    platform = platforms[0]
+    image    = fetchImageManifest(name, platform)
+  if image.list != nil:
+    return image.list
+  return image
 
 proc findSibling(self: DockerManifest, reference = "attestation-manifest"): DockerManifest =
   if self.kind != DockerManifestType.image:

@@ -126,7 +126,77 @@ proc parseAuthChallenges(data: string): seq[AuthChallenge] =
   if challenge != "":
     result.add(parseAuthChallenge(challenge.strip(chars = {' ', ','})))
 
-var authByHost = initTable[string, HttpHeaders]()
+proc authHeadersSafeRequest*(url: Uri | string,
+                             httpMethod: HttpMethod | string = HttpGet,
+                             body = "",
+                             headers: HttpHeaders = newHttpHeaders(),
+                             multipart: MultipartData = nil,
+                             retries: int = 0,
+                             firstRetryDelayMs: int = 0,
+                             timeout: int = 1000,
+                             pinnedCert: string = "",
+                             verifyMode = CVerifyPeer,
+                             maxRedirects: int = 3,
+                             disallowHttp: bool = false,
+                             only2xx: bool = false,
+                             raiseWhenAbove: int = 0,
+                             ): (HttpHeaders, Response) =
+  var
+    authHeaders = headers
+    newHeaders  = newHttpHeaders()
+    response    = safeRequest(
+      url               = url,
+      httpMethod        = httpMethod,
+      body              = body,
+      headers           = authHeaders,
+      multipart         = multipart,
+      retries           = retries,
+      firstRetryDelayMs = firstRetryDelayMs,
+      timeout           = timeout,
+      pinnedCert        = pinnedCert,
+      verifyMode        = verifyMode,
+      maxRedirects      = maxRedirects,
+      disallowHttp      = disallowHttp,
+      only2xx           = false,
+      raiseWhenAbove    = 0,
+    )
+
+  if (
+    response.code() == Http401 and
+    response.headers.hasKey("www-authenticate")
+  ):
+    trace("http: eliciting auth headers via www-authenticate for " & $url)
+    let
+      wwwAuthenticate = response.headers["www-authenticate"]
+      challenges      = parseAuthChallenges(wwwAuthenticate)
+    newHeaders        = challenges.elicitHeaders(authHeaders)
+    authHeaders       = authHeaders.update(newHeaders)
+
+    # reattempt request
+    response = safeRequest(
+      url               = url,
+      httpMethod        = httpMethod,
+      body              = body,
+      headers           = authHeaders,
+      multipart         = multipart,
+      retries           = retries,
+      firstRetryDelayMs = firstRetryDelayMs,
+      timeout           = timeout,
+      pinnedCert        = pinnedCert,
+      verifyMode        = verifyMode,
+      maxRedirects      = maxRedirects,
+      disallowHttp      = disallowHttp,
+      only2xx           = false,
+      raiseWhenAbove    = 0,
+    )
+
+  discard response.check(
+    url            = url,
+    only2xx        = only2xx,
+    raiseWhenAbove = raiseWhenAbove,
+  )
+
+  return (newHeaders, response)
 
 proc authSafeRequest*(url: Uri | string,
                       httpMethod: HttpMethod | string = HttpGet,
@@ -143,59 +213,20 @@ proc authSafeRequest*(url: Uri | string,
                       only2xx: bool = false,
                       raiseWhenAbove: int = 0,
                       ): Response =
-  let uri =
-    when url is string:
-      parseUri(url)
-    else:
-      url
-
-  var authHeaders = headers
-  if uri.hostname in authByHost:
-    authHeaders = authHeaders.update(authByHost[uri.hostname])
-
-  result = safeRequest(url               = uri,
-                       httpMethod        = httpMethod,
-                       body              = body,
-                       headers           = authHeaders,
-                       multipart         = multipart,
-                       retries           = retries,
-                       firstRetryDelayMs = firstRetryDelayMs,
-                       timeout           = timeout,
-                       pinnedCert        = pinnedCert,
-                       verifyMode        = verifyMode,
-                       maxRedirects      = maxRedirects,
-                       disallowHttp      = disallowHttp,
-                       only2xx           = false,
-                       raiseWhenAbove    = 0)
-
-  if (
-    result.code() == Http401 and
-    result.headers.hasKey("www-authenticate")
-  ):
-    trace("http: eliciting auth headers via www-authenticate for " & $uri)
-    let
-      wwwAuthenticate = result.headers["www-authenticate"]
-      challenges      = parseAuthChallenges(wwwAuthenticate)
-      newHeaders      = challenges.elicitHeaders(authHeaders)
-    authByHost[uri.hostname] = newHeaders
-    authHeaders              = authHeaders.update(newHeaders)
-
-    # reattempt request
-    result = safeRequest(url               = uri,
-                         httpMethod        = httpMethod,
-                         body              = body,
-                         headers           = authHeaders,
-                         multipart         = multipart,
-                         retries           = retries,
-                         firstRetryDelayMs = firstRetryDelayMs,
-                         timeout           = timeout,
-                         pinnedCert        = pinnedCert,
-                         verifyMode        = verifyMode,
-                         maxRedirects      = maxRedirects,
-                         disallowHttp      = disallowHttp,
-                         only2xx           = false,
-                         raiseWhenAbove    = 0)
-
-  discard result.check(url            = url,
-                       only2xx        = only2xx,
-                       raiseWhenAbove = raiseWhenAbove)
+  let (_, response) = authHeadersSafeRequest(
+    url = url,
+    httpMethod = httpMethod,
+    body = body,
+    headers = headers,
+    multipart = multipart,
+    retries = retries,
+    firstRetryDelayMs = firstRetryDelayMs,
+    timeout = timeout,
+    pinnedCert = pinnedCert,
+    verifyMode = verifyMode,
+    maxRedirects = maxRedirects,
+    disallowHttp = disallowHttp,
+    only2xx = only2xx,
+    raiseWhenAbove = raiseWhenAbove,
+  )
+  return response

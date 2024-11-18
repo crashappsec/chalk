@@ -316,12 +316,15 @@ class Chalk:
         env: Optional[dict[str, str]] = None,
         stdin: Optional[bytes] = None,
         tty: bool = False,
+        show_config: bool = False,
     ) -> ChalkProgram:
         params = params or []
         cmd: list[str] = [str(self.binary)]
 
         if command:
             cmd += [command]
+        if show_config:
+            cmd += ["--show-config"]
         if virtual:
             cmd += ["--virtual"]
         if config:
@@ -559,6 +562,7 @@ class Chalk:
         provenance: bool = False,
         sbom: bool = False,
         run_docker: bool = True,
+        show_config: bool = False,
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
         context = context or getattr(dockerfile, "parent", cwd)
@@ -613,6 +617,7 @@ class Chalk:
                         **Docker.build_env(buildkit=buildkit),
                         **(env or {}),
                     },
+                    show_config=show_config,
                 )
             )
         if expecting_report and expected_success and image_hash:

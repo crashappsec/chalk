@@ -507,20 +507,12 @@ proc getChalkMark*(obj: ChalkObj): ChalkDict =
     result[k] = v
 
 proc getChalkMarkAsStr*(obj: ChalkObj): string =
-
   if obj.cachedMark != "":
-    trace("Chalk cachemark " & $obj.cachedMark)
+    trace("Chalk cachemark " & obj.cachedMark)
     return obj.cachedMark
-  trace("Converting Mark to JSON. Mark template is: " &
-    attrGet[string](getOutputConfig() & ".mark_template"))
-
-  if obj.cachedMark != "":
-    return obj.cachedMark
-
+  trace("Converting Mark to JSON. Mark template is: " & getMarkTemplate())
   let mark = obj.getChalkMark()
-
   result = mark.toJson()
   obj.cachedMark = result
-
   if not result.startswith("""{ "MAGIC" :"""):
     error("MAGIC not provided; mark is invalid.")

@@ -116,7 +116,11 @@ def chalk_default():
     Returns bare chalk binary (for some testing case
     where we don't need stdout enabled in config)
     """
-    binary = Path(__file__).parent.parent.parent / "chalk"
+    root = Path(__file__).parent.parent.parent
+    # if present use chalk backup as it does not have cosign setup
+    binary = root / "chalk.bck"
+    if not binary.exists():
+        binary = root / "chalk"
     chalk = Chalk(binary=binary)
     assert chalk.binary and chalk.binary.is_file()
     yield chalk

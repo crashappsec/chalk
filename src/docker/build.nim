@@ -5,8 +5,31 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import ".."/[config, collect, chalkjson, plugin_api, subscan, util, plugins/vctlGit]
-import "."/[base, collect, ids, dockerfile, inspect, git, exe, entrypoint, platform, wrap, util]
+import std/json
+import ".."/[
+  chalkjson,
+  collect,
+  config,
+  plugin_api,
+  plugins/vctlGit,
+  subscan,
+  util,
+]
+import "."/[
+  base,
+  collect,
+  dockerfile,
+  entrypoint,
+  exe,
+  git,
+  ids,
+  image,
+  inspect,
+  platform,
+  registry,
+  util,
+  wrap,
+]
 
 proc processGitContext(ctx: DockerInvocation) =
   try:
@@ -94,6 +117,29 @@ proc processCmdLine(ctx: DockerInvocation) =
   if ctx.gitContext != nil:
     ctx.newCmdLine = ctx.gitContext.replaceContextArg(ctx.newCmdLine)
 
+proc processPlatforms(self: DockerInvocation) =
+  self.platforms = self.foundPlatforms
+  if len(self.platforms) == 0:
+    trace("docker: no --platform is provided")
+    self.platforms.add(self.findBaseImagePlatform())
+
+proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
+  if len(ctx.platforms) == 0:
+    raise newException(ValueError, "platforms is required to pin base images")
+  for s in ctx.dfSections:
+    let base = ctx.getBaseDockerSection(s)
+    if s != base:
+      continue
+    if s.image.isPinned():
+      continue
+    try:
+      let manifest = fetchManifestForImage(s.image, ctx.platforms)
+      s.image = manifest.nameRef()
+    except RegistryResponseError:
+      trace("docker: could not pin " & $s.image & " due to: " & getCurrentExceptionMsg())
+    except:
+      error("docker: could not pin " & $s.image & " due to: " & getCurrentExceptionMsg())
+
 proc addVirtualLabels(ctx: DockerInvocation, chalk: ChalkObj) =
   trace("docker: adding virtual label args via --label flags")
   let labelOpt = attrGetOpt[TableRef[string, string]]("docker.custom_labels")
@@ -155,39 +201,56 @@ proc addEnvVars(ctx: DockerInvocation, chalk: ChalkObj) =
     trace("docker: added " & $(len(toAdd)) & " env vars")
     ctx.addedInstructions &= toAdd
 
-proc getUpdatedDockerfile(ctx: DockerInvocation): string =
+proc getUpdatedDockerFile(ctx: DockerInvocation): string =
   ## add instructions in correct location in Dockerfile
   ## this accounts for section boundaries
-  if len(ctx.addedInstructions) == 0:
-    return ctx.inDockerFile
   let
-    first   = ctx.getFirstDockerSection()
-    section = ctx.getTargetDockerSection()
-    lines   = ctx.inDockerFile.splitLines()
-  var updated: seq[string] = lines[0 ..< first.startLine] & @[""]
-  for _, base in ctx.addedPlatform:
-    updated &= base & @[""]
-  updated &= lines[first.startLine .. section.endLine].join("\n").strip().splitLines() & @[""]
-  updated &= ctx.addedInstructions & @[""]
-  updated &= lines[section.endLine + 1 .. ^1].join("\n").strip().splitLines()
+    first  = ctx.getFirstDockerSection()
+    last   = ctx.getLastDockerSection()
+    target = ctx.getTargetDockerSection()
+    lines  = ctx.inDockerFile.splitLines()
+  var updated: seq[string] = lines[0 ..< first.startLine]
+  if len(ctx.addedPlatform) > 0:
+    updated &= @[""]
+    for _, base in ctx.addedPlatform:
+      updated = updated.join("\n").strip().splitLines() & @[
+        "",
+        "# {{{ added by chalk - https://crashoverride.com/docs/chalk",
+        base.join("\n"),
+        "# }}}",
+        "",
+      ]
+  for s in ctx.dfSections:
+    if s.image != s.foundImage:
+      var original = newSeq[string]()
+      for l in lines[s.fromInfo.startLine .. s.fromInfo.endLine]:
+        original &= @["# " & l]
+      updated = updated.join("\n").strip().splitLines() & @[
+        "",
+        "# {{{ pinned to specific digest by chalk - https://crashoverride.com/docs/chalk",
+        original.join("\n"),
+        s.asFrom(),
+        "# }}}",
+        "",
+        lines[s.fromInfo.endLine + 1 .. s.endLine].join("\n"),
+      ]
+    else:
+      updated &= lines[s.startLine .. s.endLine]
+    if s == target and len(ctx.addedInstructions) > 0:
+      updated = updated.join("\n").strip().splitLines() & @[
+        "",
+        "# {{{ added by chalk - https://crashoverride.com/docs/chalk",
+        ctx.addedInstructions.join("\n"),
+        "# }}}",
+        "",
+      ]
+  updated &= lines[last.endLine + 1 .. ^1]
   return updated.join("\n").strip() & "\n"
 
 proc setDockerFile(ctx: DockerInvocation) =
-  # If we're not changing the Docker file, then we add an explicit -f
-  # specifying the location. This may not have been specified by the
-  # user, but it is good to be explicit.
-  if len(ctx.addedInstructions) == 0:
-    trace("docker: dockerfile was not modified. using original dockerfile")
-    if ctx.dockerFileLoc == ":stdin:":
-      ctx.newCmdLine.add("-f")
-      ctx.newCmdLine.add("-")
-      ctx.newStdIn = ctx.inDockerFile
-      return
-    else:
-      ctx.newCmdLine.add("-f")
-      ctx.newCmdLine.add(ctx.dockerFileLoc)
-      return
-
+  # note that we might not be adding any instructions to the dockerfile
+  # however chalk is still pinning base images to digests for consistent
+  # reports hence we always have to update the dockerfile
   let dockerFile = ctx.getUpdatedDockerFile()
 
   if ctx.foundContext != "-":
@@ -269,22 +332,21 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   result = runChalkSubScan(usableContexts, "insert").report
   trace("docker: subscan complete.")
 
-proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
+proc collectBeforeChalkTime*(chalk: ChalkObj, ctx: DockerInvocation) =
   let
     base              = ctx.getBaseDockerSection()
     dict              = chalk.collectedData
     git               = getPluginByName("vctl_git")
     projectRootPath   = git.gitFirstDir().parentDir()
     dockerfileRelPath = getRelativePathBetween(projectRootPath, ctx.dockerFileLoc)
-
   dict.setIfNeeded("DOCKERFILE_PATH",                  ctx.dockerFileLoc)
+  dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",      dockerfileRelPath)
   dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",       ctx.foundExtraContexts)
-  dict.setIfNeeded("DOCKER_CHALK_ADDED_TO_DOCKERFILE", ctx.addedInstructions)
   dict.setIfNeeded("DOCKER_CONTEXT",                   ctx.foundContext)
   dict.setIfNeeded("DOCKER_FILE",                      ctx.inDockerFile)
-  dict.setIfNeeded("DOCKER_FILE_CHALKED",              ctx.getUpdatedDockerfile())
+  dict.setIfNeeded("DOCKER_PLATFORM",                  $(chalk.platform.normalize()))
+  dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.platforms.normalize()))
   dict.setIfNeeded("DOCKER_LABELS",                    ctx.foundLabels)
-  dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.foundPlatforms.normalize()))
   dict.setIfNeeded("DOCKER_TAGS",                      ctx.foundTags.asRepoTag())
   dict.setIfNeeded("DOCKER_BASE_IMAGE",                $(base.image))
   dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",           base.image.repo)
@@ -292,10 +354,14 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST",         base.image.digest)
   dict.setIfNeeded("DOCKER_BASE_IMAGES",               ctx.formatBaseImages())
   dict.setIfNeeded("DOCKER_COPY_IMAGES",               ctx.formatCopyImages())
-  dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",      dockerfileRelPath)
   # note this key is expected to be empty string for alias-less targets
   # hence setIfSubscribed vs setIfNeeded which doesnt allow to set empty strings
   dict.setIfSubscribed("DOCKER_TARGET",                ctx.getTargetDockerSection().alias)
+
+proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
+  let dict = chalk.collectedData
+  dict.setIfNeeded("DOCKER_CHALK_ADDED_TO_DOCKERFILE", ctx.addedInstructions)
+  dict.setIfNeeded("DOCKER_FILE_CHALKED",              ctx.getUpdatedDockerFile())
 
 proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerPlatform, ChalkObj]) =
   if dockerImageExists(ctx.iidFile):
@@ -382,14 +448,17 @@ proc dockerBuild*(ctx: DockerInvocation): int =
     baseChalk.collectedData.setIfNeeded("EMBEDDED_CHALK", unpacked)
     info("docker: context directories subscan finished.")
 
+  ctx.processPlatforms()
+  ctx.pinBuildSectionBaseImages()
+
   trace("docker: preparing chalk marks for build")
-  var oneChalk       = baseChalk
-  let
-    platforms        = ctx.getAllPlatforms()
-    chalksByPlatform = baseChalk.copyPerPlatform(platforms)
+  var oneChalk         = baseChalk
+  let chalksByPlatform = baseChalk.copyPerPlatform(ctx.platforms)
   # chalk time artifact info determines metadata id/etc
   # so has to be done by platform
   for _, chalk in chalksByPlatform:
+    # collect any additional keys which might need to be included in chalkmark
+    chalk.collectBeforeChalkTime(ctx)
     chalk.collectChalkTimeArtifactInfo()
     oneChalk = chalk
 
@@ -405,15 +474,15 @@ proc dockerBuild*(ctx: DockerInvocation): int =
     ctx.addEnvVars(oneChalk)
     try:
       # this ensures all platforms have same USER
-      let user = ctx.getCommonTargetUser(platforms)
+      let user = ctx.getCommonTargetUser(ctx.platforms)
       if wrapEntrypoint:
         trace("docker: wrapping ENTRYPOINT")
         try:
           ctx.withAtomicAdds():
             let
               # this also ensures all platfoms have the same entrypoints
-              entrypoints = ctx.getCommonTargetEntrypoints(platforms)
-              binaries    = ctx.findAllPlatformsBinaries(platforms)
+              entrypoints = ctx.getCommonTargetEntrypoints(ctx.platforms)
+              binaries    = ctx.findAllPlatformsBinaries(ctx.platforms)
             ctx.rewriteEntryPoint(entrypoints, binaries, user)
         except:
           dumpExOnDebug()
@@ -441,7 +510,7 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   # as some chalk keys are record how docker build was mutated
   # such as what instructions were added to dockerfile
   trace("docker: collecting pre-build metadata into chalkmark")
-  for platform, chalk in chalksByPlatform:
+  for _, chalk in chalksByPlatform:
     chalk.collectBeforeBuild(ctx)
 
   ctx.setDockerFile()

@@ -2,6 +2,10 @@ SHELL=bash
 BINARY=chalk
 CHALK_BUILD?=release
 
+ifeq "$(CHALK_BUILD)" "debug"
+export DEBUG=true
+endif
+
 _DOCKER_ARGS=
 _DOCKER=docker compose run --rm $(_DOCKER_ARGS) chalk
 DOCKER?=$(_DOCKER)
@@ -31,6 +35,10 @@ export PATH:=$(HOME)/.nimble/bin:$(PATH)
 # (a.k.a what Makefile is good at :D)
 $(BINARY): $(BINARY).bck
 	cp $^ $@
+# automatically run setup to configure cosign for easy local testing
+ifneq "$(CHALK_PASSWORD)" ""
+	./$@ setup
+endif
 
 # as chalk load modifies existing binary,
 # when no source files change, recopy the backup

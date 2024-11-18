@@ -264,7 +264,9 @@ type
     startLine*:   int
     endLine*:     int
     platform*:    DockerPlatform
+    fromInfo*:    FromInfo
     image*:       DockerImage
+    foundImage*:  DockerImage
     alias*:       string
     copies*:      seq[CopyInfo]
     entrypoint*:  EntryPointInfo
@@ -378,6 +380,7 @@ type
       foundTarget*:           string
       foundBuilder*:          string
 
+      platforms*:             seq[DockerPlatform]
       gitContext*:            DockerGitContext
 
       iidFilePath*:           string

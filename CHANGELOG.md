@@ -2,6 +2,25 @@
 
 ## On the `main` branch
 
+### New Features
+
+- Chalk pins base images in `Dockerfile`. For example:
+
+  ```Dockerfile
+  FROM alpine
+  ```
+
+  Will be pinned to:
+
+  ```Dockerfile
+  FROM alpine@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367effd16dc0d06d
+  ```
+
+  This makes docker build deterministic and avoids any possible
+  race conditions between chalk looking up metadata about
+  base image and actual docker build.
+  ([#449](https://github.com/crashappsec/chalk/pull/449))
+
 ## 0.4.14
 
 **Nov 11, 2024**

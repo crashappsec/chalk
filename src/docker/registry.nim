@@ -37,6 +37,7 @@ type
     pinnedCert*:  string
     verifyMode*:  SslCVerifyMode
     auth*:        HttpHeaders
+    wwwAuth*:     TableRef[string, HttpHeaders]
     fallthrough*: bool # whether to fallthrough to next config on http errors
 
 const
@@ -67,6 +68,7 @@ proc withBasicAuth(self: RegistryConfig, token: string): RegistryConfig =
     ])
   else:
     self.auth = newHttpHeaders()
+  self.wwwAuth = newTable[string, HttpHeaders]()
   return self
 
 iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
@@ -404,17 +406,19 @@ proc request(self:       DockerImage,
     trace("docker: " & msg)
     var invalid = false
     try:
-      let response = authSafeRequest(
-        uri,
-        httpMethod,
-        headers    = newHttpHeaders(
-          @[("Accept", accept)],
-        ).update(config.auth),
-        pinnedCert = config.pinnedCert,
-        verifyMode = config.verifyMode,
-        timeout    = TIMEOUT,
-        retries    = 2,
-      )
+      let
+        wwwAuth = config.wwwAuth.getOrDefault(self.repo, newHttpHeaders())
+        (authHeaders, response) = authHeadersSafeRequest(
+          uri,
+          httpMethod,
+          headers    = newHttpHeaders(
+            @[("Accept", accept)],
+          ).update(config.auth).update(wwwAuth),
+          pinnedCert = config.pinnedCert,
+          verifyMode = config.verifyMode,
+          timeout    = TIMEOUT,
+          retries    = 2,
+        )
       # for non-mirror registry:
       # as we can talk to the registry, any errors from this point on
       # mean image doesnt exist in the registry or invalid config such as
@@ -425,6 +429,7 @@ proc request(self:       DockerImage,
       # hence we need to fallthrough to the next config
       invalid = not config.fallthrough
       discard response.check(url = uri, only2xx = true)
+      config.wwwAuth[self.repo] = wwwAuth.update(authHeaders)
       for u in use.uses():
         configByRegistry[(u, self.registry)] = config
         jsonCache[(self, httpMethod, path, u)] = (msg, response)
