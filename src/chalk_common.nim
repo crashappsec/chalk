@@ -13,7 +13,7 @@
 ## of the dependency tree.
 
 import std/[os, json, streams, tables, options, strutils, sugar, posix,
-            unicode, re]
+            unicode, re, sets]
 import pkg/[nimutils, nimutils/logging, nimutils/managedtmp, con4m]
 export os, json, options, tables, strutils, streams, sugar, nimutils, logging,
        managedtmp, con4m
@@ -59,10 +59,8 @@ type
                                      ## below, instead.
     fsRef*:         string           ## Reference for this artifact on a fs
     platform*:      DockerPlatform   ## platform
-    images*:        seq[DockerImage] ## all images where image was tagged/pushed
+    repos*:         OrderedTableRef[string, DockerImageRepo] ## all images where image was tagged/pushed
     imageId*:       string           ## Image ID if this is a docker image
-    imageDigest*:   string           ## Image digest in the repo.
-    listDigest*:    string           ## Manifest list digest in the repo.
     containerId*:   string           ## Container ID if this is a container
     noCosign*:      bool             ## When we know image is not in registry. skips validation
     signed*:        bool             ## True on the insert path once signed,
@@ -283,6 +281,12 @@ type
     repo:   string
     tag:    string
     digest: string
+
+  DockerImageRepo* = ref object
+    repo*:        string
+    digests*:     OrderedSet[string]
+    listDigests*: OrderedSet[string]
+    tags*:        OrderedSet[string]
 
   GitHeadType* = enum
     commit, branch, tag, other

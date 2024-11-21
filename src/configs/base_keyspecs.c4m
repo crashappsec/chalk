@@ -2537,41 +2537,6 @@ Image ID is the digest of the image config json object.
 """
 }
 
-keyspec _IMAGE_DIGEST {
-    kind:     RunTimeArtifact
-    type:     string
-    standard: true
-    since:    "0.4.0"
-    shortdoc: "Reported digest of the image manifest"
-    doc: """
-The image digest reported by docker for an image.
-This is the digest of the image manifest as its referenced in
-the registry.
-
-This key assumes registry v2 spec which guarantees digest is
-the same across different registries.
-"""
-}
-
-keyspec _IMAGE_LIST_DIGEST {
-    kind:     RunTimeArtifact
-    type:     string
-    standard: true
-    since:    "0.4.0"
-    shortdoc: "Reported digest of the image manifest"
-    doc: """
-The manifest list digest for an image.
-This is only reported for images which built manifest list
-such as multi-platform builds or buildx builds which pushed
-additional metadata to the registry such as `--provenance`.
-This digest can be used to lookup that metdata back from the
-registry.
-
-This key assumes registry v2 spec which guarantees digest is
-the same across different registries.
-"""
-}
-
 keyspec _IMAGE_COMMENT {
     kind:     RunTimeArtifact
     type:     string
@@ -3925,7 +3890,7 @@ keyspec _INSTANCE_NETWORKS {
 
 keyspec _REPO_TAGS {
     kind:             RunTimeArtifact
-    type:             list[string]
+    type:             dict[string, dict[string, dict[string, string]]]
     standard:         true
     since:            "0.1.0"
     doc: """
@@ -3936,13 +3901,23 @@ pull), any tags associated with the artifact in the operation.
 
 keyspec _REPO_DIGESTS {
     kind:             RunTimeArtifact
-    type:             dict[string, string]
+    type:             dict[string, dict[string, list[string]]]
     standard:         true
     since:            "0.1.0"
     doc: """
 When reporting on operations involving a repository (e.g., a push or
 pull), any SHA256 digests associated with the artifact in the
 operation, mapped to the associated tag.
+"""
+}
+
+keyspec _REPO_LIST_DIGESTS {
+    kind:             RunTimeArtifact
+    type:             dict[string, dict[string, list[string]]]
+    standard:         true
+    since:            "0.4.15"
+    doc: """
+TODO
 """
 }
 

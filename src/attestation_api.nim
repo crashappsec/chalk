@@ -181,7 +181,7 @@ proc willSignBySigStore*(chalk: ChalkObj): bool =
 
 proc verifyBySigStore(chalk: ChalkObj, key: AttestationKey, image: DockerImage): (ValidateResult, ChalkDict) =
   let
-    spec   = image.withDigest(chalk.imageDigest).asRepoDigest()
+    spec   = image.asRepoDigest()
     log    = attrGet[bool]("use_transparency_log")
     cosign = getCosignLocation()
   var
@@ -238,7 +238,7 @@ proc verifyBySigStore*(chalk: ChalkObj): (ValidateResult, ChalkDict) =
     return (vNoCosign, dict)
 
   key.withCosignKey:
-    for image in chalk.images.uniq():
+    for image in chalk.repos.manifests:
       let (valid, dict) = chalk.verifyBySigStore(key, image)
       if valid == vNoHash:
         continue
@@ -250,10 +250,9 @@ proc verifyBySigStore*(chalk: ChalkObj): (ValidateResult, ChalkDict) =
 proc signBySigStore*(chalk: ChalkObj): ChalkDict =
   result = ChalkDict()
   cosignKey.withCosignKey:
-    for image in chalk.images.uniq():
+    for image in chalk.repos.manifests:
       let
-        name    = image.repo
-        spec    = image.withDigest(chalk.imageDigest).asRepoDigest()
+        spec    = image.asRepoDigest()
         mark    = chalk.getChalkMarkAsStr()
         log     = attrGet[bool]("use_transparency_log")
         cosign  = getCosignLocation()
@@ -269,9 +268,9 @@ proc signBySigStore*(chalk: ChalkObj): ChalkDict =
   "_type": "https://in-toto.io/Statement/v1",
   "subject": [
     {
-      "name": """ & escapeJson(name) & """,
+      "name": """ & escapeJson(image.repo) & """,
       "config.digest": { "sha256": """ & escapeJson(chalk.imageId) & """},
-      "digest": { "sha256": """ & escapeJson(chalk.imageDigest) & """}
+      "digest": { "sha256": """ & escapeJson(image.digest) & """}
     }
   ],
   "predicateType": "https://in-toto.io/attestation/scai/attribute-report/v0.2",

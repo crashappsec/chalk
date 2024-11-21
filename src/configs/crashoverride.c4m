@@ -276,8 +276,6 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._OP_ALL_IMAGE_METADATA.use              = false
   ~key._OP_ALL_CONTAINER_METADATA.use          = false
   ~key._IMAGE_ID.use                           = true
-  ~key._IMAGE_DIGEST.use                       = true
-  ~key._IMAGE_LIST_DIGEST.use                  = true
   ~key._IMAGE_COMMENT.use                      = true
   ~key._IMAGE_CREATION_DATETIME.use            = true
   ~key._IMAGE_DOCKER_VERSION.use               = true
@@ -436,6 +434,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._STORE_URI.use                          = true
   ~key._REPO_TAGS.use                          = true
   ~key._REPO_DIGESTS.use                       = true
+  ~key._REPO_LIST_DIGESTS.use                  = true
   ~key._FOUND_BASE_MARK.use                    = true
   ~key._SIGNATURES.use                         = true
   ~key._INVALID_SIGNATURE.use                  = true
