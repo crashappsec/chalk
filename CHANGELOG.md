@@ -2,6 +2,86 @@
 
 ## On the `main` branch
 
+### Breaking Changes
+
+- Changes to docker digest related fields.
+
+  Removed keys:
+
+  - `_IMAGE_DIGEST` - there are cases when image digest mutates.
+    For example `docker pull && docker push` will drop all
+    manifest annotations hence its digest will change.
+    Use `_REPO_DIGESTS` instead as it will include all digests
+    per repository.
+  - `_IMAGE_LIST_DIGEST` - there could be multiple list manifests
+    for the same image as list manifests can be created out-of-build.
+    Use new key `_REPO_LIST_DIGESTS` which enumerates all list digests
+    per repository.
+
+  Changed keys:
+
+  - `_REPO_DIGESTS` is now an object which enumerates list of
+    image digests organized by:
+
+    - registry
+    - image name
+
+    For example:
+
+    ```json
+    {
+      "_REPO_DIGESTS": {
+        "registry-1.docker.io": {
+          "library/alpine": [
+            "029a752048e32e843bd6defe3841186fb8d19a28dae8ec287f433bb9d6d1ad85"
+          ]
+        }
+      }
+    }
+    ```
+
+  - `_REPO_TAGS` now only includes tags which are available in registry.
+    Builds without `--push`, even with provided `--tag`, will not populate
+    `_REPO_TAGS` anymore. In addition similarly to `_REPO_DIGESTS`, it is
+    an object now where each tag is associated with its digest
+    (either list or image digest). For example:
+
+    ```json
+    {
+      "_REPO_TAGS": {
+        "registry-1.docker.io": {
+          "library/alpine": {
+            "latest": "1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a"
+          }
+        }
+      }
+    }
+    ```
+
+  New keys:
+
+  - `_REPO_LIST_DIGESTS` is similar to `_REPO_DIGESTS` but enumerates
+    known list digests (if any). For example:
+
+    ```json
+    {
+      "_REPO_LIST_DIGESTS": {
+        "registry-1.docker.io": {
+          "library/alpine": [
+            "1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a"
+          ]
+        }
+      }
+    }
+    ```
+
+  Note that all `_REPO_*` keys normalize registry to its canonical domain.
+  For example for docker hub it is `registry-1.docker.io`.
+  In addition all image names are normalized to how they are stored
+  in the registry. Note `library/` prefix for `alpine`.
+
+  ([#450](https://github.com/crashappsec/chalk/pull/450))
+
 ### New Features
 
 - Chalk pins base images in `Dockerfile`. For example:
