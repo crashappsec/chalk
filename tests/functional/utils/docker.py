@@ -41,6 +41,8 @@ class Docker:
         buildkit: bool = True,
         provenance: bool = False,
         sbom: bool = False,
+        labels: Optional[dict[str, str]] = None,
+        annotations: Optional[dict[str, str]] = None,
     ):
         stdin = b""
         tags = tags or []
@@ -51,7 +53,7 @@ class Docker:
             cmd += ["buildx"]
             buildx = True
         cmd += ["build"]
-        if buildx and not platforms:
+        if buildx and not platforms and not provenance and not sbom:
             cmd += ["--load"]
         for t in tags:
             cmd += ["-t", t]
@@ -75,6 +77,14 @@ class Docker:
             cmd += ["--provenance=false"]
         if sbom:
             cmd += ["--sbom=true"]
+        if labels:
+            for k, v in labels.items():
+                cmd += [f"--label={k}={v}"]
+        if annotations:
+            if not buildx:
+                raise ValueError("--annotation only works with buildx")
+            for k, v in annotations.items():
+                cmd += [f"--annotation={k}={v}"]
         cmd += [str(context or ".")]
         yield cmd, stdin
 
@@ -97,6 +107,8 @@ class Docker:
         provenance: bool = False,
         sbom: bool = False,
         env: Optional[dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
+        annotations: Optional[dict[str, str]] = None,
     ) -> tuple[str, Program]:
         """
         run docker build with parameters
@@ -115,6 +127,8 @@ class Docker:
             buildkit=buildkit,
             provenance=provenance,
             sbom=sbom,
+            labels=labels,
+            annotations=annotations,
         ) as (params, stdin):
             return Docker.with_image_id(
                 run(

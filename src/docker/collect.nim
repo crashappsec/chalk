@@ -54,6 +54,7 @@ let dockerImageAutoMap: JsonToChalkKeysMapping = {
   "Config.MacAddress":                          ("_IMAGE_MAC_ADDR", identity),
   "Config.OnBuild":                             ("_IMAGE_ONBUILD", identity),
   "Config.Labels":                              ("_IMAGE_LABELS", identity),
+  "Config.Annotations":                         ("_IMAGE_ANNOTATIONS", identity),
   "Config.StopSignal":                          ("_IMAGE_STOP_SIGNAL", identity),
   "Config.StopTimeout":                         ("_IMAGE_STOP_TIMEOUT", identity),
   }.toOrderedTable()
@@ -200,6 +201,7 @@ proc collectImageFrom(chalk:    ChalkObj,
     arch               = caseless{"architecture"}.getStr()
     variant            = caseless{"variant"}.getStr()
     platform           = DockerPlatform(os: os, architecture: arch, variant: variant)
+    annotations        = newJObject()
   if chalk.name == "":
     chalk.name         = name
   if chalk.cachedHash == "":
@@ -219,6 +221,7 @@ proc collectImageFrom(chalk:    ChalkObj,
       let
         manifest  = fetchImageManifest(repo, platform)
         imageRepo = manifest.asImageRepo()
+      annotations.update(manifest.annotations)
       chalk.repos[repo.repo] = imageRepo + chalk.repos.getOrDefault(repo.repo)
     except:
       trace("docker: " & getCurrentExceptionMsg())
@@ -262,6 +265,7 @@ proc collectImageFrom(chalk:    ChalkObj,
     chalk.setIfNeeded("_REPO_DIGESTS",      repoDigests)
     chalk.setIfNeeded("_REPO_LIST_DIGESTS", repoListDigests)
     chalk.setIfNeeded("_REPO_TAGS",         repoTags)
+    chalk.setIfNeeded("_IMAGE_ANNOTATIONS", annotations.nimJsonToBox())
 
 proc collectProvenance(chalk: ChalkObj) =
   if not isSubscribedKey("_IMAGE_PROVENANCE"):

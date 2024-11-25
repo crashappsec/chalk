@@ -376,6 +376,7 @@ type
       foundFileArg*:          string
       foundContext*:          string
       foundLabels*:           OrderedTableRef[string, string]
+      foundAnnotations*:      OrderedTableRef[string, string]
       foundTags*:             seq[DockerImage]
       foundBuildArgs*:        TableRef[string, string]
       foundPlatforms*:        seq[DockerPlatform]

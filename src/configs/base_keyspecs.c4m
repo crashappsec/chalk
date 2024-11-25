@@ -1692,6 +1692,18 @@ Labels added to a docker image during the build process, if any.
 """
 }
 
+keyspec DOCKER_ANNOTATIONS {
+    kind:              ChalkTimeArtifact
+    type:              dict[string, string]
+    standard:          true
+    system:            false
+    since:             "0.4.15"
+    shortdoc: "Annotations added to docker image during build process"
+    doc: """
+Labels added to a docker image during the build process, if any.
+"""
+}
+
 keyspec DOCKER_TAGS {
     kind:              ChalkTimeArtifact
     type:              list[string]
@@ -2851,6 +2863,16 @@ keyspec _IMAGE_LABELS {
     standard: true
     doc: """
 Key-value pairs adding metadata to images
+"""
+}
+
+keyspec _IMAGE_ANNOTATIONS {
+    kind:     RunTimeArtifact
+    type:     dict[string, string]
+    since:    "0.4.15"
+    standard: true
+    doc: """
+Key-value pairs adding metadata to image manifests
 """
 }
 

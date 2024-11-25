@@ -347,6 +347,7 @@ proc collectBeforeChalkTime*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_PLATFORM",                  $(chalk.platform.normalize()))
   dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.platforms.normalize()))
   dict.setIfNeeded("DOCKER_LABELS",                    ctx.foundLabels)
+  dict.setIfNeeded("DOCKER_ANNOTATIONS",               ctx.foundAnnotations)
   dict.setIfNeeded("DOCKER_TAGS",                      ctx.foundTags.asRepoTag())
   dict.setIfNeeded("DOCKER_BASE_IMAGE",                $(base.image))
   dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",           base.image.repo)

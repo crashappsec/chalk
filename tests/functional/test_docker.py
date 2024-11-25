@@ -37,8 +37,6 @@ from .utils.os import run
 
 logger = get_logger()
 
-TEST_LABEL = "CRASH_OVERRIDE_TEST_LABEL"
-
 
 @pytest.fixture(scope="session", autouse=True)
 def do_docker_cleanup() -> Iterator[None]:
@@ -935,13 +933,30 @@ def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
 
 
 def test_docker_labels(chalk: Chalk, random_hex: str):
-    tag = f"test_image_{random_hex}"
+    tag = f"{REGISTRY}/test_image_{random_hex}"
 
     # build container with env vars
-    chalk.docker_build(
+    _, build = chalk.docker_build(
+        buildx=True,
         dockerfile=DOCKERFILES / "valid" / "sample_1" / "Dockerfile",
         tag=tag,
         config=CONFIGS / "docker_heartbeat.c4m",
+        labels={"foo": "bar"},
+        annotations={"hello": "there"},
+        push=True,
+    )
+
+    assert build.mark.has(
+        DOCKER_LABELS={
+            "foo": "bar",
+            "run.crashoverride.hello": MISSING,  # only known on host-keys
+        },
+        _IMAGE_LABELS={
+            "foo": "bar",
+            "run.crashoverride.hello": "CRASH_OVERRIDE_TEST_LABEL",
+        },
+        DOCKER_ANNOTATIONS={"hello": "there"},
+        _IMAGE_ANNOTATIONS={"hello": "there"},
     )
 
     inspected = Docker.inspect(tag)
@@ -950,7 +965,7 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
     docker_configs = inspected[0]["Config"]
     assert "Labels" in docker_configs
     labels = docker_configs["Labels"]
-    assert TEST_LABEL in labels.values()
+    assert "CRASH_OVERRIDE_TEST_LABEL" in labels.values()
 
 
 @pytest.mark.parametrize(
