@@ -563,6 +563,8 @@ class Chalk:
         sbom: bool = False,
         run_docker: bool = True,
         show_config: bool = False,
+        labels: Optional[dict[str, str]] = None,
+        annotations: Optional[dict[str, str]] = None,
     ) -> tuple[str, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
         context = context or getattr(dockerfile, "parent", cwd)
@@ -585,6 +587,8 @@ class Chalk:
                 secrets=secrets,
                 provenance=provenance,
                 sbom=sbom,
+                labels=labels,
+                annotations=annotations,
             )
 
         with Docker.build_cmd(
@@ -601,6 +605,8 @@ class Chalk:
             buildkit=buildkit,
             provenance=provenance,
             sbom=sbom,
+            labels=labels,
+            annotations=annotations,
         ) as (params, stdin):
             image_hash, result = Docker.with_image_id(
                 self.run(

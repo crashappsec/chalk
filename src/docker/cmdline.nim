@@ -83,6 +83,14 @@ proc extractLabels(ctx: DockerInvocation) =
       let arr = item.split("=")
       ctx.foundLabels[arr[0]] = arr[^1]
 
+proc extractAnnotations(ctx: DockerInvocation) =
+  ctx.foundAnnotations = newOrderedTable[string, string]()
+  if "annotation" in ctx.processedFlags:
+    let rawAnnotations = unpack[seq[string]](ctx.processedFlags["annotation"].getValue())
+    for item in rawAnnotations:
+      let arr = item.split("=")
+      ctx.foundAnnotations[arr[0]] = arr[^1]
+
 proc extractExtraContexts(ctx: DockerInvocation) =
   ctx.foundExtraContexts = newOrderedTable[string, string]()
   if "build-contexts" in ctx.processedFlags:
@@ -249,6 +257,7 @@ proc extractDockerCommand*(self: DockerInvocation): DockerCmd =
     self.extractBuildArgs()
     self.extractTarget()
     self.extractLabels()
+    self.extractAnnotations()
     self.extractExtraContexts()
     self.extractPlatforms()
     self.extractTags()

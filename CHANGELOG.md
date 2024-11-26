@@ -101,6 +101,13 @@
   base image and actual docker build.
   ([#449](https://github.com/crashappsec/chalk/pull/449))
 
+- Docker annotations new keys:
+
+  - `DOCKER_ANNOTATIONS` - all `--annotation`s using in `docker build`
+  - `_IMAGE_ANNOTATIONS` - found annotations for an image in registry
+
+  ([#452](https://github.com/crashappsec/chalk/pull/452))
+
 ## 0.4.14
 
 **Nov 11, 2024**

@@ -230,6 +230,7 @@ docker {
         }
         flag_multi_arg iidfile { }
         flag_multi_arg label { }
+        flag_multi_arg annotation { }
         flag_yn        load {
           yes_aliases: []
           no_aliases:  []

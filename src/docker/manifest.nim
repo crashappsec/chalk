@@ -8,7 +8,7 @@
 ## module for interacting with remote registry docker manifests
 
 import std/[httpclient]
-import ".."/[chalk_common, config, www_authenticate, semver]
+import ".."/[chalk_common, config, www_authenticate, semver, util]
 import "."/[exe, json, ids, registry]
 
 # cache is by repo ref as its normalized in buildx imagetools command
@@ -129,6 +129,10 @@ proc mimickLocalConfig(self: DockerManifest) =
   # config object does not contain size so we add compressed size
   # for easier metadata collection
   self.json["compressedSize"] = %(self.image.getCompressedSize())
+  if self.image.annotations != nil:
+    if "config" notin self.json:
+      self.json["config"] = newJObject()
+    self.json["config"]["annotations"] = self.image.annotations
 
 proc setImageConfig(self: DockerManifest, data: DigestedJson) =
   if self.kind != DockerManifestType.image:
@@ -145,6 +149,10 @@ proc setImageConfig(self: DockerManifest, data: DigestedJson) =
       image:      self,
     )
   self.config = config
+
+proc setAnnotations(self: DockerManifest, data: JsonNode): DockerManifest {.discardable.} =
+  self.annotations = self.annotations.update(data{"annotations"})
+  return self
 
 proc setImagePlatform(self: DockerManifest, platform: DockerPlatform) =
   if self.kind != DockerManifestType.image:
@@ -168,8 +176,7 @@ proc setImageLayers(self: DockerManifest, data: DigestedJson) =
       mediaType:     layer{"mediaType"}.getStr(),
       digest:        layer{"digest"}.getStr(),
       size:          layer{"size"}.getInt(),
-      annotations:   layer{"annotations"},
-    ))
+    ).setAnnotations(layer))
 
 proc fetch(self: DockerManifest, fetchConfig = true): DockerManifest {.discardable.} =
   result = self
@@ -186,6 +193,7 @@ proc fetch(self: DockerManifest, fetchConfig = true): DockerManifest {.discardab
           error("docker: " & getCurrentExceptionMsg())
           requestManifestJson(self.asImage())
       self.setJson(data)
+      self.setAnnotations(data.json)
       self.setImageConfig(data)
       self.setImageLayers(data)
     if fetchConfig:
@@ -204,6 +212,7 @@ proc fetch(self: DockerManifest, fetchConfig = true): DockerManifest {.discardab
         error("docker: " & getCurrentExceptionMsg())
         requestManifestJson(self.asImage())
     self.setJson(data)
+    self.setAnnotations(data.json)
     self.mimickLocalConfig()
     self.configPlatform = DockerPlatform(
       os:           data.json{"os"}.getStr(),
@@ -227,6 +236,7 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
       manifests:  @[],
     )
     list.setJson(data)
+    list.setAnnotations(json)
     for item in json["manifests"].items():
       let platform = item{"platform"}
       list.manifests.add(DockerManifest(
@@ -237,13 +247,12 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
         mediaType:   item{"mediaType"}.getStr(),
         digest:      item{"digest"}.getStr(),
         size:        item{"size"}.getInt(),
-        annotations: item{"annotations"},
         platform:    DockerPlatform(
           os:           platform{"os"}.getStr(),
           architecture: platform{"architecture"}.getStr(),
           variant:      platform{"variant"}.getStr(),
         )
-      ))
+      ).setAnnotations(item))
     return list
 
   elif "config" in json and "layers" in json:
@@ -255,6 +264,7 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
       mediaType:      json{"mediaType"}.getStr(),
     )
     image.setJson(data)
+    image.setAnnotations(json)
     image.setImageConfig(data)
     image.setImageLayers(data)
     return image

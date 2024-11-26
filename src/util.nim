@@ -579,6 +579,14 @@ proc update*(self: ChalkDict, other: ChalkDict): ChalkDict {.discardable.} =
   for k, v in other:
     self[k] = v
 
+proc update*(self: JsonNode, other: JsonNode): JsonNode {.discardable.} =
+  if self == nil:
+    return other
+  if other != nil:
+    for k, v in other.pairs():
+      self[k] = v
+  return self
+
 proc merge*(self: ChalkDict, other: ChalkDict): ChalkDict {.discardable.} =
   result = self
   for k, v in other:
