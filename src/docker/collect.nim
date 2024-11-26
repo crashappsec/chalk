@@ -9,9 +9,9 @@
 ##
 ## collect - use inspection result to load info into chalk
 
-import std/[json]
+import std/[json, sets]
 import ".."/[config, chalkjson, util]
-import "."/[inspect, exe, manifest, json, ids]
+import "."/[inspect, manifest, json, ids]
 
 # https://docs.docker.com/engine/api/v1.44/#tag/Image/operation/ImageInspect
 # https://github.com/opencontainers/image-spec/blob/main/config.md
@@ -19,9 +19,6 @@ import "."/[inspect, exe, manifest, json, ids]
 # These are the keys we can auto-convert without any special-casing.
 # Types of the JSON will be checked against the key's declared type.
 let dockerImageAutoMap: JsonToChalkKeysMapping = {
-  "RepoTags":                                   ("_REPO_TAGS", identity),
-  "RepoDigests":                                ("_REPO_DIGESTS", JsonTransformer((x: JsonNode) =>
-                                                   `%`(extractDockerHashMap(x.getStrElems())))),
   "Comment":                                    ("_IMAGE_COMMENT", identity), # local-only
   "Created":                                    ("_IMAGE_CREATION_DATETIME", identity),
   "DockerVersion":                              ("_IMAGE_DOCKER_VERSION", identity), # most of the time empty string
@@ -189,40 +186,24 @@ proc collectCommon(chalk: ChalkObj, contents: JsonNode, map = dockerImageAutoMap
   chalk.setIfNeeded("_IMAGE_ID", chalk.imageId)
   chalk.collectedData.mapFromJson(contents, map)
 
-proc collectImageFrom(chalk: ChalkObj, contents: JsonNode, name: string, digest = "") =
+proc collectImageFrom(chalk:    ChalkObj,
+                      contents: JsonNode,
+                      name:     string,
+                      repos:    seq[DockerImage] = @[]) =
   let
     caseless           = contents.toLowerKeysJsonNode()
     id                 = caseless{"id"}.getStr().extractDockerHash()
-    tags               = caseless{"repotags"}.getStrElems()
+    repotags           = parseImages(caseless{"repotags"}.getStrElems())
+    repodigests        = parseImages(caseless{"repodigests"}.getStrElems(), defaultTag = "")
+    alldigests         = (repodigests & repos).uniq()
     os                 = caseless{"os"}.getStr()
     arch               = caseless{"architecture"}.getStr()
     variant            = caseless{"variant"}.getStr()
     platform           = DockerPlatform(os: os, architecture: arch, variant: variant)
-  var
-    digests            = caseless{"repodigests"}.getStrElems()
-  if (
-    # sometimes even after --push, docker inspect does not return
-    # anything for RepoDigests but it does populate RepoTags
-    # in which case when we know the digest via another mechanism
-    # such as --metadata-file we manually populate digests
-    len(digests) == 0 and
-    len(tags) > 0 and
-    digest != ""
-  ):
-    digests            = $(parseImages(tags).withDigest(digest))
-    contents["RepoDigests"] = %*(digests)
-  if chalk.cachedHash == "":
-    chalk.cachedHash   = id
-  if len(tags) > 0:
-    chalk.images       = parseImages(tags)
-  if len(digests) > 0:
-    let images         = parseImages(digests)
-    chalk.images       = images
-    chalk.imageDigest  = images[0].digest
-  if digest != "":
-    chalk.imageDigest  = digest.extractDockerHash()
   if chalk.name == "":
     chalk.name         = name
+  if chalk.cachedHash == "":
+    chalk.cachedHash   = id
   # we could be inspecting container image hence resource type should be untouched
   if ResourceContainer notin chalk.resourceType:
     chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerImage)
@@ -232,70 +213,82 @@ proc collectImageFrom(chalk: ChalkObj, contents: JsonNode, name: string, digest 
   chalk.collectCommon(contents, dockerImageAutoMap)
   chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents.nimJsonToBox())
   chalk.setIfNeeded("DOCKER_PLATFORM", $platform)
-
-proc collectDigestsFromManifest(chalk: ChalkObj, manifest: DockerManifest) =
-  chalk.imageDigest = manifest.digest.extractDockerHash()
-  chalk.setIfNeeded("_IMAGE_DIGEST", chalk.imageDigest)
-  if manifest.list != nil:
-    chalk.listDigest = manifest.list.digest.extractDockerHash()
-    chalk.setIfNeeded("_IMAGE_LIST_DIGEST", chalk.listDigest)
+  chalk.repos          = newOrderedTable[string, DockerImageRepo]()
+  for repo in alldigests:
+    try:
+      let
+        manifest  = fetchImageManifest(repo, platform)
+        imageRepo = manifest.asImageRepo()
+      chalk.repos[repo.repo] = imageRepo + chalk.repos.getOrDefault(repo.repo)
+    except:
+      trace("docker: " & getCurrentExceptionMsg())
+      continue
+  for tag in repotags:
+    if tag.repo notin chalk.repos:
+      # we dont know digest for this tag so most likely local-only image
+      continue
+    let repo = chalk.repos[tag.repo]
+    if tag.tag != "":
+      repo.tags.incl(tag.tag)
+  if len(chalk.repos) > 0:
+    var
+      allDigests      = initHashSet[string]()
+      repoDigests     = newOrderedTable[string, OrderedTableRef[string, seq[string]]]()
+      repoListDigests = newOrderedTable[string, OrderedTableRef[string, seq[string]]]()
+      repoTags        = newOrderedTable[string, OrderedTableRef[string, OrderedTableRef[string, string]]]()
+    for name, repo in chalk.repos:
+      let registry = parseImage(name).registry
+      for i in repo.manifests:
+        discard repoDigests.hasKeyOrPut(registry, newOrderedTable[string, seq[string]]())
+        discard repoDigests[registry].hasKeyOrPut(i.name, @[])
+        repoDigests[registry][i.name].add(i.digest)
+        allDigests.incl(i.digest)
+      for i in repo.listManifests:
+        discard repoListDigests.hasKeyOrPut(registry, newOrderedTable[string, seq[string]]())
+        discard repoListDigests[registry].hasKeyOrPut(i.name, @[])
+        repoListDigests[registry][i.name].add(i.digest)
+        allDigests.incl(i.digest)
+      for i in repo.tagImages:
+        discard repoTags.hasKeyOrPut(registry, newOrderedTable[string, OrderedTableRef[string, string]]())
+        discard repoTags[registry].hasKeyOrPut(i.name, newOrderedTable[string, string]())
+        let
+          manifest = fetchListOrImageManifest(i, platforms = @[platform])
+          digest   = manifest.digest.extractDockerHash()
+        if digest notin allDigests:
+          warn("docker: could not match docker image tag " & $i & " digest " & digest &
+               " to a known list or image digest " & $allDigests)
+          continue
+        repoTags[registry][i.name][i.tag] = digest
+    chalk.setIfNeeded("_REPO_DIGESTS",      repoDigests)
+    chalk.setIfNeeded("_REPO_LIST_DIGESTS", repoListDigests)
+    chalk.setIfNeeded("_REPO_TAGS",         repoTags)
 
 proc collectProvenance(chalk: ChalkObj) =
-  if chalk.listDigest == "":
-    return
   if not isSubscribedKey("_IMAGE_PROVENANCE"):
     return
-  for image in chalk.images:
+  for i in chalk.repos.listManifests:
     try:
-      let json = fetchProvenance(image.withDigest(chalk.listDigest), chalk.platform)
+      let json = fetchProvenance(i, chalk.platform)
       chalk.setIfNeeded("_IMAGE_PROVENANCE", pack(json.nimJsonToBox()))
       break
     except:
       continue
 
 proc collectSBOM(chalk: ChalkObj) =
-  if chalk.listDigest == "":
-    return
   if not isSubscribedKey("_IMAGE_SBOM"):
     return
-  for image in chalk.images:
+  for i in chalk.repos.listManifests:
     try:
-      let json = fetchSBOM(image.withDigest(chalk.listDigest), chalk.platform)
+      let json = fetchSBOM(i, chalk.platform)
       chalk.setIfNeeded("_IMAGE_SBOM", pack(json.nimJsonToBox()))
       break
     except:
       continue
 
-proc collectDigests(chalk: ChalkObj) =
-  ## docker inspect can return repo digests field with digests
-  ## for either manifest list (if exists) or a specific image digest
-  ## but in chalk we want to normalize them to a single digest
-  # we already know the digests
-  if chalk.listDigest != "":
-    return
-  # we dont have any images
-  if chalk.imageDigest == "" or len(chalk.images) == 0:
-    return
-  if not hasBuildX() and dockerInvocation != nil and dockerInvocation.cmd == push:
-    # if there is no buildx, this means its a vanilla docker push
-    # which means for docker push it cannot be a list manifest
-    # so we should be able to normalize it
-    chalk.setIfNeeded("_IMAGE_DIGEST", chalk.imageDigest)
-  else:
-    for image in chalk.images:
-      try:
-        let manifest = fetchImageManifest(image.withDigest(chalk.imageDigest), chalk.platform)
-        chalk.collectDigestsFromManifest(manifest)
-        break
-      except:
-        continue
-  let repoDigests = extractDockerHashMap($(chalk.images.withDigest(chalk.imageDigest)))
-  chalk.setIfNeeded("_REPO_DIGESTS", pack(repoDigests))
-
-proc collectImage*(chalk: ChalkObj, name: string, digest = "") =
+proc collectImage*(chalk: ChalkObj, name: string, repos: seq[DockerImage] = @[]) =
   let contents = inspectImageJson(name)
-  chalk.collectImageFrom(contents, name, digest = digest)
-  chalk.collectDigests()
+  var repo = DockerImageRepo(nil)
+  chalk.collectImageFrom(contents, name, repos = repos)
   chalk.collectProvenance()
   chalk.collectSBOM()
 
@@ -310,8 +303,7 @@ proc collectImageManifest*(chalk: ChalkObj,
   let
     manifest = fetchImageManifest(name, chalk.platform, otherNames = otherNames)
     contents = manifest.config.json
-  chalk.collectImageFrom(contents, $name)
-  chalk.collectDigestsFromManifest(manifest)
+  chalk.collectImageFrom(contents, $name, repos = @[manifest.asImage()])
   chalk.collectProvenance()
   chalk.collectSBOM()
 

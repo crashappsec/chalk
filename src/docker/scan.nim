@@ -41,7 +41,7 @@ proc scanImageOrContainer*(codec: Plugin, item: string): Option[ChalkObj] =
       # there are valid reason why container might not have chalk mark
       # such as it was a virtual insert
   except:
-    discard
+    trace("docker: " & getCurrentExceptionMsg())
   try:
     chalk.collectImage(image)
     try:
@@ -49,6 +49,7 @@ proc scanImageOrContainer*(codec: Plugin, item: string): Option[ChalkObj] =
     except:
       warn("docker: could not extract chalk mark from image " & image & ": " & getCurrentExceptionMsg())
   except:
+    trace("docker: " & getCurrentExceptionMsg())
     return none(ChalkObj)
   if not chalk.isChalked():
     addUnmarked(item)

@@ -49,6 +49,7 @@ class Docker:
         cmd = ["docker"]
         if platforms or buildx:
             cmd += ["buildx"]
+            buildx = True
         cmd += ["build"]
         if buildx and not platforms:
             cmd += ["--load"]
@@ -257,12 +258,33 @@ class Docker:
         return run(["docker", "--version"])
 
     @staticmethod
-    def pull(tag: str) -> Program:
-        return run(["docker", "pull", tag])
+    def pull(tag: str, platform: Optional[str] = None) -> Program:
+        p = []
+        if platform:
+            p = ["--platform", platform]
+        return run(["docker", "pull", tag] + p)
+
+    @staticmethod
+    def push(tag: str) -> Program:
+        return run(["docker", "push", tag])
+
+    @staticmethod
+    def tag(tag: str, new_tag: str) -> Program:
+        return run(["docker", "tag", tag, new_tag])
+
+    @staticmethod
+    def manifest_create(
+        list_manifest: str, *manifests: str, insecure: bool = True
+    ) -> Program:
+        insec = []
+        if insecure:
+            insec = ["--insecure"]
+        run(["docker", "manifest", "create", list_manifest, *manifests] + insec)
+        return run(["docker", "manifest", "push", list_manifest] + insec)
 
     @staticmethod
     def imagetools_inspect(tag: str) -> Program:
-        return run(["docker", "buildx", "imagetools", "inspect", tag])
+        return run(["docker", "buildx", "imagetools", "inspect", "--raw", tag])
 
     @staticmethod
     def inspect(name: str) -> list[ContainsMixin]:

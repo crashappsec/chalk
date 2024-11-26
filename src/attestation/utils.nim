@@ -6,7 +6,7 @@
 ##
 
 import std/[base64, os]
-import ".."/[chalk_common, config, semver, util]
+import ".."/[chalk_common, config, semver, util, docker/ids]
 
 var cosignLoc      = ""
 var cosignVersion  = parseVersion("0")
@@ -77,8 +77,7 @@ proc canVerifyBySigStore*(chalk: ChalkObj): bool =
     isCosignInstalled() and
     ResourceImage     in    chalk.resourceType and
     ResourceContainer notin chalk.resourceType and
-    len(chalk.images) >     0 and
-    chalk.imageDigest !=    ""
+    len(chalk.repos)  >     0
   )
 
 template withCosignPassword(password: string, code: untyped) =

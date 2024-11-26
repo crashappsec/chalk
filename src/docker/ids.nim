@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[net, sets, sequtils, uri]
+import std/[net, sets, uri]
 import ".."/[config, util]
 
 const
@@ -318,6 +318,9 @@ proc registry*(self: DockerImage): string =
 proc domain*(self: DockerImage): string =
   return self.registry.split(':', maxsplit = 1)[0]
 
+proc name*(self: DockerImage): string =
+  return self.normalize().repo.split('/', maxsplit = 1)[^1]
+
 proc isDockerHub*(self: DockerImage): bool =
   return self.normalize().registry == DEFAULT_REGISTRY
 
@@ -384,6 +387,9 @@ proc `$`*(self: DockerImage): string =
       "docker image is empty to be represented correctly"
     )
 
+proc exists*(self: DockerImage): bool =
+  return self != ("", "", "")
+
 proc asRepoTag*(items: seq[DockerImage]): seq[string] =
   result = @[]
   for i in items:
@@ -405,33 +411,97 @@ proc `$`*(items: seq[DockerImage]): seq[string] =
     result.add($i)
 
 proc uniq*(items: seq[DockerImage]): seq[DockerImage] =
-  return items.asRepoDigest().toSet().toSeq().parseImages()
+  var unique = initHashSet[string]()
+  result = @[]
+  for i in items:
+    let key = i.asRepoRef()
+    if key in unique:
+      continue
+    unique.incl(key)
+    result.add(i)
+
+# ----------------------------------------------------------------------------
+
+iterator manifests*(self: DockerImageRepo): DockerImage =
+  for i in self.digests:
+    yield (self.repo, "", i)
+
+iterator listManifests*(self: DockerImageRepo): DockerImage =
+  for i in self.listDigests:
+    yield (self.repo, "", i)
+
+iterator tagImages*(self: DockerImageRepo): DockerImage =
+  for i in self.tags:
+    yield (self.repo, i, "")
+
+iterator manifests*(items: OrderedTableRef[string, DockerImageRepo]): DockerImage =
+  for _, repo in items:
+    for i in repo.manifests:
+      yield i
+
+iterator listManifests*(items: OrderedTableRef[string, DockerImageRepo]): DockerImage =
+  for _, repo in items:
+    for i in repo.listManifests:
+      yield i
+
+proc `$`*(self: DockerImageRepo): string =
+  for i in self.listManifests:
+    return $i
+  for i in self.manifests:
+    return $i
+  raise newException(ValueError, "No digests to reference")
+
+proc `+`*(a: DockerImageRepo, b: DockerImageRepo): DockerImageRepo =
+  if b == nil:
+    return a
+  if a == nil:
+    return b
+  if a.repo != b.repo:
+    raise newException(ValueError, "cannot merge image repos for different repos")
+  return DockerImageRepo(
+    repo       : b.repo,
+    digests    : b.digests     + a.digests,
+    listDigests: b.listDigests + a.listDigests,
+    tags       : b.tags        + a.tags,
+  )
+
+# ----------------------------------------------------------------------------
 
 proc getImageName*(self: ChalkObj): string =
-  if len(self.images) > 0:
-    return $(self.images[0])
+  for _, repo in self.repos:
+    return $repo
   return self.name
 
-proc nameRef*(self: DockerManifest): DockerImage =
+# ----------------------------------------------------------------------------
+
+proc asImage*(self: DockerManifest): DockerImage =
   return self.name.withDigest(self.digest)
+
+proc asImageRepo*(self: DockerManifest): DockerImageRepo =
+  if self.kind != image:
+    raise newException(ValueError, "Only image manifest can be image repo referenced")
+  return DockerImageRepo(
+    repo:    self.name.repo,
+    digests: @[self.digest.extractDockerHash()].toOrderedSet(),
+    listDigests: (
+      if self.list != nil:
+        @[self.list.digest.extractDockerHash()]
+      else:
+        @[]
+    ).toOrderedSet(),
+    tags: (
+      if self.name.tag != "":
+        @[self.name.tag]
+      else:
+        @[]
+    ).toOrderedSet(),
+  )
 
 # ----------------------------------------------------------------------------
 
 proc extractDockerHashList*(value: seq[string]): seq[string] =
   for item in value:
     result.add(item.extractDockerHash())
-
-proc extractDockerHashMap*(value: seq[string]): OrderedTableRef[string, string] =
-  result = newOrderedTable[string, string]()
-  for image in parseImages(value).uniq():
-    if image.digest == "":
-      raise newException(
-        ValueError,
-        "Invalid docker repo name. Expecting <repo>@sha256:<digest> but got: " & $image
-      )
-    # specifically omitting tag as digest is more precise to reference
-    # something from the registry
-    result[image.repo] = image.digest
 
 # ----------------------------------------------------------------------------
 

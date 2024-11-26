@@ -2,6 +2,7 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import itertools
 import platform
 import re
 import shutil
@@ -46,22 +47,37 @@ def do_docker_cleanup() -> Iterator[None]:
     images: set[str] = set()
     containers: set[str] = set()
 
-    _docker_build = Chalk.docker_build
-    _run_container = Docker.run
+    _chalk_docker_build = Chalk.docker_build
+    _docker_build = Docker.build
+    _docker_tag = Docker.tag
+    _docker_run = Docker.run
 
-    def docker_build(self, *args, **kwargs):
-        image_hash, result = _docker_build(self, *args, **kwargs)
+    def chalk_docker_build(self, *args, **kwargs):
+        image_hash, result = _chalk_docker_build(self, *args, **kwargs)
         images.add(image_hash)
         return image_hash, result
 
-    def run_container(*args, **kwargs):
-        container_id, result = _run_container(*args, **kwargs)
+    def docker_build(*args, **kwargs):
+        image_hash, result = _docker_build(*args, **kwargs)
+        images.add(image_hash)
+        return image_hash, result
+
+    def docker_tag(tag, new_tag):
+        images.add(new_tag)
+        return _docker_tag(tag, new_tag)
+
+    def docker_run(*args, **kwargs):
+        container_id, result = _docker_run(*args, **kwargs)
         containers.add(container_id)
         return container_id, result
 
     with ExitStack() as stack:
-        stack.enter_context(mock.patch.object(Chalk, "docker_build", docker_build))
-        stack.enter_context(mock.patch.object(Docker, "run", run_container))
+        stack.enter_context(
+            mock.patch.object(Chalk, "docker_build", chalk_docker_build)
+        )
+        stack.enter_context(mock.patch.object(Docker, "build", docker_build))
+        stack.enter_context(mock.patch.object(Docker, "tag", docker_tag))
+        stack.enter_context(mock.patch.object(Docker, "run", docker_run))
         try:
             yield
         finally:
@@ -187,7 +203,14 @@ def test_multiple_tags(
         run_docker=False,
     )
     assert image_id
-    assert len(build.mark["_REPO_TAGS"]) == 2
+    assert build.mark.has(
+        _REPO_TAGS={
+            REGISTRY: {
+                f"{random_hex}-1": ANY,
+                f"{random_hex}-2": ANY,
+            },
+        }
+    )
 
     # ensure all tags are pushed
     for tag in tags:
@@ -790,7 +813,7 @@ def test_virtual_valid(
         {
             "_CURRENT_HASH": image_hash,
             "_IMAGE_ID": image_hash,
-            "_REPO_TAGS": Contains({f"{tag}:latest"}),
+            "_REPO_TAGS": MISSING,  # not pushed
             "DOCKERFILE_PATH": str(dockerfile),
             "DOCKERFILE_PATH_WITHIN_VCTL": str(
                 dockerfile.relative_to(ROOT.parent.parent)
@@ -848,7 +871,7 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
         {
             "_CURRENT_HASH": image_hash,
             "_IMAGE_ID": image_hash,
-            "_REPO_TAGS": Contains({f"{tag}:latest"}),
+            "_REPO_TAGS": MISSING,  # not pushed
             "DOCKERFILE_PATH": str(DOCKERFILES / test_file / "Dockerfile"),
             "DOCKERFILE_PATH_WITHIN_VCTL": str(
                 dockerfile.relative_to(ROOT.parent.parent)
@@ -961,7 +984,8 @@ def test_build_and_push(
     buildkit: bool,
     buildx: bool,
 ):
-    tag_base = f"{registry}/{test_file}_{random_hex}"
+    name = f"{test_file}_{random_hex}"
+    tag_base = f"{registry}/{name}"
     tag = f"{tag_base}:latest"
 
     image_id, build_result = chalk.docker_build(
@@ -987,10 +1011,23 @@ def test_build_and_push(
         METADATA_HASH=ANY,
         _CURRENT_HASH=image_id,
         _IMAGE_ID=image_id,
-        _IMAGE_DIGEST=image_digest if push else MISSING,
+        DOCKER_TAGS=[tag],
+        _REPO_TAGS=(
+            {
+                registry: {
+                    name: {
+                        "latest": image_digest,
+                    }
+                }
+            }
+            if push
+            else MISSING
+        ),
         _REPO_DIGESTS=(
             {
-                tag_base: image_digest,
+                registry: {
+                    name: [image_digest],
+                }
             }
             if push
             else MISSING
@@ -1003,9 +1040,10 @@ def test_build_and_push(
         METADATA_HASH=build_result.mark["METADATA_HASH"],
         _CURRENT_HASH=image_id,
         _IMAGE_ID=image_id,
-        _IMAGE_DIGEST=image_digest,
         _REPO_DIGESTS={
-            tag_base: image_digest,
+            registry: {
+                name: [image_digest],
+            }
         },
     )
 
@@ -1018,7 +1056,127 @@ def test_push_nonchalked(chalk: Chalk, random_hex: str):
     tag = f"{tag_base}:latest"
     Docker.build(content="FROM alpine", tag=tag)
     push = chalk.docker_push(tag)
-    assert push.report.has(_OP_EXIT_CODE=0, _CHALK_RUN_TIME=ANY)
+    assert push.report.has(
+        _OP_EXIT_CODE=0,
+        _CHALK_RUN_TIME=ANY,
+    )
+
+
+def test_retagging(chalk: Chalk, random_hex: str):
+    name = f"retagged_{random_hex}"
+    tag_base = f"{REGISTRY}/{name}"
+    tag = f"{tag_base}:foo"
+    # this pulls only a single platform
+    Docker.pull("alpine")
+    Docker.tag("alpine", tag)
+    # this pushes only a single platform
+    Docker.push(tag)
+    local_alpine = Docker.inspect("alpine")[0]["Id"].split(":")[1]
+    registry_image = Docker.imagetools_inspect(tag).digest
+    hub_alpine = Docker.imagetools_inspect("alpine")
+    hub_alpine_list = hub_alpine.digest
+    hub_alpine_image = next(
+        i["digest"].split(":")[1]
+        for i in hub_alpine.json()["manifests"]
+        if i["platform"]["architecture"] == "amd64"
+    )
+    extract = chalk.extract(tag)
+    assert hub_alpine_image != registry_image
+    assert extract.mark.has(
+        _IMAGE_ID=local_alpine,
+        _REPO_TAGS={
+            "registry-1.docker.io": {
+                "library/alpine": {"latest": hub_alpine_list},
+            },
+            REGISTRY: {
+                name: {"foo": registry_image},
+            },
+        },
+        _REPO_DIGESTS={
+            "registry-1.docker.io": {
+                "library/alpine": [hub_alpine_image],
+            },
+            REGISTRY: {
+                name: [registry_image],
+            },
+        },
+        _REPO_LIST_DIGESTS={
+            "registry-1.docker.io": {
+                "library/alpine": [hub_alpine_list],
+            },
+            REGISTRY: IfExists(
+                {
+                    name: MISSING,
+                }
+            ),
+        },
+    )
+
+
+def test_remanifest(chalk: Chalk, random_hex: str):
+    name = f"remanifest_{random_hex}"
+    tag_base = f"{REGISTRY}/{name}"
+    tag_list1 = "list1"
+    tag_list2 = "list2"
+    tag_amd64 = "amd64"
+    tag_arm64 = "arm64"
+    id_amd64, _ = Docker.build(
+        content="FROM alpine",
+        tag=f"{tag_base}:{tag_amd64}",
+        push=True,
+        platforms=["linux/amd64"],
+    )
+    Docker.build(
+        content="FROM alpine",
+        tag=f"{tag_base}:{tag_arm64}",
+        push=True,
+        platforms=["linux/arm64"],
+    )
+    amd64_image = Docker.imagetools_inspect(f"{tag_base}:{tag_amd64}").digest
+    arm64_image = Docker.imagetools_inspect(f"{tag_base}:{tag_arm64}").digest
+    Docker.manifest_create(
+        f"{tag_base}:{tag_list1}",
+        f"{tag_base}@sha256:{amd64_image}",
+        f"{tag_base}@sha256:{arm64_image}",
+    )
+    Docker.manifest_create(
+        f"{tag_base}:{tag_list2}",
+        f"{tag_base}@sha256:{amd64_image}",
+    )
+    amd64_list1 = Docker.imagetools_inspect(f"{tag_base}:{tag_list1}").digest
+    amd64_list2 = Docker.imagetools_inspect(f"{tag_base}:{tag_list2}").digest
+    Docker.pull(f"{tag_base}:{tag_list1}", platform="linux/amd64")
+    Docker.pull(f"{tag_base}:{tag_list2}", platform="linux/amd64")
+    Docker.pull(f"{tag_base}:{tag_amd64}", platform="linux/amd64")
+    Docker.inspect(f"{tag_base}:{tag_amd64}")
+    extract = chalk.extract(f"{tag_base}:{tag_list1}")
+    assert extract.mark.has(
+        _IMAGE_ID=id_amd64,
+        _REPO_DIGESTS={
+            REGISTRY: {
+                name: {
+                    amd64_image,
+                }
+            }
+        },
+        _REPO_LIST_DIGESTS={
+            REGISTRY: {
+                name: {
+                    amd64_list1,
+                    amd64_list2,
+                }
+            }
+        },
+        _REPO_TAGS={
+            REGISTRY: {
+                name: {
+                    tag_list1: amd64_list1,
+                    tag_list2: amd64_list2,
+                    tag_amd64: amd64_image,
+                }
+            }
+        },
+    )
 
 
 @pytest.mark.parametrize("test_file", ["valid/sample_1"])
@@ -1027,7 +1185,8 @@ def test_push_without_buildx(
     test_file: str,
     random_hex: str,
 ):
-    tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
+    name = f"{test_file}_{random_hex}"
+    tag_base = f"{REGISTRY}/{name}"
     tag = f"{tag_base}:latest"
 
     image_id, build = chalk.docker_build(
@@ -1062,9 +1221,10 @@ def test_push_without_buildx(
         METADATA_HASH=build.mark["METADATA_HASH"],
         _CURRENT_HASH=image_id,
         _IMAGE_ID=image_id,
-        _IMAGE_DIGEST=image_digest,
         _REPO_DIGESTS={
-            tag_base: image_digest,
+            REGISTRY: {
+                name: [image_digest],
+            },
         },
     )
 
@@ -1087,7 +1247,8 @@ def test_multiplatform_build(
     push: bool,
     server_http: str,
 ):
-    tag_base = f"{REGISTRY}/{test_file}_{random_hex}"
+    name = f"{test_file}_{random_hex}"
+    tag_base = f"{REGISTRY}/{name}"
     tag = f"{tag_base}:latest"
     platforms = {"linux/amd64/v1", "linux/arm64/v8", "linux/arm/v7"}
     target_platforms = {"linux/amd64", "linux/arm64", "linux/arm/v7"}
@@ -1122,9 +1283,12 @@ def test_multiplatform_build(
     metadata_ids = {i["METADATA_ID"] for i in build.marks}
     hashes = {i["_CURRENT_HASH"] for i in build.marks}
     ids = {i["_IMAGE_ID"] for i in build.marks}
-    image_digests = {i["_IMAGE_DIGEST"] for i in build.marks}
-    list_digests = {i["_IMAGE_LIST_DIGEST"] for i in build.marks}
-    repo_digests = {i["_REPO_DIGESTS"][tag_base] for i in build.marks}
+    list_digests = set(
+        itertools.chain(*[i["_REPO_LIST_DIGESTS"][REGISTRY][name] for i in build.marks])
+    )
+    repo_digests = set(
+        itertools.chain(*[i["_REPO_DIGESTS"][REGISTRY][name] for i in build.marks])
+    )
 
     assert len(chalk_ids) == 1
     assert len(metadata_ids) == len(platforms)
@@ -1133,7 +1297,6 @@ def test_multiplatform_build(
     assert hashes == ids
     assert len(hashes) == len(platforms)
     assert len(repo_digests) == len(platforms)
-    assert len(image_digests) == len(platforms)
     assert len(list_digests) == 1
 
     for mark in build.marks:
@@ -1305,7 +1468,7 @@ def test_extract(chalk: Chalk, random_hex: str):
             "_OP_ARTIFACT_TYPE": "Docker Image",
             "_IMAGE_ID": image_id,
             "_CURRENT_HASH": image_id,
-            "_REPO_TAGS": Contains({f"{tag}:latest"}),
+            "_REPO_TAGS": MISSING,
         }
     )
 

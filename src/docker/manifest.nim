@@ -173,19 +173,18 @@ proc setImageLayers(self: DockerManifest, data: DigestedJson) =
 
 proc fetch(self: DockerManifest, fetchConfig = true): DockerManifest {.discardable.} =
   result = self
-  let name = self.nameRef()
   case self.kind
   of DockerManifestType.image:
     if not self.isFetched:
       let data =
         try:
-          manifestGet(name, self.mediaType)
+          manifestGet(self.asImage(), self.mediaType)
         except RegistryResponseError:
           trace("docker: " & getCurrentExceptionMsg())
           raise
         except:
           error("docker: " & getCurrentExceptionMsg())
-          requestManifestJson(name)
+          requestManifestJson(self.asImage())
       self.setJson(data)
       self.setImageConfig(data)
       self.setImageLayers(data)
@@ -197,13 +196,13 @@ proc fetch(self: DockerManifest, fetchConfig = true): DockerManifest {.discardab
       return
     let data =
       try:
-        layerGetJson(name, self.mediaType)
+        layerGetJson(self.asImage(), self.mediaType)
       except RegistryResponseError:
         trace("docker: " & getCurrentExceptionMsg())
         raise
       except:
         error("docker: " & getCurrentExceptionMsg())
-        requestManifestJson(name)
+        requestManifestJson(self.asImage())
     self.setJson(data)
     self.mimickLocalConfig()
     self.configPlatform = DockerPlatform(
@@ -278,10 +277,11 @@ proc fetchManifest*(name: DockerImage,
   # foo:tag               # manifest for specific tag
   # foo@sha256:<checksum> # pinned to specific digest
   # therefore we gracefully handle each possibility
-  if name.asRepoDigest() in manifestCache:
-    result = manifestCache[name.asRepoDigest()]
-    result.fetch(fetchConfig = fetchConfig)
-    return
+  for key in @[name.asRepoDigest(), name.asRepoTag(), name.asRepoRef()]:
+    if key in manifestCache:
+      result = manifestCache[key]
+      result.fetch(fetchConfig = fetchConfig)
+      return result
   try:
     let
       meta = manifestHead(name)
@@ -295,7 +295,15 @@ proc fetchManifest*(name: DockerImage,
     let data = requestManifestJson(name)
     result = newManifest(name, data, otherNames = otherNames)
   result.fetch(fetchConfig = fetchConfig)
-  manifestCache[name.asRepoDigest()] = result
+  if name.digest != "":
+    manifestCache[name.asRepoDigest()] = result
+  elif name.tag != "":
+    manifestCache[name.asRepoTag()] = result
+  else:
+    manifestCache[name.asRepoRef()] = result
+  if result.kind == DockerManifestType.list:
+    for image in result.manifests:
+      manifestCache[image.asImage().asRepoDigest()] = image
 
 proc fetchListManifest*(name: DockerImage, platforms: seq[DockerPlatform] = @[]): DockerManifest =
   result = fetchManifest(name, fetchConfig = false)
@@ -358,7 +366,7 @@ proc findSibling(self: DockerManifest, reference = "attestation-manifest"): Dock
       continue
     if (
       i.annotations{"vnd.docker.reference.type"}.getStr().toLower() == reference.toLower() and
-      i.annotations{"vnd.docker.reference.digest"}.getStr().toLower() == self.nameRef.imageRef.toLower()
+      i.annotations{"vnd.docker.reference.digest"}.getStr().toLower() == self.asImage().imageRef.toLower()
     ):
       return i.fetch()
   raise newException(KeyError, "Could not find sibling image of reference type: " & reference)
@@ -378,7 +386,7 @@ proc fetchProvenance*(name: DockerImage, platform: DockerPlatform): JsonNode =
   try:
     trace("docker: looking up provenance for: " & $name)
     let layer = name.fetchImageManifest(platform).findSibling().findInTotoLayer("https://slsa.dev/provenance/")
-    result = layer.nameRef.layerGetJson(accept = layer.mediaType).json{"predicate"}
+    result = layer.asImage().layerGetJson(accept = layer.mediaType).json{"predicate"}
     trace("docker: in registry found provenance for: " & $name)
   except RegistryResponseError, KeyError:
     trace("docker: " & getCurrentExceptionMsg())
@@ -411,7 +419,7 @@ proc fetchSBOM*(name: DockerImage, platform: DockerPlatform): JsonNode =
   try:
     trace("docker: looking up SBOM for: " & $name)
     let layer = name.fetchImageManifest(platform).findSibling().findInTotoLayer("https://spdx.dev/Document")
-    result = layer.nameRef.layerGetJson(accept = layer.mediaType).json{"predicate"}
+    result = layer.asImage().layerGetJson(accept = layer.mediaType).json{"predicate"}
     trace("docker: in registry found SBOM for: " & $name)
   except RegistryResponseError, KeyError:
     trace("docker: " & getCurrentExceptionMsg())

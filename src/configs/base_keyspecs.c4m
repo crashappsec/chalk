@@ -2537,41 +2537,6 @@ Image ID is the digest of the image config json object.
 """
 }
 
-keyspec _IMAGE_DIGEST {
-    kind:     RunTimeArtifact
-    type:     string
-    standard: true
-    since:    "0.4.0"
-    shortdoc: "Reported digest of the image manifest"
-    doc: """
-The image digest reported by docker for an image.
-This is the digest of the image manifest as its referenced in
-the registry.
-
-This key assumes registry v2 spec which guarantees digest is
-the same across different registries.
-"""
-}
-
-keyspec _IMAGE_LIST_DIGEST {
-    kind:     RunTimeArtifact
-    type:     string
-    standard: true
-    since:    "0.4.0"
-    shortdoc: "Reported digest of the image manifest"
-    doc: """
-The manifest list digest for an image.
-This is only reported for images which built manifest list
-such as multi-platform builds or buildx builds which pushed
-additional metadata to the registry such as `--provenance`.
-This digest can be used to lookup that metdata back from the
-registry.
-
-This key assumes registry v2 spec which guarantees digest is
-the same across different registries.
-"""
-}
-
 keyspec _IMAGE_COMMENT {
     kind:     RunTimeArtifact
     type:     string
@@ -3925,24 +3890,97 @@ keyspec _INSTANCE_NETWORKS {
 
 keyspec _REPO_TAGS {
     kind:             RunTimeArtifact
-    type:             list[string]
+    type:             dict[string, dict[string, dict[string, string]]]
     standard:         true
     since:            "0.1.0"
     doc: """
 When reporting on operations involving a repository (e.g., a push or
 pull), any tags associated with the artifact in the operation.
+The structure is as follows:
+
+* normalized registry name (domain and port if any)
+* repository name
+* tag
+* digest tag points to
+
+For example:
+
+```json
+{
+  "_REPO_TAGS": {
+    "registry-1.docker.io": {
+      "library/alpine": {
+        "latest": "1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a"
+      }
+    }
+  }
+}
+```
 """
 }
 
 keyspec _REPO_DIGESTS {
     kind:             RunTimeArtifact
-    type:             dict[string, string]
+    type:             dict[string, dict[string, list[string]]]
     standard:         true
     since:            "0.1.0"
     doc: """
 When reporting on operations involving a repository (e.g., a push or
-pull), any SHA256 digests associated with the artifact in the
-operation, mapped to the associated tag.
+pull), any SHA256 image manifest digests associated with the artifact
+in the operation. The structure is as follows:
+
+* normalized registry name (domain and port if any)
+* repository name
+* list of digests which were observed in registry
+
+For example:
+
+```json
+{
+  "_REPO_DIGESTS": {
+    "registry-1.docker.io": {
+      "library/alpine": [
+        "029a752048e32e843bd6defe3841186fb8d19a28dae8ec287f433bb9d6d1ad85"
+      ]
+    }
+  }
+}
+
+Note that even though a single image configuration is most likely unique
+across a single registry, there could be multiple manifests.
+For example manifest contains image annotations hence any annotations mutation
+will yield new manifest digest.
+```
+"""
+}
+
+keyspec _REPO_LIST_DIGESTS {
+    kind:             RunTimeArtifact
+    type:             dict[string, dict[string, list[string]]]
+    standard:         true
+    since:            "0.4.15"
+    doc: """
+When reporting on operations involving a repository (e.g., a push or
+pull), any SHA256 list manifest digests associated with the artifact
+in the operation. The structure is as follows:
+
+* normalized registry name (domain and port if any)
+* repository name
+* list of list digests which were observed in registry
+
+For example:
+
+```json
+{
+  "_REPO_LIST_DIGESTS": {
+    "registry-1.docker.io": {
+      "library/alpine": [
+        "1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a"
+      ]
+    }
+  }
+}
+```
 """
 }
 

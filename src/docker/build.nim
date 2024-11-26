@@ -134,7 +134,7 @@ proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
       continue
     try:
       let manifest = fetchManifestForImage(s.image, ctx.platforms)
-      s.image = manifest.nameRef()
+      s.image = manifest.asImage()
     except RegistryResponseError:
       trace("docker: could not pin " & $s.image & " due to: " & getCurrentExceptionMsg())
     except:
@@ -369,15 +369,17 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
     # in some cases even with --push, repo digests show up as blank in docker inspect
     # but we might know the digest from the --metadata-file so we normalize to that
     let
+      names  = parseImages(ctx.metadataFile{"image.name"}.getStr().split(","))
       config = ctx.metadataFile{"containerimage.config.digest"}.getStr()
       maybe  = ctx.metadataFile{"containerimage.digest"}.getStr()
       # if the digest matches config digest we know this is config digest (image id)
       # and not image digest most likely because there was no --push
       # and therefore digest is unknown at this time
       digest = if config == maybe: "" else: maybe
+      repos  = if digest == "": @[] else: names.withDigest(digest)
     # image was loaded to docker cache
     for platform, chalk in chalksByPlatform:
-      chalk.collectImage(ctx.iidFile, digest = digest)
+      chalk.collectImage(ctx.iidFile, repos = repos)
   elif len(ctx.foundTags) > 0:
     trace("docker: inspecting pushed image from registry")
     # iidfile can be one of in order of precedence:
@@ -389,6 +391,7 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
       names  = parseImages(ctx.metadataFile{"image.name"}.getStr().split(","))
     for platform, chalk in chalksByPlatform:
       let name = ctx.foundTags[0].withDigest(digest)
+      trace("docker: inspecting " & $name & " for " & $platform)
       chalk.collectImageManifest(name, otherNames = names)
   else:
     # this case in theory should never happen

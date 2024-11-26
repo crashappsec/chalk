@@ -112,16 +112,19 @@ proc getDockerInfo*(): string =
 proc getDockerInfoSubList*(key: string): seq[string] =
   let lower = key.toLower()
   result = @[]
-  var found = false
+  var
+    found  = false
+    indent = 0
   for line in getDockerInfo().splitLines():
     if line.strip().toLower() == lower:
-      found = true
+      found  = true
+      indent = len(line) - len(line.strip(trailing = false))
       continue
     if not found:
       continue
     # all list entries are indented
-    # so if a line doesnt have indent we exhaused relevant lines
-    if line.strip() == line:
+    # so if a line has same indent as header we exhaused relevant lines
+    if len(line) - len(line.strip(trailing = false)) <= indent:
       break
     result.add(line.strip())
 
@@ -151,7 +154,7 @@ proc readDockerHostFile*(path: string): string =
   return output.stdOut
 
 proc readFirstDockerHostFile*(paths: seq[string]): tuple[path: string, content: string] =
-  for path in paths.toSet():
+  for path in paths.toHashSet():
     try:
       return (path, readDockerHostFile(path))
     except:
