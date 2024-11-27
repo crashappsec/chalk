@@ -59,6 +59,7 @@ type
                                      ## below, instead.
     fsRef*:         string           ## Reference for this artifact on a fs
     platform*:      DockerPlatform   ## platform
+    baseChalk*:     ChalkObj
     repos*:         OrderedTableRef[string, DockerImageRepo] ## all images where image was tagged/pushed
     imageId*:       string           ## Image ID if this is a docker image
     containerId*:   string           ## Container ID if this is a container
@@ -314,7 +315,6 @@ type
 
   DockerManifest* = ref object
     name*:             DockerImage # where manifest was fetched from
-    otherNames*:       seq[DockerImage]
     digest*:           string
     mediaType*:        string
     size*:             int

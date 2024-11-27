@@ -202,6 +202,8 @@ proc collectImageFrom(chalk:    ChalkObj,
     variant            = caseless{"variant"}.getStr()
     platform           = DockerPlatform(os: os, architecture: arch, variant: variant)
     annotations        = newJObject()
+  if chalk.platform != nil and chalk.platform != platform:
+    raise newException(ValueError, "platform does not match chalk platform")
   if chalk.name == "":
     chalk.name         = name
   if chalk.cachedHash == "":
@@ -220,7 +222,7 @@ proc collectImageFrom(chalk:    ChalkObj,
     try:
       let
         manifest  = fetchImageManifest(repo, platform)
-        imageRepo = manifest.asImageRepo()
+        imageRepo = manifest.asImageRepo(tag = repo.tag)
       annotations.update(manifest.annotations)
       chalk.repos[repo.repo] = imageRepo + chalk.repos.getOrDefault(repo.repo)
     except:
@@ -289,27 +291,41 @@ proc collectSBOM(chalk: ChalkObj) =
     except:
       continue
 
-proc collectImage*(chalk: ChalkObj, name: string, repos: seq[DockerImage] = @[]) =
+proc collectLocalImage*(chalk: ChalkObj,
+                        name: string,
+                        repos: seq[DockerImage] = @[]) =
   let contents = inspectImageJson(name)
-  var repo = DockerImageRepo(nil)
   chalk.collectImageFrom(contents, name, repos = repos)
   chalk.collectProvenance()
   chalk.collectSBOM()
 
-proc collectImage*(chalk: ChalkObj) =
+proc collectLocalImage*(chalk: ChalkObj) =
   if chalk.imageId == "":
     raise newException(ValueError, "docker: no image name/id to inspect")
-  chalk.collectImage(chalk.imageId)
+  chalk.collectLocalImage(chalk.imageId)
 
 proc collectImageManifest*(chalk: ChalkObj,
                            name: DockerImage,
-                           otherNames: seq[DockerImage] = @[]) =
+                           repos: seq[DockerImage] = @[]) =
   let
-    manifest = fetchImageManifest(name, chalk.platform, otherNames = otherNames)
+    manifest = fetchImageManifest(name, chalk.platform)
     contents = manifest.config.json
-  chalk.collectImageFrom(contents, $name, repos = @[manifest.asImage()])
+    allrepos = @[
+      name.withDigest(manifest.digest),
+    ] & repos.withDigest(manifest.digest)
+  chalk.collectImageFrom(contents, $name, repos = allrepos)
   chalk.collectProvenance()
   chalk.collectSBOM()
+
+proc collectImage*(chalk: ChalkObj,
+                   name: DockerImage,
+                   repos: seq[DockerImage] = @[]) =
+  try:
+    trace("docker: collecting image locally " & $name)
+    chalk.collectLocalImage(name.asRepoRef())
+  except:
+    trace("docker: collecting image falling back to manifest due to: " & getCurrentExceptionMsg())
+    chalk.collectImageManifest(name, repos = repos)
 
 proc collectContainer*(chalk: ChalkObj, name: string) =
   let

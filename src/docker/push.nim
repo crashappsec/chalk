@@ -5,15 +5,13 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import ".."/[config, collect, plugin_api, util]
+import ".."/[config, collect, util]
 import "."/[base, collect, scan]
 
 proc dockerPush*(ctx: DockerInvocation): int =
   ctx.newCmdLine = ctx.originalArgs
 
-  let
-    codec    = getPluginByName("docker")
-    chalkOpt = codec.scanImage(ctx.foundImage)
+  let chalkOpt = scanLocalImage(ctx.foundImage)
 
   if chalkOpt.isNone():
     error("docker: " & ctx.foundImage & " is not found. pushing without chalk")
@@ -39,6 +37,6 @@ proc dockerPush*(ctx: DockerInvocation): int =
 
   result = setExitCode(ctx.runMungedDockerInvocation())
 
-  chalk.collectImage() # refetch repo tags/digests
+  chalk.collectLocalImage() # refetch repo tags/digests
   chalk.collectRunTimeArtifactInfo()
   collectRunTimeHostInfo()

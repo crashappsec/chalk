@@ -8,7 +8,7 @@
 ## The `chalk extract` command.
 
 import "../docker"/[scan]
-import ".."/[config, collect, reporting, plugin_api]
+import ".."/[config, collect, reporting]
 
 proc processDockerChalk(item: ChalkObj) =
   trace("Processing artifact: " & item.name)
@@ -27,18 +27,16 @@ proc coreExtractFiles(path: seq[string]) =
     warn("No chalk marks extracted")
 
 proc coreExtractImages() =
-  var n      = 0
-  let docker = getPluginByName("docker")
-  for item in docker.scanAllImages():
+  var n = 0
+  for item in scanAllImages():
     n += 1
     item.processDockerChalk()
   if n == 0:
     warn("No docker images found.")
 
 proc coreExtractContainers() =
-  var n      = 0
-  let docker = getPluginByName("docker")
-  for item in docker.scanAllContainers():
+  var n = 0
+  for item in scanAllContainers():
     n += 1
     item.processDockerChalk()
   if n == 0:

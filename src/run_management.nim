@@ -147,7 +147,9 @@ proc newChalk*(name:         string            = "",
                extract:      ChalkDict         = ChalkDict(nil),
                cache:        RootRef           = RootRef(nil),
                codec:        Plugin            = Plugin(nil),
-               addToAllChalks                  = false): ChalkObj =
+               addToAllChalks                  = false,
+               platform                        = DockerPlatform(nil),
+               ): ChalkObj =
 
   result = ChalkObj(name:          name,
                     pid:           pid,
@@ -162,6 +164,7 @@ proc newChalk*(name:         string            = "",
                     cache:         cache,
                     myCodec:       codec,
                     failedKeys:    ChalkDict(),
+                    platform:      platform,
                    )
 
   if chalkId != "":

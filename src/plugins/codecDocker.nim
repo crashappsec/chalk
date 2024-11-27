@@ -24,7 +24,7 @@ proc dockerGetRunTimeArtifactInfo(self: Plugin, chalk: ChalkObj, ins: bool):
   # Note this only applies to images and not containers and so we only
   # recollect image metadata
   if ResourceContainer notin chalk.resourceType:
-    chalk.collectImage()
+    chalk.collectLocalImage()
 
 proc dockerGetRunTimeHostInfo(self: Plugin, chalks: seq[ChalkObj]): ChalkDict {.cdecl.} =
   result = ChalkDict()
