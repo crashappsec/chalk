@@ -376,8 +376,10 @@ def test_recursion_wrapping(chalk: Chalk, random_hex: str):
 def test_base_images(chalk: Chalk, random_hex: str):
     # most of the images below are manifest lists
     # so we create a dummy one which is guaranteed to be regular image manifest
-    image = f"{REGISTRY}/{random_hex}_image"
-    Docker.build(
+    name = f"{random_hex}_image"
+    image = f"{REGISTRY}/{name}"
+    _, base = chalk.docker_build(
+        config=CONFIGS / "docker_wrap.c4m",
         tag=image,
         content=Docker.dockerfile(
             """
@@ -392,7 +394,7 @@ def test_base_images(chalk: Chalk, random_hex: str):
     _, result = chalk.docker_build(
         content=Docker.dockerfile(
             f"""
-            ARG BASE=two
+            ARG BASE=seven
 
             FROM alpine as one
 
@@ -419,65 +421,98 @@ def test_base_images(chalk: Chalk, random_hex: str):
     )
     assert result.mark.has(
         DOCKER_TARGET="",
-        DOCKER_BASE_IMAGE=re.compile(r"ubuntu:24.04@sha256:"),
-        DOCKER_BASE_IMAGE_REPO="ubuntu",
-        DOCKER_BASE_IMAGE_TAG="24.04",
+        DOCKER_BASE_IMAGE_METADATA={
+            "_REPO_DIGESTS": {
+                REGISTRY: {
+                    name: [ANY],
+                }
+            },
+            "_REPO_TAGS": {
+                REGISTRY: {
+                    name: {
+                        "latest": ANY,
+                    },
+                }
+            },
+            **{k: IfExists(v) for k, v in base.mark.items() if not k.startswith("_")},
+        },
+        DOCKER_BASE_IMAGE=re.compile(rf"{image}:latest@sha256:"),
+        DOCKER_BASE_IMAGE_REPO=image,
+        DOCKER_BASE_IMAGE_REGISTRY=REGISTRY,
+        DOCKER_BASE_IMAGE_NAME=name,
+        DOCKER_BASE_IMAGE_TAG="latest",
         DOCKER_BASE_IMAGE_DIGEST=ANY,
         DOCKER_BASE_IMAGES={
             "one": {
                 "from": re.compile("alpine@sha256:"),
-                "name": re.compile("alpine@sha256:"),
+                "uri": re.compile("alpine@sha256:"),
                 "repo": "alpine",
+                "registry": "registry-1.docker.io",
+                "name": "library/alpine",
                 "tag": MISSING,
                 "digest": ANY,
             },
             "two": {
                 "from": re.compile("ubuntu:24.04@sha256:"),
-                "name": re.compile("ubuntu:24.04@sha256:"),
+                "uri": re.compile("ubuntu:24.04@sha256:"),
                 "repo": "ubuntu",
+                "registry": "registry-1.docker.io",
+                "name": "library/ubuntu",
                 "tag": "24.04",
                 "digest": ANY,
             },
             "three": {
                 "from": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
-                "name": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
+                "uri": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
                 "repo": "busybox",
+                "registry": "registry-1.docker.io",
+                "name": "library/busybox",
                 "tag": MISSING,
                 "digest": "9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
             },
             "four": {
                 "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
-                "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                "uri": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
                 "repo": "nginx",
+                "registry": "registry-1.docker.io",
+                "name": "library/nginx",
                 "tag": "1.27.0",
                 "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
             },
             "five": {
                 "from": "one",
-                "name": re.compile("alpine@sha256:"),
+                "uri": re.compile("alpine@sha256:"),
                 "repo": "alpine",
+                "registry": "registry-1.docker.io",
+                "name": "library/alpine",
                 "tag": MISSING,
                 "digest": ANY,
             },
             "six": {
                 "from": "scratch",
-                "name": "scratch",
+                "uri": "scratch",
                 "repo": "scratch",
+                "registry": MISSING,
+                "name": "scratch",
                 "tag": MISSING,
                 "digest": MISSING,
             },
             "seven": {
                 "from": re.compile(f"{image}:latest@sha256:"),
-                "name": re.compile(f"{image}:latest@sha256:"),
+                "uri": re.compile(f"{image}:latest@sha256:"),
                 "repo": image,
+                "registry": REGISTRY,
+                "name": name,
                 "tag": "latest",
                 "digest": ANY,
             },
             "": {
-                "from": "two",
-                "name": re.compile("ubuntu:24.04@sha256:"),
-                "repo": "ubuntu",
-                "tag": "24.04",
+                "from": "seven",
+                "uri": re.compile(f"{image}:latest@sha256:"),
+                "repo": image,
+                "registry": REGISTRY,
+                "name": name,
+                "tag": "latest",
                 "digest": ANY,
             },
         },
@@ -485,8 +520,10 @@ def test_base_images(chalk: Chalk, random_hex: str):
             "two": [
                 {
                     "from": "docker",
-                    "name": "docker",
+                    "uri": "docker",
                     "repo": "docker",
+                    "registry": "registry-1.docker.io",
+                    "name": "library/docker",
                     "tag": MISSING,
                     "digest": MISSING,
                     "src": ["/usr/local/bin/docker"],
@@ -494,8 +531,10 @@ def test_base_images(chalk: Chalk, random_hex: str):
                 },
                 {
                     "from": "busybox:latest",
-                    "name": "busybox:latest",
+                    "uri": "busybox:latest",
                     "repo": "busybox",
+                    "registry": "registry-1.docker.io",
+                    "name": "library/busybox",
                     "tag": "latest",
                     "digest": MISSING,
                     "src": ["/bin/busybox"],
@@ -505,8 +544,10 @@ def test_base_images(chalk: Chalk, random_hex: str):
             "five": [
                 {
                     "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
-                    "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                    "uri": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
                     "repo": "nginx",
+                    "registry": "registry-1.docker.io",
+                    "name": "library/nginx",
                     "tag": "1.27.0",
                     "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
                     "src": ["/usr/sbin/nginx"],
@@ -514,8 +555,10 @@ def test_base_images(chalk: Chalk, random_hex: str):
                 },
                 {
                     "from": "one",
-                    "name": re.compile("alpine@sha256:"),
+                    "uri": re.compile("alpine@sha256:"),
                     "repo": "alpine",
+                    "registry": "registry-1.docker.io",
+                    "name": "library/alpine",
                     "tag": MISSING,
                     "digest": ANY,
                     "src": ["/bin/sh"],
@@ -525,8 +568,10 @@ def test_base_images(chalk: Chalk, random_hex: str):
             "": [
                 {
                     "from": "four",
-                    "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                    "uri": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
                     "repo": "nginx",
+                    "registry": "registry-1.docker.io",
+                    "name": "library/nginx",
                     "tag": "1.27.0",
                     "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
                     "src": ["/usr/sbin/nginx"],

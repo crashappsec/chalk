@@ -4,7 +4,7 @@
 
 ### Breaking Changes
 
-- Changes to docker digest related fields.
+- Changes to docker image related fields.
 
   Removed keys:
 
@@ -58,6 +58,31 @@
     }
     ```
 
+  - `DOCKER_BASE_IMAGES` - sub-keys:
+
+    - `name` renamed to `uri` which contains full repository uri
+      which includes it tag and digest
+    - new `registry` key which specifies normalized registry uri
+      (domain and optional port)
+    - new `name` key specifies normalized repo name within the registry
+
+    For example:
+
+    ```json
+    {
+      "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+      "uri": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+      "repo": "nginx",
+      "registry": "registry-1.docker.io",
+      "name": "library/nginx",
+      "tag": "1.27.0",
+      "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe"
+    }
+    ```
+
+  - `DOCKER_COPY_IMAGES` - same as for `DOCKER_BASE_IMAGES` where `name` key is
+    renamed to `uri` in addition to adding `registry and `name` keys.
+
   New keys:
 
   - `_REPO_LIST_DIGESTS` is similar to `_REPO_DIGESTS` but enumerates
@@ -80,7 +105,8 @@
   In addition all image names are normalized to how they are stored
   in the registry. Note `library/` prefix for `alpine`.
 
-  ([#450](https://github.com/crashappsec/chalk/pull/450))
+  ([#450](https://github.com/crashappsec/chalk/pull/450),
+  [#453](https://github.com/crashappsec/chalk/pull/453))
 
 ### New Features
 
@@ -107,6 +133,12 @@
   - `_IMAGE_ANNOTATIONS` - found annotations for an image in registry
 
   ([#452](https://github.com/crashappsec/chalk/pull/452))
+
+- Docker base image keys:
+  - `DOCKER_BASE_IMAGE_METADATA` - all collected metadata about base image
+  - `DOCKER_BASE_IMAGE_REGISTRY` - just registry of the base image
+  - `DOCKER_BASE_IMAGE_NAME` - repo name within the registry
+    ([#453](https://github.com/crashappsec/chalk/pull/453))
 
 ## 0.4.14
 

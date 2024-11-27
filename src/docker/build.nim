@@ -27,6 +27,7 @@ import "."/[
   inspect,
   platform,
   registry,
+  scan,
   util,
   wrap,
 ]
@@ -134,7 +135,7 @@ proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
       continue
     try:
       let manifest = fetchManifestForImage(s.image, ctx.platforms)
-      s.image = manifest.asImage()
+      s.image = manifest.asImage().withTag(s.image.tag)
     except RegistryResponseError:
       trace("docker: could not pin " & $s.image & " due to: " & getCurrentExceptionMsg())
     except:
@@ -332,15 +333,23 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   result = runChalkSubScan(usableContexts, "insert").report
   trace("docker: subscan complete.")
 
-proc collectBeforeChalkTime*(chalk: ChalkObj, ctx: DockerInvocation) =
+proc collectBaseImage(chalk: ChalkObj, baseSection: DockerFileSection): ChalkDict =
+  result = ChalkDict()
+  let baseChalkOpt = scanImage(baseSection.image, platform = chalk.platform)
+  if baseChalkOpt.isSome():
+    chalk.baseChalk = baseChalkOpt.get()
+    result.update(chalk.baseChalk.collectedData)
+
+proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
   let
-    base              = ctx.getBaseDockerSection()
+    baseSection       = ctx.getBaseDockerSection()
     dict              = chalk.collectedData
     git               = getPluginByName("vctl_git")
     projectRootPath   = git.gitFirstDir().parentDir()
     dockerfileRelPath = getRelativePathBetween(projectRootPath, ctx.dockerFileLoc)
   dict.setIfNeeded("DOCKERFILE_PATH",                  ctx.dockerFileLoc)
   dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",      dockerfileRelPath)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_METADATA",       chalk.collectBaseImage(baseSection))
   dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",       ctx.foundExtraContexts)
   dict.setIfNeeded("DOCKER_CONTEXT",                   ctx.foundContext)
   dict.setIfNeeded("DOCKER_FILE",                      ctx.inDockerFile)
@@ -349,10 +358,12 @@ proc collectBeforeChalkTime*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_LABELS",                    ctx.foundLabels)
   dict.setIfNeeded("DOCKER_ANNOTATIONS",               ctx.foundAnnotations)
   dict.setIfNeeded("DOCKER_TAGS",                      ctx.foundTags.asRepoTag())
-  dict.setIfNeeded("DOCKER_BASE_IMAGE",                $(base.image))
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",           base.image.repo)
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_TAG",            base.image.tag)
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST",         base.image.digest)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE",                $(baseSection.image))
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",           baseSection.image.repo)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_REGISTRY",       baseSection.image.registry)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_NAME",           baseSection.image.name)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_TAG",            baseSection.image.tag)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST",         baseSection.image.digest)
   dict.setIfNeeded("DOCKER_BASE_IMAGES",               ctx.formatBaseImages())
   dict.setIfNeeded("DOCKER_COPY_IMAGES",               ctx.formatCopyImages())
   # note this key is expected to be empty string for alias-less targets
@@ -380,7 +391,7 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
       repos  = if digest == "": @[] else: names.withDigest(digest)
     # image was loaded to docker cache
     for platform, chalk in chalksByPlatform:
-      chalk.collectImage(ctx.iidFile, repos = repos)
+      chalk.collectLocalImage(ctx.iidFile, repos = repos)
   elif len(ctx.foundTags) > 0:
     trace("docker: inspecting pushed image from registry")
     # iidfile can be one of in order of precedence:
@@ -393,7 +404,7 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
     for platform, chalk in chalksByPlatform:
       let name = ctx.foundTags[0].withDigest(digest)
       trace("docker: inspecting " & $name & " for " & $platform)
-      chalk.collectImageManifest(name, otherNames = names)
+      chalk.collectImageManifest(name, repos = names)
   else:
     # this case in theory should never happen
     # as iid file when present should always be either locally loaded image
