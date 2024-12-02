@@ -11,7 +11,7 @@
 
 import std/[json, sets]
 import ".."/[config, chalkjson, util]
-import "."/[inspect, manifest, json, ids]
+import "."/[inspect, manifest, json, ids, git]
 
 # https://docs.docker.com/engine/api/v1.44/#tag/Image/operation/ImageInspect
 # https://github.com/opencontainers/image-spec/blob/main/config.md
@@ -271,6 +271,11 @@ proc collectImageFrom(chalk:    ChalkObj,
     chalk.setIfNeeded("_REPO_LIST_DIGESTS", repoListDigests)
     chalk.setIfNeeded("_REPO_TAGS",         repoTags)
     chalk.setIfNeeded("_IMAGE_ANNOTATIONS", annotations.nimJsonToBox())
+    chalk.setIfNeeded("COMMIT_ID",          annotations{"org.opencontainers.image.revision"}.getStr())
+    let source = annotations{"org.opencontainers.image.source"}.getStr()
+    if isGitContext(source):
+      let (remote, head, subdir) = splitContext(source)
+      chalk.setIfNeeded("ORIGIN_URI",       remote)
 
 proc collectProvenance(chalk: ChalkObj) =
   if not isSubscribedKey("_IMAGE_PROVENANCE"):

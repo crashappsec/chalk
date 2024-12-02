@@ -31,6 +31,7 @@ from .conf import (
 )
 from .utils.dict import ANY, MISSING, Contains, IfExists
 from .utils.docker import Docker
+from .utils.git import Git
 from .utils.log import get_logger
 from .utils.os import run
 
@@ -373,7 +374,14 @@ def test_recursion_wrapping(chalk: Chalk, random_hex: str):
     assert run
 
 
-def test_base_images(chalk: Chalk, random_hex: str):
+def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
+    (
+        Git(tmp_data_dir)
+        .init(remote="git@github.com:crashappsec/foo.git", branch="main")
+        .add()
+        .commit("init")
+    )
+
     # most of the images below are manifest lists
     # so we create a dummy one which is guaranteed to be regular image manifest
     name = f"{random_hex}_image"
@@ -389,6 +397,12 @@ def test_base_images(chalk: Chalk, random_hex: str):
         ),
         push=True,
         buildx=True,
+    )
+    assert base.mark.has(
+        COMMIT_ID=ANY,
+        ORIGIN_URI="git@github.com:crashappsec/foo.git",
+        DOCKER_BASE_IMAGE_COMMIT_ID=ANY,
+        DOCKER_BASE_IMAGE_ORIGIN_URI="https://github.com/alpinelinux/docker-alpine.git",
     )
 
     _, result = chalk.docker_build(
@@ -421,21 +435,13 @@ def test_base_images(chalk: Chalk, random_hex: str):
     )
     assert result.mark.has(
         DOCKER_TARGET="",
-        DOCKER_BASE_IMAGE_METADATA={
-            "_REPO_DIGESTS": {
-                REGISTRY: {
-                    name: [ANY],
-                }
-            },
-            "_REPO_TAGS": {
-                REGISTRY: {
-                    name: {
-                        "latest": ANY,
-                    },
-                }
-            },
-            **{k: IfExists(v) for k, v in base.mark.items() if not k.startswith("_")},
+        DOCKER_BASE_IMAGE_CHALK={
+            k: IfExists(v) if not k.startswith("_") else MISSING
+            for k, v in base.mark.items()
         },
+        DOCKER_BASE_IMAGE_METADATA_ID=base.mark["METADATA_ID"],
+        DOCKER_BASE_IMAGE_COMMIT_ID=base.mark["COMMIT_ID"],
+        DOCKER_BASE_IMAGE_ORIGIN_URI=base.mark["ORIGIN_URI"],
         DOCKER_BASE_IMAGE=re.compile(rf"{image}:latest@sha256:"),
         DOCKER_BASE_IMAGE_REPO=image,
         DOCKER_BASE_IMAGE_REGISTRY=REGISTRY,
@@ -1492,6 +1498,7 @@ def test_git_context(
     random_hex: str,
 ):
     tmp_file.write_text(os.environ["GITHUB_TOKEN"])
+    remote = context.split("#")[0]
 
     _, build = chalk.docker_build(
         context=context,
@@ -1500,7 +1507,10 @@ def test_git_context(
         secrets={"GIT_AUTH_TOKEN": tmp_file} if private else {},
         buildkit=buildkit,
     )
-    assert build.mark
+    assert build.mark.has(
+        ORIGIN_URI=remote,
+        COMMIT_ID=ANY,
+    )
 
 
 # extract on image id, and image name, running container id + container name, exited container id + container name
