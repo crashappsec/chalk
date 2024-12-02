@@ -254,16 +254,19 @@ proc collectImageFrom(chalk:    ChalkObj,
         repoListDigests[registry][i.name].add(i.digest)
         allDigests.incl(i.digest)
       for i in repo.tagImages:
-        discard repoTags.hasKeyOrPut(registry, newOrderedTable[string, OrderedTableRef[string, string]]())
-        discard repoTags[registry].hasKeyOrPut(i.name, newOrderedTable[string, string]())
-        let
-          manifest = fetchListOrImageManifest(i, platforms = @[platform])
-          digest   = manifest.digest.extractDockerHash()
-        if digest notin allDigests:
-          warn("docker: could not match docker image tag " & $i & " digest " & digest &
-               " to a known list or image digest " & $allDigests)
-          continue
-        repoTags[registry][i.name][i.tag] = digest
+        try:
+          let
+            manifest = fetchListOrImageManifest(i, platforms = @[platform])
+            digest   = manifest.digest.extractDockerHash()
+          if digest notin allDigests:
+            warn("docker: could not match docker image tag " & $i & " digest " & digest &
+                 " to a known list or image digest " & $allDigests)
+            continue
+          discard repoTags.hasKeyOrPut(registry, newOrderedTable[string, OrderedTableRef[string, string]]())
+          discard repoTags[registry].hasKeyOrPut(i.name, newOrderedTable[string, string]())
+          repoTags[registry][i.name][i.tag] = digest
+        except:
+          trace("docker: unable to find docker tag manifest " & getCurrentExceptionMsg())
     chalk.setIfNeeded("_REPO_DIGESTS",      repoDigests)
     chalk.setIfNeeded("_REPO_LIST_DIGESTS", repoListDigests)
     chalk.setIfNeeded("_REPO_TAGS",         repoTags)

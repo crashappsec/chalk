@@ -334,11 +334,19 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   trace("docker: subscan complete.")
 
 proc collectBaseImage(chalk: ChalkObj, baseSection: DockerFileSection): ChalkDict =
+  trace("docker: collecting chalkmark from base image " &
+        $baseSection.image & " for " & $chalk.platform)
   result = ChalkDict()
-  let baseChalkOpt = scanImage(baseSection.image, platform = chalk.platform)
-  if baseChalkOpt.isSome():
-    chalk.baseChalk = baseChalkOpt.get()
-    result.update(chalk.baseChalk.collectedData)
+  try:
+    let baseChalkOpt = scanImage(baseSection.image, platform = chalk.platform)
+    if baseChalkOpt.isSome():
+      chalk.baseChalk = baseChalkOpt.get()
+      result.update(chalk.baseChalk.collectedData)
+    else:
+      trace("docker: base image is not chalked " & $baseSection.image)
+  except:
+    trace("docker: unable to scan base image due to: " & getCurrentExceptionMsg())
+    raise
 
 proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
   let

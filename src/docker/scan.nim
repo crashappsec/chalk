@@ -10,7 +10,7 @@
 ## scan - create new chalk object and collect docker info into it
 
 import ".."/[config, plugin_api]
-import "."/[collect, inspect, extract]
+import "."/[collect, ids, inspect, extract]
 
 proc scanLocalImage*(item: string): Option[ChalkObj] =
   let chalk = newChalk(name    = item,
@@ -43,7 +43,7 @@ proc scanImage*(item: DockerImage, platform: DockerPlatform): Option[ChalkObj] =
     addUnmarked($item)
   return some(chalk)
 
-proc scanImageOrContainer*(item: string): Option[ChalkObj] =
+proc scanLocalImageOrContainer*(item: string): Option[ChalkObj] =
   let chalk = newChalk(name    = item,
                        codec   = getPluginByName("docker"))
   var image = item
@@ -75,7 +75,7 @@ proc scanImageOrContainer*(item: string): Option[ChalkObj] =
 iterator scanAllContainers*(): ChalkObj =
   for id in allContainerIDs():
     trace("docker: found container with ID = " & id)
-    yield scanImageOrContainer(id).get()
+    yield scanLocalImageOrContainer(id).get()
 
 iterator scanAllImages*(): ChalkObj =
   for id in allImageIDs():
