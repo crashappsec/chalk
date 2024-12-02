@@ -13,7 +13,7 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/psf/black
-    rev: 24.8.0 # sync:black:tests/functional/poetry.lock
+    rev: 24.10.0 # sync:black:tests/functional/poetry.lock
     hooks:
       - id: black
 
@@ -61,7 +61,7 @@ repos:
   #     )$
 
   - repo: https://github.com/tcort/markdown-link-check
-    rev: v3.12.2
+    rev: v3.13.6
     hooks:
       - id: markdown-link-check
         args:
