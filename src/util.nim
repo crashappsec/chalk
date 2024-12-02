@@ -631,7 +631,7 @@ proc getRelativePathBetween*(fromPath: string, toPath: string) : string =
   ## path of the file's `toPath`. Return nothing if its outside the project root,
   ## if `toPath` is an empty string or, if Dockerfile contents was passed via stdin.
   result = toPath.relativePath(fromPath)
-  if result.startsWith("..") or result == "" or result.endsWith(":stdin:"):
+  if result.startsWith("..") or result == "" or result.endsWith(stdinIndicator):
     trace("File is ephemeral or not contained within VCS project")
     return ""
 
