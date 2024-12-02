@@ -333,20 +333,34 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   result = runChalkSubScan(usableContexts, "insert").report
   trace("docker: subscan complete.")
 
-proc collectBaseImage(chalk: ChalkObj, baseSection: DockerFileSection): ChalkDict =
+proc collectBaseImage(chalk: ChalkObj, baseSection: DockerFileSection) =
   trace("docker: collecting chalkmark from base image " &
         $baseSection.image & " for " & $chalk.platform)
-  result = ChalkDict()
   try:
     let baseChalkOpt = scanImage(baseSection.image, platform = chalk.platform)
-    if baseChalkOpt.isSome():
-      chalk.baseChalk = baseChalkOpt.get()
-      result.update(chalk.baseChalk.collectedData)
+    if baseChalkOpt.isNone():
+      trace("docker: base image could not be scanned")
+      return
+    let
+      baseChalk = baseChalkOpt.get(ChalkObj())
+      dict      = chalk.collectedData
+      collected =
+        if baseChalk.collectedData != nil:
+          baseChalk.collectedData
+        else:
+          ChalkDict()
+    chalk.baseChalk = baseChalk
+    if baseChalk.marked:
+      dict.setIfNeeded("DOCKER_BASE_IMAGE_CHALK", baseChalk.extract)
     else:
       trace("docker: base image is not chalked " & $baseSection.image)
+    for k, v in collected:
+      let suffix = k.strip(chars = {'_'})
+      dict.setIfNeeded("DOCKER_BASE_IMAGE_" & suffix, baseChalk.collectedData[k])
+      # some keys already start with IMAGE such as _IMAGE_ANNOTATIONS
+      dict.setIfNeeded("DOCKER_BASE_" & suffix, baseChalk.collectedData[k])
   except:
     trace("docker: unable to scan base image due to: " & getCurrentExceptionMsg())
-    raise
 
 proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
   let
@@ -355,9 +369,9 @@ proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
     git               = getPluginByName("vctl_git")
     projectRootPath   = git.gitFirstDir().parentDir()
     dockerfileRelPath = getRelativePathBetween(projectRootPath, ctx.dockerFileLoc)
+  chalk.collectBaseImage(baseSection)
   dict.setIfNeeded("DOCKERFILE_PATH",                  ctx.dockerFileLoc)
   dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",      dockerfileRelPath)
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_METADATA",       chalk.collectBaseImage(baseSection))
   dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",       ctx.foundExtraContexts)
   dict.setIfNeeded("DOCKER_CONTEXT",                   ctx.foundContext)
   dict.setIfNeeded("DOCKER_FILE",                      ctx.inDockerFile)

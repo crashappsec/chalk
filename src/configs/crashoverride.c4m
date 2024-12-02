@@ -242,7 +242,10 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.DOCKER_ADDITIONAL_CONTEXTS.use          = true
   ~key.DOCKER_CHALK_ADDED_LABELS.use           = true
   ~key.DOCKER_CHALK_ADDED_TO_DOCKERFILE.use    = true
-  ~key.DOCKER_BASE_IMAGE_METADATA.use          = true
+  ~key.DOCKER_BASE_IMAGE_CHALK.use             = true
+  ~key.DOCKER_BASE_IMAGE_METADATA_ID.use       = true
+  ~key.DOCKER_BASE_IMAGE_COMMIT_ID.use         = true
+  ~key.DOCKER_BASE_IMAGE_ORIGIN_URI.use        = true
   ~key.DOCKER_BASE_IMAGE.use                   = true
   ~key.DOCKER_BASE_IMAGE_REPO.use              = true
   ~key.DOCKER_BASE_IMAGE_REGISTRY.use          = true

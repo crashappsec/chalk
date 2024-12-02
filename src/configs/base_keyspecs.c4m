@@ -1777,21 +1777,51 @@ alias of the last target/section within the Dockerfile.
 """
 }
 
-keyspec DOCKER_BASE_IMAGE_METADATA {
+keyspec DOCKER_BASE_IMAGE_CHALK {
     kind:             ChalkTimeArtifact
     type:             `x
     standard:         true
     system:           false
     since:            "0.4.15"
     doc: """
-Collected metadata about the base image. The format is similar to a chalk mark
-which includes both chalkmark keys (if any) as well as other artifact metadata.
-When chalkmark is not available, chalk attempts to collect contextual information
-about the time from:
+If the base image is chalked, its full chalkmark.
+"""
+}
 
-* image config which includes image labels
-* image attestations (both docker attestations or cosign)
-* image OCI annotations
+keyspec DOCKER_BASE_IMAGE_METADATA_ID {
+    kind:             ChalkTimeArtifact
+    type:             `x
+    standard:         true
+    system:           false
+    since:            "0.4.15"
+    doc: """
+If the base image is chalked, its METADATA_ID.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_ORIGIN_URI {
+    kind:             ChalkTimeArtifact
+    type:             `x
+    standard:         true
+    system:           false
+    since:            "0.4.15"
+    doc: """
+If the base image is chalked, its `ORIGIN_URI`.
+Otherwise origin is attempted to be fetched from
+OCI image annotation `org.opencontainers.image.source`.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_COMMIT_ID {
+    kind:             ChalkTimeArtifact
+    type:             `x
+    standard:         true
+    system:           false
+    since:            "0.4.15"
+    doc: """
+If the base image is chalked, its `COMMIT_ID`.
+Otherwise origin is attempted to be fetched from
+OCI image annotation `org.opencontainers.image.revision`.
 """
 }
 

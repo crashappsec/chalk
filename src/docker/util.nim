@@ -129,3 +129,8 @@ proc getChalkKey*(chalk: ChalkObj, k: string): string =
     return $(chalk.collectedData[key])
 
   raise newException(KeyError, "key could not be collected. Skipping environment variable.")
+
+proc getValue*(secret: DockerSecret): string =
+  if secret.src != "":
+    return tryToLoadFile(secret.src)
+  return ""

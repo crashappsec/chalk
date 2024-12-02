@@ -93,11 +93,6 @@ proc getAllBuildArgs*(ctx: DockerInvocation): Table[string, string] =
   for k, v in dockerProbeDefaultPlatforms():
     result[k] = $v
 
-proc getValue*(secret: DockerSecret): string =
-  if secret.src != "":
-    return tryToLoadFile(secret.src)
-  return ""
-
 proc getSecret*(ctx: DockerInvocation, name: string): DockerSecret =
   let empty = DockerSecret(id: "", src: "")
   return ctx.foundSecrets.getOrDefault(name, empty)
