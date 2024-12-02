@@ -412,7 +412,7 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
       trace("Processing docker artifacts.")
       for item in iterInfo.otherPaths:
         trace("Processing artifact: " & item)
-        let objOpt = scanImageOrContainer(item)
+        let objOpt = scanLocalImageOrContainer(item)
         if objOpt.isNone():
           if len(iterInfo.filePaths) > 0:
             error(item & ": No file, image or container found with this name")
