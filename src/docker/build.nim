@@ -7,7 +7,6 @@
 
 import std/json
 import ".."/[
-  chalk_common,
   chalkjson,
   collect,
   config,

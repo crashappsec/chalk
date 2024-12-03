@@ -11,7 +11,7 @@
 ## is in configs/dockercmd.c4m), so we really just need to look at
 ## the command and flag info returned.
 
-import ".."/[chalk_common, config]
+import ".."/[config]
 import "."/[ids]
 
 proc extractBuildx(ctx: DockerInvocation) =

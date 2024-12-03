@@ -85,7 +85,7 @@
 ### Fixes
 
 - `DOCKERFILE_PATH_WITHIN_VCTL` key is no longer reported when providing Dockerfile contents
-via `stdin` ([#454](https://github.com/crashappsec/chalk/pull/454)).
+  via `stdin` ([#454](https://github.com/crashappsec/chalk/pull/454)).
 
 ### New Features
 
