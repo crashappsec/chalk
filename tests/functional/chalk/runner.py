@@ -79,6 +79,11 @@ class ChalkReport(ContainsMixin, dict):
         return [ChalkMark(i, report=self) for i in self["_CHALKS"]]
 
     @property
+    def artifacts(self):
+        assert len(self["_ARTIFACTS"]) > 0
+        return [ChalkMark(i, report=self) for i in self["_ARTIFACTS"]]
+
+    @property
     def marks_by_path(self):
         return ContainsMixin(
             {
@@ -93,6 +98,11 @@ class ChalkReport(ContainsMixin, dict):
     def mark(self):
         assert len(self.marks) == 1
         return self.marks[0]
+
+    @property
+    def artifact(self):
+        assert len(self.artifacts) == 1
+        return self.artifacts[0]
 
     @property
     def errors(self):
@@ -233,6 +243,14 @@ class ChalkProgram(Program):
     @property
     def marks(self):
         return self.report.marks
+
+    @property
+    def artifact(self):
+        return self.report.artifact
+
+    @property
+    def artifacts(self):
+        return self.report.artifacts
 
     @property
     def marks_by_path(self):

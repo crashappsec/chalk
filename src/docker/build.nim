@@ -349,16 +349,15 @@ proc collectBaseImage(chalk: ChalkObj, baseSection: DockerFileSection) =
           baseChalk.collectedData
         else:
           ChalkDict()
+    baseChalk.addToAllArtifacts()
+    baseChalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("base")
     chalk.baseChalk = baseChalk
-    if baseChalk.marked:
-      dict.setIfNeeded("DOCKER_BASE_IMAGE_CHALK", baseChalk.extract)
+    if baseChalk.isMarked():
+      dict.setIfNeeded("DOCKER_BASE_IMAGE_METADATA_ID", baseChalk.extract["METADATA_ID"])
     else:
       trace("docker: base image is not chalked " & $baseSection.image)
-    for k, v in collected:
-      let suffix = k.strip(chars = {'_'})
-      dict.setIfNeeded("DOCKER_BASE_IMAGE_" & suffix, baseChalk.collectedData[k])
-      # some keys already start with IMAGE such as _IMAGE_ANNOTATIONS
-      dict.setIfNeeded("DOCKER_BASE_" & suffix, baseChalk.collectedData[k])
+    if "_IMAGE_ID" in baseChalk.collectedData:
+      dict.setIfNeeded("DOCKER_BASE_IMAGE_ID", baseChalk.collectedData["_IMAGE_ID"])
   except:
     trace("docker: unable to scan base image due to: " & getCurrentExceptionMsg())
 
@@ -581,6 +580,7 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   trace("docker: collecting post-build runtime data")
   for _, chalk in chalksByPlatform:
     chalk.addToAllChalks()
+    chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("build")
     chalk.collectRunTimeArtifactInfo()
     chalk.marked = true
   collectRunTimeHostInfo()

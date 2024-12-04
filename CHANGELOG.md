@@ -140,15 +140,20 @@
   ([#452](https://github.com/crashappsec/chalk/pull/452))
 
 - Docker base image keys:
+
+  - `_OP_ARTIFACT_CONTEXT` - what is the context of the artifact.
+    For `docker build` its either `build` or `base`.
   - `DOCKER_BASE_IMAGE_REGISTRY` - just registry of the base image
   - `DOCKER_BASE_IMAGE_NAME` - repo name within the registry
-  - `DOCKER_BASE_IMAGE_CHALK` - base image chalkmark
+  - `DOCKER_BASE_IMAGE_ID` - image id (config digest) of the base image
   - `DOCKER_BASE_IMAGE_METADATA_ID` - id of the base image chalkmark
-  - `DOCKER_BASE_IMAGE_ORIGIN_URI` - origin uri of the base image,
-    either from chalkmark or from OCI annotations
-  - `DOCKER_BASE_IMAGE_COMMIT_ID` - commit id of the base image,
-    either from chalkmark or from OCI annotations
-    ([#453](https://github.com/crashappsec/chalk/pull/453))
+  - `_ARTIFACTS` - similar to `_CHALKS` but reports potentially collected
+    information about non-chalked artifacts such as the base image.
+    If the base image is chalked it can be correlated with the build
+    chalkmark via `METADATA_ID`. Otherwise both artifacts can be linked
+    via the digest or the image id.
+
+  ([#453](https://github.com/crashappsec/chalk/pull/453))
 
 ## 0.4.14
 

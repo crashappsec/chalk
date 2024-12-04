@@ -120,6 +120,7 @@ type
   CollectionCtx* = ref object
     currentErrorObject*:       Option[ChalkObj]
     allChalks*:                seq[ChalkObj]
+    allArtifacts*:             seq[ChalkObj]
     unmarked*:                 seq[string]
     report*:                   Box
     args*:                     seq[string]

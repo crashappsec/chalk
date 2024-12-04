@@ -257,7 +257,6 @@ proc collectRunTimeHostInfo*() =
             getCurrentExceptionMsg())
       dumpExOnDebug()
 
-
 # The two below functions are helpers for the artifacts() iterator
 # and the self-extractor (in the case of findChalk anyway).
 proc ignoreArtifact(path: string, regexps: seq[Regex]): bool {.inline.} =

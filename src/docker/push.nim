@@ -33,6 +33,7 @@ proc dockerPush*(ctx: DockerInvocation): int =
 
   initCollection()
   chalk.addToAllChalks()
+  chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("push")
   chalk.collectChalkTimeArtifactInfo()
 
   result = setExitCode(ctx.runMungedDockerInvocation())

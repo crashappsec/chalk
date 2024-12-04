@@ -1799,32 +1799,6 @@ If the base image is chalked, its METADATA_ID.
 """
 }
 
-keyspec DOCKER_BASE_IMAGE_ORIGIN_URI {
-    kind:             ChalkTimeArtifact
-    type:             `x
-    standard:         true
-    system:           false
-    since:            "0.4.15"
-    doc: """
-If the base image is chalked, its `ORIGIN_URI`.
-Otherwise origin is attempted to be fetched from
-OCI image annotation `org.opencontainers.image.source`.
-"""
-}
-
-keyspec DOCKER_BASE_IMAGE_COMMIT_ID {
-    kind:             ChalkTimeArtifact
-    type:             `x
-    standard:         true
-    system:           false
-    since:            "0.4.15"
-    doc: """
-If the base image is chalked, its `COMMIT_ID`.
-Otherwise origin is attempted to be fetched from
-OCI image annotation `org.opencontainers.image.revision`.
-"""
-}
-
 keyspec DOCKER_BASE_IMAGE {
     kind:             ChalkTimeArtifact
     type:             string
@@ -1893,6 +1867,18 @@ keyspec DOCKER_BASE_IMAGE_DIGEST {
     since:            "0.4.0"
     doc: """
 Only registry digest of the base image if specified in Dockerfile used to build docker image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_ID {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.4.15"
+    doc: """
+Docker image id (config digest) of the base image.
 Note this only specifies the base image of the final build target.
 """
 }
@@ -2120,6 +2106,22 @@ those listed in the documentation for the chalk-time key,
 During insertion operations, this key is redundant with
 `ARTIFACT_TYPE`, so there is generally no reason to report on both of
 these at insertion time.
+"""
+}
+
+keyspec _OP_ARTIFACT_CONTEXT {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.4.15"
+    shortdoc:         "Context of the artifact in the report"
+    doc : """
+Context of the artifact how it is referenced in the report.
+For example during a docker build, one chalkmark can be the final
+built image however there can also be a base image chalkmark.
+This key allows to differentiate in what context the same artifact
+is being referenced.
 """
 }
 
@@ -4377,6 +4379,19 @@ Used to report chalks the operation worked on.
 
 Host reports using a profile that does not configure this key to
 report will NOT output chalks.
+"""
+}
+
+keyspec _ARTIFACTS {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.4.15"
+    normalized_order: 7
+    shortdoc:         "Contains software artifact information for the current operation"
+    doc:              """
+Similar to _CHALKS but can report metadata non-chalked artifacts.
 """
 }
 

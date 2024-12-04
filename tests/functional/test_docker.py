@@ -398,11 +398,18 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
         push=True,
         buildx=True,
     )
+    assert base.artifact.has(
+        METADATA_ID=MISSING,
+        COMMIT_ID=ANY,
+        ORIGIN_URI="https://github.com/alpinelinux/docker-alpine.git",
+        _OP_ARTIFACT_CONTEXT="base",
+    )
     assert base.mark.has(
         COMMIT_ID=ANY,
         ORIGIN_URI="git@github.com:crashappsec/foo.git",
-        DOCKER_BASE_IMAGE_COMMIT_ID=ANY,
-        DOCKER_BASE_IMAGE_ORIGIN_URI="https://github.com/alpinelinux/docker-alpine.git",
+        DOCKER_BASE_IMAGE_METADATA_ID=MISSING,
+        DOCKER_BASE_IMAGE_ID=ANY,
+        _OP_ARTIFACT_CONTEXT="build",
     )
 
     _, result = chalk.docker_build(
@@ -433,15 +440,21 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             """
         ),
     )
+    assert result.artifact.contains(
+        {k: IfExists(v) for k, v in base.mark.items() if not k.startswith("_")}
+    )
+    assert result.artifact.has(
+        _OP_ARTIFACT_CONTEXT="base",
+        _IMAGE_ID=base.mark["_IMAGE_ID"],
+        METADATA_ID=base.mark["METADATA_ID"],
+        COMMIT_ID=base.mark["COMMIT_ID"],
+        ORIGIN_URI=base.mark["ORIGIN_URI"],
+    )
     assert result.mark.has(
         DOCKER_TARGET="",
-        DOCKER_BASE_IMAGE_CHALK={
-            k: IfExists(v) if not k.startswith("_") else MISSING
-            for k, v in base.mark.items()
-        },
+        _OP_ARTIFACT_CONTEXT="build",
         DOCKER_BASE_IMAGE_METADATA_ID=base.mark["METADATA_ID"],
-        DOCKER_BASE_IMAGE_COMMIT_ID=base.mark["COMMIT_ID"],
-        DOCKER_BASE_IMAGE_ORIGIN_URI=base.mark["ORIGIN_URI"],
+        DOCKER_BASE_IMAGE_ID=base.mark["_IMAGE_ID"],
         DOCKER_BASE_IMAGE=re.compile(rf"{image}:latest@sha256:"),
         DOCKER_BASE_IMAGE_REPO=image,
         DOCKER_BASE_IMAGE_REGISTRY=REGISTRY,

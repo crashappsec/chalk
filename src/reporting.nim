@@ -47,25 +47,28 @@ proc topicUnsubscribe*(args: seq[Box], unused: ConfigState): Option[Box] =
 
   return some(pack(unsubscribe(topic, `rec?`.get())))
 
-proc setPerChalkReports(tmpl: string) =
-  ## Adds the `_CHALKS` key in the `hostinfo` global to the current
-  ## collection context with whatever items were requested in the
-  ## reporting template passed.
+proc setPerChalkReports(tmpl: string, key: string, chalks: seq[ChalkObj]) =
   var reports = seq[Box](@[])
 
-  for chalk in getAllChalks():
+  for chalk in chalks:
     if not chalk.isMarked() and len(chalk.collectedData) == 0:
       continue
     let oneReport = chalk.collectedData.filterByTemplate(tmpl)
-
     if len(oneReport) != 0:
       reports.add(pack(oneReport))
 
   if len(reports) != 0:
-    hostInfo["_CHALKS"] = pack(reports)
-    forceReportKeys(["_CHALKS"])
-  elif "_CHALKS" in hostInfo:
-    hostInfo.del("_CHALKS")
+    hostInfo[key] = pack(reports)
+    forceReportKeys([key])
+  elif key in hostInfo:
+    hostInfo.del(key)
+
+proc setPerChalkReports(tmpl: string) =
+  ## Adds the `_CHALKS` key in the `hostinfo` global to the current
+  ## collection context with whatever items were requested in the
+  ## reporting template passed.
+  setPerChalkReports(tmpl, "_CHALKS",    getAllChalks())
+  setPerChalkReports(tmpl, "_ARTIFACTS", getAllArtifacts())
 
 proc buildHostReport*(tmpl: string): string =
   setPerChalkReports(tmpl)
