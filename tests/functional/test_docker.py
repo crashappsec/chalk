@@ -3,6 +3,7 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import itertools
+import operator
 import platform
 import re
 import shutil
@@ -29,7 +30,7 @@ from .conf import (
     REGISTRY_TLS_INSECURE,
     ROOT,
 )
-from .utils.dict import ANY, MISSING, Contains, IfExists
+from .utils.dict import ANY, MISSING, Contains, IfExists, Length
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
@@ -1080,6 +1081,9 @@ def test_build_and_push(
     push_result = build_result
     # if without --push at build time, explicitly push to registry
     if not push:
+        assert build_result.mark.has(
+            _IMAGE_LAYERS=MISSING,
+        )
         push_result = chalk.docker_push(tag, buildkit=buildkit)
 
     image_digest, _ = Docker.with_image_digest(build_result)
@@ -1125,6 +1129,7 @@ def test_build_and_push(
                 name: [image_digest],
             }
         },
+        _IMAGE_LAYERS=Length(1, operator.ge),
     )
 
     pull = chalk.docker_pull(tag)

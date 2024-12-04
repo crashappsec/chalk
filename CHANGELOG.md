@@ -174,6 +174,11 @@
 
   ([#453](https://github.com/crashappsec/chalk/pull/453))
 
+- `_IMAGE_LAYERS` key which collects image layer digests as it is stored
+  in the registry. This should allow to correlate base images by matching
+  layer combinations from other images.
+  ([#456](https://github.com/crashappsec/chalk/pull/456))
+
 ## 0.4.14
 
 **Nov 11, 2024**

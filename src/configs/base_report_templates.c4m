@@ -182,6 +182,7 @@ report and subtract from it.
   key._IMAGE_SIZE.use                         = true
   key._IMAGE_ROOT_FS_TYPE.use                 = true
   key._IMAGE_ROOT_FS_LAYERS.use               = true
+  key._IMAGE_LAYERS.use                       = true
   key._IMAGE_HOSTNAME.use                     = true
   key._IMAGE_DOMAINNAME.use                   = true
   key._IMAGE_USER.use                         = true
@@ -771,6 +772,7 @@ doc: """
   key._IMAGE_SIZE.use                         = true
   key._IMAGE_ROOT_FS_TYPE.use                 = true
   key._IMAGE_ROOT_FS_LAYERS.use               = true
+  key._IMAGE_LAYERS.use                       = true
   key._IMAGE_HOSTNAME.use                     = true
   key._IMAGE_DOMAINNAME.use                   = true
   key._IMAGE_USER.use                         = true
@@ -1241,6 +1243,7 @@ container.
   key._IMAGE_SIZE.use                         = true
   key._IMAGE_ROOT_FS_TYPE.use                 = true
   key._IMAGE_ROOT_FS_LAYERS.use               = true
+  key._IMAGE_LAYERS.use                       = true
   key._IMAGE_HOSTNAME.use                     = true
   key._IMAGE_DOMAINNAME.use                   = true
   key._IMAGE_USER.use                         = true
@@ -1714,6 +1717,7 @@ and keep the run-time key.
   key._IMAGE_SIZE.use                         = true
   key._IMAGE_ROOT_FS_TYPE.use                 = true
   key._IMAGE_ROOT_FS_LAYERS.use               = true
+  key._IMAGE_LAYERS.use                       = true
   key._IMAGE_HOSTNAME.use                     = true
   key._IMAGE_DOMAINNAME.use                   = true
   key._IMAGE_USER.use                         = true
