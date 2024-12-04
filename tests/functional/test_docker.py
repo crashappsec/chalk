@@ -534,6 +534,7 @@ def test_base_images(chalk: Chalk, random_hex: str):
                 }
             ],
         },
+        DOCKERFILE_PATH_WITHIN_VCTL=MISSING,
     )
 
 

@@ -71,7 +71,7 @@ proc extractDockerFile(ctx: DockerInvocation) =
     let files = unpack[seq[string]](ctx.processedFlags["file"].getValue())
     ctx.foundFileArg = files[0]
     if ctx.foundFileArg == "-":
-      ctx.dockerFileLoc = ":stdin:"
+      ctx.dockerFileLoc = stdinIndicator
     else:
       ctx.dockerFileLoc = resolvePath(ctx.foundFileArg)
 

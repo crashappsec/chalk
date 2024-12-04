@@ -51,7 +51,7 @@ proc processGitContext(ctx: DockerInvocation) =
     raise
 
 proc processDockerFile(ctx: DockerInvocation) =
-  if ctx.dockerFileLoc == ":stdin:":
+  if ctx.dockerFileLoc == stdinIndicator:
     let input           = stdin.readAll()
     ctx.inDockerFile  = input
     ctx.originalStdIn = input
