@@ -166,8 +166,8 @@
   - `DOCKER_BASE_IMAGE_NAME` - repo name within the registry
   - `DOCKER_BASE_IMAGE_ID` - image id (config digest) of the base image
   - `DOCKER_BASE_IMAGE_METADATA_ID` - id of the base image chalkmark
-  - `_ARTIFACTS` - similar to `_CHALKS` but reports potentially collected
-    information about non-chalked artifacts such as the base image.
+  - `_COLLECTED_ARTIFACTS` - similar to `_CHALKS` but reports collected
+    information about potentially non-chalked artifacts such as the base image.
     If the base image is chalked it can be correlated with the build
     chalkmark via `METADATA_ID`. Otherwise both artifacts can be linked
     via the digest or the image id.

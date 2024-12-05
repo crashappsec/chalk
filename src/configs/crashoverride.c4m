@@ -56,7 +56,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._TZ_OFFSET.use                                 = false
   ~key._DATETIME.use                                  = true
   ~key._CHALKS.use                                    = true
-  ~key._ARTIFACTS.use                                 = true
+  ~key._COLLECTED_ARTIFACTS.use                       = true
   ~key._OP_CHALK_COUNT.use                            = true
   ~key._OP_UNMARKED_COUNT.use                         = true
   ~key._OP_CMD_FLAGS.use                              = true

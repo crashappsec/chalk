@@ -80,8 +80,8 @@ class ChalkReport(ContainsMixin, dict):
 
     @property
     def artifacts(self):
-        assert len(self["_ARTIFACTS"]) > 0
-        return [ChalkMark(i, report=self) for i in self["_ARTIFACTS"]]
+        assert len(self["_COLLECTED_ARTIFACTS"]) > 0
+        return [ChalkMark(i, report=self) for i in self["_COLLECTED_ARTIFACTS"]]
 
     @property
     def marks_by_path(self):

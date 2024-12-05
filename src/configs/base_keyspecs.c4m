@@ -4382,7 +4382,7 @@ report will NOT output chalks.
 """
 }
 
-keyspec _ARTIFACTS {
+keyspec _COLLECTED_ARTIFACTS {
     kind:             RunTimeHost
     type:             string
     standard:         true

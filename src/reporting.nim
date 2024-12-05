@@ -67,8 +67,8 @@ proc setPerChalkReports(tmpl: string) =
   ## Adds the `_CHALKS` key in the `hostinfo` global to the current
   ## collection context with whatever items were requested in the
   ## reporting template passed.
-  setPerChalkReports(tmpl, "_CHALKS",    getAllChalks())
-  setPerChalkReports(tmpl, "_ARTIFACTS", getAllArtifacts())
+  setPerChalkReports(tmpl, "_CHALKS",              getAllChalks())
+  setPerChalkReports(tmpl, "_COLLECTED_ARTIFACTS", getAllArtifacts())
 
 proc buildHostReport*(tmpl: string): string =
   setPerChalkReports(tmpl)
