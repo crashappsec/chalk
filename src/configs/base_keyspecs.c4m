@@ -2750,6 +2750,16 @@ The layer IDs of the image's root filesystem
 """
 }
 
+keyspec _IMAGE_LAYERS {
+    kind:     RunTimeArtifact
+    type:     list[string]
+    standard: true
+    since:    "0.4.15"
+    doc: """
+Layer digests of the image as they are stored in the registry.
+"""
+}
+
 keyspec _IMAGE_HOSTNAME {
     kind:     RunTimeArtifact
     type:     string

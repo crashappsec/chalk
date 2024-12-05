@@ -202,6 +202,8 @@ proc collectImageFrom(chalk:    ChalkObj,
     variant            = caseless{"variant"}.getStr()
     platform           = DockerPlatform(os: os, architecture: arch, variant: variant)
     annotations        = newJObject()
+  var
+    layers             = newSeq[string]()
   if chalk.platform != nil and chalk.platform != platform:
     raise newException(ValueError, "platform does not match chalk platform")
   if chalk.name == "":
@@ -225,6 +227,8 @@ proc collectImageFrom(chalk:    ChalkObj,
         imageRepo = manifest.asImageRepo(tag = repo.tag)
       annotations.update(manifest.annotations)
       chalk.repos[repo.repo] = imageRepo + chalk.repos.getOrDefault(repo.repo)
+      for layer in manifest.layers:
+        layers.add(layer.digest)
     except:
       trace("docker: " & getCurrentExceptionMsg())
       continue
@@ -270,6 +274,7 @@ proc collectImageFrom(chalk:    ChalkObj,
     chalk.setIfNeeded("_REPO_DIGESTS",      repoDigests)
     chalk.setIfNeeded("_REPO_LIST_DIGESTS", repoListDigests)
     chalk.setIfNeeded("_REPO_TAGS",         repoTags)
+    chalk.setIfNeeded("_IMAGE_LAYERS",      layers)
     chalk.setIfNeeded("_IMAGE_ANNOTATIONS", annotations.nimJsonToBox())
     chalk.setIfNeeded("COMMIT_ID",          annotations{"org.opencontainers.image.revision"}.getStr())
     let source = annotations{"org.opencontainers.image.source"}.getStr()

@@ -294,6 +294,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._IMAGE_SIZE.use                         = true
   ~key._IMAGE_ROOT_FS_TYPE.use                 = true
   ~key._IMAGE_ROOT_FS_LAYERS.use               = true
+  ~key._IMAGE_LAYERS.use                       = true
   ~key._IMAGE_HOSTNAME.use                     = true
   ~key._IMAGE_DOMAINNAME.use                   = true
   ~key._IMAGE_USER.use                         = true
