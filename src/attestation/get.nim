@@ -6,7 +6,7 @@
 ##
 
 import std/[httpclient, net]
-import ".."/[chalk_common, config, sinks, util]
+import ".."/[config, sinks, util]
 
 type Get = ref object of AttestationKeyProvider
   location: string

@@ -195,6 +195,8 @@ proc parseImages*(names: seq[string], defaultTag = "latest"): seq[DockerImage] =
       result.add(parseImage(name, defaultTag = defaultTag))
 
 proc withTag*(self: DockerImage, tag: string): DockerImage =
+  if tag == "":
+    return self
   return (self.repo, tag, self.digest)
 
 proc isPinned*(self: DockerImage): bool =
@@ -221,6 +223,8 @@ proc isFullyQualified(self: DockerImage): bool =
   ## (e.g. via `/etc/hosts` file)
   ## https://github.com/docker/cli/blob/826fc32e82e23bb5f80e85d8777427c5f0c24b4d/cli/command/image/pull.go#L58C36-L58C56
   ## https://github.com/distribution/reference/blob/8c942b0459dfdcc5b6685581dd0a5a470f615bff/normalize.go#L143-L191
+  if self.repo == "scratch":
+    return true
   let parts = self.repo.split('/', maxsplit = 1)
   # there is no parts in the name so like "nginx"
   # so it cant be fully qualified name
@@ -250,6 +254,8 @@ proc normalize(self: DockerImage): DockerImage =
   ## normalization maps some hardcoded registry domains
   ## to their standard API domains
   # https://github.com/docker/cli/issues/3793#issuecomment-1269051403
+  if self.repo == "scratch":
+    return self
   let
     qualified        = self.qualify()
     (registry, path) = qualified.repo.splitBy("/")
@@ -313,7 +319,10 @@ proc withRegistry*(self: DockerImage, registry: string): DockerImage =
   )
 
 proc registry*(self: DockerImage): string =
-  return self.normalize().repo.split('/', maxsplit = 1)[0]
+  let parts = self.normalize().repo.split('/', maxsplit = 1)
+  if len(parts) == 1:
+    return ""
+  return parts[0]
 
 proc domain*(self: DockerImage): string =
   return self.registry.split(':', maxsplit = 1)[0]
@@ -393,12 +402,14 @@ proc exists*(self: DockerImage): bool =
 proc asRepoTag*(items: seq[DockerImage]): seq[string] =
   result = @[]
   for i in items:
-    result.add(i.asRepoTag())
+    if i.tag != "":
+      result.add(i.asRepoTag())
 
 proc asRepoDigest*(items: seq[DockerImage]): seq[string] =
   result = @[]
   for i in items:
-    result.add(i.asRepoDigest())
+    if i.digest != "":
+      result.add(i.asRepoDigest())
 
 proc asRepoRef*(items: seq[DockerImage]): seq[string] =
   result = @[]
@@ -477,9 +488,14 @@ proc getImageName*(self: ChalkObj): string =
 proc asImage*(self: DockerManifest): DockerImage =
   return self.name.withDigest(self.digest)
 
-proc asImageRepo*(self: DockerManifest): DockerImageRepo =
+proc asImageRepo*(self: DockerManifest, tag = ""): DockerImageRepo =
   if self.kind != image:
     raise newException(ValueError, "Only image manifest can be image repo referenced")
+  var tags = newSeq[string]()
+  if self.name.tag != "":
+    tags.add(self.name.tag)
+  if tag != "":
+    tags.add(tag)
   return DockerImageRepo(
     repo:    self.name.repo,
     digests: @[self.digest.extractDockerHash()].toOrderedSet(),
@@ -489,12 +505,7 @@ proc asImageRepo*(self: DockerManifest): DockerImageRepo =
       else:
         @[]
     ).toOrderedSet(),
-    tags: (
-      if self.name.tag != "":
-        @[self.name.tag]
-      else:
-        @[]
-    ).toOrderedSet(),
+    tags: tags.toOrderedSet(),
   )
 
 # ----------------------------------------------------------------------------

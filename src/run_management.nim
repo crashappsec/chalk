@@ -122,6 +122,19 @@ proc removeFromAllChalks*(o: ChalkObj) =
   if o in collectionCtx.allChalks:
     # Note that this is NOT an order-preserving delete; it's O(1)
     collectionCtx.allChalks.del(collectionCtx.allChalks.find(o))
+proc getAllArtifacts*(): seq[ChalkObj] =
+  collectionCtx.allArtifacts
+proc getAllArtifacts*(cc: CollectionCtx): seq[ChalkObj] =
+  cc.allArtifacts
+proc addToAllArtifacts*(o: ChalkObj) =
+  if o notin collectionCtx.allArtifacts:
+    collectionCtx.allArtifacts.add(o)
+proc setAllArtifacts*(s: seq[ChalkObj]) =
+  collectionCtx.allArtifacts = s
+proc removeFromAllArtifacts*(o: ChalkObj) =
+  if o in collectionCtx.allArtifacts:
+    # Note that this is NOT an order-preserving delete; it's O(1)
+    collectionCtx.allArtifacts.del(collectionCtx.allArtifacts.find(o))
 proc getUnmarked*(): seq[string] =
   collectionCtx.unmarked
 proc addUnmarked*(s: string) =
@@ -147,7 +160,9 @@ proc newChalk*(name:         string            = "",
                extract:      ChalkDict         = ChalkDict(nil),
                cache:        RootRef           = RootRef(nil),
                codec:        Plugin            = Plugin(nil),
-               addToAllChalks                  = false): ChalkObj =
+               addToAllChalks                  = false,
+               platform                        = DockerPlatform(nil),
+               ): ChalkObj =
 
   result = ChalkObj(name:          name,
                     pid:           pid,
@@ -162,6 +177,7 @@ proc newChalk*(name:         string            = "",
                     cache:         cache,
                     myCodec:       codec,
                     failedKeys:    ChalkDict(),
+                    platform:      platform,
                    )
 
   if chalkId != "":

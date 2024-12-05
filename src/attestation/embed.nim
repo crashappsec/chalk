@@ -6,7 +6,7 @@
 ##
 
 import std/[posix]
-import ".."/[chalk_common, config]
+import ".."/[config]
 import "."/utils
 
 type Embed = ref object of AttestationKeyProvider

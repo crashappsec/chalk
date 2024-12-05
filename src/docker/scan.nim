@@ -9,14 +9,14 @@
 ##
 ## scan - create new chalk object and collect docker info into it
 
-import ".."/[config]
-import "."/[collect, inspect, extract]
+import ".."/[config, plugin_api]
+import "."/[collect, ids, inspect, extract]
 
-proc scanImage*(codec: Plugin, item: string): Option[ChalkObj] =
+proc scanLocalImage*(item: string): Option[ChalkObj] =
   let chalk = newChalk(name    = item,
-                       codec   = codec)
+                       codec   = getPluginByName("docker"))
   try:
-    chalk.collectImage(item)
+    chalk.collectLocalImage(item)
   except:
     return none(ChalkObj)
   try:
@@ -26,9 +26,26 @@ proc scanImage*(codec: Plugin, item: string): Option[ChalkObj] =
     addUnmarked(item)
   return some(chalk)
 
-proc scanImageOrContainer*(codec: Plugin, item: string): Option[ChalkObj] =
+proc scanImage*(item: DockerImage, platform: DockerPlatform): Option[ChalkObj] =
+  if $item == "scratch":
+    return none(ChalkObj)
+  var chalk = newChalk(name     = $item,
+                       codec    = getPluginByName("docker"),
+                       platform = platform)
+  try:
+    chalk.collectImage(item)
+  except:
+    return none(ChalkObj)
+  try:
+    chalk.extractImage()
+  except:
+    warn("docker: could not extract chalk mark from image: " & getCurrentExceptionMsg())
+    addUnmarked($item)
+  return some(chalk)
+
+proc scanLocalImageOrContainer*(item: string): Option[ChalkObj] =
   let chalk = newChalk(name    = item,
-                       codec   = codec)
+                       codec   = getPluginByName("docker"))
   var image = item
   try:
     chalk.collectContainer(image)
@@ -43,7 +60,7 @@ proc scanImageOrContainer*(codec: Plugin, item: string): Option[ChalkObj] =
   except:
     trace("docker: " & getCurrentExceptionMsg())
   try:
-    chalk.collectImage(image)
+    chalk.collectLocalImage(image)
     try:
       chalk.extractImage()
     except:
@@ -55,12 +72,12 @@ proc scanImageOrContainer*(codec: Plugin, item: string): Option[ChalkObj] =
     addUnmarked(item)
   return some(chalk)
 
-iterator scanAllContainers*(codec: Plugin): ChalkObj =
+iterator scanAllContainers*(): ChalkObj =
   for id in allContainerIDs():
     trace("docker: found container with ID = " & id)
-    yield codec.scanImageOrContainer(id).get()
+    yield scanLocalImageOrContainer(id).get()
 
-iterator scanAllImages*(codec: Plugin): ChalkObj =
+iterator scanAllImages*(): ChalkObj =
   for id in allImageIDs():
     trace("docker: found image with ID = " & id)
-    yield codec.scanImage(id).get()
+    yield scanLocalImage(id).get()

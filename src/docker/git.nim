@@ -6,7 +6,7 @@
 ##
 import std/[base64, strutils, uri]
 import ".."/[config, git, util]
-import "."/[base]
+import "."/[util as dutil]
 
 const
   HEADS          = "refs/heads/"
@@ -67,7 +67,7 @@ proc isSSHGitContext(context: string): bool =
 proc isGitContext*(context: string): bool =
   return isHttpGitContext(context) or isSSHGitContext(context)
 
-proc splitContext(context: string): (string, string, string) =
+proc splitContext*(context: string): (string, string, string) =
   let
     (remoteUrl, headSubdir) = context.splitBy("#")
     (head, subdir)          = headSubdir.splitBy(":")

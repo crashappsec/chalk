@@ -257,7 +257,6 @@ proc collectRunTimeHostInfo*() =
             getCurrentExceptionMsg())
       dumpExOnDebug()
 
-
 # The two below functions are helpers for the artifacts() iterator
 # and the self-extractor (in the case of findChalk anyway).
 proc ignoreArtifact(path: string, regexps: seq[Regex]): bool {.inline.} =
@@ -410,10 +409,9 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
         error(item & ": No such file or directory.")
     else:
       trace("Processing docker artifacts.")
-      let docker = getPluginByName("docker")
       for item in iterInfo.otherPaths:
         trace("Processing artifact: " & item)
-        let objOpt = docker.scanImageOrContainer(item)
+        let objOpt = scanLocalImageOrContainer(item)
         if objOpt.isNone():
           if len(iterInfo.filePaths) > 0:
             error(item & ": No file, image or container found with this name")

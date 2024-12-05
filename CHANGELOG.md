@@ -4,32 +4,40 @@
 
 ### Breaking Changes
 
-- Changes to docker digest related fields.
+- Changes to docker image related fields.
 
   Removed keys:
 
-  - `_IMAGE_DIGEST` - there are cases when image digest mutates.
-    For example `docker pull && docker push` will drop all
-    manifest annotations hence its digest will change.
-    Use `_REPO_DIGESTS` instead as it will include all digests
-    per repository.
-  - `_IMAGE_LIST_DIGEST` - there could be multiple list manifests
-    for the same image as list manifests can be created out-of-build.
-    Use new key `_REPO_LIST_DIGESTS` which enumerates all list digests
-    per repository.
+  - `_IMAGE_DIGEST` - there are cases when the image digest is mutated.
+    For example `docker pull && docker push` drops all
+    manifest annotations resulting in a change to the digest.
+    It is recommended to use `_REPO_DIGESTS` instead as it will
+    include all digests per repository.
+  - `_IMAGE_LIST_DIGEST` - it is possible to create manifests outside the build
+    context which results in multiple list manifests for the same image. The new
+    `_REPO_LIST_DIGESTS` key provides a list of all digests per repository.
 
   Changed keys:
 
-  - `_REPO_DIGESTS` is now an object which enumerates list of
-    image digests organized by:
+  - `_REPO_DIGESTS` previously (and incorrectly) would return the first registry
+    and the image digest. This key now provides a list of image digests by
+    registry and image name.
 
-    - registry
-    - image name
-
-    For example:
+    #### before
 
     ```json
     {
+        // old format
+        "_REPO_DIGESTS": {
+          "224111541501.dkr.ecr.us-east-1.amazonaws.com/co/chalketl/scripts": "249ce02d7f5fe0398fc87c2fb6c225ef78912f038f4be4fe9c35686082fe3cb0"
+    }
+    ```
+
+    #### now
+
+    ```json
+    {
+      // new format
       "_REPO_DIGESTS": {
         "registry-1.docker.io": {
           "library/alpine": [
@@ -40,11 +48,11 @@
     }
     ```
 
-  - `_REPO_TAGS` now only includes tags which are available in registry.
-    Builds without `--push`, even with provided `--tag`, will not populate
+  - `_REPO_TAGS` now includes tags which are only available in the registry.
+    Builds without `--push`, even when provided with `--tag`, will not populate
     `_REPO_TAGS` anymore. In addition similarly to `_REPO_DIGESTS`, it is
-    an object now where each tag is associated with its digest
-    (either list or image digest). For example:
+    an object where each tag is associated with its digest (either list or image
+    digest). For example:
 
     ```json
     {
@@ -58,10 +66,46 @@
     }
     ```
 
+  - `DOCKER_BASE_IMAGES` - sub-keys:
+
+    - `name` renamed to `uri`; contains the full repository uri (tag and digest)
+    - new `registry` key; the normalized registry uri (domain and optional port)
+    - new `name` key; the normalized repo name within the registry
+
+    #### before
+
+    ```json
+    // old format
+    {
+      "from": "nginx:1.27.0",
+      "tag": "1.27.0",
+      "name": "nginx:1.27.0",
+      "repo": "nginx"
+    }
+    ```
+
+    #### now
+
+    ```json
+    // new format
+    {
+      "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+      "uri": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+      "repo": "nginx",
+      "registry": "registry-1.docker.io",
+      "name": "library/nginx",
+      "tag": "1.27.0",
+      "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe"
+    }
+    ```
+
+  - `DOCKER_COPY_IMAGES` - similar to `DOCKER_BASE_IMAGES`, the `name` key has
+    been renamed to `uri` and adds the `registry` and `name` keys.
+
   New keys:
 
-  - `_REPO_LIST_DIGESTS` is similar to `_REPO_DIGESTS` but enumerates
-    known list digests (if any). For example:
+  - `_REPO_LIST_DIGESTS` - similar to `_REPO_DIGESTS` but enumerates any known
+    list digests. Example:
 
     ```json
     {
@@ -75,12 +119,13 @@
     }
     ```
 
-  Note that all `_REPO_*` keys normalize registry to its canonical domain.
-  For example for docker hub it is `registry-1.docker.io`.
-  In addition all image names are normalized to how they are stored
-  in the registry. Note `library/` prefix for `alpine`.
+  **NOTE:** All `_REPO_*` keys normalize registry to its canonical domain. For
+  example, docker hub is normalized to `registry-1.docker.io`. Additionally, all
+  image names are normalized to how they are stored in the registry. Note
+  `library/` prefix for `alpine` in the example above.
 
-  ([#450](https://github.com/crashappsec/chalk/pull/450))
+  ([#450](https://github.com/crashappsec/chalk/pull/450),
+  [#453](https://github.com/crashappsec/chalk/pull/453))
 
 ### Fixes
 
@@ -112,6 +157,22 @@
   - `_IMAGE_ANNOTATIONS` - found annotations for an image in registry
 
   ([#452](https://github.com/crashappsec/chalk/pull/452))
+
+- Docker base image keys:
+
+  - `_OP_ARTIFACT_CONTEXT` - what is the context of the artifact.
+    For `docker build` its either `build` or `base`.
+  - `DOCKER_BASE_IMAGE_REGISTRY` - just registry of the base image
+  - `DOCKER_BASE_IMAGE_NAME` - repo name within the registry
+  - `DOCKER_BASE_IMAGE_ID` - image id (config digest) of the base image
+  - `DOCKER_BASE_IMAGE_METADATA_ID` - id of the base image chalkmark
+  - `_COLLECTED_ARTIFACTS` - similar to `_CHALKS` but reports collected
+    information about potentially non-chalked artifacts such as the base image.
+    If the base image is chalked it can be correlated with the build
+    chalkmark via `METADATA_ID`. Otherwise both artifacts can be linked
+    via the digest or the image id.
+
+  ([#453](https://github.com/crashappsec/chalk/pull/453))
 
 ## 0.4.14
 
