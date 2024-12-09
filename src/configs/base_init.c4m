@@ -17,6 +17,8 @@ exec {
 # TODO Remove all sections below
 # Currently, these need to be here for singleton defaults to take hold.
 
+daemon { }
+
 extract { }
 
 source_marks { }
