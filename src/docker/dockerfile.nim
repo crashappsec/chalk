@@ -1015,6 +1015,15 @@ proc getBaseDockerSection*(ctx: DockerInvocation):  DockerFileSection =
   for s in ctx.getBaseDockerSections():
     return s
 
+iterator getBasesDockerSections*(ctx: DockerInvocation): DockerFileSection =
+  ## iterator to get only bases across all sections of dockerfile
+  var seen = newSeq[DockerFileSection]()
+  for s in ctx.dfSections:
+    let base = ctx.getBaseDockerSection(s)
+    if base notin seen:
+      seen.add(base)
+      yield base
+
 proc formatBaseImage(ctx: DockerInvocation, section: DockerFileSection): TableRef[string, string] =
   let base = ctx.getBaseDockerSection(section)
   result = newTable[string, string]()
@@ -1028,6 +1037,14 @@ proc formatBaseImage(ctx: DockerInvocation, section: DockerFileSection): TableRe
     result["tag"]    = base.image.tag
   if base.image.digest != "":
     result["digest"] = base.image.digest
+  if base.chalk != nil:
+    let
+      config   = unpack[string](base.chalk.collectedData.getOrDefault("_IMAGE_ID", pack("")))
+      metadata = unpack[string](base.chalk.collectedData.getOrDefault("_METADATA_ID", pack("")))
+    if config != "":
+      result["config_digest"] = config
+    if metadata != "":
+      result["metadata_id"]   = metadata
 
 proc formatBaseImages*(ctx: DockerInvocation): ChalkDict =
   result = ChalkDict()

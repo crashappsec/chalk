@@ -227,8 +227,9 @@ proc collectImageFrom(chalk:    ChalkObj,
         imageRepo = manifest.asImageRepo(tag = repo.tag)
       annotations.update(manifest.annotations)
       chalk.repos[repo.repo] = imageRepo + chalk.repos.getOrDefault(repo.repo)
+      layers = @[]
       for layer in manifest.layers:
-        layers.add(layer.digest)
+        layers.add(layer.digest.extractDockerHash())
     except:
       trace("docker: " & getCurrentExceptionMsg())
       continue
@@ -278,7 +279,7 @@ proc collectImageFrom(chalk:    ChalkObj,
     chalk.setIfNeeded("_IMAGE_ANNOTATIONS", annotations.nimJsonToBox())
     chalk.setIfNeeded("COMMIT_ID",          annotations{"org.opencontainers.image.revision"}.getStr())
     let source = annotations{"org.opencontainers.image.source"}.getStr()
-    if isGitContext(source):
+    if isGitContext(source, requireExtension = false):
       let (remote, head, subdir) = splitContext(source)
       chalk.setIfNeeded("ORIGIN_URI",       remote)
 

@@ -9,7 +9,7 @@
 ##
 ## scan - create new chalk object and collect docker info into it
 
-import ".."/[config, plugin_api]
+import ".."/[config, plugin_api, util]
 import "."/[collect, ids, inspect, extract]
 
 proc scanLocalImage*(item: string): Option[ChalkObj] =
@@ -36,6 +36,12 @@ proc scanImage*(item: DockerImage, platform: DockerPlatform): Option[ChalkObj] =
     chalk.collectImage(item)
   except:
     return none(ChalkObj)
+  # if we already collected the same image before, return the same pointer
+  # so that we do not duplicate collected artifacts
+  for artifact in getAllChalks() & getAllArtifacts():
+    if artifact.collectedData.getOrDefault("_IMAGE_ID") == chalk.collectedData["_IMAGE_ID"]:
+      artifact.collectedData.merge(chalk.collectedData)
+      chalk = artifact
   try:
     chalk.extractImage()
   except:

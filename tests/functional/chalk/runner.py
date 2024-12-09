@@ -11,7 +11,7 @@ from typing import Any, Literal, Optional, cast
 
 from ..conf import MAGIC
 from ..utils.bin import sha256
-from ..utils.dict import ContainsMixin, MISSING, ANY, IfExists
+from ..utils.dict import ContainsDict, MISSING, ANY, IfExists, ContainsList
 from ..utils.docker import Docker
 from ..utils.log import get_logger
 from ..utils.os import CalledProcessError, Program, run
@@ -46,7 +46,7 @@ def artifact_type(path: Path) -> str:
         return "ELF"
 
 
-class ChalkReport(ContainsMixin, dict):
+class ChalkReport(ContainsDict):
     name = "report"
 
     def __init__(self, report: dict[str, Any]):
@@ -76,16 +76,18 @@ class ChalkReport(ContainsMixin, dict):
     @property
     def marks(self):
         assert len(self["_CHALKS"]) > 0
-        return [ChalkMark(i, report=self) for i in self["_CHALKS"]]
+        return ContainsList([ChalkMark(i, report=self) for i in self["_CHALKS"]])
 
     @property
     def artifacts(self):
         assert len(self["_COLLECTED_ARTIFACTS"]) > 0
-        return [ChalkMark(i, report=self) for i in self["_COLLECTED_ARTIFACTS"]]
+        return ContainsList(
+            [ChalkMark(i, report=self) for i in self["_COLLECTED_ARTIFACTS"]]
+        )
 
     @property
     def marks_by_path(self):
-        return ContainsMixin(
+        return ChalkMark(
             {
                 i.get("PATH_WHEN_CHALKED", i.get("_OP_ARTIFACT_PATH")): i
                 for i in self.marks
@@ -122,7 +124,7 @@ class ChalkReport(ContainsMixin, dict):
         return cls(info if isinstance(info, dict) else info[0])
 
 
-class ChalkMark(ContainsMixin, dict):
+class ChalkMark(ContainsDict):
     name = "mark"
 
     @classmethod
@@ -224,7 +226,7 @@ class ChalkProgram(Program):
                     break
             else:
                 break
-        return [ChalkReport(i) for i in reports]
+        return ContainsList([ChalkReport(i) for i in reports])
 
     @property
     def report(self):
@@ -263,9 +265,9 @@ class ChalkProgram(Program):
     @property
     def vmarks(self):
         assert self.virtual_path.exists()
-        return [
-            ChalkMark.from_json(i) for i in self.virtual_path.read_text().splitlines()
-        ]
+        return ContainsList(
+            [ChalkMark.from_json(i) for i in self.virtual_path.read_text().splitlines()]
+        )
 
     @property
     def vmark(self):
@@ -279,10 +281,12 @@ class ChalkProgram(Program):
 
     @property
     def logged_reports(self):
-        return [
-            ChalkReport.from_json(json.loads(i)["$message"])
-            for i in self.logged_reports_path.read_text().splitlines()
-        ]
+        return ContainsList(
+            [
+                ChalkReport.from_json(json.loads(i)["$message"])
+                for i in self.logged_reports_path.read_text().splitlines()
+            ]
+        )
 
     @property
     def logged_report(self):
