@@ -419,6 +419,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             ARG BASE=seven
 
             FROM alpine as one
+            FROM alpine as oneduplicate
 
             FROM ubuntu:24.04 as two
             COPY --from=docker /usr/local/bin/docker /docker
@@ -441,15 +442,64 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             """
         ),
     )
-    assert result.artifact.contains(
-        {k: IfExists(v) for k, v in base.mark.items() if not k.startswith("_")}
-    )
-    assert result.artifact.has(
-        _OP_ARTIFACT_CONTEXT="base",
-        _IMAGE_ID=base.mark["_IMAGE_ID"],
-        METADATA_ID=base.mark["METADATA_ID"],
-        COMMIT_ID=base.mark["COMMIT_ID"],
-        ORIGIN_URI=base.mark["ORIGIN_URI"],
+    assert result.report.has(
+        _OP_CHALK_COUNT=1,
+        # all base images should be set as unmarked
+        _UNMARKED=Length(len({"alpine", "ubuntu", "busybox", "nginx"}), operator.ge),
+        _COLLECTED_ARTIFACTS=Contains(
+            [
+                {
+                    **{
+                        k: IfExists(v)
+                        for k, v in base.mark.items()
+                        if not k.startswith("_")
+                    },
+                    **{
+                        "_OP_ARTIFACT_CONTEXT": "base",
+                        "_IMAGE_ID": base.mark["_IMAGE_ID"],
+                        "METADATA_ID": base.mark["METADATA_ID"],
+                        "COMMIT_ID": base.mark["COMMIT_ID"],
+                        "ORIGIN_URI": base.mark["ORIGIN_URI"],
+                    },
+                },
+                {
+                    "_IMAGE_ID": ANY,
+                    "METADATA_ID": MISSING,
+                    "COMMIT_ID": ANY,
+                    "ORIGIN_URI": "https://git.launchpad.net/cloud-images/+oci/ubuntu-base",
+                    "_REPO_DIGESTS": {
+                        "registry-1.docker.io": {
+                            "library/ubuntu": ANY,
+                        }
+                    },
+                    "_REPO_TAGS": {
+                        "registry-1.docker.io": {
+                            "library/ubuntu": {
+                                "24.04": ANY,
+                            }
+                        }
+                    },
+                },
+                {
+                    "_IMAGE_ID": ANY,
+                    "METADATA_ID": MISSING,
+                    "COMMIT_ID": ANY,
+                    "ORIGIN_URI": "https://github.com/nginxinc/docker-nginx.git",
+                    "_REPO_DIGESTS": {
+                        "registry-1.docker.io": {
+                            "library/nginx": ANY,
+                        }
+                    },
+                    # even though tag is specified in dockerfile, its pinning to digest
+                    # and tag is outdated after new release
+                    "_REPO_TAGS": IfExists(
+                        {
+                            "registry-1.docker.io": MISSING,
+                        }
+                    ),
+                },
+            ]
+        ),
     )
     assert result.mark.has(
         DOCKER_TARGET="",

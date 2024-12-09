@@ -333,16 +333,16 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   result = runChalkSubScan(usableContexts, "insert").report
   trace("docker: subscan complete.")
 
-proc collectBaseImage(chalk: ChalkObj, baseSection: DockerFileSection) =
+proc collectBaseImage(chalk: ChalkObj, section: DockerFileSection) =
   trace("docker: collecting chalkmark from base image " &
-        $baseSection.image & " for " & $chalk.platform)
+        $section.image & " for " & $chalk.platform)
   try:
-    let baseChalkOpt = scanImage(baseSection.image, platform = chalk.platform)
+    let baseChalkOpt = scanImage(section.image, platform = chalk.platform)
     if baseChalkOpt.isNone():
       trace("docker: base image could not be scanned")
       return
     let
-      baseChalk = baseChalkOpt.get(ChalkObj())
+      baseChalk = baseChalkOpt.get()
       dict      = chalk.collectedData
       collected =
         if baseChalk.collectedData != nil:
@@ -352,14 +352,15 @@ proc collectBaseImage(chalk: ChalkObj, baseSection: DockerFileSection) =
     baseChalk.addToAllArtifacts()
     baseChalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("base")
     chalk.baseChalk = baseChalk
-    if baseChalk.isMarked():
-      dict.setIfNeeded("DOCKER_BASE_IMAGE_METADATA_ID", baseChalk.extract["METADATA_ID"])
-    else:
-      trace("docker: base image is not chalked " & $baseSection.image)
-    if "_IMAGE_ID" in baseChalk.collectedData:
-      dict.setIfNeeded("DOCKER_BASE_IMAGE_ID", baseChalk.collectedData["_IMAGE_ID"])
+    section.chalk   = baseChalk
+    if not baseChalk.isMarked():
+      trace("docker: base image is not chalked " & $section.image)
   except:
     trace("docker: unable to scan base image due to: " & getCurrentExceptionMsg())
+
+proc collectBaseImages(chalk: ChalkObj, ctx: DockerInvocation) =
+  for section in ctx.getBasesDockerSections():
+    chalk.collectBaseImage(section)
 
 proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
   let
@@ -368,28 +369,32 @@ proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
     git               = getPluginByName("vctl_git")
     projectRootPath   = git.gitFirstDir().parentDir()
     dockerfileRelPath = getRelativePathBetween(projectRootPath, ctx.dockerFileLoc)
-  chalk.collectBaseImage(baseSection)
-  dict.setIfNeeded("DOCKERFILE_PATH",                  ctx.dockerFileLoc)
-  dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",      dockerfileRelPath)
-  dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",       ctx.foundExtraContexts)
-  dict.setIfNeeded("DOCKER_CONTEXT",                   ctx.foundContext)
-  dict.setIfNeeded("DOCKER_FILE",                      ctx.inDockerFile)
-  dict.setIfNeeded("DOCKER_PLATFORM",                  $(chalk.platform.normalize()))
-  dict.setIfNeeded("DOCKER_PLATFORMS",                 $(ctx.platforms.normalize()))
-  dict.setIfNeeded("DOCKER_LABELS",                    ctx.foundLabels)
-  dict.setIfNeeded("DOCKER_ANNOTATIONS",               ctx.foundAnnotations)
-  dict.setIfNeeded("DOCKER_TAGS",                      ctx.foundTags.asRepoTag())
-  dict.setIfNeeded("DOCKER_BASE_IMAGE",                $(baseSection.image))
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",           baseSection.image.repo)
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_REGISTRY",       baseSection.image.registry)
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_NAME",           baseSection.image.name)
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_TAG",            baseSection.image.tag)
-  dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST",         baseSection.image.digest)
-  dict.setIfNeeded("DOCKER_BASE_IMAGES",               ctx.formatBaseImages())
-  dict.setIfNeeded("DOCKER_COPY_IMAGES",               ctx.formatCopyImages())
+  chalk.collectBaseImages(ctx)
+  if chalk.baseChalk != nil:
+    if chalk.baseChalk.isMarked():
+      dict.setIfNeeded("DOCKER_BASE_IMAGE_METADATA_ID", chalk.baseChalk.extract["METADATA_ID"])
+    dict.setIfNeeded("DOCKER_BASE_IMAGE_ID",            chalk.baseChalk.collectedData.getOrDefault("_IMAGE_ID"))
+  dict.setIfNeeded("DOCKERFILE_PATH",                   ctx.dockerFileLoc)
+  dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",       dockerfileRelPath)
+  dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",        ctx.foundExtraContexts)
+  dict.setIfNeeded("DOCKER_CONTEXT",                    ctx.foundContext)
+  dict.setIfNeeded("DOCKER_FILE",                       ctx.inDockerFile)
+  dict.setIfNeeded("DOCKER_PLATFORM",                   $(chalk.platform.normalize()))
+  dict.setIfNeeded("DOCKER_PLATFORMS",                  $(ctx.platforms.normalize()))
+  dict.setIfNeeded("DOCKER_LABELS",                     ctx.foundLabels)
+  dict.setIfNeeded("DOCKER_ANNOTATIONS",                ctx.foundAnnotations)
+  dict.setIfNeeded("DOCKER_TAGS",                       ctx.foundTags.asRepoTag())
+  dict.setIfNeeded("DOCKER_BASE_IMAGE",                 $(baseSection.image))
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",            baseSection.image.repo)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_REGISTRY",        baseSection.image.registry)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_NAME",            baseSection.image.name)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_TAG",             baseSection.image.tag)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST",          baseSection.image.digest)
+  dict.setIfNeeded("DOCKER_BASE_IMAGES",                ctx.formatBaseImages())
+  dict.setIfNeeded("DOCKER_COPY_IMAGES",                ctx.formatCopyImages())
   # note this key is expected to be empty string for alias-less targets
   # hence setIfSubscribed vs setIfNeeded which doesnt allow to set empty strings
-  dict.setIfSubscribed("DOCKER_TARGET",                ctx.getTargetDockerSection().alias)
+  dict.setIfSubscribed("DOCKER_TARGET",                 ctx.getTargetDockerSection().alias)
 
 proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   let dict = chalk.collectedData

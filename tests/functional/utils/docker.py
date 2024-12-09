@@ -9,7 +9,7 @@ from typing import Optional, TypeVar
 
 from more_itertools import windowed
 
-from .dict import ContainsMixin
+from .dict import ContainsDict
 from .log import get_logger
 from .os import Program, run
 
@@ -301,8 +301,8 @@ class Docker:
         return run(["docker", "buildx", "imagetools", "inspect", "--raw", tag])
 
     @staticmethod
-    def inspect(name: str) -> list[ContainsMixin]:
-        return [ContainsMixin(i) for i in run(["docker", "inspect", name]).json()]
+    def inspect(name: str) -> list[ContainsDict]:
+        return [ContainsDict(i) for i in run(["docker", "inspect", name]).json()]
 
     @staticmethod
     def all_images() -> list[str]:

@@ -215,12 +215,16 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   if len(cachedSearchPath) != 0:
     result.setIfNeeded("_OP_SEARCH_PATH", cachedSearchPath)
 
+  var chalks = 0
+  for i in objs:
+    if i.isMarked():
+      chalks += 1
   result.setIfNeeded("_OPERATION",            getBaseCommandName())
   result.setIfNeeded("_EXEC_ID",              execId)
   result.setIfNeeded("_OP_CHALKER_VERSION",   getChalkExeVersion())
   result.setIfNeeded("_OP_PLATFORM",          getChalkPlatform())
   result.setIfNeeded("_OP_CHALKER_COMMIT_ID", getChalkCommitId())
-  result.setIfNeeded("_OP_CHALK_COUNT",       len(getAllChalks()) - len(getUnmarked()))
+  result.setIfNeeded("_OP_CHALK_COUNT",       chalks)
   result.setIfNeeded("_OP_EXE_NAME",          getMyAppPath().splitPath().tail)
   result.setIfNeeded("_OP_EXE_PATH",          getAppDir())
   result.setIfNeeded("_OP_ARGV",              @[getMyAppPath()] & commandLineParams())
