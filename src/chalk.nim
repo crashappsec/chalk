@@ -12,9 +12,10 @@ when cprofiling:
 # Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
 import "."/[config, confload, commands, norecurse, sinks,
-            attestation_api, util]
+            attestation_api, util, n00b/init]
 
 when isMainModule:
+  setupN00b()
   setupSignalHandlers() # util.nim
   setupTerminal()       # util.nim
   ioSetup()             # sinks.nim
