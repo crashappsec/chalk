@@ -455,13 +455,18 @@ const
   techStackConfig*    = staticRead(techStackConfName)
   linguistConfig*     = staticRead(linguistConfName)
   ioConfig*           = staticRead(ioConfName)
-  defaultConfig*      = staticRead(defCfgFname) #& commentC4mCode(ioConfig)
+  defaultConfig*      = staticRead(defCfgFname)
   attestConfig*       = staticRead(attestConfName)
   coConfig*           = staticRead(coConfName)
-  commitID*           = staticexec("git rev-parse HEAD")
+  commitID*           = staticexec("git log -n1 --pretty=format:%H")
   archStr*            = staticexec("uname -m")
   osStr*              = staticexec("uname -o")
   stdinIndicator*     = ":stdin:"
+  # various time formats
+  timesDateFormat*    = "yyyy-MM-dd"
+  timesTimeFormat*    = "HH:mm:ss'.'fff"
+  timesTzFormat*      = "zzz"
+  timesIso8601Format* = timesDateFormat & "'T'" & timesTimeFormat & timesTzFormat
 
   # Make sure that ARTIFACT_TYPE fields are consistently named. I'd love
   # these to be const, but nim doesn't seem to be able to handle that :(
