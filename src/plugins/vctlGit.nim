@@ -42,7 +42,6 @@ const
   gitPackRefs      = "packed-refs"
   gitPack          = gitObjects.joinPath("pack")
   gitPackExt       = ".pack"
-  gitTimeFmt       = "ddd MMM dd HH:mm:ss YYYY"
   # https://git-scm.com/docs/pack-format
   gitObjCommit     = 1
   gitObjTag        = 4
@@ -54,13 +53,16 @@ const
   keyBranch        = "BRANCH"
   keyAuthor        = "AUTHOR"
   keyAuthorDate    = "DATE_AUTHORED"
+  keyAuthorTime    = "TIMESTAMP_AUTHORED"
   keyCommitter     = "COMMITTER"
   keyCommitDate    = "DATE_COMMITTED"
+  keyCommitTime    = "TIMESTAMP_COMMITTED"
   keyCommitMessage = "COMMIT_MESSAGE"
   keyLatestTag     = "TAG"
   keyTagSigned     = "TAG_SIGNED"
   keyTagger        = "TAGGER"
   keyTaggedDate    = "DATE_TAGGED"
+  keyTaggedTime    = "TIMESTAMP_TAGGED"
   keyTagMessage    = "TAG_MESSAGE"
 
 type
@@ -247,8 +249,7 @@ type
     commitId:    string
     tagCommitId: string
     tagger:      string
-    unixTime:    int
-    date:        string
+    time:        Time
     signed:      bool
     message:     string
 
@@ -261,9 +262,9 @@ type
     commitId:   string
     signed:     bool
     author:     string
-    authorDate: string
+    authorTime: Time
     committer:  string
-    commitDate: string
+    commitTime: Time
     message:    string
 
   GitInfo = ref object of RootRef
@@ -281,11 +282,31 @@ proc isAnnotated(self: GitTag): bool =
 proc getUint32BE(data: string, whence: SomeInteger=0): uint32 =
   result = ntohl(cast[ptr [uint32]](addr data[whence])[])
 
-template parseTime(line: string): int =
-  parseInt(line.split()[^2])
+proc extractPerson(line: string): string =
+  let parts = line.rsplit(maxsplit = 2)
+  return parts[0]
 
-template formatCommitObjectTime(line: string): string =
-  fromUnix(parseTime(line)).format(gitTimeFmt) & " " & line.split()[^1]
+proc parseGitTime(line: string): Time =
+  let
+    parts      = line.split()
+    seconds    = parseInt(parts[^2])
+    offsetStr  = parts[^1].replace(":", "")
+  if len(offsetStr) != 5:
+    raise newException(ValueError, "invalid git timestamp TZ offset " & offsetStr)
+  let
+    sign       = offsetStr[0]
+    hours      = parseInt(offsetStr[1..2])
+    minutes    = parseInt(offsetStr[3..4])
+    offset     = hours * 60 + minutes
+    utcOffset  =
+      case sign
+      of '+':
+        offset
+      of '-':
+        -offset
+      else:
+        raise newException(ValueError, "unsupported TZ offset sign: " & sign)
+  return fromUnix(seconds + utcOffset)
 
 proc readPackedObject(path: string, offset: uint64): string =
   ## read packaged git object
@@ -517,15 +538,18 @@ proc loadRef(info: RepoInfo, gitRef: string): string =
       result = commitId
 
 proc loadAuthor(info: RepoInfo) =
-  let fields = info.loadObject(info.commitId)
+  let
+    fields    = info.loadObject(info.commitId)
+    author    = fields.getOrDefault(gitAuthor, "")
+    committer = fields.getOrDefault(gitCommitter, "")
   # this makes only the same assumptions as git itself:
-  # https://github.com/git/git/blob/master/commit.c#L97 ddcb8fd
-  info.author     = fields.getOrDefault(gitAuthor, "")
+  # https://github.com/git/git/blob/master/commit.c#L97
+  info.author     = author.extractPerson()
   if info.author != "":
-    info.authorDate = formatCommitObjectTime(info.author)
-  info.committer  = fields.getOrDefault(gitCommitter, "")
+    info.authorTime = parseGitTime(author)
+  info.committer  = committer.extractPerson()
   if info.committer != "":
-    info.commitDate = formatCommitObjectTime(info.committer)
+    info.commitTime = parseGitTime(committer)
   info.message    = fields.getOrDefault(gitMessage, "")
   info.signed     = gitSign in fields
 
@@ -549,16 +573,14 @@ proc loadTag(info: RepoInfo, tag: string, tagCommit: string) =
       if fields[gitTag] == tag and fields[gitObject] == info.commitId:
         let
           tagger   = fields[gitTagger]
-          unixTime = parseTime(tagger)
-          date     = formatCommitObjectTime(tagger)
+          time     = parseGitTime(tagger)
           signed   = gitSign in fields
           message  = fields.getOrDefault(gitMessage)
         info.tags[tag] = GitTag(name:        tag,
                                 commitId:    fields[gitObject],
                                 tagCommitId: tagCommit,
-                                tagger:      tagger,
-                                unixTime:    unixTime,
-                                date:        date,
+                                tagger:      tagger.extractPerson(),
+                                time:        time,
                                 signed:      signed,
                                 message:     message)
         trace("annotated tag: " & tag)
@@ -589,7 +611,7 @@ proc loadTags(info: RepoInfo) =
                  tagCommit = tagCommit)
 
   if len(info.tags) > 0:
-    let sortedTags = info.tags.values().toSeq().sortedByIt((it.unixTime, it.name))
+    let sortedTags = info.tags.values().toSeq().sortedByIt((it.time, it.name))
     info.latestTag = sortedTags[^1]
     trace("latest tag: " & info.latestTag.name)
 
@@ -753,37 +775,31 @@ proc findAndLoad(plugin: GitInfo, path: string) =
 
   plugin.vcsDirs[vcsDir] = info
 
-proc pack(tag: GitTag): ChalkDict =
-  new result
-  if tag.tagger != "":
-    result[keyTagger] = pack(tag.tagger)
-    result[keyTaggedDate] = pack(formatCommitObjectTime(tag.tagger))
-
-proc pack(tags: Table[string, GitTag]): ChalkDict =
-  new result
-  for name, tag in tags:
-    result[name] = pack(tag.pack())
-
 proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
   if prefix == "":
-    chalkDict.setIfNeeded(prefix & keyVcsDir,      info.vcsDir.splitPath().head)
+    chalkDict.setIfNeeded(prefix & keyVcsDir,       info.vcsDir.splitPath().head)
 
-  chalkDict.setIfNeeded(prefix & keyOrigin,        info.origin)
-  chalkDict.setIfNeeded(prefix & keyCommit,        info.commitId)
-  chalkDict.setIfNeeded(prefix & keyCommitSigned,  info.signed)
-  chalkDict.setIfNeeded(prefix & keyBranch,        info.branch)
-  chalkDict.setIfNeeded(prefix & keyAuthor,        info.author)
-  chalkDict.setIfNeeded(prefix & keyAuthorDate,    info.authorDate)
-  chalkDict.setIfNeeded(prefix & keyCommitter,     info.committer)
-  chalkDict.setIfNeeded(prefix & keyCommitDate,    info.commitDate)
-  chalkDict.setIfNeeded(prefix & keyCommitMessage, info.message)
-
+  chalkDict.setIfNeeded(prefix & keyOrigin,         info.origin)
+  chalkDict.setIfNeeded(prefix & keyCommit,         info.commitId)
+  chalkDict.setIfNeeded(prefix & keyCommitSigned,   info.signed)
+  chalkDict.setIfNeeded(prefix & keyBranch,         info.branch)
+  chalkDict.setIfNeeded(prefix & keyAuthor,         info.author)
+  chalkDict.setIfNeeded(prefix & keyCommitter,      info.committer)
+  chalkDict.setIfNeeded(prefix & keyCommitMessage,  info.message)
+  if info.author != "":
+    chalkDict.setIfNeeded(prefix & keyAuthorDate,   info.authorTime.utc.format(timesIso8601Format))
+    chalkDict.setIfNeeded(prefix & keyAuthorTime,   info.authorTime.toUnixInMS())
+  if info.committer != "":
+    chalkDict.setIfNeeded(prefix & keyCommitDate,   info.commitTime.utc.format(timesIso8601Format))
+    chalkDict.setIfNeeded(prefix & keyCommitTime,   info.commitTime.toUnixInMS())
   if info.latestTag != nil:
-    chalkDict.setIfNeeded(prefix & keyLatestTag,   info.latestTag.name)
-    chalkDict.setIfNeeded(prefix & keyTagger,      info.latestTag.tagger)
-    chalkDict.setIfNeeded(prefix & keyTaggedDate,  info.latestTag.date)
-    chalkDict.setIfNeeded(prefix & keyTagSigned,   info.latestTag.signed)
-    chalkDict.setIfNeeded(prefix & keyTagMessage,  info.latestTag.message)
+    chalkDict.setIfNeeded(prefix & keyLatestTag,    info.latestTag.name)
+    chalkDict.setIfNeeded(prefix & keyTagger,       info.latestTag.tagger)
+    if info.latestTag.tagger != "":
+      chalkDict.setIfNeeded(prefix & keyTaggedDate, info.latestTag.time.utc.format(timesIso8601Format))
+      chalkDict.setIfNeeded(prefix & keyTaggedTime,   info.latestTag.time.toUnixInMS())
+    chalkDict.setIfNeeded(prefix & keyTagSigned,    info.latestTag.signed)
+    chalkDict.setIfNeeded(prefix & keyTagMessage,   info.latestTag.message)
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
   if obj.fsRef == "":

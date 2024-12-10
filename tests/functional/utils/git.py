@@ -15,7 +15,7 @@ from .os import run
 
 logger = get_logger()
 
-DATE_FORMAT = re.compile(r"^\w+ \w+ \d+ \d+:\d+:\d+ \d+ [+-]\d+$")
+DATE_FORMAT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}([+-]\d{4}|Z)$")
 
 
 class Git:
