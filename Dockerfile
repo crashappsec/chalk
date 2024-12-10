@@ -1,11 +1,25 @@
-FROM ghcr.io/crashappsec/nim:ubuntu-2.0.8 as nim
-FROM ghcr.io/sigstore/cosign/cosign:v2.2.3 as cosign
+ARG BASE=alpine
+FROM ghcr.io/sigstore/cosign/cosign:v2.2.3 AS cosign
 
 # -------------------------------------------------------------------
 
-FROM nim as deps
+FROM ghcr.io/crashappsec/nim:alpine-2.0.8 AS alpine
 
-# curl - chalk downloads some things directly with curl for the moment
+RUN apk add --no-cache \
+    bash \
+    curl \
+    make \
+    musl-dev \
+    openssl \
+    strace
+
+# add musl-gcc so its consistent CC with ubuntu
+RUN ln -s $(which gcc) /usr/bin/musl-gcc
+
+# -------------------------------------------------------------------
+
+FROM ghcr.io/crashappsec/nim:ubuntu-2.0.8 AS ubuntu
+
 RUN apt-get update -y && \
     apt-get install -y \
         curl \
@@ -14,6 +28,10 @@ RUN apt-get update -y && \
         strace \
         && \
     apt-get clean -y
+
+# -------------------------------------------------------------------
+
+FROM $BASE AS deps
 
 # XXX this is needed for the github worker
 # https://github.com/actions/runner/issues/2033
@@ -31,12 +49,12 @@ COPY src/config_version.nim /chalk/src/
 RUN mkdir -p src/configs && \
     echo 'chalk_version := "0.0.0"' > src/configs/base_keyspecs.c4m && \
     touch src/chalk.nim && \
-    nimble build
+    nimble build --verbose
 
 # -------------------------------------------------------------------
 # build chalk binary to be copied into final release stage
 
-FROM deps as build
+FROM deps AS build
 
 ARG CHALK_BUILD="release"
 
