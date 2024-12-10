@@ -11,7 +11,7 @@
 when defined(posix):
   import std/posix_utils
 
-import std/[monotimes, nativesockets, sequtils, times]
+import std/[nativesockets, sequtils, times, monotimes]
 import ".."/[config, plugin_api, normalize, chalkjson, attestation_api,
              util]
 
@@ -79,9 +79,9 @@ proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   if ResourceImage in obj.resourceType:
     if "TIMESTAMP_WHEN_CHALKED" notin obj.collectedData:
       # image is immutable so cannot overwrite timestamp from original build
-      result["TIMESTAMP_WHEN_CHALKED"] = pack(unixTimeInMS())
+      result["TIMESTAMP_WHEN_CHALKED"] = pack(startTime.toUnixInMs())
   else:
-    result["TIMESTAMP_WHEN_CHALKED"] = pack(unixTimeInMS())
+    result["TIMESTAMP_WHEN_CHALKED"] = pack(startTime.toUnixInMs())
 
   if isSubscribedKey("PRE_CHALK_HASH") and obj.fsRef != "":
     withFilesTream(obj.fsRef, mode = fmRead, strict = true):
@@ -166,8 +166,6 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
     result["_OP_ARTIFACT_REPORT_KEYS"] = pack(reportKeys)
 
 var
-  instant          = epochTime()
-  timestamp        = instant.fromUnixFloat()
   envdict          = Con4mDict[string, string]()
   cachedSearchPath = newSeq[string]()
 
@@ -177,12 +175,6 @@ proc clearCallback(self: Plugin) {.cdecl.} =
 
 when defined(posix):
   let uinfo = uname()
-
-template getDate(): string     = timestamp.format("yyyy-MM-dd")
-template getTime(): string     = timestamp.format("HH:mm:ss") & "." &
-                                   timestamp.format("fff")
-template getOffset(): string   = timestamp.format("zzz")
-template getDateTime(): string = getDate() & "T" & getTime() & getOffset()
 
 proc getEnvDict(): Box =
   if len(envdict) == 0:
@@ -230,11 +222,11 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   result.setIfNeeded("_OP_ARGV",              @[getMyAppPath()] & commandLineParams())
   result.setIfNeeded("_OP_HOSTNAME",          getHostName())
   result.setIfNeeded("_OP_UNMARKED_COUNT",    len(getUnmarked()))
-  result.setIfNeeded("_TIMESTAMP",            uint64(instant * 1000.0))
-  result.setIfNeeded("_DATE",                 pack(getDate()))
-  result.setIfNeeded("_TIME",                 pack(getTime()))
-  result.setIfNeeded("_TZ_OFFSET",            pack(getOffset()))
-  result.setIfNeeded("_DATETIME",             pack(getDateTime()))
+  result.setIfNeeded("_TIMESTAMP",            startTime.toUnixInMs())
+  result.setIfNeeded("_DATE",                 startTime.utc.format(timesDateFormat))
+  result.setIfNeeded("_TIME",                 startTime.utc.format(timesTimeFormat))
+  result.setIfNeeded("_TZ_OFFSET",            startTime.utc.format(timesTzFormat))
+  result.setIfNeeded("_DATETIME",             startTime.utc.format(timesIso8601Format))
 
   if isSubscribedKey("_ENV"):
     result["_ENV"] = getEnvDict()
@@ -264,10 +256,10 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result.setIfNeeded("INJECTOR_VERSION", getChalkExeVersion())
   result.setIfNeeded("INJECTOR_COMMIT_ID", getChalkCommitId())
   result.setIfNeeded("INJECTOR_ENV", getEnvDict())
-  result.setIfNeeded("DATE_CHALKED", pack(getDate()))
-  result.setIfNeeded("TIME_CHALKED", pack(getTime()))
-  result.setIfNeeded("TZ_OFFSET_WHEN_CHALKED", pack(getOffset()))
-  result.setIfNeeded("DATETIME_WHEN_CHALKED", pack(getDateTime()))
+  result.setIfNeeded("DATE_CHALKED", startTime.utc.format(timesDateFormat))
+  result.setIfNeeded("TIME_CHALKED", startTime.utc.format(timesTimeFormat))
+  result.setIfNeeded("TZ_OFFSET_WHEN_CHALKED", startTime.utc.format(timesTzFormat))
+  result.setIfNeeded("DATETIME_WHEN_CHALKED", startTime.utc.format(timesIso8601Format))
   result.setIfNeeded("PLATFORM_WHEN_CHALKED", getChalkPlatform())
   result.setIfNeeded("PUBLIC_IPV4_ADDR_WHEN_CHALKED", pack(getMyIpV4Addr()))
 
@@ -325,11 +317,10 @@ proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
   result.setIfNeeded("_CHALK_EXTERNAL_ACTION_AUDIT", externalActions)
 
   if isSubscribedKey("_CHALK_RUN_TIME"):
-    # startTime lives in runManagement.
     let
-      diff = getMonoTime().ticks() - startTime
-      inMs = diff div 1000 # It's in nanosec, convert to 1/1000000th of a sec
-
+      monoEndTime = getMonoTime()
+      diff        = monoEndTime - monoStartTime
+      inMs        = diff.inMilliseconds()
     result["_CHALK_RUN_TIME"] = pack(inMs)
 
 proc loadSystem*() =

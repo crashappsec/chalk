@@ -696,7 +696,22 @@ keyspec DATE_AUTHORED {
     since:            "0.1.2"
     shortdoc:         "Human readable timestamp of the author's commit"
     doc:              """
-The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+The date when commit was authored as full ISO-8601 string.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
+"""
+}
+
+keyspec TIMESTAMP_AUTHORED {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.4.15"
+    shortdoc:         "Unix timestamp of the author's commit"
+    doc:              """
+The date when commit was authored as ms since Unix epoch.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
 """
 }
 
@@ -718,7 +733,22 @@ keyspec DATE_COMMITTED {
     since:            "0.1.2"
     shortdoc:         "Human readable timestamp of most recent commit"
     doc:              """
-The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+The date when commit was created as full ISO-8601 string.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
+"""
+}
+
+keyspec TIMESTAMP_COMMITTED {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    shortdoc:         "Unix timestamp of most recent commit"
+    doc:              """
+The date when commit was created as ms since Unix epoch.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
 """
 }
 
@@ -794,12 +824,24 @@ keyspec DATE_TAGGED {
     since:            "0.3.0"
     shortdoc:         "Human readable timestamp of most recent tag"
     doc:              """
-The date of the annotated tag in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+The date when the annotated was created as full ISO-8601 string.
 
 Annotated tags are created with `git tag -a -m "comment"`.
 """
 }
 
+keyspec TIMESTAMP_TAGGED {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.4.15"
+    shortdoc:         "Unix timestamp of most recent tag"
+    doc:              """
+The date when the annotated was created in ms since Unix epoch.
+
+Annotated tags are created with `git tag -a -m "comment"`.
+"""
+}
 keyspec TAG_MESSAGE {
     kind:             ChalkTimeArtifact
     type:             string
@@ -872,7 +914,22 @@ keyspec _DATE_AUTHORED {
     since:            "0.4.0"
     shortdoc:         "Human readable timestamp of the author's commit"
     doc:              """
-The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+The date when commit was authored as full ISO-8601 string.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
+"""
+}
+
+keyspec _TIMESTAMP_AUTHORED {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.4.15"
+    shortdoc:         "Unix timestamp of the author's commit"
+    doc:              """
+The date when commit was authored as ms since Unix epoch.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
 """
 }
 
@@ -894,7 +951,22 @@ keyspec _DATE_COMMITTED {
     since:            "0.4.0"
     shortdoc:         "Human readable timestamp of most recent commit"
     doc:              """
-The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+The date when commit was created as full ISO-8601 string.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
+"""
+}
+
+keyspec _TIMESTAMP_COMMITTED {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.4.15"
+    shortdoc:         "Unix timestamp of most recent commit"
+    doc:              """
+The date when commit was created as ms since Unix epoch.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
 """
 }
 
@@ -971,6 +1043,19 @@ keyspec _DATE_TAGGED {
     shortdoc:         "Human readable timestamp of most recent tag"
     doc:              """
 The date of the annotated tag in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+
+Annotated tags are created with `git tag -a -m "comment"`.
+"""
+}
+
+keyspec _TIMESTAMP_TAGGED {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.4.15"
+    shortdoc:         "Unix timestamp of most recent tag"
+    doc:              """
+The date when the annotated was created in ms since Unix epoch.
 
 Annotated tags are created with `git tag -a -m "comment"`.
 """
@@ -5891,7 +5976,7 @@ keyspec _CHALK_RUN_TIME {
     doc: """
 Calculates the amount of time between the start of a chalk executable
 and when a report is generated. It's an integer with resolution of
-1/1000000th of a second.
+1e-6 of a second (millisecond).
 """
 }
 

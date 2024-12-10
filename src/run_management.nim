@@ -9,13 +9,14 @@
 ## setting, status stuff, and the core scan state ("collection
 ## contexts"), that the subscan module pushes and pops.
 
-import std/[posix, monotimes, enumerate]
+import std/[posix, monotimes, enumerate, times]
 import "."/chalk_common
 export chalk_common
 
 var
-  ctxStack   = @[CollectionCtx()]
-  startTime* = getMonoTime().ticks()
+  ctxStack       = @[CollectionCtx()]
+  startTime*     = getTime().utc # gives absolute wall time
+  monoStartTime* = getMonoTime() # used for computing diffs
 
 proc getChalkScope*(): AttrScope =
   con4mRuntime.configState.attrs
@@ -75,7 +76,8 @@ proc inSubscan*(): bool =
   return len(ctxStack) > 1
 
 proc clearReportingState*() =
-  startTime       = getMonoTime().ticks()
+  startTime       = getTime().utc
+  monoStartTime   = getMonoTime()
   ctxStack        = @[CollectionCtx()]
   hostInfo        = ChalkDict()
   subscribedKeys  = Table[string, bool]()

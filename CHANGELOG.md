@@ -127,10 +127,68 @@
   ([#450](https://github.com/crashappsec/chalk/pull/450),
   [#453](https://github.com/crashappsec/chalk/pull/453))
 
+- Git time-related fields are now reported in ISO-8601 format whereas
+  previously it was reporting using default git format.
+
+  Before:
+
+  ```json
+  {
+    "DATE_AUTHORED": "Tue Dec 10 11:46:06 2024 -0500",
+    "DATE_COMMITTED": "Tue Dec 10 11:46:06 2024 -0500",
+    "DATE_TAGGED": "Tue Dec 10 11:46:06 2024 -0500"
+  }
+  ```
+
+  Now:
+
+  ```json
+  {
+    "DATE_AUTHORED": "2024-12-10T16:46:06.000Z",
+    "DATE_COMMITTED": "2024-12-10T18:49:00.000Z",
+    "DATE_TAGGED": "2024-12-10T18:49:00.000Z"
+  }
+  ```
+
+  This also affects all host-level keys in addition to chalk-level keys:
+
+  - `DATE_AUTHORED`
+  - `DATE_COMMITTED`
+  - `DATE_TAGGED`
+  - `_DATE_AUTHORED`
+  - `_DATE_COMMITTED`
+  - `_DATE_TAGGED`
+
+  To make parsing easier, in addition to human readable `DATE_*` fields,
+  new `TIMESTAMP_*` fields are added which report milliseconds since
+  Unix epoch:
+
+  ```json
+  {
+    "DATE_AUTHORED": "2024-12-10T16:46:06.000Z",
+    "DATE_COMMITTED": "2024-12-10T18:49:00.000Z",
+    "DATE_TAGGED": "2024-12-10T18:49:00.000Z",
+    "TIMESTAMP_AUTHORED": 1733849166000,
+    "TIMESTAMP_COMMITTED": 1733856540000
+    "TIMESTAMP_TAGGED": 1733856540000
+  }
+  ```
+
+  ([#458](https://github.com/crashappsec/chalk/pull/458))
+
+- All datetime fields are now reported in UTC TZ whereas previously were
+  reported in machines local TZ
+  ([#458](https://github.com/crashappsec/chalk/pull/458))
+
 ### Fixes
 
-- `DOCKERFILE_PATH_WITHIN_VCTL` key is no longer reported when providing Dockerfile contents
-  via `stdin` ([#454](https://github.com/crashappsec/chalk/pull/454)).
+- `DOCKERFILE_PATH_WITHIN_VCTL` key is no longer reported when providing
+  Dockerfile contents via `stdin`
+  ([#454](https://github.com/crashappsec/chalk/pull/454)).
+
+- Git time-related fields report accurate timezone now. Previously
+  wrong commit TZ was being reported as committed in git which was not correct.
+  ([#458](https://github.com/crashappsec/chalk/pull/458))
 
 ### New Features
 
