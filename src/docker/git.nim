@@ -50,10 +50,13 @@ proc createTempKnownHosts(data: string): string =
   let path = writeNewTempFile(data)
   return path
 
-proc isHttpGitContext(context: string): bool =
+proc isHttpGitContext(context: string, requireExtension = true): bool =
   if context.startsWith("http://") or context.startsWith("https://"):
     let uri = parseUri(context)
-    return uri.path.endsWith(".git")
+    if requireExtension:
+      return uri.path.endsWith(".git")
+    else:
+      return true
   return false
 
 proc isSSHGitContext(context: string): bool =
@@ -64,8 +67,8 @@ proc isSSHGitContext(context: string): bool =
     return uri.path.endsWith(".git")
   return false
 
-proc isGitContext*(context: string): bool =
-  return isHttpGitContext(context) or isSSHGitContext(context)
+proc isGitContext*(context: string, requireExtension = true): bool =
+  return isHttpGitContext(context, requireExtension) or isSSHGitContext(context)
 
 proc splitContext*(context: string): (string, string, string) =
   let

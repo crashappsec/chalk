@@ -273,6 +273,7 @@ type
     cmd*:         CmdInfo
     shell*:       ShellInfo
     lastUser*:    UserInfo
+    chalk*:       ChalkObj
 
   DockerEntrypoint* = tuple
     entrypoint: EntryPointInfo
