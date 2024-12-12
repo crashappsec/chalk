@@ -190,6 +190,18 @@
   wrong commit TZ was being reported as committed in git which was not correct.
   ([#458](https://github.com/crashappsec/chalk/pull/458))
 
+- `_OP_ERRORS` includes all logs from chalkmark `ERR_INFO`,
+  even when its collection fails
+  ([#459](https://github.com/crashappsec/chalk/pull/459))
+
+- `docker buildx build` without both `--push` or `--load` report their
+  chalkmarks now. Chalkmarks however are missing any runtime keys
+  as those cannot be inspected due to image neither being pushed
+  to a registry or loaded into local daemon. Such an image is normally
+  inaccessible however it is still in buildx cache hence it can be
+  used in subsequent builds.
+  ([#459](https://github.com/crashappsec/chalk/pull/459))
+
 ### New Features
 
 - Chalk pins base images in `Dockerfile`. For example:

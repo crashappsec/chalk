@@ -11,13 +11,13 @@ import "../docker"/[scan]
 import ".."/[config, collect, reporting]
 
 proc processDockerChalk(item: ChalkObj) =
-  trace("Processing artifact: " & item.name)
-  item.addToAllChalks()
-  trace("Collecting artifact runtime info")
-  item.collectRuntimeArtifactInfo()
-  if item.extract == nil:
-    info(item.name & ": Artifact is unchalked.")
-  clearErrorObject()
+  item.withErrorContext():
+    trace("Processing artifact: " & item.name)
+    item.addToAllChalks()
+    trace("Collecting artifact runtime info")
+    item.collectRuntimeArtifactInfo()
+    if item.extract == nil:
+      info(item.name & ": Artifact is unchalked.")
 
 proc coreExtractFiles(path: seq[string]) =
   var numExtracts = 0

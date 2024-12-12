@@ -417,7 +417,8 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
       repos  = if digest == "": @[] else: names.withDigest(digest)
     # image was loaded to docker cache
     for platform, chalk in chalksByPlatform:
-      chalk.collectLocalImage(ctx.iidFile, repos = repos)
+      chalk.withErrorContext():
+        chalk.collectLocalImage(ctx.iidFile, repos = repos)
   elif len(ctx.foundTags) > 0:
     trace("docker: inspecting pushed image from registry")
     # iidfile can be one of in order of precedence:
@@ -428,9 +429,10 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
       digest = ctx.metadataFile{"containerimage.digest"}.getStr(ctx.iidFile)
       names  = parseImages(ctx.metadataFile{"image.name"}.getStr().split(","))
     for platform, chalk in chalksByPlatform:
-      let name = ctx.foundTags[0].withDigest(digest)
-      trace("docker: inspecting " & $name & " for " & $platform)
-      chalk.collectImageManifest(name, repos = names)
+      chalk.withErrorContext():
+        let name = ctx.foundTags[0].withDigest(digest)
+        trace("docker: inspecting " & $name & " for " & $platform)
+        chalk.collectImageManifest(name, repos = names)
   else:
     # this case in theory should never happen
     # as iid file when present should always be either locally loaded image
@@ -495,19 +497,24 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   trace("docker: preparing chalk marks for build")
   var oneChalk         = baseChalk
   let chalksByPlatform = baseChalk.copyPerPlatform(ctx.platforms)
+  for _, chalk in chalksByPlatform:
+    chalk.addToAllChalks()
   # chalk time artifact info determines metadata id/etc
   # so has to be done by platform
   for _, chalk in chalksByPlatform:
-    # collect any additional keys which might need to be included in chalkmark
-    chalk.collectBeforeChalkTime(ctx)
-    chalk.collectChalkTimeArtifactInfo()
-    oneChalk = chalk
+    chalk.withErrorContext():
+      # collect any additional keys which might need to be included in chalkmark
+      chalk.collectBeforeChalkTime(ctx)
+      chalk.collectChalkTimeArtifactInfo()
+      oneChalk = chalk
 
   if wrapVirtual:
     trace("docker: preparing virtual build")
     if wrapEntrypoint:
       warn("docker: cannot wrap entry point in virtual chalking mode.")
     ctx.addVirtualLabels(oneChalk)
+    for _, chalk in chalksByPlatform:
+      chalk.marked = true
 
   else:
     trace("docker: wrapping regular build")
@@ -532,14 +539,16 @@ proc dockerBuild*(ctx: DockerInvocation): int =
       try:
         ctx.withAtomicAdds():
           for platform, chalk in chalksByPlatform:
-            ctx.makeTextAvailableToDocker(
-              text       = chalk.getChalkMarkAsStr(),
-              newPath    = "/chalk.json",
-              user       = user,
-              chmod      = "0444",
-              byPlatform = ctx.isMultiPlatform(),
-              platform   = platform,
-            )
+            chalk.withErrorContext():
+              ctx.makeTextAvailableToDocker(
+                text       = chalk.getChalkMarkAsStr(),
+                newPath    = "/chalk.json",
+                user       = user,
+                chmod      = "0444",
+                byPlatform = ctx.isMultiPlatform(),
+                platform   = platform,
+              )
+              chalk.marked = true
       except:
         dumpExOnDebug()
         warn("docker: Cannot inject chalk mark (/chalk.json) due to: " & getCurrentExceptionMsg())
@@ -552,7 +561,8 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   # such as what instructions were added to dockerfile
   trace("docker: collecting pre-build metadata into chalkmark")
   for _, chalk in chalksByPlatform:
-    chalk.collectBeforeBuild(ctx)
+    chalk.withErrorContext():
+      chalk.collectBeforeBuild(ctx)
 
   ctx.setDockerFile()
   ctx.setIidFile()
@@ -584,10 +594,9 @@ proc dockerBuild*(ctx: DockerInvocation): int =
 
   trace("docker: collecting post-build runtime data")
   for _, chalk in chalksByPlatform:
-    chalk.addToAllChalks()
-    chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("build")
-    chalk.collectRunTimeArtifactInfo()
-    chalk.marked = true
+    chalk.withErrorContext():
+      chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("build")
+      chalk.collectRunTimeArtifactInfo()
   collectRunTimeHostInfo()
 
   if wrapVirtual and result == 0:

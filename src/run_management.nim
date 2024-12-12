@@ -107,10 +107,6 @@ proc getCurrentCollectionCtx*(): CollectionCtx =
   collectionCtx
 proc getErrorObject*(): Option[ChalkObj] =
   collectionCtx.currentErrorObject
-proc setErrorObject*(o: ChalkObj) =
-  collectionCtx.currentErrorObject = some(o)
-proc clearErrorObject*() =
-  collectionCtx.currentErrorObject = none(ChalkObj)
 proc getAllChalks*(): seq[ChalkObj] =
   collectionCtx.allChalks
 proc getAllChalks*(cc: CollectionCtx): seq[ChalkObj] =
@@ -148,6 +144,21 @@ proc setContextDirectories*(l: seq[string]) =
 proc getContextDirectories*(): seq[string] =
   collectionCtx.contextDirectories
 
+template withErrorContext*(chalk: ChalkObj, c: untyped) =
+  var previous = collectionCtx.currentErrorObject
+  try:
+    collectionCtx.currentErrorObject = some(chalk)
+    c
+  except:
+    # exception was raised while processing chalk so bubble up
+    # the errors to the system errors log so that report
+    # is not missing any critical debugging logs while individual
+    # chalk was being processed
+    systemErrors &= chalk.err
+    raise
+  finally:
+    collectionCtx.currentErrorObject = previous
+
 proc isMarked*(chalk: ChalkObj): bool {.inline.} =
   return chalk.marked
 
@@ -162,7 +173,6 @@ proc newChalk*(name:         string            = "",
                extract:      ChalkDict         = ChalkDict(nil),
                cache:        RootRef           = RootRef(nil),
                codec:        Plugin            = Plugin(nil),
-               addToAllChalks                  = false,
                platform                        = DockerPlatform(nil),
                ): ChalkObj =
 
@@ -187,11 +197,6 @@ proc newChalk*(name:         string            = "",
 
   if extract != nil and len(extract) > 1:
     result.marked = true
-
-  if addToAllChalks:
-    result.addToAllChalks()
-
-  setErrorObject(result)
 
 template setIfNotEmpty*(dict: ChalkDict, key: string, val: string) =
   if val != "":

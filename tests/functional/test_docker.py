@@ -1407,8 +1407,8 @@ def test_multiplatform_build(
     if not push:
         # as no image is loaded without --push,
         # we cant inspect anything
-        with pytest.raises(KeyError):
-            build.marks
+        for mark in build.marks:
+            assert mark.has(_CURRENT_HASH=MISSING, _IMAGE_ID=MISSING)
         return
 
     assert len(build.marks) == len(platforms)
