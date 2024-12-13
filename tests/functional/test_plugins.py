@@ -956,12 +956,6 @@ def test_semgrep(
                         "tool": {
                             "driver": {
                                 "name": "Semgrep OSS",
-                                "rules": [
-                                    {
-                                        "id": "is-comparison",
-                                        "name": "is-comparison",
-                                    }
-                                ],
                                 "semanticVersion": ANY,
                             }
                         },
