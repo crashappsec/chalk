@@ -3,7 +3,6 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import functools
-import re
 from pathlib import Path
 from typing import Optional
 
@@ -14,10 +13,6 @@ from .os import run
 
 
 logger = get_logger()
-
-DATE_FORMAT = re.compile(
-    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}([+-]\d{2}:\d{2}|Z)$"
-)
 
 
 class Git:

@@ -2,7 +2,6 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import re
 from pathlib import Path
 from typing import Optional
 
@@ -11,8 +10,8 @@ import pytest
 
 from .chalk.runner import Chalk
 from .conf import LS_PATH
-from .utils.dict import ANY, MISSING
-from .utils.git import DATE_FORMAT, Git
+from .utils.dict import ANY, MISSING, Iso8601
+from .utils.git import Git
 
 
 @pytest.mark.parametrize(
@@ -78,14 +77,14 @@ def test_repo(
         COMMIT_ID=ANY,
         COMMIT_SIGNED=sign,
         AUTHOR=git.author,
-        DATE_AUTHORED=DATE_FORMAT,
+        DATE_AUTHORED=Iso8601(),
         COMMITTER=git.committer,
-        DATE_COMMITTED=DATE_FORMAT,
+        DATE_COMMITTED=Iso8601(),
         COMMIT_MESSAGE=commit_message if not empty else MISSING,
         TAG=f"foo/{random_hex}-2",
         TAG_SIGNED=sign,
         TAGGER=git.committer if (sign or annotate) else MISSING,
-        DATE_TAGGED=DATE_FORMAT if (sign or annotate) else MISSING,
+        DATE_TAGGED=Iso8601() if (sign or annotate) else MISSING,
         TAG_MESSAGE=(tag_message if (sign or annotate) and not empty else MISSING),
         ORIGIN_URI=remote or "local",
         VCS_DIR_WHEN_CHALKED=str(tmp_data_dir),

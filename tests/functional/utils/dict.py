@@ -5,11 +5,24 @@
 import itertools
 import operator
 import re
+from datetime import datetime
 from typing import Any, Callable, Iterable, Optional, cast
 
 
 ANY = object()
 MISSING = object()
+
+
+class Iso8601:
+    def __eq__(self, other: Any):
+        if isinstance(other, datetime):
+            return True
+        try:
+            datetime.fromisoformat(other)
+        except ValueError:
+            return False
+        else:
+            return True
 
 
 class Length:
@@ -112,6 +125,8 @@ class SubsetCompare:
                 raise AssertionError(self._message_why("", str(e))) from e
             else:
                 assert eq, self._message_ne(value)
+        elif isinstance(self.expected, Iso8601):
+            assert self.expected == value, self._message_ne(value)
         else:
             assert value == self.expected, self._message_ne(value)
         return True
