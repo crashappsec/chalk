@@ -773,16 +773,16 @@ proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
   chalkDict.setIfNeeded(prefix & keyCommitter,      info.committer)
   chalkDict.setIfNeeded(prefix & keyCommitMessage,  info.message)
   if info.author != "":
-    chalkDict.setIfNeeded(prefix & keyAuthorDate,   info.authorDate.utc.format(timesIso8601Format))
+    chalkDict.setIfNeeded(prefix & keyAuthorDate,   info.authorDate.forReport().format(timesIso8601Format))
     chalkDict.setIfNeeded(prefix & keyAuthorTime,   info.authorDate.toUnixInMs())
   if info.committer != "":
-    chalkDict.setIfNeeded(prefix & keyCommitDate,   info.commitDate.utc.format(timesIso8601Format))
+    chalkDict.setIfNeeded(prefix & keyCommitDate,   info.commitDate.forReport().format(timesIso8601Format))
     chalkDict.setIfNeeded(prefix & keyCommitTime,   info.commitDate.toUnixInMs())
   if info.latestTag != nil:
     chalkDict.setIfNeeded(prefix & keyLatestTag,    info.latestTag.name)
     chalkDict.setIfNeeded(prefix & keyTagger,       info.latestTag.tagger)
     if info.latestTag.tagger != "":
-      chalkDict.setIfNeeded(prefix & keyTaggedDate, info.latestTag.date.utc.format(timesIso8601Format))
+      chalkDict.setIfNeeded(prefix & keyTaggedDate, info.latestTag.date.forReport().format(timesIso8601Format))
       chalkDict.setIfNeeded(prefix & keyTaggedTime, info.latestTag.date.toUnixInMs())
     chalkDict.setIfNeeded(prefix & keyTagSigned,    info.latestTag.signed)
     chalkDict.setIfNeeded(prefix & keyTagMessage,   info.latestTag.message)

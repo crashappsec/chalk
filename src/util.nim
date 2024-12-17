@@ -649,3 +649,9 @@ proc `+`*[T](a, b: OrderedSet[T]): OrderedSet[T] =
 proc toUnixInMs*(t: DateTime): int64 =
   let epoch = fromUnix(0).utc
   return (t - epoch).inMilliseconds()
+
+proc forReport*(t: DateTime): DateTime =
+  ## convert datetime to timezone for reporting chalk keys
+  # eventually we might add a config to specify in which TZ to report in
+  # however for now normalize to local timezone for reading report output
+  return t.local
