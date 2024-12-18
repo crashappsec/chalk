@@ -1016,7 +1016,7 @@ def test_nonvirtual_invalid(chalk: Chalk, test_file: str, random_hex: str):
         expected_success=False,
     )
 
-    assert result.report.has(_OP_EXIT_CODE=result.exit_code)
+    assert result.report.has(_OP_EXIT_CODE=result.exit_code, _CHALKS=MISSING)
 
 
 def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):

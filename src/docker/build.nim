@@ -497,8 +497,6 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   trace("docker: preparing chalk marks for build")
   var oneChalk         = baseChalk
   let chalksByPlatform = baseChalk.copyPerPlatform(ctx.platforms)
-  for _, chalk in chalksByPlatform:
-    chalk.addToAllChalks()
   # chalk time artifact info determines metadata id/etc
   # so has to be done by platform
   for _, chalk in chalksByPlatform:
@@ -574,6 +572,12 @@ proc dockerBuild*(ctx: DockerInvocation): int =
       ValueError,
       "wrapped docker build exited with " & $result
     )
+
+  # build succeeded so safe to add these chalks to all chalks
+  # as otherwise if we add too early chalkmark might be reported
+  # before artifact/image is built
+  for _, chalk in chalksByPlatform:
+    chalk.addToAllChalks()
 
   ctx.readIidFile()
   ctx.readMetadataFile()
