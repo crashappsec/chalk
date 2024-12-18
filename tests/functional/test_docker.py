@@ -1016,7 +1016,7 @@ def test_nonvirtual_invalid(chalk: Chalk, test_file: str, random_hex: str):
         expected_success=False,
     )
 
-    assert result.report.has(_OP_EXIT_CODE=result.exit_code)
+    assert result.report.has(_OP_EXIT_CODE=result.exit_code, _CHALKS=MISSING)
 
 
 def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
@@ -1407,8 +1407,8 @@ def test_multiplatform_build(
     if not push:
         # as no image is loaded without --push,
         # we cant inspect anything
-        with pytest.raises(KeyError):
-            build.marks
+        for mark in build.marks:
+            assert mark.has(_CURRENT_HASH=MISSING, _IMAGE_ID=MISSING)
         return
 
     assert len(build.marks) == len(platforms)
