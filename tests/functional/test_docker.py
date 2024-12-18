@@ -338,18 +338,23 @@ def test_base_registry(chalk: Chalk, image: str, entrypoint: str, buildx: bool):
     )
 
 
-def test_base_image(chalk: Chalk, random_hex: str):
+@pytest.mark.parametrize("push", [True, False])
+def test_base_image(chalk: Chalk, random_hex: str, push: bool):
+    base = f"{REGISTRY}/base/{random_hex}:{random_hex}"
     base_id, _ = Docker.build(
+        buildx=push,
+        push=push,
+        load=not push,
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile.base",
         context=DOCKERFILES / "valid" / "base",
-        tag=random_hex,
+        tag=base,
     )
     assert base_id
 
     image_id, _ = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile",
         context=DOCKERFILES / "valid" / "base",
-        args={"BASE": random_hex},
+        args={"BASE": base},
         config=CONFIGS / "docker_wrap.c4m",
     )
     _, run = Docker.run(image_id)

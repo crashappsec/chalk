@@ -35,6 +35,7 @@ class Docker:
         content: Optional[str] = None,
         args: Optional[dict[str, str]] = None,
         push: bool = False,
+        load: bool = True,
         platforms: Optional[list[str]] = None,
         buildx: bool = False,
         secrets: Optional[dict[str, Path]] = None,
@@ -53,7 +54,7 @@ class Docker:
             cmd += ["buildx"]
             buildx = True
         cmd += ["build"]
-        if buildx and not platforms and not provenance and not sbom:
+        if buildx and not platforms and not provenance and not sbom and load:
             cmd += ["--load"]
         for t in tags:
             cmd += ["-t", t]
@@ -99,6 +100,7 @@ class Docker:
         args: Optional[dict[str, str]] = None,
         cwd: Optional[Path] = None,
         push: bool = False,
+        load: bool = True,
         platforms: Optional[list[str]] = None,
         buildx: bool = False,
         expected_success: bool = True,
@@ -121,6 +123,7 @@ class Docker:
             content=content,
             args=args,
             push=push,
+            load=load,
             platforms=platforms,
             buildx=buildx,
             secrets=secrets,
