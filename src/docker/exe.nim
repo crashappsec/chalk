@@ -7,7 +7,7 @@
 
 import std/[os, sets]
 import pkg/[parsetoml]
-import ".."/[config, util, semver]
+import ".."/[config, util, semver, toml]
 
 var
   dockerExeLocation   = ""
@@ -202,8 +202,8 @@ proc getBuilderInfo*(ctx: DockerInvocation): string =
       builderInfo = output.getStdOut()
   return builderInfo
 
-proc getBuilderNodesInfo*(ctx: DockerInvocation): Table[string, string] =
-  result = initTable[string, string]()
+proc getBuilderNodesInfo*(ctx: DockerInvocation): TableRef[string, string] =
+  result = newTable[string, string]()
   var
     foundNodes = false
     name       = ""
@@ -224,7 +224,11 @@ proc getBuilderNodesInfo*(ctx: DockerInvocation): Table[string, string] =
       result[name] = ""
     result[name] &= line & "\n"
 
+var nodeFiles = newTable[string, string]()
 proc readBuilderNodeFile*(ctx: DockerInvocation, node: string, path: string): string =
+  let key = node & ":" & path
+  if key in nodeFiles:
+    return nodeFiles[key]
   let
     # ideally we can query the namespaces however they are not exposed
     # via docker info output and are only stored in the buildx config files
@@ -242,18 +246,24 @@ proc readBuilderNodeFile*(ctx: DockerInvocation, node: string, path: string): st
     )
   if output.exitCode != 0:
     raise newException(ValueError, "could not read buildx node's " & container & " " & path)
-  return output.stdOut
+  result = output.stdOut
+  nodeFiles[key] = result
 
 iterator iterBuilderNodesConfigs*(ctx: DockerInvocation): tuple[name: string, config: JsonNode] =
   for name, _ in ctx.getBuilderNodesInfo():
     try:
       let
         toml   = ctx.readBuilderNodeFile(name, "/etc/buildkit/buildkitd.toml")
-        config = parsetoml.parseString(toml).toJson()
+        config = parsetoml.parseString(toml).toJson().fromTomlJson()
       yield (name, config)
     except:
       trace("docker: could not load toml for buildx node " & name & " due to: " & getCurrentExceptionMsg())
       continue
+
+proc getBuilderNodesConfigs*(ctx: DockerInvocation): TableRef[string, JsonNode] =
+  result = newTable[string, JsonNode]()
+  for name, config in ctx.iterBuilderNodesConfigs():
+    result[name] = config
 
 proc getBuildKitVersion*(ctx: DockerInvocation): Version =
   once:

@@ -45,6 +45,14 @@ class Length:
         return self.op(len(other), self.size)
 
 
+class Values:
+    def __init__(self, values: Any):
+        self.values = values
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.values!r})"
+
+
 class Contains:
     def __init__(self, items: set[Any] | list[Any]):
         self.items = ContainsList(items)
@@ -125,6 +133,12 @@ class SubsetCompare:
                 raise AssertionError(self._message_why("", str(e))) from e
             else:
                 assert eq, self._message_ne(value)
+        elif isinstance(self.expected, Values):
+            assert isinstance(value, dict), self._message_ne(value)
+            values = list(value.values())
+            assert (
+                self.__class__(self.expected.values, f"Values({self.path})") == values
+            )
         elif isinstance(self.expected, Iso8601):
             assert self.expected == value, self._message_ne(value)
         else:

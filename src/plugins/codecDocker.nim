@@ -5,8 +5,8 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import "../docker"/[collect, ids, exe]
-import ".."/[config, plugin_api, semver]
+import "../docker"/[collect, ids, exe, registry]
+import ".."/[config, plugin_api, semver, chalkjson]
 
 const markLocation = "/chalk.json"
 
@@ -34,8 +34,11 @@ proc dockerGetRunTimeHostInfo(self: Plugin, chalks: seq[ChalkObj]): ChalkDict {.
   result.setIfNeeded("_DOCKER_INFO",           getDockerInfo())
   let ctx = dockerInvocation
   if ctx != nil:
-    result.setIfNeeded("_DOCKER_BUILDER_INFO", ctx.getBuilderInfo())
-    result.setIfNeeded("_DOCKER_BUILDER_BUILDKIT_VERSION",    ctx.getBuildKitVersion().normalize())
+    result.setIfNeeded("_DOCKER_USED_REGISTRIES",          getUsedRegistryConfigs())
+    result.setIfNeeded("_DOCKER_BUILDER_BUILDKIT_VERSION", ctx.getBuildKitVersion().normalize())
+    result.setIfNeeded("_DOCKER_BUILDER_INFO",             ctx.getBuilderInfo())
+    result.setIfNeeded("_DOCKER_BUILDER_NODES_INFO",       ctx.getBuilderNodesInfo())
+    result.setIfNeeded("_DOCKER_BUILDER_NODES_CONFIG",     ctx.getBuilderNodesConfigs().jsonTableToBox())
 
 proc loadCodecDocker*() =
   # cant use getDockerExePath as that uses codecs to ignore chalk
