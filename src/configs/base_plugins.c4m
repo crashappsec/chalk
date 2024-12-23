@@ -614,7 +614,11 @@ plugin docker {
     post_run_keys:  ["_DOCKER_CLIENT_VERSION", "_DOCKER_SERVER_VERSION",
                      "_DOCKER_BUILDX_VERSION", "_DOCKER_INFO",
                      "_DOCKER_BUILDER_BUILDKIT_VERSION",
-                     "_DOCKER_BUILDER_INFO"]
+                     "_DOCKER_BUILDER_INFO",
+                     "_DOCKER_BUILDER_NODES_INFO",
+                     "_DOCKER_BUILDER_NODES_CONFIG",
+                     "_DOCKER_USED_REGISTRIES"
+                     ]
     doc: """
 The docker Codec is responsible for chalk marks for Docker images and
 containers, but also does all of the docker-specific data collection

@@ -119,6 +119,9 @@ report and subtract from it.
   key._DOCKER_INFO.use                        = true
   key._DOCKER_BUILDER_BUILDKIT_VERSION.use    = true
   key._DOCKER_BUILDER_INFO.use                = true
+  key._DOCKER_BUILDER_NODES_INFO.use          = true
+  key._DOCKER_BUILDER_NODES_CONFIG.use        = true
+  key._DOCKER_USED_REGISTRIES.use             = true
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
@@ -716,6 +719,9 @@ doc: """
   key._DOCKER_INFO.use                        = true
   key._DOCKER_BUILDER_BUILDKIT_VERSION.use    = true
   key._DOCKER_BUILDER_INFO.use                = true
+  key._DOCKER_BUILDER_NODES_INFO.use          = true
+  key._DOCKER_BUILDER_NODES_CONFIG.use        = true
+  key._DOCKER_USED_REGISTRIES.use             = true
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
@@ -1196,6 +1202,9 @@ container.
   key._DOCKER_INFO.use                        = true
   key._DOCKER_BUILDER_BUILDKIT_VERSION.use    = true
   key._DOCKER_BUILDER_INFO.use                = true
+  key._DOCKER_BUILDER_NODES_INFO.use          = true
+  key._DOCKER_BUILDER_NODES_CONFIG.use        = true
+  key._DOCKER_USED_REGISTRIES.use             = true
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
@@ -1676,6 +1685,9 @@ and keep the run-time key.
   key._DOCKER_INFO.use                        = true
   key._DOCKER_BUILDER_BUILDKIT_VERSION.use    = true
   key._DOCKER_BUILDER_INFO.use                = true
+  key._DOCKER_BUILDER_NODES_INFO.use          = true
+  key._DOCKER_BUILDER_NODES_CONFIG.use        = true
+  key._DOCKER_USED_REGISTRIES.use             = true
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
@@ -2052,6 +2064,9 @@ running insert commands.
   key._DOCKER_INFO.use                        = false
   key._DOCKER_BUILDER_BUILDKIT_VERSION.use    = false
   key._DOCKER_BUILDER_INFO.use                = false
+  key._DOCKER_BUILDER_NODES_INFO.use          = false
+  key._DOCKER_BUILDER_NODES_CONFIG.use        = false
+  key._DOCKER_USED_REGISTRIES.use             = false
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
@@ -2148,6 +2163,9 @@ running commands that do NOT insert chalk marks.
   key._DOCKER_INFO.use                        = false
   key._DOCKER_BUILDER_BUILDKIT_VERSION.use    = false
   key._DOCKER_BUILDER_INFO.use                = false
+  key._DOCKER_BUILDER_NODES_INFO.use          = false
+  key._DOCKER_BUILDER_NODES_CONFIG.use        = false
+  key._DOCKER_USED_REGISTRIES.use             = false
   key.DOCKER_FILE.use                         = true
   key.DOCKER_FILE_CHALKED.use                 = true
   key.DOCKERFILE_PATH.use                     = true
