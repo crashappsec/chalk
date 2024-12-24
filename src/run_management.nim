@@ -230,8 +230,15 @@ template setIfNeeded*[T](o: ChalkDict, k: string, v: T) =
   when T is string:
     if v != "":
       setIfSubscribed(o, k, v)
-  elif T is seq or T is ChalkDict:
+  elif T is seq or T is ChalkDict or T is TableRef:
     if len(v) != 0:
+      setIfSubscribed(o, k, v)
+  elif T is Box:
+    case v.kind
+    of MkSeq, MkTable:
+      if len(v) != 0:
+        setIfSubscribed(o, k, v)
+    else:
       setIfSubscribed(o, k, v)
   elif T is Option:
     if v.isSome():

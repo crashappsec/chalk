@@ -68,6 +68,8 @@ class ChalkReport(ContainsDict):
                     # docker does not have deterministic output
                     # insecure registries are not consistently ordered
                     "_DOCKER_INFO",
+                    # route can be diff or flaky
+                    "_NETWORK_PARTIAL_TRACEROUTE_IPS",
                 }
                 | (ignore or set())
             }

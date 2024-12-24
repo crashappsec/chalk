@@ -235,6 +235,9 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._DOCKER_INFO.use                        = true
   ~key._DOCKER_BUILDER_BUILDKIT_VERSION.use    = true
   ~key._DOCKER_BUILDER_INFO.use                = true
+  ~key._DOCKER_BUILDER_NODES_INFO.use          = true
+  ~key._DOCKER_BUILDER_NODES_CONFIG.use        = true
+  ~key._DOCKER_USED_REGISTRIES.use             = true
   ~key.DOCKER_FILE.use                         = true
   ~key.DOCKER_FILE_CHALKED.use                 = true
   ~key.DOCKERFILE_PATH.use                     = true
