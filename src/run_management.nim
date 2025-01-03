@@ -198,20 +198,28 @@ proc newChalk*(name:         string            = "",
   if extract != nil and len(extract) > 1:
     result.marked = true
 
-template setIfNotEmpty*(dict: ChalkDict, key: string, val: string) =
-  if val != "":
-    dict[key] = pack(val)
+template setIfNotEmptyBox*(o: ChalkDict, k: string, v: Box) =
+  case v.kind
+  of MkSeq, MkTable, MkStr:
+    if len(v) > 0:
+      o[k] = v
+  else:
+    o[k] = v
 
-template setIfNotEmpty*[T](dict: ChalkDict, key: string, val: seq[T]) =
-  if len(val) > 0:
-    dict[key] = pack[seq[T]](val)
+template setIfNotEmpty*[T](o: ChalkDict, k: string, v: T) =
+  when T is Box:
+    setIfNotEmptyBox(o, k, v)
+  elif T is JsonNode:
+    if v != nil:
+      setIfNotEmptyBox(o, k, v.nimJsonToBox())
+  elif T is Option:
+    if v.isSome():
+      setIfNotEmptyBox(o, k, pack(v.get()))
+  else:
+    setIfNotEmptyBox(o, k, pack(v))
 
-template setFromEnvVar*(dict: ChalkDict, key: string, default: string = "") =
-  dict.setIfNotEmpty(key, os.getEnv(key, default))
-
-proc idFormat*(rawHash: string): string =
-  let s = base32vEncode(rawHash)
-  s[0 ..< 6] & "-" & s[6 ..< 10] & "-" & s[10 ..< 14] & "-" & s[14 ..< 20]
+template setFromEnvVar*(o: ChalkDict, k: string, default: string = "") =
+  o.setIfNotEmpty(k, os.getEnv(k, default))
 
 template isSubscribedKey*(key: string): bool =
   if key in subscribedKeys:
@@ -219,25 +227,20 @@ template isSubscribedKey*(key: string): bool =
   else:
     false
 
-template setIfSubscribed*[T](d: ChalkDict, k: string, v: T) =
+template setIfSubscribed*[T](o: ChalkDict, k: string, v: T) =
   if isSubscribedKey(k):
-    when T is Box:
-      d[k] = v
+    # need to normalize additional types to box to match setIfNeeded behavior
+    when T is JsonNode:
+      o[k] = v.nimJsonToBox()
+    elif T is Option:
+      if v.isSome():
+        i[k] = pack(v.get())
     else:
-      d[k] = pack[T](v)
+      o[k] = pack(v)
 
 template setIfNeeded*[T](o: ChalkDict, k: string, v: T) =
-  when T is string:
-    if v != "":
-      setIfSubscribed(o, k, v)
-  elif T is seq or T is ChalkDict:
-    if len(v) != 0:
-      setIfSubscribed(o, k, v)
-  elif T is Option:
-    if v.isSome():
-      setIfSubscribed(o, k, v.get())
-  else:
-    setIfSubscribed(o, k, v)
+  if isSubscribedKey(k):
+    setIfNotEmpty[T](o, k, v)
 
 template setIfNeeded*[T](o: ChalkObj, k: string, v: T) =
   setIfNeeded(o.collectedData, k, v)
@@ -247,6 +250,10 @@ template trySetIfNeeded*(o: ChalkDict, k: string, code: untyped) =
     o.setIfNeeded(k, code)
   except:
     trace("Could not set chalk key " & k & " due to: " & getCurrentExceptionMsg())
+
+proc idFormat*(rawHash: string): string =
+  let s = base32vEncode(rawHash)
+  s[0 ..< 6] & "-" & s[6 ..< 10] & "-" & s[10 ..< 14] & "-" & s[14 ..< 20]
 
 proc isChalkingOp*(): bool =
   return commandName in attrGet[seq[string]]("valid_chalk_command_names")

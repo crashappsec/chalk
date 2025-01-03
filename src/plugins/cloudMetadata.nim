@@ -240,8 +240,7 @@ proc oneItem(chalkDict: ChalkDict, token: string, keyname: string, url: string) 
     let
       hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
       resultOpt = hitProviderEndpoint(url, hdrs)
-    if resultOpt.isSome():
-      chalkDict.setIfNotEmpty(keyname, resultOpt.get())
+    chalkDict.setIfNotEmpty(keyname, resultOpt)
 
 proc listKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
   ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key

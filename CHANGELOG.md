@@ -249,6 +249,30 @@
   layer combinations from other images.
   ([#456](https://github.com/crashappsec/chalk/pull/456))
 
+- `_DOCKER_USED_REGISTRIES` - Configurations about all used docker registires
+  during chalk operation. For example:
+
+  ```json
+  {
+    "_DOCKER_USED_REGISTIES" {
+      "example.com:5044": {
+        "url": "https://example.com:5044/v2",
+        "source": "buildx",
+        "scheme": "https",
+        "http": false,
+        "secure": true,
+        "insecure": false,
+        "auth": true,
+        "www_auth": false,
+        "pinned_cert_path": "/etc/buildkit/certs/example_com_5044/ca.crt",
+        "pinned_cert": "-----BEGIN CERTIFICATE-----\n..."
+      }
+    }
+  }
+  ```
+
+  ([#461](https://github.com/crashappsec/chalk/pull/461))
+
 ## 0.4.14
 
 **Nov 11, 2024**

@@ -42,10 +42,11 @@ BASE_OUTCONF = ROOT.parent.parent / "src" / "configs" / "base_outconf.c4m"
 # which means that the push comes from the host
 # therefore this is sufficient for the docker push command
 # as well as the buildx
-REGISTRY = f"{os.environ.get('IP') or 'localhost'}:5044"
-REGISTRY_TLS = f"{os.environ.get('IP') or 'localhost'}:5045"
-REGISTRY_TLS_INSECURE = f"{os.environ.get('IP') or 'localhost'}:5046"
-REGISTRY_PROXY = f"{os.environ.get('IP') or 'localhost'}:5047"
+IP = os.environ.get("IP") or "localhost"
+REGISTRY = f"{IP}:5044"
+REGISTRY_TLS = f"{IP}:5045"
+REGISTRY_TLS_INSECURE = f"{IP}:5046"
+REGISTRY_PROXY = f"{IP}:5047"
 
 SERVER_CHALKDUST = "https://chalkdust.io"
 SERVER_IMDS = "http://169.254.169.254"

@@ -29,8 +29,10 @@ type
     ReadOnly # allows use of mirrors
 
   RegistryConfig = ref object
+    source*:      string
     scheme*:      string
     registry*:    string
+    mirroring*:   string
     prefix*:      string
     project*:     string
     certPath*:    string
@@ -61,6 +63,12 @@ iterator uses(use: RegistryUse): RegistryUse =
   if use == RegistryUse.ReadWrite:
     yield RegistryUse.ReadOnly
 
+proc usesWwwAuth(self: RegistryConfig): bool =
+  for _, auth in self.wwwAuth.pairs():
+    if len(auth) > 0:
+      return true
+  return false
+
 proc withBasicAuth(self: RegistryConfig, token: string): RegistryConfig =
   if token != "":
     self.auth = newHttpHeaders(@[
@@ -74,12 +82,15 @@ proc withBasicAuth(self: RegistryConfig, token: string): RegistryConfig =
 iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
                                            withHttp    = true,
                                            prefix      = "",
+                                           mirroring   = "",
                                            fallthrough = false): RegistryConfig =
   yield RegistryConfig(
+    source:      "daemon",
     scheme:      "https://",
     registry:    self.registry,
     prefix:      prefix,
     verifyMode:  CVerifyPeer,
+    mirroring:   mirroring,
     fallthrough: fallthrough,
   )
 
@@ -94,10 +105,12 @@ iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
   if cert != "":
     trace("docker: found CA certificate for " & self.registry & " at " & path & " in docker daemon")
     yield RegistryConfig(
+      source:      "daemon",
       scheme:      "https://",
       registry:    self.registry,
       prefix:      prefix,
       verifyMode:  CVerifyPeer,
+      mirroring:   mirroring,
       fallthrough: fallthrough,
       certPath:    path,
       pinnedCert:  writeNewTempFile(
@@ -112,18 +125,22 @@ iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
       trace("docker: " & i & " is configured as an insecure registry in docker daemon")
       trace("docker: " & self.registry & " will attempt TLS without verifying server cert")
       yield RegistryConfig(
+        source:      "daemon",
         scheme:      "https://",
         registry:    self.registry,
         prefix:      prefix,
         verifyMode:  CVerifyNone,
+        mirroring:   mirroring,
         fallthrough: fallthrough,
       )
       if withHttp:
         yield RegistryConfig(
+          source:      "daemon",
           scheme:      "http://",
           registry:    self.registry,
           prefix:      prefix,
           verifyMode:  CVerifyNone,
+          mirroring:   mirroring,
           fallthrough: fallthrough,
         )
     else:
@@ -150,18 +167,22 @@ iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
           trace("docker: " & self.domain & " (" & $selfIp & ") is an insecure registry via IP address match for " & i)
           trace("docker: " & self.registry & " will attempt TLS without verifying server cert")
           yield RegistryConfig(
+            source:      "daemon",
             scheme:      "https://",
             registry:    self.registry,
             prefix:      prefix,
             verifyMode:  CVerifyNone,
+            mirroring:   mirroring,
             fallthrough: fallthrough,
           )
           if withHttp:
             yield RegistryConfig(
+              source:      "daemon",
               scheme:      "http://",
               registry:    self.registry,
               prefix:      prefix,
               verifyMode:  CVerifyNone,
+              mirroring:   mirroring,
               fallthrough: fallthrough,
             )
       except:
@@ -185,15 +206,18 @@ iterator iterDaemonRegistryConfigs(self: DockerImage, use: RegistryUse): Registr
         for i in mirrored.iterDaemonSpecificRegistryConfigs(
           withHttp    = false,
           prefix      = prefix,
+          mirroring   = self.registry,
           fallthrough = true,
         ):
           yield i
       else:
         yield RegistryConfig(
+          source:      "daemon",
           scheme:      "http://",
           registry:    registry,
           prefix:      prefix,
           verifyMode:  CVerifyNone,
+          mirroring:   self.registry,
           fallthrough: true,
         )
 
@@ -209,33 +233,38 @@ proc findRegistry(self: JsonNode, registry: string): JsonNode =
 iterator iterBuildxSpecificRegistryConfigs(self:         DockerImage,
                                            node:         string,
                                            config:       JsonNode,
+                                           mirroring   = "",
                                            project     = "",
                                            fallthrough = false): RegistryConfig =
   let registry = config.findRegistry(self.registry)
   if registry != nil:
     let
-      http     = registry{"http"}{"value"}.getStr()
-      insecure = registry{"insecure"}{"value"}.getStr()
-      certs    = registry{"ca"}{"value"}
-    if insecure != "true" and http != "true":
+      http     = registry{"http"}.getBool()
+      insecure = registry{"insecure"}.getBool()
+      certs    = registry{"ca"}
+    if not insecure and not http:
       yield RegistryConfig(
+        source:      "buildx",
         scheme:      "https://",
         registry:    self.registry,
         project:     project,
         verifyMode:  CVerifyPeer,
+        mirroring:   mirroring,
         fallthrough: fallthrough,
       )
     if certs != nil and certs.kind == JArray:
       for cert in certs:
-        let path = cert{"value"}.getStr()
+        let path = cert.getStr()
         try:
           let data = dockerInvocation.readBuilderNodeFile(node, path)
           trace("docker: found CA certificate for " & self.registry & " at " & path & " in buildx node " & node)
           yield RegistryConfig(
+            source:      "buildx",
             scheme:      "https://",
             registry:    self.registry,
             project:     project,
             verifyMode:  CVerifyPeer,
+            mirroring:   mirroring,
             fallthrough: fallthrough,
             certPath:    path,
             pinnedCert:  writeNewTempFile(
@@ -247,22 +276,26 @@ iterator iterBuildxSpecificRegistryConfigs(self:         DockerImage,
         except:
           trace("docker: cannot read buildx registry CA from " & path & " in buildx node " & node)
           continue
-    if insecure == "true":
+    if insecure:
       trace("docker: " & self.registry & " is configured as an insecure registry in docker buildx node " & node)
       yield RegistryConfig(
+        source:      "buildx",
         scheme:      "https://",
         registry:    self.registry,
         project:     project,
         verifyMode:  CVerifyNone,
+        mirroring:   mirroring,
         fallthrough: fallthrough,
       )
-    if http == "true":
+    if http:
       trace("docker: " & self.registry & " is configured as an http registry in docker buildx node " & node)
       yield RegistryConfig(
+        source:      "buildx",
         scheme:      "http://",
         registry:    self.registry,
         project:     project,
         verifyMode:  CVerifyNone,
+        mirroring:   mirroring,
         fallthrough: fallthrough,
       )
 
@@ -274,11 +307,11 @@ iterator iterBuildxRegistryConfigs(self: DockerImage, use: RegistryUse): Registr
           let rconfig = config.findRegistry(self.registry)
           if rconfig == nil:
             continue
-          let mirrors  = rconfig{"mirrors"}{"value"}
+          let mirrors  = rconfig{"mirrors"}
           if mirrors == nil or mirrors.kind != JArray:
             continue
           for m in mirrors:
-            let mirror = m{"value"}.getStr()
+            let mirror = m.getStr()
             trace("docker: for registry " & self.registry & " attempting to use mirror: " & mirror)
             let
               mirrorUri = parseUri("https://" & mirror)
@@ -294,6 +327,7 @@ iterator iterBuildxRegistryConfigs(self: DockerImage, use: RegistryUse): Registr
                 node,
                 config,
                 project     = project,
+                mirroring   = self.registry,
                 fallthrough = true,
               ):
                 yield i
@@ -307,6 +341,7 @@ iterator iterBuildxRegistryConfigs(self: DockerImage, use: RegistryUse): Registr
     # try most secure config just in case it works
     # to avoid parsing configs when use is readwrite
     yield RegistryConfig(
+      source:      "buildx",
       scheme:      "https://",
       registry:    self.registry,
       verifyMode:  CVerifyPeer,
@@ -525,3 +560,31 @@ proc layerGetFSFileString*(image:  DockerImage,
     namePath  = untarPath.joinPath(name)
   extractAll(tarPath, untarPath)
   result = tryToLoadFile(namePath)
+
+proc toChalkDict(self: RegistryConfig): ChalkDict =
+  result = ChalkDict()
+  let image: DockerImage = (self.registry & "/", "", "")
+  result["url"]                  = pack($image.uri(
+    scheme  = self.scheme,
+    prefix  = self.prefix,
+    project = self.project,
+  ))
+  result["source"]               = pack(self.source)
+  result["scheme"]               = pack(self.scheme.split(':')[0])
+  result["http"]                 = pack(self.scheme == "http://")
+  result["secure"]               = pack(self.verifyMode == CVerifyPeer)
+  result["insecure"]             = pack(self.verifyMode == CVerifyNone)
+  result["auth"]                 = pack(len(self.auth) > 0)
+  result["www_auth"]             = pack(self.usesWwwAuth())
+  if self.scheme == "https://":
+    if self.certPath != "":
+      result["pinned_cert_path"] = pack(self.certPath)
+    if self.pinnedCert != "":
+      result["pinned_cert"]      = pack(tryToLoadFile(self.pinnedCert))
+  if self.mirroring != "":
+    result["mirroring"]          = pack(self.mirroring)
+
+proc getUsedRegistryConfigs*(): ChalkDict =
+  result = ChalkDict()
+  for _, config in configByRegistry.pairs():
+    result[config.registry] = pack(config.toChalkDict())

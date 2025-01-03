@@ -30,7 +30,7 @@ from .conf import (
     REGISTRY_TLS_INSECURE,
     ROOT,
 )
-from .utils.dict import ANY, MISSING, Contains, IfExists, Length
+from .utils.dict import ANY, MISSING, Contains, IfExists, Length, Values
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
@@ -98,7 +98,14 @@ def test_no_docker(chalk: Chalk):
     assert build.exit_code > 0
 
 
-@pytest.mark.parametrize("buildkit", [True, False])
+@pytest.mark.parametrize(
+    "buildkit, buildx",
+    [
+        (True, True),
+        (True, False),
+        (False, False),
+    ],
+)
 @pytest.mark.parametrize(
     "cwd, dockerfile, tag",
     [
@@ -122,6 +129,7 @@ def test_build(
     cwd: Optional[Path],
     tag: Optional[bool],
     buildkit: bool,
+    buildx: bool,
     random_hex: str,
 ):
     """
@@ -133,11 +141,56 @@ def test_build(
         cwd=cwd,
         tag=random_hex if tag else None,
         buildkit=buildkit,
+        buildx=buildx,
         config=CONFIGS / "docker_wrap.c4m",
     )
     assert image_id
     assert build.mark.has(_IMAGE_ENTRYPOINT=["/chalk", "exec", "--"])
-    assert build.report.has(_OP_EXIT_CODE=build.exit_code)
+    assert build.report.has(
+        _OP_EXIT_CODE=build.exit_code,
+        _DOCKER_CLIENT_VERSION=str,
+        _DOCKER_SERVER_VERSION=str,
+        _DOCKER_BUILDX_VERSION=str if buildx or buildkit else MISSING,
+        _DOCKER_BUILDER_BUILDKIT_VERSION=str if buildx or buildkit else MISSING,
+        _DOCKER_INFO=str,
+        _DOCKER_USED_REGISTRIES={
+            REGISTRY_PROXY: {
+                "auth": False,
+                "www_auth": False,
+                "http": True,
+                "insecure": True,
+                "mirroring": "registry-1.docker.io",
+                "scheme": "http",
+                "secure": False,
+                "source": "buildx" if buildx else "daemon",
+                "url": f"http://{REGISTRY_PROXY}/v2",
+            },
+        },
+        _DOCKER_BUILDER_INFO=str if buildx or buildkit else MISSING,
+        _DOCKER_BUILDER_NODES_INFO=Length(0, operator.gt) if buildx else MISSING,
+        _DOCKER_BUILDER_NODES_CONFIG=(
+            Values(
+                Contains(
+                    [
+                        {
+                            "debug": True,
+                            "registry": {
+                                REGISTRY: {"http": True},
+                                REGISTRY_PROXY: {"http": True},
+                                REGISTRY_TLS_INSECURE: {"insecure": True},
+                                REGISTRY_TLS: {"ca": [str]},
+                                "docker.io": {
+                                    "mirrors": Contains([REGISTRY_PROXY]),
+                                },
+                            },
+                        }
+                    ]
+                )
+            )
+            if buildx
+            else MISSING
+        ),
+    )
 
 
 @pytest.mark.parametrize("buildkit", [True, False])

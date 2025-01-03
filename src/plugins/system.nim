@@ -145,7 +145,8 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
 
   if insert:
     obj.applySubstitutions()
-    result.setIfNeeded("_OP_CHALKED_KEYS", toSeq(obj.getChalkMark().keys))
+    let chalkedKeys = toSeq(obj.getChalkMark().keys)
+    result.setIfNeeded("_OP_CHALKED_KEYS", chalkedKeys)
     result.setIfNeeded("_VIRTUAL", attrGet[bool]("virtual_chalk"))
 
   else:
@@ -162,8 +163,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
       hostKeys   = hostInfo.filterByTemplate(tmpl)
       artKeys    = obj.collectedData.filterByTemplate(tmpl)
       reportKeys = toSeq(hostKeys.keys()) & toSeq(artKeys.keys())
-
-    result["_OP_ARTIFACT_REPORT_KEYS"] = pack(reportKeys)
+    result.setIfNeeded("_OP_ARTIFACT_REPORT_KEYS", reportKeys)
 
 var
   envdict          = Con4mDict[string, string]()
