@@ -20,6 +20,8 @@ SOURCES+=$(shell find ../con4m -name '*.nim' 2> /dev/null)
 SOURCES+=$(shell find ../con4m -name '*.c4m' 2> /dev/null)
 SOURCES+=$(shell find ../nimutils -name '*.nim' 2> /dev/null)
 SOURCES+=$(shell find ../nimutils -name '*.c' 2> /dev/null)
+SOURCES+=$(shell find ../n00b -name '*.c' 2> /dev/null)
+SOURCES+=$(shell find ../n00b -name '*.h' 2> /dev/null)
 SOURCES+=src/docs/CHANGELOG.md
 
 VERSION=$(shell cat src/configs/base_keyspecs.c4m \
@@ -65,11 +67,11 @@ version:
 
 .PHONY: clean
 clean:
-	-rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop
+	-$(DOCKER) rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop
 
 .PHONY: chalk-docs
 chalk-docs: $(BINARY)
-	rm -rf $@
+	$(DOCKER) rm -rf $@
 	$(DOCKER) ./$(BINARY) docgen
 
 # devmode for local deps
@@ -82,15 +84,15 @@ nimutils con4m::
 	# It does not like dep structure but it does create the folder
 	# and nimble build does honor it :shrug:
 	-$(DOCKER) nimble develop --add https://github.com/crashappsec/$@
-	cp -r ../$@/* $@
+	$(DOCKER) cp -r ../$@/* $@
 
 nimutils::
-	rm -rf $@/nimutils
-	cd $@ && ln -fs ../../$@/nimutils .
+	$(DOCKER) rm -rf $@/nimutils
+	$(DOCKER) ln -fs ../../$@/nimutils nimutils/$@
 
 con4m::
-	rm -rf $@/files
-	cd $@ && ln -fs ../../$@/files .
+	$(DOCKER) rm -rf $@/files
+	$(DOCKER) ln -fs ../../$@/files con4m/$@
 
 # ----------------------------------------------------------------------------
 # TOOL MAKEFILES

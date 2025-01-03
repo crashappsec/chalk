@@ -16,7 +16,23 @@ var
   default  = getEnv("HOME").joinPath(".local/c0")
   localDir = getEnv("LOCAL_INSTALL_DIR", default)
   libDir   = localdir.joinPath("libs")
-  libs     = ["pcre", "ssl", "crypto", "gumbo", "hatrack"]
+  libs     = [
+    "n00b",
+    "curl",
+    "ssl",
+    "crypto",
+    "pcre",
+    "backtrace",
+    "ffi",
+    "unibreak",
+    "utf8proc",
+    "gumbo",
+  ]
 
 applyCommonLinkOptions()
-staticLinkLibraries(libs, libDir, muslBase = localDir)
+staticLinkLibraries(
+  libs,
+  libDir,
+  muslBase = localDir,
+  useMusl = true,
+)

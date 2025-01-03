@@ -5,14 +5,16 @@ on:
     branches:
       - main
     paths-ignore:
-      - '**.md'
-      - 'server/**'
-      - 'tests/functional/**'
-  pull_request:
+      - "**.md"
+      - "server/**"
+      - "tests/functional/**"
+  pull_request_target:
+    branches:
+      - main
     paths-ignore:
-      - '**.md'
-      - 'server/**'
-      - 'tests/functional/**'
+      - "**.md"
+      - "server/**"
+      - "tests/functional/**"
   workflow_dispatch:
 
 permissions:
