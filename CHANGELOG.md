@@ -256,7 +256,7 @@
   {
     "_DOCKER_USED_REGISTIES" {
       "example.com:5044": {
-        "url": "https://example.com:5044/v2",
+        "url": "https://example.com:5044/v2/",
         "source": "buildx",
         "scheme": "https",
         "http": false,

@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import "../docker"/[collect, ids, exe, registry]
+import "../docker"/[collect, ids, exe, registry, nodes]
 import ".."/[config, plugin_api, semver, chalkjson]
 
 const markLocation = "/chalk.json"

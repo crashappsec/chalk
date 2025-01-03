@@ -1,0 +1,22 @@
+##
+## Copyright (c) 2025, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+## Used to (liberally) parse the buildkit command line.
+
+buildkit {
+  getopts {
+    args: (0, high())
+    default_yes_prefixes: []
+    default_no_prefixes:  []
+    show_doc_on_err:      false
+    add_help_commands:    false
+    ignore_bad_flags:     true
+    colon_ok:             false
+    space_ok:             true
+    flag_multi_arg config { }
+  }
+}
