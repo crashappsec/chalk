@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2024, Crash Override, Inc.
+## Copyright (c) 2024-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -15,7 +15,7 @@ import std/[net, uri, httpclient, nativesockets, sets]
 import pkg/nimutils/net
 import pkg/[zippy/tarballs]
 import ".."/[config, ip, util, www_authenticate]
-import "."/[exe, json, ids]
+import "."/[exe, json, ids, nodes]
 
 type
   RegistryResponseError* = object of ValueError
@@ -225,6 +225,8 @@ iterator iterDaemonRegistryConfigs(self: DockerImage, use: RegistryUse): Registr
     yield i
 
 proc findRegistry(self: JsonNode, registry: string): JsonNode =
+  if "registry" notin self:
+    return nil
   for r in registry.registryAliases():
     if r in self{"registry"}:
       return self["registry"][r]
@@ -563,11 +565,13 @@ proc layerGetFSFileString*(image:  DockerImage,
 
 proc toChalkDict(self: RegistryConfig): ChalkDict =
   result = ChalkDict()
-  let image: DockerImage = (self.registry & "/", "", "")
+  # double // to avoid docker hub normalization with library/ prefix
+  let image: DockerImage = (self.registry & "//", "", "")
   result["url"]                  = pack($image.uri(
     scheme  = self.scheme,
     prefix  = self.prefix,
     project = self.project,
+    path    = "/",
   ))
   result["source"]               = pack(self.source)
   result["scheme"]               = pack(self.scheme.split(':')[0])

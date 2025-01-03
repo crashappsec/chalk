@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024, Crash Override, Inc.
+# Copyright (c) 2023-2025, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -579,6 +579,7 @@ class Chalk:
         load: bool = True,
         platforms: Optional[list[str]] = None,
         buildx: bool = False,
+        builder: Optional[str] = None,
         config: Optional[Path] = None,
         buildkit: bool = True,
         secrets: Optional[dict[str, Path]] = None,
@@ -610,6 +611,7 @@ class Chalk:
                 expected_success=expected_success,
                 buildkit=buildkit,
                 buildx=buildx,
+                builder=builder,
                 secrets=secrets,
                 provenance=provenance,
                 sbom=sbom,
@@ -628,6 +630,7 @@ class Chalk:
             load=load,
             platforms=platforms,
             buildx=buildx,
+            builder=builder,
             secrets=secrets,
             buildkit=buildkit,
             provenance=provenance,

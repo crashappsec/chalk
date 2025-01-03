@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024, Crash Override, Inc.
+# Copyright (c) 2023-2025, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -99,11 +99,12 @@ def test_no_docker(chalk: Chalk):
 
 
 @pytest.mark.parametrize(
-    "buildkit, buildx",
+    "buildkit, buildx, builder",
     [
-        (True, True),
-        (True, False),
-        (False, False),
+        (True, True, "empty_builder"),
+        (True, True, None),
+        (True, False, None),
+        (False, False, None),
     ],
 )
 @pytest.mark.parametrize(
@@ -130,6 +131,7 @@ def test_build(
     tag: Optional[bool],
     buildkit: bool,
     buildx: bool,
+    builder: Optional[str],
     random_hex: str,
 ):
     """
@@ -142,6 +144,7 @@ def test_build(
         tag=random_hex if tag else None,
         buildkit=buildkit,
         buildx=buildx,
+        builder=builder,
         config=CONFIGS / "docker_wrap.c4m",
     )
     assert image_id
@@ -154,17 +157,36 @@ def test_build(
         _DOCKER_BUILDER_BUILDKIT_VERSION=str if buildx or buildkit else MISSING,
         _DOCKER_INFO=str,
         _DOCKER_USED_REGISTRIES={
-            REGISTRY_PROXY: {
-                "auth": False,
-                "www_auth": False,
-                "http": True,
-                "insecure": True,
-                "mirroring": "registry-1.docker.io",
-                "scheme": "http",
-                "secure": False,
-                "source": "buildx" if buildx else "daemon",
-                "url": f"http://{REGISTRY_PROXY}/v2",
-            },
+            REGISTRY_PROXY: (
+                {
+                    "auth": False,
+                    "www_auth": False,
+                    "http": True,
+                    "insecure": True,
+                    "mirroring": "registry-1.docker.io",
+                    "scheme": "http",
+                    "secure": False,
+                    "source": "buildx" if buildx else "daemon",
+                    "url": f"http://{REGISTRY_PROXY}/v2/",
+                }
+                if not builder
+                else MISSING
+            ),
+            "registry-1.docker.io": (
+                {
+                    "url": "https://registry-1.docker.io/v2/",
+                    "source": "buildx",
+                    "scheme": "https",
+                    "http": False,
+                    "secure": True,
+                    "insecure": False,
+                    "auth": False,
+                    "www_auth": True,
+                }
+                # without empty builder, docker hub should be used as there is no proxy config anymore
+                if builder
+                else MISSING
+            ),
         },
         _DOCKER_BUILDER_INFO=str if buildx or buildkit else MISSING,
         _DOCKER_BUILDER_NODES_INFO=Length(0, operator.gt) if buildx else MISSING,
@@ -172,18 +194,23 @@ def test_build(
             Values(
                 Contains(
                     [
-                        {
-                            "debug": True,
-                            "registry": {
-                                REGISTRY: {"http": True},
-                                REGISTRY_PROXY: {"http": True},
-                                REGISTRY_TLS_INSECURE: {"insecure": True},
-                                REGISTRY_TLS: {"ca": [str]},
-                                "docker.io": {
-                                    "mirrors": Contains([REGISTRY_PROXY]),
+                        (
+                            {
+                                "debug": True,
+                                "registry": {
+                                    REGISTRY: {"http": True},
+                                    REGISTRY_PROXY: {"http": True},
+                                    REGISTRY_TLS_INSECURE: {"insecure": True},
+                                    REGISTRY_TLS: {"ca": [str]},
+                                    "docker.io": {
+                                        "mirrors": Contains([REGISTRY_PROXY]),
+                                    },
                                 },
-                            },
-                        }
+                            }
+                            if not builder
+                            # empty builder doesnt have any configs
+                            else Length(0)
+                        )
                     ]
                 )
             )

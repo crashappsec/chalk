@@ -40,6 +40,7 @@ class Docker:
         buildx: bool = False,
         secrets: Optional[dict[str, Path]] = None,
         buildkit: bool = True,
+        builder: Optional[str] = None,
         provenance: bool = False,
         sbom: bool = False,
         labels: Optional[dict[str, str]] = None,
@@ -86,6 +87,8 @@ class Docker:
                 raise ValueError("--annotation only works with buildx")
             for k, v in annotations.items():
                 cmd += [f"--annotation={k}={v}"]
+        if builder and buildx:
+            cmd += [f"--builder={builder}"]
         cmd += [str(context or ".")]
         yield cmd, stdin
 
@@ -103,6 +106,7 @@ class Docker:
         load: bool = True,
         platforms: Optional[list[str]] = None,
         buildx: bool = False,
+        builder: Optional[str] = None,
         expected_success: bool = True,
         buildkit: bool = True,
         secrets: Optional[dict[str, Path]] = None,
@@ -126,6 +130,7 @@ class Docker:
             load=load,
             platforms=platforms,
             buildx=buildx,
+            builder=builder,
             secrets=secrets,
             buildkit=buildkit,
             provenance=provenance,

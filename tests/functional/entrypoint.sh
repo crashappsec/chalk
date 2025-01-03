@@ -41,20 +41,26 @@ if which gpg &> /dev/null; then
     )
 fi
 
-name=insecure_builder
-
-if ! docker buildx inspect $name &> /dev/null; then
+insecure_builder=insecure_builder
+if ! docker buildx inspect $insecure_builder &> /dev/null; then
     docker buildx create \
         --use \
         --config=<(cat $FILEDIR/data/templates/docker/buildkitd.toml | envsubst | tee /dev/stderr) \
-        --name $name \
+        --name $insecure_builder \
         node-amd64 \
         > /dev/null
     docker buildx create \
         --append \
         --config=<(cat $FILEDIR/data/templates/docker/buildkitd.toml | envsubst) \
-        --name $name \
+        --name $insecure_builder \
         node-arm64 \
+        > /dev/null
+fi
+
+empty_builder=empty_builder
+if ! docker buildx inspect $empty_builder &> /dev/null; then
+    docker buildx create \
+        --name $empty_builder \
         > /dev/null
 fi
 

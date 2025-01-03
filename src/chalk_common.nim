@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -449,7 +449,8 @@ const
                         staticRead("configs/base_report_templates.c4m") &
                         staticRead("configs/base_outconf.c4m") &
                         staticRead("configs/base_sinkconfs.c4m") &
-                        staticRead("configs/dockercmd.c4m")
+                        staticRead("configs/dockercmd.c4m") &
+                        staticRead("configs/buildkitcmd.c4m")
   sbomConfig*         = staticRead(sbomConfName)
   sastConfig*         = staticRead(sastConfName)
   techStackConfig*    = staticRead(techStackConfName)
