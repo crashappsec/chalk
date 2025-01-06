@@ -2313,6 +2313,7 @@ For example:
 {
   "example.com:5044": {
     "url": "https://example.com:5044/v2/",
+    "mirroring": "registry-1.docker.io",
     "source": "buildx",
     "scheme": "https",
     "http": false,

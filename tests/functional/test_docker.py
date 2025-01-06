@@ -590,6 +590,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
         DOCKER_TARGET="",
         _OP_ARTIFACT_CONTEXT="build",
         DOCKER_BASE_IMAGE_METADATA_ID=base.mark["METADATA_ID"],
+        DOCKER_BASE_IMAGE_CHALK={k: IfExists(v) for k, v in base.mark.items()},
         DOCKER_BASE_IMAGE_ID=base.mark["_IMAGE_ID"],
         DOCKER_BASE_IMAGE=re.compile(rf"{image}:latest@sha256:"),
         DOCKER_BASE_IMAGE_REPO=image,

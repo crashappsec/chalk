@@ -27,9 +27,10 @@
 
     ```json
     {
-        // old format
-        "_REPO_DIGESTS": {
-          "224111541501.dkr.ecr.us-east-1.amazonaws.com/co/chalketl/scripts": "249ce02d7f5fe0398fc87c2fb6c225ef78912f038f4be4fe9c35686082fe3cb0"
+      // old format
+      "_REPO_DIGESTS": {
+        "224111541501.dkr.ecr.us-east-1.amazonaws.com/co/chalketl/scripts": "249ce02d7f5fe0398fc87c2fb6c225ef78912f038f4be4fe9c35686082fe3cb0"
+      }
     }
     ```
 
@@ -236,13 +237,15 @@
   - `DOCKER_BASE_IMAGE_NAME` - repo name within the registry
   - `DOCKER_BASE_IMAGE_ID` - image id (config digest) of the base image
   - `DOCKER_BASE_IMAGE_METADATA_ID` - id of the base image chalkmark
+  - `DOCKER_BASE_IMAGE_CHALK`` - full chalkmark of base image
   - `_COLLECTED_ARTIFACTS` - similar to `_CHALKS` but reports collected
     information about potentially non-chalked artifacts such as the base image.
     If the base image is chalked it can be correlated with the build
     chalkmark via `METADATA_ID`. Otherwise both artifacts can be linked
     via the digest or the image id.
 
-  ([#453](https://github.com/crashappsec/chalk/pull/453))
+  ([#453](https://github.com/crashappsec/chalk/pull/453),
+  [#463](https://github.com/crashappsec/chalk/pull/463))
 
 - `_IMAGE_LAYERS` key which collects image layer digests as it is stored
   in the registry. This should allow to correlate base images by matching
@@ -257,6 +260,7 @@
     "_DOCKER_USED_REGISTIES" {
       "example.com:5044": {
         "url": "https://example.com:5044/v2/",
+        "mirroring": "registry-1.docker.io",
         "source": "buildx",
         "scheme": "https",
         "http": false,

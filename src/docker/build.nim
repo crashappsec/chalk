@@ -373,6 +373,7 @@ proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
   if chalk.baseChalk != nil:
     if chalk.baseChalk.isMarked():
       dict.setIfNeeded("DOCKER_BASE_IMAGE_METADATA_ID", chalk.baseChalk.extract["METADATA_ID"])
+      dict.setIfNeeded("DOCKER_BASE_IMAGE_CHALK",       chalk.baseChalk.extract)
     dict.setIfNeeded("DOCKER_BASE_IMAGE_ID",            chalk.baseChalk.collectedData.getOrDefault("_IMAGE_ID"))
   dict.setIfNeeded("DOCKERFILE_PATH",                   ctx.dockerFileLoc)
   dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",       dockerfileRelPath)
