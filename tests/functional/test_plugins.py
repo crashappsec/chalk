@@ -22,6 +22,7 @@ logger = get_logger()
 
 
 @pytest.mark.flaky(max_runs=5)
+@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_network(copy_files: list[Path], chalk: Chalk):
     bin_path = copy_files[0]
