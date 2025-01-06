@@ -130,3 +130,8 @@ jobs:
           GITHUB_TOKEN: ${{ steps.org-token.outputs.token }}
         run: |
           make tests_parallel args="--slow"
+
+      - name: Show service logs
+        if: failure()
+        run: |
+          docker compose logs | grep -v health
