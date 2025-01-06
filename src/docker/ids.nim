@@ -10,6 +10,8 @@ import ".."/[config, util]
 
 const
   DEFAULT_REGISTRY = "registry-1.docker.io"
+  DOCKER_HUB       = "https://hub.docker.com"
+  LIBRARY          = "library/"
   HASH_HEADER      = "sha256:"
   REGISTRY_MAPPING = {
     "docker.io":       DEFAULT_REGISTRY,
@@ -266,40 +268,12 @@ proc normalize(self: DockerImage): DockerImage =
       if fullRegistry != DEFAULT_REGISTRY or '/' in path:
         path
       else:
-        "library/" & path
+        LIBRARY & path
   result = (
     fullRegistry & "/" & fullPath,
     self.tag,
     self.digest,
   )
-
-proc uri*(self:   DockerImage,
-          scheme  = "",
-          path    = "",
-          prefix  = "",
-          project = "",
-          ): Uri =
-  ## generate working URI for the registry API
-  ## note this only supports v2 registries hence hardcodes v2 suffix
-  ## also this doesnt account for any insecure registry configs
-  let normalized = self.normalize()
-  var uri        = parseUri("https://" & normalized.repo)
-  let uriPath    = uri.path
-  uri.path = (
-    prefix.removeSuffix('/') &
-    "/v2" &
-    project.removeSuffix('/') &
-    uriPath.removeSuffix('/') &
-    path
-  )
-  if scheme == "":
-    if uri.hostname in @["localhost", $IPv4_loopback(), $IPv6_loopback()]:
-      uri.scheme = "http"
-    else:
-      uri.scheme = "https"
-  else:
-    uri.scheme = scheme.split(":")[0]
-  return uri
 
 proc withRegistry*(self: DockerImage, registry: string): DockerImage =
   if registry == "":
@@ -332,6 +306,49 @@ proc name*(self: DockerImage): string =
 
 proc isDockerHub*(self: DockerImage): bool =
   return self.normalize().registry == DEFAULT_REGISTRY
+
+proc uri*(self:   DockerImage,
+          scheme  = "",
+          path    = "",
+          prefix  = "",
+          project = "",
+          ): Uri =
+  ## generate working URI for the registry API
+  ## note this only supports v2 registries hence hardcodes v2 suffix
+  ## also this doesnt account for any insecure registry configs
+  let normalized = self.normalize()
+  var uri        = parseUri("https://" & normalized.repo)
+  let uriPath    = uri.path
+  uri.path = (
+    prefix.removeSuffix('/') &
+    "/v2" &
+    project.removeSuffix('/') &
+    uriPath.removeSuffix('/') &
+    path
+  )
+  if scheme == "":
+    if uri.hostname in @["localhost", $IPv4_loopback(), $IPv6_loopback()]:
+      uri.scheme = "http"
+    else:
+      uri.scheme = "https"
+  else:
+    uri.scheme = scheme.split(":")[0]
+  return uri
+
+proc url*(self: DockerImage): string =
+  ## generate user-accessible URL for the registry
+  ## currently only supports:
+  ## * Docker Hub
+  if self.isDockerHub():
+    let
+      name = self.name
+      path =
+        if name.startsWith(LIBRARY):
+          "/_/" & name.split('/', maxsplit = 1)[^1]
+        else:
+          "/r/" & name
+    return DOCKER_HUB & path
+  return ""
 
 # below are various rendering variants as in different cases
 # different form is required

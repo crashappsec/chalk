@@ -30,7 +30,7 @@ from .conf import (
     REGISTRY_TLS_INSECURE,
     ROOT,
 )
-from .utils.dict import ANY, MISSING, Contains, IfExists, Length, Values
+from .utils.dict import ANY, MISSING, Contains, IfExists, Iso8601, Length, Values
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
@@ -522,6 +522,8 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
 
             FROM {image}:latest as seven
 
+            FROM crashappsec/chalk as chalk
+
             FROM $BASE
             COPY --from=four /usr/sbin/nginx /nginx
             """
@@ -551,6 +553,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
                     "_IMAGE_ID": ANY,
                     "METADATA_ID": MISSING,
                     "COMMIT_ID": ANY,
+                    "_IMAGE_CREATION_DATETIME": Iso8601(),
                     "ORIGIN_URI": "https://git.launchpad.net/cloud-images/+oci/ubuntu-base",
                     "_REPO_DIGESTS": {
                         "registry-1.docker.io": {
@@ -564,11 +567,17 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
                             }
                         }
                     },
+                    "_REPO_URLS": {
+                        "registry-1.docker.io": {
+                            "library/ubuntu": "https://hub.docker.com/_/ubuntu"
+                        }
+                    },
                 },
                 {
                     "_IMAGE_ID": ANY,
                     "METADATA_ID": MISSING,
                     "COMMIT_ID": ANY,
+                    "_IMAGE_CREATION_DATETIME": Iso8601(),
                     "ORIGIN_URI": "https://github.com/nginxinc/docker-nginx.git",
                     "_REPO_DIGESTS": {
                         "registry-1.docker.io": {
@@ -582,6 +591,28 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
                             "registry-1.docker.io": MISSING,
                         }
                     ),
+                    "_REPO_URLS": {
+                        "registry-1.docker.io": {
+                            "library/nginx": "https://hub.docker.com/_/nginx"
+                        }
+                    },
+                },
+                {
+                    "_IMAGE_ID": ANY,
+                    "METADATA_ID": ANY,
+                    "COMMIT_ID": ANY,
+                    "_IMAGE_CREATION_DATETIME": Iso8601(),
+                    "ORIGIN_URI": "https://github.com/crashappsec/chalk",
+                    "_REPO_DIGESTS": {
+                        "registry-1.docker.io": {
+                            "crashappsec/chalk": ANY,
+                        }
+                    },
+                    "_REPO_URLS": {
+                        "registry-1.docker.io": {
+                            "crashappsec/chalk": "https://hub.docker.com/r/crashappsec/chalk"
+                        }
+                    },
                 },
             ]
         ),

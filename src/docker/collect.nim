@@ -204,6 +204,7 @@ proc collectImageFrom(chalk:    ChalkObj,
     annotations        = newJObject()
   var
     layers             = newSeq[string]()
+    repoUrls           = newOrderedTable[string, OrderedTableRef[string, string]]()
   if chalk.platform != nil and chalk.platform != platform:
     raise newException(ValueError, "platform does not match chalk platform")
   if chalk.name == "":
@@ -225,11 +226,15 @@ proc collectImageFrom(chalk:    ChalkObj,
       let
         manifest  = fetchImageManifest(repo, platform)
         imageRepo = manifest.asImageRepo(tag = repo.tag)
+        url       = annotations{"org.opencontainers.image.url"}.getStr(repo.url())
       annotations.update(manifest.annotations)
       chalk.repos[repo.repo] = imageRepo + chalk.repos.getOrDefault(repo.repo)
       layers = @[]
       for layer in manifest.layers:
         layers.add(layer.digest.extractDockerHash())
+      if url != "":
+        discard repoUrls.hasKeyOrPut(repo.registry, newOrderedTable[string, string]())
+        discard repoUrls[repo.registry].hasKeyOrPut(repo.name, url)
     except:
       trace("docker: " & getCurrentExceptionMsg())
       continue
@@ -272,12 +277,14 @@ proc collectImageFrom(chalk:    ChalkObj,
           repoTags[registry][i.name][i.tag] = digest
         except:
           trace("docker: unable to find docker tag manifest " & getCurrentExceptionMsg())
-    chalk.setIfNeeded("_REPO_DIGESTS",      repoDigests)
-    chalk.setIfNeeded("_REPO_LIST_DIGESTS", repoListDigests)
-    chalk.setIfNeeded("_REPO_TAGS",         repoTags)
-    chalk.setIfNeeded("_IMAGE_LAYERS",      layers)
-    chalk.setIfNeeded("_IMAGE_ANNOTATIONS", annotations.nimJsonToBox())
-    chalk.setIfNeeded("COMMIT_ID",          annotations{"org.opencontainers.image.revision"}.getStr())
+    chalk.setIfNeeded("_REPO_DIGESTS",            repoDigests)
+    chalk.setIfNeeded("_REPO_LIST_DIGESTS",       repoListDigests)
+    chalk.setIfNeeded("_REPO_TAGS",               repoTags)
+    chalk.setIfNeeded("_REPO_URLS",               repoUrls)
+    chalk.setIfNeeded("_IMAGE_LAYERS",            layers)
+    chalk.setIfNeeded("_IMAGE_ANNOTATIONS",       annotations)
+    chalk.setIfNeeded("_IMAGE_CREATION_DATETIME", annotations{"org.opencontainers.image.created"}.getStr())
+    chalk.setIfNeeded("COMMIT_ID",                annotations{"org.opencontainers.image.revision"}.getStr())
     let source = annotations{"org.opencontainers.image.source"}.getStr()
     if isGitContext(source, requireExtension = false):
       let (remote, head, subdir) = splitContext(source)

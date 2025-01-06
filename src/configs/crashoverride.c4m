@@ -451,6 +451,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._INSTANCE_MAC.use                       = true
   ~key._INSTANCE_NETWORKS.use                  = true
   ~key._STORE_URI.use                          = true
+  ~key._REPO_URLS.use                          = true
   ~key._REPO_TAGS.use                          = true
   ~key._REPO_DIGESTS.use                       = true
   ~key._REPO_LIST_DIGESTS.use                  = true

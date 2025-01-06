@@ -9,11 +9,22 @@ from datetime import datetime
 from typing import Any, Callable, Iterable, Optional, cast
 
 
-ANY = object()
-MISSING = object()
+class Repr:
+    def __init__(self, name: str):
+        self.name = name
+
+    def __repr__(self) -> str:
+        return self.name
+
+
+ANY = Repr("ANY")
+MISSING = Repr("MISSING")
 
 
 class Iso8601:
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
+
     def __eq__(self, other: Any):
         if isinstance(other, datetime):
             return True
