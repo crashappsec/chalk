@@ -80,8 +80,8 @@ template toolBase(path: string) {.dirty.} =
   var
     toolInfo = initTable[string, seq[(int, PIInfo)]]()
   let
-    runSbom  = attrGet[bool]("run_sbom_tools")
-    runSast  = attrGet[bool]("run_sast_tools")
+    runSBOM  = attrGet[bool]("run_sbom_tools")
+    runSAST  = attrGet[bool]("run_sast_tools")
 
   # tools should only run during insert operations
   # note this is a subset of chalkable operations
@@ -92,8 +92,8 @@ template toolBase(path: string) {.dirty.} =
     let v = "tool." & k
     if not attrGet[bool](v & ".enabled"): continue
     let kind = attrGet[string](v & ".kind")
-    if not runSbom and kind == "sbom": continue
-    if not runSast and kind == "sast": continue
+    if not runSBOM and kind == "sbom": continue
+    if not runSAST and kind == "sast": continue
 
     let tool = (attrGet[int](v & ".priority"), PIInfo(name: k))
     if kind notin toolInfo:

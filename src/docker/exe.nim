@@ -223,7 +223,7 @@ proc getDockerAuthConfig*(): JsonNode =
       if data != "":
         dockerAuth = parseJson(data)
       else:
-        trace("docker: no auth config file " & path)
+        trace("docker: no auth config file at " & path)
     except:
       trace("docker: could not read docker auth config file " & path & " due to: " & getCurrentExceptionMsg())
   return dockerAuth

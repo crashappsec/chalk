@@ -385,7 +385,10 @@ proc fetchProvenance*(name: DockerImage, platform: DockerPlatform): JsonNode =
   # https://docs.docker.com/reference/cli/docker/buildx/imagetools/inspect/
   try:
     trace("docker: looking up provenance for: " & $name)
-    let layer = name.fetchImageManifest(platform).findSibling().findInTotoLayer("https://slsa.dev/provenance/")
+    let layer =
+      name.fetchImageManifest(platform)
+      .findSibling()
+      .findInTotoLayer("https://slsa.dev/provenance/")
     result = layer.asImage().layerGetJson(accept = layer.mediaType).json{"predicate"}
     trace("docker: in registry found provenance for: " & $name)
   except RegistryResponseError, KeyError:
