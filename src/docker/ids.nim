@@ -213,14 +213,16 @@ proc withDigest*(items: seq[DockerImage], digest: string): seq[DockerImage] =
     result.add(i.withDigest(digest))
 
 proc isFullyQualified(self: DockerImage): bool =
-  ## determine if the docker image is a fully qualified image name
-  ## as in if the image should be pulled/pushed to default docker registry (docker hub)
-  ## or to a fully qualified domain name
-  ## docker checks:
+  ## determine if the docker image is a fully qualified image name (contains domain)
+  ## and all interactions should go there or registry is implicitly
+  ## docker hub when not fully qualified (e.g. docker pull alpine).
+  ##
+  ## To determine fully qualified docker checks:
   ## * if its localhost
   ## * presence of `.` or `:` (port) in the potential registy domain
   ## * if its uppercase as repo name cannot have uppercase chars
-  ## and defaults everything else to docker hub even if its valid and resolvable domain
+  ##
+  ## Rverything else is defaulted to docker hub even if its valid and resolvable domain
   ## like `registry/test` even if `registry` is a valid resolvable address locally
   ## (e.g. via `/etc/hosts` file)
   ## https://github.com/docker/cli/blob/826fc32e82e23bb5f80e85d8777427c5f0c24b4d/cli/command/image/pull.go#L58C36-L58C56

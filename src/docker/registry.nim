@@ -24,7 +24,7 @@ type
   # for read-only docker can consult mirrors
   # whereas if it indents to write to the registry,
   # it only talks to the upstream registry
-  RegistryUse* = enum
+  RegistryUseCase* = enum
     ReadWrite
     ReadOnly # allows use of mirrors
 
@@ -55,13 +55,13 @@ const
     "application/vnd.oci.image.config.v1+json": DockerManifestType.config,
   }.toTable()
 
-iterator uses(use: RegistryUse): RegistryUse =
+iterator uses(useCase: RegistryUseCase): RegistryUseCase =
   ## which uses lookups are applicable for the registry use
   ## ReadOnly use can only be used for reads
   ## however ReadWrite use can be used for both
-  yield use
-  if use == RegistryUse.ReadWrite:
-    yield RegistryUse.ReadOnly
+  yield useCase
+  if useCase == RegistryUseCase.ReadWrite:
+    yield RegistryUseCase.ReadOnly
 
 proc usesWwwAuth(self: RegistryConfig): bool =
   for _, auth in self.wwwAuth.pairs():
@@ -188,9 +188,9 @@ iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
       except:
         continue
 
-iterator iterDaemonRegistryConfigs(self: DockerImage, use: RegistryUse): RegistryConfig =
+iterator iterDaemonRegistryConfigs(self: DockerImage, useCase: RegistryUseCase): RegistryConfig =
   # docker daemon only suports docker hub mirror
-  if use == RegistryUse.ReadOnly and self.isDockerHub():
+  if useCase == RegistryUseCase.ReadOnly and self.isDockerHub():
     for mirror in getDockerInfoSubList("registry mirrors:"):
       trace("docker: attempting to use docker hub mirror: " & mirror)
       let
@@ -301,9 +301,9 @@ iterator iterBuildxSpecificRegistryConfigs(self:         DockerImage,
         fallthrough: fallthrough,
       )
 
-iterator iterBuildxRegistryConfigs(self: DockerImage, use: RegistryUse): RegistryConfig =
+iterator iterBuildxRegistryConfigs(self: DockerImage, useCase: RegistryUseCase): RegistryConfig =
   if hasBuildx():
-    if use == RegistryUse.ReadOnly:
+    if useCase == RegistryUseCase.ReadOnly:
       for node, config in dockerInvocation.iterBuilderNodesConfigs():
         try:
           let rconfig = config.findRegistry(self.registry)
@@ -366,8 +366,8 @@ proc getBasicAuth(self: DockerImage): string =
     trace("docker: invalid auth config: " & getCurrentExceptionMsg())
     return ""
 
-var configByRegistry = initTable[(RegistryUse, string), RegistryConfig]()
-iterator getConfigs(self: DockerImage, use: RegistryUse): RegistryConfig =
+var configByRegistry = initTable[(RegistryUseCase, string), RegistryConfig]()
+iterator getConfigs(self: DockerImage, useCase: RegistryUseCase): RegistryConfig =
   ## get all plausible configs for iteracting with the registry
   ## note this is explicitly implemented as an iterator
   ## as getting specific config can be more expensive as it might
@@ -381,8 +381,8 @@ iterator getConfigs(self: DockerImage, use: RegistryUse): RegistryConfig =
     # nodex they might all have equivalent configs
     checkedConfigs = newSeq[RegistryConfig]()
 
-  if (use, self.registry) in configByRegistry:
-    cached = configByRegistry[(use, self.registry)]
+  if (useCase, self.registry) in configByRegistry:
+    cached = configByRegistry[(useCase, self.registry)]
     checkedConfigs.add(cached)
     yield cached
 
@@ -398,7 +398,7 @@ iterator getConfigs(self: DockerImage, use: RegistryUse): RegistryConfig =
       dockerInvocation.foundBuildx
     )
     template buildx() =
-      for i in self.iterBuildxRegistryConfigs(use = use):
+      for i in self.iterBuildxRegistryConfigs(useCase = useCase):
         if i notin checkedConfigs:
           let i = i.withBasicAuth(token)
           checkedConfigs.add(i)
@@ -407,7 +407,7 @@ iterator getConfigs(self: DockerImage, use: RegistryUse): RegistryConfig =
     # over daemon configs but we still scan both just in case
     if isBuildx:
       buildx()
-    for i in self.iterDaemonRegistryConfigs(use = use):
+    for i in self.iterDaemonRegistryConfigs(useCase = useCase):
       if i notin checkedConfigs:
         let i = i.withBasicAuth(token)
         checkedConfigs.add(i)
@@ -416,19 +416,19 @@ iterator getConfigs(self: DockerImage, use: RegistryUse): RegistryConfig =
       buildx()
 
 var jsonCache = initTable[
-  (DockerImage, HttpMethod, string, RegistryUse),
+  (DockerImage, HttpMethod, string, RegistryUseCase),
   (string, Response)
 ]()
 proc request(self:       DockerImage,
              httpMethod: HttpMethod,
              path:       string,
              accept:     string,
-             use =       RegistryUse.ReadOnly,
+             useCase =   RegistryUseCase.ReadOnly,
              ): (string, Response) =
-  let cacheKey = (self, httpMethod, path, use)
+  let cacheKey = (self, httpMethod, path, useCase)
   if cacheKey in jsonCache:
     return jsonCache[cacheKey]
-  for config in self.getConfigs(use = use):
+  for config in self.getConfigs(useCase = useCase):
     let uri = self.withRegistry(config.registry).uri(
       scheme  = config.scheme,
       prefix  = config.prefix,
@@ -467,7 +467,7 @@ proc request(self:       DockerImage,
       invalid = not config.fallthrough
       discard response.check(url = uri, only2xx = true)
       config.wwwAuth[self.repo] = wwwAuth.update(authHeaders)
-      for u in use.uses():
+      for u in useCase.uses():
         configByRegistry[(u, self.registry)] = config
         jsonCache[(self, httpMethod, path, u)] = (msg, response)
       return (msg, response)
@@ -478,12 +478,12 @@ proc request(self:       DockerImage,
         trace("docker: ignoring error: " & getCurrentExceptionMsg())
   raise newException(ValueError, "could not find working registry configuration for " & $self)
 
-proc manifestHead*(image: DockerImage,
-                   use =  RegistryUse.ReadOnly,
+proc manifestHead*(image:    DockerImage,
+                   useCase = RegistryUseCase.ReadOnly,
                    ): DockerDigestedJson =
   let
     (msg, response) = image.request(
-      use        = use,
+      useCase    = useCase,
       httpMethod = HttpHead,
       path       = "/manifests/" & image.imageRef,
       accept     = (
@@ -505,55 +505,55 @@ proc manifestHead*(image: DockerImage,
   let kind = CONTENT_TYPE_MAPPING[contentType]
   return newDockerDigestedJson("{}", digest, contentType, kind)
 
-proc manifestGet*(image:  DockerImage,
-                  accept: string,
-                  use =   RegistryUse.ReadOnly,
+proc manifestGet*(image:    DockerImage,
+                  accept:   string,
+                  useCase = RegistryUseCase.ReadOnly,
                   ): DockerDigestedJson =
   let
     kind          = CONTENT_TYPE_MAPPING[accept]
     (_, response) = image.request(
-      use        = use,
+      useCase    = useCase,
       httpMethod = HttpGet,
       path       = "/manifests/" & image.imageRef,
       accept     = accept,
     )
   return newDockerDigestedJson(response.body(), image.imageRef, accept, kind)
 
-proc layerGetString*(image:  DockerImage,
-                     accept: string,
-                     use =   RegistryUse.ReadOnly,
+proc layerGetString*(image:    DockerImage,
+                     accept:   string,
+                     useCase = RegistryUseCase.ReadOnly,
                      ): string =
   let
     (_, response) = image.request(
-      use        = use,
+      useCase    = useCase,
       httpMethod = HttpGet,
       path       = "/blobs/" & image.imageRef,
       accept     = accept,
     )
   return response.body()
 
-proc layerGetJson*(image:  DockerImage,
-                   accept: string,
-                   use =   RegistryUse.ReadOnly,
+proc layerGetJson*(image:    DockerImage,
+                   accept:   string,
+                   useCase = RegistryUseCase.ReadOnly,
                    ): DigestedJson =
   return parseAndDigestJson(
     image.layerGetString(
-      use    = use,
-      accept = accept,
+      useCase = useCase,
+      accept  = accept,
     ),
     digest = image.imageRef,
   )
 
-proc layerGetFSFileString*(image:  DockerImage,
-                           name:   string,
-                           accept: string,
-                           use =   RegistryUse.ReadOnly,
+proc layerGetFSFileString*(image:    DockerImage,
+                           name:     string,
+                           accept:   string,
+                           useCase = RegistryUseCase.ReadOnly,
                            ): string =
   trace("docker: extracting " & name & " from layer " & $image)
   let
     response = image.layerGetString(
-      use    = use,
-      accept = accept,
+      useCase = useCase,
+      accept  = accept,
     )
     tarPath = writeNewTempFile(response, suffix = name)
   let
