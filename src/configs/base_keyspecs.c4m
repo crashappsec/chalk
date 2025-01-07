@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.4.15-dev"
+chalk_version :=   "0.5.0"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -706,7 +706,7 @@ keyspec TIMESTAMP_AUTHORED {
     kind:             ChalkTimeArtifact
     type:             string
     standard:         true
-    since:            "0.4.15"
+    since:            "0.5.0"
     shortdoc:         "Unix timestamp of the author's commit"
     doc:              """
 The date when commit was authored as ms since Unix epoch.
@@ -834,7 +834,7 @@ keyspec TIMESTAMP_TAGGED {
     kind:             ChalkTimeArtifact
     type:             string
     standard:         true
-    since:            "0.4.15"
+    since:            "0.5.0"
     shortdoc:         "Unix timestamp of most recent tag"
     doc:              """
 The date when the annotated was created in ms since Unix epoch.
@@ -924,7 +924,7 @@ keyspec _TIMESTAMP_AUTHORED {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.4.15"
+    since:            "0.5.0"
     shortdoc:         "Unix timestamp of the author's commit"
     doc:              """
 The date when commit was authored as ms since Unix epoch.
@@ -961,7 +961,7 @@ keyspec _TIMESTAMP_COMMITTED {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.4.15"
+    since:            "0.5.0"
     shortdoc:         "Unix timestamp of most recent commit"
     doc:              """
 The date when commit was created as ms since Unix epoch.
@@ -1052,7 +1052,7 @@ keyspec _TIMESTAMP_TAGGED {
     kind:             RunTimeHost
     type:             string
     standard:         true
-    since:            "0.4.15"
+    since:            "0.5.0"
     shortdoc:         "Unix timestamp of most recent tag"
     doc:              """
 The date when the annotated was created in ms since Unix epoch.
@@ -1782,7 +1782,7 @@ keyspec DOCKER_ANNOTATIONS {
     type:              dict[string, string]
     standard:          true
     system:            false
-    since:             "0.4.15"
+    since:             "0.5.0"
     shortdoc: "Annotations added to docker image during build process"
     doc: """
 Labels added to a docker image during the build process, if any.
@@ -1867,7 +1867,7 @@ keyspec DOCKER_BASE_IMAGE_CHALK {
     type:             `x
     standard:         true
     system:           false
-    since:            "0.4.15"
+    since:            "0.5.0"
     doc: """
 If the base image is chalked, its full chalkmark.
 """
@@ -1878,7 +1878,7 @@ keyspec DOCKER_BASE_IMAGE_METADATA_ID {
     type:             `x
     standard:         true
     system:           false
-    since:            "0.4.15"
+    since:            "0.5.0"
     doc: """
 If the base image is chalked, its METADATA_ID.
 """
@@ -1913,7 +1913,7 @@ keyspec DOCKER_BASE_IMAGE_REGISTRY {
     type:             string
     standard:         true
     system:           false
-    since:            "0.4.15"
+    since:            "0.5.0"
     doc: """
 Only registry of the base image specified in Dockerfile used to build docker image.
 Note this only specifies the base image of the final build target.
@@ -1925,7 +1925,7 @@ keyspec DOCKER_BASE_IMAGE_NAME {
     type:             string
     standard:         true
     system:           false
-    since:            "0.4.15"
+    since:            "0.5.0"
     doc: """
 Only repo name (excluding registry) of the base image specified in Dockerfile used to build docker image.
 Note this only specifies the base image of the final build target.
@@ -1961,7 +1961,7 @@ keyspec DOCKER_BASE_IMAGE_ID {
     type:             string
     standard:         true
     system:           false
-    since:            "0.4.15"
+    since:            "0.5.0"
     doc: """
 Docker image id (config digest) of the base image.
 Note this only specifies the base image of the final build target.
@@ -2224,7 +2224,7 @@ keyspec _DOCKER_BUILDER_NODES_INFO {
     kind:             RunTimeHost
     type:             dict[string, string]
     standard:         true
-    since:            "0.4.15"
+    since:            "0.5.0"
     shortdoc:         "Docker buildx node information"
     doc:              """
 When buildx is being used, output of `docker buildx inspect <runner>`.
@@ -2236,7 +2236,7 @@ keyspec _DOCKER_BUILDER_NODES_CONFIG {
     kind:             RunTimeHost
     type:             dict[string, `x]
     standard:         true
-    since:            "0.4.15"
+    since:            "0.5.0"
     shortdoc:         "Docker buildx runner configurations."
     doc:              """
 Full configuration of buildx runner. Chalk currently can only inspect
@@ -2276,7 +2276,7 @@ keyspec _DOCKER_USED_REGISTRIES {
     kind:             RunTimeHost
     type:             dict[string, `x]
     standard:         true
-    since:            "0.4.15"
+    since:            "0.5.0"
     shortdoc:         "Metadata about used registries during docker command."
     doc:              """"
 During docker commands, chalk can interact with multiple docker registries.
@@ -2353,7 +2353,7 @@ keyspec _OP_ARTIFACT_CONTEXT {
     type:             string
     standard:         true
     codec:            true
-    since:            "0.4.15"
+    since:            "0.5.0"
     shortdoc:         "Context of the artifact in the report"
     doc : """
 Context of the artifact how it is referenced in the report.
@@ -2994,7 +2994,7 @@ keyspec _IMAGE_LAYERS {
     kind:     RunTimeArtifact
     type:     list[string]
     standard: true
-    since:    "0.4.15"
+    since:    "0.5.0"
     doc: """
 Layer digests of the image as they are stored in the registry.
 """
@@ -3193,7 +3193,7 @@ Key-value pairs adding metadata to images
 keyspec _IMAGE_ANNOTATIONS {
     kind:     RunTimeArtifact
     type:     dict[string, string]
-    since:    "0.4.15"
+    since:    "0.5.0"
     standard: true
     doc: """
 Key-value pairs adding metadata to image manifests
@@ -4304,7 +4304,7 @@ keyspec _REPO_LIST_DIGESTS {
     kind:             RunTimeArtifact
     type:             dict[string, dict[string, list[string]]]
     standard:         true
-    since:            "0.4.15"
+    since:            "0.5.0"
     doc: """
 When reporting on operations involving a repository (e.g., a push or
 pull), any SHA256 list manifest digests associated with the artifact
@@ -4669,7 +4669,7 @@ keyspec _COLLECTED_ARTIFACTS {
     type:             string
     standard:         true
     system:           true
-    since:            "0.4.15"
+    since:            "0.5.0"
     normalized_order: 7
     shortdoc:         "Contains software artifact information for the current operation"
     doc:              """
