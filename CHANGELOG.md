@@ -23,7 +23,7 @@
     and the image digest. This key now provides a list of image digests by
     registry and image name.
 
-    #### before
+    **Before**:
 
     ```json
     {
@@ -34,7 +34,7 @@
     }
     ```
 
-    #### now
+    **Now**:
 
     ```json
     {
@@ -73,7 +73,7 @@
     - new `registry` key; the normalized registry uri (domain and optional port)
     - new `name` key; the normalized repo name within the registry
 
-    #### before
+    **Before**:
 
     ```json
     // old format
@@ -85,7 +85,7 @@
     }
     ```
 
-    #### now
+    **Now**:
 
     ```json
     // new format
@@ -120,18 +120,33 @@
     }
     ```
 
+  - `_REPO_URLS` - similar to `_REPO_DIGESTS` but shows human-accessible URL,
+    if known as per OCI image annotation or computed for Docker Hub images.
+    Example:
+
+    ```json
+    {
+      "_REPO_URLS": {
+        "registry-1.docker.io": {
+          "library/alpine": "https://hub.docker.com/_/alpine"
+        }
+      }
+    }
+    ```
+
   **NOTE:** All `_REPO_*` keys normalize registry to its canonical domain. For
   example, docker hub is normalized to `registry-1.docker.io`. Additionally, all
   image names are normalized to how they are stored in the registry. Note
   `library/` prefix for `alpine` in the example above.
 
   ([#450](https://github.com/crashappsec/chalk/pull/450),
-  [#453](https://github.com/crashappsec/chalk/pull/453))
+  [#453](https://github.com/crashappsec/chalk/pull/453),
+  [#464](https://github.com/crashappsec/chalk/pull/464))
 
 - Git time-related fields are now reported in ISO-8601 format whereas
   previously it was reporting using default git format.
 
-  Before:
+  **Before**:
 
   ```json
   {
@@ -141,7 +156,7 @@
   }
   ```
 
-  Now:
+  **Now**:
 
   ```json
   {

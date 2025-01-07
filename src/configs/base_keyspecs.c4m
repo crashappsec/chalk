@@ -2882,6 +2882,7 @@ keyspec _IMAGE_CREATION_DATETIME {
     doc: """
 The DATETIME formatted string for the reported container image
 creation time.
+The value from docker should be in ISO-8601 format.
 """
 }
 
@@ -4322,6 +4323,38 @@ For example:
       "library/alpine": [
         "1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a"
       ]
+    }
+  }
+}
+```
+"""
+}
+
+keyspec _REPO_URLS {
+    kind:             RunTimeArtifact
+    type:             dict[string, dict[string, string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+User-accessible URLs for the image, if known per registry.
+Chalk knows how to construct URLs for these registries:
+
+* Docker Hub
+
+Alternatively this is populated from OCI annotation `org.opencontainers.image.url`.
+The structure is as follows:
+
+* normalized registry name (domain and port if any)
+* repository name
+* URL as provided by an annotation
+
+For example:
+
+```json
+{
+  "_REPO_DIGESTS": {
+    "registry-1.docker.io": {
+      "library/alpine": "https://hub.docker.com/_/alpine"
     }
   }
 }

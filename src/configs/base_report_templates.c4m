@@ -342,6 +342,7 @@ report and subtract from it.
   key._INSTANCE_IPV6_GATEWAY.use              = true
   key._INSTANCE_MAC.use                       = true
   key._INSTANCE_NETWORKS.use                  = true
+  key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
   key._REPO_LIST_DIGESTS.use                  = true
@@ -941,6 +942,7 @@ doc: """
   key._INSTANCE_MAC.use                       = true
   key._INSTANCE_NETWORKS.use                  = true
   key._STORE_URI.use                          = true
+  key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
   key._REPO_LIST_DIGESTS.use                  = true
@@ -1422,6 +1424,7 @@ container.
   key._INSTANCE_MAC.use                       = true
   key._INSTANCE_NETWORKS.use                  = true
   key._STORE_URI.use                          = true
+  key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
   key._REPO_LIST_DIGESTS.use                  = true
@@ -1906,6 +1909,7 @@ and keep the run-time key.
   key._INSTANCE_MAC.use                       = true
   key._INSTANCE_NETWORKS.use                  = true
   key._STORE_URI.use                          = true
+  key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
   key._REPO_LIST_DIGESTS.use                  = true
@@ -2100,6 +2104,7 @@ running insert commands.
   key._VIRTUAL.use                            = true
   key._CURRENT_HASH.use                       = true
   key._IMAGE_ID.use                           = true
+  key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
   key._REPO_LIST_DIGESTS.use                  = true
@@ -2203,6 +2208,7 @@ running commands that do NOT insert chalk marks.
   key._IMAGE_ID.use                           = true
   key._INSTANCE_CONTAINER_ID.use              = true
   key._INSTANCE_NAME.use                      = true
+  key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
   key._REPO_LIST_DIGESTS.use                  = true

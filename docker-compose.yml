@@ -229,8 +229,11 @@ services:
     ports:
       - "5047:5047"
     environment:
+      - REGISTRY_LOG_LEVEL=debug
       - REGISTRY_HTTP_ADDR=0.0.0.0:5047
       - REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io
+      - REGISTRY_PROXY_USERNAME=${REGISTRY_PROXY_USERNAME:-}
+      - REGISTRY_PROXY_PASSWORD=${REGISTRY_PROXY_PASSWORD:-}
     networks:
       - chalk
     healthcheck:
