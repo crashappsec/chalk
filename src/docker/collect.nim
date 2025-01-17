@@ -226,8 +226,8 @@ proc collectImageFrom(chalk:    ChalkObj,
       let
         manifest  = fetchImageManifest(repo, platform)
         imageRepo = manifest.asImageRepo(tag = repo.tag)
-        url       = annotations{"org.opencontainers.image.url"}.getStr(repo.url())
       annotations.update(manifest.annotations)
+      let url = annotations{"org.opencontainers.image.url"}.getStr(repo.url())
       chalk.repos[repo.repo] = imageRepo + chalk.repos.getOrDefault(repo.repo)
       layers = @[]
       for layer in manifest.layers:

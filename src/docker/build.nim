@@ -134,7 +134,9 @@ proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
     if s.image.isPinned():
       continue
     try:
-      let manifest = fetchManifestForImage(s.image, ctx.platforms)
+      let
+        platforms = s.platformsOrDefault(ctx.platforms)
+        manifest  = fetchManifestForImage(s.image, platforms)
       s.image = manifest.asImage().withTag(s.image.tag)
     except RegistryResponseError:
       trace("docker: could not pin " & $s.image & " due to: " & getCurrentExceptionMsg())
@@ -334,10 +336,11 @@ proc launchDockerSubscan(ctx:     DockerInvocation,
   trace("docker: subscan complete.")
 
 proc collectBaseImage(chalk: ChalkObj, ctx: DockerInvocation, section: DockerFileSection) =
+  let platform = section.platformOrDefault(chalk.platform)
   trace("docker: collecting chalkmark from base image " &
-        $section.image & " for " & $chalk.platform)
+        $section.image & " for " & $platform)
   try:
-    let baseChalkOpt = scanImage(section.image, platform = chalk.platform)
+    let baseChalkOpt = scanImage(section.image, platform = platform)
     if baseChalkOpt.isNone():
       trace("docker: base image could not be scanned")
       return

@@ -506,13 +506,14 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             FROM alpine as one
             FROM alpine as oneduplicate
 
+            FROM alpine
             FROM ubuntu:24.04 as two
             COPY --from=docker /usr/local/bin/docker /docker
             COPY --from=busybox:latest /bin/busybox /busybox
 
-            FROM busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7 as three
+            FROM --platform=linux/arm64 busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7 as three
 
-            FROM nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe as four
+            FROM --platform=linux/amd64 nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe as four
 
             FROM one as five
             COPY --from=nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe /usr/sbin/nginx /nginx
@@ -579,6 +580,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
                     "COMMIT_ID": ANY,
                     "_IMAGE_CREATION_DATETIME": Iso8601(),
                     "ORIGIN_URI": "https://github.com/nginxinc/docker-nginx.git",
+                    "DOCKER_PLATFORM": "linux/amd64",
                     "_REPO_DIGESTS": {
                         "registry-1.docker.io": {
                             "library/nginx": ANY,
@@ -594,6 +596,31 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
                     "_REPO_URLS": {
                         "registry-1.docker.io": {
                             "library/nginx": "https://hub.docker.com/_/nginx"
+                        }
+                    },
+                },
+                {
+                    "_IMAGE_ID": ANY,
+                    "METADATA_ID": MISSING,
+                    "COMMIT_ID": ANY,
+                    "_IMAGE_CREATION_DATETIME": Iso8601(),
+                    "ORIGIN_URI": "https://github.com/docker-library/busybox.git",
+                    "DOCKER_PLATFORM": re.compile(r"^linux/arm64"),
+                    "_REPO_DIGESTS": {
+                        "registry-1.docker.io": {
+                            "library/busybox": ANY,
+                        }
+                    },
+                    # even though tag is specified in dockerfile, its pinning to digest
+                    # and tag is outdated after new release
+                    "_REPO_TAGS": IfExists(
+                        {
+                            "registry-1.docker.io": MISSING,
+                        }
+                    ),
+                    "_REPO_URLS": {
+                        "registry-1.docker.io": {
+                            "library/busybox": "https://github.com/docker-library/busybox"
                         }
                     },
                 },
