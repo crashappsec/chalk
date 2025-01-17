@@ -946,8 +946,21 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
       "Did not find any build sections in Dockerfile (no FROM directive)"
     )
 
+proc platformOrDefault*(self: DockerFileSection, default: DockerPlatform): DockerPlatform =
+  if self.platform != nil:
+    return self.platform
+  return default
+
+proc platformsOrDefault*(self: DockerFileSection, default: seq[DockerPlatform]): seq[DockerPlatform] =
+  if self.platform != nil:
+    return @[self.platform]
+  return default
+
 proc asFrom*(self: DockerFileSection): string =
-  result = "FROM " & $self.image
+  result = "FROM "
+  if self.platform != nil:
+    result &= "--platform=" & $self.platform & " "
+  result &= $self.image
   if self.alias != "":
     result &= " AS " & self.alias
 

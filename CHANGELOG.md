@@ -2,6 +2,14 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- For `docker build`, `--platform` was not honored when pinning base images.
+  ([#468](https://github.com/crashappsec/chalk/pull/468))
+- `_REPO_URLS` was not extracting `org.opencontainers.image.url` annotation
+  correctly.
+  ([#468](https://github.com/crashappsec/chalk/pull/468))
+
 ## 0.5.0
 
 **Jan 08, 2025**
