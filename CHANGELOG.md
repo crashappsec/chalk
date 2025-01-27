@@ -2,6 +2,12 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- `_REPO_TAGS` did not include all pushed tags when using `buildx build --push`
+  without `--load`.
+  ([#471](https://github.com/crashappsec/chalk/pull/471))
+
 ## 0.5.1
 
 **Jan 17, 2025**

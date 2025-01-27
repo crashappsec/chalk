@@ -196,7 +196,9 @@ proc collectImageFrom(chalk:    ChalkObj,
     id                 = caseless{"id"}.getStr().extractDockerHash()
     repotags           = parseImages(caseless{"repotags"}.getStrElems())
     repodigests        = parseImages(caseless{"repodigests"}.getStrElems(), defaultTag = "")
-    alldigests         = (repodigests & repos).uniq()
+    alldigests         = repodigests & repos
+    alltags            = repotags & alldigests
+    uniqdigests        = alldigests.uniq()
     os                 = caseless{"os"}.getStr()
     arch               = caseless{"architecture"}.getStr()
     variant            = caseless{"variant"}.getStr()
@@ -221,7 +223,7 @@ proc collectImageFrom(chalk:    ChalkObj,
   chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents.nimJsonToBox())
   chalk.setIfNeeded("DOCKER_PLATFORM", $platform)
   chalk.repos          = newOrderedTable[string, DockerImageRepo]()
-  for repo in alldigests:
+  for repo in uniqdigests:
     try:
       let
         manifest  = fetchImageManifest(repo, platform)
@@ -238,7 +240,7 @@ proc collectImageFrom(chalk:    ChalkObj,
     except:
       trace("docker: " & getCurrentExceptionMsg())
       continue
-  for tag in repotags:
+  for tag in alltags:
     if tag.repo notin chalk.repos:
       # we dont know digest for this tag so most likely local-only image
       continue
