@@ -263,14 +263,17 @@ def test_docker_context(chalk: Chalk, tmp_data_dir: Path):
     assert ChalkProgram.from_program(build)
 
 
+@pytest.mark.parametrize("buildx", [True, False])
 @pytest.mark.parametrize("dockerfile", [DOCKERFILES / "valid" / "sample_1"])
 def test_multiple_tags(
     chalk: Chalk,
     dockerfile: Path,
     random_hex: str,
+    buildx: bool,
 ):
     tags = [
         f"{REGISTRY}/{random_hex}-1",
+        f"{REGISTRY}/{random_hex}-1:foo",
         f"{REGISTRY}/{random_hex}-2",
     ]
     image_id, build = chalk.docker_build(
@@ -278,6 +281,8 @@ def test_multiple_tags(
         tags=tags,
         config=CONFIGS / "docker_wrap.c4m",
         push=True,
+        load=not buildx,
+        buildx=buildx,
         # docker sanity check will push to registry
         # whereas we want to ensure chalk does the pushing
         run_docker=False,
@@ -286,8 +291,13 @@ def test_multiple_tags(
     assert build.mark.has(
         _REPO_TAGS={
             REGISTRY: {
-                f"{random_hex}-1": ANY,
-                f"{random_hex}-2": ANY,
+                f"{random_hex}-1": {
+                    "latest": ANY,
+                    "foo": ANY,
+                },
+                f"{random_hex}-2": {
+                    "latest": ANY,
+                },
             },
         }
     )
