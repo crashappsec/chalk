@@ -302,7 +302,7 @@ iterator iterBuildxSpecificRegistryConfigs(self:         DockerImage,
       )
 
 iterator iterBuildxRegistryConfigs(self: DockerImage, useCase: RegistryUseCase): RegistryConfig =
-  if hasBuildx():
+  if hasBuildX():
     if useCase == RegistryUseCase.ReadOnly:
       for node, config in dockerInvocation.iterBuilderNodesConfigs():
         try:

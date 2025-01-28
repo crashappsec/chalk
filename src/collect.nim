@@ -194,7 +194,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
       if plugin == obj.myCodec:
         trace("Filling in codec info")
         if "CHALK_ID" notin data:
-          data["CHALK_ID"]      = pack(obj.callGetChalkID())
+          data["CHALK_ID"]      = pack(obj.callGetChalkId())
         let preHashOpt = obj.callGetUnchalkedHash()
         if preHashOpt.isSome():
           data["HASH"]          = pack(preHashOpt.get())
@@ -403,7 +403,7 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
           if not inSubscan() and not obj.forceIgnore and
              obj.name notin getUnmarked():
-            obj.collectRuntimeArtifactInfo()
+            obj.collectRunTimeArtifactInfo()
 
   if not inSubscan():
     if getCommandName() != "extract":
@@ -426,5 +426,5 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
             if chalk.extract == nil:
               info(chalk.name & ": Artifact is unchalked.")
             trace("Collecting artifact runtime info")
-            chalk.collectRuntimeArtifactInfo()
+            chalk.collectRunTimeArtifactInfo()
             yield chalk

@@ -30,7 +30,7 @@ type
     psInfoCache:      Option[ProcFdSet]
 
 proc clearCallback(self: Plugin) {.cdecl.} =
-  self.internalState = RootRef(ProcFsCache())
+  self.internalState = RootRef(ProcFSCache())
 
 const PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
 let
@@ -140,7 +140,7 @@ proc getPidArgv(pid: string): string =
   if len(allArgs[^1]) == 0:
     allArgs = allArgs[0 ..< ^1]
 
-  return $(`%*`(allargs))
+  return $(`%*`(allArgs))
 
 proc getPidCommandName(pid: string): string =
   return tryToLoadFile("/proc/" & pid & "/comm").strip()
@@ -395,8 +395,8 @@ template procPort(s: string): string =
   except:
     ""
 
-proc getIPV4Routes(): ProcTable =
-  let raw = getRawIpV4Routes()
+proc getIPv4Routes(): ProcTable =
+  let raw = getRawIPv4Routes()
 
   for row in raw:
     if len(row) < 11:
@@ -520,7 +520,7 @@ proc getPsAllInfo(): ProcFdSet =
 proc procfsGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
        ChalkDict {.cdecl.} =
   result    = ChalkDict()
-  let cache = ProcFsCache(self.internalState)
+  let cache = ProcFSCache(self.internalState)
 
   if isSubscribedKey("_OP_TCP_SOCKET_INFO"):
     let info = getTCPSockInfo()
@@ -615,7 +615,7 @@ template loadArrKeyFromCacheOrCall(chalkKey, cacheKey: string, call: untyped) =
 proc procfsGetRunTimeArtifactInfo(self: Plugin, obj: ChalkObj, ins: bool):
                                  ChalkDict {.cdecl.} =
   result    = ChalkDict()
-  let cache = ProcFsCache(self.internalState)
+  let cache = ProcFSCache(self.internalState)
 
   if obj.pid.isNone():
     return
@@ -700,4 +700,4 @@ proc loadProcFs*() =
               clearCallback  = PluginClearCb(clearCallback),
               rtHostCallback = RunTimeHostCb(procfsGetRunTimeHostInfo),
               rtArtCallback  = RunTimeArtifactCb(procfsGetRunTimeArtifactInfo),
-              cache          = RootRef(ProcFsCache()))
+              cache          = RootRef(ProcFSCache()))

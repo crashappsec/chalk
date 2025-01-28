@@ -121,7 +121,7 @@ proc isValid*(self: AttestationKey): bool =
                    "-"]
 
     let
-      cmd = runCmdGetEverything(cosign, signArgs, tosign)
+      cmd = runCmdGetEverything(cosign, signArgs, toSign)
       err = cmd.getStdErr()
       sig = cmd.getStdOut()
 
@@ -138,7 +138,7 @@ proc isValid*(self: AttestationKey): bool =
                   "--insecure-ignore-sct=true",
                   "--signature=" & sig,
                   "-"]
-      vfyOut  = runCmdGetEverything(cosign, vfyArgs, tosign)
+      vfyOut  = runCmdGetEverything(cosign, vfyArgs, toSign)
 
     if vfyOut.getExit() != 0:
       error("Could not validate; public key is invalid.")

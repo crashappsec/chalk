@@ -121,4 +121,4 @@ proc loadCodecFallbackElf*() =
          scan               = ScanCb(fbScan),
          getUnchalkedHash   = UnchalkedHashCb(fbGetUnchalkedHash),
          ctArtCallback      = ChalkTimeArtifactCb(fbGetChalkTimeArtifactInfo),
-         rtArtCallback      = RunTimeArtifactCb(fbgetRunTimeArtifactInfo))
+         rtArtCallback      = RunTimeArtifactCb(fbGetRunTimeArtifactInfo))

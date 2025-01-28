@@ -356,7 +356,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
 
   let theSinkOpt = getSinkImplementation(sinkName)
   if theSinkOpt.isNone():
-    error("Sink '" & sinkname & "' is configured, and the config file " &
+    error("Sink '" & sinkName & "' is configured, and the config file " &
          "specs it, but there is no implementation for that sink.")
     return none(SinkConfig)
 

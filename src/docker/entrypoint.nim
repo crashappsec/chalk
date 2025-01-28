@@ -144,7 +144,7 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
         # when ENTRYPOINT is an empty string, doing a build with
         # buildx leaves empty string as an arg in exec
         # https://github.com/moby/buildkit/pull/1874
-        if entrypoint.str != "" or hasBuildx():
+        if entrypoint.str != "" or hasBuildX():
           shell.json & %(@[entrypoint.str])
         else:
           %(@[])

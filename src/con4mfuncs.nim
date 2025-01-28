@@ -142,7 +142,7 @@ object must already be defined at the time of the call to subscribe()
      @["chalk"]
     ),
     ("unsubscribe(string, string) -> bool",
-     BuiltInFn(topicUnSubscribe),
+     BuiltInFn(topicUnsubscribe),
      """
 For the topic name given in the first parameter, unsubscribes the sink
 configuration named in the second parameter, if subscribed.

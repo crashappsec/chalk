@@ -95,7 +95,7 @@ proc getDockerServerVersion*(): Version =
         dumpExOnDebug()
   return dockerServerVersion
 
-proc hasBuildx*(): bool =
+proc hasBuildX*(): bool =
   return getBuildXVersion() > parseVersion("0")
 
 var dockerInfo = ""
@@ -247,7 +247,7 @@ proc supportsCopyChmod*(): bool =
   # > the --chmod option requires BuildKit.
   # > Refer to https://docs.docker.com/go/buildkit/ to learn how to
   # > build images with BuildKit enabled
-  return hasBuildx()
+  return hasBuildX()
 
 proc supportsInspectJsonFlag*(): bool =
   # https://github.com/docker/cli/pull/2936

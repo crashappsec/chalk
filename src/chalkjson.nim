@@ -231,15 +231,15 @@ let
   jFalse:   ChalkJsonNode = ChalkJsonNode(kind: CJBool, boolval: false)
   jTrue:    ChalkJsonNode = ChalkJsonNode(kind: CJBool, boolval: true)
 
-proc jSonNull(s: Stream): ChalkJsonNode =
+proc jsonNull(s: Stream): ChalkJsonNode =
   literalCheck(s, jNullStr)
   return jNullLit
 
-proc jSonFalse(s: Stream): ChalkJsonNode =
+proc jsonFalse(s: Stream): ChalkJsonNode =
   literalCheck(s, jFalseStr)
   return jFalse
 
-proc jSonTrue(s: Stream): ChalkJsonNode =
+proc jsonTrue(s: Stream): ChalkJsonNode =
   literalCheck(s, jTrueStr)
   return jTrue
 
@@ -429,7 +429,7 @@ proc jsonValue(s: Stream): ChalkJsonNode =
 
 proc chalkParseJson*(s: Stream): ChalkJsonNode =
   s.jsonWS()
-  result = s.jSonValue()
+  result = s.jsonValue()
   # Per the spec, we should advance the stream white space after the
   # extracted value.  However, we don't do this at the top level just
   # in case any space after the end of the element has semantic value

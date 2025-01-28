@@ -247,7 +247,7 @@ proc macHandleWrite*(self: Plugin, chalk: ChalkObj, enc: Option[string])
     else:
       toWrite &= encode(cache.contents)
     toWrite &= "\n"
-    for line in postFixLines:
+    for line in postfixLines:
       toWrite &= line & "\n"
 
     toWrite &= chalk.cachedPreHash & "\n"

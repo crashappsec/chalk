@@ -126,11 +126,11 @@ proc toolGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
 proc toolGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
                                  ChalkDict {.cdecl.} =
   if obj.fsRef != "":
-    toolbase(resolvePath(obj.fsRef))
+    toolBase(resolvePath(obj.fsRef))
   elif getCommandName() == "build":
-    toolbase(resolvePath(getContextDirectories()[0]))
+    toolBase(resolvePath(getContextDirectories()[0]))
   else:
-    toolbase(resolvePath(obj.name))
+    toolBase(resolvePath(obj.name))
 
 proc loadExternalTool*() =
   newPlugin("tool",
