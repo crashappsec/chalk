@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.5.2
+
+**Jan 28, 2025**
 
 ### Fixes
 
@@ -12,6 +14,8 @@
 
   - uploading reports to s3 sink
   - lambda plugin as it could not get caller identity
+
+  This was a regression from `0.4.14`.
 
   ([nimutils #82](https://github.com/crashappsec/nimutils/pull/82),
   [#473](https://github.com/crashappsec/chalk/pull/473))
