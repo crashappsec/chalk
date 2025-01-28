@@ -23,6 +23,7 @@ on:
       - "*.nimble"
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -30,6 +31,7 @@ permissions:
 
 env:
   SSH_KEY: ${{ secrets.SSH_KEY }}
+  AWS_REGION: us-east-1
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
@@ -81,6 +83,12 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@0d4c9c5ea7693da7b068278f7b52bda2a190a446 # 3.2.0
+        with:
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.DOCKER_HUB_PUBLIC_READONLY_TOKEN }}
+
       - name: Prep PWD
         run: |
           mkdir -p ../con4m
@@ -116,6 +124,8 @@ jobs:
           )
         env:
           GITHUB_TOKEN: ${{ steps.org-token.outputs.token }}
+          REGISTRY_PROXY_USERNAME: ${{ github.repository_owner }}
+          REGISTRY_PROXY_PASSWORD: ${{ secrets.DOCKER_HUB_PUBLIC_READONLY_TOKEN }}
         run: |
           make tests_parallel args=""
 
@@ -128,5 +138,12 @@ jobs:
           )
         env:
           GITHUB_TOKEN: ${{ steps.org-token.outputs.token }}
+          REGISTRY_PROXY_USERNAME: ${{ github.repository_owner }}
+          REGISTRY_PROXY_PASSWORD: ${{ secrets.DOCKER_HUB_PUBLIC_READONLY_TOKEN }}
         run: |
           make tests_parallel args="--slow"
+
+      - name: Show service logs
+        if: failure()
+        run: |
+          docker compose logs | grep -v health

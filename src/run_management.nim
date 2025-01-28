@@ -9,13 +9,14 @@
 ## setting, status stuff, and the core scan state ("collection
 ## contexts"), that the subscan module pushes and pops.
 
-import std/[posix, monotimes, enumerate]
+import std/[posix, monotimes, enumerate, times]
 import "."/chalk_common
 export chalk_common
 
 var
-  ctxStack   = @[CollectionCtx()]
-  startTime* = getMonoTime().ticks()
+  ctxStack       = @[CollectionCtx()]
+  startTime*     = getTime().utc # gives absolute wall time
+  monoStartTime* = getMonoTime() # used for computing diffs
 
 proc getChalkScope*(): AttrScope =
   con4mRuntime.configState.attrs
@@ -75,7 +76,8 @@ proc inSubscan*(): bool =
   return len(ctxStack) > 1
 
 proc clearReportingState*() =
-  startTime       = getMonoTime().ticks()
+  startTime       = getTime().utc
+  monoStartTime   = getMonoTime()
   ctxStack        = @[CollectionCtx()]
   hostInfo        = ChalkDict()
   subscribedKeys  = Table[string, bool]()
@@ -105,10 +107,6 @@ proc getCurrentCollectionCtx*(): CollectionCtx =
   collectionCtx
 proc getErrorObject*(): Option[ChalkObj] =
   collectionCtx.currentErrorObject
-proc setErrorObject*(o: ChalkObj) =
-  collectionCtx.currentErrorObject = some(o)
-proc clearErrorObject*() =
-  collectionCtx.currentErrorObject = none(ChalkObj)
 proc getAllChalks*(): seq[ChalkObj] =
   collectionCtx.allChalks
 proc getAllChalks*(cc: CollectionCtx): seq[ChalkObj] =
@@ -122,6 +120,19 @@ proc removeFromAllChalks*(o: ChalkObj) =
   if o in collectionCtx.allChalks:
     # Note that this is NOT an order-preserving delete; it's O(1)
     collectionCtx.allChalks.del(collectionCtx.allChalks.find(o))
+proc getAllArtifacts*(): seq[ChalkObj] =
+  collectionCtx.allArtifacts
+proc getAllArtifacts*(cc: CollectionCtx): seq[ChalkObj] =
+  cc.allArtifacts
+proc addToAllArtifacts*(o: ChalkObj) =
+  if o notin collectionCtx.allArtifacts:
+    collectionCtx.allArtifacts.add(o)
+proc setAllArtifacts*(s: seq[ChalkObj]) =
+  collectionCtx.allArtifacts = s
+proc removeFromAllArtifacts*(o: ChalkObj) =
+  if o in collectionCtx.allArtifacts:
+    # Note that this is NOT an order-preserving delete; it's O(1)
+    collectionCtx.allArtifacts.del(collectionCtx.allArtifacts.find(o))
 proc getUnmarked*(): seq[string] =
   collectionCtx.unmarked
 proc addUnmarked*(s: string) =
@@ -132,6 +143,21 @@ proc setContextDirectories*(l: seq[string]) =
   collectionCtx.contextDirectories = l
 proc getContextDirectories*(): seq[string] =
   collectionCtx.contextDirectories
+
+template withErrorContext*(chalk: ChalkObj, c: untyped) =
+  var previous = collectionCtx.currentErrorObject
+  try:
+    collectionCtx.currentErrorObject = some(chalk)
+    c
+  except:
+    # exception was raised while processing chalk so bubble up
+    # the errors to the system errors log so that report
+    # is not missing any critical debugging logs while individual
+    # chalk was being processed
+    systemErrors &= chalk.err
+    raise
+  finally:
+    collectionCtx.currentErrorObject = previous
 
 proc isMarked*(chalk: ChalkObj): bool {.inline.} =
   return chalk.marked
@@ -147,7 +173,8 @@ proc newChalk*(name:         string            = "",
                extract:      ChalkDict         = ChalkDict(nil),
                cache:        RootRef           = RootRef(nil),
                codec:        Plugin            = Plugin(nil),
-               addToAllChalks                  = false): ChalkObj =
+               platform                        = DockerPlatform(nil),
+               ): ChalkObj =
 
   result = ChalkObj(name:          name,
                     pid:           pid,
@@ -162,6 +189,7 @@ proc newChalk*(name:         string            = "",
                     cache:         cache,
                     myCodec:       codec,
                     failedKeys:    ChalkDict(),
+                    platform:      platform,
                    )
 
   if chalkId != "":
@@ -170,25 +198,28 @@ proc newChalk*(name:         string            = "",
   if extract != nil and len(extract) > 1:
     result.marked = true
 
-  if addToAllChalks:
-    result.addToAllChalks()
+template setIfNotEmptyBox*(o: ChalkDict, k: string, v: Box) =
+  case v.kind
+  of MkSeq, MkTable, MkStr:
+    if len(v) > 0:
+      o[k] = v
+  else:
+    o[k] = v
 
-  setErrorObject(result)
+template setIfNotEmpty*[T](o: ChalkDict, k: string, v: T) =
+  when T is Box:
+    setIfNotEmptyBox(o, k, v)
+  elif T is JsonNode:
+    if v != nil:
+      setIfNotEmptyBox(o, k, v.nimJsonToBox())
+  elif T is Option:
+    if v.isSome():
+      setIfNotEmptyBox(o, k, pack(v.get()))
+  else:
+    setIfNotEmptyBox(o, k, pack(v))
 
-template setIfNotEmpty*(dict: ChalkDict, key: string, val: string) =
-  if val != "":
-    dict[key] = pack(val)
-
-template setIfNotEmpty*[T](dict: ChalkDict, key: string, val: seq[T]) =
-  if len(val) > 0:
-    dict[key] = pack[seq[T]](val)
-
-template setFromEnvVar*(dict: ChalkDict, key: string, default: string = "") =
-  dict.setIfNotEmpty(key, os.getEnv(key, default))
-
-proc idFormat*(rawHash: string): string =
-  let s = base32vEncode(rawHash)
-  s[0 ..< 6] & "-" & s[6 ..< 10] & "-" & s[10 ..< 14] & "-" & s[14 ..< 20]
+template setFromEnvVar*(o: ChalkDict, k: string, default: string = "") =
+  o.setIfNotEmpty(k, os.getEnv(k, default))
 
 template isSubscribedKey*(key: string): bool =
   if key in subscribedKeys:
@@ -196,25 +227,20 @@ template isSubscribedKey*(key: string): bool =
   else:
     false
 
-template setIfSubscribed*[T](d: ChalkDict, k: string, v: T) =
+template setIfSubscribed*[T](o: ChalkDict, k: string, v: T) =
   if isSubscribedKey(k):
-    when T is Box:
-      d[k] = v
+    # need to normalize additional types to box to match setIfNeeded behavior
+    when T is JsonNode:
+      o[k] = v.nimJsonToBox()
+    elif T is Option:
+      if v.isSome():
+        i[k] = pack(v.get())
     else:
-      d[k] = pack[T](v)
+      o[k] = pack(v)
 
 template setIfNeeded*[T](o: ChalkDict, k: string, v: T) =
-  when T is string:
-    if v != "":
-      setIfSubscribed(o, k, v)
-  elif T is seq or T is ChalkDict:
-    if len(v) != 0:
-      setIfSubscribed(o, k, v)
-  elif T is Option:
-    if v.isSome():
-      setIfSubscribed(o, k, v.get())
-  else:
-    setIfSubscribed(o, k, v)
+  if isSubscribedKey(k):
+    setIfNotEmpty[T](o, k, v)
 
 template setIfNeeded*[T](o: ChalkObj, k: string, v: T) =
   setIfNeeded(o.collectedData, k, v)
@@ -224,6 +250,10 @@ template trySetIfNeeded*(o: ChalkDict, k: string, code: untyped) =
     o.setIfNeeded(k, code)
   except:
     trace("Could not set chalk key " & k & " due to: " & getCurrentExceptionMsg())
+
+proc idFormat*(rawHash: string): string =
+  let s = base32vEncode(rawHash)
+  s[0 ..< 6] & "-" & s[6 ..< 10] & "-" & s[10 ..< 14] & "-" & s[14 ..< 20]
 
 proc isChalkingOp*(): bool =
   return commandName in attrGet[seq[string]]("valid_chalk_command_names")

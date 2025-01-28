@@ -1,8 +1,9 @@
-# Copyright (c) 2023-2024, Crash Override, Inc.
+# Copyright (c) 2023-2025, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import itertools
+import operator
 import platform
 import re
 import shutil
@@ -29,8 +30,9 @@ from .conf import (
     REGISTRY_TLS_INSECURE,
     ROOT,
 )
-from .utils.dict import ANY, MISSING, Contains, IfExists
+from .utils.dict import ANY, MISSING, Contains, IfExists, Iso8601, Length, Values
 from .utils.docker import Docker
+from .utils.git import Git
 from .utils.log import get_logger
 from .utils.os import run
 
@@ -96,7 +98,15 @@ def test_no_docker(chalk: Chalk):
     assert build.exit_code > 0
 
 
-@pytest.mark.parametrize("buildkit", [True, False])
+@pytest.mark.parametrize(
+    "buildkit, buildx, builder",
+    [
+        (True, True, "empty_builder"),
+        (True, True, None),
+        (True, False, None),
+        (False, False, None),
+    ],
+)
 @pytest.mark.parametrize(
     "cwd, dockerfile, tag",
     [
@@ -120,6 +130,8 @@ def test_build(
     cwd: Optional[Path],
     tag: Optional[bool],
     buildkit: bool,
+    buildx: bool,
+    builder: Optional[str],
     random_hex: str,
 ):
     """
@@ -131,11 +143,81 @@ def test_build(
         cwd=cwd,
         tag=random_hex if tag else None,
         buildkit=buildkit,
+        buildx=buildx,
+        builder=builder,
         config=CONFIGS / "docker_wrap.c4m",
     )
     assert image_id
     assert build.mark.has(_IMAGE_ENTRYPOINT=["/chalk", "exec", "--"])
-    assert build.report.has(_OP_EXIT_CODE=build.exit_code)
+    assert build.report.has(
+        _OP_EXIT_CODE=build.exit_code,
+        _DOCKER_CLIENT_VERSION=str,
+        _DOCKER_SERVER_VERSION=str,
+        _DOCKER_BUILDX_VERSION=str if buildx or buildkit else MISSING,
+        _DOCKER_BUILDER_BUILDKIT_VERSION=str if buildx or buildkit else MISSING,
+        _DOCKER_INFO=str,
+        _DOCKER_USED_REGISTRIES={
+            REGISTRY_PROXY: (
+                {
+                    "auth": False,
+                    "www_auth": False,
+                    "http": True,
+                    "insecure": True,
+                    "mirroring": "registry-1.docker.io",
+                    "scheme": "http",
+                    "secure": False,
+                    "source": "buildx" if buildx else "daemon",
+                    "url": f"http://{REGISTRY_PROXY}/v2/",
+                }
+                if not builder
+                else MISSING
+            ),
+            "registry-1.docker.io": (
+                {
+                    "url": "https://registry-1.docker.io/v2/",
+                    "source": "buildx",
+                    "scheme": "https",
+                    "http": False,
+                    "secure": True,
+                    "insecure": False,
+                    "auth": False,
+                    "www_auth": True,
+                }
+                # without empty builder, docker hub should be used as there is no proxy config anymore
+                if builder
+                else MISSING
+            ),
+        },
+        _DOCKER_BUILDER_INFO=str if buildx or buildkit else MISSING,
+        _DOCKER_BUILDER_NODES_INFO=Length(0, operator.gt) if buildx else MISSING,
+        _DOCKER_BUILDER_NODES_CONFIG=(
+            Values(
+                Contains(
+                    [
+                        (
+                            {
+                                "debug": True,
+                                "registry": {
+                                    REGISTRY: {"http": True},
+                                    REGISTRY_PROXY: {"http": True},
+                                    REGISTRY_TLS_INSECURE: {"insecure": True},
+                                    REGISTRY_TLS: {"ca": [str]},
+                                    "docker.io": {
+                                        "mirrors": Contains([REGISTRY_PROXY]),
+                                    },
+                                },
+                            }
+                            if not builder
+                            # empty builder doesnt have any configs
+                            else Length(0)
+                        )
+                    ]
+                )
+            )
+            if buildx
+            else MISSING
+        ),
+    )
 
 
 @pytest.mark.parametrize("buildkit", [True, False])
@@ -181,14 +263,17 @@ def test_docker_context(chalk: Chalk, tmp_data_dir: Path):
     assert ChalkProgram.from_program(build)
 
 
+@pytest.mark.parametrize("buildx", [True, False])
 @pytest.mark.parametrize("dockerfile", [DOCKERFILES / "valid" / "sample_1"])
 def test_multiple_tags(
     chalk: Chalk,
     dockerfile: Path,
     random_hex: str,
+    buildx: bool,
 ):
     tags = [
         f"{REGISTRY}/{random_hex}-1",
+        f"{REGISTRY}/{random_hex}-1:foo",
         f"{REGISTRY}/{random_hex}-2",
     ]
     image_id, build = chalk.docker_build(
@@ -196,6 +281,8 @@ def test_multiple_tags(
         tags=tags,
         config=CONFIGS / "docker_wrap.c4m",
         push=True,
+        load=not buildx,
+        buildx=buildx,
         # docker sanity check will push to registry
         # whereas we want to ensure chalk does the pushing
         run_docker=False,
@@ -204,8 +291,13 @@ def test_multiple_tags(
     assert build.mark.has(
         _REPO_TAGS={
             REGISTRY: {
-                f"{random_hex}-1": ANY,
-                f"{random_hex}-2": ANY,
+                f"{random_hex}-1": {
+                    "latest": ANY,
+                    "foo": ANY,
+                },
+                f"{random_hex}-2": {
+                    "latest": ANY,
+                },
             },
         }
     )
@@ -336,18 +428,23 @@ def test_base_registry(chalk: Chalk, image: str, entrypoint: str, buildx: bool):
     )
 
 
-def test_base_image(chalk: Chalk, random_hex: str):
+@pytest.mark.parametrize("push", [True, False])
+def test_base_image(chalk: Chalk, random_hex: str, push: bool):
+    base = f"{REGISTRY}/base/{random_hex}:{random_hex}"
     base_id, _ = Docker.build(
+        buildx=push,
+        push=push,
+        load=not push,
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile.base",
         context=DOCKERFILES / "valid" / "base",
-        tag=random_hex,
+        tag=base,
     )
     assert base_id
 
     image_id, _ = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile",
         context=DOCKERFILES / "valid" / "base",
-        args={"BASE": random_hex},
+        args={"BASE": base},
         config=CONFIGS / "docker_wrap.c4m",
     )
     _, run = Docker.run(image_id)
@@ -373,11 +470,20 @@ def test_recursion_wrapping(chalk: Chalk, random_hex: str):
     assert run
 
 
-def test_base_images(chalk: Chalk, random_hex: str):
+def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
+    (
+        Git(tmp_data_dir)
+        .init(remote="git@github.com:crashappsec/foo.git", branch="main")
+        .add()
+        .commit("init")
+    )
+
     # most of the images below are manifest lists
     # so we create a dummy one which is guaranteed to be regular image manifest
-    image = f"{REGISTRY}/{random_hex}_image"
-    Docker.build(
+    name = f"{random_hex}_image"
+    image = f"{REGISTRY}/{name}"
+    _, base = chalk.docker_build(
+        config=CONFIGS / "docker_wrap.c4m",
         tag=image,
         content=Docker.dockerfile(
             """
@@ -388,21 +494,36 @@ def test_base_images(chalk: Chalk, random_hex: str):
         push=True,
         buildx=True,
     )
+    assert base.artifact.has(
+        METADATA_ID=MISSING,
+        COMMIT_ID=ANY,
+        ORIGIN_URI="https://github.com/alpinelinux/docker-alpine.git",
+        _OP_ARTIFACT_CONTEXT="base",
+    )
+    assert base.mark.has(
+        COMMIT_ID=ANY,
+        ORIGIN_URI="git@github.com:crashappsec/foo.git",
+        DOCKER_BASE_IMAGE_METADATA_ID=MISSING,
+        DOCKER_BASE_IMAGE_ID=ANY,
+        _OP_ARTIFACT_CONTEXT="build",
+    )
 
     _, result = chalk.docker_build(
         content=Docker.dockerfile(
             f"""
-            ARG BASE=two
+            ARG BASE=seven
 
             FROM alpine as one
+            FROM alpine as oneduplicate
 
+            FROM alpine
             FROM ubuntu:24.04 as two
             COPY --from=docker /usr/local/bin/docker /docker
             COPY --from=busybox:latest /bin/busybox /busybox
 
-            FROM busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7 as three
+            FROM --platform=linux/arm64 busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7 as three
 
-            FROM nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe as four
+            FROM --platform=linux/amd64 nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe as four
 
             FROM one as five
             COPY --from=nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe /usr/sbin/nginx /nginx
@@ -412,72 +533,210 @@ def test_base_images(chalk: Chalk, random_hex: str):
 
             FROM {image}:latest as seven
 
+            FROM crashappsec/chalk as chalk
+
             FROM $BASE
             COPY --from=four /usr/sbin/nginx /nginx
             """
         ),
     )
+    assert result.report.has(
+        _OP_CHALK_COUNT=1,
+        # all base images should be set as unmarked
+        _UNMARKED=Length(len({"alpine", "ubuntu", "busybox", "nginx"}), operator.ge),
+        _COLLECTED_ARTIFACTS=Contains(
+            [
+                {
+                    **{
+                        k: IfExists(v)
+                        for k, v in base.mark.items()
+                        if not k.startswith("_")
+                    },
+                    **{
+                        "_OP_ARTIFACT_CONTEXT": "base",
+                        "_IMAGE_ID": base.mark["_IMAGE_ID"],
+                        "METADATA_ID": base.mark["METADATA_ID"],
+                        "COMMIT_ID": base.mark["COMMIT_ID"],
+                        "ORIGIN_URI": base.mark["ORIGIN_URI"],
+                    },
+                },
+                {
+                    "_IMAGE_ID": ANY,
+                    "METADATA_ID": MISSING,
+                    "COMMIT_ID": ANY,
+                    "_IMAGE_CREATION_DATETIME": Iso8601(),
+                    "ORIGIN_URI": "https://git.launchpad.net/cloud-images/+oci/ubuntu-base",
+                    "_REPO_DIGESTS": {
+                        "registry-1.docker.io": {
+                            "library/ubuntu": ANY,
+                        }
+                    },
+                    "_REPO_TAGS": {
+                        "registry-1.docker.io": {
+                            "library/ubuntu": {
+                                "24.04": ANY,
+                            }
+                        }
+                    },
+                    "_REPO_URLS": {
+                        "registry-1.docker.io": {
+                            "library/ubuntu": "https://hub.docker.com/_/ubuntu"
+                        }
+                    },
+                },
+                {
+                    "_IMAGE_ID": ANY,
+                    "METADATA_ID": MISSING,
+                    "COMMIT_ID": ANY,
+                    "_IMAGE_CREATION_DATETIME": Iso8601(),
+                    "ORIGIN_URI": "https://github.com/nginxinc/docker-nginx.git",
+                    "DOCKER_PLATFORM": "linux/amd64",
+                    "_REPO_DIGESTS": {
+                        "registry-1.docker.io": {
+                            "library/nginx": ANY,
+                        }
+                    },
+                    # even though tag is specified in dockerfile, its pinning to digest
+                    # and tag is outdated after new release
+                    "_REPO_TAGS": IfExists(
+                        {
+                            "registry-1.docker.io": MISSING,
+                        }
+                    ),
+                    "_REPO_URLS": {
+                        "registry-1.docker.io": {
+                            "library/nginx": "https://hub.docker.com/_/nginx"
+                        }
+                    },
+                },
+                {
+                    "_IMAGE_ID": ANY,
+                    "METADATA_ID": MISSING,
+                    "COMMIT_ID": ANY,
+                    "_IMAGE_CREATION_DATETIME": Iso8601(),
+                    "ORIGIN_URI": "https://github.com/docker-library/busybox.git",
+                    "DOCKER_PLATFORM": re.compile(r"^linux/arm64"),
+                    "_REPO_DIGESTS": {
+                        "registry-1.docker.io": {
+                            "library/busybox": ANY,
+                        }
+                    },
+                    # even though tag is specified in dockerfile, its pinning to digest
+                    # and tag is outdated after new release
+                    "_REPO_TAGS": IfExists(
+                        {
+                            "registry-1.docker.io": MISSING,
+                        }
+                    ),
+                    "_REPO_URLS": {
+                        "registry-1.docker.io": {
+                            "library/busybox": "https://github.com/docker-library/busybox"
+                        }
+                    },
+                },
+                {
+                    "_IMAGE_ID": ANY,
+                    "METADATA_ID": ANY,
+                    "COMMIT_ID": ANY,
+                    "_IMAGE_CREATION_DATETIME": Iso8601(),
+                    "ORIGIN_URI": "https://github.com/crashappsec/chalk",
+                    "_REPO_DIGESTS": {
+                        "registry-1.docker.io": {
+                            "crashappsec/chalk": ANY,
+                        }
+                    },
+                    "_REPO_URLS": {
+                        "registry-1.docker.io": {
+                            "crashappsec/chalk": "https://hub.docker.com/r/crashappsec/chalk"
+                        }
+                    },
+                },
+            ]
+        ),
+    )
     assert result.mark.has(
         DOCKER_TARGET="",
-        DOCKER_BASE_IMAGE=re.compile(r"ubuntu:24.04@sha256:"),
-        DOCKER_BASE_IMAGE_REPO="ubuntu",
-        DOCKER_BASE_IMAGE_TAG="24.04",
+        _OP_ARTIFACT_CONTEXT="build",
+        DOCKER_BASE_IMAGE_METADATA_ID=base.mark["METADATA_ID"],
+        DOCKER_BASE_IMAGE_CHALK={k: IfExists(v) for k, v in base.mark.items()},
+        DOCKER_BASE_IMAGE_ID=base.mark["_IMAGE_ID"],
+        DOCKER_BASE_IMAGE=re.compile(rf"{image}:latest@sha256:"),
+        DOCKER_BASE_IMAGE_REPO=image,
+        DOCKER_BASE_IMAGE_REGISTRY=REGISTRY,
+        DOCKER_BASE_IMAGE_NAME=name,
+        DOCKER_BASE_IMAGE_TAG="latest",
         DOCKER_BASE_IMAGE_DIGEST=ANY,
         DOCKER_BASE_IMAGES={
             "one": {
                 "from": re.compile("alpine@sha256:"),
-                "name": re.compile("alpine@sha256:"),
+                "uri": re.compile("alpine@sha256:"),
                 "repo": "alpine",
+                "registry": "registry-1.docker.io",
+                "name": "library/alpine",
                 "tag": MISSING,
                 "digest": ANY,
             },
             "two": {
                 "from": re.compile("ubuntu:24.04@sha256:"),
-                "name": re.compile("ubuntu:24.04@sha256:"),
+                "uri": re.compile("ubuntu:24.04@sha256:"),
                 "repo": "ubuntu",
+                "registry": "registry-1.docker.io",
+                "name": "library/ubuntu",
                 "tag": "24.04",
                 "digest": ANY,
             },
             "three": {
                 "from": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
-                "name": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
+                "uri": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
                 "repo": "busybox",
+                "registry": "registry-1.docker.io",
+                "name": "library/busybox",
                 "tag": MISSING,
                 "digest": "9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
             },
             "four": {
                 "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
-                "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                "uri": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
                 "repo": "nginx",
+                "registry": "registry-1.docker.io",
+                "name": "library/nginx",
                 "tag": "1.27.0",
                 "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
             },
             "five": {
                 "from": "one",
-                "name": re.compile("alpine@sha256:"),
+                "uri": re.compile("alpine@sha256:"),
                 "repo": "alpine",
+                "registry": "registry-1.docker.io",
+                "name": "library/alpine",
                 "tag": MISSING,
                 "digest": ANY,
             },
             "six": {
                 "from": "scratch",
-                "name": "scratch",
+                "uri": "scratch",
                 "repo": "scratch",
+                "registry": MISSING,
+                "name": "scratch",
                 "tag": MISSING,
                 "digest": MISSING,
             },
             "seven": {
                 "from": re.compile(f"{image}:latest@sha256:"),
-                "name": re.compile(f"{image}:latest@sha256:"),
+                "uri": re.compile(f"{image}:latest@sha256:"),
                 "repo": image,
+                "registry": REGISTRY,
+                "name": name,
                 "tag": "latest",
                 "digest": ANY,
             },
             "": {
-                "from": "two",
-                "name": re.compile("ubuntu:24.04@sha256:"),
-                "repo": "ubuntu",
-                "tag": "24.04",
+                "from": "seven",
+                "uri": re.compile(f"{image}:latest@sha256:"),
+                "repo": image,
+                "registry": REGISTRY,
+                "name": name,
+                "tag": "latest",
                 "digest": ANY,
             },
         },
@@ -485,8 +744,10 @@ def test_base_images(chalk: Chalk, random_hex: str):
             "two": [
                 {
                     "from": "docker",
-                    "name": "docker",
+                    "uri": "docker",
                     "repo": "docker",
+                    "registry": "registry-1.docker.io",
+                    "name": "library/docker",
                     "tag": MISSING,
                     "digest": MISSING,
                     "src": ["/usr/local/bin/docker"],
@@ -494,8 +755,10 @@ def test_base_images(chalk: Chalk, random_hex: str):
                 },
                 {
                     "from": "busybox:latest",
-                    "name": "busybox:latest",
+                    "uri": "busybox:latest",
                     "repo": "busybox",
+                    "registry": "registry-1.docker.io",
+                    "name": "library/busybox",
                     "tag": "latest",
                     "digest": MISSING,
                     "src": ["/bin/busybox"],
@@ -505,8 +768,10 @@ def test_base_images(chalk: Chalk, random_hex: str):
             "five": [
                 {
                     "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
-                    "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                    "uri": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
                     "repo": "nginx",
+                    "registry": "registry-1.docker.io",
+                    "name": "library/nginx",
                     "tag": "1.27.0",
                     "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
                     "src": ["/usr/sbin/nginx"],
@@ -514,8 +779,10 @@ def test_base_images(chalk: Chalk, random_hex: str):
                 },
                 {
                     "from": "one",
-                    "name": re.compile("alpine@sha256:"),
+                    "uri": re.compile("alpine@sha256:"),
                     "repo": "alpine",
+                    "registry": "registry-1.docker.io",
+                    "name": "library/alpine",
                     "tag": MISSING,
                     "digest": ANY,
                     "src": ["/bin/sh"],
@@ -525,8 +792,10 @@ def test_base_images(chalk: Chalk, random_hex: str):
             "": [
                 {
                     "from": "four",
-                    "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+                    "uri": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
                     "repo": "nginx",
+                    "registry": "registry-1.docker.io",
+                    "name": "library/nginx",
                     "tag": "1.27.0",
                     "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
                     "src": ["/usr/sbin/nginx"],
@@ -901,7 +1170,7 @@ def test_nonvirtual_invalid(chalk: Chalk, test_file: str, random_hex: str):
         expected_success=False,
     )
 
-    assert result.report.has(_OP_EXIT_CODE=result.exit_code)
+    assert result.report.has(_OP_EXIT_CODE=result.exit_code, _CHALKS=MISSING)
 
 
 def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
@@ -1016,6 +1285,9 @@ def test_build_and_push(
     push_result = build_result
     # if without --push at build time, explicitly push to registry
     if not push:
+        assert build_result.mark.has(
+            _IMAGE_LAYERS=MISSING,
+        )
         push_result = chalk.docker_push(tag, buildkit=buildkit)
 
     image_digest, _ = Docker.with_image_digest(build_result)
@@ -1061,6 +1333,7 @@ def test_build_and_push(
                 name: [image_digest],
             }
         },
+        _IMAGE_LAYERS=Length(1, operator.ge),
     )
 
     pull = chalk.docker_pull(tag)
@@ -1288,8 +1561,8 @@ def test_multiplatform_build(
     if not push:
         # as no image is loaded without --push,
         # we cant inspect anything
-        with pytest.raises(KeyError):
-            build.marks
+        for mark in build.marks:
+            assert mark.has(_CURRENT_HASH=MISSING, _IMAGE_ID=MISSING)
         return
 
     assert len(build.marks) == len(platforms)
@@ -1447,6 +1720,7 @@ def test_git_context(
     random_hex: str,
 ):
     tmp_file.write_text(os.environ["GITHUB_TOKEN"])
+    remote = context.split("#")[0]
 
     _, build = chalk.docker_build(
         context=context,
@@ -1455,7 +1729,10 @@ def test_git_context(
         secrets={"GIT_AUTH_TOKEN": tmp_file} if private else {},
         buildkit=buildkit,
     )
-    assert build.mark
+    assert build.mark.has(
+        ORIGIN_URI=remote,
+        COMMIT_ID=ANY,
+    )
 
 
 # extract on image id, and image name, running container id + container name, exited container id + container name

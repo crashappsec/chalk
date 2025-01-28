@@ -8,7 +8,7 @@
 ## This is for any common code for system stuff, such as executing
 ## code.
 
-import std/[httpcore, tempfiles, posix, monotimes, parseutils, exitprocs, sets]
+import std/[httpcore, tempfiles, posix, parseutils, exitprocs, sets, times, monotimes]
 import pkg/[nimutils/managedtmp]
 import "."/[config, subscan, fd_cache]
 export fd_cache
@@ -79,10 +79,9 @@ proc reportTmpFileExitState*(files, dirs, errs: seq[string]) =
     for item in files & dirs:
       error(item)
 
+  let monoEndTime = getMonoTime()
   if attrGet[bool]("report_total_time"):
-    echo "Total run time: " & $(int(getMonoTime().ticks() - startTime) /
-                                1000000000) &
-      " seconds"
+    echo("Total run time: " & $(monoEndTime - monoStartTime))
 
 proc canOpenFile*(path: string, mode: FileMode = FileMode.fmRead): bool =
   var canOpen = false
@@ -646,3 +645,13 @@ proc `+`*[T](a, b: OrderedSet[T]): OrderedSet[T] =
     result.incl(i)
   for i in b:
     result.incl(i)
+
+proc toUnixInMs*(t: DateTime): int64 =
+  let epoch = fromUnix(0).utc
+  return (t - epoch).inMilliseconds()
+
+proc forReport*(t: DateTime): DateTime =
+  ## convert datetime to timezone for reporting chalk keys
+  # eventually we might add a config to specify in which TZ to report in
+  # however for now normalize to local timezone for reading report output
+  return t.local

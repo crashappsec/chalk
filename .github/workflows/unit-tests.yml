@@ -5,14 +5,14 @@ on:
     branches:
       - main
     paths-ignore:
-      - '**.md'
-      - 'server/**'
-      - 'tests/functional/**'
+      - "**.md"
+      - "server/**"
+      - "tests/functional/**"
   pull_request:
     paths-ignore:
-      - '**.md'
-      - 'server/**'
-      - 'tests/functional/**'
+      - "**.md"
+      - "server/**"
+      - "tests/functional/**"
   workflow_dispatch:
 
 permissions:
@@ -47,6 +47,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@0d4c9c5ea7693da7b068278f7b52bda2a190a446 # 3.2.0
+        with:
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.DOCKER_HUB_PUBLIC_READONLY_TOKEN }}
 
       - name: Bake images
         run: |

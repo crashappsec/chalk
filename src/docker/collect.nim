@@ -11,7 +11,7 @@
 
 import std/[json, sets]
 import ".."/[config, chalkjson, util]
-import "."/[inspect, manifest, json, ids]
+import "."/[inspect, manifest, json, ids, git]
 
 # https://docs.docker.com/engine/api/v1.44/#tag/Image/operation/ImageInspect
 # https://github.com/opencontainers/image-spec/blob/main/config.md
@@ -196,12 +196,19 @@ proc collectImageFrom(chalk:    ChalkObj,
     id                 = caseless{"id"}.getStr().extractDockerHash()
     repotags           = parseImages(caseless{"repotags"}.getStrElems())
     repodigests        = parseImages(caseless{"repodigests"}.getStrElems(), defaultTag = "")
-    alldigests         = (repodigests & repos).uniq()
+    alldigests         = repodigests & repos
+    alltags            = repotags & alldigests
+    uniqdigests        = alldigests.uniq()
     os                 = caseless{"os"}.getStr()
     arch               = caseless{"architecture"}.getStr()
     variant            = caseless{"variant"}.getStr()
     platform           = DockerPlatform(os: os, architecture: arch, variant: variant)
     annotations        = newJObject()
+  var
+    layers             = newSeq[string]()
+    repoUrls           = newOrderedTable[string, OrderedTableRef[string, string]]()
+  if chalk.platform != nil and chalk.platform != platform:
+    raise newException(ValueError, "platform does not match chalk platform")
   if chalk.name == "":
     chalk.name         = name
   if chalk.cachedHash == "":
@@ -216,17 +223,24 @@ proc collectImageFrom(chalk:    ChalkObj,
   chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents.nimJsonToBox())
   chalk.setIfNeeded("DOCKER_PLATFORM", $platform)
   chalk.repos          = newOrderedTable[string, DockerImageRepo]()
-  for repo in alldigests:
+  for repo in uniqdigests:
     try:
       let
         manifest  = fetchImageManifest(repo, platform)
-        imageRepo = manifest.asImageRepo()
+        imageRepo = manifest.asImageRepo(tag = repo.tag)
       annotations.update(manifest.annotations)
+      let url = annotations{"org.opencontainers.image.url"}.getStr(repo.url())
       chalk.repos[repo.repo] = imageRepo + chalk.repos.getOrDefault(repo.repo)
+      layers = @[]
+      for layer in manifest.layers:
+        layers.add(layer.digest.extractDockerHash())
+      if url != "":
+        discard repoUrls.hasKeyOrPut(repo.registry, newOrderedTable[string, string]())
+        discard repoUrls[repo.registry].hasKeyOrPut(repo.name, url)
     except:
       trace("docker: " & getCurrentExceptionMsg())
       continue
-  for tag in repotags:
+  for tag in alltags:
     if tag.repo notin chalk.repos:
       # we dont know digest for this tag so most likely local-only image
       continue
@@ -252,20 +266,31 @@ proc collectImageFrom(chalk:    ChalkObj,
         repoListDigests[registry][i.name].add(i.digest)
         allDigests.incl(i.digest)
       for i in repo.tagImages:
-        discard repoTags.hasKeyOrPut(registry, newOrderedTable[string, OrderedTableRef[string, string]]())
-        discard repoTags[registry].hasKeyOrPut(i.name, newOrderedTable[string, string]())
-        let
-          manifest = fetchListOrImageManifest(i, platforms = @[platform])
-          digest   = manifest.digest.extractDockerHash()
-        if digest notin allDigests:
-          warn("docker: could not match docker image tag " & $i & " digest " & digest &
-               " to a known list or image digest " & $allDigests)
-          continue
-        repoTags[registry][i.name][i.tag] = digest
-    chalk.setIfNeeded("_REPO_DIGESTS",      repoDigests)
-    chalk.setIfNeeded("_REPO_LIST_DIGESTS", repoListDigests)
-    chalk.setIfNeeded("_REPO_TAGS",         repoTags)
-    chalk.setIfNeeded("_IMAGE_ANNOTATIONS", annotations.nimJsonToBox())
+        try:
+          let
+            manifest = fetchListOrImageManifest(i, platforms = @[platform])
+            digest   = manifest.digest.extractDockerHash()
+          if digest notin allDigests:
+            warn("docker: could not match docker image tag " & $i & " digest " & digest &
+                 " to a known list or image digest " & $allDigests)
+            continue
+          discard repoTags.hasKeyOrPut(registry, newOrderedTable[string, OrderedTableRef[string, string]]())
+          discard repoTags[registry].hasKeyOrPut(i.name, newOrderedTable[string, string]())
+          repoTags[registry][i.name][i.tag] = digest
+        except:
+          trace("docker: unable to find docker tag manifest " & getCurrentExceptionMsg())
+    chalk.setIfNeeded("_REPO_DIGESTS",            repoDigests)
+    chalk.setIfNeeded("_REPO_LIST_DIGESTS",       repoListDigests)
+    chalk.setIfNeeded("_REPO_TAGS",               repoTags)
+    chalk.setIfNeeded("_REPO_URLS",               repoUrls)
+    chalk.setIfNeeded("_IMAGE_LAYERS",            layers)
+    chalk.setIfNeeded("_IMAGE_ANNOTATIONS",       annotations)
+    chalk.setIfNeeded("_IMAGE_CREATION_DATETIME", annotations{"org.opencontainers.image.created"}.getStr())
+    chalk.setIfNeeded("COMMIT_ID",                annotations{"org.opencontainers.image.revision"}.getStr())
+    let source = annotations{"org.opencontainers.image.source"}.getStr()
+    if isGitContext(source, requireExtension = false):
+      let (remote, head, subdir) = splitContext(source)
+      chalk.setIfNeeded("ORIGIN_URI",       remote)
 
 proc collectProvenance(chalk: ChalkObj) =
   if not isSubscribedKey("_IMAGE_PROVENANCE"):
@@ -289,27 +314,41 @@ proc collectSBOM(chalk: ChalkObj) =
     except:
       continue
 
-proc collectImage*(chalk: ChalkObj, name: string, repos: seq[DockerImage] = @[]) =
+proc collectLocalImage*(chalk: ChalkObj,
+                        name: string,
+                        repos: seq[DockerImage] = @[]) =
   let contents = inspectImageJson(name)
-  var repo = DockerImageRepo(nil)
   chalk.collectImageFrom(contents, name, repos = repos)
   chalk.collectProvenance()
   chalk.collectSBOM()
 
-proc collectImage*(chalk: ChalkObj) =
+proc collectLocalImage*(chalk: ChalkObj) =
   if chalk.imageId == "":
     raise newException(ValueError, "docker: no image name/id to inspect")
-  chalk.collectImage(chalk.imageId)
+  chalk.collectLocalImage(chalk.imageId)
 
 proc collectImageManifest*(chalk: ChalkObj,
                            name: DockerImage,
-                           otherNames: seq[DockerImage] = @[]) =
+                           repos: seq[DockerImage] = @[]) =
   let
-    manifest = fetchImageManifest(name, chalk.platform, otherNames = otherNames)
+    manifest = fetchImageManifest(name, chalk.platform)
     contents = manifest.config.json
-  chalk.collectImageFrom(contents, $name, repos = @[manifest.asImage()])
+    allrepos = @[
+      name.withDigest(manifest.digest),
+    ] & repos.withDigest(manifest.digest)
+  chalk.collectImageFrom(contents, $name, repos = allrepos)
   chalk.collectProvenance()
   chalk.collectSBOM()
+
+proc collectImage*(chalk: ChalkObj,
+                   name: DockerImage,
+                   repos: seq[DockerImage] = @[]) =
+  try:
+    trace("docker: collecting image locally " & $name)
+    chalk.collectLocalImage(name.asRepoRef())
+  except:
+    trace("docker: collecting image falling back to manifest due to: " & getCurrentExceptionMsg())
+    chalk.collectImageManifest(name, repos = repos)
 
 proc collectContainer*(chalk: ChalkObj, name: string) =
   let

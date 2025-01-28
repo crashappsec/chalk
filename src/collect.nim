@@ -145,90 +145,92 @@ proc initCollection*() =
       collectChalkTimeHostInfo()
 
 proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
-  trace("Collecting run time artifact info")
-  for plugin in getAllPlugins():
-    let
-      data       = artifact.collectedData
-      subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".post_chalk_keys")
+  artifact.withErrorContext():
+    trace("Collecting run time artifact info")
+    for plugin in getAllPlugins():
+      let
+        data       = artifact.collectedData
+        subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".post_chalk_keys")
 
-    if chalkCollectionSuspendedFor(plugin.name):               continue
-    if not plugin.hasSubscribedKey(subscribed, data):          continue
-    if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != artifact.myCodec: continue
+      if chalkCollectionSuspendedFor(plugin.name):               continue
+      if not plugin.hasSubscribedKey(subscribed, data):          continue
+      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != artifact.myCodec: continue
 
-    trace("Running plugin: " & plugin.name)
-    try:
-      let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
-      if dict == nil or len(dict) == 0: continue
-      for k, v in dict:
-        if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".post_chalk_keys")): continue
-        if k notin artifact.collectedData or
-            k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
-            plugin.isSystem():
-          artifact.collectedData[k] = v
-      trace(plugin.name & ": Plugin called.")
-    except:
-      error("When collecting run-time artifact data, plugin implementation " &
-            plugin.name & " threw an exception it didn't handle (artifact = " &
-            artifact.name & "): " & getCurrentExceptionMsg())
-      dumpExOnDebug()
+      trace("Running plugin: " & plugin.name)
+      try:
+        let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
+        if dict == nil or len(dict) == 0: continue
+        for k, v in dict:
+          if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".post_chalk_keys")): continue
+          if k notin artifact.collectedData or
+              k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
+              plugin.isSystem():
+            artifact.collectedData[k] = v
+        trace(plugin.name & ": Plugin called.")
+      except:
+        error("When collecting run-time artifact data, plugin implementation " &
+              plugin.name & " threw an exception it didn't handle (artifact = " &
+              artifact.name & "): " & getCurrentExceptionMsg())
+        dumpExOnDebug()
 
-  let hashOpt = artifact.callGetEndingHash()
-  if hashOpt.isSome():
-    artifact.collectedData["_CURRENT_HASH"] = pack(hashOpt.get())
+    let hashOpt = artifact.callGetEndingHash()
+    if hashOpt.isSome():
+      artifact.collectedData["_CURRENT_HASH"] = pack(hashOpt.get())
 
 proc rtaiLinkingHack*(artifact: ChalkObj) {.cdecl, exportc.} =
   artifact.collectRunTimeArtifactInfo()
 
 proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
-  # Note that callers must have set obj.collectedData to something
-  # non-null.
-  obj.opFailed      = false
-  let data          = obj.collectedData
+  obj.withErrorContext():
+    # Note that callers must have set obj.collectedData to something
+    # non-null.
+    obj.opFailed      = false
+    let data          = obj.collectedData
 
-  trace("Collecting chalk-time data.")
-  for plugin in getAllPlugins():
-    if chalkCollectionSuspendedFor(plugin.name): continue
+    trace("Collecting chalk-time data.")
+    for plugin in getAllPlugins():
+      if chalkCollectionSuspendedFor(plugin.name): continue
 
-    if plugin == obj.myCodec:
-      trace("Filling in codec info")
-      if "CHALK_ID" notin data:
-        data["CHALK_ID"]      = pack(obj.callGetChalkID())
-      let preHashOpt = obj.callGetUnchalkedHash()
-      if preHashOpt.isSome():
-        data["HASH"]          = pack(preHashOpt.get())
-      if obj.fsRef != "":
-        data["PATH_WHEN_CHALKED"] = pack(resolvePath(obj.fsRef))
+      if plugin == obj.myCodec:
+        trace("Filling in codec info")
+        if "CHALK_ID" notin data:
+          data["CHALK_ID"]      = pack(obj.callGetChalkID())
+        let preHashOpt = obj.callGetUnchalkedHash()
+        if preHashOpt.isSome():
+          data["HASH"]          = pack(preHashOpt.get())
+        if obj.fsRef != "":
+          data["PATH_WHEN_CHALKED"] = pack(resolvePath(obj.fsRef))
 
-    if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != obj.myCodec: continue
+      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != obj.myCodec: continue
 
-    let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")
-    if not plugin.hasSubscribedKey(subscribed, data) and not plugin.isSystem():
-      trace(plugin.name & ": Skipping plugin; its metadata wouldn't be used.")
-      continue
-
-    if plugin.getChalkTimeArtifactInfo == nil:
-      continue
-
-    trace("Running plugin: " & plugin.name)
-    try:
-      let dict = plugin.callGetChalkTimeArtifactInfo(obj)
-      if dict == nil or len(dict) == 0:
-        trace(plugin.name & ": Plugin produced no keys to use.")
+      let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")
+      if not plugin.hasSubscribedKey(subscribed, data) and not plugin.isSystem():
+        trace(plugin.name & ": Skipping plugin; its metadata wouldn't be used.")
         continue
 
-      for k, v in dict:
-        if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")): continue
-        if k notin obj.collectedData or
-            k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
-            plugin.isSystem() or
-            override:
-          obj.collectedData[k] = v
-      trace(plugin.name & ": Plugin called.")
-    except:
-      error("When collecting chalk-time artifact data, plugin implementation " &
-            plugin.name & " threw an exception it didn't handle (artifact = " &
-            obj.name & "): " & getCurrentExceptionMsg())
-      dumpExOnDebug()
+      if plugin.getChalkTimeArtifactInfo == nil:
+        continue
+
+      trace("Running plugin: " & plugin.name)
+      try:
+        let dict = plugin.callGetChalkTimeArtifactInfo(obj)
+        if dict == nil or len(dict) == 0:
+          trace(plugin.name & ": Plugin produced no keys to use.")
+          continue
+
+        for k, v in dict:
+          if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")): continue
+          if k notin obj.collectedData or
+              k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
+              plugin.isSystem() or
+              override:
+            obj.collectedData[k] = v
+        trace(plugin.name & ": Plugin called.")
+      except:
+        error("When collecting chalk-time artifact data, plugin implementation " &
+              plugin.name & " threw an exception it didn't handle (artifact = " &
+              obj.name & "): " & getCurrentExceptionMsg())
+        dumpExOnDebug()
 
 proc collectRunTimeHostInfo*() =
   if hostCollectionSuspended(): return
@@ -256,7 +258,6 @@ proc collectRunTimeHostInfo*() =
             plugin.name & " threw an exception it didn't handle: " &
             getCurrentExceptionMsg())
       dumpExOnDebug()
-
 
 # The two below functions are helpers for the artifacts() iterator
 # and the self-extractor (in the case of findChalk anyway).
@@ -360,49 +361,49 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
       let chalks = codec.scanArtifactLocations(iterInfo)
 
       for obj in chalks:
-        iterInfo.fileExclusions.add(obj.fsRef)
+        obj.withErrorContext():
+          iterInfo.fileExclusions.add(obj.fsRef)
 
-        if obj.extract != nil and "MAGIC" in obj.extract:
-          obj.marked = true
+          if obj.extract != nil and "MAGIC" in obj.extract:
+            obj.marked = true
 
-        if ResourceFile in obj.resourceType:
-          if obj.fsRef == "":
-            obj.fsRef = obj.name
-            warn("Codec did not properly set the fsRef field.")
+          if ResourceFile in obj.resourceType:
+            if obj.fsRef == "":
+              obj.fsRef = obj.name
+              warn("Codec did not properly set the fsRef field.")
 
-        let path = obj.fsRef
-        if isChalkingOp():
-          if path.ignoreArtifact(iterInfo.skips):
-            if notTmp: addUnmarked(path)
-            if obj.isMarked():
-              info(path & ": Ignoring, but previously chalked")
+          let path = obj.fsRef
+          if isChalkingOp():
+            if path.ignoreArtifact(iterInfo.skips):
+              if notTmp: addUnmarked(path)
+              if obj.isMarked():
+                info(path & ": Ignoring, but previously chalked")
+              else:
+                trace(path & ": ignoring artifact")
             else:
-              trace(path & ": ignoring artifact")
+              if notTmp: obj.addToAllChalks()
+              if obj.isMarked():
+                info(path & ": Existing chalk mark extracted")
+              else:
+                trace(path & ": Currently unchalked")
           else:
             if notTmp: obj.addToAllChalks()
-            if obj.isMarked():
-              info(path & ": Existing chalk mark extracted")
+            if not obj.isMarked():
+              if notTmp: addUnmarked(path)
+              warn(path & ": Artifact is unchalked")
             else:
-              trace(path & ": Currently unchalked")
-        else:
-          if notTmp: obj.addToAllChalks()
-          if not obj.isMarked():
-            if notTmp: addUnmarked(path)
-            warn(path & ": Artifact is unchalked")
-          else:
-            for k, v in obj.extract:
-              obj.collectedData[k] = v
+              for k, v in obj.extract:
+                obj.collectedData[k] = v
 
-            info(path & ": Chalk mark extracted")
+              info(path & ": Chalk mark extracted")
 
-        if getCommandName() in ["insert", "docker"]:
-          obj.persistInternalValues()
-        yield obj
+          if getCommandName() in ["insert", "docker"]:
+            obj.persistInternalValues()
+          yield obj
 
-        clearErrorObject()
-        if not inSubscan() and not obj.forceIgnore and
-           obj.name notin getUnmarked():
-          obj.collectRuntimeArtifactInfo()
+          if not inSubscan() and not obj.forceIgnore and
+             obj.name notin getUnmarked():
+            obj.collectRuntimeArtifactInfo()
 
   if not inSubscan():
     if getCommandName() != "extract":
@@ -410,10 +411,9 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
         error(item & ": No such file or directory.")
     else:
       trace("Processing docker artifacts.")
-      let docker = getPluginByName("docker")
       for item in iterInfo.otherPaths:
         trace("Processing artifact: " & item)
-        let objOpt = docker.scanImageOrContainer(item)
+        let objOpt = scanLocalImageOrContainer(item)
         if objOpt.isNone():
           if len(iterInfo.filePaths) > 0:
             error(item & ": No file, image or container found with this name")
@@ -421,10 +421,10 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
             error(item & ": No image or container found")
         else:
           let chalk = objOpt.get()
-          chalk.addToAllChalks()
-          if chalk.extract == nil:
-            info(chalk.name & ": Artifact is unchalked.")
-          trace("Collecting artifact runtime info")
-          chalk.collectRuntimeArtifactInfo()
-          yield chalk
-          clearErrorObject()
+          chalk.withErrorContext():
+            chalk.addToAllChalks()
+            if chalk.extract == nil:
+              info(chalk.name & ": Artifact is unchalked.")
+            trace("Collecting artifact runtime info")
+            chalk.collectRuntimeArtifactInfo()
+            yield chalk

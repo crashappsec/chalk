@@ -6,8 +6,10 @@ custom_report.terminal_other_op.enabled: false
 custom_report.terminal_other_op.use_when: ["extract", "delete", "exec", "env", "heartbeat"]
 
 report_template insertion_default {
-  key._OP_EXIT_CODE.use = true
-  key._CHALK_RUN_TIME.use = true
+  key._OP_EXIT_CODE.use     = true
+  key._CHALK_RUN_TIME.use   = true
+  # key._IMAGE_SBOM.use       = false
+  # key._IMAGE_PROVENANCE.use = false
 }
 
 report_template report_default {

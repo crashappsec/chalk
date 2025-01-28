@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.4.15-dev"
+chalk_version :=   "0.5.2-dev"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -696,7 +696,22 @@ keyspec DATE_AUTHORED {
     since:            "0.1.2"
     shortdoc:         "Human readable timestamp of the author's commit"
     doc:              """
-The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+The date when commit was authored as full ISO-8601 string.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
+"""
+}
+
+keyspec TIMESTAMP_AUTHORED {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.0"
+    shortdoc:         "Unix timestamp of the author's commit"
+    doc:              """
+The date when commit was authored as ms since Unix epoch.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
 """
 }
 
@@ -718,7 +733,22 @@ keyspec DATE_COMMITTED {
     since:            "0.1.2"
     shortdoc:         "Human readable timestamp of most recent commit"
     doc:              """
-The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+The date when commit was created as full ISO-8601 string.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
+"""
+}
+
+keyspec TIMESTAMP_COMMITTED {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.1.2"
+    shortdoc:         "Unix timestamp of most recent commit"
+    doc:              """
+The date when commit was created as ms since Unix epoch.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
 """
 }
 
@@ -794,12 +824,24 @@ keyspec DATE_TAGGED {
     since:            "0.3.0"
     shortdoc:         "Human readable timestamp of most recent tag"
     doc:              """
-The date of the annotated tag in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+The date when the annotated was created as full ISO-8601 string.
 
 Annotated tags are created with `git tag -a -m "comment"`.
 """
 }
 
+keyspec TIMESTAMP_TAGGED {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.0"
+    shortdoc:         "Unix timestamp of most recent tag"
+    doc:              """
+The date when the annotated was created in ms since Unix epoch.
+
+Annotated tags are created with `git tag -a -m "comment"`.
+"""
+}
 keyspec TAG_MESSAGE {
     kind:             ChalkTimeArtifact
     type:             string
@@ -872,7 +914,22 @@ keyspec _DATE_AUTHORED {
     since:            "0.4.0"
     shortdoc:         "Human readable timestamp of the author's commit"
     doc:              """
-The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+The date when commit was authored as full ISO-8601 string.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
+"""
+}
+
+keyspec _TIMESTAMP_AUTHORED {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.5.0"
+    shortdoc:         "Unix timestamp of the author's commit"
+    doc:              """
+The date when commit was authored as ms since Unix epoch.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
 """
 }
 
@@ -894,7 +951,22 @@ keyspec _DATE_COMMITTED {
     since:            "0.4.0"
     shortdoc:         "Human readable timestamp of most recent commit"
     doc:              """
-The date of the authored commit in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+The date when commit was created as full ISO-8601 string.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
+"""
+}
+
+keyspec _TIMESTAMP_COMMITTED {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.5.0"
+    shortdoc:         "Unix timestamp of most recent commit"
+    doc:              """
+The date when commit was created as ms since Unix epoch.
+Note that git commit and author dates might be different.
+For example `git rebase` adjusts dates.
 """
 }
 
@@ -971,6 +1043,19 @@ keyspec _DATE_TAGGED {
     shortdoc:         "Human readable timestamp of most recent tag"
     doc:              """
 The date of the annotated tag in the same format as `git log`: 3-letter week-day, 3-letter month, day of month, HH:mm:ss <time-zone-offset>
+
+Annotated tags are created with `git tag -a -m "comment"`.
+"""
+}
+
+keyspec _TIMESTAMP_TAGGED {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.5.0"
+    shortdoc:         "Unix timestamp of most recent tag"
+    doc:              """
+The date when the annotated was created in ms since Unix epoch.
 
 Annotated tags are created with `git tag -a -m "comment"`.
 """
@@ -1697,7 +1782,7 @@ keyspec DOCKER_ANNOTATIONS {
     type:              dict[string, string]
     standard:          true
     system:            false
-    since:             "0.4.15"
+    since:             "0.5.0"
     shortdoc: "Annotations added to docker image during build process"
     doc: """
 Labels added to a docker image during the build process, if any.
@@ -1777,6 +1862,28 @@ alias of the last target/section within the Dockerfile.
 """
 }
 
+keyspec DOCKER_BASE_IMAGE_CHALK {
+    kind:             ChalkTimeArtifact
+    type:             `x
+    standard:         true
+    system:           false
+    since:            "0.5.0"
+    doc: """
+If the base image is chalked, its full chalkmark.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_METADATA_ID {
+    kind:             ChalkTimeArtifact
+    type:             `x
+    standard:         true
+    system:           false
+    since:            "0.5.0"
+    doc: """
+If the base image is chalked, its METADATA_ID.
+"""
+}
+
 keyspec DOCKER_BASE_IMAGE {
     kind:             ChalkTimeArtifact
     type:             string
@@ -1797,6 +1904,30 @@ keyspec DOCKER_BASE_IMAGE_REPO {
     since:            "0.4.0"
     doc: """
 Only registry repository of the base image specified in Dockerfile used to build docker image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_REGISTRY {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.5.0"
+    doc: """
+Only registry of the base image specified in Dockerfile used to build docker image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
+keyspec DOCKER_BASE_IMAGE_NAME {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.5.0"
+    doc: """
+Only repo name (excluding registry) of the base image specified in Dockerfile used to build docker image.
 Note this only specifies the base image of the final build target.
 """
 }
@@ -1825,6 +1956,18 @@ Note this only specifies the base image of the final build target.
 """
 }
 
+keyspec DOCKER_BASE_IMAGE_ID {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.5.0"
+    doc: """
+Docker image id (config digest) of the base image.
+Note this only specifies the base image of the final build target.
+"""
+}
+
 keyspec DOCKER_BASE_IMAGES {
     kind:             ChalkTimeArtifact
     type:             dict[string, `x]
@@ -1835,11 +1978,14 @@ keyspec DOCKER_BASE_IMAGES {
 All base images via `FROM` statements used in the Dockerfile for all its sections.
 Each base image will break it into its individual components of:
 
-* from - name as `FROM` references image. Can be either base image or Dockerfile target/section name
-* name - full name as its referenced in Dockerfile
-* repo - only the repo of the image
-* tag - only the tag of the image (if `:<tag>` is provided)
-* digest - only the digest of the image (if `@sha256:<digest>` is provided)
+* `from` - name as `FROM` references image. Can be either base image or Dockerfile target/section name
+* `uri` - full name as its referenced in Dockerfile
+* `registry` - only the normalized registry domain (with port)
+* `name` - only the normalized image name within the registry
+* `repo` - only the repo of the image
+* `tag` - only the tag of the image (if `:<tag>` is provided)
+* `digest` - only the digest of the image (if `@sha256:<digest>` is provided)
+* `config_digest` - digest of the image config (aka docker id)
 
 Some special cases:
 
@@ -1847,6 +1993,7 @@ Some special cases:
   it will be under empty string key
 * any transient targets/sections which reference another target/section
   via `FROM <alias>` the root base image is going to be reported
+* as chalk always pins all base images, they are always going to have digest
 
 ```
 FROM alpine as one
@@ -1862,39 +2009,61 @@ FROM two
 ```
 {
   "one": {
-    "from": "alpine",
-    "name": "alpine",
+    "uri": "alpine@sha256:1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a",
+    "digest": "1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a",
+    "registry": "registry-1.docker.io",
+    "from": "alpine@sha256:1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a",
+    "config_digest": "63b790fccc9078ab8bb913d94a5d869e19fca9b77712b315da3fa45bb8f14636",
+    "name": "library/alpine",
     "repo": "alpine"
   },
   "two": {
-    "from": "ubuntu:latest",
-    "name": "ubuntu:latest",
-    "repo": "ubuntu",
-    "tag": "latest"
+    "uri": "ubuntu:latest@sha256:80dd3c3b9c6cecb9f1667e9290b3bc61b78c2678c02cbdae5f0fea92cc6734ab",
+    "digest": "80dd3c3b9c6cecb9f1667e9290b3bc61b78c2678c02cbdae5f0fea92cc6734ab",
+    "registry": "registry-1.docker.io",
+    "from": "ubuntu:latest@sha256:80dd3c3b9c6cecb9f1667e9290b3bc61b78c2678c02cbdae5f0fea92cc6734ab",
+    "config_digest": "b1d9df8ab81559494794e522b380878cf9ba82d4c1fb67293bcf931c3aa69ae4",
+    "tag": "latest",
+    "name": "library/ubuntu",
+    "repo": "ubuntu"
   },
   "three": {
+    "uri": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
+    "digest": "9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
+    "registry": "registry-1.docker.io",
     "from": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
-    "name": "busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7",
-    "repo": "busybox",
-    "digest": "9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7"
+    "config_digest": "65ad0d468eb1c558bf7f4e64e790f586e9eda649ee9f130cd0e835b292bbc5ac",
+    "name": "library/busybox",
+    "repo": "busybox"
   },
   "four": {
+    "uri": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+    "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+    "registry": "registry-1.docker.io",
     "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
-    "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
-    "repo": "nginx",
+    "config_digest": "a72860cb95fd59e9c696c66441c64f18e66915fa26b249911e83c3854477ed9a",
     "tag": "1.27.0",
-    "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe"
-  }
+    "name": "library/nginx",
+    "repo": "nginx"
+  },
   "five": {
+    "uri": "alpine@sha256:1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a",
+    "digest": "1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a",
+    "registry": "registry-1.docker.io",
     "from": "one",
-    "name": "alpine",
+    "config_digest": "63b790fccc9078ab8bb913d94a5d869e19fca9b77712b315da3fa45bb8f14636",
+    "name": "library/alpine",
     "repo": "alpine"
   },
   "": {
+    "uri": "ubuntu:latest@sha256:80dd3c3b9c6cecb9f1667e9290b3bc61b78c2678c02cbdae5f0fea92cc6734ab",
+    "digest": "80dd3c3b9c6cecb9f1667e9290b3bc61b78c2678c02cbdae5f0fea92cc6734ab",
+    "registry": "registry-1.docker.io",
     "from": "two",
-    "name": "ubuntu:latest",
-    "repo": "ubuntu",
-    "tag": "latest"
+    "config_digest": "b1d9df8ab81559494794e522b380878cf9ba82d4c1fb67293bcf931c3aa69ae4",
+    "tag": "latest",
+    "name": "library/ubuntu",
+    "repo": "ubuntu"
   }
 }
 ```
@@ -1911,13 +2080,15 @@ keyspec DOCKER_COPY_IMAGES {
 All images used in the Dockerfile `COPY --from` directives for all its sections.
 All `COPY` statements are grouped by the Dockerfile target/section.
 
-* from - name as `COPY` references image. Can be either base image or Dockerfile target/section name
-* name - full name as its referenced in Dockerfile
-* repo - only the repo of the image
-* tag - only the tag of the image (if `:<tag>` is provided)
-* digest - only the digest of the image (if `@sha256:<digest>` is provided)
-* src - what COPY copies from image
-* dest - where COPY copies to in the target/section
+* `from` - name as `COPY` references image. Can be either base image or Dockerfile target/section name
+* `uri` - full name as its referenced in Dockerfile
+* `registry` - only the normalized registry domain (with port)
+* `name` - only the normalized image name within the registry
+* `repo` - only the repo of the image
+* `tag` - only the tag of the image (if `:<tag>` is provided)
+* `digest` - only the digest of the image (if `@sha256:<digest>` is provided)
+* `src` - what COPY copies from image
+* `dest` - where COPY copies to in the target/section
 
 Special cases:
 
@@ -1930,7 +2101,7 @@ FROM ubuntu as two
 COPY --from=docker /usr/local/bin/docker /docker
 COPY --from=busybox:latest /bin/busybox /busybox
 FROM scratch
-COPY --from=nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe /bin/nginx /nginx
+COPY --from=nginx:1.27.0@sha256:fb197595ebe76b9c0c14ab68159fd3c08bd067ec62300583543f0ebda353b5be /usr/sbin/nginx /nginx
 COPY --from=one /bin/sh /sh
 ```
 
@@ -1941,35 +2112,52 @@ COPY --from=one /bin/sh /sh
   "two": [
     {
       "from": "docker",
-      "name": "docker",
+      "uri": "docker",
       "repo": "docker",
-      "src": ["/usr/local/bin/docker"],
-      "dest": "/docker",
+      "name": "library/docker",
+      "registry": "registry-1.docker.io",
+      "src": [
+        "/usr/local/bin/docker"
+      ],
+      "dest": "/docker"
     },
     {
       "from": "busybox:latest",
-      "name": "busybox:latest",
+      "uri": "busybox:latest",
       "repo": "busybox",
+      "name": "library/busybox",
+      "registry": "registry-1.docker.io",
       "tag": "latest",
-      "src": ["/bin/busybox"],
-      "dest": "/busybox",
+      "src": [
+        "/bin/busybox"
+      ],
+      "dest": "/busybox"
     }
   ],
   "": [
     {
-      "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
-      "name": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+      "from": "nginx:1.27.0@sha256:fb197595ebe76b9c0c14ab68159fd3c08bd067ec62300583543f0ebda353b5be",
+      "uri": "nginx:1.27.0@sha256:fb197595ebe76b9c0c14ab68159fd3c08bd067ec62300583543f0ebda353b5be",
       "repo": "nginx",
-      "tag": "1.27.0"
-      "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe"
-      "src": ["/bin/nginx"],
-      "dest": "/nginx",
+      "name": "library/nginx",
+      "registry": "registry-1.docker.io",
+      "tag": "1.27.0",
+      "digest": "fb197595ebe76b9c0c14ab68159fd3c08bd067ec62300583543f0ebda353b5be",
+      "src": [
+        "/usr/sbin/nginx"
+      ],
+      "dest": "/nginx"
     },
     {
       "from": "one",
-      "name": "alpine",
+      "uri": "alpine@sha256:1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a",
       "repo": "alpine",
-      "src": ["/bin/sh"],
+      "name": "library/alpine",
+      "registry": "registry-1.docker.io",
+      "digest": "1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a",
+      "src": [
+        "/bin/sh"
+      ],
       "dest": "/sh"
     }
   ]
@@ -2032,6 +2220,115 @@ keyspec _DOCKER_BUILDER_INFO {
     doc:              "Docker buildx inspect output of the builder"
 }
 
+keyspec _DOCKER_BUILDER_NODES_INFO {
+    kind:             RunTimeHost
+    type:             dict[string, string]
+    standard:         true
+    since:            "0.5.0"
+    shortdoc:         "Docker buildx node information"
+    doc:              """
+When buildx is being used, output of `docker buildx inspect <runner>`.
+As there can be multiple runners, the info is split by each runner name.
+"""
+}
+
+keyspec _DOCKER_BUILDER_NODES_CONFIG {
+    kind:             RunTimeHost
+    type:             dict[string, `x]
+    standard:         true
+    since:            "0.5.0"
+    shortdoc:         "Docker buildx runner configurations."
+    doc:              """
+Full configuration of buildx runner. Chalk currently can only inspect
+full configuration from the runners using `docker-container` driver.
+The config is reported as JSON object parsed from the underlying TOML config.
+For example:
+
+```json
+{
+  "builder0": {
+    "debug": true,
+    "registry": {
+      "example.com:1234": {
+        "http": true
+      },
+      "example.com:5678": {
+        "ca": [
+          "/etc/buildkit/certs/example.com_5678/ca.crt"
+        ]
+      },
+      "example.com:9876": {
+        "insecure": true
+      },
+      "docker.io": {
+        "mirrors": [
+          "mirror.registry.com:1234/docker.io"
+        ]
+      }
+    }
+  }
+}
+```
+"""
+}
+
+keyspec _DOCKER_USED_REGISTRIES {
+    kind:             RunTimeHost
+    type:             dict[string, `x]
+    standard:         true
+    since:            "0.5.0"
+    shortdoc:         "Metadata about used registries during docker command."
+    doc:              """"
+During docker commands, chalk can interact with multiple docker registries.
+This key reports all registry configurations used during for the chalk operation.
+The keys is the registry domain and optional port. Value is a JSON object with:
+
+* `source` - Where the registry configuration was sourced.
+  Either `daemon` or `buildx`.
+* `url` - Full registry API URL used to interact with it.
+* `scheme` - URL scheme. Either `https` or `http`.
+* `http` - Boolean whether scheme is `http`.
+  This key matches buildx registry `http` configuration.
+* `insecure` - Boolean whether registry not does validate TLS certificate.
+  This key matches buildx registry `insecure` configuration.
+* `secure` - Boolean whether registry validates TLS certificate.
+  Note the certificate can be self-signed or part of system root cert store.
+* `auth` - Boolean whether auth is configured for the registry.
+  Note this does not indicate private registry. For example auth can be
+  used with Docker Hub in order to bypass global throttling limits.
+  This key simply indicates whether auth is configured for the registry.
+* `www_auth` - Boolean whether registry uses `WWW-Authenticate` header
+  for additional authentication challenge. For example a public registry
+  might require to mint a token even for a public image.
+  This is less common for local-hosted registries.
+* `mirroring` - If the registry is configured a mirror of another registry,
+  the name of the upstream registry.
+* `pinned_cert` - Cert used for TLS validation in PEM-format.
+* `pinned_cert_path` - Path where cert was retrieved.
+  Note the path can be relative to buildx runner, not host system file-system.
+
+For example:
+
+```json
+{
+  "example.com:5044": {
+    "url": "https://example.com:5044/v2/",
+    "mirroring": "registry-1.docker.io",
+    "source": "buildx",
+    "scheme": "https",
+    "http": false,
+    "secure": true,
+    "insecure": false,
+    "auth": true,
+    "www_auth": false,
+    "pinned_cert_path": "/etc/buildkit/certs/example_com_5044/ca.crt",
+    "pinned_cert": "-----BEGIN CERTIFICATE-----\n..."
+  }
+}
+```
+"""
+}
+
 keyspec _OP_ARTIFACT_TYPE {
     kind:             RunTimeArtifact
     type:             string
@@ -2048,6 +2345,22 @@ those listed in the documentation for the chalk-time key,
 During insertion operations, this key is redundant with
 `ARTIFACT_TYPE`, so there is generally no reason to report on both of
 these at insertion time.
+"""
+}
+
+keyspec _OP_ARTIFACT_CONTEXT {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    codec:            true
+    since:            "0.5.0"
+    shortdoc:         "Context of the artifact in the report"
+    doc : """
+Context of the artifact how it is referenced in the report.
+For example during a docker build, one chalkmark can be the final
+built image however there can also be a base image chalkmark.
+This key allows to differentiate in what context the same artifact
+is being referenced.
 """
 }
 
@@ -2569,6 +2882,7 @@ keyspec _IMAGE_CREATION_DATETIME {
     doc: """
 The DATETIME formatted string for the reported container image
 creation time.
+The value from docker should be in ISO-8601 format.
 """
 }
 
@@ -2673,6 +2987,16 @@ keyspec _IMAGE_ROOT_FS_LAYERS {
     standard: true
     doc: """
 The layer IDs of the image's root filesystem
+"""
+}
+
+keyspec _IMAGE_LAYERS {
+    kind:     RunTimeArtifact
+    type:     list[string]
+    standard: true
+    since:    "0.5.0"
+    doc: """
+Layer digests of the image as they are stored in the registry.
 """
 }
 
@@ -2869,7 +3193,7 @@ Key-value pairs adding metadata to images
 keyspec _IMAGE_ANNOTATIONS {
     kind:     RunTimeArtifact
     type:     dict[string, string]
-    since:    "0.4.15"
+    since:    "0.5.0"
     standard: true
     doc: """
 Key-value pairs adding metadata to image manifests
@@ -3980,7 +4304,7 @@ keyspec _REPO_LIST_DIGESTS {
     kind:             RunTimeArtifact
     type:             dict[string, dict[string, list[string]]]
     standard:         true
-    since:            "0.4.15"
+    since:            "0.5.0"
     doc: """
 When reporting on operations involving a repository (e.g., a push or
 pull), any SHA256 list manifest digests associated with the artifact
@@ -3999,6 +4323,38 @@ For example:
       "library/alpine": [
         "1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a"
       ]
+    }
+  }
+}
+```
+"""
+}
+
+keyspec _REPO_URLS {
+    kind:             RunTimeArtifact
+    type:             dict[string, dict[string, string]]
+    standard:         true
+    since:            "0.1.0"
+    doc: """
+User-accessible URLs for the image, if known per registry.
+Chalk knows how to construct URLs for these registries:
+
+* Docker Hub
+
+Alternatively this is populated from OCI annotation `org.opencontainers.image.url`.
+The structure is as follows:
+
+* normalized registry name (domain and port if any)
+* repository name
+* URL as provided by an annotation
+
+For example:
+
+```json
+{
+  "_REPO_DIGESTS": {
+    "registry-1.docker.io": {
+      "library/alpine": "https://hub.docker.com/_/alpine"
     }
   }
 }
@@ -4305,6 +4661,19 @@ Used to report chalks the operation worked on.
 
 Host reports using a profile that does not configure this key to
 report will NOT output chalks.
+"""
+}
+
+keyspec _COLLECTED_ARTIFACTS {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.5.0"
+    normalized_order: 7
+    shortdoc:         "Contains software artifact information for the current operation"
+    doc:              """
+Similar to _CHALKS but can report metadata non-chalked artifacts.
 """
 }
 
@@ -5794,7 +6163,7 @@ keyspec _CHALK_RUN_TIME {
     doc: """
 Calculates the amount of time between the start of a chalk executable
 and when a report is generated. It's an integer with resolution of
-1/1000000th of a second.
+1e-6 of a second (millisecond).
 """
 }
 

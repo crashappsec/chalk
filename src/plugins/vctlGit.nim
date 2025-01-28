@@ -42,7 +42,6 @@ const
   gitPackRefs      = "packed-refs"
   gitPack          = gitObjects.joinPath("pack")
   gitPackExt       = ".pack"
-  gitTimeFmt       = "ddd MMM dd HH:mm:ss YYYY"
   # https://git-scm.com/docs/pack-format
   gitObjCommit     = 1
   gitObjTag        = 4
@@ -54,13 +53,16 @@ const
   keyBranch        = "BRANCH"
   keyAuthor        = "AUTHOR"
   keyAuthorDate    = "DATE_AUTHORED"
+  keyAuthorTime    = "TIMESTAMP_AUTHORED"
   keyCommitter     = "COMMITTER"
   keyCommitDate    = "DATE_COMMITTED"
+  keyCommitTime    = "TIMESTAMP_COMMITTED"
   keyCommitMessage = "COMMIT_MESSAGE"
   keyLatestTag     = "TAG"
   keyTagSigned     = "TAG_SIGNED"
   keyTagger        = "TAGGER"
   keyTaggedDate    = "DATE_TAGGED"
+  keyTaggedTime    = "TIMESTAMP_TAGGED"
   keyTagMessage    = "TAG_MESSAGE"
 
 type
@@ -247,8 +249,8 @@ type
     commitId:    string
     tagCommitId: string
     tagger:      string
-    unixTime:    int
-    date:        string
+    date:        DateTime
+    timestamp:   int64 # needed for sorting
     signed:      bool
     message:     string
 
@@ -261,9 +263,9 @@ type
     commitId:   string
     signed:     bool
     author:     string
-    authorDate: string
+    authorDate: DateTime
     committer:  string
-    commitDate: string
+    commitDate: DateTime
     message:    string
 
   GitInfo = ref object of RootRef
@@ -281,11 +283,15 @@ proc isAnnotated(self: GitTag): bool =
 proc getUint32BE(data: string, whence: SomeInteger=0): uint32 =
   result = ntohl(cast[ptr [uint32]](addr data[whence])[])
 
-template parseTime(line: string): int =
-  parseInt(line.split()[^2])
+proc extractPerson(line: string): string =
+  let parts = line.rsplit(maxsplit = 2)
+  return parts[0]
 
-template formatCommitObjectTime(line: string): string =
-  fromUnix(parseTime(line)).format(gitTimeFmt) & " " & line.split()[^1]
+proc parseGitDateTime(line: string): DateTime =
+  let
+    parts   = line.rsplit(maxsplit = 3)
+    seconds = parseInt(parts[^2])
+  result = fromUnix(seconds).utc
 
 proc readPackedObject(path: string, offset: uint64): string =
   ## read packaged git object
@@ -517,15 +523,18 @@ proc loadRef(info: RepoInfo, gitRef: string): string =
       result = commitId
 
 proc loadAuthor(info: RepoInfo) =
-  let fields = info.loadObject(info.commitId)
+  let
+    fields    = info.loadObject(info.commitId)
+    author    = fields.getOrDefault(gitAuthor, "")
+    committer = fields.getOrDefault(gitCommitter, "")
   # this makes only the same assumptions as git itself:
-  # https://github.com/git/git/blob/master/commit.c#L97 ddcb8fd
-  info.author     = fields.getOrDefault(gitAuthor, "")
+  # https://github.com/git/git/blob/master/commit.c#L97
+  info.author     = author.extractPerson()
   if info.author != "":
-    info.authorDate = formatCommitObjectTime(info.author)
-  info.committer  = fields.getOrDefault(gitCommitter, "")
+    info.authorDate = parseGitDateTime(author)
+  info.committer  = committer.extractPerson()
   if info.committer != "":
-    info.commitDate = formatCommitObjectTime(info.committer)
+    info.commitDate = parseGitDateTime(committer)
   info.message    = fields.getOrDefault(gitMessage, "")
   info.signed     = gitSign in fields
 
@@ -548,17 +557,16 @@ proc loadTag(info: RepoInfo, tag: string, tagCommit: string) =
       # we found annotated commit pointing to current commit
       if fields[gitTag] == tag and fields[gitObject] == info.commitId:
         let
-          tagger   = fields[gitTagger]
-          unixTime = parseTime(tagger)
-          date     = formatCommitObjectTime(tagger)
-          signed   = gitSign in fields
-          message  = fields.getOrDefault(gitMessage)
+          tagger  = fields[gitTagger]
+          date    = parseGitDateTime(tagger)
+          signed  = gitSign in fields
+          message = fields.getOrDefault(gitMessage)
         info.tags[tag] = GitTag(name:        tag,
                                 commitId:    fields[gitObject],
                                 tagCommitId: tagCommit,
-                                tagger:      tagger,
-                                unixTime:    unixTime,
+                                tagger:      tagger.extractPerson(),
                                 date:        date,
+                                timestamp:   date.toUnixInMs(),
                                 signed:      signed,
                                 message:     message)
         trace("annotated tag: " & tag)
@@ -589,7 +597,7 @@ proc loadTags(info: RepoInfo) =
                  tagCommit = tagCommit)
 
   if len(info.tags) > 0:
-    let sortedTags = info.tags.values().toSeq().sortedByIt((it.unixTime, it.name))
+    let sortedTags = info.tags.values().toSeq().sortedByIt((it.timestamp, it.name))
     info.latestTag = sortedTags[^1]
     trace("latest tag: " & info.latestTag.name)
 
@@ -753,37 +761,31 @@ proc findAndLoad(plugin: GitInfo, path: string) =
 
   plugin.vcsDirs[vcsDir] = info
 
-proc pack(tag: GitTag): ChalkDict =
-  new result
-  if tag.tagger != "":
-    result[keyTagger] = pack(tag.tagger)
-    result[keyTaggedDate] = pack(formatCommitObjectTime(tag.tagger))
-
-proc pack(tags: Table[string, GitTag]): ChalkDict =
-  new result
-  for name, tag in tags:
-    result[name] = pack(tag.pack())
-
 proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
   if prefix == "":
-    chalkDict.setIfNeeded(prefix & keyVcsDir,      info.vcsDir.splitPath().head)
+    chalkDict.setIfNeeded(prefix & keyVcsDir,       info.vcsDir.splitPath().head)
 
-  chalkDict.setIfNeeded(prefix & keyOrigin,        info.origin)
-  chalkDict.setIfNeeded(prefix & keyCommit,        info.commitId)
-  chalkDict.setIfNeeded(prefix & keyCommitSigned,  info.signed)
-  chalkDict.setIfNeeded(prefix & keyBranch,        info.branch)
-  chalkDict.setIfNeeded(prefix & keyAuthor,        info.author)
-  chalkDict.setIfNeeded(prefix & keyAuthorDate,    info.authorDate)
-  chalkDict.setIfNeeded(prefix & keyCommitter,     info.committer)
-  chalkDict.setIfNeeded(prefix & keyCommitDate,    info.commitDate)
-  chalkDict.setIfNeeded(prefix & keyCommitMessage, info.message)
-
+  chalkDict.setIfNeeded(prefix & keyOrigin,         info.origin)
+  chalkDict.setIfNeeded(prefix & keyCommit,         info.commitId)
+  chalkDict.setIfNeeded(prefix & keyCommitSigned,   info.signed)
+  chalkDict.setIfNeeded(prefix & keyBranch,         info.branch)
+  chalkDict.setIfNeeded(prefix & keyAuthor,         info.author)
+  chalkDict.setIfNeeded(prefix & keyCommitter,      info.committer)
+  chalkDict.setIfNeeded(prefix & keyCommitMessage,  info.message)
+  if info.author != "":
+    chalkDict.setIfNeeded(prefix & keyAuthorDate,   info.authorDate.forReport().format(timesIso8601Format))
+    chalkDict.setIfNeeded(prefix & keyAuthorTime,   info.authorDate.toUnixInMs())
+  if info.committer != "":
+    chalkDict.setIfNeeded(prefix & keyCommitDate,   info.commitDate.forReport().format(timesIso8601Format))
+    chalkDict.setIfNeeded(prefix & keyCommitTime,   info.commitDate.toUnixInMs())
   if info.latestTag != nil:
-    chalkDict.setIfNeeded(prefix & keyLatestTag,   info.latestTag.name)
-    chalkDict.setIfNeeded(prefix & keyTagger,      info.latestTag.tagger)
-    chalkDict.setIfNeeded(prefix & keyTaggedDate,  info.latestTag.date)
-    chalkDict.setIfNeeded(prefix & keyTagSigned,   info.latestTag.signed)
-    chalkDict.setIfNeeded(prefix & keyTagMessage,  info.latestTag.message)
+    chalkDict.setIfNeeded(prefix & keyLatestTag,    info.latestTag.name)
+    chalkDict.setIfNeeded(prefix & keyTagger,       info.latestTag.tagger)
+    if info.latestTag.tagger != "":
+      chalkDict.setIfNeeded(prefix & keyTaggedDate, info.latestTag.date.forReport().format(timesIso8601Format))
+      chalkDict.setIfNeeded(prefix & keyTaggedTime, info.latestTag.date.toUnixInMs())
+    chalkDict.setIfNeeded(prefix & keyTagSigned,    info.latestTag.signed)
+    chalkDict.setIfNeeded(prefix & keyTagMessage,   info.latestTag.message)
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
   if obj.fsRef == "":

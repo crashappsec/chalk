@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024, Crash Override, Inc.
+# Copyright (c) 2023-2025, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -11,7 +11,7 @@ from typing import Any, Literal, Optional, cast
 
 from ..conf import MAGIC
 from ..utils.bin import sha256
-from ..utils.dict import ContainsMixin, MISSING, ANY, IfExists
+from ..utils.dict import ContainsDict, MISSING, ANY, IfExists, ContainsList
 from ..utils.docker import Docker
 from ..utils.log import get_logger
 from ..utils.os import CalledProcessError, Program, run
@@ -46,7 +46,7 @@ def artifact_type(path: Path) -> str:
         return "ELF"
 
 
-class ChalkReport(ContainsMixin, dict):
+class ChalkReport(ContainsDict):
     name = "report"
 
     def __init__(self, report: dict[str, Any]):
@@ -68,6 +68,8 @@ class ChalkReport(ContainsMixin, dict):
                     # docker does not have deterministic output
                     # insecure registries are not consistently ordered
                     "_DOCKER_INFO",
+                    # route can be diff or flaky
+                    "_NETWORK_PARTIAL_TRACEROUTE_IPS",
                 }
                 | (ignore or set())
             }
@@ -76,11 +78,18 @@ class ChalkReport(ContainsMixin, dict):
     @property
     def marks(self):
         assert len(self["_CHALKS"]) > 0
-        return [ChalkMark(i, report=self) for i in self["_CHALKS"]]
+        return ContainsList([ChalkMark(i, report=self) for i in self["_CHALKS"]])
+
+    @property
+    def artifacts(self):
+        assert len(self["_COLLECTED_ARTIFACTS"]) > 0
+        return ContainsList(
+            [ChalkMark(i, report=self) for i in self["_COLLECTED_ARTIFACTS"]]
+        )
 
     @property
     def marks_by_path(self):
-        return ContainsMixin(
+        return ChalkMark(
             {
                 i.get("PATH_WHEN_CHALKED", i.get("_OP_ARTIFACT_PATH")): i
                 for i in self.marks
@@ -93,6 +102,11 @@ class ChalkReport(ContainsMixin, dict):
     def mark(self):
         assert len(self.marks) == 1
         return self.marks[0]
+
+    @property
+    def artifact(self):
+        assert len(self.artifacts) == 1
+        return self.artifacts[0]
 
     @property
     def errors(self):
@@ -112,7 +126,7 @@ class ChalkReport(ContainsMixin, dict):
         return cls(info if isinstance(info, dict) else info[0])
 
 
-class ChalkMark(ContainsMixin, dict):
+class ChalkMark(ContainsDict):
     name = "mark"
 
     @classmethod
@@ -214,7 +228,7 @@ class ChalkProgram(Program):
                     break
             else:
                 break
-        return [ChalkReport(i) for i in reports]
+        return ContainsList([ChalkReport(i) for i in reports])
 
     @property
     def report(self):
@@ -235,6 +249,14 @@ class ChalkProgram(Program):
         return self.report.marks
 
     @property
+    def artifact(self):
+        return self.report.artifact
+
+    @property
+    def artifacts(self):
+        return self.report.artifacts
+
+    @property
     def marks_by_path(self):
         return self.report.marks_by_path
 
@@ -245,9 +267,9 @@ class ChalkProgram(Program):
     @property
     def vmarks(self):
         assert self.virtual_path.exists()
-        return [
-            ChalkMark.from_json(i) for i in self.virtual_path.read_text().splitlines()
-        ]
+        return ContainsList(
+            [ChalkMark.from_json(i) for i in self.virtual_path.read_text().splitlines()]
+        )
 
     @property
     def vmark(self):
@@ -261,10 +283,12 @@ class ChalkProgram(Program):
 
     @property
     def logged_reports(self):
-        return [
-            ChalkReport.from_json(json.loads(i)["$message"])
-            for i in self.logged_reports_path.read_text().splitlines()
-        ]
+        return ContainsList(
+            [
+                ChalkReport.from_json(json.loads(i)["$message"])
+                for i in self.logged_reports_path.read_text().splitlines()
+            ]
+        )
 
     @property
     def logged_report(self):
@@ -552,8 +576,10 @@ class Chalk:
         cwd: Optional[Path] = None,
         args: Optional[dict[str, str]] = None,
         push: bool = False,
+        load: bool = True,
         platforms: Optional[list[str]] = None,
         buildx: bool = False,
+        builder: Optional[str] = None,
         config: Optional[Path] = None,
         buildkit: bool = True,
         secrets: Optional[dict[str, Path]] = None,
@@ -580,10 +606,12 @@ class Chalk:
                 args=args,
                 cwd=cwd,
                 push=push,
+                load=load,
                 platforms=platforms,
                 expected_success=expected_success,
                 buildkit=buildkit,
                 buildx=buildx,
+                builder=builder,
                 secrets=secrets,
                 provenance=provenance,
                 sbom=sbom,
@@ -599,8 +627,10 @@ class Chalk:
             content=content,
             args=args,
             push=push,
+            load=load,
             platforms=platforms,
             buildx=buildx,
+            builder=builder,
             secrets=secrets,
             buildkit=buildkit,
             provenance=provenance,

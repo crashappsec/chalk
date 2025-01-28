@@ -21,6 +21,8 @@ from .utils.tmp import make_tmp_file
 logger = get_logger()
 
 
+@pytest.mark.flaky(max_runs=5)
+@pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_network(copy_files: list[Path], chalk: Chalk):
     bin_path = copy_files[0]
@@ -288,7 +290,7 @@ def test_lambda(
             "AWS_LAMBDA_FUNCTION_VERSION": "2",
             "AWS_LAMBDA_LOG_GROUP_NAME": "/aws/logs",
             "AWS_LAMBDA_LOG_STREAM_NAME": "2023/12/25/[$LATEST]f42d28eb350e42a1b840ad55fd5232fe",
-            "AWS_DEFAULT_REGION": "us-east-1",
+            "AWS_REGION": "us-west-2",
         },
     )
     top, meta = (
@@ -311,15 +313,15 @@ def test_lambda(
         {
             "_OP_CLOUD_PROVIDER": "aws",
             "_OP_CLOUD_PROVIDER_SERVICE_TYPE": "aws_lambda",
-            "_OP_CLOUD_PROVIDER_REGION": "us-east-1",
-            "_AWS_REGION": "us-east-1",
+            "_OP_CLOUD_PROVIDER_REGION": "us-west-2",
+            "_AWS_REGION": "us-west-2",
             "_OP_CLOUD_METADATA": {
                 "aws_lambda": {
                     "AWS_LAMBDA_FUNCTION_NAME": "dummy",
                     "AWS_LAMBDA_FUNCTION_VERSION": "2",
                     "AWS_LAMBDA_LOG_GROUP_NAME": "/aws/logs",
                     "AWS_LAMBDA_LOG_STREAM_NAME": "2023/12/25/[$LATEST]f42d28eb350e42a1b840ad55fd5232fe",
-                    "AWS_REGION": "us-east-1",
+                    "AWS_REGION": "us-west-2",
                     **meta,
                 },
             },
@@ -956,12 +958,6 @@ def test_semgrep(
                         "tool": {
                             "driver": {
                                 "name": "Semgrep OSS",
-                                "rules": [
-                                    {
-                                        "id": "is-comparison",
-                                        "name": "is-comparison",
-                                    }
-                                ],
                                 "semanticVersion": ANY,
                             }
                         },

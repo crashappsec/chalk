@@ -1,12 +1,11 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
 import std/[os, sets]
-import pkg/[parsetoml]
 import ".."/[config, util, semver]
 
 var
@@ -202,59 +201,6 @@ proc getBuilderInfo*(ctx: DockerInvocation): string =
       builderInfo = output.getStdOut()
   return builderInfo
 
-proc getBuilderNodesInfo*(ctx: DockerInvocation): Table[string, string] =
-  result = initTable[string, string]()
-  var
-    foundNodes = false
-    name       = ""
-  for line in ctx.getBuilderInfo().splitLines():
-    let lower = line.toLower()
-    if lower.startsWith("driver:"):
-      let driver = line.splitWhitespace()[^1]
-      if driver != "docker-container":
-        trace("docker: unsupported buildx builder driver: " & driver)
-        return
-    if lower.startsWith("nodes:"):
-      foundNodes = true
-      continue
-    if not foundNodes:
-      continue
-    if lower.startsWith("name:"):
-      name = line.splitWhitespace()[^1]
-      result[name] = ""
-    result[name] &= line & "\n"
-
-proc readBuilderNodeFile*(ctx: DockerInvocation, node: string, path: string): string =
-  let
-    # ideally we can query the namespaces however they are not exposed
-    # via docker info output and are only stored in the buildx config files
-    # which we cant read until we know the namespaces
-    # TODO search through all running containers if the default namespace is not found
-    container = "buildx_buildkit_" & node
-    output    = runDockerGetEverything(
-      @[
-        "exec",
-        container,
-        "cat",
-        path,
-      ],
-      silent = false,
-    )
-  if output.exitCode != 0:
-    raise newException(ValueError, "could not read buildx node's " & container & " " & path)
-  return output.stdOut
-
-iterator iterBuilderNodesConfigs*(ctx: DockerInvocation): tuple[name: string, config: JsonNode] =
-  for name, _ in ctx.getBuilderNodesInfo():
-    try:
-      let
-        toml   = ctx.readBuilderNodeFile(name, "/etc/buildkit/buildkitd.toml")
-        config = parsetoml.parseString(toml).toJson()
-      yield (name, config)
-    except:
-      trace("docker: could not load toml for buildx node " & name & " due to: " & getCurrentExceptionMsg())
-      continue
-
 proc getBuildKitVersion*(ctx: DockerInvocation): Version =
   once:
     let info = ctx.getBuilderInfo().toLower()
@@ -277,7 +223,7 @@ proc getDockerAuthConfig*(): JsonNode =
       if data != "":
         dockerAuth = parseJson(data)
       else:
-        trace("docker: no auth config file " & path)
+        trace("docker: no auth config file at " & path)
     except:
       trace("docker: could not read docker auth config file " & path & " due to: " & getCurrentExceptionMsg())
   return dockerAuth

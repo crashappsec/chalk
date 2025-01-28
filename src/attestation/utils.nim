@@ -6,7 +6,7 @@
 ##
 
 import std/[base64, os]
-import ".."/[chalk_common, config, semver, util, docker/ids]
+import ".."/[config, semver, util, docker/ids]
 
 var cosignLoc      = ""
 var cosignVersion  = parseVersion("0")

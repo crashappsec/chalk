@@ -2,34 +2,73 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- `_REPO_TAGS` did not include all pushed tags when using `buildx build --push`
+  without `--load`.
+  ([#471](https://github.com/crashappsec/chalk/pull/471))
+- Requests to AWS API were incorrectly signed due to additional headers
+  being included in AWS sigv4. This impacted:
+
+  - uploading reports to s3 sink
+  - lambda plugin as it could not get caller identity
+
+  ([nimutils #82](https://github.com/crashappsec/nimutils/pull/82),
+  [#473](https://github.com/crashappsec/chalk/pull/473))
+
+## 0.5.1
+
+**Jan 17, 2025**
+
+### Fixes
+
+- For `docker build`, `--platform` was not honored when pinning base images.
+  ([#468](https://github.com/crashappsec/chalk/pull/468))
+- `_REPO_URLS` was not extracting `org.opencontainers.image.url` annotation
+  correctly.
+  ([#468](https://github.com/crashappsec/chalk/pull/468))
+
+## 0.5.0
+
+**Jan 08, 2025**
+
 ### Breaking Changes
 
-- Changes to docker digest related fields.
+- Changes to docker image related fields.
 
   Removed keys:
 
-  - `_IMAGE_DIGEST` - there are cases when image digest mutates.
-    For example `docker pull && docker push` will drop all
-    manifest annotations hence its digest will change.
-    Use `_REPO_DIGESTS` instead as it will include all digests
-    per repository.
-  - `_IMAGE_LIST_DIGEST` - there could be multiple list manifests
-    for the same image as list manifests can be created out-of-build.
-    Use new key `_REPO_LIST_DIGESTS` which enumerates all list digests
-    per repository.
+  - `_IMAGE_DIGEST` - there are cases when the image digest is mutated.
+    For example `docker pull && docker push` drops all
+    manifest annotations resulting in a change to the digest.
+    It is recommended to use `_REPO_DIGESTS` instead as it will
+    include all digests per repository.
+  - `_IMAGE_LIST_DIGEST` - it is possible to create manifests outside the build
+    context which results in multiple list manifests for the same image. The new
+    `_REPO_LIST_DIGESTS` key provides a list of all digests per repository.
 
   Changed keys:
 
-  - `_REPO_DIGESTS` is now an object which enumerates list of
-    image digests organized by:
+  - `_REPO_DIGESTS` previously (and incorrectly) would return the first registry
+    and the image digest. This key now provides a list of image digests by
+    registry and image name.
 
-    - registry
-    - image name
-
-    For example:
+    **Before**:
 
     ```json
     {
+      // old format
+      "_REPO_DIGESTS": {
+        "224111541501.dkr.ecr.us-east-1.amazonaws.com/co/chalketl/scripts": "249ce02d7f5fe0398fc87c2fb6c225ef78912f038f4be4fe9c35686082fe3cb0"
+      }
+    }
+    ```
+
+    **Now**:
+
+    ```json
+    {
+      // new format
       "_REPO_DIGESTS": {
         "registry-1.docker.io": {
           "library/alpine": [
@@ -40,11 +79,11 @@
     }
     ```
 
-  - `_REPO_TAGS` now only includes tags which are available in registry.
-    Builds without `--push`, even with provided `--tag`, will not populate
+  - `_REPO_TAGS` now includes tags which are only available in the registry.
+    Builds without `--push`, even when provided with `--tag`, will not populate
     `_REPO_TAGS` anymore. In addition similarly to `_REPO_DIGESTS`, it is
-    an object now where each tag is associated with its digest
-    (either list or image digest). For example:
+    an object where each tag is associated with its digest (either list or image
+    digest). For example:
 
     ```json
     {
@@ -58,10 +97,46 @@
     }
     ```
 
+  - `DOCKER_BASE_IMAGES` - sub-keys:
+
+    - `name` renamed to `uri`; contains the full repository uri (tag and digest)
+    - new `registry` key; the normalized registry uri (domain and optional port)
+    - new `name` key; the normalized repo name within the registry
+
+    **Before**:
+
+    ```json
+    // old format
+    {
+      "from": "nginx:1.27.0",
+      "tag": "1.27.0",
+      "name": "nginx:1.27.0",
+      "repo": "nginx"
+    }
+    ```
+
+    **Now**:
+
+    ```json
+    // new format
+    {
+      "from": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+      "uri": "nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe",
+      "repo": "nginx",
+      "registry": "registry-1.docker.io",
+      "name": "library/nginx",
+      "tag": "1.27.0",
+      "digest": "97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe"
+    }
+    ```
+
+  - `DOCKER_COPY_IMAGES` - similar to `DOCKER_BASE_IMAGES`, the `name` key has
+    been renamed to `uri` and adds the `registry` and `name` keys.
+
   New keys:
 
-  - `_REPO_LIST_DIGESTS` is similar to `_REPO_DIGESTS` but enumerates
-    known list digests (if any). For example:
+  - `_REPO_LIST_DIGESTS` - similar to `_REPO_DIGESTS` but enumerates any known
+    list digests. Example:
 
     ```json
     {
@@ -75,17 +150,103 @@
     }
     ```
 
-  Note that all `_REPO_*` keys normalize registry to its canonical domain.
-  For example for docker hub it is `registry-1.docker.io`.
-  In addition all image names are normalized to how they are stored
-  in the registry. Note `library/` prefix for `alpine`.
+  - `_REPO_URLS` - similar to `_REPO_DIGESTS` but shows human-accessible URL,
+    if known as per OCI image annotation or computed for Docker Hub images.
+    Example:
 
-  ([#450](https://github.com/crashappsec/chalk/pull/450))
+    ```json
+    {
+      "_REPO_URLS": {
+        "registry-1.docker.io": {
+          "library/alpine": "https://hub.docker.com/_/alpine"
+        }
+      }
+    }
+    ```
+
+  **NOTE:** All `_REPO_*` keys normalize registry to its canonical domain. For
+  example, docker hub is normalized to `registry-1.docker.io`. Additionally, all
+  image names are normalized to how they are stored in the registry. Note
+  `library/` prefix for `alpine` in the example above.
+
+  ([#450](https://github.com/crashappsec/chalk/pull/450),
+  [#453](https://github.com/crashappsec/chalk/pull/453),
+  [#464](https://github.com/crashappsec/chalk/pull/464))
+
+- Git time-related fields are now reported in ISO-8601 format whereas
+  previously it was reporting using default git format.
+
+  **Before**:
+
+  ```json
+  {
+    "DATE_AUTHORED": "Tue Dec 10 11:46:06 2024 -0500",
+    "DATE_COMMITTED": "Tue Dec 10 11:46:06 2024 -0500",
+    "DATE_TAGGED": "Tue Dec 10 11:46:06 2024 -0500"
+  }
+  ```
+
+  **Now**:
+
+  ```json
+  {
+    "DATE_AUTHORED": "2024-12-10T16:46:06.000Z",
+    "DATE_COMMITTED": "2024-12-10T18:49:00.000Z",
+    "DATE_TAGGED": "2024-12-10T18:49:00.000Z"
+  }
+  ```
+
+  This also affects all host-level keys in addition to chalk-level keys:
+
+  - `DATE_AUTHORED`
+  - `DATE_COMMITTED`
+  - `DATE_TAGGED`
+  - `_DATE_AUTHORED`
+  - `_DATE_COMMITTED`
+  - `_DATE_TAGGED`
+
+  To make parsing easier, in addition to human readable `DATE_*` fields,
+  new `TIMESTAMP_*` fields are added which report milliseconds since
+  Unix epoch:
+
+  ```json
+  {
+    "DATE_AUTHORED": "2024-12-10T16:46:06.000Z",
+    "DATE_COMMITTED": "2024-12-10T18:49:00.000Z",
+    "DATE_TAGGED": "2024-12-10T18:49:00.000Z",
+    "TIMESTAMP_AUTHORED": 1733849166000,
+    "TIMESTAMP_COMMITTED": 1733856540000
+    "TIMESTAMP_TAGGED": 1733856540000
+  }
+  ```
+
+  ([#458](https://github.com/crashappsec/chalk/pull/458))
+
+- All datetime fields are now reported in UTC TZ whereas previously were
+  reported in machines local TZ
+  ([#458](https://github.com/crashappsec/chalk/pull/458))
 
 ### Fixes
 
-- `DOCKERFILE_PATH_WITHIN_VCTL` key is no longer reported when providing Dockerfile contents
-  via `stdin` ([#454](https://github.com/crashappsec/chalk/pull/454)).
+- `DOCKERFILE_PATH_WITHIN_VCTL` key is no longer reported when providing
+  Dockerfile contents via `stdin`
+  ([#454](https://github.com/crashappsec/chalk/pull/454)).
+
+- Git time-related fields report accurate timezone now. Previously
+  wrong commit TZ was being reported as committed in git which was not correct.
+  ([#458](https://github.com/crashappsec/chalk/pull/458))
+
+- `_OP_ERRORS` includes all logs from chalkmark `ERR_INFO`,
+  even when its collection fails
+  ([#459](https://github.com/crashappsec/chalk/pull/459))
+
+- `docker buildx build` without both `--push` or `--load` report their
+  chalkmarks now. Chalkmarks however are missing any runtime keys
+  as those cannot be inspected due to image neither being pushed
+  to a registry or loaded into local daemon. Such an image is normally
+  inaccessible however it is still in buildx cache hence it can be
+  used in subsequent builds.
+  ([#459](https://github.com/crashappsec/chalk/pull/459))
 
 ### New Features
 
@@ -112,6 +273,54 @@
   - `_IMAGE_ANNOTATIONS` - found annotations for an image in registry
 
   ([#452](https://github.com/crashappsec/chalk/pull/452))
+
+- Docker base image keys:
+
+  - `_OP_ARTIFACT_CONTEXT` - what is the context of the artifact.
+    For `docker build` its either `build` or `base`.
+  - `DOCKER_BASE_IMAGE_REGISTRY` - just registry of the base image
+  - `DOCKER_BASE_IMAGE_NAME` - repo name within the registry
+  - `DOCKER_BASE_IMAGE_ID` - image id (config digest) of the base image
+  - `DOCKER_BASE_IMAGE_METADATA_ID` - id of the base image chalkmark
+  - `DOCKER_BASE_IMAGE_CHALK`` - full chalkmark of base image
+  - `_COLLECTED_ARTIFACTS` - similar to `_CHALKS` but reports collected
+    information about potentially non-chalked artifacts such as the base image.
+    If the base image is chalked it can be correlated with the build
+    chalkmark via `METADATA_ID`. Otherwise both artifacts can be linked
+    via the digest or the image id.
+
+  ([#453](https://github.com/crashappsec/chalk/pull/453),
+  [#463](https://github.com/crashappsec/chalk/pull/463))
+
+- `_IMAGE_LAYERS` key which collects image layer digests as it is stored
+  in the registry. This should allow to correlate base images by matching
+  layer combinations from other images.
+  ([#456](https://github.com/crashappsec/chalk/pull/456))
+
+- `_DOCKER_USED_REGISTRIES` - Configurations about all used docker registires
+  during chalk operation. For example:
+
+  ```json
+  {
+    "_DOCKER_USED_REGISTIES" {
+      "example.com:5044": {
+        "url": "https://example.com:5044/v2/",
+        "mirroring": "registry-1.docker.io",
+        "source": "buildx",
+        "scheme": "https",
+        "http": false,
+        "secure": true,
+        "insecure": false,
+        "auth": true,
+        "www_auth": false,
+        "pinned_cert_path": "/etc/buildkit/certs/example_com_5044/ca.crt",
+        "pinned_cert": "-----BEGIN CERTIFICATE-----\n..."
+      }
+    }
+  }
+  ```
+
+  ([#461](https://github.com/crashappsec/chalk/pull/461))
 
 ## 0.4.14
 

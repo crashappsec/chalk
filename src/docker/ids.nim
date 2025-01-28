@@ -10,6 +10,8 @@ import ".."/[config, util]
 
 const
   DEFAULT_REGISTRY = "registry-1.docker.io"
+  DOCKER_HUB       = "https://hub.docker.com"
+  LIBRARY          = "library/"
   HASH_HEADER      = "sha256:"
   REGISTRY_MAPPING = {
     "docker.io":       DEFAULT_REGISTRY,
@@ -195,6 +197,8 @@ proc parseImages*(names: seq[string], defaultTag = "latest"): seq[DockerImage] =
       result.add(parseImage(name, defaultTag = defaultTag))
 
 proc withTag*(self: DockerImage, tag: string): DockerImage =
+  if tag == "":
+    return self
   return (self.repo, tag, self.digest)
 
 proc isPinned*(self: DockerImage): bool =
@@ -209,18 +213,22 @@ proc withDigest*(items: seq[DockerImage], digest: string): seq[DockerImage] =
     result.add(i.withDigest(digest))
 
 proc isFullyQualified(self: DockerImage): bool =
-  ## determine if the docker image is a fully qualified image name
-  ## as in if the image should be pulled/pushed to default docker registry (docker hub)
-  ## or to a fully qualified domain name
-  ## docker checks:
+  ## determine if the docker image is a fully qualified image name (contains domain)
+  ## and all interactions should go there or registry is implicitly
+  ## docker hub when not fully qualified (e.g. docker pull alpine).
+  ##
+  ## To determine fully qualified docker checks:
   ## * if its localhost
   ## * presence of `.` or `:` (port) in the potential registy domain
   ## * if its uppercase as repo name cannot have uppercase chars
-  ## and defaults everything else to docker hub even if its valid and resolvable domain
+  ##
+  ## Rverything else is defaulted to docker hub even if its valid and resolvable domain
   ## like `registry/test` even if `registry` is a valid resolvable address locally
   ## (e.g. via `/etc/hosts` file)
   ## https://github.com/docker/cli/blob/826fc32e82e23bb5f80e85d8777427c5f0c24b4d/cli/command/image/pull.go#L58C36-L58C56
   ## https://github.com/distribution/reference/blob/8c942b0459dfdcc5b6685581dd0a5a470f615bff/normalize.go#L143-L191
+  if self.repo == "scratch":
+    return true
   let parts = self.repo.split('/', maxsplit = 1)
   # there is no parts in the name so like "nginx"
   # so it cant be fully qualified name
@@ -250,6 +258,8 @@ proc normalize(self: DockerImage): DockerImage =
   ## normalization maps some hardcoded registry domains
   ## to their standard API domains
   # https://github.com/docker/cli/issues/3793#issuecomment-1269051403
+  if self.repo == "scratch":
+    return self
   let
     qualified        = self.qualify()
     (registry, path) = qualified.repo.splitBy("/")
@@ -260,12 +270,44 @@ proc normalize(self: DockerImage): DockerImage =
       if fullRegistry != DEFAULT_REGISTRY or '/' in path:
         path
       else:
-        "library/" & path
+        LIBRARY & path
   result = (
     fullRegistry & "/" & fullPath,
     self.tag,
     self.digest,
   )
+
+proc withRegistry*(self: DockerImage, registry: string): DockerImage =
+  if registry == "":
+    return self
+  # parseUri doesnt parse uri without any scheme
+  let
+    normalized = self.normalize()
+    parsed     = parseUri("https://" & registry)
+  var uri      = parseUri("https://" & normalized.repo)
+  uri.hostname = parsed.hostname
+  uri.port     = parsed.port
+  let repo = ($uri).removePrefix("https://")
+  result = (
+    repo,
+    self.tag,
+    self.digest,
+  )
+
+proc registry*(self: DockerImage): string =
+  let parts = self.normalize().repo.split('/', maxsplit = 1)
+  if len(parts) == 1:
+    return ""
+  return parts[0]
+
+proc domain*(self: DockerImage): string =
+  return self.registry.split(':', maxsplit = 1)[0]
+
+proc name*(self: DockerImage): string =
+  return self.normalize().repo.split('/', maxsplit = 1)[^1]
+
+proc isDockerHub*(self: DockerImage): bool =
+  return self.normalize().registry == DEFAULT_REGISTRY
 
 proc uri*(self:   DockerImage,
           scheme  = "",
@@ -295,34 +337,20 @@ proc uri*(self:   DockerImage,
     uri.scheme = scheme.split(":")[0]
   return uri
 
-proc withRegistry*(self: DockerImage, registry: string): DockerImage =
-  if registry == "":
-    return self
-  # parseUri doesnt parse uri without any scheme
-  let
-    normalized = self.normalize()
-    parsed     = parseUri("https://" & registry)
-  var uri      = parseUri("https://" & normalized.repo)
-  uri.hostname = parsed.hostname
-  uri.port     = parsed.port
-  let repo = ($uri).removePrefix("https://")
-  result = (
-    repo,
-    self.tag,
-    self.digest,
-  )
-
-proc registry*(self: DockerImage): string =
-  return self.normalize().repo.split('/', maxsplit = 1)[0]
-
-proc domain*(self: DockerImage): string =
-  return self.registry.split(':', maxsplit = 1)[0]
-
-proc name*(self: DockerImage): string =
-  return self.normalize().repo.split('/', maxsplit = 1)[^1]
-
-proc isDockerHub*(self: DockerImage): bool =
-  return self.normalize().registry == DEFAULT_REGISTRY
+proc url*(self: DockerImage): string =
+  ## generate user-accessible URL for the registry
+  ## currently only supports:
+  ## * Docker Hub
+  if self.isDockerHub():
+    let
+      name = self.name
+      path =
+        if name.startsWith(LIBRARY):
+          "/_/" & name.split('/', maxsplit = 1)[^1]
+        else:
+          "/r/" & name
+    return DOCKER_HUB & path
+  return ""
 
 # below are various rendering variants as in different cases
 # different form is required
@@ -393,12 +421,14 @@ proc exists*(self: DockerImage): bool =
 proc asRepoTag*(items: seq[DockerImage]): seq[string] =
   result = @[]
   for i in items:
-    result.add(i.asRepoTag())
+    if i.tag != "":
+      result.add(i.asRepoTag())
 
 proc asRepoDigest*(items: seq[DockerImage]): seq[string] =
   result = @[]
   for i in items:
-    result.add(i.asRepoDigest())
+    if i.digest != "":
+      result.add(i.asRepoDigest())
 
 proc asRepoRef*(items: seq[DockerImage]): seq[string] =
   result = @[]
@@ -477,9 +507,14 @@ proc getImageName*(self: ChalkObj): string =
 proc asImage*(self: DockerManifest): DockerImage =
   return self.name.withDigest(self.digest)
 
-proc asImageRepo*(self: DockerManifest): DockerImageRepo =
+proc asImageRepo*(self: DockerManifest, tag = ""): DockerImageRepo =
   if self.kind != image:
     raise newException(ValueError, "Only image manifest can be image repo referenced")
+  var tags = newSeq[string]()
+  if self.name.tag != "":
+    tags.add(self.name.tag)
+  if tag != "":
+    tags.add(tag)
   return DockerImageRepo(
     repo:    self.name.repo,
     digests: @[self.digest.extractDockerHash()].toOrderedSet(),
@@ -489,12 +524,7 @@ proc asImageRepo*(self: DockerManifest): DockerImageRepo =
       else:
         @[]
     ).toOrderedSet(),
-    tags: (
-      if self.name.tag != "":
-        @[self.name.tag]
-      else:
-        @[]
-    ).toOrderedSet(),
+    tags: tags.toOrderedSet(),
   )
 
 # ----------------------------------------------------------------------------

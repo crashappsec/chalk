@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -59,6 +59,7 @@ type
                                      ## below, instead.
     fsRef*:         string           ## Reference for this artifact on a fs
     platform*:      DockerPlatform   ## platform
+    baseChalk*:     ChalkObj
     repos*:         OrderedTableRef[string, DockerImageRepo] ## all images where image was tagged/pushed
     imageId*:       string           ## Image ID if this is a docker image
     containerId*:   string           ## Container ID if this is a container
@@ -119,6 +120,7 @@ type
   CollectionCtx* = ref object
     currentErrorObject*:       Option[ChalkObj]
     allChalks*:                seq[ChalkObj]
+    allArtifacts*:             seq[ChalkObj]
     unmarked*:                 seq[string]
     report*:                   Box
     args*:                     seq[string]
@@ -271,6 +273,7 @@ type
     cmd*:         CmdInfo
     shell*:       ShellInfo
     lastUser*:    UserInfo
+    chalk*:       ChalkObj
 
   DockerEntrypoint* = tuple
     entrypoint: EntryPointInfo
@@ -314,7 +317,6 @@ type
 
   DockerManifest* = ref object
     name*:             DockerImage # where manifest was fetched from
-    otherNames*:       seq[DockerImage]
     digest*:           string
     mediaType*:        string
     size*:             int
@@ -447,19 +449,25 @@ const
                         staticRead("configs/base_report_templates.c4m") &
                         staticRead("configs/base_outconf.c4m") &
                         staticRead("configs/base_sinkconfs.c4m") &
-                        staticRead("configs/dockercmd.c4m")
+                        staticRead("configs/dockercmd.c4m") &
+                        staticRead("configs/buildkitcmd.c4m")
   sbomConfig*         = staticRead(sbomConfName)
   sastConfig*         = staticRead(sastConfName)
   techStackConfig*    = staticRead(techStackConfName)
   linguistConfig*     = staticRead(linguistConfName)
   ioConfig*           = staticRead(ioConfName)
-  defaultConfig*      = staticRead(defCfgFname) #& commentC4mCode(ioConfig)
+  defaultConfig*      = staticRead(defCfgFname)
   attestConfig*       = staticRead(attestConfName)
   coConfig*           = staticRead(coConfName)
-  commitID*           = staticexec("git rev-parse HEAD")
+  commitID*           = staticexec("git log -n1 --pretty=format:%H")
   archStr*            = staticexec("uname -m")
   osStr*              = staticexec("uname -o")
   stdinIndicator*     = ":stdin:"
+  # various time formats
+  timesDateFormat*    = "yyyy-MM-dd"
+  timesTimeFormat*    = "HH:mm:ss'.'fff"
+  timesTzFormat*      = "zzz"
+  timesIso8601Format* = timesDateFormat & "'T'" & timesTimeFormat & timesTzFormat
 
   # Make sure that ARTIFACT_TYPE fields are consistently named. I'd love
   # these to be const, but nim doesn't seem to be able to handle that :(

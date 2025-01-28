@@ -25,10 +25,11 @@ proc parseAndDigestJson*(data: string, digest: string): DigestedJson =
     size:   len(data),
   )
 
-proc newDockerDigestedJson*(data: string,
-                            digest: string,
+proc newDockerDigestedJson*(data:      string,
+                            digest:    string,
                             mediaType: string,
-                            kind: DockerManifestType): DockerDigestedJson =
+                            kind:      DockerManifestType,
+                            ): DockerDigestedJson =
   return DockerDigestedJson(
     json:      parseJson(data),
     digest:    "sha256:" & extractDockerhash(digest),
@@ -96,7 +97,7 @@ proc mapFromJson(self:         ChalkDict,
   self[chalkKey] = boxedValue
 
 proc mapFromJson*(self: ChalkDict,
-                  node:  JsonNode,
+                  node: JsonNode,
                   map:  JsonToChalkKeysMapping) =
   let
     reportEmpty = attrGet[bool]("docker.report_empty_fields")

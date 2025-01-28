@@ -122,10 +122,6 @@ proc mimickLocalConfig(self: DockerManifest) =
   if self.kind != DockerManifestType.config:
     raise newException(AssertionDefect, "can only mimick config json on config manifest")
   self.json["id"] = %(self.digest.extractDockerHash())
-  # <repo>:<tag>
-  self.json["repotags"] = %*(self.otherNames.asRepoTag())
-  # <repo>:<tag>@sha256:<digest>
-  self.json["repodigests"] = %*($(self.otherNames.withDigest(self.image.digest)))
   # config object does not contain size so we add compressed size
   # for easier metadata collection
   self.json["compressedSize"] = %(self.image.getCompressedSize())
@@ -142,7 +138,6 @@ proc setImageConfig(self: DockerManifest, data: DigestedJson) =
     config     = DockerManifest(
       kind:       DockerManifestType.config,
       name:       self.name,
-      otherNames: self.otherNames,
       mediaType:  configJson{"mediaType"}.getStr(),
       digest:     configJson{"digest"}.getStr(),
       size:       configJson{"size"}.getInt(),
@@ -172,7 +167,6 @@ proc setImageLayers(self: DockerManifest, data: DigestedJson) =
     self.layers.add(DockerManifest(
       kind:          DockerManifestType.layer,
       name:          self.name,
-      otherNames:    self.otherNames,
       mediaType:     layer{"mediaType"}.getStr(),
       digest:        layer{"digest"}.getStr(),
       size:          layer{"size"}.getInt(),
@@ -223,7 +217,7 @@ proc fetch(self: DockerManifest, fetchConfig = true): DockerManifest {.discardab
     discard
   self.isFetched = true
 
-proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerImage] = @[]): DockerManifest =
+proc newManifest(name: DockerImage, data: DigestedJson): DockerManifest =
   let json = data.json
 
   if "manifests" in json:
@@ -231,7 +225,6 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
     let list = DockerManifest(
       kind:       DockerManifestType.list,
       name:       name,
-      otherNames: otherNames,
       mediaType:  json{"mediaType"}.getStr(),
       manifests:  @[],
     )
@@ -243,7 +236,6 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
         kind:        DockerManifestType.image,
         name:        name,
         list:        list,
-        otherNames:  otherNames,
         mediaType:   item{"mediaType"}.getStr(),
         digest:      item{"digest"}.getStr(),
         size:        item{"size"}.getInt(),
@@ -260,7 +252,6 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
     let image = DockerManifest(
       kind:           DockerManifestType.image,
       name:           name,
-      otherNames:     otherNames,
       mediaType:      json{"mediaType"}.getStr(),
     )
     image.setJson(data)
@@ -279,7 +270,6 @@ proc newManifest(name: DockerImage, data: DigestedJson, otherNames: seq[DockerIm
     raise newException(ValueError, "Unsupported docker manifest json")
 
 proc fetchManifest*(name: DockerImage,
-                    otherNames: seq[DockerImage] = @[],
                     fetchConfig = true): DockerManifest =
   ## request either manifest list or image manifest for specified image
   # keep in mind that image can be of multiple formats
@@ -296,14 +286,14 @@ proc fetchManifest*(name: DockerImage,
     let
       meta = manifestHead(name)
       data = manifestGet(name.withDigest(meta.digest), meta.mediaType)
-    result = newManifest(name, data, otherNames = otherNames)
+    result = newManifest(name, data)
   except RegistryResponseError:
     trace("docker: " & getCurrentExceptionMsg())
     raise
   except:
     error("docker: " & getCurrentExceptionMsg())
     let data = requestManifestJson(name)
-    result = newManifest(name, data, otherNames = otherNames)
+    result = newManifest(name, data)
   result.fetch(fetchConfig = fetchConfig)
   if name.digest != "":
     manifestCache[name.asRepoDigest()] = result
@@ -340,9 +330,9 @@ proc fetchOnlyImageManifest*(name: DockerImage, fetchConfig = true): DockerManif
 
 proc fetchImageManifest*(name: DockerImage,
                          platform: DockerPlatform,
-                         otherNames: seq[DockerImage] = @[]): DockerManifest =
+                         ): DockerManifest =
   trace("docker: fetching image manifest for: " & $name)
-  var manifest = fetchManifest(name, otherNames = otherNames)
+  var manifest = fetchManifest(name)
   if manifest.kind == DockerManifestType.list:
     manifest = manifest.findPlatformManifest(platform)
     manifest.fetch()
@@ -395,7 +385,10 @@ proc fetchProvenance*(name: DockerImage, platform: DockerPlatform): JsonNode =
   # https://docs.docker.com/reference/cli/docker/buildx/imagetools/inspect/
   try:
     trace("docker: looking up provenance for: " & $name)
-    let layer = name.fetchImageManifest(platform).findSibling().findInTotoLayer("https://slsa.dev/provenance/")
+    let layer =
+      name.fetchImageManifest(platform)
+      .findSibling()
+      .findInTotoLayer("https://slsa.dev/provenance/")
     result = layer.asImage().layerGetJson(accept = layer.mediaType).json{"predicate"}
     trace("docker: in registry found provenance for: " & $name)
   except RegistryResponseError, KeyError:

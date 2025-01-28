@@ -6,7 +6,7 @@
 ##
 
 import std/[net, os]
-import "."/[chalk_common, chalkjson, config, selfextract, plugin_api, semver, util]
+import "."/[chalkjson, config, selfextract, plugin_api, semver, util]
 import "./attestation"/[embed, get, utils]
 import "./docker"/[ids]
 export getCosignLocation, canVerifyByHash, canVerifyBySigStore # from utils

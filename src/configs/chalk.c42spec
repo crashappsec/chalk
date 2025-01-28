@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -1914,6 +1914,18 @@ ENV ARTIFACT_IDENTIFIER="X6VRPZ-C828-KDNS-QDXRT0"
   }
 }
 
+singleton buildkit {
+  gen_fieldname: "buildkitConfig"
+  gen_typename:  "BuildkitConfig"
+  gen_setters:   false
+  user_def_ok:   false
+  doc: """
+Buildkit cmdline parsing options
+"""
+  allow getopts
+}
+
+
 singleton git {
   gen_fieldname: "gitConfig"
   gen_typename:  "GitConfig"
@@ -2677,6 +2689,7 @@ root {
   allow tool
   allow extract
   allow docker
+  allow buildkit
   allow exec
   allow load
   allow env_config

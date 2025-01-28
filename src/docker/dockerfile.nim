@@ -946,8 +946,21 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
       "Did not find any build sections in Dockerfile (no FROM directive)"
     )
 
+proc platformOrDefault*(self: DockerFileSection, default: DockerPlatform): DockerPlatform =
+  if self.platform != nil:
+    return self.platform
+  return default
+
+proc platformsOrDefault*(self: DockerFileSection, default: seq[DockerPlatform]): seq[DockerPlatform] =
+  if self.platform != nil:
+    return @[self.platform]
+  return default
+
 proc asFrom*(self: DockerFileSection): string =
-  result = "FROM " & $self.image
+  result = "FROM "
+  if self.platform != nil:
+    result &= "--platform=" & $self.platform & " "
+  result &= $self.image
   if self.alias != "":
     result &= " AS " & self.alias
 
@@ -1015,16 +1028,36 @@ proc getBaseDockerSection*(ctx: DockerInvocation):  DockerFileSection =
   for s in ctx.getBaseDockerSections():
     return s
 
+iterator getBasesDockerSections*(ctx: DockerInvocation): DockerFileSection =
+  ## iterator to get only bases across all sections of dockerfile
+  var seen = newSeq[DockerFileSection]()
+  for s in ctx.dfSections:
+    let base = ctx.getBaseDockerSection(s)
+    if base notin seen:
+      seen.add(base)
+      yield base
+
 proc formatBaseImage(ctx: DockerInvocation, section: DockerFileSection): TableRef[string, string] =
   let base = ctx.getBaseDockerSection(section)
   result = newTable[string, string]()
   result["from"]     = $section.image
-  result["name"]     = $base.image
+  result["uri"]      = $base.image
   result["repo"]     = base.image.repo
+  if base.image.registry != "":
+    result["registry"] = base.image.registry
+  result["name"]     = base.image.name
   if base.image.tag != "":
     result["tag"]    = base.image.tag
   if base.image.digest != "":
     result["digest"] = base.image.digest
+  if base.chalk != nil:
+    let
+      config   = unpack[string](base.chalk.collectedData.getOrDefault("_IMAGE_ID", pack("")))
+      metadata = unpack[string](base.chalk.collectedData.getOrDefault("_METADATA_ID", pack("")))
+    if config != "":
+      result["config_digest"] = config
+    if metadata != "":
+      result["metadata_id"]   = metadata
 
 proc formatBaseImages*(ctx: DockerInvocation): ChalkDict =
   result = ChalkDict()
@@ -1039,8 +1072,11 @@ proc formatCopyImage(ctx: DockerInvocation, copy: CopyInfo): ChalkDict =
       parseImage(copy.frm, defaultTag = "")
   result = ChalkDict()
   result["from"]     = pack(copy.frm)
-  result["name"]     = pack($image)
+  result["uri"]      = pack($image)
   result["repo"]     = pack(image.repo)
+  result["name"]     = pack(image.name)
+  if image.registry != "":
+    result["registry"] = pack(image.registry)
   if image.tag != "":
     result["tag"]    = pack(image.tag)
   if image.digest != "":

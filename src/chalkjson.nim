@@ -205,6 +205,11 @@ proc nimJsonToBox*(node: JsonNode): Box =
   of JNull:
     return Box(kind: MkObj)
 
+proc jsonTableToBox*(table: TableRef[string, JsonNode]): Box =
+  var data = OrderedTableRef[string, Box]()
+  for k, v in table.pairs():
+    data[k] = v.nimJsonToBox()
+  return pack(data)
 
 proc parseError(msg: string): CJsonError {.inline.} = return CJsonError(msg: msg)
 proc readOne(s: Stream): char {.inline.} = return s.readChar()
