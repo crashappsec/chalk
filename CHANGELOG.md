@@ -7,6 +7,14 @@
 - `_REPO_TAGS` did not include all pushed tags when using `buildx build --push`
   without `--load`.
   ([#471](https://github.com/crashappsec/chalk/pull/471))
+- Requests to AWS API were incorrectly signed due to additional headers
+  being included in AWS sigv4. This impacted:
+
+  - uploading reports to s3 sink
+  - lambda plugin as it could not get caller identity
+
+  ([nimutils #82](https://github.com/crashappsec/nimutils/pull/82),
+  [#473](https://github.com/crashappsec/chalk/pull/473))
 
 ## 0.5.1
 

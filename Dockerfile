@@ -1,9 +1,9 @@
-FROM ghcr.io/crashappsec/nim:ubuntu-2.0.8 as nim
-FROM ghcr.io/sigstore/cosign/cosign:v2.2.3 as cosign
+FROM ghcr.io/crashappsec/nim:ubuntu-2.0.8 AS nim
+FROM ghcr.io/sigstore/cosign/cosign:v2.2.3 AS cosign
 
 # -------------------------------------------------------------------
 
-FROM nim as deps
+FROM nim AS deps
 
 # curl - chalk downloads some things directly with curl for the moment
 RUN apt-get update -y && \
@@ -36,7 +36,7 @@ RUN mkdir -p src/configs && \
 # -------------------------------------------------------------------
 # build chalk binary to be copied into final release stage
 
-FROM deps as build
+FROM deps AS build
 
 ARG CHALK_BUILD="release"
 
