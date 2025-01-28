@@ -3,54 +3,33 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import asyncio
-import dataclasses
-import logging.config
+import os
 import pathlib
 import secrets
 import shutil
 import tempfile
 from typing import Any, Optional
 
-import os
 import sqlalchemy
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from .__version__ import __version__
+from ..utils.log import get_logger
+from .app import app
 from .db import models, schemas
 from .db.database import SessionLocal, engine
-from .log import config
 
 
-config()
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 try:
     # sqlite does not have DDL locks therefore when multiple workers
     # start at the same time, some of them can fail creating tables
     models.Base.metadata.create_all(bind=engine)
-except Exception as error:
-    logger.error(error)
-
-
-title = "Local Chalk Ingestion Server"
-
-
-app = FastAPI(
-    title=title,
-    version=__version__,
-)
-
-
-@dataclasses.dataclass()
-class HealthResponse:
-    status: str
-
-
-@app.get("/health")
-async def healthcheck() -> HealthResponse:
-    return HealthResponse(status="ok")
+except Exception:
+    logger.exception("could not create all tables")
+    raise
 
 
 def get_db():
@@ -59,16 +38,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-@app.get("/", response_class=RedirectResponse)
-async def redirect_to_docs():
-    return RedirectResponse("/docs")
-
-
-@app.get("/version")
-async def version():
-    return {"version": __version__}
 
 
 if os.environ.get("REDIRECT"):
@@ -166,7 +135,7 @@ async def accept_report(
 
 
 @app.get("/chalks")
-async def list_chalks(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+async def list_chalks(db: Session = Depends(get_db)):
     chalks = db.query(models.Chalk).all()
     return [c.raw for c in chalks]
 
@@ -180,9 +149,7 @@ async def get_chalk(metadata_id: str, db: Session = Depends(get_db)) -> dict[str
 
 
 @app.get("/reports")
-async def list_reports(
-    db: Session = Depends(get_db), operation: Optional[str] = None
-) -> list[dict[str, Any]]:
+async def list_reports(db: Session = Depends(get_db), operation: Optional[str] = None):
     reports = db.query(models.Report)
     if operation:
         reports = reports.filter_by(operation=operation.lower())
@@ -195,18 +162,20 @@ async def list_stats(db: Session = Depends(get_db)) -> list[schemas.Stat]:
     return [schemas.Stat.model_validate(vars(c)) for c in chalk_stats]
 
 
-cosign = {}
+cosign: dict[str, str] = {}
 
 
 @app.get("/cosign")
 async def get_cosign():
     global cosign
     if not cosign:
+        bin = shutil.which("cosign")
+        assert bin
         with tempfile.TemporaryDirectory() as _tmp:
             password = secrets.token_bytes(16).hex()
             tmp = pathlib.Path(_tmp)
             process = await asyncio.subprocess.create_subprocess_exec(
-                shutil.which("cosign"),
+                bin,
                 "generate-key-pair",
                 "--output-key-prefix",
                 "chalk",

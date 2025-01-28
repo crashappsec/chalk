@@ -2,10 +2,9 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import os
 import shutil
 from pathlib import Path
-
-import os
 
 
 DOCKER_SSH_REPO = (
@@ -53,10 +52,8 @@ SERVER_IMDS = "http://169.254.169.254"
 SERVER_STATIC = "http://static:8000"
 SERVER_HTTP = "http://chalk.local:8585"
 SERVER_HTTPS = "https://tls.chalk.local:5858"
-SERVER_DB = (
-    Path(__file__).parent.parent.parent / "server" / "chalkdb.sqlite"
-).resolve()
-SERVER_CERT = (Path(__file__).parent.parent.parent / "server" / "cert.pem").resolve()
+SERVER_DB = (Path(__file__).parent / "server" / "chalkdb.sqlite").resolve()
+SERVER_CERT = (Path(__file__).parent / "server" / "cert.pem").resolve()
 
 IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") or False
 

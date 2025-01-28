@@ -3,11 +3,11 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import json
+import os
 from pathlib import Path
 from typing import Any, Callable
 
 import boto3
-import os
 import pytest
 import requests
 

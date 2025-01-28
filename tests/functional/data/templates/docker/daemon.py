@@ -2,10 +2,9 @@
 
 import argparse
 import json
+import os
 import pathlib
 import sys
-
-import os
 
 
 IP = os.environ.get("IP", "localhost")

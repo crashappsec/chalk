@@ -26,23 +26,25 @@ services:
       CHALK_PASSWORD: ${CHALK_PASSWORD:-}
 
   # --------------------------------------------------------------------------
-  # SERVER
+  # TESTS
 
   server:
     build:
-      context: ./server
-      target: deps
+      context: ./tests/functional
+    entrypoint: uvicorn
+    command: functional.server.chalk:app --host=0.0.0.0 --port=8585 --reload
     networks:
       chalk:
         aliases:
           - chalk.local
     ports:
       - 8585:8585
-    working_dir: /chalk/server
+    working_dir: /tests
     volumes:
-      - .:/chalk
+      - ./tests:/tests
     environment:
       REDIRECT: https://tls.chalk.local:5858
+      DATABASE_URL: sqlite:///functional/server/chalkdb.sqlite
     healthcheck:
       test:
         - CMD-SHELL
@@ -52,12 +54,27 @@ services:
 
   server-tls:
     build:
-      context: ./server
-      target: deps
-    command: run -r -p 5858 --domain=tls.chalk.local --keyfile=cert.key --certfile=cert.pem --use-existing-cert
-    working_dir: /chalk/server
+      context: ./tests/functional
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - |
+        python -m functional.server.certs
+        exec uvicorn functional.server.chalk:app \
+        --host=0.0.0.0 \
+        --port=5858 \
+        --ssl-certfile=functional/server/cert.pem \
+        --ssl-keyfile=functional/server/cert.key \
+        --reload
+    environment:
+      DOMAIN: tls.chalk.local
+      CERT: functional/server/cert.pem
+      KEY: functional/server/cert.key
+      DATABASE_URL: sqlite:///functional/server/chalkdb.sqlite
+    working_dir: /tests
     volumes:
-      - .:/chalk
+      - ./tests:/tests
     ports:
       - 5858:5858
     networks:
@@ -70,19 +87,20 @@ services:
         - sh -c "curl -f https://localhost:5858/health --insecure"
       start_period: 30s
       interval: 1s
-
-  # --------------------------------------------------------------------------
-  # TESTS
+    depends_on:
+      server:
+        # avoid concurrent start which attempts to migrate same sqlite db file
+        condition: service_healthy
 
   # there is no official imds test container so we have very simple wrapper
   imds:
     build:
       context: ./tests/functional
     entrypoint: uvicorn
-    command: app:app --host=0.0.0.0 --port=80 --reload
-    working_dir: /imds
+    command: functional.server.imds:app --host=0.0.0.0 --port=80 --reload
+    working_dir: /tests
     volumes:
-      - ./tests/functional/imds:/imds
+      - ./tests:/tests
     healthcheck:
       test:
         - CMD-SHELL
@@ -241,20 +259,5 @@ services:
       test:
         - CMD-SHELL
         - sh -c "echo 'GET / HTTP/1.1' | nc -v localhost 5047"
-      start_period: 30s
-      interval: 1s
-
-  sqlite:
-    image: coleifer/sqlite-web
-    volumes:
-      - ./server:/server
-    environment:
-      SQLITE_DATABASE: /server/chalkdb.sqlite
-    ports:
-      - 18080:8080
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - sh -c "echo 'GET / HTTP/1.1' | nc -v localhost 8080"
       start_period: 30s
       interval: 1s

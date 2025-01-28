@@ -4,9 +4,14 @@
 # (see https://crashoverride.com/docs/chalk)
 import json
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
+from ..utils.log import get_logger
+from .app import app
+
+
+logger = get_logger()
 
 PREFIX = "/latest"
 TOKEN = "token"
@@ -611,14 +616,6 @@ RESPONSES = {
         }
     ),
 }
-
-
-app = FastAPI()
-
-
-@app.get("/health")
-def health():
-    return
 
 
 @app.put("/latest/api/token", response_class=PlainTextResponse)
