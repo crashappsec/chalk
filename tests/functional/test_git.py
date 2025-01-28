@@ -2,10 +2,10 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import os
 from pathlib import Path
 from typing import Optional
 
-import os
 import pytest
 
 from .chalk.runner import Chalk

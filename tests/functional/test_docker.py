@@ -4,6 +4,7 @@
 # (see https://crashoverride.com/docs/chalk)
 import itertools
 import operator
+import os
 import platform
 import re
 import shutil
@@ -13,7 +14,6 @@ from pathlib import Path
 from typing import Iterator, Optional
 from unittest import mock
 
-import os
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark, ChalkProgram
@@ -30,7 +30,15 @@ from .conf import (
     REGISTRY_TLS_INSECURE,
     ROOT,
 )
-from .utils.dict import ANY, MISSING, Contains, IfExists, Iso8601, Length, Values
+from .utils.dict import (
+    ANY,
+    MISSING,
+    Contains,
+    IfExists,
+    Iso8601,
+    Length,
+    Values,
+)
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger

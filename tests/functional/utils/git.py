@@ -3,10 +3,9 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import functools
+import os
 from pathlib import Path
 from typing import Optional
-
-import os
 
 from .log import get_logger
 from .os import run

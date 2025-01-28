@@ -13,11 +13,12 @@ LOG_LEVEL
 """
 import logging
 import logging.config
+import os
 import pathlib
+import sys
 from typing import Any, Iterable, TypedDict, cast
 
 import _pytest.logging
-import os
 import structlog
 import structlog.types
 
@@ -62,23 +63,25 @@ SHARED_PROCESSORS: Iterable[structlog.types.Processor] = [
     structlog.processors.TimeStamper(fmt="iso"),
 ]
 
-STRUCTLOG_PROCESSORS: Iterable[structlog.types.Processor] = filter(
-    None,
-    [
-        (
-            # non-console renderers need format_exc_info processor
-            # so that exc_info is correctly converted to a string
-            # in the final log message
-            # however console renderer direcly processes exc_info
-            # to show pretty colors and therefore format_exc_info
-            # is omitted when ConsoleRenderer is used
-            structlog.processors.format_exc_info
-            if not isinstance(RENDERER, structlog.dev.ConsoleRenderer)
-            else None
-        ),
-        structlog.processors.StackInfoRenderer(),
-        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
-    ],
+STRUCTLOG_PROCESSORS: Iterable[structlog.types.Processor] = list(
+    filter(
+        None,
+        [
+            (
+                # non-console renderers need format_exc_info processor
+                # so that exc_info is correctly converted to a string
+                # in the final log message
+                # however console renderer direcly processes exc_info
+                # to show pretty colors and therefore format_exc_info
+                # is omitted when ConsoleRenderer is used
+                structlog.processors.format_exc_info
+                if not isinstance(RENDERER, structlog.dev.ConsoleRenderer)
+                else None
+            ),
+            structlog.processors.StackInfoRenderer(),
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+    )
 )
 
 
@@ -123,13 +126,24 @@ logging.config.dictConfig(
             # root logger config
             "": {
                 "level": LEVEL,
-                # pytest captures logs
-                "handlers": ["null"],
+                "handlers": [
+                    (
+                        "null"
+                        # pytest captures logs
+                        if "pytest" in " ".join(sys.argv)
+                        # else we report logs to stderr
+                        else "default"
+                    ),
+                ],
+            },
+            "uvicorn": {
+                "handlers": ["default"],
+                "level": "INFO",
+                "propagate": False,
             },
         },
     }
 )
-
 
 structlog.configure(
     processors=[

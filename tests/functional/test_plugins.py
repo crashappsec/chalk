@@ -2,11 +2,11 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import os
 import re
 import shutil
 from pathlib import Path
 
-import os
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark

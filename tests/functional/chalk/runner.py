@@ -3,18 +3,19 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import datetime
+import itertools
 import json
 import os
-import itertools
 from pathlib import Path
 from typing import Any, Literal, Optional, cast
 
 from ..conf import MAGIC
 from ..utils.bin import sha256
-from ..utils.dict import ContainsDict, MISSING, ANY, IfExists, ContainsList
+from ..utils.dict import ANY, MISSING, ContainsDict, ContainsList, IfExists
 from ..utils.docker import Docker
 from ..utils.log import get_logger
 from ..utils.os import CalledProcessError, Program, run
+
 
 ChalkCommand = Literal[
     "delete",

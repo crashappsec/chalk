@@ -45,7 +45,9 @@ def generate_selfsigned_cert(
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, hostnames[0])])
 
     # best practice seem to be to include the hostname in the SAN, which *SHOULD* mean COMMON_NAME is ignored.
-    alt_names = [x509.DNSName(i) for i in hostnames]
+    alt_names: list[x509.DNSName | x509.IPAddress] = [
+        x509.DNSName(i) for i in hostnames
+    ]
 
     # allow addressing by IP, for when you don't have real DNS (common in most testing scenarios
     if ip_addresses:

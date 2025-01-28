@@ -6,13 +6,13 @@ ARG COSIGN_VERSION=2.2.3
 ARG PYTHON_VERSION=3.12
 ARG POETRY_VERSION=1.5.1
 
-FROM docker:$DOCKER_VERSION as docker
-FROM docker/buildx-bin:$BUILDX_VERSION as buildx
-FROM ghcr.io/sigstore/cosign/cosign:v$COSIGN_VERSION as cosign
+FROM docker:$DOCKER_VERSION AS docker
+FROM docker/buildx-bin:$BUILDX_VERSION AS buildx
+FROM ghcr.io/sigstore/cosign/cosign:v$COSIGN_VERSION AS cosign
 
 # ----------------------------------------------------------------------------
 
-FROM python:$PYTHON_VERSION-alpine3.17 as alpine
+FROM python:$PYTHON_VERSION-alpine3.17 AS alpine
 
 # install chalk runtime deps
 RUN apk add --no-cache \
@@ -31,7 +31,7 @@ RUN if uname -m | grep -Ei "arm|aarch"; then \
 
 # ----------------------------------------------------------------------------
 
-FROM python:$PYTHON_VERSION-slim as ubuntu
+FROM python:$PYTHON_VERSION-slim AS ubuntu
 
 RUN apt-get update -y && \
     apt-get install -y \

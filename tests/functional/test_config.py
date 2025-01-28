@@ -4,20 +4,21 @@
 # (see https://crashoverride.com/docs/chalk)
 import itertools
 from pathlib import Path
-from typing import Any, Iterator, Callable, Optional
+from typing import Any, Callable, Iterator, Optional
 
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark, ChalkReport
-from .utils.log import get_logger
-from .utils.docker import Docker
 from .conf import (
-    BASE_OUTCONF,
-    LS_PATH,
-    CONFIGS,
-    BASE_REPORT_TEMPLATES,
     BASE_MARK_TEMPLATES,
+    BASE_OUTCONF,
+    BASE_REPORT_TEMPLATES,
+    CONFIGS,
+    LS_PATH,
 )
+from .utils.docker import Docker
+from .utils.log import get_logger
+
 
 logger = get_logger()
 

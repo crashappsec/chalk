@@ -4,6 +4,7 @@
 # (see https://crashoverride.com/docs/chalk)
 import datetime
 import json
+import os
 import pty
 import re
 from contextlib import suppress
@@ -12,8 +13,6 @@ from hashlib import sha256
 from pathlib import Path
 from subprocess import PIPE, CalledProcessError, Popen, TimeoutExpired
 from typing import Literal, Optional
-
-import os
 
 from .log import get_logger
 
