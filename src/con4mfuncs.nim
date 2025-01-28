@@ -126,6 +126,14 @@ proc c4mParseJson(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
 proc dockerExe(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   return some(pack(getDockerExeLocation()))
 
+proc c4mParseInt(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
+  let
+    data = unpack[string](args[0])
+  try:
+    result = some(pack(parseInt(data)))
+  except:
+    result = none(Box)
+
 let chalkCon4mBuiltins* = [
     ("version() -> string",
      BuiltinFn(getExeVersion),
@@ -182,6 +190,11 @@ Generally, these can get very noisy, and are intended more for testing,
  debugging, etc.
 """,
      @["chalk"]),
+    ("parseInt(string) -> int",
+     BuiltinFn(c4mParseInt),
+     "Parses an int from a string",
+     @["chalk"]
+    ),
     ("command_argv() -> list[string]",
      BuiltInFn(getArgvLocal),
      """
