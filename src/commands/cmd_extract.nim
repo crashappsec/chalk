@@ -15,7 +15,7 @@ proc processDockerChalk(item: ChalkObj) =
     trace("Processing artifact: " & item.name)
     item.addToAllChalks()
     trace("Collecting artifact runtime info")
-    item.collectRuntimeArtifactInfo()
+    item.collectRunTimeArtifactInfo()
     if item.extract == nil:
       info(item.name & ": Artifact is unchalked.")
 

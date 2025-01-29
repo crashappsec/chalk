@@ -135,7 +135,7 @@ proc extractMarkFromInToto(self: ChalkObj, json: JsonNode): string =
       matchesDigest = false
       digests       = newSeq[string]()
     for image in self.repos.manifests:
-      if digest.extractDockerhash() == image.digest:
+      if digest.extractDockerHash() == image.digest:
         matchesDigest = true
         digests.add(image.digest)
         break
@@ -160,7 +160,7 @@ proc extractMarkFromSigStoreCosign(self: ChalkObj): string =
     let
       allOut = runCmdGetEverything(cosign, args)
       res    = allOut.getStdout()
-      code   = allout.getExit()
+      code   = allOut.getExit()
     if code != 0:
       err = allOut.getStdErr().splitLines()[0]
       continue

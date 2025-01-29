@@ -32,7 +32,7 @@ proc newDockerDigestedJson*(data:      string,
                             ): DockerDigestedJson =
   return DockerDigestedJson(
     json:      parseJson(data),
-    digest:    "sha256:" & extractDockerhash(digest),
+    digest:    "sha256:" & extractDockerHash(digest),
     size:      len(data),
     mediaType: mediaType,
     kind:      kind,

@@ -236,7 +236,7 @@ proc detectLanguages(): HashSet[string] =
     if fpath.dirExists():
       getLanguages(fpath, result)
     else:
-      let (head, _) = splitPath(fPath)
+      let (head, _) = splitPath(fpath)
       if head.dirExists():
         getLanguages(head, result)
 
@@ -263,7 +263,7 @@ proc detectTechCwd(): TableRef[string, seq[string]] =
         if fpath.dirExists():
           scanDirectory(fpath, category, subcategory)
         else:
-          let (head, _) = splitPath(fPath)
+          let (head, _) = splitPath(fpath)
           if head.dirExists():
             scanDirectory(head, category, subcategory)
       if inFileScope[category][subcategory]:

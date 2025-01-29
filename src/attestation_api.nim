@@ -199,9 +199,9 @@ proc verifyBySigStore(chalk: ChalkObj, key: AttestationKey, image: DockerImage):
   trace("cosign " & args.join(" "))
   let
     allOut = runCmdGetEverything(cosign, args)
-    res    = allout.getStdout()
-    err    = allout.getStderr()
-    code   = allout.getExit()
+    res    = allOut.getStdout()
+    err    = allOut.getStderr()
+    code   = allOut.getExit()
   if code == 0:
     let
       blob = parseJson(res)
@@ -288,7 +288,7 @@ proc signBySigStore*(chalk: ChalkObj): ChalkDict =
       trace("cosign " & args.join(" ") & "\n" & toto)
       let
         allOut = runCmdGetEverything(cosign, args, toto)
-        code   = allout.getExit()
+        code   = allOut.getExit()
       if code != 0:
         raise newException(
           ValueError,

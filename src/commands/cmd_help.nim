@@ -138,7 +138,7 @@ proc resolveHelpFileName(docName: string): string =
 
 proc searchEmbeddedDocs(terms: seq[string]): Rope =
   # Terminal only.
-  for key, doc in helpfiles:
+  for key, doc in helpFiles:
     var matchedTerms: seq[string] = @[]
 
     for term in terms:
@@ -155,8 +155,8 @@ proc searchEmbeddedDocs(terms: seq[string]): Rope =
     result = h4("No matches in other documents.")
 
 proc getEmbeddedDoc(key: string): Rope =
-  if key in helpfiles:
-    result += text(helpfiles[key])
+  if key in helpFiles:
+    result += text(helpFiles[key])
   if result == Rope(nil):
     result = h4("No document " & key & ".")
 
@@ -535,10 +535,10 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
         for item in toCheck:
           if item in helpFiles:
             toOut += text(helpFiles[item])
-            gotit = true
+            gotIt = true
             break
 
-        if gotIt == false:
+        if not gotIt:
           # If we see an unknown argument at any position, stop what
           # we were doing and run a full-text search on all passed
           # arguments.
@@ -588,12 +588,12 @@ proc buildSinkConfigData(): seq[seq[Rope]] =
       else:                     subLists[config].add(topic)
 
   for key, config in sinkConfigs:
-    if config notin sublists:
-      sublists[config] = @[]
+    if config notin subLists:
+      subLists[config] = @[]
     result.add(@[text(key), text(config.mySink.getName()),
                  text(paramFmt(config.params)),
                  text(filterFmt(config.filters)),
-                 text(sublists[config].join(", "))])
+                 text(subLists[config].join(", "))])
 
 proc getConfigValues(): Rope =
   var
@@ -633,7 +633,7 @@ proc getConfigValues(): Rope =
                             headings = confHdrs, sectionPath = item)
 
 
-  result += outconfData.quickTable("Metadata template configuration",
+  result += outConfData.quickTable("Metadata template configuration",
                                    class = "help")
   result += custRepData.quickTable("Additional reports configured",
                                    class = "help")

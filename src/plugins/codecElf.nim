@@ -146,4 +146,4 @@ proc loadCodecElf*() =
          handleWrite        = HandleWriteCb(elfHandleWrite),
          getUnchalkedHash   = UnchalkedHashCb(elfGetUnchalkedHash),
          ctArtCallback      = ChalkTimeArtifactCb(elfGetChalkTimeArtifactInfo),
-         rtArtCallback      = RunTimeArtifactCb(elfgetRunTimeArtifactInfo))
+         rtArtCallback      = RunTimeArtifactCb(elfGetRunTimeArtifactInfo))

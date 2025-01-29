@@ -214,7 +214,7 @@ elif hostOs == "macosx":
 else:
     template makeCompletionAutoSource() = discard
 
-const currentAutocompleteVersion = (0, 1, 3)
+const currentAutoCompleteVersion = (0, 1, 3)
 
 proc validateMetaData*(obj: ChalkObj): ValidateResult {.importc.}
 
@@ -234,8 +234,8 @@ proc autocompleteFileCheck*() =
     var invalidMark = true
 
     let
-      subscan   = runChalkSubscan(dst, "extract")
-      allchalks = subscan.getallChalks()
+      subscan   = runChalkSubScan(dst, "extract")
+      allChalks = subscan.getAllChalks()
 
     if len(allChalks) != 0 and allChalks[0].extract != nil:
       if "ARTIFACT_VERSION" in allChalks[0].extract and
@@ -262,9 +262,9 @@ proc autocompleteFileCheck*() =
 
           if (major, minor, patch) != (0, 0, 0) and
              currentAutoCompleteVersion > (major, minor, patch):
-            var curVers = $(currentAutocompleteVersion[0]) & "." &
-                          $(currentAutocompleteVersion[1]) & "." &
-                          $(currentAutocompleteVersion[2])
+            var curVers = $(currentAutoCompleteVersion[0]) & "." &
+                          $(currentAutoCompleteVersion[1]) & "." &
+                          $(currentAutoCompleteVersion[2])
 
             info("Updating autocomplete script to version: " & curVers)
           else:
@@ -302,7 +302,7 @@ template otherSetupTasks*() =
 var exitCode = 0
 
 proc quitChalk*(errCode = exitCode) {.noreturn.} =
-  quit(errcode)
+  quit(errCode)
 
 proc getExitCode*(): int =
   return exitCode
@@ -377,7 +377,7 @@ proc findExePath*(cmdName:    string,
     for location in foundExes:
       let
         subscan   = runChalkSubScan(location, "extract")
-        allchalks = subscan.getAllChalks()
+        allChalks = subscan.getAllChalks()
         isChalk   = (
           len(allChalks) != 0 and
           allChalks[0].extract != nil and
@@ -412,7 +412,7 @@ proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
 
 proc runCmdNoOutputCapture*(exe:       string,
                             args:      seq[string],
-                            newStdin = ""): int {.discardable.} =
+                            newStdIn = ""): int {.discardable.} =
   let execOutput = runCmdGetEverything(exe, args, newStdIn,
                                        passthrough = true,
                                        timeoutUsec = 0) # No timeout

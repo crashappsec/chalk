@@ -490,7 +490,7 @@ var
   subscribedKeys*         = Table[string, bool]()
   systemErrors*           = seq[string](@[])
   selfChalk*              = ChalkObj(nil)
-  selfID*                 = none(string)
+  selfId*                 = none(string)
   canSelfInject*          = true
   doingTestRun*           = false
   nativeCodecsOnly*       = false

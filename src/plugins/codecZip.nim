@@ -160,7 +160,7 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
           var newv = v
           let c = tryToLoadFile(tmpPath)
           newv.contents             = c
-          cache.onDisk.contents[k]  = newV
+          cache.onDisk.contents[k]  = newv
         cache.embeddedChalk = collectionCtx.report
 
     return some(chalk)
@@ -176,8 +176,8 @@ proc doZipWrite(chalk: ChalkObj, encoded: Option[string], virtual: bool) =
   closeFileStream(chalk.fsRef)
   try:
     if encoded.isSome():
-      if not tryToWriteFile(chalkfile, encoded.get()):
-        raise newException(OSError, chalkfile & ": could not write file")
+      if not tryToWriteFile(chalkFile, encoded.get()):
+        raise newException(OSError, chalkFile & ": could not write file")
       dirToUse = joinPath(cache.tmpDir, "contents")
     else:
       dirToUse = joinPath(cache.tmpDir, "hash")
@@ -269,7 +269,7 @@ proc loadCodecZip*() =
            handleWrite   = HandleWriteCb(zipHandleWrite),
            getEndingHash = EndingHashCb(zipGetEndingHash),
            ctArtCallback = ChalkTimeArtifactCb(zipGetChalkTimeArtifactInfo),
-           rtArtCallback = RunTimeArtifactCb(zipGetRuntimeArtifactInfo))
+           rtArtCallback = RunTimeArtifactCb(zipGetRunTimeArtifactInfo))
 
   newPlugin("zippeditem",
             ctArtCallback = ChalkTimeArtifactCb(zitemGetChalkTimeArtifactInfo))

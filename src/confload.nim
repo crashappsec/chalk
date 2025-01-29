@@ -199,7 +199,7 @@ proc loadAllConfigs*() =
     let optConf = stack.configState.findOptionalConf()
     if optConf.isSome():
       let fName = optConf.get()
-      withFileStream(fname, mode = fmRead, strict = true):
+      withFileStream(fName, mode = fmRead, strict = true):
         stack.
           addConfLoad(fName, stream).
           addCallback(loadLocalStructs)

@@ -86,7 +86,7 @@ proc fetchImageEntrypoint*(image: DockerImage, platform: DockerPlatform): Docker
     return (nil, nil, nil)
   let
     imageInfo  = fetchImageOrManifestConfig(image, platform)
-    entrypoint = fromJson[EntrypointInfo](imageInfo{"Entrypoint"})
+    entrypoint = fromJson[EntryPointInfo](imageInfo{"Entrypoint"})
     cmd        = fromJson[CmdInfo](imageInfo{"Cmd"})
     shell      = fromJson[ShellInfo](imageInfo{"Shell"})
   return (entrypoint, cmd, shell)

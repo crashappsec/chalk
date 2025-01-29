@@ -69,7 +69,7 @@ proc processDockerFile(ctx: DockerInvocation) =
 
   else:
     if ctx.dockerFileLoc == "":
-      let toResolve = joinPath(ctx.foundcontext, "Dockerfile")
+      let toResolve = joinPath(ctx.foundContext, "Dockerfile")
       ctx.dockerFileLoc = resolvePath(toResolve)
 
     try:

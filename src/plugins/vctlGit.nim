@@ -166,7 +166,7 @@ proc kvPair(s: Stream): KVPair =
 
   return (key, val)
 
-proc kvpairs(s: Stream): KVPairs =
+proc kvPairs(s: Stream): KVPairs =
   result = @[]
 
   while true:
@@ -234,7 +234,7 @@ proc findGitDir(fullpath: string): string =
     gitDir       = fullpath.joinPath(".git")
     (head, tail) = fullpath.splitPath()
 
-  if gitdir.dirExists():
+  if gitDir.dirExists():
     return gitDir
 
   if tail == "":
@@ -640,7 +640,7 @@ proc refetchTags(info: RepoInfo) =
 
 proc loadCommit(info: RepoInfo, commitId: string) =
   info.commitId = commitId
-  trace("commit ID: " & info.commitID)
+  trace("commit ID: " & info.commitId)
   info.loadAuthor()
   info.loadTags()
 
@@ -792,7 +792,7 @@ proc isInRepo(obj: ChalkObj, repo: string): bool =
     return false
 
   let prefix = repo.splitPath().head
-  if obj.fsref.resolvePath().startsWith(prefix):
+  if obj.fsRef.resolvePath().startsWith(prefix):
     return true
 
   return false

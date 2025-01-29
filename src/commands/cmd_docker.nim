@@ -33,7 +33,7 @@ proc runCmdDocker*(args: seq[string]) =
 
   if getDockerExeLocation() == "":
     error("docker command is missing. chalk requires docker binary installed to wrap docker commands.")
-    ctx.dockerFailSafe()
+    ctx.dockerFailsafe()
 
   ctx.withDockerFailsafe():
     case ctx.extractDockerCommand()

@@ -31,9 +31,9 @@ proc validateMetaData*(obj: ChalkObj): ValidateResult {.cdecl, exportc.} =
   elif "CHALK_ID" notin fields:
     error(obj.name & ": extracted chalk mark missing CHALK_ID field")
     return vBadMd
-  elif obj.callGetChalkID() != unpack[string](fields["CHALK_ID"]):
+  elif obj.callGetChalkId() != unpack[string](fields["CHALK_ID"]):
     error(obj.name & ": extracted CHALK_ID doesn't match computed CHALK_ID")
-    error(obj.callGetChalkID() & " vs: " & unpack[string](fields["CHALK_ID"]))
+    error(obj.callGetChalkId() & " vs: " & unpack[string](fields["CHALK_ID"]))
     return vBadMd
   elif "METADATA_ID" notin fields:
     error(obj.name & ": extracted chalk mark missing METADATA_ID field")
@@ -84,7 +84,7 @@ proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
     result["TIMESTAMP_WHEN_CHALKED"] = pack(startTime.toUnixInMs())
 
   if isSubscribedKey("PRE_CHALK_HASH") and obj.fsRef != "":
-    withFilesTream(obj.fsRef, mode = fmRead, strict = true):
+    withFileStream(obj.fsRef, mode = fmRead, strict = true):
       result["PRE_CHALK_HASH"] = pack(stream.readAll().sha256Hex())
 
   if obj.isMarked() and "METADATA_HASH" in obj.extract:
@@ -271,7 +271,7 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
     result.setIfNeeded("HOST_MACHINE_WHEN_CHALKED", uinfo.machine)
 
   if isSubscribedKey("INJECTOR_CHALK_ID"):
-    let selfIdOpt = selfID
+    let selfIdOpt = selfId
     if selfIdOpt.isSome(): result["INJECTOR_CHALK_ID"] = pack(selfIdOpt.get())
 
 proc attestationGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):

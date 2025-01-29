@@ -25,7 +25,7 @@ proc findAuthorsFile(fullpath: string): string =
     if not gitDir.dirExists(): return head.findAuthorsFile()
   else:
     # otherwise either we are examining an AUTHOR(s) file or traverse up
-    if tail == fNameAuthor or tail == fnameAuthors: return fullpath
+    if tail == fNameAuthor or tail == fNameAuthors: return fullpath
     return head.findAuthorsFile()
 
   let

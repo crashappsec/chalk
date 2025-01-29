@@ -810,7 +810,7 @@ proc insertChalkSection*(self: ElfFile, name: string, data: string): bool =
   var fileData  = self.fileData
   fileData      = fileData[0 ..< truncateOffset]
   fileData     &= chalkSectionData
-  filedata     &= stringTableData
+  fileData     &= stringTableData
   fileData     &= sectionTableData
   self.fileData = fileData
   return self.parse()

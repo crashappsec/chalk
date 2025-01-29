@@ -293,7 +293,7 @@ proc setGitHEAD(git: DockerGitContext) =
     of GitHeadType.branch:
       git.setGitHEADToName(HEADS)
     of GitHeadType.other:
-      git.setGitHeadToname("")
+      git.setGitHEADToName("")
     of GitHeadType.tag:
       # git tags are treated as detached commits on checkout
       git.setGitHEADToCommit()
@@ -320,7 +320,7 @@ proc fetch(git: DockerGitContext) =
   for spec in git.head.refs:
     args.add(spec & ":" & spec)
   discard git.run(args)
-  git.setGitHead()
+  git.setGitHEAD()
 
 proc checkout*(git: DockerGitContext): string =
   git.tmpWorkTree = getNewTempDir(tmpFileSuffix = ".context")

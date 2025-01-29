@@ -111,7 +111,7 @@ method repr(x: FromInfo, ctx: DockerParse): string =
   for name, flag in x.flags:
     let valid = if flag.valid: "valid" else: "NOT valid"
     result &= "(flag " & flag.name & " is " & valid & "; val = "
-    result &= ctx.evalSubstitutions(flag.argToks, errors) & ") "
+    result &= ctx.evalSubstitutions(flag.argtoks, errors) & ") "
   if x.image.isNone():
     result &= "image = none??; "
   else:
@@ -197,11 +197,11 @@ proc lexVarSub(ctx: DockerParse, d: DockerStatement, s: seq[Rune], i: var int): 
       # Drops down below
     else:
       result.error = "Unterminated ${"
-      result.endIx = i
+      result.endix = i
       return
   else:
     result.error = "Unterminated ${"
-    result.endIx = i
+    result.endix = i
     return
 
   i += 1
@@ -239,7 +239,7 @@ proc lexQuoted(ctx: DockerParse, d: DockerStatement, s: seq[Rune], q: Rune, i: v
     if s[i] == Rune('$'):
       result.contents.add(val)
       val = ""
-      result.varSubs.add(ctx.lexVarsub(d, s, i))
+      result.varSubs.add(ctx.lexVarSub(d, s, i))
       continue
     val &= $(s[i])
     i += 1
