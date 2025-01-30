@@ -703,7 +703,6 @@ commands that do not match known topics)
 """
   }
 
-
   command docgen {
     shortdoc: "Generate technical documentation"
     doc: """
