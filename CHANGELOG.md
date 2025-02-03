@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.5.3
+
+**Feb 3, 2025**
 
 ### Fixes
 
