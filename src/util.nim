@@ -137,64 +137,57 @@ const
   autoCompleteLoc = "~/.local/share/bash_completion/completions/chalk.bash"
 
 when hostOs == "linux":
-  template makeCompletionAutoSource() =
+  proc makeCompletionAutoSource(dst: string) =
     let
-      acpath  = resolvePath("~/.bash_completion")
-      toWrite = ". " & dst & "\n"
-
-    withFileStream(acpath, mode = fmReadWrite, strict = false):
+      ac       = "~/.bash_completion"
+      acpath   = resolvePath(ac)
+      toWrite  = ". " & acpath
+      contents = tryToLoadFile(acpath)
+    if toWrite in contents:
+      return
+    withFileStream(acpath, mode = fmAppend, strict = false):
       if stream == nil:
         warn("Cannot write to " & acpath & " to turn on autocomplete.")
         return
       try:
-        let
-          contents = stream.readAll()
-        if toWrite in contents:
-          return
         if len(contents) != 0 and contents[^1] != '\n':
-          stream.write("\n")
+          stream.writeLine("")
+        stream.writeLine(toWrite)
       except:
         warn("Cannot write to ~/.bash_completion to turn on autocomplete.")
         dumpExOnDebug()
         return
-      stream.write(toWrite)
       info("Added sourcing of autocomplete to ~/.bash_completion file")
 
 elif hostOs == "macosx":
-  template makeCompletionAutoSource() =
+  proc makeCompletionAutoSource(dst: string) =
     let
-      acpath = resolvePath("~/.zshrc")
+      ac       = "~/.zshrc"
+      acpath   = resolvePath(ac)
+      srcLine  = "source " & dst
+      lines    = tryToLoadFile(acpath).splitLines()
+    var
+      foundbci = false
+      foundci  = false
+      foundsrc = false
 
-    withFileStream(acpath, mode = fmReadWrite, strict = false):
+    for line in lines:
+      # This is not even a little precise but should be ok
+      let words = line.split(" ")
+      if "bashcompinit" in words:
+        foundbci = true
+      elif "compinit" in words:
+        foundci = true
+      elif line == srcLine and foundci and foundbci:
+        foundsrc = true
+
+    if foundbci and foundci and foundsrc:
+      return
+
+    withFileStream(acpath, mode = fmAppend, strict = false):
       if stream == nil:
         warn("Cannot write to " & acpath & " to turn on autocomplete.")
         return
-      var
-        contents: string
-        foundbci = false
-        foundci  = false
-        foundsrc = false
-      try:
-        contents = stream.readAll()
-      except:
-        discard
-      let
-        lines   = contents.split("\n")
-        srcLine = "source " & dst
-
-      for line in lines:
-        # This is not even a little precise but should be ok
-        let words = line.split(" ")
-        if "bashcompinit" in words:
-          foundbci = true
-        elif "compinit" in words:
-          foundci = true
-        elif line == srcLine and foundci and foundbci:
-          foundsrc = true
-
-      if foundbci and foundci and foundsrc:
-        return
-
       if len(contents) != 0 and contents[^1] != '\n':
         stream.write("\n")
 
@@ -210,9 +203,10 @@ elif hostOs == "macosx":
         stream.writeLine(srcLine)
 
       info("Set up sourcing of basic autocomplete in ~/.zshrc")
+      info("Script should be sourced automatically on your next login.")
 
 else:
-    template makeCompletionAutoSource() = discard
+  proc makeCompletionAutoSource(dst: string) = discard
 
 const currentAutoCompleteVersion = (0, 1, 3)
 
@@ -289,8 +283,7 @@ proc autocompleteFileCheck*() =
     info("Installed bash auto-completion file to: " & dst)
 
   if not alreadyExists:
-    makeCompletionAutoSource()
-    info("Script should be sourced automatically on your next login.")
+    makeCompletionAutoSource(dst)
 
 template otherSetupTasks*() =
   setupManagedTemp()
