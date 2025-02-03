@@ -165,7 +165,8 @@ elif hostOs == "macosx":
       ac       = "~/.zshrc"
       acpath   = resolvePath(ac)
       srcLine  = "source " & dst
-      lines    = tryToLoadFile(acpath).splitLines()
+      contents = tryToLoadFile(acpath)
+      lines    = contents.splitLines()
     var
       foundbci = false
       foundci  = false
