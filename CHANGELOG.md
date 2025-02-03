@@ -7,6 +7,8 @@
 - Incorrect base image for `DOCKER_COPY_IMAGES` when using stage index
   (e.g. `COPY --from=<index>`).
   ([#479](https://github.com/crashappsec/chalk/pull/479))
+- Installing shell autocompletion script was wiping bash/zsh rc files.
+  ([#480](https://github.com/crashappsec/chalk/pull/480))
 
 ## 0.5.2
 
