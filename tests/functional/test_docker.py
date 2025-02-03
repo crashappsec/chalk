@@ -536,6 +536,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             FROM one as five
             COPY --from=nginx:1.27.0@sha256:97b83c73d3165f2deb95e02459a6e905f092260cd991f4c4eae2f192ddb99cbe /usr/sbin/nginx /nginx
             COPY --from=one /bin/sh /sh
+            COPY --from=0 /bin/ls /ls
 
             FROM scratch as six
 
@@ -795,6 +796,17 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
                     "digest": ANY,
                     "src": ["/bin/sh"],
                     "dest": "/sh",
+                },
+                {
+                    "from": "0",
+                    "uri": re.compile("alpine@sha256:"),
+                    "repo": "alpine",
+                    "registry": "registry-1.docker.io",
+                    "name": "library/alpine",
+                    "tag": MISSING,
+                    "digest": ANY,
+                    "src": ["/bin/ls"],
+                    "dest": "/ls",
                 },
             ],
             "": [

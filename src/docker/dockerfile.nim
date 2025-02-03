@@ -8,7 +8,7 @@
 ## Dockerfile parsing
 
 import std/[algorithm, sequtils, unicode]
-import ".."/config
+import ".."/[config, util]
 import "."/[ids]
 
 # RUN and COPY accept << and <<-
@@ -1068,6 +1068,8 @@ proc formatCopyImage(ctx: DockerInvocation, copy: CopyInfo): ChalkDict =
   let image =
     if copy.frm in ctx.dfSectionAliases:
       ctx.getBaseDockerSection(ctx.dfSectionAliases[copy.frm]).image
+    elif isUInt(copy.frm) and parseInt(copy.frm) < len(ctx.dfSections):
+      ctx.getBaseDockerSection(ctx.dfSections[parseInt(copy.frm)]).image
     else:
       parseImage(copy.frm, defaultTag = "")
   result = ChalkDict()
