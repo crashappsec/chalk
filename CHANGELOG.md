@@ -2,6 +2,12 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- Incorrect base image for `DOCKER_COPY_IMAGES` when using stage index
+  (e.g. `COPY --from=<index>`).
+  ([#479](https://github.com/crashappsec/chalk/pull/479))
+
 ## 0.5.2
 
 **Jan 28, 2025**

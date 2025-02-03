@@ -499,6 +499,13 @@ proc isInt*(i: string): bool =
   except:
     return false
 
+proc isUInt*(i: string): bool =
+  try:
+    discard parseUInt(i)
+    return true
+  except:
+    return false
+
 proc splitBy*(s: string, sep: string, default: string = ""): (string, string) =
   let parts = s.split(sep, maxsplit = 1)
   if len(parts) == 2:
