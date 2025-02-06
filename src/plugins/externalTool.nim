@@ -10,6 +10,7 @@
 
 import std/[algorithm, sequtils, sets]
 import ".."/[config, plugin_api, util]
+import "."/[vctlGit]
 
 type
   AlreadyRanError = object of CatchableError
@@ -75,6 +76,7 @@ proc runOneTool(info: PIInfo, path: string): ChalkDict =
   return d
 
 template toolBase(path: string) {.dirty.} =
+  let resolved = path.resolvePath()
   result = ChalkDict()
 
   var
@@ -104,7 +106,7 @@ template toolBase(path: string) {.dirty.} =
   for k, v in toolInfo:
     for (ignore, info) in v.sorted():
       try:
-        let data = info.runOneTool(path)
+        let data = info.runOneTool(resolved)
         # merge multiple tools into a single structure
         # for example first tool returns:
         # { SBOM: { foo: {...} } }
@@ -116,21 +118,35 @@ template toolBase(path: string) {.dirty.} =
         if len(data) >= 0 and attrGet[bool]("tool." & info.name & ".stop_on_success"):
           break
       except AlreadyRanError:
-        trace(info.name & ": already ran for " & path & ". skipping")
+        trace(info.name & ": already ran for " & resolved & ". skipping")
       except:
         error(info.name & ": " & getCurrentExceptionMsg())
 
+proc getToolPath(path: string): string =
+  let
+    git = getPluginByName("vctl_git")
+  try:
+    return git.getRepoFor(path)
+  except KeyError:
+    return path
+
 proc toolGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
-  toolBase(resolvePath(getContextDirectories()[0]))
+  for c in getContextDirectories():
+    toolBase(getToolPath(c))
+    # only care about first context
+    break
 
 proc toolGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
                                  ChalkDict {.cdecl.} =
   if obj.fsRef != "":
-    toolBase(resolvePath(obj.fsRef))
+    toolBase(obj.fsRef)
   elif getCommandName() == "build":
-    toolBase(resolvePath(getContextDirectories()[0]))
+    for c in getContextDirectories():
+      toolBase(getToolPath(c))
+      # only care about first context
+      break
   else:
-    toolBase(resolvePath(obj.name))
+    toolBase(obj.name)
 
 proc loadExternalTool*() =
   newPlugin("tool",

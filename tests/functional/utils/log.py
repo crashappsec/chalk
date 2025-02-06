@@ -51,7 +51,14 @@ def path_processor(
     return event_dict
 
 
-RENDERER = structlog.dev.ConsoleRenderer()
+class Console(structlog.dev.ConsoleRenderer):
+    def _repr(self, val: Any) -> str:
+        if isinstance(val, str):
+            return val
+        return repr(val)
+
+
+RENDERER = Console()
 
 LEVEL = (os.environ.get("LOG_LEVEL") or "INFO").upper()
 

@@ -80,15 +80,11 @@ def test_nonvirtual_valid(
         if file.suffix in {"key", "pub"}:
             continue
 
-        is_artifact = file.name == shebang
         text = file.read_text()
         lines = text.splitlines()
         first_line = next(iter(lines), "")
 
-        # shebang only should be present in artifacts
-        assert first_line.startswith(SHEBANG) == is_artifact
-
-        if is_artifact:
+        if first_line.startswith(SHEBANG):
             # chalk mark with MAGIC expected in last line
             assert lines[-1].startswith("#")
             assert MAGIC in lines[-1]

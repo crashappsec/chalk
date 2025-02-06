@@ -28,7 +28,7 @@ from .conf import (
     REGISTRY_PROXY,
     REGISTRY_TLS,
     REGISTRY_TLS_INSECURE,
-    ROOT,
+    TESTS,
 )
 from .utils.dict import (
     ANY,
@@ -1104,7 +1104,7 @@ def test_virtual_valid(
             "_REPO_TAGS": MISSING,  # not pushed
             "DOCKERFILE_PATH": str(dockerfile),
             "DOCKERFILE_PATH_WITHIN_VCTL": str(
-                dockerfile.relative_to(ROOT.parent.parent)
+                dockerfile.relative_to(TESTS.parent.parent)
             ),
             # docker tags should be set to tag above
             "DOCKER_TAGS": Contains({f"{tag}:latest"}),
@@ -1162,7 +1162,7 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
             "_REPO_TAGS": MISSING,  # not pushed
             "DOCKERFILE_PATH": str(DOCKERFILES / test_file / "Dockerfile"),
             "DOCKERFILE_PATH_WITHIN_VCTL": str(
-                dockerfile.relative_to(ROOT.parent.parent)
+                dockerfile.relative_to(TESTS.parent.parent)
             ),
             # docker tags should be set to tag above
             "DOCKER_TAGS": Contains({f"{tag}:latest"}),

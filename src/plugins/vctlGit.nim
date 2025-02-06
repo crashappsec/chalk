@@ -272,6 +272,7 @@ type
     branchName: Option[string]
     commitId:   Option[string]
     origin:     Option[string]
+    repos:      OrderedTable[string, string]
     vcsDirs:    OrderedTable[string, RepoInfo]
 
 proc clearCallback(self: Plugin) {.cdecl.} =
@@ -760,6 +761,7 @@ proc findAndLoad(plugin: GitInfo, path: string) =
       dumpExOnDebug()
 
   plugin.vcsDirs[vcsDir] = info
+  plugin.repos[path] = vcsDir.parentDir()
 
 proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
   if prefix == "":
@@ -802,6 +804,17 @@ proc gitInit(self: Plugin) =
   if len(cache.vcsDirs) == 0:
     for path in getContextDirectories():
       cache.findAndLoad(path.resolvePath())
+
+proc getRepoFor*(self: Plugin, path: string): string =
+  self.gitInit()
+  let
+    cache    = GitInfo(self.internalState)
+    resolved = path.resolvePath()
+  if resolved in cache.repos:
+    return cache.repos[resolved]
+  else:
+    trace("git: " & path & " is not inside git repo")
+    raise newException(KeyError, "not in git repo")
 
 proc gitFirstDir*(self: Plugin): string =
   self.gitInit()
