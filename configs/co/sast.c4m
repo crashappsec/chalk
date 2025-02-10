@@ -5,3 +5,4 @@ parameter var run_sast {
 }
 
 ~run_sast_tools = run_sast
+tool.semgrep.semgrep_prefer_docker = true

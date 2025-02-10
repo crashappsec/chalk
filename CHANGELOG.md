@@ -2,6 +2,14 @@
 
 ## On the `main` branch
 
+### Fixes
+
+- `chalk insert` was running external tools on the exact path
+  being chalked. For example `chalk insert hello.py` would run `semgrep`
+  on `hello.py`. Now chalk will compute nearest `git` repository
+  and run external tools on it instead.
+  ([#485](https://github.com/crashappsec/chalk/pull/485))
+
 ## 0.5.3
 
 **Feb 3, 2025**

@@ -140,7 +140,17 @@ proc addUnmarked*(s: string) =
     collectionCtx.unmarked.add(s)
 proc setContextDirectories*(l: seq[string]) =
   # Used for 'where to look for stuff' plugins, particularly version control.
-  collectionCtx.contextDirectories = l
+  var dirs = newSeq[string]()
+  for i in l:
+    dirs.add(
+      # if its a file, normalize to its parent folder
+      # as the context should be a directory
+      if i.fileExists():
+        i.parentDir()
+      else:
+        i
+    )
+  collectionCtx.contextDirectories = dirs
 proc getContextDirectories*(): seq[string] =
   collectionCtx.contextDirectories
 

@@ -41,6 +41,8 @@ logger = get_logger()
 def artifact_type(path: Path) -> str:
     if path.suffix == ".py":
         return "python"
+    if path.suffix == ".sh":
+        return "sh"
     elif path.suffix == ".zip":
         return "ZIP"
     else:

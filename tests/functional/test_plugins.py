@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
-from .conf import CODEOWNERS, CONFIGS, DATA, DOCKERFILES, LS_PATH, PYS
+from .conf import CODEOWNERS, CONFIGS, DATA, DOCKERFILES, LS_PATH, PYS, REPO
 from .utils.dict import ANY, MISSING
 from .utils.docker import Docker
 from .utils.git import Git
@@ -824,9 +824,7 @@ def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
                 "metadata": {
                     "component": {
                         "type": "file",
-                        "name": re.compile(
-                            r"tests/functional/data/dockerfiles/valid/sample_1$"
-                        ),
+                        "name": str(REPO),
                     },
                 },
             }
@@ -883,7 +881,7 @@ def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk, use_docker: bool
 
     insert = chalk.insert(bin_path, env={"EXTERNAL_TOOL_USE_DOCKER": str(use_docker)})
     assert insert.marks_by_path.contains({str(bin_path): {}})
-    assert insert.report.contains(sbom_data)
+    assert insert.mark.contains(sbom_data)
     if use_docker:
         assert "ghcr.io/anchore/syft" in insert.logs
     else:
@@ -916,7 +914,7 @@ def test_semgrep(
     )
 
     # expected sast output with custom rule
-    sast_data = {
+    report_sast_data = {
         "SAST": {
             "semgrep": {
                 "runs": [
@@ -966,17 +964,40 @@ def test_semgrep(
             }
         }
     }
+    mark_sast_data = {
+        "SAST": {
+            "semgrep": {
+                "runs": [
+                    {
+                        "invocations": [
+                            {
+                                "executionSuccessful": True,
+                            }
+                        ],
+                        "results": [],
+                        "tool": {
+                            "driver": {
+                                "name": "Semgrep OSS",
+                                "semanticVersion": ANY,
+                            }
+                        },
+                    }
+                ],
+            }
+        }
+    }
 
     insert = chalk.insert(
-        artifact=tmp_data_dir, env={"EXTERNAL_TOOL_USE_DOCKER": str(use_docker)}
+        artifact=tmp_data_dir / "hello.sh",
+        env={"EXTERNAL_TOOL_USE_DOCKER": str(use_docker)},
     )
-    assert insert.marks_by_path.contains({str(tmp_data_dir / "helloworld.py"): {}})
-    assert insert.report.contains(sast_data)
+    assert insert.marks_by_path.contains({str(tmp_data_dir / "hello.sh"): {}})
+    assert insert.report.contains(report_sast_data)
     if use_docker:
         assert "semgrep/semgrep" in insert.logs
     else:
         assert "semgrep/semgrep" not in insert.logs
 
     # check that sbom has been embedded into the artifact
-    chalk_mark = ChalkMark.from_binary(tmp_data_dir / "helloworld.py")
-    assert chalk_mark.contains(sast_data)
+    chalk_mark = ChalkMark.from_binary(tmp_data_dir / "hello.sh")
+    assert chalk_mark.contains(mark_sast_data)

@@ -16,9 +16,10 @@ DOCKER_TOKEN_REPO = (
     or "crashappsec/chalk-docker-git-context-private"
 )
 
-ROOT = Path(__file__).parent
-DATA = ROOT / "data"
-GDB = ROOT / "gdb"
+TESTS = Path(__file__).parent
+REPO = TESTS.parent.parent
+DATA = TESTS / "data"
+GDB = TESTS / "gdb"
 
 CODEOWNERS = DATA / "codeowners"
 CONFIGS = DATA / "configs"
@@ -30,12 +31,12 @@ ZIPS = DATA / "zip"
 
 # base profiles and outconf
 BASE_REPORT_TEMPLATES = (
-    ROOT.parent.parent / "src" / "configs" / "base_report_templates.c4m"
+    TESTS.parent.parent / "src" / "configs" / "base_report_templates.c4m"
 )
 BASE_MARK_TEMPLATES = (
-    ROOT.parent.parent / "src" / "configs" / "base_chalk_templates.c4m"
+    TESTS.parent.parent / "src" / "configs" / "base_chalk_templates.c4m"
 )
-BASE_OUTCONF = ROOT.parent.parent / "src" / "configs" / "base_outconf.c4m"
+BASE_OUTCONF = TESTS.parent.parent / "src" / "configs" / "base_outconf.c4m"
 
 # pushing to a registry is orchestrated over the docker socket
 # which means that the push comes from the host
