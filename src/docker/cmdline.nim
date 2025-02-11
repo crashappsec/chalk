@@ -264,6 +264,7 @@ proc extractDockerCommand*(self: DockerInvocation): DockerCmd =
     self.extractSecrets()
     # set any other non-automatically initialized attributes to avoid segfaults
     self.addedPlatform = newOrderedTable[string, seq[string]]()
+    self.dfDirectives  = newOrderedTable[string, string]()
   of DockerCmd.push:
     self.extractImage()
     self.extractAllTags()

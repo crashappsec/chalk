@@ -9,6 +9,13 @@
   on `hello.py`. Now chalk will compute nearest `git` repository
   and run external tools on it instead.
   ([#485](https://github.com/crashappsec/chalk/pull/485))
+- When `Dockerfile` specifies syntax directive, chalk checks buildkit
+  frontend version compatibility as older frontends do not support
+  `--build-context` CLI argument. Passing the flag would fail the
+  wrapped build and chalk would fallback to vanilla docker build.
+  More about syntax directive
+  [here](https://docs.docker.com/reference/dockerfile/#syntax).
+  ([#486](https://github.com/crashappsec/chalk/pull/486))
 
 ## 0.5.3
 
