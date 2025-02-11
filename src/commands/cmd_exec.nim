@@ -169,8 +169,8 @@ template doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: untyped) =
 
   while true:
     sleep(sleepInterval)
-    chalkOpt.doHeartbeatReport()
     clearReportingState()
+    chalkOpt.doHeartbeatReport()
     if fn(pid):
       break
 
