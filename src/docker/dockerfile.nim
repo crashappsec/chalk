@@ -56,8 +56,6 @@ import "."/[ids]
 # HEALTHCHECK NONE
 # SHELL ["executable", "parameters"]
 
-const validDockerDirectives = ["syntax", "escape"]
-
 proc fromJson*[T](json: JsonNode): T =
   if json == nil or json == newJNull():
     nil
@@ -693,12 +691,13 @@ proc parseHashLine(ctx: DockerParse, line: string) =
       ctx.currentEscape         = arg.runeAt(0)
       tok.errors.add("Escape character is multi-byte... not allowed.")
 
-  if name notin validDockerDirectives:
+  if name notin ["syntax", "escape", "check"]:
     return
 
   if name in ctx.directives:
     tok.errors.add("Docker directive '" & name & "' has already appeared")
 
+  trace("docker: directive " & name & "=" & tok.directive.rawArg)
   ctx.directives[name] = tok.directive
 
 proc topLevelCmdParse(s: string): (string, string) =
@@ -939,6 +938,9 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
 
   if len(ctx.foundLabels) != 0:
     trace("docker: found labels: " & $(ctx.foundLabels))
+
+  for k, v in parse.directives.pairs():
+    ctx.dfDirectives[k] = v.rawArg
 
   if section == nil:
     raise newException(

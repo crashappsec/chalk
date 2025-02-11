@@ -24,7 +24,7 @@ proc parseVersion*(version: string): Version =
     patch  = 0
     suffix = ""
   let
-    name     = version.strip(chars={'V', 'v'}, trailing=false).strip(chars={',', '.', '-', '+'})
+    name     = version.strip(chars={'V', 'v'}, trailing=false).strip(chars={',', '.', '-', '+', '/'})
     sections = name.split({'-', '+'}, maxsplit=1)
     parts    = sections[0].split('.')
   case len(parts):
@@ -87,7 +87,7 @@ proc normalize*(self: Version): string =
   return s
 
 proc getVersionFromLine*(line: string): Version =
-  for word in line.splitWhitespace():
+  for word in line.split(seps = Whitespace + {'/', ','}):
     if '.' in word:
       try:
         return parseVersion(word)

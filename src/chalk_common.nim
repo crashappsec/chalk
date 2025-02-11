@@ -155,7 +155,7 @@ type
     default*: Option[LineToken]
     error*:   string
     plus*:    bool
-    minus*:   bool  #
+    minus*:   bool
 
   LineTokenType* = enum ltOther, ltWord, ltQuoted, ltSpace
 
@@ -402,6 +402,7 @@ type
       # parsed dockerfile
       dfSections*:            seq[DockerFileSection]
       dfSectionAliases*:      OrderedTable[string, DockerFileSection]
+      dfDirectives*:          OrderedTableRef[string, string]
 
     of DockerCmd.push:
       foundImage*:            string

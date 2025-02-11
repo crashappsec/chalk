@@ -7,6 +7,7 @@
 
 import std/[os, sets]
 import ".."/[config, util, semver]
+import "."/[ids]
 
 var
   dockerExeLocation   = ""
@@ -14,6 +15,7 @@ var
   dockerServerVersion = parseVersion("0")
   buildXVersion       = parseVersion("0")
   buildKitVersion     = parseVersion("0")
+  frontendVersion     = none(Version)
 
 proc getDockerExeLocation*(): string =
   once:
@@ -214,6 +216,44 @@ proc getBuildKitVersion*(ctx: DockerInvocation): Version =
       dumpExOnDebug()
   return buildKitVersion
 
+proc getFrontendVersion*(ctx: DockerInvocation): Option[Version] =
+  ## get buildkit frontend version
+  ## * returns none if frontend is not specified
+  ##   and default buildkit version will be used
+  ## * returns "0" if the version could not be determined
+  ## * return actual version otherwise
+  result = frontendVersion
+  once:
+    if ctx == nil or ctx.cmd != DockerCmd.build:
+      return
+    let syntax = ctx.dfDirectives.getOrDefault(
+      "syntax",
+      ctx.foundBuildArgs.getOrDefault("BUILDKIT_SYNTAX", ""),
+    )
+    if syntax == "":
+      return
+    try:
+      let
+        image  = parseImage(syntax)
+        output = runDockerGetEverything(@[
+          "run",
+          "--rm",
+          $image,
+          "-version",
+        ])
+      if output.exitCode != 0:
+        trace("docker: could not get buildkint frontend versioni " & output.getStdErr())
+        frontendVersion = some(parseVersion("0"))
+      else:
+        let version = getVersionFromLine(output.stdOut)
+        trace("docker: frontend version: " & $version)
+        frontendVersion = some(version)
+      return frontendVersion
+    except:
+      dumpExOnDebug()
+      frontendVersion = some(parseVersion("0"))
+  return frontendVersion
+
 var dockerAuth = newJObject()
 proc getDockerAuthConfig*(): JsonNode =
   once:
@@ -236,11 +276,14 @@ proc supportsBuildContextFlag*(ctx: DockerInvocation): bool =
   # https://github.com/moby/buildkit/releases/tag/v0.10.0
   # which in turn is included in docker server version >= 23
   # https://docs.docker.com/engine/release-notes/23.0/#2300
+  let frontend = getFrontendVersion(ctx)
   return (
     getDockerClientVersion() >= parseVersion("21") and
     getDockerServerVersion() >= parseVersion("23") and
     getBuildXVersion()       >= parseVersion("0.8") and
-    ctx.getBuildKitVersion() >= parseVersion("0.10")
+    ctx.getBuildKitVersion() >= parseVersion("0.10") and
+    (frontend.isNone() or
+     frontend.get()          >= parseVersion("1.4"))
   )
 
 proc supportsCopyChmod*(): bool =

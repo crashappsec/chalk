@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:experimental
 FROM alpine as base
 FROM base
 RUN adduser -D testuser
