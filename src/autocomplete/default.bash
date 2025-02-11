@@ -27,6 +27,10 @@ function _chalk_delete_completions {
     fi
 }
 
+function _chalk_docker_completions {
+    _command_offset 1
+}
+
 function _chalk_load_completions {
     if [ ${_CHALK_CUR_WORD::1} = "-" ] ; then
         COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --replace --no-replace --update-arch-binaries --no-update-arch-binaries --params --no-params --validation --no-validation --validation-warning --no-validation-warning" -- ${_CHALK_CUR_WORD}))
