@@ -16,6 +16,10 @@
   More about syntax directive
   [here](https://docs.docker.com/reference/dockerfile/#syntax).
   ([#486](https://github.com/crashappsec/chalk/pull/486))
+- Heartbeat reports had older timestamps. Reporting state was cleared
+  before sleeping for the heartbeat which meant that timestamp was
+  always off by the heartbeats interval - default 10 minutes.
+  ([#487](https://github.com/crashappsec/chalk/pull/487))
 
 ## 0.5.3
 
