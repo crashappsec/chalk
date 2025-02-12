@@ -7,9 +7,11 @@ report_template.terminal_insert.key.SAST.use: true
 
 # `chalk insert` uses the mark_default template.
 mark_template.mark_default.key.SAST.use: true
+mark_template.mark_default.key.EXTERNAL_TOOL_DURATION.use: true
 
 # `chalk docker build` uses the `minimal` template.
 mark_template.minimal.key.SAST.use: true
+mark_template.minimal.key.EXTERNAL_TOOL_DURATION.use: true
 
 tool.semgrep.semgrep_config_profile: "rule.yaml"
 

@@ -8,7 +8,7 @@
 ## This plugin uses information from the config file to set metadata
 ## keys.
 
-import std/[algorithm, sequtils, sets]
+import std/[algorithm, sequtils, sets, times]
 import ".."/[config, plugin_api, util]
 import "."/[vctlGit]
 
@@ -75,7 +75,7 @@ proc runOneTool(info: PIInfo, path: string): ChalkDict =
   alreadyRan.incl(key)
   return d
 
-template toolBase(path: string) {.dirty.} =
+proc toolBase(path: string): ChalkDict =
   let resolved = path.resolvePath()
   result = ChalkDict()
 
@@ -106,7 +106,8 @@ template toolBase(path: string) {.dirty.} =
   for k, v in toolInfo:
     for (ignore, info) in v.sorted():
       try:
-        let data = info.runOneTool(resolved)
+        withDuration():
+          let data = info.runOneTool(resolved)
         # merge multiple tools into a single structure
         # for example first tool returns:
         # { SBOM: { foo: {...} } }
@@ -115,6 +116,11 @@ template toolBase(path: string) {.dirty.} =
         # merged structure should be:
         # { SBOM: { foo: {...}, bar: {...} } }
         result.merge(data.nestWith(info.name))
+        let timing = ChalkDict()
+        timing["EXTERNAL_TOOL_DURATION"] = pack(duration.inMilliseconds())
+        # add duration with structure:
+        # { 'EXTERNAL_TOOL_DURATION': {'<tool>': {'<path>': duration_ms}}}
+        result.merge(timing.nestWith(resolved).nestWith(info.name), deep = true)
         if len(data) >= 0 and attrGet[bool]("tool." & info.name & ".stop_on_success"):
           break
       except AlreadyRanError:
@@ -131,22 +137,24 @@ proc getToolPath(path: string): string =
     return path
 
 proc toolGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
+  result = ChalkDict()
   for c in getContextDirectories():
-    toolBase(getToolPath(c))
+    result.merge(toolBase(getToolPath(c)))
     # only care about first context
     break
 
 proc toolGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
                                  ChalkDict {.cdecl.} =
+  result = ChalkDict()
   if obj.fsRef != "":
-    toolBase(obj.fsRef)
+    result.merge(toolBase(obj.fsRef))
   elif getCommandName() == "build":
     for c in getContextDirectories():
-      toolBase(getToolPath(c))
+      result.merge(toolBase(getToolPath(c)))
       # only care about first context
       break
   else:
-    toolBase(obj.name)
+    result.merge(toolBase(obj.name))
 
 proc loadExternalTool*() =
   newPlugin("tool",

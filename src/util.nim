@@ -587,7 +587,7 @@ proc update*(self: JsonNode, other: JsonNode): JsonNode {.discardable.} =
       self[k] = v
   return self
 
-proc merge*(self: ChalkDict, other: ChalkDict): ChalkDict {.discardable.} =
+proc merge*(self: ChalkDict, other: ChalkDict, deep = false): ChalkDict {.discardable.} =
   result = self
   for k, v in other:
     if k in self and self[k].kind == MkSeq and v.kind == MkSeq:
@@ -596,8 +596,11 @@ proc merge*(self: ChalkDict, other: ChalkDict): ChalkDict {.discardable.} =
       let
         mine   = unpack[ChalkDict](self[k])
         theirs = unpack[ChalkDict](v)
-      for kk, vv in theirs:
-        mine[kk] = vv
+      if deep:
+        mine.merge(theirs)
+      else:
+        for kk, vv in theirs:
+          mine[kk] = vv
       self[k] = pack(mine)
     else:
       self[k] = v
@@ -656,3 +659,11 @@ proc forReport*(t: DateTime): DateTime =
   # eventually we might add a config to specify in which TZ to report in
   # however for now normalize to local timezone for reading report output
   return t.local
+
+template withDuration*(c: untyped) =
+  let start = getMonoTime()
+  c
+  let
+    stop                = getMonoTime()
+    diff                = stop - start
+    duration {.inject.} = diff

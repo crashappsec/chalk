@@ -21,6 +21,12 @@
   always off by the heartbeats interval - default 10 minutes.
   ([#487](https://github.com/crashappsec/chalk/pull/487))
 
+### New Features
+
+- `EXTERNAL_TOOL_DURATION` key which reports external tool duration
+  for each invocation.
+  ([#488](https://github.com/crashappsec/chalk/pull/488))
+
 ## 0.5.3
 
 **Feb 3, 2025**

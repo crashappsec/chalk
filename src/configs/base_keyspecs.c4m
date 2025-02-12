@@ -1499,6 +1499,22 @@ collecting this information.
 """
 }
 
+keyspec EXTERNAL_TOOL_DURATION {
+    kind:             ChalkTimeArtifact
+    type:             dict[string, dict[string, int]]
+    standard:         true
+    since:            "0.5.4"
+    shortdoc:         "Duration of each external tool invocation in ms"
+    doc:              """
+Duration how long in ms each external tool invocation took.
+The value is grouped by:
+
+* external tool name
+* execution context
+* duration
+"""
+}
+
 keyspec INFERRED_TECH_STACKS {
     kind:             ChalkTimeArtifact
     type:             `x
