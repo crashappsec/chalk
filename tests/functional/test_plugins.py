@@ -915,6 +915,11 @@ def test_semgrep(
 
     # expected sast output with custom rule
     report_sast_data = {
+        "EXTERNAL_TOOL_DURATION": {
+            "semgrep": {
+                str(tmp_data_dir): int,
+            },
+        },
         "SAST": {
             "semgrep": {
                 "runs": [
@@ -962,9 +967,14 @@ def test_semgrep(
                     }
                 ],
             }
-        }
+        },
     }
     mark_sast_data = {
+        "EXTERNAL_TOOL_DURATION": {
+            "semgrep": {
+                str(tmp_data_dir / "hello.sh"): int,
+            },
+        },
         "SAST": {
             "semgrep": {
                 "runs": [
@@ -984,7 +994,7 @@ def test_semgrep(
                     }
                 ],
             }
-        }
+        },
     }
 
     insert = chalk.insert(
