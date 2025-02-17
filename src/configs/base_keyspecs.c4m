@@ -1480,7 +1480,7 @@ keyspec SBOM {
     since:            "0.1.0"
     shortdoc: "SBOM(s) collected at Chalk time"
     doc:              """
-This field is meant to captures any SBOMs associated with a chalking
+This field is meant to capture any SBOMs associated with a chalking
 (i.e., a chalk mark insertion operation). The value, when provided, is
 a dictionary. The keys of that dictionary indicate the tool used to
 perform the chalking, and the value consists of a free-form JSON
@@ -1496,6 +1496,35 @@ source if needed.
 
 You may also set the field yourself if you have other tooling for
 collecting this information.
+"""
+}
+
+keyspec SECRET_SCANNER {
+    kind:             ChalkTimeArtifact
+    type:             dict[string, dict[string, `x]]
+    standard:         true
+    since:            "0.5.4"
+    shortdoc:         "Secret scanner results collected at Chalk time"
+    doc:              """
+This field is meant to capture any secret scanning tool results while
+chalking artifacts. Then value, when provided, is a dictionary.
+The keys of that dictionary indicate the tool used, and the value consists of
+free-form JSON object returned by the scanning tool.
+
+Currently only these tools are supported:
+
+* trufflehog.
+  If the chalking is done in a git repo, trufflehog is used in `git` mode
+  which will only scan files checked in the repo.
+  Otherwise trufflehog is used in `filesystem` mode where it will scan
+  all files within the chalking context directory.
+  **NOTE** that trufflehog validates all findings by checking
+  secrets it finds. For example for AWS keys, it will check if they
+  are still active creds in AWS. This reduces noise however might have
+  security-considerations depending on the security posture of the org.
+
+This is not enabled by default and `run_secret_scanner_tools` config needs
+to be enabled to run secret scanners.
 """
 }
 

@@ -123,6 +123,19 @@ proc c4mParseJson(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
     error("Could not parse JSON: " & getCurrentExceptionMsg())
     return none(Box)
 
+proc c4mParseJsonL(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
+  let
+    data = unpack[string](args[0])
+  try:
+    var json = newJArray()
+    for line in data.strip().splitLines():
+      json.add(parseJson(line))
+    let box  = nimJsonToBox(json)
+    return some(box)
+  except:
+    error("Could not parse JSON: " & getCurrentExceptionMsg())
+    return none(Box)
+
 proc dockerExe(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   return some(pack(getDockerExeLocation()))
 
@@ -221,8 +234,13 @@ This way the function is only computed once.
     ("parse_json(string) -> `x",
      BuiltInFn(c4mParseJson),
      """
-Same as `url_post()`, but takes a certificate file location in the final
-parameter, with which HTTPS connections must authenticate against.
+Parses JSON string and returns data-struct back.
+""",
+     @["parsing"]),
+    ("parse_jsonl(string) -> `x",
+     BuiltInFn(c4mParseJsonL),
+     """
+Parses JSONl string and returns data-struct back.
 """,
      @["parsing"]),
      ("docker_exe() -> string",

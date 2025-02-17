@@ -10,7 +10,19 @@ from pathlib import Path
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
-from .conf import CODEOWNERS, CONFIGS, DATA, DOCKERFILES, LS_PATH, PYS, REPO
+from .conf import (
+    AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY,
+    AWS_SESSION_TOKEN,
+    CODEOWNERS,
+    CONFIGS,
+    DATA,
+    DOCKERFILES,
+    LS_PATH,
+    PYS,
+    REPO,
+    aws_secrets_configured,
+)
 from .utils.dict import ANY, MISSING
 from .utils.docker import Docker
 from .utils.git import Git
@@ -1011,3 +1023,48 @@ def test_semgrep(
     # check that sbom has been embedded into the artifact
     chalk_mark = ChalkMark.from_binary(tmp_data_dir / "hello.sh")
     assert chalk_mark.contains(mark_sast_data)
+
+
+@pytest.mark.parametrize("use_docker", [True, False])
+@pytest.mark.skipif(not aws_secrets_configured(), reason="AWS secrets not configured")
+def test_trufflehog(chalk: Chalk, tmp_data_dir: Path, use_docker: bool):
+    target = tmp_data_dir / "aws.sh"
+    target.write_text(
+        f"""
+#!/bin/sh
+export AWS_ACCESS_KEY_ID={AWS_ACCESS_KEY_ID}
+export AWS_SECRET_ACCESS_KEY={AWS_SECRET_ACCESS_KEY}
+export AWS_SESSION_TOKEN={AWS_SESSION_TOKEN}
+""".strip()
+    )
+    insert = chalk.insert(
+        artifact=target,
+        env={"EXTERNAL_TOOL_USE_DOCKER": str(use_docker)},
+        config=(
+            CONFIGS / "composable" / "valid" / "secret_scanner" / "enable_secrets.c4m"
+        ),
+    )
+    data = {
+        "trufflehog": [
+            {
+                "SourceName": "trufflehog - filesystem",
+                "SourceMetadata": {
+                    "Data": {
+                        "Filesystem": {
+                            "file": str(target),
+                            "line": int,
+                        }
+                    }
+                },
+                "DetectorName": re.compile(r"^AWS"),
+            },
+        ],
+    }
+    assert insert.report.has(
+        # scans whole folder
+        SECRET_SCANNER=data,
+    )
+    assert insert.mark.has(
+        # scans specific file
+        SECRET_SCANNER=data,
+    )

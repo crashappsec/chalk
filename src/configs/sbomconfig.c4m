@@ -13,7 +13,7 @@ tool syft {
   ~attempt_install:    func install_syft(string) -> bool
   ~get_command_args:   func get_syft_args(string) -> string
   ~produce_keys:       (func extract_syft_sbom(string, int) ->
-                                                   dict[string, string])
+                                                   dict[string, `x])
   syft_exe_dir:       "/tmp"
   syft_installer:     "https://raw.githubusercontent.com/anchore/syft/main/install.sh"
   syft_container:     "anchore/syft"

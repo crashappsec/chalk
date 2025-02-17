@@ -25,7 +25,7 @@ proc clearCallback(self: Plugin) {.cdecl.} =
 proc ensureRunCallback[T](cb: CallbackObj, args: seq[Box]): T =
   let value = runCallback(cb, args)
   if value.isNone():
-    raise newException(ValueError, "missing implemenetation of " & $(cb))
+    raise newException(ValueError, "missing implementation of " & $(cb))
   return unpack[T](value.get())
 
 proc runOneTool(info: PIInfo, path: string): ChalkDict =
@@ -82,8 +82,9 @@ proc toolBase(path: string): ChalkDict =
   var
     toolInfo = initTable[string, seq[(int, PIInfo)]]()
   let
-    runSBOM  = attrGet[bool]("run_sbom_tools")
-    runSAST  = attrGet[bool]("run_sast_tools")
+    runSBOM    = attrGet[bool]("run_sbom_tools")
+    runSAST    = attrGet[bool]("run_sast_tools")
+    runSecrets = attrGet[bool]("run_secret_scanner_tools")
 
   # tools should only run during insert operations
   # note this is a subset of chalkable operations
@@ -94,8 +95,9 @@ proc toolBase(path: string): ChalkDict =
     let v = "tool." & k
     if not attrGet[bool](v & ".enabled"): continue
     let kind = attrGet[string](v & ".kind")
-    if not runSBOM and kind == "sbom": continue
-    if not runSAST and kind == "sast": continue
+    if not runSBOM    and kind == "sbom":           continue
+    if not runSAST    and kind == "sast":           continue
+    if not runSecrets and kind == "secret_scanner": continue
 
     let tool = (attrGet[int](v & ".priority"), PIInfo(name: k))
     if kind notin toolInfo:

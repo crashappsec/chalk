@@ -13,7 +13,7 @@ tool semgrep {
   attempt_install:    func install_semgrep(string) -> bool
   get_command_args:   func get_semgrep_args(string) -> string
   produce_keys:       (func load_semgrep_results(string, int) ->
-                                                   dict[string, string])
+                                                   dict[string, `x])
   semgrep_config_profile: "auto"
   semgrep_format:         "sarif"
   semgrep_metrics:        "on"
