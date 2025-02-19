@@ -26,6 +26,9 @@
 - `EXTERNAL_TOOL_DURATION` key which reports external tool duration
   for each invocation.
   ([#488](https://github.com/crashappsec/chalk/pull/488))
+- `run_secret_scanner_tools` configuration which then collects new
+  `SECRET_SCANNER` key. Currently only trufflehog is supported.
+  ([#489](https://github.com/crashappsec/chalk/pull/489))
 
 ## 0.5.3
 

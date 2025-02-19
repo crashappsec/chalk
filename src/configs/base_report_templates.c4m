@@ -107,6 +107,7 @@ report and subtract from it.
   key.EMBEDDED_TMPDIR.use                     = true
   key.CLOUD_METADATA_WHEN_CHALKED.use         = true
   key.EXTERNAL_TOOL_DURATION.use              = true
+  key.SECRET_SCANNER.use                      = true
   key.SBOM.use                                = true
   key.SAST.use                                = true
   key.ERR_INFO.use                            = true
@@ -505,6 +506,7 @@ doc: """
   key.INJECTOR_ENV.use                        = true
   key.TENANT_ID_WHEN_CHALKED.use              = true
   key.EXTERNAL_TOOL_DURATION.use              = true
+  key.SECRET_SCANNER.use                      = true
   key.SBOM.use                                = true
   key.SAST.use                                = true
   key._ACTION_ID.use                          = true
@@ -711,6 +713,7 @@ doc: """
   key.EMBEDDED_TMPDIR.use                     = true
   key.CLOUD_METADATA_WHEN_CHALKED.use         = true
   key.EXTERNAL_TOOL_DURATION.use              = true
+  key.SECRET_SCANNER.use                      = true
   key.SBOM.use                                = true
   key.SAST.use                                = true
   key.ERR_INFO.use                            = true
@@ -1015,6 +1018,7 @@ container.
   key.INJECTOR_ENV.use                        = true
   key.TENANT_ID_WHEN_CHALKED.use              = true
   key.EXTERNAL_TOOL_DURATION.use              = true
+  key.SECRET_SCANNER.use                      = true
   key.SBOM.use                                = true
   key.SAST.use                                = true
 
@@ -1198,6 +1202,7 @@ container.
   key.EMBEDDED_TMPDIR.use                     = true
   key.CLOUD_METADATA_WHEN_CHALKED.use         = true
   key.EXTERNAL_TOOL_DURATION.use              = true
+  key.SECRET_SCANNER.use                      = true
   key.SBOM.use                                = true
   key.SAST.use                                = true
   key.ERR_INFO.use                            = true
@@ -1684,6 +1689,7 @@ and keep the run-time key.
   key.EMBEDDED_TMPDIR.use                     = true
   key.CLOUD_METADATA_WHEN_CHALKED.use         = true
   key.EXTERNAL_TOOL_DURATION.use              = true
+  key.SECRET_SCANNER.use                      = true
   key.SBOM.use                                = true
   key.SAST.use                                = true
   key.ERR_INFO.use                            = true

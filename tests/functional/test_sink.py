@@ -12,20 +12,18 @@ import pytest
 import requests
 
 from .chalk.runner import Chalk
-from .conf import CAT_PATH, SERVER_CERT, SERVER_HTTP, SERVER_HTTPS, SINK_CONFIGS
+from .conf import (
+    CAT_PATH,
+    SERVER_CERT,
+    SERVER_HTTP,
+    SERVER_HTTPS,
+    SINK_CONFIGS,
+    aws_secrets_configured,
+)
 from .utils.log import get_logger
 
 
 logger = get_logger()
-
-
-def aws_secrets_configured() -> bool:
-    return all(
-        [
-            bool(os.environ.get("AWS_ACCESS_KEY_ID", "")),
-            bool(os.environ.get("AWS_SECRET_ACCESS_KEY", "")),
-        ]
-    )
 
 
 # validates some basic fields on the chalk output, which should be all the same

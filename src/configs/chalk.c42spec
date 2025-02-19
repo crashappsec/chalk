@@ -21,7 +21,7 @@ all_cmds_that_insert := ["insert", "build", "push", "load", "setup"]
 
 # Beyond valid chalk commands, these can generate reports.
 other_report_ops     := ["build", "push", "heartbeat"]
-tool_types           := ["sbom", "sast"]
+tool_types           := ["sbom", "sast", "secret_scanner"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
 key_types            := ["Chalk-time Host", "Chalk-time Artifact",
                          "Run-time Artifact", "Run-time Host"]
@@ -3080,7 +3080,18 @@ The syft command line arguments used at invocation (minus the target location) c
     doc: """
 When true, this will cause chalk to run any configured static analysis security testing (SAST) tools.  This is off by default, since it could add a noticeable delay to build time for large code bases.
 
-Currently, the only available tool out of the box is semgrep, and will only work on machines that either already have semgrep installed, or have Python3 installed.
+Currently, the only available tool out of the box is semgrep, and will only work on machines that either already have semgrep installed, have Python3 installed, or can run docker.
+"""
+  }
+
+  field run_secret_scanner_tools {
+    type:     bool
+    default:  false
+    shortdoc: "Run any configured secret scanner tools"
+    doc: """
+When true, this will cause chalk to run any configured secret scanner tools.  This is off by default.
+
+Currently, the only available tool out of the box is trufflehog.
 """
   }
 

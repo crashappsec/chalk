@@ -223,6 +223,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.EMBEDDED_TMPDIR.use                     = true
   ~key.CLOUD_METADATA_WHEN_CHALKED.use         = true
   ~key.EXTERNAL_TOOL_DURATION.use              = true
+  ~key.SECRET_SCANNER.use                      = true
   ~key.SBOM.use                                = true
   ~key.SAST.use                                = true
   ~key.ERR_INFO.use                            = true

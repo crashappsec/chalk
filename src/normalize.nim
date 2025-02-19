@@ -34,21 +34,23 @@ proc u64ToStr(i: uint64): string =
 
 proc floatToStr(f: float): string =
   result = newStringOfCap(sizeof(float)+1)
-  let arr = cast[array[8, char]](f)
 
 proc binEncodeItem(self: Box): string
+
 proc binEncodeStr(s: string): string =
   return "\x01" & u32ToStr(uint32(len(s))) & s
+
 proc binEncodeInt(i: uint64): string =
   return "\x02" & u64ToStr(i)
-proc binEncodeBool(b: bool): string  = return if b: "\x03\x01" else: "\x03\x00"
+
+proc binEncodeBool(b: bool): string  =
+  return if b: "\x03\x01" else: "\x03\x00"
 
 proc binEncodeArr(arr: seq[Box]): string =
   result = "\x04" & u32ToStr(uint32(len(arr)))
-
   for item in arr: result = result & binEncodeItem(item)
 
-proc binEncodeObj(self: ChalkDict, ignore: seq[string] = @[]): string =
+proc binEncodeTable(self: ChalkDict, ignore: seq[string] = @[]): string =
   var
     encoded = ""
     count   = 0
@@ -68,21 +70,26 @@ proc binEncodeObj(self: ChalkDict, ignore: seq[string] = @[]): string =
 proc binEncodeFloat(f: float): string =
   result = "\x06" & floatToStr(f)
 
+proc binEncodeObj(self: Box): string =
+  if self.o == nil:
+    return "\x07"
+  else:
+    error("non-null objects cannot be normalized")
+    unreachable
+
 proc binEncodeItem(self: Box): string =
   case self.kind
   of MkBool:  return binEncodeBool(unpack[bool](self))
   of MkInt:   return binEncodeInt(unpack[uint64](self))
   of MkStr:   return binEncodeStr(unpack[string](self))
-  of MkTable: return binEncodeObj(unpack[ChalkDict](self))
+  of MkTable: return binEncodeTable(unpack[ChalkDict](self))
   of MkSeq:   return binEncodeArr(unpack[seq[Box]](self))
   of MkFloat: return binEncodeFloat(unpack[float](self))
-  else:
-    echo self.kind, " ", $self
-    unreachable
+  of MkObj:   return binEncodeObj(self)
 
 proc normalizeChalk*(dict: ChalkDict): string =
   # Currently, this is only called for the METADATA_ID field, which only
   # signs things actually being written out.  We skip MAGIC, SIGNATURE
   # and SIGN_PARAMS.
   let ignoreList = attrGet[seq[string]]("ignore_when_normalizing")
-  return binEncodeObj(dict, ignoreList)
+  return binEncodeTable(dict, ignoreList)
