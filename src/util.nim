@@ -8,9 +8,9 @@
 ## This is for any common code for system stuff, such as executing
 ## code.
 
-import std/[httpcore, tempfiles, posix, parseutils, exitprocs, sets, times, monotimes]
+import std/[httpcore, tempfiles, posix, exitprocs, sets, times, monotimes]
 import pkg/[nimutils/managedtmp]
-import "."/[config, subscan, fd_cache]
+import "."/[config, subscan, fd_cache, config_version, semver]
 export fd_cache
 
 let sigNameMap = { 1: "SIGHUP", 2: "SIGINT", 3: "SIGQUIT", 4: "SIGILL",
@@ -209,8 +209,6 @@ elif hostOs == "macosx":
 else:
   proc makeCompletionAutoSource(dst: string) = discard
 
-const currentAutoCompleteVersion = (0, 1, 3)
-
 proc validateMetaData*(obj: ChalkObj): ValidateResult {.importc.}
 
 proc autocompleteFileCheck*() =
@@ -226,48 +224,30 @@ proc autocompleteFileCheck*() =
 
   let alreadyExists = fileExists(dst)
   if alreadyExists:
-    var invalidMark = true
-
     let
       subscan   = runChalkSubScan(dst, "extract")
       allChalks = subscan.getAllChalks()
 
     if len(allChalks) != 0 and allChalks[0].extract != nil:
-      if "ARTIFACT_VERSION" in allChalks[0].extract and
-         allChalks[0].validateMetaData() == vOk:
+      if (
+        "ARTIFACT_VERSION" in allChalks[0].extract and
+        allChalks[0].validateMetaData() == vOk
+      ):
+        const chalkVersion = getChalkVersion()
         let
-          boxedVers    = allChalks[0].extract["ARTIFACT_VERSION"]
-          foundRawVers = unpack[string](boxedVers)
-          splitVers    = foundRawVers.split(".")
+          boxedVersion   = allChalks[0].extract["ARTIFACT_VERSION"]
+          foundVersion   = parseVersion(unpack[string](boxedVersion))
+          currentVersion = parseVersion(chalkVersion)
 
-        if len(splitVers) == 3:
-          var
-            major, minor, patch: int
-            totalParsed = 2
+        trace("Extracted semver string from existing autocomplete file: " & $foundVersion)
 
-          totalParsed += parseInt(splitVers[0], major)
-          totalParsed += parseInt(splitVers[1], minor)
-          totalParsed += parseInt(splitVers[2], patch)
-
-          if totalParsed == len(foundRawVers):
-            invalidMark = false
-
-            trace("Extracted semver string from existing autocomplete file: " &
-                  foundRawVers)
-
-          if (major, minor, patch) != (0, 0, 0) and
-             currentAutoCompleteVersion > (major, minor, patch):
-            var curVers = $(currentAutoCompleteVersion[0]) & "." &
-                          $(currentAutoCompleteVersion[1]) & "." &
-                          $(currentAutoCompleteVersion[2])
-
-            info("Updating autocomplete script to version: " & curVers)
-          else:
-            trace("Autocomplete script does not need updating.")
-            return
-
-    if invalidMark:
-      info("Invalid chalk mark in autocompletion script. Updating.")
+        if foundVersion < currentVersion:
+          info("Updating autocomplete script to version: " & $currentVersion)
+        else:
+          trace("Autocomplete script does not need updating.")
+          return
+    else:
+      info("Autocomplete file exists but is missing chalkmark. Updating.")
 
   if not alreadyExists:
     try:
@@ -288,7 +268,10 @@ proc autocompleteFileCheck*() =
 
 template otherSetupTasks*() =
   setupManagedTemp()
-  autocompleteFileCheck()
+  try:
+    autocompleteFileCheck()
+  except:
+    warn("could not check autocomplete file due to: " & getCurrentExceptionMsg())
   if isatty(1) == 0:
     setShowColor(false)
   limitFDCacheSize(attrGet[int]("cache_fd_limit"))
