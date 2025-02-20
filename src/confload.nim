@@ -177,8 +177,6 @@ proc loadAllConfigs*() =
     addConfLoad(sbomConfName,      toStream(sbomConfig),      checkNone).
     addConfLoad(sastConfName,      toStream(sastConfig),      checkNone).
     addConfLoad(secretsConfName,   toStream(secretsConfig),   checkNone).
-    addConfLoad(techStackConfName, toStream(techStackConfig), checkNone).
-    addConfLoad(linguistConfName,  toStream(linguistConfig),  checkNone).
     addConfLoad(coConfName,        toStream(coConfig),        checkNone)
 
   stack.addCallback(loadLocalStructs)

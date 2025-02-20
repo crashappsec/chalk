@@ -55,6 +55,5 @@ loadPlugins([
   "ownerGithub",
   "procfs",
   "system",
-  "techStackGeneric",
   "vctlGit",
 ])
