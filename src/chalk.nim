@@ -12,7 +12,7 @@ when cprofiling:
 # Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
 import "."/[config, confload, commands, norecurse, sinks,
-            attestation_api, util]
+            attestation_api, util, autocomplete]
 
 when isMainModule:
   setupSignalHandlers() # util.nim
@@ -21,6 +21,7 @@ when isMainModule:
   loadAllConfigs()      # confload.nim
   recursionCheck()      # norecurse.nim
   otherSetupTasks()     # util.nim
+  setupAutocomplete()   # autocomplete.nim
   # Wait for this warning until after configs load.
   if not canSelfInject:
     warn("No working codec is available for the native executable type")

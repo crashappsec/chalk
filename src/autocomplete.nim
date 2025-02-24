@@ -1,0 +1,154 @@
+##
+## Copyright (c) 2023-2025, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+import std/[posix]
+import "."/[config, subscan, fd_cache, config_version, semver]
+
+when hostOs == "macosx":
+  const staticScriptLoc = "autocomplete/mac.bash"
+else:
+  const staticScriptLoc = "autocomplete/default.bash"
+
+const
+  bashScript      = staticRead(staticScriptLoc)
+  autoCompleteLoc = "~/.local/share/bash_completion/completions/chalk.bash"
+
+when hostOs == "linux":
+  proc makeCompletionAutoSource(dst: string) =
+    let
+      ac       = "~/.bash_completion"
+      acpath   = resolvePath(ac)
+      toWrite  = ". " & acpath
+      contents = tryToLoadFile(acpath)
+    if toWrite in contents:
+      return
+    withFileStream(acpath, mode = fmAppend, strict = false):
+      if stream == nil:
+        warn("Cannot write to " & acpath & " to turn on autocomplete.")
+        return
+      try:
+        if len(contents) != 0 and contents[^1] != '\n':
+          stream.writeLine("")
+        stream.writeLine(toWrite)
+      except:
+        warn("Cannot write to ~/.bash_completion to turn on autocomplete.")
+        dumpExOnDebug()
+        return
+      info("Added sourcing of autocomplete to ~/.bash_completion file")
+
+elif hostOs == "macosx":
+  proc makeCompletionAutoSource(dst: string) =
+    let
+      ac       = "~/.zshrc"
+      acpath   = resolvePath(ac)
+      srcLine  = "source " & dst
+      contents = tryToLoadFile(acpath)
+      lines    = contents.splitLines()
+    var
+      foundbci = false
+      foundci  = false
+      foundsrc = false
+
+    for line in lines:
+      # This is not even a little precise but should be ok
+      let words = line.split(" ")
+      if "bashcompinit" in words:
+        foundbci = true
+      elif "compinit" in words:
+        foundci = true
+      elif line == srcLine and foundci and foundbci:
+        foundsrc = true
+
+    if foundbci and foundci and foundsrc:
+      return
+
+    withFileStream(acpath, mode = fmAppend, strict = false):
+      if stream == nil:
+        warn("Cannot write to " & acpath & " to turn on autocomplete.")
+        return
+      if len(contents) != 0 and contents[^1] != '\n':
+        stream.write("\n")
+
+      if not foundbci:
+        stream.writeLine("autoload bashcompinit")
+        stream.writeLine("bashcompinit")
+
+      if not foundci:
+        stream.writeLine("autoload -Uz compinit")
+        stream.writeLine("compinit")
+
+      if not foundsrc:
+        stream.writeLine(srcLine)
+
+      info("Set up sourcing of basic autocomplete in ~/.zshrc")
+      info("Script should be sourced automatically on your next login.")
+
+else:
+  proc makeCompletionAutoSource(dst: string) = discard
+
+proc validateMetaData*(obj: ChalkObj): ValidateResult {.importc.}
+
+proc autocompleteFileCheck*() =
+  if isatty(0) == 0 or attrGet[bool]("install_completion_script") == false:
+    return
+
+  var dst = ""
+  try:
+    dst = resolvePath(autoCompleteLoc)
+  except:
+    # resolvePath can fail on ~ when uid doesnt have home dir
+    return
+
+  let alreadyExists = fileExists(dst)
+  if alreadyExists:
+    let
+      subscan   = runChalkSubScan(dst, "extract")
+      allChalks = subscan.getAllChalks()
+
+    if len(allChalks) != 0 and allChalks[0].extract != nil:
+      if (
+        "ARTIFACT_VERSION" in allChalks[0].extract and
+        allChalks[0].validateMetaData() == vOk
+      ):
+        const chalkVersion = getChalkVersion()
+        let
+          boxedVersion   = allChalks[0].extract["ARTIFACT_VERSION"]
+          foundVersion   = parseVersion(unpack[string](boxedVersion))
+          currentVersion = parseVersion(chalkVersion)
+
+        trace("Extracted semver string from existing autocomplete file: " & $foundVersion)
+
+        if foundVersion < currentVersion:
+          info("Updating autocomplete script to version: " & $currentVersion)
+        else:
+          trace("Autocomplete script does not need updating.")
+          return
+    else:
+      info("Autocomplete file exists but is missing chalkmark. Updating.")
+
+  if not alreadyExists:
+    try:
+      createDir(resolvePath(dst.splitPath().head))
+    except:
+      warn("No permission to create auto-completion directory: " &
+        dst.splitPath().head)
+      return
+
+  if not tryToWriteFile(dst, bashScript):
+    warn("Could not write to auto-completion file: " & dst)
+    return
+  else:
+    info("Installed bash auto-completion file to: " & dst)
+
+  if not alreadyExists:
+    makeCompletionAutoSource(dst)
+
+proc setupAutocomplete*() =
+  try:
+    autocompleteFileCheck()
+  except:
+    warn("could not check autocomplete file due to: " & getCurrentExceptionMsg())
