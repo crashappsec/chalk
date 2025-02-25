@@ -5,8 +5,17 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[posix]
-import "."/[config, subscan, fd_cache, config_version, semver]
+import std/[posix, options]
+import "."/[
+  chalkjson,
+  collect,
+  config,
+  config_version,
+  fd_cache,
+  plugin_api,
+  selfextract,
+  subscan,
+]
 
 when hostOs == "macosx":
   const staticScriptLoc = "autocomplete/mac.bash"
@@ -95,6 +104,9 @@ proc validateMetaData*(obj: ChalkObj): ValidateResult {.importc.}
 proc autocompleteFileCheck*() =
   if isatty(0) == 0 or attrGet[bool]("install_completion_script") == false:
     return
+  # compiling chalk itself
+  if existsEnv("CHALK_BUILD"):
+    return
 
   var dst = ""
   try:
@@ -111,21 +123,26 @@ proc autocompleteFileCheck*() =
 
     if len(allChalks) != 0 and allChalks[0].extract != nil:
       if (
-        "ARTIFACT_VERSION" in allChalks[0].extract and
+        "HASH" in allChalks[0].extract and
+        "CHALK_VERSION" in allChalks[0].extract and
         allChalks[0].validateMetaData() == vOk
       ):
         const chalkVersion = getChalkVersion()
         let
-          boxedVersion   = allChalks[0].extract["ARTIFACT_VERSION"]
-          foundVersion   = parseVersion(unpack[string](boxedVersion))
-          currentVersion = parseVersion(chalkVersion)
+          boxedVersion   = allChalks[0].extract["CHALK_VERSION"]
+          foundVersion   = unpack[string](boxedVersion)
+          boxedHash      = allChalks[0].extract["HASH"]
+          foundHash      = unpack[string](boxedHash)
+          embedHash      = bashScript.sha256Hex()
 
-        trace("Extracted semver string from existing autocomplete file: " & $foundVersion)
+        trace("Extracted semver string from existing autocomplete file: " & foundVersion)
 
-        if foundVersion < currentVersion:
-          info("Updating autocomplete script to version: " & $currentVersion)
+        # compare if the autocomplete script actually changed
+        # vs comparing chalk version
+        if foundHash != embedHash:
+          info("Updating autocomplete script to current version: " & chalkVersion)
         else:
-          trace("Autocomplete script does not need updating.")
+          trace("Autocomplete script is up to date. Skipping.")
           return
     else:
       info("Autocomplete file exists but is missing chalkmark. Updating.")
@@ -141,9 +158,25 @@ proc autocompleteFileCheck*() =
   if not tryToWriteFile(dst, bashScript):
     warn("Could not write to auto-completion file: " & dst)
     return
-  else:
-    info("Installed bash auto-completion file to: " & dst)
 
+  let selfChalkOpt = getSelfExtraction()
+  if selfChalkOpt.isSome():
+    let
+      selfChalk = selfChalkOpt.get()
+      autoCompleteChalk = newChalk(
+        dst,
+        fsRef         = dst,
+        codec         = getPluginByName("source"),
+        noAttestation = true,
+      ).copyCollectedDataFrom(selfChalk)
+    withSuspendChalkCollectionFor(autoCompleteChalk.getRequiredPlugins()):
+      initCollection()
+      collectChalkTimeHostInfo()
+      collectChalkTimeArtifactInfo(autoCompleteChalk, override = true)
+    let chalkMark = autoCompleteChalk.getChalkMarkAsStr()
+    autoCompleteChalk.callHandleWrite(some(chalkMark))
+
+  info("Installed bash auto-completion file to: " & dst)
   if not alreadyExists:
     makeCompletionAutoSource(dst)
 
@@ -152,3 +185,4 @@ proc setupAutocomplete*() =
     autocompleteFileCheck()
   except:
     warn("could not check autocomplete file due to: " & getCurrentExceptionMsg())
+    dumpExOnDebug()

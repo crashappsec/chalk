@@ -9,8 +9,9 @@
 ## code.
 
 import std/[httpcore, tempfiles, posix, exitprocs, sets, times, monotimes]
+from std/unicode import validateUtf8
 import pkg/[nimutils/managedtmp]
-import "."/[config, subscan, fd_cache, config_version, semver]
+import "."/[config, subscan, fd_cache, semver]
 export fd_cache
 
 let sigNameMap = { 1: "SIGHUP", 2: "SIGINT", 3: "SIGQUIT", 4: "SIGILL",
@@ -507,3 +508,15 @@ template withDuration*(c: untyped) =
     stop                = getMonoTime()
     diff                = stop - start
     duration {.inject.} = diff
+
+proc seemsToBeUtf8*(stream: FileStream): bool =
+  try:
+    let s = stream.peekStr(256)
+    # The below call returns the position of the first bad byte, or -1
+    # if it *is* valid.
+    if s.validateUtf8() != -1:
+      return false
+    else:
+      return true
+  except:
+    return false

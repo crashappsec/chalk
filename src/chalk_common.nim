@@ -32,9 +32,6 @@ type
     collectedData*: ChalkDict        ## What we're adding during insertion.
     extract*:       ChalkDict        ## What we extracted, or nil if no extract.
     cachedMark*:    string           ## Cached chalk mark.
-    commentPrefix*: string           ## For scripting languages only, the comment
-                                     ## prefix we use when adding / rming marks
-    detectedLang*:  string           ## Currently only used in codecSource.
     opFailed*:      bool
     marked*:        bool
     embeds*:        seq[ChalkObj]
@@ -63,11 +60,10 @@ type
     repos*:         OrderedTableRef[string, DockerImageRepo] ## all images where image was tagged/pushed
     imageId*:       string           ## Image ID if this is a docker image
     containerId*:   string           ## Container ID if this is a container
+    noAttestation*: bool             ## Whether to skip attestation for chalkmark
     noCosign*:      bool             ## When we know image is not in registry. skips validation
     signed*:        bool             ## True on the insert path once signed,
                                      ## and once we've seen an attestation otherwise
-    inspected*:     bool             ## True for images once inspected; we don't
-                                     ## need to inspect twice when we build + push.
     resourceType*:  set[ResourceType]
 
   PluginClearCb*       = proc (a: Plugin) {.cdecl.}

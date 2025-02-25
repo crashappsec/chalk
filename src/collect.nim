@@ -9,9 +9,6 @@ import std/re
 import "./docker"/[scan]
 import "."/[config, plugin_api]
 
-proc isSystem*(p: Plugin): bool =
-  return p.name in ["system", "attestation", "metsys"]
-
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we
   # are subscribed to, that hasn't already been provided?
@@ -75,16 +72,8 @@ proc registerOutconfKeys() =
   #
   # TODO: The config should hand us a list of keys to force.
   subscribedKeys["_VALIDATED"] = true
-
-  let outconf = getOutputConfig()
-
-  let markTemplate = attrGet[string](outconf & ".mark_template")
-  if markTemplate != "":
-    registerKeys("mark_template." & markTemplate)
-
-  let reportTemplate = attrGet[string](outconf & ".report_template")
-  if reportTemplate != "":
-    registerKeys("report_template." & reportTemplate)
+  registerKeys(getMarkTemplate())
+  registerKeys(getReportTemplate())
 
 proc collectChalkTimeHostInfo*() =
   if hostCollectionSuspended():
@@ -103,6 +92,7 @@ proc collectChalkTimeHostInfo*() =
 
       for k, v in dict:
         if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".pre_run_keys")):
+          trace(plugin.name & ": cannot write " & k & ". skipping")
           continue
         if k notin hostInfo or
             k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
@@ -113,7 +103,7 @@ proc collectChalkTimeHostInfo*() =
             plugin.name & " threw an exception it didn't handle: " & getCurrentExceptionMsg())
       dumpExOnDebug()
 
-proc initCollection*() =
+proc initCollection*(collectHost = true) =
   ## Chalk commands that report call this to initialize the collection
   ## system.  It looks at any reports that are currently configured,
   ## and 'registers' the keys, so that we don't waste time trying to
@@ -123,7 +113,13 @@ proc initCollection*() =
 
   trace("Collecting host-level chalk-time data")
 
-  forceChalkKeys(["MAGIC", "CHALK_VERSION", "CHALK_ID", "METADATA_ID"])
+  forceChalkKeys([
+    "MAGIC",
+    "CHALK_VERSION",
+    "CHALK_ID",
+    "METADATA_ID",
+    "HASH",
+  ])
   registerOutconfKeys()
 
   # Next, register for any custom reports.
@@ -134,14 +130,9 @@ proc initCollection*() =
       let useWhen = useWhenOpt.get()
       if (getBaseCommandName() notin useWhen and "*" notin useWhen):
         continue
+    registerKeys(getReportTemplate(report))
 
-    let templNameOpt = attrGetOpt[string](report & ".report_template")
-    if templNameOpt.isSome():
-      let templName = templNameOpt.get()
-      if templName != "":
-        registerKeys("report_template." & templName)
-
-  if isChalkingOp():
+  if isChalkingOp() and collectHost:
       collectChalkTimeHostInfo()
 
 proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
@@ -195,9 +186,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
         trace("Filling in codec info")
         if "CHALK_ID" notin data:
           data["CHALK_ID"]      = pack(obj.callGetChalkId())
-        let preHashOpt = obj.callGetUnchalkedHash()
-        if preHashOpt.isSome():
-          data["HASH"]          = pack(preHashOpt.get())
+        data.setIfNeeded("HASH", obj.callGetUnchalkedHash())
         if obj.fsRef != "":
           data["PATH_WHEN_CHALKED"] = pack(resolvePath(obj.fsRef))
 
@@ -219,7 +208,9 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
           continue
 
         for k, v in dict:
-          if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")): continue
+          if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")):
+            trace(plugin.name & ": cannot write " & k & ". skipping")
+            continue
           if k notin obj.collectedData or
               k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
               plugin.isSystem() or

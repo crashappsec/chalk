@@ -14,6 +14,7 @@ plugin system {
   pre_run_keys:     ["INJECTOR_CHALK_ID", "INJECTOR_VERSION", "TIME_CHALKED",
                      "INJECTOR_COMMIT_ID", "DATE_CHALKED",
                      "TZ_OFFSET_WHEN_CHALKED", "DATETIME_WHEN_CHALKED",
+                     "TIMESTAMP_WHEN_CHALKED",
                      "HOST_SYSNAME_WHEN_CHALKED", "HOST_NODENAME_WHEN_CHALKED",
                      "HOST_RELEASE_WHEN_CHALKED", "HOST_VERSION_WHEN_CHALKED",
                      "HOST_MACHINE_WHEN_CHALKED", "INJECTOR_ENV",
@@ -21,7 +22,7 @@ plugin system {
                      "PLATFORM_WHEN_CHALKED"]
 
   pre_chalk_keys:  ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
-                    "PRE_CHALK_HASH", "TIMESTAMP_WHEN_CHALKED"]
+                    "PRE_CHALK_HASH"]
 
   post_chalk_keys: ["_OP_ARTIFACT_PATH", "_CURRENT_HASH",
                     "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS", "_VIRTUAL",

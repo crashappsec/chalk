@@ -184,6 +184,7 @@ proc newChalk*(name:         string            = "",
                cache:        RootRef           = RootRef(nil),
                codec:        Plugin            = Plugin(nil),
                platform                        = DockerPlatform(nil),
+               noAttestation                   = false,
                ): ChalkObj =
 
   result = ChalkObj(name:          name,
@@ -200,6 +201,7 @@ proc newChalk*(name:         string            = "",
                     myCodec:       codec,
                     failedKeys:    ChalkDict(),
                     platform:      platform,
+                    noAttestation: noAttestation,
                    )
 
   if chalkId != "":
@@ -232,10 +234,7 @@ template setFromEnvVar*(o: ChalkDict, k: string, default: string = "") =
   o.setIfNotEmpty(k, os.getEnv(k, default))
 
 template isSubscribedKey*(key: string): bool =
-  if key in subscribedKeys:
-    subscribedKeys[key]
-  else:
-    false
+  subscribedKeys.getOrDefault(key, false)
 
 template setIfSubscribed*[T](o: ChalkDict, k: string, v: T) =
   if isSubscribedKey(k):
@@ -323,6 +322,17 @@ template restoreChalkCollectionFor*(p: string) =
 template chalkCollectionSuspendedFor*(p: string): bool =
   chalkCollectionSuspendedByPlugin.getOrDefault(p, 0) != 0
 
+template withSuspendChalkCollectionFor*(plugins: seq[string], c: untyped) =
+  trace("plugins temporarily suspended: " & $plugins)
+  for p in plugins:
+    suspendChalkCollectionFor(p)
+  try:
+    c
+  finally:
+    trace("plugins restored: " & $plugins)
+    for p in plugins:
+      restoreChalkCollectionFor(p)
+
 proc persistInternalValues*(chalk: ChalkObj) =
   if chalk.extract == nil:
     return
@@ -336,6 +346,15 @@ proc persistExtractedValues*(chalk: ChalkObj) =
   for item, value in chalk.extract:
     if item notin chalk.collectedData:
       chalk.collectedData[item] = value
+
+proc copyCollectedDataFrom*(self: ChalkObj, other: ChalkObj): ChalkObj =
+  # attestation keys are not transferrable between diff chalk objects
+  # as obviously signatures will not match
+  let ignore = @["CHALK_ID", "METADATA_ID", "HASH"] & attrGet[seq[string]]("plugin.attestation.pre_chalk_keys")
+  for k, v in other.extract:
+    if k notin self.collectedData and not k.startsWith("$") and k notin ignore:
+      self.collectedData[k] = v
+  return self
 
 proc makeNewValuesAvailable*(chalk: ChalkObj) =
   if chalk.extract == nil:

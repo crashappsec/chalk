@@ -15,13 +15,13 @@ import "."/[config, confload, commands, norecurse, sinks,
             attestation_api, util, autocomplete]
 
 when isMainModule:
-  setupSignalHandlers() # util.nim
-  setupTerminal()       # util.nim
-  ioSetup()             # sinks.nim
-  loadAllConfigs()      # confload.nim
-  recursionCheck()      # norecurse.nim
-  otherSetupTasks()     # util.nim
-  setupAutocomplete()   # autocomplete.nim
+  setupSignalHandlers()    # util.nim
+  setupTerminal()          # util.nim
+  ioSetup()                # sinks.nim
+  loadAllConfigs()         # confload.nim
+  recursionCheck()         # norecurse.nim
+  otherSetupTasks()        # util.nim
+
   # Wait for this warning until after configs load.
   if not canSelfInject:
     warn("No working codec is available for the native executable type")
@@ -29,8 +29,10 @@ when isMainModule:
   if passedHelpFlag:
     runChalkHelp(getCommandName()) # no return; in cmd_help.nim
 
+  setupAutocomplete()      # autocomplete.nim
   setupDefaultLogConfigs() # src/sinks.nim
   loadAttestation()        # attestation.nim
+
   case getCommandName()    # config.nim
   of "extract":            runCmdExtract(attrGet[seq[string]]("artifact_search_path"))
   of "extract.containers": runCmdExtractContainers()

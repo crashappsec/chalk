@@ -24,6 +24,7 @@ services:
     environment:
       DEBUG: ${DEBUG:-}
       CHALK_PASSWORD: ${CHALK_PASSWORD:-}
+      CHALK_BUILD: ${CHALK_BUILD:-release}
 
   # --------------------------------------------------------------------------
   # TESTS

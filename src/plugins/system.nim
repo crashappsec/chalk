@@ -76,12 +76,6 @@ proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
                                                         ChalkDict {.cdecl.} =
   result                           = ChalkDict()
   result["MAGIC"]                  = pack(magicUTF8)
-  if ResourceImage in obj.resourceType:
-    if "TIMESTAMP_WHEN_CHALKED" notin obj.collectedData:
-      # image is immutable so cannot overwrite timestamp from original build
-      result["TIMESTAMP_WHEN_CHALKED"] = pack(startTime.toUnixInMs())
-  else:
-    result["TIMESTAMP_WHEN_CHALKED"] = pack(startTime.toUnixInMs())
 
   if isSubscribedKey("PRE_CHALK_HASH") and obj.fsRef != "":
     withFileStream(obj.fsRef, mode = fmRead, strict = true):
@@ -154,16 +148,12 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
     if obj.fsRef != "":
       result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
 
-  var
-    templateName = attrGet[string](getOutputConfig() & ".report_template")
-
-  if templateName != "":
-    let
-      tmpl       = getReportTemplate()
-      hostKeys   = hostInfo.filterByTemplate(tmpl)
-      artKeys    = obj.collectedData.filterByTemplate(tmpl)
-      reportKeys = toSeq(hostKeys.keys()) & toSeq(artKeys.keys())
-    result.setIfNeeded("_OP_ARTIFACT_REPORT_KEYS", reportKeys)
+  let
+    tmpl       = getReportTemplate()
+    hostKeys   = hostInfo.filterByTemplate(tmpl)
+    artKeys    = obj.collectedData.filterByTemplate(tmpl)
+    reportKeys = toSeq(hostKeys.keys()) & toSeq(artKeys.keys())
+  result.setIfNeeded("_OP_ARTIFACT_REPORT_KEYS", reportKeys)
 
 var
   envdict          = Con4mDict[string, string]()
@@ -231,13 +221,9 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   if isSubscribedKey("_ENV"):
     result["_ENV"] = getEnvDict()
 
-  let templateName = attrGet[string](getOutputConfig() & ".report_template")
-  if isSubscribedKey("_OP_HOST_REPORT_KEYS") and templateName != "":
-    let
-      templateToUse = "report_template." & templateName
-      reportKeys    = toSeq(hostInfo.filterByTemplate(templateToUse).keys)
-
-    result["_OP_HOST_REPORT_KEYS"] = pack(reportKeys)
+  if isSubscribedKey("_OP_HOST_REPORT_KEYS"):
+    let reportKeys = toSeq(hostInfo.filterByTemplate(getReportTemplate()).keys)
+    result.setIfNeeded("_OP_HOST_REPORT_KEYS", reportKeys)
 
   when defined(posix):
     result.setIfNeeded("_OP_HOST_SYSNAME", uinfo.sysname)
@@ -260,6 +246,7 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result.setIfNeeded("TIME_CHALKED", startTime.forReport().format(timesTimeFormat))
   result.setIfNeeded("TZ_OFFSET_WHEN_CHALKED", startTime.forReport().format(timesTzFormat))
   result.setIfNeeded("DATETIME_WHEN_CHALKED", startTime.forReport().format(timesIso8601Format))
+  result.setIfNeeded("TIMESTAMP_WHEN_CHALKED", startTime.toUnixInMs())
   result.setIfNeeded("PLATFORM_WHEN_CHALKED", getChalkPlatform())
   result.setIfNeeded("PUBLIC_IPV4_ADDR_WHEN_CHALKED", pack(getMyIpV4Addr()))
 

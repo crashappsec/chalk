@@ -468,7 +468,7 @@ See the documentation for `METADATA_ID` for more information.
 }
 
 keyspec TIMESTAMP_WHEN_CHALKED {
-    kind:             ChalkTimeArtifact
+    kind:             ChalkTimeHost
     type:             int
     standard:         true
     system:           true
