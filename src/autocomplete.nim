@@ -31,7 +31,7 @@ when hostOs == "linux":
     let
       ac       = "~/.bash_completion"
       acpath   = resolvePath(ac)
-      toWrite  = ". " & acpath
+      toWrite  = ". " & dst
       contents = tryToLoadFile(acpath)
     if toWrite in contents:
       return
