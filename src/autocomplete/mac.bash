@@ -141,7 +141,6 @@ function _chalk_shift_one {
 }
 
 function _chalk_completions {
-
     _CHALK_CUR_IX=0
     _CHALK_CUR_WORD=${2}
     _CHALK_PREV=${3}
@@ -149,4 +148,6 @@ function _chalk_completions {
     _chalk_toplevel_completions
 }
 
-complete -F _chalk_completions chalk
+if type complete &> /dev/null; then
+    complete -F _chalk_completions chalk
+fi

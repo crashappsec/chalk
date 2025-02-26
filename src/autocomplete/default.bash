@@ -158,7 +158,6 @@ function _chalk_shift_one {
 }
 
 function _chalk_completions {
-
     _get_comp_words_by_ref cur prev words cword
 
     _CHALK_CUR_IX=0
@@ -168,4 +167,6 @@ function _chalk_completions {
     _chalk_toplevel_completions
 }
 
-complete -F _chalk_completions chalk
+if type complete &> /dev/null; then
+    complete -F _chalk_completions chalk
+fi
