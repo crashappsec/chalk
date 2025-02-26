@@ -17,12 +17,8 @@ import "."/[
   subscan,
 ]
 
-when hostOs == "macosx":
-  const staticScriptLoc = "autocomplete/mac.bash"
-else:
-  const staticScriptLoc = "autocomplete/default.bash"
-
 const
+  staticScriptLoc = "autocomplete/default.bash"
   bashScript      = staticRead(staticScriptLoc)
   autoCompleteLoc = "~/.local/share/bash_completion/completions/chalk.bash"
 

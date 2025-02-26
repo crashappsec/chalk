@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -9,29 +9,135 @@
 # Basic bash completion script. Con4m should start generating these.
 # Until then, maintain it manually.
 
+# shellcheck disable=2207
+
+# shims in case these are missing (e.g. on mac zsh)
+#
+function _chalk_command {
+    if type _command &> /dev/null; then
+        _command
+    fi
+}
+
+function _chalk_command_offset {
+    if type _command_offset &> /dev/null; then
+        # shellcheck disable=2068
+        _command_offset $@
+    fi
+}
+
+function _chalk_filedir {
+    if type _filedir &> /dev/null; then
+        _filedir
+    fi
+}
+
+function _chalk_flags {
+    # get all flags via:
+    # rg '^\s*(command |flag)' src/configs/getopts.c4m
+    echo "
+        --color
+        --no-color
+        --help
+        --log-level
+        --config-file
+        --enable-report
+        --disable-report
+        --report-cache-file
+        --time
+        --no-time
+        --use-embedded-config
+        --no-use-embedded-config
+        --use-external-config
+        --no-use-external-config
+        --show-config
+        --no-show-config
+        --use-report-cache
+        --no-use-report-cache
+        --debug
+        --no-debug
+        --skip-command-report
+        --no-skip-command-report
+        --skip-summary-report
+        --no-skip-summary-report
+        --skip-summary-report
+        --no-skip-summary-report
+        --symlink-behavior
+        --run-sbom-tools
+        --no-run-sbom-tools
+        --run-sast-tools
+        --no-run-sast-tools
+        --virtual
+        --no-virtual
+        --dry-run
+        --no-dry-run
+        --wrap
+        --no-wrap
+        --pager
+        --no-pager
+    "
+}
+
 function _chalk_setup_completions {
     case ${COMP_WORDS[${_CHALK_CUR_IX}]} in
         *)
-            COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --skip-command-report --no-skip-command-report --symlink-behavior --skip-summary-report --no-skip-summary-report" -- ${_CHALK_CUR_WORD}))
+            COMPREPLY=($(compgen -W "
+                $(_chalk_flags)
+                --skip-summary-report
+                --no-skip-summary-report
+                " -- "${_CHALK_CUR_WORD}"))
             ;;
     esac
 }
 
 function _chalk_delete_completions {
     if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config--use-report-cache --no-use-report-cache --dry-run --no-dry-run --no-dry-run --debug --no-debug --skip-command-report --no-skip-command-report --symlink-behavior --skip-summary-report --no-skip-summary-report --recursive --no-recursive --report-template" -- ${_CHALK_CUR_WORD}))
+        COMPREPLY=($(compgen -W "
+            $(_chalk_flags)
+            --recursive
+            --no-recursive
+            --report-template
+            " -- "${_CHALK_CUR_WORD}"))
     else
-        _filedir
+        _chalk_filedir
+    fi
+}
+
+function _chalk_env_completions {
+    if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
+        COMPREPLY=($(compgen -W "
+            $(_chalk_flags)
+            " -- "${_CHALK_CUR_WORD}"))
+    fi
+}
+
+function _chalk_version_completions {
+    if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
+        COMPREPLY=($(compgen -W "
+            $(_chalk_flags)
+            " -- "${_CHALK_CUR_WORD}"))
     fi
 }
 
 function _chalk_docker_completions {
-    _command_offset 1
+    _chalk_command_offset 1
 }
 
 function _chalk_load_completions {
     if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --replace --no-replace --update-arch-binaries --no-update-arch-binaries --params --no-params --validation --no-validation --validation-warning --no-validation-warning" -- ${_CHALK_CUR_WORD}))
+        COMPREPLY=($(compgen -W "
+            $(_chalk_flags)
+            --replace
+            --no-replace
+            --all
+            --no-all
+            --params
+            --no-params
+            --validation
+            --no-validation
+            --validation-warning
+            --no-validation-warning
+            " -- "${_CHALK_CUR_WORD}"))
     fi
 
     if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]]; then
@@ -41,16 +147,21 @@ function _chalk_load_completions {
         fi
         # Else, already got a file name so nothing to complete.
     else
-        _filedir
+        _chalk_filedir
     fi
 }
 
 function _chalk_dump_completions {
     if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --validation --no-validation --validation-warning --no-validation-warning"-- ${_CHALK_CUR_WORD}))
+        COMPREPLY=($(compgen -W "
+            $(_chalk_flags)
+            " -- "${_CHALK_CUR_WORD}"))
     else
-        EXTRA=($(compgen -W "params cache" -- ${_CHALK_CUR_WORD}))
-        COMPREPLY+=(${EXTRA[@]})
+        COMPREPLY+=($(compgen -W "
+            params
+            cache
+            all
+        " -- "${_CHALK_CUR_WORD}"))
     fi
 
     if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]]; then
@@ -60,39 +171,91 @@ function _chalk_dump_completions {
         fi
         # Else, already got a file name so nothing to complete.
     else
-        _filedir
+        _chalk_filedir
     fi
 }
 
 function _chalk_exec_completions {
     if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "-- --color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --skip-command-report --no-skip-command-report --symlink-behavior --skip-summary-report --no-skip-summary-report --exec-command-name --chalk-as-parent --no-chalk-as-parent --heartbeat --no-heartbeat --report-template" -- ${_CHALK_CUR_WORD}))
+        COMPREPLY=($(compgen -W "
+            --
+            $(_chalk_flags)
+            --exec-command-name
+            --chalk-as-parent
+            --no-chalk-as-parent
+            --heartbeat
+            --no-heartbeat
+            --report-template
+            " -- "${_CHALK_CUR_WORD}"))
     else
         if [[ ${_CHALK_PREV} = "--exec-command-name" ]]; then
-            _command
+            _chalk_command
         fi
     fi
 }
 
 function _chalk_help_completions {
-    COMPREPLY=($(compgen -W "metadata keys search templates output reports reporting plugins insert delete env dump load config version docker exec extract setup commands configurations conffile configs conf topics builtins" -- ${_CHALK_CUR_WORD}))
+    COMPREPLY=($(compgen -W "
+        metadata
+        keys
+        search
+        templates
+        output
+        reports
+        reporting
+        plugins
+        insert
+        delete
+        env
+        dump
+        load
+        config
+        version
+        docker
+        exec
+        extract
+        setup
+        commands
+        configurations
+        conffile
+        configs
+        conf
+        topics
+        builtins
+        " -- "${_CHALK_CUR_WORD}"))
 }
 
 function _chalk_extract_completions {
     if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --debug --no-debug --skip-command-report --no-skip-command-report --symlink-behavior --skip-summary-report --no-skip-summary-report --recursive --no-recursive --report-template --search-layers --no-search-layers" -- ${_CHALK_CUR_WORD}))
+        COMPREPLY=($(compgen -W "
+            $(_chalk_flags)
+            --recursive
+            --no-recursive
+            --report-template
+            --search-layers
+            --no-search-layers
+            " -- "${_CHALK_CUR_WORD}"))
     else
-        _filedir
-        EXTRA=($(compgen -W "images containers all" -- ${_CHALK_CUR_WORD}))
-        COMPREPLY+=(${EXTRA[@]})
+        _chalk_filedir
+        COMPREPLY+=($(compgen -W "
+            images
+            containers
+            all
+        " -- "${_CHALK_CUR_WORD}"))
     fi
 }
 
 function _chalk_insert_completions {
     if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --run-sbom-tools --no-run-sbom-tools --run-sast-tools --no-run-sast-tools --use-report-cache --no-use-report-cache --virtual --no-virtual --debug --no-debug --skip-command-report --no-skip-command-report --symlink-behavior --skip-summary-report --no-skip-summary-report --recursive --no-recursive --mark-template --report-template" -- ${_CHALK_CUR_WORD}))
+        COMPREPLY=($(compgen -W "
+            $(_chalk_flags)
+            --recursive
+            --no-recursive
+            --mark-template
+            --report-template
+            " -- "${_CHALK_CUR_WORD}"))
     else
-        _filedir
+        _chalk_filedir
     fi
 }
 
@@ -147,7 +310,21 @@ function _chalk_toplevel_completions {
                 _chalk_shift_one
                 _chalk_toplevel_completions
             else
-                COMPREPLY=($(compgen -W "--color --no-color --help --log-level --config-file --enable-report --disable-report --report-cache-file --time --no-time --use-embedded-config --no-use-embedded-config --use-external-config --no-use-external-config --show-config --no-show-config --use-report-cache --no-use-report-cache --virtual --no-virtual --debug --no-debug --skip-command-report --no-skip-command-report --symlink-behavior --skip-summary-report --no-skip-summary-report --wrap --no-wrap extract insert delete env exec config dump load version docker setup help helpdump" -- ${_CHALK_CUR_WORD}))
+                COMPREPLY=($(compgen -W "
+                  $(_chalk_flags)
+                   extract
+                   insert
+                   delete
+                   env
+                   exec
+                   config
+                   dump
+                   load
+                   version
+                   docker
+                   setup
+                   help
+                   " -- "${_CHALK_CUR_WORD}"))
             fi
             ;;
     esac
@@ -158,7 +335,9 @@ function _chalk_shift_one {
 }
 
 function _chalk_completions {
-    _get_comp_words_by_ref cur prev words cword
+    if type _get_comp_words_by_ref &> /dev/null; then
+        _get_comp_words_by_ref cur prev words cword
+    fi
 
     _CHALK_CUR_IX=0
     _CHALK_CUR_WORD=${2}
