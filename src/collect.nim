@@ -63,18 +63,6 @@ proc registerKeys(templ: string) =
       if useOpt.isSome() and useOpt.get():
         subscribedKeys[name] = true
 
-proc registerOutconfKeys() =
-  # We always subscribe to _VALIDATED, even if they don't want to
-  # report it; they might subscribe to the error logs it generates.
-  #
-  # This basically ends up forcing getRunTimeArtifactInfo() to run in
-  # the system plugin.
-  #
-  # TODO: The config should hand us a list of keys to force.
-  subscribedKeys["_VALIDATED"] = true
-  registerKeys(getMarkTemplate())
-  registerKeys(getReportTemplate())
-
 proc collectChalkTimeHostInfo*() =
   if hostCollectionSuspended():
     return
@@ -120,7 +108,17 @@ proc initCollection*(collectHost = true) =
     "METADATA_ID",
     "HASH",
   ])
-  registerOutconfKeys()
+
+  # We always subscribe to _VALIDATED, even if they don't want to
+  # report it; they might subscribe to the error logs it generates.
+  #
+  # This basically ends up forcing getRunTimeArtifactInfo() to run in
+  # the system plugin.
+  #
+  # TODO: The config should hand us a list of keys to force.
+  subscribedKeys["_VALIDATED"] = true
+  registerKeys(getMarkTemplate())
+  registerKeys(getReportTemplate())
 
   # Next, register for any custom reports.
   for name in getChalkSubsections("custom_report"):

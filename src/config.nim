@@ -73,8 +73,7 @@ proc getReportTemplate*(spec = ""): string =
     tmplName = attrGetOpt[string](ns & ".report_template").get("null")
   return "report_template." & tmplName
 
-template forceReportKeys*(keynames: openarray[string]) =
-  let templateRef = getReportTemplate()
+proc forceKeys(keynames: openarray[string], templateRef: string) =
   let section     = templateRef & ".key"
 
   # Create the "key" section if required.
@@ -92,26 +91,12 @@ template forceReportKeys*(keynames: openarray[string]) =
       pack(true),
       Con4mType(kind: TypeBool),
     )
+
+proc forceReportKeys*(keynames: openarray[string]) =
+  forceKeys(keynames, getReportTemplate())
 
 proc forceChalkKeys*(keynames: openarray[string]) =
-  let templateRef = getMarkTemplate()
-  let section     = templateRef & ".key"
-
-  # Create the "key" section if required.
-  if not sectionExists(section) and keynames.len > 0:
-    con4mSectionCreate(section)
-
-  let keys = attrGetObject(section).getContents()
-
-  for item in keynames:
-    # Create the item section if required.
-    if item notin keys:
-      con4mSectionCreate(section & "." & item)
-    con4mAttrSet(
-      section & "." & item & ".use",
-      pack(true),
-      Con4mType(kind: TypeBool),
-    )
+  forceKeys(keynames, getMarkTemplate())
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.sCall(cb, args)
