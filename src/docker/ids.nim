@@ -48,7 +48,7 @@ proc normalize*(self: DockerPlatform): DockerPlatform =
   # https://github.com/containerd/containerd/blob/83031836b2cf55637d7abf847b17134c51b38e53/platforms/platforms.go
   const
     osMap = {
-      "masos":          "darwin",
+      "macos":          "darwin",
     }.toTable()
     archMap = {
       "aarch64":        "arm64",
