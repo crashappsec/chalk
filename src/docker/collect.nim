@@ -220,8 +220,8 @@ proc collectImageFrom(chalk:    ChalkObj,
   chalk.platform       = platform
   chalk.imageId        = id
   chalk.collectCommon(contents, dockerImageAutoMap)
-  chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents.nimJsonToBox())
-  chalk.setIfNeeded("DOCKER_PLATFORM", $platform)
+  chalk.setIfNeeded("_OP_ALL_IMAGE_METADATA", contents)
+  chalk.setIfNeeded("DOCKER_PLATFORM",        $platform.normalize())
   chalk.repos          = newOrderedTable[string, DockerImageRepo]()
   for repo in uniqdigests:
     try:
@@ -298,7 +298,7 @@ proc collectProvenance(chalk: ChalkObj) =
   for i in chalk.repos.listManifests:
     try:
       let json = fetchProvenance(i, chalk.platform)
-      chalk.setIfNeeded("_IMAGE_PROVENANCE", pack(json.nimJsonToBox()))
+      chalk.setIfNeeded("_IMAGE_PROVENANCE", json)
       break
     except:
       continue
@@ -309,7 +309,7 @@ proc collectSBOM(chalk: ChalkObj) =
   for i in chalk.repos.listManifests:
     try:
       let json = fetchSBOM(i, chalk.platform)
-      chalk.setIfNeeded("_IMAGE_SBOM", pack(json.nimJsonToBox()))
+      chalk.setIfNeeded("_IMAGE_SBOM", json)
       break
     except:
       continue
@@ -366,4 +366,4 @@ proc collectContainer*(chalk: ChalkObj, name: string) =
   chalk.resourceType.incl(ResourceContainer)
   chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerContainer)
   chalk.collectCommon(contents, dockerContainerAutoMap)
-  chalk.setIfNeeded("_OP_ALL_CONTAINER_METADATA", contents.nimJsonToBox())
+  chalk.setIfNeeded("_OP_ALL_CONTAINER_METADATA", contents)

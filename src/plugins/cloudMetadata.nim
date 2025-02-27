@@ -89,7 +89,7 @@ proc getAzureMetadata(): ChalkDict =
       return
     try:
       let jsonValue = parseJson(value)
-      result.setIfNeeded("_AZURE_INSTANCE_METADATA", jsonValue.nimJsonToBox())
+      result.setIfNeeded("_AZURE_INSTANCE_METADATA", jsonValue)
       try:
         for iface in jsonValue["network"]["interface"]:
           var found = false
@@ -140,7 +140,7 @@ proc getGcpMetadata(): ChalkDict =
           let valueProj = projectOpt.get()
           if valueProj.startswith("{"):
             let jsonProjValue = parseJson(valueProj)
-            result.setIfNeeded("_GCP_PROJECT_METADATA", jsonProjValue.nimJsonToBox())
+            result.setIfNeeded("_GCP_PROJECT_METADATA", jsonProjValue)
           else:
             trace("GCP project metadata didnt respond with json object. Ignoring it")
         except:
@@ -277,7 +277,7 @@ proc jsonKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) 
           of AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS:
             jsonValue["SecretAccessKey"] = newJString("<<redacted>>")
             jsonValue["Token"] = newJString("<<redacted>>")
-          chalkDict.setIfNeeded(keyname, jsonValue.nimJsonToBox())
+          chalkDict.setIfNeeded(keyname, jsonValue)
         except:
           trace("IMDSv2 responded with invalid json from " & url & ": " & getCurrentExceptionMsg())
 
