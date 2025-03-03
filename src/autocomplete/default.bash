@@ -78,260 +78,164 @@ function _chalk_flags {
     "
 }
 
-function _chalk_setup_completions {
-    case ${COMP_WORDS[${_CHALK_CUR_IX}]} in
-        *)
-            COMPREPLY=($(compgen -W "
-                $(_chalk_flags)
-                --skip-summary-report
-                --no-skip-summary-report
-                " -- "${_CHALK_CUR_WORD}"))
-            ;;
-    esac
-}
-
-function _chalk_delete_completions {
-    if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "
-            $(_chalk_flags)
-            --recursive
-            --no-recursive
-            --report-template
-            " -- "${_CHALK_CUR_WORD}"))
-    else
-        _chalk_filedir
-    fi
-}
-
-function _chalk_env_completions {
-    if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "
-            $(_chalk_flags)
-            " -- "${_CHALK_CUR_WORD}"))
-    fi
-}
-
-function _chalk_version_completions {
-    if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "
-            $(_chalk_flags)
-            " -- "${_CHALK_CUR_WORD}"))
-    fi
-}
-
-function _chalk_docker_completions {
-    _chalk_command_offset 1
-}
-
-function _chalk_load_completions {
-    if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "
-            $(_chalk_flags)
-            --replace
-            --no-replace
-            --all
-            --no-all
-            --params
-            --no-params
-            --validation
-            --no-validation
-            --validation-warning
-            --no-validation-warning
-            " -- "${_CHALK_CUR_WORD}"))
-    fi
-
-    if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]]; then
-        if [[ ${COMP_WORDS[${_CHALK_CUR_IX}]::1} = "-" ]]; then
-            _chalk_shift_one
-            _chalk_load_completions
-        fi
-        # Else, already got a file name so nothing to complete.
-    else
-        _chalk_filedir
-    fi
-}
-
-function _chalk_dump_completions {
-    if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "
-            $(_chalk_flags)
-            " -- "${_CHALK_CUR_WORD}"))
-    else
-        COMPREPLY+=($(compgen -W "
-            params
-            cache
-            all
-        " -- "${_CHALK_CUR_WORD}"))
-    fi
-
-    if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]]; then
-        if [[ ${COMP_WORDS[${_CHALK_CUR_IX}]::1} = "-" ]]; then
-            _chalk_shift_one
-            _chalk_load_completions
-        fi
-        # Else, already got a file name so nothing to complete.
-    else
-        _chalk_filedir
-    fi
-}
-
-function _chalk_exec_completions {
-    if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "
-            --
-            $(_chalk_flags)
-            --exec-command-name
-            --chalk-as-parent
-            --no-chalk-as-parent
-            --heartbeat
-            --no-heartbeat
-            --report-template
-            " -- "${_CHALK_CUR_WORD}"))
-    else
-        if [[ ${_CHALK_PREV} = "--exec-command-name" ]]; then
-            _chalk_command
-        fi
-    fi
-}
-
-function _chalk_help_completions {
-    COMPREPLY=($(compgen -W "
-        metadata
-        keys
-        search
-        templates
-        output
-        reports
-        reporting
-        plugins
-        insert
-        delete
-        env
-        dump
-        load
-        config
-        version
-        docker
-        exec
-        extract
-        setup
-        commands
-        configurations
-        conffile
-        configs
-        conf
-        topics
-        builtins
-        " -- "${_CHALK_CUR_WORD}"))
-}
-
-function _chalk_extract_completions {
-    if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "
-            $(_chalk_flags)
-            --recursive
-            --no-recursive
-            --report-template
-            --search-layers
-            --no-search-layers
-            " -- "${_CHALK_CUR_WORD}"))
-    else
-        _chalk_filedir
-        COMPREPLY+=($(compgen -W "
-            images
-            containers
-            all
-        " -- "${_CHALK_CUR_WORD}"))
-    fi
-}
-
-function _chalk_insert_completions {
-    if [[ ${_CHALK_CUR_WORD::1} = "-" ]]; then
-        COMPREPLY=($(compgen -W "
-            $(_chalk_flags)
-            --recursive
-            --no-recursive
-            --mark-template
-            --report-template
-            " -- "${_CHALK_CUR_WORD}"))
-    else
-        _chalk_filedir
-    fi
+function _chalk_complete {
+    COMPREPLY=($(compgen -W "$@" -- "${_CHALK_CUR_WORD}"))
 }
 
 function _chalk_toplevel_completions {
     case ${COMP_WORDS[${_CHALK_CUR_IX}]} in
         insert)
             _chalk_shift_one
-            _chalk_insert_completions
+            _chalk_complete "
+                $(_chalk_flags)
+                --recursive
+                --no-recursive
+                --mark-template
+                --report-template
+                "
+            _chalk_filedir
             ;;
         extract)
             _chalk_shift_one
-            _chalk_extract_completions
+            _chalk_complete "
+                $(_chalk_flags)
+                --recursive
+                --no-recursive
+                --report-template
+                --search-layers
+                --no-search-layers
+                images
+                containers
+                all
+                "
+            _chalk_filedir
             ;;
         delete)
             _chalk_shift_one
-            _chalk_delete_completions
-            ;;
-        env)
-            _chalk_shift_one
-            _chalk_env_completions
+            _chalk_complete "
+                $(_chalk_flags)
+                --recursive
+                --no-recursive
+                --report-template
+                "
+            _chalk_filedir
             ;;
         exec)
             _chalk_shift_one
-            _chalk_exec_completions
+            case ${_CHALK_PREV} in
+                "--exec-command-name")
+                    _chalk_command
+                    ;;
+                "--") ;;
+                *)
+                    _chalk_complete "
+                    --
+                    $(_chalk_flags)
+                    --exec-command-name
+                    --chalk-as-parent
+                    --no-chalk-as-parent
+                    --heartbeat
+                    --no-heartbeat
+                    --report-template
+                    "
+                    ;;
+            esac
             ;;
         dump)
             _chalk_shift_one
-            _chalk_dump_completions
+            _chalk_complete "
+                $(_chalk_flags)
+                params
+                cache
+                all
+                "
             ;;
         load)
             _chalk_shift_one
-            _chalk_load_completions
-            ;;
-        version)
-            _chalk_shift_one
-            _chalk_version_completions
+            _chalk_complete "
+                $(_chalk_flags)
+                --replace
+                --no-replace
+                --all
+                --no-all
+                --params
+                --no-params
+                --validation
+                --no-validation
+                --validation-warning
+                --no-validation-warning
+                "
+            _chalk_filedir
             ;;
         docker)
             _chalk_shift_one
-            _chalk_docker_completions
+            _chalk_command_offset 1
             ;;
-        setup)
+        env) ;&
+        environment) ;&
+        setup) ;&
+        version)
             _chalk_shift_one
-            _chalk_setup_completions
+            _chalk_complete "$(_chalk_flags)"
             ;;
         help)
             _chalk_shift_one
-            _chalk_help_completions
+            _chalk_complete "
+                builtins
+                commands
+                conf
+                conffile
+                config
+                configs
+                configurations
+                delete
+                docker
+                dump
+                env
+                exec
+                extract
+                insert
+                keys
+                load
+                metadata
+                output
+                plugins
+                reporting
+                reports
+                search
+                setup
+                templates
+                topics
+                version
+                "
             ;;
         *)
             if [[ $_CHALK_CUR_IX -le $COMP_CWORD ]]; then
                 _chalk_shift_one
                 _chalk_toplevel_completions
             else
-                COMPREPLY=($(compgen -W "
+                _chalk_complete "
                   $(_chalk_flags)
-                   extract
-                   insert
+                   config
                    delete
+                   docker
+                   dump
                    env
                    exec
-                   config
-                   dump
-                   load
-                   version
-                   docker
-                   setup
+                   extract
                    help
-                   " -- "${_CHALK_CUR_WORD}"))
+                   insert
+                   load
+                   setup
+                   version
+                   "
             fi
             ;;
     esac
 }
 
 function _chalk_shift_one {
-    let "_CHALK_CUR_IX++"
+    ((_CHALK_CUR_IX++))
 }
 
 function _chalk_completions {
