@@ -14,6 +14,11 @@
   when its content is changed.
   ([#493](https://github.com/crashappsec/chalk/pull/493))
 
+### New Features
+
+- Basic support for AWS CodeBuild pipelines.
+  ([#494](https://github.com/crashappsec/chalk/pull/494))
+
 ## 0.5.4
 
 **Feb 19, 2025**

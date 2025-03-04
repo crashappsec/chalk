@@ -137,6 +137,32 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_codebuild(copy_files: list[Path], chalk: Chalk, server_imds: str):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        env={
+            # https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-env-vars.html
+            "CODEBUILD_BUILD_ARN": "arn:aws:codebuild:region-ID:account-ID:build/codebuild-demo-project:b1e6661e-e4f2-4156-9ab9-82a19EXAMPLE",
+            "CODEBUILD_INITIATOR": "username",
+            "CODEBUILD_RESOLVED_SOURCE_VERSION": "ffac537e6cbbf934b08745a378932722df287a53",
+            "CODEBUILD_SOURCE_REPO_URL": "https://github.com/octocat/repo",
+            "CODEBUILD_PUBLIC_BUILD_URL": "https://aws/build",
+            "CODEBUILD_WEBHOOK_TRIGGER": "branch/test",
+        },
+    )
+    assert insert.report.contains(
+        {
+            "BUILD_ID": "arn:aws:codebuild:region-ID:account-ID:build/codebuild-demo-project:b1e6661e-e4f2-4156-9ab9-82a19EXAMPLE",
+            "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BUILD_TRIGGER": "push",
+            "BUILD_CONTACT": ["username"],
+            "BUILD_URI": "https://aws/build",
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_aws_no_imds(
     copy_files: list[Path],
     chalk: Chalk,
