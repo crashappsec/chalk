@@ -4,6 +4,7 @@ version = "0.1.0"
 description = ""
 authors = []
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 boto3 = "^1.35.74"
@@ -13,7 +14,7 @@ filelock = "^3.12.3"
 flaky = "^3.8.1"
 more-itertools = "^10.3.0"
 ndg-httpsclient = "^0.5.1"
-pydantic = ">=2.0.0"
+pydantic = "^2.10.6"
 pytest = "^8.3.4"
 pytest-dependency = "^0.6.0"
 pytest-profiling = "^1.7.0"
@@ -32,7 +33,7 @@ mypy = {version = "^1.14.1", optional = true}
 neovim = {version = "^0.3.1", optional = true}
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.3.0"
+black = "^25.1.0"
 flake8 = "^7.1.1"
 flake8-bugbear = "^24.12.12"
 flake8-comprehensions = "^3.10.0"
