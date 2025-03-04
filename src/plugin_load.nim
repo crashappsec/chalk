@@ -37,6 +37,7 @@ macro loadPlugins(list: static[openarray[string]]): untyped =
 loadPlugins([
   "awsEcs",
   "awsLambda",
+  "ciCodeBuild",
   "ciGithub",
   "ciGitlab",
   "ciJenkins",

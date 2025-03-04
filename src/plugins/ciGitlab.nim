@@ -22,6 +22,7 @@ proc gitlabGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.}  =
     GITLAB_JOB_URL      = getEnv("CI_JOB_URL")
     GITLAB_JOB_ID       = getEnv("CI_JOB_ID")
     GITLAB_API_URL      = getEnv("CI_API_V4_URL")
+    GITLAB_PROJECT_URL  = getEnv("CI_PROJECT_URL")
     GITLAB_PROJECT_ID   = getEnv("CI_PROJECT_ID")
     GITLAB_NAMESPACE_ID = getEnv("CI_PROJECT_NAMESPACE_ID")
     GITLAB_USER         = getEnv("GITLAB_USER_LOGIN")
@@ -36,6 +37,7 @@ proc gitlabGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.}  =
   result.setIfNeeded("BUILD_API_URI",         GITLAB_API_URL)
   result.setIfNeeded("BUILD_ORIGIN_ID",       GITLAB_PROJECT_ID)
   result.setIfNeeded("BUILD_ORIGIN_OWNER_ID", GITLAB_NAMESPACE_ID)
+  result.setIfNeeded("BUILD_ORIGIN_URI",      GITLAB_PROJECT_URL)
 
   # https://docs.gitlab.com/ee/ci/jobs/job_control.html#common-if-clauses-for-rules
   result.setIfNeeded("BUILD_TRIGGER", GITLAB_EVENT_NAME)

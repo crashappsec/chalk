@@ -62,14 +62,15 @@ proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
 
   if (GITHUB_SERVER_URL != "" and GITHUB_REPOSITORY != "" and
       GITHUB_RUN_ID != ""):
-    var uri = (
+    let base = (
       GITHUB_SERVER_URL.strip(leading = false, chars = {'/'}) & "/" &
-      GITHUB_REPOSITORY.strip(chars = {'/'}) & "/actions/runs/" &
-      GITHUB_RUN_ID
+      GITHUB_REPOSITORY.strip(chars = {'/'})
     )
+    var uri = base & "/actions/runs/" & GITHUB_RUN_ID
     if GITHUB_RUN_ATTEMPT != "":
       uri = uri.strip(chars = {'/'}) & "/attempts/" & GITHUB_RUN_ATTEMPT
-    result.setIfNeeded("BUILD_URI", uri)
+    result.setIfNeeded("BUILD_ORIGIN_URI", base)
+    result.setIfNeeded("BUILD_URI",        uri)
 
   if GITHUB_API_URL != "" and (
     isSubscribedKey("BUILD_ORIGIN_KEY") or

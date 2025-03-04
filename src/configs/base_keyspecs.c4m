@@ -1191,6 +1191,20 @@ the artifact was chalked.
 """
 }
 
+keyspec BUILD_ORIGIN_URI {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.5.5"
+    shortdoc:         "Origin for the build"
+    doc:              """
+What origin is being used for the build.
+In most cases this it the repository URI.
+However in some other cases it can be another reference such as
+S3 object path for AWS CodeBuilds.
+"""
+}
+
 keyspec BUILD_ORIGIN_ID {
   kind:     ChalkTimeHost
   type:     string

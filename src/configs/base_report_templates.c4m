@@ -105,6 +105,7 @@ report and subtract from it.
   key.BUILD_ORIGIN_KEY.use                    = true
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
+  key.BUILD_ORIGIN_URI.use                    = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
@@ -709,6 +710,7 @@ doc: """
   key.BUILD_ORIGIN_KEY.use                    = true
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
+  key.BUILD_ORIGIN_URI.use                    = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
@@ -1196,6 +1198,7 @@ container.
   key.BUILD_ORIGIN_KEY.use                    = true
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
+  key.BUILD_ORIGIN_URI.use                    = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
@@ -1681,6 +1684,7 @@ and keep the run-time key.
   key.BUILD_ORIGIN_KEY.use                    = true
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
+  key.BUILD_ORIGIN_URI.use                    = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true

@@ -14,6 +14,15 @@
   when its content is changed.
   ([#493](https://github.com/crashappsec/chalk/pull/493))
 
+### New Features
+
+- Basic support for AWS CodeBuild pipelines.
+  ([#494](https://github.com/crashappsec/chalk/pull/494))
+- `BUILD_ORIGIN_URI` key which reports URI of resource which originated
+  the CI build. In most cases it will be the repository but could be
+  other resources such as S3 object URI for AWS Code Builds.
+  ([#494](https://github.com/crashappsec/chalk/pull/494))
+
 ## 0.5.4
 
 **Feb 19, 2025**
