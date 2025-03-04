@@ -18,17 +18,28 @@ proc codeBuildGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
   let
     CODEBUILD_BUILD_ARN               = getEnv("CODEBUILD_BUILD_ARN")
     CODEBUILD_INITIATOR               = getEnv("CODEBUILD_INITIATOR")
+    CODEBUILD_SOURCE_VERSION          = getEnv("CODEBUILD_SOURCE_VERSION")
     CODEBUILD_RESOLVED_SOURCE_VERSION = getEnv("CODEBUILD_RESOLVED_SOURCE_VERSION")
-    CODEBUILD_SOURCE_REPO_URL         = getEnv("CODE_BUILD_SOURCE_REPO_URL")
+    CODEBUILD_SOURCE_REPO_URL         = getEnv("CODEBUILD_SOURCE_REPO_URL")
     CODEBUILD_PUBLIC_BUILD_URL        = getEnv("CODEBUILD_PUBLIC_BUILD_URL")
     CODEBUILD_WEBHOOK_TRIGGER         = getEnv("CODEBUILD_WEBHOOK_TRIGGER")
 
   # probably not running in github CI
   if CODEBUILD_BUILD_ARN == "" and CODEBUILD_SOURCE_REPO_URL == "": return
 
+  let
+    isS3          = CODEBUILD_SOURCE_REPO_URL.startsWith("s3://")
+    versionSuffix =
+      if isS3 and CODEBUILD_SOURCE_VERSION != "":
+        # https://docs.aws.amazon.com/AmazonS3/latest/userguide/RetrievingObjectVersions.html
+        "?versionId=" & CODEBUILD_SOURCE_VERSION
+      else:
+        ""
+
   result.setIfNeeded("BUILD_URI",         CODEBUILD_PUBLIC_BUILD_URL)
   result.setIfNeeded("BUILD_ID",          CODEBUILD_BUILD_ARN)
-  if not CODEBUILD_SOURCE_REPO_URL.startsWith("s3://"):
+  result.setIfNeeded("BUILD_ORIGIN_URI",  CODEBUILD_SOURCE_REPO_URL & versionSuffix)
+  if not isS3:
     result.setIfNeeded("BUILD_COMMIT_ID", CODEBUILD_RESOLVED_SOURCE_VERSION)
 
   if CODEBUILD_WEBHOOK_TRIGGER != "":
