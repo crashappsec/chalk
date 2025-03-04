@@ -17,7 +17,7 @@ when (NimMinor, NimPatch) >= (6, 14):
   {.warning[CastSizes]: off.}
 
 import std/[unicode, parseutils, algorithm]
-import "."/config
+import "."/[config, util]
 
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']
@@ -497,25 +497,20 @@ proc forcePrivateKeys() =
   forceChalkKeys(toForce)
 
 proc getChalkMark*(obj: ChalkObj): ChalkDict =
-  trace("Creating mark using template: " & attrGet[string](getOutputConfig() & ".mark_template"))
+  let templ = getMarkTemplate()
+  trace("Creating mark using template: " & templ)
 
   forcePrivateKeys()
-
-  let templ = getMarkTemplate()
 
   assert "CHALK_VERSION" in hostInfo or "CHALK_VERSION" in obj.collectedData
 
   result              = hostInfo.filterByTemplate(templ)
-  let artifactResults = obj.collectedData.filterByTemplate(templ)
-
-  for k, v in artifactResults:
-    result[k] = v
+  result.merge(obj.collectedData.filterByTemplate(templ))
 
 proc getChalkMarkAsStr*(obj: ChalkObj): string =
   if obj.cachedMark != "":
     trace("Chalk cachemark " & obj.cachedMark)
     return obj.cachedMark
-  trace("Converting Mark to JSON. Mark template is: " & getMarkTemplate())
   let mark = obj.getChalkMark()
   result = mark.toJson()
   obj.cachedMark = result

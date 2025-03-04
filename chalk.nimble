@@ -50,26 +50,3 @@ task performance, "Get a build that adds execution profiling support":
 
 task memprofile, "Get a build that adds memory profiling to the binary":
   exec "nimble build --profiler:off --stackTrace:on -d:memProfiler -d:cprofiling"
-
-let completion_script_version = version
-
-task mark_completion, "Replace the chalk mark in a completion script, including the articact version":
-
-  exec """cat > tmpcfg.c4m << EOF
-keyspec.ARTIFACT_VERSION.value = "REPLACE_ME"
-keyspec.CHALK_PTR.value = ("This mark determines when to update the script." +
-" If there is no mark, or the mark is invalid it will be replaced. " +
-" To customize w/o Chalk disturbing it when it can update, add a valid " +
-" mark with a version key higher than the current chalk verison, or " +
-" use version 0.0.0 to prevent updates")
-
-mark_template.mark_default.key.BRANCH.use = false
-mark_template.mark_default.key.CHALK_RAND.use = false
-mark_template.mark_default.key.CODE_OWNERS.use = false
-mark_template.mark_default.key.COMMIT_ID.use = false
-mark_template.mark_default.key.PLATFORM_WHEN_CHALKED.use = false
-EOF
-""".replace("REPLACE_ME", completion_script_version)
-
-  exec "./chalk --use-external-config --config-file=./tmpcfg.c4m --no-use-embedded-config --skip-command-report insert src/autocomplete"
-  exec "rm ./tmpcfg.c4m"

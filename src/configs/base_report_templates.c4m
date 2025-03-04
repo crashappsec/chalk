@@ -11,6 +11,11 @@
 
 ## Pre-defined templates for reporting.
 
+report_template null {
+  shortdoc: "Empty report template"
+  doc:      "Empty report template"
+}
+
 report_template report_all {
   shortdoc: "You don't care, let's see it all, every time!"
   doc: """

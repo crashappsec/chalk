@@ -270,7 +270,7 @@ configuration present in the binary at the time of the wrapping.
 """
   }
 
-    flag_yn pager {
+  flag_yn pager {
       no_aliases: ["no-more", "no-less"]
       field_to_set: "use_pager"
       doc: """

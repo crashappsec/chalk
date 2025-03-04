@@ -498,6 +498,7 @@ def test_profiles(
         "CHALK_ID",
         "CHALK_VERSION",
         "METADATA_ID",
+        "HASH",
     }
     for key in minimal_chalk:
         assert key in chalk_mark

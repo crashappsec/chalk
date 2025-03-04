@@ -174,10 +174,10 @@ proc willSignByHash*(chalk: ChalkObj): bool =
   # If there's no associated fs ref, it's either a container or
   # something we don't have permission to read; either way, it's not
   # getting signed in this flow.
-  return willSign() and chalk.canVerifyByHash()
+  return willSign() and not chalk.noAttestation and chalk.canVerifyByHash()
 
 proc willSignBySigStore*(chalk: ChalkObj): bool =
-  return willSign() and chalk.canVerifyBySigStore()
+  return willSign() and not chalk.noAttestation and chalk.canVerifyBySigStore()
 
 proc verifyBySigStore(chalk: ChalkObj, key: AttestationKey, image: DockerImage): (ValidateResult, ChalkDict) =
   let

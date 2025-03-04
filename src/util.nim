@@ -8,9 +8,10 @@
 ## This is for any common code for system stuff, such as executing
 ## code.
 
-import std/[httpcore, tempfiles, posix, parseutils, exitprocs, sets, times, monotimes]
+import std/[httpcore, tempfiles, posix, exitprocs, sets, times, monotimes]
+from std/unicode import validateUtf8
 import pkg/[nimutils/managedtmp]
-import "."/[config, subscan, fd_cache]
+import "."/[config, subscan, fd_cache, semver]
 export fd_cache
 
 let sigNameMap = { 1: "SIGHUP", 2: "SIGINT", 3: "SIGQUIT", 4: "SIGILL",
@@ -127,168 +128,8 @@ proc setupManagedTemp*() =
   setDefaultTmpFilePrefix(tmpFilePrefix)
   setDefaultTmpFileSuffix(tmpFileSuffix)
 
-when hostOs == "macosx":
-  const staticScriptLoc = "autocomplete/mac.bash"
-else:
-  const staticScriptLoc = "autocomplete/default.bash"
-
-const
-  bashScript      = staticRead(staticScriptLoc)
-  autoCompleteLoc = "~/.local/share/bash_completion/completions/chalk.bash"
-
-when hostOs == "linux":
-  proc makeCompletionAutoSource(dst: string) =
-    let
-      ac       = "~/.bash_completion"
-      acpath   = resolvePath(ac)
-      toWrite  = ". " & acpath
-      contents = tryToLoadFile(acpath)
-    if toWrite in contents:
-      return
-    withFileStream(acpath, mode = fmAppend, strict = false):
-      if stream == nil:
-        warn("Cannot write to " & acpath & " to turn on autocomplete.")
-        return
-      try:
-        if len(contents) != 0 and contents[^1] != '\n':
-          stream.writeLine("")
-        stream.writeLine(toWrite)
-      except:
-        warn("Cannot write to ~/.bash_completion to turn on autocomplete.")
-        dumpExOnDebug()
-        return
-      info("Added sourcing of autocomplete to ~/.bash_completion file")
-
-elif hostOs == "macosx":
-  proc makeCompletionAutoSource(dst: string) =
-    let
-      ac       = "~/.zshrc"
-      acpath   = resolvePath(ac)
-      srcLine  = "source " & dst
-      contents = tryToLoadFile(acpath)
-      lines    = contents.splitLines()
-    var
-      foundbci = false
-      foundci  = false
-      foundsrc = false
-
-    for line in lines:
-      # This is not even a little precise but should be ok
-      let words = line.split(" ")
-      if "bashcompinit" in words:
-        foundbci = true
-      elif "compinit" in words:
-        foundci = true
-      elif line == srcLine and foundci and foundbci:
-        foundsrc = true
-
-    if foundbci and foundci and foundsrc:
-      return
-
-    withFileStream(acpath, mode = fmAppend, strict = false):
-      if stream == nil:
-        warn("Cannot write to " & acpath & " to turn on autocomplete.")
-        return
-      if len(contents) != 0 and contents[^1] != '\n':
-        stream.write("\n")
-
-      if not foundbci:
-        stream.writeLine("autoload bashcompinit")
-        stream.writeLine("bashcompinit")
-
-      if not foundci:
-        stream.writeLine("autoload -Uz compinit")
-        stream.writeLine("compinit")
-
-      if not foundsrc:
-        stream.writeLine(srcLine)
-
-      info("Set up sourcing of basic autocomplete in ~/.zshrc")
-      info("Script should be sourced automatically on your next login.")
-
-else:
-  proc makeCompletionAutoSource(dst: string) = discard
-
-const currentAutoCompleteVersion = (0, 1, 3)
-
-proc validateMetaData*(obj: ChalkObj): ValidateResult {.importc.}
-
-proc autocompleteFileCheck*() =
-  if isatty(0) == 0 or attrGet[bool]("install_completion_script") == false:
-    return
-
-  var dst = ""
-  try:
-    dst = resolvePath(autoCompleteLoc)
-  except:
-    # resolvePath can fail on ~ when uid doesnt have home dir
-    return
-
-  let alreadyExists = fileExists(dst)
-  if alreadyExists:
-    var invalidMark = true
-
-    let
-      subscan   = runChalkSubScan(dst, "extract")
-      allChalks = subscan.getAllChalks()
-
-    if len(allChalks) != 0 and allChalks[0].extract != nil:
-      if "ARTIFACT_VERSION" in allChalks[0].extract and
-         allChalks[0].validateMetaData() == vOk:
-        let
-          boxedVers    = allChalks[0].extract["ARTIFACT_VERSION"]
-          foundRawVers = unpack[string](boxedVers)
-          splitVers    = foundRawVers.split(".")
-
-        if len(splitVers) == 3:
-          var
-            major, minor, patch: int
-            totalParsed = 2
-
-          totalParsed += parseInt(splitVers[0], major)
-          totalParsed += parseInt(splitVers[1], minor)
-          totalParsed += parseInt(splitVers[2], patch)
-
-          if totalParsed == len(foundRawVers):
-            invalidMark = false
-
-            trace("Extracted semver string from existing autocomplete file: " &
-                  foundRawVers)
-
-          if (major, minor, patch) != (0, 0, 0) and
-             currentAutoCompleteVersion > (major, minor, patch):
-            var curVers = $(currentAutoCompleteVersion[0]) & "." &
-                          $(currentAutoCompleteVersion[1]) & "." &
-                          $(currentAutoCompleteVersion[2])
-
-            info("Updating autocomplete script to version: " & curVers)
-          else:
-            trace("Autocomplete script does not need updating.")
-            return
-
-    if invalidMark:
-      info("Invalid chalk mark in autocompletion script. Updating.")
-
-  if not alreadyExists:
-    try:
-      createDir(resolvePath(dst.splitPath().head))
-    except:
-      warn("No permission to create auto-completion directory: " &
-        dst.splitPath().head)
-      return
-
-  if not tryToWriteFile(dst, bashScript):
-    warn("Could not write to auto-completion file: " & dst)
-    return
-  else:
-    info("Installed bash auto-completion file to: " & dst)
-
-  if not alreadyExists:
-    makeCompletionAutoSource(dst)
-
-template otherSetupTasks*() =
+proc otherSetupTasks*() =
   setupManagedTemp()
-  autocompleteFileCheck()
   if isatty(1) == 0:
     setShowColor(false)
   limitFDCacheSize(attrGet[int]("cache_fd_limit"))
@@ -667,3 +508,15 @@ template withDuration*(c: untyped) =
     stop                = getMonoTime()
     diff                = stop - start
     duration {.inject.} = diff
+
+proc seemsToBeUtf8*(stream: FileStream): bool =
+  try:
+    let s = stream.peekStr(256)
+    # The below call returns the position of the first bad byte, or -1
+    # if it *is* valid.
+    if s.validateUtf8() != -1:
+      return false
+    else:
+      return true
+  except:
+    return false

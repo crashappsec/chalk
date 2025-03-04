@@ -8,6 +8,12 @@
   configurations as well as keys.
   ([#352](https://github.com/crashappsec/chalk/pull/352))
 
+### Fixes
+
+- In interactive shell, autocomplete script is now only updated
+  when its content is changed.
+  ([#493](https://github.com/crashappsec/chalk/pull/493))
+
 ## 0.5.4
 
 **Feb 19, 2025**

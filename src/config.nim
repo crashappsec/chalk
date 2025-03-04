@@ -56,19 +56,24 @@ proc filterByTemplate*(dict: ChalkDict, p: string): ChalkDict =
       if sectionExists(ss) and attrGet[bool](ss & ".use"):
         result[k] = v
 
-proc getOutputConfig*(): string =
+proc getOutputConfig(): string =
   return "outconf." & getBaseCommandName()
 
-template getMarkTemplate*(): string =
-  let tmplName = attrGet[string](getOutputConfig() & ".mark_template")
-  "mark_template." & tmplName
+proc getMarkTemplate*(): string =
+  let tmplName = attrGetOpt[string](getOutputConfig() & ".mark_template").get("mark_default")
+  return "mark_template." & tmplName
 
-template getReportTemplate*(): string =
-  let tmplName = attrGet[string](getOutputConfig() & ".report_template")
-  "report_template." & tmplName
+proc getReportTemplate*(spec = ""): string =
+  let
+    ns =
+      if spec == "":
+        getOutputConfig()
+      else:
+        spec
+    tmplName = attrGetOpt[string](ns & ".report_template").get("null")
+  return "report_template." & tmplName
 
-template forceReportKeys*(keynames: openarray[string]) =
-  let templateRef = getReportTemplate()
+proc forceKeys(keynames: openarray[string], templateRef: string) =
   let section     = templateRef & ".key"
 
   # Create the "key" section if required.
@@ -87,26 +92,11 @@ template forceReportKeys*(keynames: openarray[string]) =
       Con4mType(kind: TypeBool),
     )
 
-template forceChalkKeys*(keynames: openarray[string]) =
-  if isChalkingOp():
-    let templateRef = getMarkTemplate()
-    let section     = templateRef & ".key"
+proc forceReportKeys*(keynames: openarray[string]) =
+  forceKeys(keynames, getReportTemplate())
 
-    # Create the "key" section if required.
-    if not sectionExists(section) and keynames.len > 0:
-      con4mSectionCreate(section)
-
-    let keys = attrGetObject(section).getContents()
-
-    for item in keynames:
-      # Create the item section if required.
-      if item notin keys:
-        con4mSectionCreate(section & "." & item)
-      con4mAttrSet(
-        section & "." & item & ".use",
-        pack(true),
-        Con4mType(kind: TypeBool),
-      )
+proc forceChalkKeys*(keynames: openarray[string]) =
+  forceKeys(keynames, getMarkTemplate())
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.sCall(cb, args)
