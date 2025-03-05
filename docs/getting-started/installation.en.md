@@ -11,6 +11,7 @@ self-contained with no dependencies to install.
 ### Step 1: Visit the Download Page
 
 Navigate to the Crash Override downloads page at:
+
 ```
 https://crashoverride.com/downloads
 ```
@@ -18,6 +19,7 @@ https://crashoverride.com/downloads
 ### Step 2: Download the Binary for Your System
 
 Select the appropriate binary for your operating system and architecture. Chalk currently supports:
+
 - Linux (amd64 and arm64)
 - macOS (amd64 and arm64)
 

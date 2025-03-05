@@ -70,43 +70,43 @@ name: Build with Chalk
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0  # Important: Fetch full history for complete git metadata
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Important: Fetch full history for complete git metadata
 
-    - name: Download Chalk
-      run: |
-        curl -L -o chalk https://crashoverride.com/downloads/chalk-linux-amd64
-        chmod +x chalk
-        sudo mv chalk /usr/local/bin/
+      - name: Download Chalk
+        run: |
+          curl -L -o chalk https://crashoverride.com/downloads/chalk-linux-amd64
+          chmod +x chalk
+          sudo mv chalk /usr/local/bin/
 
-    - name: Build application
-      run: |
-        # Your normal build commands here
-        make build
+      - name: Build application
+        run: |
+          # Your normal build commands here
+          make build
 
-    - name: Apply Chalk mark
-      run: |
-        chalk insert ./bin/myapplication
+      - name: Apply Chalk mark
+        run: |
+          chalk insert ./bin/myapplication
 
-    # For Docker-based applications
-    - name: Build and mark Docker image
-      run: |
-        chalk docker build -t myorg/myapp:${{ github.sha }} .
+      # For Docker-based applications
+      - name: Build and mark Docker image
+        run: |
+          chalk docker build -t myorg/myapp:${{ github.sha }} .
 
-    - name: Push Docker image
-      run: |
-        echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-        chalk docker push myorg/myapp:${{ github.sha }}
+      - name: Push Docker image
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          chalk docker push myorg/myapp:${{ github.sha }}
 ```
 
 #### Step 2: (Optional) Configure Chalk Output

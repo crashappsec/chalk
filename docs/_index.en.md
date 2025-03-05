@@ -4,8 +4,8 @@
 
 ## About Chalk
 
-Chalk is an open-source observability tool created by [Crash Override](https://crashoverride.com) 
-that provides full lifecycle visibility into your software development process. Chalk acts like GPS 
+Chalk is an open-source observability tool created by [Crash Override](https://crashoverride.com)
+that provides full lifecycle visibility into your software development process. Chalk acts like GPS
 for your software, allowing you to easily see where software comes from and where it gets deployed.
 
 Chalk collects, stores, and reports metadata about software from build to production. The connection
@@ -19,17 +19,17 @@ ensuring they can be easily validated and extracted later.
 - **Extraction**: Extract marks from artifacts already in production
 - **Reporting**: Generate comprehensive reports about artifacts and environments
 - **Runtime Monitoring**: Configure heartbeat monitoring for deployed applications
-- **Supply Chain Security**: Generate SBOMs, collect code provenance data, and provide digital 
+- **Supply Chain Security**: Generate SBOMs, collect code provenance data, and provide digital
   signatures
 
 ## About Crash Override
 
-Crash Override is a company that develops a cloud platform providing observability for the software 
-engineering lifecycle. Our flagship open-source project is Chalk. The platform is expected to be 
+Crash Override is a company that develops a cloud platform providing observability for the software
+engineering lifecycle. Our flagship open-source project is Chalk. The platform is expected to be
 generally available in early 2025.
 
-You can register to use our cloud platform while it is in beta at 
-[crashoverride.com/signup](https://crashoverride.com/signup), or contact us at any time using 
+You can register to use our cloud platform while it is in beta at
+[crashoverride.com/signup](https://crashoverride.com/signup), or contact us at any time using
 [crashoverride.com/contact-us](https://crashoverride.com/contact-us).
 
 ## Getting Started
@@ -43,9 +43,9 @@ New to Chalk? Start here to learn the basics:
 
 - [Command Line Reference](./chalk/command-line.md) - Details all available commands and flags
 - [Configuration Overview](./chalk/config-overview.md) - Learn how to configure Chalk
-- [Configuration Options Guide](./chalk/config-overview/config-file.md) - Detailed reference for 
+- [Configuration Options Guide](./chalk/config-overview/config-file.md) - Detailed reference for
   configuration properties
-- [Metadata Reference](./chalk/config-overview/metadata.md) - Details what metadata Chalk can 
+- [Metadata Reference](./chalk/config-overview/metadata.md) - Details what metadata Chalk can
   collect and report
 
 ## How-To Guides
@@ -60,11 +60,11 @@ Our How-To Guides provide recipes to solve specific problems:
 
 ## Configuration Deep Dives
 
-- [Output Configuration](./chalk/config-overview/output-config.md) - Configure where reports get 
+- [Output Configuration](./chalk/config-overview/output-config.md) - Configure where reports get
   sent
-- [Built-in Functions](./chalk/config-overview/builtins.md) - Functions available in configuration 
+- [Built-in Functions](./chalk/config-overview/builtins.md) - Functions available in configuration
   files
-- [Custom Configurations](./chalk/config-overview/custom-config.md) - Writing your own 
+- [Custom Configurations](./chalk/config-overview/custom-config.md) - Writing your own
   configurations
 - [FAQ](./chalk/config-overview/faq.md) - Common questions about configurations
 
@@ -72,7 +72,7 @@ Our How-To Guides provide recipes to solve specific problems:
 
 - [Hashing in Chalk](./chalk/hashing.md) - How Chalk uses cryptographic hashing
 - [Heartbeat Configuration](./chalk/heartbeat.md) - Configure periodic reporting
-- [Signing Key Provider](./chalk/signing-key-provider.md) - Information about the Chalk Signing Key 
+- [Signing Key Provider](./chalk/signing-key-provider.md) - Information about the Chalk Signing Key
   Provider Service
 
 ## Release Information
@@ -81,8 +81,8 @@ Our How-To Guides provide recipes to solve specific problems:
 
 ## Contributions
 
-We welcome contributions to our open-source projects. Find more information at 
-[crashoverride.com/docs/other/contributing](https://crashoverride.com/docs/other/contributing) or 
+We welcome contributions to our open-source projects. Find more information at
+[crashoverride.com/docs/other/contributing](https://crashoverride.com/docs/other/contributing) or
 check our [contribution guidelines](./overview.md).
 
 ## Downloads
@@ -91,11 +91,11 @@ We provide binary releases for our open-source projects at [crashoverride.com/re
 
 ## Help and Support
 
-If you need additional help, or would like a demo of the cloud platform, please contact us using 
+If you need additional help, or would like a demo of the cloud platform, please contact us using
 [crashoverride.com/contact-us](https://crashoverride.com/contact-us).
 
 ## Subscribe to Updates
 
-We operate a newsletter that is sent periodically with information about new product features. You 
-can sign up from our homepage, [crashoverride.com](https://crashoverride.com). You can also follow 
+We operate a newsletter that is sent periodically with information about new product features. You
+can sign up from our homepage, [crashoverride.com](https://crashoverride.com). You can also follow
 our blog at [crashoverride.com/blog](https://crashoverride.com/blog).

@@ -1,7 +1,8 @@
 ---
-title: 
-description: 
+title:
+description:
 ---
+
 # Chalk™ User Guide
 
 ## About This Guide
@@ -29,16 +30,16 @@ HOW-TO guides.
 
 Beyond this document, there's an extensive amount of reference material for users:
 
-| Name                                                          | What it is                                                                                                                         |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Name                                                                                 | What it is                                                                                                                         |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
 | [**Metadata Reference**](../chalk/config-overview/metadata.md)                       | Details what metadata Chalk can collect and report on, and in what circumstances                                                   |
-| [**Command Line Reference**](../chalk/command-line.md)               | Details command-line usage, including flags                                                                                        |
-| [**Configuration Overview**](../chalk/config-overview.md)      | Provides overview on Chalk configuration components                                                                                |
+| [**Command Line Reference**](../chalk/command-line.md)                               | Details command-line usage, including flags                                                                                        |
+| [**Configuration Overview**](../chalk/config-overview.md)                            | Provides overview on Chalk configuration components                                                                                |
 | [**The Chalk Configuration Options Guide**](../chalk/config-overview/config-file.md) | Details properties you can set in Chalk's configuration file, if you choose to use it over our command-line configuration wizard   |
 | [**Output Configuration Reference**](../chalk/config-overview/output-config.md)      | Shows how to set up sending reports wherever you like, using the config file.                                                      |
 | [**Metadata Report Configuration Guide**](../chalk/config-overview/metadata.md)      | Shows how to specify what data to collect, when, and how to report different things to different places, if using the config file. |
 | [**Config File Builtins**](../chalk/config-overview/builtins.md)                     | Shows the functions you can call from within a configuration file                                                                  |
-| [**Release Notes**](../chalk/release-notes.md)                  | Includes key known issues in the current release of Chalk                                                                          |
+| [**Release Notes**](../chalk/release-notes.md)                                       | Includes key known issues in the current release of Chalk                                                                          |
 
 We have provided chalk with sensible default configurations for demo and testing, as well as some sample configs for specific use cases available through the [Chalk Getting Started Guide](../chalk/getting-started.md) and the how-to guides.
 
@@ -110,9 +111,9 @@ environments.
 
 ### Configuration
 
-Chalk stores its own configuration inside its own binary. This configuration is 
-used to set up behavior and preferences for each command, including how marking 
-and reporting happens. For more information on how to write Chalk 
+Chalk stores its own configuration inside its own binary. This configuration is
+used to set up behavior and preferences for each command, including how marking
+and reporting happens. For more information on how to write Chalk
 configurations, see the [config overview](./config-overview.md).
 
 ### Command Line Operations

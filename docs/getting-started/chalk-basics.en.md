@@ -124,6 +124,7 @@ Chalk has now added a chalk mark to the image. The mark is stored in a file at t
 container filesystem.
 
 :> [!NOTE]
+
 > More documentation is available [on how Chalk wraps Docker](../advanced-topics/docker.en.md).
 
 ## Extracting Chalk Marks
