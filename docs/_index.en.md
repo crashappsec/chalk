@@ -43,10 +43,6 @@ New to Chalk? Start here to learn the basics:
 
 - [Command Line Reference](./chalk/command-line.md) - Details all available commands and flags
 - [Configuration Overview](./chalk/config-overview.md) - Learn how to configure Chalk
-- [Configuration Options Guide](./chalk/config-overview/config-file.md) - Detailed reference for
-  configuration properties
-- [Metadata Reference](./chalk/config-overview/metadata.md) - Details what metadata Chalk can
-  collect and report
 
 ## How-To Guides
 
@@ -60,10 +56,6 @@ Our How-To Guides provide recipes to solve specific problems:
 
 ## Configuration Deep Dives
 
-- [Output Configuration](./chalk/config-overview/output-config.md) - Configure where reports get
-  sent
-- [Built-in Functions](./chalk/config-overview/builtins.md) - Functions available in configuration
-  files
 - [Custom Configurations](./chalk/config-overview/custom-config.md) - Writing your own
   configurations
 - [FAQ](./chalk/config-overview/faq.md) - Common questions about configurations
