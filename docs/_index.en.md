@@ -42,7 +42,7 @@ New to Chalk? Start here to learn the basics:
 ## Core Documentation
 
 - [Command Line Reference](./chalk/command-line.md) - Details all available commands and flags
-- [Configuration Overview](./chalk/config-overview.md) - Learn how to configure Chalk
+- [Configuration Overview](./chalk/config.md) - Learn how to configure Chalk
 
 ## How-To Guides
 
@@ -56,9 +56,9 @@ Our How-To Guides provide recipes to solve specific problems:
 
 ## Configuration Deep Dives
 
-- [Custom Configurations](./chalk/config-overview/custom-config.md) - Writing your own
+- [Custom Configurations](./chalk/config/custom-config.md) - Writing your own
   configurations
-- [FAQ](./chalk/config-overview/faq.md) - Common questions about configurations
+- [FAQ](./chalk/config/faq.md) - Common questions about configurations
 
 ## Advanced Topics
 

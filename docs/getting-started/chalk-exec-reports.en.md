@@ -356,5 +356,4 @@ configurations tailored to your specific observability needs, integrate with mon
 and build automated workflows that leverage this valuable runtime information.
 
 For more detailed information on available metadata keys and configuration options, refer to the
-[Chalk Metadata Reference](./advanced-topics/config-overview/metadata.md) and
 [Configuration Guide](./advanced-topics/).

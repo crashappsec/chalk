@@ -30,16 +30,11 @@ HOW-TO guides.
 
 Beyond this document, there's an extensive amount of reference material for users:
 
-| Name                                                                                 | What it is                                                                                                                         |
-| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| [**Metadata Reference**](../chalk/config-overview/metadata.md)                       | Details what metadata Chalk can collect and report on, and in what circumstances                                                   |
-| [**Command Line Reference**](../chalk/command-line.md)                               | Details command-line usage, including flags                                                                                        |
-| [**Configuration Overview**](../chalk/config-overview.md)                            | Provides overview on Chalk configuration components                                                                                |
-| [**The Chalk Configuration Options Guide**](../chalk/config-overview/config-file.md) | Details properties you can set in Chalk's configuration file, if you choose to use it over our command-line configuration wizard   |
-| [**Output Configuration Reference**](../chalk/config-overview/output-config.md)      | Shows how to set up sending reports wherever you like, using the config file.                                                      |
-| [**Metadata Report Configuration Guide**](../chalk/config-overview/metadata.md)      | Shows how to specify what data to collect, when, and how to report different things to different places, if using the config file. |
-| [**Config File Builtins**](../chalk/config-overview/builtins.md)                     | Shows the functions you can call from within a configuration file                                                                  |
-| [**Release Notes**](../chalk/release-notes.md)                                       | Includes key known issues in the current release of Chalk                                                                          |
+| Name                                                   | What it is                                                |
+| ------------------------------------------------------ | --------------------------------------------------------- |
+| [**Command Line Reference**](../chalk/command-line.md) | Details command-line usage, including flags               |
+| [**Configuration Overview**](../chalk/config.md)       | Provides overview on Chalk configuration components       |
+| [**Release Notes**](../chalk/CHANGELOG.md)             | Includes key known issues in the current release of Chalk |
 
 We have provided chalk with sensible default configurations for demo and testing, as well as some sample configs for specific use cases available through the [Chalk Getting Started Guide](../chalk/getting-started.md) and the how-to guides.
 
@@ -114,7 +109,7 @@ environments.
 Chalk stores its own configuration inside its own binary. This configuration is
 used to set up behavior and preferences for each command, including how marking
 and reporting happens. For more information on how to write Chalk
-configurations, see the [config overview](./config-overview.md).
+configurations, see the [config overview](../config.md).
 
 ### Command Line Operations
 
@@ -472,7 +467,7 @@ needs), but the people who do should find the syntax to be
 straightforward to anyone with basic programming experience.
 
 For people who want to dig into the actual configuration file, we
-provide an overview in [Config Overview](../chalk/config-overview.md),
+provide an overview in [Config Overview](../chalk/config.md),
 and more details in the how-to guides for specific use cases. We also
 provide documentation via the help in `chalk help config`.
 
@@ -852,7 +847,7 @@ For more information, see the following:
   are available in which operations, as well as the meaning of the
   fields. Documentation for keys will also include the conditions
   where the reference implementation can find them.
-- [The Config Overview Guide](../chalk/config-overview.md) covers how
+- [The Config Overview Guide](../chalk/config.md) covers how
   to configure WHERE reports get sent.
 
 Note that compliant insertion implementations do not require compliant
@@ -1069,7 +1064,7 @@ lists of keys to include or not include for a given situation.
 
 While you can build your own templates, the easiest thing to do is to copy and paste the default templates into your new configuration file, change the defaults, and then load the config file. Defaults are available in `src/configs/base_report_templates.c4m` for report templates and in `src/configs/base_chalk_templates.c4m` for mark templates.
 
-For more information on how templates can be configured manually in the configuration file, see the [Config Overview Guide](../chalk/config-overview.md).
+For more information on how templates can be configured manually in the configuration file, see the [Config Overview Guide](../chalk/config.md).
 
 ### Reporting Templates for Docker Labels
 

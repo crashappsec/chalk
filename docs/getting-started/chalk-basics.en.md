@@ -300,4 +300,4 @@ In this guide, you've learned how to:
 
 These basic operations form the foundation for more advanced Chalk usage. As you become more familiar with Chalk, you can explore more complex configurations and integrate Chalk into your CI/CD pipelines for automated software tracking and reporting.
 
-For more detailed information, refer to the [Chalk User Guide](./user-guide.md) and [Configuration Overview](./config-overview.md).
+For more detailed information, refer to the [Chalk User Guide](./user-guide.md) and [Configuration Overview](./config.md).
