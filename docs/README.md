@@ -40,6 +40,7 @@ New to Chalk? Start here to learn the basics:
 - [Attestation](./attestation.md) - Enabling and using automatic attestations in chalk
 - [Docker Wrapping](./docker-wrapping.md) - How chalk wraps docker builds.
 - [Custom Configurations](./config-overview.md) - Writing your own configurations
+- [Custom Keys](./config-custom-keys.md) - Collecting your own custom keys
 - [Configuration FAQ](./config-faq.md) - Common questions about configurations
 
 ## Release Information
