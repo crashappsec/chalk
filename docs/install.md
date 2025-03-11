@@ -1,7 +1,8 @@
 # Chalk Installation Guide
 
-This guide provides detailed instructions for getting Chalk up and running on your system. You can
-either download a pre-built binary (recommended for most users) or build Chalk from source.
+This guide provides detailed instructions for getting Chalk up and running on
+your system. You can either download a pre-built binary (recommended for most
+users) or build Chalk from source.
 
 ## Option 1: Downloading the Chalk Binary
 
@@ -55,9 +56,9 @@ Chalk supports multiple operating systems and architectures:
 
 ## Option 2: Building Chalk from Source
 
-Building from source gives you the latest features and the ability to customize your build. There
-are two methods to build Chalk from source: using Docker (recommended) or building directly on your
-system.
+Building from source gives you the latest features and the ability to customize
+your build. There are two methods to build Chalk from source: using Docker
+(recommended) or building directly on your system.
 
 1. Clone the Chalk Repository
 
@@ -106,6 +107,7 @@ chalk help
 chalk help commands
 ```
 
-Now that you have Chalk working, you can start using it to mark and track your software artifacts.
-Refer to the [Getting Started Guide](https://crashoverride.com/docs/chalk/getting-started) for an
-introduction to Chalk's capabilities.
+Now that you have Chalk working, you can start using it to mark and track your
+software artifacts. Refer to the
+[Getting Started Guide](https://crashoverride.com/docs/chalk/getting-started)
+for an introduction to Chalk's capabilities.

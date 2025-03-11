@@ -2,20 +2,22 @@
 
 ## Why Integrate Chalk into Your CI/CD Pipeline?
 
-Modern software development relies heavily on Continuous Integration and Continuous Deployment
-(CI/CD) pipelines to automate building, testing, and deploying applications. These pipelines
-represent a critical juncture in the software lifecycle – the moment where source code transforms
-into deployable artifacts that will eventually run in production environments.
+Modern software development relies heavily on Continuous Integration and
+Continuous Deployment (CI/CD) pipelines to automate building, testing, and
+deploying applications. These pipelines represent a critical juncture in the
+software lifecycle – the moment where source code transforms into deployable
+artifacts that will eventually run in production environments.
 
 Integrating Chalk into your CI/CD pipeline creates several powerful advantages:
 
 ### 1. Automatic Traceability Across the Software Lifecycle
 
-When Chalk operates at build time, it creates a permanent connection between your source code and
-your production artifacts. This connection enables developers, operations teams, and security
-professionals to trace any production artifact back to its exact source commit, build environment,
-and pipeline execution. This traceability becomes invaluable when investigating incidents,
-debugging production issues, or conducting security forensics.
+When Chalk operates at build time, it creates a permanent connection between
+your source code and your production artifacts. This connection enables
+developers, operations teams, and security professionals to trace any
+production artifact back to its exact source commit, build environment, and
+pipeline execution. This traceability becomes invaluable when investigating
+incidents, debugging production issues, or conducting security forensics.
 
 ### 2. Enhanced Software Supply Chain Security
 
@@ -28,38 +30,43 @@ pipeline, you can automatically:
 - Collect and store code ownership information
 - Document the build environment and dependencies
 
-This information can help satisfy regulatory requirements (like NIST's SSDF or the US Executive
-Order on Improving the Nation's Cybersecurity) and provide evidence for security certifications.
+This information can help satisfy regulatory requirements (like NIST's SSDF or
+the US Executive Order on Improving the Nation's Cybersecurity) and provide
+evidence for security certifications.
 
 ### 3. Improved Developer and Operations Collaboration
 
-When an issue arises in production, operations teams often struggle to identify which team is
-responsible for a particular service or artifact. By embedding ownership and repository information
-directly into artifacts, Chalk eliminates the typical back-and-forth of "who owns this?" and allows
-teams to route incidents to the correct owners immediately.
+When an issue arises in production, operations teams often struggle to identify
+which team is responsible for a particular service or artifact. By embedding
+ownership and repository information directly into artifacts, Chalk eliminates
+the typical back-and-forth of "who owns this?" and allows teams to route
+incidents to the correct owners immediately.
 
 ### 4. Automated Inventory Management
 
-As organizations grow, keeping track of all deployed software becomes increasingly challenging.
-Chalk automatically creates data that can be used to maintains a real-time inventory of
-applications, helping organizations understand what they have running, where it's running, and who's
-responsible for it – without requiring manual tracking or documentation.
+As organizations grow, keeping track of all deployed software becomes
+increasingly challenging. Chalk automatically creates data that can be used
+to maintains a real-time inventory of applications, helping organizations
+understand what they have running, where it's running, and who's responsible
+for it – without requiring manual tracking or documentation.
 
 ### 5. Build Context Preservation
 
-CI/CD systems contain valuable metadata about the build process that is typically lost once
-artifacts are deployed. Chalk preserves this ephemeral information by embedding it directly into the
-artifacts, ensuring it remains available throughout the software's lifecycle.
+CI/CD systems contain valuable metadata about the build process that is
+typically lost once artifacts are deployed. Chalk preserves this ephemeral
+information by embedding it directly into the artifacts, ensuring it remains
+available throughout the software's lifecycle.
 
 ## Integrating Chalk with Common CI/CD Platforms
 
-Now that we understand why integrating Chalk into CI/CD pipelines is valuable, let's explore how to
-implement it on several popular platforms.
+Now that we understand why integrating Chalk into CI/CD pipelines is valuable,
+let's explore how to implement it on several popular platforms.
 
 ### GitHub Actions
 
-GitHub Actions is a popular CI/CD platform integrated directly into GitHub repositories. Here's how
-to incorporate Chalk into your GitHub Actions workflows:
+GitHub Actions is a popular CI/CD platform integrated directly into GitHub
+repositories. Here's how to incorporate Chalk into your GitHub Actions
+workflows:
 
 1. Add [setup-chalk-action](https://github.com/crashappsec/setup-chalk-action) step:
 
@@ -149,7 +156,8 @@ sh <(curl -fsSL https://crashoverride.run/setup.sh) --load="
 
 ## Advanced CI/CD Integration Patterns
 
-Beyond basic integration, here are some advanced patterns for using Chalk in CI/CD pipelines:
+Beyond basic integration, here are some advanced patterns for using Chalk in
+CI/CD pipelines:
 
 ### Enabling And Verifying Attestations
 
@@ -167,40 +175,42 @@ load these components:
 
 ## Best Practices for CI/CD Integration
 
-- **Store Chalk binary in your artifact repository**: Instead of downloading Chalk in every
-  pipeline run, consider storing the binary in your organization's artifact repository for faster
-  and more reliable access.
+- **Store Chalk binary in your artifact repository**: Instead of downloading
+  Chalk in every pipeline run, consider storing the binary in your organization's
+  artifact repository for faster and more reliable access.
 
-- **Version pin your Chalk binary**: Explicitly specify which version of Chalk to use to ensure
-  consistent behavior across pipeline runs.
+- **Version pin your Chalk binary**: Explicitly specify which version of Chalk
+  to use to ensure consistent behavior across pipeline runs.
 
-- **Use CI/CD secrets for sensitive configuration**: Never hardcode API keys, passwords, or
-  other sensitive information in your pipeline configuration.
+- **Use CI/CD secrets for sensitive configuration**: Never hardcode API keys,
+  passwords, or other sensitive information in your pipeline configuration.
 
-- **Cache the Chalk configuration**: For complex configurations, consider creating a custom Docker
-  image with Chalk pre-installed and configured.
+- **Cache the Chalk configuration**: For complex configurations, consider
+  creating a custom Docker image with Chalk pre-installed and configured.
 
-- **Incorporate Chalk verification in deployment gates**: Before promoting artifacts to production,
-  verify their Chalk marks to ensure they haven't been tampered with.
+- **Incorporate Chalk verification in deployment gates**: Before promoting
+  artifacts to production, verify their Chalk marks to ensure they haven't been
+  tampered with.
 
-- **Integrate with security scanning**: Use the security information collected by Chalk (SBOMs,
-  SAST results) as input for additional security scanning tools.
+- **Integrate with security scanning**: Use the security information collected
+  by Chalk (SBOMs, SAST results) as input for additional security scanning tools.
 
-- **Include Chalk reports in compliance documentation**: For regulated industries, archive Chalk
-  reports alongside other build artifacts to help meet compliance requirements.
+- **Include Chalk reports in compliance documentation**: For regulated
+  industries, archive Chalk reports alongside other build artifacts to help meet
+  compliance requirements.
 
 ## Troubleshooting CI/CD Integration
 
 ### Common Issues
 
-- **Missing Git metadata**: Ensure your CI/CD checkout step fetches the full repository history to
-  allow Chalk to capture accurate git information.
+- **Missing Git metadata**: Ensure your CI/CD checkout step fetches the full
+  repository history to allow Chalk to capture accurate git information.
 
-- **Docker-in-Docker issues**: When using Chalk with Docker in CI/CD environments, ensure your
-  container runtime has the necessary permissions.
+- **Docker-in-Docker issues**: When using Chalk with Docker in CI/CD
+  environments, ensure your container runtime has the necessary permissions.
 
-- **File permission problems**: CI/CD environments often run with restricted permissions. Ensure
-  Chalk has write access to the artifacts it needs to mark.
+- **File permission problems**: CI/CD environments often run with restricted
+  permissions. Ensure Chalk has write access to the artifacts it needs to mark.
 
 ### Debugging Tips
 
@@ -221,20 +231,23 @@ load these components:
   chalk --show-config version
   ```
 
-- Test your Chalk configuration locally before integrating it into your CI/CD pipeline.
+- Test your Chalk configuration locally before integrating it into your CI/CD
+  pipeline.
 
 ## Wrapping-up
 
-Integrating Chalk into your CI/CD pipeline allows you to automatically collect valuable metadata
-about your software, create a permanent link between source code and production artifacts, and
-enhance your security posture with supply chain verification.
+Integrating Chalk into your CI/CD pipeline allows you to automatically collect
+valuable metadata about your software, create a permanent link between source
+code and production artifacts, and enhance your security posture with supply
+chain verification.
 
-By following the examples and best practices in this guide, you can implement Chalk in a way that
-adds minimal overhead to your build process while providing substantial benefits throughout your
-software's lifecycle.
+By following the examples and best practices in this guide, you can implement
+Chalk in a way that adds minimal overhead to your build process while providing
+substantial benefits throughout your software's lifecycle.
 
-Remember that the specific integration approach may vary based on your organization's requirements
-and existing toolchain. Chalk's flexibility allows it to fit into virtually any CI/CD process,
-whether you're building traditional applications, containers, or cloud native services.
+Remember that the specific integration approach may vary based on your
+organization's requirements and existing toolchain. Chalk's flexibility allows
+it to fit into virtually any CI/CD process, whether you're building traditional
+applications, containers, or cloud native services.
 
 [`setup.sh`]: https://github.com/crashappsec/setup-chalk-action/blob/main/setup.sh
