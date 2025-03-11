@@ -37,7 +37,7 @@ Docker and k8s however have
 for `ENTRYPOINT` and a `CMD` hence making it very easy to
 unintentionally override it’s `ENTERYPOINT` as `k8s` `command` sets
 the run-time `ENTRYPOINT`. Here is the mapping between docker and
-[k8s terminology](https://kubernetes.io/docs/tasks/inject-data-application/define-co mmand-argument-container/):
+[k8s terminology](https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/):
 
 | Docker       | K8S       |
 | ------------ | --------- |
@@ -68,7 +68,7 @@ and report any of the runtime information.
 In order to fix the pod definition to run chalk, you can either:
 
 - omit the`command` in the pod definition and only use `args` in which case k8s
-  will honor the `ENTRYPIOINT` from the image config. For example:
+  will honor the `ENTRYPOINT` from the image config. For example:
 
   ```yaml
   apiVersion: v1
