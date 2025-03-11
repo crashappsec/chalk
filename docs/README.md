@@ -38,6 +38,7 @@ New to Chalk? Start here to learn the basics:
 ## Chalk Features
 
 - [Attestation](./attestation.md) - Enabling and using automatic attestations in chalk
+- [SBOM](./sbom.md) - Automatically collect SBOM information during builds.
 - [Docker Wrapping](./docker-wrapping.md) - How chalk wraps docker builds.
 - [k8s Docker ENTRYPOINT Wrapping](./docker-k8s.md) - How to use chalked containers in k8s.
 - [Custom Configurations](./config-overview.md) - Writing your own configurations
