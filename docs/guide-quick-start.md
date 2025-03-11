@@ -8,7 +8,7 @@ marks, and configure Chalk's reporting behavior.
 
 Before starting, ensure you have a working installation of Chalk. If you
 have not installed Chalk yet, please refer to the
-[Chalk Installation Guide](./installation.en.md).
+[Chalk Installation Guide](./install.md).
 
 ## Marking a Binary
 
@@ -109,7 +109,7 @@ Chalk has now added a chalk mark to the image. The mark is stored in a file at
 the root of the container filesystem at `/chalk.json`.
 
 More documentation is available
-[on how Chalk wraps Docker](../advanced-topics/docker.en.md).
+[on how Chalk wraps Docker](./docker-wrapping.md).
 
 ## Extracting Chalk Marks
 
@@ -304,5 +304,5 @@ configurations and integrate Chalk into your CI/CD pipelines for automated
 software tracking and reporting.
 
 For more detailed information, refer to the
-[Chalk User Guide](./user-guide.md) and
-[Configuration Overview](./config.md).
+[Chalk User Guide](./guide-user.md) and
+[Configuration Overview](./config-overview.md).

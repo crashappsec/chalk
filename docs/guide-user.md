@@ -57,11 +57,8 @@ you better understand Chalk's behavior and some of the design decisions behind
 it.
 
 This document is NOT intended to be a tutorial overview. For that, see the
-[Getting Started Guide](../getting-started.md) for an easy introduction to
+[Getting Started Guide](./guide-getting-started.md) for an easy introduction to
 Chalk.
-
-We have provided chalk with sensible default configurations for demo and
-testing, as well as some sample configurations via https://chalkdust.io.
 
 ## Source Code Availability
 
@@ -120,7 +117,7 @@ be used to find metadata in production environments.
 Chalk stores its own configuration inside its own binary. This configuration
 is used to set up behavior and preferences for each command, including how
 marking and reporting happens. For more information on how to write Chalk
-configurations, see the [config overview](../config.md).
+configurations, see the [config overview](./config-overview.md).
 
 ### Command Line Operations
 
@@ -208,7 +205,7 @@ You can also configure chalk to run:
 - run secret scanner via `trufflehog`
 
 Chalk also supports custom metadata collection and digital signing.
-See [attestation](../attestation.md) for more information.
+See [attestation](./attestation.md) for more information.
 
 You can configure chalk to use `insert` as the default command, in which case
 the binary can be deployed with no command line options whatsoever.
@@ -345,7 +342,7 @@ The current default behavior for chalk is then to exit quietly, without
 impacting your process. Chalk can also be configured to continue running in the
 background and emit a periodic heartbeat report that is fully customizable.
 
-See [exec guide](./exec.md) for more information.
+See [exec guide](./guide-exec.md) for more information.
 
 ### Metadata Keys
 
@@ -456,7 +453,7 @@ who do should find the syntax to be straightforward to anyone with basic
 programming experience.
 
 For people who want to dig into the actual configuration file, we provide
-an overview in [Config Overview](../chalk/config.md). We also provide
+an overview in [Config Overview](./config-overview.md). We also provide
 documentation via the help in `chalk help configs`.
 
 Note that other implementations of Chalk are free to implement their own
@@ -825,7 +822,7 @@ For more information, see the following:
   are available in which operations, as well as the meaning of the
   fields. Documentation for keys will also include the conditions
   where the reference implementation can find them.
-- [The Config Overview Guide](../chalk/config.md) covers how
+- [The Config Overview Guide](./config-overview.md) covers how
   to configure WHERE reports get sent.
 
 Note that compliant insertion implementations do not require compliant
@@ -1068,7 +1065,7 @@ in `src/configs/base_report_templates.c4m` for report templates and in
 `src/configs/base_chalk_templates.c4m` for mark templates.
 
 For more information on how templates can be configured manually in the
-configuration file, see the [Config Overview Guide](../chalk/config.md).
+configuration file, see the [Config Overview Guide](./config-overview.md).
 
 ### Reporting Templates for Docker Labels
 

@@ -153,7 +153,7 @@ Beyond basic integration, here are some advanced patterns for using Chalk in CI/
 
 ### Enabling And Verifying Attestations
 
-See [Attestation TODO](../advanced-topics/attestation.en.md) guide.
+See [Attestation](./attestation.md) guide.
 
 ### Running External Tools
 

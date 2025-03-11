@@ -186,7 +186,7 @@ For a full list of what sinks are available by default, see
 
 Beyond this document, there's an extensive amount of reference material for users:
 
-| Name                                                | What it is                                      |
-| --------------------------------------------------- | ----------------------------------------------- |
-| [**Writing Custom Configs**](./custom-config.en.md) | An guide on customizing configs.                |
-| [**Frequently Asked Questions**](./faq.en.md)       | Frequently asked questions about configuration. |
+| Name                                              | What it is                                      |
+| ------------------------------------------------- | ----------------------------------------------- |
+| [**Writing Custom Configs**](./config-custom.md)  | An guide on customizing configs.                |
+| [**Frequently Asked Questions**](./config-faq.md) | Frequently asked questions about configuration. |
