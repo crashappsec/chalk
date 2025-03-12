@@ -46,11 +46,11 @@ load and tweak configurations without having to manually edit a configuration
 file.
 
 Assuming you've downloaded Chalk into your working directory, you can load the
-compliance configuration file by running:
+SBOM configuration file by running:
 
 ```bash
 $ chalk load https://chalkdust.io/run_sbom.c4m
-$ chalk load https://chalkdust.io/embed_sbom.c4m
+$ chalk load https://chalkdust.io/embed_sboms.c4m
 ```
 
 By default, Chalk is already collecting provenance information by examining
@@ -60,7 +60,7 @@ key things to the default behavior:
 
 - `run_sbom.c4m` - It will enable the collection of SBOMs (off by default
   because on large projects, this can add a small delay to the build)
-- `embed_sbom.c4m` - For simplicity it will embed SBOM findings into
+- `embed_sboms.c4m` - For simplicity it will embed SBOM findings into
   the chalk mark which is going to be embedded into the artifact. Note that
   SBOM findings can be large and can increase the artifact size significantly.
   If that is a concern, we recommend shipping SBOM data to and external sink
@@ -69,7 +69,7 @@ key things to the default behavior:
 You can check that the configuration has been loaded by running:
 
 ```bash
-chalk dump
+$ chalk dump
 ```
 
 #### Step 2: Turn on digital signing
@@ -81,7 +81,7 @@ Here is the quick summary.
 First you will need to generate a signing key for chalk:
 
 ```bash
-chalk setup
+$ chalk setup
 ```
 
 Above will create `chalk.key` and `chalk.pub` as well as show value for .
@@ -134,9 +134,9 @@ following examples we will be using a local registry at `localhost:5000`.
 To clone and build the `wordsmith` project, run:
 
 ```bash
-git clone https://github.com/dockersamples/wordsmith
-cd wordsmith/api
-chalk docker build -t localhost:5000/wordsmith:latest . --push
+$ git clone https://github.com/dockersamples/wordsmith
+$ cd wordsmith/api
+$ chalk docker build -t localhost:5000/wordsmith:latest . --push
 ```
 
 You'll see Docker run normally (it'll take a minute or so). If your permissions
@@ -170,7 +170,7 @@ The terminal report (displayed after the Docker output) should look like this:
 To check that the container pushed has been successfully Chalked, we can run:
 
 ```bash
-chalk extract localhost:5000/wordsmith:latest
+$ chalk extract localhost:5000/wordsmith:latest
 ```
 
 The terminal report for the extract operation should look like this:
@@ -184,7 +184,7 @@ The terminal report for the extract operation should look like this:
       {
         "_OP_ARTIFACT_TYPE": "Docker Image",
         "_REPO_DIGESTS": {
-          "localhost:5044": {
+          "localhost:5000": {
             "wordsmith": [
               "4a12fd9ca65dd21bf6a9416117ce94b986131787dfbcd3b1ead258170be16e69"
             ]
@@ -206,6 +206,7 @@ are the same -- this ID is how we will track the container.
 Checking the raw Chalk mark, we can see the SBOM data has been embedded:
 
 ```json
+$ docker run -it --rm --entrypoint=cat localhost:5000/wordsmith:latest /chalk.json | jq
 {
   "CHALK_ID": "GWWH8K-W4TW-GEVV-18JMKT",
   "METADATA_ID": "DZDT7N-4RP1-KGXM-7K27WY",
@@ -244,8 +245,8 @@ For example, let's make a copy of the `ls` binary into `tmp` called `ls-test`
 and Chalk it:
 
 ```bash
-cp $(which ls) /tmp/ls-test
-chalk insert /tmp/ls-test
+$ cp $(which ls) /tmp/ls-test
+$ chalk insert /tmp/ls-test
 ```
 
 This will insert a Chalk mark into the `ls-test` binary, with environmental
@@ -268,7 +269,8 @@ this:
         "METADATA_ID": "2NQ40N-7T08-05MJ-30EXKZ",
         "SIGNATURE": "MEYCIQCjXwUttf2Lpx7PYx5QsFSCXqrpY4+1Q6vUWWz7ZEMl0QIhAN2whDM4WgzzrNcSVwWh7mfTcVtjgnumyxAzXkWbMp3J",
         "_VIRTUAL": false,
-        "_CURRENT_HASH": "8696974df4fc39af88ee23e307139afc533064f976da82172de823c3ad66f444"
+        "_CURRENT_HASH": "8696974df4fc39af88ee23e307139afc533064f976da82172de823c3ad66f444",
+        [...]
       }
     ],
     [...]
@@ -277,12 +279,7 @@ this:
 To check that the Chalk mark has been correctly added, we can run:
 
 ```bash
-chalk extract /tmp/ls-test
-```
-
-The terminal report for the extract operation should look like this:
-
-```json
+$ chalk extract /tmp/ls-test
 [
   {
     "_OPERATION": "extract",
@@ -295,7 +292,8 @@ The terminal report for the extract operation should look like this:
         "METADATA_ID": "2NQ40N-7T08-05MJ-30EXKZ",
         "_OP_ARTIFACT_PATH": "/tmp/ls-test",
         "_OP_ARTIFACT_TYPE": "ELF",
-        "_CURRENT_HASH": "7cf6bd9e964e19e06f77fff30b8a088fbde7ccbfc94b9500c09772e175613def"
+        "_CURRENT_HASH": "7cf6bd9e964e19e06f77fff30b8a088fbde7ccbfc94b9500c09772e175613def",
+        [...]
       }
     ],
     [...]
