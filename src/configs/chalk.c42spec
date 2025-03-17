@@ -3365,6 +3365,16 @@ Currently, the only available tool out of the box is trufflehog.
 """
   }
 
+  field lambda_mode {
+    type:     bool
+    default:  false
+    shortdoc: "lambda mode"
+    doc:      """
+When present, inject the executed chalk binary itself in the zip
+archive being processed upon insertion.
+"""
+  }
+
   field recursive {
     type:     bool
     default:  true
