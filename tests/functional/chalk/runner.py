@@ -446,6 +446,7 @@ class Chalk:
         expecting_report: bool = True,
         expecting_chalkmarks: bool = True,
         use_embedded: bool = True,
+        params: Optional[list[str]] = None,
     ) -> ChalkProgram:
         result = self.run(
             command="insert",
@@ -457,6 +458,7 @@ class Chalk:
             ignore_errors=ignore_errors,
             expecting_report=expecting_report,
             use_embedded=use_embedded,
+            params=params,
         )
         if expecting_report:
             if expecting_chalkmarks:
