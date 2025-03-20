@@ -32,11 +32,12 @@ services:
       - ../n00b/build_dev/libn00b.a.p:/root/.local/c0/libs/libn00b.a.p
       - ../n00b/build_dev/subprojects/utf8proc-2.9.0/libutf8proc.a:/root/.local/c0/libs/libutf8proc.a
       - ../n00b/subprojects/libffi-3.4.6/x86_64-pc-linux-musl/.libs/libffi.a:/root/.local/c0/libs/libffi.a
-      - ../n00b/subprojects/libbacktrace-531aec7c52b66cd750a28a698f3c060f279b18b0/.libs/libbacktrace.a:/root/.local/c0/libs/libbacktrace.a
+      - ../n00b/subprojects/libbacktrace-1db85642e3fca189cf4e076f840a45d6934b2456/.libs/libbacktrace.a:/root/.local/c0/libs/libbacktrace.a
       - ../n00b/subprojects/libunibreak-5.1/src/.libs/libunibreak.a:/root/.local/c0/libs/libunibreak.a
       - ../n00b/subprojects/curl-8.9.1/lib/.libs/libcurl.a:/root/.local/c0/libs/libcurl.a
       - ../n00b/subprojects/openssl-3.4.0/libssl.a:/root/.local/c0/libs/libssl.a
       - ../n00b/subprojects/openssl-3.4.0/libcrypto.a:/root/.local/c0/libs/libcrypto.a
+      - ../n00b/subprojects/libevent-2.1.12-stable/.libs/libevent.a:/root/.local/c0/libs/libevent.a
       # n00b headers
       - ../n00b/include/n00b.h:/root/.local/c0/include/n00b.h
       - ../n00b/include/hatrack.h:/root/.local/c0/include/hatrack.h
@@ -50,13 +51,15 @@ services:
       - ../n00b/include/io/:/root/.local/c0/include/io/
       - ../n00b/include/n00b/:/root/.local/c0/include/n00b/
       - ../n00b/include/util/:/root/.local/c0/include/util/
+      - ../n00b/include/runtime/:/root/.local/c0/include/runtime/
       - ../n00b/include/vendor/:/root/.local/c0/include/vendor/
       # other headers
-      - ../n00b/subprojects/libbacktrace-531aec7c52b66cd750a28a698f3c060f279b18b0/backtrace.h:/root/.local/c0/include/backtrace.h
+      - ../n00b/subprojects/libbacktrace-1db85642e3fca189cf4e076f840a45d6934b2456/backtrace.h:/root/.local/c0/include/backtrace.h
       - ../n00b/subprojects/curl-8.9.1/include/curl/:/root/.local/c0/include/curl/
       - ../n00b/subprojects/libunibreak-5.1/src/linebreak.h:/root/.local/c0/include/linebreak.h
       - ../n00b/subprojects/libunibreak-5.1/src/unibreakbase.h:/root/.local/c0/include/unibreakbase.h
       - ../n00b/subprojects/utf8proc-2.9.0/utf8proc.h:/root/.local/c0/include/utf8proc.h
+      - ../n00b/subprojects/libevent-2.1.12-stable/include/event2/:/root/.local/c0/include/event2/
       # nimutils
       - ../nimutils/nimutils/c/md4nim.h:/root/.local/c0/include/md4nim.h
 

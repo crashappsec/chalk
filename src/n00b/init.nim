@@ -1,17 +1,25 @@
-proc n00bInit(
-  argc: cint,
-  argv: pointer,
-  envp: pointer,
-) {.importc:"n00b_init".}
-
-proc n00bInstallDefaultStyles() {.importc:"n00b_install_default_styles".}
+import std/[cmdline, envvars]
+import ./[c, subproc]
 
 proc setupN00b*() =
-  let argv = @[cstring("chalk"), cast[cstring](nil)]
-  let envp = @[cast[cstring](nil)]
-  n00bInit(
-    1,
-    addr(argv[0]),
-    addr(envp[0]),
+  # nim doesnt expose native C envp so need to manually reconstruct it
+  var envs = newSeq[string]()
+  for k, v in envPairs():
+    envs.add(k & "=" & v)
+  let
+    args = commandLineParams()
+    argv = allocCStringArray(args)
+    envp = allocCStringArray(envs)
+  n00b_init(
+    cint(len(args)),
+    argv,
+    envp,
   )
-  n00bInstallDefaultStyles()
+  n00bTerminalAppSetup()
+
+  echo("!!! n00b is here")
+  let p = runCommand("/usr/bin/ls", @["."])
+  echo("subproc done")
+  discard p.exitCode()
+  discard p.stdout()
+  discard p.stderr()

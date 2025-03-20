@@ -18,6 +18,7 @@ var
   libDir   = localdir.joinPath("libs")
   libs     = [
     "n00b",
+    "event",
     "curl",
     "ssl",
     "crypto",
