@@ -145,7 +145,7 @@ def test_lambda_extract_after_insert(
     ],
     indirect=True,
 )
-def test_lambda_with_other_zip_formats(
+def test_lambda_with_other_lambda_zips(
     tmp_data_dir: Path,
     chalk: Chalk,
     copy_files: list[Path],
