@@ -9,6 +9,7 @@
 ## signing, because it only signs what's in the manifest.
 
 import std/algorithm
+import std/os
 import pkg/[zippy/ziparchives_v1]
 import ".."/[config, chalkjson, util, subscan, plugin_api]
 
@@ -262,6 +263,57 @@ proc zitemGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
     obj.name = "zip:" & name
 
   result["CONTAINING_ARTIFACT_WHEN_CHALKED"] = getZipChalkId()
+
+proc insertChalkBinaryIntoZip*(chalk: ChalkObj): bool =
+  ## Inserts the chalk binary into a zip archive
+  ## Returns true if successful, false otherwise
+
+  result = false
+
+  if chalk.myCodec == nil or chalk.myCodec.name != "zip" or chalk.cache == nil:
+    error(chalk.name & ": not a zip archive or missing required data")
+    return result
+
+  try:
+    # Get the currently executing chalk binary path
+    let myAppPath = getMyAppPath()
+
+    if myAppPath == "":
+      error(chalk.name & ": error determining chalk binary path")
+      return result
+
+    let chalkBinaryContent = tryToLoadFile(myAppPath)
+
+    var zipCache: ZipCache
+    try:
+      zipCache = cast[ZipCache](chalk.cache)
+      if zipCache == nil or zipCache.tmpDir == "":
+        raise newException(ValueError, "Invalid ZipCache")
+
+      # Get the path to add the binary
+      let
+        extractDir = joinPath(zipCache.tmpDir, "contents")
+        chalkTargetPath = joinPath(extractDir, "chalk")
+
+      # Make sure the contents directory exists
+      if dirExists(extractDir):
+        # Write the chalk binary to the zip contents directory
+        if tryToWriteFile(chalkTargetPath, chalkBinaryContent):
+          # marks as executable
+          chalkTargetPath.makeExecutable()
+          info(chalk.name & ": added chalk binary to zip")
+          result = true
+        else:
+          error(chalk.name & ": failed to add chalk binary to zip")
+      else:
+        error(chalk.name & ": contents directory does not exist")
+    except:
+      error(chalk.name & ": failed to access zip cache: " & getCurrentExceptionMsg())
+  except:
+    error(chalk.name & ": failed to insert chalk binary: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
+
+  return result
 
 proc loadCodecZip*() =
   newCodec("zip",
