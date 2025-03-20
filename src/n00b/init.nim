@@ -15,7 +15,7 @@ proc setupN00b*() =
     argv,
     envp,
   )
-  n00bTerminalAppSetup()
+  n00b_terminal_app_setup()
 
   echo("!!! n00b is here")
   let p = runCommand("/usr/bin/ls", @["."])
