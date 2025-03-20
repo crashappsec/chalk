@@ -1984,6 +1984,23 @@ ENV ARTIFACT_IDENTIFIER="X6VRPZ-C828-KDNS-QDXRT0"
   }
 }
 
+singleton zip {
+  user_def_ok:   true
+  doc: """
+Configurations on how zip archives are handled during a chalk insert command.
+  """
+
+  field inject_binary {
+    type:     bool
+    default:  false
+    shortdoc: "Inject binary into zip archive upon chalk insert"
+    doc:      """
+When present, inject the executed chalk binary itself in the zip
+archive being processed upon insertion.
+"""
+  }
+}
+
 singleton scan_context {
   user_def_ok:   false
   doc: """
@@ -2965,6 +2982,7 @@ root {
   allow git
   allow network
   allow certs
+  allow zip
 
   shortdoc: "Chalk Configuration Options"
 
@@ -3362,16 +3380,6 @@ Currently, the only available tool out of the box is semgrep, and will only work
 When true, this will cause chalk to run any configured secret scanner tools.  This is off by default.
 
 Currently, the only available tool out of the box is trufflehog.
-"""
-  }
-
-  field lambda_mode {
-    type:     bool
-    default:  false
-    shortdoc: "lambda mode"
-    doc:      """
-When present, inject the executed chalk binary itself in the zip
-archive being processed upon insertion.
 """
   }
 

@@ -258,7 +258,33 @@ class ContainsMixin:
             return x
 
 
-class ContainsDict(ContainsMixin, dict): ...
+class ContainsDict(ContainsMixin, dict):
+    def if_exists(self) -> "ContainsDict":
+        """
+        Return a new ContainsDict where all values are wrapped with `IfExists`.
+
+        This allows for conditional matching - values will only be checked if
+        the corresponding key exists in the target dictionary.
+
+        Examples:
+
+        >>> ContainsDict({"foo": "bar", "baz": "qux"}).if_exists()
+        {'foo': IfExists('bar'), 'baz': IfExists('qux')}
+
+        >>> ContainsDict({"foo": "bar"}).contains(ContainsDict({"foo": "bar", "baz": "qux"}))
+        Traceback (most recent call last):
+        ...
+        AssertionError: ['baz']: is missing
+
+        >>> ContainsDict({"foo": "bar"}).contains(ContainsDict({"foo": "bar", "baz": "qux"}).if_exists())
+        True
+
+        >>> ContainsDict({"foo": "bar", "baz": "oops"}).contains(ContainsDict({"foo": "bar", "baz": "qux"}).if_exists())
+        Traceback (most recent call last):
+        ...
+        AssertionError: ['baz']: 'oops' != 'qux'
+        """
+        return ContainsDict({k: IfExists(v) for k, v in self.items()})
 
 
 class ContainsList(ContainsMixin, list):

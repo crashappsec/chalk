@@ -332,9 +332,12 @@ help templates`
       field_to_set: "recursive"
     }
 
-    flag_yn env_vars {
-      doc: default_env_var_doc
-      field_to_set: "env_vars"
+    flag_yn inject_binary_into_zip {
+      doc: """
+When true, inject the executed chalk binary itself in the zip
+archive targeted by the insertion command.
+"""
+      field_to_set: "zip.inject_binary"
     }
 
     flag_arg mark_template {
