@@ -63,11 +63,7 @@ def test_lambda_insert(
     test_file = copy_files[0]
 
     # Run chalk insert with the --lambda
-    insert = chalk.insert(
-        artifact=tmp_data_dir,
-        virtual=False,
-        params=["--lambda"],
-    )
+    insert = chalk.insert(artifact=tmp_data_dir, virtual=False, lambda_mode=True)
 
     # Verify the chalk mark was added
     verify_chalk_mark_added(insert, test_file)
@@ -75,9 +71,6 @@ def test_lambda_insert(
     # Verify chalk binary was added to the zip
     extract_dir = tmp_data_dir / "extracted"
     verify_chalk_binary_in_zip(test_file, extract_dir)
-
-    # Cleanup
-    shutil.rmtree(extract_dir)
 
 
 def test_lambda_insert_empty_zip(
@@ -94,7 +87,7 @@ def test_lambda_insert_empty_zip(
     insert = chalk.insert(
         artifact=tmp_data_dir,
         virtual=False,
-        params=["--lambda"],
+        lambda_mode=True,
         expecting_chalkmarks=False,  # Don't expect marks for empty zip
     )
 
@@ -129,11 +122,7 @@ def test_lambda_extract_after_insert(
     test_file = copy_files[0]
 
     # First insert a chalk mark with lambda flag
-    insert = chalk.insert(
-        artifact=tmp_data_dir,
-        virtual=False,
-        params=["--lambda"],
-    )
+    insert = chalk.insert(artifact=tmp_data_dir, virtual=False, lambda_mode=True)
     verify_chalk_mark_added(insert, test_file)
 
     # Now extract and verify we can read the chalk mark
@@ -169,11 +158,7 @@ def test_lambda_with_other_zip_formats(
     test_file = copy_files[0]
 
     # Run chalk insert with the lambda flag
-    insert = chalk.insert(
-        artifact=tmp_data_dir,
-        virtual=False,
-        params=["--lambda"],
-    )
+    insert = chalk.insert(artifact=tmp_data_dir, virtual=False, lambda_mode=True)
 
     # Verify the chalk mark was added
     verify_chalk_mark_added(insert, test_file)
@@ -181,6 +166,3 @@ def test_lambda_with_other_zip_formats(
     # Verify chalk binary was added to the zip
     extract_dir = tmp_data_dir / "extracted"
     verify_chalk_binary_in_zip(test_file, extract_dir)
-
-    # Cleanup
-    shutil.rmtree(extract_dir)
