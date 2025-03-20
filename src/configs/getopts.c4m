@@ -315,12 +315,12 @@ help templates`
       field_to_set: "recursive"
     }
 
-    flag_yn lambda {
+    flag_yn inject_binary {
       doc: """
-When present, inject the executed chalk binary itself in the zip
+When present, inject the executed chalk binary itself into a zip
 archive being processed upon insertion.
 """
-      field_to_set: "lambda_mode"
+      field_to_set: "inject_binary"
     }
 
     flag_arg mark_template {
