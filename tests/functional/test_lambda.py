@@ -30,13 +30,11 @@ def verify_chalk_binary_in_zip(zip_path: Path, extract_dir: Path):
     extract_dir.mkdir(exist_ok=True)
 
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(extract_dir)
-
-    # Verify the chalk binary was added
-    chalk_binary_path = extract_dir / "chalk"
-    assert chalk_binary_path.exists(), "Chalk binary was not found in the zip"
-    # TODO: uncomment when zip archive exec perms if fixed
-    # assert os.access(chalk_binary_path, os.X_OK), "Chalk binary is not executable"
+        # Verify the chalk binary was added
+        assert "chalk" in zip_ref.namelist()
+        # TODO: uncomment when zip archive exec perms if fixed
+        # chalk_entry = [e for e in zip_ref.infolist() if e.filename == "chalk"][0]
+        # assert chalk_entry.external_attr == 2179792896
 
 
 def verify_chalk_mark_added(result, test_file):
