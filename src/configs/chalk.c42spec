@@ -112,6 +112,15 @@ Used to set the output order. If not provided, this will inherit
 the normalization order from the associated keyspec.
 """
   }
+
+  field object_store {
+    type:      string
+    validator: func object_store_check
+    default:   ""
+    doc:       """
+TODO
+"""
+  }
 }
 
 object mark_template {
@@ -428,7 +437,16 @@ informational statement, you can add the key "error", "warn", or
 If the "error" key is present, this will also be taken as a tool
 failure, and no other keys will be checked.
 """
-   }
+  }
+
+  field canonicalize {
+    type:       func (dict[string, string]) -> dict[string, string]
+    require:    false
+    validator:  func key_canonicalize_check
+    doc:        """
+TODO
+"""
+  }
 
   field doc {
     type:     string
@@ -636,6 +654,15 @@ appear with a 'value' field.
 The normalization order used for signing and hashing metadata.
 This only works for built-in keys; everything else is given the same
 priority and should be sorted alphabetically.
+"""
+  }
+
+  field canonicalize {
+    type:       func (`x) -> `x
+    require:    false
+    validator:  func key_canonicalize_check
+    doc:        """
+TODO
 """
   }
 
@@ -902,6 +929,108 @@ in this section are defined by the `sink` configuration named in this
 field.
 """
   }
+}
+
+object_store_types := ["", "presign"]
+
+object object_store_config {
+  user_def_ok:   true
+  doc: """
+TODO
+"""
+
+  allow object_store_presign
+
+  field enabled {
+    type:    bool
+    default: true
+    doc:     """
+Set to false to leave in the config but disable it.
+"""
+  }
+
+  field object_store {
+    type:       string
+    default:    ""
+    choice:     object_store_types
+    doc:        """
+TODO
+"""
+  }
+
+}
+
+singleton object_store_presign {
+  user_def_ok:   true
+  doc:           """
+TODO
+"""
+
+  field uri {
+    type:     string
+    require:  true
+    shortdoc: "TODO"
+    doc:      """
+TODO
+"""
+  }
+
+  field headers {
+    type:     dict[string, string]
+    default:  {}
+    shortdoc: "TODO"
+    doc:      """
+TODO
+"""
+  }
+
+  field disallow_http {
+    type:     bool
+    default:  false
+    shortdoc: "TODO"
+    doc:      """
+TODO
+"""
+  }
+
+  field timeout {
+    type:     int
+    default:  30000 # some keys are pretty large and need more time to upload
+    shortdoc: "TODO"
+    doc:      """
+TODO
+"""
+  }
+
+  field pinned_cert_file {
+    type:     string
+    default:  ""
+    shortdoc: "TODO"
+    doc:      """
+TODO
+"""
+  }
+
+  field read_auth {
+    type:      string
+    shortdoc:  "TODO"
+    validator: func auth_check
+    default:   ""
+    doc:       """
+TODO
+"""
+  }
+
+  field write_auth {
+    type:      string
+    shortdoc:  "TODO"
+    validator: func auth_check
+    default:   ""
+    doc:       """
+TODO
+"""
+  }
+
 }
 
 object auth {
@@ -2426,6 +2555,7 @@ root {
   allow plugin
   allow sink
   allow sink_config
+  allow object_store_config
   allow auth
   allow auth_config
   allow attestation
@@ -3207,6 +3337,20 @@ func key_callback_check(keyname, callback: func (string) -> `x) {
   return ""
 }
 
+func key_canonicalize_check(keyname, callback: func (`x) -> `x) {
+  result    := ""
+  path      := split(keyname, ".")
+  key_name  := path[1]
+  fieldType := $(attr_get("keyspec." + key_name + ".type", typespec))
+  expected  := to_type("(" + fieldType + ") -> " + fieldType)
+  actual    := typeof(callback)
+  if not typecmp(expected, actual) {
+    return ("In: '" + keyname + "' canonicalize() is of type '" + $(actual) +
+            "', but the key specification requires the type: '" +
+            $(expected) + "'")
+  }
+}
+
 func never_early_check(keyname, val) {
   result := ""
 
@@ -3699,6 +3843,26 @@ func sink_config_check(path) {
      if not conffields.contains(sinkfields[i]) {
        return "sink config is missing required field: '" + sinkfields[i] + "'"
      }
+  }
+}
+
+func auth_check(path, val) {
+  result := ""
+  if val == "" {
+    return # Unconfigured
+  }
+  if not attr_exists("auth_config." + val) {
+    return "No such auth configured: '" + val + "'"
+  }
+}
+
+func object_store_check(path, val) {
+  result := ""
+  if val == "" {
+    return # Unconfigured
+  }
+  if not attr_exists("object_store_config." + val) {
+    return "No such object store configured: '" + val + "'"
   }
 }
 

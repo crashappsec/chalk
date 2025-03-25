@@ -80,6 +80,7 @@ proc clearReportingState*() =
   monoStartTime   = getMonoTime()
   ctxStack        = @[CollectionCtx()]
   hostInfo        = ChalkDict()
+  objectsData     = ObjectsDict()
   subscribedKeys  = Table[string, bool]()
   systemErrors    = @[]
   failedKeys      = ChalkDict()
@@ -194,6 +195,7 @@ proc newChalk*(name:         string            = "",
                     repos:         newOrderedTable[string, DockerImageRepo](),
                     containerId:   containerId,
                     collectedData: ChalkDict(),
+                    objectsData:   ObjectsDict(),
                     opFailed:      false,
                     resourceType:  resourceType,
                     extract:       extract,

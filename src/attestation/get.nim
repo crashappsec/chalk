@@ -6,7 +6,7 @@
 ##
 
 import std/[httpclient, net]
-import ".."/[config, sinks, util]
+import ".."/[config, auth, util]
 
 type Get = ref object of AttestationKeyProvider
   location: string

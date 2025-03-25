@@ -7,7 +7,7 @@
 
 ## Chalk reporting logic.
 
-import "."/[config, chalkjson, reportcache, sinks, collect]
+import "."/[config, chalkjson, reportcache, sinks, collect, object_store/api]
 
 proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   if doingTestRun:
@@ -53,7 +53,11 @@ proc setPerChalkReports(tmpl: string, key: string, chalks: seq[ChalkObj]) =
   for chalk in chalks:
     if not chalk.isMarked() and len(chalk.collectedData) == 0:
       continue
-    let oneReport = chalk.collectedData.filterByTemplate(tmpl)
+    let oneReport = objectifyByTemplate(
+      chalk.collectedData.filterByTemplate(tmpl),
+      chalk.objectsData,
+      tmpl,
+    )
     if len(oneReport) != 0:
       reports.add(pack(oneReport))
 
@@ -72,7 +76,11 @@ proc setPerChalkReports(tmpl: string) =
 
 proc buildHostReport*(tmpl: string): string =
   setPerChalkReports(tmpl)
-  prepareContents(hostInfo, tmpl)
+  return objectifyByTemplate(
+    hostInfo.filterByTemplate(tmpl),
+    objectsData,
+    tmpl,
+  ).toJson(tmpl)
 
 proc doCommandReport(): string =
   let

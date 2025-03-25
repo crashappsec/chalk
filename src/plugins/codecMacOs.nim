@@ -258,13 +258,13 @@ proc macHandleWrite*(self: Plugin, chalk: ChalkObj, enc: Option[string])
 
 proc macGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):
                                 ChalkDict {.cdecl.} =
-  result                  = ChalkDict()
-  result["ARTIFACT_TYPE"] = artTypeMachO
+  result = ChalkDict()
+  result.setIfNeeded("ARTIFACT_TYPE", artTypeMachO)
 
 proc macGetRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj, ins: bool):
                               ChalkDict {.cdecl.} =
-  result                      = ChalkDict()
-  result["_OP_ARTIFACT_TYPE"] = artTypeMachO
+  result = ChalkDict()
+  result.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeMachO)
 
 proc loadCodecMacOs*() =
   newCodec("macos",

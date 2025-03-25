@@ -8,7 +8,7 @@
 ## Chalk-specific setup and APIs around nimtuils' IO sinks.
 
 import std/uri
-import "."/config
+import "."/[config, auth]
 
 proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
   return (msg, true)
@@ -64,8 +64,6 @@ var availableSinkConfigs = { "log_hook"     : defaultLogHook,
 
 when not defined(release):
   availableSinkConfigs["debug_hook"] = defaultDebugHook
-
-var availableAuthConfigs: Table[string, AuthConfig]
 
 # These are used by reportcache.nim
 var   sinkErrors*: seq[SinkConfig] = @[]
@@ -174,52 +172,7 @@ proc successHandler(cfg: SinkConfig, t: Topic, errmsg: string) =
     else:
       info(toOut)
 
-proc getAuthConfigByName*(name: string, attr: AttrScope = AttrScope(nil)): Option[AuthConfig] =
-  if name == "":
-    return none(AuthConfig)
 
-  if name in availableAuthConfigs:
-    return some(availableAuthConfigs[name])
-
-  let
-    attrRoot = if attr != nil: attr else: getChalkScope()
-    section  = "auth_config." & name
-    opts     = OrderedTableRef[string, string]()
-
-  if attrRoot.getObjectOpt(section).isNone():
-    error(section & " is referenced but its missing in the config")
-    return none(AuthConfig)
-
-  let authType = getOpt[string](attrRoot, section & ".auth").getOrElse("")
-  if authType == "":
-    error(section & ".auth is required")
-    return none(AuthConfig)
-
-  let implementationOpt = getAuthImplementation(authType)
-  if implementationOpt.isNone():
-    error("there is no implementation for " & authType & " auth")
-    return none(AuthConfig)
-
-  for k, _ in getObject(attrRoot, section).contents:
-    case k
-    of "auth":
-      continue
-    else:
-      let boxOpt = getOpt[Box](attrRoot, section & "." & k)
-      if boxOpt.isSome():
-        opts[k]  = unpack[string](boxOpt.get())
-      else:
-        error(section & "." & k & " is missing")
-        return none(AuthConfig)
-
-  try:
-    result = configAuth(implementationOpt.get(), name, some(opts))
-  except:
-    error(section & " is misconfigured: " & getCurrentExceptionMsg())
-    return none(AuthConfig)
-
-  if result.isSome():
-    availableAuthConfigs[name] = result.get()
 
 var
   errCbOpt = some(FailCallback(ioErrorHandler))

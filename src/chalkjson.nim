@@ -448,18 +448,20 @@ proc extractOneChalkJson*(chalkData: string, path: string): ChalkDict =
 # Output ordering for keys.
 proc orderKeys*(dict: ChalkDict,
                 tplate: string): seq[string] =
-  var tmp: seq[(int, string)] = @[]
+  var tmp: seq[(int, string, string)] = @[]
   for k, _ in dict:
-    var order = attrGet[int]("keyspec." & k & ".normalized_order")
-    if tplate != "" and sectionExists(tplate & ".key." & k):
-      let orderOpt = attrGetOpt[int](tplate & ".key." & k & ".order")
+    var
+      kk = k.removePrefix(objectStorePrefix) # object store objects are not expected to be defined as keyspec
+      order = attrGet[int]("keyspec." & kk & ".normalized_order")
+    if tplate != "" and sectionExists(tplate & ".key." & kk):
+      let orderOpt = attrGetOpt[int](tplate & ".key." & kk & ".order")
       if orderOpt.isSome():
         order = orderOpt.get()
-    tmp.add((order, k))
+    tmp.add((order, kk, k))
 
   tmp.sort()
   result = @[]
-  for (_, key) in tmp: result.add(key)
+  for (_, _, key) in tmp: result.add(key)
 
 # %* from the json module; this basically does any escaping
 # we need, which gives us a JsonNode object, that we then convert
@@ -482,10 +484,6 @@ proc toJson*(dict: ChalkDict, tplate: string): string =
 
 proc toJson*(dict: ChalkDict): string =
   return dict.toJson("")
-
-proc prepareContents*(dict: ChalkDict,
-                      t: string): string =
-  return dict.filterByTemplate(t).toJson(t)
 
 proc forcePrivateKeys() =
   var toForce: seq[string]

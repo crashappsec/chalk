@@ -221,22 +221,28 @@ proc zipGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
 
   let extension = obj.fsRef.splitFile().ext.toLowerAscii()
 
-  result["ARTIFACT_TYPE"] = case extension
-                                of ".jar": artTypeJAR
-                                of ".war": artTypeWAR
-                                of ".ear": artTypeEAR
-                                else:      artTypeZip
+  result.setIfNeeded(
+    "ARTIFACT_TYPE",
+    case extension
+    of ".jar": artTypeJAR
+    of ".war": artTypeWAR
+    of ".ear": artTypeEAR
+    else:      artTypeZip
+  )
 
 proc zipGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, ins: bool):
        ChalkDict {.cdecl.} =
   result        = ChalkDict()
   let extension = obj.fsRef.splitFile().ext.toLowerAscii()
 
-  result["_OP_ARTIFACT_TYPE"] = case extension
-                            of ".jar": artTypeJAR
-                            of ".war": artTypeWAR
-                            of ".ear": artTypeEAR
-                            else:      artTypeZip
+  result.setIfNeeded(
+    "_OP_ARTIFACT_TYPE",
+    case extension
+    of ".jar": artTypeJAR
+    of ".war": artTypeWAR
+    of ".ear": artTypeEAR
+    else:      artTypeZip
+  )
 
 proc zitemGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
        ChalkDict {.cdecl.} =

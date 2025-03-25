@@ -14,7 +14,7 @@
 
 import std/[httpclient]
 import pkg/[con4m/st, nimutils/jwt]
-import "."/[config, reporting, sinks, chalkjson, docker/exe]
+import "."/[config, reporting, auth, sinks, chalkjson, docker/exe]
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
