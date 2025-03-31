@@ -50,7 +50,7 @@ proc url(this: ObjectStoreConfig, keyRef: ObjectStoreRef): Uri =
   let self = ObjectStorePresign(this)
   result = parseUri(self.uri)
   result.path.removeSuffix('/')
-  result.path = result.path & "/" & keyRef.key & "." & keyRef.digest
+  result.path = result.path & "/" & keyRef.key & "." & keyRef.id
 
 proc fqn(this: ObjectStoreConfig, keyRef: ObjectStoreRef): Uri =
   let self = ObjectStorePresign(this)
@@ -66,6 +66,7 @@ proc request(self:           ObjectStorePresign,
   var signHeaders = newHttpHeaders(@[
     ("Content-Type", "application/json"),
     ("X-Content-Length", $len(body)),
+    ("X-Chalk-Digest-Sha256", keyRef.digest),
     ("X-Chalk-Version", getChalkExeVersion()),
     # TODO expose better API for action id interaction
     ("X-Chalk-Action-Id", unpack[string](hostInfo["_ACTION_ID"])),

@@ -116,6 +116,7 @@ type
   ObjectStoreRef* = ref object
     config*: ObjectStoreConfig
     key*:    string
+    id*:     string
     digest*: string
     query*:  string
 

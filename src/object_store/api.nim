@@ -38,6 +38,7 @@ proc newObjectStoreRef*(self: ObjectStoreConfig, k: string, data: string): Objec
   return ObjectStoreRef(
     config: self,
     key:    k,
+    id:     data.sha256Hex(),
     digest: data.sha256Hex(),
   )
 
