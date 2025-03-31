@@ -1,4 +1,4 @@
-![Chalk Logo](https://crashoverride.com/images/logos/chalk-logo.png)
+![Chalk Logo](https://chalkproject.io/logo.svg)
 
 [![tests](https://github.com/crashappsec/chalk/actions/workflows/tests.yml/badge.svg?branch=main&event=push)](https://github.com/crashappsec/chalk/actions/workflows/tests.yml?query=branch%3Amain)
 
@@ -14,23 +14,23 @@ You can use Chalk to solve a variety of specific use cases such as:
 
 ### Create software security supply chain compliance reports automatically
 
-Many companies and the US Government are now mandating suppliers to provide supply chain statements when delivering software. This how to is an easy button to deliver the [software bill of materials (SBOM)](https://www.ntia.gov/page/software-bill-materials), code and builds provenance and supports [SLSA](https://www.slsa.dev), Supply-chain Levels for Software Artifacts, [level 2](https://slsa.dev/spec/v1.0/levels) compliance (an emerging supply chain standard) before SLSA [level 1](https://slsa.dev/spec/v1.0/levels) has been mandated. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-create-software-security-supply-chain-compliance-reports-automatically).
+Many companies and the US Government are now mandating suppliers to provide supply chain statements when delivering software. This how to is an easy button to deliver the [software bill of materials (SBOM)](https://www.ntia.gov/page/software-bill-materials), code and builds provenance and supports [SLSA](https://www.slsa.dev), Supply-chain Levels for Software Artifacts, [level 2](https://slsa.dev/spec/v1.0/levels) compliance (an emerging supply chain standard) before SLSA [level 1](https://slsa.dev/spec/v1.0/levels) has been mandated. Follow this how-to on our docs site [here](https://chalkproject.io/docs/how-to-guides/how-to-create-software-security-supply-chain-compliance-reports-automatically).
 
 ### Create and maintain real-time application inventory
 
-From a code base, easily understand the environments where code and even particular branches are running. Gather code owners for the applications and code repos. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-create-a-real-time-application-inventory).
+From a code base, easily understand the environments where code and even particular branches are running. Gather code owners for the applications and code repos. Follow this how-to on our docs site [here](https://chalkproject.io/docs/how-to-guides/how-to-create-a-real-time-application-inventory).
 
 ### Deploy Chalk globally using Docker
 
-You can deploy Chalk by setting a global alias for Docker and having it call Chalk, so that every build that runs through your build server using Docker, will automatically be 'chalked'. It's a technique that can be combined with chalks ability to deploy tools and configure monitoring, to automatically add security controls and collect information for every application. Follow this how-to on our docs site [here](https://crashoverride.com/docs/how-to-guides/how-to-deploy-chalk-globally-using-docker)]
+You can deploy Chalk by setting a global alias for Docker and having it call Chalk, so that every build that runs through your build server using Docker, will automatically be 'chalked'. It's a technique that can be combined with chalks ability to deploy tools and configure monitoring, to automatically add security controls and collect information for every application. Follow this how-to on our docs site [here](https://chalkproject.io/docs/how-to-guides/how-to-deploy-chalk-globally-using-docker)]
 
-All documentation for Chalk is available at https://crashoverride.com/docs and is also fully accessible though the command line interface.
+All documentation for Chalk is available at https://chalkproject.io/docs/ and is also fully accessible though the command line interface.
 
 ## Getting started
 
-We recommend following the [getting started guide](https://crashoverride.com/docs/chalk/getting-started) on our documentation web site. Full documentation is also available directly inside the CLI.
+We recommend following the [getting started guide](https://chalkproject.io/docs/getting-started) on our documentation web site. Full documentation is also available directly inside the CLI.
 
-We provide free binary downloads on our [release page](https://crashoverride.com/releases).
+We provide free binary downloads on our [release page](https://chalkproject.io/download/).
 
 ## Issues
 
@@ -43,7 +43,7 @@ We are constantly learning about emerging use cases for Chalk, and are always in
 
 ## Making contributions
 
-We welcome contributions but do require you to complete a contributor license agreement or CLA. You can read the CLA and about our process [here](https://crashoverride.com/docs/other/contributing).
+We welcome contributions but do require you to complete a contributor license agreement or CLA. You can read the CLA and about our process [here](https://chalkproject.io/docs/contributing/contributions/).
 
 ## Getting additional help
 
