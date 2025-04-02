@@ -315,6 +315,14 @@ help templates`
       field_to_set: "recursive"
     }
 
+    flag_yn lambda {
+      doc: """
+When present, inject the executed chalk binary itself in the zip
+archive being processed upon insertion.
+"""
+      field_to_set: "lambda_mode"
+    }
+
     flag_arg mark_template {
       field_to_set: "outconf.insert.mark_template"
       doc: """
@@ -702,7 +710,6 @@ flexible in what it can collect and how it reports.
 commands that do not match known topics)
 """
   }
-
 
   command docgen {
     shortdoc: "Generate technical documentation"
