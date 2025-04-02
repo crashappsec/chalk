@@ -14,6 +14,7 @@ tool syft {
   ~get_command_args:   func get_syft_args(string) -> string
   ~produce_keys:       (func extract_syft_sbom(string, int) ->
                                                    dict[string, `x])
+  ~canonicalize:      func canonicalize_syft(`x) -> `x
   syft_exe_dir:       "/tmp"
   syft_installer:     "https://raw.githubusercontent.com/anchore/syft/main/install.sh"
   syft_container:     "anchore/syft"
@@ -139,4 +140,12 @@ func extract_syft_sbom(out: string, code) {
   }
 
   return { "SBOM" : parse_json(out) }
+}
+
+func canonicalize_syft(data: dict[string, `v]) {
+  result := data
+  result := delete(result, "version")
+  result := delete(result, "serialNumber")
+  # includes timestamp as well as component versions which are not deterministic
+  result := delete(result, "metadata")
 }

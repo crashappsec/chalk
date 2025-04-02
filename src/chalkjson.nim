@@ -461,7 +461,8 @@ proc orderKeys*(dict: ChalkDict,
 
   tmp.sort()
   result = @[]
-  for (_, _, key) in tmp: result.add(key)
+  for (_, _, key) in tmp:
+    result.add(key)
 
 # %* from the json module; this basically does any escaping
 # we need, which gives us a JsonNode object, that we then convert

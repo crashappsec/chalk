@@ -6,7 +6,7 @@
 ##
 
 import std/[tables, uri]
-import ".."/[config]
+import ".."/[config, normalize]
 import "."/[presign]
 
 let objectStores = {
@@ -34,11 +34,15 @@ proc getObjectStoreConfigByName(name: string): ObjectStoreConfig =
   result = store.init(store, name)
   objectStoreConfigs[name] = result
 
-proc newObjectStoreRef*(self: ObjectStoreConfig, k: string, data: string): ObjectStoreRef =
+proc newObjectStoreRef*(self:          ObjectStoreConfig,
+                        k:             string,
+                        data:          string,
+                        canonicalData: Box,
+                        ): ObjectStoreRef =
   return ObjectStoreRef(
     config: self,
     key:    k,
-    id:     data.sha256Hex(),
+    id:     canonicalData.binEncodeItem().sha256Hex(),
     digest: data.sha256Hex(),
   )
 
@@ -52,6 +56,25 @@ proc `$`(self: ObjectStoreRef): string =
       queries.add((k, v))
     uri.query = encodeQuery(queries)
   result = $uri
+
+proc canonicalizeKey(key: string, data: Box): Box =
+  let callbackOpt = attrGetOpt[CallbackObj]("keyspec." & key & ".canonicalize")
+  if callbackOpt.isNone():
+    trace("object store: no canonicalize() for " & key)
+    return data
+  let callback = callbackOpt.get()
+  trace("object store: canonicalizing " & key & " with " & $callback)
+  try:
+    let canonicalized = runCallback(callback, @[data])
+    #let canonicalized = runCallback("keyspec." & key & ".canonicalize", @[data])
+    if canonicalized.isNone():
+      error("object store: missing implementation to canonicalize " & key & " for " & $callback)
+      return data
+    return canonicalized.get()
+  except:
+    error("object store: failed to canonicalize " & key & " due to:" & getCurrentExceptionMsg())
+    dumpExOnDebug()
+    return data
 
 proc objectifyByTemplate*(collectedData: ChalkDict,
                           objectsData: ObjectsDict,
@@ -77,9 +100,10 @@ proc objectifyByTemplate*(collectedData: ChalkDict,
       result[objectStorePrefix & k] = pack($(objectRefs[k]))
       continue
     let
-      storeConfig = getObjectStoreConfigByName(storeConfigName)
-      data        = $v # TODO this is WRONG
-      lookupRef   = newObjectStoreRef(storeConfig, k, data)
+      storeConfig   = getObjectStoreConfigByName(storeConfigName)
+      canonicalData = canonicalizeKey(k, v)
+      data          = v.boxToJson()
+      lookupRef     = newObjectStoreRef(storeConfig, k, data, canonicalData)
     var storeRef: ObjectStoreRef
     try:
       trace("object store: looking up key in object store: " & $lookupRef)

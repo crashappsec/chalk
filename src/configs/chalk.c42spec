@@ -440,9 +440,8 @@ failure, and no other keys will be checked.
   }
 
   field canonicalize {
-    type:       func (dict[string, string]) -> dict[string, string]
+    type:       func (`x) -> `y
     require:    false
-    validator:  func key_canonicalize_check
     doc:        """
 TODO
 """
@@ -658,9 +657,8 @@ priority and should be sorted alphabetically.
   }
 
   field canonicalize {
-    type:       func (`x) -> `x
+    type:       func (`x) -> `y
     require:    false
-    validator:  func key_canonicalize_check
     doc:        """
 TODO
 """
@@ -3335,20 +3333,6 @@ func key_callback_check(keyname, callback: func (string) -> `x) {
   }
 
   return ""
-}
-
-func key_canonicalize_check(keyname, callback: func (`x) -> `x) {
-  result    := ""
-  path      := split(keyname, ".")
-  key_name  := path[1]
-  fieldType := $(attr_get("keyspec." + key_name + ".type", typespec))
-  expected  := to_type("(" + fieldType + ") -> " + fieldType)
-  actual    := typeof(callback)
-  if not typecmp(expected, actual) {
-    return ("In: '" + keyname + "' canonicalize() is of type '" + $(actual) +
-            "', but the key specification requires the type: '" +
-            $(expected) + "'")
-  }
 }
 
 func never_early_check(keyname, val) {

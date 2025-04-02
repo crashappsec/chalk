@@ -35,7 +35,7 @@ proc u64ToStr(i: uint64): string =
 proc floatToStr(f: float): string =
   result = newStringOfCap(sizeof(float)+1)
 
-proc binEncodeItem(self: Box): string
+proc binEncodeItem*(self: Box): string
 
 proc binEncodeStr(s: string): string =
   return "\x01" & u32ToStr(uint32(len(s))) & s
@@ -77,7 +77,7 @@ proc binEncodeObj(self: Box): string =
     error("non-null objects cannot be normalized")
     unreachable
 
-proc binEncodeItem(self: Box): string =
+proc binEncodeItem*(self: Box): string =
   case self.kind
   of MkBool:  return binEncodeBool(unpack[bool](self))
   of MkInt:   return binEncodeInt(unpack[uint64](self))

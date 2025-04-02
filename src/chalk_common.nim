@@ -457,6 +457,7 @@ const
   chalkC42Spec*       = staticRead(chalkSpecName)
   getoptConfig*       = staticRead(getoptConfName)
   baseConfig*         = staticRead("configs/base_init.c4m") &
+                        staticRead("configs/base_callbacks.c4m") &
                         staticRead("configs/base_keyspecs.c4m") &
                         staticRead("configs/base_plugins.c4m") &
                         staticRead("configs/base_sinks.c4m") &

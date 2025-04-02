@@ -14,7 +14,7 @@
 
 import std/[httpclient]
 import pkg/[con4m/st, nimutils/jwt]
-import "."/[config, reporting, auth, sinks, chalkjson, docker/exe]
+import "."/[config, reporting, auth, sinks, chalkjson, docker/exe, normalize]
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))
@@ -111,6 +111,10 @@ proc memoizeInChalkmark(args: seq[Box], s: ConfigState): Option[Box] =
   selfChalkSetSubKey(memoizeKey, name, value)
   return valueOpt
 
+proc c4mToJson(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
+  let data = args[0]
+  return some(pack(data.boxToJson()))
+
 proc c4mParseJson(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   let
     data = unpack[string](args[0])
@@ -136,8 +140,28 @@ proc c4mParseJsonL(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
     error("Could not parse JSON: " & getCurrentExceptionMsg())
     return none(Box)
 
+proc c4mBinarySha256(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
+  let data = args[0]
+  return some(pack(data.binEncodeItem().sha256Hex()))
+
 proc dockerExe(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   return some(pack(getDockerExeLocation()))
+
+proc canonicalizeTool(args: seq[Box], usued = ConfigState(nil)): Option[Box] =
+  let
+    tool = unpack[string](args[0])
+    data = args[1]
+  let callbackOpt = attrGetOpt[CallbackObj]("tool." & tool & ".canonicalize")
+  if callbackOpt.isNone():
+    trace(tool & ": no canonicalize()")
+    return some(data)
+  let callback = callbackOpt.get()
+  trace(tool & ": canonicalizing with " & $callback)
+  let canonicalized = runCallback(callback, @[data])
+  if canonicalized.isNone():
+    error(tool & ": missing implementation to canonicalize with " & $callback)
+    return some(data)
+  return canonicalized
 
 let chalkCon4mBuiltins* = [
     ("version() -> string",
@@ -236,20 +260,37 @@ This way the function is only computed once.
      """
 Parses JSON string and returns data-struct back.
 """,
-     @["parsing"]),
+     @["json"]),
     ("parse_jsonl(string) -> `x",
      BuiltInFn(c4mParseJsonL),
      """
 Parses JSONl string and returns data-struct back.
 """,
-     @["parsing"]),
+     @["json"]),
+    ("to_json(`x) -> string",
+     BuiltInFn(c4mToJson),
+     """
+Convert to JSON string.
+""",
+     @["json"]),
+    ("binary_sha256(`x) -> string",
+     BuiltInFn(c4mBinarySha256),
+     """
+Returns normalized binary hash of the data.
+""",
+     @["chalk"]),
      ("docker_exe() -> string",
       BuiltInFn(dockerExe),
       """
 Find non-chalked docker executable path.
 """,
       @["chalk"]),
-
+     ("canonicalize_tool(string, `x) -> `x",
+      BuiltInFn(canonicalizeTool),
+      """
+Canonicalize external tool output key.
+""",
+      @["chalk"]),
 ]
 
 let errSinkObj = SinkImplementation(outputFunction: chalkErrSink)
