@@ -76,51 +76,63 @@ proc canonicalizeKey(key: string, data: Box): Box =
     dumpExOnDebug()
     return data
 
+proc objectifyKey(dict:            ChalkDict,
+                  k:               string,
+                  v:               Box,
+                  content:         string,
+                  objectsData:     ObjectsDict,
+                  storeConfigName: string) =
+  let objectRefs = objectsData.mgetOrPut(storeConfigName, newOrderedTable[string, ObjectStoreRef]())
+  # key was already objectified before. use existing ref
+  if k in objectRefs:
+    dict[objectStorePrefix & k] = pack($(objectRefs[k]))
+    return
+  let
+    storeConfig = getObjectStoreConfigByName(storeConfigName)
+    canonical   = canonicalizeKey(k, v)
+    lookupRef   = newObjectStoreRef(storeConfig, k, content, canonical)
+  var storeRef: ObjectStoreRef
+  try:
+    trace("object store: looking up key in object store: " & $lookupRef)
+    storeRef = storeConfig.store.objectExists(storeConfig, lookupRef)
+    if storeRef == nil:
+      try:
+        trace("object store: creating key in object store: " & $lookupRef)
+        storeRef = storeConfig.store.createObject(storeConfig, lookupRef, content)
+      except:
+        error("object store: could not upload object " & $lookupRef & " due to: " & getCurrentExceptionMsg())
+        dumpExOnDebug()
+  except:
+    error("object store: could not lookup existing object " & $lookupRef & " due to: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
+  if storeRef != nil:
+    objectRefs[k] = storeRef
+    dict[objectStorePrefix & k] = pack($storeRef)
+  else:
+    error("object store: could not either lookup existing or upload object for " & k)
+    dict[k] = v
+
 proc objectifyByTemplate*(collectedData: ChalkDict,
                           objectsData: ObjectsDict,
                           temp: string,
                           ): ChalkDict =
+  let
+    defaultEnabled         = attrGetOpt[bool](temp & ".default_object_store.enabled").get(false)
+    defaultStoreConfigName = attrGetOpt[string](temp & ".default_object_store.object_store").get("")
+    defaultThreshold       = attrGetOpt[Con4mSize](temp & ".default_object_store.threshold").get(0)
+    useDefault             = defaultEnabled and defaultStoreConfigName != "" and defaultThreshold > 0
   result = ChalkDict()
   for k, v in collectedData:
     let
-      path            = temp & ".key." & k & ".object_store"
-      storeConfigName = attrGetOpt[string](path).get("")
-    # there is no object store for this key. use original value
-    if storeConfigName == "":
-      result[k] = v
-      continue
-    # object store is explicitly disabled. use original value
-    let enabled = attrGetOpt[bool]("object_store_config." & storeConfigName & ".enabled").get(false)
-    if not enabled:
-      result[k] = v
-      continue
-    let objectRefs = objectsData.mgetOrPut(storeConfigName, newOrderedTable[string, ObjectStoreRef]())
-    # key was already objectified before. use existing ref
-    if k in objectRefs:
-      result[objectStorePrefix & k] = pack($(objectRefs[k]))
-      continue
-    let
-      storeConfig   = getObjectStoreConfigByName(storeConfigName)
-      canonicalData = canonicalizeKey(k, v)
-      data          = v.boxToJson()
-      lookupRef     = newObjectStoreRef(storeConfig, k, data, canonicalData)
-    var storeRef: ObjectStoreRef
-    try:
-      trace("object store: looking up key in object store: " & $lookupRef)
-      storeRef = storeConfig.store.objectExists(storeConfig, lookupRef)
-      if storeRef == nil:
-        try:
-          trace("object store: creating key in object store: " & $lookupRef)
-          storeRef = storeConfig.store.createObject(storeConfig, lookupRef, data)
-        except:
-          error("object store: could not upload object " & $lookupRef & " due to: " & getCurrentExceptionMsg())
-          dumpExOnDebug()
-    except:
-      error("object store: could not lookup existing object " & $lookupRef & " due to: " & getCurrentExceptionMsg())
-      dumpExOnDebug()
-    if storeRef != nil:
-      objectRefs[k] = storeRef
-      result[objectStorePrefix & k] = pack($storeRef)
+      storeConfigName = attrGetOpt[string](temp & ".key." & k & ".object_store").get("")
+      enabled         = attrGetOpt[bool]("object_store_config." & storeConfigName & ".enabled").get(false)
+      useStore        = enabled and storeConfigName != ""
+      content         = v.boxToJson()
+    if useStore:
+      trace("object_store: using per-key " & k & " object store " & storeConfigName)
+      objectifyKey(result, k, v, content, objectsData, storeConfigName)
+    elif useDefault and Con4mSize(len(content)) > defaultThreshold:
+      trace("object_store: using default object store " & defaultStoreConfigName)
+      objectifyKey(result, k, v, content, objectsData, defaultStoreConfigName)
     else:
-      error("object store: could not either lookup existing or upload object for " & k)
       result[k] = v

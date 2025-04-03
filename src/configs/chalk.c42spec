@@ -315,6 +315,40 @@ This field will be shown when the running command `chalk template [your_report_n
   }
 
   allow key {}
+  allow default_object_store {}
+}
+
+singleton default_object_store {
+  user_def_ok:   true
+  doc: """
+TODO
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    doc:      """
+TODO
+"""
+  }
+
+  field object_store {
+    type:      string
+    validator: func object_store_check
+    default:   ""
+    doc:       """
+TODO
+"""
+  }
+
+  field threshold {
+    type:    Size
+    require: false
+    doc:     """
+TODO
+"""
+  }
+
 }
 
 object tool {
