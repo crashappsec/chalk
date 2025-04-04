@@ -163,6 +163,33 @@ proc canonicalizeTool(args: seq[Box], usued = ConfigState(nil)): Option[Box] =
     return some(data)
   return canonicalized
 
+proc copyReportTemplateKeys(args: seq[Box], c = ConfigState(nil)): Option[Box] =
+  let
+    copyFrom        = unpack[string](args[0])
+    copyFromSection = "report_template." & copyFrom & ".key"
+    copyTo          = unpack[string](args[1])
+    copyToSection   = "report_template." & copyTo & ".key"
+
+  if not sectionExists(c, copyFromSection):
+    error(copyFrom & " report template does not exist. Cannot copy from it")
+    return none(Box)
+
+  if not sectionExists(c, copyToSection):
+    con4mSectionCreate(c, copyToSection)
+
+  let copyFromKeys = attrGetObject(c, copyFromSection).getContents()
+  for k in copyFromKeys:
+    if not sectionExists(c, copyToSection & "." & k):
+      con4mSectionCreate(c, copyToSection & "." & k)
+    con4mAttrSet(
+      c,
+      copyToSection & "." & k & ".use",
+      pack(attrGet[bool](copyFromSection & "." & k & ".use")),
+      Con4mType(kind: TypeBool),
+    )
+
+  return none(Box)
+
 let chalkCon4mBuiltins* = [
     ("version() -> string",
      BuiltinFn(getExeVersion),
@@ -289,6 +316,12 @@ Find non-chalked docker executable path.
       BuiltInFn(canonicalizeTool),
       """
 Canonicalize external tool output key.
+""",
+      @["chalk"]),
+     ("copy_report_template_keys(string, string)",
+      BuiltInFn(copyReportTemplateKeys),
+      """
+Copy existing reporting template keys to another reporting template.
 """,
       @["chalk"]),
 ]

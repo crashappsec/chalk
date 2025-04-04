@@ -57,6 +57,19 @@
 
   ([#500](https://github.com/crashappsec/chalk/pull/500))
 
+- `copy_report_template_keys` built-in function which copies all keys
+  as they are subscribed from one report template to another:
+
+  ```
+  report_template one {
+    key.ONE.use = true
+    key.TWO.use = false
+  }
+  copy_report_template_keys("one", "two")
+  ```
+
+  ([#500](https://github.com/crashappsec/chalk/pull/500))
+
 ## 0.5.4
 
 **Feb 19, 2025**
