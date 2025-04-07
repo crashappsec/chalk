@@ -3279,6 +3279,7 @@ keyspec _IMAGE_SBOM {
     type:     `x
     standard: true
     since:    "0.4.0"
+    canonicalize: func canonicalize_image_sbom(`x) -> `y
     shortdoc: "Docker image SBOM information"
     doc: """
 Docker SPDX SBOM information created with `docker build --sbom=true`.
