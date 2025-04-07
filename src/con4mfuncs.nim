@@ -181,10 +181,16 @@ proc copyReportTemplateKeys(args: seq[Box], c = ConfigState(nil)): Option[Box] =
   for k in copyFromKeys:
     if not sectionExists(c, copyToSection & "." & k):
       con4mSectionCreate(c, copyToSection & "." & k)
+    let
+      toUsePath = copyFromSection & "." & k & ".use"
+      toUseOpt   = attrGetOpt[bool](toUsePath)
+    if toUseOpt.isNone():
+      error(toUsePath & ": is unkown. copy_report_template_keys() is used before that key is defined. skipping")
+      continue
     con4mAttrSet(
       c,
       copyToSection & "." & k & ".use",
-      pack(attrGet[bool](copyFromSection & "." & k & ".use")),
+      pack(toUseOpt.get()),
       Con4mType(kind: TypeBool),
     )
 
