@@ -11,7 +11,7 @@ import tempfile
 from typing import Any, Optional
 
 import sqlalchemy
-from fastapi import Depends, HTTPException, Request, Response, status
+from fastapi import Body, Depends, HTTPException, Request, Response, status
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -198,3 +198,53 @@ async def get_dummy_chalk(platform: str):
 echo $@
 exit 0
 """.strip()
+
+
+objects: dict[str, Any] = {}
+
+
+@app.head("/presign/objects/{key}")
+async def object_exists_presign(key: str, request: Request):
+    redirect = request.url_for("object_exists", key=key)
+    return RedirectResponse(
+        f"{redirect}?signature=foobar",
+        status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+    )
+
+
+@app.get("/presign/objects/{key}")
+async def object_get_presign(key: str, request: Request):
+    redirect = request.url_for("object_get", key=key)
+    return RedirectResponse(
+        f"{redirect}?signature=foobar",
+        status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+    )
+
+
+@app.put("/presign/objects/{key}")
+async def object_create_presign(key: str, request: Request):
+    redirect = request.url_for("object_create", key=key)
+    return RedirectResponse(
+        f"{redirect}?signature=foobar",
+        status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+    )
+
+
+@app.head("/objects/{key}")
+async def object_exists(key: str):
+    if key not in objects:
+        raise HTTPException(status_code=404)
+
+
+@app.get("/objects/{key}")
+async def object_get(key: str):
+    if key not in objects:
+        raise HTTPException(status_code=404)
+    return objects[key]
+
+
+@app.put("/objects/{key}")
+async def object_create(key: str, data: dict = Body(None)):
+    if key in objects:
+        raise HTTPException(status_code=status.HTTP_412_PRECONDITION_FAILED)
+    objects[key] = data

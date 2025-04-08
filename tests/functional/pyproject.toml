@@ -27,6 +27,7 @@ requests = "^2.32.3"
 sqlalchemy = "^2.0.15"
 structlog = "^25.1.0"
 uvicorn = "^0.34.0"
+httpx = "^0.28.1"
 
 [tool.poetry.group.neovim.dependencies]
 mypy = {version = "^1.14.1", optional = true}
