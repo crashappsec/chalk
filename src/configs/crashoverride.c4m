@@ -27,7 +27,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.DATE_CHALKED.use                               = false
   ~key.TIME_CHALKED.use                               = false
   ~key.TZ_OFFSET_WHEN_CHALKED.use                     = false
-  ~key.DATETIME_WHEN_CHALKED.use                      = false
+  ~key.DATETIME_WHEN_CHALKED.use                      = true
   ~key.EARLIEST_VERSION.use                           = false
   ~key.HOST_SYSNAME_WHEN_CHALKED.use                  = false
   ~key.HOST_NODENAME_WHEN_CHALKED.use                 = false
@@ -160,7 +160,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._INSTANCE_LOCAL_IPV6.use                = false
   ~key._INSTANCE_LOCAL_IPV6_PREFIX_LEN.use     = false
   ~key.CHALK_ID.use                            = true
-  ~key.TIMESTAMP_WHEN_CHALKED.use              = false
+  ~key.TIMESTAMP_WHEN_CHALKED.use              = true
   ~key.CHALK_PTR.use                           = false
   ~key.PATH_WHEN_CHALKED.use                   = true
   ~key.PATH_WITHIN_ZIP.use                     = true
