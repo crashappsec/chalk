@@ -100,8 +100,18 @@ proc objectifyKey(dict:            ChalkDict,
         trace("object store: creating key in object store: " & $lookupRef)
         storeRef = storeConfig.store.createObject(storeConfig, lookupRef, content)
       except:
-        error("object store: could not upload object " & $lookupRef & " due to: " & getCurrentExceptionMsg())
-        dumpExOnDebug()
+        let e = getCurrentExceptionMsg()
+        # it is possible multiple chalks might be trying to upload the same object/hash
+        # to the object store at the same time in which case only one should succeed
+        # and so just in case attempt to fetch existing object again
+        # p.s. this is more likely for externally created metadata
+        # where there could be many builds referencing the same metadata
+        # such as _IMAGE_SBOM for a base image like alpine
+        trace("object store: attempting to refetch object to handle possible creation race conditions")
+        storeRef = storeConfig.store.objectExists(storeConfig, lookupRef)
+        if storeRef == nil:
+          error("object store: could not upload object " & $lookupRef & " due to: " & e)
+          dumpExOnDebug()
   except:
     error("object store: could not lookup existing object " & $lookupRef & " due to: " & getCurrentExceptionMsg())
     dumpExOnDebug()
