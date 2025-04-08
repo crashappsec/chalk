@@ -186,15 +186,36 @@ proc authHeadersSafeRequest*(url: Uri | string,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
       disallowHttp      = disallowHttp,
-      only2xx           = false,
-      raiseWhenAbove    = 0,
+      only2xx           = only2xx,
+      raiseWhenAbove    = raiseWhenAbove,
     )
 
-  discard response.check(
-    url            = url,
-    only2xx        = only2xx,
-    raiseWhenAbove = raiseWhenAbove,
-  )
+  try:
+    discard response.check(
+      url            = url,
+      only2xx        = only2xx,
+      raiseWhenAbove = raiseWhenAbove,
+    )
+  except:
+    # reattempt the request with retries as above response error
+    # might be transient however however never retried as
+    # only2xx and raiseWhenAbove is not used on the first call
+    response = safeRequest(
+      url               = url,
+      httpMethod        = httpMethod,
+      body              = body,
+      headers           = authHeaders,
+      multipart         = multipart,
+      retries           = retries,
+      firstRetryDelayMs = firstRetryDelayMs,
+      timeout           = timeout,
+      pinnedCert        = pinnedCert,
+      verifyMode        = verifyMode,
+      maxRedirects      = maxRedirects,
+      disallowHttp      = disallowHttp,
+      only2xx           = only2xx,
+      raiseWhenAbove    = raiseWhenAbove,
+    )
 
   return (newHeaders, response)
 

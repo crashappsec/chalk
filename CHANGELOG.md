@@ -13,6 +13,9 @@
 - In interactive shell, autocomplete script is now only updated
   when its content is changed.
   ([#493](https://github.com/crashappsec/chalk/pull/493))
+- Docker registry throttling errors are retried now
+  before failing out from wrapped build.
+  ([#502](https://github.com/crashappsec/chalk/pull/502))
 
 ### New Features
 
