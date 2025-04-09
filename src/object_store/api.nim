@@ -66,7 +66,6 @@ proc canonicalizeKey(key: string, data: Box): Box =
   trace("object store: canonicalizing " & key & " with " & $callback)
   try:
     let canonicalized = runCallback(callback, @[data])
-    #let canonicalized = runCallback("keyspec." & key & ".canonicalize", @[data])
     if canonicalized.isNone():
       error("object store: missing implementation to canonicalize " & key & " for " & $callback)
       return data
