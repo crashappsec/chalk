@@ -1492,7 +1492,8 @@ keyspec SBOM {
     type:             dict[string, dict[string, `x]]
     standard:         true
     since:            "0.1.0"
-    shortdoc: "SBOM(s) collected at Chalk time"
+    canonicalize:     func canonicalize_tools(dict[string, `x]) -> dict[string, `x]
+    shortdoc:         "SBOM(s) collected at Chalk time"
     doc:              """
 This field is meant to capture any SBOMs associated with a chalking
 (i.e., a chalk mark insertion operation). The value, when provided, is
@@ -1518,6 +1519,7 @@ keyspec SECRET_SCANNER {
     type:             dict[string, dict[string, `x]]
     standard:         true
     since:            "0.5.4"
+    canonicalize:     func canonicalize_tools(dict[string, `x]) -> dict[string, `x]
     shortdoc:         "Secret scanner results collected at Chalk time"
     doc:              """
 This field is meant to capture any secret scanning tool results while
@@ -1563,6 +1565,7 @@ keyspec SAST {
     type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
+    canonicalize:     func canonicalize_tools(dict[string, `x]) -> dict[string, `x]
     shortdoc: "SAST scan results collected at Chalk time"
     doc:              """
 This field captures any static analysis security tooling reports that
@@ -3276,6 +3279,7 @@ keyspec _IMAGE_SBOM {
     type:     `x
     standard: true
     since:    "0.4.0"
+    canonicalize: func canonicalize_image_sbom(`x) -> `y
     shortdoc: "Docker image SBOM information"
     doc: """
 Docker SPDX SBOM information created with `docker build --sbom=true`.

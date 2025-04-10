@@ -9,11 +9,12 @@
 
 tool semgrep {
   kind: "sast"
-  get_tool_location:  func find_semgrep(string) -> string
-  attempt_install:    func install_semgrep(string) -> bool
-  get_command_args:   func get_semgrep_args(string) -> string
-  produce_keys:       (func load_semgrep_results(string, int) ->
+  ~get_tool_location:  func find_semgrep(string) -> string
+  ~attempt_install:    func install_semgrep(string) -> bool
+  ~get_command_args:   func get_semgrep_args(string) -> string
+  ~produce_keys:       (func load_semgrep_results(string, int) ->
                                                    dict[string, `x])
+  ~canonicalize:       func canonicalize_semgrep(`x) -> `x
   semgrep_config_profile: "auto"
   semgrep_format:         "sarif"
   semgrep_metrics:        "on"
@@ -165,4 +166,20 @@ func load_semgrep_results(out: string, code) {
   }
 
   return { "SAST" : parse_json(out) }
+}
+
+func canonicalize_semgrep(data: dict[string, `v]) {
+  result := data
+  result := delete(result, "version")
+  var runs: list[dict[string, `r]]
+  runs := get(result, "runs")
+  for i from 0 to len(runs) {
+    irun := runs[i]
+    # tool lists tool metadata such as which rule-sets were scanned
+    # which is not deterministic as it depends on the semgrep version
+    # as well as which flags were passed in
+    irun := delete(irun, "tool")
+    runs := set(runs, i, irun)
+  }
+  result := set(result, "runs", runs)
 }

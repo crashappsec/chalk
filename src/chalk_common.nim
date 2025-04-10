@@ -13,13 +13,14 @@
 ## of the dependency tree.
 
 import std/[os, json, streams, tables, options, strutils, sugar, posix,
-            unicode, re, sets]
+            unicode, re, sets, uri]
 import pkg/[nimutils, nimutils/logging, nimutils/managedtmp, con4m]
 export os, json, options, tables, strutils, streams, sugar, nimutils, logging,
        managedtmp, con4m
 
 type
   ChalkDict*    = OrderedTableRef[string, Box]
+  ObjectsDict*  = OrderedTableRef[string, OrderedTableRef[string, ObjectStoreRef]]
 
   ResourceType* = enum
     ResourceFile, ResourceImage, ResourceContainer, ResourcePid
@@ -30,6 +31,7 @@ type
     cachedHash*:    string           ## Cached 'ending' hash
     cachedPreHash*: string           ## Cached 'unchalked' hash
     collectedData*: ChalkDict        ## What we're adding during insertion.
+    objectsData*:   ObjectsDict      ## per object store and key object ref
     extract*:       ChalkDict        ## What we extracted, or nil if no extract.
     cachedMark*:    string           ## Cached chalk mark.
     opFailed*:      bool
@@ -110,6 +112,24 @@ type
     generateKey*:      proc (self: AttestationKeyProvider): AttestationKey
     retrieveKey*:      proc (self: AttestationKeyProvider): AttestationKey
     retrievePassword*: proc (self: AttestationKeyProvider, key: AttestationKey): string
+
+  ObjectStoreRef* = ref object
+    config*: ObjectStoreConfig
+    key*:    string
+    id*:     string
+    digest*: string
+    query*:  string
+
+  ObjectStore* = ref object of RootRef
+    name*:         string
+    init*:         proc (self: ObjectStore, name: string): ObjectStoreConfig
+    uri*:          proc (self: ObjectStoreConfig, keyRef: ObjectStoreRef): Uri
+    objectExists*: proc (self: ObjectStoreConfig, keyRef: ObjectStoreRef): ObjectStoreRef
+    createObject*: proc (self: ObjectStoreConfig, keyRef: ObjectStoreRef, data: string): ObjectStoreRef
+
+  ObjectStoreConfig* = ref object of RootRef
+    name*:  string
+    store*: ObjectStore
 
   KeyType* = enum KtChalkableHost, KtChalk, KtNonChalk, KtHostOnly
 
@@ -437,6 +457,7 @@ const
   chalkC42Spec*       = staticRead(chalkSpecName)
   getoptConfig*       = staticRead(getoptConfName)
   baseConfig*         = staticRead("configs/base_init.c4m") &
+                        staticRead("configs/base_callbacks.c4m") &
                         staticRead("configs/base_keyspecs.c4m") &
                         staticRead("configs/base_plugins.c4m") &
                         staticRead("configs/base_sinks.c4m") &
@@ -463,24 +484,22 @@ const
   timesTimeFormat*    = "HH:mm:ss'.'fff"
   timesTzFormat*      = "zzz"
   timesIso8601Format* = timesDateFormat & "'T'" & timesTimeFormat & timesTzFormat
+  objectStorePrefix*  = "@"
 
-  # Make sure that ARTIFACT_TYPE fields are consistently named. I'd love
-  # these to be const, but nim doesn't seem to be able to handle that :(
-let
-  artTypeElf*             = pack("ELF")
-  artTypeShebang*         = pack("Unix Script")
-  artTypeZip*             = pack("ZIP")
-  artTypeJAR*             = pack("JAR")
-  artTypeWAR*             = pack("WAR")
-  artTypeEAR*             = pack("EAR")
-  artTypeDockerImage*     = pack("Docker Image")
-  artTypeDockerContainer* = pack("Docker Container")
-  artTypePy*              = pack("Python")
-  artTypePyc*             = pack("Python Bytecode")
-  artTypeMachO*           = pack("Mach-O executable")
+  # Make sure that ARTIFACT_TYPE fields are consistently named
+  artTypeElf*             = "ELF"
+  artTypeZip*             = "ZIP"
+  artTypeJAR*             = "JAR"
+  artTypeWAR*             = "WAR"
+  artTypeEAR*             = "EAR"
+  artTypeDockerImage*     = "Docker Image"
+  artTypeDockerContainer* = "Docker Container"
+  artTypePyc*             = "Python Bytecode"
+  artTypeMachO*           = "Mach-O executable"
 
 var
   hostInfo*               = ChalkDict()
+  objectsData*            = ObjectsDict()
   failedKeys*             = ChalkDict()
   subscribedKeys*         = Table[string, bool]()
   systemErrors*           = seq[string](@[])

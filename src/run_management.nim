@@ -18,20 +18,35 @@ var
   startTime*     = getTime().utc # gives absolute wall time
   monoStartTime* = getMonoTime() # used for computing diffs
 
+proc getChalkConfigState(): ConfigState =
+  con4mRuntime.configState
+
 proc getChalkScope*(): AttrScope =
-  con4mRuntime.configState.attrs
+  getChalkConfigState().attrs
+
+proc sectionExists*(c: ConfigState, s: string): bool =
+  c.attrs.getObjectOpt(s).isSome()
 
 proc sectionExists*(s: string): bool =
-  getChalkScope().getObjectOpt(s).isSome()
+  sectionExists(getChalkConfigState(), s)
+
+proc attrGet*[T](c: ConfigState, fqn: string): T =
+  get[T](c.attrs, fqn)
 
 proc attrGet*[T](fqn: string): T =
-  get[T](getChalkScope(), fqn)
+  attrGet[T](getChalkConfigState(), fqn)
+
+proc attrGetOpt*[T](c: ConfigState, fqn: string): Option[T] =
+  getOpt[T](c.attrs, fqn)
 
 proc attrGetOpt*[T](fqn: string): Option[T] =
-  getOpt[T](getChalkScope(), fqn)
+  attrGetOpt[T](getChalkConfigState(), fqn)
+
+proc attrGetObject*(c: ConfigState, fqn: string): AttrScope =
+  getObject(c.attrs, fqn)
 
 proc attrGetObject*(fqn: string): AttrScope =
-  getObject(getChalkScope(), fqn)
+  attrGetObject(getChalkConfigState(), fqn)
 
 iterator getChalkSubsections*(s: string): string =
   ## Walks the contents of the given chalk config section, and yields the
@@ -48,15 +63,25 @@ proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
   ## attribute isn't already set, use the other `con4mAttrSet` overload instead.
   doAssert attrSet(ctx, fqn, value).code == errOk
 
+proc con4mAttrSet*(c: ConfigState, fqn: string, value: Box, attrType: Con4mType) =
+  ## Sets the value of the `fqn` attribute to `value`, raising `AssertionDefect`
+  ## if unsuccessful.
+  ##
+  ## This proc may be used if the attribute is not already set.
+  doAssert attrSet(c.attrs, fqn, value, attrType).code == errOk
+
 proc con4mAttrSet*(fqn: string, value: Box, attrType: Con4mType) =
   ## Sets the value of the `fqn` attribute to `value`, raising `AssertionDefect`
   ## if unsuccessful.
   ##
   ## This proc may be used if the attribute is not already set.
-  doAssert attrSet(getChalkScope(), fqn, value, attrType).code == errOk
+  con4mAttrSet(getChalkConfigState(), fqn, value, attrType)
+
+proc con4mSectionCreate*(c: ConfigState, fqn: string) =
+  discard attrLookup(c.attrs, fqn.split('.'), ix = 0, op = vlSecDef)
 
 proc con4mSectionCreate*(fqn: string) =
-  discard attrLookup(getChalkScope(), fqn.split('.'), ix = 0, op = vlSecDef)
+  con4mSectionCreate(con4mRuntime.configState, fqn)
 
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
@@ -80,6 +105,7 @@ proc clearReportingState*() =
   monoStartTime   = getMonoTime()
   ctxStack        = @[CollectionCtx()]
   hostInfo        = ChalkDict()
+  objectsData     = ObjectsDict()
   subscribedKeys  = Table[string, bool]()
   systemErrors    = @[]
   failedKeys      = ChalkDict()
@@ -194,6 +220,7 @@ proc newChalk*(name:         string            = "",
                     repos:         newOrderedTable[string, DockerImageRepo](),
                     containerId:   containerId,
                     collectedData: ChalkDict(),
+                    objectsData:   ObjectsDict(),
                     opFailed:      false,
                     resourceType:  resourceType,
                     extract:       extract,

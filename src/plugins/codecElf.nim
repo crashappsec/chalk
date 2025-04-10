@@ -131,13 +131,13 @@ proc elfHandleWrite*(codec: Plugin,
 
 proc elfGetChalkTimeArtifactInfo*(codec: Plugin, chalk: ChalkObj):
                                 ChalkDict {.cdecl.} =
-  result                      = ChalkDict()
-  result["ARTIFACT_TYPE"]     = artTypeElf
+  result = ChalkDict()
+  result.setIfNeeded("ARTIFACT_TYPE", artTypeElf)
 
 proc elfGetRunTimeArtifactInfo*(codec: Plugin, chalk: ChalkObj, ins: bool):
                               ChalkDict {.cdecl.} =
-  result                      = ChalkDict()
-  result["_OP_ARTIFACT_TYPE"] = artTypeElf
+  result = ChalkDict()
+  result.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeElf)
 
 proc loadCodecElf*() =
   newCodec("elf",

@@ -112,6 +112,46 @@ Used to set the output order. If not provided, this will inherit
 the normalization order from the associated keyspec.
 """
   }
+
+  field object_store {
+    type:      string
+    validator: func object_store_check
+    default:   ""
+    doc:       """
+When used, report will omit the key itself but instead will contain a reference
+to an object store. The reference is prefixed with `@`.
+
+For example:
+
+```
+report_template example {
+  key.EXAMPLE.use = true
+  key.EXAMPLE.object_store = "example"
+}
+```
+
+The report can be:
+
+```
+{
+  "@EXAMPLE": "presign+https://example.com/EXAMPLE.1a2b3c?foo=bar"
+}
+```
+
+The reference is an URI with these components:
+
+* object store type (e.g. presign)
+* per object store type its unique identifier URI
+* key name
+* hash of the canonicalized value
+* query string of additional metadata
+
+Object store allows consistent metadata to be reference multiple times
+across multiple reports. For example many repositories do not change
+their SBOM on every build therefore allowing to reference same object
+for multiple reports allows to de-duplicate SBOM data between builds.
+"""
+  }
 }
 
 object mark_template {
@@ -306,6 +346,62 @@ This field will be shown when the running command `chalk template [your_report_n
   }
 
   allow key {}
+  allow default_object_store {}
+}
+
+singleton default_object_store {
+  user_def_ok:   true
+  doc: """
+Default object store configuration to be used for all keys in the report template.
+Currently only keys larger than specific threshold are objectified.
+
+Object store configuration per key always takes precedence over the
+report template default object store. For example:
+
+```
+object_store_config one {...}
+object_store_config two {...}
+report_template example {
+  key.EXAMPLE.object_store = "one"
+  default_object_store {
+    object_store = "two"
+  }
+}
+```
+
+As `key.EXAMPLE` is explicitly configured with the object store, it will be
+objectified with `one` object store configuration and default object store for
+`EXAMPLE` is completely ignored.
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    doc:      """
+Whether default object store should be used in the report template.
+When disabled, none of the keys are going to be objectified.
+"""
+  }
+
+  field object_store {
+    type:      string
+    validator: func object_store_check
+    default:   ""
+    doc:       """
+Name of the object store config to use for the report template.
+See `object_store_config`.
+"""
+  }
+
+  field threshold {
+    type:    Size
+    require: false
+    doc:     """
+Threshold when the key in the report template should be objectified.
+This is most useful to avoid sending large keys
+"""
+  }
+
 }
 
 object tool {
@@ -428,7 +524,19 @@ informational statement, you can add the key "error", "warn", or
 If the "error" key is present, this will also be taken as a tool
 failure, and no other keys will be checked.
 """
-   }
+  }
+
+  field canonicalize {
+    type:       func (`x) -> `y
+    require:    false
+    doc:        """
+Callback for canonicalizing tool output to a deterministic value
+which can be used to compute the hash of the value for the object store.
+For example for `SBOM` tool, this should remove all build timestamps
+to allow to recompute the same hash between builds as long as SBOM
+items are the same.
+"""
+  }
 
   field doc {
     type:     string
@@ -636,6 +744,18 @@ appear with a 'value' field.
 The normalization order used for signing and hashing metadata.
 This only works for built-in keys; everything else is given the same
 priority and should be sorted alphabetically.
+"""
+  }
+
+  field canonicalize {
+    type:       func (`x) -> `y
+    require:    false
+    doc:        """
+Callback for canonicalizing key output to a deterministic value
+which can be used to compute the hash of the value for the object store.
+For example for `SBOM` tool, this should remove all build timestamps
+to allow to recompute the same hash between builds as long as SBOM
+items are the same.
 """
   }
 
@@ -902,6 +1022,183 @@ in this section are defined by the `sink` configuration named in this
 field.
 """
   }
+}
+
+object_store_types := ["", "presign"]
+
+object object_store_config {
+  user_def_ok:   true
+  doc: """
+Chalk collects metadata and sends that metadata to various sinks/destinations.
+Within the context of one build, collected metadata is unique however
+over time various builds might be collecting identical metadata.
+For example most repos do not change their dependencies on every commit
+and therefore most commits will not be changing the repo SBOM.
+As such reporting the same information for each chalk report is wasteful.
+Object store allows a single chalk key value to be stored externally,
+therefore allowing to refer to the same object across multiple reports.
+
+Chalk can be configured with multiple object store configurations.
+Each chalk metadata key per report template is then optionally configured
+which object store it should use. Alternately the all of the report template
+can be configured with a default object store to automatically use an object
+store for large keys going over the threshold size.
+This flexibility allows to send different keys to different object stores.
+For example SBOM data might be sent to one object store but SAST
+data to another.
+
+Currently chalk supports these object store types:
+
+* `presign` - send objects to an API which returns presigned URLs
+"""
+
+  allow object_store_presign
+
+  field enabled {
+    type:    bool
+    default: true
+    doc:     """
+Whether the object store should be enabled.
+When disabled, keys configured with this object store will not
+use the object store.
+"""
+  }
+
+  field object_store {
+    type:       string
+    default:    ""
+    choice:     object_store_types
+    doc:        """
+Type of the object store which is being configured.
+Depending on this value, corresponding configuration should be provided
+as a sub-configuration:
+
+```
+object_store_config example {
+  object_store: "presign"
+  object_store_presign {
+    uri: "https://example.com/objects"
+  }
+}
+```
+"""
+  }
+
+}
+
+singleton object_store_presign {
+  user_def_ok:   true
+  doc:           """
+Presign object store configuration.
+This object store interacts with an API which is expected to redirect to a presigned URL.
+The API is expected to implement the following endpoints:
+
+* `HEAD <uri>/<key>.<hash>` - check if the object already exists in object store
+* `GET <uri>/<key>.<hash>` - fetch existing object
+* `PUT <uri>/<key>.<hash>` - upload new object
+
+In all cases chalk includes these headers to presign endpoints:
+
+* `Content-Type: application/json`
+* `X-Content-Length` - similar to `Content-Length` but is sent to presigning API
+* `X-Chalk-Digest-Sha256` - raw digest of the uploaded content to check for transmission errors
+* `X-Chalk-Version`
+* `X-Chalk-Action-Id` - same as `_ACTION_ID` which can be used to associate object to original
+  report which created it.
+
+Presign API can return these headers:
+
+* `X-Forward-Headers` - comma-delimited headers which should be forwarded to the redirected URL.
+  This provides generic way to send additional headers such as additional
+  metadata to the object store.
+  This is especially useful when presigned URL cannot be self-contained.
+  For example S3 does not allow to include object metadata in presigned URL
+  and requires sending `X-Amz-Meta-*` headers.
+* `X-Chalk-Object-Query` - additional query string to be included in the object store
+  reference used in the report. For example:
+
+  ```
+  X-Chalk-Object-Query: foo=bar
+  ```
+
+  Will yield object reference:
+
+  ```
+  {
+    "@KEY": "presign+https://example.com/objects/KEY.hash?foo=bar"
+  }
+  ```
+"""
+
+  field uri {
+    type:     string
+    require:  true
+    shortdoc: "URI of the presign API"
+    doc:      """
+Base URI of the presign API.
+Object `<key>.<hash>` are appended to the URI when making request for any specific objects.
+"""
+  }
+
+  field headers {
+    type:     dict[string, string]
+    default:  {}
+    shortdoc: "Additional headers to send to presign API"
+    doc:      "Additional headers to send to presign API"
+  }
+
+  field disallow_http {
+    type:     bool
+    default:  false
+    shortdoc: "Disallow http presign API"
+    doc:      """
+Whenever presign API endpoint is not known ahead of time,
+this can be used to disallow http API and only support TLS requests.
+"""
+  }
+
+  field timeout {
+    type:     int
+    default:  30000 # some keys are pretty large and need more time to upload
+    shortdoc: "Object store timeout in milliseconds"
+    doc:      """
+Timeout duration for the object store API.
+This timeout is used both for the presign API as well as for the object store uploads.
+If very large keys are expected to be uploaded, larger timeout should be allocated.
+"""
+  }
+
+  field pinned_cert_file {
+    type:     string
+    default:  ""
+    shortdoc: "TLS certificate to validate server with"
+    doc:      """
+TLS self-signed cert used to validate the TLS connection with the presigned API.
+"""
+  }
+
+  field read_auth {
+    type:      string
+    default:   ""
+    validator: func auth_check
+    shortdoc:  "Auth configuration name for read requests"
+    doc:       """
+Auth configuration which should be used for making HEAD/GET requests to presigned API.
+See `auth_config` for more details.
+"""
+  }
+
+  field write_auth {
+    type:      string
+    validator: func auth_check
+    default:   ""
+    shortdoc:  "Auth configuration name for write requests"
+    doc:       """
+Auth configuration which should be used for making PUT requests to presigned API.
+See `auth_config` for more details.
+"""
+  }
+
 }
 
 object auth {
@@ -2426,6 +2723,7 @@ root {
   allow plugin
   allow sink
   allow sink_config
+  allow object_store_config
   allow auth
   allow auth_config
   allow attestation
@@ -3699,6 +3997,26 @@ func sink_config_check(path) {
      if not conffields.contains(sinkfields[i]) {
        return "sink config is missing required field: '" + sinkfields[i] + "'"
      }
+  }
+}
+
+func auth_check(path, val) {
+  result := ""
+  if val == "" {
+    return # Unconfigured
+  }
+  if not attr_exists("auth_config." + val) {
+    return "No such auth configured: '" + val + "'"
+  }
+}
+
+func object_store_check(path, val) {
+  result := ""
+  if val == "" {
+    return # Unconfigured
+  }
+  if not attr_exists("object_store_config." + val) {
+    return "No such object store configured: '" + val + "'"
   }
 }
 

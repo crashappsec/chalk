@@ -1,0 +1,51 @@
+func validate_jwt(token) {
+  if not is_jwt_valid(token) {
+    return "Invalid JWT token for reporting reports back to CrashOverride"
+  }
+  return ""
+}
+
+parameter auth_config.crashoverride_object_store_read.token {
+  shortdoc:  "Crash Override Reading Object Store API token"
+  doc:       "Token interacting with CrashOverride object store"
+  default:   ""
+  validator: func validate_jwt(string) -> string
+}
+
+parameter auth_config.crashoverride_object_store_write.token {
+  shortdoc:  "Crash Override Writing to Object Store API token"
+  doc:       "Token interacting with CrashOverride object store"
+  default:   ""
+  validator: func validate_jwt(string) -> string
+}
+
+parameter object_store_config.crashoverride.object_store_presign.uri {
+  shortdoc: "Object Store API URL"
+  doc:      "Object Store API URL"
+  default:  "https://chalk.crashoverride.run/v0.1/objects"
+}
+
+auth_config crashoverride_object_store_read {
+  ~auth:  "jwt"
+}
+
+auth_config crashoverride_object_store_write {
+  ~auth:  "jwt"
+}
+
+object_store_config crashoverride {
+  ~enabled:      true
+  ~object_store: "presign"
+  object_store_presign {
+    ~read_auth:  "crashoverride_object_store_read"
+    ~write_auth: "crashoverride_object_store_write"
+  }
+}
+
+report_template crashoverride {
+  ~key.SBOM.object_store              = "crashoverride"
+  ~key.SAST.object_store              = "crashoverride"
+  ~key.SECRET_SCANNER.object_store    = "crashoverride"
+  ~key._IMAGE_SBOM.object_store       = "crashoverride"
+  ~key._IMAGE_PROVENANCE.object_store = "crashoverride"
+}

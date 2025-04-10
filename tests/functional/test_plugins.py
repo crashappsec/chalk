@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024, Crash Override, Inc.
+# Copyright (c) 2023-2025, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -7,6 +7,7 @@ import re
 import shutil
 from pathlib import Path
 
+import httpx
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
@@ -23,7 +24,7 @@ from .conf import (
     REPO,
     aws_secrets_configured,
 )
-from .utils.dict import ANY, MISSING
+from .utils.dict import ANY, MISSING, ContainsDict
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
@@ -855,7 +856,9 @@ def test_metadata_gcp(
 
 
 @pytest.mark.parametrize("test_file", ["valid/sample_1"])
-def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
+def test_syft_docker(
+    chalk_copy: Chalk, test_file: str, random_hex: str, server_http: str
+):
     # we need to enable sboms + embed sboms
     chalk = chalk_copy
     chalk.load(
@@ -866,16 +869,14 @@ def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
     # expected sbom output
     # stripped to show basics only in case we change versions
     sbom_data = {
-        "SBOM": {
-            "syft": {
-                "bomFormat": "CycloneDX",
-                "metadata": {
-                    "component": {
-                        "type": "file",
-                        "name": str(REPO),
-                    },
+        "syft": {
+            "bomFormat": "CycloneDX",
+            "metadata": {
+                "component": {
+                    "type": "file",
+                    "name": str(REPO),
                 },
-            }
+            },
         }
     }
 
@@ -883,10 +884,24 @@ def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
     image_hash, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
+        env={"OBJECT_STORE": f"{server_http}/presign/objects"},
     )
 
-    assert build.report.contains(sbom_data)
-    assert build.mark.has(SBOM=MISSING)
+    assert build.report.contains(
+        {
+            "SBOM": MISSING,
+            "@SBOM": re.compile(rf"^presign\+{server_http}/presign/objects/SBOM"),
+        }
+    )
+    assert build.mark.contains({"SBOM": MISSING, "@SBOM": MISSING})
+
+    url = build.report["@SBOM"].split("+", maxsplit=1)[1]
+    assert ContainsDict(
+        httpx.get(
+            url,
+            follow_redirects=True,
+        ).json()
+    ).contains(sbom_data)
 
     # check sbom data from running container
     _, result = Docker.run(
@@ -896,7 +911,7 @@ def test_syft_docker(chalk_copy: Chalk, test_file: str, random_hex: str):
     )
     chalk_mark = ChalkMark.from_json(result.stdout.decode())
 
-    assert chalk_mark.contains(sbom_data)
+    assert chalk_mark.has(SBOM=sbom_data)
 
 
 @pytest.mark.parametrize("use_docker", [True, False])

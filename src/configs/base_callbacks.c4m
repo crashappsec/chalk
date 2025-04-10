@@ -1,0 +1,37 @@
+##
+## Copyright (c) 2025, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+# base non-builtin callbacks to get used in keyspecs
+
+func canonicalize_tools(data: dict[string, `x]) {
+  t := typeof(data)
+  if not typecmp(t, dict[string, `x]) {
+    error("unsupported type (" + $(t) + ")for tool data to canonicalize it")
+    return data
+  }
+  result := {}
+  names  := keys(data)
+  for i from 0 to len(names) {
+    name          := names[i]
+    value         := get(data, name)
+    canonicalized := canonicalize_tool(name, value)
+    result := set(result, name, canonicalized)
+  }
+}
+
+func canonicalize_image_sbom(data: dict[string, `x]) {
+  t := typeof(data)
+  if not typecmp(t, dict[string, `x]) {
+    error("unsupported type (" + $(t) + ") for image SBOM data to canonicalize it")
+    return data
+  }
+  result := data
+  # contains uuid
+  result := delete(result, "documentNamespace")
+  # contains timestamp
+  result := delete(result, "creationInfo")
+}

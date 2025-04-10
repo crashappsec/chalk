@@ -77,13 +77,13 @@ proc pycGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
 
 proc pycGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):
                                 ChalkDict {.cdecl.} =
-  result                  = ChalkDict()
-  result["ARTIFACT_TYPE"] = artTypePyc
+  result = ChalkDict()
+  result.setIfNeeded("ARTIFACT_TYPE", artTypePyc)
 
 proc pycGetRunTimeArtifactInfo*(self:  Plugin, chalk: ChalkObj, ins: bool):
                               ChalkDict {.cdecl.} =
-  result                      = ChalkDict()
-  result["_OP_ARTIFACT_TYPE"] = artTypePyc
+  result = ChalkDict()
+  result.setIfNeeded("_OP_ARTIFACT_TYPE", artTypePyc)
 
 proc loadCodecPythonPyc*() =
   newCodec("python_pyc",

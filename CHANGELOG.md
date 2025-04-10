@@ -22,6 +22,53 @@
   the CI build. In most cases it will be the repository but could be
   other resources such as S3 object URI for AWS Code Builds.
   ([#494](https://github.com/crashappsec/chalk/pull/494))
+- Object store which allows to upload specific keys to an object
+  store and reference them in the report vs including full value
+  in the raw report. This allows to both deduplicate
+  some common metadata between builds (e.g. SBOM) as well as make
+  report smaller.
+  See `object_store_config` how to configure the object store.
+  TLDR:
+
+  ```
+  auth_config example {
+    auth: "jwt"
+    token: env("TOKEN")
+  }
+
+  object_store_config example {
+    object_store: "presign"
+    object_store_presign {
+      uri: "https://example.com/objects"
+      read_auth: "example"
+      write_auth: "example"
+    }
+  }
+
+  report_template example {
+    key.EXAMPLE.use: true
+    key.EXAMPLE.object_store: "example"
+    default_object_store {
+      enabled: true
+      object_store: "example"
+    }
+  }
+  ```
+
+  ([#500](https://github.com/crashappsec/chalk/pull/500))
+
+- `copy_report_template_keys` built-in function which copies all keys
+  as they are subscribed from one report template to another:
+
+  ```
+  report_template one {
+    key.ONE.use = true
+    key.TWO.use = false
+  }
+  copy_report_template_keys("one", "two")
+  ```
+
+  ([#500](https://github.com/crashappsec/chalk/pull/500))
 
 ## 0.5.4
 

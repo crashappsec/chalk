@@ -5,6 +5,14 @@ custom_report.terminal_chalk_time.enabled: false
 custom_report.terminal_other_op.enabled: false
 custom_report.terminal_other_op.use_when: ["extract", "delete", "exec", "env", "heartbeat"]
 
+object_store_config server {
+  enabled = env_exists("OBJECT_STORE")
+  object_store = "presign"
+  object_store_presign {
+    uri = env("OBJECT_STORE")
+  }
+}
+
 report_template insertion_default {
   key._OP_EXIT_CODE.use     = true
   key._CHALK_RUN_TIME.use   = true
