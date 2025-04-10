@@ -443,34 +443,38 @@ proc request(self:       DockerImage,
     trace("docker: " & msg)
     var invalid = false
     try:
-      let
-        wwwAuth = config.wwwAuth.getOrDefault(self.repo, newHttpHeaders())
-        (authHeaders, response) = authHeadersSafeRequest(
-          uri,
-          httpMethod,
-          headers    = newHttpHeaders(
-            @[("Accept", accept)],
-          ).update(config.auth).update(wwwAuth),
-          pinnedCert = config.pinnedCert,
-          verifyMode = config.verifyMode,
-          timeout    = TIMEOUT,
-          retries    = 2,
-        )
-      # for non-mirror registry:
-      # as we can talk to the registry, any errors from this point on
-      # mean image doesnt exist in the registry or invalid config such as
-      # invalid auth which we cant improve even if we attempt other configs
-      # for mirror registry:
-      # as mirror might be missing the image, on 404s docker reattempts
-      # to fetch the image from upstream registry bypassing the mirror
-      # hence we need to fallthrough to the next config
-      invalid = not config.fallthrough
-      discard response.check(url = uri, only2xx = true)
-      config.wwwAuth[self.repo] = wwwAuth.update(authHeaders)
-      for u in useCase.uses():
-        configByRegistry[(u, self.registry)] = config
-        jsonCache[(self, httpMethod, path, u)] = (msg, response)
-      return (msg, response)
+      try:
+        let
+          wwwAuth = config.wwwAuth.getOrDefault(self.repo, newHttpHeaders())
+          (authHeaders, response) = authHeadersSafeRequest(
+            uri,
+            httpMethod,
+            headers    = newHttpHeaders(
+              @[("Accept", accept)],
+            ).update(config.auth).update(wwwAuth),
+            pinnedCert = config.pinnedCert,
+            verifyMode = config.verifyMode,
+            timeout    = TIMEOUT,
+            retries    = 2,
+            only2xx    = true,
+          )
+        config.wwwAuth[self.repo] = wwwAuth.update(authHeaders)
+        for u in useCase.uses():
+          configByRegistry[(u, self.registry)] = config
+          jsonCache[(self, httpMethod, path, u)] = (msg, response)
+        return (msg, response)
+      except ValueError:
+        # ValueError is only raised when only2xx fails
+        # for non-mirror registry:
+        # as we can talk to the registry, any errors from this point on
+        # mean image doesnt exist in the registry or invalid config such as
+        # invalid auth which we cant improve even if we attempt other configs
+        # for mirror registry:
+        # as mirror might be missing the image, on 404s docker reattempts
+        # to fetch the image from upstream registry bypassing the mirror
+        # hence we need to fallthrough to the next config
+        invalid = not config.fallthrough
+        raise
     except:
       if invalid:
         raise newException(RegistryResponseError, getCurrentExceptionMsg())
