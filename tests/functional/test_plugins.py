@@ -24,7 +24,7 @@ from .conf import (
     REPO,
     aws_secrets_configured,
 )
-from .utils.dict import ANY, MISSING, ContainsDict
+from .utils.dict import ANY, MISSING, Contains, ContainsDict, ContainsList
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
@@ -39,13 +39,50 @@ logger = get_logger()
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_network(copy_files: list[Path], chalk: Chalk):
     bin_path = copy_files[0]
-    insert = chalk.insert(bin_path)
+    insert = chalk.insert(bin_path, config=CONFIGS / "netstats.c4m")
     assert insert.report.has(
         _NETWORK_PARTIAL_TRACEROUTE_IPS={
             # by default traceroute is for 2 hops
             "1.1.1.1": [ANY, ANY],
         },
+        _OP_TCP_SOCKET_INFO=Contains(
+            [
+                ContainsList(
+                    [
+                        str,
+                        str,  # port
+                        str,  # ip
+                        str,  # port
+                        "LISTEN",
+                        str,  # uid
+                        str,  # inode
+                    ]
+                )
+            ]
+        ),
+        _OP_UDP_SOCKET_INFO=Contains(
+            [
+                ContainsList(
+                    [
+                        str,  # ip
+                        str,  # port
+                        str,  # ip
+                        str,  # port
+                        "UNCONN",
+                        str,  # uid
+                        str,  # inode
+                    ]
+                )
+            ]
+        ),
     )
+    assert {i[4] for i in insert.report["_OP_TCP_SOCKET_INFO"]} <= {
+        "LISTEN",
+        "ESTABLISHED",
+    }
+    assert {i[4] for i in insert.report["_OP_UDP_SOCKET_INFO"]} <= {
+        "UNCONN",
+    }
 
 
 def test_codeowners(tmp_data_dir: Path, chalk: Chalk):

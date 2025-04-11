@@ -2707,6 +2707,13 @@ By default partial traceroute runs for public cloudflare IP `1.1.1.1`.
     hidden:  true
     doc:     "Timeout to use in ms for each hop in partial traceroute"
   }
+
+  field tcp_socket_statuses {
+    type:    list[string]
+    default: ["LISTEN", "ESTABLISHED"]
+    hidden:  true
+    doc:     "Which TCP socket connect statuses to include in _OP_TCP_SOCKET_INFO"
+  }
 }
 
 root {

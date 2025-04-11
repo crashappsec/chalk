@@ -1,0 +1,5 @@
+network.tcp_socket_statuses = ["LISTEN", "ESTABLISHED"]
+report_template insertion_default {
+  key._OP_TCP_SOCKET_INFO.use = true
+  key._OP_UDP_SOCKET_INFO.use = true
+}
