@@ -49,6 +49,24 @@ let
     "P" : "Parked",
     "I" : "Idle"
   }.toTable()
+  tcpStatusMap = {
+    "01": "ESTABLISHED",
+    "02": "SYN_SENT",
+    "03": "SYN_RECEIVED",
+    "04": "FIN_WAIT1",
+    "05": "FIN_WAIT2",
+    "06": "TIME_WAIT",
+    "07": "CLOSE",
+    "08": "CLOSE_WAIT",
+    "09": "LAST_ACK",
+    "0a", "0A": "LISTEN",
+    "0b", "0B": "CLOSING",
+    "0c", "0C": "NEW_SYN_RECV",
+    "": "UNKNOWN",
+  }.toTable()
+  udpStatusMap = {
+    "": "UNCONN",
+  }.toTable()
 
 {.warning[PtrToCStringConv]: off.}
 
@@ -410,38 +428,7 @@ proc getIPv4Routes(): ProcTable =
     result.add(@[dst, gw, nm, row[0], row[3], row[4], row[5], row[6],row[8],
                  row[9], row[10]])
 
-proc sockStatusMap(s: string): string =
-  case s
-  of "01":
-    return "ESTABLISHED"
-  of "02":
-    return "SYN_SENT"
-  of "03":
-    return "SYN_RECEIVED"
-  of "04":
-    return "FIN_WAIT1"
-  of "05":
-    return "FIN_WAIT2"
-  of "06":
-    return "TIME_WAIT"
-  of "07":
-    return "CLOSE"
-  of "08":
-    return "CLOSE_WAIT"
-  of "09":
-    return "LAST_ACK"
-  of "0a", "0A":
-    return "LISTEN"
-  of "0b", "0B":
-    return "CLOSING"
-  of "0c", "0C":
-    return "NEW_SYN_RECV"
-  else:
-    return "UNKNOWN"
-
-proc udpStatusMap(s: string): string = "UNCONN"
-
-proc getSockInfo(raw: string, mapStatus: (string) -> string): ProcTable =
+proc getSockInfo(raw: string, mapStatus: Table[string, string]): ProcTable =
   let lines = raw.strip().split("\n")
 
   if len(lines) < 2:
@@ -483,15 +470,34 @@ proc getSockInfo(raw: string, mapStatus: (string) -> string): ProcTable =
           break
       i += 1
 
-    result.add(@[ procIpV4(localAddr), procPort(localPort),
-                  procIpV4(remoteAddr), procPort(remotePort),
-                  mapStatus(status), uid, inode ])
+    result.add(@[
+      procIpV4(localAddr),
+      procPort(localPort),
+      procIpV4(remoteAddr),
+      procPort(remotePort),
+      mapStatus.getOrDefault(status, mapStatus[""]),
+      uid,
+      inode,
+    ])
 
-template getTCPSockInfo(): ProcTable =
-    getSockInfo(getRawTCPSockInfo(), sockStatusMap)
+proc filterSockInfo(data: ProcTable, config: string): ProcTable =
+  let statuses = attrGet[seq[string]](config)
+  result = @[]
+  for i in data:
+    if len(i) < 5:
+      continue
+    let status = i[4]
+    if status in statuses or "*" in statuses:
+      result.add(i)
 
-template getUDPSockInfo(): ProcTable =
-    getSockInfo(getRawUDPSockInfo(), udpStatusMap)
+proc getTCPSockInfo(): ProcTable =
+    return filterSockInfo(
+      getSockInfo(getRawTCPSockInfo(), tcpStatusMap),
+      "network.tcp_socket_statuses",
+    )
+
+proc getUDPSockInfo(): ProcTable =
+    return getSockInfo(getRawUDPSockInfo(), udpStatusMap)
 
 proc getProcSockInfo(allSockInfo: ProcTable, myFdInfo: ProcFdSet):
                     ProcTable  =

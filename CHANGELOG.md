@@ -73,6 +73,10 @@
 
   ([#500](https://github.com/crashappsec/chalk/pull/500))
 
+- `network.tcp_socket_statuses` configuration which allows to filter
+  TCP sockets with specific statuses to be reported in `_OP_TCP_SOCKET_INFO`.
+  ([#504](https://github.com/crashappsec/chalk/pull/504))
+
 ## 0.5.4
 
 **Feb 19, 2025**
