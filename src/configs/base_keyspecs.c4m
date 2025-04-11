@@ -4421,9 +4421,9 @@ keyspec _SIGNATURES {
     since:            "0.4.0"
     doc:              """
 Digital signatures for artifact.  For build/push operations, this will
-generally represent the digital signatures added as part of the
+generally represent full digital attestation added as part of the
 operation. For extraction operations, it represents a *validated*
-extracted signature.
+extracted full attestation.
 
 In some cases there are multiple signatures such as when pushing
 docker image to multiple registries. Each registry will have a unique
