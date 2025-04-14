@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[net, os]
+import std/[net, os, json]
 import "."/[chalkjson, config, selfextract, plugin_api, semver, util]
 import "./attestation"/[embed, get, utils]
 import "./docker"/[ids]
@@ -206,7 +206,9 @@ proc verifyBySigStore(chalk: ChalkObj, key: AttestationKey, image: DockerImage):
     let
       blob = parseJson(res)
       sigs = blob["signatures"]
-    dict["_SIGNATURES"] = sigs.nimJsonToBox()
+      att  = newJArray()
+    att.add(blob)
+    dict["_SIGNATURES"] = att.nimJsonToBox()
     trace("in-toto signatures are: " & $sigs)
     info(spec & ": Successfully validated signature.")
     return (vSignedOk, dict)

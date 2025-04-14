@@ -7,6 +7,10 @@
 - Tech stack plugin is removed and all its associated
   configurations as well as keys.
   ([#352](https://github.com/crashappsec/chalk/pull/352))
+- `_SIGNATURES` now includes full cosign attestation payload
+  instead of just the signature. This allows to externally
+  validate the signature without relying on access to the registry.
+  ([#505](https://github.com/crashappsec/chalk/pull/505))
 
 ### Fixes
 
