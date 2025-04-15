@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.5.5
+
+**Apr 15, 2025**
 
 ### Breaking Changes
 
