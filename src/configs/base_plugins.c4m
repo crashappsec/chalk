@@ -95,7 +95,7 @@ plugin vctl_git {
                       "AUTHOR", "DATE_AUTHORED", "TIMESTAMP_AUTHORED",
                       "COMMITTER", "DATE_COMMITTED", "TIMESTAMP_COMMITTED", "COMMIT_MESSAGE",
                       "TAG", "TAG_SIGNED", "TAGGER", "DATE_TAGGED", "TIMESTAMP_TAGGED",
-                      "TAG_MESSAGE", "VCS_DIR_WHEN_CHALKED"]
+                      "TAG_MESSAGE", "VCS_DIR_WHEN_CHALKED", "VCS_MISSING_FILES"]
     post_run_keys:   ["_COMMIT_ID", "_COMMIT_SIGNED",
                       "_BRANCH", "_ORIGIN_URI",
                       "_AUTHOR", "_DATE_AUTHORED", "_TIMESTAMP_AUTHORED",

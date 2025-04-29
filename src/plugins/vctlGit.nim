@@ -8,7 +8,7 @@
 ## The plugin responsible for pulling metadata from the git
 ## repository.
 
-import std/[algorithm, nativesockets, sequtils, times]
+import std/[algorithm, nativesockets, sequtils, times, strutils]
 import pkg/[zippy, zippy/inflate]
 import ".."/[config, git, plugin_api, util]
 
@@ -46,24 +46,6 @@ const
   gitObjCommit     = 1
   gitObjTag        = 4
   gitHeaderType    = "$type"
-  keyVcsDir        = "VCS_DIR_WHEN_CHALKED"
-  keyOrigin        = "ORIGIN_URI"
-  keyCommit        = "COMMIT_ID"
-  keyCommitSigned  = "COMMIT_SIGNED"
-  keyBranch        = "BRANCH"
-  keyAuthor        = "AUTHOR"
-  keyAuthorDate    = "DATE_AUTHORED"
-  keyAuthorTime    = "TIMESTAMP_AUTHORED"
-  keyCommitter     = "COMMITTER"
-  keyCommitDate    = "DATE_COMMITTED"
-  keyCommitTime    = "TIMESTAMP_COMMITTED"
-  keyCommitMessage = "COMMIT_MESSAGE"
-  keyLatestTag     = "TAG"
-  keyTagSigned     = "TAG_SIGNED"
-  keyTagger        = "TAGGER"
-  keyTaggedDate    = "DATE_TAGGED"
-  keyTaggedTime    = "TIMESTAMP_TAGGED"
-  keyTagMessage    = "TAG_MESSAGE"
 
 type
   KVPair*  = (string, string)
@@ -763,31 +745,53 @@ proc findAndLoad(plugin: GitInfo, path: string) =
   plugin.vcsDirs[vcsDir] = info
   plugin.repos[path] = vcsDir.parentDir()
 
+# TODO ideally should be done via libgit
+# but for now easier to depend on git CLI
+proc findMissingFiles(info: RepoInfo): seq[string] =
+  result = newSeq[string]()
+  let
+    root = info.vcsDir.splitPath().head
+    exe  = getGitExeLocation()
+  if exe == "":
+    trace("no git exe. unable to run ls-files. skipping")
+    return
+  withWorkingDir(root):
+    let
+      args   = @["ls-files"]
+      output = runCmdGetEverything(exe, args)
+    if output.exitCode != 0:
+      trace("ingoring git " & args.join(" ") & ": " & output.stdErr)
+      return
+    for f in output.stdOut.strip().splitLines():
+      if not fileExists(root.joinPath(f)):
+        result.add(f)
+
 proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
   if prefix == "":
-    chalkDict.setIfNeeded(prefix & keyVcsDir,       info.vcsDir.splitPath().head)
+    chalkDict.setIfNeeded(prefix & "VCS_DIR_WHEN_CHALKED", info.vcsDir.splitPath().head)
+    chalkDict.setIfNeeded(prefix & "VCS_MISSING_FILES",    info.findMissingFiles())
 
-  chalkDict.setIfNeeded(prefix & keyOrigin,         info.origin)
-  chalkDict.setIfNeeded(prefix & keyCommit,         info.commitId)
-  chalkDict.setIfNeeded(prefix & keyCommitSigned,   info.signed)
-  chalkDict.setIfNeeded(prefix & keyBranch,         info.branch)
-  chalkDict.setIfNeeded(prefix & keyAuthor,         info.author)
-  chalkDict.setIfNeeded(prefix & keyCommitter,      info.committer)
-  chalkDict.setIfNeeded(prefix & keyCommitMessage,  info.message)
+  chalkDict.setIfNeeded(prefix & "ORIGIN_URI",             info.origin)
+  chalkDict.setIfNeeded(prefix & "COMMIT_ID",              info.commitId)
+  chalkDict.setIfNeeded(prefix & "COMMIT_SIGNED",          info.signed)
+  chalkDict.setIfNeeded(prefix & "BRANCH",                 info.branch)
+  chalkDict.setIfNeeded(prefix & "AUTHOR",                 info.author)
+  chalkDict.setIfNeeded(prefix & "COMMITTER",              info.committer)
+  chalkDict.setIfNeeded(prefix & "COMMIT_MESSAGE",         info.message)
   if info.author != "":
-    chalkDict.setIfNeeded(prefix & keyAuthorDate,   info.authorDate.forReport().format(timesIso8601Format))
-    chalkDict.setIfNeeded(prefix & keyAuthorTime,   info.authorDate.toUnixInMs())
+    chalkDict.setIfNeeded(prefix & "DATE_AUTHORED",        info.authorDate.forReport().format(timesIso8601Format))
+    chalkDict.setIfNeeded(prefix & "TIMESTAMP_AUTHORED",   info.authorDate.toUnixInMs())
   if info.committer != "":
-    chalkDict.setIfNeeded(prefix & keyCommitDate,   info.commitDate.forReport().format(timesIso8601Format))
-    chalkDict.setIfNeeded(prefix & keyCommitTime,   info.commitDate.toUnixInMs())
+    chalkDict.setIfNeeded(prefix & "DATE_COMMITTED",       info.commitDate.forReport().format(timesIso8601Format))
+    chalkDict.setIfNeeded(prefix & "TIMESTAMP_COMMITTED",  info.commitDate.toUnixInMs())
   if info.latestTag != nil:
-    chalkDict.setIfNeeded(prefix & keyLatestTag,    info.latestTag.name)
-    chalkDict.setIfNeeded(prefix & keyTagger,       info.latestTag.tagger)
+    chalkDict.setIfNeeded(prefix & "TAG",                  info.latestTag.name)
+    chalkDict.setIfNeeded(prefix & "TAGGER",               info.latestTag.tagger)
     if info.latestTag.tagger != "":
-      chalkDict.setIfNeeded(prefix & keyTaggedDate, info.latestTag.date.forReport().format(timesIso8601Format))
-      chalkDict.setIfNeeded(prefix & keyTaggedTime, info.latestTag.date.toUnixInMs())
-    chalkDict.setIfNeeded(prefix & keyTagSigned,    info.latestTag.signed)
-    chalkDict.setIfNeeded(prefix & keyTagMessage,   info.latestTag.message)
+      chalkDict.setIfNeeded(prefix & "DATE_TAGGED",        info.latestTag.date.forReport().format(timesIso8601Format))
+      chalkDict.setIfNeeded(prefix & "TIMESTAMP_TAGGED",   info.latestTag.date.toUnixInMs())
+    chalkDict.setIfNeeded(prefix & "TAG_SIGNED",           info.latestTag.signed)
+    chalkDict.setIfNeeded(prefix & "TAG_MESSAGE",          info.latestTag.message)
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
   if obj.fsRef == "":

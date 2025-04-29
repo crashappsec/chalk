@@ -1191,6 +1191,19 @@ the artifact was chalked.
 """
 }
 
+keyspec VCS_MISSING_FILES {
+    kind:             ChalkTimeArtifact
+    type:             list[string]
+    standard:         true
+    since:            "0.5.6"
+    shortdoc:         "Which files are in VCS but are missing on disk"
+    doc:              """
+Reports names of files which are in VCS but are missing on disk during chalk operation.
+If there are missing files, this might indicate CI process is mutating the repo
+before chalking an artifact.
+"""
+}
+
 keyspec BUILD_ORIGIN_URI {
     kind:             ChalkTimeHost
     type:             string

@@ -74,6 +74,7 @@ or vice versa.
   key.PACKAGE_URI.use                         = true
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
+  key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
@@ -182,6 +183,7 @@ mark_template mark_large {
   key.PACKAGE_URI.use                         = true
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
+  key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
