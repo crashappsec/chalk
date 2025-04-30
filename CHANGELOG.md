@@ -1,6 +1,14 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.5.6
+
+**Apr 30, 2025**
+
+### New Features
+
+- `VCS_MISSING_FILES` key. It lists all files tracked by version control
+  however missing on disk while chalking an artifact.
+  ([#509](https://github.com/crashappsec/chalk/pull/509))
 
 ## 0.5.5
 

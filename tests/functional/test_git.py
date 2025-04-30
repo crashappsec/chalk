@@ -58,6 +58,8 @@ def test_repo(
         if not empty
         else ""
     )
+    dummy = tmp_data_dir / "dummy"
+    dummy.write_text("hello")
     git = (
         Git(tmp_data_dir, sign=sign)
         .init(remote=remote, branch="foo/bar")
@@ -70,6 +72,7 @@ def test_repo(
         git.pack()
     if symbolic_ref:
         git.symbolic_ref(f"refs/tags/foo/{random_hex}-2")
+    dummy.unlink()
     artifact = copy_files[0]
     result = chalk_copy.insert(artifact)
     assert result.mark.has(
@@ -88,6 +91,7 @@ def test_repo(
         TAG_MESSAGE=(tag_message if (sign or annotate) and not empty else MISSING),
         ORIGIN_URI=remote or "local",
         VCS_DIR_WHEN_CHALKED=str(tmp_data_dir),
+        VCS_MISSING_FILES=[dummy.name],
     )
     assert result.report.has(
         _ORIGIN_URI=remote or "local",

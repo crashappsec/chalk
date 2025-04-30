@@ -95,6 +95,7 @@ report and subtract from it.
   key.PACKAGE_URI.use                         = true
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
+  key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
@@ -700,6 +701,7 @@ doc: """
   key.PACKAGE_URI.use                         = true
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
+  key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
@@ -1188,6 +1190,7 @@ container.
   key.PACKAGE_URI.use                         = true
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
+  key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
@@ -1674,6 +1677,7 @@ and keep the run-time key.
   key.PACKAGE_URI.use                         = true
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
+  key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
