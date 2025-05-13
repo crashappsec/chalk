@@ -444,7 +444,7 @@ proc parseProgramTable(self: ElfFile): bool =
   # If ELF header e_phnum is is PN_XNUM, it means the actual count of entries
   # in the PHTAB is stored in the sh_info member of the initial entry in the
   # section header table. This is rare, and so unsupported for now.
-  if elf.programCount.value == PN_XNUM:
+  if elfHeader.programCount.value == PN_XNUM:
     self.errors.add(ERR_PN_XNUM)
     return false
 
