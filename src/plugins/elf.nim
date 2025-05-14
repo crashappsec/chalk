@@ -93,6 +93,8 @@ const
   PT_LOPROC                  = 0x70000000
   PT_HIPROC                  = 0x7FFFFFFF
 
+  PN_XNUM                    = 0xFFFF
+
   SHT_NULL                   = 0x00
   SHT_PROGBITS               = 0x01
   SHT_SYMTAB                 = 0x02
@@ -136,6 +138,8 @@ const
   ERR_SETCHALK_MISSING_CHALK = "setChalkSection(): no chalk section present"
   ERR_SETCHALK_INVALID_NAME  = "setChalkSection(): invalid name length"
   ERR_SETCHALK_INTERSECT     = "setChalkSection(): unexpected ELF structure"
+  ERR_SECTION_COUNT_LIMIT    = "unimplemented: section count hit SHN_LORESERVE"
+  ERR_PN_XNUM                = "unimplemented: support for PN_XNUM"
 
   # Chalk strings for the section header names
   SH_NAME_CHALKMARK*         = ".chalk.mark"
@@ -433,9 +437,17 @@ proc parseProgramTable(self: ElfFile): bool =
     self.errors.add(ERR_PROGRAM_OUT_OF_RANGE)
     return false
   let programHeaderSize = elfHeader.programHeaderSize.value
-  if programHeaderSize < ELF64_PROGRAM_HEADER_SIZE:
+  if programHeaderSize != ELF64_PROGRAM_HEADER_SIZE:
     self.errors.add(ERR_PROGRAM_HEADER_SIZE)
     return false
+
+  # If ELF header e_phnum is is PN_XNUM, it means the actual count of entries
+  # in the PHTAB is stored in the sh_info member of the initial entry in the
+  # section header table. This is rare, and so unsupported for now.
+  if elfHeader.programCount.value == PN_XNUM:
+    self.errors.add(ERR_PN_XNUM)
+    return false
+
   let programTableSize = programHeaderSize * elfHeader.programCount.value
   if programTableSize < programHeaderSize: # catches int wrap and programCount=0
     self.errors.add(ERR_INVALID_FIELD)
@@ -507,7 +519,7 @@ proc parseSectionTable(self: ElfFile): bool =
       self.errors.add(ERR_SECTION_TABLE_ELF_HDR)
     return false
   let sectionHeaderSize = elfHeader.sectionHeaderSize.value
-  if sectionHeaderSize < ELF64_SECTION_HEADER_SIZE:
+  if sectionHeaderSize != ELF64_SECTION_HEADER_SIZE:
     self.errors.add(ERR_SECTION_HEADER_SIZE)
     return false
   let sectionTableSize = sectionHeaderSize * elfHeader.sectionCount.value
@@ -697,6 +709,16 @@ proc insertChalkSection*(self: ElfFile, name: string, data: string): bool =
     # for now we don't support this: it's in a segment and we don't know
     # what the program requirements are for "knowing" about it
     self.errors.add(ERR_SHSTRTAB_ADDRESS)
+    return false
+
+  # We shouldn't increment the section count if it's >= SHN_LORESERVE-1,
+  # because once the section count hits SHN_LORESERVE, the section count
+  # is supposed to be moved to the sh_size member of the initial entry of
+  # the section table, and the ELF Header e_shnum is supposed to become 0.
+  # We could add support for this but it's an uncommon scenario, so support
+  # can be added if we begin encountering it
+  if sectionCount >= SHN_LORESERVE - 1:
+    self.errors.add(ERR_SECTION_COUNT_LIMIT)
     return false
 
   let sectionTableIntersections = ranges.intersect(sectionTableOffset,
