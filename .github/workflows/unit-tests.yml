@@ -4,15 +4,23 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "**.md"
-      - "server/**"
-      - "tests/functional/**"
-  pull_request:
-    paths-ignore:
-      - "**.md"
-      - "server/**"
-      - "tests/functional/**"
+    paths:
+      - src/**
+      - tests/unit/**
+      - config.nims
+      - "*.nimble"
+      # ignore docs not to waste CI minutes
+      - "!src/docs/**"
+  pull_request_target:
+    branches:
+      - main
+    paths:
+      - src/**
+      - tests/unit/**
+      - config.nims
+      - "*.nimble"
+      # ignore docs not to waste CI minutes
+      - "!src/docs/**"
   workflow_dispatch:
 
 permissions:
@@ -21,6 +29,18 @@ permissions:
 
 jobs:
   unit-tests:
+    if: |
+      (
+        github.event_name == 'pull_request' &&
+        !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
+      ) || (
+        github.event_name == 'push'
+      ) || (
+        github.event_name == 'workflow_dispatch'
+      ) || (
+        github.event_name == 'schedule'
+      )
+
     strategy:
       fail-fast: false
       matrix:
