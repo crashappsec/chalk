@@ -1,5 +1,14 @@
 # Chalk Release Notes
 
+## On the `main` branch
+
+### Fixes
+
+- Docker pass-through commands (non build/push) commands were capturing all
+  IO which could possibly fail with OOM. Standard in/out is no longer captured
+  for pass-through commands to resolve that.
+  ([#514](https://github.com/crashappsec/chalk/pull/514))
+
 ## 0.5.6
 
 **Apr 30, 2025**
