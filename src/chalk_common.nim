@@ -23,7 +23,7 @@ type
   ObjectsDict*  = OrderedTableRef[string, OrderedTableRef[string, ObjectStoreRef]]
 
   ResourceType* = enum
-    ResourceFile, ResourceImage, ResourceContainer, ResourcePid
+    ResourceFile, ResourceImage, ResourceContainer, ResourcePid, ResourceCert
 
   ## The chalk info for a single artifact.
   ChalkObj* = ref object
@@ -99,6 +99,7 @@ type
     internalState*:            RootRef
     # This is only used when using the default script chalking.
     commentStart*:             string
+    resourceTypes*:            set[ResourceType]
 
   AttestationKey* = ref object
     password*:   string
@@ -486,6 +487,8 @@ const
   timesIso8601Format* = timesDateFormat & "'T'" & timesTimeFormat & timesTzFormat
   objectStorePrefix*  = "@"
 
+  allResourceTypes*   = { ResourceFile, ResourceImage, ResourceContainer, ResourcePid, ResourceCert }
+
   # Make sure that ARTIFACT_TYPE fields are consistently named
   artTypeElf*             = "ELF"
   artTypeZip*             = "ZIP"
@@ -496,6 +499,7 @@ const
   artTypeDockerContainer* = "Docker Container"
   artTypePyc*             = "Python Bytecode"
   artTypeMachO*           = "Mach-O executable"
+  artX509Cert*            = "x509 Cert"
 
 var
   hostInfo*               = ChalkDict()

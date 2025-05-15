@@ -398,8 +398,9 @@ proc newPlugin*(
   ctArtCallback:  ChalkTimeArtifactCb = ChalkTimeArtifactCb(nil),
   rtArtCallback:  RunTimeArtifactCb   = RunTimeArtifactCb(nil),
   rtHostCallback: RunTimeHostCb       = RunTimeHostCb(nil),
-  cache:          RootRef             = RootRef(nil)):
-    Plugin {.discardable, cdecl.} =
+  cache:          RootRef             = RootRef(nil),
+  resourceTypes:  set[ResourceType]   = allResourceTypes - {ResourceCert},
+): Plugin {.discardable, cdecl.} =
   result = Plugin(name:                     name,
                   clearState:               clearCallback,
                   getChalkTimeHostInfo:     ctHostCallback,
@@ -407,6 +408,7 @@ proc newPlugin*(
                   getRunTimeArtifactInfo:   rtArtCallback,
                   getRunTimeHostInfo:       rtHostCallback,
                   internalState:            cache,
+                  resourceTypes:            resourceTypes,
                   enabled:                  true)
 
   if not result.checkPlugin(codec = false):

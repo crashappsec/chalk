@@ -297,7 +297,6 @@ Captures metadata from the environment variables in AWS Lambda function.
 """
 }
 
-
 # This plugin takes values from the conf file, whether they're static
 # values, or callbacks. By default, these are of the lowest priority
 # of anything that can conflict.
@@ -528,6 +527,19 @@ as source, but are distributed as python byte code (.pyc files).
 <p>
 Accepted file extensions can be set using the `pyc_extensions`
 configuration variable.
+"""
+}
+
+plugin certs {
+  enabled:         true
+  codec:           true
+  priority:        1
+  post_chalk_keys: ["_OP_ARTIFACT_TYPE",
+                    "_CERT_SUBJECT",
+                    "_CERT_NOT_BEFORE",
+                    "_CERT_NOT_AFTER"]
+  doc: """
+Collect metadata about cert PEM files.
 """
 }
 

@@ -312,6 +312,7 @@ proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
 
 proc loadSystem*() =
   newPlugin("system",
+            resourceTypes  = allResourceTypes,
             clearCallback  = PluginClearCb(clearCallback),
             ctHostCallback = ChalkTimeHostCb(sysGetChalkTimeHostInfo),
             ctArtCallback  = ChalkTimeArtifactCb(sysGetChalkTimeArtifactInfo),
@@ -319,8 +320,10 @@ proc loadSystem*() =
             rtHostCallback = RunTimeHostCb(sysGetRunTimeHostInfo))
 
   newPlugin("attestation",
+            resourceTypes  = allResourceTypes,
             ctArtCallback  = ChalkTimeArtifactCb(attestationGetChalkTimeArtifactInfo),
             rtArtCallback  = RunTimeArtifactCb(attestationGetRunTimeArtifactInfo))
 
   newPlugin("metsys",
+            resourceTypes  = allResourceTypes,
             rtHostCallback = RunTimeHostCb(metsysGetRunTimeHostInfo))

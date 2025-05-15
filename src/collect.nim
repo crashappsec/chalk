@@ -188,7 +188,11 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
         if obj.fsRef != "":
           data["PATH_WHEN_CHALKED"] = pack(resolvePath(obj.fsRef))
 
-      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != obj.myCodec: continue
+      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != obj.myCodec:
+        continue
+
+      if len(obj.resourceType * plugin.resourceTypes) == 0:
+        continue
 
       let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")
       if not plugin.hasSubscribedKey(subscribed, data) and not plugin.isSystem():

@@ -6192,6 +6192,39 @@ ingress gateway IP even within docker network-namespaced containers.
 """
 }
 
+keyspec _CERT_SUBJECT {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "TODO"
+    doc: """
+TODO
+"""
+}
+
+keyspec _CERT_NOT_BEFORE {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "TODO"
+    doc: """
+TODO
+"""
+}
+
+keyspec _CERT_NOT_AFTER {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "TODO"
+    doc: """
+TODO
+"""
+}
+
 keyspec _CHALK_EXTERNAL_ACTION_AUDIT {
     kind: RunTimeHost
     type: list[(string, string)]

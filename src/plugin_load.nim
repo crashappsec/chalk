@@ -42,6 +42,7 @@ loadPlugins([
   "ciGitlab",
   "ciJenkins",
   "cloudMetadata",
+  "codecCerts",
   "codecDocker",
   "codecElf",
   "codecFallbackElf",
