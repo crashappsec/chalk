@@ -74,6 +74,7 @@ type
   RunTimeArtifactCb*   = proc (a: Plugin, b: ChalkObj, c: bool): ChalkDict {.cdecl.}
   RunTimeHostCb*       = proc (a: Plugin, b: seq[ChalkObj]): ChalkDict {.cdecl.}
   ScanCb*              = proc (a: Plugin, b: string): Option[ChalkObj] {.cdecl.}
+  SearchCb*            = proc (a: Plugin, b: string): seq[ChalkObj] {.cdecl.}
   UnchalkedHashCb*     = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
   EndingHashCb*        = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
   ChalkIdCb*           = proc (a: Plugin, b: ChalkObj): string {.cdecl.}
@@ -91,6 +92,7 @@ type
     # Codec-only bits
     nativeObjPlatforms*:       seq[string]
     scan*:                     ScanCb
+    search*:                   SearchCb
     getUnchalkedHash*:         UnchalkedHashCb
     getEndingHash*:            EndingHashCb
     getChalkId*:               ChalkIdCb

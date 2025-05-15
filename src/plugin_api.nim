@@ -79,7 +79,15 @@ proc callGetRunTimeHostInfo*(plugin: Plugin, objs: seq[ChalkObj]):
 
 proc callScan*(plugin: Plugin, s: string): Option[ChalkObj] =
   let cb = plugin.scan
-  result = cb(plugin, s)
+  if cb != nil:
+    return cb(plugin, s)
+  return none(ChalkObj)
+
+proc callSearch*(plugin: Plugin, s: string): seq[ChalkObj] =
+  let cb = plugin.search
+  if cb != nil:
+    return cb(plugin, s)
+  return @[]
 
 proc callGetUnchalkedHash*(obj: ChalkObj): Option[string] =
   let
@@ -202,6 +210,13 @@ proc scanLocation(self: Plugin, loc: string): Option[ChalkObj] =
     error(loc & "Scan canceled: " & getCurrentExceptionMsg())
     dumpExOnDebug()
 
+proc searchLocation(self: Plugin, loc: string): seq[ChalkObj] =
+  try:
+    return callSearch(self, loc)
+  except:
+    error(loc & "Search canceled: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
+
 proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
   result = false
 
@@ -264,6 +279,8 @@ or --copy to copy the file and replace the symlink.""")
       let opt = self.scanLocation(item)
       if opt.isSome():
         let chalk = opt.get()
+        result.add(chalk)
+      for chalk in self.searchLocation(item):
         result.add(chalk)
 
 proc simpleHash(self: Plugin, chalk: ChalkObj): Option[string] =
@@ -417,6 +434,7 @@ proc newPlugin*(
 proc newCodec*(
   name:               string,
   scan:               ScanCb              = ScanCb(nil),
+  search:             SearchCb            = SearchCb(nil),
   ctHostCallback:     ChalkTimeHostCb     = ChalkTimeHostCb(nil),
   ctArtCallback:      ChalkTimeArtifactCb = ChalkTimeArtifactCb(nil),
   rtArtCallback:      RunTimeArtifactCb   = RunTimeArtifactCb(defaultRtArtInfo),
@@ -433,6 +451,7 @@ proc newCodec*(
 
   result = Plugin(name:                     name,
                   scan:                     scan,
+                  search:                   search,
                   getChalkTimeHostInfo:     ctHostCallback,
                   getChalkTimeArtifactInfo: ctArtCallback,
                   getRunTimeArtifactInfo:   rtArtCallback,

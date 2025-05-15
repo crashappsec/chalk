@@ -12,13 +12,13 @@
 import std/[options]
 import ".."/[config, plugin_api, fd_cache]
 
-proc certsScan(self: Plugin,
-               path: string,
-               ): Option[ChalkObj] {.cdecl.} =
-
+proc certsSearch(self: Plugin,
+                 path: string,
+                 ): seq[ChalkObj] {.cdecl.} =
+  result = newSeq[ChalkObj]()
   withFileStream(path, mode = fmRead, strict = false):
     if stream == nil:
-      return none(ChalkObj)
+      return
     let contents = stream.readAll()
     if "BEGIN CERTIFICATE" in contents and "END CERTIFICATE" in contents:
         let chalk = newChalk(
@@ -27,8 +27,7 @@ proc certsScan(self: Plugin,
           codec        = self,
           resourceType = {ResourceCert},
         )
-        return some(chalk)
-    return none(ChalkObj)
+        result.add(chalk)
 
 proc certsHandleWrite*(self: Plugin,
                        chalk: ChalkObj,
@@ -52,7 +51,7 @@ proc certsRunTimeCallback(self: Plugin,
 proc loadCodecCerts*() =
   newCodec(
     "certs",
-     scan             = ScanCb(certsScan),
+     search           = SearchCb(certsSearch),
      handleWrite      = HandleWriteCb(certsHandleWrite),
      getUnchalkedHash = UnchalkedHashCb(certsGetUnchalkedHash),
      rtArtCallback    = RunTimeArtifactCb(certsRunTimeCallback),
