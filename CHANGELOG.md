@@ -51,6 +51,13 @@
   environment variable where the artifact was found.
   ([#515](https://github.com/crashappsec/chalk/pull/515))
 
+### Fixes
+
+- Docker pass-through commands (non build/push) commands were capturing all
+  IO which could possibly fail with OOM. Standard in/out is no longer captured
+  for pass-through commands to resolve that.
+  ([#514](https://github.com/crashappsec/chalk/pull/514))
+
 ## 0.5.7
 
 **May 22, 2025**

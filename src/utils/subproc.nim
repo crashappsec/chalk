@@ -12,13 +12,10 @@ import pkg/[
 proc runCmdNoOutputCapture*(exe:       string,
                             args:      seq[string],
                             newStdIn = ""): int {.discardable.} =
-  let execOutput = runCmdGetEverything(exe, args, newStdIn,
+  let execOutput = runCmdGetEverything(exe,
+                                       args,
+                                       newStdIn,
                                        passthrough = true,
-                                       timeoutUsec = 0) # No timeout
-  result = execOutput.getExit()
-
-proc runCmdExitCode*(exe: string, args: seq[string]): int {.discardable } =
-  let execOutput = runCmdGetEverything(exe, args,
-                                       passthrough = false,
+                                       capture     = SPIoNone,
                                        timeoutUsec = 0) # No timeout
   result = execOutput.getExit()
