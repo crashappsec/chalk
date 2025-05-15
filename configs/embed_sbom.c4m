@@ -1,0 +1,4 @@
+# Embed sboms in chalk marks.
+
+# `chalk insert` and `docker build` uses the mark_default template.
+mark_template.mark_default.key.SBOM.use: true
