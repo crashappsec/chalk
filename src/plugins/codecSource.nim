@@ -276,7 +276,7 @@ proc scriptLoadMark(codec:   Plugin,
 
     result = some(chalk)
 
-    chalk.cachedPreHash = toHash.sha256Hex()
+    chalk.cachedUnchalkedHash = toHash.sha256Hex()
     if dict != nil and len(dict) > 0:
       # When len(dict) == 1, that's the 'placeholder chalk mark', which
       # we consider to be not a chalk mark for script files.
@@ -312,13 +312,13 @@ proc scriptWriteMark(plugin:  Plugin,
       if not chalk.replaceFileContents(toWrite):
         chalk.opFailed = true
         return
-    chalk.cachedHash = toWrite.sha256Hex()
+    chalk.cachedEndingHash = toWrite.sha256Hex()
   else:
     let toWrite = contents.getMarkedScriptContents(chalk, encoded.get())
     if not chalk.replaceFileContents(toWrite):
       chalk.opFailed = true
     else:
-      chalk.cachedHash = toWrite.sha256Hex()
+      chalk.cachedEndingHash = toWrite.sha256Hex()
 
 proc sourceScan(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   let isExe = path.isExecutable()

@@ -77,10 +77,6 @@ proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   result                           = ChalkDict()
   result["MAGIC"]                  = pack(magicUTF8)
 
-  if isSubscribedKey("PRE_CHALK_HASH") and obj.fsRef != "":
-    withFileStream(obj.fsRef, mode = fmRead, strict = true):
-      result["PRE_CHALK_HASH"] = pack(stream.readAll().sha256Hex())
-
   if obj.isMarked() and "METADATA_HASH" in obj.extract:
     let h = unpack[string](obj.extract["METADATA_HASH"]).strip().parseHexStr()
 

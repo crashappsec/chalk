@@ -27,46 +27,47 @@ type
 
   ## The chalk info for a single artifact.
   ChalkObj* = ref object
-    name*:          string           ## The name to use for the artifact in errors.
-    cachedHash*:    string           ## Cached 'ending' hash
-    cachedPreHash*: string           ## Cached 'unchalked' hash
-    collectedData*: ChalkDict        ## What we're adding during insertion.
-    objectsData*:   ObjectsDict      ## per object store and key object ref
-    extract*:       ChalkDict        ## What we extracted, or nil if no extract.
-    cachedMark*:    string           ## Cached chalk mark.
-    opFailed*:      bool
-    marked*:        bool
-    embeds*:        seq[ChalkObj]
-    failedKeys*:    ChalkDict
-    err*:           seq[string]      ## Runtime logs for chalking are filtered
-                                     ## based on the "chalk log level". They
-                                     ## end up here, until the end of chalking
-                                     ## where, they get added to ERR_INFO, if
-                                     ## any.  To disable, simply set the chalk
-                                     ## log level to 'none'.
-    cache*:         RootRef          ## Generic pointer a codec can use to
-                                     ## store any state it might want to stash.
-    myCodec*:       Plugin
-    forceIgnore*:   bool             ## If the system decides the codec shouldn't
-                                     ## process this, set this bool.
-    pid*:           Option[Pid]      ## If an exec() or eval() and we know
-                                     ## the pid, this will be set.
-    startOffset*:   int              ## Plugins by default use file streams; we
-    endOffset*:     int              ## keep state fields for that to bridge between
-                                     ## extract and write. If the plugin needs to do
-                                     ## something else, use the cache field
-                                     ## below, instead.
-    fsRef*:         string           ## Reference for this artifact on a fs
-    platform*:      DockerPlatform   ## platform
-    baseChalk*:     ChalkObj
-    repos*:         OrderedTableRef[string, DockerImageRepo] ## all images where image was tagged/pushed
-    imageId*:       string           ## Image ID if this is a docker image
-    containerId*:   string           ## Container ID if this is a container
-    noAttestation*: bool             ## Whether to skip attestation for chalkmark
-    noCosign*:      bool             ## When we know image is not in registry. skips validation
-    signed*:        bool             ## True on the insert path once signed,
-                                     ## and once we've seen an attestation otherwise
-    resourceType*:  set[ResourceType]
+    name*:                  string           ## The name to use for the artifact in errors.
+    cachedUnchalkedHash*:   string           ## Cached 'unchalked' hash (without any chalkmarks)
+    cachedPrechalkingHash*: string           ## Cached pre-chalking hash (with previous chalkmarks but without new chalkmark)
+    cachedEndingHash*:      string           ## Cached 'ending' hash (with new chalkmark)
+    collectedData*:         ChalkDict        ## What we're adding during insertion.
+    objectsData*:           ObjectsDict      ## per object store and key object ref
+    extract*:               ChalkDict        ## What we extracted, or nil if no extract.
+    cachedMark*:            string           ## Cached chalk mark.
+    opFailed*:              bool
+    marked*:                bool
+    embeds*:                seq[ChalkObj]
+    failedKeys*:            ChalkDict
+    err*:                   seq[string]      ## Runtime logs for chalking are filtered
+                                             ## based on the "chalk log level". They
+                                             ## end up here, until the end of chalking
+                                             ## where, they get added to ERR_INFO, if
+                                             ## any.  To disable, simply set the chalk
+                                             ## log level to 'none'.
+    cache*:                 RootRef          ## Generic pointer a codec can use to
+                                             ## store any state it might want to stash.
+    myCodec*:               Plugin
+    forceIgnore*:           bool             ## If the system decides the codec shouldn't
+                                             ## process this, set this bool.
+    pid*:                   Option[Pid]      ## If an exec() or eval() and we know
+                                             ## the pid, this will be set.
+    startOffset*:           int              ## Plugins by default use file streams; we
+    endOffset*:             int              ## keep state fields for that to bridge between
+                                             ## extract and write. If the plugin needs to do
+                                             ## something else, use the cache field
+                                             ## below, instead.
+    fsRef*:                 string           ## Reference for this artifact on a fs
+    platform*:              DockerPlatform   ## platform
+    baseChalk*:             ChalkObj
+    repos*:                 OrderedTableRef[string, DockerImageRepo] ## all images where image was tagged/pushed
+    imageId*:               string           ## Image ID if this is a docker image
+    containerId*:           string           ## Container ID if this is a container
+    noAttestation*:         bool             ## Whether to skip attestation for chalkmark
+    noCosign*:              bool             ## When we know image is not in registry. skips validation
+    signed*:                bool             ## True on the insert path once signed,
+                                             ## and once we've seen an attestation otherwise
+    resourceType*:          set[ResourceType]
 
   PluginClearCb*       = proc (a: Plugin) {.cdecl.}
   ChalkTimeHostCb*     = proc (a: Plugin): ChalkDict {.cdecl.}
@@ -76,6 +77,7 @@ type
   ScanCb*              = proc (a: Plugin, b: string): Option[ChalkObj] {.cdecl.}
   SearchCb*            = proc (a: Plugin, b: string): seq[ChalkObj] {.cdecl.}
   UnchalkedHashCb*     = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
+  PrechalkingHashCb*   = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
   EndingHashCb*        = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
   ChalkIdCb*           = proc (a: Plugin, b: ChalkObj): string {.cdecl.}
   HandleWriteCb*       = proc (a: Plugin, b: ChalkObj, c: Option[string]) {.cdecl.}
@@ -94,6 +96,7 @@ type
     scan*:                     ScanCb
     search*:                   SearchCb
     getUnchalkedHash*:         UnchalkedHashCb
+    getPrechalkingHash*:       PrechalkingHashCb
     getEndingHash*:            EndingHashCb
     getChalkId*:               ChalkIdCb
     handleWrite*:              HandleWriteCb

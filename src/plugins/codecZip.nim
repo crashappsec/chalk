@@ -133,7 +133,7 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
       else:
         chalk.marked  = false
 
-    chalk.cachedPreHash = hashExtractedZip(hashD)
+    chalk.cachedUnchalkedHash = hashExtractedZip(hashD)
 
     if subscans:
       extractCtx = runChalkSubScan(origD, "extract")
@@ -146,7 +146,7 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
           chalk.extract["EMBEDDED_CHALK"] = extractCtx.report
       if getCommandName() != "extract":
         pushZipDir(tmpDir)
-        pushChalkId(chalk.cachedPreHash.idFormat())
+        pushChalkId(chalk.cachedUnchalkedHash.idFormat())
         let collectionCtx = runChalkSubScan(origD, getCommandName())
         popChalkId()
         popZipDir()
@@ -186,7 +186,7 @@ proc doZipWrite(chalk: ChalkObj, encoded: Option[string], virtual: bool) =
     newArchive.addDir(dirToUse & "/")
     if not virtual:
       newArchive.writeZipArchive(chalk.fsRef)
-    chalk.cachedHash = newArchive.hashZip()
+    chalk.cachedEndingHash = newArchive.hashZip()
   except:
     error(chalkFile & ": " & getCurrentExceptionMsg())
     dumpExOnDebug()
@@ -196,7 +196,7 @@ proc zipHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
   chalk.doZipWrite(encoded, virtual = false)
 
 proc zipGetEndingHash*(self: Plugin, chalk: ChalkObj): Option[string] {.cdecl.} =
-  if chalk.cachedHash == "":
+  if chalk.cachedEndingHash == "":
     # When true, --virtual was passed, so we skipped where we calculate
     # the hash post-write. Theoretically, the hash should be the same as
     # the unchalked hash, but there could be chalked files in there, so
@@ -206,9 +206,9 @@ proc zipGetEndingHash*(self: Plugin, chalk: ChalkObj): Option[string] {.cdecl.} 
       cache = ZipCache(chalk.cache)
       path  = cache.tmpDir.joinPath("contents") & "/"
 
-    chalk.cachedHash = hashExtractedZip(path)
+    chalk.cachedEndingHash = hashExtractedZip(path)
 
-  return some(chalk.cachedHash)
+  return some(chalk.cachedEndingHash)
 
 proc zipGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
                                 ChalkDict {.cdecl.} =

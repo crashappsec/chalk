@@ -162,9 +162,7 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
               artifact.name & "): " & getCurrentExceptionMsg())
         dumpExOnDebug()
 
-    let hashOpt = artifact.callGetEndingHash()
-    if hashOpt.isSome():
-      artifact.collectedData["_CURRENT_HASH"] = pack(hashOpt.get())
+    artifact.collectedData.setIfNeeded("_CURRENT_HASH", artifact.callGetEndingHash())
 
 proc rtaiLinkingHack*(artifact: ChalkObj) {.cdecl, exportc.} =
   artifact.collectRunTimeArtifactInfo()
@@ -185,8 +183,9 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
         if "CHALK_ID" notin data:
           data["CHALK_ID"]      = pack(obj.callGetChalkId())
         data.setIfNeeded("HASH", obj.callGetUnchalkedHash())
+        data.setIfNeeded("PRE_CHALK_HASH", obj.callGetPrechalkingHash())
         if obj.fsRef != "":
-          data["PATH_WHEN_CHALKED"] = pack(resolvePath(obj.fsRef))
+          data.setIfNeeded("PATH_WHEN_CHALKED", resolvePath(obj.fsRef))
 
       if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != obj.myCodec:
         continue

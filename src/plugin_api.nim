@@ -90,20 +90,34 @@ proc callSearch*(plugin: Plugin, s: string): seq[ChalkObj] =
   return @[]
 
 proc callGetUnchalkedHash*(obj: ChalkObj): Option[string] =
+  if obj.cachedUnchalkedHash != "":
+    return some(obj.cachedUnchalkedHash)
   let
     plugin = obj.myCodec
     cb     = plugin.getUnchalkedHash
   result = cb(plugin, obj)
   if result.isSome():
-    obj.cachedPreHash = result.get()
+    obj.cachedUnchalkedHash = result.get()
+
+proc callGetPrechalkingHash*(obj: ChalkObj): Option[string] =
+  if obj.cachedPrechalkingHash != "":
+    return some(obj.cachedPrechalkingHash)
+  let
+    plugin = obj.myCodec
+    cb     = plugin.getPrechalkingHash
+  result = cb(plugin, obj)
+  if result.isSome():
+    obj.cachedEndingHash = result.get()
 
 proc callGetEndingHash*(obj: ChalkObj): Option[string] =
+  if obj.cachedEndingHash != "":
+    return some(obj.cachedEndingHash)
   let
     plugin = obj.myCodec
     cb     = plugin.getEndingHash
   result = cb(plugin, obj)
   if result.isSome():
-    obj.cachedHash = result.get()
+    obj.cachedEndingHash = result.get()
 
 proc callGetChalkId*(obj: ChalkObj): string =
   let
@@ -297,13 +311,20 @@ proc defUnchalkedHash(self: Plugin, obj: ChalkObj): Option[string] {.cdecl.} =
   ##
   ## The default assumes that this was cached during scan, and if the
   ## hash isn't cached, it doesn't exist.
-
-  if obj.cachedPreHash != "": return some(obj.cachedPreHash)
+  if obj.cachedUnchalkedHash != "":
+    return some(obj.cachedUnchalkedHash)
   return none(string)
+
+proc defPrechalkingHash(self: Plugin, chalk: ChalkObj): Option[string] {.cdecl.} =
+  ## This is called before chalking is done.
+  if chalk.cachedPrechalkingHash != "":
+    return some(chalk.cachedPrechalkingHash)
+  return simpleHash(self, chalk)
 
 proc defEndingHash(self: Plugin, chalk: ChalkObj): Option[string] {.cdecl.} =
   ## This is called after chalking is done.  We check the cache first.
-  if chalk.cachedHash != "": return some(chalk.cachedHash)
+  if chalk.cachedEndingHash != "":
+    return some(chalk.cachedEndingHash)
   return simpleHash(self, chalk)
 
 proc randChalkId(self: Plugin, chalk: ChalkObj): string {.cdecl.} =
@@ -440,6 +461,7 @@ proc newCodec*(
   rtArtCallback:      RunTimeArtifactCb   = RunTimeArtifactCb(defaultRtArtInfo),
   rtHostCallback:     RunTimeHostCb       = RunTimeHostCb(nil),
   getUnchalkedHash:   UnchalkedHashCb     = UnchalkedHashCb(defUnchalkedHash),
+  getPrechalkingHash: PrechalkingHashCb   = PrechalkingHashCb(defPrechalkingHash),
   getEndingHash:      EndingHashCb        = EndingHashCb(defEndingHash),
   getChalkId:         ChalkIdCb           = ChalkIdCb(defaultChalkId),
   handleWrite:        HandleWriteCb       = HandleWriteCb(defaultCodecWrite),
@@ -457,6 +479,7 @@ proc newCodec*(
                   getRunTimeArtifactInfo:   rtArtCallback,
                   getRunTimeHostInfo:       rtHostCallback,
                   getUnchalkedHash:         getUnchalkedHash,
+                  getPrechalkingHash:       getPrechalkingHash,
                   getEndingHash:            getEndingHash,
                   getChalkId:               getChalkId,
                   handleWrite:              handleWrite,

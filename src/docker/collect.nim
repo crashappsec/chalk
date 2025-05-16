@@ -211,8 +211,8 @@ proc collectImageFrom(chalk:    ChalkObj,
     raise newException(ValueError, "platform does not match chalk platform")
   if chalk.name == "":
     chalk.name         = name
-  if chalk.cachedHash == "":
-    chalk.cachedHash   = id
+  if chalk.cachedEndingHash == "":
+    chalk.cachedEndingHash = id
   # we could be inspecting container image hence resource type should be untouched
   if ResourceContainer notin chalk.resourceType:
     chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerImage)
@@ -355,9 +355,7 @@ proc collectContainer*(chalk: ChalkObj, name: string) =
     contents          = inspectContainerJson(name)
     id                = contents["Id"].getStr()
     image             = contents["Image"].getStr().extractDockerHash()
-  if chalk.cachedHash  == "":
-    # why are we using image hash for containers?
-    chalk.cachedHash  = image
+  chalk.cachedEndingHash = id
   if chalk.name == "":
     # container name can start with `/`
     chalk.name        = contents["Name"].getStr().strip(chars = {'/'})
