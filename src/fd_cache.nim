@@ -29,10 +29,16 @@
 ## * when cache reaches its limit size, it closes LRU file streams
 ##
 
-# TODO move this to nimutils
-
-import std/[enumerate, posix, streams, tables]
+import std/[enumerate, posix, tables]
+import std/streams {.all.}
 import nimutils/file
+
+# copy of upstream shape which allows to access internal File reference
+# as otherwise its a private attribute
+type
+  MyFileStream = ref MyFileStreamObj
+  MyFileStreamObj = object of Stream
+    f*: File
 
 # ----------------------------------------------------------------------------
 
@@ -258,3 +264,6 @@ template withFileStream*(path: string,
                          code: untyped) =
   fdCache.withFileStream(path, mode, strict):
     code
+
+proc getOsFileHandle*(fs: FileStream): FileHandle =
+  return cast[MyFileStream](fs).f.getOsFileHandle()
