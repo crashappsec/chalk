@@ -6192,7 +6192,18 @@ ingress gateway IP even within docker network-namespaced containers.
 """
 }
 
-keyspec _CERT_SUBJECT {
+keyspec _X509_VERSION {
+    kind:             RunTimeArtifact
+    type:             int
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "TODO"
+    doc: """
+TODO
+"""
+}
+
+keyspec _X509_SUBJECT {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
@@ -6203,7 +6214,7 @@ TODO
 """
 }
 
-keyspec _CERT_NOT_BEFORE {
+keyspec _X509_SERIAL {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
@@ -6214,7 +6225,84 @@ TODO
 """
 }
 
-keyspec _CERT_NOT_AFTER {
+keyspec _X509_KEY {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "TODO"
+    doc: """
+TODO
+"""
+}
+
+keyspec _X509_KEY_USAGE {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "TODO"
+    doc: """
+TODO
+"""
+}
+
+keyspec _X509_BASIC_CONSTRAINTS {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "TODO"
+    doc: """
+TODO
+"""
+}
+
+keyspec _X509_ISSUER {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "TODO"
+    doc: """
+TODO
+"""
+}
+
+keyspec _X509_SUBJECT_KEY_IDENTIFIER {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "TODO"
+    doc: """
+TODO
+"""
+}
+
+keyspec _X509_AUTHORITY_KEY_IDENTIFIER {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "TODO"
+    doc: """
+TODO
+"""
+}
+
+keyspec _X509_NOT_BEFORE {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "TODO"
+    doc: """
+TODO
+"""
+}
+
+keyspec _X509_NOT_AFTER {
     kind:             RunTimeArtifact
     type:             string
     standard:         true

@@ -2123,6 +2123,17 @@ running insert commands.
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
   key._REPO_LIST_DIGESTS.use                  = true
+  key._X509_VERSION.use                       = true
+  key._X509_SUBJECT.use                       = true
+  key._X509_SERIAL.use                        = true
+  key._X509_KEY.use                           = true
+  key._X509_KEY_USAGE.use                     = true
+  key._X509_BASIC_CONSTRAINTS.use             = true
+  key._X509_ISSUER.use                        = true
+  key._X509_SUBJECT_KEY_IDENTIFIER.use        = true
+  key._X509_AUTHORITY_KEY_IDENTIFIER.use      = true
+  key._X509_NOT_BEFORE.use                    = true
+  key._X509_NOT_AFTER.use                     = true
 }
 
 report_template terminal_rest {

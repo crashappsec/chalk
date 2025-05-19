@@ -10,7 +10,16 @@
 
 
 import std/[options]
-import ".."/[config, plugin_api, fd_cache]
+import ".."/[config, plugin_api, fd_cache, util]
+
+include "../certs.c"
+
+proc extract_cert_data(fd: FileHandle, version: ptr cint): cstringarray {.importc.}
+proc cleanup_cert_info(info: cstringarray) {.importc.}
+
+type X509Cert = ref object of RootRef
+  keyValue: TableRef[string, string]
+  version:  int
 
 proc certsSearch(self: Plugin,
                  path: string,
@@ -19,15 +28,38 @@ proc certsSearch(self: Plugin,
   withFileStream(path, mode = fmRead, strict = false):
     if stream == nil:
       return
-    let contents = stream.readAll()
-    if "BEGIN CERTIFICATE" in contents and "END CERTIFICATE" in contents:
-        let chalk = newChalk(
-          name         = path,
-          fsRef        = path,
-          codec        = self,
-          resourceType = {ResourceCert},
+    var version: cint = 0
+    let output = extract_cert_data(stream.getOsFileHandle(), addr version)
+    if output == nil:
+      return
+    try:
+      let
+        metadata = cStringArrayToSeq(output)
+        keyValue = newTable[string, string]()
+        cache    = X509Cert(
+          version:  int(version),
+          keyValue: keyValue,
         )
-        result.add(chalk)
+      for i in 0..<int(len(metadata)/2):
+        let
+          key = metadata[i*2]
+          value = metadata[i*2+1]
+        keyValue[key] = $value
+      echo("!!!!!")
+      echo(keyValue)
+      let chalk = newChalk(
+        name          = path,
+        fsRef         = path,
+        codec         = self,
+        resourceType  = {ResourceCert},
+        cache         = cache,
+      )
+      chalk.collectedData.setIfNotEmpty("CHALK_VERSION", getChalkExeVersion())
+      chalk.extract = chalk.collectedData
+      result.add(chalk)
+    finally:
+      # cleanup_cert_info(output)
+      discard
 
 proc certsHandleWrite*(self: Plugin,
                        chalk: ChalkObj,
@@ -36,23 +68,45 @@ proc certsHandleWrite*(self: Plugin,
   # we do not update cert files
   return
 
-proc certsGetUnchalkedHash(self: Plugin,
-                           chalk: ChalkObj,
-                           ): Option[string] {.cdecl.} =
-  return some("01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b")
+proc certsGetHash(self: Plugin,
+                  chalk: ChalkObj,
+                  ): Option[string] {.cdecl.} =
+  # return some("01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b")
+  let cert = X509Cert(chalk.cache)
+  return some(cert.keyValue.getOrDefault("Serial"))
+
+proc certsCallback(chalk: ChalkObj, prefix = ""): ChalkDict =
+  let cert = X509Cert(chalk.cache)
+  result = ChalkDict()
+  result.setIfNeeded(prefix & "X509_VERSION",                  cert.version)
+  result.setIfNeeded(prefix & "X509_SUBJECT",                  cert.keyValue.getOrDefault("Subject"))
+  result.setIfNeeded(prefix & "X509_SERIAL",                   cert.keyValue.getOrDefault("Serial"))
+  result.setIfNeeded(prefix & "X509_KEY",                      cert.keyValue.getOrDefault("Key"))
+  result.setIfNeeded(prefix & "X509_KEY_USAGE",                cert.keyValue.getOrDefault("X509v3 Key Usage"))
+  result.setIfNeeded(prefix & "X509_BASIC_CONSTRAINTS",        cert.keyValue.getOrDefault("X509v3 Basic Constraints"))
+  result.setIfNeeded(prefix & "X509_ISSUER",                   cert.keyValue.getOrDefault("Issuer"))
+  result.setIfNeeded(prefix & "X509_SUBJECT_KEY_IDENTIFIER",   cert.keyValue.getOrDefault("X509v3 Subject Key Identifier"))
+  result.setIfNeeded(prefix & "X509_AUTHORITY_KEY_IDENTIFIER", cert.keyValue.getOrDefault("X509v3 Authority Key Identifier"))
+  result.setIfNeeded(prefix & "X509_NOT_BEFORE",               cert.keyValue.getOrDefault("Not Before"))
+  result.setIfNeeded(prefix & "X509_NOT_AFTER",                cert.keyValue.getOrDefault("Not After"))
 
 proc certsRunTimeCallback(self: Plugin,
                           chalk: ChalkObj,
                           ins: bool,
                           ): ChalkDict {.exportc, cdecl.} =
+  echo("!!!!")
   result = ChalkDict()
   result.setIfNeeded("_OP_ARTIFACT_TYPE", artX509Cert)
+  result.merge(chalk.certsCallback(prefix = "_"))
+  echo($result)
 
 proc loadCodecCerts*() =
   newCodec(
     "certs",
-     search           = SearchCb(certsSearch),
-     handleWrite      = HandleWriteCb(certsHandleWrite),
-     getUnchalkedHash = UnchalkedHashCb(certsGetUnchalkedHash),
-     rtArtCallback    = RunTimeArtifactCb(certsRunTimeCallback),
+     search             = SearchCb(certsSearch),
+     handleWrite        = HandleWriteCb(certsHandleWrite),
+     getUnchalkedHash   = UnchalkedHashCb(certsGetHash),
+     getPrechalkingHash = PrechalkingHashCb(certsGetHash),
+     getEndingHash      = EndingHashCb(certsGetHash),
+     rtArtCallback      = RunTimeArtifactCb(certsRunTimeCallback),
   )

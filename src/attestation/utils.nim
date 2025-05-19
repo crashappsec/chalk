@@ -70,7 +70,7 @@ proc canAttestVerify*(key: AttestationKey): bool =
   )
 
 proc canVerifyByHash*(chalk: ChalkObj): bool =
-  return isCosignInstalled() and chalk.fsRef != ""
+  return isCosignInstalled() and chalk.fsRef != "" and ResourceCert notin chalk.resourceType
 
 proc canVerifyBySigStore*(chalk: ChalkObj): bool =
   return (
