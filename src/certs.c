@@ -98,12 +98,11 @@ extract_cert_data(int fd, int *version)
     STACK_OF(X509_EXTENSION) *exts = cert->cert_info.extensions;
 
     int num_exts = sk_X509_EXTENSION_num(exts);
-
     if (num_exts < 0) {
         num_exts = 0;
     }
 
-    char **result = calloc(sizeof(char *), FIXED_LEN + num_exts);
+    char **result = calloc(sizeof(char *), FIXED_LEN + num_exts * 2);
 
     int ix       = 0;
     result[ix++] = strdup("Subject");
@@ -118,10 +117,6 @@ extract_cert_data(int fd, int *version)
     result[ix++] = not_before;
     result[ix++] = strdup("Not After");
     result[ix++] = not_after;
-
-    // TODO remove debugging segfault
-    // result[ix++] = 0;
-    // return result;
 
     for (int i = 0; i < num_exts; i++) {
         printf("######################################## %d of %d\n", i, num_exts);
@@ -169,9 +164,6 @@ extract_cert_data(int fd, int *version)
         }
         BIO_free(ext_bio);
         ext_bio = NULL;
-
-        // TODO remove debugging segfault
-        // break;
     }
 
     result[ix++] = 0;
