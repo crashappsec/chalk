@@ -330,11 +330,6 @@ proc signByHash*(chalk: ChalkObj, mdHash : string): ChalkDict =
   cosignKey.withCosignKey:
     let
       cosign    = getCosignLocation()
-    echo("!!!!!!!!!!!!!!")
-    echo(cosign)
-    echo(args)
-    echo(blob)
-    let
       allOutput = runCmdGetEverything(cosign, args, blob & "\n")
       signature = allOutput.getStdout().strip()
     if signature == "":

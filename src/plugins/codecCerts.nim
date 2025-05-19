@@ -45,8 +45,6 @@ proc certsSearch(self: Plugin,
           key = metadata[i*2]
           value = metadata[i*2+1]
         keyValue[key] = $value
-      echo("!!!!!")
-      echo(keyValue)
       let chalk = newChalk(
         name          = path,
         fsRef         = path,
@@ -54,12 +52,12 @@ proc certsSearch(self: Plugin,
         resourceType  = {ResourceCert},
         cache         = cache,
       )
+      # needed by attestation to work correctly so we "fake" chalkmark
       chalk.collectedData.setIfNotEmpty("CHALK_VERSION", getChalkExeVersion())
       chalk.extract = chalk.collectedData
       result.add(chalk)
     finally:
-      # cleanup_cert_info(output)
-      discard
+      cleanup_cert_info(output)
 
 proc certsHandleWrite*(self: Plugin,
                        chalk: ChalkObj,
@@ -71,7 +69,6 @@ proc certsHandleWrite*(self: Plugin,
 proc certsGetHash(self: Plugin,
                   chalk: ChalkObj,
                   ): Option[string] {.cdecl.} =
-  # return some("01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b")
   let cert = X509Cert(chalk.cache)
   return some(cert.keyValue.getOrDefault("Serial"))
 
@@ -94,11 +91,9 @@ proc certsRunTimeCallback(self: Plugin,
                           chalk: ChalkObj,
                           ins: bool,
                           ): ChalkDict {.exportc, cdecl.} =
-  echo("!!!!")
   result = ChalkDict()
   result.setIfNeeded("_OP_ARTIFACT_TYPE", artX509Cert)
   result.merge(chalk.certsCallback(prefix = "_"))
-  echo($result)
 
 proc loadCodecCerts*() =
   newCodec(

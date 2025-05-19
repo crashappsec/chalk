@@ -119,8 +119,6 @@ extract_cert_data(int fd, int *version)
     result[ix++] = not_after;
 
     for (int i = 0; i < num_exts; i++) {
-        printf("######################################## %d of %d\n", i, num_exts);
-
         X509_EXTENSION *ex      = sk_X509_EXTENSION_value(exts, i);
         ASN1_OBJECT    *obj     = X509_EXTENSION_get_object(ex);
         BIO            *ext_bio = BIO_new(BIO_s_mem());
