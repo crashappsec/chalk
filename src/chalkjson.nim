@@ -17,7 +17,7 @@ when (NimMinor, NimPatch) >= (6, 14):
   {.warning[CastSizes]: off.}
 
 import std/[unicode, parseutils, algorithm]
-import "."/[config, util]
+import "."/[config, util, normalize]
 
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']
@@ -521,3 +521,15 @@ proc getChalkMarkAsStr*(obj: ChalkObj): string =
   obj.cachedMark = result
   if not result.startsWith("""{ "MAGIC" :"""):
     error("MAGIC not provided; mark is invalid.")
+
+
+proc computeMetadataHashAndId*(obj: ChalkObj): ChalkDict =
+  let
+    toHash       = obj.getChalkMark().normalizeChalk()
+    computed     = toHash.sha256()
+    computedHash = computed.hex()
+    computedId   = computed.idFormat()
+
+  result = ChalkDict()
+  result["METADATA_HASH"] = pack(computedHash)
+  result["METADATA_ID"]   = pack(computedId)

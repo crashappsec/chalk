@@ -10,7 +10,7 @@
 
 
 import std/[options]
-import ".."/[config, plugin_api, fd_cache, util]
+import ".."/[config, plugin_api, fd_cache, util, chalkjson]
 
 include "../certs.c"
 
@@ -28,6 +28,7 @@ proc certsSearch(self: Plugin,
   withFileStream(path, mode = fmRead, strict = false):
     if stream == nil:
       return
+    stream.setPosition(0)
     var version: cint = 0
     let output = extract_cert_data(stream.getOsFileHandle(), addr version)
     if output == nil:
@@ -45,16 +46,26 @@ proc certsSearch(self: Plugin,
           key = metadata[i*2]
           value = metadata[i*2+1]
         keyValue[key] = $value
-      let chalk = newChalk(
-        name          = path,
-        fsRef         = path,
-        codec         = self,
-        resourceType  = {ResourceCert},
-        cache         = cache,
-      )
-      # needed by attestation to work correctly so we "fake" chalkmark
-      chalk.collectedData.setIfNotEmpty("CHALK_VERSION", getChalkExeVersion())
-      chalk.extract = chalk.collectedData
+      let
+        data  = ChalkDict()
+        chalk = newChalk(
+          name          = path,
+          fsRef         = path,
+          codec         = self,
+          marked        = true, # allows to "extract"
+          resourceType  = {ResourceCert},
+          cache         = cache,
+          collectedData = data,
+          extract       = data,
+        )
+      # cert is already a key-value store and so we will not be chalking
+      # a cert file but we still want chalk to collect metadata about it
+      # therefore we "fake" chalkmark to be able to collect/report metadata
+      # about it as if was chalked
+      data.setIfNotEmpty("MAGIC",         magicUTF8)
+      data.setIfNotEmpty("CHALK_VERSION", getChalkExeVersion())
+      data.setIfNotEmpty("CHALK_ID",      chalk.callGetChalkId())
+      data.merge(chalk.computeMetadataHashAndId())
       result.add(chalk)
     finally:
       cleanup_cert_info(output)
@@ -69,8 +80,12 @@ proc certsHandleWrite*(self: Plugin,
 proc certsGetHash(self: Plugin,
                   chalk: ChalkObj,
                   ): Option[string] {.cdecl.} =
-  let cert = X509Cert(chalk.cache)
-  return some(cert.keyValue.getOrDefault("Serial"))
+  let
+    cert   = X509Cert(chalk.cache)
+    serial = cert.keyValue.getOrDefault("Serial")
+  # serial is not guaranteed to be enough bits for a chalk hash
+  # and so we expand it with sha256 to guarantee supported length
+  return some(serial.sha256Hex())
 
 proc certsCallback(chalk: ChalkObj, prefix = ""): ChalkDict =
   let cert = X509Cert(chalk.cache)

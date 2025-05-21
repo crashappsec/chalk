@@ -262,13 +262,15 @@ proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
     skipLinks    = false
     followFLinks = false
 
-  if isChalkingOp():
-    let symLinkBehavior = attrGet[string]("symlink_behavior")
-    if symLinkBehavior == "skip":
-      skipLinks = true
-    elif symLinkBehavior == "clobber":
-      followFLinks = true
-      yieldLinks   = false
+  let symLinkBehavior = attrGet[string]("symlink_behavior")
+  case symLinkBehavior
+  of "skip":
+    skipLinks = true
+  of "clobber":
+    followFLinks = true
+    yieldLinks   = false
+  else:
+    discard
 
   for path in state.filePaths:
     trace("Codec " & self.name & ": beginning scan of " & path)
@@ -280,14 +282,25 @@ proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
       if skipLinks:
         var info: FileInfo
         try:
-          info = getFileInfo(path, followSymlink = false)
+          info = getFileInfo(item, followSymlink = false)
         except:
           continue
         if info.kind == pcLinkToFile:
-          warn("Skipping symbolic link: " & path & """\n
+          warn(item & """: skipping symbolic link
 Use --clobber to follow and clobber the linked-to file when inserting,
 or --copy to copy the file and replace the symlink.""")
           continue
+
+      # with symlinks same file can be referenced multiple times
+      # and so we lookup any existing chalk and if present, ignore this item
+      var alreadyScanned = ChalkObj(nil)
+      for chalk in result & getAllChalks():
+        if chalk.fsRef == item:
+          alreadyScanned = chalk
+          break
+      if alreadyScanned != nil:
+        trace(item & ": was already previously scanned. ignoring")
+        continue
 
       trace(item & ": scanning file")
       let opt = self.scanLocation(item)

@@ -466,6 +466,17 @@ report and subtract from it.
   key._AWS_RESERVATION_ID.use                 = true
   key._AWS_SPOT_INSTANCE_ACTION.use           = true
   key._AWS_SPOT_TERMINATION_TIME.use          = true
+  key._X509_VERSION.use                       = true
+  key._X509_SUBJECT.use                       = true
+  key._X509_SERIAL.use                        = true
+  key._X509_KEY.use                           = true
+  key._X509_KEY_USAGE.use                     = true
+  key._X509_BASIC_CONSTRAINTS.use             = true
+  key._X509_ISSUER.use                        = true
+  key._X509_SUBJECT_KEY_IDENTIFIER.use        = true
+  key._X509_AUTHORITY_KEY_IDENTIFIER.use      = true
+  key._X509_NOT_BEFORE.use                    = true
+  key._X509_NOT_AFTER.use                     = true
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
   key._CHALK_RUN_TIME.use                     = true
   key.$CHALK_CONFIG.use                       = true
@@ -962,6 +973,17 @@ doc: """
   key._INVALID_SIGNATURE.use                  = true
   key._VALIDATED_SIGNATURE.use                = true
   key._VALIDATED_METADATA.use                 = true
+  key._X509_VERSION.use                       = true
+  key._X509_SUBJECT.use                       = true
+  key._X509_SERIAL.use                        = true
+  key._X509_KEY.use                           = true
+  key._X509_KEY_USAGE.use                     = true
+  key._X509_BASIC_CONSTRAINTS.use             = true
+  key._X509_ISSUER.use                        = true
+  key._X509_SUBJECT_KEY_IDENTIFIER.use        = true
+  key._X509_AUTHORITY_KEY_IDENTIFIER.use      = true
+  key._X509_NOT_BEFORE.use                    = true
+  key._X509_NOT_AFTER.use                     = true
   key.$CHALK_CONFIG.use                       = true
   key.$CHALK_IMPLEMENTATION_NAME.use          = true
   key.$CHALK_LOAD_COUNT.use                   = true
@@ -1448,6 +1470,10 @@ container.
   key._INVALID_SIGNATURE.use                  = true
   key._VALIDATED_SIGNATURE.use                = true
   key._VALIDATED_METADATA.use                 = true
+  key._X509_SUBJECT.use                       = true
+  key._X509_ISSUER.use                        = true
+  key._X509_NOT_BEFORE.use                    = true
+  key._X509_NOT_AFTER.use                     = true
   key.$CHALK_CONFIG.use                       = true
   key.$CHALK_IMPLEMENTATION_NAME.use          = true
   key.$CHALK_LOAD_COUNT.use                   = true
@@ -1935,6 +1961,10 @@ and keep the run-time key.
   key._INVALID_SIGNATURE.use                  = true
   key._VALIDATED_SIGNATURE.use                = true
   key._VALIDATED_METADATA.use                 = true
+  key._X509_SUBJECT.use                       = true
+  key._X509_ISSUER.use                        = true
+  key._X509_NOT_BEFORE.use                    = true
+  key._X509_NOT_AFTER.use                     = true
   key.$CHALK_CONFIG.use                       = true
   key.$CHALK_IMPLEMENTATION_NAME.use          = true
   key.$CHALK_LOAD_COUNT.use                   = true
@@ -2123,15 +2153,8 @@ running insert commands.
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
   key._REPO_LIST_DIGESTS.use                  = true
-  key._X509_VERSION.use                       = true
   key._X509_SUBJECT.use                       = true
-  key._X509_SERIAL.use                        = true
-  key._X509_KEY.use                           = true
-  key._X509_KEY_USAGE.use                     = true
-  key._X509_BASIC_CONSTRAINTS.use             = true
   key._X509_ISSUER.use                        = true
-  key._X509_SUBJECT_KEY_IDENTIFIER.use        = true
-  key._X509_AUTHORITY_KEY_IDENTIFIER.use      = true
   key._X509_NOT_BEFORE.use                    = true
   key._X509_NOT_AFTER.use                     = true
 }
@@ -2240,4 +2263,8 @@ running commands that do NOT insert chalk marks.
   key._REPO_LIST_DIGESTS.use                  = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
+  key._X509_SUBJECT.use                       = true
+  key._X509_ISSUER.use                        = true
+  key._X509_NOT_BEFORE.use                    = true
+  key._X509_NOT_AFTER.use                     = true
  }

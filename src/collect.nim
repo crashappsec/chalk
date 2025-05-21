@@ -391,11 +391,12 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
           if getCommandName() in ["insert", "docker"]:
             obj.persistInternalValues()
-          yield obj
 
           if not inSubscan() and not obj.forceIgnore and
              obj.name notin getUnmarked():
             obj.collectRunTimeArtifactInfo()
+
+          yield obj
 
   if not inSubscan():
     if getCommandName() != "extract":

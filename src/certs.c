@@ -33,16 +33,18 @@ convert_ASN1TIME(ASN1_TIME *t, char *buf, size_t len)
 char *
 BIO_all(BIO *bio)
 {
-    char *result;
-    char *cur;
-    char  scratch[PIPE_BUF];
-    int   total;
+    BUF_MEM *bptr = NULL;
+    char    *result;
+    char    *cur;
+    char     scratch[PIPE_BUF];
+    int      total;
 
+    BIO_get_mem_ptr(bio, &bptr);
     int n = BIO_read(bio, scratch, PIPE_BUF);
     if (!n) {
         return NULL;
     }
-    result = strdup(scratch);
+    result = strndup(scratch, n);
     total  = n;
 
     while ((n = BIO_read(bio, scratch, PIPE_BUF)) > 0) {
@@ -52,6 +54,26 @@ BIO_all(BIO *bio)
         free(result);
         result = cur;
         total  = total + n;
+    }
+
+    int lastchar = bptr->length;
+
+    // BIO_read sometimes reads more bytes,
+    // possibly for not-NULL terminated objects
+    if (bptr->length < total) {
+        result[bptr->length] = 0;
+
+        // remove newlines
+        if (lastchar > 1
+            && (bptr->data[lastchar - 1] == '\n'
+                || bptr->data[lastchar - 1] == '\r')) {
+            result[lastchar - 1] = 0;
+        }
+        if (lastchar > 0
+            && (bptr->data[lastchar] == '\n'
+                || bptr->data[lastchar] == '\r')) {
+            result[lastchar] = 0;
+        }
     }
 
     return result;
@@ -94,6 +116,7 @@ extract_cert_data(int fd, int *version)
     *version = ((int)X509_get_version(cert)) + 1;
 
     char *key_contents = BIO_all(key_bio);
+    // BIO_set_close(key_bio, BIO_CLOSE);
     BIO_free(key_bio);
     STACK_OF(X509_EXTENSION) *exts = cert->cert_info.extensions;
 
@@ -119,47 +142,36 @@ extract_cert_data(int fd, int *version)
     result[ix++] = not_after;
 
     for (int i = 0; i < num_exts; i++) {
+        char           *name    = NULL;
+        char           *value   = NULL;
         X509_EXTENSION *ex      = sk_X509_EXTENSION_value(exts, i);
         ASN1_OBJECT    *obj     = X509_EXTENSION_get_object(ex);
         BIO            *ext_bio = BIO_new(BIO_s_mem());
         BUF_MEM        *bptr    = NULL;
         BIO_get_mem_ptr(ext_bio, &bptr);
-        BIO_set_close(ext_bio, BIO_NOCLOSE);
-
-        if (!X509V3_EXT_print(ext_bio, ex, 0, 0)) {
-            char *tmp = BIO_all(ext_bio);
-            if (tmp) {
-                result[ix++] = tmp;
-            }
-        }
-
-        // remove newlines
-        int lastchar = bptr->length;
-        if (lastchar > 1
-            && (bptr->data[lastchar - 1] == '\n'
-                || bptr->data[lastchar - 1] == '\r')) {
-            bptr->data[lastchar - 1] = 0;
-        }
-        if (lastchar > 0
-            && (bptr->data[lastchar] == '\n'
-                || bptr->data[lastchar] == '\r')) {
-            bptr->data[lastchar] = 0;
-        }
+        BIO_set_close(ext_bio, BIO_CLOSE);
 
         unsigned nid = OBJ_obj2nid(obj);
         if (nid == NID_undef) {
+            // raw OID as extension name
             char extname[200];
             OBJ_obj2txt(extname, 200, (const ASN1_OBJECT *)obj, 1);
-            result[ix++] = strdup(extname);
-        }
-        else {
+            name = strdup(extname);
+        } else {
             const char *c_ext_name = OBJ_nid2ln(nid);
-            result[ix++]           = strdup(c_ext_name);
+            name = strdup(c_ext_name);
         }
 
-        if (bptr) {
-            result[ix++] = strdup(bptr->data);
+        X509V3_EXT_print(ext_bio, ex, 0, 0);
+        value = BIO_all(ext_bio);
+
+        if (!value) {
+            value = strdup("");
         }
+
+        result[ix++] = name;
+        result[ix++] = value;
+
         BIO_free(ext_bio);
         ext_bio = NULL;
     }

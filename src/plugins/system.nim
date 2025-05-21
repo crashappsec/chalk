@@ -266,18 +266,11 @@ proc attestationGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   obj.collectedData.setIfNeeded("ERR_INFO", obj.err)
   obj.collectedData.setIfNeeded("FAILED_KEYS", obj.failedKeys)
 
-  let
-    toHash       = obj.getChalkMark().normalizeChalk()
-    computed     = toHash.sha256()
-    computedHash = computed.hex()
-    computedId   = computed.idFormat()
-
-  result["METADATA_HASH"] = pack(computedHash)
-  result["METADATA_ID"]   = pack(computedId)
+  result.merge(obj.computeMetadataHashAndId())
 
   if obj.willSignByHash():
     try:
-      result.update(obj.signByHash(computedHash))
+      result.update(obj.signByHash(unpack[string](result["METADATA_HASH"])))
     except:
       error("Cannot sign " & obj.name & ": " & getCurrentExceptionMsg())
 
