@@ -71,7 +71,7 @@ proc canonicalizeKey(key: string, data: Box): Box =
       return data
     return canonicalized.get()
   except:
-    error("object store: failed to canonicalize " & key & " due to:" & getCurrentExceptionMsg())
+    error("object store: failed to canonicalize " & key & " due to: " & getCurrentExceptionMsg())
     dumpExOnDebug()
     return data
 

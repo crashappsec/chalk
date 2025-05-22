@@ -490,12 +490,18 @@ proc forcePrivateKeys() =
   var toForce: seq[string]
 
   for k in getChalkSubsections("keyspec"):
-    if k.startswith("$"):
+    if k.startsWith("$"):
       toForce.add(k)
 
   forceChalkKeys(toForce)
 
 proc getChalkMark*(obj: ChalkObj): ChalkDict =
+  # we already have exact chalkmark so use it
+  # as otherwise we might compute different keys
+  # for example if the chalk template config has changed
+  if obj.cachedMark != "":
+    return obj.cachedMark.extractOneChalkJson(obj.name)
+
   let templ = getMarkTemplate()
   trace("Creating mark using template: " & templ)
 
@@ -513,5 +519,5 @@ proc getChalkMarkAsStr*(obj: ChalkObj): string =
   let mark = obj.getChalkMark()
   result = mark.toJson()
   obj.cachedMark = result
-  if not result.startswith("""{ "MAGIC" :"""):
+  if not result.startsWith("""{ "MAGIC" :"""):
     error("MAGIC not provided; mark is invalid.")

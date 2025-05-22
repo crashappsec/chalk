@@ -92,4 +92,4 @@ proc normalizeChalk*(dict: ChalkDict): string =
   # signs things actually being written out.  We skip MAGIC, SIGNATURE
   # and SIGN_PARAMS.
   let ignoreList = attrGet[seq[string]]("ignore_when_normalizing")
-  return binEncodeTable(dict, ignoreList)
+  result = binEncodeTable(dict, ignoreList)

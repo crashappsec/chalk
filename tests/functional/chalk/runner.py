@@ -684,10 +684,18 @@ class Chalk:
                 pass
         return image_hash, result
 
-    def docker_push(self, image: str, buildkit: bool = True):
+    def docker_push(
+        self,
+        image: str,
+        buildkit: bool = True,
+        env: Optional[dict[str, str]] = None,
+    ):
         return self.run(
             params=["docker", "push", image],
-            env=Docker.build_env(buildkit=buildkit),
+            env={
+                **Docker.build_env(buildkit=buildkit),
+                **(env or {}),
+            },
         )
 
     def docker_pull(self, image: str):

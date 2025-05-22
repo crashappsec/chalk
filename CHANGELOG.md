@@ -1,5 +1,16 @@
 # Chalk Release Notes
 
+## 0.5.7
+
+**May 22, 2025**
+
+### Fixes
+
+- `docker push` of chalked image in CI will report different `METADATA_ID`
+  than what is in the chalkmark.
+  This was a regression in 0.5.5 which was fixing another bug.
+  ([#516](https://github.com/crashappsec/chalk/pull/516))
+
 ## 0.5.6
 
 **Apr 30, 2025**
