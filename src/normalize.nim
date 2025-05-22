@@ -63,7 +63,6 @@ proc binEncodeTable(self: ChalkDict, ignore: seq[string] = @[]): string =
   for k, v in self.sortedPairs():
     if k in ignore:
       continue
-    echo("!!chalkmark!! ", k, "=", $v)
     encoded  &= binEncodeStr(k) & binEncodeItem(v)
     count += 1
   return "\x05" & u32ToStr(uint32(count)) & encoded
@@ -93,6 +92,4 @@ proc normalizeChalk*(dict: ChalkDict): string =
   # signs things actually being written out.  We skip MAGIC, SIGNATURE
   # and SIGN_PARAMS.
   let ignoreList = attrGet[seq[string]]("ignore_when_normalizing")
-  echo("<<<<")
   result = binEncodeTable(dict, ignoreList)
-  echo(">>>>")

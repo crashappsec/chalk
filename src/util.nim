@@ -432,7 +432,9 @@ proc merge*(self: ChalkDict, other: ChalkDict, deep = false): ChalkDict {.discar
   result = self
   for k, v in other:
     if k in self and self[k].kind == MkSeq and v.kind == MkSeq:
-      self[k] &= v
+      for i in v:
+        if i notin self[k]:
+          self[k].add(i)
     elif k in self and self[k].kind == MkTable and v.kind == MkTable:
       let
         mine   = unpack[ChalkDict](self[k])

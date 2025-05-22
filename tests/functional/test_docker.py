@@ -1292,6 +1292,13 @@ def test_build_and_push(
     name = f"{test_file}_{random_hex}"
     tag_base = f"{registry}/{name}"
     tag = f"{tag_base}:latest"
+    env = {
+        "CI": "true",
+        "GITHUB_SHA": "abc",
+        # generates BUILD_CONTACT which is a list
+        # which can break METADATA_ID computation between build/push
+        "GITHUB_ACTOR": "octocat",
+    }
 
     image_id, build_result = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
@@ -1300,6 +1307,7 @@ def test_build_and_push(
         tag=tag,
         push=push,
         run_docker=buildkit,  # legacy builder doesnt allow to build empty image
+        env=env,
     )
 
     push_result = build_result
@@ -1308,7 +1316,7 @@ def test_build_and_push(
         assert build_result.mark.has(
             _IMAGE_LAYERS=MISSING,
         )
-        push_result = chalk.docker_push(tag, buildkit=buildkit)
+        push_result = chalk.docker_push(tag, buildkit=buildkit, env=env)
 
     image_digest, _ = Docker.with_image_digest(build_result)
 
