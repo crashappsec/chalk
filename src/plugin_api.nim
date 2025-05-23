@@ -262,11 +262,16 @@ proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
     skipLinks    = false
     followFLinks = false
 
-  let symLinkBehavior = attrGet[string]("symlink_behavior")
+  let symLinkBehavior =
+    if isChalkingOp():
+      attrGet[string]("symlink_behavior_chalking")
+    else:
+      attrGet[string]("symlink_behavior_non_chalking")
+
   case symLinkBehavior
   of "skip":
     skipLinks = true
-  of "clobber":
+  of "clobber", "follow":
     followFLinks = true
     yieldLinks   = false
   else:

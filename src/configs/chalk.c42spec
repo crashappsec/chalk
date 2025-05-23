@@ -3410,21 +3410,37 @@ custom_report.terminal_other_op.enabled: false
 """
   }
 
-  field symlink_behavior {
+  field symlink_behavior_chalking {
     type: string
     default: "skip"
     choice: ["skip", "clobber", "copy"]
-    shortdoc: "Behavior for symbolic links to files"
+    shortdoc: "Behavior for symbolic links to files while chalking"
     doc: """
-Chalk never follows directory links. When running non-chalking operations, chalk will read the file on the other end of the link, and report using the file name of the link.
-
-For insertion operations, Chalk will, out of the box, warn on symbolic links, without processing them.
+Chalk never follows directory links. For insertion operations, Chalk will, out
+of the box, warn on symbolic links, without processing them.
 
 This variable controls what happens in those cases:
 
 - <em>skip</em>   will not process files that are linked.
-- <em>clobber</em> will read the artifact on the other end of the link, and, if writing, try to replace the file being linked to.
-- <em>copy</em> will read the artifact on the other end of the link, and, if writing, will replace the link with a modified file, leaving the file on the other end of the link intact.
+- <em>clobber</em> will read the artifact on the other end of the link try to replace the file being linked to.
+- <em>copy</em> will read the artifact on the other end of the link will replace the link with a modified file, leaving the file on the other end of the link intact.
+"""
+  }
+
+  field symlink_behavior_non_chalking {
+    type: string
+    default: "follow"
+    choice: ["skip", "follow"]
+    shortdoc: "Behavior for symbolic links to files while scanning"
+    doc: """
+Chalk never follows directory links. When running non-chalking operations,
+chalk will read the file on the other end of the link, and report using the
+file name of the link.
+
+This variable controls what happens in those cases:
+
+- <em>skip</em>   will not process files that are linked.
+- <em>follow</em> will read the artifact on the other end of the link.
 """
   }
 
