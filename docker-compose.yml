@@ -21,9 +21,6 @@ services:
       - $PWD:$PWD
       - $PWD/../nimutils:$PWD/../nimutils
       - $PWD/../con4m:$PWD/../con4m
-      - ../n00b/subprojects/openssl-3.4.0/include/openssl/:/root/.local/c0/include/openssl/
-      - ../n00b/subprojects/openssl-3.4.0/include/crypto/:/root/.local/c0/include/crypto/
-      - ../n00b/subprojects/openssl-3.4.0/include/internal/:/root/.local/c0/include/internal/
     environment:
       DEBUG: ${DEBUG:-}
       CHALK_PASSWORD: ${CHALK_PASSWORD:-}
