@@ -164,9 +164,6 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
 
     artifact.collectedData.setIfNeeded("_CURRENT_HASH", artifact.callGetEndingHash())
 
-proc rtaiLinkingHack*(artifact: ChalkObj) {.cdecl, exportc.} =
-  artifact.collectRunTimeArtifactInfo()
-
 proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
   obj.withErrorContext():
     # Note that callers must have set obj.collectedData to something
@@ -392,11 +389,11 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
           if getCommandName() in ["insert", "docker"]:
             obj.persistInternalValues()
 
+          yield obj
+
           if not inSubscan() and not obj.forceIgnore and
              obj.name notin getUnmarked():
             obj.collectRunTimeArtifactInfo()
-
-          yield obj
 
   if not inSubscan():
     if getCommandName() != "extract":
