@@ -7,18 +7,39 @@
 
 ## The `chalk insert` command.
 
-import ".."/[config, selfextract, collect, reporting, chalkjson, plugin_api]
+import ".."/[config, collect, reporting, chalkjson, plugin_api, chalk_common, selfextract]
+import "../plugins/codecZip"
 
 
 proc runCmdInsert*(path: seq[string]) {.exportc,cdecl.} =
   setContextDirectories(path)
   initCollection()
   let virtual = attrGet[bool]("virtual_chalk")
+  let injectBinary = attrGet[bool]("inject_binary")
 
   for item in artifacts(path):
     trace(item.name & ": begin chalking")
+
+    # If binary injection is enabled, handle zip archives first
+    if injectBinary:
+      var isZip = false
+      if item.myCodec != nil and item.myCodec.name == "zip":
+        isZip = true
+
+      if isZip:
+        info(item.name & ": inserting binary into zip archive")
+
+        # Insert binary before collecting chalk info
+        if not insertChalkBinaryIntoZip(item):
+          item.opFailed = true
+          continue
+      else:
+        info(item.name & ": artifact is not a zip archive")
+
+    # Now collect chalk info after possibly modifying the file
     item.collectChalkTimeArtifactInfo()
     trace(item.name & ": chalk data collection finished.")
+
     if item.isMarked() and configKey in item.extract:
       info(item.name & ": Is a configured chalk exe; skipping insertion.")
       item.removeFromAllChalks()

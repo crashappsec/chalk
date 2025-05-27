@@ -9,6 +9,7 @@
 ## signing, because it only signs what's in the manifest.
 
 import std/algorithm
+import std/os
 import pkg/[zippy/ziparchives_v1]
 import ".."/[config, chalkjson, util, subscan, plugin_api]
 
@@ -268,6 +269,69 @@ proc zitemGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
     obj.name = "zip:" & name
 
   result["CONTAINING_ARTIFACT_WHEN_CHALKED"] = getZipChalkId()
+
+proc insertChalkBinaryIntoZip*(chalk: ChalkObj): bool =
+  ## Inserts the chalk binary into a zip archive
+  ## Returns true if successful, false otherwise
+
+  result = false
+
+  if chalk.myCodec == nil or chalk.myCodec.name != "zip" or chalk.cache == nil:
+    error(chalk.name & ": not a zip archive or missing required data")
+    return result
+
+  try:
+    # Get the currently executing chalk binary path
+    let myAppPath = getMyAppPath()
+
+    if myAppPath == "":
+      error(chalk.name & ": error determining chalk binary path")
+      return result
+
+    let chalkBinaryContent = tryToLoadFile(myAppPath)
+
+    var zipCache: ZipCache
+    try:
+      zipCache = cast[ZipCache](chalk.cache)
+      if zipCache == nil or zipCache.tmpDir == "":
+        raise newException(ValueError, "Invalid ZipCache")
+
+      # Get the paths to add the binary
+      let
+        contentDir = joinPath(zipCache.tmpDir, "contents")
+        hashDir = joinPath(zipCache.tmpDir, "hash")
+        contentTargetPath = joinPath(contentDir, "chalk")
+        hashTargetPath = joinPath(hashDir, "chalk")
+
+      # Make sure the directories exist
+      if dirExists(contentDir) and dirExists(hashDir):
+        # Write the chalk binary to both directories
+        let contentSuccess = tryToWriteFile(contentTargetPath, chalkBinaryContent)
+        let hashSuccess = tryToWriteFile(hashTargetPath, chalkBinaryContent)
+
+        if contentSuccess and hashSuccess:
+          # Make both executable
+          contentTargetPath.makeExecutable()
+          hashTargetPath.makeExecutable()
+          trace(chalk.name & ": added chalk binary to zip (both content and hash dirs)")
+
+          # Update the hash calculation with the binary included
+          let newHash = hashExtractedZip(hashDir)
+          chalk.cachedPreHash = hashExtractedZip(hashDir)
+          info(chalk.name & ": recalculated hash including the chalk binary")
+
+          result = true
+        else:
+          error(chalk.name & ": failed to add chalk binary to zip directories")
+      else:
+        error(chalk.name & ": content or hash directory does not exist")
+    except:
+      error(chalk.name & ": failed to access zip cache: " & getCurrentExceptionMsg())
+  except:
+    error(chalk.name & ": failed to insert chalk binary: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
+
+  return result
 
 proc loadCodecZip*() =
   newCodec("zip",

@@ -344,6 +344,7 @@ class Chalk:
         stdin: Optional[bytes] = None,
         tty: bool = False,
         show_config: bool = False,
+        inject_binary: bool = False,
     ) -> ChalkProgram:
         params = params or []
         cmd: list[str] = [str(self.binary)]
@@ -375,6 +376,8 @@ class Chalk:
             cmd += ["--debug"]
         if no_color:
             cmd += ["--no-color"]
+        if inject_binary:
+            cmd += ["--inject-binary"]
         if params:
             cmd += params
 
@@ -433,6 +436,7 @@ class Chalk:
         expecting_report: bool = True,
         expecting_chalkmarks: bool = True,
         use_embedded: bool = True,
+        inject_binary=False,
     ) -> ChalkProgram:
         result = self.run(
             command="insert",
@@ -444,6 +448,7 @@ class Chalk:
             ignore_errors=ignore_errors,
             expecting_report=expecting_report,
             use_embedded=use_embedded,
+            inject_binary=inject_binary,
         )
         if expecting_report:
             if expecting_chalkmarks:
