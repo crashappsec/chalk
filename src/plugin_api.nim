@@ -455,7 +455,7 @@ proc newPlugin*(
   rtArtCallback:  RunTimeArtifactCb   = RunTimeArtifactCb(nil),
   rtHostCallback: RunTimeHostCb       = RunTimeHostCb(nil),
   cache:          RootRef             = RootRef(nil),
-  resourceTypes:  set[ResourceType]   = allResourceTypes - {ResourceCert},
+  resourceTypes:  set[ResourceType]   = defResourceTypes,
 ): Plugin {.discardable, cdecl.} =
   result = Plugin(name:                     name,
                   clearState:               clearCallback,

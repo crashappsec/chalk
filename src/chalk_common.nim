@@ -493,6 +493,7 @@ const
   objectStorePrefix*  = "@"
 
   allResourceTypes*   = { ResourceFile, ResourceImage, ResourceContainer, ResourcePid, ResourceCert }
+  defResourceTypes*   = allResourceTypes - { ResourceCert }
 
   # Make sure that ARTIFACT_TYPE fields are consistently named
   artTypeElf*             = "ELF"

@@ -135,7 +135,7 @@ proc initCollection*(collectHost = true) =
 
 proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
   artifact.withErrorContext():
-    trace("Collecting run time artifact info")
+    trace("Collecting run time artifact info" & artifact.name & " (" & artifact.myCodec.name & ")")
     for plugin in getAllPlugins():
       let
         data       = artifact.collectedData
@@ -171,9 +171,12 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
     obj.opFailed      = false
     let data          = obj.collectedData
 
-    trace("Collecting chalk-time data.")
+    trace("Collecting chalk-time data for " & obj.name & " (" & obj.myCodec.name & ")")
     for plugin in getAllPlugins():
       if chalkCollectionSuspendedFor(plugin.name): continue
+
+      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != obj.myCodec:
+        continue
 
       if plugin == obj.myCodec:
         trace("Filling in codec info")
@@ -184,10 +187,8 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
         if obj.fsRef != "":
           data.setIfNeeded("PATH_WHEN_CHALKED", resolvePath(obj.fsRef))
 
-      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != obj.myCodec:
-        continue
-
-      if len(obj.resourceType * plugin.resourceTypes) == 0:
+      elif len(obj.resourceType * plugin.resourceTypes) == 0:
+        trace(plugin.name & ": Skipping for " & $obj.resourceType & " notin " & $plugin.resourceTypes)
         continue
 
       let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")
@@ -342,7 +343,7 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
   # First, iterate over all our file system entries.
   if iterInfo.filePaths.len() != 0:
     for codec in getAllCodecs():
-      if getNativeCodecsOnly() and hostOs notin codec.nativeObjPlatforms:
+      if getNativeCodecsOnly() and hostOS notin codec.nativeObjPlatforms:
         continue
       if codec.name == "docker":
         continue
