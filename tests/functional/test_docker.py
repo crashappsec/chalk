@@ -1822,7 +1822,7 @@ def test_extract(chalk: Chalk, random_hex: str):
         {
             "_OP_ARTIFACT_TYPE": "Docker Container",
             "_IMAGE_ID": image_id,
-            "_CURRENT_HASH": image_id,
+            "_CURRENT_HASH": container_id,
             "_INSTANCE_CONTAINER_ID": container_id,
             "_INSTANCE_NAME": container_name,
             "_INSTANCE_STATUS": "running",
@@ -1852,7 +1852,7 @@ def test_extract(chalk: Chalk, random_hex: str):
         {
             "_OP_ARTIFACT_TYPE": "Docker Container",
             "_IMAGE_ID": image_id,
-            "_CURRENT_HASH": image_id,
+            "_CURRENT_HASH": container_id,
             "_INSTANCE_CONTAINER_ID": container_id,
             "_INSTANCE_NAME": container_name,
             "_INSTANCE_STATUS": "exited",
