@@ -467,15 +467,18 @@ This is mostly a copy of insert template however all keys are immutable.
 
   ~key._X509_VERSION.use                       = true
   ~key._X509_SUBJECT.use                       = true
+  ~key._X509_SUBJECT_ALTERNATIVE_NAME .use     = true
   ~key._X509_SERIAL.use                        = true
   ~key._X509_KEY.use                           = true
   ~key._X509_KEY_USAGE.use                     = true
+  ~key._X509_EXTENDED_KEY_USAGE.use            = true
   ~key._X509_BASIC_CONSTRAINTS.use             = true
   ~key._X509_ISSUER.use                        = true
   ~key._X509_SUBJECT_KEY_IDENTIFIER.use        = true
   ~key._X509_AUTHORITY_KEY_IDENTIFIER.use      = true
   ~key._X509_NOT_BEFORE.use                    = true
   ~key._X509_NOT_AFTER.use                     = true
+  ~key._X509_EXTRA_EXTENSIONS.use              = true
 
   ~key.$CHALK_CONFIG.use                       = true
   ~key.$CHALK_IMPLEMENTATION_NAME.use          = true

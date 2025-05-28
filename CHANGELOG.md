@@ -2,6 +2,28 @@
 
 ## On the `main` branch
 
+### New Features
+
+- X509 Certificate codec which can parse PEM files and report
+  metadata keys about the certificate:
+
+  - `_X509_VERSION`
+  - `_X509_SUBJECT`
+  - `_X509_SUBJECT_ALTERNATIVE_NAME`
+  - `_X509_SERIAL`
+  - `_X509_KEY`
+  - `_X509_KEY_USAGE`
+  - `_X509_EXTENDED_KEY_USAGE`
+  - `_X509_BASIC_CONSTRAINTS`
+  - `_X509_ISSUER`
+  - `_X509_SUBJECT_KEY_IDENTIFIER`
+  - `_X509_AUTHORITY_KEY_IDENTIFIER`
+  - `_X509_NOT_BEFORE`
+  - `_X509_NOT_AFTER`
+  - `_X509_EXTRA_EXTENSIONS`
+
+  ([#515](https://github.com/crashappsec/chalk/pull/515))
+
 ## 0.5.7
 
 **May 22, 2025**

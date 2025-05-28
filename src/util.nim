@@ -455,6 +455,15 @@ proc nestWith*(self: ChalkDict, key: string): ChalkDict =
     value[key] = v
     result[k] = pack(value)
 
+proc copy*[A, B](data: TableRef[A, B]): TableRef[A, B] =
+  result = newTable[A, B]()
+  for k, v in data:
+    result[k] = v
+
+proc popOrDefault*[A, B](data: TableRef[A, B], key: A, default: B): B =
+  result = data.getOrDefault(key, default)
+  data.del(key)
+
 proc strip*(items: seq[string], leading = true, trailing = true, chars = Whitespace): seq[string] =
   result = @[]
   for i in items:

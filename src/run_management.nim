@@ -239,12 +239,13 @@ proc newChalk*(name:          string            = "",
     result.marked = true
 
 template setIfNotEmptyBox*(o: ChalkDict, k: string, v: Box) =
-  case v.kind
+  let value = v
+  case value.kind
   of MkSeq, MkTable, MkStr:
-    if len(v) > 0:
-      o[k] = v
+    if len(value) > 0:
+      o[k] = value
   else:
-    o[k] = v
+    o[k] = value
 
 template setIfNotEmpty*[T](o: ChalkDict, k: string, v: T) =
   when T is Box:

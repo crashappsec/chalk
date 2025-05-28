@@ -88,19 +88,28 @@ proc certsGetHash(self: Plugin,
   return some(serial.sha256Hex())
 
 proc certsCallback(chalk: ChalkObj, prefix = ""): ChalkDict =
-  let cert = X509Cert(chalk.cache)
+  let
+    cert       = X509Cert(chalk.cache)
+    kv         = cert.keyValue.copy()
+    extensions = newTable[string, string]()
   result = ChalkDict()
   result.setIfNeeded(prefix & "X509_VERSION",                  cert.version)
-  result.setIfNeeded(prefix & "X509_SUBJECT",                  cert.keyValue.getOrDefault("Subject"))
-  result.setIfNeeded(prefix & "X509_SERIAL",                   cert.keyValue.getOrDefault("Serial"))
-  result.setIfNeeded(prefix & "X509_KEY",                      cert.keyValue.getOrDefault("Key"))
-  result.setIfNeeded(prefix & "X509_KEY_USAGE",                cert.keyValue.getOrDefault("X509v3 Key Usage"))
-  result.setIfNeeded(prefix & "X509_BASIC_CONSTRAINTS",        cert.keyValue.getOrDefault("X509v3 Basic Constraints"))
-  result.setIfNeeded(prefix & "X509_ISSUER",                   cert.keyValue.getOrDefault("Issuer"))
-  result.setIfNeeded(prefix & "X509_SUBJECT_KEY_IDENTIFIER",   cert.keyValue.getOrDefault("X509v3 Subject Key Identifier"))
-  result.setIfNeeded(prefix & "X509_AUTHORITY_KEY_IDENTIFIER", cert.keyValue.getOrDefault("X509v3 Authority Key Identifier"))
-  result.setIfNeeded(prefix & "X509_NOT_BEFORE",               cert.keyValue.getOrDefault("Not Before"))
-  result.setIfNeeded(prefix & "X509_NOT_AFTER",                cert.keyValue.getOrDefault("Not After"))
+  result.setIfNeeded(prefix & "X509_SUBJECT",                  kv.popOrDefault("Subject", ""))
+  result.setIfNeeded(prefix & "X509_SUBJECT_ALTERNATIVE_NAME", kv.popOrDefault("X509v3 Subject Alternative Name", ""))
+  result.setIfNeeded(prefix & "X509_SERIAL",                   kv.popOrDefault("Serial", ""))
+  result.setIfNeeded(prefix & "X509_KEY",                      kv.popOrDefault("Key", ""))
+  result.setIfNeeded(prefix & "X509_KEY_USAGE",                kv.popOrDefault("X509v3 Key Usage", ""))
+  result.setIfNeeded(prefix & "X509_EXTENDED_KEY_USAGE",       kv.popOrDefault("X509v3 Extended Key Usage", ""))
+  result.setIfNeeded(prefix & "X509_BASIC_CONSTRAINTS",        kv.popOrDefault("X509v3 Basic Constraints", ""))
+  result.setIfNeeded(prefix & "X509_ISSUER",                   kv.popOrDefault("Issuer", ""))
+  result.setIfNeeded(prefix & "X509_SUBJECT_KEY_IDENTIFIER",   kv.popOrDefault("X509v3 Subject Key Identifier", ""))
+  result.setIfNeeded(prefix & "X509_AUTHORITY_KEY_IDENTIFIER", kv.popOrDefault("X509v3 Authority Key Identifier", ""))
+  result.setIfNeeded(prefix & "X509_NOT_BEFORE",               kv.popOrDefault("Not Before", ""))
+  result.setIfNeeded(prefix & "X509_NOT_AFTER",                kv.popOrDefault("Not After", ""))
+  for k, v in kv:
+    if k.startsWith("X509") or k[0].isDigit():
+      extensions[k] = v
+  result.setIfNeeded(prefix & "X509_EXTRA_EXTENSIONS",         extensions)
 
 proc certsRunTimeCallback(self: Plugin,
                           chalk: ChalkObj,
