@@ -12,14 +12,21 @@
 import std/[options]
 import ".."/[config, plugin_api, fd_cache, util, chalkjson]
 
-include "../certs.c"
+{.compile:"../certs.c".}
 
-proc extract_cert_data(fd: FileHandle, version: ptr cint): cstringarray {.importc.}
-proc cleanup_cert_info(info: cstringarray) {.importc.}
+type
+  CertBIO  = pointer
+  Cert     = ptr object
+    key_value: cstringArray
+    version:   cint
+  X509Cert = ref object of RootRef
+    keyValue: TableRef[string, string]
+    version:  int
 
-type X509Cert = ref object of RootRef
-  keyValue: TableRef[string, string]
-  version:  int
+proc open_cert(fd: FileHandle): CertBIO {.importc.}
+proc close_cert(c: CertBIO) {.importc.}
+proc extract_cert_data(c: CertBIO): Cert {.importc.}
+proc cleanup_cert_info(cert: Cert) {.importc.}
 
 proc certsSearch(self: Plugin,
                  path: string,
@@ -29,46 +36,49 @@ proc certsSearch(self: Plugin,
     if stream == nil:
       return
     stream.setPosition(0)
-    var version: cint = 0
-    let output = extract_cert_data(stream.getOsFileHandle(), addr version)
-    if output == nil:
-      return
+    let bio = open_cert(stream.getOsFileHandle())
     try:
-      let
-        metadata = cStringArrayToSeq(output)
-        keyValue = newTable[string, string]()
-        cache    = X509Cert(
-          version:  int(version),
-          keyValue: keyValue,
-        )
-      for i in 0..<int(len(metadata)/2):
-        let
-          key = metadata[i*2]
-          value = metadata[i*2+1]
-        keyValue[key] = $value
-      let
-        data  = ChalkDict()
-        chalk = newChalk(
-          name          = path,
-          fsRef         = path,
-          codec         = self,
-          marked        = true, # allows to "extract"
-          resourceType  = {ResourceCert},
-          cache         = cache,
-          collectedData = data,
-          extract       = data,
-        )
-      # cert is already a key-value store and so we will not be chalking
-      # a cert file but we still want chalk to collect metadata about it
-      # therefore we "fake" chalkmark to be able to collect/report metadata
-      # about it as if was chalked
-      data.setIfNotEmpty("MAGIC",         magicUTF8)
-      data.setIfNotEmpty("CHALK_VERSION", getChalkExeVersion())
-      data.setIfNotEmpty("CHALK_ID",      chalk.callGetChalkId())
-      data.merge(chalk.computeMetadataHashAndId())
-      result.add(chalk)
+      while true:
+        let output = extract_cert_data(bio)
+        if output == nil:
+          return
+        try:
+          let
+            metadata = cStringArrayToSeq(output.key_value)
+            keyValue = newTable[string, string]()
+            cache    = X509Cert(
+              version:  int(output.version),
+              keyValue: keyValue,
+            )
+            data     = ChalkDict()
+            chalk    = newChalk(
+              name          = path,
+              fsRef         = path,
+              codec         = self,
+              marked        = true, # allows to "extract"
+              resourceType  = {ResourceCert},
+              cache         = cache,
+              collectedData = data,
+              extract       = data,
+            )
+          for i in 0..<int(len(metadata)/2):
+            let
+              key   = metadata[i*2]
+              value = metadata[i*2+1]
+            keyValue[key] = $value
+          # cert is already a key-value store and so we will not be chalking
+          # a cert file but we still want chalk to collect metadata about it
+          # therefore we "fake" chalkmark to be able to collect/report metadata
+          # about it as if was chalked
+          data.setIfNotEmpty("MAGIC",         magicUTF8)
+          data.setIfNotEmpty("CHALK_VERSION", getChalkExeVersion())
+          data.setIfNotEmpty("CHALK_ID",      chalk.callGetChalkId())
+          data.merge(chalk.computeMetadataHashAndId())
+          result.add(chalk)
+        finally:
+          cleanup_cert_info(output)
     finally:
-      cleanup_cert_info(output)
+      close_cert(bio)
 
 proc certsHandleWrite*(self: Plugin,
                        chalk: ChalkObj,

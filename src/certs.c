@@ -1,4 +1,3 @@
-{. emit:"""
 #include <crypto/x509.h>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
@@ -80,16 +79,22 @@ BIO_all(BIO *bio)
 }
 
 #define FIXED_LEN 13
-char **
-extract_cert_data(int fd, int *version)
+
+typedef struct {
+    char **key_value;
+    int  version;
+} Cert;
+
+Cert *
+extract_cert_data(BIO *fdb)
 {
     char scratch[2000];
 
-    BIO          *fdb    = BIO_new_fd(fd, 0);
-    X509         *cert   = PEM_read_bio_X509(fdb, NULL, NULL, NULL);
+    X509         *cert          = PEM_read_bio_X509(fdb, NULL, NULL, NULL);
     if (!cert) {
         return NULL;
     }
+    int version                 = ((int)X509_get_version(cert)) + 1;
     EVP_PKEY     *pub           = X509_get_pubkey(cert);
     void         *subjn         = X509_get_subject_name(cert);
     char         *subj          = X509_NAME_oneline(subjn, NULL, 0);
@@ -113,8 +118,6 @@ extract_cert_data(int fd, int *version)
         NULL);
     OSSL_ENCODER_to_bio(encoder, key_bio);
 
-    *version = ((int)X509_get_version(cert)) + 1;
-
     char *key_contents = BIO_all(key_bio);
     // BIO_set_close(key_bio, BIO_CLOSE);
     BIO_free(key_bio);
@@ -125,21 +128,21 @@ extract_cert_data(int fd, int *version)
         num_exts = 0;
     }
 
-    char **result = calloc(sizeof(char *), FIXED_LEN + num_exts * 2);
+    char **key_value = calloc(sizeof(char *), FIXED_LEN + num_exts * 2);
 
     int ix       = 0;
-    result[ix++] = strdup("Subject");
-    result[ix++] = subj;
-    result[ix++] = strdup("Issuer");
-    result[ix++] = issuer;
-    result[ix++] = strdup("Serial");
-    result[ix++] = serial;
-    result[ix++] = strdup("Key");
-    result[ix++] = key_contents;
-    result[ix++] = strdup("Not Before");
-    result[ix++] = not_before;
-    result[ix++] = strdup("Not After");
-    result[ix++] = not_after;
+    key_value[ix++] = strdup("Subject");
+    key_value[ix++] = subj;
+    key_value[ix++] = strdup("Issuer");
+    key_value[ix++] = issuer;
+    key_value[ix++] = strdup("Serial");
+    key_value[ix++] = serial;
+    key_value[ix++] = strdup("Key");
+    key_value[ix++] = key_contents;
+    key_value[ix++] = strdup("Not Before");
+    key_value[ix++] = not_before;
+    key_value[ix++] = strdup("Not After");
+    key_value[ix++] = not_after;
 
     for (int i = 0; i < num_exts; i++) {
         char           *name    = NULL;
@@ -169,50 +172,42 @@ extract_cert_data(int fd, int *version)
             value = strdup("");
         }
 
-        result[ix++] = name;
-        result[ix++] = value;
+        key_value[ix++] = name;
+        key_value[ix++] = value;
 
         BIO_free(ext_bio);
         ext_bio = NULL;
     }
 
-    result[ix++] = 0;
+    key_value[ix++] = 0;
 
-    BIO_free(fdb);
-
+    Cert *result = malloc(sizeof(Cert));
+    result->key_value = key_value;
+    result->version   = version;
     return result;
 }
 
 void
-cleanup_cert_info(char **info)
+cleanup_cert_info(Cert *cert)
 {
-    char *p = *info++;
-
+    char **info = cert->key_value;
+    char *p     = *info++;
     while (p) {
         free(p);
         p = *info++;
     }
+    free(cert);
 }
 
-/*
-void
-test_x509()
+BIO *
+open_cert(int fd)
 {
-    int    fd = open("tmp/public_certificate.pem", O_RDONLY);
-    int    version;
-    int    num_items;
-    char **to_print = extract_cert_data(fd, &version, &num_items);
-
-    int i  = 0;
-    int ix = 0;
-    while (i < num_items) {
-        char *a = to_print[i++];
-        char *b = to_print[i++];
-        printf("%d: %s: %s\n", ++ix, a, b);
-    }
-
-    cleanup_cert_info(to_print);
+    BIO  *fdb    = BIO_new_fd(fd, 0);
+    return fdb;
 }
-*/
 
-""".}
+void
+close_cert(BIO *fdb)
+{
+    BIO_free(fdb);
+}
