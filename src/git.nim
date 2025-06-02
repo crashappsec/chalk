@@ -5,11 +5,11 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import "."/[config, util]
+import "."/[config, exe]
 
 proc setGitExeLocation*() =
   once:
-    gitExeLocation = util.findExePath("git").get("")
+    gitExeLocation = exe.findExePath("git").get("")
     if gitExeLocation == "":
       error("No git command found in PATH")
       raise newException(ValueError, "No git")

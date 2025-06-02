@@ -6,7 +6,7 @@
 ##
 
 import std/[os, sets]
-import ".."/[config, util, semver]
+import ".."/[config, semver, exe]
 import "."/[ids]
 
 var

@@ -89,13 +89,17 @@ proc startTestRun*() =
   doingTestRun = true
 proc endTestRun*()   =
   doingTestRun = false
-proc startNativeCodecsOnly*() =
-  nativeCodecsOnly = true
-proc endNativeCodecsOnly*() =
-  nativeCodecsOnly = false
 
-template getNativeCodecsOnly*(): bool =
-  nativeCodecsOnly
+template withOnlyCodecs*(codecs: seq[Plugin], c: untyped) =
+  let saved = onlyCodecs
+  onlyCodecs = codecs
+  try:
+    c
+  finally:
+    onlyCodecs = saved
+
+template getOnlyCodecs*(): seq[Plugin] =
+  onlyCodecs
 
 proc inSubscan*(): bool =
   return len(ctxStack) > 1

@@ -117,7 +117,7 @@ proc getSelfExtraction*(): Option[ChalkObj] =
                "To add permissions run: 'chmod +rx " & myPath & "'\n")
 
     let ai = ArtifactIterationInfo(filePaths: @[myPath])
-    for i in ai.scanArtifactLocationsWith(getFileCodecs(onlyNative = true)):
+    for i in ai.scanArtifactLocationsWith(getNativeCodecs()):
       selfChalk = i
       break
 

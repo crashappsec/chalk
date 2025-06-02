@@ -11,7 +11,7 @@
 import std/[httpcore, tempfiles, posix, exitprocs, sets, times, monotimes]
 from std/unicode import validateUtf8
 import pkg/[nimutils/managedtmp]
-import "."/[config, subscan, fd_cache, semver]
+import "."/[config, fd_cache, semver]
 export fd_cache
 
 let sigNameMap = { 1: "SIGHUP", 2: "SIGINT", 3: "SIGQUIT", 4: "SIGILL",
@@ -189,49 +189,6 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
             error(chalk.fsRef & ": Could not write (no permission)")
         dumpExOnDebug()
         return false
-
-proc findExePath*(cmdName:    string,
-                  extraPaths: seq[string] = @[],
-                  configPath: Option[string] = none(string),
-                  usePath         = true,
-                  ignoreChalkExes = false): Option[string] =
-  var paths = extraPaths
-  if configPath.isSome():
-    # prepend on purpose so that config path
-    # takes precedence over rest of dirs in PATH
-    paths = @[configPath.get()] & paths
-
-  trace("Searching PATH for " & cmdName)
-  var foundExes = findAllExePaths(cmdName, paths, usePath)
-
-  if ignoreChalkExes:
-    var newExes: seq[string]
-
-    startNativeCodecsOnly()
-
-    for location in foundExes:
-      let
-        subscan   = runChalkSubScan(location, "extract")
-        allChalks = subscan.getAllChalks()
-        isChalk   = (
-          len(allChalks) != 0 and
-          allChalks[0].extract != nil and
-         "$CHALK_IMPLEMENTATION_NAME" in allChalks[0].extract
-        )
-      if not isChalk:
-        newExes.add(location)
-        break
-
-    endNativeCodecsOnly()
-
-    foundExes = newExes
-
-  if foundExes.len() == 0:
-    trace("Could not find '" & cmdName & "' in PATH.")
-    return none(string)
-
-  trace("Found '" & cmdName & "' in PATH: " & foundExes[0])
-  return some(foundExes[0])
 
 proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
   for path in prioritizedExes:

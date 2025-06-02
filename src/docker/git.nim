@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 import std/[base64, strutils, uri]
-import ".."/[config, git, util]
+import ".."/[config, git, util, exe]
 import "."/[util as dutil]
 
 const
@@ -17,7 +17,7 @@ const
 
 proc setSshKeyscanExeLocation() =
   once:
-    sshKeyscanExeLocation = util.findExePath("ssh-keyscan").get("")
+    sshKeyscanExeLocation = exe.findExePath("ssh-keyscan").get("")
     if sshKeyscanExeLocation == "":
       warn("No ssh-keyscan command found in PATH")
 

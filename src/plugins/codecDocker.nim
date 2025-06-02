@@ -8,8 +8,6 @@
 import "../docker"/[collect, ids, exe, registry, nodes]
 import ".."/[config, plugin_api, semver, chalkjson]
 
-const markLocation = "/chalk.json"
-
 proc dockerGetChalkId(self: Plugin, chalk: ChalkObj): string {.cdecl.} =
   if chalk.extract != nil and "CHALK_ID" in chalk.extract:
     return unpack[string](chalk.extract["CHALK_ID"])

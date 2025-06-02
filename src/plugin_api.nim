@@ -440,13 +440,21 @@ proc getAllCodecs*(): seq[Plugin] =
     for item in getAllPlugins():
       if item.isCodec():
         codecs.add(item)
-
   return codecs
 
-proc getFileCodecs*(onlyNative = false): seq[Plugin] =
+proc getNativeCodecs*(): seq[Plugin] =
   for codec in getAllCodecs():
-    if (onlyNative or getNativeCodecsOnly()) and hostOS notin codec.nativeObjPlatforms:
+    if hostOS notin codec.nativeObjPlatforms:
       continue
+    result.add(codec)
+
+proc getFileCodecs*(): seq[Plugin] =
+  let fileCodecs =
+    if len(getOnlyCodecs()) > 0:
+      getOnlyCodecs()
+    else:
+      getAllCodecs()
+  for codec in fileCodecs:
     if codec.name == "docker":
       continue
     result.add(codec)
