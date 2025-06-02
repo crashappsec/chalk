@@ -116,17 +116,9 @@ proc getSelfExtraction*(): Option[ChalkObj] =
                "Ensure chalk has both read and execute permissions. " &
                "To add permissions run: 'chmod +rx " & myPath & "'\n")
 
-    for codec in getAllCodecs():
-      if hostOS notin codec.nativeObjPlatforms:
-        continue
-      let
-        ai     = ArtifactIterationInfo(filePaths: @[myPath])
-        chalks = codec.scanArtifactLocations(ai)
-
-      if len(chalks) == 0:
-        continue
-
-      selfChalk = chalks[0]
+    let ai = ArtifactIterationInfo(filePaths: @[myPath])
+    for i in ai.scanArtifactLocationsWith(getFileCodecs(onlyNative = true)):
+      selfChalk = i
       break
 
     if selfChalk == nil:

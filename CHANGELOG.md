@@ -2,6 +2,18 @@
 
 ## On the `main` branch
 
+### Breaking Changes
+
+- Symlink behavior can now be different between chalking/non-chalking
+  operations. As such:
+
+  - renamed `symlink_behavior` -> `symlink_behavior_chalking` config
+  - renamed `--symlink-behavior` -> `--chalk-symlink-behavior` CLI flags
+  - added `symlink_behavior_non_chalking` config
+  - added `--scan-symlink-behavior` CLI flag along with `--ignore` choice flag
+
+  ([#515](https://github.com/crashappsec/chalk/pull/515))
+
 ### New Features
 
 - X509 Certificate codec which can parse PEM files and report

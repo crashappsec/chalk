@@ -231,7 +231,7 @@ proc searchLocation(self: Plugin, loc: string): seq[ChalkObj] =
     error(loc & "Search canceled: " & getCurrentExceptionMsg())
     dumpExOnDebug()
 
-proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
+proc mustIgnore(path: string, regexes: seq[Regex]): bool =
   result = false
 
   for i, item in regexes:
@@ -242,11 +242,19 @@ proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
         trace("We will NOT report additional path skips.")
       return true
 
-proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
-                        seq[ChalkObj] =
+iterator scanArtifactLocationsWith*(state: ArtifactIterationInfo,
+                                    codecs: seq[Plugin],
+                                    ): ChalkObj =
   # This will call scan() with a file stream, and you pass back a
   # Chalk object if chalk is there.
-  result = @[]
+
+  let
+    symLinkBehaviorConfig =
+      if isChalkingOp():
+        "symlink_behavior_chalking"
+      else:
+        "symlink_behavior_non_chalking"
+    symLinkBehavior = attrGet[string](symLinkBehaviorConfig)
 
   var
     # The first item we pass to getAllFileNames(). If we're following file
@@ -258,62 +266,50 @@ proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
     #
     # The second item is the ACTUAL desirec behavior, which we check when
     # we determine a link was yielded.
-    yieldLinks   = true
-    skipLinks    = false
-    followFLinks = false
-
-  let symLinkBehavior =
-    if isChalkingOp():
-      attrGet[string]("symlink_behavior_chalking")
-    else:
-      attrGet[string]("symlink_behavior_non_chalking")
+    fileLinks: PathBehavior
+    skipLinks: bool
 
   case symLinkBehavior
-  of "skip":
+  of "skip", "ignore":
+    # yield links but then show warning that they are skipped
+    fileLinks = PathBehavior.Yield
     skipLinks = true
   of "clobber", "follow":
-    followFLinks = true
-    yieldLinks   = false
+    fileLinks = PathBehavior.Follow
+    skipLinks = false
   else:
-    discard
+    fileLinks = PathBehavior.Yield
+    skipLinks = false
 
   for path in state.filePaths:
-    trace("Codec " & self.name & ": beginning scan of " & path)
-
+    trace(path & ": beginning scan")
     let p = path.resolvePath()
-    for item in p.getAllFileNames(state.recurse, yieldLinks, followFLinks):
-      if item in state.fileExclusions or item.mustIgnore(state.skips):
+    for i in p.getAllFileNames(recurse = state.recurse, fileLinks = fileLinks):
+      if i.name in state.fileExclusions or i.name.mustIgnore(state.skips):
         continue
-      if skipLinks:
-        var info: FileInfo
-        try:
-          info = getFileInfo(item, followSymlink = false)
-        except:
-          continue
-        if info.kind == pcLinkToFile:
-          warn(item & """: skipping symbolic link
-Use --clobber to follow and clobber the linked-to file when inserting,
-or --copy to copy the file and replace the symlink.""")
-          continue
+      if skipLinks and i.isSymlink():
+        warn(i.name & ": skipping symbolic link. Customize behavior with config " & symLinkBehaviorConfig)
+        continue
 
       # with symlinks same file can be referenced multiple times
-      # and so we lookup any existing chalk and if present, ignore this item
+      # and so we lookup any existing chalk and if present, ignore this i.name
       var alreadyScanned = ChalkObj(nil)
-      for chalk in result & getAllChalks():
-        if chalk.fsRef == item:
+      for chalk in getAllChalks():
+        if chalk.fsRef == i.name:
           alreadyScanned = chalk
           break
       if alreadyScanned != nil:
-        trace(item & ": was already previously scanned. ignoring")
+        trace(i.name & ": was already previously scanned. ignoring")
         continue
 
-      trace(item & ": scanning file")
-      let opt = self.scanLocation(item)
-      if opt.isSome():
-        let chalk = opt.get()
-        result.add(chalk)
-      for chalk in self.searchLocation(item):
-        result.add(chalk)
+      for codec in codecs:
+        trace(i.name & ": scanning file with " & codec.name)
+        let opt = codec.scanLocation(i.name)
+        if opt.isSome():
+          let chalk = opt.get()
+          yield chalk
+        for chalk in codec.searchLocation(i.name):
+          yield chalk
 
 proc simpleHash(self: Plugin, chalk: ChalkObj): Option[string] =
   # The default if the stream can't be acquired.
@@ -446,6 +442,14 @@ proc getAllCodecs*(): seq[Plugin] =
         codecs.add(item)
 
   return codecs
+
+proc getFileCodecs*(onlyNative = false): seq[Plugin] =
+  for codec in getAllCodecs():
+    if (onlyNative or getNativeCodecsOnly()) and hostOS notin codec.nativeObjPlatforms:
+      continue
+    if codec.name == "docker":
+      continue
+    result.add(codec)
 
 proc newPlugin*(
   name:           string,

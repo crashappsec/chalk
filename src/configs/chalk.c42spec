@@ -3421,16 +3421,16 @@ of the box, warn on symbolic links, without processing them.
 
 This variable controls what happens in those cases:
 
-- <em>skip</em>   will not process files that are linked.
+- <em>skip</em>    will not process files that are linked.
 - <em>clobber</em> will read the artifact on the other end of the link try to replace the file being linked to.
-- <em>copy</em> will read the artifact on the other end of the link will replace the link with a modified file, leaving the file on the other end of the link intact.
+- <em>copy</em>    will read the artifact on the other end of the link will replace the link with a modified file, leaving the file on the other end of the link intact.
 """
   }
 
   field symlink_behavior_non_chalking {
     type: string
     default: "follow"
-    choice: ["skip", "follow"]
+    choice: ["ignore", "follow"]
     shortdoc: "Behavior for symbolic links to files while scanning"
     doc: """
 Chalk never follows directory links. When running non-chalking operations,
@@ -3439,7 +3439,7 @@ file name of the link.
 
 This variable controls what happens in those cases:
 
-- <em>skip</em>   will not process files that are linked.
+- <em>ignore</em> will not process files that are linked.
 - <em>follow</em> will read the artifact on the other end of the link.
 """
   }

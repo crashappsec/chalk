@@ -5,7 +5,7 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/re
+import std/[re]
 import "./docker"/[scan]
 import "."/[config, plugin_api]
 
@@ -342,59 +342,51 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
   # First, iterate over all our file system entries.
   if iterInfo.filePaths.len() != 0:
-    for codec in getAllCodecs():
-      if getNativeCodecsOnly() and hostOS notin codec.nativeObjPlatforms:
-        continue
-      if codec.name == "docker":
-        continue
-      trace("Asking codec '" &  codec.name & "' to scan artifacts.")
-      let chalks = codec.scanArtifactLocations(iterInfo)
+    for obj in iterInfo.scanArtifactLocationsWith(getFileCodecs()):
+      obj.withErrorContext():
+        iterInfo.fileExclusions.add(obj.fsRef)
 
-      for obj in chalks:
-        obj.withErrorContext():
-          iterInfo.fileExclusions.add(obj.fsRef)
+        if obj.extract != nil and "MAGIC" in obj.extract:
+          obj.marked = true
 
-          if obj.extract != nil and "MAGIC" in obj.extract:
-            obj.marked = true
+        if ResourceFile in obj.resourceType:
+          if obj.fsRef == "":
+            obj.fsRef = obj.name
+            warn("Codec did not properly set the fsRef field.")
 
-          if ResourceFile in obj.resourceType:
-            if obj.fsRef == "":
-              obj.fsRef = obj.name
-              warn("Codec did not properly set the fsRef field.")
-
-          let path = obj.fsRef
-          if isChalkingOp():
-            if path.ignoreArtifact(iterInfo.skips):
-              if notTmp: addUnmarked(path)
-              if obj.isMarked():
-                info(path & ": Ignoring, but previously chalked")
-              else:
-                trace(path & ": ignoring artifact")
+        let path = obj.fsRef
+        if isChalkingOp():
+          if path.ignoreArtifact(iterInfo.skips):
+            if notTmp: addUnmarked(path)
+            if obj.isMarked():
+              info(path & ": Ignoring, but previously chalked")
             else:
-              if notTmp: obj.addToAllChalks()
-              if obj.isMarked():
-                info(path & ": Existing chalk mark extracted")
-              else:
-                trace(path & ": Currently unchalked")
+              trace(path & ": ignoring artifact")
           else:
             if notTmp: obj.addToAllChalks()
-            if not obj.isMarked():
-              if notTmp: addUnmarked(path)
-              warn(path & ": Artifact is unchalked")
+            if obj.isMarked():
+              info(path & ": Existing chalk mark extracted")
             else:
-              for k, v in obj.extract:
-                obj.collectedData[k] = v
+              trace(path & ": Currently unchalked")
+        else:
+          if notTmp: obj.addToAllChalks()
+          if not obj.isMarked():
+            if notTmp: addUnmarked(path)
+            warn(path & ": Artifact is unchalked")
+          else:
+            for k, v in obj.extract:
+              obj.collectedData[k] = v
 
-              info(path & ": Chalk mark extracted")
+            info(path & ": Chalk mark extracted")
 
-          if getCommandName() in ["insert", "docker"]:
-            obj.persistInternalValues()
+        if getCommandName() in ["insert", "docker"]:
+          obj.persistInternalValues()
 
-          yield obj
+        yield obj
 
-          if not inSubscan() and not obj.forceIgnore and
-             obj.name notin getUnmarked():
-            obj.collectRunTimeArtifactInfo()
+        if not inSubscan() and not obj.forceIgnore and
+           obj.name notin getUnmarked():
+          obj.collectRunTimeArtifactInfo()
 
   if not inSubscan():
     if getCommandName() != "extract":
