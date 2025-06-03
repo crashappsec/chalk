@@ -3108,14 +3108,18 @@ validate in the transparency log.
 
   field ignore_patterns {
     type:     list[string]
-    default:  ["/dev/.*", "/proc/.*", "/sys/.*", ".*/\\..*", ".*\\.txt", ".*\\.json"]
+    default:  ["/dev/.*",
+               "/proc/.*",
+               "/sys/.*",
+               ".*/\\..*",
+               ".*/\\.git/.*",
+               ".*/__pycache__/.*",
+               ".*/.mypy_cache/.*",
+               ".*\\.json"]
     shortdoc: "Ignore Patterns"
     doc:       """
-For operations that insert or remove chalk marks, this is a list of
-regular expressions for files to ignore when scanning for artifacts to
-chalk.
-
-The 'extract' operation ignores this.
+This is a list of regular expressions for files to ignore when scanning
+for artifacts to chalk.
 """
   }
 

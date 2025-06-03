@@ -249,33 +249,18 @@ proc collectRunTimeHostInfo*() =
             getCurrentExceptionMsg())
       dumpExOnDebug()
 
-# The two below functions are helpers for the artifacts() iterator
-# and the self-extractor (in the case of findChalk anyway).
-proc ignoreArtifact(path: string, regexps: seq[Regex]): bool {.inline.} =
-  # If plugins use the default implementation of scanning, then it
-  # will already have checked the 'ignore' list. That short circuits
-  # us much faster than letting plugins do a bunch of extraction, then
-  # checking here, afterward.
-  #
-  # But, what if they forget to check?  We check again here, and give
-  # an appropriate message, though at the trace level.
-
-  for i, item in regexps:
-    if path.match(item):
-      trace(path & ": returned artifact ignored due to matching: " &
-        attrGet[seq[string]]("ignore_patterns")[i])
-      trace("Developers: codecs should not be returning ignored artifacts.")
-      return true
-
-  return false
-
 proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
   new result
 
-  let selfPath = resolvePath(getMyAppPath())
+  let
+    selfPath = resolvePath(getMyAppPath())
+    skipList = attrGet[seq[string]]("ignore_patterns")
 
   result.fileExclusions = @[selfPath]
   result.recurse        = attrGet[bool]("recursive")
+
+  for item in skipList:
+    result.skips.add(re(item))
 
   for item in argv:
     let maybe = resolvePath(item)
@@ -316,8 +301,16 @@ proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
 proc artSetupForExecAndEnv(argv: seq[string]): ArtifactIterationInfo =
   # For the moment.
   new result
-
   result.filePaths = argv
+
+  let
+    selfPath = resolvePath(getMyAppPath())
+    skipList = attrGet[seq[string]]("ignore_patterns")
+
+  result.fileExclusions = @[selfPath]
+  result.recurse        = attrGet[bool]("recursive")
+  for item in skipList:
+    result.skips.add(re(item))
 
 proc resolveAll(argv: seq[string]): seq[string] =
   for item in argv:
@@ -356,18 +349,11 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
         let path = obj.fsRef
         if isChalkingOp():
-          if path.ignoreArtifact(iterInfo.skips):
-            if notTmp: addUnmarked(path)
-            if obj.isMarked():
-              info(path & ": Ignoring, but previously chalked")
-            else:
-              trace(path & ": ignoring artifact")
+          if notTmp: obj.addToAllChalks()
+          if obj.isMarked():
+            info(path & ": Existing chalk mark extracted")
           else:
-            if notTmp: obj.addToAllChalks()
-            if obj.isMarked():
-              info(path & ": Existing chalk mark extracted")
-            else:
-              trace(path & ": Currently unchalked")
+            trace(path & ": Currently unchalked")
         else:
           if notTmp: obj.addToAllChalks()
           if not obj.isMarked():

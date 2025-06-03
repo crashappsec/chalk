@@ -14,6 +14,10 @@
 
   ([#515](https://github.com/crashappsec/chalk/pull/515))
 
+- Configuration `ignore_patterns` was used only in chalking operations.
+  Now it is used in all chalk operations.
+  ([#515](https://github.com/crashappsec/chalk/pull/515))
+
 ### New Features
 
 - X509 Certificate codec which can parse PEM files and report

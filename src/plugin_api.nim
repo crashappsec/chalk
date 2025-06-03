@@ -231,17 +231,6 @@ proc searchLocation(self: Plugin, loc: string): seq[ChalkObj] =
     error(loc & ": Search canceled: " & getCurrentExceptionMsg())
     dumpExOnDebug()
 
-proc mustIgnore(path: string, regexes: seq[Regex]): bool =
-  result = false
-
-  for i, item in regexes:
-    if path.match(item):
-      once:
-        trace(path & ": ignored due to matching ignore pattern: " &
-          attrGet[seq[string]]("ignore_patterns")[i])
-        trace("We will NOT report additional path skips.")
-      return true
-
 iterator scanArtifactLocationsWith*(state: ArtifactIterationInfo,
                                     codecs: seq[Plugin],
                                     ): ChalkObj =
@@ -284,9 +273,12 @@ iterator scanArtifactLocationsWith*(state: ArtifactIterationInfo,
   for path in state.filePaths:
     trace(path & ": beginning scan")
     let p = path.resolvePath()
-    for i in p.getAllFileNames(recurse = state.recurse, fileLinks = fileLinks):
-      if i.name in state.fileExclusions or i.name.mustIgnore(state.skips):
-        continue
+    for i in p.getAllFileNames(
+      recurse     = state.recurse,
+      fileLinks   = fileLinks,
+      ignore      = state.fileExclusions,
+      ignoreRegex = state.skips,
+    ):
       if skipLinks and i.isSymlink():
         warn(i.name & ": skipping symbolic link. Customize behavior with config " & symLinkBehaviorConfig)
         continue
