@@ -221,14 +221,14 @@ proc scanLocation(self: Plugin, loc: string): Option[ChalkObj] =
   try:
     result = callScan(self, loc)
   except:
-    error(loc & "Scan canceled: " & getCurrentExceptionMsg())
+    error(loc & ": Scan canceled: " & getCurrentExceptionMsg())
     dumpExOnDebug()
 
 proc searchLocation(self: Plugin, loc: string): seq[ChalkObj] =
   try:
     return callSearch(self, loc)
   except:
-    error(loc & "Search canceled: " & getCurrentExceptionMsg())
+    error(loc & ": Search canceled: " & getCurrentExceptionMsg())
     dumpExOnDebug()
 
 proc mustIgnore(path: string, regexes: seq[Regex]): bool =
@@ -293,23 +293,28 @@ iterator scanArtifactLocationsWith*(state: ArtifactIterationInfo,
 
       # with symlinks same file can be referenced multiple times
       # and so we lookup any existing chalk and if present, ignore this i.name
-      var alreadyScanned = ChalkObj(nil)
-      for chalk in getAllChalks():
+      var alreadyScanned = false
+      for chalk in getAllChalks() & getAllArtifacts():
         if chalk.fsRef == i.name:
-          alreadyScanned = chalk
+          alreadyScanned = true
           break
-      if alreadyScanned != nil:
+      if alreadyScanned:
         trace(i.name & ": was already previously scanned. ignoring")
         continue
 
       for codec in codecs:
+        var found = false
         trace(i.name & ": scanning file with " & codec.name)
         let opt = codec.scanLocation(i.name)
         if opt.isSome():
           let chalk = opt.get()
           yield chalk
+          found = true
         for chalk in codec.searchLocation(i.name):
           yield chalk
+          found = true
+        if found:
+          break
 
 proc simpleHash(self: Plugin, chalk: ChalkObj): Option[string] =
   # The default if the stream can't be acquired.
