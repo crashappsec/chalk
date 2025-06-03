@@ -30,11 +30,13 @@ proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
       ix        = byte_blob.find(magicUTF8)
 
     if ix == -1:
-      #No magic == no existing chalk, new chalk created
-      let chalk         = newChalk(name   = loc,
-                                   fsRef  = loc,
-                                   codec  =  self)
-      chalk.startOffset = len(byte_blob)
+      # No magic == no existing chalk, new chalk created
+      chalk = newChalk(
+        name        = loc,
+        fsRef       = loc,
+        codec       =  self,
+        startOffset = len(byte_blob),
+      )
 
     else: # Existing chalk, just reflect whats found
       stream.setPosition(ix)
