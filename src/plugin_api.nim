@@ -429,6 +429,10 @@ proc getAllPlugins*(): seq[Plugin] =
 proc getPluginByName*(s: string): Plugin =
   return installedPlugins[s]
 
+proc getPluginsByName*(s: seq[string]): seq[Plugin] =
+  for i in s:
+    result.add(getPluginByName(i))
+
 proc getOptionalPlugins*(c: ChalkObj): seq[string] =
   ## get all optional plugins
   ## optional plugin is neither a system plugin or the chalk codec plugin

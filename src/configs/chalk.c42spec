@@ -1734,6 +1734,7 @@ times in the default configuration where error messages are logged to
 the console (when running `chalk docker`).
 """
   allow getopts
+  allow scan_context
 
   field wrap_entrypoint {
     type:    bool
@@ -1953,7 +1954,6 @@ are no default output sinks subscribed to this topic.
     doc: """
 Docker's internal reporting often gives results that are empty when
 not set.  If this is on, such fields are elided on reporting.
-
 """
   }
 
@@ -1982,6 +1982,37 @@ ENV ARTIFACT_IDENTIFIER="X6VRPZ-C828-KDNS-QDXRT0"
 ```
 """
   }
+}
+
+singleton scan_context {
+  user_def_ok:   false
+  doc: """
+Configurations how to scan docker contexts during docker build.
+"""
+
+  field run {
+    type: bool
+    default: true
+    shortdoc: "Scan docker build contexts"
+    doc: """
+Whether to scan docker build contexts for chalked artifacts.
+"""
+  }
+
+  field codecs {
+    type:     list[string]
+    default:  ["certs"]
+    validator: func validate_codecs
+    shortdoc: "Codec names to scan"
+    doc: """
+Scan docker context with only these codecs enabled.
+This allows to find a specific type of collected artifacts
+while building docker image.
+
+Empty list will scan with all codecs.
+"""
+  }
+
 }
 
 singleton buildkit {
@@ -4115,6 +4146,21 @@ func outconf_mark_templates_exist()
       return ("Outconf section for command '" + all_cmds_that_insert[i] +
       "' is missing a valid `mark_template`; all commands that add " +
       "chalk marks must have one defined.")
+    }
+  }
+}
+
+func validate_codecs(path: string, val: list[string]) {
+  result := ""
+  for i from 0 to len(val) {
+    codec_name := val[i]
+    codec_path := "plugin." + codec_name + ".codec"
+    if not attr_exists(codec_path) {
+      return "There is no plugin '" + codec_name + "'"
+    }
+    is_codec := attr_get(codec_path, bool)
+    if not is_codec {
+      return "Plugin '" + codec_name + "' is not a codec"
     }
   }
 }

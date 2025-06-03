@@ -91,12 +91,19 @@ proc endTestRun*()   =
   doingTestRun = false
 
 template withOnlyCodecs*(codecs: seq[Plugin], c: untyped) =
-  let saved = onlyCodecs
-  onlyCodecs = codecs
-  try:
+  if len(codecs) > 0:
+    var names = newSeq[string]()
+    for i in codecs:
+      names.add(i.name)
+    trace("Restricting scanning codecs to only " & $names)
+    let saved = onlyCodecs
+    onlyCodecs = codecs
+    try:
+      c
+    finally:
+      onlyCodecs = saved
+  else:
     c
-  finally:
-    onlyCodecs = saved
 
 template getOnlyCodecs*(): seq[Plugin] =
   onlyCodecs
@@ -133,7 +140,7 @@ proc popCollectionCtx*() =
 template collectionCtx(): CollectionCtx =
   ctxStack[^1]
 
-proc addIfMissing*(to: var seq[ChalkObj], o: ChalkObj) =
+proc addIfMissing(to: var seq[ChalkObj], o: ChalkObj) =
   let check = collectionCtx.allChalks & collectionCtx.allArtifacts
   if o in check:
     return

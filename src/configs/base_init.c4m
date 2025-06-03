@@ -21,7 +21,9 @@ extract { }
 
 source_marks { }
 
-docker { }
+docker {
+  scan_context {}
+}
 
 load { }
 

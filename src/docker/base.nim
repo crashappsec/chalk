@@ -79,6 +79,22 @@ proc getAllDockerContexts*(ctx: DockerInvocation): seq[string] =
   for k, v in ctx.foundExtraContexts:
     result.add(resolvePath(v))
 
+proc getUsableDockerContexts*(ctx: DockerInvocation): seq[string] =
+  result = @[]
+  for context in ctx.getAllDockerContexts():
+    if context == "-":
+      warn("docker: currently cannot use contexts passed via stdin.")
+      continue
+    if ':' in context:
+      warn("docker: cannot use remote context: " & context & " (skipping)")
+      continue
+    try:
+      discard context.resolvePath().getFileInfo()
+      result.add(context)
+    except:
+      warn("docker: cannot find context directory for chalking: " & context)
+      continue
+
 proc isMultiPlatform*(ctx: DockerInvocation): bool =
   return len(ctx.foundPlatforms) > 1
 
