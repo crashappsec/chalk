@@ -141,8 +141,9 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
 
   else:
     result.setValidated(obj, obj.validateMetaData())
-    if obj.fsRef != "":
-      result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
+
+  if obj.fsRef != "":
+    result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
 
   let
     tmpl       = getReportTemplate()
