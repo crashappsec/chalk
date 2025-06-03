@@ -133,6 +133,19 @@ proc popCollectionCtx*() =
 template collectionCtx(): CollectionCtx =
   ctxStack[^1]
 
+proc addIfMissing*(to: var seq[ChalkObj], o: ChalkObj) =
+  let check = collectionCtx.allChalks & collectionCtx.allArtifacts
+  if o in check:
+    return
+  if "CHALK_ID" in o.collectedData:
+    let id = o.collectedData["CHALK_ID"]
+    for i in check:
+      if "CHALK_ID" in i.collectedData:
+        let otherId = i.collectedData["CHALK_ID"]
+        if id == otherId:
+          return
+  to.add(o)
+
 proc getCurrentCollectionCtx*(): CollectionCtx =
   collectionCtx
 proc getErrorObject*(): Option[ChalkObj] =
@@ -142,8 +155,7 @@ proc getAllChalks*(): seq[ChalkObj] =
 proc getAllChalks*(cc: CollectionCtx): seq[ChalkObj] =
   cc.allChalks
 proc addToAllChalks*(o: ChalkObj) =
-  if o notin collectionCtx.allChalks:
-    collectionCtx.allChalks.add(o)
+  collectionCtx.allChalks.addIfMissing(o)
 proc setAllChalks*(s: seq[ChalkObj]) =
   collectionCtx.allChalks = s
 proc removeFromAllChalks*(o: ChalkObj) =
@@ -155,8 +167,7 @@ proc getAllArtifacts*(): seq[ChalkObj] =
 proc getAllArtifacts*(cc: CollectionCtx): seq[ChalkObj] =
   cc.allArtifacts
 proc addToAllArtifacts*(o: ChalkObj) =
-  if o notin collectionCtx.allArtifacts:
-    collectionCtx.allArtifacts.add(o)
+  collectionCtx.allArtifacts.addIfMissing(o)
 proc setAllArtifacts*(s: seq[ChalkObj]) =
   collectionCtx.allArtifacts = s
 proc removeFromAllArtifacts*(o: ChalkObj) =
@@ -216,6 +227,7 @@ proc newChalk*(name:          string            = "",
                codec:         Plugin            = Plugin(nil),
                platform                         = DockerPlatform(nil),
                noAttestation                    = false,
+               startOffset                      = 0,
                ): ChalkObj =
 
   result = ChalkObj(name:          name,
@@ -234,6 +246,7 @@ proc newChalk*(name:          string            = "",
                     failedKeys:    ChalkDict(),
                     platform:      platform,
                     noAttestation: noAttestation,
+                    startOffset:   startOffset,
                    )
 
   if chalkId != "":
