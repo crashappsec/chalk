@@ -92,16 +92,23 @@ class ChalkReport(ContainsDict):
             [ChalkMark(i, report=self) for i in self["_COLLECTED_ARTIFACTS"]]
         )
 
-    @property
-    def marks_by_path(self):
+    def _by_path(self, items: ContainsList) -> "ChalkMark":
         return ChalkMark(
             {
                 i.get("PATH_WHEN_CHALKED", i.get("_OP_ARTIFACT_PATH")): i
-                for i in self.marks
+                for i in items
                 # paths can be missing for example in minimum report profile
                 if "PATH_WHEN_CHALKED" in i or "_OP_ARTIFACT_PATH" in i
             }
         )
+
+    @property
+    def artifacts_by_path(self):
+        return self._by_path(self.artifacts)
+
+    @property
+    def marks_by_path(self):
+        return self._by_path(self.marks)
 
     @property
     def mark(self):
@@ -264,6 +271,10 @@ class ChalkProgram(Program):
     @property
     def marks_by_path(self):
         return self.report.marks_by_path
+
+    @property
+    def artifacts_by_path(self):
+        return self.report.artifacts_by_path
 
     @property
     def virtual_path(self):

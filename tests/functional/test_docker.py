@@ -478,6 +478,26 @@ def test_recursion_wrapping(chalk: Chalk, random_hex: str):
     assert run
 
 
+def test_subscan(chalk: Chalk, server_cert: Path, random_hex: str):
+    _, build = chalk.docker_build(
+        config=CONFIGS / "docker_wrap.c4m",
+        tag=random_hex,
+        context=server_cert.parent,
+        content=Docker.dockerfile(
+            """
+            FROM alpine
+            """
+        ),
+    )
+    assert build.artifacts_by_path.contains(
+        {
+            str(server_cert): {
+                "_X509_SUBJECT": "/CN=tls.chalk.local",
+            }
+        }
+    )
+
+
 def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
     (
         Git(tmp_data_dir)
