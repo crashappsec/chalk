@@ -63,7 +63,7 @@ proc getOutputConfig(): string =
   return "outconf." & getBaseCommandName()
 
 proc getMarkTemplate*(): string =
-  let tmplName = attrGetOpt[string](getOutputConfig() & ".mark_template").get("mark_default")
+  var tmplName = attrGetOpt[string](getOutputConfig() & ".mark_template").get("").elseWhenEmpty("mark_default")
   return "mark_template." & tmplName
 
 proc getReportTemplate*(spec = ""): string =
@@ -73,7 +73,7 @@ proc getReportTemplate*(spec = ""): string =
         getOutputConfig()
       else:
         spec
-    tmplName = attrGetOpt[string](ns & ".report_template").get("null")
+    tmplName = attrGetOpt[string](ns & ".report_template").get("").elseWhenEmpty("null")
   return "report_template." & tmplName
 
 proc forceKeys(keynames: openarray[string], templateRef: string) =

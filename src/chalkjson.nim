@@ -506,7 +506,7 @@ proc forcePrivateKeys() =
 
   forceChalkKeys(toForce)
 
-proc getChalkMark*(obj: ChalkObj): ChalkDict =
+proc getChalkMark*(obj: ChalkObj, onlyCollected = false): ChalkDict =
   # we already have exact chalkmark so use it
   # as otherwise we might compute different keys
   # for example if the chalk template config has changed
@@ -520,23 +520,25 @@ proc getChalkMark*(obj: ChalkObj): ChalkDict =
 
   assert "CHALK_VERSION" in hostInfo or "CHALK_VERSION" in obj.collectedData
 
-  result              = hostInfo.filterByTemplate(templ)
+  result = ChalkDict()
+  if not onlyCollected:
+    result            = hostInfo.filterByTemplate(templ)
   result.merge(obj.collectedData.filterByTemplate(templ))
 
-proc getChalkMarkAsStr*(obj: ChalkObj): string =
+proc getChalkMarkAsStr*(obj: ChalkObj, onlyCollected = false): string =
   if obj.cachedMark != "":
     trace("Chalk cachemark " & obj.cachedMark)
     return obj.cachedMark
-  let mark = obj.getChalkMark()
+  let mark = obj.getChalkMark(onlyCollected = onlyCollected)
   result = mark.toJson()
   obj.cachedMark = result
   if not result.startsWith("""{ "MAGIC" :"""):
     error("MAGIC not provided; mark is invalid.")
 
 
-proc computeMetadataHashAndId*(obj: ChalkObj): ChalkDict =
+proc computeMetadataHashAndId*(obj: ChalkObj, onlyCollected = false): ChalkDict =
   let
-    toHash       = obj.getChalkMark().normalizeChalk()
+    toHash       = obj.getChalkMark(onlyCollected = onlyCollected).normalizeChalk()
     computed     = toHash.sha256()
     computedHash = computed.hex()
     computedId   = computed.idFormat()

@@ -76,9 +76,11 @@ proc certsSearch(self: Plugin,
           # therefore we "fake" chalkmark to be able to collect/report metadata
           # about it as if was chalked
           data.setIfNotEmpty("MAGIC",         magicUTF8)
+          data.setIfNotEmpty("ARTIFACT_TYPE", artX509Cert)
           data.setIfNotEmpty("CHALK_VERSION", getChalkExeVersion())
           data.setIfNotEmpty("CHALK_ID",      chalk.callGetChalkId())
-          data.merge(chalk.computeMetadataHashAndId())
+          data.merge(chalk.computeMetadataHashAndId(onlyCollected = true))
+          discard chalk.getChalkMarkAsStr(onlyCollected = true) # cache chalkmark for future validation
           result.add(chalk)
         finally:
           cleanup_cert_info(output)

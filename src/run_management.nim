@@ -87,11 +87,11 @@ proc addIfMissing(to: var seq[ChalkObj], o: ChalkObj) =
   let check = collectionCtx.allChalks & collectionCtx.allArtifacts
   if o in check:
     return
-  if "CHALK_ID" in o.collectedData:
-    let id = o.collectedData["CHALK_ID"]
+  if "METADATA_ID" in o.collectedData:
+    let id = o.collectedData["METADATA_ID"]
     for i in check:
-      if "CHALK_ID" in i.collectedData:
-        let otherId = i.collectedData["CHALK_ID"]
+      if "METADATA_ID" in i.collectedData:
+        let otherId = i.collectedData["METADATA_ID"]
         if id == otherId:
           return
   to.add(o)
