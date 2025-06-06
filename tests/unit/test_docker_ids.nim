@@ -1,5 +1,5 @@
 import std/uri
-import ../../src/chalk_common
+import ../../src/types
 import ../../src/docker/ids
 
 template assertEq(a, b: untyped) =

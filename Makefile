@@ -177,8 +177,8 @@ tests_parallel: tests
 tests_bash:
 	docker compose run --rm --no-deps tests bash
 
-.PHONY: src/pingttl
-src/pingttl: src/pingttl.nim
+.PHONY: src/utils/pingttl
+src/utils/pingttl: src/utils/pingttl.nim
 	$(DOCKER) nim c -r $< 1.1.1.1 1
 	-docker compose run --rm --no-deps --entrypoint=strace tests -- $$(pwd)/$@ 1.1.1.1 1
 	-docker compose run --rm --no-deps --entrypoint=strace tests -- $$(pwd)/$@ 1.1.1.1 2

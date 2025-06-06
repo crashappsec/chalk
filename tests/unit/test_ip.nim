@@ -1,5 +1,5 @@
 import std/net
-import ../../src/ip
+import ../../src/utils/ip
 
 proc main() =
   doAssert parseIpAddress("10.10.10.10") notin parseIpCidrRange("10.11.12.13/32")
