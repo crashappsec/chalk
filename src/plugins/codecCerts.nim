@@ -14,6 +14,7 @@ import ".."/[
   plugin_api,
   run_management,
   types,
+  utils/envvars,
   utils/files,
 ]
 
@@ -29,9 +30,57 @@ type
     version:  int
 
 proc open_cert(fd: FileHandle): CertBIO {.importc.}
+proc read_cert(data: cstring, c: cint): CertBIO {.importc.}
 proc close_cert(c: CertBIO) {.importc.}
 proc extract_cert_data(c: CertBIO): Cert {.importc.}
 proc cleanup_cert_info(cert: Cert) {.importc.}
+
+iterator findCerts(self:  Plugin,
+                   bio:   CertBIO,
+                   name:  string,
+                   fsRef: string,
+                  ): ChalkObj =
+  while true:
+    let output = extract_cert_data(bio)
+    if output == nil:
+      break
+    try:
+      let
+        metadata = cstringArrayToSeq(output.key_value)
+        keyValue = newTable[string, string]()
+        cache    = X509Cert(
+          version:  int(output.version),
+          keyValue: keyValue,
+        )
+        data     = ChalkDict()
+        chalk    = newChalk(
+          name          = name,
+          fsRef         = fsRef,
+          codec         = self,
+          marked        = true, # allows to "extract"
+          resourceType  = {ResourceCert},
+          cache         = cache,
+          collectedData = data,
+          extract       = data,
+        )
+      for i in 0..<int(len(metadata)/2):
+        let
+          key   = metadata[i*2]
+          value = metadata[i*2+1]
+        keyValue[key] = $value
+      # cert is already a key-value store and so we will not be chalking
+      # a cert file but we still want chalk to collect metadata about it
+      # therefore we "fake" chalkmark to be able to collect/report metadata
+      # about it as if was chalked
+      data.setIfNotEmpty("MAGIC",         magicUTF8)
+      data.setIfNotEmpty("ARTIFACT_TYPE", artX509Cert)
+      data.setIfNotEmpty("CHALK_VERSION", getChalkExeVersion())
+      data.setIfNotEmpty("CHALK_ID",      chalk.callGetChalkId())
+      data.merge(chalk.computeMetadataHashAndId(onlyCollected = true))
+      discard chalk.getChalkMarkAsStr(onlyCollected = true) # cache chalkmark for future validation
+      yield chalk
+    finally:
+      cleanup_cert_info(output)
 
 proc certsSearch(self: Plugin,
                  path: string,
@@ -43,47 +92,12 @@ proc certsSearch(self: Plugin,
     stream.setPosition(0)
     let bio = open_cert(stream.getOsFileHandle())
     try:
-      while true:
-        let output = extract_cert_data(bio)
-        if output == nil:
-          return
-        try:
-          let
-            metadata = cStringArrayToSeq(output.key_value)
-            keyValue = newTable[string, string]()
-            cache    = X509Cert(
-              version:  int(output.version),
-              keyValue: keyValue,
-            )
-            data     = ChalkDict()
-            chalk    = newChalk(
-              name          = path,
-              fsRef         = path,
-              codec         = self,
-              marked        = true, # allows to "extract"
-              resourceType  = {ResourceCert},
-              cache         = cache,
-              collectedData = data,
-              extract       = data,
-            )
-          for i in 0..<int(len(metadata)/2):
-            let
-              key   = metadata[i*2]
-              value = metadata[i*2+1]
-            keyValue[key] = $value
-          # cert is already a key-value store and so we will not be chalking
-          # a cert file but we still want chalk to collect metadata about it
-          # therefore we "fake" chalkmark to be able to collect/report metadata
-          # about it as if was chalked
-          data.setIfNotEmpty("MAGIC",         magicUTF8)
-          data.setIfNotEmpty("ARTIFACT_TYPE", artX509Cert)
-          data.setIfNotEmpty("CHALK_VERSION", getChalkExeVersion())
-          data.setIfNotEmpty("CHALK_ID",      chalk.callGetChalkId())
-          data.merge(chalk.computeMetadataHashAndId(onlyCollected = true))
-          discard chalk.getChalkMarkAsStr(onlyCollected = true) # cache chalkmark for future validation
-          result.add(chalk)
-        finally:
-          cleanup_cert_info(output)
+      for chalk in self.findCerts(
+        bio   = bio,
+        name  = path,
+        fsRef = path,
+      ):
+        result.add(chalk)
     finally:
       close_cert(bio)
 
@@ -128,13 +142,36 @@ proc certsCallback(chalk: ChalkObj, prefix = ""): ChalkDict =
       extensions[k] = v
   result.setIfNeeded(prefix & "X509_EXTRA_EXTENSIONS",         extensions)
 
-proc certsRunTimeCallback(self: Plugin,
+proc certsRunTimeArtCallback(self: Plugin,
                           chalk: ChalkObj,
                           ins: bool,
                           ): ChalkDict {.exportc, cdecl.} =
   result = ChalkDict()
   result.setIfNeeded("_OP_ARTIFACT_TYPE", artX509Cert)
   result.merge(chalk.certsCallback(prefix = "_"))
+
+proc certsRunTimeHostCallback*(self: Plugin,
+                               objs: seq[ChalkObj],
+                               ): ChalkDict {.cdecl.} =
+  result = ChalkDict()
+  # TODO this is an abuse of the collectio phases
+  # The cert plugin does not actually collect any metadata into the hostinfo here
+  # but it collects additional chalk artifacts from env vars
+  # which is def not the intended use of the run time host callback
+  # ideally this should be handled by the collection system itself but currently
+  # there are no hooks for that in the plugin api hence this hack
+  for k, v in envPairs():
+    let bio = read_cert(cstring(v), cint(len(v)))
+    try:
+      for chalk in self.findCerts(
+        bio   = bio,
+        name  = k,
+        fsRef = "",
+      ):
+        addToAllArtifacts(chalk)
+        chalk.collectedData.merge(self.certsRunTimeArtCallback(chalk, false))
+    finally:
+      close_cert(bio)
 
 proc loadCodecCerts*() =
   newCodec(
@@ -144,5 +181,6 @@ proc loadCodecCerts*() =
      getUnchalkedHash   = UnchalkedHashCb(certsGetHash),
      getPrechalkingHash = PrechalkingHashCb(certsGetHash),
      getEndingHash      = EndingHashCb(certsGetHash),
-     rtArtCallback      = RunTimeArtifactCb(certsRunTimeCallback),
+     rtArtCallback      = RunTimeArtifactCb(certsRunTimeArtCallback),
+     rtHostCallback     = RunTimeHostCb(certsRunTimeHostCallback)
   )

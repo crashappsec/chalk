@@ -213,6 +213,13 @@ open_cert(int fd)
     return fdb;
 }
 
+BIO *
+read_cert(char *data, int n)
+{
+    BIO  *fdb    = BIO_new_mem_buf(data, n);
+    return fdb;
+}
+
 void
 close_cert(BIO *fdb)
 {

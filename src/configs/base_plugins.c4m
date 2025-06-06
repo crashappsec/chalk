@@ -550,6 +550,7 @@ plugin certs {
                     "_X509_NOT_BEFORE",
                     "_X509_NOT_AFTER",
                     "_X509_EXTRA_EXTENSIONS"]
+  post_run_keys:    ["*"]
   doc: """
 Collect metadata about cert PEM files.
 """
