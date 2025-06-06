@@ -41,10 +41,12 @@ logger = get_logger()
 def artifact_type(path: Path) -> str:
     if path.suffix == ".py":
         return "python"
-    if path.suffix == ".sh":
+    elif path.suffix == ".sh":
         return "sh"
     elif path.suffix == ".zip":
         return "ZIP"
+    elif path.suffix == ".pem":
+        return "x509 Cert"
     else:
         return "ELF"
 
@@ -495,8 +497,10 @@ class Chalk:
                 for path, chalk in result.marks_by_path.items():
                     assert chalk.has(
                         ARTIFACT_TYPE=artifact_type(Path(path)),
-                        PLATFORM_WHEN_CHALKED=result.report["_OP_PLATFORM"],
-                        INJECTOR_COMMIT_ID=result.report["_OP_CHALKER_COMMIT_ID"],
+                        PLATFORM_WHEN_CHALKED=IfExists(result.report["_OP_PLATFORM"]),
+                        INJECTOR_COMMIT_ID=IfExists(
+                            result.report["_OP_CHALKER_COMMIT_ID"]
+                        ),
                     )
             if not expecting_chalkmarks:
                 assert "_CHALKS" not in result.report
