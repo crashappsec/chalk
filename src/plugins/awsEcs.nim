@@ -7,9 +7,20 @@
 
 ## This plugin collects data from the AWS ECS Metadata IP.
 
-import std/httpclient
-import pkg/[nimutils/awsclient]
-import ".."/[config, chalkjson, plugin_api]
+import std/[
+  os,
+]
+import pkg/[
+  nimutils/awsclient,
+]
+import ".."/[
+  chalkjson,
+  plugin_api,
+  run_management,
+  types,
+  utils/http,
+  utils/json,
+]
 
 let
   cloudMetadataUrl3 = os.getEnv("ECS_CONTAINER_METADATA_URI")

@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2024, Crash Override, Inc.
+## Copyright (c) 2024-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -16,8 +16,15 @@
 ## * ipaddress to int-tuple conversion
 ## * cidr to ip range (tuple of ip-tuples)
 
-import std/[algorithm, bitops, enumerate, net, strutils]
-import "."/[util]
+import std/[
+  algorithm,
+  bitops,
+  enumerate,
+  net,
+]
+import "."/[
+  strings,
+]
 
 type
   IpInt   = (uint64, uint64)

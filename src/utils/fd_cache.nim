@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2024, Crash Override, Inc.
+## Copyright (c) 2024-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -29,9 +29,17 @@
 ## * when cache reaches its limit size, it closes LRU file streams
 ##
 
-import std/[enumerate, posix, tables]
-import std/streams {.all.}
-import nimutils/file
+import std/[
+  enumerate,
+  posix,
+  streams,
+]
+import pkg/[
+  nimutils/file,
+]
+import "."/[
+  tables,
+]
 
 # copy of upstream shape which allows to access internal File reference
 # as otherwise its a private attribute

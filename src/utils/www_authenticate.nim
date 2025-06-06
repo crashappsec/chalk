@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2024, Crash Override, Inc.
+## Copyright (c) 2024-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -8,9 +8,21 @@
 ## Very basic implementation of https://www.rfc-editor.org/rfc/rfc7235#section-4.1
 ## Currently only bearer challenge is supported
 
-import std/[httpclient, net, uri, tables, strutils, json, sequtils]
-import pkg/nimutils/net
-import "."/[config, util]
+import std/[
+  net,
+  sequtils,
+  uri,
+]
+import pkg/[
+  nimutils/net,
+  nimutils/logging,
+]
+import "."/[
+  http,
+  json,
+  strings,
+  tables,
+]
 
 type
   AuthChallengeType = enum

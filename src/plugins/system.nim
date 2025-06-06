@@ -11,9 +11,23 @@
 when defined(posix):
   import std/posix_utils
 
-import std/[nativesockets, sequtils, times, monotimes]
-import ".."/[config, plugin_api, normalize, chalkjson, attestation_api,
-             util]
+import std/[
+  nativesockets,
+  sequtils,
+]
+import ".."/[
+  attestation_api,
+  chalkjson,
+  config,
+  normalize,
+  plugin_api,
+  run_management,
+  types,
+  utils/envvars,
+  utils/exec,
+  utils/files,
+  utils/times,
+]
 
 var execId = secureRand[uint64]().toHex().toLower()
 

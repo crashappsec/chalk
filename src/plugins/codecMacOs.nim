@@ -9,8 +9,16 @@
 
 # We use slightly different magic for our heredoc. It's uppercase and longer.
 
-import std/base64
-import ".."/[config, chalkjson, util, plugin_api]
+import std/[
+  base64,
+]
+import ".."/[
+  chalkjson,
+  plugin_api,
+  run_management,
+  types,
+  utils/files,
+]
 
 let prefix = """
 #!/bin/bash
@@ -253,7 +261,7 @@ proc macHandleWrite*(self: Plugin, chalk: ChalkObj, enc: Option[string])
     toWrite &= chalk.cachedUnchalkedHash & "\n"
     toWrite &= enc.get() & "\n"
 
-  if not chalk.replaceFileContents(toWrite):
+  if not chalk.fsRef.replaceFileContents(toWrite):
     chalk.opFailed = true
 
 proc macGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):

@@ -7,8 +7,21 @@
 
 ## The `chalk exec` command.
 
-import std/[posix, sequtils]
-import ".."/[config, collect, util, reporting, chalkjson, plugin_api]
+import std/[
+  posix,
+  sequtils,
+]
+import ".."/[
+  chalkjson,
+  collect,
+  config,
+  plugin_api,
+  reporting,
+  run_management,
+  types,
+  utils/exec,
+  utils/files,
+]
 
 # this const is not available in nim stdlib hence manual c import
 var TIOCNOTTY {.importc, header: "sys/ioctl.h"}: cuint

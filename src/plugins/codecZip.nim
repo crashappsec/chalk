@@ -8,9 +8,21 @@
 ## Handle JAR, WAR and other ZIP-based formats.  Works fine w/ JAR
 ## signing, because it only signs what's in the manifest.
 
-import std/algorithm
-import pkg/[zippy/ziparchives_v1]
-import ".."/[config, chalkjson, util, subscan, plugin_api]
+import std/[
+  algorithm,
+]
+import pkg/[
+  zippy/ziparchives_v1,
+]
+import ".."/[
+  chalkjson,
+  config,
+  plugin_api,
+  run_management,
+  subscan,
+  types,
+  utils/files,
+]
 
 const zipChalkFile = "chalk.json"
 

@@ -7,8 +7,17 @@
 
 ## utilities for interacting with docker images
 
-import ".."/[config, util]
-import "."/[exe, ids, inspect, manifest, dockerfile]
+import ".."/[
+  types,
+  utils/json,
+]
+import "."/[
+  dockerfile,
+  exe,
+  ids,
+  inspect,
+  manifest,
+]
 
 proc pullImage*(name: string) =
   ## utility function for pull docker image to local daemon

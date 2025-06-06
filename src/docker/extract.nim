@@ -7,9 +7,23 @@
 
 ## extract chalkmark json from images/containers into chalk object
 
-import std/[base64]
-import ".."/[attestation/utils, config, chalkjson, util]
-import "."/[exe, inspect, ids, manifest, registry]
+import std/[
+  base64,
+]
+import ".."/[
+  attestation/utils,
+  chalkjson,
+  types,
+  utils/json,
+  utils/files,
+]
+import "."/[
+  exe,
+  ids,
+  inspect,
+  manifest,
+  registry,
+]
 
 proc hasChalkLayer(self: ChalkObj): bool =
   result = false

@@ -9,7 +9,13 @@
 ## source code, including shell scripts. It considers the shebang line
 ## if any, and the file extension.
 
-import ".."/[config, plugin_api, util]
+import ".."/[
+  config,
+  plugin_api,
+  run_management,
+  types,
+  utils/files,
+]
 
 type
   SourceCache = ref object of RootRef
@@ -309,13 +315,13 @@ proc scriptWriteMark(plugin:  Plugin,
     )
     # only delete chalk-mark if mark already exists
     if existingMark != nil:
-      if not chalk.replaceFileContents(toWrite):
+      if not chalk.fsRef.replaceFileContents(toWrite):
         chalk.opFailed = true
         return
     chalk.cachedEndingHash = toWrite.sha256Hex()
   else:
     let toWrite = contents.getMarkedScriptContents(chalk, encoded.get())
-    if not chalk.replaceFileContents(toWrite):
+    if not chalk.fsRef.replaceFileContents(toWrite):
       chalk.opFailed = true
     else:
       chalk.cachedEndingHash = toWrite.sha256Hex()

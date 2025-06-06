@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -11,16 +11,34 @@ when cprofiling:
 
 # Note that imports cause topics and plugins to register.
 {.warning[UnusedImport]: off.}
-import "."/[config, confload, commands, norecurse, sinks,
-            attestation_api, util, autocomplete]
+import std/[
+  posix,
+]
+import "."/[
+  attestation_api,
+  autocomplete,
+  commands,
+  config,
+  confload,
+  norecurse,
+  run_management,
+  sinks,
+  types,
+  utils/exec,
+  utils/files,
+  utils/terminal,
+]
 
 when isMainModule:
-  setupSignalHandlers()    # util.nim
-  setupTerminal()          # util.nim
+  setupSignalHandlers()    # utils/terminal.nim
+  setupTerminal()          # utils/terminal.nim
   ioSetup()                # sinks.nim
   loadAllConfigs()         # confload.nim
   recursionCheck()         # norecurse.nim
-  otherSetupTasks()        # util.nim
+  setupManagedTemp()       # utils/files.nim
+  if isatty(1) == 0:
+    setShowColor(false)
+  limitFDCacheSize(attrGet[int]("cache_fd_limit"))
 
   # Wait for this warning until after configs load.
   if not canSelfInject:

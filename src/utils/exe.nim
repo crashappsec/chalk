@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -8,8 +8,21 @@
 ## This is for any common code for system stuff, such as executing
 ## code.
 
-import std/[posix]
-import "."/[config, subscan, plugin_api]
+import std/[
+  options,
+  os,
+  posix,
+]
+import pkg/[
+  nimutils,
+  nimutils/logging,
+]
+import ".."/[
+  plugin_api,
+  run_management,
+  subscan,
+  types,
+]
 
 proc findExePath*(cmdName:    string,
                   extraPaths: seq[string] = @[],
@@ -50,3 +63,10 @@ proc findExePath*(cmdName:    string,
 
   trace("Found '" & cmdName & "' in PATH: " & foundExes[0])
   return some(foundExes[0])
+
+proc makeExecutable*(path: string) =
+  let
+    existing = path.getFilePermissions()
+    wanted   = existing + {fpUserExec, fpGroupExec, fpOthersExec}
+  if existing != wanted:
+    path.setFilePermissions(wanted)

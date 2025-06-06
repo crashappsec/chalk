@@ -8,11 +8,16 @@
 ## This plugin is responsible for providing metadata gleaned from a
 ## Jenkins CI environment.
 
+import ".."/[
+  chalkjson,
+  config,
+  plugin_api,
+  run_management,
+  types,
+  utils/files,
+]
 
-import std/[options]
-import ".."/[config, plugin_api, fd_cache, util, chalkjson]
-
-{.compile:"../certs.c".}
+{.compile:"../utils/certs.c".}
 
 type
   CertBIO  = pointer

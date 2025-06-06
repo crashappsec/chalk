@@ -24,8 +24,15 @@
 ## codec; doing so will break compatibility. The built-in
 ## configuration enforces this, but please don't ever change it!
 
-import std/endians
-import ".."/[config, util, plugin_api]
+import std/[
+  endians,
+]
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+  utils/files,
+]
 
 const
   b64OffsetLoc = 0x28

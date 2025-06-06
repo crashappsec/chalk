@@ -9,9 +9,23 @@
 ##
 ## collect - use inspection result to load info into chalk
 
-import std/[json, sets]
-import ".."/[config, chalkjson, util]
-import "."/[inspect, manifest, json, ids, git]
+import std/[
+  sugar,
+]
+import ".."/[
+  chalkjson,
+  run_management,
+  types,
+  utils/json,
+  utils/sets,
+]
+import "."/[
+  git,
+  ids,
+  inspect,
+  json,
+  manifest,
+]
 
 # https://docs.docker.com/engine/api/v1.44/#tag/Image/operation/ImageInspect
 # https://github.com/opencontainers/image-spec/blob/main/config.md

@@ -1,3 +1,10 @@
+##
+## Copyright (c) 2023-2025, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
 ## `chalk.nimble` imports this file to set its `version` value.
 ## It'd be better for the below proc to be in `src/config.nim`, but
 ## `nimble build` currently fails when the nimble file imports that module.

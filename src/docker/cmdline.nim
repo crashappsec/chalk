@@ -11,8 +11,13 @@
 ## is in configs/dockercmd.c4m), so we really just need to look at
 ## the command and flag info returned.
 
-import ".."/[config]
-import "."/[ids]
+import ".."/[
+  types,
+  utils/envvars,
+]
+import "."/[
+  ids,
+]
 
 proc extractBuildx(ctx: DockerInvocation) =
   ctx.foundBuildx = ctx.cmdName.startsWith("buildx.")

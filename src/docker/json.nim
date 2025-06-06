@@ -7,9 +7,19 @@
 
 ## docker-specific json utils for collecting docker inspected metadata
 
-import std/[json]
-import ".."/[config, chalkjson, util]
-import "."/[ids]
+import std/[
+  unicode,
+]
+import ".."/[
+  chalkjson,
+  run_management,
+  types,
+  utils/strings,
+  utils/json,
+]
+import "."/[
+  ids,
+]
 
 proc parseAndDigestJson*(data: string): DigestedJson =
   return DigestedJson(

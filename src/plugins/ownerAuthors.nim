@@ -7,7 +7,12 @@
 
 ## Plugin that looks for an old school AUTHOR/AUTHORS file.
 
-import ".."/[config, plugin_api]
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+  utils/files,
+]
 
 const
   fNameAuthor  = "AUTHOR"

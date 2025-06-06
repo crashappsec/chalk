@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -16,8 +16,19 @@
 when (NimMinor, NimPatch) >= (6, 14):
   {.warning[CastSizes]: off.}
 
-import std/[unicode, parseutils, algorithm]
-import "."/[config, util, normalize]
+import std/[
+  algorithm,
+  parseutils,
+  unicode,
+]
+import "."/[
+  config,
+  normalize,
+  run_management,
+  types,
+  utils/json,
+  utils/strings,
+]
 
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']

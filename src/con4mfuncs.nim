@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -12,9 +12,23 @@
 ## Though, it might be a decent thing to push the logging stuff into
 ## con4m at some point, as long as it's all optional.
 
-import std/[httpclient]
-import pkg/[con4m/st, nimutils/jwt]
-import "."/[config, reporting, auth, sinks, chalkjson, docker/exe, normalize]
+import pkg/[
+  con4m/st,
+  nimutils/jwt,
+]
+import "."/[
+  auth,
+  chalkjson,
+  config,
+  docker/exe,
+  normalize,
+  reporting,
+  run_management,
+  sinks,
+  types,
+  utils/http,
+  utils/json,
+]
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getCommandName()))

@@ -5,8 +5,17 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[base64, os]
-import ".."/[config, semver, util, docker/ids]
+import std/[
+  base64,
+  os,
+]
+import ".."/[
+  docker/ids,
+  config,
+  types,
+  utils/files,
+  utils/semver,
+]
 
 var cosignLoc      = ""
 var cosignVersion  = parseVersion("0")

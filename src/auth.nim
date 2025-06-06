@@ -5,7 +5,9 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import "."/config
+import "."/[
+  types,
+]
 
 var availableAuthConfigs: Table[string, AuthConfig]
 

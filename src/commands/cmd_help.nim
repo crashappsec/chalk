@@ -7,7 +7,17 @@
 
 ## The `chalk help` command.
 
-import ".."/[config, sinks]
+import std/[
+  cmdline,
+]
+import ".."/[
+  config,
+  run_management,
+  sinks,
+  types,
+  utils/files,
+  utils/json,
+]
 
 const helpFiles = newFileTable("../docs/")
 
@@ -552,12 +562,12 @@ proc runChalkHelp*(cmdName = "help") {.noreturn.} =
   quit(0)
 
 const
-  docDir   = "chalk-docs"
-  cmdline  = docDir.joinPath("command-line.md")
-  conffile = docDir.joinPath("config-file.md")
-  outconf  = docDir.joinPath("output-config.md")
-  keyinfo  = docDir.joinPath("metadata.md")
-  builtins = docDir.joinPath("builtins.md")
+  docDir       = "chalk-docs"
+  commandline  = docDir.joinPath("command-line.md")
+  conffile     = docDir.joinPath("config-file.md")
+  outconf      = docDir.joinPath("output-config.md")
+  keyinfo      = docDir.joinPath("metadata.md")
+  builtins     = docDir.joinPath("builtins.md")
 
 proc paramFmt(t: StringTable): string =
   var parts: seq[string] = @[]
@@ -660,7 +670,7 @@ proc runChalkDocGen*() =
 
   createDir(docDir)
   # 1. Write out command docs.
-  f = newFileStream(cmdline, fmWrite)
+  f = newFileStream(commandline, fmWrite)
   for item in allCommandSections:
     f.write(con4mRuntime.getCommandDocs(item).toHtml())
   f.close()

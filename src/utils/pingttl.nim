@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2024, Crash Override, Inc.
+## Copyright (c) 2024-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -26,7 +26,7 @@ when hostOs == "linux":
     proc trace(s: string) =
       echo(s)
   else:
-    import "."/[config]
+    import ".."/[types]
 
   # these dont seem to be in stdlib?
   let

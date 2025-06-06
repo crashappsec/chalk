@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -12,14 +12,22 @@
 ## All of the data collection these plugins do is orchestrated in
 ## collect.nim
 
-import std/[re, algorithm]
-import "."/[config, chalkjson, util]
+import std/[
+  algorithm,
+]
+import "."/[
+  chalkjson,
+  run_management,
+  types,
+  utils/strings,
+  utils/files,
+]
 
 # These things don't check for null pointers, because they should only
 # get called when plugins declare stuff in the config file, so this
 # should all be pre-checked.
 
-proc isSystem*(p: Plugin, ): bool =
+proc isSystem*(p: Plugin): bool =
   return p.name in ["system", "attestation", "metsys"]
 
 proc callGetChalkTimeHostInfo*(plugin: Plugin): ChalkDict =
@@ -379,7 +387,7 @@ proc defaultCodecWrite*(s:     Plugin,
       post = stream.readAll()
 
   let contents = pre & enc.getOrElse("") & post
-  if not chalk.replaceFileContents(contents):
+  if not chalk.fsRef.replaceFileContents(contents):
     chalk.opFailed = true
 
 var codecs: seq[Plugin] = @[]

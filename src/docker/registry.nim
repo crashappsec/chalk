@@ -11,11 +11,31 @@
 ## https://docs.docker.com/reference/cli/dockerd/#daemon-configuration-file
 ## https://docs.docker.com/build/buildkit/toml-configuration/
 
-import std/[net, uri, httpclient, nativesockets, sets]
-import pkg/nimutils/net
-import pkg/[zippy/tarballs]
-import ".."/[config, ip, util, www_authenticate]
-import "."/[exe, json, ids, nodes]
+import std/[
+  nativesockets,
+  net,
+  uri,
+]
+import pkg/[
+  nimutils/net,
+  zippy/tarballs,
+]
+import ".."/[
+  types,
+  utils/files,
+  utils/ip,
+  utils/json,
+  utils/http,
+  utils/sets,
+  utils/strings,
+  utils/www_authenticate,
+]
+import "."/[
+  exe,
+  ids,
+  json,
+  nodes,
+]
 
 type
   RegistryResponseError* = object of ValueError

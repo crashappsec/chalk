@@ -1,13 +1,21 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[re]
-import "./docker"/[scan]
-import "."/[config, plugin_api]
+import std/[
+  re,
+]
+import "."/[
+  config,
+  docker/scan,
+  plugin_api,
+  run_management,
+  types,
+  utils/files,
+]
 
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we

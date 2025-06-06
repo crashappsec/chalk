@@ -5,8 +5,15 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[httpclient, net]
-import ".."/[config, auth, util]
+import std/[
+  net,
+]
+import ".."/[
+  auth,
+  types,
+  utils/http,
+  utils/json,
+]
 
 type Get = ref object of AttestationKeyProvider
   location: string

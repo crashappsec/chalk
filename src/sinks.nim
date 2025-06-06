@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -7,8 +7,16 @@
 
 ## Chalk-specific setup and APIs around nimtuils' IO sinks.
 
-import std/uri
-import "."/[config, auth]
+import std/[
+  uri,
+]
+import "."/[
+  auth,
+  run_management,
+  types,
+  utils/json,
+  utils/files,
+]
 
 proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
   return (msg, true)

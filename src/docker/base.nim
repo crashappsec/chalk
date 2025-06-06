@@ -8,9 +8,19 @@
 ## Common docker-specific utility bits used in various parts of the
 ## implementation.
 
-import "../commands"/[cmd_help]
-import ".."/[config, util, reporting]
-import "."/[exe, ids, platform]
+import ".."/[
+  commands/cmd_help,
+  reporting,
+  types,
+  utils/exec,
+  utils/files,
+  utils/subproc,
+]
+import "."/[
+  exe,
+  ids,
+  platform,
+]
 
 proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
   # If our mundged docker invocation fails, then we conservatively

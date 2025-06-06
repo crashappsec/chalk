@@ -5,9 +5,23 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[tables, httpclient]
-import ".."/[config, util]
-import "."/[dockerfile, exe, image, ids, inspect, manifest]
+import ".."/[
+  config,
+  types,
+  utils/envvars,
+  utils/exe,
+  utils/files,
+  utils/http,
+  utils/json,
+]
+import "."/[
+  dockerfile,
+  exe,
+  ids,
+  image,
+  inspect,
+  manifest,
+]
 
 var defaultPlatforms = initTable[string, DockerPlatform]()
 proc dockerProbeDefaultPlatforms*(): Table[string, DockerPlatform] =

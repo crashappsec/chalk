@@ -5,8 +5,16 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[net, sets, uri]
-import ".."/[config, util]
+import std/[
+  net,
+  uri,
+]
+import ".."/[
+  run_management,
+  types,
+  utils/sets,
+  utils/strings,
+]
 
 const
   DEFAULT_REGISTRY = "registry-1.docker.io"

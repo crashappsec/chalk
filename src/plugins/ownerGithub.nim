@@ -7,8 +7,14 @@
 
 ## Looks for and parses github CODEOWNERS files.
 
-import std/[os]
-import ".."/[config, plugin_api]
+import std/[
+  os,
+]
+import ".."/[
+  plugin_api,
+  types,
+  utils/files,
+]
 
 
 const

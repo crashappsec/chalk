@@ -8,7 +8,12 @@
 ## This is a simple codec for dealing with python bytecode files;
 ##  i.e., currently ones that have the extensions .pyc, .pyo, .pyd
 
-import ".."/[config, plugin_api, util]
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+  utils/files,
+]
 
 proc pycScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
   var chalk: ChalkObj
@@ -67,7 +72,7 @@ proc pycHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
   else:
     toWrite = pre
 
-  if not chalk.replaceFileContents(toWrite):
+  if not chalk.fsRef.replaceFileContents(toWrite):
     chalk.opFailed = true
 
 

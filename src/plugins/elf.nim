@@ -4,8 +4,12 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import std/algorithm
-import ".."/config
+import std/[
+  algorithm,
+]
+import ".."/[
+  types,
+]
 
 # We've got a lot of ELF-specific defines we're not using but we
 # want to keep around, so silence any warnings.

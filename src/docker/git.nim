@@ -4,9 +4,23 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import std/[base64, strutils, uri]
-import ".."/[config, git, util, exe]
-import "."/[util as dutil]
+import std/[
+  base64,
+  uri,
+]
+import ".."/[
+  types,
+  utils/envvars,
+  utils/exe,
+  utils/files,
+  utils/git,
+  utils/redacted,
+  utils/strings,
+  utils/lists,
+]
+import "."/[
+  util as dutil,
+]
 
 const
   HEADS          = "refs/heads/"

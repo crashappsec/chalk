@@ -5,9 +5,20 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[os, sets]
-import ".."/[config, semver, exe]
-import "."/[ids]
+import std/[
+  os,
+]
+import ".."/[
+  types,
+  utils/exe,
+  utils/json,
+  utils/semver,
+  utils/sets,
+  utils/strings,
+]
+import "."/[
+  ids,
+]
 
 var
   dockerExeLocation   = ""

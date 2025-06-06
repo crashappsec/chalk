@@ -1,3 +1,10 @@
+//
+// Copyright (c) 2023-2025, Crash Override, Inc.
+//
+// This file is part of Chalk
+// (see https://crashoverride.com/docs/chalk)
+//
+
 #include <crypto/x509.h>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>

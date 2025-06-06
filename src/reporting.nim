@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -7,7 +7,16 @@
 
 ## Chalk reporting logic.
 
-import "."/[config, chalkjson, reportcache, sinks, collect, object_store/api]
+import "."/[
+  chalkjson,
+  collect,
+  config,
+  object_store/api,
+  reportcache,
+  run_management,
+  sinks,
+  types,
+]
 
 proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   if doingTestRun:

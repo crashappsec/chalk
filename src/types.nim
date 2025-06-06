@@ -12,14 +12,40 @@
 ## This file should never import other chalk modules; it's at the root
 ## of the dependency tree.
 
-import std/[os, json, streams, tables, options, strutils, sugar, posix,
-            unicode, re, sets, uri]
-import pkg/[nimutils, nimutils/logging, nimutils/managedtmp, con4m]
-export os, json, options, tables, strutils, streams, sugar, nimutils, logging,
-       managedtmp, con4m
+import std/[
+  options,
+  posix,
+  re,
+  streams,
+  sugar,
+  unicode,
+  uri,
+]
+import pkg/[
+  nimutils,
+  nimutils/logging,
+  con4m,
+]
+import "."/[
+  con4mwrap,
+  utils/chalkdict,
+  utils/json,
+  utils/sets,
+  utils/strings,
+  utils/tables,
+]
+
+export chalkdict # ChalkDict
+export con4mwrap # con4m accessors/etc
+export logging   # error()/trace()/etc
+export nimutils  # Box
+export options   # .get()/etc for accessing chalk Option() vars
+export streams   # Stream()
+export strings   # string split/etc
+export sugar     # easier calling functions
+export tables
 
 type
-  ChalkDict*    = OrderedTableRef[string, Box]
   ObjectsDict*  = OrderedTableRef[string, OrderedTableRef[string, ObjectStoreRef]]
 
   ResourceType* = enum
@@ -447,8 +473,6 @@ const
   magicUTF8*          = "dadfedabbadabbed"
   emptyMark*          = "{ \"MAGIC\" : \"" & magicUTF8 & "\" }"
   implName*           = "chalk-reference"
-  tmpFilePrefix*      = "chalk-"
-  tmpFileSuffix*      = "-file.tmp"
   chalkSpecName*      = "configs/chalk.c42spec"
   getoptConfName*     = "configs/getopts.c4m"
   baseConfName*       = "configs/base_*.c4m"
@@ -522,9 +546,7 @@ var
   installedPlugins*       = Table[string, Plugin]()
   externalActions*        = newSeq[seq[string]]()
   commandName*            = ""
-  gitExeLocation*         = ""
   sshKeyscanExeLocation*  = ""
-  con4mRuntime*:          ConfigStack # can be nil
   dockerInvocation*:      DockerInvocation # ca be nil
 
 template dumpExOnDebug*() =
@@ -545,11 +567,3 @@ proc getBaseCommandName*(): string =
     result = commandName.split('.')[0]
   else:
     result = commandName
-
-template formatTitle*(text: string): string =
-  ## Used by both help and defaults command.
-  let
-    titleCode = toAnsiCode(@[acFont4, acBRed])
-    endCode   = toAnsiCode(@[acReset])
-
-  titleCode & text & endCode & "\n"

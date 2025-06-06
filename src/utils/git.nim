@@ -1,11 +1,18 @@
 ##
-## Copyright (c) 2024, Crash Override, Inc.
+## Copyright (c) 2024-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import "."/[config, exe]
+import ".."/[
+  types,
+]
+import "."/[
+  exe,
+]
+
+var gitExeLocation = ""
 
 proc setGitExeLocation*() =
   once:

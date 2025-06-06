@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -12,8 +12,13 @@
 ## for that, because it'd be too easy to lose interoperability if
 ## people whiff on whatever we decide for how to handle spaces, etc.
 
-import std/[algorithm, sequtils]
-import "."/config
+import std/[
+  algorithm,
+  sequtils,
+]
+import "."/[
+  types,
+]
 
 iterator sortedPairs(d: ChalkDict): tuple[key: string, value: Box] =
   for key in d.keys().toSeq().sorted():
@@ -68,7 +73,7 @@ proc binEncodeTable(self: ChalkDict, ignore: seq[string] = @[]): string =
   return "\x05" & u32ToStr(uint32(count)) & encoded
 
 proc binEncodeFloat(f: float): string =
-  result = "\x06" & floatToStr(f)
+  result = "\X06" & floatToStr(f)
 
 proc binEncodeObj(self: Box): string =
   if self.o == nil:

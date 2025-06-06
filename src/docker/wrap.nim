@@ -7,9 +7,21 @@
 
 ## Dockerfile wrapping logic
 
-import std/[sequtils]
-import ".."/[config, selfextract]
-import "."/[dockerfile, platform, exe, ids, image]
+import std/[
+  sequtils,
+]
+import ".."/[
+  selfextract,
+  types,
+  utils/files,
+]
+import "."/[
+  dockerfile,
+  exe,
+  ids,
+  image,
+  platform,
+]
 
 proc getTargetUser(ctx: DockerInvocation, platform: DockerPlatform): string =
   ## get USER from the target section

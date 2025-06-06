@@ -5,9 +5,16 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import pkg/[parsetoml]
-import ".."/[config, util, toml]
-import "."/[exe, inspect]
+import ".."/[
+  types,
+  utils/json,
+  utils/strings,
+  utils/toml,
+]
+import "."/[
+  exe,
+  inspect,
+]
 
 proc getBuilderNodesInfo*(ctx: DockerInvocation): TableRef[string, string] =
   result = newTable[string, string]()

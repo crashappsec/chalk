@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -22,8 +22,13 @@
 ## 'current' sinks need to catch up.  If so, we UNSUBSCRIBE them from
 ## the current topic, and re-subscribe them to a topic just for them.
 
-import std/tempfiles
-import "."/[config, sinks, util]
+import "."/[
+  sinks,
+  types,
+  utils/exec,
+  utils/files,
+  utils/json,
+]
 
 # These string constants are only used if there's a catastrophic
 # problem w/ the reporting cache; see `panicPublish` below.

@@ -16,8 +16,19 @@
 when hostOs != "linux":
   {.warning[UnusedImport]: off.}
 
-import std/[posix, re, base64]
-import ".."/[config, plugin_api, util]
+import std/[
+  base64,
+  posix,
+  re,
+]
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+  utils/envvars,
+  utils/files,
+  utils/json,
+]
 
 type
   ProcDict   = OrderedTableRef[string, string]

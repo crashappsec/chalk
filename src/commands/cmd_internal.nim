@@ -5,8 +5,10 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[json]
-import ".."/[config]
+import ".."/[
+  types,
+  utils/json,
+]
 
 proc onbuild() =
   let data = readFile("/chalk.json")
