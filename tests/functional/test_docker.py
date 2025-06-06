@@ -493,6 +493,9 @@ def test_subscan(chalk: Chalk, server_cert: Path, random_hex: str):
         {
             str(server_cert): {
                 "_X509_SUBJECT": "/CN=tls.chalk.local",
+                "_OP_ARTIFACT_PATH_WITHIN_VCTL": str(
+                    server_cert.relative_to(TESTS.parent.parent)
+                ),
             }
         }
     )

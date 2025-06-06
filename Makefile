@@ -73,6 +73,9 @@ chalk-docs: $(BINARY)
 	rm -rf $@
 	$(DOCKER) ./$(BINARY) docgen
 
+watch: $(SOURCES)
+	echo $^ | tr ' ' '\n' | entr $(MAKE)
+
 # devmode for local deps
 # this allows to dev againt local versions of nimutils/con4m
 # this works for both docker/host builds

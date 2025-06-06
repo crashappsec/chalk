@@ -40,6 +40,10 @@
 
   ([#515](https://github.com/crashappsec/chalk/pull/515))
 
+- `_OP_ARTIFACT_PATH_WITHIN_VCTL` key which indicates path of the file
+  in the git repo.
+  ([#515](https://github.com/crashappsec/chalk/pull/515))
+
 ## 0.5.7
 
 **May 22, 2025**

@@ -159,6 +159,7 @@ report and subtract from it.
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_CONTEXT.use                = true
   key._OP_ARTIFACT_PATH.use                   = true
+  key._OP_ARTIFACT_PATH_WITHIN_VCTL.use       = true
   key._CURRENT_HASH.use                       = true
   key._VALIDATED_METADATA.use                 = true
   key._VALIDATED_SIGNATURE.use                = true
@@ -779,6 +780,7 @@ doc: """
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_CONTEXT.use                = true
   key._OP_ARTIFACT_PATH.use                   = true
+  key._OP_ARTIFACT_PATH_WITHIN_VCTL.use       = true
   key._CURRENT_HASH.use                       = true
   key._VIRTUAL.use                            = true
   key._OP_ARTIFACT_REPORT_KEYS.use            = false
@@ -1282,6 +1284,7 @@ container.
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_CONTEXT.use                = true
   key._OP_ARTIFACT_PATH.use                   = true
+  key._OP_ARTIFACT_PATH_WITHIN_VCTL.use       = true
   key._CURRENT_HASH.use                       = true
   key._VIRTUAL.use                            = true
   key._OP_ARTIFACT_REPORT_KEYS.use            = false
@@ -1774,6 +1777,7 @@ and keep the run-time key.
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_CONTEXT.use                = true
   key._OP_ARTIFACT_PATH.use                   = true
+  key._OP_ARTIFACT_PATH_WITHIN_VCTL.use       = true
   key._CURRENT_HASH.use                       = true
   key._VIRTUAL.use                            = true
   key._OP_ARTIFACT_REPORT_KEYS.use            = false
@@ -2262,6 +2266,7 @@ running commands that do NOT insert chalk marks.
   key._OP_ARTIFACT_TYPE.use                   = true
   key._OP_ARTIFACT_CONTEXT.use                = true
   key._OP_ARTIFACT_PATH.use                   = true
+  key._OP_ARTIFACT_PATH_WITHIN_VCTL.use       = true
   key._CURRENT_HASH.use                       = true
   key._IMAGE_ID.use                           = true
   key._INSTANCE_CONTAINER_ID.use              = true

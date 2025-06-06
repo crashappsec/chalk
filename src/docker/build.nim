@@ -357,11 +357,15 @@ proc collectBaseImages(chalk: ChalkObj, ctx: DockerInvocation) =
 
 proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
   let
-    baseSection       = ctx.getBaseDockerSection()
-    dict              = chalk.collectedData
-    git               = getPluginByName("vctl_git")
-    projectRootPath   = git.gitFirstDir().parentDir()
-    dockerfileRelPath = getRelativePathBetween(projectRootPath, ctx.dockerFileLoc)
+    baseSection         = ctx.getBaseDockerSection()
+    dict                = chalk.collectedData
+    git                 = getPluginByName("vctl_git")
+    gitPathOpt          = git.gitFirstDir()
+  if gitPathOpt.isSome():
+    let
+      repoPath          = gitPathOpt.get().parentDir()
+      dockerfileRelPath = getRelativePathBetween(repoPath, ctx.dockerFileLoc)
+    dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",     dockerfileRelPath)
   chalk.collectBaseImages(ctx)
   if chalk.baseChalk != nil:
     if chalk.baseChalk.isMarked():
@@ -369,7 +373,6 @@ proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
       dict.setIfNeeded("DOCKER_BASE_IMAGE_CHALK",       chalk.baseChalk.extract)
     dict.setIfNeeded("DOCKER_BASE_IMAGE_ID",            chalk.baseChalk.collectedData.getOrDefault("_IMAGE_ID"))
   dict.setIfNeeded("DOCKERFILE_PATH",                   ctx.dockerFileLoc)
-  dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",       dockerfileRelPath)
   dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",        ctx.foundExtraContexts)
   dict.setIfNeeded("DOCKER_CONTEXT",                    ctx.foundContext)
   dict.setIfNeeded("DOCKER_FILE",                       ctx.inDockerFile)

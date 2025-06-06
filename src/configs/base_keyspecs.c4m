@@ -2433,6 +2433,18 @@ However, on insertion operations, this field is redundant with
 """
 }
 
+keyspec _OP_ARTIFACT_PATH_WITHIN_VCTL {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.5.8"
+    shortdoc:         "Path of the artifact within the repo"
+    doc:              """
+Path of the artifact relative to the version control repo.
+"""
+}
+
 keyspec _CURRENT_HASH {
     kind:             RunTimeArtifact
     type:             string
