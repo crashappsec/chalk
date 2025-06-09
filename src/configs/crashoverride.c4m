@@ -271,6 +271,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._OP_ARTIFACT_CONTEXT.use                = true
   ~key._OP_ARTIFACT_PATH.use                   = true
   ~key._OP_ARTIFACT_PATH_WITHIN_VCTL.use       = true
+  ~key._OP_ARTIFACT_ENV_VAR_NAME.use           = true
   ~key._CURRENT_HASH.use                       = true
   ~key._VIRTUAL.use                            = true
   ~key._OP_ARTIFACT_REPORT_KEYS.use            = false

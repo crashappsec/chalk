@@ -97,6 +97,12 @@ proc callSearch*(plugin: Plugin, s: string): seq[ChalkObj] =
     return cb(plugin, s)
   return @[]
 
+proc callSearchEnvVar*(plugin: Plugin, k: string, v: string): seq[ChalkObj] =
+  let cb = plugin.searchEnvVar
+  if cb != nil:
+    return cb(plugin, k, v)
+  return @[]
+
 proc callGetUnchalkedHash*(obj: ChalkObj): Option[string] =
   if obj.cachedUnchalkedHash != "":
     return some(obj.cachedUnchalkedHash)
@@ -239,7 +245,14 @@ proc searchLocation(self: Plugin, loc: string): seq[ChalkObj] =
     error(loc & ": Search canceled: " & getCurrentExceptionMsg())
     dumpExOnDebug()
 
-iterator scanArtifactLocationsWith*(state: ArtifactIterationInfo,
+proc searchEnvironmentVariable(self: Plugin, k: string, v: string): seq[ChalkObj] =
+  try:
+    return callSearchEnvVar(self, k, v)
+  except:
+    error(k & ": Search env var canceled: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
+
+iterator scanArtifactLocationsWith*(state:  ArtifactIterationInfo,
                                     codecs: seq[Plugin],
                                     ): ChalkObj =
   # This will call scan() with a file stream, and you pass back a
@@ -311,6 +324,19 @@ iterator scanArtifactLocationsWith*(state: ArtifactIterationInfo,
           yield chalk
           found = true
         for chalk in codec.searchLocation(i.name):
+          yield chalk
+          found = true
+        if found:
+          break
+
+  if state.envVars:
+    for k, v in envPairs():
+      for codec in codecs:
+        if codec.searchEnvVar == nil:
+          continue
+        var found = false
+        trace(k & ": scanning env var with " & codec.name)
+        for chalk in codec.searchEnvironmentVariable(k, v):
           yield chalk
           found = true
         if found:
@@ -495,6 +521,7 @@ proc newCodec*(
   name:               string,
   scan:               ScanCb              = ScanCb(nil),
   search:             SearchCb            = SearchCb(nil),
+  searchEnvVar:       SearchEnvVarCb      = SearchEnvVarCb(nil),
   ctHostCallback:     ChalkTimeHostCb     = ChalkTimeHostCb(nil),
   ctArtCallback:      ChalkTimeArtifactCb = ChalkTimeArtifactCb(nil),
   rtArtCallback:      RunTimeArtifactCb   = RunTimeArtifactCb(defaultRtArtInfo),
@@ -513,6 +540,7 @@ proc newCodec*(
   result = Plugin(name:                     name,
                   scan:                     scan,
                   search:                   search,
+                  searchEnvVar:             searchEnvVar,
                   getChalkTimeHostInfo:     ctHostCallback,
                   getChalkTimeArtifactInfo: ctArtCallback,
                   getRunTimeArtifactInfo:   rtArtCallback,

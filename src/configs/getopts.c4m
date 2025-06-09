@@ -12,6 +12,10 @@ default_recursive_doc := """
 Determines whether a file scan will recursively walk paths to find artifacts.
 """
 
+default_env_var_doc := """
+Determines whether env vars will be scanned to find artifacts.
+"""
+
 getopts {
   # If this is set when we call getoptFinalize(), it'll get used.
   command_attribute: "default_command"
@@ -328,6 +332,11 @@ help templates`
       field_to_set: "recursive"
     }
 
+    flag_yn env_vars {
+      doc: default_env_var_doc
+      field_to_set: "env_vars"
+    }
+
     flag_arg mark_template {
       field_to_set: "outconf.insert.mark_template"
       doc: """
@@ -366,6 +375,11 @@ it finds, based on your reporting configuration.
       no_aliases: ["R"]
       doc: default_recursive_doc
       field_to_set: "recursive"
+    }
+
+    flag_yn env_vars {
+      doc: default_env_var_doc
+      field_to_set: "env_vars"
     }
 
     flag_arg report_template {
@@ -444,6 +458,12 @@ The named reporting template must already exist in your configuration.
  doc: """
 Reports environmental information, without scanning for chalk. If a chalk ID or metadata ID is passed at the command line, then a chalk can be reported with just that metadata. This is intended to be a lightweight version of 'extract' tied to a single artifact.
 """
+
+    flag_yn env_vars {
+      doc: default_env_var_doc
+      field_to_set: "env_vars"
+    }
+
   }
 
   command exec {
@@ -488,6 +508,12 @@ This changes the reporting template to use for the default report.
 The named reporting template must already exist in your configuration.
 """
     }
+
+    flag_yn env_vars {
+      doc: default_env_var_doc
+      field_to_set: "env_vars"
+    }
+
   }
   command config {
     aliases:  []

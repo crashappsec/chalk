@@ -266,6 +266,7 @@ proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
 
   result.fileExclusions = @[selfPath]
   result.recurse        = attrGet[bool]("recursive")
+  result.envVars        = attrGet[bool]("env_vars")
 
   for item in skipList:
     result.skips.add(re(item))
@@ -280,7 +281,7 @@ proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
     else:
       result.otherPaths.add(item)
 
-proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
+proc artSetupForInsertAndDelete(argv: seq[string], envVars = false): ArtifactIterationInfo =
   new result
 
   let
@@ -289,6 +290,7 @@ proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
 
   result.fileExclusions = @[selfPath]
   result.recurse        = attrGet[bool]("recursive")
+  result.envVars        = envVars
 
   for item in skipList:
     result.skips.add(re(item))
@@ -317,6 +319,8 @@ proc artSetupForExecAndEnv(argv: seq[string]): ArtifactIterationInfo =
 
   result.fileExclusions = @[selfPath]
   result.recurse        = attrGet[bool]("recursive")
+  result.envVars        = attrGet[bool]("env_vars")
+
   for item in skipList:
     result.skips.add(re(item))
 
@@ -329,7 +333,9 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
   if notTmp:
     case getBaseCommandName()
-    of "insert", "delete":
+    of "insert":
+      iterInfo = artSetupForInsertAndDelete(argv, envVars = attrGet[bool]("env_vars"))
+    of "delete":
       iterInfo = artSetupForInsertAndDelete(argv)
     of "extract":
       iterInfo = artSetupForExtract(argv)

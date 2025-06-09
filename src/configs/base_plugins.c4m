@@ -24,7 +24,7 @@ plugin system {
   pre_chalk_keys:  ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
                     "PRE_CHALK_HASH"]
 
-  post_chalk_keys: ["_OP_ARTIFACT_PATH", "_CURRENT_HASH",
+  post_chalk_keys: ["_OP_ARTIFACT_PATH", "_OP_ARTIFACT_ENV_VAR_NAME", "_CURRENT_HASH",
                     "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS", "_VIRTUAL",
                     "_VALIDATED_SIGNATURE", "_VALIDATED_METADATA",
                     "_INVALID_SIGNATURE"]
@@ -550,7 +550,6 @@ plugin certs {
                     "_X509_NOT_BEFORE",
                     "_X509_NOT_AFTER",
                     "_X509_EXTRA_EXTENSIONS"]
-  post_run_keys:    ["*"]
   doc: """
 Collect metadata about cert PEM files.
 """

@@ -2433,6 +2433,19 @@ However, on insertion operations, this field is redundant with
 """
 }
 
+keyspec _OP_ARTIFACT_ENV_VAR_NAME {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.5.8"
+    shortdoc:         "Env var name where artifact was found during the current operation"
+    doc:              """
+Name of the env var for a given artifact, in the environment local for
+the current operation.
+"""
+}
+
 keyspec _OP_ARTIFACT_PATH_WITHIN_VCTL {
     kind:             RunTimeArtifact
     type:             string

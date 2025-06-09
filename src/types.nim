@@ -84,6 +84,7 @@ type
                                              ## something else, use the cache field
                                              ## below, instead.
     fsRef*:                 string           ## Reference for this artifact on a fs
+    envVarName*:            string           ## env var name from where artifact is found
     platform*:              DockerPlatform   ## platform
     baseChalk*:             ChalkObj
     repos*:                 OrderedTableRef[string, DockerImageRepo] ## all images where image was tagged/pushed
@@ -102,6 +103,7 @@ type
   RunTimeHostCb*       = proc (a: Plugin, b: seq[ChalkObj]): ChalkDict {.cdecl.}
   ScanCb*              = proc (a: Plugin, b: string): Option[ChalkObj] {.cdecl.}
   SearchCb*            = proc (a: Plugin, b: string): seq[ChalkObj] {.cdecl.}
+  SearchEnvVarCb*      = proc (a: Plugin, b: string, c: string): seq[ChalkObj] {.cdecl.}
   UnchalkedHashCb*     = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
   PrechalkingHashCb*   = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
   EndingHashCb*        = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
@@ -121,6 +123,7 @@ type
     nativeObjPlatforms*:       seq[string]
     scan*:                     ScanCb
     search*:                   SearchCb
+    searchEnvVar*:             SearchEnvVarCb
     getUnchalkedHash*:         UnchalkedHashCb
     getPrechalkingHash*:       PrechalkingHashCb
     getEndingHash*:            EndingHashCb
@@ -181,6 +184,7 @@ type
     skips*:           seq[Regex]
     chalks*:          seq[ChalkObj]
     recurse*:         bool
+    envVars*:         bool
 
   DockerStatement* = ref object of RootRef
     startLine*:  int

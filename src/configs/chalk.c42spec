@@ -3190,6 +3190,16 @@ artifact search path will be traversed recursively.
 """
   }
 
+  field env_vars {
+    type:     bool
+    default:  true
+    shortdoc: "Scan env vars"
+    doc:      """
+When scanning for artifacts, if this is true, env vars will be scanned
+by supported codecs.
+"""
+  }
+
   field docker_exe {
     type:     string
     require:  false

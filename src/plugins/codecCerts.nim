@@ -14,7 +14,6 @@ import ".."/[
   plugin_api,
   run_management,
   types,
-  utils/envvars,
   utils/files,
 ]
 
@@ -35,10 +34,11 @@ proc close_cert(c: CertBIO) {.importc.}
 proc extract_cert_data(c: CertBIO): Cert {.importc.}
 proc cleanup_cert_info(cert: Cert) {.importc.}
 
-iterator findCerts(self:  Plugin,
-                   bio:   CertBIO,
-                   name:  string,
-                   fsRef: string,
+iterator findCerts(self:       Plugin,
+                   bio:        CertBIO,
+                   name:       string,
+                   fsRef:      string = "",
+                   envVarName: string = "",
                   ): ChalkObj =
   while true:
     let output = extract_cert_data(bio)
@@ -56,6 +56,7 @@ iterator findCerts(self:  Plugin,
         chalk    = newChalk(
           name          = name,
           fsRef         = fsRef,
+          envVarName    = envVarName,
           codec         = self,
           marked        = true, # allows to "extract"
           resourceType  = {ResourceCert},
@@ -100,6 +101,22 @@ proc certsSearch(self: Plugin,
         result.add(chalk)
     finally:
       close_cert(bio)
+
+proc certsSearchEnvVar*(self: Plugin,
+                        k: string,
+                        v: string,
+                        ): seq[ChalkObj] {.cdecl.} =
+  result = newSeq[ChalkObj]()
+  let bio = read_cert(cstring(v), cint(len(v)))
+  try:
+    for chalk in self.findCerts(
+      bio        = bio,
+      name       = k,
+      envVarName = k,
+    ):
+      result.add(chalk)
+  finally:
+    close_cert(bio)
 
 proc certsHandleWrite*(self: Plugin,
                        chalk: ChalkObj,
@@ -150,37 +167,14 @@ proc certsRunTimeArtCallback(self: Plugin,
   result.setIfNeeded("_OP_ARTIFACT_TYPE", artX509Cert)
   result.merge(chalk.certsCallback(prefix = "_"))
 
-proc certsRunTimeHostCallback*(self: Plugin,
-                               objs: seq[ChalkObj],
-                               ): ChalkDict {.cdecl.} =
-  result = ChalkDict()
-  # TODO this is an abuse of the collectio phases
-  # The cert plugin does not actually collect any metadata into the hostinfo here
-  # but it collects additional chalk artifacts from env vars
-  # which is def not the intended use of the run time host callback
-  # ideally this should be handled by the collection system itself but currently
-  # there are no hooks for that in the plugin api hence this hack
-  for k, v in envPairs():
-    let bio = read_cert(cstring(v), cint(len(v)))
-    try:
-      for chalk in self.findCerts(
-        bio   = bio,
-        name  = k,
-        fsRef = "",
-      ):
-        addToAllArtifacts(chalk)
-        chalk.collectedData.merge(self.certsRunTimeArtCallback(chalk, false))
-    finally:
-      close_cert(bio)
-
 proc loadCodecCerts*() =
   newCodec(
     "certs",
      search             = SearchCb(certsSearch),
+     searchEnvVar       = SearchEnvVarCb(certsSearchEnvVar),
      handleWrite        = HandleWriteCb(certsHandleWrite),
      getUnchalkedHash   = UnchalkedHashCb(certsGetHash),
      getPrechalkingHash = PrechalkingHashCb(certsGetHash),
      getEndingHash      = EndingHashCb(certsGetHash),
      rtArtCallback      = RunTimeArtifactCb(certsRunTimeArtCallback),
-     rtHostCallback     = RunTimeHostCb(certsRunTimeHostCallback)
   )
