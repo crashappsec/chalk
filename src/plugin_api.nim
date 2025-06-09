@@ -291,6 +291,17 @@ iterator scanArtifactLocationsWith*(state:  ArtifactIterationInfo,
     fileLinks = PathBehavior.Yield
     skipLinks = false
 
+  # note the outer loop is over file paths, not codecs (it used to be at some point)
+  # to get efficient FS scanning. For example when scanning '/' there is some overhead
+  # as getAllFileNames() need to walk the FS tree which means:
+  # * a bunch of lstat calls in order to determine whether found paths are files/dirs/etc
+  # * keep track of which dirs were already seen to handle circular loops
+  # * open FD for each found path
+  # As such its a lot more efficient to walk by all paths first and then
+  # attempt to find chalk artifact for each path by checking all codecs as that:
+  # * pays above overhead once
+  # * reuses opened FDs between codecs hence less open()/close() overhead
+  # Cnanging loop topology scanning ubuntu container '/' went from ~180sec to ~100sec
   for path in state.filePaths:
     trace(path & ": beginning scan")
     let p = path.resolvePath()
