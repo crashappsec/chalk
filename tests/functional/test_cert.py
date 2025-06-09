@@ -2,6 +2,7 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import base64
 import re
 from pathlib import Path
 
@@ -22,7 +23,7 @@ def test_cert(
     insert = chalk.extract(
         artifact=certifi.where(),
         env={
-            "CO_CERT": server_cert.read_text(),
+            "CO_CERT": base64.b64encode(server_cert.read_bytes()).decode(),
         },
     )
     assert insert.marks.contains(

@@ -8,6 +8,9 @@
 ## This plugin is responsible for providing metadata gleaned from a
 ## Jenkins CI environment.
 
+import std/[
+  base64,
+]
 import ".."/[
   chalkjson,
   config,
@@ -102,26 +105,49 @@ proc certsSearch(self: Plugin,
     finally:
       close_cert(bio)
 
-proc certsSearchEnvVar*(self: Plugin,
-                        k: string,
-                        v: string,
-                        ): seq[ChalkObj] {.cdecl.} =
-  result = newSeq[ChalkObj]()
-  let bio = read_cert(cstring(v), cint(len(v)))
+iterator certsSearchEnvVar(self: Plugin,
+                           k:    string,
+                           bio:  CertBIO,
+                           ): ChalkObj =
   try:
     for chalk in self.findCerts(
       bio        = bio,
       name       = k,
       envVarName = k,
     ):
-      result.add(chalk)
+      yield chalk
   finally:
     close_cert(bio)
 
-proc certsHandleWrite*(self: Plugin,
-                       chalk: ChalkObj,
-                       data: Option[string],
-                       ) {.cdecl.} =
+proc certsSearchEnvVar(self: Plugin,
+                       k: string,
+                       v: string,
+                       ): seq[ChalkObj] {.cdecl.} =
+  result = newSeq[ChalkObj]()
+  for chalk in self.certsSearchEnvVar(
+    bio = read_cert(cstring(v), cint(len(v))),
+    k   = k,
+  ):
+    result.add(chalk)
+
+  # sometimes env vars are base64-encoded certs os attempt to parse them
+  if len(result) == 0:
+    var b64 = ""
+    try:
+      b64 = decode(v)
+    except:
+      discard # not base64 string
+    if b64 != "":
+      for chalk in self.certsSearchEnvVar(
+        bio = read_cert(cstring(b64), cint(len(b64))),
+        k   = k,
+      ):
+        result.add(chalk)
+
+proc certsHandleWrite(self: Plugin,
+                      chalk: ChalkObj,
+                      data: Option[string],
+                      ) {.cdecl.} =
   # we do not update cert files
   return
 
