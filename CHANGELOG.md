@@ -43,8 +43,12 @@
 - `_OP_ARTIFACT_PATH_WITHIN_VCTL` key which indicates path of the file
   in the git repo.
   ([#515](https://github.com/crashappsec/chalk/pull/515))
-- `_OP_ARTIFACT_ENV_VAR_NAME` key which indicates name of the environment
-  variable where the artifact was found (e.g. cert)
+- Scanning of environment variables for artifacts.
+  Currently only `certs` codec supports scanning env vars.
+  This behavior can be customized (by default on) via new`env_vars`
+  configuration or`--[no-]env-vars` flag.
+  Additionally new `_OP_ARTIFACT_ENV_VAR_NAME` key indicates name of the
+  environment variable where the artifact was found.
   ([#515](https://github.com/crashappsec/chalk/pull/515))
 
 ## 0.5.7
