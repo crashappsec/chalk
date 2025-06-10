@@ -241,6 +241,27 @@ proc getAwsToken(): Option[string] =
           "See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html"
         ),
       )
+    elif "Invalid argument" in msg:
+      addFailedKey(
+        "_OP_CLOUD_METADATA",
+        code = "IMDS_OS_ERROR",
+        error = msg,
+        description = (
+          "Chalk encountered an error connecting to IMDSv2 due to an OS error. " &
+          "This most likely indicates custom networking configuration in the OS which disallows connections to: " & getUrl("") & ". " &
+          "See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html"
+        ),
+      )
+    else:
+      addFailedKey(
+        "_OP_CLOUD_METADATA",
+        code = "IMDS_UNKNOWN",
+        error = msg,
+        description = (
+          "Chalk could not communicate with IMDSv2. " &
+          "See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html"
+        ),
+      )
     return none(string)
 
 proc oneItem(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
