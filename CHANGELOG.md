@@ -57,6 +57,8 @@
   IO which could possibly fail with OOM. Standard in/out is no longer captured
   for pass-through commands to resolve that.
   ([#514](https://github.com/crashappsec/chalk/pull/514))
+- Support for IPv6 Docker registry references
+  ([#520](https://github.com/crashappsec/chalk/pull/520))
 
 ## 0.5.7
 

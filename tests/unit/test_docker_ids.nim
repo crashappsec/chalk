@@ -23,6 +23,15 @@ proc main() =
   assertEq(parseImage("foo.com:1234/test:tag"), image("foo.com:1234/test", "tag", ""))
   assertEq(parseImage("127.0.0.1/test:tag"), image("127.0.0.1/test", "tag", ""))
   assertEq(parseImage("127.0.0.1:1234/test:tag"), image("127.0.0.1:1234/test", "tag", ""))
+  assertEq(parseImage("[2001:df8:0:0:0:ab1:0:0]/test"), image("[2001:df8:0:0:0:ab1:0:0]/test", "latest", ""))
+  assertEq(parseImage("[2001:df8:0:0:0:ab1:0:0]/test:tag"), image("[2001:df8:0:0:0:ab1:0:0]/test", "tag", ""))
+  assertEq(parseImage("[2001:df8:0:0:0:ab1:0:0]:1234/test:tag"), image("[2001:df8:0:0:0:ab1:0:0]:1234/test", "tag", ""))
+
+  assertEq(parseImage("[2001:df8:0:0:0:ab1:0:0]/test:tag").registry, "[2001:df8:0:0:0:ab1:0:0]")
+  assertEq(parseImage("[2001:df8:0:0:0:ab1:0:0]/test:tag").domain, "[2001:df8:0:0:0:ab1:0:0]")
+  assertEq(parseImage("[2001:df8:0:0:0:ab1:0:0]:1234/test:tag").registry, "[2001:df8:0:0:0:ab1:0:0]:1234")
+  assertEq(parseImage("[2001:df8:0:0:0:ab1:0:0]:1234/test:tag").domain, "[2001:df8:0:0:0:ab1:0:0]")
+
   assertEq(parseImage("sha256:bb99ae95b8ce6a10d397d0b8998cfe12ac055baabd917be9e00cd095991b8630"), image("", "", "bb99ae95b8ce6a10d397d0b8998cfe12ac055baabd917be9e00cd095991b8630"))
 
   assertEq($(parseImage("foo").uri), "https://registry-1.docker.io/v2/library/foo")
@@ -39,8 +48,11 @@ proc main() =
   assertEq($(parseImage("localhost/bar").uri), "http://localhost/v2/bar")
   assertEq($(parseImage("localhost:1234/bar").uri), "http://localhost:1234/v2/bar")
   assertEq($(parseImage("127.0.0.1/bar").uri), "http://127.0.0.1/v2/bar")
-  assertEq($(parseImage("127.0.0.1/bar").uri), "http://127.0.0.1/v2/bar")
   assertEq($(parseImage("127.0.0.1:1234/bar").uri), "http://127.0.0.1:1234/v2/bar")
+  assertEq($(parseImage("1.1.1.1/bar").uri), "https://1.1.1.1/v2/bar")
+  assertEq($(parseImage("1.1.1.1:1234/bar").uri), "https://1.1.1.1:1234/v2/bar")
+  assertEq($(parseImage("[2001:df8:0:0:0:ab1:0:0]/bar").uri), "https://[2001:df8:0:0:0:ab1:0:0]/v2/bar")
+  assertEq($(parseImage("[2001:df8:0:0:0:ab1:0:0]:1234/bar").uri), "https://[2001:df8:0:0:0:ab1:0:0]:1234/v2/bar")
 
   assertEq($(parseImage("localhost/bar").uri(scheme="https://")), "https://localhost/v2/bar")
   assertEq($(parseImage("foo").uri(path = "/manifests/latest")), "https://registry-1.docker.io/v2/library/foo/manifests/latest")
