@@ -309,7 +309,13 @@ proc registry*(self: DockerImage): string =
   return parts[0]
 
 proc domain*(self: DockerImage): string =
-  return self.registry.split(':', maxsplit = 1)[0]
+  let
+    registry = self.registry
+    parsed   = parseUri("http://" & registry)
+  if parsed.isIpv6:
+    return "[" & parsed.hostname & "]"
+  else:
+    return parsed.hostname
 
 proc name*(self: DockerImage): string =
   return self.normalize().repo.split('/', maxsplit = 1)[^1]
