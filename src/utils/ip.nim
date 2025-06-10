@@ -54,8 +54,8 @@ proc ipRange*(self: IpAddress, bits: uint): IpRange =
     return (ip, ip)
   let
     a, b = ip
-    ma   = if same >  64: 0'u64        else: high(uint64) shr same
-    mb   = if same <= 64: high(uint64) else: high(uint64) shr (same - 64)
+    ma   = if same >= 64: 0'u64        else: high(uint64) shr same
+    mb   = if same <  64: high(uint64) else: high(uint64) shr (same - 64)
   result = (
     (a[0].clearMasked(ma), b[1].clearMasked(mb)),
     (a[0].setMasked(ma),   b[1].setMasked(mb)),
@@ -83,3 +83,72 @@ proc contains*(ipRange: IpRange, self: IpAddress): bool =
     n           = self.toInt()
     (low, high) = ipRange
   return n >= low and n <= high
+
+let
+  specialPurposeIpv4 = @[
+    # https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml
+    "0.0.0.0/8".parseIpCidrRange(),
+    "0.0.0.0/32".parseIpCidrRange(),
+    "10.0.0.0/8".parseIpCidrRange(),
+    "100.64.0.0/10".parseIpCidrRange(),
+    "127.0.0.0/8".parseIpCidrRange(),
+    "169.254.0.0/16".parseIpCidrRange(),
+    "172.16.0.0/12".parseIpCidrRange(),
+    "192.0.0.0/24".parseIpCidrRange(),
+    "192.0.0.0/29".parseIpCidrRange(),
+    "192.0.0.8/32".parseIpCidrRange(),
+    "192.0.0.9/32".parseIpCidrRange(),
+    "192.0.0.10/32".parseIpCidrRange(),
+    "192.0.0.170/32".parseIpCidrRange(),
+    "192.0.0.171/32".parseIpCidrRange(),
+    "192.0.2.0/24".parseIpCidrRange(),
+    "192.31.196.0/24".parseIpCidrRange(),
+    "192.52.193.0/24".parseIpCidrRange(),
+    "192.88.99.0/24".parseIpCidrRange(),
+    "192.168.0.0/16".parseIpCidrRange(),
+    "192.175.48.0/24".parseIpCidrRange(),
+    "198.18.0.0/15".parseIpCidrRange(),
+    "198.51.100.0/24".parseIpCidrRange(),
+    "203.0.113.0/24".parseIpCidrRange(),
+    "240.0.0.0/4".parseIpCidrRange(),
+    "255.255.255.255/32".parseIpCidrRange(),
+  ]
+  specialPurposeIpv6 = @[
+    # https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
+    "::1/128".parseIpCidrRange(),
+    "::/128".parseIpCidrRange(),
+    "::ffff:0:0/96".parseIpCidrRange(),
+    "64:ff9b::/96".parseIpCidrRange(),
+    "64:ff9b:1::/48".parseIpCidrRange(),
+    "100::/64".parseIpCidrRange(),
+    "100:0:0:1::/64".parseIpCidrRange(),
+    "2001::/23".parseIpCidrRange(),
+    "2001::/32".parseIpCidrRange(),
+    "2001:1::1/128".parseIpCidrRange(),
+    "2001:1::2/128".parseIpCidrRange(),
+    "2001:1::3/128".parseIpCidrRange(),
+    "2001:2::/48".parseIpCidrRange(),
+    "2001:3::/32".parseIpCidrRange(),
+    "2001:4:112::/48".parseIpCidrRange(),
+    "2001:10::/28".parseIpCidrRange(),
+    "2001:20::/28".parseIpCidrRange(),
+    "2001:30::/28".parseIpCidrRange(),
+    "2001:db8::/32".parseIpCidrRange(),
+    "2002::/16".parseIpCidrRange(),
+    "2620:4f:8000::/48".parseIpCidrRange(),
+    "3fff::/20".parseIpCidrRange(),
+    "5f00::/16".parseIpCidrRange(),
+    "fc00::/7".parseIpCidrRange(),
+    "fe80::/10".parseIpCidrRange(),
+  ]
+
+proc isSpecialPurpose*(self: IpAddress): bool =
+  let ranges =
+    if self.family == IPv6:
+      specialPurposeIpv6
+    else:
+      specialPurposeIpv4
+  for i, special in ranges:
+    if self in special:
+      return true
+  return false
