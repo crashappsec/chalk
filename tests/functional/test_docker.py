@@ -478,6 +478,29 @@ def test_recursion_wrapping(chalk: Chalk, random_hex: str):
     assert run
 
 
+def test_subscan(chalk: Chalk, server_cert: Path, random_hex: str):
+    _, build = chalk.docker_build(
+        config=CONFIGS / "docker_wrap.c4m",
+        tag=random_hex,
+        context=server_cert.parent,
+        content=Docker.dockerfile(
+            """
+            FROM alpine
+            """
+        ),
+    )
+    assert build.artifacts_by_path.contains(
+        {
+            str(server_cert): {
+                "_X509_SUBJECT": "/CN=tls.chalk.local",
+                "_OP_ARTIFACT_PATH_WITHIN_VCTL": str(
+                    server_cert.relative_to(TESTS.parent.parent)
+                ),
+            }
+        }
+    )
+
+
 def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
     (
         Git(tmp_data_dir)
@@ -1822,7 +1845,7 @@ def test_extract(chalk: Chalk, random_hex: str):
         {
             "_OP_ARTIFACT_TYPE": "Docker Container",
             "_IMAGE_ID": image_id,
-            "_CURRENT_HASH": image_id,
+            "_CURRENT_HASH": container_id,
             "_INSTANCE_CONTAINER_ID": container_id,
             "_INSTANCE_NAME": container_name,
             "_INSTANCE_STATUS": "running",
@@ -1852,7 +1875,7 @@ def test_extract(chalk: Chalk, random_hex: str):
         {
             "_OP_ARTIFACT_TYPE": "Docker Container",
             "_IMAGE_ID": image_id,
-            "_CURRENT_HASH": image_id,
+            "_CURRENT_HASH": container_id,
             "_INSTANCE_CONTAINER_ID": container_id,
             "_INSTANCE_NAME": container_name,
             "_INSTANCE_STATUS": "exited",

@@ -5,10 +5,20 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import "../docker"/[collect, ids, exe, registry, nodes]
-import ".."/[config, plugin_api, semver, chalkjson]
-
-const markLocation = "/chalk.json"
+import "../docker"/[
+  collect,
+  exe,
+  ids,
+  nodes,
+  registry,
+]
+import ".."/[
+  chalkjson,
+  plugin_api,
+  run_management,
+  types,
+  utils/semver,
+]
 
 proc dockerGetChalkId(self: Plugin, chalk: ChalkObj): string {.cdecl.} =
   if chalk.extract != nil and "CHALK_ID" in chalk.extract:

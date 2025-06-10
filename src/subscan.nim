@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -8,7 +8,11 @@
 ## Implements recursive scanning, for instance, used to process
 ## contents of zip files.
 
-import "."/config
+import "."/[
+  config,
+  run_management,
+  types,
+]
 
 # For the moment, this seems to be breaking our external dependency?!!!
 proc runCmdInsert*(path: seq[string]) {.importc.}

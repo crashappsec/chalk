@@ -16,6 +16,7 @@ SOURCES+=$(shell find src/ -name '*.nim')
 SOURCES+=$(shell find src/ -name '*.c4m')
 SOURCES+=$(shell find src/ -name '*.c42spec')
 SOURCES+=$(shell find src/ -name '*.md')
+SOURCES+=$(shell find src/ -name '*.c')
 SOURCES+=$(shell find ../con4m -name '*.nim' 2> /dev/null)
 SOURCES+=$(shell find ../con4m -name '*.c4m' 2> /dev/null)
 SOURCES+=$(shell find ../nimutils -name '*.nim' 2> /dev/null)
@@ -71,6 +72,9 @@ clean:
 chalk-docs: $(BINARY)
 	rm -rf $@
 	$(DOCKER) ./$(BINARY) docgen
+
+watch: $(SOURCES)
+	echo $^ | tr ' ' '\n' | entr $(MAKE)
 
 # devmode for local deps
 # this allows to dev againt local versions of nimutils/con4m
@@ -176,8 +180,8 @@ tests_parallel: tests
 tests_bash:
 	docker compose run --rm --no-deps tests bash
 
-.PHONY: src/pingttl
-src/pingttl: src/pingttl.nim
+.PHONY: src/utils/pingttl
+src/utils/pingttl: src/utils/pingttl.nim
 	$(DOCKER) nim c -r $< 1.1.1.1 1
 	-docker compose run --rm --no-deps --entrypoint=strace tests -- $$(pwd)/$@ 1.1.1.1 1
 	-docker compose run --rm --no-deps --entrypoint=strace tests -- $$(pwd)/$@ 1.1.1.1 2

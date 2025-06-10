@@ -24,7 +24,7 @@ plugin system {
   pre_chalk_keys:  ["MAGIC", "OLD_CHALK_METADATA_HASH", "OLD_CHALK_METADATA_ID",
                     "PRE_CHALK_HASH"]
 
-  post_chalk_keys: ["_OP_ARTIFACT_PATH", "_CURRENT_HASH",
+  post_chalk_keys: ["_OP_ARTIFACT_PATH", "_OP_ARTIFACT_ENV_VAR_NAME", "_CURRENT_HASH",
                     "_OP_CHALKED_KEYS", "_OP_ARTIFACT_REPORT_KEYS", "_VIRTUAL",
                     "_VALIDATED_SIGNATURE", "_VALIDATED_METADATA",
                     "_INVALID_SIGNATURE"]
@@ -96,6 +96,7 @@ plugin vctl_git {
                       "COMMITTER", "DATE_COMMITTED", "TIMESTAMP_COMMITTED", "COMMIT_MESSAGE",
                       "TAG", "TAG_SIGNED", "TAGGER", "DATE_TAGGED", "TIMESTAMP_TAGGED",
                       "TAG_MESSAGE", "VCS_DIR_WHEN_CHALKED", "VCS_MISSING_FILES"]
+    post_chalk_keys: ["_OP_ARTIFACT_PATH_WITHIN_VCTL"]
     post_run_keys:   ["_COMMIT_ID", "_COMMIT_SIGNED",
                       "_BRANCH", "_ORIGIN_URI",
                       "_AUTHOR", "_DATE_AUTHORED", "_TIMESTAMP_AUTHORED",
@@ -296,7 +297,6 @@ plugin aws_lambda {
 Captures metadata from the environment variables in AWS Lambda function.
 """
 }
-
 
 # This plugin takes values from the conf file, whether they're static
 # values, or callbacks. By default, these are of the lowest priority
@@ -528,6 +528,30 @@ as source, but are distributed as python byte code (.pyc files).
 <p>
 Accepted file extensions can be set using the `pyc_extensions`
 configuration variable.
+"""
+}
+
+plugin certs {
+  enabled:         true
+  codec:           true
+  priority:        1
+  post_chalk_keys: ["_OP_ARTIFACT_TYPE",
+                    "_X509_VERSION",
+                    "_X509_SUBJECT",
+                    "_X509_SUBJECT_ALTERNATIVE_NAME",
+                    "_X509_SERIAL",
+                    "_X509_KEY",
+                    "_X509_KEY_USAGE",
+                    "_X509_EXTENDED_KEY_USAGE",
+                    "_X509_BASIC_CONSTRAINTS",
+                    "_X509_ISSUER",
+                    "_X509_SUBJECT_KEY_IDENTIFIER",
+                    "_X509_AUTHORITY_KEY_IDENTIFIER",
+                    "_X509_NOT_BEFORE",
+                    "_X509_NOT_AFTER",
+                    "_X509_EXTRA_EXTENSIONS"]
+  doc: """
+Collect metadata about cert PEM files.
 """
 }
 

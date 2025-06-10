@@ -174,7 +174,7 @@ def server_sql():
 def server_cert():
     if not SERVER_CERT.is_file():
         pytest.skip(f"{SERVER_CERT} is missing. skipping test")
-    return str(SERVER_CERT)
+    return SERVER_CERT
 
 
 @lru_cache()
@@ -198,7 +198,7 @@ def server_http():
 
 
 @pytest.fixture()
-def server_https(server_cert: str):
+def server_https(server_cert: Path):
     if not is_server_up(f"{SERVER_HTTPS}/health", verify=server_cert):
         pytest.skip(f"{SERVER_HTTPS} is down. skipping test")
     return SERVER_HTTPS

@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2024, Crash Override, Inc.
+## Copyright (c) 2024-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -29,10 +29,24 @@
 ## * when cache reaches its limit size, it closes LRU file streams
 ##
 
-# TODO move this to nimutils
+import std/[
+  enumerate,
+  posix,
+  streams,
+]
+import pkg/[
+  nimutils/file,
+]
+import "."/[
+  tables,
+]
 
-import std/[enumerate, posix, streams, tables]
-import nimutils/file
+# copy of upstream shape which allows to access internal File reference
+# as otherwise its a private attribute
+type
+  MyFileStream = ref MyFileStreamObj
+  MyFileStreamObj = object of Stream
+    f*: File
 
 # ----------------------------------------------------------------------------
 
@@ -258,3 +272,6 @@ template withFileStream*(path: string,
                          code: untyped) =
   fdCache.withFileStream(path, mode, strict):
     code
+
+proc getOsFileHandle*(fs: FileStream): FileHandle =
+  return cast[MyFileStream](fs).f.getOsFileHandle()

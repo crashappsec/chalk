@@ -2433,6 +2433,31 @@ However, on insertion operations, this field is redundant with
 """
 }
 
+keyspec _OP_ARTIFACT_ENV_VAR_NAME {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    system:           true
+    since:            "0.5.8"
+    shortdoc:         "Env var name where artifact was found during the current operation"
+    doc:              """
+Name of the env var for a given artifact, in the environment local for
+the current operation.
+"""
+}
+
+keyspec _OP_ARTIFACT_PATH_WITHIN_VCTL {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    system:           false
+    since:            "0.5.8"
+    shortdoc:         "Path of the artifact within the repo"
+    doc:              """
+Path of the artifact relative to the version control repo.
+"""
+}
+
 keyspec _CURRENT_HASH {
     kind:             RunTimeArtifact
     type:             string
@@ -6189,6 +6214,278 @@ keyspec _NETWORK_PARTIAL_TRACEROUTE_IPS {
 Partial traceroutes to IPs as configured by `network.tracerroute_ips`.
 This allows to discover local network resources such as local
 ingress gateway IP even within docker network-namespaced containers.
+"""
+}
+
+keyspec _X509_VERSION {
+    kind:             RunTimeArtifact
+    type:             int
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "X509 Certificate Version"
+    doc: """
+This field describes the version of the encoded certificate.  When
+extensions are used, as expected in this profile, version MUST be 3
+(value is 2).  If no extensions are present, but a UniqueIdentifier
+is present, the version SHOULD be 2 (value is 1); however, the
+version MAY be 3.  If only basic fields are present, the version
+SHOULD be 1 (the value is omitted from the certificate as the default
+value); however, the version MAY be 2 or 3.
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.1
+"""
+}
+
+keyspec _X509_SUBJECT {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Identity certificate is bound to"
+    doc: """
+The subject field identifies the entity associated with the public
+key stored in the subject public key field.  The subject name MAY be
+carried in the subject field and/or the subjectAltName extension.  If
+the subject is a CA (e.g., the basic constraints extension, as
+discussed in Section 4.2.1.9, is present and the value of cA is
+TRUE), then the subject field MUST be populated with a non-empty
+distinguished name matching the contents of the issuer field (Section
+4.1.2.4) in all certificates issued by the subject CA.  If the
+subject is a CRL issuer (e.g., the key usage extension, as discussed
+in Section 4.2.1.3, is present and the value of cRLSign is TRUE),
+then the subject field MUST be populated with a non-empty
+distinguished name matching the contents of the issuer field (Section
+5.1.2.3) in all CRLs issued by the subject CRL issuer.  If subject
+naming information is present only in the subjectAltName extension
+(e.g., a key bound only to an email address or URI), then the subject
+name MUST be an empty sequence and the subjectAltName extension MUST
+be critical.
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.6
+"""
+}
+
+keyspec _X509_SUBJECT_ALTERNATIVE_NAME {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Alternate identities certificate is bound to"
+    doc: """
+The subject alternative name extension allows identities to be bound
+to the subject of the certificate.  These identities may be included
+in addition to or in place of the identity in the subject field of
+the certificate.  Defined options include an Internet electronic mail
+address, a DNS name, an IP address, and a Uniform Resource Identifier
+(URI).  Other options exist, including completely local definitions.
+Multiple name forms, and multiple instances of each name form, MAY be
+included.  Whenever such identities are to be bound into a
+certificate, the subject alternative name (or issuer alternative
+name) extension MUST be used; however, a DNS name MAY also be
+represented in the subject field using the domainComponent attribute
+as described in Section 4.1.2.4.  Note that where such names are
+represented in the subject field implementations are not required to
+convert them into DNS names.
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.6
+"""
+}
+
+keyspec _X509_SERIAL {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Certificate serial number"
+    doc: """
+The serial number MUST be a positive integer assigned by the CA to
+each certificate.  It MUST be unique for each certificate issued by a
+given CA (i.e., the issuer name and serial number identify a unique
+certificate).  CAs MUST force the serialNumber to be a non-negative
+integer.
+
+Given the uniqueness requirements above, serial numbers can be
+expected to contain long integers.  Certificate users MUST be able to
+handle serialNumber values up to 20 octets.  Conforming CAs MUST NOT
+use serialNumber values longer than 20 octets.
+
+Note: Non-conforming CAs may issue certificates with serial numbers
+that are negative or zero.  Certificate users SHOULD be prepared to
+gracefully handle such certificates.
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.2
+"""
+}
+
+keyspec _X509_KEY {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Certificate public key"
+    doc: """
+Content of the public key.
+"""
+}
+
+keyspec _X509_KEY_USAGE {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Certificate key usage restrictions"
+    doc: """
+The key usage extension defines the purpose (e.g., encipherment,
+signature, certificate signing) of the key contained in the
+certificate.  The usage restriction might be employed when a key that
+could be used for more than one operation is to be restricted.  For
+example, when an RSA key should be used only to verify signatures on
+objects other than public key certificates and CRLs, the
+digitalSignature and/or nonRepudiation bits would be asserted.
+Likewise, when an RSA key should be used only for key management, the
+keyEncipherment bit would be asserted.
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.3
+"""
+}
+
+keyspec _X509_EXTENDED_KEY_USAGE {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Purpose for the certificate usage (e.g. TLS)"
+    doc: """
+This extension indicates one or more purposes for which the certified
+public key may be used, in addition to or in place of the basic
+purposes indicated in the key usage extension.  In general, this
+extension will appear only in end entity certificates.
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.12
+"""
+}
+
+keyspec _X509_BASIC_CONSTRAINTS {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "CA certificate indication"
+    doc: """
+The basic constraints extension identifies whether the subject of the
+certificate is a CA and the maximum depth of valid certification
+paths that include this certificate.
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.9
+"""
+}
+
+keyspec _X509_ISSUER {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Subject of the CA which minted the cert"
+    doc: """
+The issuer field identifies the entity that has signed and issued the
+certificate.  The issuer field MUST contain a non-empty distinguished
+name (DN).  The issuer field is defined as the X.501 type Name [X.501].
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.4
+"""
+}
+
+keyspec _X509_SUBJECT_KEY_IDENTIFIER {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Identity of the key for the certificate"
+    doc: """
+The subject key identifier extension provides a means of identifying
+certificates that contain a particular public key.
+
+To facilitate certification path construction, this extension MUST
+appear in all conforming CA certificates, that is, all certificates
+including the basic constraints extension (Section 4.2.1.9) where the
+value of cA is TRUE.  In conforming CA certificates, the value of the
+subject key identifier MUST be the value placed in the key identifier
+field of the authority key identifier extension (Section 4.2.1.1) of
+certificates issued by the subject of this certificate.  Applications
+are not required to verify that key identifiers match when performing
+certification path validation.
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.2
+"""
+}
+
+keyspec _X509_AUTHORITY_KEY_IDENTIFIER {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Identity of the CA key used to mint certificate"
+    doc: """
+The authority key identifier extension provides a means of
+identifying the public key corresponding to the private key used to
+sign a certificate.  This extension is used where an issuer has
+multiple signing keys (either due to multiple concurrent key pairs or
+due to changeover).  The identification MAY be based on either the
+key identifier (the subject key identifier in the issuer's
+certificate) or the issuer name and serial number.
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.1
+"""
+}
+
+keyspec _X509_NOT_BEFORE {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Certificate Creation Datetime"
+    doc: """
+The certificate validity period is the time interval during which the
+CA warrants that it will maintain information about the status of the
+certificate.  The field is represented as a SEQUENCE of two dates:
+the date on which the certificate validity period begins (notBefore)
+and the date on which the certificate validity period ends
+(notAfter).  Both notBefore and notAfter may be encoded as UTCTime or
+GeneralizedTime.
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.5
+"""
+}
+
+keyspec _X509_NOT_AFTER {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Certificate Expiration Datetime"
+    doc: """
+The certificate validity period is the time interval during which the
+CA warrants that it will maintain information about the status of the
+certificate.  The field is represented as a SEQUENCE of two dates:
+the date on which the certificate validity period begins (notBefore)
+and the date on which the certificate validity period ends
+(notAfter).  Both notBefore and notAfter may be encoded as UTCTime or
+GeneralizedTime.
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.5
+"""
+}
+
+keyspec _X509_EXTRA_EXTENSIONS {
+    kind:             RunTimeArtifact
+    type:             dict[string, string]
+    standard:         true
+    since:            "0.5.7"
+    shortdoc:         "Extra Certificate Extensions"
+    doc: """
+Extra certificate extensions not already reported in other chalk keys normalized as a string.
+Note this relies on OpenSSL to map the extensions OID to a standard extension name.
+For custom extensions when the mapping is unknown, raw OID is used as the extension's name.
 """
 }
 

@@ -7,8 +7,14 @@
 
 ## The `chalk dump` command.
 
-import std/posix
-import ".."/[config, selfextract]
+import std/[
+  posix,
+]
+import ".."/[
+  run_management,
+  selfextract,
+  types,
+]
 
 proc baseDump(toDump: string) {.noreturn.} =
   publish("confdump", toDump)

@@ -9,8 +9,17 @@
 ##
 ## scan - create new chalk object and collect docker info into it
 
-import ".."/[config, plugin_api, util]
-import "."/[collect, ids, inspect, extract]
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+]
+import "."/[
+  collect,
+  extract,
+  ids,
+  inspect,
+]
 
 proc scanLocalImage*(item: string): Option[ChalkObj] =
   let chalk = newChalk(name    = item,

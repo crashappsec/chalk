@@ -1,7 +1,11 @@
-import std/[cmdline, strformat, strscans, strutils]
-from src/config_version import getChalkVersion
+import std/[cmdline, strformat, strscans, strutils, os]
 
-version       = getChalkVersion(withSuffix = false)
+when fileExists("src/config_version.nim"):
+  from src/config_version import getChalkVersion
+else:
+  proc getChalkVersion(): string = ""
+
+version       = getChalkVersion().split("-")[0]
 author        = "John Viega"
 description   = "Software artifact metadata to make it easy to tie " &
                 "deployments to source code and collect metadata."
@@ -11,7 +15,7 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 2.0.8"
-requires "https://github.com/crashappsec/con4m#7329856cf1f0a37abc3592e75d6d86bcb38643f3"
+requires "https://github.com/crashappsec/con4m#1be7501e56827a341372baf4c403af899a7f1578"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
 requires "https://github.com/NimParsers/parsetoml == 0.7.1" # MIT
 

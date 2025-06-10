@@ -5,8 +5,14 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[unicode]
-import ".."/[config, util]
+import std/[
+  unicode,
+]
+import ".."/[
+  types,
+  utils/json,
+  utils/strings,
+]
 
 template withAtomicAdds*(ctx: DockerInvocation, code: untyped) =
   withAtomicVar(ctx.addedPlatform):

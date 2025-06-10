@@ -7,9 +7,20 @@
 
 ## module for interacting with remote registry docker manifests
 
-import std/[httpclient]
-import ".."/[config, www_authenticate, semver, util]
-import "."/[exe, json, ids, registry]
+import ".."/[
+  types,
+  utils/http,
+  utils/json,
+  utils/semver,
+  utils/strings,
+  utils/www_authenticate,
+]
+import "."/[
+  exe,
+  ids,
+  json,
+  registry,
+]
 
 # cache is by repo ref as its normalized in buildx imagetools command
 var

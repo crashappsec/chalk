@@ -5,8 +5,18 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import ".."/[config, collect, util]
-import "."/[base, collect, scan]
+import ".."/[
+  collect,
+  config,
+  run_management,
+  types,
+  utils/exec,
+]
+import "."/[
+  base,
+  collect,
+  scan,
+]
 
 proc dockerPush*(ctx: DockerInvocation): int =
   ctx.newCmdLine = ctx.originalArgs

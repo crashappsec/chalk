@@ -5,15 +5,19 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/json
 import ".."/[
   chalkjson,
   collect,
   config,
   plugin_api,
   plugins/vctlGit,
+  run_management,
   subscan,
-  util,
+  types,
+  utils/atomic,
+  utils/exec,
+  utils/files,
+  utils/json,
 ]
 import "."/[
   base,
@@ -312,27 +316,19 @@ proc readMetadataFile(ctx: DockerInvocation) =
     data = "{}"
   ctx.metadataFile = data.tryParseMetadataFile()
 
-proc launchDockerSubscan(ctx:     DockerInvocation,
-                         contexts: seq[string]): Box =
-
-  var usableContexts: seq[string]
-  for context in contexts:
-    if context == "-":
-      warn("docker: currently cannot sub-chalk contexts passed via stdin.")
-      continue
-    if ':' in context:
-      warn("docker: cannot sub-chalk remote context: " & context & " (skipping)")
-      continue
-    try:
-      discard context.resolvePath().getFileInfo()
-      usableContexts.add(context)
-    except:
-      warn("docker: cannot find context directory for subscan: " & context)
-      continue
-  if len(usableContexts) == 0:
+proc launchDockerSubchalk(ctx:     DockerInvocation,
+                          contexts: seq[string]): Box =
+  if len(contexts) == 0:
     warn("docker: no context sub scanning performed.")
-  info("docker: starting a recursive subscan of context directories.")
-  result = runChalkSubScan(usableContexts, "insert").report
+  info("docker: starting a recursive chalking of context directories.")
+  result = runChalkSubScan(contexts, "insert").report
+  trace("docker: chalking complete.")
+
+proc launchDockerSubscan(ctx:     DockerInvocation,
+                         contexts: seq[string]): seq[ChalkObj] =
+  if len(contexts) == 0:
+    warn("docker: no context sub scanning performed.")
+  result = runChalkSubScan(contexts, "extract").allChalks
   trace("docker: subscan complete.")
 
 proc collectBaseImage(chalk: ChalkObj, ctx: DockerInvocation, section: DockerFileSection) =
@@ -361,11 +357,15 @@ proc collectBaseImages(chalk: ChalkObj, ctx: DockerInvocation) =
 
 proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
   let
-    baseSection       = ctx.getBaseDockerSection()
-    dict              = chalk.collectedData
-    git               = getPluginByName("vctl_git")
-    projectRootPath   = git.gitFirstDir().parentDir()
-    dockerfileRelPath = getRelativePathBetween(projectRootPath, ctx.dockerFileLoc)
+    baseSection         = ctx.getBaseDockerSection()
+    dict                = chalk.collectedData
+    git                 = getPluginByName("vctl_git")
+    gitPathOpt          = git.gitFirstDir()
+  if gitPathOpt.isSome():
+    let
+      repoPath          = gitPathOpt.get().parentDir()
+      dockerfileRelPath = getRelativePathBetween(repoPath, ctx.dockerFileLoc)
+    dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",     dockerfileRelPath)
   chalk.collectBaseImages(ctx)
   if chalk.baseChalk != nil:
     if chalk.baseChalk.isMarked():
@@ -373,7 +373,6 @@ proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
       dict.setIfNeeded("DOCKER_BASE_IMAGE_CHALK",       chalk.baseChalk.extract)
     dict.setIfNeeded("DOCKER_BASE_IMAGE_ID",            chalk.baseChalk.collectedData.getOrDefault("_IMAGE_ID"))
   dict.setIfNeeded("DOCKERFILE_PATH",                   ctx.dockerFileLoc)
-  dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",       dockerfileRelPath)
   dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",        ctx.foundExtraContexts)
   dict.setIfNeeded("DOCKER_CONTEXT",                    ctx.foundContext)
   dict.setIfNeeded("DOCKER_FILE",                       ctx.inDockerFile)
@@ -464,7 +463,9 @@ proc dockerBuild*(ctx: DockerInvocation): int =
     )
     wrapVirtual    = attrGet[bool]("virtual_chalk")
     wrapEntrypoint = attrGet[bool]("docker.wrap_entrypoint")
-    dockerSubscan  = attrGet[bool]("chalk_contained_items")
+    dockerSubchalk = attrGet[bool]("chalk_contained_items")
+    subscanRun     = attrGet[bool]("docker.scan_context.run")
+    subscanCodecs  = attrGet[seq[string]]("docker.scan_context.codecs")
 
   trace("docker: processing build CLI args")
   ctx.processGitContext()
@@ -478,16 +479,32 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   forceChalkKeys(["DOCKER_PLATFORM"])
 
   trace("docker: collecting pre-build metadata")
-  let contexts = ctx.getAllDockerContexts()
+  let contexts = ctx.getUsableDockerContexts()
   setContextDirectories(contexts)
   initCollection()
-  if dockerSubscan:
-    info("docker: starting subscan of context directories.")
-    let
-      subscanBox = ctx.launchDockerSubscan(contexts)
-      unpacked   = unpack[seq[Box]](subscanBox)
-    baseChalk.collectedData.setIfNeeded("EMBEDDED_CHALK", unpacked)
-    info("docker: context directories subscan finished.")
+  if dockerSubchalk:
+    try:
+      info("docker: starting chalking of context directories.")
+      let
+        subchalkBox = ctx.launchDockerSubchalk(contexts)
+        unpacked     = unpack[seq[Box]](subchalkBox)
+      baseChalk.collectedData.setIfNeeded("EMBEDDED_CHALK", unpacked)
+      info("docker: context directories chalking finished.")
+    except:
+      error("docker: could not subchalk due to: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
+  if subscanRun:
+    try:
+      withOnlyCodecs(getPluginsByName(subscanCodecs)):
+        info("docker: starting sub-scan of context directories.")
+        for chalk in ctx.launchDockerSubscan(contexts):
+          # as its a subscan, artifact info is not collected hence needs to be manually triggered
+          chalk.collectRunTimeArtifactInfo()
+          addToAllArtifacts(chalk)
+        info("docker: context directories subscan finished.")
+    except:
+      error("docker: could not subchalk due to: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
 
   ctx.processPlatforms()
   ctx.pinBuildSectionBaseImages()

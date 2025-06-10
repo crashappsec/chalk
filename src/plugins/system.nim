@@ -11,9 +11,23 @@
 when defined(posix):
   import std/posix_utils
 
-import std/[nativesockets, sequtils, times, monotimes]
-import ".."/[config, plugin_api, normalize, chalkjson, attestation_api,
-             util]
+import std/[
+  nativesockets,
+  sequtils,
+]
+import ".."/[
+  attestation_api,
+  chalkjson,
+  config,
+  normalize,
+  plugin_api,
+  run_management,
+  types,
+  utils/envvars,
+  utils/exec,
+  utils/files,
+  utils/times,
+]
 
 var execId = secureRand[uint64]().toHex().toLower()
 
@@ -76,10 +90,6 @@ proc sysGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
                                                         ChalkDict {.cdecl.} =
   result                           = ChalkDict()
   result["MAGIC"]                  = pack(magicUTF8)
-
-  if isSubscribedKey("PRE_CHALK_HASH") and obj.fsRef != "":
-    withFileStream(obj.fsRef, mode = fmRead, strict = true):
-      result["PRE_CHALK_HASH"] = pack(stream.readAll().sha256Hex())
 
   if obj.isMarked() and "METADATA_HASH" in obj.extract:
     let h = unpack[string](obj.extract["METADATA_HASH"]).strip().parseHexStr()
@@ -145,8 +155,10 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
 
   else:
     result.setValidated(obj, obj.validateMetaData())
-    if obj.fsRef != "":
-      result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
+
+  if obj.fsRef != "":
+    result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
+  result.setIfNeeded("_OP_ARTIFACT_ENV_VAR_NAME", obj.envVarName)
 
   let
     tmpl       = getReportTemplate()
@@ -270,18 +282,11 @@ proc attestationGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   obj.collectedData.setIfNeeded("ERR_INFO", obj.err)
   obj.collectedData.setIfNeeded("FAILED_KEYS", obj.failedKeys)
 
-  let
-    toHash       = obj.getChalkMark().normalizeChalk()
-    computed     = toHash.sha256()
-    computedHash = computed.hex()
-    computedId   = computed.idFormat()
-
-  result["METADATA_HASH"] = pack(computedHash)
-  result["METADATA_ID"]   = pack(computedId)
+  result.merge(obj.computeMetadataHashAndId())
 
   if obj.willSignByHash():
     try:
-      result.update(obj.signByHash(computedHash))
+      result.update(obj.signByHash(unpack[string](result["METADATA_HASH"])))
     except:
       error("Cannot sign " & obj.name & ": " & getCurrentExceptionMsg())
 
@@ -312,6 +317,7 @@ proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
 
 proc loadSystem*() =
   newPlugin("system",
+            resourceTypes  = allResourceTypes,
             clearCallback  = PluginClearCb(clearCallback),
             ctHostCallback = ChalkTimeHostCb(sysGetChalkTimeHostInfo),
             ctArtCallback  = ChalkTimeArtifactCb(sysGetChalkTimeArtifactInfo),
@@ -319,8 +325,10 @@ proc loadSystem*() =
             rtHostCallback = RunTimeHostCb(sysGetRunTimeHostInfo))
 
   newPlugin("attestation",
+            resourceTypes  = allResourceTypes,
             ctArtCallback  = ChalkTimeArtifactCb(attestationGetChalkTimeArtifactInfo),
             rtArtCallback  = RunTimeArtifactCb(attestationGetRunTimeArtifactInfo))
 
   newPlugin("metsys",
+            resourceTypes  = allResourceTypes,
             rtHostCallback = RunTimeHostCb(metsysGetRunTimeHostInfo))

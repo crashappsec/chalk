@@ -7,8 +7,18 @@
 
 ## Utilities for inspecting/fetching/wrapping dockerfile entrypoints
 
-import ".."/[config, util]
-import "."/[dockerfile, exe, ids, image, wrap, util]
+import ".."/[
+  types,
+  utils/json,
+]
+import "."/[
+  dockerfile,
+  exe,
+  ids,
+  image,
+  util,
+  wrap,
+]
 
 proc getTargetEntrypoints(ctx: DockerInvocation, platform: DockerPlatform): DockerEntrypoint =
   ## get entrypoints (entrypoint/cmd/shell) from the target section

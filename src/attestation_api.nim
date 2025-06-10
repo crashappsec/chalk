@@ -1,14 +1,33 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[net, os, json]
-import "."/[chalkjson, config, selfextract, plugin_api, semver, util]
-import "./attestation"/[embed, get, utils]
-import "./docker"/[ids]
+import std/[
+  net,
+  os,
+]
+import "."/[
+  chalkjson,
+  config,
+  plugin_api,
+  run_management,
+  selfextract,
+  types,
+  utils/json,
+  utils/semver,
+]
+import "./attestation"/[
+  embed,
+  get,
+  utils,
+]
+import "./docker"/[
+  ids,
+]
+
 export getCosignLocation, canVerifyByHash, canVerifyBySigStore # from utils
 
 proc writeSelfConfig(selfChalk: ChalkObj): bool {.importc, discardable.}

@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -16,8 +16,19 @@
 when (NimMinor, NimPatch) >= (6, 14):
   {.warning[CastSizes]: off.}
 
-import std/[unicode, parseutils, algorithm]
-import "."/[config, util]
+import std/[
+  algorithm,
+  parseutils,
+  unicode,
+]
+import "."/[
+  config,
+  normalize,
+  run_management,
+  types,
+  utils/json,
+  utils/strings,
+]
 
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']
@@ -495,7 +506,7 @@ proc forcePrivateKeys() =
 
   forceChalkKeys(toForce)
 
-proc getChalkMark*(obj: ChalkObj): ChalkDict =
+proc getChalkMark*(obj: ChalkObj, onlyCollected = false): ChalkDict =
   # we already have exact chalkmark so use it
   # as otherwise we might compute different keys
   # for example if the chalk template config has changed
@@ -509,15 +520,29 @@ proc getChalkMark*(obj: ChalkObj): ChalkDict =
 
   assert "CHALK_VERSION" in hostInfo or "CHALK_VERSION" in obj.collectedData
 
-  result              = hostInfo.filterByTemplate(templ)
+  result = ChalkDict()
+  if not onlyCollected:
+    result            = hostInfo.filterByTemplate(templ)
   result.merge(obj.collectedData.filterByTemplate(templ))
 
-proc getChalkMarkAsStr*(obj: ChalkObj): string =
+proc getChalkMarkAsStr*(obj: ChalkObj, onlyCollected = false): string =
   if obj.cachedMark != "":
     trace("Chalk cachemark " & obj.cachedMark)
     return obj.cachedMark
-  let mark = obj.getChalkMark()
+  let mark = obj.getChalkMark(onlyCollected = onlyCollected)
   result = mark.toJson()
   obj.cachedMark = result
   if not result.startsWith("""{ "MAGIC" :"""):
     error("MAGIC not provided; mark is invalid.")
+
+
+proc computeMetadataHashAndId*(obj: ChalkObj, onlyCollected = false): ChalkDict =
+  let
+    toHash       = obj.getChalkMark(onlyCollected = onlyCollected).normalizeChalk()
+    computed     = toHash.sha256()
+    computedHash = computed.hex()
+    computedId   = computed.idFormat()
+
+  result = ChalkDict()
+  result["METADATA_HASH"] = pack(computedHash)
+  result["METADATA_ID"]   = pack(computedId)

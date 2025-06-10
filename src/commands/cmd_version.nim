@@ -7,9 +7,13 @@
 
 ## The `chalk version` command.
 
-import "../attestation"/utils
-import "../docker"/exe
-import ".."/[config, semver]
+import ".."/[
+  attestation/utils,
+  config,
+  docker/exe,
+  types,
+  utils/semver,
+]
 
 proc default(version: Version, default = ""): string =
   if version == parseVersion("0"):

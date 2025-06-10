@@ -8,9 +8,19 @@
 ## Common docker-specific utility bits used in various parts of the
 ## implementation.
 
-import "../commands"/[cmd_help]
-import ".."/[config, util, reporting]
-import "."/[exe, ids, platform]
+import ".."/[
+  commands/cmd_help,
+  reporting,
+  types,
+  utils/exec,
+  utils/files,
+  utils/subproc,
+]
+import "."/[
+  exe,
+  ids,
+  platform,
+]
 
 proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
   # If our mundged docker invocation fails, then we conservatively
@@ -78,6 +88,22 @@ proc getAllDockerContexts*(ctx: DockerInvocation): seq[string] =
       result.add(resolvePath(ctx.foundContext))
   for k, v in ctx.foundExtraContexts:
     result.add(resolvePath(v))
+
+proc getUsableDockerContexts*(ctx: DockerInvocation): seq[string] =
+  result = @[]
+  for context in ctx.getAllDockerContexts():
+    if context == "-":
+      warn("docker: currently cannot use contexts passed via stdin.")
+      continue
+    if ':' in context:
+      warn("docker: cannot use remote context: " & context & " (skipping)")
+      continue
+    try:
+      discard context.resolvePath().getFileInfo()
+      result.add(context)
+    except:
+      warn("docker: cannot find context directory for chalking: " & context)
+      continue
 
 proc isMultiPlatform*(ctx: DockerInvocation): bool =
   return len(ctx.foundPlatforms) > 1

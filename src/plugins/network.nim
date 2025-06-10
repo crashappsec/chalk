@@ -5,13 +5,21 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[net]
-import ".."/[config, plugin_api, pingttl]
+import std/[
+  net,
+]
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+  utils/pingttl,
+]
+
 
 proc getTtlIps(): Box =
   var data = newTable[string, seq[string]]()
   # pingttl is only implemented for linux
-  when hostOs == "linux":
+  when hostOS == "linux":
     let
       ipHops    = attrGet[TableRef[string, int]]("network.partial_traceroute_ips")
       timeoutMs = attrGet[int]("network.partial_traceroute_timeout_ms")

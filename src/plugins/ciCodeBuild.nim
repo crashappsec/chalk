@@ -8,8 +8,12 @@
 ## This plugin is responsible for providing metadata gleaned from a
 ## AWS Code Build CI environment.
 
-import std/[strutils]
-import ".."/[config, plugin_api]
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+  utils/envvars,
+]
 
 proc codeBuildGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
   result = ChalkDict()

@@ -5,9 +5,16 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[posix]
-import ".."/[config]
-import "."/utils
+import std/[
+  posix,
+]
+import ".."/[
+  types,
+  utils/files,
+]
+import "."/[
+  utils,
+]
 
 type Embed = ref object of AttestationKeyProvider
   filename:  string

@@ -5,8 +5,17 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[base64, os]
-import ".."/[config, semver, util, docker/ids]
+import std/[
+  base64,
+  os,
+]
+import ".."/[
+  docker/ids,
+  config,
+  types,
+  utils/files,
+  utils/semver,
+]
 
 var cosignLoc      = ""
 var cosignVersion  = parseVersion("0")
@@ -70,7 +79,7 @@ proc canAttestVerify*(key: AttestationKey): bool =
   )
 
 proc canVerifyByHash*(chalk: ChalkObj): bool =
-  return isCosignInstalled() and chalk.fsRef != ""
+  return isCosignInstalled() and chalk.fsRef != "" and ResourceCert notin chalk.resourceType
 
 proc canVerifyBySigStore*(chalk: ChalkObj): bool =
   return (

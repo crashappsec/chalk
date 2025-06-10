@@ -7,8 +7,17 @@
 
 ## This plugin collects data from the AWS Lambda env vars
 
-import pkg/[nimutils/stsclient]
-import ".."/[config, plugin_api]
+import std/[
+  os,
+]
+import pkg/[
+  nimutils/stsclient,
+]
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+]
 
 var lambdaMetadata = ChalkDict()
 

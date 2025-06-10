@@ -4,8 +4,16 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import "."/elf
-import ".."/[config, plugin_api, util]
+
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+  utils/files,
+]
+import "."/[
+  elf,
+]
 
 const
   CHALK_MAGIC_JSON_KEY = "MAGIC\""
@@ -123,7 +131,7 @@ proc elfHandleWrite*(codec: Plugin,
           success = elf.setChalkSection(SH_NAME_CHALKMARK, data.get())
       else:
         success = elf.unchalk()
-      if success and chalk.replaceFileContents(elf.fileData):
+      if success and chalk.fsRef.replaceFileContents(elf.fileData):
         return
   except:
     discard

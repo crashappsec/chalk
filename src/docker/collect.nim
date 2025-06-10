@@ -9,9 +9,23 @@
 ##
 ## collect - use inspection result to load info into chalk
 
-import std/[json, sets]
-import ".."/[config, chalkjson, util]
-import "."/[inspect, manifest, json, ids, git]
+import std/[
+  sugar,
+]
+import ".."/[
+  chalkjson,
+  run_management,
+  types,
+  utils/json,
+  utils/sets,
+]
+import "."/[
+  git,
+  ids,
+  inspect,
+  json,
+  manifest,
+]
 
 # https://docs.docker.com/engine/api/v1.44/#tag/Image/operation/ImageInspect
 # https://github.com/opencontainers/image-spec/blob/main/config.md
@@ -211,8 +225,8 @@ proc collectImageFrom(chalk:    ChalkObj,
     raise newException(ValueError, "platform does not match chalk platform")
   if chalk.name == "":
     chalk.name         = name
-  if chalk.cachedHash == "":
-    chalk.cachedHash   = id
+  if chalk.cachedEndingHash == "":
+    chalk.cachedEndingHash = id
   # we could be inspecting container image hence resource type should be untouched
   if ResourceContainer notin chalk.resourceType:
     chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerImage)
@@ -355,9 +369,7 @@ proc collectContainer*(chalk: ChalkObj, name: string) =
     contents          = inspectContainerJson(name)
     id                = contents["Id"].getStr()
     image             = contents["Image"].getStr().extractDockerHash()
-  if chalk.cachedHash  == "":
-    # why are we using image hash for containers?
-    chalk.cachedHash  = image
+  chalk.cachedEndingHash = id
   if chalk.name == "":
     # container name can start with `/`
     chalk.name        = contents["Name"].getStr().strip(chars = {'/'})

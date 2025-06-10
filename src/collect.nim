@@ -1,13 +1,21 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/re
-import "./docker"/[scan]
-import "."/[config, plugin_api]
+import std/[
+  re,
+]
+import "."/[
+  config,
+  docker/scan,
+  plugin_api,
+  run_management,
+  types,
+  utils/files,
+]
 
 proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
   # Decides whether to run a given plugin... does it export any key we
@@ -135,7 +143,7 @@ proc initCollection*(collectHost = true) =
 
 proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
   artifact.withErrorContext():
-    trace("Collecting run time artifact info")
+    trace("Collecting run time artifact info" & artifact.name & " (" & artifact.myCodec.name & ")")
     for plugin in getAllPlugins():
       let
         data       = artifact.collectedData
@@ -162,12 +170,7 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
               artifact.name & "): " & getCurrentExceptionMsg())
         dumpExOnDebug()
 
-    let hashOpt = artifact.callGetEndingHash()
-    if hashOpt.isSome():
-      artifact.collectedData["_CURRENT_HASH"] = pack(hashOpt.get())
-
-proc rtaiLinkingHack*(artifact: ChalkObj) {.cdecl, exportc.} =
-  artifact.collectRunTimeArtifactInfo()
+    artifact.collectedData.setIfNeeded("_CURRENT_HASH", artifact.callGetEndingHash())
 
 proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
   obj.withErrorContext():
@@ -176,19 +179,25 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
     obj.opFailed      = false
     let data          = obj.collectedData
 
-    trace("Collecting chalk-time data.")
+    trace("Collecting chalk-time data for " & obj.name & " (" & obj.myCodec.name & ")")
     for plugin in getAllPlugins():
       if chalkCollectionSuspendedFor(plugin.name): continue
+
+      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != obj.myCodec:
+        continue
 
       if plugin == obj.myCodec:
         trace("Filling in codec info")
         if "CHALK_ID" notin data:
           data["CHALK_ID"]      = pack(obj.callGetChalkId())
         data.setIfNeeded("HASH", obj.callGetUnchalkedHash())
+        data.setIfNeeded("PRE_CHALK_HASH", obj.callGetPrechalkingHash())
         if obj.fsRef != "":
-          data["PATH_WHEN_CHALKED"] = pack(resolvePath(obj.fsRef))
+          data.setIfNeeded("PATH_WHEN_CHALKED", resolvePath(obj.fsRef))
 
-      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != obj.myCodec: continue
+      elif len(obj.resourceType * plugin.resourceTypes) == 0:
+        trace(plugin.name & ": Skipping for " & $obj.resourceType & " notin " & $plugin.resourceTypes)
+        continue
 
       let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")
       if not plugin.hasSubscribedKey(subscribed, data) and not plugin.isSystem():
@@ -248,33 +257,19 @@ proc collectRunTimeHostInfo*() =
             getCurrentExceptionMsg())
       dumpExOnDebug()
 
-# The two below functions are helpers for the artifacts() iterator
-# and the self-extractor (in the case of findChalk anyway).
-proc ignoreArtifact(path: string, regexps: seq[Regex]): bool {.inline.} =
-  # If plugins use the default implementation of scanning, then it
-  # will already have checked the 'ignore' list. That short circuits
-  # us much faster than letting plugins do a bunch of extraction, then
-  # checking here, afterward.
-  #
-  # But, what if they forget to check?  We check again here, and give
-  # an appropriate message, though at the trace level.
-
-  for i, item in regexps:
-    if path.match(item):
-      trace(path & ": returned artifact ignored due to matching: " &
-        attrGet[seq[string]]("ignore_patterns")[i])
-      trace("Developers: codecs should not be returning ignored artifacts.")
-      return true
-
-  return false
-
 proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
   new result
 
-  let selfPath = resolvePath(getMyAppPath())
+  let
+    selfPath = resolvePath(getMyAppPath())
+    skipList = attrGet[seq[string]]("ignore_patterns")
 
   result.fileExclusions = @[selfPath]
   result.recurse        = attrGet[bool]("recursive")
+  result.envVars        = attrGet[bool]("env_vars")
+
+  for item in skipList:
+    result.skips.add(re(item))
 
   for item in argv:
     let maybe = resolvePath(item)
@@ -286,7 +281,7 @@ proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
     else:
       result.otherPaths.add(item)
 
-proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
+proc artSetupForInsertAndDelete(argv: seq[string], envVars = false): ArtifactIterationInfo =
   new result
 
   let
@@ -295,6 +290,7 @@ proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
 
   result.fileExclusions = @[selfPath]
   result.recurse        = attrGet[bool]("recursive")
+  result.envVars        = envVars
 
   for item in skipList:
     result.skips.add(re(item))
@@ -315,8 +311,18 @@ proc artSetupForInsertAndDelete(argv: seq[string]): ArtifactIterationInfo =
 proc artSetupForExecAndEnv(argv: seq[string]): ArtifactIterationInfo =
   # For the moment.
   new result
-
   result.filePaths = argv
+
+  let
+    selfPath = resolvePath(getMyAppPath())
+    skipList = attrGet[seq[string]]("ignore_patterns")
+
+  result.fileExclusions = @[selfPath]
+  result.recurse        = attrGet[bool]("recursive")
+  result.envVars        = attrGet[bool]("env_vars")
+
+  for item in skipList:
+    result.skips.add(re(item))
 
 proc resolveAll(argv: seq[string]): seq[string] =
   for item in argv:
@@ -327,7 +333,9 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
   if notTmp:
     case getBaseCommandName()
-    of "insert", "delete":
+    of "insert":
+      iterInfo = artSetupForInsertAndDelete(argv, envVars = attrGet[bool]("env_vars"))
+    of "delete":
       iterInfo = artSetupForInsertAndDelete(argv)
     of "extract":
       iterInfo = artSetupForExtract(argv)
@@ -341,58 +349,44 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
   # First, iterate over all our file system entries.
   if iterInfo.filePaths.len() != 0:
-    for codec in getAllCodecs():
-      if getNativeCodecsOnly() and hostOs notin codec.nativeObjPlatforms:
-        continue
-      if codec.name == "docker":
-        continue
-      trace("Asking codec '" &  codec.name & "' to scan artifacts.")
-      let chalks = codec.scanArtifactLocations(iterInfo)
+    for obj in iterInfo.scanArtifactLocationsWith(getFileCodecs()):
+      obj.withErrorContext():
+        iterInfo.fileExclusions.add(obj.fsRef)
 
-      for obj in chalks:
-        obj.withErrorContext():
-          iterInfo.fileExclusions.add(obj.fsRef)
+        if obj.extract != nil and "MAGIC" in obj.extract:
+          obj.marked = true
 
-          if obj.extract != nil and "MAGIC" in obj.extract:
-            obj.marked = true
+        if ResourceFile in obj.resourceType:
+          if obj.fsRef == "":
+            obj.fsRef = obj.name
+            warn("Codec did not properly set the fsRef field.")
 
-          if ResourceFile in obj.resourceType:
-            if obj.fsRef == "":
-              obj.fsRef = obj.name
-              warn("Codec did not properly set the fsRef field.")
-
-          let path = obj.fsRef
-          if isChalkingOp():
-            if path.ignoreArtifact(iterInfo.skips):
-              if notTmp: addUnmarked(path)
-              if obj.isMarked():
-                info(path & ": Ignoring, but previously chalked")
-              else:
-                trace(path & ": ignoring artifact")
-            else:
-              if notTmp: obj.addToAllChalks()
-              if obj.isMarked():
-                info(path & ": Existing chalk mark extracted")
-              else:
-                trace(path & ": Currently unchalked")
+        let path = obj.fsRef
+        if isChalkingOp():
+          if notTmp: obj.addToAllChalks()
+          if obj.isMarked():
+            info(path & ": Existing chalk mark extracted")
           else:
-            if notTmp: obj.addToAllChalks()
-            if not obj.isMarked():
-              if notTmp: addUnmarked(path)
-              warn(path & ": Artifact is unchalked")
-            else:
-              for k, v in obj.extract:
-                obj.collectedData[k] = v
+            trace(path & ": Currently unchalked")
+        else:
+          if notTmp: obj.addToAllChalks()
+          if not obj.isMarked():
+            if notTmp: addUnmarked(path)
+            warn(path & ": Artifact is unchalked")
+          else:
+            for k, v in obj.extract:
+              obj.collectedData[k] = v
 
-              info(path & ": Chalk mark extracted")
+            info(path & ": Chalk mark extracted")
 
-          if getCommandName() in ["insert", "docker"]:
-            obj.persistInternalValues()
-          yield obj
+        if getCommandName() in ["insert", "docker"]:
+          obj.persistInternalValues()
 
-          if not inSubscan() and not obj.forceIgnore and
-             obj.name notin getUnmarked():
-            obj.collectRunTimeArtifactInfo()
+        yield obj
+
+        if not inSubscan() and not obj.forceIgnore and
+           obj.name notin getUnmarked():
+          obj.collectRunTimeArtifactInfo()
 
   if not inSubscan():
     if getCommandName() != "extract":

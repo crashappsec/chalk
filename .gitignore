@@ -1,6 +1,7 @@
 .TODO
 /bin
 /chalk
+/src/utils/pingttl
 /src/getlibpath
 /deps
 /nimcache

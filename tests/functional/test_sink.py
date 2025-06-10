@@ -191,7 +191,7 @@ def test_post_https_fastapi(
     chalk: Chalk,
     server_sql: Callable[[str], str | None],
     server_https: str,
-    server_cert: str,
+    server_cert: Path,
 ):
     _test_server(
         artifact=copy_files[0],
@@ -263,7 +263,7 @@ def _test_server(
     conf: str,
     url: str,
     server_sql: Callable[[str], str | None],
-    verify: str | None,
+    verify: Path | None,
     env: dict[str, str],
     ignore_errors=False,
 ):
@@ -296,7 +296,10 @@ def _test_server(
 
     # get the chalk from the api
     response = requests.get(
-        f"{url}/chalks/{metadata_id}", allow_redirects=True, timeout=5, verify=verify
+        f"{url}/chalks/{metadata_id}",
+        allow_redirects=True,
+        timeout=5,
+        verify=str(verify) if verify else None,
     )
     response.raise_for_status()
     fetched_chalk = response.json()

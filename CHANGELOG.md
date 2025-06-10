@@ -2,6 +2,55 @@
 
 ## On the `main` branch
 
+### Breaking Changes
+
+- Symlink behavior can now be different between chalking/non-chalking
+  operations. As such:
+
+  - renamed `symlink_behavior` -> `symlink_behavior_chalking` config
+  - renamed `--symlink-behavior` -> `--chalk-symlink-behavior` CLI flags
+  - added `symlink_behavior_non_chalking` config
+  - added `--scan-symlink-behavior` CLI flag along with `--ignore` choice flag
+
+  ([#515](https://github.com/crashappsec/chalk/pull/515))
+
+- Configuration `ignore_patterns` was used only in chalking operations.
+  Now it is used in all chalk operations.
+  ([#515](https://github.com/crashappsec/chalk/pull/515))
+
+### New Features
+
+- X509 Certificate codec which can parse PEM files and report
+  metadata keys about the certificate:
+
+  - `_X509_VERSION`
+  - `_X509_SUBJECT`
+  - `_X509_SUBJECT_ALTERNATIVE_NAME`
+  - `_X509_SERIAL`
+  - `_X509_KEY`
+  - `_X509_KEY_USAGE`
+  - `_X509_EXTENDED_KEY_USAGE`
+  - `_X509_BASIC_CONSTRAINTS`
+  - `_X509_ISSUER`
+  - `_X509_SUBJECT_KEY_IDENTIFIER`
+  - `_X509_AUTHORITY_KEY_IDENTIFIER`
+  - `_X509_NOT_BEFORE`
+  - `_X509_NOT_AFTER`
+  - `_X509_EXTRA_EXTENSIONS`
+
+  ([#515](https://github.com/crashappsec/chalk/pull/515))
+
+- `_OP_ARTIFACT_PATH_WITHIN_VCTL` key which indicates path of the file
+  in the git repo.
+  ([#515](https://github.com/crashappsec/chalk/pull/515))
+- Scanning of environment variables for artifacts.
+  Currently only `certs` codec supports scanning env vars.
+  This behavior can be customized (by default on) via new`env_vars`
+  configuration or`--[no-]env-vars` flag.
+  Additionally new `_OP_ARTIFACT_ENV_VAR_NAME` key indicates name of the
+  environment variable where the artifact was found.
+  ([#515](https://github.com/crashappsec/chalk/pull/515))
+
 ## 0.5.7
 
 **May 22, 2025**

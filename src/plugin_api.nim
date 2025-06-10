@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -12,14 +12,22 @@
 ## All of the data collection these plugins do is orchestrated in
 ## collect.nim
 
-import std/[re, algorithm]
-import "."/[config, chalkjson, util]
+import std/[
+  algorithm,
+]
+import "."/[
+  chalkjson,
+  run_management,
+  types,
+  utils/strings,
+  utils/files,
+]
 
 # These things don't check for null pointers, because they should only
 # get called when plugins declare stuff in the config file, so this
 # should all be pre-checked.
 
-proc isSystem*(p: Plugin, ): bool =
+proc isSystem*(p: Plugin): bool =
   return p.name in ["system", "attestation", "metsys"]
 
 proc callGetChalkTimeHostInfo*(plugin: Plugin): ChalkDict =
@@ -79,23 +87,51 @@ proc callGetRunTimeHostInfo*(plugin: Plugin, objs: seq[ChalkObj]):
 
 proc callScan*(plugin: Plugin, s: string): Option[ChalkObj] =
   let cb = plugin.scan
-  result = cb(plugin, s)
+  if cb != nil:
+    return cb(plugin, s)
+  return none(ChalkObj)
+
+proc callSearch*(plugin: Plugin, s: string): seq[ChalkObj] =
+  let cb = plugin.search
+  if cb != nil:
+    return cb(plugin, s)
+  return @[]
+
+proc callSearchEnvVar*(plugin: Plugin, k: string, v: string): seq[ChalkObj] =
+  let cb = plugin.searchEnvVar
+  if cb != nil:
+    return cb(plugin, k, v)
+  return @[]
 
 proc callGetUnchalkedHash*(obj: ChalkObj): Option[string] =
+  if obj.cachedUnchalkedHash != "":
+    return some(obj.cachedUnchalkedHash)
   let
     plugin = obj.myCodec
     cb     = plugin.getUnchalkedHash
   result = cb(plugin, obj)
   if result.isSome():
-    obj.cachedPreHash = result.get()
+    obj.cachedUnchalkedHash = result.get()
+
+proc callGetPrechalkingHash*(obj: ChalkObj): Option[string] =
+  if obj.cachedPrechalkingHash != "":
+    return some(obj.cachedPrechalkingHash)
+  let
+    plugin = obj.myCodec
+    cb     = plugin.getPrechalkingHash
+  result = cb(plugin, obj)
+  if result.isSome():
+    obj.cachedEndingHash = result.get()
 
 proc callGetEndingHash*(obj: ChalkObj): Option[string] =
+  if obj.cachedEndingHash != "":
+    return some(obj.cachedEndingHash)
   let
     plugin = obj.myCodec
     cb     = plugin.getEndingHash
   result = cb(plugin, obj)
   if result.isSome():
-    obj.cachedHash = result.get()
+    obj.cachedEndingHash = result.get()
 
 proc callGetChalkId*(obj: ChalkObj): string =
   let
@@ -199,25 +235,36 @@ proc scanLocation(self: Plugin, loc: string): Option[ChalkObj] =
   try:
     result = callScan(self, loc)
   except:
-    error(loc & "Scan canceled: " & getCurrentExceptionMsg())
+    error(loc & ": Scan canceled: " & getCurrentExceptionMsg())
     dumpExOnDebug()
 
-proc mustIgnore(path: string, regexes: seq[Regex]): bool {.inline.} =
-  result = false
+proc searchLocation(self: Plugin, loc: string): seq[ChalkObj] =
+  try:
+    return callSearch(self, loc)
+  except:
+    error(loc & ": Search canceled: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
 
-  for i, item in regexes:
-    if path.match(item):
-      once:
-        trace(path & ": ignored due to matching ignore pattern: " &
-          attrGet[seq[string]]("ignore_patterns")[i])
-        trace("We will NOT report additional path skips.")
-      return true
+proc searchEnvironmentVariable(self: Plugin, k: string, v: string): seq[ChalkObj] =
+  try:
+    return callSearchEnvVar(self, k, v)
+  except:
+    error(k & ": Search env var canceled: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
 
-proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
-                        seq[ChalkObj] =
+iterator scanArtifactLocationsWith*(state:  ArtifactIterationInfo,
+                                    codecs: seq[Plugin],
+                                    ): ChalkObj =
   # This will call scan() with a file stream, and you pass back a
   # Chalk object if chalk is there.
-  result = @[]
+
+  let
+    symLinkBehaviorConfig =
+      if isChalkingOp():
+        "symlink_behavior_chalking"
+      else:
+        "symlink_behavior_non_chalking"
+    symLinkBehavior = attrGet[string](symLinkBehaviorConfig)
 
   var
     # The first item we pass to getAllFileNames(). If we're following file
@@ -229,42 +276,82 @@ proc scanArtifactLocations*(self: Plugin, state: ArtifactIterationInfo):
     #
     # The second item is the ACTUAL desirec behavior, which we check when
     # we determine a link was yielded.
-    yieldLinks   = true
-    skipLinks    = false
-    followFLinks = false
+    fileLinks: PathBehavior
+    skipLinks: bool
 
-  if isChalkingOp():
-    let symLinkBehavior = attrGet[string]("symlink_behavior")
-    if symLinkBehavior == "skip":
-      skipLinks = true
-    elif symLinkBehavior == "clobber":
-      followFLinks = true
-      yieldLinks   = false
+  case symLinkBehavior
+  of "skip", "ignore":
+    # yield links but then show warning that they are skipped
+    fileLinks = PathBehavior.Yield
+    skipLinks = true
+  of "clobber", "follow":
+    fileLinks = PathBehavior.Follow
+    skipLinks = false
+  else:
+    fileLinks = PathBehavior.Yield
+    skipLinks = false
 
+  # note the outer loop is over file paths, not codecs (it used to be at some point)
+  # to get efficient FS scanning. For example when scanning '/' there is some overhead
+  # as getAllFileNames() need to walk the FS tree which means:
+  # * a bunch of lstat calls in order to determine whether found paths are files/dirs/etc
+  # * keep track of which dirs were already seen to handle circular loops
+  # * open FD for each found path
+  # As such its a lot more efficient to walk by all paths first and then
+  # attempt to find chalk artifact for each path by checking all codecs as that:
+  # * pays above overhead once
+  # * reuses opened FDs between codecs hence less open()/close() overhead
+  # Cnanging loop topology scanning ubuntu container '/' went from ~180sec to ~100sec
   for path in state.filePaths:
-    trace("Codec " & self.name & ": beginning scan of " & path)
-
+    trace(path & ": beginning scan")
     let p = path.resolvePath()
-    for item in p.getAllFileNames(state.recurse, yieldLinks, followFLinks):
-      if item in state.fileExclusions or item.mustIgnore(state.skips):
+    for i in p.getAllFileNames(
+      recurse     = state.recurse,
+      fileLinks   = fileLinks,
+      ignore      = state.fileExclusions,
+      ignoreRegex = state.skips,
+    ):
+      if skipLinks and i.isSymlink():
+        warn(i.name & ": skipping symbolic link. Customize behavior with config " & symLinkBehaviorConfig)
         continue
-      if skipLinks:
-        var info: FileInfo
-        try:
-          info = getFileInfo(path, followSymlink = false)
-        except:
-          continue
-        if info.kind == pcLinkToFile:
-          warn("Skipping symbolic link: " & path & """\n
-Use --clobber to follow and clobber the linked-to file when inserting,
-or --copy to copy the file and replace the symlink.""")
-          continue
 
-      trace(item & ": scanning file")
-      let opt = self.scanLocation(item)
-      if opt.isSome():
-        let chalk = opt.get()
-        result.add(chalk)
+      # with symlinks same file can be referenced multiple times
+      # and so we lookup any existing chalk and if present, ignore this i.name
+      var alreadyScanned = false
+      for chalk in getAllChalks() & getAllArtifacts():
+        if chalk.fsRef == i.name:
+          alreadyScanned = true
+          break
+      if alreadyScanned:
+        trace(i.name & ": was already previously scanned. ignoring")
+        continue
+
+      for codec in codecs:
+        var found = false
+        trace(i.name & ": scanning file with " & codec.name)
+        let opt = codec.scanLocation(i.name)
+        if opt.isSome():
+          let chalk = opt.get()
+          yield chalk
+          found = true
+        for chalk in codec.searchLocation(i.name):
+          yield chalk
+          found = true
+        if found:
+          break
+
+  if state.envVars:
+    for k, v in envPairs():
+      for codec in codecs:
+        if codec.searchEnvVar == nil:
+          continue
+        var found = false
+        trace(k & ": scanning env var with " & codec.name)
+        for chalk in codec.searchEnvironmentVariable(k, v):
+          yield chalk
+          found = true
+        if found:
+          break
 
 proc simpleHash(self: Plugin, chalk: ChalkObj): Option[string] =
   # The default if the stream can't be acquired.
@@ -280,13 +367,20 @@ proc defUnchalkedHash(self: Plugin, obj: ChalkObj): Option[string] {.cdecl.} =
   ##
   ## The default assumes that this was cached during scan, and if the
   ## hash isn't cached, it doesn't exist.
-
-  if obj.cachedPreHash != "": return some(obj.cachedPreHash)
+  if obj.cachedUnchalkedHash != "":
+    return some(obj.cachedUnchalkedHash)
   return none(string)
+
+proc defPrechalkingHash(self: Plugin, chalk: ChalkObj): Option[string] {.cdecl.} =
+  ## This is called before chalking is done.
+  if chalk.cachedPrechalkingHash != "":
+    return some(chalk.cachedPrechalkingHash)
+  return simpleHash(self, chalk)
 
 proc defEndingHash(self: Plugin, chalk: ChalkObj): Option[string] {.cdecl.} =
   ## This is called after chalking is done.  We check the cache first.
-  if chalk.cachedHash != "": return some(chalk.cachedHash)
+  if chalk.cachedEndingHash != "":
+    return some(chalk.cachedEndingHash)
   return simpleHash(self, chalk)
 
 proc randChalkId(self: Plugin, chalk: ChalkObj): string {.cdecl.} =
@@ -330,7 +424,7 @@ proc defaultCodecWrite*(s:     Plugin,
       post = stream.readAll()
 
   let contents = pre & enc.getOrElse("") & post
-  if not chalk.replaceFileContents(contents):
+  if not chalk.fsRef.replaceFileContents(contents):
     chalk.opFailed = true
 
 var codecs: seq[Plugin] = @[]
@@ -372,6 +466,10 @@ proc getAllPlugins*(): seq[Plugin] =
 proc getPluginByName*(s: string): Plugin =
   return installedPlugins[s]
 
+proc getPluginsByName*(s: seq[string]): seq[Plugin] =
+  for i in s:
+    result.add(getPluginByName(i))
+
 proc getOptionalPlugins*(c: ChalkObj): seq[string] =
   ## get all optional plugins
   ## optional plugin is neither a system plugin or the chalk codec plugin
@@ -388,8 +486,24 @@ proc getAllCodecs*(): seq[Plugin] =
     for item in getAllPlugins():
       if item.isCodec():
         codecs.add(item)
-
   return codecs
+
+proc getNativeCodecs*(): seq[Plugin] =
+  for codec in getAllCodecs():
+    if hostOS notin codec.nativeObjPlatforms:
+      continue
+    result.add(codec)
+
+proc getFileCodecs*(): seq[Plugin] =
+  let fileCodecs =
+    if len(getOnlyCodecs()) > 0:
+      getOnlyCodecs()
+    else:
+      getAllCodecs()
+  for codec in fileCodecs:
+    if codec.name == "docker":
+      continue
+    result.add(codec)
 
 proc newPlugin*(
   name:           string,
@@ -398,8 +512,9 @@ proc newPlugin*(
   ctArtCallback:  ChalkTimeArtifactCb = ChalkTimeArtifactCb(nil),
   rtArtCallback:  RunTimeArtifactCb   = RunTimeArtifactCb(nil),
   rtHostCallback: RunTimeHostCb       = RunTimeHostCb(nil),
-  cache:          RootRef             = RootRef(nil)):
-    Plugin {.discardable, cdecl.} =
+  cache:          RootRef             = RootRef(nil),
+  resourceTypes:  set[ResourceType]   = defResourceTypes,
+): Plugin {.discardable, cdecl.} =
   result = Plugin(name:                     name,
                   clearState:               clearCallback,
                   getChalkTimeHostInfo:     ctHostCallback,
@@ -407,6 +522,7 @@ proc newPlugin*(
                   getRunTimeArtifactInfo:   rtArtCallback,
                   getRunTimeHostInfo:       rtHostCallback,
                   internalState:            cache,
+                  resourceTypes:            resourceTypes,
                   enabled:                  true)
 
   if not result.checkPlugin(codec = false):
@@ -415,11 +531,14 @@ proc newPlugin*(
 proc newCodec*(
   name:               string,
   scan:               ScanCb              = ScanCb(nil),
+  search:             SearchCb            = SearchCb(nil),
+  searchEnvVar:       SearchEnvVarCb      = SearchEnvVarCb(nil),
   ctHostCallback:     ChalkTimeHostCb     = ChalkTimeHostCb(nil),
   ctArtCallback:      ChalkTimeArtifactCb = ChalkTimeArtifactCb(nil),
   rtArtCallback:      RunTimeArtifactCb   = RunTimeArtifactCb(defaultRtArtInfo),
   rtHostCallback:     RunTimeHostCb       = RunTimeHostCb(nil),
   getUnchalkedHash:   UnchalkedHashCb     = UnchalkedHashCb(defUnchalkedHash),
+  getPrechalkingHash: PrechalkingHashCb   = PrechalkingHashCb(defPrechalkingHash),
   getEndingHash:      EndingHashCb        = EndingHashCb(defEndingHash),
   getChalkId:         ChalkIdCb           = ChalkIdCb(defaultChalkId),
   handleWrite:        HandleWriteCb       = HandleWriteCb(defaultCodecWrite),
@@ -431,11 +550,14 @@ proc newCodec*(
 
   result = Plugin(name:                     name,
                   scan:                     scan,
+                  search:                   search,
+                  searchEnvVar:             searchEnvVar,
                   getChalkTimeHostInfo:     ctHostCallback,
                   getChalkTimeArtifactInfo: ctArtCallback,
                   getRunTimeArtifactInfo:   rtArtCallback,
                   getRunTimeHostInfo:       rtHostCallback,
                   getUnchalkedHash:         getUnchalkedHash,
+                  getPrechalkingHash:       getPrechalkingHash,
                   getEndingHash:            getEndingHash,
                   getChalkId:               getChalkId,
                   handleWrite:              handleWrite,

@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -7,8 +7,11 @@
 
 ## Wrappers for more abstracted accessing of configuration information
 
-import "."/[run_management, config_version]
-export run_management
+import "."/[
+  config_version,
+  types,
+  utils/strings,
+]
 
 proc selfChalkGetKey*(keyName: string): Option[Box] =
   if selfChalk == nil or selfChalk.extract == nil or
@@ -60,7 +63,7 @@ proc getOutputConfig(): string =
   return "outconf." & getBaseCommandName()
 
 proc getMarkTemplate*(): string =
-  let tmplName = attrGetOpt[string](getOutputConfig() & ".mark_template").get("mark_default")
+  var tmplName = attrGetOpt[string](getOutputConfig() & ".mark_template").get("").elseWhenEmpty("mark_default")
   return "mark_template." & tmplName
 
 proc getReportTemplate*(spec = ""): string =
@@ -70,7 +73,7 @@ proc getReportTemplate*(spec = ""): string =
         getOutputConfig()
       else:
         spec
-    tmplName = attrGetOpt[string](ns & ".report_template").get("null")
+    tmplName = attrGetOpt[string](ns & ".report_template").get("").elseWhenEmpty("null")
   return "report_template." & tmplName
 
 proc forceKeys(keynames: openarray[string], templateRef: string) =

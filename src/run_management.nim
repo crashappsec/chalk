@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -9,79 +9,22 @@
 ## setting, status stuff, and the core scan state ("collection
 ## contexts"), that the subscan module pushes and pops.
 
-import std/[posix, monotimes, enumerate, times]
-import "."/chalk_common
-export chalk_common
+import std/[
+  enumerate,
+  os,
+  posix,
+]
+import pkg/[
+  con4m,
+]
+import "."/[
+  types,
+  utils/json,
+  utils/strings,
+  utils/times,
+]
 
-var
-  ctxStack       = @[CollectionCtx()]
-  startTime*     = getTime().utc # gives absolute wall time
-  monoStartTime* = getMonoTime() # used for computing diffs
-
-proc getChalkConfigState(): ConfigState =
-  con4mRuntime.configState
-
-proc getChalkScope*(): AttrScope =
-  getChalkConfigState().attrs
-
-proc sectionExists*(c: ConfigState, s: string): bool =
-  c.attrs.getObjectOpt(s).isSome()
-
-proc sectionExists*(s: string): bool =
-  sectionExists(getChalkConfigState(), s)
-
-proc attrGet*[T](c: ConfigState, fqn: string): T =
-  get[T](c.attrs, fqn)
-
-proc attrGet*[T](fqn: string): T =
-  attrGet[T](getChalkConfigState(), fqn)
-
-proc attrGetOpt*[T](c: ConfigState, fqn: string): Option[T] =
-  getOpt[T](c.attrs, fqn)
-
-proc attrGetOpt*[T](fqn: string): Option[T] =
-  attrGetOpt[T](getChalkConfigState(), fqn)
-
-proc attrGetObject*(c: ConfigState, fqn: string): AttrScope =
-  getObject(c.attrs, fqn)
-
-proc attrGetObject*(fqn: string): AttrScope =
-  attrGetObject(getChalkConfigState(), fqn)
-
-iterator getChalkSubsections*(s: string): string =
-  ## Walks the contents of the given chalk config section, and yields the
-  ## names of the subsections.
-  for k, v in attrGetObject(s).contents:
-    if v.isA(AttrScope):
-      yield k
-
-proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
-  ## Sets the value of the `fqn` attribute in `ctx.attrs` to `value`, raising
-  ## `AssertionDefect` if unsuccessful.
-  ##
-  ## This proc must only be used if the attribute is already set. If the
-  ## attribute isn't already set, use the other `con4mAttrSet` overload instead.
-  doAssert attrSet(ctx, fqn, value).code == errOk
-
-proc con4mAttrSet*(c: ConfigState, fqn: string, value: Box, attrType: Con4mType) =
-  ## Sets the value of the `fqn` attribute to `value`, raising `AssertionDefect`
-  ## if unsuccessful.
-  ##
-  ## This proc may be used if the attribute is not already set.
-  doAssert attrSet(c.attrs, fqn, value, attrType).code == errOk
-
-proc con4mAttrSet*(fqn: string, value: Box, attrType: Con4mType) =
-  ## Sets the value of the `fqn` attribute to `value`, raising `AssertionDefect`
-  ## if unsuccessful.
-  ##
-  ## This proc may be used if the attribute is not already set.
-  con4mAttrSet(getChalkConfigState(), fqn, value, attrType)
-
-proc con4mSectionCreate*(c: ConfigState, fqn: string) =
-  discard attrLookup(c.attrs, fqn.split('.'), ix = 0, op = vlSecDef)
-
-proc con4mSectionCreate*(fqn: string) =
-  con4mSectionCreate(con4mRuntime.configState, fqn)
+var ctxStack = @[CollectionCtx()]
 
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
@@ -89,13 +32,24 @@ proc startTestRun*() =
   doingTestRun = true
 proc endTestRun*()   =
   doingTestRun = false
-proc startNativeCodecsOnly*() =
-  nativeCodecsOnly = true
-proc endNativeCodecsOnly*() =
-  nativeCodecsOnly = false
 
-template getNativeCodecsOnly*(): bool =
-  nativeCodecsOnly
+template withOnlyCodecs*(codecs: seq[Plugin], c: untyped) =
+  if len(codecs) > 0:
+    var names = newSeq[string]()
+    for i in codecs:
+      names.add(i.name)
+    trace("Restricting scanning codecs to only " & $names)
+    let saved = onlyCodecs
+    onlyCodecs = codecs
+    try:
+      c
+    finally:
+      onlyCodecs = saved
+  else:
+    c
+
+template getOnlyCodecs*(): seq[Plugin] =
+  onlyCodecs
 
 proc inSubscan*(): bool =
   return len(ctxStack) > 1
@@ -129,6 +83,19 @@ proc popCollectionCtx*() =
 template collectionCtx(): CollectionCtx =
   ctxStack[^1]
 
+proc addIfMissing(to: var seq[ChalkObj], o: ChalkObj) =
+  let check = collectionCtx.allChalks & collectionCtx.allArtifacts
+  if o in check:
+    return
+  if "METADATA_ID" in o.collectedData:
+    let id = o.collectedData["METADATA_ID"]
+    for i in check:
+      if "METADATA_ID" in i.collectedData:
+        let otherId = i.collectedData["METADATA_ID"]
+        if id == otherId:
+          return
+  to.add(o)
+
 proc getCurrentCollectionCtx*(): CollectionCtx =
   collectionCtx
 proc getErrorObject*(): Option[ChalkObj] =
@@ -138,8 +105,7 @@ proc getAllChalks*(): seq[ChalkObj] =
 proc getAllChalks*(cc: CollectionCtx): seq[ChalkObj] =
   cc.allChalks
 proc addToAllChalks*(o: ChalkObj) =
-  if o notin collectionCtx.allChalks:
-    collectionCtx.allChalks.add(o)
+  collectionCtx.allChalks.addIfMissing(o)
 proc setAllChalks*(s: seq[ChalkObj]) =
   collectionCtx.allChalks = s
 proc removeFromAllChalks*(o: ChalkObj) =
@@ -151,8 +117,7 @@ proc getAllArtifacts*(): seq[ChalkObj] =
 proc getAllArtifacts*(cc: CollectionCtx): seq[ChalkObj] =
   cc.allArtifacts
 proc addToAllArtifacts*(o: ChalkObj) =
-  if o notin collectionCtx.allArtifacts:
-    collectionCtx.allArtifacts.add(o)
+  collectionCtx.allArtifacts.addIfMissing(o)
 proc setAllArtifacts*(s: seq[ChalkObj]) =
   collectionCtx.allArtifacts = s
 proc removeFromAllArtifacts*(o: ChalkObj) =
@@ -198,37 +163,42 @@ template withErrorContext*(chalk: ChalkObj, c: untyped) =
 proc isMarked*(chalk: ChalkObj): bool {.inline.} =
   return chalk.marked
 
-proc newChalk*(name:         string            = "",
-               chalkId:      string            = "",
-               pid:          Option[Pid]       = none(Pid),
-               fsRef:        string            = "",
-               imageId:      string            = "",
-               containerId:  string            = "",
-               marked:       bool              = false,
-               resourceType: set[ResourceType] = {ResourceFile},
-               extract:      ChalkDict         = ChalkDict(nil),
-               cache:        RootRef           = RootRef(nil),
-               codec:        Plugin            = Plugin(nil),
-               platform                        = DockerPlatform(nil),
-               noAttestation                   = false,
+proc newChalk*(name:          string            = "",
+               chalkId:       string            = "",
+               pid:           Option[Pid]       = none(Pid),
+               fsRef:         string            = "",
+               envVarName:    string            = "",
+               imageId:       string            = "",
+               containerId:   string            = "",
+               marked:        bool              = false,
+               resourceType:  set[ResourceType] = {ResourceFile},
+               extract:       ChalkDict         = ChalkDict(nil),
+               collectedData: ChalkDict         = ChalkDict(),
+               cache:         RootRef           = RootRef(nil),
+               codec:         Plugin            = Plugin(nil),
+               platform                         = DockerPlatform(nil),
+               noAttestation                    = false,
+               startOffset                      = 0,
                ): ChalkObj =
 
   result = ChalkObj(name:          name,
                     pid:           pid,
                     fsRef:         fsRef,
+                    envVarName:    envVarName,
                     imageId:       imageId,
                     repos:         newOrderedTable[string, DockerImageRepo](),
                     containerId:   containerId,
-                    collectedData: ChalkDict(),
                     objectsData:   ObjectsDict(),
                     opFailed:      false,
                     resourceType:  resourceType,
+                    collectedData: collectedData,
                     extract:       extract,
                     cache:         cache,
                     myCodec:       codec,
                     failedKeys:    ChalkDict(),
                     platform:      platform,
                     noAttestation: noAttestation,
+                    startOffset:   startOffset,
                    )
 
   if chalkId != "":
@@ -238,12 +208,13 @@ proc newChalk*(name:         string            = "",
     result.marked = true
 
 template setIfNotEmptyBox*(o: ChalkDict, k: string, v: Box) =
-  case v.kind
+  let value = v
+  case value.kind
   of MkSeq, MkTable, MkStr:
-    if len(v) > 0:
-      o[k] = v
+    if len(value) > 0:
+      o[k] = value
   else:
-    o[k] = v
+    o[k] = value
 
 template setIfNotEmpty*[T](o: ChalkDict, k: string, v: T) =
   when T is Box:

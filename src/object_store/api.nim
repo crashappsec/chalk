@@ -5,9 +5,17 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[tables, uri]
-import ".."/[config, normalize]
-import "."/[presign]
+import std/[
+  uri,
+]
+import ".."/[
+  normalize,
+  config,
+  types,
+]
+import "."/[
+  presign,
+]
 
 let objectStores = {
   presignObjectStore.name: presignObjectStore,

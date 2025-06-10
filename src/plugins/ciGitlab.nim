@@ -9,7 +9,12 @@
 ## Gitlab CI environment.
 
 
-import ".."/[config, plugin_api]
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+  utils/envvars,
+]
 
 proc gitlabGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.}  =
   result = ChalkDict()

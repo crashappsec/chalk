@@ -5,16 +5,21 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[posix, options]
+import std/[
+  options,
+  posix,
+]
 import "."/[
   chalkjson,
   collect,
-  config,
   config_version,
-  fd_cache,
   plugin_api,
+  run_management,
   selfextract,
   subscan,
+  types,
+  utils/fd_cache,
+  utils/files,
 ]
 
 const

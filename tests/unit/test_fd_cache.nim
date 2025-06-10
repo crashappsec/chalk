@@ -1,6 +1,6 @@
 import std/os
 # Import non-exported `newFDCache`, which is currently used only in these tests.
-import ../../src/fd_cache {.all.}
+import ../../src/utils/fd_cache {.all.}
 
 proc withCache() =
   let

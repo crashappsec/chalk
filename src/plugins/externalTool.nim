@@ -8,9 +8,23 @@
 ## This plugin uses information from the config file to set metadata
 ## keys.
 
-import std/[algorithm, sequtils, sets, times]
-import ".."/[config, plugin_api, util]
-import "."/[vctlGit]
+import std/[
+  algorithm,
+  sequtils,
+]
+import ".."/[
+  config,
+  plugin_api,
+  run_management,
+  types,
+  utils/envvars,
+  utils/files,
+  utils/sets,
+  utils/times,
+]
+import "."/[
+  vctlGit,
+]
 
 type
   AlreadyRanError = object of CatchableError

@@ -7,9 +7,19 @@
 
 ## Dockerfile parsing
 
-import std/[algorithm, sequtils, unicode]
-import ".."/[config, util]
-import "."/[ids]
+import std/[
+  algorithm,
+  sequtils,
+  unicode,
+]
+import ".."/[
+  types,
+  utils/envvars,
+  utils/json,
+]
+import "."/[
+  ids,
+]
 
 # RUN and COPY accept << and <<-
 # This one is particularly a HFS:

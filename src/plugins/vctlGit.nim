@@ -8,9 +8,24 @@
 ## The plugin responsible for pulling metadata from the git
 ## repository.
 
-import std/[algorithm, nativesockets, sequtils, times, strutils]
-import pkg/[zippy, zippy/inflate]
-import ".."/[config, git, plugin_api, util]
+import std/[
+  algorithm,
+  nativesockets,
+  sequtils,
+]
+import pkg/[
+  zippy,
+  zippy/inflate,
+]
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+  utils/files,
+  utils/git,
+  utils/strings,
+  utils/times,
+]
 
 const
   eBadGitConf      = "Git configuration file is invalid"
@@ -820,12 +835,12 @@ proc getRepoFor*(self: Plugin, path: string): string =
     trace("git: " & path & " is not inside git repo")
     raise newException(KeyError, "not in git repo")
 
-proc gitFirstDir*(self: Plugin): string =
+proc gitFirstDir*(self: Plugin): Option[string] =
   self.gitInit()
   let cache = GitInfo(self.internalState)
   for dir, _ in cache.vcsDirs:
-    return dir
-  raise newException(ValueError, "no git folder in any of the contexts")
+    return some(dir)
+  return none(string)
 
 proc gitGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
                                 ChalkDict {.cdecl.} =
@@ -847,10 +862,21 @@ proc gitGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
       result.setVcsKeys(info)
       break
 
+proc gitGetRunTimeArtifactInfo*(self:  Plugin,
+                                chalk: ChalkObj,
+                                ins: bool,
+                                ): ChalkDict {.cdecl.} =
+  self.gitInit()
+  result = ChalkDict()
+  if chalk.fsRef == "":
+    return
+  let cache = GitInfo(self.internalState)
+  for dir, info in cache.vcsDirs:
+    result.setIfNeeded("_OP_ARTIFACT_PATH_WITHIN_VCTL", getRelativePathBetween(dir.parentDir(), chalk.fsRef))
+
 proc gitGetRunTimeHostInfo(self: Plugin, chalks: seq[ChalkObj]):
                            ChalkDict {.cdecl.} =
   self.gitInit()
-
   result = ChalkDict()
   let cache = GitInfo(self.internalState)
   for dir, info in cache.vcsDirs:
@@ -861,5 +887,6 @@ proc loadVctlGit*() =
   newPlugin("vctl_git",
             clearCallback  = PluginClearCb(clearCallback),
             ctArtCallback  = ChalkTimeArtifactCb(gitGetChalkTimeArtifactInfo),
+            rtArtCallback  = RunTimeArtifactCb(gitGetRunTimeArtifactInfo),
             rtHostCallback = RunTimeHostCb(gitGetRunTimeHostInfo),
             cache          = RootRef(GitInfo()))

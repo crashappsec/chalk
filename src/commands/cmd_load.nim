@@ -7,8 +7,17 @@
 
 ## The `chalk load` command.
 
-import std/posix
-import ".."/[config, selfextract, plugin_api, reporting, collect]
+import std/[
+  posix,
+]
+import ".."/[
+  collect,
+  plugin_api,
+  reporting,
+  run_management,
+  selfextract,
+  types,
+]
 
 proc runCmdConfLoad*() =
   setContextDirectories(@["."])

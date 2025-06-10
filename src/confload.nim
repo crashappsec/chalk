@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -17,7 +17,15 @@
 ## environment here.
 
 import std/macros except error
-import "."/[config, selfextract, con4mfuncs, plugin_load, util]
+import "."/[
+  con4mfuncs,
+  config,
+  plugin_load,
+  run_management,
+  selfextract,
+  types,
+  utils/files,
+]
 
 # Since these are system keys, we are the only one able to write them,
 # and it's easier to do it directly here than in the system plugin.

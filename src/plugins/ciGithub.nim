@@ -8,8 +8,14 @@
 ## This plugin is responsible for providing metadata gleaned from a
 ## github CI environment.
 
-import std/[json, httpclient, strutils]
-import ".."/[config, plugin_api]
+import ".."/[
+  plugin_api,
+  run_management,
+  types,
+  utils/envvars,
+  utils/http,
+  utils/json,
+]
 
 proc getRepo(api: string, repo: string): JsonNode =
   # https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#get-a-repository

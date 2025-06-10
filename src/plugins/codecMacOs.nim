@@ -9,8 +9,16 @@
 
 # We use slightly different magic for our heredoc. It's uppercase and longer.
 
-import std/base64
-import ".."/[config, chalkjson, util, plugin_api]
+import std/[
+  base64,
+]
+import ".."/[
+  chalkjson,
+  plugin_api,
+  run_management,
+  types,
+  utils/files,
+]
 
 let prefix = """
 #!/bin/bash
@@ -184,7 +192,7 @@ proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
                         Option[string] {.cdecl.} =
   var contents: string
 
-  if chalk.cachedPreHash == "":
+  if chalk.cachedUnchalkedHash == "":
     let cache = ExeCache(chalk.cache)
 
     if cache.b64.isSome():
@@ -216,18 +224,18 @@ proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
       error("MacOS binary contents could not be properly read.")
       return none(string)
 
-    chalk.cachedPreHash = contents.sha256Hex()
+    chalk.cachedUnchalkedHash = contents.sha256Hex()
     if not isChalkingOp():
       # the ending hash will be the hash of the script file as on disk.
       withFileStream(chalk.fsRef, mode = fmRead, strict = false):
         if stream != nil:
-          let contents     = stream.readAll()
-          chalk.cachedHash = contents.sha256Hex()
+          let contents           = stream.readAll()
+          chalk.cachedEndingHash = contents.sha256Hex()
 
-  if chalk.cachedPreHash == "":
+  if chalk.cachedUnchalkedHash == "":
     return none(string)
   else:
-    return some(chalk.cachedPreHash)
+    return some(chalk.cachedUnchalkedHash)
 
 proc macHandleWrite*(self: Plugin, chalk: ChalkObj, enc: Option[string])
   {.cdecl.} =
@@ -250,10 +258,10 @@ proc macHandleWrite*(self: Plugin, chalk: ChalkObj, enc: Option[string])
     for line in postfixLines:
       toWrite &= line & "\n"
 
-    toWrite &= chalk.cachedPreHash & "\n"
+    toWrite &= chalk.cachedUnchalkedHash & "\n"
     toWrite &= enc.get() & "\n"
 
-  if not chalk.replaceFileContents(toWrite):
+  if not chalk.fsRef.replaceFileContents(toWrite):
     chalk.opFailed = true
 
 proc macGetChalkTimeArtifactInfo*(self: Plugin, chalk: ChalkObj):

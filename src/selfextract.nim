@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2025, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -7,7 +7,18 @@
 
 ## Code specific to reading and writing Chalk's own chalk mark.
 
-import "."/[config, plugin_api, collect, con4mfuncs, chalkjson, util]
+import "."/[
+  chalkjson,
+  collect,
+  con4mfuncs,
+  config,
+  plugin_api,
+  run_management,
+  types,
+  utils/exe,
+  utils/files,
+  utils/json,
+]
 
 const
   configKey* = "$CHALK_CONFIG"
@@ -116,17 +127,9 @@ proc getSelfExtraction*(): Option[ChalkObj] =
                "Ensure chalk has both read and execute permissions. " &
                "To add permissions run: 'chmod +rx " & myPath & "'\n")
 
-    for codec in getAllCodecs():
-      if hostOS notin codec.nativeObjPlatforms:
-        continue
-      let
-        ai     = ArtifactIterationInfo(filePaths: @[myPath])
-        chalks = codec.scanArtifactLocations(ai)
-
-      if len(chalks) == 0:
-        continue
-
-      selfChalk = chalks[0]
+    let ai = ArtifactIterationInfo(filePaths: @[myPath])
+    for i in ai.scanArtifactLocationsWith(getNativeCodecs()):
+      selfChalk = i
       break
 
     if selfChalk == nil:

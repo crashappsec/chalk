@@ -5,8 +5,16 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/[tables, options, uri, httpclient, sequtils]
-import ".."/[config, auth, util]
+import std/[
+  sequtils,
+  uri,
+]
+import ".."/[
+  auth,
+  config,
+  types,
+  utils/http,
+]
 
 type
   ObjectStorePresign = ref object of ObjectStoreConfig

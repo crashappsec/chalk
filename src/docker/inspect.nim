@@ -9,9 +9,15 @@
 ##
 ## inspect - return raw json as provided by docker CLI without any chalk context
 
-import std/[json]
-import ".."/[config]
-import "."/[exe, ids]
+import ".."/[
+  types,
+  utils/json,
+  utils/strings,
+]
+import "."/[
+  exe,
+  ids,
+]
 
 proc inspectHistoryCommands*(name: string): seq[string] =
   ## utility function for getting docker image history
@@ -19,8 +25,8 @@ proc inspectHistoryCommands*(name: string): seq[string] =
   let
     args   = @["history", name, "--format", "{{.CreatedBy}}", "--no-trunc"]
     output = runDockerGetEverything(args)
-    stdout = output.getStdOut().strip()
-    stderr = output.getStdErr().strip()
+    stdout = output.getStdout().strip()
+    stderr = output.getStderr().strip()
   if output.getExit() != 0:
     raise newException(
       ValueError,
@@ -44,8 +50,8 @@ proc inspectJson(name: string, what: string): JsonNode =
     args &= @["--format", "json"]
   let
     output = runDockerGetEverything(args)
-    stdout = output.getStdOut().strip()
-    stderr = output.getStdErr().strip()
+    stdout = output.getStdout().strip()
+    stderr = output.getStderr().strip()
   if output.getExit() != 0:
     raise newException(
       ValueError,

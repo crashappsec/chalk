@@ -22,8 +22,20 @@
 ## But when wrapping docker, this module does the bulk of the work and
 ## is responsible for all of the collection logic.
 
-import "../docker"/[base, build, push, exe, cmdline]
-import ".."/[config, reporting, util, commands/cmd_help]
+import "../docker"/[
+  base,
+  build,
+  cmdline,
+  exe,
+  push,
+]
+import ".."/[
+  commands/cmd_help,
+  config,
+  reporting,
+  types,
+  utils/exec,
+]
 
 proc runCmdDocker*(args: seq[string]) =
   var

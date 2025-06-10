@@ -7,8 +7,14 @@
 
 ## The `chalk extract` command.
 
-import "../docker"/[scan]
-import ".."/[config, collect, reporting]
+import ".."/[
+  collect,
+  config,
+  docker/scan,
+  reporting,
+  run_management,
+  types,
+]
 
 proc processDockerChalk(item: ChalkObj) =
   item.withErrorContext():

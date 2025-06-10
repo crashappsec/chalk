@@ -4,8 +4,12 @@
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
-import std/algorithm
-import ".."/config
+import std/[
+  algorithm,
+]
+import ".."/[
+  types,
+]
 
 # We've got a lot of ELF-specific defines we're not using but we
 # want to keep around, so silence any warnings.
@@ -413,6 +417,9 @@ proc parseHeader*(self: ElfFile): bool =
     sectionCount:       getValue[uint16](data, ELF64_SH_COUNT_16),
     sectionStringIndex: getValue[uint16](data, ELF64_SH_STRIDX_16),
   )
+  # ELF is not either executable or a shared object (lib)
+  if int(self.header.elfType.value) notin [ET_REL, ET_EXEC, ET_DYN]:
+    return false
   self.ranges.insertString(0, ELF64_HEADER_SIZE, ELF_HEADER_NAME)
   let shStrTabIndex = self.header.sectionStringIndex.value
   if shStrTabIndex == 0:
@@ -431,7 +438,10 @@ proc parseProgramTable(self: ElfFile): bool =
   var dataLen     = uint64(len(data))
   var elfHeader   = self.header
   var tableOffset = elfHeader.programTable.value
-  if tableOffset > dataLen or tableOffset < ELF64_HEADER_SIZE:
+  if tableOffset < ELF64_HEADER_SIZE:
+    trace("elf: missing program table. skipping")
+    return false
+  if tableOffset > dataLen:
     # we could add range intersection checks here but for now
     # just doing a basic bounds check
     self.errors.add(ERR_PROGRAM_OUT_OF_RANGE)

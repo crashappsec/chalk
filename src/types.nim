@@ -12,61 +12,89 @@
 ## This file should never import other chalk modules; it's at the root
 ## of the dependency tree.
 
-import std/[os, json, streams, tables, options, strutils, sugar, posix,
-            unicode, re, sets, uri]
-import pkg/[nimutils, nimutils/logging, nimutils/managedtmp, con4m]
-export os, json, options, tables, strutils, streams, sugar, nimutils, logging,
-       managedtmp, con4m
+import std/[
+  options,
+  posix,
+  re,
+  streams,
+  sugar,
+  unicode,
+  uri,
+]
+import pkg/[
+  nimutils,
+  nimutils/logging,
+  con4m,
+]
+import "."/[
+  con4mwrap,
+  utils/chalkdict,
+  utils/json,
+  utils/sets,
+  utils/strings,
+  utils/tables,
+]
+
+export chalkdict # ChalkDict
+export con4mwrap # con4m accessors/etc
+export logging   # error()/trace()/etc
+export nimutils  # Box
+export options   # .get()/etc for accessing chalk Option() vars
+export streams   # Stream()
+export strings   # string split/etc
+export sugar     # easier calling functions
+export tables
 
 type
-  ChalkDict*    = OrderedTableRef[string, Box]
   ObjectsDict*  = OrderedTableRef[string, OrderedTableRef[string, ObjectStoreRef]]
 
   ResourceType* = enum
-    ResourceFile, ResourceImage, ResourceContainer, ResourcePid
+    ResourceFile, ResourceImage, ResourceContainer, ResourcePid, ResourceCert
 
   ## The chalk info for a single artifact.
   ChalkObj* = ref object
-    name*:          string           ## The name to use for the artifact in errors.
-    cachedHash*:    string           ## Cached 'ending' hash
-    cachedPreHash*: string           ## Cached 'unchalked' hash
-    collectedData*: ChalkDict        ## What we're adding during insertion.
-    objectsData*:   ObjectsDict      ## per object store and key object ref
-    extract*:       ChalkDict        ## What we extracted, or nil if no extract.
-    cachedMark*:    string           ## Cached chalk mark.
-    opFailed*:      bool
-    marked*:        bool
-    embeds*:        seq[ChalkObj]
-    failedKeys*:    ChalkDict
-    err*:           seq[string]      ## Runtime logs for chalking are filtered
-                                     ## based on the "chalk log level". They
-                                     ## end up here, until the end of chalking
-                                     ## where, they get added to ERR_INFO, if
-                                     ## any.  To disable, simply set the chalk
-                                     ## log level to 'none'.
-    cache*:         RootRef          ## Generic pointer a codec can use to
-                                     ## store any state it might want to stash.
-    myCodec*:       Plugin
-    forceIgnore*:   bool             ## If the system decides the codec shouldn't
-                                     ## process this, set this bool.
-    pid*:           Option[Pid]      ## If an exec() or eval() and we know
-                                     ## the pid, this will be set.
-    startOffset*:   int              ## Plugins by default use file streams; we
-    endOffset*:     int              ## keep state fields for that to bridge between
-                                     ## extract and write. If the plugin needs to do
-                                     ## something else, use the cache field
-                                     ## below, instead.
-    fsRef*:         string           ## Reference for this artifact on a fs
-    platform*:      DockerPlatform   ## platform
-    baseChalk*:     ChalkObj
-    repos*:         OrderedTableRef[string, DockerImageRepo] ## all images where image was tagged/pushed
-    imageId*:       string           ## Image ID if this is a docker image
-    containerId*:   string           ## Container ID if this is a container
-    noAttestation*: bool             ## Whether to skip attestation for chalkmark
-    noCosign*:      bool             ## When we know image is not in registry. skips validation
-    signed*:        bool             ## True on the insert path once signed,
-                                     ## and once we've seen an attestation otherwise
-    resourceType*:  set[ResourceType]
+    name*:                  string           ## The name to use for the artifact in errors.
+    cachedUnchalkedHash*:   string           ## Cached 'unchalked' hash (without any chalkmarks)
+    cachedPrechalkingHash*: string           ## Cached pre-chalking hash (with previous chalkmarks but without new chalkmark)
+    cachedEndingHash*:      string           ## Cached 'ending' hash (with new chalkmark)
+    collectedData*:         ChalkDict        ## What we're adding during insertion.
+    objectsData*:           ObjectsDict      ## per object store and key object ref
+    extract*:               ChalkDict        ## What we extracted, or nil if no extract.
+    cachedMark*:            string           ## Cached chalk mark.
+    opFailed*:              bool
+    marked*:                bool
+    embeds*:                seq[ChalkObj]
+    failedKeys*:            ChalkDict
+    err*:                   seq[string]      ## Runtime logs for chalking are filtered
+                                             ## based on the "chalk log level". They
+                                             ## end up here, until the end of chalking
+                                             ## where, they get added to ERR_INFO, if
+                                             ## any.  To disable, simply set the chalk
+                                             ## log level to 'none'.
+    cache*:                 RootRef          ## Generic pointer a codec can use to
+                                             ## store any state it might want to stash.
+    myCodec*:               Plugin
+    forceIgnore*:           bool             ## If the system decides the codec shouldn't
+                                             ## process this, set this bool.
+    pid*:                   Option[Pid]      ## If an exec() or eval() and we know
+                                             ## the pid, this will be set.
+    startOffset*:           int              ## Plugins by default use file streams; we
+    endOffset*:             int              ## keep state fields for that to bridge between
+                                             ## extract and write. If the plugin needs to do
+                                             ## something else, use the cache field
+                                             ## below, instead.
+    fsRef*:                 string           ## Reference for this artifact on a fs
+    envVarName*:            string           ## env var name from where artifact is found
+    platform*:              DockerPlatform   ## platform
+    baseChalk*:             ChalkObj
+    repos*:                 OrderedTableRef[string, DockerImageRepo] ## all images where image was tagged/pushed
+    imageId*:               string           ## Image ID if this is a docker image
+    containerId*:           string           ## Container ID if this is a container
+    noAttestation*:         bool             ## Whether to skip attestation for chalkmark
+    noCosign*:              bool             ## When we know image is not in registry. skips validation
+    signed*:                bool             ## True on the insert path once signed,
+                                             ## and once we've seen an attestation otherwise
+    resourceType*:          set[ResourceType]
 
   PluginClearCb*       = proc (a: Plugin) {.cdecl.}
   ChalkTimeHostCb*     = proc (a: Plugin): ChalkDict {.cdecl.}
@@ -74,7 +102,10 @@ type
   RunTimeArtifactCb*   = proc (a: Plugin, b: ChalkObj, c: bool): ChalkDict {.cdecl.}
   RunTimeHostCb*       = proc (a: Plugin, b: seq[ChalkObj]): ChalkDict {.cdecl.}
   ScanCb*              = proc (a: Plugin, b: string): Option[ChalkObj] {.cdecl.}
+  SearchCb*            = proc (a: Plugin, b: string): seq[ChalkObj] {.cdecl.}
+  SearchEnvVarCb*      = proc (a: Plugin, b: string, c: string): seq[ChalkObj] {.cdecl.}
   UnchalkedHashCb*     = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
+  PrechalkingHashCb*   = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
   EndingHashCb*        = proc (a: Plugin, b: ChalkObj): Option[string] {.cdecl.}
   ChalkIdCb*           = proc (a: Plugin, b: ChalkObj): string {.cdecl.}
   HandleWriteCb*       = proc (a: Plugin, b: ChalkObj, c: Option[string]) {.cdecl.}
@@ -91,7 +122,10 @@ type
     # Codec-only bits
     nativeObjPlatforms*:       seq[string]
     scan*:                     ScanCb
+    search*:                   SearchCb
+    searchEnvVar*:             SearchEnvVarCb
     getUnchalkedHash*:         UnchalkedHashCb
+    getPrechalkingHash*:       PrechalkingHashCb
     getEndingHash*:            EndingHashCb
     getChalkId*:               ChalkIdCb
     handleWrite*:              HandleWriteCb
@@ -99,6 +133,7 @@ type
     internalState*:            RootRef
     # This is only used when using the default script chalking.
     commentStart*:             string
+    resourceTypes*:            set[ResourceType]
 
   AttestationKey* = ref object
     password*:   string
@@ -149,6 +184,7 @@ type
     skips*:           seq[Regex]
     chalks*:          seq[ChalkObj]
     recurse*:         bool
+    envVars*:         bool
 
   DockerStatement* = ref object of RootRef
     startLine*:  int
@@ -441,8 +477,6 @@ const
   magicUTF8*          = "dadfedabbadabbed"
   emptyMark*          = "{ \"MAGIC\" : \"" & magicUTF8 & "\" }"
   implName*           = "chalk-reference"
-  tmpFilePrefix*      = "chalk-"
-  tmpFileSuffix*      = "-file.tmp"
   chalkSpecName*      = "configs/chalk.c42spec"
   getoptConfName*     = "configs/getopts.c4m"
   baseConfName*       = "configs/base_*.c4m"
@@ -486,6 +520,9 @@ const
   timesIso8601Format* = timesDateFormat & "'T'" & timesTimeFormat & timesTzFormat
   objectStorePrefix*  = "@"
 
+  allResourceTypes*   = { ResourceFile, ResourceImage, ResourceContainer, ResourcePid, ResourceCert }
+  defResourceTypes*   = allResourceTypes - { ResourceCert }
+
   # Make sure that ARTIFACT_TYPE fields are consistently named
   artTypeElf*             = "ELF"
   artTypeZip*             = "ZIP"
@@ -496,6 +533,7 @@ const
   artTypeDockerContainer* = "Docker Container"
   artTypePyc*             = "Python Bytecode"
   artTypeMachO*           = "Mach-O executable"
+  artX509Cert*            = "x509 Cert"
 
 var
   hostInfo*               = ChalkDict()
@@ -507,14 +545,12 @@ var
   selfId*                 = none(string)
   canSelfInject*          = true
   doingTestRun*           = false
-  nativeCodecsOnly*       = false
+  onlyCodecs*             = newSeq[Plugin]()
   passedHelpFlag*         = false
   installedPlugins*       = Table[string, Plugin]()
   externalActions*        = newSeq[seq[string]]()
   commandName*            = ""
-  gitExeLocation*         = ""
   sshKeyscanExeLocation*  = ""
-  con4mRuntime*:          ConfigStack # can be nil
   dockerInvocation*:      DockerInvocation # ca be nil
 
 template dumpExOnDebug*() =
@@ -535,11 +571,3 @@ proc getBaseCommandName*(): string =
     result = commandName.split('.')[0]
   else:
     result = commandName
-
-template formatTitle*(text: string): string =
-  ## Used by both help and defaults command.
-  let
-    titleCode = toAnsiCode(@[acFont4, acBRed])
-    endCode   = toAnsiCode(@[acReset])
-
-  titleCode & text & endCode & "\n"
