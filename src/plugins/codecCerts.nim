@@ -27,9 +27,11 @@ type
   Cert     = ptr object
     key_value: cstringArray
     version:   cint
+    key_size:  cint
   X509Cert = ref object of RootRef
     keyValue: TableRef[string, string]
     version:  int
+    keySize:  int
 
 proc open_cert(fd: FileHandle): CertBIO {.importc.}
 proc read_cert(data: cstring, c: cint): CertBIO {.importc.}
@@ -54,6 +56,7 @@ iterator findCerts(self:       Plugin,
         cache    = X509Cert(
           version:  int(output.version),
           keyValue: keyValue,
+          keySize:  int(output.key_size),
         )
         data     = ChalkDict()
         chalk    = newChalk(
@@ -172,7 +175,10 @@ proc certsCallback(chalk: ChalkObj, prefix = ""): ChalkDict =
   result.setIfNeeded(prefix & "X509_SUBJECT_ALTERNATIVE_NAME", kv.popOrDefault("X509v3 Subject Alternative Name", ""))
   result.setIfNeeded(prefix & "X509_SERIAL",                   kv.popOrDefault("Serial", ""))
   result.setIfNeeded(prefix & "X509_KEY",                      kv.popOrDefault("Key", ""))
+  result.setIfNeeded(prefix & "X509_KEY_TYPE",                 kv.popOrDefault("Key Type", ""))
+  result.setIfNeeded(prefix & "X509_KEY_SIZE",                 cert.keySize)
   result.setIfNeeded(prefix & "X509_KEY_USAGE",                kv.popOrDefault("X509v3 Key Usage", ""))
+  result.setIfNeeded(prefix & "X509_SIGNATURE_TYPE",           kv.popOrDefault("Signature Type", ""))
   result.setIfNeeded(prefix & "X509_EXTENDED_KEY_USAGE",       kv.popOrDefault("X509v3 Extended Key Usage", ""))
   result.setIfNeeded(prefix & "X509_BASIC_CONSTRAINTS",        kv.popOrDefault("X509v3 Basic Constraints", ""))
   result.setIfNeeded(prefix & "X509_ISSUER",                   kv.popOrDefault("Issuer", ""))

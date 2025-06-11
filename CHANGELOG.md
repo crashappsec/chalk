@@ -28,7 +28,10 @@
   - `_X509_SUBJECT_ALTERNATIVE_NAME`
   - `_X509_SERIAL`
   - `_X509_KEY`
+  - `_X509_KEY_TYPE`
+  - `_X509_KEY_SIZE`
   - `_X509_KEY_USAGE`
+  - `_X509_SIGNATURE_TYPE`
   - `_X509_EXTENDED_KEY_USAGE`
   - `_X509_BASIC_CONSTRAINTS`
   - `_X509_ISSUER`
@@ -38,7 +41,8 @@
   - `_X509_NOT_AFTER`
   - `_X509_EXTRA_EXTENSIONS`
 
-  ([#515](https://github.com/crashappsec/chalk/pull/515))
+  ([#515](https://github.com/crashappsec/chalk/pull/515),
+  [#521](https://github.com/crashappsec/chalk/pull/521))
 
 - `_OP_ARTIFACT_PATH_WITHIN_VCTL` key which indicates path of the file
   in the git repo.

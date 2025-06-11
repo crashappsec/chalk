@@ -472,7 +472,10 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._X509_SUBJECT_ALTERNATIVE_NAME .use     = true
   ~key._X509_SERIAL.use                        = true
   ~key._X509_KEY.use                           = true
+  ~key._X509_KEY_TYPE.use                      = true
+  ~key._X509_KEY_SIZE.use                      = true
   ~key._X509_KEY_USAGE.use                     = true
+  ~key._X509_SIGNATURE_TYPE.use                = true
   ~key._X509_EXTENDED_KEY_USAGE.use            = true
   ~key._X509_BASIC_CONSTRAINTS.use             = true
   ~key._X509_ISSUER.use                        = true
