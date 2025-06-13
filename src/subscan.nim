@@ -41,11 +41,11 @@ proc runChalkSubScan*(location: seq[string],
     setLogLevel(llError)
 
   let runtime = getChalkRuntime()
+  result = pushCollectionCtx()
   try:
     if suspendHost:
       suspendHostCollection()
     runtime.con4mAttrSet("recursive", pack(true))
-    result                = pushCollectionCtx()
     case cmd
     # if someone is doing 'docker' recursively, we look
     # at the file system instead of a docker file.
@@ -63,6 +63,7 @@ proc runChalkSubScan*(location: seq[string],
 
     setCommandName(oldCmd)
     setArgs(oldArgs)
+    trace("subscan: found " & $len(result.allChalks) & " artifacts")
     trace("Subscan done. Restored command name to: " & oldCmd)
     runtime.con4mAttrSet("recursive", pack(oldRecursive))
 
