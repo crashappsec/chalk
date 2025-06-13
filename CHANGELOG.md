@@ -41,8 +41,19 @@
   - `_X509_NOT_AFTER`
   - `_X509_EXTRA_EXTENSIONS`
 
+  Certificate behavior can be customized via `certs` configuration block
+  which includes following configs:
+
+  - certs.filter_method
+  - certs.scan_no_extension
+  - certs.scan_extensions
+  - certs.ignore_filenames
+  - certs.ignore_prefixes
+  - certs.ignore_extensions
+
   ([#515](https://github.com/crashappsec/chalk/pull/515),
-  [#521](https://github.com/crashappsec/chalk/pull/521))
+  [#521](https://github.com/crashappsec/chalk/pull/521),
+  [#522](https://github.com/crashappsec/chalk/pull/522))
 
 - `_OP_ARTIFACT_PATH_WITHIN_VCTL` key which indicates path of the file
   in the git repo.

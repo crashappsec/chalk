@@ -2319,6 +2319,189 @@ final report, if the monitored process has exited.
   }
 }
 
+certs_filter_methods := ["blacklist", "whitelist"]
+
+singleton certs {
+  user_def_ok:   false
+  doc: """
+Configuration how certs codec behaves and looks for certificates.
+"""
+
+  field filter_method {
+    type:    string
+    default: "whitelist"
+    choice:  certs_filter_methods
+    doc:     """
+Method how files are filtered before attempting to look for a cert.
+Can be either `whitelist` or `blacklist`.
+
+Whitelist honors all `scan_*` configurations:
+* `scan_no_extension`
+* `scan_extensions`
+
+Blacklist honors all `ignore_*` configurations:
+* `ignore_filenames`
+* `ignore_prefixes`
+* `ignore_extensions`
+"""
+  }
+
+  field scan_no_extension {
+    type:    bool
+    default: true
+    doc:     """
+In whitelist mode, whether to scan files for certs when the filename has no extension.
+"""
+  }
+
+  field scan_extensions {
+    type:    list[string]
+    default: [
+              "0", # used in /etc/ssl/certs
+              "cer",
+              "cert",
+              "crt",
+              "der",
+              "key",
+              "pem"
+             ]
+    doc:     """
+In whitelist mode, whether to scan files for certs when the filename has one of the given extensions.
+"""
+  }
+
+  field ignore_filenames {
+    type:    list[string]
+    default: [
+              ".editorconfig",
+              ".eslintignore",
+              ".eslintrc",
+              ".git",
+              ".gitattributes",
+              ".gitkeep",
+              ".keep",
+              ".npmignore",
+              ".nvmrc",
+              ".nycrc",
+              ".prettierrc",
+              ".yarnignore",
+              "AUTHORS",
+              "CHANGELOG",
+              "CODEOWNERS",
+              "Makefile",
+              "NOTICE"
+             ]
+    doc:     """
+In blacklist mode, names of files to ignore to look certs in.
+"""
+  }
+
+  field ignore_prefixes {
+    type:    list[string]
+    default: [
+              "Dockerfile",
+              "LICENSE"
+             ]
+    doc:     """
+In blacklist mode, prefixes of filenames to ignore to look certs in.
+"""
+  }
+
+  field ignore_extensions {
+    type:    list[string]
+    default: [
+              "a",
+              "asm",
+              "bash",
+              "bat",
+              "c",
+              "cc",
+              "cjs",
+              "coffee",
+              "cpp",
+              "cs",
+              "css",
+              "csv",
+              "cts",
+              "ctx",
+              "docx",
+              "ejs",
+              "env",
+              "envrc",
+              "flow",
+              "gif",
+              "go",
+              "graphql",
+              "gz",
+              "h",
+              "hbs",
+              "html",
+              "ico",
+              "ini",
+              "ipynb",
+              "java",
+              "jpeg",
+              "jpg",
+              "js",
+              "json",
+              "jsonl",
+              "jst",
+              "jsx",
+              "kt",
+              "lock",
+              "log",
+              "lua",
+              "m",
+              "map",
+              "markdown",
+              "md",
+              "mdown",
+              "mdx",
+              "mjs",
+              "mts",
+              "mtx",
+              "nim",
+              "o",
+              "otf",
+              "php",
+              "pl",
+              "png",
+              "ps1",
+              "py",
+              "pyc",
+              "r",
+              "rb",
+              "rs",
+              "scss",
+              "sh",
+              "snap",
+              "so",
+              "sql",
+              "svg",
+              "swift",
+              "tar",
+              "text",
+              "toml",
+              "ts",
+              "tsx",
+              "ttf",
+              "txt",
+              "vue",
+              "wasm",
+              "woff",
+              "woff2",
+              "xml",
+              "yaml",
+              "yml",
+              "zip"
+              ]
+    doc: """
+In blacklist mode, file extensions to ignore to look certs in.
+"""
+ }
+
+}
+
 singleton env_config {
   user_def_ok:   false
   doc: """
@@ -2780,6 +2963,7 @@ root {
   allow cloud_provider
   allow git
   allow network
+  allow certs
 
   shortdoc: "Chalk Configuration Options"
 
