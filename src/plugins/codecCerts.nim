@@ -18,6 +18,7 @@ import ".."/[
   run_management,
   types,
   utils/files,
+  utils/strings,
 ]
 
 {.compile:"../utils/certs.c".}
@@ -89,9 +90,9 @@ iterator findCerts(self:       Plugin,
     finally:
       cleanup_cert_info(output)
 
-proc certsSearch(self: Plugin,
-                 path: string,
-                 ): seq[ChalkObj] {.cdecl.} =
+proc certsPathSearch(self: Plugin,
+                     path: string,
+                    ): seq[ChalkObj] =
   result = newSeq[ChalkObj]()
   withFileStream(path, mode = fmRead, strict = false):
     if stream == nil:
@@ -107,6 +108,45 @@ proc certsSearch(self: Plugin,
         result.add(chalk)
     finally:
       close_cert(bio)
+
+proc certsSearch(self: Plugin,
+                 path: string,
+                 ): seq[ChalkObj] {.cdecl.} =
+  result = newSeq[ChalkObj]()
+  let
+    mtd            = attrGet[string]("certs.filter_method")
+    (_, name, ext) = path.splitFile()
+    filename       = name & ext
+  if mtd == "blacklist":
+    let
+      ignoreNames    = attrGet[seq[string]]("certs.ignore_filenames")
+      ignorePrefixes = attrGet[seq[string]]("certs.ignore_prefixes")
+      ignoreExts     = attrGet[seq[string]]("certs.ignore_extensions")
+    for i in ignoreExts:
+      if filename.toLowerAscii().endsWith("." & i.toLowerAscii()):
+        trace(path & ": ignored via certs.ignore_extensions")
+        return
+    for i in ignorePrefixes:
+      if filename.toLowerAscii().startsWith(i.toLowerAscii()):
+        trace(path & ": ignored via certs.ignore_prefixes")
+        return
+    for i in ignoreNames:
+      if filename.toLowerAscii() == i.toLowerAscii():
+        trace(path & ": ignored via certs.ignore_filenames")
+        return
+    return self.certsPathSearch(path)
+  else:
+    let
+      scanNoExt = attrGet[bool]("certs.scan_no_extension")
+      scanExts  = attrGet[seq[string]]("certs.scan_extensions")
+    if ext == "" and scanNoExt:
+        return self.certsPathSearch(path)
+    for i in scanExts:
+      if filename.toLowerAscii().endsWith("." & i.toLowerAscii()):
+        return self.certsPathSearch(path)
+    trace(path & ": ignored due to certs whitelist settings. See " &
+          @["certs.scan_no_extension",
+            "certs.scan_extensions"].join(", "))
 
 iterator certsSearchEnvVar(self: Plugin,
                            k:    string,
