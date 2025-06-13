@@ -50,6 +50,8 @@
   Additionally new `_OP_ARTIFACT_ENV_VAR_NAME` key indicates name of the
   environment variable where the artifact was found.
   ([#515](https://github.com/crashappsec/chalk/pull/515))
+- Reporting all IMDSv2 errors in `FAILED_KEYS` or `_OP_FAILED_KEYS`.
+  ([#519](https://github.com/crashappsec/chalk/pull/519))
 
 ### Fixes
 
