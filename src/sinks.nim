@@ -42,6 +42,8 @@ const
                      }.toTable()
 
 proc chalkErrSink*(msg: string, cfg: SinkConfig, t: Topic, arg: StringTable) =
+  if inSubscan():
+    return
   let errObject = getErrorObject()
   if not isChalkingOp() or errObject.isNone():
     systemErrors.add(msg)

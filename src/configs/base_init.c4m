@@ -35,6 +35,8 @@ cloud_provider {
 
 network { }
 
+certs { }
+
 attestation {
   attestation_key_embed { }
   attestation_key_get { }
