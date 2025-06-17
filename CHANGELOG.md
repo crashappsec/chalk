@@ -20,7 +20,7 @@
 
 ### New Features
 
-- X509 Certificate codec which can parse PEM files and report
+- X509 Certificate codec which can parse PEM/DER files and report
   metadata keys about the certificate:
 
   - `_X509_VERSION`
@@ -53,7 +53,8 @@
 
   ([#515](https://github.com/crashappsec/chalk/pull/515),
   [#521](https://github.com/crashappsec/chalk/pull/521),
-  [#522](https://github.com/crashappsec/chalk/pull/522))
+  [#522](https://github.com/crashappsec/chalk/pull/522),
+  [#524](https://github.com/crashappsec/chalk/pull/524))
 
 - `_OP_ARTIFACT_PATH_WITHIN_VCTL` key which indicates path of the file
   in the git repo.

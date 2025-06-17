@@ -35,6 +35,7 @@ server/app/server-static
 *.sqlite
 *.key
 *.pem
+*.der
 *.pub
 keys/*
 nimble.develop
