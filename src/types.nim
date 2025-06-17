@@ -447,6 +447,7 @@ type
       metadataFilePath*:      string
       metadataFile*:          JsonNode
       dockerFileLoc*:         string # can be :stdin:
+      vctlDockerFileLoc*:     string # path within version control
       inDockerFile*:          string
       addedPlatform*:         OrderedTableRef[string, seq[string]]
       addedInstructions*:     seq[string]

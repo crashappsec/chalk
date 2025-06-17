@@ -76,6 +76,12 @@
   ([#514](https://github.com/crashappsec/chalk/pull/514))
 - Support for IPv6 Docker registry references
   ([#520](https://github.com/crashappsec/chalk/pull/520))
+- `DOCKERFILE_PATH` was always reported as `:stdin:` when using docker git
+  context, regardless if `Dockerfile` was actually read from `stdin`.
+  It will only report `:stdin:` now when reading `Dockerfile` from `stdin`.
+  Otherwise it is omitted and instead ``DOCKERFILE_PATH_WITHIN_VCTL` is
+  reports relative `Dockerfile` path to the remote git context repository.
+  ([#523](https://github.com/crashappsec/chalk/pull/523))
 
 ## 0.5.7
 
