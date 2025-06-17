@@ -1663,12 +1663,13 @@ def test_multiplatform_build(
 
 @pytest.mark.slow()
 @pytest.mark.parametrize(
-    "context, dockerfile, private, buildkit",
+    "context, dockerfile, content, private, buildkit",
     [
         # without buildkit
         # note legacy builder defaults to "master" branch so needs to be overwritten
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#main",
+            None,
             None,
             False,
             False,
@@ -1676,6 +1677,7 @@ def test_multiplatform_build(
         # git scheme
         pytest.param(
             f"git@github.com:{DOCKER_SSH_REPO}.git",
+            None,
             None,
             False,
             True,
@@ -1687,6 +1689,7 @@ def test_multiplatform_build(
         pytest.param(
             f"ssh://git@github.com:22/{DOCKER_SSH_REPO}.git",
             None,
+            None,
             False,
             True,
             marks=pytest.mark.skipif(
@@ -1697,6 +1700,15 @@ def test_multiplatform_build(
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git",
             None,
+            None,
+            False,
+            True,
+        ),
+        # https but dockerfile from stdin
+        (
+            "https://github.com/crashappsec/chalk-docker-git-context.git",
+            None,
+            "FROM alpine",
             False,
             True,
         ),
@@ -1704,12 +1716,14 @@ def test_multiplatform_build(
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git",
             "./Dockerfile",
+            None,
             False,
             True,
         ),
         # with commit
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#e488e0f9eaad7eb08c05334454787a7966c39f84",
+            None,
             None,
             False,
             True,
@@ -1718,12 +1732,14 @@ def test_multiplatform_build(
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#main",
             None,
+            None,
             False,
             True,
         ),
         # with tag
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#1-annotated",
+            None,
             None,
             False,
             True,
@@ -1732,12 +1748,14 @@ def test_multiplatform_build(
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#main:nested",
             None,
+            None,
             False,
             True,
         ),
         # with PR ref
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#refs/pull/1/merge",
+            None,
             None,
             False,
             True,
@@ -1746,12 +1764,14 @@ def test_multiplatform_build(
         (
             "https://github.com/crashappsec/chalk-docker-git-context.git#refs/tags/1-annotated",
             None,
+            None,
             False,
             True,
         ),
         # private repo
         (
             f"https://github.com/{DOCKER_TOKEN_REPO}.git",
+            None,
             None,
             True,
             True,
@@ -1765,6 +1785,7 @@ def test_git_context(
     chalk: Chalk,
     context: str,
     dockerfile: Optional[str],
+    content: Optional[str],
     private: bool,
     buildkit: bool,
     tmp_file: Path,
@@ -1776,12 +1797,17 @@ def test_git_context(
     _, build = chalk.docker_build(
         context=context,
         dockerfile=dockerfile,
+        content=content,
         tag=random_hex,
         secrets={"GIT_AUTH_TOKEN": tmp_file} if private else {},
         buildkit=buildkit,
     )
     assert build.mark.has(
         ORIGIN_URI=remote,
+        DOCKERFILE_PATH=":stdin:" if content else MISSING,
+        DOCKERFILE_PATH_WITHIN_VCTL=(
+            (dockerfile or "Dockerfile") if not content else MISSING
+        ),
         COMMIT_ID=ANY,
     )
 

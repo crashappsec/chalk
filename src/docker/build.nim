@@ -62,14 +62,16 @@ proc processDockerFile(ctx: DockerInvocation) =
     ctx.originalStdIn = input
     trace("docker: read Dockerfile from stdin")
 
-  elif ctx.gitContext != nil and ctx.supportsBuildContextFlag():
+  elif ctx.gitContext != nil:
     # ctx.dockerFileLoc is resolvedPath which is invalid
     # in git context as we need raw path passed in the CLI
-    var dockerFileLoc = ctx.foundFileArg
-    if dockerFileLoc == "":
-      dockerFileLoc = "Dockerfile"
-    ctx.inDockerFile = ctx.gitContext.show(dockerFileLoc)
-    ctx.dockerFileLoc = ":stdin:"
+    var name = ctx.foundFileArg
+    if name == "":
+      name = "Dockerfile"
+    ctx.inDockerFile      = ctx.gitContext.show(name)
+    ctx.vctlDockerFileLoc = name
+    # build is not technially from the FS so no absolute FS path
+    ctx.dockerFileLoc     = ""
 
   else:
     if ctx.dockerFileLoc == "":
@@ -89,6 +91,13 @@ proc processDockerFile(ctx: DockerInvocation) =
       dumpExOnDebug()
       error("docker: " & ctx.foundFileArg & ": Dockerfile not readable")
       raise newException(ValueError, "Read perms")
+
+    let
+      git          = getPluginByName("vctl_git")
+      gitPathOpt   = git.gitFirstDir()
+    if gitPathOpt.isSome():
+      let repoPath = gitPathOpt.get().parentDir()
+      ctx.vctlDockerFileLoc = getRelativePathBetween(repoPath, ctx.dockerFileLoc)
 
 proc processCmdLine(ctx: DockerInvocation) =
   ## The main docker parse tries to pull out as many flags as it can
@@ -359,13 +368,6 @@ proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
   let
     baseSection         = ctx.getBaseDockerSection()
     dict                = chalk.collectedData
-    git                 = getPluginByName("vctl_git")
-    gitPathOpt          = git.gitFirstDir()
-  if gitPathOpt.isSome():
-    let
-      repoPath          = gitPathOpt.get().parentDir()
-      dockerfileRelPath = getRelativePathBetween(repoPath, ctx.dockerFileLoc)
-    dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",     dockerfileRelPath)
   chalk.collectBaseImages(ctx)
   if chalk.baseChalk != nil:
     if chalk.baseChalk.isMarked():
@@ -373,6 +375,7 @@ proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
       dict.setIfNeeded("DOCKER_BASE_IMAGE_CHALK",       chalk.baseChalk.extract)
     dict.setIfNeeded("DOCKER_BASE_IMAGE_ID",            chalk.baseChalk.collectedData.getOrDefault("_IMAGE_ID"))
   dict.setIfNeeded("DOCKERFILE_PATH",                   ctx.dockerFileLoc)
+  dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",       ctx.vctlDockerFileLoc)
   dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",        ctx.foundExtraContexts)
   dict.setIfNeeded("DOCKER_CONTEXT",                    ctx.foundContext)
   dict.setIfNeeded("DOCKER_FILE",                       ctx.inDockerFile)
@@ -469,6 +472,8 @@ proc dockerBuild*(ctx: DockerInvocation): int =
 
   trace("docker: processing build CLI args")
   ctx.processGitContext()
+  let contexts = ctx.getUsableDockerContexts()
+  setContextDirectories(contexts)
   ctx.processDockerFile()
   ctx.processCmdLine()
   ctx.evalAndExtractDockerfile(ctx.getAllBuildArgs())
@@ -479,8 +484,6 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   forceChalkKeys(["DOCKER_PLATFORM"])
 
   trace("docker: collecting pre-build metadata")
-  let contexts = ctx.getUsableDockerContexts()
-  setContextDirectories(contexts)
   initCollection()
   if dockerSubchalk:
     try:
