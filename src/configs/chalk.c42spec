@@ -2363,7 +2363,8 @@ In whitelist mode, whether to scan files for certs when the filename has no exte
               "crt",
               "der",
               "key",
-              "pem"
+              "pem",
+              "pub"
              ]
     doc:     """
 In whitelist mode, whether to scan files for certs when the filename has one of the given extensions.

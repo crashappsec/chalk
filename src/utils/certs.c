@@ -96,12 +96,19 @@ typedef struct {
 Cert *
 extract_cert_data(BIO *fdb)
 {
-    char scratch[2000];
-
+    int               cur        = BIO_tell(fdb);
     X509             *cert       = PEM_read_bio_X509(fdb, NULL, NULL, NULL);
     if (!cert) {
-        return NULL;
+        // attempt to rewind to original position to reread as DER cert
+        if (BIO_seek(fdb, cur) < 0) {
+            return NULL;
+        }
+        cert                     = d2i_X509_bio(fdb, NULL);
+        if (!cert) {
+            return NULL;
+        }
     }
+    char              scratch[2000];
     int               version    = ((int)X509_get_version(cert)) + 1;
     EVP_PKEY         *pub        = X509_get_pubkey(cert);
     int               keynid     = EVP_PKEY_base_id(pub);
