@@ -218,6 +218,7 @@ proc certsCallback(chalk: ChalkObj, prefix = ""): ChalkDict =
   result.setIfNeeded(prefix & "X509_KEY_TYPE",                 kv.popOrDefault("Key Type", ""))
   result.setIfNeeded(prefix & "X509_KEY_SIZE",                 cert.keySize)
   result.setIfNeeded(prefix & "X509_KEY_USAGE",                kv.popOrDefault("X509v3 Key Usage", ""))
+  result.setIfNeeded(prefix & "X509_SIGNATURE",                kv.popOrDefault("Signature", ""))
   result.setIfNeeded(prefix & "X509_SIGNATURE_TYPE",           kv.popOrDefault("Signature Type", ""))
   result.setIfNeeded(prefix & "X509_EXTENDED_KEY_USAGE",       kv.popOrDefault("X509v3 Extended Key Usage", ""))
   result.setIfNeeded(prefix & "X509_BASIC_CONSTRAINTS",        kv.popOrDefault("X509v3 Basic Constraints", ""))
