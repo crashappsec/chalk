@@ -16,7 +16,7 @@ from .utils.log import get_logger
 
 logger = get_logger()
 
-COLON_HEX = re.compile(r"^([0-9a-f]{2}:)*([0-9a-f]{2})$")
+COLON_HEX = re.compile(r"^([0-9a-fA-F]{2}:)*([0-9a-fA-F]{2})$")
 
 
 def test_cert(

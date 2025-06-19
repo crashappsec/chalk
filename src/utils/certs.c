@@ -39,17 +39,12 @@ char *
 convert_ASN1STRING(ASN1_BIT_STRING *s)
 {
     int            l      = ASN1_STRING_length(s);
-    // each byte is 2 hex plus colon or last char NULL
-    char          *result = calloc(l * 3, 1);
-    unsigned char *data   = ASN1_STRING_get0_data(s);
-    char          *cur    = result;
-
-    for (int i = 0; i < l - 1; i++) {
-        sprintf(cur, "%02x:", data[i]);
-        cur += 3;
-    }
-    sprintf(cur, "%02x", data[l - 1]);
-
+    unsigned char *ptr    = ASN1_STRING_get0_data(s);
+    unsigned char *tmp    = OPENSSL_buf2hexstr(ptr, l);
+    // as we need to free() the key-values, we copy hex string via strdup()
+    // as otherwise openssl pointer needs to be freed with OPENSSL_free()
+    unsigned char *result = strdup(tmp);
+    OPENSSL_free(tmp);
     return result;
 }
 
