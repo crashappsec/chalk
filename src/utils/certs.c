@@ -35,6 +35,24 @@ convert_ASN1TIME(ASN1_TIME *t, char *buf, size_t len)
     return -1;
 }
 
+char *
+convert_ASN1STRING(ASN1_BIT_STRING *s)
+{
+    int            l      = ASN1_STRING_length(s);
+    // each byte is 2 hex plus colon or last char NULL
+    char          *result = calloc(l * 3, 1);
+    unsigned char *data   = ASN1_STRING_get0_data(s);
+    char          *cur    = result;
+
+    for (int i = 0; i < l - 1; i++) {
+        sprintf(cur, "%02x:", data[i]);
+        cur += 3;
+    }
+    sprintf(cur, "%02x", data[l - 1]);
+
+    return result;
+}
+
 // Drain a bio.
 char *
 BIO_all(BIO *bio)
@@ -85,7 +103,7 @@ BIO_all(BIO *bio)
     return result;
 }
 
-#define FIXED_LEN 17
+#define FIXED_LEN 19
 
 typedef struct {
     char **key_value;
@@ -116,6 +134,8 @@ extract_cert_data(BIO *fdb)
     int               keysize    = EVP_PKEY_get_bits(pub);
     int               signid     = X509_get_signature_nid(cert);
     char             *sigtype    = strdup(OBJ_nid2ln(signid));
+    ASN1_BIT_STRING  *sig;
+    X509_ALGOR       *sigalg;
     void             *subjn      = X509_get_subject_name(cert);
     char             *subj       = X509_NAME_oneline(subjn, NULL, 0);
     void             *in         = X509_get_issuer_name(cert);
@@ -138,6 +158,8 @@ extract_cert_data(BIO *fdb)
         NULL);
     OSSL_ENCODER_to_bio(encoder, key_bio);
 
+    X509_get0_signature(&sig, &sigalg, cert);
+
     char *key_contents = BIO_all(key_bio);
     BIO_free(key_bio);
     STACK_OF(X509_EXTENSION) *exts = cert->cert_info.extensions;
@@ -149,23 +171,27 @@ extract_cert_data(BIO *fdb)
 
     char **key_value = calloc(sizeof(char *), FIXED_LEN + num_exts * 2);
 
-    int ix       = 0;
-    key_value[ix++] = strdup("Subject");
-    key_value[ix++] = subj;
-    key_value[ix++] = strdup("Issuer");
-    key_value[ix++] = issuer;
-    key_value[ix++] = strdup("Serial");
-    key_value[ix++] = serial;
-    key_value[ix++] = strdup("Key");
-    key_value[ix++] = key_contents;
-    key_value[ix++] = strdup("Key Type");
-    key_value[ix++] = keytype;
-    key_value[ix++] = strdup("Signature Type");
-    key_value[ix++] = sigtype;
-    key_value[ix++] = strdup("Not Before");
-    key_value[ix++] = not_before;
-    key_value[ix++] = strdup("Not After");
-    key_value[ix++] = not_after;
+    int ix              = 0;
+    key_value[ix++]     = strdup("Subject");
+    key_value[ix++]     = subj;
+    key_value[ix++]     = strdup("Issuer");
+    key_value[ix++]     = issuer;
+    key_value[ix++]     = strdup("Serial");
+    key_value[ix++]     = serial;
+    key_value[ix++]     = strdup("Key");
+    key_value[ix++]     = key_contents;
+    key_value[ix++]     = strdup("Key Type");
+    key_value[ix++]     = keytype;
+    key_value[ix++]     = strdup("Signature Type");
+    key_value[ix++]     = sigtype;
+    key_value[ix++]     = strdup("Not Before");
+    key_value[ix++]     = not_before;
+    key_value[ix++]     = strdup("Not After");
+    key_value[ix++]     = not_after;
+    if (sig) {
+        key_value[ix++] = strdup("Signature");
+        key_value[ix++] = convert_ASN1STRING(sig);
+    }
 
     for (int i = 0; i < num_exts; i++) {
         char           *name    = NULL;

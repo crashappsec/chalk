@@ -6371,6 +6371,17 @@ https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.3
 """
 }
 
+keyspec _X509_SIGNATURE {
+    kind:             RunTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.5.8"
+    shortdoc:         "Certificate signature"
+    doc: """
+Certificate signature in hex
+"""
+}
+
 keyspec _X509_SIGNATURE_TYPE {
     kind:             RunTimeArtifact
     type:             int
