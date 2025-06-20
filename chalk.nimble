@@ -15,7 +15,7 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 2.0.8"
-requires "https://github.com/crashappsec/con4m#2404941ff60d06c61fc7c99a2dbbea23717bc4db"
+requires "https://github.com/crashappsec/con4m#139bfc8c2f16f6069cf59daf7f41ef9a2ef60b5e"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
 requires "https://github.com/NimParsers/parsetoml == 0.7.1" # MIT
 
