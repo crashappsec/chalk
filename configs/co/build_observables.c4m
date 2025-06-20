@@ -1,23 +1,25 @@
-keyspec X_BUILD_OBSERVABLES {
+keyspec _X_BUILD_OBSERVABLES {
   kind:  RunTimeHost
   type:  `x
   callback: func build_observables
 }
 
 func build_observables(contexts) {
-  observables := "/mnt/crashoverride/observables/*" + env("GITHUB_RUN_ID") + ".json"
+  observables := "/mnt/curiosity/observables/" + env("GITHUB_RUN_ID") + "-" + env("GITHUB_RUN_ATTEMPT") + "-observables.json"
   trace("Parsing observables from " + observables)
   output := strip(run("jq -c -s '.' " + observables))
   if starts_with(output, "[") {
-      return parse_json(output)
+    trace("collected build observables output")
+    return parse_json(output)
   } else {
-      trace("empty observables output")
-      return
+    trace("empty observables output")
+    return
   }
 }
+
 report_template crashoverride {
-  if command_name == "env" {
-    ~key.X_BUILD_OBSERVABLES.use           = true
+  if command_name() == "env" {
+    ~key._X_BUILD_OBSERVABLES.use          = true
     ~key._X_BUILD_OBSERVABLES.object_store = "crashoverride"
   }
 }
