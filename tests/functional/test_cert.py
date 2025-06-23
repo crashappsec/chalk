@@ -36,12 +36,16 @@ def test_cert(
                 {
                     "_OP_ARTIFACT_PATH": re.compile(r"/cacert.pem$"),
                     "_X509_SIGNATURE": COLON_HEX,
-                    "_X509_SUBJECT": "/C=US/O=DigiCert Inc/OU=www.digicert.com/CN=DigiCert Global Root CA",
+                    "_X509_SUBJECT": {
+                        "commonName": "DigiCert Global Root CA",
+                    },
                 },
                 {
                     "_OP_ARTIFACT_ENV_VAR_NAME": "CO_CERT",
                     "_X509_SIGNATURE": COLON_HEX,
-                    "_X509_SUBJECT": "/CN=tls.chalk.local",
+                    "_X509_SUBJECT": {
+                        "commonName": "tls.chalk.local",
+                    },
                 },
             ]
         )

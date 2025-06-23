@@ -27,10 +27,14 @@ type
   CertBIO  = pointer
   Cert     = ptr object
     key_value: cstringArray
+    subject:   cstringArray
+    issuer:    cstringArray
     version:   cint
     key_size:  cint
   X509Cert = ref object of RootRef
     keyValue: TableRef[string, string]
+    subject:  TableRef[string, string]
+    issuer:   TableRef[string, string]
     version:  int
     keySize:  int
 
@@ -39,6 +43,15 @@ proc read_cert(data: cstring, c: cint): CertBIO {.importc.}
 proc close_cert(c: CertBIO) {.importc.}
 proc extract_cert_data(c: CertBIO): Cert {.importc.}
 proc cleanup_cert_info(cert: Cert) {.importc.}
+
+proc toTable(t: cstringArray): TableRef[string, string] =
+  result = newTable[string, string]()
+  let kv = cstringArrayToSeq(t)
+  for i in 0..<int(len(kv)/2):
+    let
+      key   = kv[i*2]
+      value = kv[i*2+1]
+    result[key] = $value
 
 iterator findCerts(self:       Plugin,
                    bio:        CertBIO,
@@ -52,11 +65,11 @@ iterator findCerts(self:       Plugin,
       break
     try:
       let
-        metadata = cstringArrayToSeq(output.key_value)
-        keyValue = newTable[string, string]()
         cache    = X509Cert(
           version:  int(output.version),
-          keyValue: keyValue,
+          keyValue: output.key_value.toTable(),
+          subject:  output.subject.toTable(),
+          issuer:   output.issuer.toTable(),
           keySize:  int(output.key_size),
         )
         data     = ChalkDict()
@@ -71,11 +84,6 @@ iterator findCerts(self:       Plugin,
           collectedData = data,
           extract       = data,
         )
-      for i in 0..<int(len(metadata)/2):
-        let
-          key   = metadata[i*2]
-          value = metadata[i*2+1]
-        keyValue[key] = $value
       # cert is already a key-value store and so we will not be chalking
       # a cert file but we still want chalk to collect metadata about it
       # therefore we "fake" chalkmark to be able to collect/report metadata
@@ -211,7 +219,7 @@ proc certsCallback(chalk: ChalkObj, prefix = ""): ChalkDict =
     extensions = newTable[string, string]()
   result = ChalkDict()
   result.setIfNeeded(prefix & "X509_VERSION",                  cert.version)
-  result.setIfNeeded(prefix & "X509_SUBJECT",                  kv.popOrDefault("Subject", ""))
+  result.setIfNeeded(prefix & "X509_SUBJECT",                  cert.subject)
   result.setIfNeeded(prefix & "X509_SUBJECT_ALTERNATIVE_NAME", kv.popOrDefault("X509v3 Subject Alternative Name", ""))
   result.setIfNeeded(prefix & "X509_SERIAL",                   kv.popOrDefault("Serial", ""))
   result.setIfNeeded(prefix & "X509_KEY",                      kv.popOrDefault("Key", ""))
@@ -222,7 +230,7 @@ proc certsCallback(chalk: ChalkObj, prefix = ""): ChalkDict =
   result.setIfNeeded(prefix & "X509_SIGNATURE_TYPE",           kv.popOrDefault("Signature Type", ""))
   result.setIfNeeded(prefix & "X509_EXTENDED_KEY_USAGE",       kv.popOrDefault("X509v3 Extended Key Usage", ""))
   result.setIfNeeded(prefix & "X509_BASIC_CONSTRAINTS",        kv.popOrDefault("X509v3 Basic Constraints", ""))
-  result.setIfNeeded(prefix & "X509_ISSUER",                   kv.popOrDefault("Issuer", ""))
+  result.setIfNeeded(prefix & "X509_ISSUER",                   cert.issuer)
   result.setIfNeeded(prefix & "X509_SUBJECT_KEY_IDENTIFIER",   kv.popOrDefault("X509v3 Subject Key Identifier", ""))
   result.setIfNeeded(prefix & "X509_AUTHORITY_KEY_IDENTIFIER", kv.popOrDefault("X509v3 Authority Key Identifier", ""))
   result.setIfNeeded(prefix & "X509_NOT_BEFORE",               kv.popOrDefault("Not Before", ""))

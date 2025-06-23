@@ -6238,7 +6238,7 @@ https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.1
 
 keyspec _X509_SUBJECT {
     kind:             RunTimeArtifact
-    type:             string
+    type:             dict[string, string]
     standard:         true
     since:            "0.5.8"
     shortdoc:         "Identity certificate is bound to"
@@ -6426,7 +6426,7 @@ https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.9
 
 keyspec _X509_ISSUER {
     kind:             RunTimeArtifact
-    type:             string
+    type:             dict[string, string]
     standard:         true
     since:            "0.5.8"
     shortdoc:         "Subject of the CA which minted the cert"
