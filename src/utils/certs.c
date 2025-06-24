@@ -54,7 +54,7 @@ convert_ASN1STRING(ASN1_BIT_STRING *s)
 }
 
 char **
-convert_NAME(X509_NAME *n)
+convert_NAME(X509_NAME *n, int short_name)
 {
     int l            = X509_NAME_entry_count(n);
     char **key_value = calloc(sizeof(char *), l * 2 + 1);
@@ -72,8 +72,11 @@ convert_NAME(X509_NAME *n)
             OBJ_obj2txt(scratch, 200, key, 1);
             key_value[ix++] = strdup(scratch);
         } else {
-            const char *name = OBJ_nid2ln(nid);
-            key_value[ix++]  = strdup(name);
+            if (short_name) {
+                key_value[ix++] = strdup(OBJ_nid2sn(nid));
+            } else {
+                key_value[ix++] = strdup(OBJ_nid2ln(nid));
+            }
         }
 
         int len = ASN1_STRING_to_UTF8(&utf8, value);
@@ -142,7 +145,9 @@ BIO_all(BIO *bio)
 typedef struct {
     char **key_value;
     char **subject;
+    char **subject_short;
     char **issuer;
+    char **issuer_short;
     int  version;
     int  key_size;
 } Cert;
@@ -260,12 +265,14 @@ extract_cert_data(BIO *fdb)
 
     key_value[ix++] = 0;
 
-    Cert *result = malloc(sizeof(Cert));
-    result->key_value = key_value;
-    result->subject   = convert_NAME(subj);
-    result->issuer    = convert_NAME(issuer);
-    result->version   = version;
-    result->key_size  = keysize;
+    Cert *result          = malloc(sizeof(Cert));
+    result->key_value     = key_value;
+    result->subject       = convert_NAME(subj, 0);
+    result->subject_short = convert_NAME(subj, 1);
+    result->issuer        = convert_NAME(issuer, 0);
+    result->issuer_short  = convert_NAME(issuer, 1);
+    result->version       = version;
+    result->key_size      = keysize;
     return result;
 }
 

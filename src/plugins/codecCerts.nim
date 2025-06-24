@@ -26,17 +26,21 @@ import ".."/[
 type
   CertBIO  = pointer
   Cert     = ptr object
-    key_value: cstringArray
-    subject:   cstringArray
-    issuer:    cstringArray
-    version:   cint
-    key_size:  cint
+    key_value:     cstringArray
+    subject:       cstringArray
+    subject_short: cstringArray
+    issuer:        cstringArray
+    issuer_short:  cstringArray
+    version:       cint
+    key_size:      cint
   X509Cert = ref object of RootRef
-    keyValue: TableRef[string, string]
-    subject:  TableRef[string, string]
-    issuer:   TableRef[string, string]
-    version:  int
-    keySize:  int
+    keyValue:     TableRef[string, string]
+    subject:      TableRef[string, string]
+    subjectShort: TableRef[string, string]
+    issuer:       TableRef[string, string]
+    issuerShort:  TableRef[string, string]
+    version:      int
+    keySize:      int
 
 proc open_cert(fd: FileHandle): CertBIO {.importc.}
 proc read_cert(data: cstring, c: cint): CertBIO {.importc.}
@@ -66,11 +70,13 @@ iterator findCerts(self:       Plugin,
     try:
       let
         cache    = X509Cert(
-          version:  int(output.version),
-          keyValue: output.key_value.toTable(),
-          subject:  output.subject.toTable(),
-          issuer:   output.issuer.toTable(),
-          keySize:  int(output.key_size),
+          version:      int(output.version),
+          keyValue:     output.key_value.toTable(),
+          subject:      output.subject.toTable(),
+          subjectShort: output.subject_short.toTable(),
+          issuer:       output.issuer.toTable(),
+          issuerShort:  output.issuer_short.toTable(),
+          keySize:      int(output.key_size),
         )
         data     = ChalkDict()
         chalk    = newChalk(
@@ -220,6 +226,7 @@ proc certsCallback(chalk: ChalkObj, prefix = ""): ChalkDict =
   result = ChalkDict()
   result.setIfNeeded(prefix & "X509_VERSION",                  cert.version)
   result.setIfNeeded(prefix & "X509_SUBJECT",                  cert.subject)
+  result.setIfNeeded(prefix & "X509_SUBJECT_SHORT",            cert.subjectShort)
   result.setIfNeeded(prefix & "X509_SUBJECT_ALTERNATIVE_NAME", kv.popOrDefault("X509v3 Subject Alternative Name", ""))
   result.setIfNeeded(prefix & "X509_SERIAL",                   kv.popOrDefault("Serial", ""))
   result.setIfNeeded(prefix & "X509_KEY",                      kv.popOrDefault("Key", ""))
@@ -231,6 +238,7 @@ proc certsCallback(chalk: ChalkObj, prefix = ""): ChalkDict =
   result.setIfNeeded(prefix & "X509_EXTENDED_KEY_USAGE",       kv.popOrDefault("X509v3 Extended Key Usage", ""))
   result.setIfNeeded(prefix & "X509_BASIC_CONSTRAINTS",        kv.popOrDefault("X509v3 Basic Constraints", ""))
   result.setIfNeeded(prefix & "X509_ISSUER",                   cert.issuer)
+  result.setIfNeeded(prefix & "X509_ISSUER_SHORT",             cert.issuerShort)
   result.setIfNeeded(prefix & "X509_SUBJECT_KEY_IDENTIFIER",   kv.popOrDefault("X509v3 Subject Key Identifier", ""))
   result.setIfNeeded(prefix & "X509_AUTHORITY_KEY_IDENTIFIER", kv.popOrDefault("X509v3 Authority Key Identifier", ""))
   result.setIfNeeded(prefix & "X509_NOT_BEFORE",               kv.popOrDefault("Not Before", ""))
