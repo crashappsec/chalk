@@ -492,7 +492,9 @@ def test_subscan(chalk: Chalk, server_cert: Path, random_hex: str):
     assert build.artifacts_by_path.contains(
         {
             str(server_cert): {
-                "_X509_SUBJECT": "/CN=tls.chalk.local",
+                "_X509_SUBJECT": {
+                    "commonName": "tls.chalk.local",
+                },
                 "_OP_ARTIFACT_PATH_WITHIN_VCTL": str(
                     server_cert.relative_to(TESTS.parent.parent)
                 ),

@@ -53,6 +53,40 @@ convert_ASN1STRING(ASN1_BIT_STRING *s)
     return result;
 }
 
+char **
+convert_NAME(X509_NAME *n)
+{
+    int l            = X509_NAME_entry_count(n);
+    char **key_value = calloc(sizeof(char *), l * 2 + 1);
+    int ix           = 0;
+    for (int i = 0; i < l; i++) {
+        X509_NAME_ENTRY *entry = X509_NAME_get_entry(n, i);
+        ASN1_OBJECT     *key   = X509_NAME_ENTRY_get_object(entry);
+        unsigned         nid   = OBJ_obj2nid(key);
+        ASN1_STRING     *value = X509_NAME_ENTRY_get_data(entry);
+        unsigned char   *utf8;
+
+        if (nid == NID_undef) {
+            // raw OID as the key
+            char scratch[200];
+            OBJ_obj2txt(scratch, 200, key, 1);
+            key_value[ix++] = strdup(scratch);
+        } else {
+            const char *name = OBJ_nid2ln(nid);
+            key_value[ix++]  = strdup(name);
+        }
+
+        int len = ASN1_STRING_to_UTF8(&utf8, value);
+        if (len < 0) {
+            key_value[ix++] = strdup("");
+        } else {
+            key_value[ix++] = strndup(utf8, len);
+            OPENSSL_free(utf8);
+        }
+    }
+    return key_value;
+}
+
 // Drain a bio.
 char *
 BIO_all(BIO *bio)
@@ -103,10 +137,12 @@ BIO_all(BIO *bio)
     return result;
 }
 
-#define FIXED_LEN 19
+#define FIXED_LEN 15
 
 typedef struct {
     char **key_value;
+    char **subject;
+    char **issuer;
     int  version;
     int  key_size;
 } Cert;
@@ -136,10 +172,8 @@ extract_cert_data(BIO *fdb)
     char             *sigtype    = strdup(OBJ_nid2ln(signid));
     ASN1_BIT_STRING  *sig;
     X509_ALGOR       *sigalg;
-    void             *subjn      = X509_get_subject_name(cert);
-    char             *subj       = X509_NAME_oneline(subjn, NULL, 0);
-    void             *in         = X509_get_issuer_name(cert);
-    char             *issuer     = X509_NAME_oneline(in, NULL, 0);
+    X509_NAME        *subj       = X509_get_subject_name(cert);
+    X509_NAME        *issuer     = X509_get_issuer_name(cert);
     ASN1_INTEGER     *sn         = X509_get_serialNumber(cert);
     BIGNUM           *bn         = ASN1_INTEGER_to_BN(sn, NULL);
     char             *serial     = BN_bn2dec(bn);
@@ -172,10 +206,6 @@ extract_cert_data(BIO *fdb)
     char **key_value = calloc(sizeof(char *), FIXED_LEN + num_exts * 2);
 
     int ix              = 0;
-    key_value[ix++]     = strdup("Subject");
-    key_value[ix++]     = subj;
-    key_value[ix++]     = strdup("Issuer");
-    key_value[ix++]     = issuer;
     key_value[ix++]     = strdup("Serial");
     key_value[ix++]     = serial;
     key_value[ix++]     = strdup("Key");
@@ -232,20 +262,30 @@ extract_cert_data(BIO *fdb)
 
     Cert *result = malloc(sizeof(Cert));
     result->key_value = key_value;
+    result->subject   = convert_NAME(subj);
+    result->issuer    = convert_NAME(issuer);
     result->version   = version;
     result->key_size  = keysize;
     return result;
 }
 
 void
-cleanup_cert_info(Cert *cert)
+cleanup_key_value(char **kv)
 {
-    char **info = cert->key_value;
+    char **info = kv;
     char *p     = *info++;
     while (p) {
         free(p);
         p = *info++;
     }
+}
+
+void
+cleanup_cert_info(Cert *cert)
+{
+    cleanup_key_value(cert->key_value);
+    cleanup_key_value(cert->subject);
+    cleanup_key_value(cert->issuer);
     free(cert);
 }
 
