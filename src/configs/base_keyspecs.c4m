@@ -6261,6 +6261,39 @@ naming information is present only in the subjectAltName extension
 name MUST be an empty sequence and the subjectAltName extension MUST
 be critical.
 
+This field uses long keys (e.g. commonName).
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.6
+"""
+}
+
+keyspec _X509_SUBJECT_SHORT {
+    kind:             RunTimeArtifact
+    type:             dict[string, string]
+    standard:         true
+    since:            "0.5.8"
+    shortdoc:         "Identity certificate is bound to"
+    doc: """
+The subject field identifies the entity associated with the public
+key stored in the subject public key field.  The subject name MAY be
+carried in the subject field and/or the subjectAltName extension.  If
+the subject is a CA (e.g., the basic constraints extension, as
+discussed in Section 4.2.1.9, is present and the value of cA is
+TRUE), then the subject field MUST be populated with a non-empty
+distinguished name matching the contents of the issuer field (Section
+4.1.2.4) in all certificates issued by the subject CA.  If the
+subject is a CRL issuer (e.g., the key usage extension, as discussed
+in Section 4.2.1.3, is present and the value of cRLSign is TRUE),
+then the subject field MUST be populated with a non-empty
+distinguished name matching the contents of the issuer field (Section
+5.1.2.3) in all CRLs issued by the subject CRL issuer.  If subject
+naming information is present only in the subjectAltName extension
+(e.g., a key bound only to an email address or URI), then the subject
+name MUST be an empty sequence and the subjectAltName extension MUST
+be critical.
+
+This field uses short keys (e.g. CN).
+
 https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.6
 """
 }
@@ -6434,6 +6467,25 @@ keyspec _X509_ISSUER {
 The issuer field identifies the entity that has signed and issued the
 certificate.  The issuer field MUST contain a non-empty distinguished
 name (DN).  The issuer field is defined as the X.501 type Name [X.501].
+
+This field uses long keys (e.g. commonName).
+
+https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.4
+"""
+}
+
+keyspec _X509_ISSUER_SHORT {
+    kind:             RunTimeArtifact
+    type:             dict[string, string]
+    standard:         true
+    since:            "0.5.8"
+    shortdoc:         "Subject of the CA which minted the cert"
+    doc: """
+The issuer field identifies the entity that has signed and issued the
+certificate.  The issuer field MUST contain a non-empty distinguished
+name (DN).  The issuer field is defined as the X.501 type Name [X.501].
+
+This field uses short keys (e.g. CN).
 
 https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.4
 """

@@ -25,6 +25,7 @@
 
   - `_X509_VERSION`
   - `_X509_SUBJECT`
+  - `_X509_SUBJECT_SHORT`
   - `_X509_SUBJECT_ALTERNATIVE_NAME`
   - `_X509_SERIAL`
   - `_X509_KEY`
@@ -36,11 +37,45 @@
   - `_X509_EXTENDED_KEY_USAGE`
   - `_X509_BASIC_CONSTRAINTS`
   - `_X509_ISSUER`
+  - `_X509_ISSUER_SHORT`
   - `_X509_SUBJECT_KEY_IDENTIFIER`
   - `_X509_AUTHORITY_KEY_IDENTIFIER`
   - `_X509_NOT_BEFORE`
   - `_X509_NOT_AFTER`
   - `_X509_EXTRA_EXTENSIONS`
+
+  For example:
+
+  ```json
+  {
+    "_OP_ARTIFACT_TYPE": "x509 Cert",
+    "_X509_VERSION": 3,
+    "_X509_SUBJECT": {
+      "commonName": "DigiCert Assured ID Root CA",
+      "countryName": "US",
+      "organizationName": "DigiCert Inc",
+      "organizationalUnitName": "www.digicert.com"
+    },
+    "_X509_ISSUER": {
+      "commonName": "DigiCert Assured ID Root CA",
+      "countryName": "US",
+      "organizationName": "DigiCert Inc",
+      "organizationalUnitName": "www.digicert.com"
+    },
+    "_X509_SERIAL": "17154717934120587862167794914071425081",
+    "_X509_KEY": "-----BEGIN RSA PUBLIC KEY-----\nMIIBCgKCAQEArQ4VzuRDgFyxh/O3YPlxEqWu3CaUiKr0zvUgOShYYAz4gNqpFZUy\nYTy1sSiEiorcnwoMgxd6j5Csiud5U1wxhCr2D5gyNnbM3t08qKLvavsh8lJh358g\n1x/isdn+GGTSEltf+VgYNbxHzaE2+Wt/1LA4PsEbw4wz2dgvGP4oD7Ong9bDbkTA\nYTWWFv5ZnIt2bdfxoksNK/8LctqeYNCOkDXGeFWHIKHP5W0KyEl8MZgzbCLph9Ay\nWqK6E4IR7TkXnZk6cqHm+qTZ1Rcxda6FfSKuPwFGhvYoecix2uRXF8R+HA6wtJKm\nVrO9spftqqfwt8WoP5UW0P+hlusIXxh3TwIDAQAB\n-----END RSA PUBLIC KEY-----\n",
+    "_X509_KEY_TYPE": "rsaEncryption",
+    "_X509_KEY_SIZE": 2048,
+    "_X509_KEY_USAGE": "Digital Signature, Certificate Sign, CRL Sign",
+    "_X509_SIGNATURE": "a2:0e:bc:df:e2:ed:f0:e3:72:73:7a:64:94:bf:f7:72:66:d8:32:e4:42:75:62:ae:87:eb:f2:d5:d9:de:56:b3:9f:cc:ce:14:28:b9:0d:97:60:5c:12:4c:58:e4:d3:3d:83:49:45:58:97:35:69:1a:a8:47:ea:56:c6:79:ab:12:d8:67:81:84:df:7f:09:3c:94:e6:b8:26:2c:20:bd:3d:b3:28:89:f7:5f:ff:22:e2:97:84:1f:e9:65:ef:87:e0:df:c1:67:49:b3:5d:eb:b2:09:2a:eb:26:ed:78:be:7d:3f:2b:f3:b7:26:35:6d:5f:89:01:b6:49:5b:9f:01:05:9b:ab:3d:25:c1:cc:b6:7f:c2:f1:6f:86:c6:fa:64:68:eb:81:2d:94:eb:42:b7:fa:8c:1e:dd:62:f1:be:50:67:b7:6c:bd:f3:f1:1f:6b:0c:36:07:16:7f:37:7c:a9:5b:6d:7a:f1:12:46:60:83:d7:27:04:be:4b:ce:97:be:c3:67:2a:68:11:df:80:e7:0c:33:66:bf:13:0d:14:6e:f3:7f:1f:63:10:1e:fa:8d:1b:25:6d:6c:8f:a5:b7:61:01:b1:d2:a3:26:a1:10:71:9d:ad:e2:c3:f9:c3:99:51:b7:2b:07:08:ce:2e:e6:50:b2:a7:fa:0a:45:2f:a2:f0:f2",
+    "_X509_SIGNATURE_TYPE": "sha1WithRSAEncryption",
+    "_X509_BASIC_CONSTRAINTS": "CA:TRUE",
+    "_X509_SUBJECT_KEY_IDENTIFIER": "45:EB:A2:AF:F4:92:CB:82:31:2D:51:8B:A7:A7:21:9D:F3:6D:C8:0F",
+    "_X509_AUTHORITY_KEY_IDENTIFIER": "45:EB:A2:AF:F4:92:CB:82:31:2D:51:8B:A7:A7:21:9D:F3:6D:C8:0F",
+    "_X509_NOT_BEFORE": "Nov 10 00:00:00 2006 GMT",
+    "_X509_NOT_AFTER": "Nov 10 00:00:00 2031 GMT"
+  }
+  ```
 
   Certificate behavior can be customized via `certs` configuration block
   which includes following configs:
@@ -56,7 +91,8 @@
   [#521](https://github.com/crashappsec/chalk/pull/521),
   [#522](https://github.com/crashappsec/chalk/pull/522),
   [#524](https://github.com/crashappsec/chalk/pull/524),
-  [#526](https://github.com/crashappsec/chalk/pull/526))
+  [#526](https://github.com/crashappsec/chalk/pull/526),
+  [#532](https://github.com/crashappsec/chalk/pull/532))
 
 - `_OP_ARTIFACT_PATH_WITHIN_VCTL` key which indicates path of the file
   in the git repo.
