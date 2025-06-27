@@ -148,7 +148,7 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
         chalk.marked  = false
 
     if chalkBinary in cache.onDisk.contents:
-      info("chalk binary exists. removing it.")
+      info("Chalk binary exists, removing it.")
       tryOrBail:
         removeFile(joinPath(hashD, chalkBinary))
 
@@ -239,7 +239,7 @@ proc zipHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
   let injectBinary = attrGet[bool]("zip.inject_binary")
   if injectBinary:
     try:
-      info(chalk.name & ": inserting binary into zip archive")
+      info(chalk.name & ": Inserting binary into zip archive")
       insertChalkBinaryIntoZip(chalk)
     except:
       error(chalk.name & ": failed to insert chalk binary due to: " & getCurrentExceptionMsg())
