@@ -25,8 +25,10 @@ proc runCmdInsert*(path: seq[string]) {.exportc,cdecl.} =
 
   for item in artifacts(path):
     trace(item.name & ": begin chalking")
+
     item.collectChalkTimeArtifactInfo()
     trace(item.name & ": chalk data collection finished.")
+
     if item.isMarked() and configKey in item.extract:
       info(item.name & ": Is a configured chalk exe; skipping insertion.")
       item.removeFromAllChalks()

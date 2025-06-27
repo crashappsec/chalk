@@ -106,6 +106,8 @@
   ([#515](https://github.com/crashappsec/chalk/pull/515))
 - Reporting all IMDSv2 errors in `FAILED_KEYS` or `_OP_FAILED_KEYS`.
   ([#519](https://github.com/crashappsec/chalk/pull/519))
+- Adds `zip.inject_binary` config and `--inject-binary-into-zip` CLI flag to
+  the `chalk insert` command as part of chalk's AWS Lambda support ([#498](https://github.com/crashappsec/chalk/pull/498))
 
 ### Fixes
 

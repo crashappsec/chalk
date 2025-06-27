@@ -21,10 +21,12 @@ import ".."/[
   run_management,
   subscan,
   types,
+  utils/exe,
   utils/files,
 ]
 
 const zipChalkFile = "chalk.json"
+const chalkBinary = "chalk"
 
 type
   ZipCache = ref object of RootRef
@@ -145,6 +147,12 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
       else:
         chalk.marked  = false
 
+    if chalkBinary in cache.onDisk.contents:
+      info("chalk binary exists. removing it.")
+      tryOrBail:
+        removeFile(joinPath(hashD, chalkBinary))
+
+
     chalk.cachedUnchalkedHash = hashExtractedZip(hashD)
 
     if subscans:
@@ -177,6 +185,29 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
 
     return some(chalk)
 
+proc insertChalkBinaryIntoZip(chalk: ChalkObj) =
+  ## Injects the chalk binary into a zip archive
+  ## Raises an exception on failure
+
+  let
+    myAppPath = getMyAppPath()
+    chalkBinaryContent = tryToLoadFile(myAppPath)
+    zipCache = ZipCache(chalk.cache)
+    contentDir = joinPath(zipCache.tmpDir, "contents")
+    contentTargetPath = joinPath(contentDir, "chalk")
+
+  # Check the directory exists
+  if not dirExists(contentDir):
+      raise newException(IOError, chalk.name & ": zip content directory does not exist")
+
+  # Write the chalk binary to content directory
+  if tryToWriteFile(contentTargetPath, chalkBinaryContent):
+    contentTargetPath.makeExecutable()
+    trace(chalk.name & ": added chalk binary to content zip dir")
+  else:
+    raise newException(ValueError, "failed to add chalk binary to zip directory")
+
+
 proc doZipWrite(chalk: ChalkObj, encoded: Option[string], virtual: bool) =
   let
     cache     = ZipCache(chalk.cache)
@@ -205,6 +236,14 @@ proc doZipWrite(chalk: ChalkObj, encoded: Option[string], virtual: bool) =
 
 proc zipHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
                    {.cdecl.} =
+  let injectBinary = attrGet[bool]("zip.inject_binary")
+  if injectBinary:
+    try:
+      info(chalk.name & ": inserting binary into zip archive")
+      insertChalkBinaryIntoZip(chalk)
+    except:
+      error(chalk.name & ": failed to insert chalk binary due to: " & getCurrentExceptionMsg())
+
   chalk.doZipWrite(encoded, virtual = false)
 
 proc zipGetEndingHash*(self: Plugin, chalk: ChalkObj): Option[string] {.cdecl.} =
