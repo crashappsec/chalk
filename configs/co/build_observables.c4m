@@ -1,6 +1,4 @@
 report_template crashoverride {
-  if command_name() == "env" {
-    ~key._X_BUILD_OBSERVABLES.use          = true
-    ~key._X_BUILD_OBSERVABLES.object_store = "crashoverride"
-  }
+  ~key._X_BUILD_OBSERVABLES.use          = true
+  ~key._X_BUILD_OBSERVABLES.object_store = "crashoverride"
 }

@@ -5,12 +5,22 @@ keyspec _X_BUILD_OBSERVABLES {
 }
 
 func build_observables(contexts) {
-  observables := "/mnt/curiosity/observables/" + env("GITHUB_RUN_ID") + "-" + env("GITHUB_RUN_ATTEMPT") + "-observables.json"
-  trace("Parsing observables from " + observables)
-  output := strip(run("jq -c -s '.' " + observables))
-  if starts_with(output, "[") {
-    trace("collected build observables output")
-    return parse_json(output)
+  if command_name() != "env" {
+    return
+  }
+  run_id := env("GITHUB_RUN_ID")
+  attempt := env("GITHUB_RUN_ATTEMPT")
+  if run_id == "" or attempt == "" {
+    return
+  }
+  path := "/mnt/curiosity/observables/" + run_id + "-" + attempt + "-observables.json"
+  if not is_file(path) {
+    return
+  }
+  content := read_file(path)
+  if starts_with(content, "[") or starts_with(content, "{") {
+    trace("collected build observables output from " + path)
+    return [parse_json(content)]
   } else {
     trace("empty observables output")
     return
