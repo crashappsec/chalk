@@ -107,7 +107,8 @@
 - Reporting all IMDSv2 errors in `FAILED_KEYS` or `_OP_FAILED_KEYS`.
   ([#519](https://github.com/crashappsec/chalk/pull/519))
 - Adds `zip.inject_binary` config and `--inject-binary-into-zip` CLI flag to
-  the `chalk insert` command as part of chalk's AWS Lambda support ([#498](https://github.com/crashappsec/chalk/pull/498))
+  the `chalk insert` command as part of chalk's AWS Lambda support
+  ([#498](https://github.com/crashappsec/chalk/pull/498))
 
 ### Fixes
 
@@ -123,6 +124,11 @@
   Otherwise it is omitted and instead ``DOCKERFILE_PATH_WITHIN_VCTL` is
   reports relative `Dockerfile` path to the remote git context repository.
   ([#523](https://github.com/crashappsec/chalk/pull/523))
+- When any key in confspec fails, error is ignored which allows
+  all other confspec keys to be collected. Any single error used to
+  throw global exception which prevented all other keys from being collected
+  including required keys like `_ACTION_ID`.
+  ([#536](https://github.com/crashappsec/chalk/pull/536))
 
 ## 0.5.7
 
