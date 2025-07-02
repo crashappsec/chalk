@@ -24,14 +24,17 @@ proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
     if attrGet[int](v & ".kind") != int(kt): continue
     if not isSubscribedKey(k):
       continue
-    let valueOpt = attrGetOpt[Box](v & ".value")
-    let callbackOpt = attrGetOpt[CallbackObj](v & ".callback")
-    if valueOpt.isSome():
-      result.setIfNeeded(k, valueOpt.get())
-    elif callbackOpt.isSome():
-      let cbOpt = runCallback(callbackOpt.get(), args)
-      if cbOpt.isSome():
-        result.setIfNeeded(k, cbOpt.get())
+    try:
+      let valueOpt = attrGetOpt[Box](v & ".value")
+      let callbackOpt = attrGetOpt[CallbackObj](v & ".callback")
+      if valueOpt.isSome():
+        result.setIfNeeded(k, valueOpt.get())
+      elif callbackOpt.isSome():
+        let cbOpt = runCallback(callbackOpt.get(), args)
+        if cbOpt.isSome():
+          result.setIfNeeded(k, cbOpt.get())
+    except:
+      error("conffile: " & k & " ignoring error: " & getCurrentExceptionMsg())
 
 proc confGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   return scanForWork(KtChalkableHost, none(ChalkObj),
