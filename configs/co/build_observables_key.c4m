@@ -5,6 +5,7 @@ keyspec _X_BUILD_OBSERVABLES {
 }
 
 func build_observables(contexts) {
+  result := {}
   if command_name() != "env" {
     return
   }
