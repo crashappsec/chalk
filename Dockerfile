@@ -1,4 +1,4 @@
-FROM ghcr.io/crashappsec/nim:ubuntu-2.0.8 AS nim
+FROM ghcr.io/crashappsec/nim:ubuntu-2.2.4 AS nim
 FROM ghcr.io/sigstore/cosign/cosign:v2.2.3 AS cosign
 
 # -------------------------------------------------------------------

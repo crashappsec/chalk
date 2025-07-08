@@ -37,7 +37,7 @@ proc getCosignVersion*(): Version =
       return cosignVersion
     let
       cmd    = runCmdGetEverything(path, @["version"])
-      stdOut = cmd.getStdOut()
+      stdOut = cmd.getStdout()
       lines  = stdOut.splitLines()
     if cmd.getExit() != 0:
       warn("Could not find cosign version")
@@ -131,8 +131,8 @@ proc isValid*(self: AttestationKey): bool =
 
     let
       cmd = runCmdGetEverything(cosign, signArgs, toSign)
-      err = cmd.getStdErr()
-      sig = cmd.getStdOut()
+      err = cmd.getStderr()
+      sig = cmd.getStdout()
 
     if cmd.getExit() != 0 or sig == "":
       error("Could not sign; either password is wrong, or key is invalid: " & sig & " " & err)

@@ -18,7 +18,7 @@ const
   msec           = 1000
   defaultTimeout = 10
 
-when hostOs == "linux":
+when hostOS == "linux":
   # allow to use this as standalone module for testing without chalk imports
   when isMainModule:
     proc dumpExOnDebug() =
@@ -64,7 +64,7 @@ when hostOs == "linux":
       data*:       string
 
   proc SO_EE_OFFENDER(err: ptr SockExtendedErr):
-    ptr Sockaddr {.importc, header: "<linux/errqueue.h>".}
+    ptr SockAddr {.importc, header: "<linux/errqueue.h>".}
 
   proc computeChecksum(x: openArray[uint8]): uint16 =
     ## https://www.rfc-editor.org/rfc/rfc792

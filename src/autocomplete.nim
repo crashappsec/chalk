@@ -27,7 +27,7 @@ const
   bashScript      = staticRead(staticScriptLoc)
   autoCompleteLoc = "~/.local/share/bash_completion/completions/chalk.bash"
 
-when hostOs == "linux":
+when hostOS == "linux":
   proc makeCompletionAutoSource(dst: string) =
     let
       ac       = "~/.bash_completion"
@@ -50,7 +50,7 @@ when hostOs == "linux":
         return
       info("Added sourcing of autocomplete to ~/.bash_completion file")
 
-elif hostOs == "macosx":
+elif hostOS == "macosx":
   proc makeCompletionAutoSource(dst: string) =
     let
       ac       = "~/.zshrc"

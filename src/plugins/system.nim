@@ -222,7 +222,7 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   result.setIfNeeded("_OP_EXE_NAME",          getMyAppPath().splitPath().tail)
   result.setIfNeeded("_OP_EXE_PATH",          getAppDir())
   result.setIfNeeded("_OP_ARGV",              @[getMyAppPath()] & commandLineParams())
-  result.setIfNeeded("_OP_HOSTNAME",          getHostName())
+  result.setIfNeeded("_OP_HOSTNAME",          getHostname())
   result.setIfNeeded("_OP_UNMARKED_COUNT",    len(getUnmarked()))
   result.setIfNeeded("_TIMESTAMP",            startTime.toUnixInMs())
   result.setIfNeeded("_DATE",                 startTime.forReport().format(timesDateFormat))

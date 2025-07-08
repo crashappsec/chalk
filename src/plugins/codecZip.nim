@@ -46,7 +46,7 @@ template getZipDir(): string     = zipDirs[^1]
 template getZipChalkId(): Box    = chalkIds[^1]
 
 proc hashZip(toHash: ZipArchive): string =
-  var sha = initSHA256()
+  var sha = initSha256()
   var keys: seq[string]
 
   for k, v in toHash.contents:

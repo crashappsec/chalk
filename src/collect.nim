@@ -143,7 +143,7 @@ proc initCollection*(collectHost = true) =
 
 proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
   artifact.withErrorContext():
-    trace("Collecting run time artifact info" & artifact.name & " (" & artifact.myCodec.name & ")")
+    trace("Collecting run time artifact info " & artifact.name & " (" & artifact.myCodec.name & ")")
     for plugin in getAllPlugins():
       let
         data       = artifact.collectedData

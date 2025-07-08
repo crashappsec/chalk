@@ -134,7 +134,7 @@ template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
       line &= "\n\tfilename        = " & escapeJson(fname)
       line &= "\n\tlog_search_path = " & log_path
 
-      if cfg.mysink.name != "file":
+      if cfg.mySink.name != "file":
         let
           max      = cfg.params["max"]
           trunc    = if "truncation_amount" in cfg.params:

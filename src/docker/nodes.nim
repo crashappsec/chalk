@@ -63,7 +63,7 @@ proc readBuilderNodeFile*(ctx: DockerInvocation, node: string, path: string): st
     )
   if output.exitCode != 0:
     raise newException(ValueError, "could not read buildx node's " & container & " " & path)
-  result = output.stdOut
+  result = output.stdout
   nodeFiles[key] = result
 
 iterator iterBuilderNodesConfigs*(ctx: DockerInvocation): tuple[name: string, config: JsonNode] =
@@ -75,7 +75,7 @@ iterator iterBuilderNodesConfigs*(ctx: DockerInvocation): tuple[name: string, co
         entrypoint = config{"Entrypoint"}
         cmd        = config{"Cmd"}
         args       = (entrypoint & cmd).getStrElems()
-      con4mRuntime.addStartGetopts("buildkit.getopts", args = args).run()
+      con4mRuntime.addStartGetOpts("buildkit.getopts", args = args).run()
       let flags    = con4mRuntime.getFlags()
       if "config" notin flags:
         trace("docker: " & name & " builder node is not using custom configuration. using empty default config")
