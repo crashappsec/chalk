@@ -28,3 +28,8 @@ staticLinkLibraries(libs, libDir, muslBase = localDir)
 # To be enabled, this has to be combined either with --styleCheck:error or --styleCheck:hint.
 switch("styleCheck", "usages")
 switch("styleCheck", "error")
+
+# begin Nimble config (version 2)
+when withDir(thisDir(), system.fileExists("nimble.paths")):
+  include "nimble.paths"
+# end Nimble config
