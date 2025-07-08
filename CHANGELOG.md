@@ -153,6 +153,9 @@
   throw global exception which prevented all other keys from being collected
   including required keys like `_ACTION_ID`.
   ([#536](https://github.com/crashappsec/chalk/pull/536))
+- Not all containers have `root` user. When needing to switch to `root`
+  in wrapped `Dockerfile` now using `USER 0:0` which should exist at all times.
+  ([#539](https://github.com/crashappsec/chalk/pull/539))
 
 ## 0.5.7
 
