@@ -8,7 +8,6 @@
 ## The `chalk exec` command.
 
 import std/[
-  inotify,
   options,
   posix,
   sequtils,
@@ -25,12 +24,25 @@ import ".."/[
   utils/exec,
   utils/files,
   utils/sets,
-  utils/sets,
 ]
 
 when hostOS == "macosx":
   proc proc_pidpath(pid: Pid, pathbuf: pointer, len: uint32): cint
     {.cdecl, header: "<libproc.h>", importc.}
+
+when hostOS == "linux":
+  import std/inotify
+
+else:
+  type InotifyEvent = object
+    wd*: FileHandle
+    mask*: uint32
+    cookie*: uint32
+    len*: uint32
+    name*: char
+
+  iterator inotify_events(evs: pointer, n: int): ptr InotifyEvent =
+    discard
 
 const
   PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
@@ -194,47 +206,52 @@ type PostExecState = ref object
   watcher:      FileHandle
   watchedDirs:  TableRef[FileHandle, string]
 
-proc initPostExecWatch(): Option[PostExecState] =
-  if not attrGet[bool]("exec.postexec.run"):
+when hostOS == "linux":
+  proc initPostExecWatch(): Option[PostExecState] =
+    if not attrGet[bool]("exec.postexec.run"):
+      return none(PostExecState)
+
+    let tmp = attrGet[string]("exec.postexec.access_watch.prep_tmp_path")
+    if not fileExists(tmp):
+      return none(PostExecState)
+
+    let
+      toWatchPaths = tryToLoadFile(tmp).splitLines()
+      watcher      = inotify_init1(O_NONBLOCK)
+    var
+      toWatchDirs  = initHashSet[string]()
+      watchedDirs  = newTable[FileHandle, string]()
+
+    if watcher < 0:
+      error("inotify: " & $osLastError())
+      return none(PostExecState)
+
+    # watch dirs where artifacts are contained to:
+    # * reduces inotify FD overhead
+    # * contains name in the watched event struct
+    for c in toWatchPaths:
+      if c == "":
+        continue
+      let (dir, _) = c.splitPath()
+      toWatchDirs.incl(dir)
+
+    for d in toWatchDirs:
+      let wd = inotify_add_watch(watcher, cstring(d), IN_ACCESS)
+      if wd < 0:
+        error("inotify: could not watch " & d)
+        continue
+      trace("inotify: watching " & d)
+      watchedDirs[wd] = d
+
+    return some(PostExecState(
+      toWatchPaths: toWatchPaths,
+      watcher:      watcher,
+      watchedDirs:  watchedDirs,
+    ))
+
+else:
+  proc initPostExecWatch(): Option[PostExecState] =
     return none(PostExecState)
-
-  let tmp = attrGet[string]("exec.postexec.access_watch.prep_tmp_path")
-  if not fileExists(tmp):
-    return none(PostExecState)
-
-  let
-    toWatchPaths = tryToLoadFile(tmp).splitLines()
-    watcher      = inotify_init1(O_NONBLOCK)
-  var
-    toWatchDirs  = initHashSet[string]()
-    watchedDirs  = newTable[FileHandle, string]()
-
-  if watcher < 0:
-    error("inotify: " & $osLastError())
-    return none(PostExecState)
-
-  # watch dirs where artifacts are contained to:
-  # * reduces inotify FD overhead
-  # * contains name in the watched event struct
-  for c in toWatchPaths:
-    if c == "":
-      continue
-    let (dir, _) = c.splitPath()
-    toWatchDirs.incl(dir)
-
-  for d in toWatchDirs:
-    let wd = inotify_add_watch(watcher, cstring(d), IN_ACCESS)
-    if wd < 0:
-      error("inotify: could not watch " & d)
-      continue
-    trace("inotify: watching " & d)
-    watchedDirs[wd] = d
-
-  return some(PostExecState(
-    toWatchPaths: toWatchPaths,
-    watcher:      watcher,
-    watchedDirs:  watchedDirs,
-  ))
 
 proc doPostExec(state: Option[PostExecState], detach: bool) =
   if state.isNone():
