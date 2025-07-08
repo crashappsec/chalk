@@ -2018,8 +2018,8 @@ Configurations how to scan docker contexts during docker build.
 """
 
   field run {
-    type: bool
-    default: true
+    type:     bool
+    default:  false
     shortdoc: "Scan docker build contexts"
     doc: """
 Whether to scan docker build contexts for chalked artifacts.
