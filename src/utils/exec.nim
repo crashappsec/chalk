@@ -17,6 +17,9 @@ import "."/[
 
 var exitCode = 0
 
+# this const is not available in nim stdlib hence manual c import
+var TIOCNOTTY {.importc, header: "sys/ioctl.h"}: cuint
+
 proc quitChalk*(errCode = exitCode) {.noreturn.} =
   quit(errCode)
 
@@ -38,3 +41,11 @@ proc handleExec*(prioritizedExes: seq[string], args: seq[string]) {.noreturn.} =
 
   error("Chalk: exec could not find a working executable to run.")
   quitChalk(1)
+
+proc detachFromParent*() =
+  discard setpgid(0, 0) # Detach from the process group.
+  if isatty(0) != 0:
+    # if stdin is TTY, detach from it in child process
+    # otherwise child process will receive HUP signal
+    # on exit which is not expected
+    discard ioctl(0, TIOCNOTTY) # Detach TTY for stdin

@@ -760,6 +760,11 @@ Internal function to generate technical documentation in markdown format.
       shortdoc: "Docker ONBUILD"
       doc:      "Adjust /chalk.json during docker ONBUILD"
     }
+
+    command prep_postexec {
+      shortdoc: "Find files for postexec to watch"
+      doc:      "Find chalk artifact paths for postexec to watch access for"
+    }
   }
 
 }

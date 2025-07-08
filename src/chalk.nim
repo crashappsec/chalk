@@ -71,6 +71,7 @@ when isMainModule:
   of "setup":              runCmdSetup()
   of "docgen":             runChalkDocGen() # in cmd_help
   of "__.onbuild":         runCmdOnBuild() # in cmd_internal
+  of "__.prep_postexec":   runCmdPrepPostExec() # in cmd_internal
   else:
     runChalkHelp(getCommandName()) # noreturn, will not show config.
 

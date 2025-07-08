@@ -159,6 +159,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
   if obj.fsRef != "":
     result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
   result.setIfNeeded("_OP_ARTIFACT_ENV_VAR_NAME", obj.envVarName)
+  result.setIfNeeded("_OP_ARTIFACT_ACCESSED", obj.accessed)
 
   let
     tmpl       = getReportTemplate()
@@ -166,6 +167,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
     artKeys    = obj.collectedData.filterByTemplate(tmpl)
     reportKeys = toSeq(hostKeys.keys()) & toSeq(artKeys.keys())
   result.setIfNeeded("_OP_ARTIFACT_REPORT_KEYS", reportKeys)
+
 
 var
   envdict          = Con4mDict[string, string]()

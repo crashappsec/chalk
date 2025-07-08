@@ -31,6 +31,10 @@ outconf exec {
   report_template:        "report_default"
 }
 
+outconf postexec {
+  report_template:        "report_default"
+}
+
 outconf heartbeat {
   report_template:        "heartbeat"
 }
