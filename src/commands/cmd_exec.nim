@@ -303,6 +303,8 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   finally:
     discard close(ws.watcher)
 
+  clearReportingState()
+
   let
     codecs = attrGet[seq[string]]("exec.postexec.access_watch.scan_codecs")
     toScan = usedPaths.toSeq()
