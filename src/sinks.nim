@@ -222,7 +222,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       sinkName    = attrGetOpt[string](section & "." & k).getOrElse("")
     of "auth":
       authName    = attrGetOpt[string](section & "." & k).getOrElse("")
-    of "use_search_path", "disallow_http":
+    of "use_search_path", "disallow_http", "prefer_bundled_certs":
       let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         if boxOpt.get().kind != MkBool:
@@ -374,8 +374,10 @@ proc setupDefaultLogConfigs*() =
       trace("Audit log subscription enabled")
   let
     uri     = attrGet[string]("crashoverride_usage_reporting_url")
-    params  = some(newOrderedTable({ "uri":          uri,
-                                     "content_type": "application/json" }))
+    params  = some(newOrderedTable({ "uri":                  uri,
+                                     "content_type":         "application/json",
+                                     "prefer_bundled_certs": "true",
+                                     }))
     sink    = getSinkImplementation("post").get()
     useConf = configSink(sink, "usage_stats_conf", params, handler=errCbOpt,
                              logger=okCbOpt).get()

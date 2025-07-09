@@ -2,6 +2,10 @@
 ~docker.prep_postexec    = true
 ~exec.postexec.run       = true
 
+sink_config crashoverride {
+  ~prefer_bundled_certs: true
+}
+
 custom_report crashoverride_postexec {
   ~enabled:         true
   ~report_template: "crashoverride"

@@ -1177,6 +1177,16 @@ TLS self-signed cert used to validate the TLS connection with the presigned API.
 """
   }
 
+  field prefer_bundled_certs {
+    type:     bool
+    default:  false
+    shortdoc: "Whether to prefer chalk bundled root CA certs"
+    doc:      """
+Instead of relying on system root CA certs, prefer chalk bundled certs.
+If bundled certs request fails, it falls back to system CA store.
+"""
+  }
+
   field read_auth {
     type:      string
     default:   ""
@@ -4343,7 +4353,7 @@ func sink_config_check(path) {
           return conffield + ": This field must be int"
       }
     }
-    elif contains(["enabled", "use_search_path", "disallow_http"], conffield) {
+    elif contains(["enabled", "use_search_path", "disallow_http", "prefer_bundled_certs"], conffield) {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, bool) {
           return conffield + ": Field must be `true` or `false`"
