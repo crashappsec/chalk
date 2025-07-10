@@ -265,6 +265,8 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   let ws        = state.get()
   var usedPaths = initHashSet[string]()
 
+  clearReportingState()
+
   try:
     setCommandName("postexec")
     if detach:
@@ -303,8 +305,6 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   finally:
     discard close(ws.watcher)
 
-  clearReportingState()
-
   let
     codecs = attrGet[seq[string]]("exec.postexec.access_watch.scan_codecs")
     toScan = usedPaths.toSeq()
@@ -320,7 +320,8 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
       addToAllArtifacts(chalk)
   trace("postexec: subscan complete")
 
-  doReporting()
+  withSuspendChalkCollectionFor(getOptionalPluginNames()):
+    doReporting()
 
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):

@@ -57,7 +57,7 @@ proc runCmdConfLoad*() =
         true
     else:
       for plugin in getAllPlugins():
-        if not plugin.isSystem():
+        if not plugin.isSystem:
           suspendChalkCollectionFor(plugin.name)
       url.handleConfigLoad()
 

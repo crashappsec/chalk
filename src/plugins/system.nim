@@ -324,13 +324,16 @@ proc loadSystem*() =
             ctHostCallback = ChalkTimeHostCb(sysGetChalkTimeHostInfo),
             ctArtCallback  = ChalkTimeArtifactCb(sysGetChalkTimeArtifactInfo),
             rtArtCallback  = RunTimeArtifactCb(sysGetRunTimeArtifactInfo),
-            rtHostCallback = RunTimeHostCb(sysGetRunTimeHostInfo))
+            rtHostCallback = RunTimeHostCb(sysGetRunTimeHostInfo),
+            isSystem       = true)
 
   newPlugin("attestation",
             resourceTypes  = allResourceTypes,
             ctArtCallback  = ChalkTimeArtifactCb(attestationGetChalkTimeArtifactInfo),
-            rtArtCallback  = RunTimeArtifactCb(attestationGetRunTimeArtifactInfo))
+            rtArtCallback  = RunTimeArtifactCb(attestationGetRunTimeArtifactInfo),
+            isSystem       = true)
 
   newPlugin("metsys",
             resourceTypes  = allResourceTypes,
-            rtHostCallback = RunTimeHostCb(metsysGetRunTimeHostInfo))
+            rtHostCallback = RunTimeHostCb(metsysGetRunTimeHostInfo),
+            isSystem       = true)

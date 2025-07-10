@@ -114,6 +114,8 @@ type
   Plugin* = ref object
     name*:                     string
     enabled*:                  bool
+    isSystem*:                 bool
+    isCodec*:                  bool
     clearState*:               PluginClearCb
     getChalkTimeHostInfo*:     ChalkTimeHostCb
     getChalkTimeArtifactInfo*: ChalkTimeArtifactCb

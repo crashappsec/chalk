@@ -170,7 +170,7 @@ proc autocompleteFileCheck*() =
         codec         = getPluginByName("source"),
         noAttestation = true,
       ).copyCollectedDataFrom(selfChalk)
-    withSuspendChalkCollectionFor(autoCompleteChalk.getOptionalPlugins()):
+    withSuspendChalkCollectionFor(autoCompleteChalk.getOptionalPluginNames()):
       initCollection()
       collectChalkTimeHostInfo()
       collectChalkTimeArtifactInfo(autoCompleteChalk, override = true)

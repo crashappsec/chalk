@@ -58,4 +58,5 @@ proc loadConfFile*() =
             ctHostCallback = ChalkTimeHostCb(confGetChalkTimeHostInfo),
             ctArtCallback  = ChalkTimeArtifactCb(confGetChalkTimeArtifactInfo),
             rtArtCallback  = RunTimeArtifactCb(confGetRunTimeArtifactInfo),
-            rtHostCallback = RunTimeHostCb(confGetRunTimeHostInfo))
+            rtHostCallback = RunTimeHostCb(confGetRunTimeHostInfo),
+            isSystem       = true)
