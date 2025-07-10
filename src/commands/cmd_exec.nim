@@ -262,8 +262,8 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
     # parent process
     return
 
-  let ws        = state.get()
-  var usedPaths = initHashSet[string]()
+  let ws            = state.get()
+  var accessedPaths = initHashSet[string]()
 
   clearReportingState()
 
@@ -298,23 +298,25 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
           path = joinPath(dir, name)
         if path in ws.toWatchPaths:
           trace("postexec: found accessed artifact " & path)
-          usedPaths.incl(path)
+          accessedPaths.incl(path)
         else:
           trace("postexec: ignoring accessed non-artifact " & path)
 
   finally:
     discard close(ws.watcher)
 
-  let
-    codecs = attrGet[seq[string]]("exec.postexec.access_watch.scan_codecs")
-    toScan = usedPaths.toSeq()
+  let codecs = attrGet[seq[string]]("exec.postexec.access_watch.scan_codecs")
 
   trace("postexec: subscan for chalkmarks in " &
-        $len(toScan) & " accessed artifacts " &
+        $len(accessedPaths) & " accessed artifacts " &
         "out of known " & $len(ws.toWatchPaths) & " artifacts")
   withOnlyCodecs(getPluginsByName(codecs)):
     for chalk in runChalkSubScan(ws.toWatchPaths, "extract").allChalks:
-      chalk.accessed = chalk.fsRef in toScan
+      chalk.accessed = chalk.fsRef in accessedPaths
+      if chalk.accessed:
+        trace(chalk.fsRef & ": chalkmark accessed")
+      else:
+        trace(chalk.fsRef & ": chalkmark not accessed")
       # as its a subscan, artifact info is not collected hence needs to be manually triggered
       chalk.collectRunTimeArtifactInfo()
       addToAllArtifacts(chalk)
