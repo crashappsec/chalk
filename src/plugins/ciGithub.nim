@@ -90,19 +90,10 @@ proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
       warn("github: could not fetch repo info: " & getCurrentExceptionMsg())
 
   # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
-  if GITHUB_EVENT_NAME != "" and GITHUB_REF_TYPE != "":
-    if GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
-      result.setIfNeeded("BUILD_TRIGGER", "tag")
-    elif GITHUB_EVENT_NAME == "push":
-      result.setIfNeeded("BUILD_TRIGGER", "push")
-    elif GITHUB_EVENT_NAME == "workflow_dispatch":
-      result.setIfNeeded("BUILD_TRIGGER", "manual")
-    elif GITHUB_EVENT_NAME == "workflow_call":
-      result.setIfNeeded("BUILD_TRIGGER", "external")
-    elif GITHUB_EVENT_NAME == "schedule":
-      result.setIfNeeded("BUILD_TRIGGER", "schedule")
-    else:
-      result.setIfNeeded("BUILD_TRIGGER", "other: " & GITHUB_EVENT_NAME)
+  if GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
+    result.setIfNeeded("BUILD_TRIGGER", "tag")
+  else:
+    result.setIfNeeded("BUILD_TRIGGER", GITHUB_EVENT_NAME)
 
   if GITHUB_ACTOR != "": result.setIfNeeded("BUILD_CONTACT", @[GITHUB_ACTOR])
 

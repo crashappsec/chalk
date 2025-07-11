@@ -196,7 +196,7 @@ def test_codebuild_git(copy_files: list[Path], chalk: Chalk, server_imds: str):
         {
             "BUILD_ID": "arn:aws:codebuild:region-ID:account-ID:build/codebuild-demo-project:b1e6661e-e4f2-4156-9ab9-82a19EXAMPLE",
             "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
-            "BUILD_TRIGGER": "push",
+            "BUILD_TRIGGER": "branch",
             "BUILD_CONTACT": ["username"],
             "BUILD_URI": "https://aws/build",
             "BUILD_ORIGIN_URI": "https://github.com/octocat/repo",
@@ -224,7 +224,7 @@ def test_codebuild_s3(copy_files: list[Path], chalk: Chalk, server_imds: str):
         {
             "BUILD_ID": "arn:aws:codebuild:region-ID:account-ID:build/codebuild-demo-project:b1e6661e-e4f2-4156-9ab9-82a19EXAMPLE",
             "BUILD_COMMIT_ID": MISSING,
-            "BUILD_TRIGGER": "push",
+            "BUILD_TRIGGER": "branch",
             "BUILD_CONTACT": ["username"],
             "BUILD_URI": "https://aws/build",
             "BUILD_ORIGIN_URI": "s3://bucket/object?versionId=version",
