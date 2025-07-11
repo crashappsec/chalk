@@ -6,16 +6,16 @@ keyspec _X_BUILD_OBSERVABLES {
 
 func build_observables(contexts) {
   if command_name() != "env" {
-    return
+    return ""
   }
   run_id := env("GITHUB_RUN_ID")
   attempt := env("GITHUB_RUN_ATTEMPT")
   if run_id == "" or attempt == "" {
-    return
+    return ""
   }
   path := "/mnt/curiosity/observables/" + run_id + "-" + attempt + "-observables.br"
   if not is_file(path) {
-    return
+    return ""
   }
   return read_file(path)
 }
