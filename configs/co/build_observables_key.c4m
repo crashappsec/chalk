@@ -1,6 +1,6 @@
 keyspec _X_BUILD_OBSERVABLES {
   kind:  RunTimeHost
-  type:  `x
+  type:  string
   callback: func build_observables
 }
 
