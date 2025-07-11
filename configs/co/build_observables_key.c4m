@@ -14,16 +14,9 @@ func build_observables(contexts) {
   if run_id == "" or attempt == "" {
     return
   }
-  path := "/mnt/curiosity/observables/" + run_id + "-" + attempt + "-observables.json"
+  path := "/mnt/curiosity/observables/" + run_id + "-" + attempt + "-observables.br"
   if not is_file(path) {
     return
   }
-  content := read_file(path)
-  if starts_with(content, "[") or starts_with(content, "{") {
-    trace("collected build observables output from " + path)
-    return [parse_json(content)]
-  } else {
-    trace("empty observables output")
-    return
-  }
+  return read_file(path)
 }
