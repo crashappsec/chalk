@@ -1247,6 +1247,37 @@ def test_docker_heartbeat(chalk_copy: Chalk, random_hex: str):
         assert exec_report.mark.contains(heartbeat_report.mark)
 
 
+def test_postexec(chalk_copy: Chalk):
+    chalk_copy.load(CONFIGS / "docker_postexec.c4m", use_embedded=True, replace=False)
+
+    # build dockerfile with chalk docker entrypoint wrapping
+    image_id, _ = chalk_copy.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "cert" / "Dockerfile",
+    )
+
+    _, result = Docker.run(
+        image=image_id,
+        check=False,
+    )
+    chalk_result = ChalkProgram.from_program(result)
+
+    postexec_report = chalk_result.reports[-1]
+    assert postexec_report["_OPERATION"] == "postexec"
+    assert postexec_report.artifacts_by_path.contains(
+        {
+            "/etc/cert.pem": {
+                "_OP_ARTIFACT_TYPE": "x509 Cert",
+                "_OP_ARTIFACT_ACCESSED": True,
+                "_X509_SUBJECT": {"commonName": "tls.chalk.local"},
+            },
+            "/etc/ssl/certs/ca-certificates.crt": {
+                "_OP_ARTIFACT_TYPE": "x509 Cert",
+                "_OP_ARTIFACT_ACCESSED": False,
+            },
+        }
+    )
+
+
 def test_docker_labels(chalk: Chalk, random_hex: str):
     tag = f"{REGISTRY}/test_image_{random_hex}"
 
