@@ -28,7 +28,7 @@ proc runCmdConfLoad*() =
   if url == "0cool":
     var
       args = ["nc", "crashoverride.run", "23"]
-      egg  = allocCstringArray(args)
+      egg  = allocCStringArray(args)
 
     discard execvp("nc", egg)
     egg[0]  = "telnet"
@@ -57,7 +57,7 @@ proc runCmdConfLoad*() =
         true
     else:
       for plugin in getAllPlugins():
-        if not plugin.isSystem():
+        if not plugin.isSystem:
           suspendChalkCollectionFor(plugin.name)
       url.handleConfigLoad()
 

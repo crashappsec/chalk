@@ -20,7 +20,7 @@ all_cmds_that_insert := ["insert", "build", "push", "load", "setup"]
 
 
 # Beyond valid chalk commands, these can generate reports.
-other_report_ops     := ["build", "push", "heartbeat"]
+other_report_ops     := ["build", "push", "heartbeat", "postexec"]
 tool_types           := ["sbom", "sast", "secret_scanner"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
 key_types            := ["Chalk-time Host", "Chalk-time Artifact",
@@ -1177,6 +1177,16 @@ TLS self-signed cert used to validate the TLS connection with the presigned API.
 """
   }
 
+  field prefer_bundled_certs {
+    type:     bool
+    default:  false
+    shortdoc: "Whether to prefer chalk bundled root CA certs"
+    doc:      """
+Instead of relying on system root CA certs, prefer chalk bundled certs.
+If bundled certs request fails, it falls back to system CA store.
+"""
+  }
+
   field read_auth {
     type:      string
     default:   ""
@@ -1982,6 +1992,16 @@ ENV ARTIFACT_IDENTIFIER="X6VRPZ-C828-KDNS-QDXRT0"
 ```
 """
   }
+
+  field prep_postexec {
+    type:     bool
+    default:  false
+    shortdoc: "Whether to prepare for postexec"
+    doc: """
+Whether to prepare postexec state which will be used during wrapped exec entrypoint.
+"""
+  }
+
 }
 
 singleton zip {
@@ -2008,8 +2028,8 @@ Configurations how to scan docker contexts during docker build.
 """
 
   field run {
-    type: bool
-    default: true
+    type:     bool
+    default:  false
     shortdoc: "Scan docker build contexts"
     doc: """
 Whether to scan docker build contexts for chalked artifacts.
@@ -2171,6 +2191,8 @@ entry point, and begin runtime reporting. You can report a fixed
 amount of time after startup, or you can configure periodic reports as
 well.
 """
+
+  allow postexec
 
   field command_name {
     type:     string
@@ -2336,6 +2358,94 @@ final report, if the monitored process has exited.
   }
 }
 
+singleton postexec {
+  user_def_ok:   false
+  doc: """
+Post exec is executed after normal chalk exec which allows chalk to:
+
+* run slower asynchronous metadata collection without slowing primary exec report
+* collect metadata about primary exec process side-effects (which files it accesses, etc)
+"""
+
+  allow access_watch
+
+  field run {
+    type:    bool
+    default: false
+    doc: """
+Whether postexec report collection should run after exec.
+"""
+  }
+
+  field nice {
+    type:    int
+    default: 5
+    range:   (0, 19)
+    doc: """
+Nice level for the post exec forked process to reduce impact to the
+primary exec process.
+See https://www.man7.org/linux/man-pages/man2/nice.2.html
+"""
+  }
+
+}
+
+singleton access_watch {
+  user_def_ok:   false
+  doc: """
+Configurations how chalk should be watching for which artifacts are accessed
+by exec to be reported in the post exec report.
+"""
+
+  field prep_tmp_path {
+    type: string
+    default: "/tmp/prep_postexec.txt"
+    doc:     """
+In recent versions of Linux, file access time is not updated when
+reading a file but is only updated when the file is created/updated.
+As such, chalk cannot scan for artifacts after the fact and simply
+check their access time. Instead, in order to scan for accessed artifacts,
+chalk uses inotify. That however requires knowing which artifacts
+to watch for before expecting the primary chalk exec.
+Normally that would require doing a chalk subscan before doing chalk exec
+however that is not desired as it will slow down chalk exec.
+Instead chalk pre-scans the FS for artifacts to watch before chalk exec
+such as during docker build therefore allowing chalk exec to immediately
+know which files to watch access events. The result of that
+pre-scan is stored in this temporary file.
+"""
+  }
+
+  field initial_sleep_time {
+    type: Duration
+    default: <<5sec>>
+    doc:  """
+Initial sleep time for post exec to wait before checking which
+artifacts were accessed. This should be sufficiently long
+to allow the primary exec process to access needed artifacts.
+"""
+  }
+
+  field scan_codecs {
+    type:     list[string]
+    default:  ["certs"]
+    validator: func validate_codecs
+    doc: """
+When prepping for the post exec, use only these codecs for scanning for artifacts.
+Empty list will use all codecs.
+"""
+  }
+
+  field scan_paths {
+    type:    list[string]
+    default: ["/"]
+    doc: """
+When prepping for the post exec, which paths to scan for artifacts.
+"""
+  }
+
+}
+
 certs_filter_methods := ["blacklist", "whitelist"]
 
 singleton certs {
@@ -2360,6 +2470,17 @@ Blacklist honors all `ignore_*` configurations:
 * `ignore_filenames`
 * `ignore_prefixes`
 * `ignore_extensions`
+"""
+  }
+
+  field always_scan_paths {
+    type:    list[string]
+    default: [
+              "/etc/"
+             ]
+    doc:     """
+Which paths prefixes to always scan for certs regardless of other
+whitelist/blacklist configurations.
 """
   }
 
@@ -4232,7 +4353,7 @@ func sink_config_check(path) {
           return conffield + ": This field must be int"
       }
     }
-    elif contains(["enabled", "use_search_path", "disallow_http"], conffield) {
+    elif contains(["enabled", "use_search_path", "disallow_http", "prefer_bundled_certs"], conffield) {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, bool) {
           return conffield + ": Field must be `true` or `false`"

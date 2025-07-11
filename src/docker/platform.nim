@@ -53,15 +53,15 @@ proc dockerProbeDefaultPlatforms*(): Table[string, DockerPlatform] =
         let build  = runDockerGetEverything(@["build", "-t", tmpTag, "-f", "-", "."],
                                             probeFile)
         if build.getExit() != 0:
-          warn("docker: could not probe build platforms: " & build.stdErr)
+          warn("docker: could not probe build platforms: " & build.stderr)
           return result
 
       let probe = runDockerGetEverything(@["run", "--rm", tmpTag])
       if probe.getExit() != 0:
-        warn("docker: could not probe build platforms: " & probe.stdErr)
+        warn("docker: could not probe build platforms: " & probe.stderr)
         return result
 
-      data = probe.stdOut
+      data = probe.stdout
       trace("docker: probing for build platforms: " & data)
 
     finally:
@@ -81,7 +81,7 @@ proc dockerProbeDefaultPlatforms*(): Table[string, DockerPlatform] =
         result[k] = parseDockerPlatform(value)
 
 proc getSystemBuildPlatform*(): DockerPlatform =
-  return DockerPlatform(os: hostOs, architecture: hostCPU)
+  return DockerPlatform(os: hostOS, architecture: hostCPU)
 
 proc findDockerPlatform*(): DockerPlatform =
   return dockerProbeDefaultPlatforms().getOrDefault("TARGETPLATFORM", getSystemBuildPlatform())

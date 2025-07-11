@@ -1,0 +1,9 @@
+docker.wrap_entrypoint                        = true
+docker.scan_context.run                       = true
+docker.prep_postexec                          = true
+exec.postexec.run                             = true
+exec.postexec.access_watch.initial_sleep_time = <<1sec>>
+
+report_template report_default {
+  key._OP_ARTIFACT_ACCESSED.use = true
+}

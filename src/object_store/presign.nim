@@ -18,13 +18,14 @@ import ".."/[
 
 type
   ObjectStorePresign = ref object of ObjectStoreConfig
-    uri*:            string
-    headers*:        HttpHeaders
-    disallowHttp*:   bool
-    timeout*:        int
-    pinnedCertFile*: string
-    readAuth*:       AuthConfig
-    writeAuth*:      AuthConfig
+    uri*:                string
+    headers*:            HttpHeaders
+    disallowHttp*:       bool
+    timeout*:            int
+    pinnedCertFile*:     string
+    preferBundledCerts*: bool
+    readAuth*:           AuthConfig
+    writeAuth*:          AuthConfig
 
 proc getConfig[T](name: string, field: string): T =
   return attrGet[T]("object_store_config." & name & ".object_store_presign." & field)
@@ -42,15 +43,16 @@ proc init(self: ObjectStore, name: string): ObjectStoreConfig =
   let
     headers = getConfig[TableRef[string, string]](name, "headers")
     config  = ObjectStorePresign(
-      name:           name,
-      store:          self,
-      headers:        newHttpHeaders(headers.pairs().toSeq()),
-      uri:            getConfig[string](name, "uri"),
-      disallowHttp:   getConfig[bool](  name, "disallow_http"),
-      timeout:        getConfig[int](   name, "timeout"),
-      pinnedCertFile: getConfig[string](name, "pinned_cert_file"),
-      readAuth:       readAuthOpt.get(nil),
-      writeAuth:      writeAuthOpt.get(nil),
+      name:               name,
+      store:              self,
+      headers:            newHttpHeaders(headers.pairs().toSeq()),
+      uri:                getConfig[string](name, "uri"),
+      disallowHttp:       getConfig[bool](  name, "disallow_http"),
+      timeout:            getConfig[int](   name, "timeout"),
+      pinnedCertFile:     getConfig[string](name, "pinned_cert_file"),
+      preferBundledCerts: getConfig[bool](  name, "prefer_bundled_certs"),
+      readAuth:           readAuthOpt.get(nil),
+      writeAuth:          writeAuthOpt.get(nil),
     )
   return ObjectStoreConfig(config)
 
@@ -91,16 +93,17 @@ proc request(self:           ObjectStorePresign,
   # and will only send it to the returned signed URL
   # which is why we disallow redirects here via maxRedirects
   # NOTE this assumes that the endpoint immediately returns presigned URL
-  let signResponse = safeRequest(url               = self.url(keyRef),
-                                 timeout           = self.timeout,
-                                 headers           = signHeaders,
-                                 disallowHttp      = self.disallowHttp,
-                                 pinnedCert        = self.pinnedCertFile,
-                                 httpMethod        = httpMethod,
-                                 retries           = 2,
-                                 firstRetryDelayMs = 100,
-                                 maxRedirects      = 0,
-                                 raiseWhenAbove    = 400)
+  let signResponse = safeRequest(url                = self.url(keyRef),
+                                 timeout            = self.timeout,
+                                 headers            = signHeaders,
+                                 disallowHttp       = self.disallowHttp,
+                                 pinnedCert         = self.pinnedCertFile,
+                                 preferBundledCerts = self.preferBundledCerts,
+                                 httpMethod         = httpMethod,
+                                 retries            = 2,
+                                 firstRetryDelayMs  = 100,
+                                 maxRedirects       = 0,
+                                 raiseWhenAbove     = 400)
   trace("object store: " & $httpMethod & " " & $url & " -> " & $signResponse.code)
 
   if signResponse.code notin [Http302, Http307]:

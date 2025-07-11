@@ -1,0 +1,14 @@
+~docker.scan_context.run = true
+~docker.prep_postexec    = true
+~exec.postexec.run       = true
+
+sink_config crashoverride {
+  ~prefer_bundled_certs: true
+}
+
+custom_report crashoverride_postexec {
+  ~enabled:         true
+  ~report_template: "crashoverride"
+  ~sink_configs:    ["crashoverride"]
+  ~use_when:        ["postexec"]
+}

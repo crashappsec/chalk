@@ -105,8 +105,8 @@ iterator allIDs(what: string, cmd: string): string =
   ## utility function for getting all docker ids in local system (container or image)
   let
     output = runDockerGetEverything(@[cmd, "--no-trunc", "--format", "{{.ID}}"])
-    stdout = output.getStdOut().strip()
-    stderr = output.getStdErr().strip()
+    stdout = output.getStdout().strip()
+    stderr = output.getStderr().strip()
 
   if output.getExit() != 0 or stdout == "":
     error("docker: could not find any " & what & ": " & stdout & " " & stderr)

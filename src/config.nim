@@ -76,7 +76,7 @@ proc getReportTemplate*(spec = ""): string =
     tmplName = attrGetOpt[string](ns & ".report_template").get("").elseWhenEmpty("null")
   return "report_template." & tmplName
 
-proc forceKeys(keynames: openarray[string], templateRef: string) =
+proc forceKeys(keynames: openArray[string], templateRef: string) =
   let section     = templateRef & ".key"
 
   # Create the "key" section if required.
@@ -95,16 +95,16 @@ proc forceKeys(keynames: openarray[string], templateRef: string) =
       Con4mType(kind: TypeBool),
     )
 
-proc forceReportKeys*(keynames: openarray[string]) =
+proc forceReportKeys*(keynames: openArray[string]) =
   forceKeys(keynames, getReportTemplate())
 
-proc forceChalkKeys*(keynames: openarray[string]) =
+proc forceChalkKeys*(keynames: openArray[string]) =
   forceKeys(keynames, getMarkTemplate())
 
 proc runCallback*(cb: CallbackObj, args: seq[Box]): Option[Box] =
   return con4mRuntime.configState.sCall(cb, args)
 proc runCallback*(s: string, args: seq[Box]): Option[Box] =
-  return con4mRuntime.configState.scall(s, args)
+  return con4mRuntime.configState.sCall(s, args)
 
 proc getChalkExeVersion*(): string =
   const version = getChalkVersion()
@@ -117,6 +117,7 @@ proc setCommandName*(s: string) =
   ## Used when nesting operations.  For instance, when recursively
   ## chalking Zip files, we run a 'delete' over a copy of the Zip
   ## to calculate the unchalked hash.
+  trace("chalk: running " & s)
   commandName = s
 
 proc getChalkRuntime*(): ConfigState      = con4mRuntime.configState

@@ -66,7 +66,7 @@ version:
 
 .PHONY: clean
 clean:
-	-rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop
+	-rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop nimble.paths
 
 .PHONY: chalk-docs
 chalk-docs: $(BINARY)
@@ -80,21 +80,17 @@ watch: $(SOURCES)
 # this allows to dev againt local versions of nimutils/con4m
 # this works for both docker/host builds
 
-nimutils con4m::
-	# If you simply symlink folder nimble does not like it
-	# but checking out repo via `nimble develop` kind of works
-	# It does not like dep structure but it does create the folder
-	# and nimble build does honor it :shrug:
-	-$(DOCKER) nimble develop --add https://github.com/crashappsec/$@
-	cp -r ../$@/* $@
+../%/.git:
+	git clone git@github.com:crashappsec/$*.git
 
-nimutils::
-	rm -rf $@/nimutils
-	cd $@ && ln -fs ../../$@/nimutils .
+nimble.paths:
+	echo --noNimblePath > $@
 
-con4m::
-	rm -rf $@/files
-	cd $@ && ln -fs ../../$@/files .
+nimutils con4m: nimble.paths
+	$(MAKE) -s ../$@/.git
+	echo '--path:"$(abspath ../$@)"' >> $^
+	ln -s ../$@ $@
+	touch $@
 
 # ----------------------------------------------------------------------------
 # TOOL MAKEFILES

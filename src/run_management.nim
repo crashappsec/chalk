@@ -232,6 +232,8 @@ template setFromEnvVar*(o: ChalkDict, k: string, default: string = "") =
   o.setIfNotEmpty(k, os.getEnv(k, default))
 
 template isSubscribedKey*(key: string): bool =
+  when defined(debug):
+    trace("isSubscribedKey: " & key & "=" & $subscribedKeys.getOrDefault(key, false))
   subscribedKeys.getOrDefault(key, false)
 
 template setIfSubscribed*[T](o: ChalkDict, k: string, v: T) =

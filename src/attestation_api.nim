@@ -237,7 +237,7 @@ proc verifyBySigStore(chalk: ChalkObj, key: AttestationKey, image: DockerImage):
       return (vNoHash, dict)
     else:
       # note that we fail hard on any connection/auth errors
-      trace("Verification failed: " & allOut.getStdErr())
+      trace("Verification failed: " & allOut.getStderr())
       warn(spec & ": Did not validate signature.")
       return (vBadSig, dict)
 

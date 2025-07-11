@@ -284,6 +284,7 @@ outconf = {
     "build",
     "push",
     "exec",
+    "postexec",
     "heartbeat",
     "delete",
     "env",
