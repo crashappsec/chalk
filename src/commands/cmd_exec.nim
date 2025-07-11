@@ -170,6 +170,7 @@ proc getParentExitStatus(trueParentPid: Pid): bool =
   return false
 
 proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
+  clearReportingState()
   initCollection()
   if chalkOpt.isSome():
     let chalk = chalkOpt.get()
@@ -192,11 +193,9 @@ proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
     sleepInterval = int(inMicroSec / 1000)
 
   setCommandName("heartbeat")
-  clearReportingState()
 
   while true:
     sleep(sleepInterval)
-    clearReportingState()
     chalkOpt.doHeartbeatReport()
     if fn(pid):
       break
@@ -266,6 +265,7 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   var accessedPaths = initHashSet[string]()
 
   clearReportingState()
+  initCollection()
 
   try:
     setCommandName("postexec")
