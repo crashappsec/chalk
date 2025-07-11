@@ -1,29 +1,21 @@
 keyspec _X_BUILD_OBSERVABLES {
   kind:  RunTimeHost
-  type:  `x
+  type:  string
   callback: func build_observables
 }
 
 func build_observables(contexts) {
-  result := {}
   if command_name() != "env" {
-    return
+    return ""
   }
   run_id := env("GITHUB_RUN_ID")
   attempt := env("GITHUB_RUN_ATTEMPT")
   if run_id == "" or attempt == "" {
-    return
+    return ""
   }
-  path := "/mnt/curiosity/observables/" + run_id + "-" + attempt + "-observables.json"
+  path := "/mnt/curiosity/observables/" + run_id + "-" + attempt + "-observables.br"
   if not is_file(path) {
-    return
+    return ""
   }
-  content := read_file(path)
-  if starts_with(content, "[") or starts_with(content, "{") {
-    trace("collected build observables output from " + path)
-    return [parse_json(content)]
-  } else {
-    trace("empty observables output")
-    return
-  }
+  return base64(read_file(path))
 }
