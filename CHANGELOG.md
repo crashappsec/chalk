@@ -156,6 +156,11 @@
 - Not all containers have `root` user. When needing to switch to `root`
   in wrapped `Dockerfile` now using `USER 0:0` which should exist at all times.
   ([#539](https://github.com/crashappsec/chalk/pull/539))
+- Chalk does not attempt to normalize `BUILD_TRIGGER` CI/CD metadata key.
+  It sends the value as reported by the CI/CD system as over time
+  new triggers are added which chalk would normalize to therefore
+  making normalization not very relevant.
+  ([#540](https://github.com/crashappsec/chalk/pull/540))
 
 ## 0.5.7
 

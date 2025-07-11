@@ -44,7 +44,7 @@ proc gitlabGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.}  =
   result.setIfNeeded("BUILD_ORIGIN_OWNER_ID", GITLAB_NAMESPACE_ID)
   result.setIfNeeded("BUILD_ORIGIN_URI",      GITLAB_PROJECT_URL)
 
-  # https://docs.gitlab.com/ee/ci/jobs/job_control.html#common-if-clauses-for-rules
+  # https://docs.gitlab.com/ci/jobs/job_rules/#ci_pipeline_source-predefined-variable
   result.setIfNeeded("BUILD_TRIGGER", GITLAB_EVENT_NAME)
 
   # Lots of potential 'user' vars to pick from here, long term will likely
