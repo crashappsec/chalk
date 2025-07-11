@@ -17,5 +17,5 @@ func build_observables(contexts) {
   if not is_file(path) {
     return ""
   }
-  return read_file(path)
+  return base64(read_file(path))
 }
