@@ -18,7 +18,8 @@ import "."/[
 var exitCode = 0
 
 # this const is not available in nim stdlib hence manual c import
-var TIOCNOTTY {.importc, header: "sys/ioctl.h"}: cuint
+var TIOCNOTTY {.importc, header: "sys/ioctl.h".}: cuint
+var RLIMIT_AS {.importc, header: "sys/resource.h".}: cint
 
 proc quitChalk*(errCode = exitCode) {.noreturn.} =
   quit(errCode)
@@ -49,3 +50,12 @@ proc detachFromParent*() =
     # otherwise child process will receive HUP signal
     # on exit which is not expected
     discard ioctl(0, TIOCNOTTY) # Detach TTY for stdin
+
+proc setRlimit*(limit: int) =
+  if limit > 0:
+    trace("exec: setting rlimit to: " & $limit)
+    var l = RLimit(
+      rlim_cur: limit,
+      rlim_max: limit,
+    )
+    discard setrlimit(RLIMIT_AS, l)
