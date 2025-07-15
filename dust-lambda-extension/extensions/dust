@@ -1,0 +1,309 @@
+#!/usr/bin/env bash
+##
+## Copyright (c) 2025, Crash Override, Inc.
+##
+## This file is part of the Chalk project
+## (see https://crashoverride.com/docs/chalk)
+##
+
+set -eEu
+set -o pipefail
+
+# Enable debug mode only if DEBUG environment variable is set
+[[ ${DEBUG:-} == "true" ]] && set -x
+
+# Logger helpers with consistent formatting and timestamps
+log_with_level() {
+    local level="$1"
+    local color="$2"
+    local message="$3"
+    echo -e "\e[${color}m[$(date -Iseconds)] [${level}] ${message}\e[0m" >&2
+}
+
+LOG_DEBUG() { if [[ ${DEBUG:-} == "true" ]]; then log_with_level "DEBUG" "0;34" "$1"; else true; fi; }
+LOG_INFO() { log_with_level "INFO" "0;32" "$1"; }
+LOG_ERROR() { log_with_level "ERROR" "0;31" "$1"; }
+LOG_WARNING() { log_with_level "WARN" "0;33" "$1"; }
+
+fatal() {
+    LOG_ERROR "$@"
+    exit 1
+}
+
+# Configurables (set via environment variables)
+readonly EXTENSION_NAME="${EXTENSION_NAME:-dust}"
+readonly MAX_FAILURES=${MAX_FAILURES:-5}
+
+# Constants
+readonly TASK_PATH="/var/task"
+readonly CHALK_BIN_PATH="$TASK_PATH/chalk"
+readonly CHALK_MARK_PATH="$TASK_PATH/chalk.json"
+readonly TMP_CHALK_PATH="/tmp/chalk"
+
+# Validate critical environment variable
+if [[ -z ${AWS_LAMBDA_RUNTIME_API:-} ]]; then
+    fatal "AWS_LAMBDA_RUNTIME_API environment variable is not set"
+fi
+
+readonly AWS_LAMBDA_RUNTIME_API
+readonly REGISTER_API="http://${AWS_LAMBDA_RUNTIME_API}/2020-01-01/extension/register"
+readonly NEXT_API="http://${AWS_LAMBDA_RUNTIME_API}/2020-01-01/extension/event/next"
+readonly EXIT_API="http://${AWS_LAMBDA_RUNTIME_API}/2020-01-01/extension/exit"
+
+# Global variables
+EXTENSION_ID=""
+EXIT_REQUESTED=false
+
+# Improved error handling for curl requests - returns both headers and body
+make_api_request() {
+    local method="$1"
+    local url="$2"
+    local headers=("${@:3}")
+
+    local temp_body_file
+    local temp_headers_file
+    temp_body_file=$(mktemp)
+    temp_headers_file=$(mktemp)
+    local http_code
+
+    # Use array to properly handle headers with spaces
+    local curl_args=(-s -w "%{http_code}" -o "$temp_body_file" --dump-header "$temp_headers_file" -X "$method" "$url")
+
+    # Handle headers and data arguments
+    local i=0
+    while [[ $i -lt ${#headers[@]} ]]; do
+        if [[ ${headers[i]} == "--data" ]]; then
+            curl_args+=("--data" "${headers[i + 1]}")
+            ((i += 2))
+        else
+            curl_args+=(-H "${headers[i]}")
+            ((i++))
+        fi
+    done
+
+    http_code=$(curl "${curl_args[@]}")
+    local curl_exit_code=$?
+
+    if [[ $curl_exit_code -ne 0 ]]; then
+        LOG_ERROR "curl failed with exit code $curl_exit_code for $method $url"
+        rm -f "$temp_body_file" "$temp_headers_file"
+        return 1
+    fi
+
+    if [[ $http_code -lt 200 || $http_code -ge 300 ]]; then
+        LOG_ERROR "HTTP request failed with status $http_code for $method $url"
+        LOG_DEBUG "Response: $(cat "$temp_body_file")"
+        rm -f "$temp_body_file" "$temp_headers_file"
+        return 1
+    fi
+
+    # Return a structured format with headers and body
+    echo "--- HEADERS ---"
+    cat "$temp_headers_file"
+    echo "--- BODY ---"
+    cat "$temp_body_file"
+
+    rm -f "$temp_body_file" "$temp_headers_file"
+    return 0
+}
+
+# Helper function to extract headers from make_api_request response
+extract_response_headers() {
+    sed -n '/^--- HEADERS ---$/,/^--- BODY ---$/p' | sed '1d;$d'
+}
+
+# Helper function to extract body from make_api_request response
+extract_response_body() {
+    sed -n '/^--- BODY ---$/,$p' | sed '1d'
+}
+
+# Handle signals cleanly with proper cleanup
+handle_signal() {
+    LOG_INFO "Received termination signal. Preparing to shut down."
+    EXIT_REQUESTED=true
+    do_shutdown
+}
+
+cleanup() {
+    LOG_INFO "Cleaning-up"
+    rm -f "$TMP_CHALK_PATH"
+}
+
+do_shutdown() {
+    LOG_INFO "Starting clean shutdown process."
+    cleanup
+    if [[ -n $EXTENSION_ID && $EXIT_REQUESTED == "true" ]]; then
+        LOG_DEBUG "Signaling extension shutdown to Lambda."
+        # Signal the Lambda platform that we are exiting
+        if ! make_api_request "POST" "$EXIT_API" "Lambda-Extension-Identifier: $EXTENSION_ID" > /dev/null 2>&1; then
+            LOG_WARNING "Failed to notify Lambda platform of extension shutdown"
+        fi
+    fi
+
+    exit 0
+}
+
+# Setup binary with proper validation and error handling
+setup_chalk_binary() {
+    # Check if chalk binary exists and is executable
+    if [[ ! -x $CHALK_BIN_PATH ]]; then
+        LOG_ERROR "chalk binary not found or not executable at $CHALK_BIN_PATH"
+        return 1
+    fi
+
+    # Copy chalk binary to /tmp if it doesn't exist or is outdated
+    if [[ ! -x $TMP_CHALK_PATH ]] || [[ $CHALK_BIN_PATH -nt $TMP_CHALK_PATH ]]; then
+        LOG_INFO "Copying chalk binary to /tmp"
+        if ! cp "$CHALK_BIN_PATH" "$TMP_CHALK_PATH"; then
+            LOG_ERROR "Failed to copy chalk binary to /tmp"
+            return 1
+        fi
+
+        if ! chmod +x "$TMP_CHALK_PATH"; then
+            LOG_ERROR "Failed to make chalk binary executable in /tmp"
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+# Process chalk marks
+process_chalk_marks() {
+    LOG_INFO "$TMP_CHALK_PATH extracting $CHALK_MARK_PATH"
+    if [[ -f $CHALK_MARK_PATH ]]; then
+        LOG_DEBUG "Found $CHALK_MARK_PATH, running chalk extract."
+        if ! "$TMP_CHALK_PATH" extract "$TASK_PATH"; then
+            LOG_WARNING "chalk extract command failed"
+            return 1
+        fi
+    else
+        LOG_WARNING "No chalk.json found at $CHALK_MARK_PATH"
+        return 1
+    fi
+
+    return 0
+}
+
+# JSON parsing using pure bash/standard tools (no jq dependency)
+extract_json_field() {
+    local json="$1"
+    local field="$2"
+
+    # Use grep with improved regex to handle various JSON formatting
+    local result
+    result=$(echo "$json" | grep -o "\"$field\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
+        | sed "s/\"$field\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\"/\1/")
+
+    # Handle case where field might have null value
+    if [[ $result == "null" ]]; then
+        result=""
+    fi
+
+    echo "$result"
+}
+
+register_extension() {
+    # Only register for SHUTDOWN events (INVOKE events are not needed)
+    local registration_payload='{"events":["SHUTDOWN"]}'
+
+    # Use make_api_request for consistent error handling
+    local api_response
+    if ! api_response=$(make_api_request "POST" "$REGISTER_API" \
+        "--data" "$registration_payload" \
+        "Lambda-Extension-Name: $EXTENSION_NAME" \
+        "Content-Type: application/json"); then
+        fatal "Extension registration failed."
+    fi
+
+    # Extract Extension ID from response headers
+    local headers
+    headers=$(echo "$api_response" | extract_response_headers)
+
+    EXTENSION_ID=$(echo "$headers" | awk '/^[Ll]ambda-[Ee]xtension-[Ii]dentifier:/ {
+        gsub(/\r$/, "");
+        gsub(/^[^:]*:[[:space:]]*/, "");
+        print $0;
+        exit
+    }')
+
+    if [[ -z $EXTENSION_ID ]]; then
+        LOG_ERROR "Failed to register extension or parse Extension ID."
+    fi
+
+    LOG_INFO "Extension registered with ID: $EXTENSION_ID"
+}
+
+# Main execution starts here
+main() {
+    LOG_INFO "Starting Lambda extension: $EXTENSION_NAME"
+
+    # Set up signal handlers
+    trap handle_signal SIGINT SIGTERM
+
+    register_extension
+
+    # Setup chalk binary
+    if ! setup_chalk_binary; then
+        LOG_ERROR "Failed to setup chalk binary"
+    fi
+
+    # Process chalk marks
+    process_chalk_marks || LOG_WARNING "Chalk mark processing failed, continuing anyway"
+
+    # Poll for events from the Lambda Runtime API
+    LOG_INFO "Starting event polling loop."
+
+    local consecutive_failures=0
+
+    while [[ $EXIT_REQUESTED == "false" ]]; do
+        LOG_DEBUG "Polling for next event..."
+
+        local event_response
+        if event_response=$(make_api_request "GET" "$NEXT_API" "Lambda-Extension-Identifier: $EXTENSION_ID" | extract_response_body); then
+            consecutive_failures=0
+
+            # Extract event type from JSON response
+            local event_type
+            event_type=$(extract_json_field "$event_response" "eventType")
+
+            LOG_DEBUG "Received event: $event_type"
+
+            case "$event_type" in
+                "SHUTDOWN")
+                    LOG_INFO "Received SHUTDOWN event. Initiating clean shutdown."
+                    EXIT_REQUESTED=true
+                    do_shutdown
+                    ;;
+                "INVOKE")
+                    LOG_DEBUG "Received INVOKE event. Continuing to poll."
+                    ;;
+                "")
+                    LOG_WARNING "Received event with no eventType field"
+                    LOG_DEBUG "Full event response: $event_response"
+                    ;;
+                *)
+                    LOG_DEBUG "Received unknown event type: $event_type. Continuing to poll."
+                    ;;
+            esac
+        else
+            # Increment failure counter
+            ((consecutive_failures++))
+            LOG_ERROR "Failed to get next event from Runtime API (failure $consecutive_failures/${MAX_FAILURES})"
+
+            if [[ $consecutive_failures -ge $MAX_FAILURES ]]; then
+                LOG_ERROR "Too many consecutive failures. Shutting down."
+                EXIT_REQUESTED=true
+                do_shutdown
+            fi
+
+            # Brief backoff before retrying
+            sleep 1
+        fi
+    done
+}
+
+# Run main function if script is executed directly
+if [[ ${BASH_SOURCE[0]} == "${0}" ]]; then
+    main "$@"
+fi
