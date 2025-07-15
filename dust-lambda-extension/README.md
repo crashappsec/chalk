@@ -15,11 +15,8 @@ After satisfying the [dependencies](#dependencies) below, simply run
 
 **dependencies:**
 
-- Bash >=5.1
 - GNU Make
-- Python >=3.12
-- venv
-- pip
+- pre-commit (can be installed via pip, pipx, brew, pacman, etc.)
 - zip
 
 To see what individual commands are available target the `help` goal:
@@ -27,14 +24,6 @@ To see what individual commands are available target the `help` goal:
 ```bash
 make help
 ```
-
-## development.
-
-Bootstrap the development environment with `make init` which creates sets up a
-Python virtualenv and development dependencies.
-
-Run lint the project with `make lint` which will format documentation and the
-extension application code.
 
 ## deployment.
 
