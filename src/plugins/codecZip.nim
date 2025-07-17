@@ -241,7 +241,7 @@ proc zipHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
     let
       ext = chalk.fsRef.splitFile().ext.strip()
       allowedExtensions = attrGet[seq[string]]("zip.allowed_extensions")
-    
+
     if ext.startsWith(".") and ext[1..^1] in allowedExtensions:
       try:
         info(chalk.name & ": Inserting binary into zip archive")
