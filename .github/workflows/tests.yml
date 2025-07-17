@@ -24,6 +24,15 @@ on:
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
   workflow_dispatch:
+    inputs:
+      curiosity_only:
+        required: false
+        default: false
+        type: boolean
+      trapdefs_only:
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -60,8 +69,11 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+      - name: Checkout Code
+        uses: crashappsec/action-checkout@main
+        with:
+          fetch-depth: 0
+          profile: observe
 
       # for tests to checkout dummy private repo
       - name: Get GitHub Token
