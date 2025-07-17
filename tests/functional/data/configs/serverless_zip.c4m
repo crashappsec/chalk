@@ -1,0 +1,4 @@
+# inject the chalk binary into zip archives by default
+zip.inject_binary: true
+# only inject the chalk binary into these exetensions
+zip.allowed_extensions: ["zip", "serverless.zip"]

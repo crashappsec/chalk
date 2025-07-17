@@ -238,11 +238,24 @@ proc zipHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
                    {.cdecl.} =
   let injectBinary = attrGet[bool]("zip.inject_binary")
   if injectBinary:
-    try:
-      info(chalk.name & ": Inserting binary into zip archive")
-      insertChalkBinaryIntoZip(chalk)
-    except:
-      error(chalk.name & ": failed to insert chalk binary due to: " & getCurrentExceptionMsg())
+    let
+      filename = chalk.fsRef.splitFile().name & chalk.fsRef.splitFile().ext
+      allowedExtensions = attrGet[seq[string]]("zip.allowed_extensions")
+
+    var shouldInject = false
+    for ext in allowedExtensions:
+      if filename.toLowerAscii().endsWith("." & ext.toLowerAscii()):
+        shouldInject = true
+        break
+
+    if shouldInject:
+      try:
+        info(chalk.name & ": Inserting binary into zip archive")
+        insertChalkBinaryIntoZip(chalk)
+      except:
+        error(chalk.name & ": failed to insert chalk binary due to: " & getCurrentExceptionMsg())
+    else:
+      trace(chalk.name & ": skipping binary injection - no matching extension found")
 
   chalk.doZipWrite(encoded, virtual = false)
 
