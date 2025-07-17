@@ -328,6 +328,8 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   withSuspendChalkCollectionFor(getOptionalPluginNames()):
     doReporting()
 
+  quitChalk()
+
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):
     error("'exec' command not supported on this platform.")
@@ -452,7 +454,7 @@ proc runCmdExec*(args: seq[string]) =
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting()
 
-      postExecState.doPostExec(detach = false)
+      postExecState.doPostExec(detach = true)
 
       if attrGet[bool]("exec.heartbeat"):
         chalkOpt.doHeartbeat(ppid, getParentExitStatus)
