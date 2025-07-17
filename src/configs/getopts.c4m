@@ -340,6 +340,15 @@ archive targeted by the insertion command.
       field_to_set: "zip.inject_binary"
     }
 
+    flag_multi_arg zip_allowed_extensions {
+      doc: """
+Specify file extensions that are allowed for zip binary injection.
+Only files with these extensions will have the binary injected when
+--inject-binary-into-zip is used. Can be specified multiple times.
+"""
+      field_to_set: "zip.allowed_extensions"
+    }
+
     flag_arg mark_template {
       field_to_set: "outconf.insert.mark_template"
       doc: """

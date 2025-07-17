@@ -358,6 +358,7 @@ class Chalk:
         tty: bool = False,
         show_config: bool = False,
         inject_binary_into_zip: bool = False,
+        zip_allowed_extensions: Optional[list[str]] = None,
     ) -> ChalkProgram:
         params = params or []
         cmd: list[str] = [str(self.binary)]
@@ -391,6 +392,13 @@ class Chalk:
             cmd += ["--no-color"]
         if inject_binary_into_zip:
             cmd += ["--inject-binary-into-zip"]
+        if zip_allowed_extensions is not None:
+            if zip_allowed_extensions:
+                for ext in zip_allowed_extensions:
+                    cmd += [f"--zip-allowed-extensions={ext}"]
+            else:
+                # Empty list - pass empty string to clear the default
+                cmd += ["--zip-allowed-extensions="]
         if params:
             cmd += params
 
@@ -450,6 +458,7 @@ class Chalk:
         expecting_chalkmarks: bool = True,
         use_embedded: bool = True,
         inject_binary_into_zip=False,
+        zip_allowed_extensions: Optional[list[str]] = None,
     ) -> ChalkProgram:
         result = self.run(
             command="insert",
@@ -462,6 +471,7 @@ class Chalk:
             expecting_report=expecting_report,
             use_embedded=use_embedded,
             inject_binary_into_zip=inject_binary_into_zip,
+            zip_allowed_extensions=zip_allowed_extensions,
         )
         if expecting_report:
             if expecting_chalkmarks:

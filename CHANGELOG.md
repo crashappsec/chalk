@@ -131,6 +131,10 @@
 - Chalk can set rlimit for heartbeats process.
   By default no limit is set.
   ([#544](https://github.com/crashappsec/chalk/pull/544))
+- Adds `zip.allowed_extensions` which will only inject the chalk binary if a
+  target archive's extension is in the list of `allowed_extensions`. Defaults to
+  `[zip]` and can be overriden with the `--zip-allowed-extensions` flag. (
+  [#547](https://github.com/crashappsec/chalk/pull/547))
 
 ### Fixes
 
