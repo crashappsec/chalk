@@ -160,6 +160,10 @@
 
 - `BUILD_UNIQUE_ID` to uniquely identify jobs in GitHub.
   ([#562](https://github.com/crashappsec/chalk/pull/562))
+- Adds `zip.allowed_extensions` which will only inject the chalk binary if a
+  target archive's extension is in the list of `allowed_extensions`. Defaults to
+  `[zip]` and can be overriden with the `--zip-allowed-extensions` flag. (
+  [#547](https://github.com/crashappsec/chalk/pull/547))
 
 ### Fixes
 
