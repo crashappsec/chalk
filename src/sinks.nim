@@ -108,10 +108,11 @@ template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
                     "\"\"\"\n" & cfg.params["headers"] & "\n\"\"\""
                   else:
                     "none"
-      line &= "\n\turi          = " & cfg.params["uri"]
-      line &= "\n\tcontent_type = " & cfg.params["content_type"]
-      line &= "\n\ttimeout      = " & timeout
-      line &= "\n\theaders      = " & headers & "\n"
+      line &= "\n\turi                = " & cfg.params["uri"]
+      line &= "\n\tcontent_type       = " & cfg.params["content_type"]
+      line &= "\n\ttimeout            = " & timeout
+      line &= "\n\theaders            = " & headers & "\n"
+      line &= "\n\tpreferBundledCerts = " & cfg.params.getOrDefault("prefer_bundled_certs", "false") & "\n"
     of "s3":
       let state = S3SinkState(cfg.private)
       line &= "\n\turi    = " & cfg.params["uri"]
