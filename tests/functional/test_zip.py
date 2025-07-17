@@ -15,11 +15,14 @@ from .utils.log import get_logger
 logger = get_logger()
 
 # Test data fixtures
-PYTHON_LAMBDA_ZIP = ZIPS / "python" / "my_deployment_package.zip"
-NODEJS_LAMBDA_ZIP = ZIPS / "nodejs" / "function.zip"
+EMPTY_ZIP = ZIPS / "empty" / "empty.zip"
 GOLANG_LAMBDA_ZIP = ZIPS / "golang" / "myFunction.zip"
 MISC_LAMBDA_ZIP = ZIPS / "misc" / "misc.zip"
-EMPTY_ZIP = ZIPS / "empty" / "empty.zip"
+NODEJS_LAMBDA_ZIP = ZIPS / "nodejs" / "function.zip"
+PYTHON_LAMBDA_ZIP = ZIPS / "python" / "my_deployment_package.zip"
+JAR_FILE = ZIPS / "misc" / "test.jar"
+WAR_FILE = ZIPS / "misc" / "test.war"
+
 
 
 @pytest.mark.slow()
@@ -137,3 +140,114 @@ def maybe_contains_chalk_binary(zip_path: Path, virtual: bool):
         else:
             # Verify the chalk binary was added
             return "chalk" in zip_ref.namelist()
+
+
+
+@pytest.mark.parametrize(
+    "copy_files",
+    [
+        [JAR_FILE],
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize("virtual", [True, False])
+def test_zip_allowed_extensions_default_jar(
+    tmp_data_dir: Path,
+    chalk: Chalk,
+    copy_files: list[Path],
+    virtual: bool,
+):
+    """Test that binary injection is blocked with default allowed extensions for .jar files."""
+    test_file = copy_files[0]
+
+    # Test with .jar extension (should NOT inject binary with default config)
+    insert = chalk.insert(
+        artifact=test_file,
+        virtual=virtual,
+        inject_binary_into_zip=True,
+    )
+    assert insert.report.marks_by_path.contains({str(test_file): {}})
+    if not virtual:
+        # With default config, binary should not be injected in .jar files
+        assert not maybe_contains_chalk_binary(test_file, virtual)
+
+
+@pytest.mark.slow()
+@pytest.mark.parametrize(
+    "copy_files",
+    [
+        [MISC_LAMBDA_ZIP],
+        [JAR_FILE],
+        [WAR_FILE],
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize("virtual", [True, False])
+@pytest.mark.parametrize(
+    "zip_allowed_extensions,should_inject",
+    [
+        (["zip"], {"zip": True, "jar": False, "war": False}),
+        (["zip", "jar"], {"zip": True, "jar": True, "war": False}),
+        ([], {"zip": False, "jar": False, "war": False}),
+    ],
+)
+def test_zip_allowed_extensions_parametrized(
+    tmp_data_dir: Path,
+    chalk: Chalk,
+    copy_files: list[Path],
+    virtual: bool,
+    zip_allowed_extensions: list[str],
+    should_inject: dict[str, bool],
+):
+    """Test that CLI flag properly configures allowed extensions for different file types."""
+    test_file = copy_files[0]
+    file_extension = test_file.suffix[1:]  # Remove the dot
+
+    # Test with specified allowed extensions
+    insert = chalk.insert(
+        artifact=test_file,
+        virtual=virtual,
+        inject_binary_into_zip=True,
+        zip_allowed_extensions=zip_allowed_extensions,
+    )
+    assert insert.report.marks_by_path.contains({str(test_file): {}})
+
+    if not virtual:
+        expected_injection = should_inject.get(file_extension, False)
+        if expected_injection:
+            assert maybe_contains_chalk_binary(test_file, virtual)
+        else:
+            assert not maybe_contains_chalk_binary(test_file, virtual)
+
+
+@pytest.mark.slow()
+@pytest.mark.parametrize(
+    "copy_files",
+    [
+        [MISC_LAMBDA_ZIP],
+        [JAR_FILE],
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize("virtual", [True, False])
+def test_zip_allowed_extensions_without_injection_flag(
+    tmp_data_dir: Path,
+    chalk: Chalk,
+    copy_files: list[Path],
+    virtual: bool,
+):
+    """Test that allowed extensions have no effect without inject_binary_into_zip flag."""
+    test_file = copy_files[0]
+
+    # Test without inject_binary_into_zip flag
+    insert = chalk.insert(
+        artifact=test_file,
+        virtual=virtual,
+        inject_binary_into_zip=False,
+        zip_allowed_extensions=["zip", "jar", "war"],
+    )
+    assert insert.report.marks_by_path.contains({str(test_file): {}})
+
+    if not virtual:
+        # No binary should be injected regardless of allowed extensions
+        assert not maybe_contains_chalk_binary(test_file, virtual)

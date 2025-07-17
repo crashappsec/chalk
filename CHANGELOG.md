@@ -109,6 +109,10 @@
 - Adds `zip.inject_binary` config and `--inject-binary-into-zip` CLI flag to
   the `chalk insert` command as part of chalk's AWS Lambda support
   ([#498](https://github.com/crashappsec/chalk/pull/498))
+- Adds `zip.allowed_extensions` which will only inject the chalk binary if a
+  target archive's extension is in the list of `allowed_extensions`. Defaults to
+  `[zip]` and can be overriden with the `--zip-allowed-extensions` flag. (
+  [#547](https://github.com/crashappsec/chalk/pull/547))
 
 ### Fixes
 
