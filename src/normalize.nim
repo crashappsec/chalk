@@ -15,6 +15,7 @@
 import std/[
   algorithm,
   sequtils,
+  streams,
 ]
 import "."/[
   types,
@@ -40,25 +41,36 @@ proc u64ToStr(i: uint64): string =
 proc floatToStr(f: float): string =
   result = newStringOfCap(sizeof(float)+1)
 
-proc binEncodeItem*(self: Box): string
+proc binEncodeItem(s: Stream, self: Box)
 
-proc binEncodeStr(s: string): string =
-  return "\x01" & u32ToStr(uint32(len(s))) & s
+proc binEncodeStr(t: Stream, s: string) =
+  t.write("\x01")
+  t.write(u32ToStr(uint32(len(s))))
+  t.write(s)
 
-proc binEncodeInt(i: uint64): string =
-  return "\x02" & u64ToStr(i)
+proc binEncodeInt(s: Stream, i: uint64) =
+  s.write("\x02")
+  s.write(u64ToStr(i))
 
-proc binEncodeBool(b: bool): string  =
-  return if b: "\x03\x01" else: "\x03\x00"
+proc binEncodeBool(s: Stream, b: bool) =
+  if b:
+    s.write("\x03\x01")
+  else:
+    s.write("\x03\x00")
 
-proc binEncodeArr(arr: seq[Box]): string =
-  result = "\x04" & u32ToStr(uint32(len(arr)))
-  for item in arr: result = result & binEncodeItem(item)
+proc binEncodeArr(s: Stream, arr: seq[Box]) =
+  s.write("\x04")
+  s.write(u32ToStr(uint32(len(arr))))
+  for item in arr:
+    s.binEncodeItem(item)
 
-proc binEncodeTable(self: ChalkDict, ignore: seq[string] = @[]): string =
-  var
-    encoded = ""
-    count   = 0
+proc binEncodeTable(s: Stream, self: ChalkDict, ignore: seq[string] = @[]) =
+  # we dont know the count ahead of time as we need to account for ignores
+  # so we can write 0 for now and then replace the stream content with updated count
+  var count = 0
+  s.write("\x05")
+  let countPosition = s.getPosition()
+  s.write(u32ToStr(uint32(count)))
   # It's important to write everything out in a canonical order for
   # signing.  The keys are written in the order we spec, and user-defined
   # keys are in lexigraphical order.
@@ -68,33 +80,49 @@ proc binEncodeTable(self: ChalkDict, ignore: seq[string] = @[]): string =
   for k, v in self.sortedPairs():
     if k in ignore:
       continue
-    encoded  &= binEncodeStr(k) & binEncodeItem(v)
+    s.binEncodeStr(k)
+    s.binEncodeItem(v)
     count += 1
-  return "\x05" & u32ToStr(uint32(count)) & encoded
+  let endPosition = s.getPosition()
+  s.setPosition(countPosition)
+  # replace the count in the stream
+  s.write(u32ToStr(uint32(count)))
+  s.setPosition(endPosition)
 
-proc binEncodeFloat(f: float): string =
-  result = "\X06" & floatToStr(f)
+proc binEncodeFloat(s: Stream, f: float) =
+  s.write("\X06")
+  s.write(floatToStr(f))
 
-proc binEncodeObj(self: Box): string =
+proc binEncodeObj(s: Stream, self: Box) =
   if self.o == nil:
-    return "\x07"
+    s.write("\x07")
   else:
     error("non-null objects cannot be normalized")
     unreachable
 
-proc binEncodeItem*(self: Box): string =
+proc binEncodeItem(s: Stream, self: Box) =
   case self.kind
-  of MkBool:  return binEncodeBool(unpack[bool](self))
-  of MkInt:   return binEncodeInt(unpack[uint64](self))
-  of MkStr:   return binEncodeStr(unpack[string](self))
-  of MkTable: return binEncodeTable(unpack[ChalkDict](self))
-  of MkSeq:   return binEncodeArr(unpack[seq[Box]](self))
-  of MkFloat: return binEncodeFloat(unpack[float](self))
-  of MkObj:   return binEncodeObj(self)
+  of MkBool:  s.binEncodeBool(unpack[bool](self))
+  of MkInt:   s.binEncodeInt(unpack[uint64](self))
+  of MkStr:   s.binEncodeStr(unpack[string](self))
+  of MkTable: s.binEncodeTable(unpack[ChalkDict](self))
+  of MkSeq:   s.binEncodeArr(unpack[seq[Box]](self))
+  of MkFloat: s.binEncodeFloat(unpack[float](self))
+  of MkObj:   s.binEncodeObj(self)
+
+proc binEncodeItem*(self: Box): string =
+  let s = newStringStream()
+  s.binEncodeItem(self)
+  s.setPosition(0)
+  result = s.readAll()
 
 proc normalizeChalk*(dict: ChalkDict): string =
   # Currently, this is only called for the METADATA_ID field, which only
   # signs things actually being written out.  We skip MAGIC, SIGNATURE
   # and SIGN_PARAMS.
-  let ignoreList = attrGet[seq[string]]("ignore_when_normalizing")
-  result = binEncodeTable(dict, ignoreList)
+  let
+    ignoreList = attrGet[seq[string]]("ignore_when_normalizing")
+    s          = newStringStream()
+  s.binEncodeTable(dict, ignoreList)
+  s.setPosition(0)
+  result = s.readAll()
