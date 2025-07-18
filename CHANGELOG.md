@@ -155,7 +155,12 @@
   It sends the value as reported by the CI/CD system as over time
   new triggers are added which chalk would normalize to therefore
   making normalization not very relevant.
-  ([#540](https://github.com/crashappsec/chalk/pull/540))
+  ([#542](https://github.com/crashappsec/chalk/pull/542))
+- Chalk removes raw secrets as reported by trufflehog and instead:
+  - ensures `Redacted` is always present
+  - adds `RawHash` to allow to distinguish between raw secret values
+
+  ([#543](https://github.com/crashappsec/chalk/pull/543))
 
 ## 0.5.7
 
