@@ -1145,6 +1145,10 @@ export AWS_SESSION_TOKEN={AWS_SESSION_TOKEN}
                     }
                 },
                 "DetectorName": re.compile(r"^AWS"),
+                "Raw": MISSING,
+                "RawV2": MISSING,
+                "RawHash": re.compile(r"[0-9a-f]{64}"),
+                "Redacted": re.compile(r".+"),
             },
         ],
     }
