@@ -191,8 +191,11 @@ proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
   let
     inMicroSec    = int(attrGet[Con4mDuration]("exec.heartbeat_rate"))
     sleepInterval = int(inMicroSec / 1000)
+    limit         = int(attrGet[Con4mSize]("exec.heartbeat_rlimit"))
 
   setCommandName("heartbeat")
+  clearReportingState()
+  setRlimit(limit)
 
   while true:
     sleep(sleepInterval)

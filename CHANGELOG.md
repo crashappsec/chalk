@@ -128,6 +128,9 @@
 - Adds `zip.inject_binary` config and `--inject-binary-into-zip` CLI flag to
   the `chalk insert` command as part of chalk's AWS Lambda support
   ([#498](https://github.com/crashappsec/chalk/pull/498))
+- Chalk can set rlimit for heartbeats process.
+  By default no limit is set.
+  ([#544](https://github.com/crashappsec/chalk/pull/544))
 
 ### Fixes
 
