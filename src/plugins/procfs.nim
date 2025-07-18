@@ -13,7 +13,7 @@
 
 {. hint[XDeclaredButNotUsed]: off.}
 
-when hostOs != "linux":
+when hostOS != "linux":
   {.warning[UnusedImport]: off.}
 
 import std/[
@@ -187,7 +187,7 @@ proc getPidExe(pid: string): string =
 proc clockConvert(input: string): string =
   # For this one, if anything in /proc changes, the parsing
   # throws an exception we'll catch and report on.
-  return $(float(parseBiggestUint(input)) / clockSpeed)
+  return $(float(parseBiggestUInt(input)) / clockSpeed)
 
 proc getPidStatInfo(pid: string, res: var ProcDict) =
   let contents = tryToLoadFile("/proc/" & pid & "/stat")
@@ -342,7 +342,7 @@ proc getIPv4Interfaces(): ProcTable =
     let (name, stats) = line.strip().splitBy(":")
     if stats == "":
       continue
-    let parts = stats.strip().splitWhiteSpace()
+    let parts = stats.strip().splitWhitespace()
     # should be:
     # recv: [bytes, packets, errors, drops, fifo, frame, compressed, multicast]
     # transmit: [bytes, packets, errors, drops, fifo, colls, carrier, compressed]
@@ -712,7 +712,7 @@ proc procfsGetRunTimeArtifactInfo(self: Plugin, obj: ChalkObj, ins: bool):
 
 
 proc loadProcFs*() =
-  when hostOs == "linux":
+  when hostOS == "linux":
     newPlugin("procfs",
               clearCallback  = PluginClearCb(clearCallback),
               rtHostCallback = RunTimeHostCb(procfsGetRunTimeHostInfo),

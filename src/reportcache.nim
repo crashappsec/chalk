@@ -263,7 +263,7 @@ proc handleCacheFlushing(topic, msg: string): bool =
 
     # Once we're here, the current sink has data to try to flush, so
     # we follow the above plan.
-    let tmpTopicObj = register_topic("$tmp$" & topic & "$" & subscriber.name)
+    let tmpTopicObj = registerTopic("$tmp$" & topic & "$" & subscriber.name)
     subscribe(tmpTopicObj, subscriber)
     unsubs.add((topic, subscriber))
 

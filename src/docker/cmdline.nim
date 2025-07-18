@@ -207,7 +207,7 @@ proc initDockerInvocation*(originalArgs: seq[string]): DockerInvocation =
   ## flags and remaining arguments.
 
   try:
-    con4mRuntime.addStartGetopts("docker.getopts", args = originalArgs).run()
+    con4mRuntime.addStartGetOpts("docker.getopts", args = originalArgs).run()
   except:
     discard
 

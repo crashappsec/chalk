@@ -48,7 +48,7 @@ var transformers  = TransformTableRef()
 
 proc getKeyspecTable(state:          ConfigState,
                      filterValueStr: string,
-                     fieldsToUse:    openarray[string]): Rope =
+                     fieldsToUse:    openArray[string]): Rope =
 
   const headingsToUse = ["Key", "Collection Type", "Value Type", "Description"]
 
@@ -373,7 +373,7 @@ proc getTemplateHelp(state: ConfigState, args: seq[string]): Rope =
     result += state.getMarkTemplateDocs()
 
     if len(args) == 0:
-      result += callout("""To see details on a template's contents,
+      result += callOut("""To see details on a template's contents,
 do `chalk help template [name]`
 or `chalk help template all` to see all templates.
 
@@ -457,10 +457,10 @@ proc getOutputHelp(state: ConfigState): Rope =
 
 proc hasHelpFlag(args: seq[string]): bool =
   for item in args:
-    if not item.startswith("-"):
+    if not item.startsWith("-"):
       continue
     var s = item[1 .. ^1]
-    while s.startswith("-"):
+    while s.startsWith("-"):
       s = s[1 .. ^1]
 
     if s in ["help", "h"]:
@@ -474,7 +474,7 @@ proc makeColorTable(): Rope =
   styleMap["tr"] = newStyle(bgColor = "default")
   var cells: seq[seq[Rope]]
 
-  for color, v in colorTable:
+  for color, v in nimutils.colorTable:
     let cell = center(td(atom(color)).bgColor(color).tpad(1).bpad(1))
     if v < 0x400000:
       cell.setClass("light")

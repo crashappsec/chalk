@@ -72,7 +72,7 @@ proc getBuildXVersion*(): Version =
     let version = runDockerGetEverything(@["buildx", "version"])
     if version.exitCode == 0:
       try:
-        buildXVersion = getVersionFromLine(version.stdOut)
+        buildXVersion = getVersionFromLine(version.stdout)
         trace("docker: buildx version: " & $(buildXVersion))
       except:
         dumpExOnDebug()
@@ -87,7 +87,7 @@ proc getDockerClientVersion*(): Version =
     let version = runDockerGetEverything(@["--version"])
     if version.exitCode == 0:
       try:
-        dockerClientVersion = getVersionFromLine(version.stdOut)
+        dockerClientVersion = getVersionFromLine(version.stdout)
         trace("docker: client version: " & $(dockerClientVersion))
       except:
         dumpExOnDebug()
@@ -99,7 +99,7 @@ proc getDockerServerVersion*(): Version =
     if version.exitCode == 0:
       try:
         dockerServerVersion = getVersionFromLineWhich(
-          version.stdOut.splitLines(),
+          version.stdout.splitLines(),
           isAfterLineStartingWith = "Server:",
           contains                = "Version:",
         )
@@ -116,9 +116,9 @@ proc getDockerInfo*(): string =
   once:
     let output = runDockerGetEverything(@["info"])
     if output.exitCode != 0:
-      error("docker: could not get docker info " & output.getStdErr())
+      error("docker: could not get docker info " & output.getStderr())
     else:
-      dockerInfo = output.getStdOut()
+      dockerInfo = output.getStdout()
   return dockerInfo
 
 proc getDockerInfoSubList*(key: string): seq[string] =
@@ -163,7 +163,7 @@ proc readDockerHostFile*(path: string): string =
   if output.exitCode != 0:
     raise newException(ValueError, "could not read " & path)
   trace("docker: read docker host's " & path)
-  return output.stdOut
+  return output.stdout
 
 proc readFirstDockerHostFile*(paths: seq[string]): tuple[path: string, content: string] =
   for path in paths.toHashSet():
@@ -183,7 +183,7 @@ proc getContextName(): string =
       if output.exitCode == 0:
         try:
           let
-            data = output.getStdOut.parseJson()
+            data = output.getStdout.parseJson()
             name = data{"Name"}.getStr()
           if name != "":
             contextName = name
@@ -210,8 +210,8 @@ proc getBuilderInfo*(ctx: DockerInvocation): string =
         args.add(name)
       let output = runDockerGetEverything(args, silent = false)
       if output.exitCode != 0:
-        trace("docker: could not get buildx builder information: " & output.getStdErr())
-      builderInfo = output.getStdOut()
+        trace("docker: could not get buildx builder information: " & output.getStderr())
+      builderInfo = output.getStdout()
   return builderInfo
 
 proc getBuildKitVersion*(ctx: DockerInvocation): Version =
@@ -253,10 +253,10 @@ proc getFrontendVersion*(ctx: DockerInvocation): Option[Version] =
           "-version",
         ])
       if output.exitCode != 0:
-        trace("docker: could not get buildkint frontend versioni " & output.getStdErr())
+        trace("docker: could not get buildkint frontend versioni " & output.getStderr())
         frontendVersion = some(parseVersion("0"))
       else:
-        let version = getVersionFromLine(output.stdOut)
+        let version = getVersionFromLine(output.stdout)
         trace("docker: frontend version: " & $version)
         frontendVersion = some(version)
       return frontendVersion
@@ -339,4 +339,4 @@ proc installBinFmt*() =
       "all",
     ])
     if output.exitCode != 0:
-      raise newException(ValueError, "could not install binfmt " & output.getStdErr())
+      raise newException(ValueError, "could not install binfmt " & output.getStderr())

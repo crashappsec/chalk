@@ -165,7 +165,7 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
           toAdd.add("COPY " & chmodstr & name & " " & newPath)
         elif chmod != "":
           if hasUser:
-            toAdd.add("USER root")
+            toAdd.add("USER 0:0")
           toAdd.add("COPY " & name & " " & newPath)
           toAdd.add("RUN chmod " & chmod & " " & newPath)
           if hasUser:

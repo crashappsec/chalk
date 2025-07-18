@@ -131,6 +131,10 @@ proc certsSearch(self: Plugin,
     mtd            = attrGet[string]("certs.filter_method")
     (_, name, ext) = path.splitFile()
     filename       = name & ext
+    alwaysScan     = attrGet[seq[string]]("certs.always_scan_paths")
+  for i in alwaysScan:
+    if path.toLowerAscii().startsWith(i.toLowerAscii()):
+      return self.certsPathSearch(path)
   if mtd == "blacklist":
     let
       ignoreNames    = attrGet[seq[string]]("certs.ignore_filenames")

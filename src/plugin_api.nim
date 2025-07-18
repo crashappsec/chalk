@@ -27,9 +27,6 @@ import "."/[
 # get called when plugins declare stuff in the config file, so this
 # should all be pre-checked.
 
-proc isSystem*(p: Plugin): bool =
-  return p.name in ["system", "attestation", "metsys"]
-
 proc callGetChalkTimeHostInfo*(plugin: Plugin): ChalkDict =
   if not plugin.enabled:
     return ChalkDict()
@@ -429,8 +426,6 @@ proc defaultCodecWrite*(s:     Plugin,
 
 var codecs: seq[Plugin] = @[]
 
-template isCodec*(plugin: Plugin): bool = attrGet[bool]("plugin." & plugin.name & ".codec")
-
 proc checkPlugin(plugin: Plugin, codec: bool): bool {.inline.} =
   let
     name    = plugin.name
@@ -470,21 +465,24 @@ proc getPluginsByName*(s: seq[string]): seq[Plugin] =
   for i in s:
     result.add(getPluginByName(i))
 
-proc getOptionalPlugins*(c: ChalkObj): seq[string] =
+proc getOptionalPluginNames*(c: ChalkObj): seq[string] =
   ## get all optional plugins
   ## optional plugin is neither a system plugin or the chalk codec plugin
   result = newSeq[string]()
   for p in getAllPlugins():
-    if not p.isSystem() and p != c.myCodec:
+    if not p.isSystem and p != c.myCodec:
       result.add(p.name)
 
-proc disablePluginByName*(s: string) =
-  getPluginByName(s).enabled = false
+proc getOptionalPluginNames*(): seq[string] =
+  result = newSeq[string]()
+  for p in getAllPlugins():
+    if not p.isSystem and not p.isCodec:
+      result.add(p.name)
 
 proc getAllCodecs*(): seq[Plugin] =
   once:
     for item in getAllPlugins():
-      if item.isCodec():
+      if item.isCodec:
         codecs.add(item)
   return codecs
 
@@ -514,6 +512,7 @@ proc newPlugin*(
   rtHostCallback: RunTimeHostCb       = RunTimeHostCb(nil),
   cache:          RootRef             = RootRef(nil),
   resourceTypes:  set[ResourceType]   = defResourceTypes,
+  isSystem:       bool                = false,
 ): Plugin {.discardable, cdecl.} =
   result = Plugin(name:                     name,
                   clearState:               clearCallback,
@@ -523,7 +522,8 @@ proc newPlugin*(
                   getRunTimeHostInfo:       rtHostCallback,
                   internalState:            cache,
                   resourceTypes:            resourceTypes,
-                  enabled:                  true)
+                  enabled:                  true,
+                  isSystem:                 isSystem)
 
   if not result.checkPlugin(codec = false):
     result = Plugin(nil)
@@ -564,7 +564,8 @@ proc newCodec*(
                   nativeObjPlatforms:       nativeObjPlatforms,
                   internalState:            cache,
                   commentStart:             commentStart,
-                  enabled:                  enabled)
+                  enabled:                  enabled,
+                  isCodec:                  true)
 
   if not result.checkPlugin(codec = true):
     result = Plugin(nil)

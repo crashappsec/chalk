@@ -393,7 +393,7 @@ proc handleConfigLoad*(inpath: string): bool =
 
   var path: string
 
-  if inpath.endswith(".c4m"):
+  if inpath.endsWith(".c4m"):
     path = inpath
   else:
     path = inpath & ".c4m"

@@ -8,6 +8,7 @@
 ## The `chalk exec` command.
 
 import std/[
+  options,
   posix,
   sequtils,
 ]
@@ -18,17 +19,30 @@ import ".."/[
   plugin_api,
   reporting,
   run_management,
+  subscan,
   types,
   utils/exec,
   utils/files,
+  utils/sets,
 ]
 
-# this const is not available in nim stdlib hence manual c import
-var TIOCNOTTY {.importc, header: "sys/ioctl.h"}: cuint
-
-when hostOs == "macosx":
+when hostOS == "macosx":
   proc proc_pidpath(pid: Pid, pathbuf: pointer, len: uint32): cint
     {.cdecl, header: "<libproc.h>", importc.}
+
+when hostOS == "linux":
+  import std/inotify
+
+else:
+  type InotifyEvent = object
+    wd*: FileHandle
+    mask*: uint32
+    cookie*: uint32
+    len*: uint32
+    name*: char
+
+  iterator inotify_events(evs: pointer, n: int): ptr InotifyEvent =
+    discard
 
 const
   PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
@@ -53,10 +67,10 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
     chalk:    ChalkObj
     extract:  ChalkDict
 
-  when hostOs == "macosx":
+  when hostOS == "macosx":
     if proc_pidpath(pid, addr n[0], PATH_MAX) > 0:
       exe1path =  $(cast[cstring](addr n[0]))
-  elif hostOs == "linux":
+  elif hostOS == "linux":
       let procPath = "/proc/" & $(pid) & "/exe"
       if readlink(cstring(procPath),
                   cast[cstring](addr n[0]), PATH_MAX) != -1:
@@ -156,6 +170,7 @@ proc getParentExitStatus(trueParentPid: Pid): bool =
   return false
 
 proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
+  clearReportingState()
   initCollection()
   if chalkOpt.isSome():
     let chalk = chalkOpt.get()
@@ -172,26 +187,143 @@ proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
     chalk.collectRunTimeArtifactInfo()
   doReporting()
 
-template doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: untyped) =
+proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
   let
     inMicroSec    = int(attrGet[Con4mDuration]("exec.heartbeat_rate"))
     sleepInterval = int(inMicroSec / 1000)
 
   setCommandName("heartbeat")
-  clearReportingState()
 
   while true:
     sleep(sleepInterval)
-    clearReportingState()
     chalkOpt.doHeartbeatReport()
     if fn(pid):
       break
 
-template doHeartbeatAsChild(chalkOpt: Option[ChalkObj], pid: Pid) =
-  chalkOpt.doHeartbeat(pid, getParentExitStatus)
+type PostExecState = ref object
+  toWatchPaths: seq[string]
+  watcher:      FileHandle
+  watchedDirs:  TableRef[FileHandle, string]
 
-template doHeartbeatAsParent(chalkOpt: Option[ChalkObj], pid: Pid) =
-  chalkOpt.doHeartbeat(pid, getChildExitStatus)
+when hostOS == "linux":
+  proc initPostExecWatch(): Option[PostExecState] =
+    if not attrGet[bool]("exec.postexec.run"):
+      return none(PostExecState)
+
+    let tmp = attrGet[string]("exec.postexec.access_watch.prep_tmp_path")
+    if not fileExists(tmp):
+      return none(PostExecState)
+
+    let
+      toWatchPaths = tryToLoadFile(tmp).splitLines()
+      watcher      = inotify_init1(O_NONBLOCK)
+    var
+      toWatchDirs  = initHashSet[string]()
+      watchedDirs  = newTable[FileHandle, string]()
+
+    if watcher < 0:
+      error("inotify: " & $osLastError())
+      return none(PostExecState)
+
+    # watch dirs where artifacts are contained to:
+    # * reduces inotify FD overhead
+    # * contains name in the watched event struct
+    for c in toWatchPaths:
+      if c == "":
+        continue
+      let (dir, _) = c.splitPath()
+      toWatchDirs.incl(dir)
+
+    for d in toWatchDirs:
+      let wd = inotify_add_watch(watcher, cstring(d), IN_ACCESS)
+      if wd < 0:
+        error("inotify: could not watch " & d)
+        continue
+      trace("inotify: watching " & d)
+      watchedDirs[wd] = d
+
+    return some(PostExecState(
+      toWatchPaths: toWatchPaths,
+      watcher:      watcher,
+      watchedDirs:  watchedDirs,
+    ))
+
+else:
+  proc initPostExecWatch(): Option[PostExecState] =
+    return none(PostExecState)
+
+proc doPostExec(state: Option[PostExecState], detach: bool) =
+  if state.isNone():
+    return
+
+  let pid = fork()
+  if pid == 0:
+    # parent process
+    return
+
+  let ws            = state.get()
+  var accessedPaths = initHashSet[string]()
+
+  clearReportingState()
+  initCollection()
+
+  try:
+    setCommandName("postexec")
+    if detach:
+      detachFromParent()
+
+    let niceValue = attrGet[int]("exec.postexec.nice")
+    trace("postexec: using nice " & $niceValue)
+    discard nice(cint(niceValue))
+
+    let
+      inMicroSec   = int(attrGet[Con4mDuration]("exec.postexec.access_watch.initial_sleep_time"))
+      initialSleep = int(inMicroSec / 1000)
+    trace("postexec: sleeping " & $initialSleep & "ms")
+    sleep(initialSleep)
+
+    var buffer = newSeq[byte](8192)
+    while (
+      let n = read(ws.watcher, buffer[0].addr, 8192)
+      n
+    ) > 0:
+      for e in inotify_events(buffer[0].addr, n):
+        let
+          name = $cast[cstring](addr e[].name)
+          wd   = e[].wd
+        if wd notin ws.watchedDirs:
+          error("postexec: inotify notified for non-watched wd")
+        let
+          dir  = ws.watchedDirs[wd]
+          path = joinPath(dir, name)
+        if path in ws.toWatchPaths:
+          trace("postexec: found accessed artifact " & path)
+          accessedPaths.incl(path)
+        else:
+          trace("postexec: ignoring accessed non-artifact " & path)
+
+  finally:
+    discard close(ws.watcher)
+
+  let codecs = attrGet[seq[string]]("exec.postexec.access_watch.scan_codecs")
+
+  trace("postexec: subscan for chalkmarks in " &
+        $len(accessedPaths) & " accessed artifacts " &
+        "out of known " & $len(ws.toWatchPaths) & " artifacts")
+  withOnlyCodecs(getPluginsByName(codecs)):
+    for chalk in runChalkSubScan(ws.toWatchPaths, "extract").allChalks:
+      chalk.accessed = chalk.fsRef in accessedPaths
+      if chalk.accessed:
+        trace(chalk.fsRef & ": chalkmark accessed")
+      else:
+        trace(chalk.fsRef & ": chalkmark not accessed")
+      # as its a subscan, artifact info is not collected hence needs to be manually triggered
+      chalk.collectRunTimeArtifactInfo()
+      addToAllArtifacts(chalk)
+  trace("postexec: subscan complete")
+
+  withSuspendChalkCollectionFor(getOptionalPluginNames()):
+    doReporting()
 
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):
@@ -249,7 +381,9 @@ proc runCmdExec*(args: seq[string]) =
     if randVal > inRange:
       handleExec(allOpts, argsToPass)
 
-  let pid  = fork()
+  let
+    postExecState = initPostExecWatch()
+    pid           = fork()
 
   if attrGet[bool]("exec.chalk_as_parent"):
     if pid == 0:
@@ -278,8 +412,10 @@ proc runCmdExec*(args: seq[string]) =
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting()
 
+      postExecState.doPostExec(detach = false)
+
       if attrGet[bool]("exec.heartbeat"):
-        chalkOpt.doHeartbeatAsParent(pid)
+        chalkOpt.doHeartbeat(pid, getChildExitStatus)
       else:
         trace("Waiting for spawned process to exit.")
         var stat_loc: cint
@@ -307,16 +443,13 @@ proc runCmdExec*(args: seq[string]) =
       initCollection()
       trace("Host collection finished.")
       let chalkOpt = doExecCollection(allOpts, ppid)
-      discard setpgid(0, 0) # Detach from the process group.
-      if isatty(0) != 0:
-        # if stdin is TTY, detach from it in child process
-        # otherwise child process will receive HUP signal
-        # on exit which is not expected
-        discard ioctl(0, TIOCNOTTY) # Detach TTY for stdin
+      detachFromParent()
       # On some platforms we don't support
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting()
 
+      postExecState.doPostExec(detach = false)
+
       if attrGet[bool]("exec.heartbeat"):
-        chalkOpt.doHeartbeatAsChild(ppid)
+        chalkOpt.doHeartbeat(ppid, getParentExitStatus)

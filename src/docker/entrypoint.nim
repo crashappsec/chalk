@@ -82,6 +82,8 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
   let
     fromArgs                 = attrGet[bool]("exec.command_name_from_args")
     wrapCmd                  = attrGet[bool]("docker.wrap_cmd")
+    prepPostExec             = attrGet[bool]("docker.prep_postexec")
+    runPostExec              = attrGet[bool]("exec.postexec.run")
     (entrypoint, cmd, shell) = entrypoint
 
   if not fromArgs:
@@ -123,7 +125,7 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
   var toAdd: seq[string] = @[]
   let hasUser = user != "" and user != "root" and user != "0"
   if hasUser:
-    toAdd.add("ONBUILD USER root")
+    toAdd.add("ONBUILD USER 0:0")
   toAdd.add("""ONBUILD RUN ["/chalk", "--no-use-embedded-config", "--no-use-external-config", "__", "onbuild"]""")
   if hasUser:
     toAdd.add("ONBUILD USER " & user)
@@ -172,6 +174,14 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
     toAdd.add("ENTRYPOINT " & formatChalkExec())
     toAdd.add("CMD " & $(cmd))
     trace("docker: CMD wrapped with ENTRYPOINT.")
+
+
+  if prepPostExec and runPostExec:
+    if hasUser:
+      toAdd.add("USER 0:0")
+    toAdd.add("""RUN ["/chalk", "--no-use-embedded-config", "--no-use-external-config", "__", "prep_postexec"]""")
+    if hasUser:
+      toAdd.add("USER " & user)
 
   ctx.addedInstructions &= toAdd
   trace("docker: added instructions:\n" & toAdd.join("\n"))

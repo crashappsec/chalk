@@ -94,7 +94,7 @@ proc getAzureMetadata(): ChalkDict =
       trace("Did not get metadata back from Azure endpoint")
       return
     let value = resultOpt.get()
-    if not value.startswith("{"):
+    if not value.startsWith("{"):
       trace("Azure metadata didnt respond with json object. Ignoring it")
       return
     try:
@@ -148,7 +148,7 @@ proc getGcpMetadata(): ChalkDict =
       if projectOpt.isSome():
         try:
           let valueProj = projectOpt.get()
-          if valueProj.startswith("{"):
+          if valueProj.startsWith("{"):
             let jsonProjValue = parseJson(valueProj)
             result.setIfNeeded("_GCP_PROJECT_METADATA", jsonProjValue)
           else:
@@ -164,7 +164,7 @@ proc getGcpMetadata(): ChalkDict =
       trace("Did not get instance metadata back from GCP endpoint")
       return
     let value = resultOpt.get()
-    if not value.startswith("{"):
+    if not value.startsWith("{"):
       trace("GCP metadata didnt respond with json object. Ignoring it")
       return
     try:
@@ -298,7 +298,7 @@ proc jsonKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) 
       let value = resultOpt.get()
       # imdsv2 does not respond with application/json content-type
       # header and so we check first char before attempting json parse
-      if not value.startswith("{"):
+      if not value.startsWith("{"):
         trace("IMDSv2 didnt respond with json object. Ignoring it. URL: " & url)
       else:
         try:
@@ -324,7 +324,7 @@ proc extractJsonKey(chalkDict: ChalkDict, token: string, keyname: string,
       let value = resultOpt.get()
       # imdsv2 does not respond with application/json content-type
       # header and so we check first char before attempting json parse
-      if not value.startswith("{"):
+      if not value.startsWith("{"):
         trace("Provider Didn't respond with json object. Ignoring it. URL: " & url)
       else:
         chalkDict.trySetIfNeeded(keyname):

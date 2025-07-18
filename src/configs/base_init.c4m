@@ -12,6 +12,9 @@ func get_args(key) { return command_argv(); }
 
 exec {
   search_path: array_add(split(env("PATH"), ":"), ["."])
+  postexec {
+    access_watch {}
+  }
 }
 
 # TODO Remove all sections below

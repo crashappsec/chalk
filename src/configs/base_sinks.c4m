@@ -125,15 +125,16 @@ thwart TLS protection of the connection.
 }
 
 sink post {
-  ~uri:              true
-  ~headers:          false
-  ~content_type:     false
-  ~disallow_http:    false
-  ~timeout:          false
-  ~pinned_cert_file: false
-  ~on_write_msg:     false
-  ~auth:             false
-  shortdoc:          "HTTP/HTTPS POST"
+  ~uri:                  true
+  ~headers:              false
+  ~content_type:         false
+  ~disallow_http:        false
+  ~timeout:              false
+  ~pinned_cert_file:     false
+  ~prefer_bundled_certs: false
+  ~on_write_msg:         false
+  ~auth:                 false
+  shortdoc:              "HTTP/HTTPS POST"
   doc:       """
 
 | Parameter | Required | Description |
@@ -144,6 +145,7 @@ sink post {
 | `disallow_http` | false | Do not allow HTTP connections, only HTTPS |
 | `timeout` | false | Connection timeout in ms |
 | `pinned_cert_file` | false | TLS certificate file |
+| `prefer_bundled_certs` | false | Whether to prefer chalk bundled root CA certs |
 | `auth` | false | Auth configuration for the API |
 
 The post will always be a single JSON object, and the default
@@ -187,16 +189,17 @@ sink_config my_https_config {
 }
 
 sink presign {
-  ~uri:              true
-  ~headers:          false
-  ~content_type:     false
-  ~disallow_http:    false
-  ~timeout:          false
-  ~pinned_cert_file: false
-  ~on_write_msg:     false
-  ~auth:             false
-  shortdoc:          "HTTP/HTTPS Presign PUT"
-  doc:               """
+  ~uri:                  true
+  ~headers:              false
+  ~content_type:         false
+  ~disallow_http:        false
+  ~timeout:              false
+  ~pinned_cert_file:     false
+  ~prefer_bundled_certs: false
+  ~on_write_msg:         false
+  ~auth:                 false
+  shortdoc:              "HTTP/HTTPS Presign PUT"
+  doc:                   """
 Sink which allows to upload reports to pre-signed URL.
 
 All parameters are identical as `post` sink.
