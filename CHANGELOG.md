@@ -157,7 +157,6 @@
   making normalization not very relevant.
   ([#542](https://github.com/crashappsec/chalk/pull/542))
 - Chalk removes raw secrets as reported by trufflehog and instead:
-
   - ensures `Redacted` is always present
   - adds `RawHash` to allow to distinguish between raw secret values
 
