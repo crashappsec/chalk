@@ -40,7 +40,7 @@ proc setlocale(category: cint, locale: cstring): cstring {. importc, cdecl,
                                 nodecl, header: "<locale.h>", discardable .}
 
 proc restoreTerminal() {.noconv.} =
-  tcSetAttr(cint(1), TcsaConst.TCSAFLUSH, savedTermState)
+  tcsetattr(cint(1), TcsaConst.TCSAFLUSH, savedTermState)
 
 proc regularTerminationSignal(signal: cint) {.noconv.} =
   let pid = getpid()
@@ -54,7 +54,7 @@ proc regularTerminationSignal(signal: cint) {.noconv.} =
     echo("pid: " & $(pid) & " - Aborting due to signal: " &
          sigNameMap[signal]  & "(" & $(signal) & ")")
     dumpExOnDebug()
-  var sigset:  SigSet
+  var sigset:  Sigset
 
   discard sigemptyset(sigset)
 
@@ -69,11 +69,11 @@ proc regularTerminationSignal(signal: cint) {.noconv.} =
 
 proc setupTerminal*() =
   setlocale(LC_ALL, cstring(""))
-  tcGetAttr(cint(1), savedTermState)
+  tcgetattr(cint(1), savedTermState)
   addExitProc(restoreTerminal)
 
 proc setupSignalHandlers*() =
-  var handler: SigAction
+  var handler: Sigaction
 
   handler.sa_handler = regularTerminationSignal
   handler.sa_flags   = 0

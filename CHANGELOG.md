@@ -80,20 +80,44 @@
   Certificate behavior can be customized via `certs` configuration block
   which includes following configs:
 
-  - certs.filter_method
-  - certs.scan_no_extension
-  - certs.scan_extensions
-  - certs.ignore_filenames
-  - certs.ignore_prefixes
-  - certs.ignore_extensions
+  - `certs.filter_method`
+  - `certs.always_scan_paths`
+  - `certs.scan_no_extension`
+  - `certs.scan_extensions`
+  - `certs.ignore_filenames`
+  - `certs.ignore_prefixes`
+  - `certs.ignore_extensions`
 
   ([#515](https://github.com/crashappsec/chalk/pull/515),
   [#521](https://github.com/crashappsec/chalk/pull/521),
   [#522](https://github.com/crashappsec/chalk/pull/522),
   [#524](https://github.com/crashappsec/chalk/pull/524),
   [#526](https://github.com/crashappsec/chalk/pull/526),
-  [#532](https://github.com/crashappsec/chalk/pull/532))
+  [#532](https://github.com/crashappsec/chalk/pull/532),
+  [#539](https://github.com/crashappsec/chalk/pull/539))
 
+- Asynchronous metadata collection after `chalk exec` with
+  new `postexec` report.
+  Currently it:
+
+  - watches when known artifacts are accessed by chalk exec
+    (by default watches for cert usage)
+
+  This added these configurations:
+
+  - `docker.prep_postexec`
+  - `exec.postexec.run`
+  - `exec.postexec.nice`
+  - `exec.postexec.access_watch.prep_tmp_path`
+  - `exec.postexec.access_watch.initial_sleep_time`
+  - `exec.postexec.access_watch.scan_codecs`
+  - `exec.postexec.access_watch.scan_paths`
+
+  ([#539](https://github.com/crashappsec/chalk/pull/539))
+
+- `_OP_ARTIFACT_ACCESSED` key which indicates whether the artifact
+  was accessed during chalk operation.
+  ([#539](https://github.com/crashappsec/chalk/pull/539))
 - `_OP_ARTIFACT_PATH_WITHIN_VCTL` key which indicates path of the file
   in the git repo.
   ([#515](https://github.com/crashappsec/chalk/pull/515))
@@ -129,6 +153,9 @@
   throw global exception which prevented all other keys from being collected
   including required keys like `_ACTION_ID`.
   ([#536](https://github.com/crashappsec/chalk/pull/536))
+- Not all containers have `root` user. When needing to switch to `root`
+  in wrapped `Dockerfile` now using `USER 0:0` which should exist at all times.
+  ([#539](https://github.com/crashappsec/chalk/pull/539))
 
 ## 0.5.7
 

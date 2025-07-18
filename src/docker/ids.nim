@@ -132,7 +132,7 @@ proc parseDockerPlatform*(platform: string): DockerPlatform =
       )
     else:
       return DockerPlatform(
-        os:           hostOs,
+        os:           hostOS,
         architecture: parts[0],
       )
   of 2:

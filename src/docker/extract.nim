@@ -54,13 +54,13 @@ proc extractContainerMark(containerId: string): string =
   )
   if cpCmd.exitCode != 0:
     trace("docker: " & containerId & ": could not cp /chalk.json from " &
-          containerId & ": " & cpCmd.stdErr)
-    if "No such container" in cpCmd.stdErr:
+          containerId & ": " & cpCmd.stderr)
+    if "No such container" in cpCmd.stderr:
       raise newException(
         ValueError,
         containerId & ": container shut down before mark extraction",
       )
-    elif "Could not find the file" in cpCmd.stdErr:
+    elif "Could not find the file" in cpCmd.stderr:
       raise newException(
         ValueError,
         containerId & ": container is unmarked.",
@@ -68,7 +68,7 @@ proc extractContainerMark(containerId: string): string =
     else:
       raise newException(
         ValueError,
-        containerId & ": container mark not retrieved: " & cpCmd.stdErr,
+        containerId & ": container mark not retrieved: " & cpCmd.stderr,
       )
   result = tryToLoadFile(markTmp)
   if result == "":
@@ -99,10 +99,10 @@ proc extractImageMark(self: ChalkObj): string =
         self.imageId],
       silent = false,
     )
-    containerId = createCmd.stdOut.strip()
+    containerId = createCmd.stdout.strip()
   if createCmd.exitCode != 0:
     trace("docker: " & self.imageId & ": could not create container to extract /chalk.json: " &
-          createCmd.stdErr)
+          createCmd.stderr)
     raise newException(
       ValueError,
       self.imageId & ": error extracting chalkmark"
@@ -176,7 +176,7 @@ proc extractMarkFromSigStoreCosign(self: ChalkObj): string =
       res    = allOut.getStdout()
       code   = allOut.getExit()
     if code != 0:
-      err = allOut.getStdErr().splitLines()[0]
+      err = allOut.getStderr().splitLines()[0]
       continue
     let json = parseJson(res)
     return self.extractMarkFromInToto(json)

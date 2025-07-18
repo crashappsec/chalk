@@ -37,7 +37,7 @@ proc extractShebangLanguage(stream: FileStream, path: string): string =
       return pathParts.tail
 
     for item in args[1 .. ^1]:
-      if item == "" or item.startswith("-"):
+      if item == "" or item.startsWith("-"):
         continue
 
       let

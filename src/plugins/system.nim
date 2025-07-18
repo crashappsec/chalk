@@ -159,6 +159,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
   if obj.fsRef != "":
     result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
   result.setIfNeeded("_OP_ARTIFACT_ENV_VAR_NAME", obj.envVarName)
+  result.setIfNeeded("_OP_ARTIFACT_ACCESSED", obj.accessed)
 
   let
     tmpl       = getReportTemplate()
@@ -166,6 +167,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
     artKeys    = obj.collectedData.filterByTemplate(tmpl)
     reportKeys = toSeq(hostKeys.keys()) & toSeq(artKeys.keys())
   result.setIfNeeded("_OP_ARTIFACT_REPORT_KEYS", reportKeys)
+
 
 var
   envdict          = Con4mDict[string, string]()
@@ -222,7 +224,7 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   result.setIfNeeded("_OP_EXE_NAME",          getMyAppPath().splitPath().tail)
   result.setIfNeeded("_OP_EXE_PATH",          getAppDir())
   result.setIfNeeded("_OP_ARGV",              @[getMyAppPath()] & commandLineParams())
-  result.setIfNeeded("_OP_HOSTNAME",          getHostName())
+  result.setIfNeeded("_OP_HOSTNAME",          getHostname())
   result.setIfNeeded("_OP_UNMARKED_COUNT",    len(getUnmarked()))
   result.setIfNeeded("_TIMESTAMP",            startTime.toUnixInMs())
   result.setIfNeeded("_DATE",                 startTime.forReport().format(timesDateFormat))
@@ -322,13 +324,16 @@ proc loadSystem*() =
             ctHostCallback = ChalkTimeHostCb(sysGetChalkTimeHostInfo),
             ctArtCallback  = ChalkTimeArtifactCb(sysGetChalkTimeArtifactInfo),
             rtArtCallback  = RunTimeArtifactCb(sysGetRunTimeArtifactInfo),
-            rtHostCallback = RunTimeHostCb(sysGetRunTimeHostInfo))
+            rtHostCallback = RunTimeHostCb(sysGetRunTimeHostInfo),
+            isSystem       = true)
 
   newPlugin("attestation",
             resourceTypes  = allResourceTypes,
             ctArtCallback  = ChalkTimeArtifactCb(attestationGetChalkTimeArtifactInfo),
-            rtArtCallback  = RunTimeArtifactCb(attestationGetRunTimeArtifactInfo))
+            rtArtCallback  = RunTimeArtifactCb(attestationGetRunTimeArtifactInfo),
+            isSystem       = true)
 
   newPlugin("metsys",
             resourceTypes  = allResourceTypes,
-            rtHostCallback = RunTimeHostCb(metsysGetRunTimeHostInfo))
+            rtHostCallback = RunTimeHostCb(metsysGetRunTimeHostInfo),
+            isSystem       = true)

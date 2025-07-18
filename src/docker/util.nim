@@ -51,7 +51,7 @@ type SkipLabel = object of CatchableError
 proc formatLabelValue(v: string): string =
   if unicode.strip(v).len() == 0:
     raise newException(SkipLabel, "empty label")
-  if v.startswith('"') and v[^1] == '"':
+  if v.startsWith('"') and v[^1] == '"':
     if len(v) > 1:
       return v
     else:

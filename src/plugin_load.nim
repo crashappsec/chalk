@@ -11,7 +11,7 @@
 
 import std/macros
 
-macro loadPlugins(list: static[openarray[string]]): untyped =
+macro loadPlugins(list: static[openArray[string]]): untyped =
   var
     imports = newNimNode(nnkStmtList)
     loads   = newNimNode(nnkStmtList)

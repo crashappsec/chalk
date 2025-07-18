@@ -50,7 +50,7 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
   if not attrGet[bool](section & ".system"):
     return true
 
-  if plugin.isSystem():
+  if plugin.isSystem:
     return true
 
   case plugin.name
@@ -92,7 +92,7 @@ proc collectChalkTimeHostInfo*() =
           continue
         if k notin hostInfo or
             k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
-            plugin.isSystem():
+            plugin.isSystem:
           hostInfo[k] = v
     except:
       error("When collecting chalk-time host info, plugin implementation " &
@@ -143,7 +143,7 @@ proc initCollection*(collectHost = true) =
 
 proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
   artifact.withErrorContext():
-    trace("Collecting run time artifact info" & artifact.name & " (" & artifact.myCodec.name & ")")
+    trace("Collecting run time artifact info " & artifact.name & " (" & artifact.myCodec.name & ")")
     for plugin in getAllPlugins():
       let
         data       = artifact.collectedData
@@ -161,7 +161,7 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
           if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".post_chalk_keys")): continue
           if k notin artifact.collectedData or
               k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
-              plugin.isSystem():
+              plugin.isSystem:
             artifact.collectedData[k] = v
         trace(plugin.name & ": Plugin called.")
       except:
@@ -200,7 +200,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
         continue
 
       let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")
-      if not plugin.hasSubscribedKey(subscribed, data) and not plugin.isSystem():
+      if not plugin.hasSubscribedKey(subscribed, data) and not plugin.isSystem:
         trace(plugin.name & ": Skipping plugin; its metadata wouldn't be used.")
         continue
 
@@ -220,7 +220,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
             continue
           if k notin obj.collectedData or
               k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
-              plugin.isSystem() or
+              plugin.isSystem or
               override:
             obj.collectedData[k] = v
         trace(plugin.name & ": Plugin called.")
@@ -249,7 +249,7 @@ proc collectRunTimeHostInfo*() =
         if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".post_run_keys")): continue
         if k notin hostInfo or
             k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
-            plugin.isSystem():
+            plugin.isSystem:
           hostInfo[k] = v
     except:
       error("When collecting run-time host info, plugin implementation " &

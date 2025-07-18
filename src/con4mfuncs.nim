@@ -212,7 +212,7 @@ proc copyReportTemplateKeys(args: seq[Box], c = ConfigState(nil)): Option[Box] =
 
 let chalkCon4mBuiltins* = [
     ("version() -> string",
-     BuiltinFn(getExeVersion),
+     BuiltInFn(getExeVersion),
      "The current version of the chalk program.",
      @["chalk"]
     ),

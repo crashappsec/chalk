@@ -376,7 +376,7 @@ proc findPackedGitObject(vcsDir, refId: string): string =
       startOffset = nameTable   + (skipCount        * nameLen)
       lastOffset  = startOffset + ((candidates - 1) * nameLen)
     var found     = uint64(0)
-    for offset in countUp(startOffset, lastOffset, nameLen):
+    for offset in countup(startOffset, lastOffset, nameLen):
       let currentNameBytes = data[offset ..< offset + nameLen]
       if currentNameBytes == nameBytes:
         found = offset
@@ -627,7 +627,7 @@ proc refetchTags(info: RepoInfo) =
   trace("git " & args.join(" "))
   let output = runCmdGetEverything(getGitExeLocation(), args)
   if output.getExit() != 0:
-    trace("git: could not fetch latest tag from origin: " & output.getStdErr())
+    trace("git: could not fetch latest tag from origin: " & output.getStderr())
     return
   let oldLatestTag = info.latestTag
   info.loadTags()
@@ -775,9 +775,9 @@ proc findMissingFiles(info: RepoInfo): seq[string] =
       args   = @["ls-files"]
       output = runCmdGetEverything(exe, args)
     if output.exitCode != 0:
-      trace("ingoring git " & args.join(" ") & ": " & output.stdErr)
+      trace("ingoring git " & args.join(" ") & ": " & output.stderr)
       return
-    for f in output.stdOut.strip().splitLines():
+    for f in output.stdout.strip().splitLines():
       if not fileExists(root.joinPath(f)):
         result.add(f)
 

@@ -55,7 +55,7 @@ proc fetchSshKnownHost(remote: string): string =
   trace("Running " & sshKeyscanExeLocation & " " & args.join(" "))
   let fetched  = runCmdGetEverything(sshKeyscanExeLocation, args)
   if fetched.exitCode != 0:
-    return fetched.stdOut
+    return fetched.stdout
   return ""
 
 proc createTempKnownHosts(data: string): string =
@@ -165,7 +165,7 @@ proc run(git:    DockerGitContext,
       result = runCmdGetEverything(getGitExeLocation(), allArgs.raw())
   if strict and result.exitCode != 0:
     error("Failed to run git " & allArgs.redacted().join(" "))
-    error(strip(result.stdOut & result.stdErr))
+    error(strip(result.stdout & result.stderr))
     raise newException(ValueError, "Git failed")
 
 template parseNameFrom(line: string): string =
@@ -241,7 +241,7 @@ proc getRemoteHead(git: DockerGitContext, head: string): GitHead =
   # Same applies to branches as multiple branches can have the same head.
   let
     output = git.run(@["ls-remote", "--symref", git.remoteUrl], dir = false)
-    lines  = output.stdOut.splitLines()
+    lines  = output.stdout.splitLines()
   var head = head
   new result
 
@@ -349,7 +349,7 @@ proc show*(git: DockerGitContext, path: string): string =
     fullPath = joinPath(root, git.subdir, path).resolvePath()
     relPath  = fullPath.relativePath(root)
     refSpec  = git.head.gitRef & ":" & relPath
-  return git.run(@["show", refSpec]).stdOut
+  return git.run(@["show", refSpec]).stdout
 
 proc gitContext*(context: string,
                  authTokenSecret: DockerSecret,

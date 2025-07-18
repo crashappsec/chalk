@@ -124,7 +124,7 @@ proc setupManagedTemp*() =
   let customTmpDirOpt = attrGetOpt[string]("default_tmp_dir")
 
   if customTmpDirOpt.isSome() and not existsEnv("TMPDIR"):
-    putenv("TMPDIR", customTmpDirOpt.get())
+    putEnv("TMPDIR", customTmpDirOpt.get())
 
   # temp folder needs to exist in order to successfully create
   # tmp files otherwise nim's createTempFile throws segfault

@@ -84,6 +84,7 @@ type
                                              ## something else, use the cache field
                                              ## below, instead.
     fsRef*:                 string           ## Reference for this artifact on a fs
+    accessed*:              bool             ## Whether artifact was accessed during chalk operation (used only in exec)
     envVarName*:            string           ## env var name from where artifact is found
     platform*:              DockerPlatform   ## platform
     baseChalk*:             ChalkObj
@@ -113,6 +114,8 @@ type
   Plugin* = ref object
     name*:                     string
     enabled*:                  bool
+    isSystem*:                 bool
+    isCodec*:                  bool
     clearState*:               PluginClearCb
     getChalkTimeHostInfo*:     ChalkTimeHostCb
     getChalkTimeArtifactInfo*: ChalkTimeArtifactCb
@@ -510,9 +513,9 @@ const
   defaultConfig*      = staticRead(defCfgFname)
   attestConfig*       = staticRead(attestConfName)
   coConfig*           = staticRead(coConfName)
-  commitID*           = staticexec("git log -n1 --pretty=format:%H")
-  archStr*            = staticexec("uname -m")
-  osStr*              = staticexec("uname -o")
+  commitID*           = staticExec("git log -n1 --pretty=format:%H")
+  archStr*            = staticExec("uname -m")
+  osStr*              = staticExec("uname -o")
   stdinIndicator*     = ":stdin:"
   # various time formats
   timesDateFormat*    = "yyyy-MM-dd"
