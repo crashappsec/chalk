@@ -48,13 +48,7 @@ proc codeBuildGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
 
   if CODEBUILD_WEBHOOK_TRIGGER != "":
     let event = CODEBUILD_WEBHOOK_TRIGGER.split("/")[0]
-    case event
-    of "tag":
-      result.setIfNeeded("BUILD_TRIGGER", "tag")
-    of "branch", "pr":
-      result.setIfNeeded("BUILD_TRIGGER", "push")
-    else:
-      result.setIfNeeded("BUILD_TRIGGER", "other: " & event)
+    result.setIfNeeded("BUILD_TRIGGER", event)
 
   if CODEBUILD_INITIATOR != "":
     result.setIfNeeded("BUILD_CONTACT", @[CODEBUILD_INITIATOR])
