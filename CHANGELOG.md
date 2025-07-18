@@ -6,7 +6,6 @@
 
 - Symlink behavior can now be different between chalking/non-chalking
   operations. As such:
-
   - renamed `symlink_behavior` -> `symlink_behavior_chalking` config
   - renamed `--symlink-behavior` -> `--chalk-symlink-behavior` CLI flags
   - added `symlink_behavior_non_chalking` config
@@ -22,7 +21,6 @@
 
 - X509 Certificate codec which can parse PEM/DER files and report
   metadata keys about the certificate:
-
   - `_X509_VERSION`
   - `_X509_SUBJECT`
   - `_X509_SUBJECT_SHORT`
@@ -79,7 +77,6 @@
 
   Certificate behavior can be customized via `certs` configuration block
   which includes following configs:
-
   - `certs.filter_method`
   - `certs.always_scan_paths`
   - `certs.scan_no_extension`
@@ -99,12 +96,10 @@
 - Asynchronous metadata collection after `chalk exec` with
   new `postexec` report.
   Currently it:
-
   - watches when known artifacts are accessed by chalk exec
     (by default watches for cert usage)
 
   This added these configurations:
-
   - `docker.prep_postexec`
   - `exec.postexec.run`
   - `exec.postexec.nice`
@@ -156,6 +151,11 @@
 - Not all containers have `root` user. When needing to switch to `root`
   in wrapped `Dockerfile` now using `USER 0:0` which should exist at all times.
   ([#539](https://github.com/crashappsec/chalk/pull/539))
+- Chalk does not attempt to normalize `BUILD_TRIGGER` CI/CD metadata key.
+  It sends the value as reported by the CI/CD system as over time
+  new triggers are added which chalk would normalize to therefore
+  making normalization not very relevant.
+  ([#540](https://github.com/crashappsec/chalk/pull/540))
 
 ## 0.5.7
 
@@ -316,7 +316,6 @@
   ([#471](https://github.com/crashappsec/chalk/pull/471))
 - Requests to AWS API were incorrectly signed due to additional headers
   being included in AWS sigv4. This impacted:
-
   - uploading reports to s3 sink
   - lambda plugin as it could not get caller identity
 
@@ -346,7 +345,6 @@
 - Changes to docker image related fields.
 
   Removed keys:
-
   - `_IMAGE_DIGEST` - there are cases when the image digest is mutated.
     For example `docker pull && docker push` drops all
     manifest annotations resulting in a change to the digest.
@@ -357,7 +355,6 @@
     `_REPO_LIST_DIGESTS` key provides a list of all digests per repository.
 
   Changed keys:
-
   - `_REPO_DIGESTS` previously (and incorrectly) would return the first registry
     and the image digest. This key now provides a list of image digests by
     registry and image name.
@@ -407,7 +404,6 @@
     ```
 
   - `DOCKER_BASE_IMAGES` - sub-keys:
-
     - `name` renamed to `uri`; contains the full repository uri (tag and digest)
     - new `registry` key; the normalized registry uri (domain and optional port)
     - new `name` key; the normalized repo name within the registry
@@ -443,7 +439,6 @@
     been renamed to `uri` and adds the `registry` and `name` keys.
 
   New keys:
-
   - `_REPO_LIST_DIGESTS` - similar to `_REPO_DIGESTS` but enumerates any known
     list digests. Example:
 
@@ -506,7 +501,6 @@
   ```
 
   This also affects all host-level keys in addition to chalk-level keys:
-
   - `DATE_AUTHORED`
   - `DATE_COMMITTED`
   - `DATE_TAGGED`
@@ -577,14 +571,12 @@
   ([#449](https://github.com/crashappsec/chalk/pull/449))
 
 - Docker annotations new keys:
-
   - `DOCKER_ANNOTATIONS` - all `--annotation`s using in `docker build`
   - `_IMAGE_ANNOTATIONS` - found annotations for an image in registry
 
   ([#452](https://github.com/crashappsec/chalk/pull/452))
 
 - Docker base image keys:
-
   - `_OP_ARTIFACT_CONTEXT` - what is the context of the artifact.
     For `docker build` its either `build` or `base`.
   - `DOCKER_BASE_IMAGE_REGISTRY` - just registry of the base image
@@ -640,7 +632,6 @@
 - Changes in embed attestation provider configuration.
   Removed `attestation_key_embed.location` configuration.
   It is replaced with these configurations:
-
   - `attestation_key_embed.filename`
   - `attestation_key_embed.save_path`
   - `attestation_key_embed.get_paths`
@@ -705,7 +696,6 @@
 - `FAILED_KEYS` and `_OP_FAILED_KEYS` - metadata keys
   which chalk could not collect metadata for.
   Each key contains:
-
   - `code` - short identifiable code of a known error
   - `message` - exact encountered error/exception message
   - `description` - human-readable description of the error
@@ -782,7 +772,6 @@
 ### Fixes
 
 - Fixing `ENTRYPOINT` wrapping for empty-like definitions:
-
   - `ENTRYPOINT`
   - `ENTRYPOINT []`
   - `ENTRYPOINT [""]`
@@ -824,7 +813,6 @@
   repository origin and commit id.
   ([#380](https://github.com/crashappsec/chalk/pull/380))
 - New chalk keys:
-
   - `DOCKER_TARGET` - name of the target being built in `Dockerfile`
   - `DOCKER_BASE_IMAGES` - breakdown of all base images across
     all sections of `Dockerfile`
@@ -841,7 +829,6 @@
 
 - A chalk report would previously omit the `_OP_CLOUD_PROVIDER`
   and `_OP_CLOUD_PROVIDER_SERVICE_TYPE` keys when:
-
   - No other instance metadata key (e.g. `_GCP_INSTANCE_METADATA`
     or `_OP_CLOUD_PROVIDER_IP`) was subscribed.
   - The instance metadata service couldn't be reached, or
@@ -986,7 +973,6 @@
 ### New Features
 
 - New chalk keys:
-
   - New key holding GCP project metadata: `_GCP_PROJECT_METADATA`
     ([#311](https://github.com/crashappsec/chalk/pull/31))
 
@@ -1009,10 +995,8 @@
 ### New Features
 
 - New chalk keys:
-
   - Keys to identify the origin repository, using
     an identifier provided by the CI/CD system:
-
     - `BUILD_ORIGIN_ID`
     - `BUILD_ORIGIN_KEY`
     - `BUILD_ORIGIN_OWNER_ID`
@@ -1027,7 +1011,6 @@
 ### Breaking Changes
 
 - Removed chalk keys:
-
   - `_IMAGE_VIRTUAL_SIZE` - deprecated by docker
   - `_IMAGE_LAST_TAG_TIME` - scoped to local daemon and is
     not shared with buildx. Many images report as
@@ -1049,7 +1032,6 @@
   [#286](https://github.com/crashappsec/chalk/pull/286))
 
 - Changed chalk keys:
-
   - `DOCKER_CHALK_ADDED_TO_DOCKERFILE` - is now a list
     vs a single string
   - `_IMAGE_STOP_SIGNAL` - is now a string vs an int.
@@ -1059,7 +1041,6 @@
   ([#282](https://github.com/crashappsec/chalk/pull/282))
 
 - Removed configurations:
-
   - `extract.search_base_layers_for_marks` - chalk mark
     is not guaranteed to be top layer in all cases.
     For example it is not top layer without buildx.
@@ -1112,7 +1093,6 @@
   `--provenance=true` and `--sbom=true`.
   ([#282](https://github.com/crashappsec/chalk/pull/282))
 - New Chalk keys:
-
   - `_IMAGE_COMPRESSED_SIZE` - compressed docker image size
     when collecting image metadata directly from the registry
   - `DOCKER_PLATFORMS` - all platforms used in docker build
@@ -1152,7 +1132,6 @@
     This allows to report from what repo the report is
     running even if its different from repos of individual
     chalk marks or when there are no chalk marks.
-
     - `_ORIGIN_URI`
     - `_BRANCH`
     - `_TAG`
@@ -1196,7 +1175,6 @@
   ([#286](https://github.com/crashappsec/chalk/pull/286))
 
 - New chalk configurations:
-
   - `docker.arch_binary_locations_path` - path where to
     auto-discover chalk binary locations for docker
     multi-platform builds.
@@ -1254,7 +1232,6 @@
   values related to signing backup service have changed.
 
   Removed attributes:
-
   - `use_signing_key_backup_service`
   - `signing_key_backup_service_url`
   - `signing_key_backup_service_auth_config_name`
@@ -1339,7 +1316,6 @@
 ### New Features
 
 - Chalk can now write two new keys to chalk marks and reports:
-
   - `COMMIT_MESSAGE`: the entire commit message of the most
     recent commit.
   - `TAG_MESSAGE`: the entire tag message of an annotated tag,
@@ -1457,7 +1433,6 @@
 - Adding support for git context for docker build commands.
   ([#86](https://github.com/crashappsec/chalk/pull/86))
 - Adding new git metadata fields about:
-
   - authored commit
   - committer
   - tag
@@ -1520,7 +1495,6 @@
   its own `ENTRYPOINT`. A later release will correctly
   inspect all base images and wrap `ENTRYPOINT` correctly.
 - This release does not support:
-
   - Mac x86_64 builds
   - Linux aarch64 builds
 
