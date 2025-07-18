@@ -1,4 +1,3 @@
-~docker.scan_context.run = true
 ~docker.prep_postexec    = true
 ~exec.postexec.run       = true
 
