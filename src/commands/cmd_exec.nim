@@ -24,6 +24,7 @@ import ".."/[
   utils/exec,
   utils/files,
   utils/sets,
+  utils/times,
 ]
 
 when hostOS == "macosx":
@@ -280,30 +281,34 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
     discard nice(cint(niceValue))
 
     let
-      inMicroSec   = int(attrGet[Con4mDuration]("exec.postexec.access_watch.initial_sleep_time"))
-      initialSleep = int(inMicroSec / 1000)
-    trace("postexec: sleeping " & $initialSleep & "ms")
-    sleep(initialSleep)
+      pollInMicroSec     = int(attrGet[Con4mDuration]("exec.postexec.access_watch.initial_poll_time"))
+      intervalInMicroSec = int(attrGet[Con4mDuration]("exec.postexec.access_watch.initial_poll_interval"))
+      pollMs             = int(pollInMicroSec / 1000)
+      intervalMs         = int(intervalInMicroSec / 1000)
+      start              = getMonoTime()
 
-    var buffer = newSeq[byte](8192)
-    while (
-      let n = read(ws.watcher, buffer[0].addr, 8192)
-      n
-    ) > 0:
-      for e in inotify_events(buffer[0].addr, n):
-        let
-          name = $cast[cstring](addr e[].name)
-          wd   = e[].wd
-        if wd notin ws.watchedDirs:
-          error("postexec: inotify notified for non-watched wd")
-        let
-          dir  = ws.watchedDirs[wd]
-          path = joinPath(dir, name)
-        if path in ws.toWatchPaths:
-          trace("postexec: found accessed artifact " & path)
-          accessedPaths.incl(path)
-        else:
-          trace("postexec: ignoring accessed non-artifact " & path)
+    trace("postexec: polling " & $pollMs & "ms every " & $intervalMs & "ms")
+    while (getMonoTime() - start).inMilliseconds <= pollMs:
+      sleep(intervalMs)
+      var buffer = newSeq[byte](8192)
+      while (
+        let n = read(ws.watcher, buffer[0].addr, 8192)
+        n
+      ) > 0:
+        for e in inotify_events(buffer[0].addr, n):
+          let
+            name = $cast[cstring](addr e[].name)
+            wd   = e[].wd
+          if wd notin ws.watchedDirs:
+            error("postexec: inotify notified for non-watched wd")
+          let
+            dir  = ws.watchedDirs[wd]
+            path = joinPath(dir, name)
+          if path in ws.toWatchPaths:
+            trace("postexec: found accessed artifact " & path)
+            accessedPaths.incl(path)
+          else:
+            trace("postexec: ignoring accessed non-artifact " & path)
 
   finally:
     discard close(ws.watcher)

@@ -2426,13 +2426,21 @@ pre-scan is stored in this temporary file.
 """
   }
 
-  field initial_sleep_time {
+  field initial_poll_time {
     type: Duration
     default: <<5sec>>
     doc:  """
-Initial sleep time for post exec to wait before checking which
+Initial poll time for how long post exec should be checking which
 artifacts were accessed. This should be sufficiently long
 to allow the primary exec process to access needed artifacts.
+"""
+  }
+
+  field initial_poll_interval {
+    type: Duration
+    default: <<10ms>>
+    doc:  """
+How often to poll for the accessed events.
 """
   }
 
