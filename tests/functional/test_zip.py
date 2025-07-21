@@ -24,7 +24,6 @@ JAR_FILE = ZIPS / "misc" / "test.jar"
 WAR_FILE = ZIPS / "misc" / "test.war"
 
 
-
 @pytest.mark.slow()
 @pytest.mark.parametrize(
     "copy_files",
@@ -140,7 +139,6 @@ def maybe_contains_chalk_binary(zip_path: Path, virtual: bool):
         else:
             # Verify the chalk binary was added
             return "chalk" in zip_ref.namelist()
-
 
 
 @pytest.mark.parametrize(
