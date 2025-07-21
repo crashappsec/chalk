@@ -261,7 +261,7 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
     return
 
   let pid = fork()
-  if pid == 0:
+  if pid != 0:
     # parent process
     return
 
