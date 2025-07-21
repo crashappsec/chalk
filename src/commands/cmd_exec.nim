@@ -268,10 +268,9 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   let ws            = state.get()
   var accessedPaths = initHashSet[string]()
 
-  clearReportingState()
-  initCollection()
-
   try:
+    clearReportingState()
+    initCollection()
     setCommandName("postexec")
     if detach:
       detachFromParent()
