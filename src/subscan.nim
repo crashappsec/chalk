@@ -61,7 +61,7 @@ proc runChalkSubScan*(location: seq[string],
     if savedLogLevel.isSome():
       setLogLevel(savedLogLevel.get())
 
-    setCommandName(oldCmd)
+    setCommandName(oldCmd, msg = "restoring from " & cmd & " to")
     setArgs(oldArgs)
     trace("subscan: found " & $len(result.allChalks) & " artifacts")
     trace("Subscan done. Restored command name to: " & oldCmd)

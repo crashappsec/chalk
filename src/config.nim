@@ -113,11 +113,11 @@ proc getChalkExeVersion*(): string =
 proc getChalkCommitId*(): string     = commitID
 proc getChalkPlatform*(): string     = osStr & " " & archStr
 proc getCommandName*(): string       = commandName
-proc setCommandName*(s: string) =
+proc setCommandName*(s: string, msg = "running") =
   ## Used when nesting operations.  For instance, when recursively
   ## chalking Zip files, we run a 'delete' over a copy of the Zip
   ## to calculate the unchalked hash.
-  trace("chalk: running " & s)
+  trace("chalk: " & msg & " " & s)
   commandName = s
 
 proc getChalkRuntime*(): ConfigState      = con4mRuntime.configState
