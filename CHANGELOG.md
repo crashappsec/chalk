@@ -104,11 +104,13 @@
   - `exec.postexec.run`
   - `exec.postexec.nice`
   - `exec.postexec.access_watch.prep_tmp_path`
-  - `exec.postexec.access_watch.initial_sleep_time`
+  - `exec.postexec.access_watch.initial_poll_time`
+  - `exec.postexec.access_watch.initial_poll_interval`
   - `exec.postexec.access_watch.scan_codecs`
   - `exec.postexec.access_watch.scan_paths`
 
-  ([#539](https://github.com/crashappsec/chalk/pull/539))
+  ([#539](https://github.com/crashappsec/chalk/pull/539),
+  [#548](https://github.com/crashappsec/chalk/pull/548))
 
 - `_OP_ARTIFACT_ACCESSED` key which indicates whether the artifact
   was accessed during chalk operation.
