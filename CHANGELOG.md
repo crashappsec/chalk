@@ -167,6 +167,10 @@
 
   ([#543](https://github.com/crashappsec/chalk/pull/543))
 
+- Chalk `color` configuration is now honored for logs.
+  Previously it was only honored for chalk pager outputs.
+  ([#549](https://github.com/crashappsec/chalk/pull/549))
+
 ## 0.5.7
 
 **May 22, 2025**

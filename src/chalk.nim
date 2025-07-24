@@ -36,8 +36,6 @@ when isMainModule:
   loadAllConfigs()         # confload.nim
   recursionCheck()         # norecurse.nim
   setupManagedTemp()       # utils/files.nim
-  if isatty(1) == 0:
-    setShowColor(false)
   limitFDCacheSize(attrGet[int]("cache_fd_limit"))
 
   # Wait for this warning until after configs load.

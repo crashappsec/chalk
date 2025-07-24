@@ -42,14 +42,15 @@ proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
 proc logBase(ll: string, args: seq[Box], s: ConfigState): Option[Box] =
   let
     msg      = unpack[string](args[0])
-    color    = s.attrLookup("color").get()
-    llevel   = s.attrLookup("log_level").get()
-
+    color    = s.attrLookup("color")
+    llevel   = s.attrLookup("log_level")
 
   # We probably don't need to check and set this every time. However,
   # the value CAN change across stacks.
-  setShowColor(unpack[bool](color))
-  setLogLevel(unpack[string](llevel))
+  if color.isSome():
+    setShowColor(unpack[bool](color.get()))
+  if llevel.isSome():
+    setLogLevel(unpack[string](llevel.get()))
 
   log(ll, msg)
 

@@ -33,12 +33,16 @@ if not using_tty() {
   color: false
   custom_report.terminal_chalk_time.enabled: false
   custom_report.terminal_other_op.enabled: false
+  trace("tty: chalk is running without TTY. Disabling color output and terminal custom reports.")
 } elif env_exists("NO_COLOR") {
   color: false
+  trace("tty: NO_COLOR disables colors")
 } elif env("TERM") == "dumb" {
   color: false
+  trace("tty: TERM=dump disables colors")
 } else {
   color: true
+  trace("tty: chalk is running with TTY")
 }
 
 if skip_summary_report {
