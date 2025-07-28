@@ -71,7 +71,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: crashappsec/action-checkout@main
+        uses: crashappsec/action-checkout@vatlidak/testing
         with:
           fetch-depth: 0
           profile: observe
