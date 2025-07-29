@@ -249,14 +249,12 @@ proc runCmdNoOutputCapture*(exe:       string,
                             args:      seq[string],
                             newStdIn = ""): int {.discardable.} =
   let execOutput = runCmdGetEverything(exe, args, newStdIn,
-                                       passthrough = true,
-                                       timeoutUsec = 0) # No timeout
+                                       passthrough = true)
   result = execOutput.getExit()
 
 proc runCmdExitCode*(exe: string, args: seq[string]): int {.discardable } =
   let execOutput = runCmdGetEverything(exe, args,
-                                       passthrough = false,
-                                       timeoutUsec = 0) # No timeout
+                                       passthrough = false)
   result = execOutput.getExit()
 
 type Redacted* = ref object
