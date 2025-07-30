@@ -171,6 +171,17 @@
   Previously it was only honored for chalk pager outputs.
   ([#549](https://github.com/crashappsec/chalk/pull/549))
 
+## 0.5.8
+
+**July 29, 2025**
+
+### Fixes
+
+- Fixes chalk calling subprocesses no longer polls for subprocess
+  IO with timeout of 0 which caused chalk pegging CPU
+  while polling for IO.
+  ([#550](https://github.com/crashappsec/chalk/pull/550))
+
 ## 0.5.7
 
 **May 22, 2025**
